@@ -96,11 +96,11 @@ function buildApp(): void {
     throw new Error("the replay path is not under test here");
   };
   const spend: GatewaySpendApp = {
-    spendEvents: () => GatewaySpendEventsService.create(repo),
-    budgetSpend: () => budgets,
+    getSpendEvents: () => GatewaySpendEventsService.create(repo),
+    getBudgetSpend: () => budgets,
     webhookEndpoints: () => ({ findDeliverable: refuse }),
-    webhookEvents: () => undefined,
-    webhookDelivery: () => undefined,
+    webhookEvents: refuse,
+    webhookDelivery: refuse,
     spendEventEnvelope: testEnvelope,
     endpointAcceptsEvent: () => true,
     settlementPolicy: () => FixedGatewaySettlementPolicyService.create(15 * 60_000),
@@ -115,7 +115,6 @@ function buildApp(): void {
         tenantIds,
         ...(virtualKeyId === undefined ? {} : { virtualKeyId }),
       }),
-    spendStoreUnavailable: () => new Error("the spend store is unreachable"),
   };
   app = mountSpendFamily(spend);
 }

@@ -407,9 +407,9 @@ export const fieldMappings: Record<string, FieldMapping> = {
 };
 
 /**
- * Get the CH field mapping for an ES field path
+ * The CH field mapping for an ES field path, from the fixed table
  */
-export function getFieldMapping(esField: string): FieldMapping | undefined {
+export function pickFieldMapping(esField: string): FieldMapping | undefined {
   return fieldMappings[esField];
 }
 
@@ -437,7 +437,7 @@ export function getColumnExpression(esField: string): string {
 /**
  * Check if a field requires a JOIN to a different table
  */
-export function requiresJoin(esField: string): CHTable | null {
+export function detectRequiredJoin(esField: string): CHTable | null {
   const table = getTableForField(esField);
   return table !== "trace_summaries" ? table : null;
 }

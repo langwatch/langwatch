@@ -1,7 +1,8 @@
-import type {
-  AnnotationQueueItem,
-  AnnotationQueueRecord,
-  AnnotationScore,
+import {
+  AnnotationScoreNotFoundError,
+  type AnnotationQueueItem,
+  type AnnotationQueueRecord,
+  type AnnotationScore,
 } from "@langwatch/annotation-contract";
 
 export type MemoryAnnotationQueue = AnnotationQueueRecord &
@@ -34,16 +35,21 @@ export class MemoryAnnotationQueueDatabase {
   replaceItems(items: readonly AnnotationQueueItem[]): void {
     this.#items = [...items];
   }
-  score(projectId: string, scoreId: string): AnnotationScore | undefined {
-    return this.#scores.get(`${projectId}:${scoreId}`);
+  getScore(projectId: string, scoreId: string): AnnotationScore {
+    const score = this.#scores.get(`${projectId}:${scoreId}`);
+    if (!score) throw new AnnotationScoreNotFoundError(scoreId);
+    return score;
+  }
+  findScores(projectId: string, scoreIds: readonly string[]): AnnotationScore[] {
+    return scoreIds.flatMap((id) => {
+      const score = this.#scores.get(`${projectId}:${id}`);
+      return score ? [score] : [];
+    });
   }
   scores(): readonly AnnotationScore[] {
     return [...this.#scores.values()];
   }
   replaceScore(score: AnnotationScore): void {
     this.#scores.set(`${score.projectId}:${score.id}`, score);
-  }
-  scoreName(projectId: string, scoreId: string): string | undefined {
-    return this.score(projectId, scoreId)?.name;
   }
 }

@@ -15,7 +15,25 @@ import { ReportScheduleService } from "../report-schedule.service.ts";
 
 /** Only the one read the reconcile sweep makes; the rest is not this test's subject. */
 function reportTargets(rows: ReportScheduleTarget[]): TriggerRepository {
-  return { findActiveReportTargets: async () => rows } as unknown as TriggerRepository;
+  const unused = (member: string) => () => {
+    throw new Error(`the reconcile sweep never calls TriggerRepository.${member}`);
+  };
+  return {
+    findActiveReportTargets: async () => rows,
+    findActiveForProject: unused("findActiveForProject"),
+    countUsage: unused("countUsage"),
+    claimSend: unused("claimSend"),
+    isSendClaimed: unused("isSendClaimed"),
+    findClaimedTraceIds: unused("findClaimedTraceIds"),
+    updateLastRunAt: unused("updateLastRunAt"),
+    findByIdOrThrow: unused("findByIdOrThrow"),
+    findById: unused("findById"),
+    findAllByProjectId: unused("findAllByProjectId"),
+    findByCustomGraphId: unused("findByCustomGraphId"),
+    findByCustomGraphIds: unused("findByCustomGraphIds"),
+    create: unused("create"),
+    update: unused("update"),
+  };
 }
 
 class Clock implements AutomationClock {

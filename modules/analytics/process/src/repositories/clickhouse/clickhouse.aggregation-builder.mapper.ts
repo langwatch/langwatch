@@ -35,7 +35,7 @@ import {
  * The `group_key` projection, or null when the query has no grouping. A column
  * that already answers for its own nulls keeps its own expression.
  */
-function groupKeyExpression({
+function buildGroupKeyExpression({
   groupByColumn,
   groupByHandlesUnknown,
 }: {
@@ -59,7 +59,7 @@ function isUniqOverTraceId(selectExpression: string): boolean {
  * Resolve which columns a joined table needs based on the SQL expressions that
  * reference it.
  */
-function resolveRequiredColumns(
+function deriveRequiredColumns(
   table: CHTable,
   expressions: string[],
 ): ReadonlySet<string> | undefined {
@@ -687,7 +687,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   ];
   const joinClauses = Array.from(allJoins)
     .map((table) => {
-      const requiredColumns = resolveRequiredColumns(table, allExpressions);
+      const requiredColumns = deriveRequiredColumns(table, allExpressions);
       // Both-periods regime: bound the stored_spans / evaluation_runs JOINs to
       // the same date envelope as the outer OccurredAt filter so they prune
       // partitions.
@@ -1008,7 +1008,7 @@ function buildMixedEvalTimeseriesQuery({
   const dateTrunc =
     typeof input.timeScale === "number" ? getDateTruncFunction(input.timeScale, timeZone) : null;
 
-  const groupKeyExpr = groupKeyExpression({ groupByColumn, groupByHandlesUnknown });
+  const groupKeyExpr = buildGroupKeyExpression({ groupByColumn, groupByHandlesUnknown });
 
   // Inner CTE: per-trace granularity. Trace-level columns are collapsed with
   // `any()` since they're constant per TraceId. Eval metrics keep their full
@@ -1716,7 +1716,7 @@ function buildSubqueryTimeseriesQuery({
 
   // Build group_key expression when groupBy is active, matching the pattern used in
   // buildArrayJoinTimeseriesQuery and the standard query path.
-  const groupKeyExpr = groupKeyExpression({ groupByColumn, groupByHandlesUnknown });
+  const groupKeyExpr = buildGroupKeyExpression({ groupByColumn, groupByHandlesUnknown });
 
   // Build CTEs for each subquery metric, one for current and one for previous period
   // Use 'cte_' prefix to ensure CTE names don't start with a digit (which is invalid SQL)
@@ -1997,7 +1997,7 @@ function buildDateBucketedPipelineQuery({
       WHEN ${ts}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)} THEN 'previous'
     END`;
 
-  const groupKeyExpr = groupKeyExpression({ groupByColumn, groupByHandlesUnknown });
+  const groupKeyExpr = buildGroupKeyExpression({ groupByColumn, groupByHandlesUnknown });
 
   const fullFilterWhere = filterWhere;
 
@@ -2064,7 +2064,7 @@ function buildDateBucketedPipelineQuery({
     ];
     const simpleJoinClauses = Array.from(simpleJoins)
       .map((table) => {
-        const requiredColumns = resolveRequiredColumns(table, allSimpleExprs);
+        const requiredColumns = deriveRequiredColumns(table, allSimpleExprs);
         // Both-periods regime: bound the stored_spans / evaluation_runs JOINs
         // to the date envelope.
         return buildJoinClause({
@@ -2497,7 +2497,7 @@ export function buildDataForFilterQuery({
   const filterExpressions = [filterTranslation.whereClause];
   const filterJoins = Array.from(filterTranslation.requiredJoins)
     .map((table) => {
-      const requiredColumns = resolveRequiredColumns(table, filterExpressions);
+      const requiredColumns = deriveRequiredColumns(table, filterExpressions);
       // Start/end regime: bound the stored_spans / evaluation_runs JOINs to
       // the date envelope.
       return buildJoinClause({

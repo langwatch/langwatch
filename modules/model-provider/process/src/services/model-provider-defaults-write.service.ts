@@ -58,8 +58,8 @@ export class ModelProviderDefaultsWriteService {
 
   async save(input: ModelDefaultConfigWriteInput): Promise<ModelDefaultConfig> {
     const parsed = modelDefaultConfigWriteInputSchema.parse(input);
-    const existing = parsed.id ? await this.options.defaults.tryGetById(parsed.id) : null;
-    this.assertExistingConfig(parsed.id, existing);
+    const existing = parsed.id ? await this.options.defaults.getById(parsed.id) : null;
+    this.assertExistingConfig(existing);
 
     if (parsed.scopes?.length === 0) {
       return this.deleteEmptyConfig(parsed.actorId, existing);
@@ -103,13 +103,13 @@ export class ModelProviderDefaultsWriteService {
     });
   }
 
-  tryGet(input: { id: string }): Promise<ModelDefaultConfig | null> {
-    return this.options.defaults.tryGetById(input.id);
+  getById(input: { id: string }): Promise<ModelDefaultConfig> {
+    return this.options.defaults.getById(input.id);
   }
 
   async delete(input: ModelDefaultDeleteInput): Promise<void> {
-    const existing = await this.options.defaults.tryGetById(input.id);
-    if (!existing || existing.scopes.length === 0) {
+    const existing = await this.options.defaults.getById(input.id);
+    if (existing.scopes.length === 0) {
       throw new ModelDefaultNotFoundError();
     }
 
@@ -120,11 +120,7 @@ export class ModelProviderDefaultsWriteService {
     await this.options.defaults.delete(input.id);
   }
 
-  private assertExistingConfig(id: string | undefined, existing: ModelDefaultConfig | null): void {
-    if (id && !existing) {
-      throw new ModelDefaultNotFoundError();
-    }
-
+  private assertExistingConfig(existing: ModelDefaultConfig | null): void {
     if (existing && existing.scopes.length === 0) {
       throw new ModelDefaultNotFoundError();
     }

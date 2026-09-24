@@ -57,20 +57,19 @@ const nodeHost = {
   useEntryDatasetTotal: () => null,
 } as never;
 
-const codeNode = (): Node =>
-  ({
-    id: "code1",
-    type: "code",
-    position: { x: 0, y: 0 },
-    data: {
-      name: "code1",
-      inputs: [],
-      outputs: [],
-      parameters: [
-        { identifier: "code", type: "code", value: "class Code1(dspy.Module):\n    pass\n" },
-      ],
-    },
-  }) as unknown as Node;
+const codeNode = (): Node => ({
+  id: "code1",
+  type: "code",
+  position: { x: 0, y: 0 },
+  data: {
+    name: "code1",
+    inputs: [],
+    outputs: [],
+    parameters: [
+      { identifier: "code", type: "code", value: "class Code1(dspy.Module):\n    pass\n" },
+    ],
+  },
+});
 
 const renderPanel = () =>
   render(

@@ -81,6 +81,8 @@ export default function EditTraceCheck() {
         mappings: check.data.mappings as CheckConfigFormData["mappings"],
       }
     : undefined;
+  const checkFailed = !check.isLoading && check.isError;
+  const checkReady = !check.isLoading && !check.isError;
 
   return (
     <Box width="full">
@@ -137,7 +139,7 @@ export default function EditTraceCheck() {
             </Menu.Root>
           </HStack>
 
-          {check.isLoading ? (
+          {check.isLoading && (
             <Card.Root width="full">
               <Card.Body>
                 <VStack gap={4} width="full">
@@ -147,12 +149,14 @@ export default function EditTraceCheck() {
                 </VStack>
               </Card.Body>
             </Card.Root>
-          ) : check.isError ? (
+          )}
+          {checkFailed && (
             <Alert.Root status="error">
               <Alert.Indicator />
               <Alert.Content>An error has occurred trying to load the check configs</Alert.Content>
             </Alert.Root>
-          ) : (
+          )}
+          {checkReady && (
             <CheckConfigForm
               checkId={checkId}
               defaultValues={defaultValues}

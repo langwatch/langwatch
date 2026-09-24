@@ -198,11 +198,11 @@ function filterLabel({
     const project = available.projects.find((candidate) => candidate.id === currentProjectId);
     return project ? `Project: ${project.name}` : "This Project";
   }
-  const prefix =
-    filter.scopeType === "ORGANIZATION"
-      ? "Organization"
-      : filter.scopeType === "TEAM"
-        ? "Team"
-        : "Project";
-  return `${prefix}: ${filter.name}`;
+  return `${scopeTypePrefix(filter.scopeType)}: ${filter.name}`;
+}
+
+function scopeTypePrefix(scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"): string {
+  if (scopeType === "ORGANIZATION") return "Organization";
+  if (scopeType === "TEAM") return "Team";
+  return "Project";
 }

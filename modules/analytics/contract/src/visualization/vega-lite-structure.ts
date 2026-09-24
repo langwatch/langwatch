@@ -35,7 +35,7 @@ export function measureUtf8Bytes(text: string): number {
  * serialized at all (cycles, or nesting deep enough to defeat `JSON.stringify`),
  * which callers treat as a refusal rather than as "small enough".
  */
-export function measureSpecBytes(spec: unknown): number | null {
+export function computeSpecBytes(spec: unknown): number | null {
   try {
     const json = JSON.stringify(spec);
     if (typeof json !== "string") return null;
@@ -57,7 +57,7 @@ export function measureJsonDepth(root: unknown, ceiling: number): number {
   while (stack.length > 0) {
     const entry = stack.pop();
     if (!entry) break;
-    const children = childValuesOf(entry.value);
+    const children = extractChildValues(entry.value);
     if (children === null) continue;
 
     deepest = Math.max(deepest, entry.depth);
@@ -71,7 +71,7 @@ export function measureJsonDepth(root: unknown, ceiling: number): number {
 }
 
 /** Container children, or `null` when the value is a scalar. */
-function childValuesOf(value: unknown): unknown[] | null {
+function extractChildValues(value: unknown): unknown[] | null {
   if (Array.isArray(value)) return value;
   if (isPlainObject(value)) return Object.values(value);
   return null;
@@ -255,7 +255,7 @@ function collectFrom({
     node,
     isUnit: "mark" in node,
     datasetName: context.datasetName,
-    declaredDatasetName: declaredDatasetNameOf(node),
+    declaredDatasetName: extractDeclaredDatasetName(node),
     dataPath: context.dataPath,
     repeatFields: context.repeatFields,
   });
@@ -266,7 +266,7 @@ function collectFrom({
 }
 
 /** The dataset a node names itself, or `null` when its `data` names none. */
-function declaredDatasetNameOf(node: Record<string, unknown>): string | null {
+function extractDeclaredDatasetName(node: Record<string, unknown>): string | null {
   const data = node.data;
   return isPlainObject(data) && typeof data.name === "string" ? data.name : null;
 }
@@ -283,7 +283,7 @@ function extendContext({
   const declaresData = isPlainObject(node.data);
 
   return {
-    datasetName: declaresData ? declaredDatasetNameOf(node) : inherited.datasetName,
+    datasetName: declaresData ? extractDeclaredDatasetName(node) : inherited.datasetName,
     dataPath: declaresData ? joinPointer(path, "data") : inherited.dataPath,
     repeatFields: {
       ...inherited.repeatFields,

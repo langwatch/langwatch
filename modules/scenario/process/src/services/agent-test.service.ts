@@ -12,6 +12,7 @@ import type {
   AgentTestRunResult,
   AgentTestTurnResult,
 } from "@langwatch/agent-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -20,7 +21,7 @@ import { AgentRole, type AgentInput } from "@langwatch/scenario";
 import {
   AGENT_TEST_SCENARIO_ID,
   agentTestScenarioConfig,
-  agentTestTarget,
+  mapAgentTestTarget,
   generateBatchRunId,
   generateScenarioRunId,
   getAgentTestSetId,
@@ -144,7 +145,7 @@ export class AgentTestService {
     projectId: string;
     actor: RunActor | undefined;
   }): Promise<TargetConfig> {
-    const target = agentTestTarget(input.agent);
+    const target = mapAgentTestTarget(input.agent);
     if (!target) {
       throw new AgentTestRefusedError({ reason: NOT_TESTABLE_REASON });
     }
@@ -184,11 +185,15 @@ export class AgentTestService {
     projectId: string;
     target: TargetConfig;
   }): Promise<AdapterRead> {
-    const result = await this.targetPrefetch.fetch({
-      projectId: input.projectId,
-      target: input.target,
-      runSecretValues: {},
-    });
+    const result = await this.targetPrefetch
+      .getTargetAdapter({ projectId: input.projectId, target: input.target, runSecretValues: {} })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "scenario_target_not_found") {
+          return null;
+        }
+
+        throw error;
+      });
     if (result === null) {
       return null;
     }
@@ -279,7 +284,7 @@ export class AgentTestService {
       throw new AgentTestRefusedError({ reason: CONNECTED_RUN_NOT_QUEUEABLE_REASON });
     }
 
-    // `agentTestTarget` never answers "prompt"; only "connected" was excluded
+    // `mapAgentTestTarget` never answers "prompt"; only "connected" was excluded
     // above, so what remains is exactly what a run can queue.
     const queueableTarget = target as QueueableTarget;
 

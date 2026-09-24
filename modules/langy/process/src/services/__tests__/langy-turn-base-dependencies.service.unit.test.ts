@@ -50,7 +50,7 @@ function makeFixture(over: Partial<LangyTurnServiceDeps> = {}) {
       mint: vi.fn(async () => ({ token: "session-key", apiKeyId: "key-1" })),
       revoke: vi.fn(async () => undefined),
     },
-    context: { tryRender: vi.fn(() => null) },
+    context: { render: vi.fn(() => null) },
     uiActionSurface: { resolve: vi.fn(async () => true) },
     metrics: { count: vi.fn() },
     admission: {

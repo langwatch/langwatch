@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { WORKBENCH_ACTION_KINDS } from "../manifest.ts";
 import {
-  narrateWorkbenchAction,
+  pickWorkbenchActionNarration,
   narrateWorkbenchRun,
   WORKBENCH_ACTION_NARRATION,
 } from "../narration.ts";
@@ -16,7 +16,7 @@ describe("workbench action narration", () => {
     /** @scenario "An action being applied says which one" */
     it("has words for every one of them", () => {
       for (const kind of WORKBENCH_ACTION_KINDS) {
-        expect(narrateWorkbenchAction(kind), kind).toBeTruthy();
+        expect(pickWorkbenchActionNarration(kind), kind).toBeTruthy();
       }
     });
 
@@ -42,7 +42,7 @@ describe("workbench action narration", () => {
 
   describe("given an unknown kind", () => {
     it("says nothing rather than guessing", () => {
-      expect(narrateWorkbenchAction("workbench.notAThing")).toBeNull();
+      expect(pickWorkbenchActionNarration("workbench.notAThing")).toBeNull();
     });
   });
 

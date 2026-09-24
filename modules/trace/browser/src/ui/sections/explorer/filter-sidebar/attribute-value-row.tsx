@@ -4,6 +4,12 @@ import { memo } from "react";
 
 import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button.tsx";
 
+function attributeAriaChecked(state: FacetValueState): boolean | "mixed" {
+  if (state === "include") return true;
+  if (state === "exclude") return "mixed";
+  return false;
+}
+
 export const AttributeValueRow = memo(function AttributeValueRow({
   attrKey,
   value,
@@ -28,7 +34,7 @@ export const AttributeValueRow = memo(function AttributeValueRow({
     <RowButton
       type="button"
       role="checkbox"
-      aria-checked={isInclude ? true : isExclude ? "mixed" : false}
+      aria-checked={attributeAriaChecked(state)}
       position="relative"
       width="full"
       paddingY={1}

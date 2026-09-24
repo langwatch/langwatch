@@ -23,7 +23,7 @@ import {
   VEGA_LITE_SCHEMA_URL,
   validateAgainstVegaLiteSchema,
 } from "../vega-lite-schema.ts";
-import { collectViewNodes, measureSpecBytes } from "../vega-lite-structure.ts";
+import { collectViewNodes, computeSpecBytes } from "../vega-lite-structure.ts";
 import { LWQL_VEGA_RULE_IDS, VEGA_VALIDATION_ERROR_CODES } from "../visualization-types.ts";
 
 /** `…/visualization/__tests__` → `…/visualization` */
@@ -116,7 +116,7 @@ describe("the Vega-Lite validator and policy modules", () => {
         ).toEqual([]);
         expect(screenVegaExpression("datum.a + 1").forbiddenIdentifiers).toEqual([]);
         expect(collectViewNodes({ mark: "bar" })).toHaveLength(1);
-        expect(measureSpecBytes({ a: 1 })).toBe(7);
+        expect(computeSpecBytes({ a: 1 })).toBe(7);
         expect(parseVegaLiteSpecText("{}").ok).toBe(true);
         expect(typeof createNoNetworkVegaLoader().load).toBe("function");
       });

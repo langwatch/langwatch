@@ -31,7 +31,39 @@ import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
-import { SourceComposerDrawer, SourceEditDrawer } from "../governance-inventory.screen.tsx";
+import {
+  type ComposerState,
+  SourceComposerDrawer,
+  SourceEditDrawer,
+} from "../governance-inventory.screen.tsx";
+import type { Source } from "../ingestion-source-forms.ts";
+
+function sourceRow(overrides: Partial<Source>): Source {
+  return {
+    id: "src_test",
+    organizationId: "org_acme",
+    teamId: null,
+    sourceType: "otel_generic",
+    name: "Test source",
+    description: null,
+    parserConfig: {},
+    hasPollerCursor: false,
+    pullSchedule: null,
+    status: "active",
+    traceProjectId: null,
+    traceProjectArchived: false,
+    lastEventAt: null,
+    archivedAt: null,
+    createdAt: "2026-03-01T00:00:00.000Z",
+    updatedAt: "2026-03-01T00:00:00.000Z",
+    createdById: null,
+    errorCount: 0,
+    lastRunCompleteness: null,
+    pullStatus: null,
+    lastSuccessAt: null,
+    ...overrides,
+  };
+}
 
 /**
  * `OttlEditor` calls tRPC on render and is not what this file is about, so it
@@ -70,15 +102,13 @@ const DESTINATION_CTX = {
   availableProjects: [{ id: "proj_analytics", name: "Analytics · Data", teamId: "team_data" }],
 };
 
-type ComposerState = Parameters<typeof SourceComposerDrawer>[0]["composer"];
-
 /**
  * The composer holds its state in the page above it, which is exactly the
  * property under test when the Advanced group unmounts its contents. So the
  * harness holds it the same way rather than passing a frozen object.
  */
-function ComposerHarness({ sourceType }: { sourceType: string }) {
-  const [composer, setComposer] = useState({
+function ComposerHarness({ sourceType }: { sourceType: ComposerState["sourceType"] }) {
+  const [composer, setComposer] = useState<ComposerState>({
     sourceType,
     name: "",
     description: "",
@@ -86,7 +116,7 @@ function ComposerHarness({ sourceType }: { sourceType: string }) {
     ottlStatements: [],
     pullSchedule: "",
     traceProjectId: null,
-  } as unknown as ComposerState);
+  });
   return (
     <SourceComposerDrawer
       isOpen
@@ -104,7 +134,7 @@ function ComposerHarness({ sourceType }: { sourceType: string }) {
   );
 }
 
-const renderComposer = (sourceType = "databricks_genie") =>
+const renderComposer = (sourceType: ComposerState["sourceType"] = "databricks_genie") =>
   renderWithGovernanceHost(<ComposerHarness sourceType={sourceType} />, {
     host: fakeGovernanceHost(),
   });
@@ -139,7 +169,7 @@ const openAdvanced = async ({
  * place. This type also declares no advanced parser field of its own, which
  * makes it the case that proves the group appears for the extras alone.
  */
-const editableSource = {
+const editableSource = sourceRow({
   id: "src_anthropic",
   name: "Anthropic admin",
   description: "Spend from the Anthropic admin API",
@@ -148,7 +178,7 @@ const editableSource = {
   traceProjectId: null,
   traceProjectArchived: false,
   hasPollerCursor: false,
-} as unknown as Parameters<typeof SourceEditDrawer>[0]["source"];
+});
 
 /**
  * A push source. It offers neither setting: `routesConversations` excludes
@@ -156,7 +186,7 @@ const editableSource = {
  * drawer must show no Advanced group at all rather than an empty one — a
  * disclosure that opens onto nothing is worse than no disclosure.
  */
-const pushSource = {
+const pushSource = sourceRow({
   id: "src_otel",
   name: "Fleet telemetry",
   description: "Anything that speaks OTLP",
@@ -165,7 +195,7 @@ const pushSource = {
   traceProjectId: null,
   traceProjectArchived: false,
   hasPollerCursor: false,
-} as unknown as Parameters<typeof SourceEditDrawer>[0]["source"];
+});
 
 /**
  * A Genie source: the only shape in which the edit drawer offers a
@@ -175,7 +205,7 @@ const pushSource = {
  * destination down a path that renders no parser fields — which is why the
  * group cannot simply belong to them.
  */
-const routingSource = {
+const routingSource = sourceRow({
   id: "src_genie",
   name: "Genie fleet",
   description: "Conversations from the Genie workspace",
@@ -184,7 +214,7 @@ const routingSource = {
   traceProjectId: null,
   traceProjectArchived: false,
   hasPollerCursor: false,
-} as unknown as Parameters<typeof SourceEditDrawer>[0]["source"];
+});
 
 const renderEditDrawer = (source = editableSource) =>
   renderWithGovernanceHost(

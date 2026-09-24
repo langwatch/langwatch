@@ -4,6 +4,7 @@
  * organization a tenant routes by, for all three kinds of tenant.
  */
 import { PLATFORM_TENANT } from "@langwatch/clickhouse-client";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
 import { TenantDirectoryService, type TenantOwnershipReader } from "../tenant-directory.service.ts";
@@ -15,9 +16,11 @@ function directoryOver(world: {
 }) {
   const asked: string[] = [];
   const reader: TenantOwnershipReader = {
-    tryFindProjectOrganizationId: async (tenantId) => {
+    getProjectOrganizationId: async (tenantId) => {
       asked.push(`project:${tenantId}`);
-      return world.projects?.[tenantId] ?? null;
+      const organizationId = world.projects?.[tenantId];
+      if (organizationId === undefined) throw new ProjectNotFoundError();
+      return organizationId;
     },
     organizationExists: async (tenantId) => {
       asked.push(`organization:${tenantId}`);

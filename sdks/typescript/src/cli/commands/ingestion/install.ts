@@ -299,13 +299,7 @@ function renderHumanReport(report: InstallReport): void {
     process.stdout.write(`${chalk.green("✓")} LangWatch Claude Code plugin ${pluginVerb}\n`);
   }
 
-  if (report.codex_turn_harvest_action === "installed") {
-    process.stdout.write(
-      `${chalk.green("✓")} Codex will record each turn's conversation as it completes\n`,
-    );
-  } else if (report.codex_turn_harvest_action === "blocked") {
-    process.stdout.write(`${chalk.yellow("!")} ${CODEX_TURN_HARVEST_BLOCKED_MESSAGE}\n`);
-  }
+  renderCodexTurnHarvest(report);
 
   if (report.session_hooks_action) {
     const hooksVerb =
@@ -322,6 +316,16 @@ function renderHumanReport(report: InstallReport): void {
   }
 
   renderToolInstallationNotes(report);
+}
+
+function renderCodexTurnHarvest(report: InstallReport): void {
+  if (report.codex_turn_harvest_action === "installed") {
+    process.stdout.write(
+      `${chalk.green("✓")} Codex will record each turn's conversation as it completes\n`,
+    );
+  } else if (report.codex_turn_harvest_action === "blocked") {
+    process.stdout.write(`${chalk.yellow("!")} ${CODEX_TURN_HARVEST_BLOCKED_MESSAGE}\n`);
+  }
 }
 
 function renderToolInstallationNotes(report: InstallReport): void {

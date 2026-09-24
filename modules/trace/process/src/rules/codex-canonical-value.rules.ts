@@ -32,13 +32,14 @@ export const asNumber = (raw: unknown): number | null => {
 export const asString = (raw: unknown): string | null =>
   typeof raw === "string" && raw.length > 0 ? raw : null;
 
-export const positiveOrNull = (n: number | null): number | null => (n !== null && n > 0 ? n : null);
+export const toPositiveOrNull = (n: number | null): number | null =>
+  n !== null && n > 0 ? n : null;
 
 export type CanonicalLift = readonly [string, string | number | null];
 
 export const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export function conversationIdOf(attrs: {
+export function extractConversationId(attrs: {
   get: (key: string) => unknown;
   take: (key: string) => unknown;
 }): string | null {
@@ -47,7 +48,7 @@ export function conversationIdOf(attrs: {
   return sessionId !== null && UUID_SHAPE.test(sessionId) ? sessionId : turnId;
 }
 
-export function nonCachedInput({
+export function computeNonCachedInput({
   attrs,
   cacheRead,
   cacheCreation,

@@ -5,6 +5,17 @@ import { nowInstant, toEpochMs } from "@langwatch/time";
 import type { Experiment, Project } from "@langwatch/workflow-contract";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+const runsRefetchInterval = ({
+  keepFetching,
+  isSomeRunning,
+}: {
+  keepFetching: boolean;
+  isSomeRunning: boolean;
+}): number => {
+  if (keepFetching) return 1;
+  return isSomeRunning ? 3000 : 10_000;
+};
+
 /**
  * Duplicated from `ui/elements/.../batch-evaluation-summary.tsx` — behavior/
  * may not import ui/ (layer order). Same 5-line body, two owners.
@@ -78,7 +89,7 @@ export const useBatchEvaluationState = ({
       experimentId: experiment?.id ?? "",
     },
     {
-      refetchInterval: keepFetching ? 1 : isSomeRunning ? 3000 : 10_000,
+      refetchInterval: runsRefetchInterval({ keepFetching, isSomeRunning }),
       enabled: !!project && !!experiment,
     },
   );
@@ -118,15 +129,10 @@ export const useBatchEvaluationState = ({
   }, [selectedRun]);
 
   useEffect(() => {
-    if (
-      batchEvaluationRuns.data?.runs.some(
-        (r: any) => getFinishedAt(r.timestamps, nowInstant().epochMilliseconds) === undefined,
-      )
-    ) {
-      setIsSomeRunning(true);
-    } else {
-      setIsSomeRunning(false);
-    }
+    const hasUnfinishedRun = batchEvaluationRuns.data?.runs.some(
+      (r: any) => getFinishedAt(r.timestamps, nowInstant().epochMilliseconds) === undefined,
+    );
+    setIsSomeRunning(!!hasUnfinishedRun);
   }, [batchEvaluationRuns.data?.runs]);
 
   return {

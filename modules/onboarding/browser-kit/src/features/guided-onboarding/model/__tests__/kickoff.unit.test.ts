@@ -82,7 +82,7 @@ describe("the guided onboarding kickoff", () => {
     });
   });
 
-  describe("settling the kickoff against stored state", () => {
+  describe("when settling the kickoff against stored state", () => {
     /** @scenario "The kickoff settles its state lines from the durable record before the turn starts" */
     it("replaces the sent state fields with the stored facts and rebuilds the brief", () => {
       const [typed, brief] = buildGuidedKickoffParts({ input: KICKOFF });
@@ -101,7 +101,7 @@ describe("the guided onboarding kickoff", () => {
     });
   });
 
-  describe("planning the send", () => {
+  describe("when planning the send", () => {
     it("attaches a fresh kickoff to the organization and does not attach a continuation", () => {
       const fresh = planGuidedKickoffSend({ kickoff: KICKOFF, organizationId: "org_1" });
       expect(fresh.continuing).toBe(false);
@@ -116,7 +116,7 @@ describe("the guided onboarding kickoff", () => {
     });
   });
 
-  describe("the tour card rows", () => {
+  describe("when building the tour card rows", () => {
     it("always shows who it is setting up for and the picks, and the provider only once recorded", () => {
       const withoutProvider = guidedTourCardRows({ ...KICKOFF, provider: undefined });
       expect(withoutProvider).toEqual([

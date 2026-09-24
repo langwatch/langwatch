@@ -14,7 +14,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import WebSocket from "ws";
 
 import { createConnectedAgentFixture } from "../../__tests__/connected-agent.fixture.ts";
-import { resultCapViolation } from "../../rules/connected-agent-caps.rules.ts";
+import { detectResultCapViolation } from "../../rules/connected-agent-caps.rules.ts";
 import { UNREADABLE_RESULT_MESSAGE } from "../../rules/connected-agent-frame.rules.ts";
 import type { AgentService } from "../../services/agent.service.ts";
 import type { ConnectedAgentCredentials } from "../../services/connected-agent-credential.service.ts";
@@ -59,19 +59,19 @@ const fakeCredentials: ConnectedAgentCredentials = {
   },
 };
 
-describe("resultCapViolation", () => {
+describe("detectResultCapViolation", () => {
   const caps = relayPayloadCaps(1);
 
   describe("when the output is above the result cap", () => {
     /** @scenario "A result above the result cap is refused" */
     it("names the result cap", () => {
       const output = "x".repeat(caps.resultBytes + 10);
-      expect(resultCapViolation({ output, session: undefined, caps })).toEqual({
+      expect(detectResultCapViolation({ output, session: undefined, caps })).toEqual({
         what: "result",
         sizeBytes: expect.any(Number),
         limitBytes: caps.resultBytes,
       });
-      expect(resultCapViolation({ output: "small", session: undefined, caps })).toBeNull();
+      expect(detectResultCapViolation({ output: "small", session: undefined, caps })).toBeNull();
     });
   });
 
@@ -79,12 +79,12 @@ describe("resultCapViolation", () => {
     /** @scenario "A session above the session cap is refused" */
     it("names the session cap", () => {
       const session = { token: "y".repeat(caps.sessionBytes + 10) };
-      expect(resultCapViolation({ output: "ok", session, caps })).toEqual({
+      expect(detectResultCapViolation({ output: "ok", session, caps })).toEqual({
         what: "session",
         sizeBytes: expect.any(Number),
         limitBytes: caps.sessionBytes,
       });
-      expect(resultCapViolation({ output: "ok", session: { id: "s1" }, caps })).toBeNull();
+      expect(detectResultCapViolation({ output: "ok", session: { id: "s1" }, caps })).toBeNull();
     });
   });
 });

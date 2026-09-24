@@ -116,7 +116,7 @@ export const resolveGrowthEventsPriceId = ({
  * Dollars only, and absent until the meter behind it is provisioned: failing a
  * checkout over another feature's meter would block every Growth signup.
  */
-export const resolveGrowthInstantEvalPriceId = ({
+export const pickGrowthInstantEvalPriceId = ({
   currency,
   prices,
 }: {
@@ -150,7 +150,7 @@ export const createCheckoutLineItems = ({
   if (coreMembers < 1) {
     throw new InvalidSeatCountError(coreMembers);
   }
-  const instantEvalPriceId = resolveGrowthInstantEvalPriceId({ currency, prices });
+  const instantEvalPriceId = pickGrowthInstantEvalPriceId({ currency, prices });
 
   return [
     {

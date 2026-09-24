@@ -75,7 +75,7 @@ export class OtlpSpanTokenEstimationService {
       return null;
     }
 
-    const tokens = await this.deps.tokenizer.countTokens(model, text);
+    const tokens = await this.deps.tokenizer.computeTokenCount(model, text);
     if (tokens === undefined) {
       return null;
     }

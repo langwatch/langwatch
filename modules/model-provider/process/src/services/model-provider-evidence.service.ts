@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { modelProviderListProjectInputSchema } from "@langwatch/model-provider-contract";
 
 import type { ModelCostProjectScope } from "../app/model-provider.members.ts";
@@ -23,8 +24,12 @@ export class ModelProviderEvidenceService {
 
   async hasEnabledProvider(input: { projectId: string }): Promise<boolean> {
     const { projectId } = modelProviderListProjectInputSchema.parse(input);
-    const projectScopes = await this.scopes.tryGetProjectScopes(projectId);
-
-    return projectScopes ? this.providers.hasEnabledForScopes(projectScopes) : false;
+    return this.scopes
+      .getProjectScopes(projectId)
+      .then((projectScopes) => this.providers.hasEnabledForScopes(projectScopes))
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "project_not_found") return false;
+        throw error;
+      });
   }
 }

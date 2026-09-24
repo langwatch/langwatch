@@ -54,7 +54,7 @@ const CANONICAL_KEYS: ReadonlySet<string> = new Set([
   "conversation",
 ]);
 
-const autoparseContexts = (contexts: unknown): string[] | undefined => {
+const parseContexts = (contexts: unknown): string[] | undefined => {
   if (contexts === null || contexts === undefined) return undefined;
   const parsedContexts = Array.isArray(contexts) ? contexts : [contexts];
 
@@ -76,8 +76,8 @@ export const getEvaluatorDataForParams = (
 
   const data_ = defaultEvaluatorInputSchema.parse({
     ...params,
-    contexts: autoparseContexts(params.contexts),
-    expected_contexts: autoparseContexts(params.expected_contexts),
+    contexts: parseContexts(params.contexts),
+    expected_contexts: parseContexts(params.expected_contexts),
   });
 
   // Preserve evaluator-specific fields (e.g. pairwise's candidate_a_id /
@@ -241,7 +241,7 @@ function promoteTargetType(
  * An SDK batch's targets, with a `type` carried in `metadata` promoted to the
  * target's own field. Null where the batch named no targets at all.
  */
-export const processTargets = (
+export const normalizeTargets = (
   targets: ESBatchEvaluationRESTParams["targets"],
 ): ESBatchEvaluationTarget[] | null => {
   if (!targets || targets.length === 0) return null;

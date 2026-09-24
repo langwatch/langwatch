@@ -59,7 +59,7 @@ export class ExperimentWorkbenchTargetNamesService {
 
       const names: Record<string, string> = {};
       for (const target of targets) {
-        const entity = entityFor({ target, prompts, agents, evaluators });
+        const entity = pickTargetEntity({ target, prompts, agents, evaluators });
         const name = pickTargetName({ target, entity, isLoading: false });
         if (name) {
           names[target.id] = name;
@@ -143,7 +143,7 @@ const loadPrompts = async ({
   return byId;
 };
 
-const entityFor = ({
+const pickTargetEntity = ({
   target,
   prompts,
   agents,

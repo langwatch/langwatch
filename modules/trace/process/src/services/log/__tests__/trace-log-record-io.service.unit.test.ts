@@ -26,7 +26,7 @@ function record(overrides: Partial<LogRecordReceivedEventData>): LogRecordReceiv
     scopeVersion: null,
     piiRedactionLevel: "STRICT",
     ...overrides,
-  } as unknown as LogRecordReceivedEventData;
+  };
 }
 
 const SPRING_AI_SCOPE =

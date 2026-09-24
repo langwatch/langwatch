@@ -13,6 +13,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 
 import type { Event } from "../../domain/types.ts";
 import { EventSourcedQueueProcessorMemory } from "../../queues/memory.ts";
+import type { ReplayEvent } from "../../replay/replayEventSource.ts";
 import { replayEvents } from "../../replay/replayExecutor.ts";
 import {
   createMockEventStore,
@@ -138,11 +139,7 @@ describe("event-subscriber runtime boundary", () => {
       expect(registry.has("test-pipeline:subscriber:conversationProcess")).toBe(true);
       // …and received the exact committed event the store persisted (the queue
       // carries the full envelope, trace-metadata enrichment included).
-      const committedEvent = (
-        eventStore.storeEvents as unknown as {
-          mock: { calls: [readonly Event[]][] };
-        }
-      ).mock.calls[0]![0]![0]!;
+      const committedEvent = eventStore.storeEvents.mock.calls[0]![0]![0]!;
       expect(handled).toHaveLength(1);
       expect(handled[0]!.event).toEqual(committedEvent);
       expect(handled[0]!.event.id).toBe("evt-full-payload");
@@ -212,7 +209,7 @@ describe("event-subscriber runtime boundary", () => {
       // queue does on retry: re-run the subscriber's registry entry.
       const subscriberEntry = registry.get("test-pipeline:subscriber:conversationProcess");
       expect(subscriberEntry).toBeDefined();
-      await subscriberEntry!.process(event as unknown as Record<string, unknown>);
+      await subscriberEntry!.process(event);
 
       expect(handled).toHaveLength(2); // subscriber retried and succeeded
       expect(applied).toHaveLength(1); // projection NOT reapplied by the retry
@@ -247,7 +244,11 @@ describe("event-subscriber runtime boundary", () => {
       // The real replay execution primitive rebuilds the fold from events.
       const processed = await replayEvents({
         projection: fold,
-        events: events as unknown as Parameters<typeof replayEvents>[0]["events"],
+        events: events.map((event): ReplayEvent => ({
+          ...event,
+          timestamp: event.createdAt,
+          idempotencyKey: event.idempotencyKey ?? event.id,
+        })),
       });
 
       expect(processed).toBe(2);

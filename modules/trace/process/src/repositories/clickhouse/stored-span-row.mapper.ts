@@ -14,7 +14,7 @@ const DECIMAL_NUMBER_RE = /^-?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 const logger = createLogger("langwatch:trace:stored-span-row-codec");
 
 /** A ClickHouse Nullable(Float) as a number, or null when it is absent or unparseable. */
-function nullableFloat(raw: number | string | null | undefined): number | null {
+function toNullableFloat(raw: number | string | null | undefined): number | null {
   if (raw === null || raw === undefined || raw === "") return null;
   const n = typeof raw === "string" ? Number(raw) : raw;
   return Number.isFinite(n) ? n : null;
@@ -33,7 +33,7 @@ function validateSpanKind(value: number): NormalizedSpanKind {
   return NormalizedSpanKind.INTERNAL;
 }
 
-function validateStatusCode(value: number | null): NormalizedStatusCode | null {
+function normalizeStatusCode(value: number | null): NormalizedStatusCode | null {
   if (value === null) return null;
   if (VALID_STATUS_CODES.has(value)) return value as NormalizedStatusCode;
   logger.warn({ value }, "Unknown StatusCode from ClickHouse, defaulting to UNSET");
@@ -208,7 +208,7 @@ export function mapChRowToNormalized(row: FullSpanRow): NormalizedSpan {
     kind: validateSpanKind(row.SpanKind),
     resourceAttributes: deserializeAttributes(ensureStringRecord(row.ResourceAttributes)),
     spanAttributes: deserializeAttributes(ensureStringRecord(row.SpanAttributes)),
-    statusCode: validateStatusCode(row.StatusCode),
+    statusCode: normalizeStatusCode(row.StatusCode),
     statusMessage: row.StatusMessage,
     instrumentationScope: {
       name: row.ScopeName ?? "",
@@ -229,7 +229,7 @@ export function mapChRowToNormalized(row: FullSpanRow): NormalizedSpan {
     droppedLinksCount: 0 as const,
     // Nullable(Float64) round-trips as number | null over JSONEachRow, but a
     // string can still arrive depending on settings — coerce defensively.
-    cost: nullableFloat(row.Cost),
-    nonBilledCost: nullableFloat(row.NonBilledCost),
+    cost: toNullableFloat(row.Cost),
+    nonBilledCost: toNullableFloat(row.NonBilledCost),
   };
 }

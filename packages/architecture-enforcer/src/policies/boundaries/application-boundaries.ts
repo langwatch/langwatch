@@ -308,6 +308,33 @@ function lintClassifiedSourceImports(
   return violations;
 }
 
+function productImplementationViolations({
+  pkg,
+  files,
+}: {
+  pkg: ClassifiedPackage;
+  files: readonly string[];
+}): ArchitectureViolation[] {
+  const violations: ArchitectureViolation[] = [];
+
+  for (const file of files) {
+    const relativeFile = workspacePath(join(pkg.root, "src"), file);
+    if (!PRODUCT_IMPLEMENTATION_PATH.test(relativeFile)) continue;
+
+    violations.push({
+      policy: "composition-source",
+      file,
+      message: `${pkg.name} cannot contain product implementation module ${JSON.stringify(relativeFile)}.`,
+      allowed:
+        pkg.kind === "enterprise-root"
+          ? "Move the implementation to its Enterprise feature surface."
+          : "Keep only runtime composition and move the implementation to its owning feature package.",
+    });
+  }
+
+  return violations;
+}
+
 function lintCompositionSourceShape(
   packages: readonly ClassifiedPackage[],
 ): ArchitectureViolation[] {
@@ -327,20 +354,7 @@ function lintCompositionSourceShape(
       accept: (file) => SOURCE_FILE.test(file),
     });
 
-    for (const file of files) {
-      const relativeFile = workspacePath(join(pkg.root, "src"), file);
-      if (!PRODUCT_IMPLEMENTATION_PATH.test(relativeFile)) continue;
-
-      violations.push({
-        policy: "composition-source",
-        file,
-        message: `${pkg.name} cannot contain product implementation module ${JSON.stringify(relativeFile)}.`,
-        allowed:
-          pkg.kind === "enterprise-root"
-            ? "Move the implementation to its Enterprise feature surface."
-            : "Keep only runtime composition and move the implementation to its owning feature package.",
-      });
-    }
+    violations.push(...productImplementationViolations({ pkg, files }));
 
     if (pkg.kind !== "enterprise-composition") continue;
 
@@ -370,6 +384,34 @@ function lintCompositionSourceShape(
   return violations;
 }
 
+function combinedRuntimeViolations({
+  root,
+  groups,
+}: {
+  root: string;
+  groups: ReadonlyMap<string, ReadonlySet<string>>;
+}): ArchitectureViolation[] {
+  const violations: ArchitectureViolation[] = [];
+
+  for (const [packageRoot, imports] of groups) {
+    if (!imports.has(API_RUNTIME)) continue;
+
+    if (!imports.has(WORKER_RUNTIME)) continue;
+
+    if (packageRoot === "tools/dev-runtime") continue;
+
+    violations.push({
+      policy: "application-boundary",
+      file: join(root, packageRoot, "src"),
+      message: `${packageRoot} imports both API and worker runtime construction entry points.`,
+      allowed:
+        "Only the private tools/dev-runtime contributor composition may combine both runtimes.",
+    });
+  }
+
+  return violations;
+}
+
 function lintRuntimeConstructionImports(
   root: string,
   packages: readonly ClassifiedPackage[],
@@ -393,21 +435,7 @@ function lintRuntimeConstructionImports(
     groups.set(packageRoot, known);
   }
 
-  for (const [packageRoot, imports] of groups) {
-    if (!imports.has(API_RUNTIME)) continue;
-
-    if (!imports.has(WORKER_RUNTIME)) continue;
-
-    if (packageRoot === "tools/dev-runtime") continue;
-
-    violations.push({
-      policy: "application-boundary",
-      file: join(root, packageRoot, "src"),
-      message: `${packageRoot} imports both API and worker runtime construction entry points.`,
-      allowed:
-        "Only the private tools/dev-runtime contributor composition may combine both runtimes.",
-    });
-  }
+  violations.push(...combinedRuntimeViolations({ root, groups }));
 
   const devRuntime = packages.find((pkg) => pkg.kind === "dev-runtime");
   if (!devRuntime) return violations;

@@ -417,13 +417,13 @@ export function attachmentOpensOnAttach({
 
 const pathText = (path: readonly string[]): string => path.join(".");
 
-function conversationPathIssue(path: readonly string[]): string | null {
+function describeConversationPathIssue(path: readonly string[]): string | null {
   const [head] = path;
   const known = (CONVERSATION_PATHS as readonly string[]).includes(head ?? "");
   return path.length === 1 && known ? null : `The conversation has no ${pathText(path)}`;
 }
 
-function scenarioPathIssue({
+function describeScenarioPathIssue({
   path,
   ctx,
   isPlanLevel,
@@ -445,7 +445,7 @@ function scenarioPathIssue({
     : `The suite declares no field named ${second}`;
 }
 
-function tracePathIssue(path: readonly string[]): string | null {
+function describeTracePathIssue(path: readonly string[]): string | null {
   const [head, second, third] = path;
   if (path.length === 1 && (head === TRACE_CONTEXTS_PATH || head === TRACE_SPANS_PATH)) {
     return null;
@@ -475,15 +475,15 @@ export function scenarioMappingPathIssue({
   if (mapping.type === "value") return null;
   switch (mapping.sourceId) {
     case "conversation":
-      return conversationPathIssue(mapping.path);
+      return describeConversationPathIssue(mapping.path);
     case "scenario":
-      return scenarioPathIssue({
+      return describeScenarioPathIssue({
         path: mapping.path,
         ctx,
         isPlanLevel: isPlanLevel ?? false,
       });
     case "trace":
-      return tracePathIssue(mapping.path);
+      return describeTracePathIssue(mapping.path);
   }
 }
 

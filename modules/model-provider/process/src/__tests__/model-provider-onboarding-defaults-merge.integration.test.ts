@@ -75,11 +75,10 @@ describe.skipIf(!DB_URL)(
 
     /** The single config attached at the organization scope, as stored. */
     async function storedConfig(): Promise<Record<string, string>> {
-      const config = await defaults.tryFindByScope({
+      const config = await defaults.getByScope({
         scopeType: "ORGANIZATION",
         scopeId: fixture.organizationId,
       });
-      if (!config) throw new Error("expected a config at the organization scope, found none");
       return config.config as Record<string, string>;
     }
 

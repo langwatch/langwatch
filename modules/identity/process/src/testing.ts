@@ -6,7 +6,7 @@ import type { IdentityUsersRepository } from "./repositories/identity-users.repo
 
 /**
  * The `User` reads the identity guards take, in memory. Shared rather than
- * re-declared per suite, or a looser stub of `tryFindUserIdByEmail` would
+ * re-declared per suite, or a looser stub of `findUserIdsByEmail` would
  * prove the guard against a population that cannot collide (ADR-116 §6).
  */
 export function inMemoryIdentityUsers({
@@ -21,16 +21,13 @@ export function inMemoryIdentityUsers({
   const rows = new Map(Object.entries(emails));
   return {
     async storeUserHashKeyIfMissing() {},
-    async tryFindEmail({ userId }) {
-      return rows.get(userId) ?? null;
+    async getUserEmail({ userId }) {
+      return { email: rows.get(userId) ?? null };
     },
-    async tryFindUserIdByEmail({ normalizedValue }) {
-      for (const [userId, email] of rows) {
-        if (email.toLowerCase() === normalizedValue.toLowerCase()) {
-          return userId;
-        }
-      }
-      return null;
+    async findUserIdsByEmail({ normalizedValue }) {
+      return [...rows]
+        .filter(([, email]) => email.toLowerCase() === normalizedValue.toLowerCase())
+        .map(([userId]) => userId);
     },
     async findAddressStanding({ userId }) {
       const email = rows.get(userId);

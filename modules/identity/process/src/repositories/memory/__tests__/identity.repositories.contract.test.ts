@@ -35,9 +35,21 @@ describe("given the memory identity repositories", () => {
       await repositories.users.storeUserHashKeyIfMissing({ userId: "user_1", userHashKey: "k1" });
       await repositories.users.storeUserHashKeyIfMissing({ userId: "user_1", userHashKey: "k2" });
 
-      expect(await repositories.heads.tryFindUserHashKey({ userId: "user_1" })).toBe("k1");
+      expect(await repositories.heads.getUserHashKey({ userId: "user_1" })).toEqual({
+        userHashKey: "k1",
+      });
       // The memory store folds synchronously, so a user it knows has folded.
       expect(await repositories.heads.hasFolded({ userId: "user_1" })).toBe(true);
+    });
+  });
+
+  describe("when the hash key of an unknown user is read", () => {
+    it("refuses with user_not_found", async () => {
+      const { repositories } = scenario();
+
+      await expect(
+        repositories.heads.getUserHashKey({ userId: "user_ghost" }),
+      ).rejects.toMatchObject({ code: "user_not_found" });
     });
   });
 
@@ -47,8 +59,8 @@ describe("given the memory identity repositories", () => {
       seedUser(store, "user_1", "Sam@Acme.com");
 
       expect(
-        await repositories.users.tryFindUserIdByEmail({ normalizedValue: "sam@acme.com" }),
-      ).toBe("user_1");
+        await repositories.users.findUserIdsByEmail({ normalizedValue: "sam@acme.com" }),
+      ).toEqual(["user_1"]);
     });
   });
 

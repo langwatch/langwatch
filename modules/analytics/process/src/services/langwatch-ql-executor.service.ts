@@ -36,7 +36,7 @@ export class LangWatchQLExecutorService {
    * Reads the restricted identity's connection out of the environment a process handed over, or
    * reports that this deployment has none.
    */
-  tryConnectionFromEnvironment(
+  parseConnectionFromEnvironment(
     environment: Record<string, string | undefined>,
   ): LangWatchQLConnection | null {
     const url = environment.LWQL_CLICKHOUSE_URL;

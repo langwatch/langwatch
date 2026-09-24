@@ -1,5 +1,5 @@
 import { isRecord } from "../rules/canonical-guard.rules.ts";
-import { contentToText, toolDefinitionsMessage } from "../rules/claude-code-content.rules.ts";
+import { contentToText, buildToolDefinitionsMessage } from "../rules/claude-code-content.rules.ts";
 
 /** claude appends this marker where it cut an oversized inline body. */
 const CLAUDE_TRUNCATION_MARKER = /\s*\[TRUNCATED - [^\]]*\]\s*$/;
@@ -317,7 +317,7 @@ export class ClaudeCodeTruncatedRequestService {
    * system/tools values, keeps partial system text that identifies session context.
    * @internal exported for unit testing
    */
-  salvage(raw: string): { role: string; content: string }[] | null {
+  parseTruncatedMessages(raw: string): { role: string; content: string }[] | null {
     const trimmed = raw.replace(CLAUDE_TRUNCATION_MARKER, "");
 
     const system = this.salvageTopLevelValue(trimmed, "system");
@@ -326,7 +326,7 @@ export class ClaudeCodeTruncatedRequestService {
 
     const out = [
       this.salvagedSystemMessage(system),
-      toolDefinitionsMessage(this.salvagedArray(tools)),
+      buildToolDefinitionsMessage(this.salvagedArray(tools)),
       ...this.salvagedHistoryMessages(messages),
     ].filter((m): m is { role: string; content: string } => m !== null);
 

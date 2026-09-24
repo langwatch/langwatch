@@ -77,17 +77,15 @@ export class InviteCreationService {
     return new InviteCreationService({ ...this.deps, invites });
   }
 
-  /**
-   * Validates that an invite can be created:
-   */
-  async tryCheckDuplicateInvite({
+  /** Whether this address already holds an open invite to this organization. */
+  async hasOpenInvite({
     email,
     organizationId,
   }: {
     email: string;
     organizationId: string;
-  }): Promise<OrganizationInvite | null> {
-    return this.invites.tryFindOpenInviteForEmail({ email, organizationId });
+  }): Promise<boolean> {
+    return (await this.invites.tryFindOpenInviteForEmail({ email, organizationId })) !== null;
   }
 
   /**
@@ -390,7 +388,7 @@ export class InviteCreationService {
     const validInvites = preparedInvites.filter(
       (invite): invite is NonNullable<typeof invite> => invite !== null,
     );
-    const personalTeam = await this.invites.tryFindPersonalTeamInScopes({
+    const [personalTeam] = await this.invites.findPersonalTeamsInScopes({
       scopes: validInvites.flatMap(
         (invite) =>
           invite.teamAssignments?.map((assignment) => ({
@@ -428,12 +426,12 @@ export class InviteCreationService {
     }[] = [];
 
     for (const invite of invites) {
-      const existingInvite = await txInviteService.tryCheckDuplicateInvite({
+      const hasOpenInvite = await txInviteService.hasOpenInvite({
         email: invite.email,
         organizationId: invite.organizationId,
       });
 
-      if (existingInvite) {
+      if (hasOpenInvite) {
         if (isStrict) {
           throw new DuplicateInviteError(invite.email);
         }
@@ -480,7 +478,7 @@ export class InviteCreationService {
 
     return {
       // Stored trimmed, because the reads look the address up as it was
-      // typed: `tryCheckDuplicateInvite` and `tryFindPendingByOrgAndEmail` both miss
+      // typed: `hasOpenInvite` and the pending-invite lookup both miss
       // a row written as " a@b.com ", so the duplicate check never fires and
       // SSO onboarding never finds the invite it should adopt.
       email,

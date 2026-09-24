@@ -45,8 +45,8 @@ function resolverWith(options: {
 }) {
   return ModelProviderResolutionService.create({
     defaults: {
-      listForOrganization: async () => options.configs,
-      listForProject: async () => options.configs,
+      findForOrganization: async () => options.configs,
+      findForProject: async () => options.configs,
     },
     catalog: {
       defaultFeatures: () => [

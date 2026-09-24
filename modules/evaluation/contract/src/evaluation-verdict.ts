@@ -5,14 +5,14 @@
 
 export type TerminalEvaluationStatus = "processed" | "error" | "skipped";
 
-export function verdictPassedOf(data: {
+export function deriveVerdictPassed(data: {
   status: TerminalEvaluationStatus;
   passed?: boolean | null;
 }): boolean | null {
   return data.status === "processed" ? (data.passed ?? null) : null;
 }
 
-export function verdictScoreOf(data: {
+export function deriveVerdictScore(data: {
   status: TerminalEvaluationStatus;
   score?: number | null;
 }): number | null {

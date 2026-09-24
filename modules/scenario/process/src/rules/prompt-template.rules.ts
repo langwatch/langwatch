@@ -8,7 +8,7 @@ import type { AgentInput } from "@langwatch/scenario";
 import {
   computeBestMatchMappings,
   resolveFieldMappings,
-  sourceFieldOf,
+  extractSourceField,
   type FieldMapping,
   type RunParameterValues,
 } from "@langwatch/scenario-contract";
@@ -131,7 +131,7 @@ export function buildContext({
     // The shared resolver serialises the conversation as JSON, right for an
     // HTTP body but wrong for prompt text, so mapped inputs substitute the
     // same as the base `messages`/`threadId` bindings for consistency.
-    const sourceField = sourceFieldOf(effectiveMappings[identifier]!);
+    const sourceField = extractSourceField(effectiveMappings[identifier]!);
     if (sourceField === "messages") {
       context[identifier] = transcript;
     } else if (sourceField === "threadId") {

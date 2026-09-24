@@ -10,7 +10,7 @@ class CountingTokenizer implements TraceTokenCounter {
 
   constructor(private readonly answer: number | undefined) {}
 
-  async countTokens(model: string, text: string | undefined): Promise<number | undefined> {
+  async computeTokenCount(model: string, text: string | undefined): Promise<number | undefined> {
     this.calls.push({ model, text });
     return this.answer;
   }

@@ -1,11 +1,13 @@
-import scenario, { assertSkillWasRead } from "@langwatch/scenario";
 import fs from "fs";
-import { describe, it, expect } from "vitest";
-import dotenv from "dotenv";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
+
 import { openai } from "@ai-sdk/openai";
+import scenario, { assertSkillWasRead } from "@langwatch/scenario";
+import dotenv from "dotenv";
+import { describe, it, expect } from "vitest";
+
 import {
   copyFixtureToWorkDir,
   createClaudeCodeAgent,
@@ -58,11 +60,13 @@ function findNewPythonFiles(dir: string, excludeNames: string[] = ["main.py"]): 
       entry.name !== ".venv"
     ) {
       results.push(...findNewPythonFiles(fullPath, []));
-    } else if (
+      continue;
+    }
+    const isNewPythonFile =
       entry.isFile() &&
       !excludeNames.includes(entry.name) &&
-      (entry.name.endsWith('.ipynb') || entry.name.endsWith('.py'))
-    ) {
+      (entry.name.endsWith(".ipynb") || entry.name.endsWith(".py"));
+    if (isNewPythonFile) {
       results.push(fullPath);
     }
   }

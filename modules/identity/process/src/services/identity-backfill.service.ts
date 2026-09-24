@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import {
   type BackfillDiff,
   backfillParityDiffs,
@@ -93,7 +94,10 @@ export class IdentityBackfillService {
   }
 
   async migrateUser({ userId }: { userId: string }): Promise<IdentityBackfillOutcome> {
-    const user = await this.reads.tryFindUser({ userId });
+    const user = await this.reads.getUser({ userId }).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "user_not_found") return null;
+      throw error;
+    });
     if (!user) {
       // A vanished user has no history to adopt and no gate to open that
       // anything would consult; finalizing records that this pass looked.

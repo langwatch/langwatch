@@ -436,47 +436,87 @@ export class CanonicalLogAdapter implements LogPreparer {
         providerKind,
       };
     }
-    if (providerKind === "claude_code") {
-      const sessionId = attributes["session.id"] ?? "";
-      if (sessionId) {
-        const promptId = attributes["prompt.id"] ?? "";
-        const turnKey = promptId ? `${sessionId}:${promptId}` : sessionId;
-        const traceId = CanonicalLogAdapter.validTraceId(wireTraceId)
-          ? wireTraceId
-          : CanonicalLogAdapter.sha256(turnKey).slice(0, 32);
-        const spanId = CanonicalLogAdapter.validSpanId(wireSpanId)
-          ? wireSpanId
-          : CanonicalLogAdapter.sha256(
-              `${sessionId}:${promptId}:${eventName}:${attributes["event.sequence"] ?? ""}`,
-            ).slice(0, 16);
-        return {
-          traceId,
-          spanId,
-          source: "claude_synthesized",
-          providerKind,
-        };
-      }
+    const sessionId = attributes["session.id"] ?? "";
+    if (providerKind === "claude_code" && sessionId) {
+      return CanonicalLogAdapter.claudeSynthesizedCorrelation({
+        sessionId,
+        wireTraceId,
+        wireSpanId,
+        eventName,
+        attributes,
+      });
     }
-    if (providerKind === "codex") {
-      const conversationId = attributes["conversation.id"] ?? "";
-      if (conversationId) {
-        const traceId = CanonicalLogAdapter.validTraceId(wireTraceId)
-          ? wireTraceId
-          : CanonicalLogAdapter.sha256(conversationId).slice(0, 32);
-        const spanId = CanonicalLogAdapter.validSpanId(wireSpanId)
-          ? wireSpanId
-          : CanonicalLogAdapter.sha256(
-              `${conversationId}:${eventName}:${attributes["event.sequence"] ?? ""}`,
-            ).slice(0, 16);
-        return {
-          traceId,
-          spanId,
-          source: "codex_synthesized",
-          providerKind,
-        };
-      }
+    const conversationId = attributes["conversation.id"] ?? "";
+    if (providerKind === "codex" && conversationId) {
+      return CanonicalLogAdapter.codexSynthesizedCorrelation({
+        conversationId,
+        wireTraceId,
+        wireSpanId,
+        eventName,
+        attributes,
+      });
     }
     return { traceId: "", spanId: "", source: "none", providerKind };
+  }
+
+  private static claudeSynthesizedCorrelation(args: {
+    sessionId: string;
+    wireTraceId: string;
+    wireSpanId: string;
+    eventName: string;
+    attributes: Record<string, string>;
+  }): {
+    traceId: string;
+    spanId: string;
+    source: LogCorrelationSource;
+    providerKind: LogProviderKind;
+  } {
+    const { sessionId, wireTraceId, wireSpanId, eventName, attributes } = args;
+    const promptId = attributes["prompt.id"] ?? "";
+    const turnKey = promptId ? `${sessionId}:${promptId}` : sessionId;
+    const traceId = CanonicalLogAdapter.validTraceId(wireTraceId)
+      ? wireTraceId
+      : CanonicalLogAdapter.sha256(turnKey).slice(0, 32);
+    const spanId = CanonicalLogAdapter.validSpanId(wireSpanId)
+      ? wireSpanId
+      : CanonicalLogAdapter.sha256(
+          `${sessionId}:${promptId}:${eventName}:${attributes["event.sequence"] ?? ""}`,
+        ).slice(0, 16);
+    return {
+      traceId,
+      spanId,
+      source: "claude_synthesized",
+      providerKind: "claude_code",
+    };
+  }
+
+  private static codexSynthesizedCorrelation(args: {
+    conversationId: string;
+    wireTraceId: string;
+    wireSpanId: string;
+    eventName: string;
+    attributes: Record<string, string>;
+  }): {
+    traceId: string;
+    spanId: string;
+    source: LogCorrelationSource;
+    providerKind: LogProviderKind;
+  } {
+    const { conversationId, wireTraceId, wireSpanId, eventName, attributes } = args;
+    const traceId = CanonicalLogAdapter.validTraceId(wireTraceId)
+      ? wireTraceId
+      : CanonicalLogAdapter.sha256(conversationId).slice(0, 32);
+    const spanId = CanonicalLogAdapter.validSpanId(wireSpanId)
+      ? wireSpanId
+      : CanonicalLogAdapter.sha256(
+          `${conversationId}:${eventName}:${attributes["event.sequence"] ?? ""}`,
+        ).slice(0, 16);
+    return {
+      traceId,
+      spanId,
+      source: "codex_synthesized",
+      providerKind: "codex",
+    };
   }
 
   private static bodyType(body: unknown): CanonicalLogRecord["bodyType"] {

@@ -167,7 +167,7 @@ const IDENTIFIER_PATTERNS: readonly RegExp[] = [
  * only thing safely taken from the message — the rest would leak the query and the
  * deployment's shape. Fails closed twice: sentence form, then identifier shape.
  */
-export function unknownIdentifierFromError(error: unknown): string | undefined {
+export function extractUnknownIdentifier(error: unknown): string | undefined {
   if (!(error instanceof Error)) return undefined;
   for (const pattern of IDENTIFIER_PATTERNS) {
     const candidate = pattern.exec(error.message)?.[1];

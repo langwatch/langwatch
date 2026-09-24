@@ -3,7 +3,10 @@ import { randomBytes } from "node:crypto";
 import { nowInstant } from "@langwatch/time";
 
 import type { GithubHost } from "../../app/github.members.ts";
-import { GithubTokenCacheRepository } from "../github-token-cache.repository.ts";
+import {
+  GithubTokenCacheRepository,
+  type GithubLockAcquisition,
+} from "../github-token-cache.repository.ts";
 import type { GithubRedis } from "./github-redis.connection.ts";
 
 const LOCK_TTL_SEC = 15;
@@ -59,11 +62,14 @@ export class GithubTokenCacheRedisRepository extends GithubTokenCacheRepository 
     return this.write(this.livenessKey(input.installationId), input.value, input.ttlSec);
   }
 
-  acquireLivenessLock(installationId: string): Promise<string | null> {
+  acquireLivenessLock(installationId: string): Promise<GithubLockAcquisition> {
     return this.acquireOnce(`${this.livenessKey(installationId)}:lock`);
   }
 
-  acquireMintLock(input: { installationId: string; scopeKey: string }): Promise<string | null> {
+  acquireMintLock(input: {
+    installationId: string;
+    scopeKey: string;
+  }): Promise<GithubLockAcquisition> {
     return this.acquireWaiting(`${this.prefix(input.installationId)}:${input.scopeKey}:lock`);
   }
 
@@ -113,23 +119,23 @@ export class GithubTokenCacheRedisRepository extends GithubTokenCacheRepository 
     }
   }
 
-  private async acquireOnce(key: string): Promise<string | null> {
+  private async acquireOnce(key: string): Promise<GithubLockAcquisition> {
     if (!this.redis) {
-      return null;
+      return { acquired: false };
     }
 
     const token = randomBytes(16).toString("hex");
     try {
       const result = await this.redis.set(key, token, "NX", "EX", LOCK_TTL_SEC);
-      return result === "OK" ? token : null;
+      return result === "OK" ? { acquired: true, token } : { acquired: false };
     } catch {
-      return null;
+      return { acquired: false };
     }
   }
 
-  private async acquireWaiting(key: string): Promise<string | null> {
+  private async acquireWaiting(key: string): Promise<GithubLockAcquisition> {
     if (!this.redis) {
-      return null;
+      return { acquired: false };
     }
 
     const token = randomBytes(16).toString("hex");
@@ -138,16 +144,16 @@ export class GithubTokenCacheRedisRepository extends GithubTokenCacheRepository 
       try {
         const result = await this.redis.set(key, token, "NX", "EX", LOCK_TTL_SEC);
         if (result === "OK") {
-          return token;
+          return { acquired: true, token };
         }
       } catch {
-        return null;
+        return { acquired: false };
       }
 
       await new Promise((resolve) => setTimeout(resolve, LOCK_RETRY_MS));
     }
 
-    return null;
+    return { acquired: false };
   }
 
   private async release(key: string, token: string): Promise<void> {

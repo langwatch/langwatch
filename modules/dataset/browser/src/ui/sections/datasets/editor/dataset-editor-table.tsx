@@ -155,6 +155,39 @@ function EditorTableHeading({
   return <>{title}</>;
 }
 
+function displayedRowCount({
+  hasSearchFailed,
+  showAddRow,
+  rowCount,
+}: {
+  hasSearchFailed: boolean;
+  showAddRow: boolean;
+  rowCount: number;
+}): number {
+  if (hasSearchFailed) return 0;
+  if (showAddRow) return Math.max(rowCount + 1, 3);
+  return rowCount;
+}
+
+function rowCountLabel({
+  isSearching,
+  isMatchCountKnown,
+  totalRecordCount,
+  unsearchedRecordCount,
+}: {
+  isSearching: boolean;
+  isMatchCountKnown: boolean;
+  totalRecordCount: number;
+  unsearchedRecordCount: number | undefined;
+}): string {
+  if (!isSearching) return plainRecordCount(totalRecordCount);
+  if (isMatchCountKnown) {
+    return formatSearchRecordCount({ matched: totalRecordCount, total: unsearchedRecordCount });
+  }
+  if (unsearchedRecordCount === undefined) return "";
+  return plainRecordCount(unsearchedRecordCount);
+}
+
 export function DatasetEditorTable({
   datasetId,
   inMemoryDataset,
@@ -495,7 +528,7 @@ export function DatasetEditorTable({
   const hasSearchFailed = isSearching && !!databaseDatasetError;
   // Match count only reportable once search settles; avoid false counts during in-flight or error.
   const isMatchCountKnown = !hasSearchFailed && !holdingPreviousData;
-  const displayRowCount = hasSearchFailed ? 0 : showAddRow ? Math.max(rowCount + 1, 3) : rowCount;
+  const displayRowCount = displayedRowCount({ hasSearchFailed, showAddRow, rowCount });
 
   // Block page navigation while a record save is queued or in flight: switching
   // pages reloads the store (setData drops the prior page's records), so an
@@ -727,16 +760,12 @@ export function DatasetEditorTable({
               on hand describes unsearched rows, so reporting it as the result
               of the search would be false. Report the dataset's own size
               instead, and say nothing at all when even that is not known. */}
-          {isSearching
-            ? isMatchCountKnown
-              ? formatSearchRecordCount({
-                  matched: totalRecordCount,
-                  total: unsearchedRecordCount.current,
-                })
-              : unsearchedRecordCount.current === undefined
-                ? ""
-                : plainRecordCount(unsearchedRecordCount.current)
-            : plainRecordCount(totalRecordCount)}
+          {rowCountLabel({
+            isSearching,
+            isMatchCountKnown,
+            totalRecordCount,
+            unsearchedRecordCount: unsearchedRecordCount.current,
+          })}
         </Text>
         {datasetId && <SaveStatusChip state={autosave.state} error={autosave.error} />}
         <Spacer />

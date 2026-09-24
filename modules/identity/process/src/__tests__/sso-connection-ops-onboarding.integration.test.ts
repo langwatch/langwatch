@@ -105,7 +105,7 @@ describe("ops-assisted onboarding", () => {
     it("reaches a connection ready to activate, every step a separate fact naming the operator", async () => {
       await onboard();
 
-      const held = await connections.tryFindConnection({
+      const held = await connections.getConnection({
         connectionId: CONNECTION,
       });
       // Ready to activate: the state activation is commandable from, with the
@@ -131,7 +131,7 @@ describe("ops-assisted onboarding", () => {
     it("leaves a test sign-in as the only thing still wanted from the customer", async () => {
       await onboard();
 
-      const held = await connections.tryFindConnection({
+      const held = await connections.getConnection({
         connectionId: CONNECTION,
       });
       // Nothing is pending against the customer: no ceremony was ever opened,
@@ -164,7 +164,7 @@ describe("ops-assisted onboarding", () => {
     it("says on the connection that the domain was attested, by whom and when", async () => {
       await onboard();
 
-      const held = await connections.tryFindConnection({
+      const held = await connections.getConnection({
         connectionId: CONNECTION,
       });
       // The method rides on the connection, not only in the log — so the back
@@ -196,7 +196,7 @@ describe("ops-assisted onboarding", () => {
         testLoginAccountId: "acc_test",
       });
 
-      const held = await connections.tryFindConnection({
+      const held = await connections.getConnection({
         connectionId: CONNECTION,
       });
       expect(held?.state).toBe("ACTIVE");
@@ -239,7 +239,7 @@ describe("ops-assisted onboarding", () => {
         code: "sso_connection_activation_blocked",
       });
 
-      const held = await connections.tryFindConnection({
+      const held = await connections.getConnection({
         connectionId: CONNECTION,
       });
       expect(held?.state).toBe("VERIFIED");

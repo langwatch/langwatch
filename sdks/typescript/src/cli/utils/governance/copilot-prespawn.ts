@@ -65,21 +65,22 @@ export function detectManagedOtelPin(
       if (fileMentionsOtel(p)) return p;
       continue;
     }
-    if (stat.isDirectory()) {
-      let entries: string[];
-      try {
-        entries = fs.readdirSync(p);
-      } catch {
-        continue;
-      }
-      for (const entry of entries) {
-        if (!entry.endsWith(".json")) continue;
-        const full = path.join(p, entry);
-        if (fileMentionsOtel(full)) return full;
-      }
-    }
+    if (!stat.isDirectory()) continue;
+    const pinned = findDirEntries(p)
+      .filter((entry) => entry.endsWith(".json"))
+      .map((entry) => path.join(p, entry))
+      .find((full) => fileMentionsOtel(full));
+    if (pinned) return pinned;
   }
   return null;
+}
+
+function findDirEntries(dir: string): string[] {
+  try {
+    return fs.readdirSync(dir);
+  } catch {
+    return [];
+  }
 }
 
 /**

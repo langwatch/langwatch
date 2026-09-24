@@ -6,7 +6,7 @@
 
 import { isReplyTextPart } from "@langwatch/trace-contract";
 
-import { isNonEmptyString, isRecord, safeStringify } from "./canonical-guard.rules.ts";
+import { isNonEmptyString, isRecord, stringifySafely } from "./canonical-guard.rules.ts";
 
 /**
  * Gemini content roles are "user" | "model"; chat messages use
@@ -35,7 +35,7 @@ const toolCallFromFunctionCall = (fc: Record<string, unknown>): unknown => ({
   type: "function",
   function: {
     name: isNonEmptyString(fc.name) ? fc.name : "",
-    arguments: safeStringify(fc.args ?? {}) ?? "{}",
+    arguments: stringifySafely(fc.args ?? {}) ?? "{}",
   },
 });
 
@@ -43,7 +43,7 @@ const toolMessageFromFunctionResponse = (fr: Record<string, unknown>): unknown =
   role: "tool",
   ...(isNonEmptyString(fr.id) ? { tool_call_id: fr.id } : {}),
   ...(isNonEmptyString(fr.name) ? { name: fr.name } : {}),
-  content: safeStringify(fr.response ?? {}) ?? "{}",
+  content: stringifySafely(fr.response ?? {}) ?? "{}",
 });
 
 /** The text and tool calls of one turn, held until a function response or the end flushes them. */
@@ -125,7 +125,7 @@ export const convertGeminiContent = ({
  * also accepts a content object ({ parts: [{ text }] }) or a list of
  * strings/parts.
  */
-export const systemInstructionText = (raw: unknown): string | null => {
+export const extractSystemInstructionText = (raw: unknown): string | null => {
   if (typeof raw === "string") {
     return raw.length > 0 ? raw : null;
   }
@@ -163,5 +163,5 @@ export const stringifyToolPayload = (raw: unknown): string | null => {
   if (typeof raw === "string") {
     return raw.length > 0 ? raw : null;
   }
-  return safeStringify(raw);
+  return stringifySafely(raw);
 };

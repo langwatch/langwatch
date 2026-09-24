@@ -147,6 +147,10 @@ export function VirtualKeyProviderAccessSection({
 
   const invalidReason = providerAccessInvalidReason(value, eligible);
 
+  const showNoScopes = !isLoading && scopes.length === 0;
+  const showNoEligible = !isLoading && scopes.length > 0 && eligible.length === 0;
+  const showReady = !isLoading && scopes.length > 0 && eligible.length > 0;
+
   return (
     <VStack align="start" width="full" gap={1.5}>
       <HStack gap={1} alignItems="center">
@@ -158,18 +162,20 @@ export function VirtualKeyProviderAccessSection({
         />
       </HStack>
 
-      {isLoading ? (
+      {isLoading && (
         <HStack gap={2}>
           <Spinner size="xs" />
           <Text fontSize="xs" color="fg.muted">
             Resolving providers…
           </Text>
         </HStack>
-      ) : scopes.length === 0 ? (
+      )}
+      {showNoScopes && (
         <Text fontSize="xs" color="fg.muted">
           Pick an ownership above to see the providers this key can reach.
         </Text>
-      ) : eligible.length === 0 ? (
+      )}
+      {showNoEligible && (
         <VStack
           align="stretch"
           gap={1}
@@ -191,7 +197,8 @@ export function VirtualKeyProviderAccessSection({
             first; the key cannot route requests without a provider.
           </Text>
         </VStack>
-      ) : (
+      )}
+      {showReady && (
         <VStack align="stretch" width="full" gap={1}>
           <HStack paddingX={0.5} paddingY={1}>
             <Checkbox

@@ -44,6 +44,19 @@ fragment of them and none of the fragments agreed.
 | `find<Noun>` | an array. The empty array is the absence. |
 | `list<Noun>` | a collection or a page. Service vocabulary; a repository answers `find*`. |
 
+**A keyed read that may miss is a `get*`** (Alex, 2026-09-24). One thing by its key
+that may not exist throws the module's not-found `HandledError`; a caller for
+whom absence is normal catches that error's `code` and nothing else. It is never
+a `find*` returning an array of at most one for the caller to destructure.
+
+A read whose miss **means something other than not-found** — "keep the legacy address" when a resolver
+deliberately swallows its failures — answers an explicit result union naming that outcome, never null
+(Alex, 2026-09-24). A swallow that only hides an infrastructure failure is removed instead: the failure
+propagates and degrades to "unknown" (ARCHITECTURE §12).
+
+A method whose name and return shape are **dictated by a vendor's callback interface** (better-auth's
+`beforeUserCreate`, …) is exempt from the naming rules (Alex, 2026-09-24); the exemption lives in the rule.
+
 **Writes.** `create`, `update`, `delete`, `upsert`, `archive` — the five the
 tree already uses. A write whose target may normally be absent returns an
 explicit result union rather than null.
@@ -57,7 +70,12 @@ parse · extract · build · stringify · serialize · deserialize · format · 
 normalize · coerce · decode · encode · convert · derive · compute · translate
 project · visit · as* · to*            (already exempt)
 infer · classify · detect · pick · describe · map          (added by this ADR)
+fold · reduce          (Alex, 2026-09-24: event reducers; state is null before the first event)
 ```
+
+A lookup in a **fixed in-code table** keyed by the input is a derivation too (Alex, 2026-09-24): the table is part of
+the code, not a store, so a miss means "the input names nothing in it" — name it `pick*`/`map*` (a model catalogue's
+`pickModelById`). A table read from a store, config or a peer is a lookup and follows the `get*`/`find*` rules.
 
 **`resolve*` and `read*` stay governed.** They are the two verbs that read both
 ways — `resolveOriginFromSpan` is a derivation, `resolveProjectId` is a lookup
@@ -74,8 +92,8 @@ what it answers, and `langwatch/banned-verb-prefix` says so (it absorbed
 
 - `fallible-result-naming` falls by about 22 immediately, and by up to 103 more
   as `resolve*`/`read*` are decided individually.
-- The ~1,217 existing nullable `find*` methods stay exactly as they are. That
-  ruling is unchanged and this ADR does not reopen it.
+- Superseded 2026-09-23 (Alex, "no dropping"): the existing nullable `find*` and
+  `try*` methods are converted to this vocabulary, callers included (lint wave W6).
 - A new verb belongs in one of the three groups above or it does not belong.
   Adding one means editing this ADR, the exemption list in
   `packages/oxlint-rules/src/rules/fallible-result-naming.rule.mjs`, and the

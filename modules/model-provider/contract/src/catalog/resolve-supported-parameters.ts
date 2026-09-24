@@ -1,5 +1,5 @@
 import type { CustomModelEntry, SupportedParameter } from "../custom-model.ts";
-import { getModelMetadata } from "./model-catalog.ts";
+import { pickModelMetadata } from "./model-catalog.ts";
 
 type ProviderWithCustomModels = {
   customModels?: CustomModelEntry[] | null;
@@ -27,7 +27,7 @@ export function resolveSupportedParameters(
   if (custom?.supportedParameters !== undefined) {
     return custom.supportedParameters;
   }
-  const meta = getModelMetadata(modelId);
+  const meta = pickModelMetadata(modelId);
   if (meta?.supportedParameters && meta.supportedParameters.length > 0) {
     return meta.supportedParameters as SupportedParameter[];
   }

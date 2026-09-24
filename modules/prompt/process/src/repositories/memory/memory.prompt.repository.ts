@@ -29,8 +29,8 @@ import {
 import {
   type MemoryPromptState,
   clone,
-  displayHandle,
-  latestVersion,
+  deriveDisplayHandle,
+  findVersions,
   type StoredConfig,
   type StoredVersion,
   schemaVersionOf,
@@ -103,7 +103,7 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
       .filter((row) => row.copiedFromPromptId === input.sourcePromptId && row.deletedAt === null)
       .map((row) => ({
         id: row.id,
-        handle: displayHandle(row, row.projectId, row.organizationId),
+        handle: deriveDisplayHandle(row, row.projectId, row.organizationId),
         projectId: row.projectId,
         projectName: row.projectId,
         teamName: "",
@@ -130,7 +130,7 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
       .filter((row) => row.deletedAt === null && visibleConfig(row, params))
       .toSorted((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime())
       .flatMap((row) => {
-        const version = latestVersion(this.#state, row.id, row.projectId);
+        const [version] = findVersions(this.#state, row.id, row.projectId);
         if (!version) return [];
         return [this.#withLatest(row, version, params)];
       });
@@ -183,7 +183,8 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
     const existing = [...this.#state.configs.values()].find(
       (row) =>
         row.projectId === projectId &&
-        (row.id === idOrHandle || displayHandle(row, projectId, row.organizationId) === idOrHandle),
+        (row.id === idOrHandle ||
+          deriveDisplayHandle(row, projectId, row.organizationId) === idOrHandle),
     );
     if (!existing) {
       throw new NotFoundError(`Prompt config not found. ID: ${idOrHandle}`);
@@ -435,7 +436,9 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
             {
               id,
               name:
-                displayHandle(config, params.projectId, params.organizationId) ?? config.name ?? id,
+                deriveDisplayHandle(config, params.projectId, params.organizationId) ??
+                config.name ??
+                id,
             },
           ]
         : [];
@@ -462,7 +465,7 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
   }
 
   #forDisplay(config: StoredConfig, projectId: string, organizationId: string): PromptConfigRow {
-    return { ...clone(config), handle: displayHandle(config, projectId, organizationId) };
+    return { ...clone(config), handle: deriveDisplayHandle(config, projectId, organizationId) };
   }
 
   #withLatest(

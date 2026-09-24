@@ -9,7 +9,11 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ATTR_KEYS, type OtlpResource, type OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import type { DataPrivacyResolution, PiiAnalysis } from "../../app/data-privacy.members.ts";
+import type {
+  DataPrivacyResolution,
+  PiiAnalysis,
+  PiiClearing,
+} from "../../app/data-privacy.members.ts";
 import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service.ts";
 
 /**
@@ -33,14 +37,14 @@ class FakePiiAnalysis implements PiiAnalysis {
     } = {},
   ) {}
 
-  async tryClearGoogleDlp(input: {
+  async clearGoogleDlp(input: {
     text: string;
     piiRedactionLevel: string;
     exceptPatterns?: readonly string[];
-  }): Promise<string | null> {
+  }): Promise<PiiClearing> {
     this.dlpCalls.push({ text: input.text, exceptPatterns: input.exceptPatterns });
     if (this.behaviour.dlpThrows) throw this.behaviour.dlpThrows;
-    return "[REDACTED]";
+    return { kind: "redacted", text: "[REDACTED]" };
   }
 
   async clearPresidio(

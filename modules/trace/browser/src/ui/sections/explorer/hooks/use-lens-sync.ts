@@ -56,6 +56,17 @@ function decode(id: string, name: string, filters: unknown): LensConfig | null {
   };
 }
 
+function decodeLenses(
+  rows: readonly { id: string; name: string; filters: unknown }[],
+): LensConfig[] {
+  const lenses: LensConfig[] = [];
+  for (const row of rows) {
+    const decoded = decode(row.id, row.name, row.filters);
+    if (decoded) lenses.push(decoded);
+  }
+  return lenses;
+}
+
 /**
  * Wires the lens viewStore to the server-side SavedView table. Call once at the top of
  * TracesPage. The hook:
@@ -77,26 +88,20 @@ export function useLensSync(): void {
     },
   );
 
+  const invalidateLenses = () => {
+    if (projectId) {
+      void utils.savedViews.getAll.invalidate({ projectId, kind: KIND });
+    }
+  };
+
   const createMutation = api.savedViews.create.useMutation({
-    onSuccess: () => {
-      if (projectId) {
-        void utils.savedViews.getAll.invalidate({ projectId, kind: KIND });
-      }
-    },
+    onSuccess: invalidateLenses,
   });
   const renameMutation = api.savedViews.rename.useMutation({
-    onSuccess: () => {
-      if (projectId) {
-        void utils.savedViews.getAll.invalidate({ projectId, kind: KIND });
-      }
-    },
+    onSuccess: invalidateLenses,
   });
   const deleteMutation = api.savedViews.delete.useMutation({
-    onSuccess: () => {
-      if (projectId) {
-        void utils.savedViews.getAll.invalidate({ projectId, kind: KIND });
-      }
-    },
+    onSuccess: invalidateLenses,
   });
 
   // Refs so the bridge closures stay stable across renders — `set...Bridge`
@@ -153,11 +158,6 @@ export function useLensSync(): void {
   useEffect(() => {
     const rows = lensesQuery.data;
     if (!rows) return;
-    const lenses: LensConfig[] = [];
-    for (const row of rows) {
-      const decoded = decode(row.id, row.name, row.filters);
-      if (decoded) lenses.push(decoded);
-    }
-    setUserLenses(lenses);
+    setUserLenses(decodeLenses(rows));
   }, [lensesQuery.data, setUserLenses]);
 }

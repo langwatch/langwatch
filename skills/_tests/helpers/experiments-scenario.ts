@@ -1,8 +1,9 @@
-import { bashCommands } from "@langwatch/scenario";
-import dotenv from "dotenv";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { bashCommands } from "@langwatch/scenario";
+import dotenv from "dotenv";
 
 import {
   copyFixtureToWorkDir,
@@ -92,9 +93,7 @@ export const experimentWasCreatedOrAdvanced = ({
  * rather than the whole transcript's JSON: a command quoting an earlier
  * argument (`export PATH="./bin:$PATH" && ...`) defeats a regex over that JSON.
  */
-export function executedCommandTranscript(state: {
-  messages: { content: unknown }[];
-}): string {
+export function executedCommandTranscript(state: { messages: { content: unknown }[] }): string {
   return bashCommands(state as Parameters<typeof bashCommands>[0]).join("\n");
 }
 
@@ -141,15 +140,17 @@ export function findGeneratedFiles({
 
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     const fullPath = path.join(directory, entry.name);
-    if (
+    const isSearchableDirectory =
       entry.isDirectory() &&
       !entry.name.startsWith(".") &&
-      entry.name !== "node_modules" &&
-      entry.name !== ".venv" &&
-      entry.name !== "bin"
-    ) {
+      !["node_modules", ".venv", "bin"].includes(entry.name);
+    if (isSearchableDirectory) {
       files.push(...findGeneratedFiles({ directory: fullPath, extensions }));
-    } else if (entry.isFile() && extensions.some((extension) => entry.name.endsWith(extension))) {
+      continue;
+    }
+    const isGeneratedFile =
+      entry.isFile() && extensions.some((extension) => entry.name.endsWith(extension));
+    if (isGeneratedFile) {
       files.push(fullPath);
     }
   }

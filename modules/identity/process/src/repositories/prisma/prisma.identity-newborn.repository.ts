@@ -55,15 +55,16 @@ export class PrismaIdentityNewbornRepository implements IdentityNewbornRepositor
   }
 
   /**
-   * The user already standing at a pinned id, if any. The entrance asks BEFORE it states anything,
+   * Whether a user already stands at a pinned id. The entrance asks BEFORE it states anything,
    * because the id is derived from the normalized address and normalization strips plus-tags: a
    * second sign-up at `sam+x@acme.com` derives the id `sam@acme.com` was born under.
    */
-  async tryFindUserAtPinnedId({ userId }: { userId: string }): Promise<{ id: string } | null> {
-    return this.prisma.user.findUnique({
+  async hasUserAtPinnedId({ userId }: { userId: string }): Promise<boolean> {
+    const occupant = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { id: true },
     });
+    return occupant !== null;
   }
 
   /**

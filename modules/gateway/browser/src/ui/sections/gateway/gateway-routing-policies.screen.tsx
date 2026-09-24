@@ -202,15 +202,11 @@ function useScopeNameResolver(
   }, [organization?.teams]);
 
   return (scopes: ScopeTriadEntry[]): NamedScope[] =>
-    scopes.map((scope) => ({
-      ...scope,
-      name:
-        scope.scopeType === "ORGANIZATION"
-          ? organization?.name
-          : scope.scopeType === "TEAM"
-            ? names.teams.get(scope.scopeId)
-            : names.projects.get(scope.scopeId),
-    }));
+    scopes.map((scope) => {
+      if (scope.scopeType === "ORGANIZATION") return { ...scope, name: organization?.name };
+      const lookup = scope.scopeType === "TEAM" ? names.teams : names.projects;
+      return { ...scope, name: lookup.get(scope.scopeId) };
+    });
 }
 
 /**

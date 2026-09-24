@@ -1,5 +1,6 @@
 import { LANGY_SESSION_API_KEY_NAME, type ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { langyCandidatePermissions, type LangyCredentialSession } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, toDate } from "@langwatch/time";
@@ -54,7 +55,10 @@ export class LangySessionKeyService extends LangySessionKey {
     projectId: string;
     organizationId: string;
   }): Promise<{ token: string; apiKeyId: string }> {
-    const scope = await this.repository.tryFindProjectScope(input.projectId);
+    const scope = await this.repository.getProjectScope(input.projectId).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "project_not_found") return null;
+      throw error;
+    });
     const permissions =
       scope && scope.organizationId === input.organizationId
         ? await this.authz.effectivePermissions({
@@ -118,7 +122,10 @@ export class LangySessionKeyService extends LangySessionKey {
     apiKeyId: string;
     projectId: string;
   }): Promise<LangySessionKeyRevocation> {
-    const key = await this.repository.tryFindById(input);
+    const key = await this.repository.getById(input).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "api_key_not_found") return null;
+      throw error;
+    });
     if (!key) {
       return "not_found";
     }

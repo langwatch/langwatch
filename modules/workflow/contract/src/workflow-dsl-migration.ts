@@ -25,7 +25,7 @@ type MigrationParameter = Record<string, unknown>;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const parametersOf = (node: MigrationNode): MigrationParameter[] | undefined => {
+const extractParameters = (node: MigrationNode): MigrationParameter[] | undefined => {
   const { parameters } = node.data;
   return Array.isArray(parameters) && parameters.every(isRecord) ? parameters : undefined;
 };
@@ -34,7 +34,7 @@ const updateParameters = (
   node: MigrationNode,
   transform: (parameter: MigrationParameter) => MigrationParameter,
 ) => {
-  const parameters = parametersOf(node);
+  const parameters = extractParameters(node);
   if (parameters) {
     node.data.parameters = parameters.map(transform);
   }

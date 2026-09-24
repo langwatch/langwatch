@@ -24,6 +24,34 @@ import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vite
 
 import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
 import { SourceEditDrawer } from "../governance-inventory.screen.tsx";
+import type { Source } from "../ingestion-source-forms.ts";
+
+function sourceRow(overrides: Partial<Source>): Source {
+  return {
+    id: "src_test",
+    organizationId: "org_acme",
+    teamId: null,
+    sourceType: "otel_generic",
+    name: "Test source",
+    description: null,
+    parserConfig: {},
+    hasPollerCursor: false,
+    pullSchedule: null,
+    status: "active",
+    traceProjectId: null,
+    traceProjectArchived: false,
+    lastEventAt: null,
+    archivedAt: null,
+    createdAt: "2026-03-01T00:00:00.000Z",
+    updatedAt: "2026-03-01T00:00:00.000Z",
+    createdById: null,
+    errorCount: 0,
+    lastRunCompleteness: null,
+    pullStatus: null,
+    lastSuccessAt: null,
+    ...overrides,
+  };
+}
 
 /**
  * `OttlEditor` sits inside the drawer's body and calls tRPC on render. It is
@@ -72,7 +100,7 @@ const DESTINATION_CTX = {
  * reads are set; the row carries many more, and typing them here would tie
  * this test to columns it never looks at.
  */
-const sourceLandingInAnalytics = {
+const sourceLandingInAnalytics = sourceRow({
   id: "src_genie",
   name: "Genie fleet",
   description: "Conversations from the Genie workspace",
@@ -80,7 +108,7 @@ const sourceLandingInAnalytics = {
   parserConfig: { workspaceId: "ws_acme" },
   traceProjectId: "proj_analytics",
   traceProjectArchived: false,
-} as unknown as Parameters<typeof SourceEditDrawer>[0]["source"];
+});
 
 /**
  * The same source after its destination project was archived. The server
@@ -88,11 +116,11 @@ const sourceLandingInAnalytics = {
  * because forgetting it would lose the only record of where the source used
  * to land.
  */
-const sourceLandingInAnArchivedProject = {
+const sourceLandingInAnArchivedProject = sourceRow({
   ...sourceLandingInAnalytics,
   traceProjectId: "proj_gone",
   traceProjectArchived: true,
-} as unknown as Parameters<typeof SourceEditDrawer>[0]["source"];
+});
 
 /** Exactly what `buildEditSubmission` produces, read off the drawer's own prop. */
 type UpdateInput = Parameters<Parameters<typeof SourceEditDrawer>[0]["onSubmit"]>[0];

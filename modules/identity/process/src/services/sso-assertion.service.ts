@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import {
   isConfiguredLegacySsoRoute,
   isSsoConnectionInSetup,
@@ -139,7 +140,12 @@ export class SsoAssertionService {
     }
     const { domain } = asserted;
 
-    const connection = await this.deps.connections.tryFindConnection({ connectionId: providerId });
+    const connection = await this.deps.connections
+      .getConnection({ connectionId: providerId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "sso_connection_not_found") return null;
+        throw error;
+      });
     if (!connection) {
       return this.refuse({
         reason: "connection-not-found",

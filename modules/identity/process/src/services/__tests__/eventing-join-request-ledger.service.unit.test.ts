@@ -22,13 +22,13 @@ const ORGANIZATION = "organization_acme";
 const REQUEST = "joinreq_1";
 
 function compose(input: { senders?: Record<string, JoinRequestStagedSender> } = {}) {
-  const storeEvents = vi.fn(async () => undefined);
+  const storeEvents = vi.fn<EventStore<JoinRequestEvent>["storeEvents"]>(async () => undefined);
   const send = vi.fn(async () => undefined);
   const senders = input.senders ?? { expireJoin: { send }, approveJoin: { send } };
   const tryResolveStagedSender = vi.fn((name: string) => senders[name] ?? null);
   // A store whose cursor already sits past anything appended, so convergence
   // returns on the first read rather than sleeping through a real window.
-  const tryLoad = vi.fn(async () => ({
+  const tryLoad = vi.fn<StateProjectionStore<JoinRequestFoldState>["tryLoad"]>(async () => ({
     state: {} as JoinRequestFoldState,
     cursor: { acceptedAt: Number.MAX_SAFE_INTEGER, eventId: "evt_last" },
     occurredAt: 0,
@@ -37,28 +37,45 @@ function compose(input: { senders?: Record<string, JoinRequestStagedSender> } = 
     version: "1",
   }));
 
+  const unread = async (): Promise<never> => {
+    throw new Error("the ledger never reads the event log");
+  };
+  const eventStore: EventStore<JoinRequestEvent> = {
+    storeEvents,
+    getEvent: unread,
+    getEvents: unread,
+    getEventsOccurredSince: unread,
+    getEventsUpTo: unread,
+    countEventsBefore: unread,
+  };
+  const projectionStore: StateProjectionStore<JoinRequestFoldState> = {
+    tryLoad,
+    store: async () => {
+      throw new Error("the ledger never stores the fold");
+    },
+  };
+
   const adapter = EventingJoinRequestLedgerAdapter.create({
-    projectionStore: { tryLoad } as unknown as StateProjectionStore<JoinRequestFoldState>,
-    eventStore: async () => ({ storeEvents }) as unknown as EventStore<JoinRequestEvent>,
+    projectionStore,
+    eventStore: async () => eventStore,
     tryResolveStagedSender,
     convergence: { timeoutMs: 20, pollMs: 1 },
   });
   return { adapter, storeEvents, send, tryResolveStagedSender, tryLoad };
 }
 
-const expireCommand = (): JoinRequestCommand =>
-  ({
-    type: EXPIRE_JOIN_COMMAND_TYPE,
-    data: {
-      tenantId: ORGANIZATION,
-      organizationId: ORGANIZATION,
-      joinRequestId: REQUEST,
-      commandId: "cmd_1",
-      occurredAtMs: 1_700_000_000_000,
-      actor: { type: "system", id: "system:join-requests" },
-      scheduledFor: 1_700_000_000_000,
-    },
-  }) as unknown as JoinRequestCommand;
+const expireCommand = (): JoinRequestCommand => ({
+  type: EXPIRE_JOIN_COMMAND_TYPE,
+  data: {
+    tenantId: ORGANIZATION,
+    organizationId: ORGANIZATION,
+    joinRequestId: REQUEST,
+    commandId: "cmd_1",
+    occurredAtMs: 1_700_000_000_000,
+    actor: { type: "system", id: "system:join-requests" },
+    scheduledFor: 1_700_000_000_000,
+  },
+});
 
 describe("given a command whose guard stated a fact", () => {
   describe("when the ledger commits it", () => {

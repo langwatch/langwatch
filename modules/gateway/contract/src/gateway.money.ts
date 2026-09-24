@@ -101,7 +101,7 @@ export function usdDisplayString(value: { toString(): string }): string {
  * Nano-USD as JSON number or null above MAX_SAFE_INTEGER; display string has
  * no ceiling.
  */
-export function decimalUsdToNanoUsd(value: { toString(): string }): number | null {
+export function convertDecimalUsdToNanoUsd(value: { toString(): string }): number | null {
   const nano = usdToNanoUsd(value);
   if (nano > BigInt(Number.MAX_SAFE_INTEGER) || nano < -BigInt(Number.MAX_SAFE_INTEGER)) {
     return null;

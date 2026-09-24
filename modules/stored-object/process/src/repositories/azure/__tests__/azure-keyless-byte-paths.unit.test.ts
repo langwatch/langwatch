@@ -33,6 +33,7 @@ import {
   StoredObjectAzureDestination,
   StoredObjectDestinationPolicyAdapter,
   StoredObjectProjectS3Config,
+  type StoredObjectProjectBucket,
 } from "#services/stored-object-destination-policy.service";
 import { StoredObjectStorageRegistryAdapter } from "#services/stored-object-storage-registry.service";
 
@@ -73,8 +74,8 @@ const READ_ONLY_CONFIG: AzureBlobCredentialsConfig = {
 };
 
 class NoPrivateBucket extends StoredObjectProjectS3Config {
-  async tryGet(): Promise<null> {
-    return null;
+  async resolveBucket(): Promise<StoredObjectProjectBucket> {
+    return { kind: "platform" };
   }
 }
 

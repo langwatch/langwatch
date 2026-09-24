@@ -4,12 +4,12 @@ import {
   buildJoinClause,
   fieldMappings,
   getColumnExpression,
-  getFieldMapping,
+  pickFieldMapping,
   getFieldsRequiringTable,
   getTableAlias,
   getTableForField,
   qualifiedColumn,
-  requiresJoin,
+  detectRequiredJoin,
   tableAliases,
 } from "../clickhouse.field-mappings.mapper.ts";
 
@@ -67,16 +67,16 @@ describe("field-mappings", () => {
     });
   });
 
-  describe("getFieldMapping()", () => {
+  describe("pickFieldMapping()", () => {
     it("returns mapping for known fields", () => {
-      const mapping = getFieldMapping("trace_id");
+      const mapping = pickFieldMapping("trace_id");
       expect(mapping).toBeDefined();
       expect(mapping?.table).toBe("trace_summaries");
       expect(mapping?.column).toBe("TraceId");
     });
 
     it("returns undefined for unknown fields", () => {
-      const mapping = getFieldMapping("unknown.field");
+      const mapping = pickFieldMapping("unknown.field");
       expect(mapping).toBeUndefined();
     });
   });
@@ -117,19 +117,19 @@ describe("field-mappings", () => {
     });
   });
 
-  describe("requiresJoin()", () => {
+  describe("detectRequiredJoin()", () => {
     it("returns null for trace_summaries fields", () => {
-      expect(requiresJoin("trace_id")).toBeNull();
-      expect(requiresJoin("metrics.total_cost")).toBeNull();
+      expect(detectRequiredJoin("trace_id")).toBeNull();
+      expect(detectRequiredJoin("metrics.total_cost")).toBeNull();
     });
 
     it("returns stored_spans for span fields", () => {
-      expect(requiresJoin("spans.span_id")).toBe("stored_spans");
-      expect(requiresJoin("spans.model")).toBe("stored_spans");
+      expect(detectRequiredJoin("spans.span_id")).toBe("stored_spans");
+      expect(detectRequiredJoin("spans.model")).toBe("stored_spans");
     });
 
     it("returns evaluation_runs for evaluation fields", () => {
-      expect(requiresJoin("evaluations.evaluator_id")).toBe("evaluation_runs");
+      expect(detectRequiredJoin("evaluations.evaluator_id")).toBe("evaluation_runs");
     });
   });
 

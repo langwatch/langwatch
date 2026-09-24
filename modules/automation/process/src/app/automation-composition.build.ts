@@ -24,6 +24,7 @@ import type {
   AutomationScheduledJobRepository,
   ScheduledJobRecord,
 } from "../repositories/automation-scheduled-job.repository.ts";
+import { RedisAutomationPersistCapRepository } from "../repositories/redis/redis.automation-persist-cap.repository.ts";
 import type {
   AutomationDispatchError,
   AutomationHeartbeat,
@@ -81,7 +82,7 @@ export function buildAutomationInfrastructure(input: {
     heartbeat: new UnmeasuredApiAutomationHeartbeat(),
     runaway: new UncontainedApiAutomationRunaway(members.logger),
     testFire: new UndeliverableApiTestFire(),
-    redis: members.redis,
+    persistCaps: RedisAutomationPersistCapRepository.create({ connection: members.redis }),
     providers: new AutomationProviderSecretsAdapter(providers),
     slackChannels: new UnavailableAutomationSlackDirectory(),
     traceFilters: new UnwiredAutomationTraceFilterCompiler(),

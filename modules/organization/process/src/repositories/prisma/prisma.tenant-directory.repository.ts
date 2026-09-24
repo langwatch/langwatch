@@ -1,5 +1,6 @@
 import type { TenantDirectory } from "@langwatch/clickhouse-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 
 import {
   TenantDirectoryService,
@@ -20,19 +21,22 @@ export class PrismaTenantDirectoryRepository {
 
   private constructor() {}
 
-  async tryFindProjectOrganizationId({
+  async getProjectOrganizationId({
     client,
     tenantId,
   }: {
     client: TenantDirectoryClient;
     tenantId: string;
-  }): Promise<string | null> {
+  }): Promise<string> {
     const project = await client.project.findUnique({
       where: { id: tenantId },
       select: { team: { select: { organizationId: true } } },
     });
+    const organizationId = project?.team?.organizationId;
+    if (!organizationId)
+      throw new ProjectNotFoundError("Project not found", { meta: { tenantId } });
 
-    return project?.team?.organizationId ?? null;
+    return organizationId;
   }
 
   async organizationExists({
@@ -76,8 +80,8 @@ export function bindTenantDirectoryReader(
 ): TenantDirectory & TenantOwnershipReader {
   const tenants = PrismaTenantDirectoryRepository.create();
   const reader: TenantOwnershipReader = {
-    tryFindProjectOrganizationId: (tenantId) =>
-      tenants.tryFindProjectOrganizationId({ client: database, tenantId }),
+    getProjectOrganizationId: (tenantId) =>
+      tenants.getProjectOrganizationId({ client: database, tenantId }),
     organizationExists: (tenantId) => tenants.organizationExists({ client: database, tenantId }),
     userExists: (tenantId) => tenants.userExists({ client: database, tenantId }),
   };

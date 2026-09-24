@@ -59,15 +59,16 @@ function findGeneratedFiles({ dir, extensions }: { dir: string; extensions: stri
 
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const fullPath = path.join(dir, entry.name);
-    if (
+    const isSearchableDirectory =
       entry.isDirectory() &&
       !entry.name.startsWith(".") &&
-      entry.name !== "node_modules" &&
-      entry.name !== ".venv" &&
-      entry.name !== "bin"
-    ) {
+      !["node_modules", ".venv", "bin"].includes(entry.name);
+    if (isSearchableDirectory) {
       results.push(...findGeneratedFiles({ dir: fullPath, extensions }));
-    } else if (entry.isFile() && extensions.some((ext) => entry.name.endsWith(ext))) {
+      continue;
+    }
+    const isGeneratedFile = entry.isFile() && extensions.some((ext) => entry.name.endsWith(ext));
+    if (isGeneratedFile) {
       results.push(fullPath);
     }
   }

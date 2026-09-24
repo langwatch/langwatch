@@ -13,7 +13,7 @@ import {
 } from "../../model/billing-plans.ts";
 import { type PlannedUser } from "../../model/subscription-types.ts";
 
-type TRPCRefetchFn = { refetch: () => any };
+type TRPCRefetchFn = { refetch: () => unknown };
 
 function memberTypeToRole(memberType: MemberType): "MEMBER" | "EXTERNAL" {
   return memberType === "FullMember" ? "MEMBER" : "EXTERNAL";

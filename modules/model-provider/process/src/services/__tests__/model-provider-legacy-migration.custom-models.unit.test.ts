@@ -26,7 +26,7 @@ function buildRow({
   };
 }
 
-describe("ModelProviderLegacyMigrationService.migrateCustomModelsRow()", () => {
+describe("ModelProviderLegacyMigrationService.convertCustomModelsRow()", () => {
   // Stub registry lookup: simulate openai having "gpt-4o" and "gpt-4o-mini" as chat models,
   // and "text-embedding-3-small" as embedding model
   const registryLookup = (provider: string, mode: "chat" | "embedding") => {
@@ -56,7 +56,7 @@ describe("ModelProviderLegacyMigrationService.migrateCustomModelsRow()", () => {
         customEmbeddingsModels: ["text-embedding-3-small"],
       });
 
-      const result = migrations.migrateCustomModelsRow({ row, registryLookup });
+      const result = migrations.convertCustomModelsRow({ row, registryLookup });
 
       expect(result).not.toBeNull();
       expect(result!.customModels).toEqual([]);
@@ -72,7 +72,7 @@ describe("ModelProviderLegacyMigrationService.migrateCustomModelsRow()", () => {
         customEmbeddingsModels: ["text-embedding-3-small", "my-custom-embedding"],
       });
 
-      const result = migrations.migrateCustomModelsRow({ row, registryLookup });
+      const result = migrations.convertCustomModelsRow({ row, registryLookup });
 
       expect(result).not.toBeNull();
       expect(result!.customModels).toEqual([
@@ -115,7 +115,7 @@ describe("ModelProviderLegacyMigrationService.migrateCustomModelsRow()", () => {
         customEmbeddingsModels: [],
       });
 
-      const result = migrations.migrateCustomModelsRow({ row, registryLookup });
+      const result = migrations.convertCustomModelsRow({ row, registryLookup });
 
       expect(result).toBeNull();
     });
@@ -129,7 +129,7 @@ describe("ModelProviderLegacyMigrationService.migrateCustomModelsRow()", () => {
         customEmbeddingsModels: [],
       });
 
-      const result = migrations.migrateCustomModelsRow({ row, registryLookup });
+      const result = migrations.convertCustomModelsRow({ row, registryLookup });
 
       expect(result).toBeNull();
     });
@@ -143,7 +143,7 @@ describe("ModelProviderLegacyMigrationService.migrateCustomModelsRow()", () => {
         customEmbeddingsModels: null,
       });
 
-      const result = migrations.migrateCustomModelsRow({ row, registryLookup });
+      const result = migrations.convertCustomModelsRow({ row, registryLookup });
 
       expect(result).toBeNull();
     });
@@ -157,7 +157,7 @@ describe("ModelProviderLegacyMigrationService.migrateCustomModelsRow()", () => {
         customEmbeddingsModels: null,
       });
 
-      const result = migrations.migrateCustomModelsRow({ row, registryLookup });
+      const result = migrations.convertCustomModelsRow({ row, registryLookup });
 
       expect(result).not.toBeNull();
       expect(result!.customModels).toEqual([
@@ -181,7 +181,7 @@ describe("ModelProviderLegacyMigrationService.migrateCustomModelsRow()", () => {
         customEmbeddingsModels: ["my-custom-embedding"],
       });
 
-      const result = migrations.migrateCustomModelsRow({ row, registryLookup });
+      const result = migrations.convertCustomModelsRow({ row, registryLookup });
 
       expect(result).not.toBeNull();
       expect(result!.customModels).toBeNull();
@@ -204,7 +204,7 @@ describe("ModelProviderLegacyMigrationService.migrateCustomModelsRow()", () => {
         customModels: ["my-vllm-model", "my-other-model"],
       });
 
-      const result = migrations.migrateCustomModelsRow({ row, registryLookup });
+      const result = migrations.convertCustomModelsRow({ row, registryLookup });
 
       expect(result).not.toBeNull();
       expect(result!.customModels).toHaveLength(2);
@@ -229,7 +229,7 @@ describe("ModelProviderLegacyMigrationService.migrateCustomModelsRow()", () => {
         customEmbeddingsModels: ["my-custom-embedding"],
       });
 
-      const result = migrations.migrateCustomModelsRow({ row, registryLookup });
+      const result = migrations.convertCustomModelsRow({ row, registryLookup });
 
       expect(result).not.toBeNull();
       // customModels is already migrated, should be left as-is

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import {
-  audienceForLegacyStoredObjectPurpose,
+  mapLegacyStoredObjectPurposeToAudience,
   storedObjectIdSchema,
   storedObjectMediaTypeSchema,
   storedObjectProjectIdSchema,
@@ -144,7 +144,7 @@ export class ClickHouseImportStoredObjectMigration implements SystemMigration {
     if (!Number.isSafeInteger(row.sizeBytes) || row.sizeBytes < 0) {
       throw new TypeError("Legacy Stored Object byte length is invalid");
     }
-    const audience = audienceForLegacyStoredObjectPurpose(row.purpose);
+    const audience = mapLegacyStoredObjectPurposeToAudience(row.purpose);
     if (!audience) {
       throw new TypeError("Legacy Stored Object purpose has no delivery audience");
     }

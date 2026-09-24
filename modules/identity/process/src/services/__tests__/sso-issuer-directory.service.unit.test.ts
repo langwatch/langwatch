@@ -4,7 +4,11 @@
  * customers of this installation registered, and identity is who holds it.
  * Corresponds to specs/identity/sso-connection-lifecycle.feature.
  */
-import { emptySsoConnection, type SsoConnectionState } from "@langwatch/identity-contract";
+import {
+  emptySsoConnection,
+  SsoConnectionNotFoundError,
+  type SsoConnectionState,
+} from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
 import { SsoConnectionReadRepository } from "../../repositories/sso-connection.repository.ts";
@@ -34,20 +38,19 @@ function directoryOver({
   owners?: Record<string, string>;
 }) {
   class StubReads extends SsoConnectionReadRepository {
-    async tryFindConnection({
-      connectionId,
-    }: {
-      connectionId: string;
-    }): Promise<SsoConnectionState | null> {
-      return states.find((state) => state.connectionId === connectionId) ?? null;
+    async getConnection({ connectionId }: { connectionId: string }): Promise<SsoConnectionState> {
+      const found = states.find((state) => state.connectionId === connectionId);
+      if (!found) throw new SsoConnectionNotFoundError(connectionId);
+      return found;
     }
-    async tryFindDomainOwner({
+    async getDomainOwner({
       domain,
     }: {
       domain: string;
-    }): Promise<{ connectionId: string; organizationId: string } | null> {
+    }): Promise<{ connectionId: string; organizationId: string }> {
       const connectionId = owners[domain];
-      return connectionId ? { connectionId, organizationId: "org_acme" } : null;
+      if (!connectionId) throw new SsoConnectionNotFoundError(domain);
+      return { connectionId, organizationId: "org_acme" };
     }
     async findForOrganization(): Promise<SsoConnectionState[]> {
       return states;

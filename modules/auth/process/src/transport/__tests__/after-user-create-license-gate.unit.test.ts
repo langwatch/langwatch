@@ -17,7 +17,10 @@ import type {
   BetterAuthPendingInvite,
 } from "../../channels/better-auth.channel.ts";
 import { afterUserCreate } from "../../channels/http/http.better-auth-hooks.channel.ts";
-import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
+import type {
+  BetterAuthHookOrganization,
+  BetterAuthHooksRepository,
+} from "../../repositories/better-auth-hooks.repository.ts";
 
 class StubFederation implements BetterAuthFederation {
   constructor(private readonly ssoAllowed: boolean) {}
@@ -55,19 +58,46 @@ class StubAnnouncements implements BetterAuthAnnouncements {
   }
 }
 
-function organizationRepo(organization: { id: string; ssoDomain: string } | null) {
-  const mocks = {
-    tryFindOrganizationBySsoDomain: vi.fn().mockResolvedValue(organization),
-    createOrganizationMembership: vi.fn(),
+function hooksRepo(members: Partial<BetterAuthHooksRepository>): BetterAuthHooksRepository {
+  const unused = (): never => {
+    throw new Error("this repository member is not used by this test");
   };
-  return { double: mocks as unknown as BetterAuthHooksRepository, mocks };
+  return {
+    tryFindUserForHooks: unused,
+    tryFindOrganizationBySsoDomain: unused,
+    countAccountsForUser: unused,
+    findFederatedAccountsForUser: unused,
+    findFederatedAccountsForUsers: unused,
+    deleteAccounts: unused,
+    flagPendingSsoSetup: unused,
+    createOrganizationMembership: unused,
+    reconcileSsoAccounts: unused,
+    recordLastLogin: unused,
+    countOrgMembershipsForUser: unused,
+    ...members,
+  };
+}
+
+function organizationRepo(organization: BetterAuthHookOrganization | null) {
+  const mocks = {
+    tryFindOrganizationBySsoDomain: vi
+      .fn<BetterAuthHooksRepository["tryFindOrganizationBySsoDomain"]>()
+      .mockResolvedValue(organization),
+    createOrganizationMembership:
+      vi.fn<BetterAuthHooksRepository["createOrganizationMembership"]>(),
+  };
+  return { double: hooksRepo(mocks), mocks };
 }
 
 describe("the ssoDomain auto-join on an unlicensed deployment", () => {
   /** @scenario "Unlicensed-mode signup does not auto-join a domain-matched organization" */
   it("creates the account and skips the domain-matched organization entirely", async () => {
     const federation = new StubFederation(false);
-    const { double: repo, mocks } = organizationRepo({ id: "org_1", ssoDomain: "acme.com" });
+    const { double: repo, mocks } = organizationRepo({
+      id: "org_1",
+      name: "Acme",
+      ssoProvider: null,
+    });
 
     await afterUserCreate({
       repo,

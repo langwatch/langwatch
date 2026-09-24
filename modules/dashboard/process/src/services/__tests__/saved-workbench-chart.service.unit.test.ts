@@ -32,7 +32,7 @@ import {
   type SavedWorkbenchChartRepository,
 } from "../saved-workbench-chart.service.ts";
 
-const PROTECTIONS = { canSeePII: false } as unknown as LangWatchQLProtections;
+const PROTECTIONS: LangWatchQLProtections = {};
 
 function definition(overrides: Partial<SavedWorkbenchChartDefinition> = {}) {
   return {

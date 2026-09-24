@@ -50,7 +50,7 @@ export class SendgridEmailGatewayAdapter extends EmailGateway {
     // Same CRLF/header-injection hardening as the SES raw-MIME path: strip
     // line breaks from custom header names and values before they reach the
     // provider.
-    const sanitizedHeaders = this.mime.trySanitizeHeaders(content.headers);
+    const sanitizedHeaders = this.mime.normalizeHeaders(content.headers);
 
     const message = {
       to: content.to,

@@ -240,6 +240,39 @@ function nodeLlmConfig(rawLlmValue: LlmConfigParameter["value"]): LLMConfig {
   return rawLlmValue;
 }
 
+// Build LLM config, omitting undefined fields so they don't override
+// defaults during merge in PromptEditorDrawer (e.g., maxTokens from project)
+function localLlmConfig(llmConfig: LLMConfig): LocalPromptConfig["llm"] {
+  return {
+    model: llmConfig.model,
+    ...(llmConfig.temperature !== undefined && {
+      temperature: llmConfig.temperature,
+    }),
+    ...(llmConfig.max_tokens !== undefined && {
+      maxTokens: llmConfig.max_tokens,
+    }),
+    ...(llmConfig.top_p !== undefined && { topP: llmConfig.top_p }),
+    ...(llmConfig.frequency_penalty !== undefined && {
+      frequencyPenalty: llmConfig.frequency_penalty,
+    }),
+    ...(llmConfig.presence_penalty !== undefined && {
+      presencePenalty: llmConfig.presence_penalty,
+    }),
+    ...(llmConfig.seed !== undefined && { seed: llmConfig.seed }),
+    ...(llmConfig.top_k !== undefined && { topK: llmConfig.top_k }),
+    ...(llmConfig.min_p !== undefined && { minP: llmConfig.min_p }),
+    ...(llmConfig.repetition_penalty !== undefined && {
+      repetitionPenalty: llmConfig.repetition_penalty,
+    }),
+    ...(llmConfig.reasoning !== undefined && {
+      reasoning: llmConfig.reasoning,
+    }),
+    ...(llmConfig.verbosity !== undefined && {
+      verbosity: llmConfig.verbosity,
+    }),
+  };
+}
+
 /**
  * Converts inline node data (parameters array) to LocalPromptConfig format.
  * @param nodeData - Raw node data from the workflow (Signature or LlmPromptConfigComponent)
@@ -290,36 +323,7 @@ export function nodeDataToLocalPromptConfig(
     ...(o.json_schema && { json_schema: o.json_schema }),
   }));
 
-  // Build LLM config, omitting undefined fields so they don't override
-  // defaults during merge in PromptEditorDrawer (e.g., maxTokens from project)
-  const llm: LocalPromptConfig["llm"] = {
-    model: llmConfig.model,
-    ...(llmConfig.temperature !== undefined && {
-      temperature: llmConfig.temperature,
-    }),
-    ...(llmConfig.max_tokens !== undefined && {
-      maxTokens: llmConfig.max_tokens,
-    }),
-    ...(llmConfig.top_p !== undefined && { topP: llmConfig.top_p }),
-    ...(llmConfig.frequency_penalty !== undefined && {
-      frequencyPenalty: llmConfig.frequency_penalty,
-    }),
-    ...(llmConfig.presence_penalty !== undefined && {
-      presencePenalty: llmConfig.presence_penalty,
-    }),
-    ...(llmConfig.seed !== undefined && { seed: llmConfig.seed }),
-    ...(llmConfig.top_k !== undefined && { topK: llmConfig.top_k }),
-    ...(llmConfig.min_p !== undefined && { minP: llmConfig.min_p }),
-    ...(llmConfig.repetition_penalty !== undefined && {
-      repetitionPenalty: llmConfig.repetition_penalty,
-    }),
-    ...(llmConfig.reasoning !== undefined && {
-      reasoning: llmConfig.reasoning,
-    }),
-    ...(llmConfig.verbosity !== undefined && {
-      verbosity: llmConfig.verbosity,
-    }),
-  };
+  const llm = localLlmConfig(llmConfig);
 
   return {
     llm,

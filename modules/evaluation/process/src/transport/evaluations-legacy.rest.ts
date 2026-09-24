@@ -483,9 +483,15 @@ async function evaluateDataset({
   const checkType = monitor?.checkType ?? evaluation;
   const settings = monitor ? monitor.parameters : null;
 
-  const evaluator = await getEvaluatorIncludingCustom(app, projectId, checkType as EvaluatorTypes);
-
-  if (!evaluator) return answer({ error: `Evaluator not found: ${checkType}` }, 400);
+  let evaluator: EvaluatorIncludingCustom;
+  try {
+    evaluator = await getEvaluatorIncludingCustom(app, projectId, checkType as EvaluatorTypes);
+  } catch (error) {
+    if (error instanceof HandledError && error.code === "evaluator_not_found") {
+      return answer({ error: `Evaluator not found: ${checkType}` }, 400);
+    }
+    throw error;
+  }
 
   let data: EvaluationDispatchData;
 
@@ -607,11 +613,17 @@ async function handleEvaluatorCall({
   const isLegacyPairwiseDispatch = saved.checkType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
   const checkType = resolveDispatchEvaluatorType(saved.checkType) ?? saved.checkType;
 
-  const evaluatorDefinition =
-    saved.workflowDefinition ??
-    (await getEvaluatorIncludingCustom(app, projectId, checkType as EvaluatorTypes));
-
-  if (!evaluatorDefinition) return answer({ error: `Evaluator not found: ${checkType}` }, 404);
+  let evaluatorDefinition: NonNullable<typeof saved.workflowDefinition> | EvaluatorIncludingCustom;
+  try {
+    evaluatorDefinition =
+      saved.workflowDefinition ??
+      (await getEvaluatorIncludingCustom(app, projectId, checkType as EvaluatorTypes));
+  } catch (error) {
+    if (error instanceof HandledError && error.code === "evaluator_not_found") {
+      return answer({ error: `Evaluator not found: ${checkType}` }, 404);
+    }
+    throw error;
+  }
 
   let params: EvaluationRESTParams;
 
@@ -624,7 +636,7 @@ async function handleEvaluatorCall({
   }
 
   const isGuardrail = !!(asGuardrail || params.as_guardrail);
-  const disabled = disabledGuardrailAnswer({ monitor, isGuardrail });
+  const disabled = buildDisabledGuardrailAnswer({ monitor, isGuardrail });
 
   if (disabled) return disabled;
 
@@ -658,7 +670,7 @@ async function handleEvaluatorCall({
     return answer({ error: sentenceFor(error) }, 400);
   }
 
-  const missing = missingRequiredField({ evaluatorDefinition, data, projectId });
+  const missing = detectMissingRequiredField({ evaluatorDefinition, data, projectId });
 
   if (missing) return missing;
 
@@ -679,7 +691,7 @@ async function handleEvaluatorCall({
  * A guardrail whose monitor an operator has switched off does not block the
  * request it was guarding: it skips, and says it passed.
  */
-function disabledGuardrailAnswer({
+function buildDisabledGuardrailAnswer({
   monitor,
   isGuardrail,
 }: {
@@ -822,7 +834,7 @@ async function mergeEvaluatorSettings({
 }
 
 /** The first required field this input does not carry, as its own refusal. */
-function missingRequiredField({
+function detectMissingRequiredField({
   evaluatorDefinition,
   data,
   projectId,
@@ -1108,13 +1120,19 @@ function internalErrorResult(details: string): SingleEvaluationResult {
   return { status: "error", error_type: "INTERNAL_ERROR", details, traceback: [] };
 }
 
+type EvaluatorIncludingCustom =
+  | EvaluatorDefinition<keyof typeof AVAILABLE_EVALUATORS>
+  | CustomEvaluatorDefinition;
+
+/**
+ * A built-in or project custom evaluator by type; throws `EvaluatorNotFoundError` when neither
+ * has it.
+ */
 export const getEvaluatorIncludingCustom = async (
   app: EvaluationApi,
   projectId: string,
   checkType: EvaluatorTypes,
-): Promise<
-  EvaluatorDefinition<keyof typeof AVAILABLE_EVALUATORS> | CustomEvaluatorDefinition | undefined
-> => {
+): Promise<EvaluatorIncludingCustom> => {
   const availableCustomEvaluators = await app.listCustomEvaluators({ projectId });
   const customEntries: [string, CustomEvaluatorDefinition][] = [];
 
@@ -1139,7 +1157,9 @@ export const getEvaluatorIncludingCustom = async (
     ...Object.fromEntries(customEntries),
   };
 
-  return availableEvaluators[checkType];
+  const evaluator: EvaluatorIncludingCustom | undefined = availableEvaluators[checkType];
+  if (!evaluator) throw new EvaluatorNotFoundError(checkType);
+  return evaluator;
 };
 
 /**

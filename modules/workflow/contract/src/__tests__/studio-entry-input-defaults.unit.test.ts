@@ -4,7 +4,7 @@ import {
   applyEntryInputDefaults,
   entryInlineWithDefaults,
 } from "../studio-entry-input-defaults.ts";
-import type { Field, StudioWorkflow } from "../studio-workflow.ts";
+import type { Entry, Field, StudioWorkflow } from "../studio-workflow.ts";
 
 const inline = (records: Record<string, unknown[]>) => ({
   records,
@@ -57,18 +57,24 @@ describe("entryInlineWithDefaults", () => {
 });
 
 describe("applyEntryInputDefaults", () => {
-  const workflowWithEntry = (entryData: Record<string, unknown>): StudioWorkflow =>
-    ({
-      nodes: [
-        {
-          id: "entry",
-          type: "entry",
-          data: entryData,
-        },
-        { id: "other", type: "code", data: {} },
-      ],
-      edges: [],
-    }) as unknown as StudioWorkflow;
+  const workflowWithEntry = (entryData: Pick<Entry, "outputs" | "dataset">): StudioWorkflow => ({
+    spec_version: "1.5",
+    name: "Entry defaults",
+    icon: "",
+    description: "",
+    version: "1.0",
+    nodes: [
+      {
+        id: "entry",
+        type: "entry",
+        position: { x: 0, y: 0 },
+        data: { entry_selection: "first", train_size: 0.8, test_size: 0.2, seed: 42, ...entryData },
+      },
+      { id: "other", type: "code", position: { x: 0, y: 0 }, data: {} },
+    ],
+    edges: [],
+    state: {},
+  });
 
   describe("given an entry node with a defaulted input missing from the dataset", () => {
     /** @scenario "New Studio workflows use portable templates and entry defaults" */

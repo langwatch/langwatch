@@ -58,6 +58,12 @@ function GovernanceTeamDetailPage() {
   const pageTitle = team
     ? `${team.teamName} · AI Governance · LangWatch`
     : "Team · AI Governance · LangWatch";
+  const activityView = teamActivityView({
+    canReadActivity,
+    hasError: !!teamsQuery.error,
+    isLoading: teamsQuery.isLoading,
+    hasTeam: !!team,
+  });
 
   return (
     <GovernanceLayout pageTitle={pageTitle}>
@@ -86,26 +92,28 @@ function GovernanceTeamDetailPage() {
           </HStack>
         </VStack>
 
-        {!canReadActivity ? (
+        {activityView === "forbidden" && (
           <PermissionRequiredNotice
             permission="activityMonitor:view"
             detail="This team's spend and activity stay hidden until then."
           />
-        ) : teamsQuery.error ? (
+        )}
+        {activityView === "error" && teamsQuery.error && (
           <HandledErrorAlert
             error={teamsQuery.error}
             fallbackTitle="Couldn't load this team's activity"
           />
-        ) : teamsQuery.isLoading ? (
-          <Spinner />
-        ) : !team ? (
+        )}
+        {activityView === "loading" && <Spinner />}
+        {activityView === "missing" && (
           <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={5}>
             <Text fontSize="sm" color="fg.muted">
               No spend data for this team in the last 30 days. The team may not have any associated
               ingestion sources reporting activity yet.
             </Text>
           </Box>
-        ) : (
+        )}
+        {activityView === "ready" && team && (
           <>
             <SimpleGrid columns={{ base: 1, md: 4 }} gap={3}>
               <Stat label="Spend (30 d)" value={fmtUsd(team.spendUsd)} />
@@ -175,3 +183,20 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 export default GovernanceTeamDetailPage;
+
+function teamActivityView({
+  canReadActivity,
+  hasError,
+  isLoading,
+  hasTeam,
+}: {
+  canReadActivity: boolean;
+  hasError: boolean;
+  isLoading: boolean;
+  hasTeam: boolean;
+}): "forbidden" | "error" | "loading" | "missing" | "ready" {
+  if (!canReadActivity) return "forbidden";
+  if (hasError) return "error";
+  if (isLoading) return "loading";
+  return hasTeam ? "ready" : "missing";
+}

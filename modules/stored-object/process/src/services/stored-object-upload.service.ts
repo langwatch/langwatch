@@ -3,7 +3,7 @@
  * in-process, and create, PUT to a signed URL, confirm. Every id is a fresh
  * KSUID and every digest is taken as the bytes stream.
  */
-import { ValidationError } from "@langwatch/handled-error";
+import { HandledError, ValidationError } from "@langwatch/handled-error";
 import {
   DirectUploadUnavailableError,
   StorageUnavailableError,
@@ -63,7 +63,8 @@ export class StoredObjectUploadService {
     } catch (error) {
       if (
         error instanceof DirectUploadUnavailableError ||
-        error instanceof StoredObjectBytesMissingError
+        error instanceof StoredObjectBytesMissingError ||
+        error instanceof StoredObjectNotFoundError
       ) {
         throw error;
       }
@@ -240,9 +241,13 @@ export class StoredObjectUploadService {
 
     const address = value.storage;
     const digest = await StoredObjectUploadService.storageCall(() =>
-      this.options.storage.tryStat({ projectId: input.projectId, address }),
-    );
-    if (!digest) throw new UploadIncompleteError();
+      this.options.storage.getStat({ projectId: input.projectId, address }),
+    ).catch((error: unknown) => {
+      if (error instanceof HandledError && error.code === "stored_object_not_found") {
+        throw new UploadIncompleteError();
+      }
+      throw error;
+    });
 
     StoredObjectUploadService.assertByteFacts(value, digest.byteLength);
     const now = this.options.now();

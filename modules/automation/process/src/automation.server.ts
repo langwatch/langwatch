@@ -30,6 +30,7 @@ import type { AutomationRunawayNotice } from "./channels/automation-runaway-noti
 import type { SchedulerWake } from "./channels/automation-scheduler-wake.channel.ts";
 import type { AutomationEmailCapRepository } from "./repositories/automation-email-cap.repository.ts";
 import type { AutomationPersistActionWriter } from "./repositories/automation-persist-action.repository.ts";
+import type { AutomationPersistCapRepository } from "./repositories/automation-persist-cap.repository.ts";
 import { automationRepositories } from "./repositories/automation-repositories.registry.ts";
 import type { AutomationRunaway } from "./repositories/automation-runaway.repository.ts";
 import type { AutomationScheduledJobRepository } from "./repositories/automation-scheduled-job.repository.ts";
@@ -94,10 +95,7 @@ import { AutomationWebhookSecretsService } from "./services/automation-webhook-s
 import { AutomationEmailCapService } from "./services/email-cap.service.ts";
 import { GraphTriggerHeartbeatService } from "./services/graph-trigger-heartbeat.service.ts";
 import { AutomationPersistActionService } from "./services/persist-action.service.ts";
-import {
-  AutomationPersistCapService,
-  type AutomationPersistCapRedis,
-} from "./services/persist-cap.service.ts";
+import { AutomationPersistCapService } from "./services/persist-cap.service.ts";
 import { ReportChartService, type ReportChartDeps } from "./services/report-chart.service.ts";
 import {
   ReportDispatchService,
@@ -382,8 +380,8 @@ export function createAutomationSettlement(input: {
   /** The one database client the composing process opened. */
   prisma: AutomationSettlementDatabase;
   clock: AutomationClock;
-  /** The shared store the daily ceiling counts in; absent counts per process. */
-  redis?: AutomationPersistCapRedis | null;
+  /** Where the daily ceiling counts: a Redis one counts fleet-wide. */
+  persistCapSlots: AutomationPersistCapRepository;
   projects: AutomationProjectDirectory;
   traces: AutomationSettlementTraceReader;
   evaluations: AutomationSettlementEvaluationReader;
@@ -435,6 +433,7 @@ export function createAutomationSettlement(input: {
       ? AutomationPersistCapService.create({
           projects: input.persistCeiling.projects,
           planProvider: input.persistCeiling.plans,
+          slots: input.persistCapSlots,
           config: {
             free: input.persistCeiling.free,
             paid: input.persistCeiling.paid,
@@ -447,7 +446,7 @@ export function createAutomationSettlement(input: {
   const ledger = PrismaAutomationSettlementLedgerRepository.create({
     prisma,
     clock,
-    redis: input.redis ?? null,
+    persistCaps: input.persistCapSlots,
     persistCap: persistCaps
       ? { kind: "resolved", resolve: (projectId) => persistCaps.resolvePersistDailyCap(projectId) }
       : { kind: "fixed", cap: statedCeiling(input.persistCeiling) },

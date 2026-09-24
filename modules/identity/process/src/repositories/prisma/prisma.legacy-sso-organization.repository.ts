@@ -1,3 +1,4 @@
+import { SsoConnectionNotFoundError } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { LegacySsoOrganizationRepository } from "../../services/sso-connection-grandfather.service.ts";
@@ -14,22 +15,24 @@ export class PrismaLegacySsoOrganizationRepository implements LegacySsoOrganizat
 
   constructor(private readonly prisma: PrismaClient) {}
 
-  async tryFindLegacySso({
+  async getLegacySso({
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<{ ssoDomain: string; ssoProvider: string } | null> {
+  }): Promise<{ ssoDomain: string; ssoProvider: string }> {
     const organization = await this.prisma.organization.findUnique({
       where: { id: organizationId },
       select: { ssoDomain: true, ssoProvider: true },
     });
-    if (!organization?.ssoDomain || !organization.ssoProvider) return null;
+    if (!organization?.ssoDomain || !organization.ssoProvider) {
+      throw new SsoConnectionNotFoundError(`${organizationId} carries no legacy SSO`);
+    }
     return { ssoDomain: organization.ssoDomain, ssoProvider: organization.ssoProvider };
   }
 
   /**
    * The organization registered to a domain, by the same columns
-   * {@link tryFindLegacySso} reads. Not part of
+   * {@link getLegacySso} reads. Not part of
    * {@link LegacySsoOrganizationRepository}; for a caller wanting the org itself.
    */
   async findByDomain({

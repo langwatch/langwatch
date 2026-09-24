@@ -147,12 +147,13 @@ describe("given the workspace's TypeScript projects", () => {
         if (typeof buildInfo !== "string") return [`${file}: no tsBuildInfoFile`];
         const resolvedBuildInfo = resolve(dirname(join(REPO_ROOT, file)), buildInfo);
         const inside = relative(dirname(join(REPO_ROOT, file)), resolvedBuildInfo);
+        const ownsBuildInfo = owns(join(REPO_ROOT, file), resolvedBuildInfo);
         // Build info belongs beside what the project produces, which for all
         // but two projects is its own `dist`. Under node_modules it is wrong
         // twice: an install wipes it, and clearing the output directory leaves
         // it behind, so the next build reads an up-to-date project and emits
         // nothing into the directory that was just deleted.
-        if (!owns(join(REPO_ROOT, file), resolvedBuildInfo) || inside.includes("node_modules/")) {
+        if (!ownsBuildInfo || inside.includes("node_modules/")) {
           return [
             `${file}: tsBuildInfoFile is ${buildInfo}, which is not inside the project's own output`,
           ];

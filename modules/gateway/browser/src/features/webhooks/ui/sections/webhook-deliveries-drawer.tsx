@@ -28,8 +28,14 @@ type HealthView = RouterOutputs["webhookEndpoints"]["health"];
 type DeliveriesPage = RouterOutputs["webhookEndpoints"]["deliveries"];
 type DeliveryView = DeliveriesPage["deliveries"][number];
 
+function outcomePalette(outcome: string) {
+  if (outcome === "success") return "green";
+  if (outcome === "terminal") return "red";
+  return "orange";
+}
+
 function outcomeBadge(outcome: string) {
-  const palette = outcome === "success" ? "green" : outcome === "terminal" ? "red" : "orange";
+  const palette = outcomePalette(outcome);
   return (
     <Badge size="sm" colorPalette={palette}>
       {outcome}

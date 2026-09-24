@@ -2,6 +2,7 @@ import {
   emptySsoConnection,
   reduceSsoConnection,
   type SsoConnectionFactInput,
+  SsoConnectionNotFoundError,
   type SsoConnectionState,
 } from "@langwatch/identity-contract";
 
@@ -43,26 +44,23 @@ export class InMemoryConnections
     return candidate;
   }
 
-  async tryFindConnection({
-    connectionId,
-  }: {
-    connectionId: string;
-  }): Promise<SsoConnectionState | null> {
-    return this.states.get(connectionId) ?? null;
+  async getConnection({ connectionId }: { connectionId: string }): Promise<SsoConnectionState> {
+    const state = this.states.get(connectionId);
+    if (!state) throw new SsoConnectionNotFoundError(`connection ${connectionId} does not exist`);
+    return state;
   }
 
-  async tryFindDomainOwner({
+  async getDomainOwner({
     domain,
   }: {
     domain: string;
-  }): Promise<{ connectionId: string; organizationId: string } | null> {
+  }): Promise<{ connectionId: string; organizationId: string }> {
     const holders = [...this.states.values()].filter((state) =>
       ownedVerifiedDomains(state).includes(domain),
     );
     const owner = holders.find((state) => state.replacesConnectionId === null) ?? holders[0];
-    return owner
-      ? { connectionId: owner.connectionId, organizationId: owner.organizationId }
-      : null;
+    if (!owner) throw new SsoConnectionNotFoundError(`no live connection holds domain ${domain}`);
+    return { connectionId: owner.connectionId, organizationId: owner.organizationId };
   }
 
   async findForOrganization({

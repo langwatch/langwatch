@@ -251,7 +251,7 @@ export function splitPermission(permission: string): {
  * Grain exclusion reason: grain-level (GRAIN_EXCLUSIONS) or action-only
  * (attach/detach on gatewayGuardrails). Returns reason or undefined.
  */
-function grainExclusionReason(family: string, action: string): string | undefined {
+function describeGrainExclusion(family: string, action: string): string | undefined {
   const grainExcluded = GRAIN_EXCLUSIONS[`${family}:${action}`];
   if (grainExcluded) return grainExcluded;
   if (GUARDRAIL_ONLY_ACTIONS.has(action) && family !== GUARDRAIL_FAMILY) {
@@ -288,7 +288,7 @@ export function classifyForLangy(permission: string): LangyPermissionVerdict {
   const fullyExcluded = FULLY_EXCLUDED_FAMILIES[family];
   if (fullyExcluded) return { disposition: "excluded", reason: fullyExcluded };
 
-  const grainExcluded = grainExclusionReason(family, action);
+  const grainExcluded = describeGrainExclusion(family, action);
   if (grainExcluded) return { disposition: "excluded", reason: grainExcluded };
 
   const authScope = AUTH_SCOPE_FAMILIES[family];

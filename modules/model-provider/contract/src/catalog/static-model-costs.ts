@@ -5,7 +5,7 @@ import { llmModels } from "./model-catalog.ts";
 const ANTHROPIC_MODEL_ID = /^~?anthropic\//;
 const OPENAI_AUDIO_MODEL_ID = /^~?openai\/(gpt-audio|gpt-realtime)/;
 
-export function resolveCacheWrite1hRate(
+export function deriveCacheWrite1hRate(
   modelId: string,
   pricing: {
     inputCostPerToken?: number;
@@ -27,7 +27,7 @@ export function resolveCacheWrite1hRate(
   return pricing.inputCostPerToken * 2;
 }
 
-export function resolveAudioOutputRate(
+export function deriveAudioOutputRate(
   modelId: string,
   pricing: {
     audioCostPerToken?: number;
@@ -65,9 +65,9 @@ export function getStaticModelCostRates(): readonly ModelCostRate[] {
           outputCostPerToken: model.pricing.outputCostPerToken ?? 0,
           cacheReadCostPerToken: model.pricing.inputCacheReadPerToken,
           cacheCreationCostPerToken: model.pricing.inputCacheWritePerToken,
-          cacheCreation1hCostPerToken: resolveCacheWrite1hRate(modelId, model.pricing),
+          cacheCreation1hCostPerToken: deriveCacheWrite1hRate(modelId, model.pricing),
           inputAudioCostPerToken: model.pricing.audioCostPerToken,
-          outputAudioCostPerToken: resolveAudioOutputRate(modelId, model.pricing),
+          outputAudioCostPerToken: deriveAudioOutputRate(modelId, model.pricing),
           inputImageCostPerToken: model.pricing.imageCostPerToken,
           outputImageCostPerToken: model.pricing.imageOutputCostPerToken,
           inputCostPerCharacter: model.pricing.inputCostPerCharacter,

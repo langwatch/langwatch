@@ -29,40 +29,24 @@ describe("given a process that produces identity commands without consuming them
   describe("when it builds the four definitions", () => {
     it("names the pipelines the worker routes on", () => {
       expect(
-        (
-          IdentityProducerPipelinesAdapter.create({
-            processName: PROCESS_NAME,
-          }).identityPipeline() as unknown as {
-            metadata: { name: string };
-          }
-        ).metadata.name,
+        IdentityProducerPipelinesAdapter.create({
+          processName: PROCESS_NAME,
+        }).identityPipeline().metadata.name,
       ).toBe(IDENTITY_PIPELINE_NAME);
       expect(
-        (
-          IdentityProducerPipelinesAdapter.create({
-            processName: PROCESS_NAME,
-          }).joinRequestPipeline() as unknown as {
-            metadata: { name: string };
-          }
-        ).metadata.name,
+        IdentityProducerPipelinesAdapter.create({
+          processName: PROCESS_NAME,
+        }).joinRequestPipeline().metadata.name,
       ).toBe(JOIN_REQUEST_PIPELINE_NAME);
       expect(
-        (
-          IdentityProducerPipelinesAdapter.create({
-            processName: PROCESS_NAME,
-          }).ssoConnectionPipeline() as unknown as {
-            metadata: { name: string };
-          }
-        ).metadata.name,
+        IdentityProducerPipelinesAdapter.create({
+          processName: PROCESS_NAME,
+        }).ssoConnectionPipeline().metadata.name,
       ).toBe(SSO_CONNECTION_PIPELINE_NAME);
       expect(
-        (
-          IdentityProducerPipelinesAdapter.create({
-            processName: PROCESS_NAME,
-          }).scimSyncPipeline() as unknown as {
-            metadata: { name: string };
-          }
-        ).metadata.name,
+        IdentityProducerPipelinesAdapter.create({
+          processName: PROCESS_NAME,
+        }).scimSyncPipeline().metadata.name,
       ).toBe(SCIM_SYNC_PIPELINE_NAME);
     });
 
@@ -80,9 +64,7 @@ describe("given a process that produces identity commands without consuming them
       }).build();
 
       expect(commandNamesOf(producer as never)).toEqual(commandNamesOf(consumer as never));
-      expect((producer as unknown as { aggregate: { type: string } }).aggregate.type).toBe(
-        (consumer as unknown as { aggregate: { type: string } }).aggregate.type,
-      );
+      expect(producer.aggregate.type).toBe(consumer.aggregate.type);
     });
 
     /**
@@ -107,9 +89,7 @@ describe("given a process that produces identity commands without consuming them
         "revokeScimSync",
       ]);
       expect(commandNamesOf(producer as never)).toEqual(commandNamesOf(consumer as never));
-      expect((producer as unknown as { aggregate: { type: string } }).aggregate.type).toBe(
-        (consumer as unknown as { aggregate: { type: string } }).aggregate.type,
-      );
+      expect(producer.aggregate.type).toBe(consumer.aggregate.type);
     });
   });
 

@@ -7722,9 +7722,18 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/audit-log-contract':
+        specifier: workspace:*
+        version: link:../../audit-log/contract
+      '@langwatch/auth-contract':
+        specifier: workspace:*
+        version: link:../../auth/contract
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/coding-agent-contract':
+        specifier: workspace:*
+        version: link:../../coding-agent/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
@@ -10648,6 +10657,9 @@ importers:
       '@langwatch/api-key-contract':
         specifier: workspace:*
         version: link:../../api-key/contract
+      '@langwatch/audit-log-contract':
+        specifier: workspace:*
+        version: link:../../audit-log/contract
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -10657,6 +10669,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
+      '@langwatch/langy-contract':
+        specifier: workspace:*
+        version: link:../../langy/contract
       '@langwatch/onboarding-contract':
         specifier: workspace:*
         version: link:../../onboarding/contract
@@ -10678,6 +10693,9 @@ importers:
       '@langwatch/topic-contract':
         specifier: workspace:*
         version: link:../../topic/contract
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2)

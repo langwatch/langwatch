@@ -9,6 +9,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   redactStoredObjectStorageUri,
   ObjectNotFoundError,
+  StoredObjectNotFoundError,
 } from "@langwatch/stored-object-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 import { SpanKind } from "@opentelemetry/api";
@@ -33,7 +34,7 @@ function deriveStoredObjectId({
   sha256: string;
 }): string {
   const hash = createHash("sha1").update(`${projectId}:${sha256}`).digest();
-  const identifier = hash.subarray(0, 8) as unknown as Uint8Array;
+  const identifier = hash.subarray(0, 8);
   const instance = new Instance(Instance.schemes.RANDOM, identifier);
 
   return new Ksuid("prod", "so", 0, instance, 0).toString();
@@ -303,17 +304,16 @@ export class StoredObjectsService {
   /**
    * Retrieves a stored object row and a readable stream of its bytes.
    */
-  async tryGetById({
+  /** Throws `StoredObjectNotFoundError` when the project holds no such row. */
+  async getById({
     projectId,
     id,
   }: {
     projectId: string;
     id: string;
-  }): Promise<
-    { row: StoredObject; stream: Readable } | { row: StoredObject; status: "missing" } | null
-  > {
+  }): Promise<{ row: StoredObject; stream: Readable } | { row: StoredObject; status: "missing" }> {
     return tracer.withActiveSpan(
-      "StoredObjectsService.tryGetById",
+      "StoredObjectsService.getById",
       {
         kind: SpanKind.INTERNAL,
         attributes: {
@@ -327,7 +327,7 @@ export class StoredObjectsService {
         span.setAttribute("result.found", row !== null);
 
         if (!row) {
-          return null;
+          throw new StoredObjectNotFoundError();
         }
 
         try {

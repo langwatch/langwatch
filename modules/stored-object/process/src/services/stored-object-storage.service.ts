@@ -6,9 +6,10 @@ import type {
   SignedObjectUpload,
   StoredObjectAddress,
 } from "@langwatch/process-stores/members";
-import type {
-  StoredObjectByteStream,
-  StoredObjectStorageDestination,
+import {
+  StoredObjectNotFoundError,
+  type StoredObjectByteStream,
+  type StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -69,26 +70,26 @@ export class StoredObjectStorageService extends StoredObjectStorage {
     });
   }
 
-  async tryStat(input: {
+  async getStat(input: {
     projectId: string;
     address: StoredObjectStorageAddress;
-  }): Promise<ObjectDigest | null> {
+  }): Promise<ObjectDigest> {
     try {
       return await this.objects.digest(memberAddressOf(input.projectId, input.address));
     } catch (error) {
-      if (isAbsent(error)) return null;
+      if (isAbsent(error)) throw new StoredObjectNotFoundError();
       throw error;
     }
   }
 
-  async tryRead(input: {
+  async getBytes(input: {
     projectId: string;
     address: StoredObjectStorageAddress;
-  }): Promise<StoredObjectByteStream | null> {
+  }): Promise<StoredObjectByteStream> {
     try {
       return await this.objects.read(memberAddressOf(input.projectId, input.address));
     } catch (error) {
-      if (isAbsent(error)) return null;
+      if (isAbsent(error)) throw new StoredObjectNotFoundError();
       throw error;
     }
   }

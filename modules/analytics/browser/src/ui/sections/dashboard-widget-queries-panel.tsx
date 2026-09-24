@@ -126,33 +126,33 @@ export function DashboardWidgetQueriesPanel({
         minHeight={0}
         overflowY="auto"
       >
-        {queries.map((query, index) => (
-          <DashboardWidgetQueryRow
-            // Index, not name: a row mid-rename (typing toward a duplicate,
-            // or briefly blank) must not remount and lose editor focus.
-            key={index}
-            value={valueOf(index)}
-            isOpen={openValues.includes(valueOf(index))}
-            query={query}
-            nameError={
-              dupes.has(query.name)
-                ? "Another query already uses this name."
-                : !query.name.trim()
-                  ? "Every query needs a name."
-                  : null
-            }
-            onChange={(next) => {
-              const updated = [...queries];
-              updated[index] = next;
-              onChange(updated);
-            }}
-            onRemove={() => handleRemove(index)}
-            canRemove={queries.length > 1}
-            onRun={() => void handleRun(query)}
-            isRunning={runningNames.has(query.name)}
-            lastRun={lastRuns[query.name]}
-          />
-        ))}
+        {queries.map((query, index) => {
+          const blankNameError = query.name.trim() ? null : "Every query needs a name.";
+          const nameError = dupes.has(query.name)
+            ? "Another query already uses this name."
+            : blankNameError;
+          return (
+            <DashboardWidgetQueryRow
+              // Index, not name: a row mid-rename (typing toward a duplicate,
+              // or briefly blank) must not remount and lose editor focus.
+              key={index}
+              value={valueOf(index)}
+              isOpen={openValues.includes(valueOf(index))}
+              query={query}
+              nameError={nameError}
+              onChange={(next) => {
+                const updated = [...queries];
+                updated[index] = next;
+                onChange(updated);
+              }}
+              onRemove={() => handleRemove(index)}
+              canRemove={queries.length > 1}
+              onRun={() => void handleRun(query)}
+              isRunning={runningNames.has(query.name)}
+              lastRun={lastRuns[query.name]}
+            />
+          );
+        })}
       </Accordion.Root>
     </VStack>
   );

@@ -3,7 +3,10 @@
  * failure has to name it: a bare throw reaches the customer as a generic
  * "unknown error". @see specs/npx-installer/07-lean-install.feature
  */
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { HandledError } from "@langwatch/handled-error";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -18,17 +21,27 @@ const langevalsEvaluate = vi.fn(() => {
   throw new Error("the analysis service must never be reached for an unknown evaluator");
 });
 
+function unused(member: string) {
+  return (): never => {
+    throw new Error(`${member} is not reached for an unknown evaluator`);
+  };
+}
+
 function run() {
-  const deps = {
-    traceService: {} as never,
-    spanDigest: {} as never,
-    modelEnvResolver: {} as never,
+  const deps: EvaluationExecutionDeps = {
+    traceService: {
+      getTracesWithSpans: unused("traceService.getTracesWithSpans"),
+      getEvaluationsMultiple: unused("traceService.getEvaluationsMultiple"),
+      getTracesWithSpansByThreadIds: unused("traceService.getTracesWithSpansByThreadIds"),
+    },
+    spanDigest: { format: unused("spanDigest.format") },
+    modelEnvResolver: { resolveForEvaluator: unused("modelEnvResolver.resolveForEvaluator") },
     langevalsClient: { evaluate: langevalsEvaluate },
-    workflows: {} as never,
-    evaluators: {} as never,
-    workflowExecutor: {} as never,
-    installEnvironment: {} as never,
-  } as unknown as EvaluationExecutionDeps;
+    workflows: createApiFixture<WorkflowApi>({}),
+    evaluators: createApiFixture<EvaluatorApi>({}),
+    workflowExecutor: { runEvaluationWorkflow: unused("workflowExecutor.runEvaluationWorkflow") },
+    installEnvironment: {},
+  };
 
   return EvaluationExecutionService.create(deps).executeForData({
     projectId: "project-1",

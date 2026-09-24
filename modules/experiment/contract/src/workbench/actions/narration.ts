@@ -18,7 +18,7 @@ export const WORKBENCH_ACTION_NARRATION: Record<string, string> = {
 };
 
 /** The line for one action, or null when the kind has nothing to say. */
-export function narrateWorkbenchAction(kind: string): string | null {
+export function pickWorkbenchActionNarration(kind: string): string | null {
   return WORKBENCH_ACTION_NARRATION[kind] ?? null;
 }
 

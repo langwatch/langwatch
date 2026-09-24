@@ -1,10 +1,10 @@
 import {
   COMPARISON_EVALUATOR_TYPE,
+  type ComparisonEvaluatorConfig,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
   type EvaluationsV3State,
   type EvaluatorConfig,
   type ExecutionCell,
-  type TargetConfig,
 } from "@langwatch/experiment-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 /**
@@ -27,7 +27,9 @@ type PlanState = Pick<
 
 type SeededOutput = { output: unknown; cost?: number; duration?: number };
 
-const comparisonConfig = (overrides: Record<string, unknown> = {}) => ({
+const comparisonConfig = (
+  overrides: Partial<ComparisonEvaluatorConfig> = {},
+): ComparisonEvaluatorConfig => ({
   variants: ["target-1", "target-2"],
   hasGoldenAnswer: true,
   goldenField: "expected",
@@ -54,7 +56,7 @@ const loadedPrompts = new Map([
 ]);
 
 const stateWithChipComparison = (
-  comparison: Record<string, unknown> = comparisonConfig(),
+  comparison: ComparisonEvaluatorConfig = comparisonConfig(),
 ): PlanState => ({
   datasets: [{ id: "dataset-1", name: "Test Dataset" } as PlanState["datasets"][0]],
   activeDatasetId: "dataset-1",
@@ -62,17 +64,16 @@ const stateWithChipComparison = (
   evaluators: [
     {
       id: "comparison-eval",
-      name: "Judge",
       evaluatorType: COMPARISON_EVALUATOR_TYPE,
       inputs: [{ identifier: "candidates", type: "str" }],
       mappings: {},
       comparison,
-    } as unknown as EvaluatorConfig,
+    },
   ],
 });
 
 const stateWithColumnComparison = (
-  comparison: Record<string, unknown> = comparisonConfig(),
+  comparison: ComparisonEvaluatorConfig = comparisonConfig(),
 ): PlanState => ({
   datasets: [{ id: "dataset-1", name: "Test Dataset" } as PlanState["datasets"][0]],
   activeDatasetId: "dataset-1",
@@ -87,7 +88,7 @@ const stateWithColumnComparison = (
       outputs: [{ identifier: "label", type: "str" }],
       mappings: {},
       comparison,
-    } as unknown as TargetConfig,
+    },
   ] as PlanState["targets"],
   evaluators: [],
 });

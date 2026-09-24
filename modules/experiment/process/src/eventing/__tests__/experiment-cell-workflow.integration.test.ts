@@ -8,7 +8,7 @@ import type {
 } from "@langwatch/experiment-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { LATEST_SPEC_VERSION, type LlmPromptConfigComponent } from "@langwatch/workflow-contract";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   buildCellWorkflow,
@@ -161,37 +161,31 @@ describe("WorkflowBuilder", () => {
   });
 
   describe("when building a signature node from local config", () => {
-    it("builds signature node with correct structure", () => {
-      const config = createBasicLocalPromptConfig();
-      const targetConfig = createBasicTargetConfig();
-      const cell = createBasicCell();
+    let config: ReturnType<typeof createBasicLocalPromptConfig>;
+    let targetConfig: ReturnType<typeof createBasicTargetConfig>;
+    let cell: ReturnType<typeof createBasicCell>;
+    let node: ReturnType<typeof buildSignatureNodeFromLocalConfig>;
 
-      const node = buildSignatureNodeFromLocalConfig({
+    beforeEach(() => {
+      config = createBasicLocalPromptConfig();
+      targetConfig = createBasicTargetConfig();
+      cell = createBasicCell();
+      node = buildSignatureNodeFromLocalConfig({
         nodeId: "test-node",
         name: "Test Prompt",
         localConfig: config,
         targetConfig,
         cell,
       });
+    });
 
+    it("builds signature node with correct structure", () => {
       expect(node.id).toBe("test-node");
       expect(node.type).toBe("signature");
       expect(node.data.name).toBe("Test Prompt");
     });
 
     it("sets LLM config correctly", () => {
-      const config = createBasicLocalPromptConfig();
-      const targetConfig = createBasicTargetConfig();
-      const cell = createBasicCell();
-
-      const node = buildSignatureNodeFromLocalConfig({
-        nodeId: "test-node",
-        name: "Test Prompt",
-        localConfig: config,
-        targetConfig,
-        cell,
-      });
-
       const llmParam = (node.data as LlmPromptConfigComponent).parameters.find(
         (p) => p.identifier === "llm",
       );
@@ -204,18 +198,6 @@ describe("WorkflowBuilder", () => {
     });
 
     it("extracts system message as instructions", () => {
-      const config = createBasicLocalPromptConfig();
-      const targetConfig = createBasicTargetConfig();
-      const cell = createBasicCell();
-
-      const node = buildSignatureNodeFromLocalConfig({
-        nodeId: "test-node",
-        name: "Test Prompt",
-        localConfig: config,
-        targetConfig,
-        cell,
-      });
-
       const instructionsParam = (node.data as LlmPromptConfigComponent).parameters.find(
         (p) => p.identifier === "instructions",
       );
@@ -223,18 +205,6 @@ describe("WorkflowBuilder", () => {
     });
 
     it("sets non-system messages", () => {
-      const config = createBasicLocalPromptConfig();
-      const targetConfig = createBasicTargetConfig();
-      const cell = createBasicCell();
-
-      const node = buildSignatureNodeFromLocalConfig({
-        nodeId: "test-node",
-        name: "Test Prompt",
-        localConfig: config,
-        targetConfig,
-        cell,
-      });
-
       const messagesParam = (node.data as LlmPromptConfigComponent).parameters.find(
         (p) => p.identifier === "messages",
       );
@@ -242,18 +212,6 @@ describe("WorkflowBuilder", () => {
     });
 
     it("sets inputs and outputs", () => {
-      const config = createBasicLocalPromptConfig();
-      const targetConfig = createBasicTargetConfig();
-      const cell = createBasicCell();
-
-      const node = buildSignatureNodeFromLocalConfig({
-        nodeId: "test-node",
-        name: "Test Prompt",
-        localConfig: config,
-        targetConfig,
-        cell,
-      });
-
       expect(node.data.inputs).toHaveLength(1);
       expect(node.data.inputs?.[0]?.identifier).toBe("input");
       expect(node.data.outputs).toHaveLength(1);
@@ -286,35 +244,30 @@ describe("WorkflowBuilder", () => {
       parameters: {},
     });
 
-    it("builds signature node from database prompt", () => {
-      const prompt = createMockPrompt();
-      const targetConfig = createBasicTargetConfig();
-      const cell = createBasicCell();
+    let prompt: ReturnType<typeof createMockPrompt>;
+    let targetConfig: ReturnType<typeof createBasicTargetConfig>;
+    let cell: ReturnType<typeof createBasicCell>;
+    let node: ReturnType<typeof buildSignatureNodeFromPrompt>;
 
-      const node = buildSignatureNodeFromPrompt({
+    beforeEach(() => {
+      prompt = createMockPrompt();
+      targetConfig = createBasicTargetConfig();
+      cell = createBasicCell();
+      node = buildSignatureNodeFromPrompt({
         nodeId: "test-node",
         prompt,
         targetConfig,
         cell,
       });
+    });
 
+    it("builds signature node from database prompt", () => {
       expect(node.id).toBe("test-node");
       expect(node.type).toBe("signature");
       expect(node.data.name).toBe("test-prompt");
     });
 
     it("uses prompt model and settings", () => {
-      const prompt = createMockPrompt();
-      const targetConfig = createBasicTargetConfig();
-      const cell = createBasicCell();
-
-      const node = buildSignatureNodeFromPrompt({
-        nodeId: "test-node",
-        prompt,
-        targetConfig,
-        cell,
-      });
-
       const llmParam = (node.data as LlmPromptConfigComponent).parameters.find(
         (p) => p.identifier === "llm",
       );
@@ -327,76 +280,53 @@ describe("WorkflowBuilder", () => {
   });
 
   describe("when building an evaluator node", () => {
-    it("builds evaluator node with correct type", () => {
-      const evaluator = createBasicEvaluatorConfig();
-      const cell = createBasicCell();
+    let evaluator: ReturnType<typeof createBasicEvaluatorConfig>;
+    let cell: ReturnType<typeof createBasicCell>;
+    let node: ReturnType<typeof buildEvaluatorNode>;
 
-      const node = buildEvaluatorNode({
+    beforeEach(() => {
+      evaluator = createBasicEvaluatorConfig();
+      cell = createBasicCell();
+      node = buildEvaluatorNode({
         evaluator,
         nodeId: "target-1.eval-1",
         targetId: "target-1",
         cell,
         index: 0,
       });
+    });
 
+    it("builds evaluator node with correct type", () => {
       expect(node.id).toBe("target-1.eval-1");
       expect(node.type).toBe("evaluator");
       expect(node.data.cls).toBe("LangWatchEvaluator");
     });
 
     it("sets evaluator type", () => {
-      const evaluator = createBasicEvaluatorConfig();
-      const cell = createBasicCell();
-
-      const node = buildEvaluatorNode({
-        evaluator,
-        nodeId: "target-1.eval-1",
-        targetId: "target-1",
-        cell,
-        index: 0,
-      });
-
       // Full evaluator type including namespace
       expect(node.data.evaluator).toBe("langevals/exact_match");
     });
 
     it("sets evaluator inputs", () => {
-      const evaluator = createBasicEvaluatorConfig();
-      const cell = createBasicCell();
-
-      const node = buildEvaluatorNode({
-        evaluator,
-        nodeId: "target-1.eval-1",
-        targetId: "target-1",
-        cell,
-        index: 0,
-      });
-
       expect(node.data.inputs).toHaveLength(2);
       expect(node.data.inputs?.map((i) => i.identifier)).toEqual(["output", "expected_output"]);
     });
 
     it("sets standard evaluator outputs", () => {
-      const evaluator = createBasicEvaluatorConfig();
-      const cell = createBasicCell();
-
-      const node = buildEvaluatorNode({
-        evaluator,
-        nodeId: "target-1.eval-1",
-        targetId: "target-1",
-        cell,
-        index: 0,
-      });
-
       expect(node.data.outputs?.map((o) => o.identifier)).toEqual(["passed", "score", "label"]);
     });
   });
 
   describe("given the workflow's entry node", () => {
-    it("entry node contains dataset values", () => {
-      const input = createBasicInput();
-      const result = buildCellWorkflow(input, {});
+    let input: ReturnType<typeof createBasicInput>;
+    let result: ReturnType<typeof buildCellWorkflow>;
 
+    beforeEach(() => {
+      input = createBasicInput();
+      result = buildCellWorkflow(input, {});
+    });
+
+    it("entry node contains dataset values", () => {
       const entryNode = result.workflow.nodes.find((n) => n.type === "entry");
       expect(entryNode?.data.outputs).toBeDefined();
 
@@ -408,9 +338,6 @@ describe("WorkflowBuilder", () => {
     });
 
     it("entry node has inline dataset with row data", () => {
-      const input = createBasicInput();
-      const result = buildCellWorkflow(input, {});
-
       const entryNode = result.workflow.nodes.find((n) => n.type === "entry");
       const dataset = (entryNode?.data as any)?.dataset;
 

@@ -219,7 +219,7 @@ export class GithubFeatureService implements GithubApi {
     return this.installState.registerNonce(input);
   }
 
-  consumeInstallNonce(nonce: string): Promise<boolean | null> {
+  consumeInstallNonce(nonce: string): Promise<"consumed" | "spent" | "unavailable"> {
     return this.installState.consumeNonce(nonce);
   }
 
@@ -227,8 +227,8 @@ export class GithubFeatureService implements GithubApi {
     return this.installState.sign(payload);
   }
 
-  verifyInstallState(token: string | null | undefined): GithubInstallStatePayload | null {
-    return this.installState.verify(token);
+  parseInstallState(token: string | null | undefined): GithubInstallStatePayload | null {
+    return this.installState.parse(token);
   }
 
   popupResponseHtml(login: string): string {

@@ -1,4 +1,4 @@
-import { DatasetConflictError } from "@langwatch/dataset-contract";
+import { DatasetConflictError, type Dataset } from "@langwatch/dataset-contract";
 /**
  * Dataset names are unique per project by slug. The editor asks whether a name is free, and a
  * copy asks for the next name that is — neither may hand back a slug that already belongs to
@@ -6,21 +6,54 @@ import { DatasetConflictError } from "@langwatch/dataset-contract";
  */
 import { describe, expect, it } from "vitest";
 
-import type { DatasetRepository } from "../../repositories/dataset.repository.ts";
+import { MemoryDatasetDatabase } from "../../repositories/memory/memory.dataset.database.ts";
+import { MemoryDatasetRepository } from "../../repositories/memory/memory.dataset.repository.ts";
 import { DatasetNamingService } from "../dataset-naming.service.ts";
 
 const PROJECT_ID = "project-1";
 
+type SlugLookup = { slug: string; projectId: string; excludeId?: string };
+
+function datasetHolding({ id, slug }: { id: string; slug: string }): Dataset {
+  return {
+    id,
+    projectId: PROJECT_ID,
+    name: slug,
+    slug,
+    columnTypes: [],
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    archivedAt: null,
+    mapping: null,
+    useS3: false,
+    s3RecordCount: null,
+    contentLayout: "postgres",
+    status: "ready",
+    statusError: null,
+    stagingKey: null,
+    uploadFilename: null,
+    rowCount: null,
+    sizeBytes: null,
+    chunkCount: null,
+    chunkOffsets: null,
+  };
+}
+
+function repositoryWith(findBySlug: (input: SlugLookup) => Promise<Dataset | null>) {
+  return Object.assign(
+    MemoryDatasetRepository.create({ database: MemoryDatasetDatabase.create() }),
+    { findBySlug },
+  );
+}
+
 function namingOver(takenSlugs: Record<string, string>) {
   const calls: { slug: string; excludeId?: string }[] = [];
-  const repository = {
-    findBySlug: async ({ slug, excludeId }: { slug: string; excludeId?: string }) => {
-      calls.push({ slug, ...(excludeId ? { excludeId } : {}) });
-      const id = takenSlugs[slug];
+  const repository = repositoryWith(async ({ slug, excludeId }) => {
+    calls.push({ slug, ...(excludeId ? { excludeId } : {}) });
+    const id = takenSlugs[slug];
 
-      return id && id !== excludeId ? { id, slug } : null;
-    },
-  } as unknown as DatasetRepository;
+    return id && id !== excludeId ? datasetHolding({ id, slug }) : null;
+  });
 
   return { service: DatasetNamingService.create(repository), calls };
 }
@@ -84,9 +117,9 @@ describe("DatasetNamingService", () => {
 
   describe("when every candidate name is taken", () => {
     it("refuses rather than looping forever", async () => {
-      const repository = {
-        findBySlug: async ({ slug }: { slug: string }) => ({ id: `dataset-${slug}` }),
-      } as unknown as DatasetRepository;
+      const repository = repositoryWith(async ({ slug }) =>
+        datasetHolding({ id: `dataset-${slug}`, slug }),
+      );
 
       await expect(
         DatasetNamingService.create(repository).findNextAvailableName({

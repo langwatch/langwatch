@@ -118,8 +118,8 @@ export class RedisGithubAppTokenCache implements GithubAppTokenCache {
       });
       return minted;
     } finally {
-      if (lock) {
-        await this.cache.releaseMintLock({ ...cacheKey, token: lock });
+      if (lock.acquired) {
+        await this.cache.releaseMintLock({ ...cacheKey, token: lock.token });
       }
     }
   }
@@ -179,7 +179,7 @@ export class RedisGithubAppTokenCache implements GithubAppTokenCache {
     }
 
     const lock = await this.cache.acquireLivenessLock(installationId);
-    if (!lock) {
+    if (!lock.acquired) {
       return;
     }
 
@@ -201,7 +201,7 @@ export class RedisGithubAppTokenCache implements GithubAppTokenCache {
         ttlSec: LIVENESS_FAILURE_BACKOFF_SEC,
       });
     } finally {
-      await this.cache.releaseLivenessLock({ installationId, token: lock });
+      await this.cache.releaseLivenessLock({ installationId, token: lock.token });
     }
   }
 }

@@ -11,7 +11,11 @@ import {
   type RestProtocolProducer,
 } from "@langwatch/api/rest";
 import { zodErrorMessage } from "@langwatch/config";
-import { dSPyStepRESTParamsSchema, ExperimentApi } from "@langwatch/experiment-contract";
+import {
+  type DSPyStepRESTParams,
+  dSPyStepRESTParamsSchema,
+  ExperimentApi,
+} from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { HTTPException } from "hono/http-exception";
@@ -55,6 +59,59 @@ const answer = ({
   status: 200 | 400 | 500;
   body: object;
 }) => response.write({ status, mediaType: "application/json", body: JSON.stringify(body) });
+
+/** Stores each step in order and answers for the batch, stopping at the first failure. */
+const storeDspySteps = async ({
+  app,
+  response,
+  projectId,
+  steps,
+}: {
+  app: ExperimentApi;
+  response: RestProtocolProducer<"application/json">;
+  projectId: string;
+  steps: DSPyStepRESTParams[];
+}) => {
+  const costs = await app.listModelCosts({ projectId });
+
+  for (const param of steps) {
+    try {
+      const experiment = await app.findOrCreateForRun({
+        projectId,
+        ...(param.experiment_id ? { experimentId: param.experiment_id } : {}),
+        ...(param.experiment_slug ? { experimentSlug: param.experiment_slug } : {}),
+        experimentType: "DSPY",
+      });
+
+      await app.upsertDspyStep(
+        dspyStepOf({
+          tenantId: projectId,
+          experimentId: experiment.id,
+          param,
+          costs,
+          now: nowInstant().epochMilliseconds,
+        }),
+      );
+
+      logger.info(
+        { stepId: param.index, runId: param.run_id, projectId },
+        "Successfully stored DSPy step",
+      );
+    } catch (error) {
+      const context = { projectId, stepId: param.index, runId: param.run_id };
+      logger.error({ error, ...context }, "failed to process DSPy step");
+      if (error instanceof z.ZodError) {
+        return answer({ response, status: 400, body: { error: zodErrorMessage(error) } });
+      }
+
+      // Generic on purpose (ADR-045): the detail is on the log line above,
+      // and a driver's own message names host, port and database.
+      return answer({ response, status: 500, body: { error: "Internal server error" } });
+    }
+  }
+
+  return answer({ response, status: 200, body: { message: "ok" } });
+};
 
 export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
   .withNamespace("dspy")
@@ -118,7 +175,8 @@ export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
     }
 
     for (const param of parsed.data) {
-      if (param.timestamps.created_at && param.timestamps.created_at.toString().length === 10) {
+      const createdAt = param.timestamps.created_at;
+      if (createdAt && createdAt.toString().length === 10) {
         logger.error(
           { stepId: param.index, runId: param.run_id, projectId },
           "timestamps not in milliseconds for step",
@@ -137,45 +195,7 @@ export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
 
     logger.info({ stepCount: parsed.data.length, projectId }, "Processing DSPy steps");
 
-    const costs = await app.listModelCosts({ projectId });
-
-    for (const param of parsed.data) {
-      try {
-        const experiment = await app.findOrCreateForRun({
-          projectId,
-          ...(param.experiment_id ? { experimentId: param.experiment_id } : {}),
-          ...(param.experiment_slug ? { experimentSlug: param.experiment_slug } : {}),
-          experimentType: "DSPY",
-        });
-
-        await app.upsertDspyStep(
-          dspyStepOf({
-            tenantId: projectId,
-            experimentId: experiment.id,
-            param,
-            costs,
-            now: nowInstant().epochMilliseconds,
-          }),
-        );
-
-        logger.info(
-          { stepId: param.index, runId: param.run_id, projectId },
-          "Successfully stored DSPy step",
-        );
-      } catch (error) {
-        const context = { projectId, stepId: param.index, runId: param.run_id };
-        logger.error({ error, ...context }, "failed to process DSPy step");
-        if (error instanceof z.ZodError) {
-          return answer({ response, status: 400, body: { error: zodErrorMessage(error) } });
-        }
-
-        // Generic on purpose (ADR-045): the detail is on the log line above,
-        // and a driver's own message names host, port and database.
-        return answer({ response, status: 500, body: { error: "Internal server error" } });
-      }
-    }
-
-    return answer({ response, status: 200, body: { message: "ok" } });
+    return storeDspySteps({ app, response, projectId, steps: parsed.data });
   })
 
   .build();

@@ -1,6 +1,10 @@
 import type { NormalizedSpan, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import {
+  createInitState,
+  createTestSpan,
+} from "../../eventing/__tests__/trace-summary-test.fixtures.ts";
 import { ModelCatalogTraceModelCostAdapter } from "../model-catalog.trace-model-cost.service.ts";
 import { SpanCostService } from "../span-cost.service.ts";
 
@@ -14,34 +18,25 @@ const service = SpanCostService.create({
  */
 function costedSpan(overrides?: Partial<NormalizedSpan>): NormalizedSpan {
   return {
+    ...createTestSpan({
+      spanId: "s1",
+      name: "llm",
+      startTimeUnixMs: 0,
+      spanAttributes: {
+        "gen_ai.usage.input_tokens": 1000,
+        "gen_ai.usage.output_tokens": 0,
+        "langwatch.model.inputCostPerToken": 0.001,
+      },
+    }),
     traceId: "t1",
-    spanId: "s1",
-    parentSpanId: null,
-    name: "llm",
-    startTimeUnixMs: 0,
     endTimeUnixMs: 1000,
-    spanAttributes: {
-      "gen_ai.usage.input_tokens": 1000,
-      "gen_ai.usage.output_tokens": 0,
-      "langwatch.model.inputCostPerToken": 0.001,
-    },
-    resourceAttributes: {},
-    events: [],
-    links: [],
+    durationMs: 1000,
     ...overrides,
-  } as unknown as NormalizedSpan;
+  };
 }
 
 function emptyState(): TraceSummaryData {
-  return {
-    totalCost: null,
-    nonBilledCost: null,
-    totalPromptTokenCount: null,
-    totalCompletionTokenCount: null,
-    tokensEstimated: false,
-    timeToFirstTokenMs: null,
-    timeToLastTokenMs: null,
-  } as unknown as TraceSummaryData;
+  return createInitState();
 }
 
 describe("SpanCostService — bundled (non-billable) cost classification", () => {

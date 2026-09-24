@@ -13,7 +13,7 @@ import {
   type PromptVersionRow,
 } from "../prompt-version.repository.ts";
 import type { MemoryPromptState } from "./memory-prompt.state.ts";
-import { clone, latestVersion, maxVersion, schemaVersionOf } from "./memory-prompt.state.ts";
+import { clone, findVersions, schemaVersionOf } from "./memory-prompt.state.ts";
 import type { MemoryLlmConfigRepository } from "./memory.prompt.repository.ts";
 
 export class MemoryLlmConfigVersionsRepository extends LlmConfigVersionsRepository {
@@ -52,7 +52,7 @@ export class MemoryLlmConfigVersionsRepository extends LlmConfigVersionsReposito
     return clone(version);
   }
   async findLatestId(params: { configId: string; projectId: string }): Promise<string | null> {
-    return latestVersion(this.#state, params.configId, params.projectId)?.id ?? null;
+    return findVersions(this.#state, params.configId, params.projectId)[0]?.id ?? null;
   }
   async findLatestVersion(
     configId: string,
@@ -61,7 +61,7 @@ export class MemoryLlmConfigVersionsRepository extends LlmConfigVersionsReposito
     const config = this.#state.configs.get(configId);
     if (!config || config.projectId !== projectId)
       throw new NotFoundError("Prompt config not found.");
-    const version = latestVersion(this.#state, configId, projectId);
+    const [version] = findVersions(this.#state, configId, projectId);
     if (!version) {
       throw new NotFoundError("No versions found for this config.");
     }
@@ -78,7 +78,11 @@ export class MemoryLlmConfigVersionsRepository extends LlmConfigVersionsReposito
       projectId: params.versionData.projectId,
       organizationId: params.organizationId,
     });
-    const next = (maxVersion(this.#state, config.id, config.projectId) ?? -1) + 1;
+    const next =
+      Math.max(
+        -1,
+        ...findVersions(this.#state, config.id, config.projectId).map((row) => row.version),
+      ) + 1;
     const created = this.#configs.appendVersion({
       ...params.versionData,
       version: next,

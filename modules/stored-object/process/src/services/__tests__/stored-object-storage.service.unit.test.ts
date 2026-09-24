@@ -72,7 +72,7 @@ describe("StoredObjectStorageService", () => {
       });
 
       await expect(
-        textOf(await storage.tryRead({ projectId: "project-1", address })),
+        textOf(await storage.getBytes({ projectId: "project-1", address })),
       ).resolves.toBe("hello");
     });
   });
@@ -81,10 +81,10 @@ describe("StoredObjectStorageService", () => {
     it("does not read another project through a caller-supplied project address", async () => {
       const { storage, reached } = recordingStorage();
 
-      await expect(storage.tryRead({ projectId: "project-1", address })).rejects.toThrow(
+      await expect(storage.getBytes({ projectId: "project-1", address })).rejects.toThrow(
         "outside the requested project",
       );
-      await expect(storage.tryStat({ projectId: "project-1", address })).rejects.toThrow(
+      await expect(storage.getStat({ projectId: "project-1", address })).rejects.toThrow(
         "outside the requested project",
       );
       await expect(storage.delete({ projectId: "project-1", address })).rejects.toThrow(
@@ -116,7 +116,7 @@ describe("StoredObjectStorageService", () => {
       const { storage, reached } = recordingStorage();
       const address = { provider: "memory", destinationId: "memory", relativeId };
 
-      await expect(storage.tryRead({ projectId: "project-1", address })).rejects.toThrow(
+      await expect(storage.getBytes({ projectId: "project-1", address })).rejects.toThrow(
         "outside the requested project",
       );
       expect(reached).toEqual([]);
@@ -140,7 +140,7 @@ describe("StoredObjectStorageService", () => {
       ];
 
       for (const address of addresses) {
-        await expect(storage.tryRead({ projectId: "project-1", address })).rejects.toThrow(
+        await expect(storage.getBytes({ projectId: "project-1", address })).rejects.toThrow(
           "invalid provider destination",
         );
         await expect(

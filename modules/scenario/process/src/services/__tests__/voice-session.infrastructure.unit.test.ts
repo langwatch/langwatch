@@ -1,12 +1,13 @@
-import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+import { ScenarioNotFoundError, ScenarioRunStatus } from "@langwatch/scenario-contract";
 /**
  * Infrastructure composition for "Talk to it" route over in-memory fakes.
  * Verifies infrastructure translates service results to promised shapes.
  * @see specs/features/agents/voice-agents-v1.feature
  */
-import type {
-  VoiceTransport,
-  VoiceTransportRunner,
+import {
+  type VoiceTransport,
+  type VoiceTransportRunner,
+  VoiceAgentRowNotFoundError,
 } from "@langwatch/scenario-contract/voice-runtime";
 import { describe, expect, it, vi } from "vitest";
 
@@ -26,7 +27,7 @@ interface AgentRow {
   [field: string]: unknown;
 }
 
-/** The scenario row `resolveScenarioSet` reads, narrowed to what it reads. */
+/** The scenario row `getScenarioSet` reads, narrowed to what it reads. */
 interface ScenarioRow {
   id: string;
   testSuiteId: string | null;
@@ -58,12 +59,16 @@ function createVoiceSessionInfrastructureFromServices(
 }
 
 function fakeAgentService(over: {
-  getById?: (input: { id: string; projectId: string }) => Promise<AgentRow | null>;
+  getById?: (input: { id: string; projectId: string }) => Promise<AgentRow>;
   createVoiceAgent?: (input: unknown) => Promise<{ id: string }>;
   hasVoiceAgentForExternalId?: (input: unknown) => Promise<boolean>;
 }) {
   return {
-    getById: over.getById ?? vi.fn(async () => null),
+    getById:
+      over.getById ??
+      vi.fn(async () => {
+        throw new VoiceAgentRowNotFoundError();
+      }),
     createVoiceAgent:
       over.createVoiceAgent ??
       vi.fn(async () => {
@@ -74,10 +79,14 @@ function fakeAgentService(over: {
 }
 
 function fakeScenarioService(over: {
-  getById?: (input: { id: string; projectId: string }) => Promise<ScenarioRow | null>;
+  getById?: (input: { id: string; projectId: string }) => Promise<ScenarioRow>;
 }) {
   return {
-    getById: over.getById ?? vi.fn(async () => null),
+    getById:
+      over.getById ??
+      vi.fn(async () => {
+        throw new ScenarioNotFoundError("missing");
+      }),
   };
 }
 
@@ -122,7 +131,7 @@ function voiceAgentRow(over: Partial<AgentRow> = {}): AgentRow {
 }
 
 describe("Feature: voice-session infrastructure composition", () => {
-  describe("given resolveVoiceAgentRow", () => {
+  describe("given getVoiceAgentRow", () => {
     describe("when the row is a saved voice agent", () => {
       it("resolves the vendor agent id off a saved voice agent row", async () => {
         const agentService = fakeAgentService({
@@ -133,7 +142,7 @@ describe("Feature: voice-session infrastructure composition", () => {
           scenarioService: fakeScenarioService({}),
         });
 
-        const row = await ports.resolveVoiceAgentRow({
+        const row = await ports.getVoiceAgentRow({
           projectId: "project_1",
           agentRowId: "agent_row",
         });
@@ -147,7 +156,7 @@ describe("Feature: voice-session infrastructure composition", () => {
     });
 
     describe("when the row is not a voice agent", () => {
-      it("answers null for a row that is not a voice agent", async () => {
+      it("throws agent_not_found for a row that is not a voice agent", async () => {
         const agentService = fakeAgentService({
           getById: vi.fn(async () => voiceAgentRow({ type: "http" })),
         });
@@ -156,28 +165,22 @@ describe("Feature: voice-session infrastructure composition", () => {
           scenarioService: fakeScenarioService({}),
         });
 
-        const row = await ports.resolveVoiceAgentRow({
-          projectId: "project_1",
-          agentRowId: "agent_row",
-        });
-
-        expect(row).toBeNull();
+        await expect(
+          ports.getVoiceAgentRow({ projectId: "project_1", agentRowId: "agent_row" }),
+        ).rejects.toMatchObject({ code: "agent_not_found" });
       });
     });
 
     describe("when the row does not exist", () => {
-      it("answers null when the row does not exist", async () => {
+      it("throws agent_not_found when the row does not exist", async () => {
         const ports = createVoiceSessionInfrastructureFromServices({
           agentService: fakeAgentService({}),
           scenarioService: fakeScenarioService({}),
         });
 
-        const row = await ports.resolveVoiceAgentRow({
-          projectId: "project_1",
-          agentRowId: "missing",
-        });
-
-        expect(row).toBeNull();
+        await expect(
+          ports.getVoiceAgentRow({ projectId: "project_1", agentRowId: "missing" }),
+        ).rejects.toMatchObject({ code: "agent_not_found" });
       });
     });
   });
@@ -239,7 +242,7 @@ describe("Feature: voice-session infrastructure composition", () => {
     });
   });
 
-  describe("given resolveScenarioSet", () => {
+  describe("given getScenarioSet", () => {
     describe("when the scenario is filed in a suite", () => {
       it("resolves the suite set when the scenario is filed in one", async () => {
         const ports = createVoiceSessionInfrastructureFromServices({
@@ -251,7 +254,7 @@ describe("Feature: voice-session infrastructure composition", () => {
           }),
         });
 
-        const result = await ports.resolveScenarioSet?.({
+        const result = await ports.getScenarioSet?.({
           projectId: "project_1",
           scenarioId: "scenario_1",
         });
@@ -269,7 +272,7 @@ describe("Feature: voice-session infrastructure composition", () => {
           }),
         });
 
-        const result = await ports.resolveScenarioSet?.({
+        const result = await ports.getScenarioSet?.({
           projectId: "project_1",
           scenarioId: "scenario_1",
         });
@@ -279,18 +282,15 @@ describe("Feature: voice-session infrastructure composition", () => {
     });
 
     describe("when the scenario is gone", () => {
-      it("answers null when the scenario is gone", async () => {
+      it("throws scenario_not_found when the scenario is gone", async () => {
         const ports = createVoiceSessionInfrastructureFromServices({
           agentService: fakeAgentService({}),
           scenarioService: fakeScenarioService({}),
         });
 
-        const result = await ports.resolveScenarioSet?.({
-          projectId: "project_1",
-          scenarioId: "missing",
-        });
-
-        expect(result).toBeNull();
+        await expect(
+          ports.getScenarioSet?.({ projectId: "project_1", scenarioId: "missing" }),
+        ).rejects.toMatchObject({ code: "scenario_not_found" });
       });
     });
   });
@@ -394,6 +394,40 @@ describe("Feature: voice-session infrastructure composition", () => {
         expect(ports.audioProxyUrl({ conversationId: "conv 1", projectId: "p1" })).toBe(
           "/api/voice/session/conv%201/audio?projectId=p1",
         );
+      });
+    });
+  });
+
+  describe("given getCredential", () => {
+    describe("when the project has no key for the transport", () => {
+      it("throws voice_key_missing with the transport's own message", async () => {
+        const ports = createVoiceSessionInfrastructureFromServices({
+          agentService: fakeAgentService({}),
+          scenarioService: fakeScenarioService({}),
+        });
+
+        await expect(
+          ports.getCredential({ projectId: "project_1", transport: "elevenlabs_convai" }),
+        ).rejects.toMatchObject({
+          code: "voice_key_missing",
+          message: "No ElevenLabs key in this project",
+        });
+      });
+    });
+
+    describe("when the project has an ElevenLabs key", () => {
+      it("answers the ElevenLabs credential", async () => {
+        const ports = createVoiceSessionInfrastructureFromServices({
+          agentService: fakeAgentService({}),
+          scenarioService: fakeScenarioService({}),
+          elevenLabsCredentials: {
+            resolveForProject: vi.fn(async () => ({ apiKey: "k", baseUrl: "https://el" })),
+          },
+        });
+
+        expect(
+          await ports.getCredential({ projectId: "project_1", transport: "elevenlabs_convai" }),
+        ).toEqual({ kind: "elevenlabs", apiKey: "k", baseUrl: "https://el" });
       });
     });
   });

@@ -167,7 +167,9 @@ describe("sso connection guards", () => {
       // Nothing routes: routing reads verified domains on an ACTIVE
       // connection, and a claim is neither.
       expect(state.verifiedDomains).toEqual([]);
-      expect(await connections.tryFindDomainOwner({ domain: "acme.com" })).toBeNull();
+      await expect(connections.getDomainOwner({ domain: "acme.com" })).rejects.toMatchObject({
+        code: "sso_connection_not_found",
+      });
     });
   });
 
@@ -328,14 +330,14 @@ describe("sso connection guards", () => {
         }),
       ).rejects.toMatchObject({ code: "sso_connection_domain_taken" });
 
-      const held = await connections.tryFindConnection({
+      const held = await connections.getConnection({
         connectionId: CONNECTION,
       });
       // No event: the refusal happens before any fact exists, so the claimant
       // is left exactly where it was.
       expect(held?.state).toBe("APPROVED");
       expect(held?.verifiedDomains).toEqual([]);
-      expect(await connections.tryFindDomainOwner({ domain: "acme.com" })).toEqual({
+      expect(await connections.getDomainOwner({ domain: "acme.com" })).toEqual({
         connectionId: "ssoc_first",
         organizationId: "org_first",
       });
@@ -354,7 +356,7 @@ describe("sso connection guards", () => {
           testLoginAccountId: "acc_test",
         }),
       ).rejects.toMatchObject({ code: "sso_connection_activation_blocked" });
-      expect((await connections.tryFindConnection({ connectionId: CONNECTION }))?.state).toBe(
+      expect((await connections.getConnection({ connectionId: CONNECTION })).state).toBe(
         "VERIFIED",
       );
 
@@ -413,7 +415,7 @@ describe("sso connection guards", () => {
       expect(suspended.state.state).toBe("SUSPENDED");
       // Suspension stops routing but does not relinquish ownership: otherwise
       // another organization could seize the domain during an IdP outage.
-      expect(await connections.tryFindDomainOwner({ domain: "acme.com" })).toEqual({
+      expect(await connections.getDomainOwner({ domain: "acme.com" })).toEqual({
         connectionId: CONNECTION,
         organizationId: ORG,
       });
@@ -425,7 +427,7 @@ describe("sso connection guards", () => {
       breakGlass.set(true);
       const resumed = await run(() => guards.resumeConnection({ ...identity }));
       expect(resumed.state.state).toBe("ACTIVE");
-      expect(await connections.tryFindDomainOwner({ domain: "acme.com" })).toEqual({
+      expect(await connections.getDomainOwner({ domain: "acme.com" })).toEqual({
         connectionId: CONNECTION,
         organizationId: ORG,
       });
@@ -443,9 +445,7 @@ describe("sso connection guards", () => {
       ).rejects.toMatchObject({
         code: "sso_connection_teardown_strands_users",
       });
-      expect((await connections.tryFindConnection({ connectionId: CONNECTION }))?.state).toBe(
-        "ACTIVE",
-      );
+      expect((await connections.getConnection({ connectionId: CONNECTION })).state).toBe("ACTIVE");
 
       stranding.set([]);
       const { state } = await run(() =>
@@ -479,7 +479,9 @@ describe("sso connection guards", () => {
         guards.completeTeardown({ ...identity, occurredAtMs: T0 + 1_000 }),
       );
       expect(state.state).toBe("TORN_DOWN");
-      expect(await connections.tryFindDomainOwner({ domain: "acme.com" })).toBeNull();
+      await expect(connections.getDomainOwner({ domain: "acme.com" })).rejects.toMatchObject({
+        code: "sso_connection_not_found",
+      });
     });
 
     /** @scenario "Asking again while a removal waits brings the date forward" */
@@ -520,7 +522,7 @@ describe("sso connection guards", () => {
 
     /** @scenario "Grandfathered state never weakens a live guard" */
     it("applies the same guards a self-served connection gets", async () => {
-      const held = await connections.tryFindConnection({
+      const held = await connections.getConnection({
         connectionId: CONNECTION,
       });
       expect(held?.state).toBe("ACTIVE");
@@ -583,7 +585,7 @@ describe("sso connection guards", () => {
       const second = await grandfather();
       expect(second).toEqual([]);
 
-      const held = await connections.tryFindConnection({
+      const held = await connections.getConnection({
         connectionId: CONNECTION,
       });
       expect(held?.state).toBe("ACTIVE");
@@ -647,7 +649,7 @@ describe("sso connection guards", () => {
         guards.approveDomainClaim({ ...identity, domain: "acme.com", authority: "dns-proof" }),
       ).rejects.toMatchObject({ code: "sso_connection_invalid_transition" });
 
-      const held = await connections.tryFindConnection({ connectionId: CONNECTION });
+      const held = await connections.getConnection({ connectionId: CONNECTION });
       expect(held?.approvedDomains).toEqual([]);
       expect(held?.domainClaims[0]?.state).toBe("WAITING");
     });
@@ -679,7 +681,7 @@ describe("sso connection guards", () => {
         });
       }
 
-      const held = await connections.tryFindConnection({ connectionId: CONNECTION });
+      const held = await connections.getConnection({ connectionId: CONNECTION });
       expect(held?.state).toBe("DRAFT");
       expect(held?.domainClaims).toEqual([]);
     });
@@ -703,7 +705,7 @@ describe("sso connection guards", () => {
         code: "sso_domain_claim_throttled",
         meta: { retryAfterSeconds: 3_540 },
       });
-      const held = await connections.tryFindConnection({ connectionId: CONNECTION });
+      const held = await connections.getConnection({ connectionId: CONNECTION });
       expect(held?.domainClaims.map((claim) => claim.state)).toEqual(Array(5).fill("WITHDRAWN"));
     });
   });

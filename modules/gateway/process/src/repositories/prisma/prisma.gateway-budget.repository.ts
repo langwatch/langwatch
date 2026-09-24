@@ -6,7 +6,7 @@
 
 import {
   serializeRowForAudit,
-  budgetPeriodFloorMs,
+  computeBudgetPeriodFloorMs,
   attributedUserBucketScopeId,
   bucketScopeIdFor,
   budgetAppliesToProvider,
@@ -938,7 +938,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     const resetsAt = GatewayWindow.nextBoundaryFor({
       budget: { window: input.window, cycleAnchorAt },
     });
-    const projectId = resolveProjectFromScope(input.scope);
+    const projectId = extractScopeProjectId(input.scope);
 
     const created = await this.prisma
       .$transaction(async (tx) => {
@@ -1260,7 +1260,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
               // MANUAL window has no calendar period to fall back on, so
               // without it this read totals the budget's whole lifetime and
               // decides against a number the gateway never enforces on.
-              periodFloorMs: budgetPeriodFloorMs(budgetPeriodOf(r.budget)),
+              periodFloorMs: computeBudgetPeriodFloorMs(budgetPeriodOf(r.budget)),
             })),
           );
           return new Map(spends.map((s) => [s.budgetId, s.spentUsd] as const));
@@ -1404,7 +1404,7 @@ function scopeIdForScope(scope: BudgetScope): string {
   }
 }
 
-function resolveProjectFromScope(scope: BudgetScope): string | null {
+function extractScopeProjectId(scope: BudgetScope): string | null {
   return scope.kind === "PROJECT" ? scope.projectId : null;
 }
 

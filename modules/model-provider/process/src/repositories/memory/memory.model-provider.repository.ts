@@ -1,4 +1,5 @@
 import {
+  ModelProviderNotFoundError,
   modelProviderSchema,
   type ModelDefaultScope,
   type ModelProvider,
@@ -46,36 +47,37 @@ export class MemoryModelProviderRepository implements ModelProviderRepository {
     };
   }
 
-  tryFindById(input: {
+  getById(input: {
     id: string;
     organizationId?: string;
     projectScopes?: ModelDefaultScope[];
-  }): Promise<ModelProvider | null> {
+  }): Promise<ModelProvider> {
     const row = this.database.providers.get(input.id);
-    if (!row) return Promise.resolve(null);
+    if (!row) return Promise.reject(new ModelProviderNotFoundError());
     if (input.organizationId && row.organizationId !== input.organizationId) {
-      return Promise.resolve(null);
+      return Promise.reject(new ModelProviderNotFoundError());
     }
     if (input.projectScopes && !matchesAnyScope(row.scopes, input.projectScopes)) {
-      return Promise.resolve(null);
+      return Promise.reject(new ModelProviderNotFoundError());
     }
 
     return Promise.resolve(row);
   }
 
-  tryFindByProviderForProject(input: {
+  getByProviderForProject(input: {
     provider: string;
     projectScopes: ModelDefaultScope[];
-  }): Promise<ModelProvider | null> {
+  }): Promise<ModelProvider> {
     const rows = this.rows()
       .filter((row) => row.provider === input.provider)
       .filter((row) => matchesAnyScope(row.scopes, input.projectScopes))
       .toSorted(byCreatedAtAscending);
 
-    return Promise.resolve(rows[0] ?? null);
+    const [first] = rows;
+    return first ? Promise.resolve(first) : Promise.reject(new ModelProviderNotFoundError());
   }
 
-  listForProject(projectScopes: ModelDefaultScope[]): Promise<ModelProvider[]> {
+  findForProject(projectScopes: ModelDefaultScope[]): Promise<ModelProvider[]> {
     return Promise.resolve(
       this.rows()
         .filter((row) => matchesAnyScope(row.scopes, projectScopes))
@@ -83,7 +85,7 @@ export class MemoryModelProviderRepository implements ModelProviderRepository {
     );
   }
 
-  listForOrganization(organizationId: string): Promise<ModelProvider[]> {
+  findForOrganization(organizationId: string): Promise<ModelProvider[]> {
     return Promise.resolve(
       this.rows()
         .filter((row) => row.organizationId === organizationId)

@@ -162,6 +162,9 @@ function UserSpendPanel({
   );
 
   const users = usersQuery.data ?? [];
+  const isLoading = usersQuery.isLoading;
+  const isEmpty = !isLoading && users.length === 0;
+  const hasRows = !isLoading && users.length > 0;
 
   return (
     <>
@@ -183,19 +186,19 @@ function UserSpendPanel({
         overflow="hidden"
       >
         <Header />
-        {usersQuery.isLoading ? (
+        {isLoading && (
           <Box padding={6}>
             <Spinner />
           </Box>
-        ) : users.length === 0 ? (
+        )}
+        {isEmpty && (
           <Box padding={6} color="fg.muted" fontSize="sm">
             {usersQuery.error
               ? "Member activity could not be read."
               : "No active users this window."}
           </Box>
-        ) : (
-          users.map((u) => <Row key={u.actor} user={u} />)
         )}
+        {hasRows && users.map((u) => <Row key={u.actor} user={u} />)}
       </VStack>
       <Text fontSize="xs" color="fg.muted">
         {users.length} user{users.length === 1 ? "" : "s"} shown.
@@ -256,16 +259,32 @@ function Header() {
   );
 }
 
+function trendArrow(pct: number): string {
+  if (pct > 0) return "↑";
+  if (pct < 0) return "↓";
+  return "·";
+}
+
+function trendColorFor({
+  hasPriorBaseline,
+  pct,
+}: {
+  hasPriorBaseline: boolean;
+  pct: number;
+}): string {
+  if (!hasPriorBaseline) return "fg.muted";
+  if (pct > 25) return "orange.500";
+  if (pct < -25) return "blue.500";
+  return "fg.muted";
+}
+
 function Row({ user }: { user: SpendByUser }) {
   const dotColor = getHexColorForString(user.actor);
-  const arrow = user.trendVsPreviousPct > 0 ? "↑" : user.trendVsPreviousPct < 0 ? "↓" : "·";
-  const trendColor = !user.hasPriorBaseline
-    ? "fg.muted"
-    : user.trendVsPreviousPct > 25
-      ? "orange.500"
-      : user.trendVsPreviousPct < -25
-        ? "blue.500"
-        : "fg.muted";
+  const arrow = trendArrow(user.trendVsPreviousPct);
+  const trendColor = trendColorFor({
+    hasPriorBaseline: user.hasPriorBaseline,
+    pct: user.trendVsPreviousPct,
+  });
   return (
     <Link
       href={`/governance/users/${encodeURIComponent(user.actor)}`}

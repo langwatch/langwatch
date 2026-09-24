@@ -12,6 +12,21 @@ type PerformanceRow = {
   hasPerformanceError?: boolean;
 };
 
+type Trend = "up" | "down" | "neutral";
+
+const TREND_COLOR: Record<Trend, string> = { up: "green.fg", down: "red.fg", neutral: "fg.muted" };
+
+const TREND_STROKE: Record<Trend, string> = {
+  up: "var(--chakra-colors-green-500)",
+  down: "var(--chakra-colors-red-500)",
+  neutral: "var(--chakra-colors-gray-400)",
+};
+
+function trendOf(delta: number | null): Trend {
+  if (delta === null || delta === 0) return "neutral";
+  return delta > 0 ? "up" : "down";
+}
+
 export const PerformancePreview = ({ row }: { row: PerformanceRow }) => {
   const performance = row.performance;
 
@@ -37,8 +52,8 @@ export const PerformancePreview = ({ row }: { row: PerformanceRow }) => {
 
   const { current, previous, metric, points } = performance;
   const delta = current !== null && previous !== null ? current - previous : null;
-  const trend = delta === null || delta === 0 ? "neutral" : delta > 0 ? "up" : "down";
-  const trendColor = trend === "up" ? "green.fg" : trend === "down" ? "red.fg" : "fg.muted";
+  const trend = trendOf(delta);
+  const trendColor = TREND_COLOR[trend];
 
   if (current === null) {
     return (
@@ -107,12 +122,7 @@ const Sparkline = ({
       return `${x},${y}`;
     })
     .join(" ");
-  const stroke =
-    trend === "up"
-      ? "var(--chakra-colors-green-500)"
-      : trend === "down"
-        ? "var(--chakra-colors-red-500)"
-        : "var(--chakra-colors-gray-400)";
+  const stroke = TREND_STROKE[trend];
 
   return (
     <Box width={`${width}px`} height={`${height}px`} flexShrink={0}>

@@ -25,6 +25,13 @@ type PlanState = Pick<
   "datasets" | "activeDatasetId" | "targets" | "evaluators"
 >;
 
+/** The target ids a scope names outright: one for a target or cell, several for target-rows. */
+function scopeNamedTargetIds(scope: ExecutionScope): string[] {
+  if (scope.type === "target" || scope.type === "cell") return [scope.targetId];
+  if (scope.type === "target-rows") return scope.targetIds;
+  return [];
+}
+
 export class ExperimentCellPlanService {
   static create(): ExperimentCellPlanService {
     return new ExperimentCellPlanService();
@@ -239,14 +246,7 @@ export class ExperimentCellPlanService {
 
     const targetIds = this.scopedTargetIds({ state, scope });
 
-    const scopedComparisonDeps = new Set(
-      (scope.type === "target" || scope.type === "cell"
-        ? [scope.targetId]
-        : scope.type === "target-rows"
-          ? scope.targetIds
-          : []
-      ).flatMap(comparisonDeps),
-    );
+    const scopedComparisonDeps = new Set(scopeNamedTargetIds(scope).flatMap(comparisonDeps));
 
     for (const rowIndex of rowIndices) {
       const datasetEntry = datasetRows[rowIndex];
@@ -259,36 +259,69 @@ export class ExperimentCellPlanService {
         continue;
       }
 
-      for (const targetId of targetIds) {
-        if (scopedComparisonDeps.has(targetId) && seedTargetOutputs?.[`${rowIndex}:${targetId}`]) {
-          continue;
-        }
-
-        const targetConfig = state.targets.find((t: TargetConfig) => t.id === targetId);
-        if (!targetConfig) {
-          continue;
-        }
-
-        // Column-style comparison targets (pairwise #5100, N-way #5101) are
-        // skipped in Phase 1 — they need every variant's output, not yet
-        // available per-target. Picked up by generateComparisonCells (Phase 2).
-        if (targetConfig.type === "evaluator" && isComparisonEvaluator(targetConfig)) {
-          continue;
-        }
-
-        cells.push({
+      cells.push(
+        ...this.rowCells({
+          state,
           rowIndex,
-          targetId,
-          targetConfig,
-          // Comparison evaluators (pairwise #5100, N-way #5101) run in Phase 2
-          // once every variant's output exists; they would crash here. See
-          // generateComparisonCells.
-          evaluatorConfigs: state.evaluators.filter((e) => !isComparisonEvaluator(e)),
-          datasetEntry: { _datasetId: datasetId, ...datasetEntry },
-        });
-      }
+          datasetEntry,
+          targetIds,
+          scopedComparisonDeps,
+          seedTargetOutputs,
+          datasetId,
+        }),
+      );
     }
 
+    return cells;
+  }
+
+  /** Phase 1 cells for one dataset row, one per in-scope target still to run. */
+  private rowCells({
+    state,
+    rowIndex,
+    datasetEntry,
+    targetIds,
+    scopedComparisonDeps,
+    seedTargetOutputs,
+    datasetId,
+  }: {
+    state: PlanState;
+    rowIndex: number;
+    datasetEntry: Record<string, unknown>;
+    targetIds: string[];
+    scopedComparisonDeps: Set<string>;
+    seedTargetOutputs?: Record<string, SeededTargetOutput>;
+    datasetId: string;
+  }): ExecutionCell[] {
+    const cells: ExecutionCell[] = [];
+    for (const targetId of targetIds) {
+      if (scopedComparisonDeps.has(targetId) && seedTargetOutputs?.[`${rowIndex}:${targetId}`]) {
+        continue;
+      }
+
+      const targetConfig = state.targets.find((t: TargetConfig) => t.id === targetId);
+      if (!targetConfig) {
+        continue;
+      }
+
+      // Column-style comparison targets (pairwise #5100, N-way #5101) are
+      // skipped in Phase 1 — they need every variant's output, not yet
+      // available per-target. Picked up by generateComparisonCells (Phase 2).
+      if (targetConfig.type === "evaluator" && isComparisonEvaluator(targetConfig)) {
+        continue;
+      }
+
+      cells.push({
+        rowIndex,
+        targetId,
+        targetConfig,
+        // Comparison evaluators (pairwise #5100, N-way #5101) run in Phase 2
+        // once every variant's output exists; they would crash here. See
+        // generateComparisonCells.
+        evaluatorConfigs: state.evaluators.filter((e) => !isComparisonEvaluator(e)),
+        datasetEntry: { _datasetId: datasetId, ...datasetEntry },
+      });
+    }
     return cells;
   }
 

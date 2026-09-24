@@ -18,7 +18,7 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import type { EvaluationReport } from "../app/evaluation.members.ts";
-import { gatedVerdictFields, processTargets } from "../rules/evaluation-dispatch.rules.ts";
+import { gatedVerdictFields, normalizeTargets } from "../rules/evaluation-dispatch.rules.ts";
 
 const logger = createLogger("langwatch:evaluation:batch-log");
 
@@ -121,7 +121,7 @@ export class EvaluationBatchLogService {
       ...params,
       experiment_id: experiment.id,
       project_id: projectId,
-      targets: processTargets(params.targets),
+      targets: normalizeTargets(params.targets),
       dataset: params.dataset ?? [],
       evaluations: params.evaluations ?? [],
       timestamps: {

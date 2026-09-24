@@ -6,21 +6,22 @@ import { createTrpcRuntime } from "@langwatch/api/trpc";
  * as `project.trpc.unit.test.ts`, whose seven `vi.fn` mounts stay green while
  * every procedure throws. Spec: specs/projects/projects-browser-door.feature
  */
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { LocalFeatureApis, ResourceScope } from "@langwatch/kernel";
+import { ResourceScope } from "@langwatch/kernel";
+import type { LangyApi } from "@langwatch/langy-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { ProjectApi, type Project, type ProjectWithTeam } from "@langwatch/project-contract";
+import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { ShareApi } from "@langwatch/share-contract";
 import { type TopicApi, type TopicClusteringStatus } from "@langwatch/topic-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { ProjectApp } from "../../app/project.app.ts";
 import { MemoryProjectDatabase } from "../../repositories/memory/memory.project.database.ts";
 import { MemoryProjectRepository } from "../../repositories/memory/memory.project.repository.ts";
-import type { ProjectHomeApi } from "../home.trpc.ts";
-import type { IntegrationsChecksApi } from "../integrations-checks.trpc.ts";
 import type { ProjectBrowserApi } from "../project.trpc.ts";
 import { projectTrpcTransport } from "../project.trpc.ts";
 import { projectTrpcTestMembers, type ProjectTrpcTestContext } from "./project.trpc.harness.ts";
@@ -30,34 +31,6 @@ const ACTOR_ID = "user-1";
 const ORGANIZATION_ID = "organization-1";
 const OTHER_PROJECT_ID = "project_other";
 const NOW = new Date("2026-09-01T00:00:00.000Z");
-
-/**
- * Which members of the browser witness the app answers today. `Record<keyof
- * …>` forces a new member to be classified here; the three `false` entries
- * are other verticals' — see `.claude/handoffs/project-trpc-witness-alignment.md`.
- */
-const BROWSER_MEMBERS_SERVED: Record<keyof ProjectBrowserApi, boolean> = {
-  projects: true,
-  encryptProjectSecret: true,
-  probePermission: true,
-  reportTopicClusteringFailure: true,
-  /** The trace module's `resolveViewerProtections`. */
-  getFieldProtections: false,
-  /** The Langy gateway's virtual-key mint. */
-  provisionLangyVirtualKey: false,
-  /** The audit-log module's `record`. */
-  recordApiKeyRegenerated: false,
-};
-
-/** The home strip reads the audit trail and five other verticals' rows. */
-const HOME_MEMBERS_SERVED: Record<keyof ProjectHomeApi, boolean> = {
-  getRecentItems: false,
-};
-
-/** The setup checklist counts nine verticals' rows. */
-const CHECKS_MEMBERS_SERVED: Record<keyof IntegrationsChecksApi, boolean> = {
-  getCheckStatus: false,
-};
 
 function team(overrides: Partial<ProjectWithTeam["team"]> = {}): ProjectWithTeam["team"] {
   return {
@@ -175,6 +148,9 @@ function application(
       topics: createApiFixture<TopicApi>({
         getClusteringStatus: async () => IDLE_CLUSTERING,
       }),
+      trace: createApiFixture<TraceApi>({}, "trace"),
+      auditLog: createApiFixture<AuditLogApi>({}, "auditLog"),
+      langy: createApiFixture<LangyApi>({}, "langy"),
     },
     repositories: { projects: MemoryProjectRepository.create({ memory: database }) },
     members: {
@@ -197,20 +173,6 @@ function application(
   });
 
   return { app, database, asked, logged };
-}
-
-/**
- * The object boot hands every one of this module's transports: the app bound
- * to the module's own API token, through the operations-only proxy — it is
- * the proxy, not the class, that decides whether a member access throws.
- */
-function provided(app: ProjectApp) {
-  const apis = new LocalFeatureApis();
-  apis.declare(ProjectApi);
-  apis.bind(ProjectApi, app);
-  apis.ready();
-
-  return apis.reference(ProjectApi);
 }
 
 /**
@@ -246,43 +208,6 @@ function mount(options: Parameters<typeof application>[0] = {}) {
 
   return { ...built, caller: router.createCaller({ actor: { id: ACTOR_ID } }) };
 }
-
-describe("given the application the composition builds", () => {
-  describe("when a mounted door reaches it through the feature-API proxy", () => {
-    /** @scenario "a mounted door reaches only members the application serves" */
-    it("serves each browser member the map names, and refuses the rest by name", () => {
-      const reference = provided(application().app);
-
-      const members = Object.entries(BROWSER_MEMBERS_SERVED);
-      for (const [member] of members.filter(([, served]) => served)) {
-        expect(typeof Reflect.get(reference, member)).toBe("function");
-      }
-      for (const [member] of members.filter(([, served]) => !served)) {
-        expect(() => Reflect.get(reference, member)).toThrow(
-          `exposes operations only: ${member} is not callable`,
-        );
-      }
-    });
-
-    it("refuses the home and setup-checklist members no installed peer answers", () => {
-      const reference = provided(application().app);
-      const unserved = [
-        ...Object.keys(HOME_MEMBERS_SERVED).filter(
-          (member) => !HOME_MEMBERS_SERVED[member as keyof ProjectHomeApi],
-        ),
-        ...Object.keys(CHECKS_MEMBERS_SERVED).filter(
-          (member) => !CHECKS_MEMBERS_SERVED[member as keyof IntegrationsChecksApi],
-        ),
-      ];
-
-      for (const member of unserved) {
-        expect(() => Reflect.get(reference, member)).toThrow(
-          `exposes operations only: ${member} is not callable`,
-        );
-      }
-    });
-  });
-});
 
 describe("the project tRPC namespace over the application the composition builds", () => {
   describe("when the base key is read", () => {

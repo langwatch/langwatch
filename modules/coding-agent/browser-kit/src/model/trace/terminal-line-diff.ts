@@ -28,23 +28,7 @@ export function computeLineDiff(oldText: string, newText: string): DiffLine[] {
     ];
   }
 
-  const lcs: number[][] = Array.from({ length: oldLines.length + 1 }, () =>
-    Array.from({ length: newLines.length + 1 }, () => 0),
-  );
-  for (let oldIndex = oldLines.length - 1; oldIndex >= 0; oldIndex--) {
-    for (let newIndex = newLines.length - 1; newIndex >= 0; newIndex--) {
-      const current = lcs[oldIndex];
-      if (!current) {
-        continue;
-      }
-
-      const sameLine = oldLines[oldIndex] === newLines[newIndex];
-      const nextOld = lcsValue(lcs, oldIndex + 1, newIndex);
-      const nextNew = lcsValue(lcs, oldIndex, newIndex + 1);
-      const diagonal = lcsValue(lcs, oldIndex + 1, newIndex + 1);
-      current[newIndex] = sameLine ? diagonal + 1 : Math.max(nextOld, nextNew);
-    }
-  }
+  const lcs = buildLcsTable({ oldLines, newLines });
 
   const result: DiffLine[] = [];
   let oldIndex = 0;
@@ -107,6 +91,33 @@ export function diffStat(lines: DiffLine[]): { added: number; removed: number } 
     }
   }
   return { added, removed };
+}
+
+function buildLcsTable({
+  oldLines,
+  newLines,
+}: {
+  oldLines: string[];
+  newLines: string[];
+}): number[][] {
+  const lcs: number[][] = Array.from({ length: oldLines.length + 1 }, () =>
+    Array.from({ length: newLines.length + 1 }, () => 0),
+  );
+  for (let oldIndex = oldLines.length - 1; oldIndex >= 0; oldIndex--) {
+    for (let newIndex = newLines.length - 1; newIndex >= 0; newIndex--) {
+      const current = lcs[oldIndex];
+      if (!current) {
+        continue;
+      }
+
+      const sameLine = oldLines[oldIndex] === newLines[newIndex];
+      const nextOld = lcsValue(lcs, oldIndex + 1, newIndex);
+      const nextNew = lcsValue(lcs, oldIndex, newIndex + 1);
+      const diagonal = lcsValue(lcs, oldIndex + 1, newIndex + 1);
+      current[newIndex] = sameLine ? diagonal + 1 : Math.max(nextOld, nextNew);
+    }
+  }
+  return lcs;
 }
 
 function lcsValue(matrix: number[][], row: number, column: number): number {

@@ -50,6 +50,14 @@ export type ActorContext = {
   permissions: GatewayScopePermissions;
 };
 
+/** A key's scopes as given (or read from the stored key when absent) and its trace destination. */
+export type GuardrailProjectKey = {
+  organizationId: string;
+  vkId: string | null;
+  inputScopes: { scopeType: string; scopeId: string }[] | undefined;
+  traceProjectId?: string | null;
+};
+
 function scopeLabel(scope: Scope): string {
   return `${scope.scopeType}:${scope.scopeId}`;
 }
@@ -339,21 +347,16 @@ export class VirtualKeyAuthorizationService {
   }
 
   /**
-   * Resolves the single project scope a key is reachable from. Guardrails are project-scoped, so a
-   * key can only attach guardrails from that one project; zero or several project scopes return
-   * null, neither having a well-defined guardrail surface.
+   * The one project a key's guardrails are judged against: its single project scope, else its
+   * trace destination. With neither there is no guardrail surface, so it throws
+   * GatewayGuardrailProjectMismatchError.
    */
-  async tryResolveVkProjectId({
+  async getGuardrailProjectId({
     organizationId,
     vkId,
     inputScopes,
     traceProjectId,
-  }: {
-    organizationId: string;
-    vkId: string | null;
-    inputScopes: { scopeType: string; scopeId: string }[] | undefined;
-    traceProjectId?: string | null;
-  }): Promise<string | null> {
+  }: GuardrailProjectKey): Promise<string> {
     let scopes = inputScopes;
     let storedTraceProjectId: string | null = null;
     if (!scopes && vkId) {
@@ -373,7 +376,12 @@ export class VirtualKeyAuthorizationService {
     // Guardrails are project-scoped and enforce where traces land, so an
     // org- or team-owned key's guardrail surface is its explicit trace
     // destination.
-    return traceProjectId ?? storedTraceProjectId;
+    const destination = traceProjectId ?? storedTraceProjectId;
+    if (!destination) {
+      throw new GatewayGuardrailProjectMismatchError();
+    }
+
+    return destination;
   }
 
   /**
@@ -408,7 +416,7 @@ export class VirtualKeyAuthorizationService {
    */
   async assertGuardrailAttachmentsAllowed(
     ctx: ActorContext,
-    vkProjectId: string | null,
+    key: GuardrailProjectKey,
     attachments: GuardrailAttachment[] | undefined,
   ): Promise<void> {
     const referencedIds = Array.from(new Set((attachments ?? []).flatMap((a) => a.guardrailIds)));
@@ -416,9 +424,7 @@ export class VirtualKeyAuthorizationService {
       return;
     }
 
-    if (!vkProjectId) {
-      throw new GatewayGuardrailProjectMismatchError();
-    }
+    const vkProjectId = await this.getGuardrailProjectId(key);
 
     // Any referenced guardrail that belongs to a different project (or does
     // not exist) is simply absent from the result, so the membership check

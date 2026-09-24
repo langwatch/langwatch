@@ -3,11 +3,14 @@
  * a token codec that remembers what it minted, a fixed delivery capability,
  * and the row-and-stream reads the byte surface performs.
  */
-import type { AuthzDenialReason, PermissionDecision } from "@langwatch/authz-contract";
-import type {
-  StoredObjectDeliveryCapability,
-  StoredObjectOwnerResolver,
-  StoredObjectStorageDestination,
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { AuthzApi, AuthzDenialReason, PermissionDecision } from "@langwatch/authz-contract";
+import type { RateLimiter } from "@langwatch/process-stores/members";
+import {
+  StoredObjectNotFoundError,
+  type StoredObjectDeliveryCapability,
+  type StoredObjectOwnerResolver,
+  type StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
 
 import { MemoryStoredObjectRepositories } from "../../repositories/memory/memory.stored-object.repositories.ts";
@@ -56,11 +59,11 @@ export class MemoryStoredObjectStorage extends StoredObjectStorage {
       : { kind: "through-process" as const };
   }
 
-  async tryStat() {
+  async getStat() {
     return { byteLength: 3, sha256: STORED_OBJECT_TEST_SHA256 };
   }
 
-  async tryRead() {
+  async getBytes() {
     const bytes = this.bytes;
 
     return (async function* () {
@@ -132,7 +135,8 @@ export class MemoryStoredObjectFiles implements StoredObjectFileReader {
     return this.head;
   }
 
-  async tryGetById(): Promise<StoredObjectFileStreamRead | null> {
+  async getById(): Promise<StoredObjectFileStreamRead> {
+    if (!this.read) throw new StoredObjectNotFoundError();
     return this.read;
   }
 }
@@ -141,7 +145,10 @@ export function createStoredObjectTestOwners(
   projectId: string | null = null,
 ): StoredObjectOwnerResolver {
   return {
-    tryResolve: async () => (projectId ? { projectId } : null),
+    getOwner: async () => {
+      if (!projectId) throw new StoredObjectNotFoundError();
+      return { projectId };
+    },
   } as StoredObjectOwnerResolver;
 }
 
@@ -167,8 +174,13 @@ export function createStoredObjectTestApp(
     permissions?: StoredObjectPermissions;
   }> = {},
 ): StoredObjectApp {
+  const permissions = input.permissions ?? new GrantedStoredObjectPermissions();
+
   return StoredObjectApp.fromInfrastructure({
-    permissions: input.permissions ?? new GrantedStoredObjectPermissions(),
+    permissions: createApiFixture<AuthzApi>({
+      getDecision: (args) => permissions.getDecision(args),
+    }),
+    rateLimiter: createApiFixture<RateLimiter>({}),
     repositories: input.repositories ?? MemoryStoredObjectRepositories.create(),
     infrastructure: createStoredObjectTestInfrastructure(input.members ?? {}),
   });

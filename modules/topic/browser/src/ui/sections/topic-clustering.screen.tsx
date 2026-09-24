@@ -20,6 +20,8 @@ import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { nowInstant } from "@langwatch/time";
 import type {
   ClusteringErrorCode,
+  TopicClusteringRunHistoryEntry,
+  TopicClusteringStatus,
   TopicClusteringRunMode,
   TopicClusteringSkipReason,
 } from "@langwatch/topic-contract";
@@ -200,6 +202,76 @@ function outcomeBadge(outcome: string | null, isRunInFlight: boolean) {
   }
 }
 
+function ClusteringStatusBody({
+  isLoading,
+  data,
+}: {
+  isLoading: boolean;
+  data: TopicClusteringStatus | undefined;
+}) {
+  if (isLoading) {
+    return (
+      <VStack align="start" gap={2} width="full">
+        <Skeleton height="20px" width="60%" />
+        <Skeleton height="20px" width="40%" />
+      </VStack>
+    );
+  }
+  if (!data) return <Text color="fg.muted">Clustering status is unavailable.</Text>;
+  return (
+    <VStack align="start" gap={3}>
+      <HStack gap={3}>
+        <Text fontWeight="medium">Last run</Text>
+        {outcomeBadge(data.lastRunOutcome, data.isRunInFlight)}
+        {data.lastRunAt && <Text color="fg.muted">{formatTimeAgo(data.lastRunAt) ?? ""}</Text>}
+      </HStack>
+      {data.lastRunOutcome === "completed" && (
+        <Text fontSize="sm" color="fg.muted">
+          {/* The mode is only trustworthy on a completed run: a failure
+              leaves the previous run's mode in place. */}
+          {(() => {
+            const modeCopy = copyFor(RUN_MODE_COPY, data.lastRunMode);
+            return modeCopy ? `${modeCopy}. ` : null;
+          })()}
+          Organized {data.lastRunTracesProcessed} traces into {data.lastRunTopicsCount} topics and{" "}
+          {data.lastRunSubtopicsCount} subtopics.
+        </Text>
+      )}
+      {data.lastRunOutcome === "skipped" && data.lastRunSkippedReason && (
+        <Text fontSize="sm" color="fg.muted">
+          {copyFor(SKIP_REASON_COPY, data.lastRunSkippedReason) ?? "Skipped"}.
+        </Text>
+      )}
+      {data.lastRunOutcome === "failed" &&
+        (() => {
+          const guidance = data.isLastRunErrorUserActionable
+            ? copyFor(CLUSTERING_FAILURE_GUIDANCE, data.lastRunErrorCode)
+            : undefined;
+          return guidance ? (
+            <Alert.Root status="warning">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Title>{guidance.title}</Alert.Title>
+                <Alert.Description>{guidance.description}</Alert.Description>
+              </Alert.Content>
+            </Alert.Root>
+          ) : (
+            <Text fontSize="sm" color="red.fg">
+              The last run failed on our side. It will retry automatically at the next scheduled
+              run.
+            </Text>
+          );
+        })()}
+      <HStack gap={3}>
+        <Text fontWeight="medium">Next scheduled run</Text>
+        <Text color="fg.muted">
+          {data.nextRunAt ? (formatTimeAgo(data.nextRunAt) ?? "") : "Not scheduled yet"}
+        </Text>
+      </HStack>
+    </VStack>
+  );
+}
+
 function ClusteringStatusCard({
   projectId,
   lastTriggeredAt,
@@ -229,70 +301,7 @@ function ClusteringStatusCard({
         <Heading>Schedule</Heading>
       </Card.Header>
       <Card.Body width="full">
-        {status.isLoading ? (
-          <VStack align="start" gap={2} width="full">
-            <Skeleton height="20px" width="60%" />
-            <Skeleton height="20px" width="40%" />
-          </VStack>
-        ) : status.data ? (
-          <VStack align="start" gap={3}>
-            <HStack gap={3}>
-              <Text fontWeight="medium">Last run</Text>
-              {outcomeBadge(status.data.lastRunOutcome, status.data.isRunInFlight)}
-              {status.data.lastRunAt && (
-                <Text color="fg.muted">{formatTimeAgo(status.data.lastRunAt) ?? ""}</Text>
-              )}
-            </HStack>
-            {status.data.lastRunOutcome === "completed" && (
-              <Text fontSize="sm" color="fg.muted">
-                {/* The mode is only trustworthy on a completed run: a failure
-                    leaves the previous run's mode in place. */}
-                {(() => {
-                  const modeCopy = copyFor(RUN_MODE_COPY, status.data.lastRunMode);
-                  return modeCopy ? `${modeCopy}. ` : null;
-                })()}
-                Organized {status.data.lastRunTracesProcessed} traces into{" "}
-                {status.data.lastRunTopicsCount} topics and {status.data.lastRunSubtopicsCount}{" "}
-                subtopics.
-              </Text>
-            )}
-            {status.data.lastRunOutcome === "skipped" && status.data.lastRunSkippedReason && (
-              <Text fontSize="sm" color="fg.muted">
-                {copyFor(SKIP_REASON_COPY, status.data.lastRunSkippedReason) ?? "Skipped"}.
-              </Text>
-            )}
-            {status.data.lastRunOutcome === "failed" &&
-              (() => {
-                const guidance = status.data.isLastRunErrorUserActionable
-                  ? copyFor(CLUSTERING_FAILURE_GUIDANCE, status.data.lastRunErrorCode)
-                  : undefined;
-                return guidance ? (
-                  <Alert.Root status="warning">
-                    <Alert.Indicator />
-                    <Alert.Content>
-                      <Alert.Title>{guidance.title}</Alert.Title>
-                      <Alert.Description>{guidance.description}</Alert.Description>
-                    </Alert.Content>
-                  </Alert.Root>
-                ) : (
-                  <Text fontSize="sm" color="red.fg">
-                    The last run failed on our side. It will retry automatically at the next
-                    scheduled run.
-                  </Text>
-                );
-              })()}
-            <HStack gap={3}>
-              <Text fontWeight="medium">Next scheduled run</Text>
-              <Text color="fg.muted">
-                {status.data.nextRunAt
-                  ? (formatTimeAgo(status.data.nextRunAt) ?? "")
-                  : "Not scheduled yet"}
-              </Text>
-            </HStack>
-          </VStack>
-        ) : (
-          <Text color="fg.muted">Clustering status is unavailable.</Text>
-        )}
+        <ClusteringStatusBody isLoading={status.isLoading} data={status.data} />
       </Card.Body>
     </Card.Root>
   );
@@ -338,6 +347,58 @@ function runDetail(run: {
   }
 }
 
+function RunHistoryBody({
+  isLoading,
+  runs,
+}: {
+  isLoading: boolean;
+  runs: TopicClusteringRunHistoryEntry[];
+}) {
+  if (isLoading) {
+    return (
+      <VStack align="start" gap={2} width="full" padding={6}>
+        <Skeleton height="20px" width="80%" />
+        <Skeleton height="20px" width="70%" />
+      </VStack>
+    );
+  }
+  if (runs.length === 0) {
+    return (
+      <Text color="fg.muted" padding={6}>
+        No runs yet. History appears here after the first scheduled or manual run.
+      </Text>
+    );
+  }
+  return (
+    <Table.Root variant="line" size="sm" width="full">
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader>When</Table.ColumnHeader>
+          <Table.ColumnHeader>Started by</Table.ColumnHeader>
+          <Table.ColumnHeader>Outcome</Table.ColumnHeader>
+          <Table.ColumnHeader>Details</Table.ColumnHeader>
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {runs.map((run) => (
+          <Table.Row key={run.runId}>
+            <Table.Cell whiteSpace="nowrap">{formatTimeAgo(run.startedAt) ?? ""}</Table.Cell>
+            <Table.Cell whiteSpace="nowrap">
+              {run.trigger === "manual" ? "You" : "Schedule"}
+            </Table.Cell>
+            <Table.Cell>{outcomeBadge(run.outcome, false)}</Table.Cell>
+            <Table.Cell>
+              <Text fontSize="sm" color="fg.muted">
+                {runDetail(run)}
+              </Text>
+            </Table.Cell>
+          </Table.Row>
+        ))}
+      </Table.Body>
+    </Table.Root>
+  );
+}
+
 function RunHistoryCard({ projectId }: { projectId: string }) {
   const history = topicApi.topics.getClusteringRunHistory.useQuery(
     { projectId },
@@ -353,43 +414,7 @@ function RunHistoryCard({ projectId }: { projectId: string }) {
         <Heading>Run history</Heading>
       </Card.Header>
       <Card.Body width="full" paddingX={0} paddingY={0} overflowX="auto">
-        {history.isLoading ? (
-          <VStack align="start" gap={2} width="full" padding={6}>
-            <Skeleton height="20px" width="80%" />
-            <Skeleton height="20px" width="70%" />
-          </VStack>
-        ) : history.data && history.data.length > 0 ? (
-          <Table.Root variant="line" size="sm" width="full">
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeader>When</Table.ColumnHeader>
-                <Table.ColumnHeader>Started by</Table.ColumnHeader>
-                <Table.ColumnHeader>Outcome</Table.ColumnHeader>
-                <Table.ColumnHeader>Details</Table.ColumnHeader>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {history.data.map((run) => (
-                <Table.Row key={run.runId}>
-                  <Table.Cell whiteSpace="nowrap">{formatTimeAgo(run.startedAt) ?? ""}</Table.Cell>
-                  <Table.Cell whiteSpace="nowrap">
-                    {run.trigger === "manual" ? "You" : "Schedule"}
-                  </Table.Cell>
-                  <Table.Cell>{outcomeBadge(run.outcome, false)}</Table.Cell>
-                  <Table.Cell>
-                    <Text fontSize="sm" color="fg.muted">
-                      {runDetail(run)}
-                    </Text>
-                  </Table.Cell>
-                </Table.Row>
-              ))}
-            </Table.Body>
-          </Table.Root>
-        ) : (
-          <Text color="fg.muted" padding={6}>
-            No runs yet. History appears here after the first scheduled or manual run.
-          </Text>
-        )}
+        <RunHistoryBody isLoading={history.isLoading} runs={history.data ?? []} />
       </Card.Body>
     </Card.Root>
   );

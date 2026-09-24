@@ -63,7 +63,7 @@ function producerOnlyAutomations(processName: string): AutomationEvaluationSubsc
       Promise.reject(producerOnly(processName, "match an automation trigger")),
     handleEvaluationGraphTriggerActivity: () =>
       Promise.reject(producerOnly(processName, "sweep graph triggers")),
-  } as unknown as AutomationEvaluationSubscriberService;
+  };
 }
 
 /**

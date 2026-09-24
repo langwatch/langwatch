@@ -105,6 +105,8 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
 
   const [apiDialogEvaluator, setApiDialogEvaluator] = useState<EvaluatorListRow | null>(null);
   const [evaluatorToDelete, setEvaluatorToDelete] = useState<EvaluatorListRow | null>(null);
+  const showEmptyState = !evaluatorsQuery.isLoading && evaluators?.length === 0;
+  const showEvaluators = !evaluatorsQuery.isLoading && evaluators?.length !== 0;
 
   return (
     <Drawer.Root
@@ -139,13 +141,15 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
               paddingX={6}
               paddingBottom={4}
             >
-              {evaluatorsQuery.isLoading ? (
+              {evaluatorsQuery.isLoading && (
                 <HStack justify="center" paddingY={8}>
                   <Spinner size="md" />
                 </HStack>
-              ) : evaluators?.length === 0 ? (
+              )}
+              {showEmptyState && (
                 <EvaluatorListEmptyState onCreateNew={onCreateNew} itemLabel={itemLabel} />
-              ) : (
+              )}
+              {showEvaluators &&
                 evaluators?.map((evaluator) => (
                   <EvaluatorListItem
                     key={evaluator.id}
@@ -158,8 +162,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
                     onDelete={() => setEvaluatorToDelete(evaluator)}
                     onUseFromApi={() => setApiDialogEvaluator(evaluator)}
                   />
-                ))
-              )}
+                ))}
             </VStack>
           </VStack>
         </Drawer.Body>

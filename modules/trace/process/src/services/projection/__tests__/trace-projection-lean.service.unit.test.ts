@@ -396,7 +396,7 @@ describe("given a gen_ai.input.messages chat payload whose developer prompt alon
   });
 });
 
-describe("TraceProjectionLeanService.structuredIoPreview", () => {
+describe("TraceProjectionLeanService.buildStructuredIoPreview", () => {
   describe("when the payload is a chat array larger than the budget only because of one long message", () => {
     it("clamps the long content and keeps every message", () => {
       const payload = JSON.stringify([
@@ -404,7 +404,10 @@ describe("TraceProjectionLeanService.structuredIoPreview", () => {
         { role: "user", content: "hi" },
       ]);
 
-      const preview = TraceProjectionLeanService.structuredIoPreview(payload, IO_PREVIEW_BYTES);
+      const preview = TraceProjectionLeanService.buildStructuredIoPreview(
+        payload,
+        IO_PREVIEW_BYTES,
+      );
 
       expect(preview).not.toBeNull();
       const messages = JSON.parse(preview!) as { role: string }[];
@@ -424,7 +427,7 @@ describe("TraceProjectionLeanService.structuredIoPreview", () => {
         { role: "user", content: "what do you mean?" },
       ]);
 
-      const preview = TraceProjectionLeanService.structuredIoPreview(payload, 32 * 1024);
+      const preview = TraceProjectionLeanService.buildStructuredIoPreview(payload, 32 * 1024);
 
       expect(preview).not.toBeNull();
       expect(Buffer.byteLength(preview!, "utf-8")).toBeLessThanOrEqual(32 * 1024);
@@ -445,7 +448,7 @@ describe("TraceProjectionLeanService.structuredIoPreview", () => {
   describe("when the value is not JSON", () => {
     it("reports null so the caller falls back to the byte cut", () => {
       expect(
-        TraceProjectionLeanService.structuredIoPreview("plain prose ".repeat(10), 1024),
+        TraceProjectionLeanService.buildStructuredIoPreview("plain prose ".repeat(10), 1024),
       ).toBeNull();
     });
   });
@@ -706,7 +709,7 @@ function makeSpanReceivedEventWithOversizedEventAttr(): Event {
       piiRedactionLevel: "DISABLED",
     },
     metadata: { spanId: "bbbbbbbbbbbbbbbb", traceId: "aaaaaaaaaaaaaaaa" },
-  } as unknown as Event;
+  };
 }
 
 /**
@@ -744,7 +747,7 @@ function makeSpanReceivedEventWithOversizedResourceAttr(): Event {
       piiRedactionLevel: "DISABLED",
     },
     metadata: { spanId: "bbbbbbbbbbbbbbbb", traceId: "aaaaaaaaaaaaaaaa" },
-  } as unknown as Event;
+  };
 }
 
 // ---------------------------------------------------------------------------

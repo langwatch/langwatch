@@ -1,5 +1,5 @@
 export {
-  inlineDataToMediaPart,
+  convertInlineDataToMediaPart,
   isInlineDataCarrier,
   normalizeContentSource,
   parseBase64DataUri,

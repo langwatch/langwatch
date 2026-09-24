@@ -14,7 +14,7 @@ import {
 import type { Command } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import type { MonitorIdInput, MonitorWithEvaluator } from "@langwatch/monitor-contract";
-import { monitorWithEvaluatorSchema } from "@langwatch/monitor-contract";
+import { MonitorNotFoundError, monitorWithEvaluatorSchema } from "@langwatch/monitor-contract";
 import type {
   EvaluationTraceEvent,
   EvaluationTraceSpan,
@@ -23,6 +23,7 @@ import type {
 import { vi } from "vitest";
 
 import type {
+  EvaluationAzureSafetyCredentialsResolution,
   EvaluationCostRecorder,
   EvaluationExecutionReceipt,
   EvaluationMonitorLookup,
@@ -99,9 +100,10 @@ export function buildMonitor(overrides: Record<string, unknown> = {}): MonitorWi
  * belongs to the monitor feature's own tests.
  */
 export class TestMonitorLookup implements EvaluationMonitorLookup {
-  readonly tryGetMonitorById = vi.fn(
-    async (_input: MonitorIdInput): Promise<MonitorWithEvaluator | null> => this.monitor,
-  );
+  readonly getMonitorById = vi.fn(async (input: MonitorIdInput): Promise<MonitorWithEvaluator> => {
+    if (!this.monitor) throw new MonitorNotFoundError(input.id);
+    return this.monitor;
+  });
 
   constructor(private readonly monitor: MonitorWithEvaluator | null) {}
 }
@@ -273,8 +275,10 @@ export function buildExecutionDeps(
   const costRecorder = new TestCostRecorder();
   const executionReceipt = new TestEvaluationExecutionReceipt(evaluations, costRecorder);
   const azureSafetyCredentials = vi.fn(
-    async (_input: { tenantId: string }): Promise<Record<string, string> | null> =>
-      options.azureCredentials ?? null,
+    async (_input: { tenantId: string }): Promise<EvaluationAzureSafetyCredentialsResolution> =>
+      options.azureCredentials
+        ? { kind: "configured", credentials: options.azureCredentials }
+        : { kind: "unconfigured" },
   );
 
   return {
@@ -282,7 +286,7 @@ export function buildExecutionDeps(
     traces,
     executionReceipt,
     azureSafetyCredentials: {
-      tryGetForTenant: azureSafetyCredentials,
+      resolveForTenant: azureSafetyCredentials,
     },
     settingsRecovery: {
       isDisabled: options.settingsRecoveryDisabled ?? (async () => false),

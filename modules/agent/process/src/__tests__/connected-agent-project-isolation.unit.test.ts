@@ -7,7 +7,7 @@ import { AgentCallForeignProjectError, CALL_KEY_SLACK_SECONDS } from "@langwatch
 import type { StoredCall } from "@langwatch/agent-contract";
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   callAckKey,
@@ -135,14 +135,20 @@ describe("the project fence of connected agent state", () => {
   });
 
   describe("when a session acknowledges a call of another project", () => {
+    let store: MemoryStore;
+    let core: AgentSessionService;
+
+    // The envelope of the victim's call, reachable under the attacker's own
+    // key: the fence has to hold on the envelope, not only on the key.
+    beforeEach(async () => {
+      const built = build();
+      store = built.store;
+      core = AgentSessionService.create(built.options);
+      await parkCall({ store, writtenBy: victimProjectId, readableBy: attackerProjectId });
+    });
+
     /** @scenario "An ack for a call of another project is refused" */
     it("refuses the frame and does not mark the call as started", async () => {
-      const { store, options } = build();
-      const core = AgentSessionService.create(options);
-      // The envelope of the victim's call, reachable under the attacker's own
-      // key: the fence has to hold on the envelope, not only on the key.
-      await parkCall({ store, writtenBy: victimProjectId, readableBy: attackerProjectId });
-
       await expect(core.ack(sessionOf(attackerProjectId), callId)).rejects.toBeInstanceOf(
         AgentCallForeignProjectError,
       );
@@ -152,10 +158,6 @@ describe("the project fence of connected agent state", () => {
 
     /** @scenario "An ack for a call of another project is refused" */
     it("refuses a result frame and writes no result for the other project", async () => {
-      const { store, options } = build();
-      const core = AgentSessionService.create(options);
-      await parkCall({ store, writtenBy: victimProjectId, readableBy: attackerProjectId });
-
       await expect(
         core.result(sessionOf(attackerProjectId), {
           type: "result",

@@ -9,7 +9,7 @@ import {
 import {
   assertPostgresSkipReasons,
   LWQL_POSTGRES_SKIPPED_MODELS,
-  postgresSkipReason,
+  derivePostgresSkipReason,
 } from "../lwql-postgres-skipped-models.rules.ts";
 import { LWQL_POSTGRES_ALL_OVERRIDES } from "../lwql-postgres-view-catalog.rules.ts";
 import { LWQL_PRISMA_MANIFEST } from "../lwql-prisma-manifest.rules.ts";
@@ -55,7 +55,7 @@ describe("given every model in the committed Prisma manifest", () => {
     for (const model of modelNames) {
       const buckets = [
         derivedBaseRelations.has(tableByModel.get(model)!),
-        postgresSkipReason(model, LWQL_POSTGRES_SKIPPED_MODELS) !== undefined,
+        derivePostgresSkipReason(model, LWQL_POSTGRES_SKIPPED_MODELS) !== undefined,
       ].filter(Boolean).length;
       expect(buckets, `"${model}" should land in exactly one bucket`).toBe(1);
     }
@@ -63,7 +63,7 @@ describe("given every model in the committed Prisma manifest", () => {
 
   it("pins the current split with literal counts, so drift is visible", () => {
     const skipped = modelNames.filter(
-      (model) => postgresSkipReason(model, LWQL_POSTGRES_SKIPPED_MODELS) !== undefined,
+      (model) => derivePostgresSkipReason(model, LWQL_POSTGRES_SKIPPED_MODELS) !== undefined,
     );
     expect(derived.length).toBe(DERIVED_MODEL_COUNT);
     expect(skipped.length).toBe(SKIPPED_MODEL_COUNT);
@@ -86,7 +86,7 @@ describe("given every model in the committed Prisma manifest", () => {
         `${model} is permission-gated and must not be a derived view`,
       ).toBe(false);
       expect(
-        postgresSkipReason(model, LWQL_POSTGRES_SKIPPED_MODELS),
+        derivePostgresSkipReason(model, LWQL_POSTGRES_SKIPPED_MODELS),
         `${model} must be skipped with a permission-gated reason`,
       ).toContain("permission-gated:");
     }

@@ -4,7 +4,7 @@ import type { CanonicalEvent } from "@langwatch/trace-contract";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
 import { extractOutputMessages, recordValueType } from "../rules/canonical-extraction.rules.ts";
-import { isRecord, safeJsonParse } from "../rules/canonical-guard.rules.ts";
+import { isRecord, parseJsonSafely } from "../rules/canonical-guard.rules.ts";
 import {
   extractSystemInstructionFromMessages,
   stripSystemMessages,
@@ -54,7 +54,7 @@ const extractStrandsContent = (eventAttrs: Record<string, unknown>): unknown => 
 
 /** Candidate attribute as content: string, array, or wrapper field. */
 const strandsContentOfCandidate = (candidate: unknown): unknown => {
-  const parsed = safeJsonParse(candidate);
+  const parsed = parseJsonSafely(candidate);
 
   if (typeof parsed === "string" && parsed.trim().length > 0) {
     return parsed;

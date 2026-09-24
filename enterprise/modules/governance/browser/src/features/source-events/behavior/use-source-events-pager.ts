@@ -203,7 +203,7 @@ function presentPager<R extends PagerRow>({
     // A failure with pages on screen is not the table's whole story:
     // "error" is reserved for a walk that never loaded anything. A
     // mid-walk failure keeps status "ready" and travels in `error`.
-    status: state.pages === null ? (state.error !== null ? "error" : "loading") : "ready",
+    status: pagerStatus({ hasPages: state.pages !== null, hasError: state.error !== null }),
     error: state.error,
     page: state.page,
     pageSize: state.pageSize,
@@ -300,4 +300,15 @@ export function useSourceEventsPager<R extends PagerRow>({
   );
 
   return presentPager({ state, controls: { goToPage, setPageSize } });
+}
+
+function pagerStatus({
+  hasPages,
+  hasError,
+}: {
+  hasPages: boolean;
+  hasError: boolean;
+}): "loading" | "error" | "ready" {
+  if (hasPages) return "ready";
+  return hasError ? "error" : "loading";
 }

@@ -21,6 +21,11 @@ export function readUiErrorActions(meta: Record<string, unknown> | undefined): U
   };
 }
 
+function copyLabel({ hasFailed, isCopied }: { hasFailed: boolean; isCopied: boolean }) {
+  if (hasFailed) return "Couldn't copy";
+  return isCopied ? "Copied" : "Copy error ID";
+}
+
 export function UiErrorActions({ docsUrl, traceId }: UiErrorActionsProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [hasFailed, setHasFailed] = useState(false);
@@ -94,7 +99,7 @@ export function UiErrorActions({ docsUrl, traceId }: UiErrorActionsProps) {
           // targets what the user can see.
         >
           {isCopied ? <CheckIcon width={10} height={10} /> : <CopyIcon width={10} height={10} />}
-          {hasFailed ? "Couldn't copy" : isCopied ? "Copied" : "Copy error ID"}
+          {copyLabel({ hasFailed, isCopied })}
         </chakra.button>
       )}
     </HStack>

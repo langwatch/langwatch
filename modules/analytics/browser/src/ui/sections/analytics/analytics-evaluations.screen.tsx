@@ -325,6 +325,70 @@ const renderGridItems = (
   });
 };
 
+interface GraphClickParams {
+  evaluatorId: string;
+  groupKey?: string;
+  date?: string;
+  startDate?: string;
+  endDate?: string;
+  checkType: string;
+  isGuardrail: boolean;
+}
+
+function traceExplorerQuery(params: GraphClickParams): string {
+  const isCategoryEvaluator = params.checkType === "langevals/llm_category";
+
+  // Build filter parameters using dot notation with evaluator ID as key
+  // Format: evaluation_passed.{evaluatorId}=0|1 and evaluation_run.{evaluatorId}=processed
+  const filterParams: Record<string, string | string[]> = {
+    [`evaluation_run.${params.evaluatorId}`]: ["processed"], // Excludes error/scheduled
+  };
+
+  // Add appropriate filter based on evaluator type. status="processed" is filtered
+  // first to exclude error/scheduled, then the specific filter (passed/label) is added.
+  if (params.isGuardrail && params.groupKey) {
+    // For guardrail evaluators, filter by passed/failed. groupKey comes from the graph
+    // and can be "passed", "failed", "1", "0", "true", "false", "positive", "negative"
+    const passed =
+      params.groupKey === "passed" ||
+      params.groupKey === "true" ||
+      params.groupKey === "positive" ||
+      params.groupKey === "1";
+    const failed =
+      params.groupKey === "failed" ||
+      params.groupKey === "false" ||
+      params.groupKey === "negative" ||
+      params.groupKey === "0";
+
+    if (passed) {
+      filterParams[`evaluation_passed.${params.evaluatorId}`] = "1";
+    } else if (failed) {
+      filterParams[`evaluation_passed.${params.evaluatorId}`] = "0";
+    }
+  } else if (isCategoryEvaluator && params.groupKey) {
+    // For category evaluators, filter by label
+    filterParams[`evaluation_label.${params.evaluatorId}`] = params.groupKey;
+  }
+
+  // Add date range filter if provided (for bar chart drill-down)
+  if (params.startDate && params.endDate) {
+    filterParams.startDate = params.startDate;
+    filterParams.endDate = params.endDate;
+  }
+
+  // Navigate to the Trace Explorer with query parameters. A whole address
+  // rather than a merge: none of this page's parameters mean anything on
+  // the trace explorer.
+  return Object.entries(filterParams)
+    .map(
+      ([key, value]) =>
+        `${encodeURIComponent(key)}=${encodeURIComponent(
+          Array.isArray(value) ? value.join(",") : value,
+        )}`,
+    )
+    .join("&");
+}
+
 function EvaluationsContent() {
   const host = useAnalyticsHost();
   const project = host.project();
@@ -339,71 +403,11 @@ function EvaluationsContent() {
   const visibleChecks = selectedEvaluation ? [selectedEvaluation] : (checks.data ?? []);
 
   const handleGraphClick = useCallback(
-    (params: {
-      evaluatorId: string;
-      groupKey?: string;
-      date?: string;
-      startDate?: string;
-      endDate?: string;
-      checkType: string;
-      isGuardrail: boolean;
-    }) => {
+    (params: GraphClickParams) => {
       if (!project || !params.evaluatorId) {
         return;
       }
-
-      const isCategoryEvaluator = params.checkType === "langevals/llm_category";
-
-      // Build filter parameters using dot notation with evaluator ID as key
-      // Format: evaluation_passed.{evaluatorId}=0|1 and evaluation_run.{evaluatorId}=processed
-      const filterParams: Record<string, string | string[]> = {
-        [`evaluation_run.${params.evaluatorId}`]: ["processed"], // Excludes error/scheduled
-      };
-
-      // Add appropriate filter based on evaluator type. status="processed" is filtered
-      // first to exclude error/scheduled, then the specific filter (passed/label) is added.
-      if (params.isGuardrail && params.groupKey) {
-        // For guardrail evaluators, filter by passed/failed. groupKey comes from the graph
-        // and can be "passed", "failed", "1", "0", "true", "false", "positive", "negative"
-        const passed =
-          params.groupKey === "passed" ||
-          params.groupKey === "true" ||
-          params.groupKey === "positive" ||
-          params.groupKey === "1";
-        const failed =
-          params.groupKey === "failed" ||
-          params.groupKey === "false" ||
-          params.groupKey === "negative" ||
-          params.groupKey === "0";
-
-        if (passed) {
-          filterParams[`evaluation_passed.${params.evaluatorId}`] = "1";
-        } else if (failed) {
-          filterParams[`evaluation_passed.${params.evaluatorId}`] = "0";
-        }
-      } else if (isCategoryEvaluator && params.groupKey) {
-        // For category evaluators, filter by label
-        filterParams[`evaluation_label.${params.evaluatorId}`] = params.groupKey;
-      }
-
-      // Add date range filter if provided (for bar chart drill-down)
-      if (params.startDate && params.endDate) {
-        filterParams.startDate = params.startDate;
-        filterParams.endDate = params.endDate;
-      }
-
-      // Navigate to the Trace Explorer with query parameters. A whole address
-      // rather than a merge: none of this page's parameters mean anything on
-      // the trace explorer.
-      const query = Object.entries(filterParams)
-        .map(
-          ([key, value]) =>
-            `${encodeURIComponent(key)}=${encodeURIComponent(
-              Array.isArray(value) ? value.join(",") : value,
-            )}`,
-        )
-        .join("&");
-      host.navigate(`/${project.slug}/traces?${query}`);
+      host.navigate(`/${project.slug}/traces?${traceExplorerQuery(params)}`);
     },
     [project, host],
   );

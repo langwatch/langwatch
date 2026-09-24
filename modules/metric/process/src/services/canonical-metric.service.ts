@@ -13,7 +13,7 @@ import {
 import {
   METRIC_KIND_DATA_KEY,
   candidatePointCount,
-  metricKind,
+  classifyMetricKind,
 } from "../rules/metric-kinds.rules.ts";
 import { buildPoint } from "../rules/metric-point.rules.ts";
 import { isRecord, type UnknownRecord } from "../rules/metric-serialization.rules.ts";
@@ -77,7 +77,7 @@ async function prepareMetric({
   rejections: RejectionLog;
 }): Promise<void> {
   const label = typeof metric.name === "string" ? metric.name : "<unnamed>";
-  const kind = metricKind(metric);
+  const kind = classifyMetricKind(metric);
   if (!kind) {
     rejections.reject(
       `metric ${label} has no single supported data kind`,

@@ -116,15 +116,7 @@ export default function BatchEvaluation({
         };
       }
       acc[curr.evaluation]!.all.push(curr);
-      acc[curr.evaluation]![
-        curr.status === "processed"
-          ? "processed"
-          : curr.status === "error"
-            ? "error"
-            : curr.status === "skipped"
-              ? "skipped"
-              : "unknown"
-      ].push(curr);
+      acc[curr.evaluation]![statusBucket(curr.status)].push(curr);
       return acc;
     },
     {} as Record<
@@ -164,6 +156,9 @@ export default function BatchEvaluation({
       ];
     }),
   );
+
+  const isEmpty = !evaluations.isLoading && evaluations.data?.length === 0;
+  const showGroups = !evaluations.isLoading && !isEmpty;
 
   return (
     <Box background="bg.surface" width="full" height="full" paddingTop={14}>
@@ -283,7 +278,7 @@ export default function BatchEvaluation({
         paddingX={6}
       >
         <VStack align="start" minWidth="0">
-          {evaluations.isLoading ? (
+          {evaluations.isLoading && (
             <Box>
               <Table.Root variant="line" borderWidth="1px" borderColor="border">
                 <Table.Body>
@@ -299,9 +294,9 @@ export default function BatchEvaluation({
                 </Table.Body>
               </Table.Root>
             </Box>
-          ) : evaluations.data && evaluations.data.length === 0 ? (
-            <Text>No data found</Text>
-          ) : (
+          )}
+          {isEmpty && <Text>No data found</Text>}
+          {showGroups &&
             Object.entries(groupedByEvaluation ?? {}).map(([evaluationKey, evaluations]) => {
               const hasExpectedOutput = evaluations.all.some(
                 (evaluation) => (evaluation.data as JsonObject)?.expected_output,
@@ -363,36 +358,22 @@ export default function BatchEvaluation({
                                   </Tooltip>
                                 </Table.Cell>
                               )}
-                              <Table.Cell
-                                color={
-                                  evaluation.status === "skipped"
-                                    ? "yellow.700"
-                                    : evaluation.status === "error"
-                                      ? "red.700"
-                                      : undefined
-                                }
-                              >
+                              <Table.Cell color={STATUS_COLORS.get(evaluation.status)}>
                                 {evaluation.status}
                               </Table.Cell>
                               {evaluation.status === "processed" ? (
                                 <Table.Cell
                                   textAlign="center"
                                   fontWeight="500"
-                                  color={
-                                    passedOrScoreMetric[evaluationKey] === "score"
-                                      ? evaluation.score < 0.5
-                                        ? "red.500"
-                                        : "green.500"
-                                      : evaluation.passed
-                                        ? "green.500"
-                                        : "red.500"
-                                  }
+                                  color={resultColor({
+                                    isScore: passedOrScoreMetric[evaluationKey] === "score",
+                                    evaluation,
+                                  })}
                                 >
-                                  {passedOrScoreMetric[evaluationKey] === "score"
-                                    ? numeral(evaluation.score).format("0.00")
-                                    : evaluation.passed
-                                      ? "True"
-                                      : "False"}
+                                  {resultLabel({
+                                    isScore: passedOrScoreMetric[evaluationKey] === "score",
+                                    evaluation,
+                                  })}
                                 </Table.Cell>
                               ) : (
                                 <Table.Cell textAlign="center">-</Table.Cell>
@@ -400,13 +381,7 @@ export default function BatchEvaluation({
                               {hasDetails && (
                                 <Table.Cell
                                   maxWidth={300}
-                                  color={
-                                    evaluation.status === "skipped"
-                                      ? "yellow.700"
-                                      : evaluation.status === "error"
-                                        ? "red.700"
-                                        : undefined
-                                  }
+                                  color={STATUS_COLORS.get(evaluation.status)}
                                 >
                                   <Tooltip content={evaluation.details}>
                                     <Text lineClamp={1} wordBreak="break-all" display="block">
@@ -434,10 +409,43 @@ export default function BatchEvaluation({
                   </Box>
                 </VStack>
               );
-            })
-          )}
+            })}
         </VStack>
       </Box>
     </Box>
   );
+}
+
+const STATUS_COLORS = new Map<string, string>([
+  ["skipped", "yellow.700"],
+  ["error", "red.700"],
+]);
+
+function statusBucket(status: string): "processed" | "error" | "skipped" | "unknown" {
+  if (status === "processed") return "processed";
+  if (status === "error") return "error";
+  if (status === "skipped") return "skipped";
+  return "unknown";
+}
+
+function resultColor({
+  isScore,
+  evaluation,
+}: {
+  isScore: boolean;
+  evaluation: BatchEvaluation;
+}): string {
+  if (isScore) return evaluation.score < 0.5 ? "red.500" : "green.500";
+  return evaluation.passed ? "green.500" : "red.500";
+}
+
+function resultLabel({
+  isScore,
+  evaluation,
+}: {
+  isScore: boolean;
+  evaluation: BatchEvaluation;
+}): string {
+  if (isScore) return numeral(evaluation.score).format("0.00");
+  return evaluation.passed ? "True" : "False";
 }

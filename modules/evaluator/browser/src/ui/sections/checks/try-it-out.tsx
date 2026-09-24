@@ -90,7 +90,7 @@ function waitingCell(isNextUp: boolean) {
 export function TryItOut({
   form,
 }: {
-  form: UseFormReturn<CheckConfigFormData, any, CheckConfigFormData>;
+  form: UseFormReturn<CheckConfigFormData, unknown, CheckConfigFormData>;
 }) {
   const { project } = useOrganizationTeamProject();
   const { watch } = form;
@@ -175,6 +175,8 @@ export function TryItOut({
     setRunningState({ state: "idle" });
   }, [tracesPassingPreconditionsOnLoad.data]);
 
+  const runningNextTraceId = runningState.state === "idle" ? undefined : runningState.nextTraceId;
+
   useEffect(() => {
     if (!project || !evaluatorType || runningState.state !== "running") return;
 
@@ -256,7 +258,7 @@ export function TryItOut({
       },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runningState.state, (runningState as any).nextTraceId]);
+  }, [runningState.state, runningNextTraceId]);
 
   const totalCost = Object.values(runningResults).reduce(
     (acc, result) =>

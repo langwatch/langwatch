@@ -17,7 +17,12 @@ import {
   defaultCodexNotifyCommand,
   writeCodexNotifyBlock,
 } from "../codex-config-toml";
-import { appEnvHasAllVars, appSettingsTargetFor, installAppEnv } from "./app-settings";
+import {
+  type AppSettingsTarget,
+  appEnvHasAllVars,
+  appSettingsTargetFor,
+  installAppEnv,
+} from "./app-settings";
 import { ensureLangwatchClaudePlugin, readClaudePluginState } from "./claude-plugin";
 import { assertCodexAgentGuidance } from "./codex-agents-md";
 import { type GovernanceConfig, saveConfig } from "./config";
@@ -317,6 +322,49 @@ function persistQuestion({ tool, targetHint }: { tool: string; targetHint: strin
   return `Install env vars to ${targetHint} so that next time the plain \`${tool}\` command keeps capturing telemetry data?`;
 }
 
+async function offerAppEnvPersist({
+  cfg,
+  tool,
+  vars,
+  appTarget,
+}: {
+  cfg: GovernanceConfig;
+  tool: string;
+  vars: Record<string, string>;
+  appTarget: AppSettingsTarget;
+}): Promise<void> {
+  if (appEnvHasAllVars(appTarget, vars)) {
+    // The exports are current, but the session context seam may not be: it
+    // arrived after the env block, so a device that persisted earlier
+    // carries the block and none of it. Same file, same grant, so assert it
+    // here rather than leaving repository identity off every session that
+    // already said yes.
+    reassertClaudeSessionContext(tool);
+    return;
+  }
+  console.log();
+  const choice = await askPersistChoice({
+    target: appTarget.displayPath,
+    tool,
+  });
+  if (choice === "skip" || choice === "no") return;
+  if (choice === "never") {
+    recordNeverChoice(cfg);
+    return;
+  }
+  try {
+    installAppEnv(appTarget, vars);
+    console.log(
+      chalk.green(`  ✓ Installed langwatch telemetry exports to ${appTarget.displayPath}`),
+    );
+    installClaudeSessionContext(tool);
+  } catch (err) {
+    console.log(
+      chalk.yellow(`  ! Couldn't write to ${appTarget.displayPath}: ${(err as Error).message}`),
+    );
+  }
+}
+
 /**
  * Ingestion-mode (Path B) persist offer: once persisted, a plain `<tool>`
  * invocation inherits OTEL_EXPORTER_OTLP_* and keeps capturing. `claude`
@@ -338,36 +386,7 @@ export async function maybeOfferIngestionShellRcPersist({
 
   const appTarget = appSettingsTargetFor(tool);
   if (appTarget) {
-    if (appEnvHasAllVars(appTarget, vars)) {
-      // The exports are current, but the session context seam may not be: it
-      // arrived after the env block, so a device that persisted earlier
-      // carries the block and none of it. Same file, same grant, so assert it
-      // here rather than leaving repository identity off every session that
-      // already said yes.
-      reassertClaudeSessionContext(tool);
-      return;
-    }
-    console.log();
-    const choice = await askPersistChoice({
-      target: appTarget.displayPath,
-      tool,
-    });
-    if (choice === "skip" || choice === "no") return;
-    if (choice === "never") {
-      recordNeverChoice(cfg);
-      return;
-    }
-    try {
-      installAppEnv(appTarget, vars);
-      console.log(
-        chalk.green(`  ✓ Installed langwatch telemetry exports to ${appTarget.displayPath}`),
-      );
-      installClaudeSessionContext(tool);
-    } catch (err) {
-      console.log(
-        chalk.yellow(`  ! Couldn't write to ${appTarget.displayPath}: ${(err as Error).message}`),
-      );
-    }
+    await offerAppEnvPersist({ cfg, tool, vars, appTarget });
     return;
   }
 

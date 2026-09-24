@@ -32,6 +32,7 @@ export function DevicesPanel() {
   });
 
   const sessions = sessionsQuery.data ?? [];
+  const isLoadingDevices = !ready || sessionsQuery.isLoading;
 
   return (
     <VStack align="stretch" gap={4}>
@@ -56,13 +57,13 @@ export function DevicesPanel() {
         />
       )}
 
-      {!ready || sessionsQuery.isLoading ? (
+      {isLoadingDevices && (
         <Text fontSize="sm" color="fg.muted" paddingY={8}>
           Loading devices…
         </Text>
-      ) : sessions.length === 0 ? (
-        <NoDevicesState />
-      ) : (
+      )}
+      {!isLoadingDevices && sessions.length === 0 && <NoDevicesState />}
+      {!isLoadingDevices && sessions.length > 0 && (
         <VStack align="stretch" gap={2}>
           {sessions.map((session) => (
             <DeviceRow

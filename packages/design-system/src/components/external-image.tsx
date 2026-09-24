@@ -79,6 +79,52 @@ export const getProxiedImageUrl = (url: string): string => {
   return `/api/image-proxy?url=${encodeURIComponent(url)}`;
 };
 
+function computeClampOffset({
+  rect,
+  centerX,
+  centerY,
+  viewportWidth,
+  viewportHeight,
+  margin,
+}: {
+  rect: DOMRect;
+  centerX: number;
+  centerY: number;
+  viewportWidth: number;
+  viewportHeight: number;
+  margin: number;
+}): { top: number; left: number } {
+  // Current position (centered via CSS transform)
+  // The element is at centerX, centerY with transform: translate(-50%, -50%)
+  // So its edges are:
+  const currentLeft = centerX - rect.width / 2;
+  const currentTop = centerY - rect.height / 2;
+  const currentRight = currentLeft + rect.width;
+  const currentBottom = currentTop + rect.height;
+
+  let offsetLeft = 0;
+  let offsetTop = 0;
+
+  // Push left if overflowing right
+  if (currentRight > viewportWidth - margin) {
+    offsetLeft = viewportWidth - margin - currentRight;
+  }
+  // Push right if overflowing left
+  if (currentLeft + offsetLeft < margin) {
+    offsetLeft = margin - currentLeft;
+  }
+  // Push up if overflowing bottom
+  if (currentBottom > viewportHeight - margin) {
+    offsetTop = viewportHeight - margin - currentBottom;
+  }
+  // Push down if overflowing top
+  if (currentTop + offsetTop < margin) {
+    offsetTop = margin - currentTop;
+  }
+
+  return { top: offsetTop, left: offsetLeft };
+}
+
 export const ExternalImage = ({
   alt,
   src,
@@ -124,33 +170,14 @@ export const ExternalImage = ({
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
 
-        // Current position (centered via CSS transform)
-        // The element is at centerX, centerY with transform: translate(-50%, -50%)
-        // So its edges are:
-        const currentLeft = expandedPosition.centerX - rect.width / 2;
-        const currentTop = expandedPosition.centerY - rect.height / 2;
-        const currentRight = currentLeft + rect.width;
-        const currentBottom = currentTop + rect.height;
-
-        let offsetLeft = 0;
-        let offsetTop = 0;
-
-        // Push left if overflowing right
-        if (currentRight > viewportWidth - VIEWPORT_MARGIN) {
-          offsetLeft = viewportWidth - VIEWPORT_MARGIN - currentRight;
-        }
-        // Push right if overflowing left
-        if (currentLeft + offsetLeft < VIEWPORT_MARGIN) {
-          offsetLeft = VIEWPORT_MARGIN - currentLeft;
-        }
-        // Push up if overflowing bottom
-        if (currentBottom > viewportHeight - VIEWPORT_MARGIN) {
-          offsetTop = viewportHeight - VIEWPORT_MARGIN - currentBottom;
-        }
-        // Push down if overflowing top
-        if (currentTop + offsetTop < VIEWPORT_MARGIN) {
-          offsetTop = VIEWPORT_MARGIN - currentTop;
-        }
+        const { top: offsetTop, left: offsetLeft } = computeClampOffset({
+          rect,
+          centerX: expandedPosition.centerX,
+          centerY: expandedPosition.centerY,
+          viewportWidth,
+          viewportHeight,
+          margin: VIEWPORT_MARGIN,
+        });
 
         setClampOffset({ top: offsetTop, left: offsetLeft });
         setIsPositioned(true);

@@ -286,16 +286,14 @@ export function VirtualKeyOwnershipReadOnly({
   viewTracesHref?: string;
   ctx: Pick<OwnershipContext, "organizationName" | "availableTeams" | "availableProjects">;
 }) {
-  const named = scopes.map((s) => ({
-    scopeType: s.scopeType,
-    scopeId: s.scopeId,
-    name:
-      s.scopeType === "ORGANIZATION"
-        ? ctx.organizationName
-        : s.scopeType === "TEAM"
-          ? ctx.availableTeams.find((t) => t.id === s.scopeId)?.name
-          : (projectName(s.scopeId, ctx) ?? undefined),
-  }));
+  const named = scopes.map((s) => {
+    const ids = { scopeType: s.scopeType, scopeId: s.scopeId };
+    if (s.scopeType === "ORGANIZATION") return { ...ids, name: ctx.organizationName };
+    if (s.scopeType === "TEAM") {
+      return { ...ids, name: ctx.availableTeams.find((t) => t.id === s.scopeId)?.name };
+    }
+    return { ...ids, name: projectName(s.scopeId, ctx) ?? undefined };
+  });
   // A deleted project is not in the picker's list, so its name does not
   // resolve; the badge next to it is what carries the meaning either way.
   const destination = traceProjectId

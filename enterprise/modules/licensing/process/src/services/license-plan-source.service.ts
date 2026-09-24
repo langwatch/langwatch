@@ -3,8 +3,16 @@ import {
   mapToPlanInfo,
   type PlanInfo,
 } from "@langwatch/enterprise-licensing-contract";
+import { HandledError } from "@langwatch/handled-error";
 
 import type { LicenseCryptography, OrganizationLicense } from "../app/licensing.members.ts";
+
+/** An organization that no longer exists holds no licence: plan reads answer unlicensed. */
+const unlicensedWhenMissing = (error: unknown): { licenseKey: null } => {
+  if (HandledError.isHandled(error) && error.code === "organization_not_found")
+    return { licenseKey: null };
+  throw error;
+};
 
 export type LicensePlanSourceOptions = {
   /** Where the organization's activated licence key is read from. */
@@ -29,7 +37,9 @@ export class LicensePlanSourceService {
 
   /** The Cloud reading: signature AND term, so a lapsed contract steps aside. */
   async getActivePlan(organizationId: string): Promise<PlanInfo> {
-    const licenseKey = await this.licenses.tryReadLicense(organizationId);
+    const { licenseKey } = await this.licenses
+      .getOrganizationLicense(organizationId)
+      .catch(unlicensedWhenMissing);
     if (!licenseKey) {
       return UNLIMITED_PLAN;
     }
@@ -41,7 +51,9 @@ export class LicensePlanSourceService {
 
   /** The self-hosted reading: signature only, so a lapsed licence still holds. */
   async getSelfHostedPlan(organizationId: string): Promise<PlanInfo> {
-    const licenseKey = await this.licenses.tryReadLicense(organizationId);
+    const { licenseKey } = await this.licenses
+      .getOrganizationLicense(organizationId)
+      .catch(unlicensedWhenMissing);
     if (!licenseKey) {
       return UNLIMITED_PLAN;
     }

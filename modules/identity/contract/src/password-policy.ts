@@ -23,7 +23,7 @@ export const PASSWORD_REQUIREMENTS_HINT = `At least ${PASSWORD_MINIMUM_LENGTH} c
  */
 declare const TextEncoder: new () => { encode(input: string): { length: number } };
 
-export function passwordProblem(value: string): string | null {
+export function describePasswordProblem(value: string): string | null {
   if (value.length < PASSWORD_MINIMUM_LENGTH) {
     return `Use at least ${PASSWORD_MINIMUM_LENGTH} characters`;
   }

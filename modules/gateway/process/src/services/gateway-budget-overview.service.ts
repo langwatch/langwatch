@@ -259,7 +259,7 @@ export class BudgetOverviewService {
           ...budget,
           scopeClass,
           scopePhrase: scopePhraseFor(scopeClass, budget.scopeLabel),
-          resetsAt: resetsAtFor(budget.window),
+          resetsAt: computeResetsAt(budget.window),
           ...(topModels && topModels.length > 0 && scopeClass === "personal" ? { topModels } : {}),
         };
       })
@@ -293,7 +293,7 @@ export class BudgetOverviewService {
 
     const scopeLabel =
       targets.get(scopeTargetKey(budget.scopeType, budget.scopeId))?.name ?? budget.scopeId;
-    const scopeClass = absoluteScopeClass(budget.scopeType) ?? "other";
+    const scopeClass = classifyAbsoluteScope(budget.scopeType) ?? "other";
 
     return {
       id: budget.id,
@@ -314,7 +314,7 @@ export class BudgetOverviewService {
       managedByVirtualKeyId: budget.managedByVirtualKeyId,
       scopeClass,
       scopePhrase: absoluteScopePhrase(budget.scopeType, scopeLabel),
-      resetsAt: resetsAtFor(budget.window),
+      resetsAt: computeResetsAt(budget.window),
     };
   }
 
@@ -409,7 +409,7 @@ function scopeClassForUser(
     case "PROJECT":
       return budget.scopeId === ctx.personalProjectId ? "personal" : "project";
     default:
-      return absoluteScopeClass(budget.scopeType) ?? "other";
+      return classifyAbsoluteScope(budget.scopeType) ?? "other";
   }
 }
 
@@ -431,7 +431,7 @@ const SCOPE_CLASS_BY_TYPE = {
  * assert a scope, since mislabelling an unrecognised scope as a whole-organization budget is the
  * same mislabel this service exists to remove.
  */
-function absoluteScopeClass(scopeType: string): BudgetOverviewScopeClass | null {
+function classifyAbsoluteScope(scopeType: string): BudgetOverviewScopeClass | null {
   return SCOPE_CLASS_BY_TYPE[scopeType as keyof typeof SCOPE_CLASS_BY_TYPE] ?? null;
 }
 
@@ -460,7 +460,7 @@ function scopePhraseFor(scopeClass: BudgetOverviewScopeClass, scopeLabel: string
 }
 
 function absoluteScopePhrase(scopeType: string, scopeLabel: string): string {
-  const scopeClass = absoluteScopeClass(scopeType);
+  const scopeClass = classifyAbsoluteScope(scopeType);
   // Without a user in context "this key's budget" and a bare "personal
   // budget" would dangle; name the target instead.
   if (scopeClass === "key") {
@@ -474,7 +474,7 @@ function absoluteScopePhrase(scopeType: string, scopeLabel: string): string {
   return scopePhraseFor(scopeClass ?? "other", scopeLabel);
 }
 
-function resetsAtFor(window: string): string | null {
+function computeResetsAt(window: string): string | null {
   if (window === "TOTAL") {
     return null;
   }

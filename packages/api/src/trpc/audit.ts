@@ -375,6 +375,80 @@ export function resetSlowCallThrottle(): void {
   slowCallThrottle.reset();
 }
 
+type TrpcCallLogData = {
+  path: string;
+  type: string;
+  duration: number;
+  userAgent: string | null;
+  statusCode: number | null;
+  error?: unknown;
+  handledErrorCode?: string;
+  handledErrorFault?: HandledError["fault"];
+};
+
+function failedCallLogLevel({
+  handledCause,
+  resolvedStatus,
+}: {
+  handledCause: HandledError | undefined;
+  resolvedStatus: number;
+}) {
+  if (!handledCause) return getLogLevelFromStatusCode(resolvedStatus);
+
+  return handledCause.fault === "customer" ? "warn" : "error";
+}
+
+function logFailedCall({
+  error,
+  logData,
+  log,
+  capture,
+}: {
+  error: unknown;
+  logData: TrpcCallLogData;
+  log: Pick<Logger, "info" | "warn" | "error">;
+  capture: (failure: unknown) => void;
+}): void {
+  logData.error = error;
+
+  // Derive HTTP status from the TRPCError code, not ctx.res.statusCode.
+  // The response status hasn't been set yet at middleware time - tRPC sets
+  // it later when serializing the response. So we map it ourselves.
+  const resolvedStatus = error instanceof TRPCError ? getHTTPStatusCodeFromError(error) : 500;
+
+  const cause = error instanceof TRPCError ? error.cause : undefined;
+  // isHandled also matches an instance from a second copy of the package,
+  // which bare `instanceof` misses - see its brand check.
+  const handledCause = HandledError.isHandled(cause) ? cause : undefined;
+
+  // A handled error states its own status, and it is the accurate one: tRPC
+  // v10 has no code for 502/503/504, so an upstream failure resolves to 500
+  // through `handledErrorToTRPCCode` and would otherwise be counted against
+  // our own error budget every time a customer typos a base URL.
+  logData.statusCode = handledCause?.httpStatus ?? resolvedStatus;
+
+  // Include handled error code + fault in log data for structured
+  // filtering (and spike alerting on handledErrorCode).
+  if (handledCause) {
+    logData.handledErrorCode = handledCause.code;
+    logData.handledErrorFault = handledCause.fault;
+  }
+
+  // Only unhandled 5xx errors are captured as exceptions: handled errors
+  // are expected failure modes with typed causes, not bugs.
+  if (resolvedStatus >= 500 && !handledCause) {
+    capture(error);
+  }
+
+  // Handled errors log by fault attribution, not status: customer-fault
+  // errors are expected (warn - watched for spikes), while platform and
+  // provider failures are incidents worth an error line. Unhandled errors
+  // stay status-based.
+  const logLevel = failedCallLogLevel({ handledCause, resolvedStatus });
+
+  log[logLevel](logData, "trpc call");
+}
+
 /** Processes a tRPC call result and logs accordingly. Extracted for testability. */
 export function handleTrpcCallLogging({
   result,
@@ -407,16 +481,7 @@ export function handleTrpcCallLogging({
   slowCallBudgetMs?: number;
   now?: number;
 }): void {
-  const logData: {
-    path: string;
-    type: string;
-    duration: number;
-    userAgent: string | null;
-    statusCode: number | null;
-    error?: unknown;
-    handledErrorCode?: string;
-    handledErrorFault?: HandledError["fault"];
-  } = {
+  const logData: TrpcCallLogData = {
     path,
     type,
     duration,
@@ -425,49 +490,7 @@ export function handleTrpcCallLogging({
   };
 
   if (!result.ok) {
-    logData.error = result.error;
-
-    // Derive HTTP status from the TRPCError code, not ctx.res.statusCode.
-    // The response status hasn't been set yet at middleware time - tRPC sets
-    // it later when serializing the response. So we map it ourselves.
-    const resolvedStatus =
-      result.error instanceof TRPCError ? getHTTPStatusCodeFromError(result.error) : 500;
-
-    const cause = result.error instanceof TRPCError ? result.error.cause : undefined;
-    // isHandled also matches an instance from a second copy of the package,
-    // which bare `instanceof` misses - see its brand check.
-    const handledCause = HandledError.isHandled(cause) ? cause : undefined;
-
-    // A handled error states its own status, and it is the accurate one: tRPC
-    // v10 has no code for 502/503/504, so an upstream failure resolves to 500
-    // through `handledErrorToTRPCCode` and would otherwise be counted against
-    // our own error budget every time a customer typos a base URL.
-    logData.statusCode = handledCause?.httpStatus ?? resolvedStatus;
-
-    // Include handled error code + fault in log data for structured
-    // filtering (and spike alerting on handledErrorCode).
-    if (handledCause) {
-      logData.handledErrorCode = handledCause.code;
-      logData.handledErrorFault = handledCause.fault;
-    }
-
-    // Only unhandled 5xx errors are captured as exceptions: handled errors
-    // are expected failure modes with typed causes, not bugs.
-    if (resolvedStatus >= 500 && !handledCause) {
-      capture(result.error);
-    }
-
-    // Handled errors log by fault attribution, not status: customer-fault
-    // errors are expected (warn - watched for spikes), while platform and
-    // provider failures are incidents worth an error line. Unhandled errors
-    // stay status-based.
-    const logLevel = handledCause
-      ? handledCause.fault === "customer"
-        ? "warn"
-        : "error"
-      : getLogLevelFromStatusCode(resolvedStatus);
-
-    log[logLevel](logData, "trpc call");
+    logFailedCall({ error: result.error, logData, log, capture });
 
     return;
   }

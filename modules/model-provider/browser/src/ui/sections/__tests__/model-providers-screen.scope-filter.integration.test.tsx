@@ -58,9 +58,14 @@ vi.mock("@langwatch/authz-browser-kit", async () => {
     ...actual,
     ScopeFilter: ({ onChange }: { onChange: (next: unknown) => void }) => (
       <div>
-        <button data-testid="filter-all" onClick={() => onChange({ kind: "all" })} />
+        <button
+          data-testid="filter-all"
+          aria-label="Filter all"
+          onClick={() => onChange({ kind: "all" })}
+        />
         <button
           data-testid="filter-team-1"
+          aria-label="Filter team 1"
           onClick={() =>
             onChange({
               kind: "specific",

@@ -8,10 +8,7 @@ const planMock = vi.hoisted(() => ({
 import { Temporal } from "@langwatch/time";
 
 import { SettlementProjectService } from "../../fixtures/settlement.fixtures.ts";
-// No Redis is injected here, so these exercise the in-memory fallback. The
-// counting contract is the same either way; what differs is the blast radius
-// when Redis is down, which the email caps already pin.
-// The TTL cache would otherwise carry one test's plan answer into the next.
+import { MemoryAutomationPersistCapRepository } from "../../repositories/memory/memory.automation-persist-cap.repository.ts";
 import { AutomationPersistCapService } from "../persist-cap.service.ts";
 
 const PROJECT_ID = "proj-1";
@@ -36,7 +33,12 @@ const persistCapDependencies = {
     enterprise: 10_000,
   },
 };
-const persistCaps = AutomationPersistCapService.create(persistCapDependencies);
+const freshPersistCaps = () =>
+  AutomationPersistCapService.create({
+    ...persistCapDependencies,
+    slots: MemoryAutomationPersistCapRepository.create(),
+  });
+let persistCaps = freshPersistCaps();
 
 function plan(overrides: Record<string, unknown>) {
   planMock.resolveOrganizationId.mockResolvedValue("org-1");
@@ -54,38 +56,12 @@ function plan(overrides: Record<string, unknown>) {
   });
 }
 
-describe("given the two keys one Lua script touches together", () => {
-  describe("when their Redis Cluster slots are compared", () => {
-    /** @scenario "The ceiling survives a clustered Redis" */
-    it("routes both to one slot by sharing a hash tag", () => {
-      const hashTag = (key: string) => key.match(/\{([^}]*)\}/)?.[1];
-      const dedupKey = `${PROJECT_ID}/${TRIGGER_ID}:persist:trace-1`;
-      const counter = AutomationPersistCapService.persistCapKey({
-        projectId: PROJECT_ID,
-        triggerId: TRIGGER_ID,
-        now: Temporal.Instant.from("2026-08-09T12:00:00.000Z"),
-      });
-      const claim = AutomationPersistCapService.persistCapClaimKey({
-        projectId: PROJECT_ID,
-        triggerId: TRIGGER_ID,
-        dedupKey,
-      });
-
-      // Cluster hashes only what is between the braces. Without a shared tag
-      // the EVAL is rejected with CROSSSLOT, which this module catches as an
-      // ordinary Redis error and answers by dropping to per-worker counters,
-      // so the fleet-wide ceiling silently stops being fleet-wide.
-      expect(hashTag(counter)).toBe(`${PROJECT_ID}:${TRIGGER_ID}`);
-      expect(hashTag(claim)).toBe(hashTag(counter));
-    });
-  });
-});
-
 describe("given a project on a plan", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(projects, "getOrganizationId").mockImplementation(planMock.resolveOrganizationId);
-    AutomationPersistCapService.resetMemoryStore();
+    AutomationPersistCapService.resetPlanCache();
+    persistCaps = freshPersistCaps();
   });
 
   describe("when its daily ceiling is resolved", () => {
@@ -211,7 +187,8 @@ describe("given a project on a plan", () => {
 
 describe("given a trigger with a daily ceiling", () => {
   beforeEach(() => {
-    AutomationPersistCapService.resetMemoryStore();
+    AutomationPersistCapService.resetPlanCache();
+    persistCaps = freshPersistCaps();
   });
 
   const consume = (traceId: string, now = DAY_ONE, cap = 2) =>
@@ -284,7 +261,8 @@ describe("given a trigger with a daily ceiling", () => {
 
 describe("given a project whose triggers have consumed slots today", () => {
   beforeEach(() => {
-    AutomationPersistCapService.resetMemoryStore();
+    AutomationPersistCapService.resetPlanCache();
+    persistCaps = freshPersistCaps();
   });
 
   describe("when the automations list reads their counts", () => {

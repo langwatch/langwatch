@@ -1,7 +1,12 @@
+import { AuditLogApi } from "@langwatch/audit-log-contract";
+import { AuthApi } from "@langwatch/auth-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import {
   GithubApi,
   type GithubApi as GithubApiContract,
   type GithubAppConfig,
+  type GithubConnectionAuditEntry,
   type GithubConnectionStatus,
   type GithubDisconnectResult,
   type GithubInstallation,
@@ -23,7 +28,7 @@ import {
   type OrganizationApi as OrganizationApiContract,
 } from "@langwatch/organization-contract";
 import { reads, type ProcessMembers } from "@langwatch/process-stores/members";
-import { ProjectApi } from "@langwatch/project-contract";
+import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
 
 import type { GithubRepositories } from "../repositories/github.repositories.ts";
@@ -212,7 +217,14 @@ class ComposedGithubBranchDemand implements GithubBranchDemand {
 export class GithubApp implements GithubApiContract {
   static readonly reads = reads("redis", "secrets");
   static readonly contract = GithubApi;
-  static readonly dependencies = { organizations: OrganizationApi, projects: ProjectApi };
+  static readonly dependencies = {
+    organizations: OrganizationApi,
+    projects: ProjectApi,
+    permissions: AuthzApi,
+    auth: AuthApi,
+    auditLog: AuditLogApi,
+    codingAgents: CodingAgentApi,
+  };
   static readonly config = githubConfig;
   static readonly secrets = {
     privateKey: Secret.load("GITHUB_LANGY_PRIVATE_KEY", { optional: true }),
@@ -221,10 +233,28 @@ export class GithubApp implements GithubApiContract {
 
   readonly #service: GithubApiContract;
   readonly #branchMaintenance: GithubBranchMaintenance;
+  readonly #projects: ProjectApiContract;
+  readonly #permissions: AuthzApi;
+  readonly #auth: AuthApi;
+  readonly #auditLog: AuditLogApi;
+  readonly #codingAgents: CodingAgentApi;
 
-  private constructor(service: GithubApiContract, branchMaintenance: GithubBranchMaintenance) {
-    this.#service = service;
-    this.#branchMaintenance = branchMaintenance;
+  private constructor(parts: {
+    service: GithubApiContract;
+    branchMaintenance: GithubBranchMaintenance;
+    projects: ProjectApiContract;
+    permissions: AuthzApi;
+    auth: AuthApi;
+    auditLog: AuditLogApi;
+    codingAgents: CodingAgentApi;
+  }) {
+    this.#service = parts.service;
+    this.#branchMaintenance = parts.branchMaintenance;
+    this.#projects = parts.projects;
+    this.#permissions = parts.permissions;
+    this.#auth = parts.auth;
+    this.#auditLog = parts.auditLog;
+    this.#codingAgents = parts.codingAgents;
   }
 
   /**
@@ -361,8 +391,8 @@ export class GithubApp implements GithubApiContract {
     };
     const hostConfig = config.host === undefined ? {} : { hostConfig: { host: config.host } };
 
-    return new GithubApp(
-      GithubApp.composeApi({
+    return new GithubApp({
+      service: GithubApp.composeApi({
         repositories,
         redis: members.redis,
         organization: dependencies.organizations,
@@ -380,13 +410,43 @@ export class GithubApp implements GithubApiContract {
       // `github_maintenance` (ADR-144), ported from the deleted
       // `GithubWorkerFeatureInstaller`: composed here, not received, so the
       // sweep runs over this same graph's rows.
-      GithubApp.composeBranchMaintenance({
+      branchMaintenance: GithubApp.composeBranchMaintenance({
         repositories,
         redis: members.redis,
         config: branchConfig,
         ...hostConfig,
       }),
-    );
+      projects: dependencies.projects,
+      permissions: dependencies.permissions,
+      auth: dependencies.auth,
+      auditLog: dependencies.auditLog,
+      codingAgents: dependencies.codingAgents,
+    });
+  }
+
+  /** The capability the installation and connection doors read: this module itself. */
+  github(): GithubApiContract {
+    return this;
+  }
+  /** Connecting grants the whole organization's repository access, so it takes management. */
+  canManageOrganization(input: { userId: string; organizationId: string }): Promise<boolean> {
+    return this.#permissions.hasPermission({ ...input, permission: "organization:manage" });
+  }
+  findOrganizationForProject(projectId: string): Promise<string | undefined> {
+    return this.#projects.findOrganizationId(projectId);
+  }
+  /** Whether the person who started the install flow is the one signed in on this request. */
+  async isSignedInAs(input: { request: Request; userId: string }): Promise<boolean> {
+    const verified = await this.#auth.tryVerifyBrowserSession({ headers: input.request.headers });
+    const session = await this.#auth.tryResolveBrowserSession({ verified });
+
+    return session?.user.id === input.userId;
+  }
+  recordAudit(entry: GithubConnectionAuditEntry): Promise<void> {
+    return this.#auditLog.record(entry);
+  }
+  async backfillPullRequestMappings(input: { organizationId: string }): Promise<void> {
+    await this.#codingAgents.backfillPullRequestMappings(input);
   }
 
   /** The fleet-wide branch sweep `github_maintenance` schedules. */
@@ -415,14 +475,14 @@ export class GithubApp implements GithubApiContract {
   registerInstallNonce(input: { nonce: string; ttlSec: number }): Promise<boolean> {
     return this.#service.registerInstallNonce(input);
   }
-  consumeInstallNonce(nonce: string): Promise<boolean | null> {
+  consumeInstallNonce(nonce: string): Promise<"consumed" | "spent" | "unavailable"> {
     return this.#service.consumeInstallNonce(nonce);
   }
   signInstallState(payload: GithubInstallStatePayload): string {
     return this.#service.signInstallState(payload);
   }
-  verifyInstallState(token: string | null | undefined): GithubInstallStatePayload | null {
-    return this.#service.verifyInstallState(token);
+  parseInstallState(token: string | null | undefined): GithubInstallStatePayload | null {
+    return this.#service.parseInstallState(token);
   }
   popupResponseHtml(login: string): string {
     return this.#service.popupResponseHtml(login);

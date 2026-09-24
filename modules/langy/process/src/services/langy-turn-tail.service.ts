@@ -54,6 +54,11 @@ interface TailDeps {
  * The live tail of one turn: what the reader sees, and the watchdog that ends
  * it when the turn stops beating.
  */
+/** `stopped`: the stream ended (reader gone, real terminal seen) before any verdict. */
+export type MissedTerminalWatch = SettlementOutcome | { kind: "stopped" };
+
+const STOPPED: MissedTerminalWatch = { kind: "stopped" };
+
 export class LangyTurnTailService {
   static create(): LangyTurnTailService {
     return new LangyTurnTailService();
@@ -63,10 +68,9 @@ export class LangyTurnTailService {
 
   /**
    * Polls the turn's durable fold + per-turn heartbeat while its live edge is tailed, and
-   * resolves to what should end the tail — or null if the stream ended first (aborted) or the
-   * turn is still going.
+   * resolves to what should end the tail — or `stopped` when the stream ended first.
    */
-  async tryWatchForMissedTerminal({
+  async watchForMissedTerminal({
     readHealth,
     signal,
     onAbandoned,
@@ -81,11 +85,11 @@ export class LangyTurnTailService {
     pollMs?: number;
     confirmPolls?: number;
     delay?: Delay;
-  }): Promise<SettlementOutcome | null> {
+  }): Promise<MissedTerminalWatch> {
     let streaks = NO_SETTLEMENT_STREAKS;
     while (!signal.aborted) {
       if (!(await delay(pollMs, signal))) {
-        return null;
+        return STOPPED;
       }
 
       const next = advanceSettlement({
@@ -104,7 +108,7 @@ export class LangyTurnTailService {
       }
     }
 
-    return null;
+    return STOPPED;
   }
 
   /**
@@ -154,7 +158,7 @@ export class LangyTurnTailService {
     const followSignal = AbortSignal.any([signal, settle.signal]);
     let synthesized: LangyStreamEntry | null = null;
 
-    const watcher = this.tryWatchForMissedTerminal({
+    const watcher = this.watchForMissedTerminal({
       readHealth,
       signal: followSignal,
       onAbandoned,
@@ -166,11 +170,11 @@ export class LangyTurnTailService {
         // An abandoned turn yields nothing: we do not know how it ended, and
         // inventing a terminal for a turn that may still be alive would tell the
         // reader it finished when it did not.
-        if (outcome?.kind === "terminal") {
+        if (outcome.kind === "terminal") {
           synthesized = outcome.entry;
         }
 
-        if (outcome) {
+        if (outcome.kind !== "stopped") {
           settle.abort();
         } // unblock the follow() below
       })

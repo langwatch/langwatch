@@ -99,7 +99,7 @@ export function preserve(template: string): FencedTemplate {
  * `type` and the api-key header name are left alone, not secrets. The copy
  * matters: in-place substitution would bake a rotated-away value into every later turn.
  */
-export function resolveAuth({
+export function renderAuth({
   auth,
   secrets,
 }: {

@@ -35,11 +35,12 @@ function fakeStripe(): Stripe {
 function composeService(licenseFeatures?: LicenseFeaturesResolver) {
   const sendLicenseEmail = vi.fn(async (_: LicenseEmailDelivery) => undefined);
   const notifyLicensePurchase = vi.fn(async () => undefined);
-  const delivery = {
+  const delivery: LicensePurchaseDelivery = {
+    recordLicense: vi.fn(async (_: { licenseKey: string }) => undefined),
     sendLicenseEmail,
     notifyLicensePurchase,
-  } as unknown as LicensePurchaseDelivery;
-  const generateLicense = {
+  };
+  const generateLicense: LicenseGenerator = {
     generate: () => ({
       licenseKey: "key_1",
       licenseData: {
@@ -49,7 +50,7 @@ function composeService(licenseFeatures?: LicenseFeaturesResolver) {
         organizationName: "Acme Corp",
       },
     }),
-  } as unknown as LicenseGenerator;
+  };
   const service = LicensePurchaseService.create({
     delivery,
     generateLicense,

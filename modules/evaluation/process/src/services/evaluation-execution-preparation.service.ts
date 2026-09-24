@@ -3,6 +3,7 @@ import {
   isAzureEvaluatorType,
   type ExecuteEvaluationCommandData,
 } from "@langwatch/evaluation-contract";
+import { HandledError } from "@langwatch/handled-error";
 import type { MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import type { EvaluationTraceEvent } from "@langwatch/trace-contract";
@@ -60,11 +61,14 @@ export class EvaluationExecutionPreparationService {
   ) {}
 
   async prepare(data: ExecuteEvaluationCommandData): Promise<EvaluationPreparationResult> {
-    const monitor = await this.deps.monitors.tryGetMonitorById({
-      projectId: data.tenantId,
-      id: data.evaluatorId,
-    });
-    if (!monitor) {
+    let monitor: Monitor;
+    try {
+      monitor = await this.deps.monitors.getMonitorById({
+        projectId: data.tenantId,
+        id: data.evaluatorId,
+      });
+    } catch (error) {
+      if (!(error instanceof HandledError && error.code === "monitor_not_found")) throw error;
       logger.warn(
         { tenantId: data.tenantId, evaluatorId: data.evaluatorId },
         "Monitor not found — skipping evaluation",
@@ -140,11 +144,11 @@ export class EvaluationExecutionPreparationService {
       return null;
     }
 
-    const credentials = await this.deps.azureSafetyCredentials.tryGetForTenant({
+    const credentials = await this.deps.azureSafetyCredentials.resolveForTenant({
       tenantId: data.tenantId,
     });
 
-    return credentials ? null : this.reportAzureSkip(data, monitor);
+    return credentials.kind === "configured" ? null : this.reportAzureSkip(data, monitor);
   }
 
   private reportAzureSkip(

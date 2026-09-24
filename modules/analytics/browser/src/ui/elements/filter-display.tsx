@@ -10,7 +10,7 @@ import { Filter } from "react-feather";
 import { ClampedText } from "./clamped-text.tsx";
 
 interface FilterDisplayProps {
-  filters: string | Record<string, any>;
+  filters: string | Record<string, unknown>;
   hasBorder?: boolean;
   /**
    * Clamp each value to a single line, revealing the rest on hover. Turn this
@@ -119,7 +119,7 @@ export const FilterDisplay = ({
   hasBorder = false,
   shouldClampValues = true,
 }: FilterDisplayProps) => {
-  const applyFilters = (filters: string | Record<string, any>) => {
+  const applyFilters = (filters: string | Record<string, unknown>) => {
     const obj = typeof filters === "string" ? JSON.parse(filters) : filters;
     const result = [];
 

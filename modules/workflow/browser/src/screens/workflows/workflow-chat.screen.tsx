@@ -10,7 +10,6 @@ import { FullLogo } from "@langwatch/design-system/full-logo";
 import { LoadingScreen } from "@langwatch/design-system/loading-screen";
 import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import { parseStudioWorkflow } from "@langwatch/workflow-contract";
-import type { Edge, Node } from "@xyflow/react";
 
 import { publishedWorkflowSchema } from "../../model/published-workflow.ts";
 import { WorkflowChatBox } from "../../ui/sections/workflow-chat-box.tsx";
@@ -45,11 +44,7 @@ export default function WorkflowChatScreen() {
       <Box height="full" bg="bg.muted" padding={16} paddingTop={4}>
         <FullLogo />
         <ChakraCard.Root height="90%" bg="bg.panel" padding={5} marginTop={4}>
-          <WorkflowChatBox
-            workflowId={workflowId}
-            nodes={parsed?.nodes as unknown as Node[]}
-            edges={parsed?.edges as unknown as Edge[]}
-          />
+          <WorkflowChatBox workflowId={workflowId} nodes={parsed?.nodes} edges={parsed?.edges} />
         </ChakraCard.Root>
       </Box>
     </Box>

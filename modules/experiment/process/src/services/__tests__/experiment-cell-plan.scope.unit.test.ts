@@ -59,7 +59,7 @@ const stateWith = ({
 const rows = (count: number) =>
   Array.from({ length: count }, (_, i) => ({ question: `Question ${i}`, expected: `Answer ${i}` }));
 
-const comparisonEvaluator = {
+const comparisonEvaluator: EvaluatorConfig = {
   id: "comparison-eval",
   evaluatorType: "langevals/select_best_compare",
   inputs: [{ identifier: "candidates", type: "str" }],
@@ -71,9 +71,9 @@ const comparisonEvaluator = {
     includeMetrics: [],
     randomizeOrder: true,
   },
-} as unknown as EvaluatorConfig;
+};
 
-const comparisonTarget = {
+const comparisonTarget: TargetConfig = {
   id: "comparison-target",
   type: "evaluator",
   targetEvaluatorId: "db-select-best-evaluator",
@@ -87,7 +87,7 @@ const comparisonTarget = {
     includeMetrics: [],
     randomizeOrder: true,
   },
-} as unknown as TargetConfig;
+};
 
 const plan = (state: PlanState, datasetRows: Record<string, unknown>[], scope: ExecutionScope) =>
   cellPlan.generateCells({ state, datasetRows, scope });

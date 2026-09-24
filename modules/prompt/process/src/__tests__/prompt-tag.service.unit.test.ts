@@ -4,7 +4,7 @@ import {
   PromptTagProtectedError,
   PromptTagValidationError,
 } from "@langwatch/prompt-contract";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import { PROTECTED_TAGS, type PromptTagRepository } from "../repositories/prompt-tag.repository.ts";
 import { PromptTagService } from "../services/prompt-tag.service.ts";
@@ -33,21 +33,22 @@ function makeTag(overrides: Partial<StoredPromptTag> = {}): StoredPromptTag {
  * method as an unbound value through `repo.<method>`.
  */
 function makeRepo(
-  overrides: Partial<Record<keyof PromptTagRepository, ReturnType<typeof vi.fn>>> = {},
+  overrides: Partial<{ [K in keyof PromptTagRepository]: Mock<PromptTagRepository[K]> }> = {},
 ) {
   const mocks = {
-    findAll: vi.fn().mockResolvedValue([]),
-    findById: vi.fn().mockResolvedValue(null),
-    findByName: vi.fn().mockResolvedValue(null),
-    create: vi.fn().mockResolvedValue(makeTag()),
-    delete: vi.fn().mockResolvedValue(undefined),
-    deleteByName: vi.fn().mockResolvedValue(undefined),
-    rename: vi.fn().mockResolvedValue(makeTag()),
-    seedForOrg: vi.fn().mockResolvedValue(undefined),
-    existsForOrg: vi.fn().mockResolvedValue(true),
+    findAll: vi.fn<PromptTagRepository["findAll"]>().mockResolvedValue([]),
+    findById: vi.fn<PromptTagRepository["findById"]>().mockResolvedValue(null),
+    findByName: vi.fn<PromptTagRepository["findByName"]>().mockResolvedValue(null),
+    create: vi.fn<PromptTagRepository["create"]>().mockResolvedValue(makeTag()),
+    delete: vi.fn<PromptTagRepository["delete"]>().mockResolvedValue(undefined),
+    deleteByName: vi.fn<PromptTagRepository["deleteByName"]>().mockResolvedValue(undefined),
+    rename: vi.fn<PromptTagRepository["rename"]>().mockResolvedValue(makeTag()),
+    seedForOrg: vi.fn<PromptTagRepository["seedForOrg"]>().mockResolvedValue(undefined),
+    existsForOrg: vi.fn<PromptTagRepository["existsForOrg"]>().mockResolvedValue(true),
+    findByOrgAndName: vi.fn<PromptTagRepository["findByOrgAndName"]>().mockResolvedValue(null),
     ...overrides,
   };
-  const repo = mocks as unknown as PromptTagRepository;
+  const repo: PromptTagRepository = mocks;
   return { repo, ...mocks };
 }
 
@@ -148,7 +149,9 @@ describe("PromptTagService", () => {
     describe("when org has tags", () => {
       it("delegates to repo.findAll and returns tags", async () => {
         const tags = [makeTag({ name: "canary" }), makeTag({ name: "ab-test" })];
-        const { repo, findAll } = makeRepo({ findAll: vi.fn().mockResolvedValue(tags) });
+        const { repo, findAll } = makeRepo({
+          findAll: vi.fn<PromptTagRepository["findAll"]>().mockResolvedValue(tags),
+        });
         const service = PromptTagService.create(repo);
 
         const result = await service.getAll({ organizationId });
@@ -160,7 +163,9 @@ describe("PromptTagService", () => {
 
     describe("when org has no tags", () => {
       it("returns an empty array", async () => {
-        const { repo } = makeRepo({ findAll: vi.fn().mockResolvedValue([]) });
+        const { repo } = makeRepo({
+          findAll: vi.fn<PromptTagRepository["findAll"]>().mockResolvedValue([]),
+        });
         const service = PromptTagService.create(repo);
 
         const result = await service.getAll({ organizationId });
@@ -175,7 +180,9 @@ describe("PromptTagService", () => {
       /** @scenario prompt tags remain subordinate behaviour */
       it("delegates to repo.create with all parameters", async () => {
         const tag = makeTag({ name: "canary" });
-        const { repo, create } = makeRepo({ create: vi.fn().mockResolvedValue(tag) });
+        const { repo, create } = makeRepo({
+          create: vi.fn<PromptTagRepository["create"]>().mockResolvedValue(tag),
+        });
         const service = PromptTagService.create(repo);
 
         const result = await service.create({
@@ -194,7 +201,9 @@ describe("PromptTagService", () => {
 
       it("delegates without createdById when omitted", async () => {
         const tag = makeTag();
-        const { repo, create } = makeRepo({ create: vi.fn().mockResolvedValue(tag) });
+        const { repo, create } = makeRepo({
+          create: vi.fn<PromptTagRepository["create"]>().mockResolvedValue(tag),
+        });
         const service = PromptTagService.create(repo);
 
         await service.create({ organizationId, name: "canary" });
@@ -223,7 +232,7 @@ describe("PromptTagService", () => {
       it("throws PromptTagConflictError", async () => {
         const prismaError = { code: "P2002" };
         const { repo } = makeRepo({
-          create: vi.fn().mockRejectedValue(prismaError),
+          create: vi.fn<PromptTagRepository["create"]>().mockRejectedValue(prismaError),
         });
         const service = PromptTagService.create(repo);
 
@@ -237,7 +246,9 @@ describe("PromptTagService", () => {
   describe("delete()", () => {
     describe("when tag does not exist", () => {
       it("refuses without calling repo.delete", async () => {
-        const { repo, delete: del } = makeRepo({ findById: vi.fn().mockResolvedValue(null) });
+        const { repo, delete: del } = makeRepo({
+          findById: vi.fn<PromptTagRepository["findById"]>().mockResolvedValue(null),
+        });
         const service = PromptTagService.create(repo);
 
         await expect(
@@ -259,7 +270,9 @@ describe("PromptTagService", () => {
 
       beforeEach(() => {
         tag = makeTag({ name: "latest" });
-        ({ repo, delete: del } = makeRepo({ findById: vi.fn().mockResolvedValue(tag) }));
+        ({ repo, delete: del } = makeRepo({
+          findById: vi.fn<PromptTagRepository["findById"]>().mockResolvedValue(tag),
+        }));
         service = PromptTagService.create(repo);
       });
 
@@ -285,8 +298,8 @@ describe("PromptTagService", () => {
       it("deletes the tag and returns it", async () => {
         const tag = makeTag({ name: "canary" });
         const { repo, delete: del } = makeRepo({
-          findById: vi.fn().mockResolvedValue(tag),
-          delete: vi.fn().mockResolvedValue(undefined),
+          findById: vi.fn<PromptTagRepository["findById"]>().mockResolvedValue(tag),
+          delete: vi.fn<PromptTagRepository["delete"]>().mockResolvedValue(undefined),
         });
         const service = PromptTagService.create(repo);
 
@@ -302,7 +315,9 @@ describe("PromptTagService", () => {
       it("deletes seeded tags (production, staging) without error", async () => {
         for (const name of ["production", "staging"]) {
           const tag = makeTag({ name });
-          const { repo } = makeRepo({ findById: vi.fn().mockResolvedValue(tag) });
+          const { repo } = makeRepo({
+            findById: vi.fn<PromptTagRepository["findById"]>().mockResolvedValue(tag),
+          });
           const service = PromptTagService.create(repo);
 
           const result = await service.delete({ id: tag.id, organizationId });
@@ -315,7 +330,9 @@ describe("PromptTagService", () => {
   describe("deleteByName()", () => {
     describe("when tag does not exist", () => {
       it("refuses without calling repo.deleteByName", async () => {
-        const { repo, deleteByName } = makeRepo({ findByName: vi.fn().mockResolvedValue(null) });
+        const { repo, deleteByName } = makeRepo({
+          findByName: vi.fn<PromptTagRepository["findByName"]>().mockResolvedValue(null),
+        });
         const service = PromptTagService.create(repo);
 
         await expect(
@@ -357,8 +374,8 @@ describe("PromptTagService", () => {
       it("deletes the tag and returns it", async () => {
         const tag = makeTag({ name: "canary" });
         const { repo, deleteByName } = makeRepo({
-          findByName: vi.fn().mockResolvedValue(tag),
-          deleteByName: vi.fn().mockResolvedValue(undefined),
+          findByName: vi.fn<PromptTagRepository["findByName"]>().mockResolvedValue(tag),
+          deleteByName: vi.fn<PromptTagRepository["deleteByName"]>().mockResolvedValue(undefined),
         });
         const service = PromptTagService.create(repo);
 
@@ -381,7 +398,7 @@ describe("PromptTagService", () => {
       it("delegates to repo.rename with correct parameters", async () => {
         const renamedTag = makeTag({ name: "beta" });
         const { repo, rename } = makeRepo({
-          rename: vi.fn().mockResolvedValue(renamedTag),
+          rename: vi.fn<PromptTagRepository["rename"]>().mockResolvedValue(renamedTag),
         });
         const service = PromptTagService.create(repo);
 
@@ -436,7 +453,7 @@ describe("PromptTagService", () => {
       it("throws PromptTagConflictError", async () => {
         const prismaError = { code: "P2002" };
         const { repo } = makeRepo({
-          rename: vi.fn().mockRejectedValue(prismaError),
+          rename: vi.fn<PromptTagRepository["rename"]>().mockRejectedValue(prismaError),
         });
         const service = PromptTagService.create(repo);
 
@@ -453,7 +470,9 @@ describe("PromptTagService", () => {
     describe("when repo throws not-found error", () => {
       it("throws PromptTagNotFoundError", async () => {
         const { repo } = makeRepo({
-          rename: vi.fn().mockRejectedValue(new Error('Tag "canary" not found')),
+          rename: vi
+            .fn<PromptTagRepository["rename"]>()
+            .mockRejectedValue(new Error('Tag "canary" not found')),
         });
         const service = PromptTagService.create(repo);
 

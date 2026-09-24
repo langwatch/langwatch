@@ -116,7 +116,10 @@ describe("PostgresIdentityEmailAdapter", () => {
         identifiers: [identifier()],
       });
 
-      await expect(emails.tryResolveEmail({ userId: "user-1" })).resolves.toBe("alex@example.test");
+      await expect(emails.resolveEmail({ userId: "user-1" })).resolves.toEqual({
+        kind: "resolved",
+        email: "alex@example.test",
+      });
     });
 
     /** @scenario "Every proven address is offered for invitation matching" */
@@ -131,10 +134,13 @@ describe("PostgresIdentityEmailAdapter", () => {
         ],
       });
 
-      await expect(emails.verifiedEmailsOf({ userId: "user-1" })).resolves.toEqual([
-        { identifierId: "identifier_1", value: "alex@example.test", provider: "email" },
-        { identifierId: "identifier_2", value: "alex@work.test", provider: "email" },
-      ]);
+      await expect(emails.verifiedEmailsOf({ userId: "user-1" })).resolves.toEqual({
+        kind: "resolved",
+        emails: [
+          { identifierId: "identifier_1", value: "alex@example.test", provider: "email" },
+          { identifierId: "identifier_2", value: "alex@work.test", provider: "email" },
+        ],
+      });
     });
   });
 
@@ -143,7 +149,9 @@ describe("PostgresIdentityEmailAdapter", () => {
     it("keeps the legacy column without reading the projection", async () => {
       const { emails, calls } = build({ anyoneFinalized: false, identifiers: [identifier()] });
 
-      await expect(emails.tryResolveEmail({ userId: "user-1" })).resolves.toBe(null);
+      await expect(emails.resolveEmail({ userId: "user-1" })).resolves.toEqual({
+        kind: "keep_legacy",
+      });
       expect(calls.identifiers).toBe(0);
       expect(calls.latchUser).toBe(0);
     });
@@ -158,7 +166,9 @@ describe("PostgresIdentityEmailAdapter", () => {
         identifiers: [identifier()],
       });
 
-      await expect(emails.tryResolveEmail({ userId: "user-1" })).resolves.toBe(null);
+      await expect(emails.resolveEmail({ userId: "user-1" })).resolves.toEqual({
+        kind: "keep_legacy",
+      });
       expect(calls.identifiers).toBe(0);
     });
   });
@@ -168,7 +178,9 @@ describe("PostgresIdentityEmailAdapter", () => {
     it("keeps the legacy column", async () => {
       const { emails } = build({ failLatch: true, identifiers: [identifier()] });
 
-      await expect(emails.tryResolveEmail({ userId: "user-1" })).resolves.toBe(null);
+      await expect(emails.resolveEmail({ userId: "user-1" })).resolves.toEqual({
+        kind: "keep_legacy",
+      });
     });
 
     /** @scenario "An unreadable latch keeps the legacy column and says so" */
@@ -176,7 +188,7 @@ describe("PostgresIdentityEmailAdapter", () => {
       const { logger, lines } = createTestLogger();
       const { emails } = build({ failLatch: true, logger });
 
-      await emails.tryResolveEmail({ userId: "user-1" });
+      await emails.resolveEmail({ userId: "user-1" });
 
       const line = lines.findLine("warn", "identifier backfill");
       expect(line).toBeDefined();
@@ -193,7 +205,9 @@ describe("PostgresIdentityEmailAdapter", () => {
         identifiers: [identifier({ state: "SUPERSEDED_BY_A_LATER_BUILD" })],
       });
 
-      await expect(emails.tryResolveEmail({ userId: "user-1" })).resolves.toBe(null);
+      await expect(emails.resolveEmail({ userId: "user-1" })).resolves.toEqual({
+        kind: "keep_legacy",
+      });
     });
   });
 
@@ -207,8 +221,8 @@ describe("PostgresIdentityEmailAdapter", () => {
         cacheTtlMs: 60_000,
       });
 
-      await emails.tryResolveEmail({ userId: "user-1" });
-      await emails.tryResolveEmail({ userId: "user-1" });
+      await emails.resolveEmail({ userId: "user-1" });
+      await emails.resolveEmail({ userId: "user-1" });
 
       expect(calls.latchAnyone).toBe(1);
       expect(calls.latchUser).toBe(1);
@@ -228,9 +242,9 @@ describe("PostgresIdentityEmailAdapter", () => {
         clock,
       );
 
-      await emails.tryResolveEmail({ userId: "user-1" });
+      await emails.resolveEmail({ userId: "user-1" });
       clock.now += 60_001;
-      await emails.tryResolveEmail({ userId: "user-1" });
+      await emails.resolveEmail({ userId: "user-1" });
 
       expect(calls.latchAnyone).toBe(2);
       expect(calls.latchUser).toBe(2);
@@ -247,8 +261,8 @@ describe("PostgresIdentityEmailAdapter", () => {
       });
 
       await Promise.all([
-        emails.tryResolveEmail({ userId: "user-1" }),
-        emails.tryResolveEmail({ userId: "user-1" }),
+        emails.resolveEmail({ userId: "user-1" }),
+        emails.resolveEmail({ userId: "user-1" }),
       ]);
 
       expect(calls.latchAnyone).toBe(1);
@@ -266,11 +280,11 @@ describe("PostgresIdentityEmailAdapter", () => {
         cacheMaxUsers: 2,
       });
 
-      await emails.tryResolveEmail({ userId: "user-1" });
-      await emails.tryResolveEmail({ userId: "user-2" });
-      await emails.tryResolveEmail({ userId: "user-3" });
+      await emails.resolveEmail({ userId: "user-1" });
+      await emails.resolveEmail({ userId: "user-2" });
+      await emails.resolveEmail({ userId: "user-3" });
       const beforeReRead = calls.latchUser;
-      await emails.tryResolveEmail({ userId: "user-1" });
+      await emails.resolveEmail({ userId: "user-1" });
 
       expect(beforeReRead).toBe(3);
       expect(calls.latchUser).toBe(4);

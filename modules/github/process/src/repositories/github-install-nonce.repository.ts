@@ -12,9 +12,9 @@ export abstract class GithubInstallNonceRepository {
   abstract registerNonce(input: { nonce: string; ttlSec: number }): Promise<boolean>;
 
   /**
-   * Consumes a nonce once: true when this caller took it, false when it was
-   * never registered or is already spent, and null when no store could answer,
-   * which the flow reads as "replay cannot be judged here".
+   * Consumes a nonce once: consumed when this caller took it, spent when it was
+   * never registered or is already used, and unavailable when no store could
+   * answer, which the flow reads as "replay cannot be judged here".
    */
-  abstract consumeNonce(nonce: string): Promise<boolean | null>;
+  abstract consumeNonce(nonce: string): Promise<"consumed" | "spent" | "unavailable">;
 }

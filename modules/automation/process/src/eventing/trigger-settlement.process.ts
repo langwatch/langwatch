@@ -164,7 +164,7 @@ export class TriggerSettlement {
     // Byte order, not localeCompare: the page key must never depend on the
     // process locale or ICU version.
     const sorted = [...matches].toSorted((left, right) =>
-      left.traceId < right.traceId ? -1 : left.traceId > right.traceId ? 1 : 0,
+      compareByteOrder(left.traceId, right.traceId),
     );
     const pages: PersistPage[] = [];
     for (let start = 0; start < sorted.length; start += PERSIST_PAGE_MAX) {
@@ -221,4 +221,10 @@ export class TriggerSettlement {
       nextBoundary: TriggerSettlement.nextWakeFrom(nextState),
     };
   }
+}
+
+function compareByteOrder(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
 }

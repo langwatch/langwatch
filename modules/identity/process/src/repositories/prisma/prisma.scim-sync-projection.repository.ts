@@ -9,6 +9,7 @@ import type {
   ScimSyncLifecycleState,
   ScimSyncState,
 } from "@langwatch/identity-contract";
+import { ScimSyncNotFoundError } from "@langwatch/identity-contract";
 import type {
   Prisma,
   PrismaClient,
@@ -95,20 +96,21 @@ export class PrismaScimSyncProjectionRepository
 
   /**
    * The guards' read. Organization-scoped as well as keyed by the sync, so a
-   * command whose tenant and aggregate disagree resolves to nothing rather
-   * than to another organization's sync.
+   * command whose tenant and aggregate disagree reads as not found rather
+   * than as another organization's sync.
    */
-  async tryFindSync({
+  async getSync({
     scimSyncId,
     organizationId,
   }: {
     scimSyncId: string;
     organizationId: string;
-  }): Promise<ScimSyncState | null> {
+  }): Promise<ScimSyncState> {
     const row = await this.prisma.scimSyncState.findFirst({
       where: { id: scimSyncId, organizationId },
     });
-    return row ? PrismaScimSyncProjectionRepository.rowToScimSync(row) : null;
+    if (!row) throw new ScimSyncNotFoundError(scimSyncId);
+    return PrismaScimSyncProjectionRepository.rowToScimSync(row);
   }
 
   /** Organization-scoped, so a peer's page can never contain a sync that is

@@ -1,7 +1,13 @@
+import { JoinRequestNotFoundError } from "@langwatch/identity-contract";
+import { OrganizationNotFoundError } from "@langwatch/organization-contract";
+import { UserNotFoundError } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { JoinRequestMail } from "../../app/identity.members.ts";
-import { JoinRequestAudience } from "../../repositories/join-request-audience.repository.ts";
+import {
+  JoinRequestAudience,
+  type JoinRequestAudienceProfile,
+} from "../../repositories/join-request-audience.repository.ts";
 import { JoinRequestNotificationService } from "../join-request-notification.service.ts";
 
 /**
@@ -24,24 +30,30 @@ class Audience extends JoinRequestAudience {
     super();
   }
 
-  async tryFindRequesterId(): Promise<string | null> {
-    return "requesterId" in this.answers ? (this.answers.requesterId ?? null) : REQUESTER;
+  async getRequesterId(): Promise<string> {
+    if (!("requesterId" in this.answers)) return REQUESTER;
+    if (!this.answers.requesterId) throw new JoinRequestNotFoundError("no such request");
+    return this.answers.requesterId;
   }
 
-  async tryFindOrganizationName(): Promise<string | null> {
-    return "organizationName" in this.answers ? (this.answers.organizationName ?? null) : "Acme";
+  async getOrganizationName(): Promise<string> {
+    if (!("organizationName" in this.answers)) return "Acme";
+    if (!this.answers.organizationName) throw new OrganizationNotFoundError(ORGANIZATION);
+    return this.answers.organizationName;
   }
 
   async findAdminEmails(): Promise<string[]> {
     return this.answers.admins ?? ["admin@acme.example"];
   }
 
-  async tryFindDisplayName(): Promise<string | null> {
-    return "displayName" in this.answers ? (this.answers.displayName ?? null) : "Ada Lovelace";
-  }
-
-  async tryFindEmail(): Promise<string | null> {
-    return "email" in this.answers ? (this.answers.email ?? null) : "ada@acme.example";
+  async getUserProfile(): Promise<JoinRequestAudienceProfile> {
+    if ("displayName" in this.answers && !this.answers.displayName) {
+      throw new UserNotFoundError(REQUESTER);
+    }
+    return {
+      name: this.answers.displayName ?? "Ada Lovelace",
+      email: "email" in this.answers ? (this.answers.email ?? null) : "ada@acme.example",
+    };
   }
 }
 

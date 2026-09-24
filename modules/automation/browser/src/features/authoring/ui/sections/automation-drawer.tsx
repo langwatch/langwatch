@@ -300,15 +300,9 @@ export function AutomationDrawer({
   useEffect(() => {
     if (automationId) return;
     if (prefilledFromParams.current) return;
-    if (
-      !initialSource &&
-      !initialName &&
-      !initialAction &&
-      !initialFilters &&
-      !initialFilterQuery
-    ) {
-      return;
-    }
+    const nothingPrefilled =
+      !initialSource && !initialName && !initialAction && !initialFilters && !initialFilterQuery;
+    if (nothingPrefilled) return;
     // The webhook feature flag can still be loading on mount (it defaults
     // to false while in flight). Don't latch prefilledFromParams until it
     // resolves, or a SEND_WEBHOOK prefill on a genuinely enabled project
@@ -512,7 +506,8 @@ export function AutomationDrawer({
   useEffect(() => {
     if (automationId || seededNameFromGraph.current) return;
     if (!prefilledGraphId || !graphName) return;
-    if (useAutomationStore.getState().draft.name.trim() !== "") return;
+    const draftName = useAutomationStore.getState().draft.name;
+    if (draftName.trim() !== "") return;
     dispatch({ type: "SET_NAME", value: `${graphName} alert` });
     seededNameFromGraph.current = true;
   }, [automationId, prefilledGraphId, graphName, dispatch]);

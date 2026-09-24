@@ -32,7 +32,6 @@ function renderHeader() {
       projectSlug="proj"
       filters={{}}
       isDragging={false}
-      dragAttributes={{} as unknown as Parameters<typeof GraphCardHeader>[0]["dragAttributes"]}
       dragListeners={undefined}
       onDelete={vi.fn()}
       isDeleting={false}

@@ -658,13 +658,8 @@ const detectComparisonColumns = (
     if (!hasLabel && !isComparisonEvaluator(ev) && !isForced) continue;
 
     const label = ev.label ?? "";
-    if (
-      hasLabel &&
-      !isSlotLabel(label) &&
-      !resolveToTargetId(label) &&
-      !isComparisonEvaluator(ev) &&
-      !isForced
-    ) {
+    const hasUnrelatedLabel = hasLabel && !isSlotLabel(label) && !resolveToTargetId(label);
+    if (hasUnrelatedLabel && !isComparisonEvaluator(ev) && !isForced) {
       continue;
     }
 
@@ -866,6 +861,8 @@ const detectEvaluatorOutputFieldsForEvaluator = (
  * Extract output from evaluator inputs for a specific evaluator
  * Returns all inputs as the "output" for display
  */
+const UNWRAPPED_OUTPUT_KEYS = new Set(["output", "response", "generated", "answer", "prediction"]);
+
 const extractOutputFromEvaluatorInputsForEvaluator = (
   evaluations: ExperimentRunWithItems["evaluations"],
   evaluatorId: string,
@@ -879,13 +876,7 @@ const extractOutputFromEvaluatorInputsForEvaluator = (
     // If there's only one key and it's a common output field, unwrap it
     if (keys.length === 1) {
       const key = keys[0]!;
-      if (
-        key === "output" ||
-        key === "response" ||
-        key === "generated" ||
-        key === "answer" ||
-        key === "prediction"
-      ) {
+      if (UNWRAPPED_OUTPUT_KEYS.has(key)) {
         return { output: inputs[key] };
       }
     }

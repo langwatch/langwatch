@@ -86,11 +86,11 @@ const PAIR = [
 
 /** The pair as the policy reads it; only the address half comes from the database. */
 class PairReads extends SsoConnectionReadRepository {
-  async tryFindConnection(): Promise<SsoConnectionState | null> {
+  async getConnection(): Promise<SsoConnectionState> {
     throw new Error("the callback policy never reads one connection by id");
   }
 
-  async tryFindDomainOwner() {
+  async getDomainOwner() {
     return { connectionId: REPLACEMENT_ID, organizationId: ORGANIZATION_ID };
   }
 

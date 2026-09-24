@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import {
   normalizeDomain,
   SSO_DNS_PROOF_TTL_MS,
@@ -261,9 +262,12 @@ export class SsoDomainCeremonyService {
     organizationId: string;
     domain: string;
   }): Promise<boolean> {
-    const owner = await this.deps.reads.tryFindDomainOwner({
-      domain: normalizeDomain(domain),
-    });
+    const owner = await this.deps.reads
+      .getDomainOwner({ domain: normalizeDomain(domain) })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "sso_connection_not_found") return null;
+        throw error;
+      });
 
     return owner !== null && owner.organizationId !== organizationId;
   }
@@ -277,8 +281,8 @@ export class SsoDomainCeremonyService {
     organizationId: string;
     connectionId: string;
   }): Promise<SsoConnectionState> {
-    const state = await this.deps.reads.tryFindConnection({ connectionId });
-    if (!state || state.organizationId !== organizationId) {
+    const state = await this.deps.reads.getConnection({ connectionId });
+    if (state.organizationId !== organizationId) {
       throw new SsoConnectionNotFoundError(`connection ${connectionId} does not exist`);
     }
 

@@ -3,9 +3,10 @@
  * and they are not one operation: the portable capability answers metadata and
  * an async iterable, the byte surface needs the ROW. Each has its own name.
  */
+import { browserCallerOfRequest } from "@langwatch/api/rest";
 import { AuthzApi } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { ProcessMembers, RateLimiter } from "@langwatch/process-stores/members";
 import {
   StoredObjectApi,
   storedObjectConfig,
@@ -14,6 +15,7 @@ import {
   type ReadStoredObjectResult,
   type StoreStoredObjectFromBytesInput,
   type StoreStoredObjectFromBytesResult,
+  type StoredObjectFileViewPermission,
   type StoredObjectHead,
   type StoredObjectMetadata,
   type StoredObjectOwnerResolver,
@@ -29,13 +31,16 @@ import {
   type StoredObjectStorageDestination,
   type StoredObjectStorageUsage,
 } from "@langwatch/stored-object-contract";
+import { nowInstant } from "@langwatch/time";
 
 import type { StoredObjectRepositories } from "../repositories/stored-object.repositories.ts";
 import type { StoredObjectUploadSignerService } from "../services/stored-object-upload-signer.service.ts";
-import {
-  StoredObjectService,
-  type StoredObjectPermissions,
-} from "../services/stored-object.service.ts";
+import { StoredObjectService } from "../services/stored-object.service.ts";
+import type {
+  StoredObjectFileAllowance,
+  StoredObjectFileApi,
+  StoredObjectFileCaller,
+} from "../transport/stored-object-file.rest.ts";
 import { buildStoredObjectInfrastructure } from "./stored-object-composition.build.ts";
 import type {
   StoredObjectDelivery,
@@ -64,7 +69,7 @@ type StoredObjectDependencies = Readonly<{
 
 type StoredObjectMembers = Pick<
   ProcessMembers,
-  "clickhouse" | "logger" | "objectStorage" | "encryption"
+  "clickhouse" | "logger" | "objectStorage" | "encryption" | "rateLimiter"
 > &
   Readonly<{ publicBaseUrl: string | undefined }>;
 
@@ -75,7 +80,7 @@ type StoredObjectSetup = FeatureSetup<
   StoredObjectRepositories
 >;
 
-export class StoredObjectApp implements StoredObjectApi {
+export class StoredObjectApp implements StoredObjectApi, StoredObjectFileApi {
   static readonly contract = StoredObjectApi;
   static readonly dependencies: StoredObjectDependencies = { authz: AuthzApi };
   static readonly config = storedObjectConfig;
@@ -84,6 +89,7 @@ export class StoredObjectApp implements StoredObjectApi {
     "logger",
     "objectStorage",
     "encryption",
+    "rateLimiter",
     "publicBaseUrl",
   ] as const;
 
@@ -99,6 +105,7 @@ export class StoredObjectApp implements StoredObjectApi {
       infrastructure,
       repositories: setup.repositories,
       permissions: setup.dependencies.authz,
+      rateLimiter: setup.members.rateLimiter,
     });
   }
 
@@ -110,12 +117,13 @@ export class StoredObjectApp implements StoredObjectApi {
   static fromInfrastructure(setup: {
     infrastructure: StoredObjectInfrastructure;
     repositories: StoredObjectRepositories;
-    permissions: StoredObjectPermissions;
+    permissions: AuthzApi;
+    rateLimiter: RateLimiter;
   }): StoredObjectApp {
     const { infrastructure: members, repositories } = setup;
 
-    return new StoredObjectApp(
-      StoredObjectService.create({
+    return new StoredObjectApp({
+      storage: StoredObjectService.create({
         records: repositories.records,
         storage: members.storage,
         delivery: members.delivery,
@@ -125,16 +133,61 @@ export class StoredObjectApp implements StoredObjectApi {
         maximumUploadBytes: members.maximumUploadBytes,
         uploadExpiryMs: members.uploadExpiryMs,
       }),
-      members.owners,
-    );
+      owners: members.owners,
+      permissions: setup.permissions,
+      rateLimiter: setup.rateLimiter,
+    });
   }
 
-  #storage: StoredObjectService;
-  #owners: StoredObjectOwnerResolver;
+  readonly #storage: StoredObjectService;
+  readonly #owners: StoredObjectOwnerResolver;
+  readonly #permissions: AuthzApi;
+  readonly #rateLimiter: RateLimiter;
 
-  private constructor(storedObjects: StoredObjectService, owners: StoredObjectOwnerResolver) {
-    this.#storage = storedObjects;
-    this.#owners = owners;
+  private constructor(parts: {
+    storage: StoredObjectService;
+    owners: StoredObjectOwnerResolver;
+    permissions: AuthzApi;
+    rateLimiter: RateLimiter;
+  }) {
+    this.#storage = parts.storage;
+    this.#owners = parts.owners;
+    this.#permissions = parts.permissions;
+    this.#rateLimiter = parts.rateLimiter;
+  }
+
+  /** Who the process's own browser verifier admitted on this request, before the handler ran. */
+  async identify({ request }: { request: Request }): Promise<StoredObjectFileCaller> {
+    const userId = browserCallerOfRequest(request)?.userId;
+
+    return userId ? { userId } : {};
+  }
+
+  /** One fixed-window count of the caller's reads, on the process's own limiter. */
+  async countRead(input: {
+    key: string;
+    windowSeconds: number;
+    max: number;
+  }): Promise<StoredObjectFileAllowance> {
+    const decision = await this.#rateLimiter.check(input.key, {
+      requests: input.max,
+      seconds: input.windowSeconds,
+    });
+    const retryAfterSeconds = decision.retryAfterSeconds ?? input.windowSeconds;
+
+    return {
+      allowed: decision.allowed,
+      resetAt: nowInstant().epochMilliseconds + retryAfterSeconds * 1000,
+    };
+  }
+
+  /** Refuses with the authz module's own denial unless the person holds the permission. */
+  assertProjectPermission(input: {
+    userId: string;
+    projectId: string;
+    permission: StoredObjectFileViewPermission;
+  }): Promise<void> {
+    return this.#permissions.authorizeProjectPermission(input);
   }
 
   /** Begins an upload and answers where to put the bytes. */
@@ -173,7 +226,7 @@ export class StoredObjectApp implements StoredObjectApi {
   /** One object's row and, when the bytes are there, a stream of them. */
   readById(
     input: Readonly<{ projectId: string; id: string }>,
-  ): Promise<StoredObjectFileStreamRead | null> {
+  ): Promise<StoredObjectFileStreamRead> {
     return this.#storage.readById(input);
   }
 
@@ -182,8 +235,8 @@ export class StoredObjectApp implements StoredObjectApi {
    * outage on one instance raises rather than answering "no owner": a degraded
    * instance must not read as a deleted object.
    */
-  resolveOwner(input: { id: string }): Promise<{ projectId: string } | null> {
-    return this.#owners.tryResolve(input);
+  resolveOwner(input: { id: string }): Promise<{ projectId: string }> {
+    return this.#owners.getOwner(input);
   }
 
   storeFromBytes(

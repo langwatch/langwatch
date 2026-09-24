@@ -19,6 +19,40 @@ const AUGMENT_KIND: Record<string, AugmentKind> = {
   [API_KEYS_AND_SECRETS_DETECTION]: "secret",
 };
 
+function walkStrings({
+  node,
+  depth,
+  values,
+}: {
+  node: unknown;
+  depth: number;
+  values: string[];
+}): void {
+  if (values.length >= MAX_STRINGS || depth > MAX_DEPTH) {
+    return;
+  }
+
+  if (typeof node === "string") {
+    values.push(node);
+
+    return;
+  }
+
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      walkStrings({ node: item, depth: depth + 1, values });
+    }
+
+    return;
+  }
+
+  if (node && typeof node === "object") {
+    for (const item of Object.values(node)) {
+      walkStrings({ node: item, depth: depth + 1, values });
+    }
+  }
+}
+
 export class EvaluatorNativeService {
   static create(): EvaluatorNativeService {
     return new EvaluatorNativeService();
@@ -143,32 +177,7 @@ export class EvaluatorNativeService {
 
   private static collectStrings(value: unknown): string[] {
     const values: string[] = [];
-    const walk = (node: unknown, depth: number): void => {
-      if (values.length >= MAX_STRINGS || depth > MAX_DEPTH) {
-        return;
-      }
-
-      if (typeof node === "string") {
-        values.push(node);
-
-        return;
-      }
-
-      if (Array.isArray(node)) {
-        for (const item of node) {
-          walk(item, depth + 1);
-        }
-
-        return;
-      }
-
-      if (node && typeof node === "object") {
-        for (const item of Object.values(node)) {
-          walk(item, depth + 1);
-        }
-      }
-    };
-    walk(value, 0);
+    walkStrings({ node: value, depth: 0, values });
 
     return values;
   }

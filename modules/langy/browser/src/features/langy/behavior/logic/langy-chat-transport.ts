@@ -104,35 +104,7 @@ export function createLangyChatTransport(deps: LangyChatTransportDeps): ChatTran
   return {
     async sendMessages(options) {
       const ctx = deps.getContext();
-      // A create carries THIS send and nothing else.
-      const lastUserMessage = options.messages.findLast((message) => message.role === "user");
-      const turnInput = {
-        // One logical send, one identity: minted fresh on every sendMessages
-        // call (each composer submit / regenerate re-arms with a new key), so
-        // a genuine re-send of the same text is a NEW turn. Transport/proxy
-        // retries replay the same mutation body — same key, same content —
-        // and collapse onto the same admitted turn.
-        idempotencyKey: crypto.randomUUID(),
-        messages: options.messages,
-        ...(options.trigger ? { trigger: options.trigger } : {}),
-        projectId: ctx.projectId,
-        ...(ctx.modelOverride ? { modelOverride: ctx.modelOverride } : {}),
-        ...(ctx.pageContext?.length ? { pageContext: ctx.pageContext } : {}),
-        ...(ctx.skills?.length ? { skills: ctx.skills } : {}),
-      };
-
-      const { conversationId, turnId }: StartTurnResponse = ctx.conversationId
-        ? await trpcClient.langy.continueConversation.mutate({
-            ...turnInput,
-            conversationId: ctx.conversationId,
-          })
-        : await trpcClient.langy.createConversation.mutate({
-            ...turnInput,
-            messages: lastUserMessage ? [lastUserMessage] : [],
-            // Adopt the warmed conversation when the panel holds one, so the
-            // first turn reuses the worker the panel open already booted.
-            ...(ctx.pendingConversationId ? { conversationId: ctx.pendingConversationId } : {}),
-          });
+      const { conversationId, turnId } = await startTurn({ ctx, options });
       deps.onIds({ conversationId, turnId });
 
       return subscribeTurnStream({
@@ -153,6 +125,46 @@ export function createLangyChatTransport(deps: LangyChatTransportDeps): ChatTran
       return subscribeTurnStream({ ...target, ...streamCallbacks(deps) });
     },
   };
+}
+
+/** Admits the turn: continues the open conversation, or creates one carrying only this send. */
+async function startTurn({
+  ctx,
+  options,
+}: {
+  ctx: LangyTurnRequestContext;
+  options: Parameters<ChatTransport<UIMessage>["sendMessages"]>[0];
+}): Promise<StartTurnResponse> {
+  // A create carries THIS send and nothing else.
+  const lastUserMessage = options.messages.findLast((message) => message.role === "user");
+  const turnInput = {
+    // One logical send, one identity: minted fresh on every sendMessages
+    // call (each composer submit / regenerate re-arms with a new key), so
+    // a genuine re-send of the same text is a NEW turn. Transport/proxy
+    // retries replay the same mutation body — same key, same content —
+    // and collapse onto the same admitted turn.
+    idempotencyKey: crypto.randomUUID(),
+    messages: options.messages,
+    ...(options.trigger ? { trigger: options.trigger } : {}),
+    projectId: ctx.projectId,
+    ...(ctx.modelOverride ? { modelOverride: ctx.modelOverride } : {}),
+    ...(ctx.pageContext?.length ? { pageContext: ctx.pageContext } : {}),
+    ...(ctx.skills?.length ? { skills: ctx.skills } : {}),
+  };
+
+  if (ctx.conversationId) {
+    return trpcClient.langy.continueConversation.mutate({
+      ...turnInput,
+      conversationId: ctx.conversationId,
+    });
+  }
+  return trpcClient.langy.createConversation.mutate({
+    ...turnInput,
+    messages: lastUserMessage ? [lastUserMessage] : [],
+    // Adopt the warmed conversation when the panel holds one, so the
+    // first turn reuses the worker the panel open already booted.
+    ...(ctx.pendingConversationId ? { conversationId: ctx.pendingConversationId } : {}),
+  });
 }
 
 /** The entry handlers both a dispatched and a resumed stream route through. */

@@ -29,7 +29,7 @@ import {
   isClickHouseUnknownFunctionError,
   isClickHouseUnknownIdentifierError,
   translateClickHouseQueryError,
-  unknownIdentifierFromError,
+  extractUnknownIdentifier,
 } from "./clickhouse.query-error-translation.mapper.ts";
 import { toError } from "./clickhouse.to-error.mapper.ts";
 
@@ -74,7 +74,7 @@ function refusalFor({
 
   if (isClickHouseUnknownIdentifierError(error)) {
     return new LangWatchQLUnknownIdentifierError({
-      identifier: unknownIdentifierFromError(error),
+      identifier: extractUnknownIdentifier(error),
       reasons: [toError(error)],
     });
   }

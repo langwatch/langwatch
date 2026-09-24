@@ -35,15 +35,16 @@ export function createDashboardTestAnalytics(overrides: Partial<AnalyticsApi> = 
       parameters: [],
       appFunctions: [],
     }),
-    executeLangWatchQL: async (_input: LangWatchQLExecuteInput) =>
-      ({
-        columns: [],
-        rows: [],
-        statistics: { elapsedMs: 0, rowsRead: 0, bytesRead: 0 },
-        diagnostics: [],
-        followsTimeWindow: false,
-        followsGranularity: false,
-      }) as unknown as LangWatchQLQueryResult,
+    executeLangWatchQL: async (
+      _input: LangWatchQLExecuteInput,
+    ): Promise<LangWatchQLQueryResult> => ({
+      columns: [],
+      rows: [],
+      statistics: { elapsedMs: 0, rowsRead: 0, bytesRead: 0, rowsReturned: 0 },
+      diagnostics: [],
+      followsTimeWindow: false,
+      followsGranularity: false,
+    }),
     isWorkbenchEnabled: async () => true,
     assertCustomChartPlaygroundEnabled: async () => void 0,
     resolveProtections: async () => FULLY_PERMITTED,

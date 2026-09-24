@@ -25,9 +25,8 @@ export type StoredObjectFileStreamRead =
 /** The legacy index's reads the byte surface and the probe perform (ADR-158 §5). */
 export interface StoredObjectFileReader {
   headById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectProbe>;
-  tryGetById(
-    input: Readonly<{ projectId: string; id: string }>,
-  ): Promise<StoredObjectFileStreamRead | null>;
+  /** Throws `StoredObjectNotFoundError` when the project holds no such row. */
+  getById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectFileStreamRead>;
 }
 
 export type StoredObjectOwnerLookupSpan = Readonly<{
@@ -142,15 +141,17 @@ export abstract class StoredObjectStorage {
     expiresAt: Instant;
   }): Promise<SignedObjectUpload>;
 
-  abstract tryStat(input: {
+  /** Throws `StoredObjectNotFoundError` when no bytes are at the address. */
+  abstract getStat(input: {
     projectId: StoredObjectProjectId;
     address: StoredObjectStorageAddress;
-  }): Promise<ObjectDigest | null>;
+  }): Promise<ObjectDigest>;
 
-  abstract tryRead(input: {
+  /** Throws `StoredObjectNotFoundError` when no bytes are at the address. */
+  abstract getBytes(input: {
     projectId: StoredObjectProjectId;
     address: StoredObjectStorageAddress;
-  }): Promise<StoredObjectByteStream | null>;
+  }): Promise<StoredObjectByteStream>;
 
   abstract delete(input: {
     projectId: StoredObjectProjectId;

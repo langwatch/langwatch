@@ -13,6 +13,23 @@ import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button.
 
 const MIN_VISIBLE_FILL_PCT = 4;
 
+function facetAriaChecked(state: FacetValueState): boolean | "mixed" {
+  if (state === "include") return true;
+  if (state === "exclude") return "mixed";
+  return false;
+}
+
+function facetStateLabel(state: FacetValueState): string {
+  if (state === "include") return "included";
+  if (state === "exclude") return "excluded";
+  return "click to include";
+}
+
+function orbOpacityFor({ dimmed, isActive }: { dimmed?: boolean; isActive: boolean }): number {
+  if (!dimmed) return 1;
+  return isActive ? 0.9 : 0.6;
+}
+
 export const FacetRow = memo(function FacetRow({
   item,
   state,
@@ -47,12 +64,10 @@ export const FacetRow = memo(function FacetRow({
   const isActive = isInclude || isExclude;
 
   const palette = isExclude ? "red" : paletteFromColor(item.dotColor);
-  const orbOpacity = item.dimmed ? (isActive ? 0.9 : 0.6) : 1;
+  const orbOpacity = orbOpacityFor({ dimmed: item.dimmed, isActive });
 
-  const ariaChecked = isInclude ? true : isExclude ? "mixed" : false;
-  const ariaLabel = `${item.label} — ${
-    isInclude ? "included" : isExclude ? "excluded" : "click to include"
-  }`;
+  const ariaChecked = facetAriaChecked(state);
+  const ariaLabel = `${item.label} — ${facetStateLabel(state)}`;
 
   const subtleBg = `${palette}.subtle`;
   const solidBar = `${palette}.solid`;

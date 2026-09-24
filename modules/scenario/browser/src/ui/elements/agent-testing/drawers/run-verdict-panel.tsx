@@ -9,7 +9,7 @@ import { formatScore } from "@langwatch/design-system/metric-value-formatters";
 import {
   ScenarioRunStatus,
   resolveScenarioError,
-  scenarioErrorDetail,
+  extractScenarioErrorDetail,
   scenarioErrorTitle,
 } from "@langwatch/scenario-contract";
 import {
@@ -39,6 +39,10 @@ import { PASS_RATE_AMBER_COLOR } from "../shared/pass-rate-color.ts";
  */
 const PASSED_COLOR = SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.SUCCESS].fgColor;
 const FAILED_COLOR = SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.FAILED].fgColor;
+const VERDICT_WORD: Partial<Record<ScenarioRunStatus, "PASSED" | "FAILED">> = {
+  [ScenarioRunStatus.SUCCESS]: "PASSED",
+  [ScenarioRunStatus.FAILED]: "FAILED",
+};
 
 /**
  * The criteria of a run split into passed and failed, each list held in the order the
@@ -127,12 +131,7 @@ function VerdictStatusLine({
   status: ScenarioRunStatus;
   failedEvaluatorName: string | null;
 }) {
-  const word =
-    status === ScenarioRunStatus.SUCCESS
-      ? "PASSED"
-      : status === ScenarioRunStatus.FAILED
-        ? "FAILED"
-        : null;
+  const word = VERDICT_WORD[status];
   if (!word) return null;
   const color = word === "PASSED" ? PASSED_COLOR : FAILED_COLOR;
   const namedEvaluator = word === "FAILED" ? failedEvaluatorName : null;
@@ -518,7 +517,7 @@ function restatesFailure(reasoning: string): boolean {
 function RunFailurePanel({ raw }: { raw: string }) {
   const [detailOpen, setDetailOpen] = useState(false);
   const handled = resolveScenarioError(raw);
-  const detail = scenarioErrorDetail(raw);
+  const detail = extractScenarioErrorDetail(raw);
   const hasDetail = !!detail && detail.trim() !== handled.message.trim();
 
   return (
@@ -630,6 +629,8 @@ export function RunVerdictPanel({
   const reasoningIsError = isErrorPayload(reasoning);
   const showsReasoning = !!reasoning && !(!!error && restatesFailure(reasoning));
   const inconclusive = new Set(inconclusiveCriteria);
+  const showsFailurePanel = reasoningIsError && !!reasoning;
+  const showsJudgeReasoning = !showsFailurePanel && showsReasoning;
   const orderedMet = orderCriteria(metCriteria, declaredCriteria);
   const orderedFailed = orderCriteria(
     unmetCriteria.filter((criterion) => !inconclusive.has(criterion)),
@@ -678,11 +679,12 @@ export function RunVerdictPanel({
         ) : null}
         <EvaluatorsSection evaluations={evaluations} />
       </VStack>
-      {reasoningIsError && reasoning ? (
+      {showsFailurePanel && reasoning ? (
         <Box marginTop={SPACE_BELOW_CRITERIA}>
           <RunFailurePanel raw={reasoning} />
         </Box>
-      ) : showsReasoning && reasoning ? (
+      ) : null}
+      {showsJudgeReasoning && reasoning ? (
         <VStack align="stretch" gap={2} marginTop={SPACE_BELOW_CRITERIA}>
           <PanelHeading>Judge reasoning</PanelHeading>
           <Text

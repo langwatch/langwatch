@@ -87,7 +87,7 @@ function isStoredObjectRefUrl(url: string): boolean {
 }
 
 /** The ref one binary part yields, or none when it does not point at our own stored objects. */
-function binaryMediaRef(
+function buildBinaryMediaRef(
   media: Extract<CollectedMediaPart["media"], { type: "binary" }>,
   withRole: { role?: MediaPartRole },
 ): TraceMediaRef | null {
@@ -105,10 +105,10 @@ function binaryMediaRef(
 }
 
 /** The ref one collected part yields, or none when it points outside stored objects. */
-function mediaRefOf(part: CollectedMediaPart): TraceMediaRef | null {
+function deriveMediaRef(part: CollectedMediaPart): TraceMediaRef | null {
   const { media, role } = part;
   const withRole = role ? { role } : {};
-  if (media.type === "binary") return binaryMediaRef(media, withRole);
+  if (media.type === "binary") return buildBinaryMediaRef(media, withRole);
   if (media.source.type === "url" && isStoredObjectRefUrl(media.source.value)) {
     return { kind: media.type, url: media.source.value, ...withRole };
   }
@@ -123,7 +123,7 @@ export function collectMediaRefs(value: unknown): TraceMediaRef[] {
   for (const part of collectAnnotatedMediaParts(value)) {
     if (refs.length >= MAX_TRACE_MEDIA_REFS) break;
 
-    const ref = mediaRefOf(part);
+    const ref = deriveMediaRef(part);
     if (!ref || seen.has(ref.url)) continue;
 
     seen.add(ref.url);

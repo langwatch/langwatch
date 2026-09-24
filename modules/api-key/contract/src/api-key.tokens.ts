@@ -9,7 +9,7 @@ export const INGEST_KEY_PREFIX = "ik-lw-";
 
 const API_KEY_BODY_REGEX = /^[0-9A-Za-z]{16}_[0-9A-Za-z]{48}$/;
 
-export function splitApiKeyToken(token: string): { lookupId: string; secret: string } | null {
+export function parseApiKeyToken(token: string): { lookupId: string; secret: string } | null {
   const prefix = [LEGACY_PAT_PREFIX, INGEST_KEY_PREFIX, API_KEY_PREFIX].find((candidate) =>
     token.startsWith(candidate),
   );

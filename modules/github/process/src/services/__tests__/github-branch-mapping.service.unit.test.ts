@@ -58,10 +58,10 @@ class FakeInstallations implements GithubInstallationLookup {
   findByInstallationId(): Promise<{ organizationId: string } | null> {
     return Promise.resolve(this.installation);
   }
-  resolveInstallationForRepository(): Promise<{
+  getInstallationForRepository(): Promise<{
     installationId: string;
     repositoryId: string;
-  } | null> {
+  }> {
     return Promise.resolve({ installationId: "install-1", repositoryId: "repo-1" });
   }
 }

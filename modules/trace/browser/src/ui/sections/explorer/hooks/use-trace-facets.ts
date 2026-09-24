@@ -3,7 +3,7 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
 
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
-import { api } from "../../../../behavior/trace-api.ts";
+import { api, type RouterOutputs } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { SAMPLE_DISCOVER_DESCRIPTORS } from "../onboarding/data/sample-descriptors.ts";
 import {
@@ -17,6 +17,51 @@ const EMPTY_RESULT: { facets: never[]; pending: boolean } = {
   facets: EMPTY,
   pending: true,
 };
+
+type DiscoverResult = RouterOutputs["traces"]["discover"] | undefined;
+
+function pendingPollDelay({
+  data,
+  attempts,
+}: {
+  data: DiscoverResult;
+  attempts: { current: number };
+}): number | false {
+  if (!data?.pending) {
+    attempts.current = 0;
+    return false;
+  }
+  const delay = Math.min(2000 * 2 ** attempts.current, 15000);
+  attempts.current += 1;
+  return delay;
+}
+
+// Resolution order: 1. Stale-project guard with no cache for the new project — show
+// the skeleton (EMPTY_RESULT) so we don't bleed project A's payload into project B's
+// render.
+function pickFacetsResult({
+  data,
+  cachedFacets,
+  isFromOtherProject,
+  isQueryLoading,
+}: {
+  data: DiscoverResult;
+  cachedFacets: DiscoverDescriptors | null;
+  isFromOtherProject: boolean;
+  isQueryLoading: boolean;
+}) {
+  const liveSettled = data && !data.pending ? data : undefined;
+  const cachedResult = cachedFacets
+    ? { facets: cachedFacets, pending: false }
+    : (data ?? EMPTY_RESULT);
+  const settledResult = liveSettled ?? cachedResult;
+  const result = isFromOtherProject && !cachedFacets ? EMPTY_RESULT : settledResult;
+  // Loading reflects what the sidebar will see: live or cached data driving `result`
+  // means a useful sidebar already, so only a first visit shows the skeleton.
+  const haveUsableData = liveSettled || cachedFacets;
+  const isLoading = haveUsableData ? false : isQueryLoading || isFromOtherProject || result.pending;
+  return { result, isLoading };
+}
 
 export function useTraceFacets() {
   const { project } = useOrganizationTeamProject();
@@ -55,16 +100,8 @@ export function useTraceFacets() {
       trpc: { context: { skipBatch: true } },
       // Polling fallback for cold misses: the server returns `pending: true` and kicks
       // an async compute that broadcasts `discover_updated` over SSE when it lands.
-      refetchInterval: (query) => {
-        const data = query.state.data;
-        if (!data?.pending) {
-          pendingPollAttemptsRef.current = 0;
-          return false;
-        }
-        const delay = Math.min(2000 * 2 ** pendingPollAttemptsRef.current, 15000);
-        pendingPollAttemptsRef.current += 1;
-        return delay;
-      },
+      refetchInterval: (query) =>
+        pendingPollDelay({ data: query.state.data, attempts: pendingPollAttemptsRef }),
     },
   );
 
@@ -109,25 +146,12 @@ export function useTraceFacets() {
     [projectId],
   );
 
-  // Resolution order: 1. Stale-project guard with no cache for the new project — show
-  // the skeleton (EMPTY_RESULT) so we don't bleed project A's payload into project B's
-  // render.
-  const liveSettled = query.data && !query.data.pending ? query.data : undefined;
-  const cachedResult = cachedFacets
-    ? { facets: cachedFacets, pending: false }
-    : (query.data ?? EMPTY_RESULT);
-  const settledResult = liveSettled ?? cachedResult;
-  const result = isFromOtherProject && !cachedFacets ? EMPTY_RESULT : settledResult;
-
-  // Loading reflects what the sidebar will see: if there's either
-  // live or cached data driving `result`, the operator already has a
-  // useful sidebar so `isLoading` is false. Only first-time visitors
-  // — or a project switch into a project we've never visited — see
-  // `isLoading: true` and the skeleton it triggers downstream.
-  const haveUsableData = liveSettled || cachedFacets;
-  const isLoading = haveUsableData
-    ? false
-    : query.isLoading || isFromOtherProject || result.pending;
+  const { result, isLoading } = pickFacetsResult({
+    data: query.data,
+    cachedFacets,
+    isFromOtherProject,
+    isQueryLoading: query.isLoading,
+  });
 
   if (isSamplePreview) {
     return { data: SAMPLE_DISCOVER_DESCRIPTORS, isLoading: false };

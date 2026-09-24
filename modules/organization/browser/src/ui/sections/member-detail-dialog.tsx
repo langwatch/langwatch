@@ -128,8 +128,9 @@ export function MemberDetailDialog({
       (row) => !pendingBindingRemovals.has(row.id) && bindingKey(row) === bindingKey(binding),
     );
     if (alreadyHeld) return;
+    const stagedKey = bindingKey(binding);
     setPendingBindingAdditions((prev) =>
-      prev.some((staged) => bindingKey(staged) === bindingKey(binding)) ? prev : [...prev, binding],
+      prev.some((staged) => bindingKey(staged) === stagedKey) ? prev : [...prev, binding],
     );
   };
 
@@ -268,6 +269,16 @@ export function MemberDetailDialog({
     !binding.customRoleId &&
     binding.role === (member.role as string);
 
+  const isLoadingDirectBindings = directBindings.isLoading;
+  const hasNoStagedOrDirectAccess =
+    userDirectBindings.length === 0 && pendingBindingAdditions.length === 0;
+  const hasNoDirectAccess = !isLoadingDirectBindings && hasNoStagedOrDirectAccess;
+  const hasDirectAccess = !isLoadingDirectBindings && !hasNoStagedOrDirectAccess;
+  const isLoadingMemberGroups = memberGroups.isLoading;
+  const memberGroupList = memberGroups.data ?? [];
+  const hasNoMemberGroups = !isLoadingMemberGroups && memberGroupList.length === 0;
+  const hasMemberGroups = !isLoadingMemberGroups && memberGroupList.length > 0;
+
   return (
     <Dialog.Root
       open={open}
@@ -324,13 +335,13 @@ export function MemberDetailDialog({
                   Access
                 </Text>
 
-                {directBindings.isLoading ? (
-                  <Spinner size="sm" />
-                ) : userDirectBindings.length === 0 && pendingBindingAdditions.length === 0 ? (
+                {isLoadingDirectBindings && <Spinner size="sm" />}
+                {hasNoDirectAccess && (
                   <Text fontSize="sm" color="fg.muted" fontStyle="italic">
                     No access configured.
                   </Text>
-                ) : (
+                )}
+                {hasDirectAccess && (
                   <VStack gap={2} align="stretch">
                     {userDirectBindings.map((b) => {
                       const markedForRemoval = pendingBindingRemovals.has(b.id);
@@ -434,15 +445,15 @@ export function MemberDetailDialog({
               <Text fontSize="sm" fontWeight="semibold" mb={3}>
                 Group access
               </Text>
-              {memberGroups.isLoading ? (
-                <Spinner size="sm" />
-              ) : !memberGroups.data?.length ? (
+              {isLoadingMemberGroups && <Spinner size="sm" />}
+              {hasNoMemberGroups && (
                 <Text fontSize="sm" color="fg.muted" fontStyle="italic">
                   Not a member of any groups.
                 </Text>
-              ) : (
+              )}
+              {hasMemberGroups && (
                 <VStack gap={2} align="stretch">
-                  {memberGroups.data.map((group) =>
+                  {memberGroupList.map((group) =>
                     group.bindings.length === 0 ? (
                       <HStack
                         key={group.id}

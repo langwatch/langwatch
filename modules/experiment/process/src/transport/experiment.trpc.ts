@@ -37,7 +37,7 @@ const mapExperimentError = (error: unknown): never => {
 };
 
 /** The dataset a workflow's entry node draws from, when it names one. */
-const datasetIdOf = (dsl: unknown): string | undefined => {
+const extractDatasetId = (dsl: unknown): string | undefined => {
   const parsed = studioWorkflowSchema.safeParse(dsl);
   if (!parsed.success) return undefined;
   const entry = parsed.data.nodes.find((node) => node.type === "entry");
@@ -46,11 +46,44 @@ const datasetIdOf = (dsl: unknown): string | undefined => {
 };
 
 /** The most recently created run in a list, or undefined for an empty list. */
-function latestRunOf<T extends { timestamps: { createdAt: number } }>(
+function pickLatestRun<T extends { timestamps: { createdAt: number } }>(
   runs: readonly T[],
 ): T | undefined {
   return runs.slice().toSorted((a, b) => b.timestamps.createdAt - a.timestamps.createdAt)[0];
 }
+
+const copySavedDatasets = async ({
+  app,
+  datasets,
+  sourceProjectId,
+  targetProjectId,
+}: {
+  app: ExperimentApi;
+  datasets: readonly { type: string; datasetId?: string }[];
+  sourceProjectId: string;
+  targetProjectId: string;
+}): Promise<Record<string, string>> => {
+  const datasetIdMap: Record<string, string> = {};
+
+  for (const entry of datasets) {
+    if (entry.type === "saved" && entry.datasetId) {
+      try {
+        const newDataset = await app.copyDataset({
+          sourceDatasetId: entry.datasetId,
+          sourceProjectId,
+          targetProjectId,
+        });
+        datasetIdMap[entry.datasetId] = newDataset.id;
+      } catch {
+        // A dataset that cannot be copied (for example one already removed)
+        // keeps its original reference rather than failing the whole copy.
+        continue;
+      }
+    }
+  }
+
+  return datasetIdMap;
+};
 
 /**
  * Copies an EVALUATIONS_V3 experiment to another project: the state in
@@ -83,28 +116,16 @@ const copyEvaluationsV3Experiment = async ({
   delete workbenchState.results;
 
   if (copyDatasets && Array.isArray(workbenchState.datasets)) {
-    const datasetIdMap: Record<string, string> = {};
-
-    for (const entry of workbenchState.datasets as {
-      id: string;
-      type: string;
-      datasetId?: string;
-    }[]) {
-      if (entry.type === "saved" && entry.datasetId) {
-        try {
-          const newDataset = await app.copyDataset({
-            sourceDatasetId: entry.datasetId,
-            sourceProjectId,
-            targetProjectId,
-          });
-          datasetIdMap[entry.datasetId] = newDataset.id;
-        } catch {
-          // A dataset that cannot be copied (for example one already removed)
-          // keeps its original reference rather than failing the whole copy.
-          continue;
-        }
-      }
-    }
+    const datasetIdMap = await copySavedDatasets({
+      app,
+      datasets: workbenchState.datasets as {
+        id: string;
+        type: string;
+        datasetId?: string;
+      }[],
+      sourceProjectId,
+      targetProjectId,
+    });
 
     for (const entry of workbenchState.datasets as {
       id: string;
@@ -489,7 +510,7 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
     const pagedExperiments = nonLegacyExperiments.slice(pageOffset, pageOffset + pageSize);
 
     const datasetIds = pagedExperiments
-      .map((experiment) => datasetIdOf(experiment.workflow?.currentVersion?.dsl))
+      .map((experiment) => extractDatasetId(experiment.workflow?.currentVersion?.dsl))
       .filter((id): id is string => !!id);
 
     const datasetsById = Object.fromEntries(
@@ -506,7 +527,7 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
     const experimentsWithDatasetsAndRuns = pagedExperiments
       .map((experiment) => {
         const runs = runsByExperimentId[experiment.id] ?? [];
-        const latestRun = latestRunOf(runs);
+        const latestRun = pickLatestRun(runs);
         const primaryMetric = latestRun
           ? Object.values(latestRun.summary.evaluations)[0]
           : undefined;
@@ -518,7 +539,7 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
             primaryMetric,
             latestRun: { timestamps: latestRun?.timestamps },
           },
-          dataset: datasetsById[datasetIdOf(experiment.workflow?.currentVersion?.dsl) ?? ""],
+          dataset: datasetsById[extractDatasetId(experiment.workflow?.currentVersion?.dsl) ?? ""],
           updatedAt: latestRun?.timestamps.createdAt ?? experiment.updatedAt.getTime(),
         };
       })

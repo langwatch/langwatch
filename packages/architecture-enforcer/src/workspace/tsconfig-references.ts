@@ -226,38 +226,45 @@ function checkRootsOf(directory: string): string[] {
   ].filter((file) => existsSync(file));
 }
 
+type CycleWalk = {
+  edges: ReadonlyMap<string, readonly string[]>;
+  dropped: ReadonlySet<string>;
+  done: Set<string>;
+  path: string[];
+  onPath: Set<string>;
+};
+
+function walkForCycle(walk: CycleWalk, node: string): string[] | undefined {
+  const { edges, dropped, done, path, onPath } = walk;
+  if (onPath.has(node)) return [...path.slice(path.indexOf(node)), node];
+
+  if (done.has(node)) return void 0;
+
+  path.push(node);
+  onPath.add(node);
+
+  for (const next of edges.get(node) ?? []) {
+    if (dropped.has(`${node}\n${next}`)) continue;
+
+    const cycle = walkForCycle(walk, next);
+    if (cycle) return cycle;
+  }
+
+  path.pop();
+  onPath.delete(node);
+  done.add(node);
+
+  return void 0;
+}
+
 function firstCycle(
   edges: ReadonlyMap<string, readonly string[]>,
   dropped: ReadonlySet<string>,
 ): string[] | undefined {
-  const done = new Set<string>();
-  const path: string[] = [];
-  const onPath = new Set<string>();
-
-  const walk = (node: string): string[] | undefined => {
-    if (onPath.has(node)) return [...path.slice(path.indexOf(node)), node];
-
-    if (done.has(node)) return void 0;
-
-    path.push(node);
-    onPath.add(node);
-
-    for (const next of edges.get(node) ?? []) {
-      if (dropped.has(`${node}\n${next}`)) continue;
-
-      const cycle = walk(next);
-      if (cycle) return cycle;
-    }
-
-    path.pop();
-    onPath.delete(node);
-    done.add(node);
-
-    return void 0;
-  };
+  const walk: CycleWalk = { edges, dropped, done: new Set(), path: [], onPath: new Set() };
 
   for (const node of [...edges.keys()].toSorted()) {
-    const cycle = walk(node);
+    const cycle = walkForCycle(walk, node);
     if (cycle) return cycle;
   }
 

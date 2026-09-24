@@ -70,8 +70,8 @@ export function DeployPromptDialog({
 
   const versions = useMemo(() => versionsQuery.data ?? [], [versionsQuery.data]);
 
-  const latestVersion = versions.reduce(
-    (max: any, v: any) => (!max || v.version > max.version ? v : max),
+  const latestVersion = versions.reduce<(typeof versions)[number] | null>(
+    (max, v) => (!max || v.version > max.version ? v : max),
     null,
   );
 
@@ -93,7 +93,7 @@ export function DeployPromptDialog({
       const next: TagSelections = {};
       for (const tagDef of nonLatestTags) {
         const found = tagDef.id
-          ? assignmentData.find((t: any) => t.promptTag.id === tagDef.id)
+          ? assignmentData.find((t) => t.promptTag.id === tagDef.id)
           : undefined;
         next[tagDef.name] = prev[tagDef.name] ?? found?.versionId ?? "";
       }
@@ -110,9 +110,7 @@ export function DeployPromptDialog({
 
     for (const tagDef of nonLatestTags) {
       const selectedVersionId = tagSelections[tagDef.name] ?? "";
-      const currentTag = tagDef.id
-        ? data.find((t: any) => t.promptTag.id === tagDef.id)
-        : undefined;
+      const currentTag = tagDef.id ? data.find((t) => t.promptTag.id === tagDef.id) : undefined;
       if (selectedVersionId && selectedVersionId !== (currentTag?.versionId ?? "")) {
         mutations.push(
           assignTag.mutateAsync({

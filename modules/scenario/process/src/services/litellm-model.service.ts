@@ -79,7 +79,7 @@ function rejectionAsksForReasoningOff(body: string): boolean {
  * tool-carrying JSON body with no reasoning effort of its own. A caller
  * that asked for a specific effort keeps it and gets the endpoint's error.
  */
-function retryEligibleRequestBody(
+function extractRetryEligibleRequestBody(
   init: RequestInit | undefined,
 ): Record<string, unknown> | undefined {
   const body = init?.body;
@@ -107,7 +107,7 @@ function withReasoningOffRetry(baseFetch: typeof globalThis.fetch): typeof globa
     const response = await baseFetch(input, init);
     if (response.status !== 400) return response;
 
-    const parsed = retryEligibleRequestBody(init);
+    const parsed = extractRetryEligibleRequestBody(init);
     if (!parsed) return response;
 
     // Read the rejection from a clone so the original stays consumable if it

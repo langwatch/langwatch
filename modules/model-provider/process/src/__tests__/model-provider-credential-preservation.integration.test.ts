@@ -105,11 +105,11 @@ describe.skipIf(!DB_URL)(
             } as never),
           ).rejects.toMatchObject({ code: "model_provider_credentials_would_be_dropped" });
 
-          const stored = await repository.tryFindById({
+          const stored = await repository.getById({
             id: created.id,
             organizationId: fixture.organizationId,
           });
-          expect(stored?.customKeys).toEqual({
+          expect(stored.customKeys).toEqual({
             AZURE_OPENAI_API_KEY: STORED_KEY,
             AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
           });

@@ -9,7 +9,7 @@ import {
   inferSpanTypeIfAbsent,
   recordValueType,
 } from "../rules/canonical-extraction.rules.ts";
-import { safeJsonParse } from "../rules/canonical-guard.rules.ts";
+import { parseJsonSafely } from "../rules/canonical-guard.rules.ts";
 import type { AttributeCanonicaliser, ExtractorContext } from "./canonical-attributes.service.ts";
 
 export class LogfireCanonicaliserService implements AttributeCanonicaliser {
@@ -43,7 +43,7 @@ export class LogfireCanonicaliserService implements AttributeCanonicaliser {
             const message = eventAttrs.message ?? eventAttrs.content ?? eventAttrs.text;
 
             if (message !== void 0) {
-              return { role: "assistant", content: safeJsonParse(message) };
+              return { role: "assistant", content: parseJsonSafely(message) };
             }
 
             return void 0;

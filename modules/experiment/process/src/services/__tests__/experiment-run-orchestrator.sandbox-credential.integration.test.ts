@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { ExecutionCell } from "@langwatch/experiment-contract";
 import type { StudioServerEvent, WorkflowApi } from "@langwatch/workflow-contract";
 /**
@@ -35,10 +36,10 @@ const ports = {
   cost: { priceMetrics: async () => undefined },
 } as unknown as ExperimentRunCollaborators;
 
-const workflows = {
-  enrichStudioEvent: async ({ event }: { event: unknown }) => event,
-  prepareStudioEvent: async ({ event }: { event: unknown }) => event,
-} as unknown as WorkflowApi;
+const workflows = createApiFixture<WorkflowApi>({
+  enrichStudioEvent: async ({ event }) => event,
+  prepareStudioEvent: async ({ event }) => event,
+});
 
 const makeCell = (): ExecutionCell => ({
   rowIndex: 0,
@@ -55,7 +56,7 @@ const makeCell = (): ExecutionCell => ({
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],
     },
-  } as unknown as ExecutionCell["targetConfig"],
+  },
   evaluatorConfigs: [],
   datasetEntry: { _datasetId: "dataset-1", input: "hi" },
   skipTarget: false,

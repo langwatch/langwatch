@@ -34,6 +34,7 @@ import {
   isEnterpriseTier,
 } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { HandledError } from "@langwatch/handled-error";
 import {
   IdentityApi,
   type IdentityEmailService,
@@ -548,7 +549,14 @@ export class AuthApp implements AuthApiContract {
   async findCliAccessSession(input: {
     authorization: string | null | undefined;
   }): Promise<CliAccessSession | null> {
-    const record = await this.#cliSessions.resolveAccessToken(input.authorization);
+    const record = await this.#cliSessions
+      .getAccessToken(input.authorization)
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "cli_session_record_not_found") {
+          return null;
+        }
+        throw error;
+      });
     if (!record) return null;
 
     return {

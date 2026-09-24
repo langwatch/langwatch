@@ -4,7 +4,7 @@ import {
   API_KEY_PREFIX,
   INGEST_KEY_PREFIX,
   LEGACY_PAT_PREFIX,
-  splitApiKeyToken,
+  parseApiKeyToken,
 } from "@langwatch/api-key-contract";
 
 import { ApiKeyTokenRepository } from "../api-key-token.repository.ts";
@@ -41,7 +41,7 @@ export class ApiKeyTokenAdapter extends ApiKeyTokenRepository {
   }
 
   findTokenParts(token: string): { lookupId: string; secret: string } | null {
-    return splitApiKeyToken(token);
+    return parseApiKeyToken(token);
   }
 
   static randomText(length: number): string {
@@ -81,4 +81,4 @@ export class ApiKeyTokenAdapter extends ApiKeyTokenRepository {
   }
 }
 
-export { API_KEY_PREFIX, INGEST_KEY_PREFIX, LEGACY_PAT_PREFIX, splitApiKeyToken };
+export { API_KEY_PREFIX, INGEST_KEY_PREFIX, LEGACY_PAT_PREFIX, parseApiKeyToken };

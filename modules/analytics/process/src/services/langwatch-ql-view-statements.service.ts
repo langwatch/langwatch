@@ -163,7 +163,7 @@ function groupedColumnExpression(
     return catalogShapes.columnExpression({
       column,
       source: sourceColumn,
-      joined: joinedColumnQualifier(view),
+      joined: deriveJoinedColumnQualifier(view),
     });
   }
 
@@ -211,7 +211,7 @@ function projectedExpression({
  * `joined` argument. `undefined` for a single-table view, so a column there
  * cannot reference a table the view does not read.
  */
-function joinedColumnQualifier(
+function deriveJoinedColumnQualifier(
   view: LangWatchQLViewDefinition,
 ): ((name: string) => string) | undefined {
   const { join } = view;
@@ -335,7 +335,7 @@ export class LangWatchQLViewStatementsService {
     }
 
     assertPredicateColumnsDeclared(view);
-    const joinedColumn = joinedColumnQualifier(view);
+    const joinedColumn = deriveJoinedColumnQualifier(view);
     const strategy = dedupStrategyFor({ view, dedup });
     const grain = catalogShapes.grainColumns(view);
     // Any aggregating source renders as a `GROUP BY`, whether its published grain
@@ -395,7 +395,7 @@ export class LangWatchQLViewStatementsService {
   }
 
   /** Column-scoped `SELECT` on a joined view's *second* source table. */
-  joinSourceColumnGrantStatement({
+  buildJoinSourceColumnGrantStatement({
     names,
     sourceDatabase,
     view,

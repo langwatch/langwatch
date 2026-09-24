@@ -67,7 +67,7 @@ export function signFrame(
  */
 export function verifyFrame(runToken: string, frame: LangyFrameEnvelope): boolean {
   const expected = Buffer.from(computeFrameMac(runToken, frame), "hex");
-  const got = macBytes(frame.mac);
+  const got = decodeMacBytes(frame.mac);
   if (got === null || got.length !== expected.length) return false;
   return timingSafeEqual(got, expected);
 }
@@ -77,7 +77,7 @@ export function verifyFrame(runToken: string, frame: LangyFrameEnvelope): boolea
  * SHA-256 digest. `Buffer.from(x, "hex")` silently truncates on stray
  * characters, so the shape is validated first rather than trusting a partial decode.
  */
-function macBytes(mac: string): Buffer | null {
+function decodeMacBytes(mac: string): Buffer | null {
   if (typeof mac !== "string" || !/^[0-9a-fA-F]{64}$/.test(mac)) return null;
   return Buffer.from(mac, "hex");
 }

@@ -8,15 +8,15 @@ import {
   StripeUsageReportingService,
 } from "../usage-reporting.service.ts";
 
-function meterIdFor(nodeEnvironment: string | undefined): string {
+function meterIdFor(nodeEnvironment: string | undefined): string | undefined {
   const create = vi.spyOn(StripeUsageReportingService, "create");
   try {
     StripeUsageReportingBuilder.create({
       secretKey: "sk_test_composition",
       nodeEnvironment,
     }).build();
-    const [deps] = create.mock.calls[0] as unknown as [{ meterId: string }];
-    return deps.meterId;
+    const [deps] = create.mock.calls[0] ?? [];
+    return deps?.meterId;
   } finally {
     create.mockRestore();
   }

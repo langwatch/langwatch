@@ -70,7 +70,7 @@ function isEvalSlimGroupByKey(groupBy: string): groupBy is EvalSlimGroupByKey {
   }
 }
 
-function evalSlimGroupByExpression(groupBy?: string): string | null {
+function buildEvalSlimGroupByExpression(groupBy?: string): string | null {
   if (!groupBy) return null;
   if (!isEvalSlimGroupByKey(groupBy)) {
     throw new Error(`Eval slim builder cannot group by "${groupBy}".`);
@@ -230,7 +230,7 @@ export function buildEvalSlimTimeseriesQuery(
     selectExprs.push(`${dateTrunc(`${ea}.OccurredAt`, input.timeScale, timeZone)} AS date`);
   }
 
-  const groupByColumn = evalSlimGroupByExpression(input.groupBy);
+  const groupByColumn = buildEvalSlimGroupByExpression(input.groupBy);
   if (groupByColumn) {
     selectExprs.push(
       `if(${groupByColumn} IS NULL, 'unknown', toString(${groupByColumn})) AS group_key`,

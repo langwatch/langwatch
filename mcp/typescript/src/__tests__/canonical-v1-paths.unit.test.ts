@@ -5,7 +5,9 @@
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { initConfig } from "../config.js";
 import { listDashboards } from "../langwatch-api-dashboards.js";
 
@@ -54,8 +56,10 @@ describe("given the request paths the MCP server builds", () => {
           if (!V1_FAMILIES.has(match[1]!)) continue;
           const segments = (match[2] ?? "").split(/\\?\//).filter(Boolean);
           if (segments.some((segment) => VERSION_SEGMENT.test(segment))) continue;
-          if (BARE_ONLY.some((bare) => bare.test(match[0]!.replace(/\\/g, "")))) continue;
-          if (BARE_ONLY.some((bare) => bare.test(match[0]!))) continue;
+          const path = match[0]!;
+          const unescapedPath = path.replace(/\\/g, "");
+          if (BARE_ONLY.some((bare) => bare.test(unescapedPath))) continue;
+          if (BARE_ONLY.some((bare) => bare.test(path))) continue;
           const line = source.slice(0, match.index).split("\n").length;
           offenders.push(`${file.slice(SERVER_SRC.length + 1)}:${line} ${match[0]}`);
         }

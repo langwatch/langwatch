@@ -364,7 +364,7 @@ export function providerDeprecation(provider: string): { replacedBy: string } | 
   )?.deprecated;
 }
 
-export function getParameterConstraints(modelId: string): ParameterConstraints | undefined {
+export function pickParameterConstraints(modelId: string): ParameterConstraints | undefined {
   const provider = modelId.split("/")[0];
   if (!provider) {
     return undefined;

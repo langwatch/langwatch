@@ -581,7 +581,7 @@ export class TestGithubService implements GithubApi {
     throw new Error("not used by Coding Agent tests");
   }
 
-  verifyInstallState(): never {
+  parseInstallState(): never {
     throw new Error("not used by Coding Agent tests");
   }
 

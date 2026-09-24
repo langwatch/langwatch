@@ -10,7 +10,7 @@ export class GatewayProviderLabelService {
 
   private constructor() {}
 
-  labelFor(labels: Map<string, string>, providerKey: string | null): string | null {
+  formatProviderLabel(labels: Map<string, string>, providerKey: string | null): string | null {
     return providerKey ? (labels.get(providerKey) ?? providerKey) : null;
   }
 }

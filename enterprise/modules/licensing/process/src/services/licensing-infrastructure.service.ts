@@ -31,7 +31,7 @@ export class LicensingInfrastructureService {
     const licenses = options.licenses;
     const unavailable = () => new Error(`${this.processName} does not compose license mutation`);
     const repository: LicenseStorage = {
-      tryReadLicense: (organizationId) => licenses.tryReadLicense(organizationId),
+      getOrganizationLicense: (organizationId) => licenses.getOrganizationLicense(organizationId),
       findOrganizationsWithLicense: () => licenses.findOrganizationsWithLicense(),
       organizationExists: () => Promise.reject(unavailable()),
       storeLicense: () => Promise.reject(unavailable()),

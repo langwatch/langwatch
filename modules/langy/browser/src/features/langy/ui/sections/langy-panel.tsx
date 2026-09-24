@@ -226,6 +226,21 @@ const MotionNotice = motion.create(Box);
 // AnimatePresence mount.
 const MotionBox = motion.create(Box);
 
+function panelMotionState({
+  isOpen,
+  peekDismissed,
+  peeking,
+}: {
+  isOpen: boolean;
+  peekDismissed: boolean;
+  peeking: boolean;
+}): "open" | "peekDismissed" | "peek" | "closed" {
+  if (isOpen) return "open";
+  if (peekDismissed) return "peekDismissed";
+  if (peeking) return "peek";
+  return "closed";
+}
+
 /**
  * How much of the viewport the floating card may claim once its conversation has earned
  * it.
@@ -2404,20 +2419,22 @@ function LangyPanel({
   // card rather than an error, and anything else that is not a composer notice
   // is a domain-error card. Derived here so it can be rendered from ONE place
   // regardless of whether the conversation has messages yet.
-  const failureSurface =
-    recovery.isRecovering && recovery.message ? (
-      <LangyRecoveringLine message={recovery.message} />
-    ) : needsGithubConnect && organizationId ? (
-      // NOT an error. A missing integration is a setup step, so it surfaces as the
-      // connect card at the point in the conversation where Langy needed it —
-      // never a red card and never a toast.
+  let failureSurface: ReactNode = null;
+  if (recovery.isRecovering && recovery.message) {
+    failureSurface = <LangyRecoveringLine message={recovery.message} />;
+  } else if (needsGithubConnect && organizationId) {
+    // NOT an error. A missing integration is a setup step, so it surfaces as the
+    // connect card at the point in the conversation where Langy needed it —
+    // never a red card and never a toast.
+    failureSurface = (
       <LangyGitHubConnectCard organizationId={organizationId} onConnected={onGithubConnected} />
-    ) : turnError && turnError.render !== "composer-notice" && !recovery.willAutoRecover ? (
-      // `!willAutoRecover` pins the card OUT the moment a failure is known to be
-      // auto-retryable, so it cannot flash for a frame before the retry timer
-      // arms. A `composer-notice` error rides above the composer instead.
-      <LangyError presentation={turnError} onAction={onErrorAction} />
-    ) : null;
+    );
+  } else if (turnError && turnError.render !== "composer-notice" && !recovery.willAutoRecover) {
+    // `!willAutoRecover` pins the card OUT the moment a failure is known to be
+    // auto-retryable, so it cannot flash for a frame before the retry timer
+    // arms. A `composer-notice` error rides above the composer instead.
+    failureSurface = <LangyError presentation={turnError} onAction={onErrorAction} />;
+  }
 
   // The generated title for the open conversation, read off the recents list —
   // the SAME server state, kept fresh by the useLangyFreshness SSE coordinator,
@@ -2432,6 +2449,70 @@ function LangyPanel({
     const trimmed = typeof title === "string" ? title.trim() : "";
     return trimmed.length > 0 ? trimmed : null;
   }, [conversations, activeConversationId]);
+
+  const dockChrome = dockShellClaimed
+    ? {
+        // An app shell is mounted: the dock joins it as a SECOND content
+        // card.
+        top: `${APP_HEADER_HEIGHT}px`,
+        right: 0,
+        bottom: 0,
+        borderTopWidth: "1px",
+        borderLeftWidth: "1px",
+        borderColor: "border.muted",
+        borderTopLeftRadius: "xl",
+        borderBottomLeftRadius: 0,
+        boxShadow: "none",
+        _dark: { boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)" },
+      }
+    : {
+        // No shell on this page (a full-screen tool like the studio):
+        // the dock stays a flush full-height pane on the viewport edge.
+        top: 0,
+        right: 0,
+        bottom: 0,
+        borderLeftWidth: "1px",
+        borderTopLeftRadius: 0,
+        borderBottomLeftRadius: 0,
+        boxShadow: "none",
+      };
+  const floatingOrDockChrome = floating
+    ? {
+        // Anchored bottom corner, growing UPWARD, capped by
+        // FLOATING_MAX_VIEWPORT_DVH so a sliver of page always shows and the
+        // card reads as floating over it.
+        ...(floatingDodgesDrawer ? { left: `${PANEL_INSET}px` } : { right: `${PANEL_INSET}px` }),
+        bottom: `${PANEL_INSET}px`,
+        height: "auto",
+        minHeight: floatingMinHeight,
+        maxHeight: FLOATING_MAX_HEIGHT,
+        // Floating reads as glass: a touch translucent over a blur of the page
+        // behind it.
+        background: "bg.surface/85",
+        backdropFilter: "blur(8px)",
+        borderWidth: "1px",
+        borderRadius: "20px",
+        boxShadow:
+          "0 1px 2px rgba(20,20,23,0.04), 0 12px 28px rgba(20,20,23,0.10), 0 32px 64px rgba(20,20,23,0.10)",
+        _dark: {
+          background: "bg.surface/88",
+          backdropFilter: "blur(16px) saturate(1.1)",
+          // The stacked drop shadows give depth from OUTSIDE; the inset
+          // hairline gives the top edge a lit rim from INSIDE, so the panel
+          // reads as a raised object catching light rather than a flat cut-
+          // out. white/12 — one notch above the border's white/10.
+          boxShadow:
+            "0 1px 2px rgba(0,0,0,0.4), 0 12px 28px rgba(0,0,0,0.5), 0 32px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12)",
+        },
+      }
+    : dockChrome;
+  // The dock peeks on X, and needs the same eased travel. `width` rides
+  // along for the dock ↔ floating morph (see the floating card's css).
+  const dockMotionCss = reduceMotion
+    ? undefined
+    : {
+        transition: `translate ${LANGY_TRANSITION}, width 340ms cubic-bezier(0.32, 0.72, 0, 1)`,
+      };
 
   return (
     <Profiler id="LangyPanel" onRender={onProfilerRender}>
@@ -2503,7 +2584,7 @@ function LangyPanel({
           // made inert instead (see the content wrapper below), so the only
           // thing reachable behind the edge is the open control.
           aria-hidden={!isOpen && !peeking}
-          role="complementary"
+          as="aside"
           aria-label="Langy assistant"
           // The guided tour's handoff spotlight finds the panel by this.
           data-tour="langy-panel"
@@ -2523,7 +2604,7 @@ function LangyPanel({
           // edge its peek sliver rests on.
           transformOrigin={floating ? "bottom right" : "right center"}
           initial={false}
-          animate={isOpen ? "open" : peekDismissed ? "peekDismissed" : peeking ? "peek" : "closed"}
+          animate={panelMotionState({ isOpen, peekDismissed, peeking })}
           variants={variants}
           // The peek's whole motion, on the one element: rest → near → open is
           // a single property easing on the panel's own curve. Never set while
@@ -2563,13 +2644,7 @@ function LangyPanel({
                     maxHeight: "calc(100dvh - 24px)",
                   },
                 }
-              : // The dock peeks on X, and needs the same eased travel. `width`
-                // rides along for the dock ↔ floating morph (see above).
-                reduceMotion
-                ? undefined
-                : {
-                    transition: `translate ${LANGY_TRANSITION}, width 340ms cubic-bezier(0.32, 0.72, 0, 1)`,
-                  }
+              : dockMotionCss
           }
           {...(isDrawerCompanion
             ? {
@@ -2587,63 +2662,7 @@ function LangyPanel({
                 borderRadius: "lg",
                 boxShadow: "lg",
               }
-            : floating
-              ? {
-                  // Anchored bottom corner, growing UPWARD, capped by
-                  // FLOATING_MAX_VIEWPORT_DVH so a sliver of page always shows and the
-                  // card reads as floating over it.
-                  ...(floatingDodgesDrawer
-                    ? { left: `${PANEL_INSET}px` }
-                    : { right: `${PANEL_INSET}px` }),
-                  bottom: `${PANEL_INSET}px`,
-                  height: "auto",
-                  minHeight: floatingMinHeight,
-                  maxHeight: FLOATING_MAX_HEIGHT,
-                  // Floating reads as glass: a touch translucent over a blur of the page
-                  // behind it.
-                  background: "bg.surface/85",
-                  backdropFilter: "blur(8px)",
-                  borderWidth: "1px",
-                  borderRadius: "20px",
-                  boxShadow:
-                    "0 1px 2px rgba(20,20,23,0.04), 0 12px 28px rgba(20,20,23,0.10), 0 32px 64px rgba(20,20,23,0.10)",
-                  _dark: {
-                    background: "bg.surface/88",
-                    backdropFilter: "blur(16px) saturate(1.1)",
-                    // The stacked drop shadows give depth from OUTSIDE; the inset
-                    // hairline gives the top edge a lit rim from INSIDE, so the panel
-                    // reads as a raised object catching light rather than a flat cut-
-                    // out. white/12 — one notch above the border's white/10.
-                    boxShadow:
-                      "0 1px 2px rgba(0,0,0,0.4), 0 12px 28px rgba(0,0,0,0.5), 0 32px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12)",
-                  },
-                }
-              : dockShellClaimed
-                ? {
-                    // An app shell is mounted: the dock joins it as a SECOND content
-                    // card.
-                    top: `${APP_HEADER_HEIGHT}px`,
-                    right: 0,
-                    bottom: 0,
-                    borderTopWidth: "1px",
-                    borderLeftWidth: "1px",
-                    borderColor: "border.muted",
-                    borderTopLeftRadius: "xl",
-                    borderBottomLeftRadius: 0,
-                    boxShadow: "none",
-                    _dark: { boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)" },
-                  }
-                : {
-                    // No shell on this page (a full-screen tool like the studio):
-                    // the dock stays a flush full-height pane on the viewport edge.
-                    top: 0,
-                    right: 0,
-                    bottom: 0,
-                    borderLeftWidth: "1px",
-                    borderTopLeftRadius: 0,
-                    borderBottomLeftRadius: 0,
-                    boxShadow: "none",
-                  })}
+            : floatingOrDockChrome)}
         >
           {/* Texture, under the content (which stacks at zIndex 1) and inert to
           the pointer. Two gates on purpose: the JSX renders it in the FLOATING

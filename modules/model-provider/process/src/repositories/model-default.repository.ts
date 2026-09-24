@@ -16,9 +16,9 @@ export type ModelDefaultConfigSaveInput = {
  * newest first so the narrowest write wins where two configs name a scope.
  */
 export interface ModelDefaultRepository {
-  listForProject(projectScopes: ModelDefaultScope[]): Promise<ModelDefaultConfig[]>;
-  tryGetById(id: string): Promise<ModelDefaultConfig | null>;
-  tryFindByScope(scope: ModelDefaultScope): Promise<ModelDefaultConfig | null>;
+  findForProject(projectScopes: ModelDefaultScope[]): Promise<ModelDefaultConfig[]>;
+  getById(id: string): Promise<ModelDefaultConfig>;
+  getByScope(scope: ModelDefaultScope): Promise<ModelDefaultConfig>;
   save(input: ModelDefaultConfigSaveInput): Promise<ModelDefaultConfig>;
   set(input: {
     id: string;
@@ -29,5 +29,5 @@ export interface ModelDefaultRepository {
     authorId: string | null;
   }): Promise<void>;
   delete(id: string): Promise<void>;
-  listForOrganization(organizationId: string): Promise<ModelDefaultConfig[]>;
+  findForOrganization(organizationId: string): Promise<ModelDefaultConfig[]>;
 }

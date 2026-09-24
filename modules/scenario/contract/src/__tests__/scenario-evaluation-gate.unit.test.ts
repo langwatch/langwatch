@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { evaluationFailsRun, gatedStatus, gatedVerdict } from "../scenario-evaluation-gate.ts";
+import {
+  evaluationFailsRun,
+  gatedStatus,
+  computeGatedVerdict,
+} from "../scenario-evaluation-gate.ts";
 import type { ScenarioEvaluationResult } from "../schemas/event-schemas.ts";
 
 function evaluation(overrides: Partial<ScenarioEvaluationResult> = {}): ScenarioEvaluationResult {
@@ -13,7 +17,7 @@ function evaluation(overrides: Partial<ScenarioEvaluationResult> = {}): Scenario
   };
 }
 
-describe("gatedVerdict", () => {
+describe("computeGatedVerdict", () => {
   describe("given evaluations that are skipped, scored and passed", () => {
     /** @scenario "The gate reads only required failures and errors" */
     it("keeps the judge's verdict", () => {
@@ -26,16 +30,16 @@ describe("gatedVerdict", () => {
         evaluation({ status: "passed", passed: true }),
       ];
 
-      expect(gatedVerdict({ evaluations, judgeVerdict: "success" })).toBe("success");
-      expect(gatedVerdict({ evaluations, judgeVerdict: "failure" })).toBe("failure");
-      expect(gatedVerdict({ evaluations, judgeVerdict: undefined })).toBeUndefined();
+      expect(computeGatedVerdict({ evaluations, judgeVerdict: "success" })).toBe("success");
+      expect(computeGatedVerdict({ evaluations, judgeVerdict: "failure" })).toBe("failure");
+      expect(computeGatedVerdict({ evaluations, judgeVerdict: undefined })).toBeUndefined();
     });
   });
 
   describe("given a required evaluation that failed", () => {
     it("turns the verdict to failure", () => {
       expect(
-        gatedVerdict({
+        computeGatedVerdict({
           evaluations: [evaluation({ status: "failed", passed: false })],
           judgeVerdict: "success",
         }),
@@ -46,7 +50,7 @@ describe("gatedVerdict", () => {
   describe("given a required evaluation with the status error", () => {
     it("turns the verdict to failure", () => {
       expect(
-        gatedVerdict({
+        computeGatedVerdict({
           evaluations: [evaluation({ status: "error", details: "timeout" })],
           judgeVerdict: "success",
         }),
@@ -57,7 +61,7 @@ describe("gatedVerdict", () => {
   describe("given a failed evaluation that is not required", () => {
     it("keeps the judge's verdict", () => {
       const evaluations = [evaluation({ status: "failed", passed: false, required: false })];
-      expect(gatedVerdict({ evaluations, judgeVerdict: "success" })).toBe("success");
+      expect(computeGatedVerdict({ evaluations, judgeVerdict: "success" })).toBe("success");
       expect(evaluationFailsRun(evaluations[0]!)).toBe(false);
     });
   });
@@ -66,7 +70,7 @@ describe("gatedVerdict", () => {
     /** @scenario "A run the judge never graded stays ungraded even with a required failure" */
     it("stays ungraded instead of reading as a failure", () => {
       expect(
-        gatedVerdict({
+        computeGatedVerdict({
           evaluations: [evaluation({ status: "failed", passed: false })],
           judgeVerdict: undefined,
         }),

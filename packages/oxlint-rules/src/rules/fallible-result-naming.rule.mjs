@@ -17,7 +17,7 @@ const GET_VOCABULARY = /^get([A-Z]|$)/;
 // ADR-146's derivations: absence from one means "the input carried none".
 // `resolve*` and `read*` stay governed and are decided per call site.
 const DERIVATION_VOCABULARY =
-  /^(parse|extract|build|stringify|serialize|serialise|deserialize|deserialise|format|render|normalize|normalise|coerce|decode|encode|convert|derive|compute|translate|project|visit|as|to|infer|classify|detect|pick|describe|map)([A-Z]|$)/;
+  /^(parse|extract|build|stringify|serialize|serialise|deserialize|deserialise|format|render|normalize|normalise|coerce|decode|encode|convert|derive|compute|translate|project|visit|as|to|infer|classify|detect|pick|describe|map|fold|reduce)([A-Z]|$)/;
 
 /** Shared with `banned-verb-prefix`, which owns the `try*` naming defect. */
 export function isTryPrefixedName(name) {

@@ -71,32 +71,50 @@ export default function ExperimentPage() {
     );
   }
 
-  return (
-    <Box width="full">
-      {project && experiment.data?.type === ExperimentType.DSPY ? (
+  if (project && experiment.data?.type === ExperimentType.DSPY) {
+    return (
+      <Box width="full">
         <DSPyExperiment project={project} experiment={experiment.data} />
-      ) : project && experiment.data?.type === ExperimentType.BATCH_EVALUATION ? (
+      </Box>
+    );
+  }
+
+  if (project && experiment.data?.type === ExperimentType.BATCH_EVALUATION) {
+    return (
+      <Box width="full">
         <BatchEvaluation
           project={project}
           experiment={experiment.data}
           evaluations={legacyBatchEvaluations}
         />
-      ) : !project ||
-        experiment.data === undefined ||
-        experiment.data.type === ExperimentType.BATCH_EVALUATION_V2 ||
-        experiment.data.type === ExperimentType.EVALUATIONS_V3 ? (
+      </Box>
+    );
+  }
+
+  if (
+    !project ||
+    experiment.data === undefined ||
+    experiment.data.type === ExperimentType.BATCH_EVALUATION_V2 ||
+    experiment.data.type === ExperimentType.EVALUATIONS_V3
+  ) {
+    return (
+      <Box width="full">
         <BatchEvaluationResults project={project} experiment={experiment.data} />
-      ) : (
-        <Box padding={6}>
-          <Alert.Root status="warning">
-            <Alert.Indicator />
-            <Alert.Title>Unknown experiment type</Alert.Title>
-            <Alert.Description>
-              This experiment has an unrecognized type: {experiment.data.type}
-            </Alert.Description>
-          </Alert.Root>
-        </Box>
-      )}
+      </Box>
+    );
+  }
+
+  return (
+    <Box width="full">
+      <Box padding={6}>
+        <Alert.Root status="warning">
+          <Alert.Indicator />
+          <Alert.Title>Unknown experiment type</Alert.Title>
+          <Alert.Description>
+            This experiment has an unrecognized type: {experiment.data.type}
+          </Alert.Description>
+        </Alert.Root>
+      </Box>
     </Box>
   );
 }

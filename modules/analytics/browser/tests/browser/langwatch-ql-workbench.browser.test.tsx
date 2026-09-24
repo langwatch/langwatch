@@ -191,13 +191,18 @@ afterEach(() => cleanup());
 describe("the LangWatchQL workbench in real Chromium", () => {
   describe("given an authorized member with a live LangWatchQL schema", () => {
     describe("when the member types a statement, runs it, and waits", () => {
-      /** @scenario "A real browser carries a query from editor to native table" */
-      it("shows the returned rows in the native result table beside the run statistics", async () => {
+      let editor: HTMLElement;
+
+      beforeEach(async () => {
         renderWorkbench();
 
-        const editor = await screen.findByTestId("lwql-editor-input", {}, MOUNT_TIMEOUT);
+        editor = await screen.findByTestId("lwql-editor-input", {}, MOUNT_TIMEOUT);
         await userEvent.click(editor);
         await userEvent.keyboard(SQL);
+      });
+
+      /** @scenario "A real browser carries a query from editor to native table" */
+      it("shows the returned rows in the native result table beside the run statistics", async () => {
         expect(editor).toHaveValue(SQL);
 
         await userEvent.click(screen.getByRole("button", { name: "Run query" }));
@@ -232,11 +237,6 @@ describe("the LangWatchQL workbench in real Chromium", () => {
 
       /** @scenario "A real browser carries a query from editor to native table" */
       it("windows the rows against the measured viewport and moves that window when the member scrolls", async () => {
-        renderWorkbench();
-
-        const editor = await screen.findByTestId("lwql-editor-input", {}, MOUNT_TIMEOUT);
-        await userEvent.click(editor);
-        await userEvent.keyboard(SQL);
         await userEvent.click(screen.getByRole("button", { name: "Run query" }));
         await poll(() => renderedRows().length > 0);
 

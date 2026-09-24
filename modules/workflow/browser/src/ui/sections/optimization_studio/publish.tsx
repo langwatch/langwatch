@@ -27,6 +27,7 @@ import {
 } from "@langwatch/workflow-browser-kit";
 import {
   getEntryInputs,
+  type NodeDataset,
   parseStudioWorkflow,
   type Project,
   type StudioWorkflow,
@@ -46,8 +47,8 @@ import { VersionToBeUsed } from "./version-to-be-used.tsx";
 
 // Type with dataset property
 interface NodeDataWithDataset {
-  dataset: any;
-  [key: string]: any;
+  dataset: NodeDataset;
+  [key: string]: unknown;
 }
 
 /**

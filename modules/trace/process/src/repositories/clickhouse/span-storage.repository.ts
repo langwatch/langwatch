@@ -246,7 +246,7 @@ interface ModelSpanSampleQueryRow {
 }
 
 /** Map-subscript token values arrive as strings ('' when absent). */
-function tokenCount(...raws: string[]): number | null {
+function parseTokenCount(...raws: string[]): number | null {
   for (const raw of raws) {
     if (raw === "") continue;
     const num = Number(raw);
@@ -263,11 +263,11 @@ function mapModelSpanSampleRow(row: ModelSpanSampleQueryRow): ModelSpanSampleRow
     model: row.Model,
     // Canonical key first, legacy alias as fallback, same coalesce order
     // as extractMetrics in span.mapper.ts.
-    inputTokens: tokenCount(row.InputTokensRaw, row.PromptTokensRaw),
-    outputTokens: tokenCount(row.OutputTokensRaw, row.CompletionTokensRaw),
-    cacheReadTokens: tokenCount(row.CacheReadTokensRaw),
-    cacheCreationTokens: tokenCount(row.CacheCreationTokensRaw),
-    cacheCreation1hTokens: tokenCount(row.CacheCreation1hTokensRaw),
+    inputTokens: parseTokenCount(row.InputTokensRaw, row.PromptTokensRaw),
+    outputTokens: parseTokenCount(row.OutputTokensRaw, row.CompletionTokensRaw),
+    cacheReadTokens: parseTokenCount(row.CacheReadTokensRaw),
+    cacheCreationTokens: parseTokenCount(row.CacheCreationTokensRaw),
+    cacheCreation1hTokens: parseTokenCount(row.CacheCreation1hTokensRaw),
     startTimeMs: Number(row.StartTimeMs),
   };
 }
@@ -426,7 +426,7 @@ export interface SpanSummaryQueryRow {
 }
 
 /** "" → null, malformed → null, otherwise the parsed number. */
-function attrNumber(raw: string): number | null {
+function parseAttrNumber(raw: string): number | null {
   if (!raw) return null;
   const n = Number(raw);
   return Number.isFinite(n) ? n : null;
@@ -436,7 +436,7 @@ function attrNumber(raw: string): number | null {
  * An empty ClickHouse column means the span never reported the quantity, and
  * the cost cascade must not read it as a zero it can price.
  */
-function set(value: string | null | undefined): string | undefined {
+function toReportedValue(value: string | null | undefined): string | undefined {
   return value || undefined;
 }
 
@@ -454,27 +454,35 @@ function computeSummaryRowCost({
 }): number {
   return TraceSpanCostMatchingService.computeSpanCost({
     attrs: {
-      [ATTR_KEYS.GEN_AI_RESPONSE_MODEL]: set(row.ResponseModel),
-      [ATTR_KEYS.GEN_AI_REQUEST_MODEL]: set(row.Model),
-      [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: set(row.CacheReadTokens),
-      [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: set(row.CacheCreationTokens),
-      [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS]: set(row.CacheCreation1hTokens),
-      [ATTR_KEYS.GEN_AI_USAGE_INPUT_CHARS]: set(row.InputChars),
-      [ATTR_KEYS.GEN_AI_USAGE_AUDIO_SECONDS]: set(row.AudioSeconds),
-      [ATTR_KEYS.GEN_AI_USAGE_INPUT_AUDIO_TOKENS]: set(row.InputAudioTokens),
-      [ATTR_KEYS.GEN_AI_USAGE_OUTPUT_AUDIO_TOKENS]: set(row.OutputAudioTokens),
-      [ATTR_KEYS.GEN_AI_USAGE_INPUT_IMAGE_TOKENS]: set(row.InputImageTokens),
-      [ATTR_KEYS.GEN_AI_USAGE_OUTPUT_IMAGE_TOKENS]: set(row.OutputImageTokens),
-      [ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN]: set(row.CustomInputRate),
-      [ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN]: set(row.CustomOutputRate),
-      [ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN]: set(row.CustomCacheReadRate),
-      [ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN]: set(row.CustomCacheCreationRate),
-      [ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_1H_COST_PER_TOKEN]: set(
+      [ATTR_KEYS.GEN_AI_RESPONSE_MODEL]: toReportedValue(row.ResponseModel),
+      [ATTR_KEYS.GEN_AI_REQUEST_MODEL]: toReportedValue(row.Model),
+      [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: toReportedValue(row.CacheReadTokens),
+      [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: toReportedValue(
+        row.CacheCreationTokens,
+      ),
+      [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS]: toReportedValue(
+        row.CacheCreation1hTokens,
+      ),
+      [ATTR_KEYS.GEN_AI_USAGE_INPUT_CHARS]: toReportedValue(row.InputChars),
+      [ATTR_KEYS.GEN_AI_USAGE_AUDIO_SECONDS]: toReportedValue(row.AudioSeconds),
+      [ATTR_KEYS.GEN_AI_USAGE_INPUT_AUDIO_TOKENS]: toReportedValue(row.InputAudioTokens),
+      [ATTR_KEYS.GEN_AI_USAGE_OUTPUT_AUDIO_TOKENS]: toReportedValue(row.OutputAudioTokens),
+      [ATTR_KEYS.GEN_AI_USAGE_INPUT_IMAGE_TOKENS]: toReportedValue(row.InputImageTokens),
+      [ATTR_KEYS.GEN_AI_USAGE_OUTPUT_IMAGE_TOKENS]: toReportedValue(row.OutputImageTokens),
+      [ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN]: toReportedValue(row.CustomInputRate),
+      [ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN]: toReportedValue(row.CustomOutputRate),
+      [ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN]: toReportedValue(
+        row.CustomCacheReadRate,
+      ),
+      [ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN]: toReportedValue(
+        row.CustomCacheCreationRate,
+      ),
+      [ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_1H_COST_PER_TOKEN]: toReportedValue(
         row.CustomCacheCreation1hRate,
       ),
-      [ATTR_KEYS.LANGWATCH_SPAN_COST]: set(row.LwSpanCost),
+      [ATTR_KEYS.LANGWATCH_SPAN_COST]: toReportedValue(row.LwSpanCost),
     } as NormalizedAttributes,
-    model: row.ResponseModel || set(row.Model),
+    model: row.ResponseModel || toReportedValue(row.Model),
     promptTokens: inputTokens,
     completionTokens: outputTokens,
   });
@@ -1729,11 +1737,11 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   static mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
-    const explicitCost = attrNumber(row.Cost);
-    const inputTokens = attrNumber(row.InputTokens);
-    const outputTokens = attrNumber(row.OutputTokens);
-    const cacheReadTokens = attrNumber(row.CacheReadTokens);
-    const cacheCreationTokens = attrNumber(row.CacheCreationTokens);
+    const explicitCost = parseAttrNumber(row.Cost);
+    const inputTokens = parseAttrNumber(row.InputTokens);
+    const outputTokens = parseAttrNumber(row.OutputTokens);
+    const cacheReadTokens = parseAttrNumber(row.CacheReadTokens);
+    const cacheCreationTokens = parseAttrNumber(row.CacheCreationTokens);
 
     // Some SDKs emit `gen_ai.usage.cost = 0` meaning "unknown", so any
     // non-positive explicit cost counts as absent and the computed cost runs.

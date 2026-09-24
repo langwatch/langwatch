@@ -11,7 +11,7 @@ import type { GatewayBudgetWindow } from "./gateway.budget.ts";
  * the calendar one, or undefined for the rollup fast path. MANUAL windows always read from
  * their stored boundary.
  */
-export function budgetPeriodFloorMs(
+export function computeBudgetPeriodFloorMs(
   budget: {
     window: GatewayBudgetWindow;
     currentPeriodStartedAt: Instant;
@@ -64,7 +64,7 @@ export function effectiveBudgetPeriod(
       resetsAt: budget.resetsAt,
     };
   }
-  const floorMs = budgetPeriodFloorMs(budget, now);
+  const floorMs = computeBudgetPeriodFloorMs(budget, now);
   return {
     currentPeriodStartedAt:
       floorMs === undefined
@@ -78,7 +78,7 @@ export function effectiveBudgetPeriod(
  * The OccurredAt lower bound for ONE bucket of a budget: the later of the budget's own period
  * floor and that bucket's boundary row, whichever of the two exist.
  */
-export function bucketPeriodFloorMs(
+export function computeBucketPeriodFloorMs(
   budget: {
     window: GatewayBudgetWindow;
     currentPeriodStartedAt: Instant;
@@ -89,7 +89,7 @@ export function bucketPeriodFloorMs(
   now: Instant = nowInstant(),
 ): number | undefined {
   const candidates = [
-    budgetPeriodFloorMs(budget, now),
+    computeBudgetPeriodFloorMs(budget, now),
     boundaryPeriodStartedAt?.epochMilliseconds,
   ].filter((n): n is number => typeof n === "number");
   return candidates.length > 0 ? Math.max(...candidates) : undefined;
@@ -124,7 +124,7 @@ export function currentPeriodStart(window: GatewayBudgetWindow, now: Instant): I
   }
   // TOTAL and MANUAL: one lifetime bucket, keyed by the epoch sentinel
   // (the MV's multiIf falls through to epoch for both). MANUAL is never
-  // read through the PeriodStart fast path (budgetPeriodFloorMs always
+  // read through the PeriodStart fast path (computeBudgetPeriodFloorMs always
   // floors it onto the raw-events read); the sentinel only keys where its
   // debits land in the rollup.
   return Temporal.Instant.fromEpochMilliseconds(0);

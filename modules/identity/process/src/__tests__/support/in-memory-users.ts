@@ -4,7 +4,7 @@ import type { IdentityUsersRepository } from "../../repositories/identity-users.
 
 /**
  * The `User` table as identity reads it, in memory. Mainly for
- * `tryFindUserIdByEmail` (the legacy collision guard, ADR-116 §6): unseeded
+ * `findUserIdsByEmail` (the legacy collision guard, ADR-116 §6): unseeded
  * has no legacy holders (most guard tests), seeded gets the refusal.
  */
 export class InMemoryUsers implements IdentityUsersRepository {
@@ -24,21 +24,16 @@ export class InMemoryUsers implements IdentityUsersRepository {
     if (!this.hashKeys.has(userId)) this.hashKeys.set(userId, userHashKey);
   }
 
-  async tryFindEmail({ userId }: { userId: string }): Promise<string | null> {
-    return this.emails.get(userId) ?? null;
+  async getUserEmail({ userId }: { userId: string }): Promise<{ email: string | null }> {
+    return { email: this.emails.get(userId) ?? null };
   }
 
   /** The production comparison: case-insensitive equality against the column
    *  as stored, never a re-normalization of it. */
-  async tryFindUserIdByEmail({
-    normalizedValue,
-  }: {
-    normalizedValue: string;
-  }): Promise<string | null> {
-    for (const [userId, email] of this.emails) {
-      if (email.toLowerCase() === normalizedValue.toLowerCase()) return userId;
-    }
-    return null;
+  async findUserIdsByEmail({ normalizedValue }: { normalizedValue: string }): Promise<string[]> {
+    return [...this.emails]
+      .filter(([, email]) => email.toLowerCase() === normalizedValue.toLowerCase())
+      .map(([userId]) => userId);
   }
 
   /** The three facts a cutover link is decided on, over the same rows. */

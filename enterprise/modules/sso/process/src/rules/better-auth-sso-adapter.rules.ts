@@ -33,7 +33,7 @@ import { auth0, type genericOAuth, okta } from "better-auth/plugins/generic-oaut
  * accepts only a string, so the narrowing happens here rather than at each
  * provider, in the same shape `fallbackNameImplementation` uses.
  */
-function profilePicture(...candidates: readonly unknown[]): string | undefined {
+function pickProfilePicture(...candidates: readonly unknown[]): string | undefined {
   for (const candidate of candidates) {
     if (typeof candidate === "string" && candidate.trim() !== "") return candidate;
   }
@@ -290,7 +290,7 @@ const oidcProviderImplementation = {
       mapProfileToUser: (profile) => ({
         name: BetterAuthSsoAdapter.fallbackName(profile),
         email: profile.email ?? undefined,
-        image: profilePicture(profile.picture),
+        image: pickProfilePicture(profile.picture),
       }),
     };
   },
@@ -451,7 +451,7 @@ const genericOAuthImplementation = {
           } = {
             name: BetterAuthSsoAdapter.fallbackName(profile),
             email: profile.email ?? undefined,
-            image: profilePicture(profile.picture),
+            image: pickProfilePicture(profile.picture),
           };
           // SAML sign-ins count as verified: the email was asserted by the
           // organization's own IdP, but Auth0 reports `email_verified: false`
@@ -495,7 +495,7 @@ const genericOAuthImplementation = {
         mapProfileToUser: (profile) => ({
           name: BetterAuthSsoAdapter.fallbackName(profile),
           email: profile.email ?? undefined,
-          image: profilePicture(profile.image, profile.picture),
+          image: pickProfilePicture(profile.image, profile.picture),
         }),
       });
     }

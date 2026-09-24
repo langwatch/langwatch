@@ -217,6 +217,8 @@ function useAgentSync({ orgId, canManage }: { orgId: string; canManage: boolean 
     isAsking: mutation.isPending,
     hasAsked,
   });
+  const unavailableReason =
+    status.state === "unavailable" ? AGENT_SYNC_UNAVAILABLE_REASONS[status.because] : null;
 
   return {
     connected,
@@ -228,9 +230,7 @@ function useAgentSync({ orgId, canManage }: { orgId: string; canManage: boolean 
     reason:
       status.state === "asked"
         ? "Already asked. Reload the page to see what the providers reported."
-        : status.state !== "unavailable"
-          ? null
-          : AGENT_SYNC_UNAVAILABLE_REASONS[status.because],
+        : unavailableReason,
     press: () => {
       if (status.state !== "ready") return;
       mutation.mutate({ organizationId: orgId });

@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import {
   buildProviderOnboardingDefaultPlan,
   type ModelDefaultScope,
@@ -35,7 +36,10 @@ export class ModelProviderOnboardingDefaultsService {
 
     for (const scope of input.scopes) {
       const organizationId = await this.options.scopes.getOrganizationIdForScope(scope);
-      const existing = await this.options.defaults.tryFindByScope(scope);
+      const existing = await this.options.defaults.getByScope(scope).catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "model_default_not_found") return null;
+        throw error;
+      });
       if (!existing) {
         await this.options.defaults.save({
           id: this.options.ids.generate({ type: "default" }),

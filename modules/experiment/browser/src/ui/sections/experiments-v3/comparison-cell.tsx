@@ -1,6 +1,6 @@
 import { Box, HStack, Icon, IconButton, Popover, Text, VStack } from "@chakra-ui/react";
 import { Markdown } from "@langwatch/browser-host/markdown";
-import { parseEvaluationResult } from "@langwatch/evaluator-contract";
+import { parseEvaluationResult, type ParsedEvaluationResult } from "@langwatch/evaluator-contract";
 import { labelNamesVariant, resolveVerdictLabel } from "@langwatch/experiment-contract";
 import { CircleAlert, Equal, Play, Trophy } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
@@ -41,6 +41,10 @@ function stripBiasPreamble(details: string | undefined): string | undefined {
   return details.replace(/^Call \d+ \([^)]*\):\s*/i, "").trim();
 }
 
+function includesAny(text: string, needles: string[]): boolean {
+  return needles.some((needle) => text.includes(needle));
+}
+
 function friendlyError(details: string | undefined): {
   headline: string;
   hint?: string;
@@ -50,25 +54,17 @@ function friendlyError(details: string | undefined): {
   if (!raw) return { headline: "Comparison failed" };
 
   const lower = raw.toLowerCase();
-  if (
-    lower.includes("authenticationerror") ||
-    lower.includes("api key") ||
-    lower.includes("api_key")
-  ) {
+  if (includesAny(lower, ["authenticationerror", "api key", "api_key"])) {
     return { ...MISSING_MODEL_API_KEY_EXPLANATION, raw };
   }
-  if (lower.includes("rate limit") || lower.includes("ratelimit") || lower.includes("429")) {
+  if (includesAny(lower, ["rate limit", "ratelimit", "429"])) {
     return {
       headline: "Judge model rate-limited",
       hint: "Slow the run down (lower concurrency) or try a different model.",
       raw,
     };
   }
-  if (
-    lower.includes("model not found") ||
-    lower.includes("invalid model") ||
-    lower.includes("does not exist")
-  ) {
+  if (includesAny(lower, ["model not found", "invalid model", "does not exist"])) {
     return {
       headline: "Judge model not available",
       hint: "Pick a different model in the evaluator config.",
@@ -82,11 +78,7 @@ function friendlyError(details: string | undefined): {
       raw,
     };
   }
-  if (
-    lower.includes("waiting on") ||
-    lower.includes("no output for this row") ||
-    lower.includes("missingvariantoutput")
-  ) {
+  if (includesAny(lower, ["waiting on", "no output for this row", "missingvariantoutput"])) {
     const dashIdx = raw.indexOf("—");
     if (dashIdx > 0) {
       return {
@@ -105,6 +97,18 @@ function friendlyError(details: string | undefined): {
   }
   const lines = raw.split(/\r?\n/);
   return { headline: lines[0]!, raw: lines.length > 1 ? raw : undefined };
+}
+
+function explainComparisonError(parsed: ParsedEvaluationResult): {
+  headline: string;
+  hint?: string;
+  raw?: string;
+} {
+  const domainExplanation = parsed.domainError
+    ? explainEvaluatorDomainError(parsed.domainError)
+    : null;
+  if (!domainExplanation) return friendlyError(parsed.details);
+  return { ...domainExplanation, raw: parsed.details?.trim() };
 }
 
 /**
@@ -224,15 +228,7 @@ export function ComparisonCell({
   }
 
   if (parsed.status === "error") {
-    const domainExplanation = parsed.domainError
-      ? explainEvaluatorDomainError(parsed.domainError)
-      : null;
-    const { headline, hint, raw } = domainExplanation
-      ? {
-          ...domainExplanation,
-          raw: parsed.details?.trim(),
-        }
-      : friendlyError(parsed.details);
+    const { headline, hint, raw } = explainComparisonError(parsed);
     return withRunAction(
       <Box p={2} bg="red.subtle" color="red.fg" borderRadius="md" fontSize="13px">
         <HStack gap={1.5} align="start">

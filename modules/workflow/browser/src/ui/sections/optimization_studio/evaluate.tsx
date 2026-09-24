@@ -95,6 +95,26 @@ type DatasetSplitOption = {
   datasetEntry?: number;
 };
 
+function evaluateDisabledReason({
+  hasProvidersWithoutCustomKeys,
+  isDatasetLoading,
+  estimatedTotal,
+  needsACommitMessage,
+}: {
+  hasProvidersWithoutCustomKeys: boolean;
+  isDatasetLoading: boolean;
+  estimatedTotal: number | undefined;
+  needsACommitMessage: boolean;
+}): string | false {
+  if (hasProvidersWithoutCustomKeys) return "Set up your API keys to run evaluations";
+  if (isDatasetLoading) return false;
+  if (!estimatedTotal || estimatedTotal < 1) {
+    return "You need at least 1 dataset entry to run evaluations";
+  }
+  if (needsACommitMessage) return "You need to provide a version description";
+  return false;
+}
+
 export function EvaluateModalContent({
   form,
   onClose,
@@ -336,15 +356,12 @@ export function EvaluateModalContent({
 
   const isDatasetLoading = total === undefined && datasetQuery.isFetching;
 
-  const isDisabled = hasProvidersWithoutCustomKeys
-    ? "Set up your API keys to run evaluations"
-    : isDatasetLoading
-      ? false
-      : !estimatedTotal || estimatedTotal < 1
-        ? "You need at least 1 dataset entry to run evaluations"
-        : needsACommitMessage
-          ? "You need to provide a version description"
-          : false;
+  const isDisabled = evaluateDisabledReason({
+    hasProvidersWithoutCustomKeys,
+    isDatasetLoading,
+    estimatedTotal,
+    needsACommitMessage,
+  });
 
   return (
     <FormProvider {...form}>

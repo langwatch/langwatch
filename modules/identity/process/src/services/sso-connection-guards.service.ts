@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import {
   ACTIVATE_CONNECTION_COMMAND_TYPE,
   type ActivateConnectionCommandData,
@@ -104,9 +105,12 @@ export class SsoConnectionGuardsService {
   }
 
   async registerConnection(data: RegisterConnectionCommandData): Promise<SsoConnectionFactInput[]> {
-    const existing = await this.checks.tryFindConnection({
-      connectionId: data.connectionId,
-    });
+    const existing = await this.checks
+      .getConnection({ connectionId: data.connectionId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "sso_connection_not_found") return null;
+        throw error;
+      });
     // A retry of the same self-served registration states nothing; an id held
     // by anything else is refused rather than moved.
     if (existing) {
@@ -174,9 +178,12 @@ export class SsoConnectionGuardsService {
         `connection ${data.connectionId}: legacy import requires the system migration actor`,
       );
     }
-    const existing = await this.checks.tryFindConnection({
-      connectionId: data.connectionId,
-    });
+    const existing = await this.checks
+      .getConnection({ connectionId: data.connectionId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "sso_connection_not_found") return null;
+        throw error;
+      });
     if (existing) {
       return [];
     }
@@ -844,9 +851,12 @@ export class SsoConnectionGuardsService {
   async registerReplacementConnection(
     data: RegisterReplacementConnectionCommandData,
   ): Promise<SsoConnectionFactInput[]> {
-    const existing = await this.checks.tryFindConnection({
-      connectionId: data.connectionId,
-    });
+    const existing = await this.checks
+      .getConnection({ connectionId: data.connectionId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "sso_connection_not_found") return null;
+        throw error;
+      });
     if (existing) {
       // A retry of the same registration states nothing; an id held by
       // anything else is refused rather than moved.
@@ -862,9 +872,12 @@ export class SsoConnectionGuardsService {
       );
     }
 
-    const predecessor = await this.checks.tryFindConnection({
-      connectionId: data.replacesConnectionId,
-    });
+    const predecessor = await this.checks
+      .getConnection({ connectionId: data.replacesConnectionId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "sso_connection_not_found") return null;
+        throw error;
+      });
     if (
       predecessor?.organizationId !== data.organizationId ||
       predecessor.source !== "legacy-grandfathered" ||

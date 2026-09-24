@@ -7,6 +7,8 @@ function traceWithIO(): Trace {
   return {
     trace_id: "trace-1",
     project_id: "project-1",
+    metadata: {},
+    spans: [],
     input: { value: "the secret question" },
     output: { value: "the answer" },
     metrics: {
@@ -18,7 +20,7 @@ function traceWithIO(): Trace {
       tokens_estimated: false,
     },
     timestamps: { started_at: 1, inserted_at: 2, updated_at: 3 },
-  } as unknown as Trace;
+  };
 }
 
 /**
@@ -41,7 +43,7 @@ function traceWithDroppedSpan(markerValue: string): Trace {
         params: { langwatch: { privacy: { dropped: markerValue } } },
       },
     ],
-  } as unknown as Trace;
+  };
 }
 
 const visibleToAll = {

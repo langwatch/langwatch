@@ -1,4 +1,5 @@
 import type { LegacySsoAccessQuery } from "@langwatch/auth-contract";
+import { HandledError } from "@langwatch/handled-error";
 import {
   SsoMigrationFinalizationBlockedError,
   type SsoConnectionState,
@@ -192,7 +193,12 @@ export class SsoLegacyIdentityRetirementService {
     organizationId: string;
     connectionId: string;
   }): Promise<SsoConnectionState> {
-    const connection = await this.deps.connections.tryFindConnection({ connectionId });
+    const connection = await this.deps.connections
+      .getConnection({ connectionId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "sso_connection_not_found") return null;
+        throw error;
+      });
     if (!connection || connection.organizationId !== organizationId) {
       throw blocked(
         "legacy-pair-incomplete",

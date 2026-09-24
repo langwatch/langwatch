@@ -11,7 +11,7 @@ import type {
   LlmPromptConfigComponent,
   SignatureComponentConfig,
 } from "@langwatch/workflow-contract";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   buildCellWorkflow,
@@ -416,23 +416,23 @@ describe("buildHttpNodeFromAgent", () => {
     },
   });
 
+  let agent: ReturnType<typeof createHttpAgent>;
+  let targetConfig: ReturnType<typeof createTargetConfig>;
+  let cell: ReturnType<typeof createCell>;
+  let node: ReturnType<typeof buildHttpNodeFromAgent>;
+
+  beforeEach(() => {
+    agent = createHttpAgent();
+    targetConfig = createTargetConfig();
+    cell = createCell();
+    node = buildHttpNodeFromAgent({ nodeId: "target-1", agent, targetConfig, cell });
+  });
+
   it("creates HTTP node with correct type", () => {
-    const agent = createHttpAgent();
-    const targetConfig = createTargetConfig();
-    const cell = createCell();
-
-    const node = buildHttpNodeFromAgent({ nodeId: "target-1", agent, targetConfig, cell });
-
     expect(node.type).toBe("http");
   });
 
   it("extracts variables from body template as inputs", () => {
-    const agent = createHttpAgent();
-    const targetConfig = createTargetConfig();
-    const cell = createCell();
-
-    const node = buildHttpNodeFromAgent({ nodeId: "target-1", agent, targetConfig, cell });
-
     // Should extract {{input}} and {{threadId}} from body template
     const inputIdentifiers = node.data.inputs?.map((i) => i.identifier);
     expect(inputIdentifiers).toContain("input");
@@ -440,12 +440,6 @@ describe("buildHttpNodeFromAgent", () => {
   });
 
   it("applies value mappings to inputs", () => {
-    const agent = createHttpAgent();
-    const targetConfig = createTargetConfig();
-    const cell = createCell();
-
-    const node = buildHttpNodeFromAgent({ nodeId: "target-1", agent, targetConfig, cell });
-
     // threadId has a value mapping, should have that value
     const threadIdInput = node.data.inputs?.find((i) => i.identifier === "threadId");
     expect(threadIdInput?.value).toBe("test-thread-123");
@@ -456,12 +450,6 @@ describe("buildHttpNodeFromAgent", () => {
   });
 
   it("includes HTTP config in parameters array", () => {
-    const agent = createHttpAgent();
-    const targetConfig = createTargetConfig();
-    const cell = createCell();
-
-    const node = buildHttpNodeFromAgent({ nodeId: "target-1", agent, targetConfig, cell });
-
     // HTTP config is stored in parameters (consistent with other node types)
     const params = node.data.parameters ?? [];
     const getParam = (id: string) => params.find((p) => p.identifier === id)?.value;
@@ -475,12 +463,6 @@ describe("buildHttpNodeFromAgent", () => {
   });
 
   it("has single output named 'output'", () => {
-    const agent = createHttpAgent();
-    const targetConfig = createTargetConfig();
-    const cell = createCell();
-
-    const node = buildHttpNodeFromAgent({ nodeId: "target-1", agent, targetConfig, cell });
-
     expect(node.data.outputs).toHaveLength(1);
     expect(node.data.outputs?.[0]?.identifier).toBe("output");
     expect(node.data.outputs?.[0]?.type).toBe("str");

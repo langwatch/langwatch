@@ -15,7 +15,7 @@ export function skipListToInput(patterns: readonly string[] | null | undefined):
 }
 
 /** The first entry that does not compile, with its one-based line number. */
-export function firstInvalidSkipPattern(
+export function detectInvalidSkipPattern(
   patterns: readonly string[],
 ): { line: number; pattern: string } | null {
   for (const [index, pattern] of patterns.entries()) {

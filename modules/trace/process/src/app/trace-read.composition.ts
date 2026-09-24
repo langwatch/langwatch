@@ -26,6 +26,7 @@ import {
   type TraceQueryFieldValuesInput,
   type TraceQueryFieldValuesResult,
 } from "../repositories/query-field-values.repository.ts";
+import type { TraceSpanDedupRepository } from "../repositories/trace-span-dedup.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import { type TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
 import { TraceEditOverlayService } from "../services/trace-edit-overlay.service.ts";
@@ -35,7 +36,6 @@ import {
   TraceIngestionService,
   TraceIngressCommand,
   type CodingAgentIngestFilter,
-  type TraceSpanDedup,
 } from "../services/trace-ingestion.service.ts";
 import { TraceIOExtractionService } from "../services/trace-io-extraction.service.ts";
 import { TraceLegacyCredentialService } from "../services/trace-legacy-credential.service.ts";
@@ -85,7 +85,7 @@ export type TraceReaderCompositionOptions = {
    * every process that composes Trace's REST surface, and a claim that is
    * absent rather than null would be an ingest path deciding silently.
    */
-  dedup: TraceSpanDedup;
+  dedup: TraceSpanDedupRepository;
   /**
    * The ceiling the INGESTION doors ask about, where it is not the viewer
    * protections' own. Narrow because one question is all they ask: whether this

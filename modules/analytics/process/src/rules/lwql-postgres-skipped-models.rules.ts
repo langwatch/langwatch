@@ -146,7 +146,7 @@ export const LWQL_POSTGRES_SKIPPED_MODELS: PostgresSkipMap = {
  * The reason a model is off the derived catalog, or `undefined` if it should be
  * catalogued.
  */
-export function postgresSkipReason(
+export function derivePostgresSkipReason(
   model: string,
   skip: PostgresSkipMap = LWQL_POSTGRES_SKIPPED_MODELS,
 ): string | undefined {

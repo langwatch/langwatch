@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import {
   codexTokenKeysSchema,
   modelProviderCodexGatewayRefreshInputSchema,
@@ -50,9 +51,12 @@ export class ModelProviderCodexService {
     providerRowId: string;
   }): Promise<ModelProviderCodexGatewayRefresh> {
     const parsed = modelProviderCodexGatewayRefreshInputSchema.parse(input);
-    const provider = await this.options.repository.tryFindById({
-      id: parsed.providerRowId,
-    });
+    const provider = await this.options.repository
+      .getById({ id: parsed.providerRowId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "model_provider_not_found") return null;
+        throw error;
+      });
     if (provider?.provider !== "openai_codex") {
       return modelProviderCodexGatewayRefreshSchema.parse({ status: "not_connected" });
     }

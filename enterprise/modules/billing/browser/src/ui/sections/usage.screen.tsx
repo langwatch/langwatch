@@ -98,6 +98,19 @@ function ResourceLimitsCard({
   );
 }
 
+function messagesLabelFor({
+  usageUnit,
+  pricingModel,
+}: {
+  usageUnit: string | undefined;
+  pricingModel: string | null | undefined;
+}): string {
+  if (usageUnit === "traces") return RESOURCE_LABELS.tracesPerMonth;
+  if (usageUnit === "events") return RESOURCE_LABELS.eventsPerMonth;
+  if (pricingModel === PricingModel.TIERED) return RESOURCE_LABELS.tracesPerMonth;
+  return RESOURCE_LABELS.eventsPerMonth;
+}
+
 export default function UsageScreen() {
   const host = useBillingHost();
   const organization = host.organization();
@@ -120,14 +133,10 @@ export default function UsageScreen() {
     { organizationId },
     { ...queryOpts, enabled: !!organization && isSaaS === false },
   );
-  const messagesLabel =
-    usage.data?.usageUnit === "traces"
-      ? RESOURCE_LABELS.tracesPerMonth
-      : usage.data?.usageUnit === "events"
-        ? RESOURCE_LABELS.eventsPerMonth
-        : organization?.pricingModel === PricingModel.TIERED
-          ? RESOURCE_LABELS.tracesPerMonth
-          : RESOURCE_LABELS.eventsPerMonth;
+  const messagesLabel = messagesLabelFor({
+    usageUnit: usage.data?.usageUnit,
+    pricingModel: organization?.pricingModel,
+  });
   const showLiteMembers =
     organization?.pricingModel === PricingModel.SEAT_EVENT || isSaaS === false;
 

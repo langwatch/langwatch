@@ -103,12 +103,12 @@ describe.each(backends)("given the $name installation-token cache", (backend) =>
     it("refuses a second holder until the first releases it", async () => {
       const key = { installationId: INSTALLATION, scopeKey: SCOPE };
       const first = await cache.acquireMintLock(key);
-      expect(first).not.toBeNull();
+      if (!first.acquired) throw new Error("the first holder did not get the mint lock");
 
-      await expect(cache.acquireMintLock(key)).resolves.toBeNull();
+      await expect(cache.acquireMintLock(key)).resolves.toEqual({ acquired: false });
 
-      await cache.releaseMintLock({ ...key, token: first ?? "" });
-      await expect(cache.acquireMintLock(key)).resolves.not.toBeNull();
+      await cache.releaseMintLock({ ...key, token: first.token });
+      await expect(cache.acquireMintLock(key)).resolves.toMatchObject({ acquired: true });
     });
 
     it("leaves another scope's lock free", async () => {
@@ -116,19 +116,21 @@ describe.each(backends)("given the $name installation-token cache", (backend) =>
 
       await expect(
         cache.acquireMintLock({ installationId: INSTALLATION, scopeKey: OTHER_SCOPE }),
-      ).resolves.not.toBeNull();
+      ).resolves.toMatchObject({ acquired: true });
     });
   });
 
   describe("when the liveness lock is held", () => {
     it("refuses a second holder until the first releases it", async () => {
       const first = await cache.acquireLivenessLock(INSTALLATION);
-      expect(first).not.toBeNull();
+      if (!first.acquired) throw new Error("the first holder did not get the liveness lock");
 
-      await expect(cache.acquireLivenessLock(INSTALLATION)).resolves.toBeNull();
+      await expect(cache.acquireLivenessLock(INSTALLATION)).resolves.toEqual({ acquired: false });
 
-      await cache.releaseLivenessLock({ installationId: INSTALLATION, token: first ?? "" });
-      await expect(cache.acquireLivenessLock(INSTALLATION)).resolves.not.toBeNull();
+      await cache.releaseLivenessLock({ installationId: INSTALLATION, token: first.token });
+      await expect(cache.acquireLivenessLock(INSTALLATION)).resolves.toMatchObject({
+        acquired: true,
+      });
     });
 
     it("keeps a holder that does not own the lock from releasing it", async () => {
@@ -136,7 +138,7 @@ describe.each(backends)("given the $name installation-token cache", (backend) =>
 
       await cache.releaseLivenessLock({ installationId: INSTALLATION, token: "someone-else" });
 
-      await expect(cache.acquireLivenessLock(INSTALLATION)).resolves.toBeNull();
+      await expect(cache.acquireLivenessLock(INSTALLATION)).resolves.toEqual({ acquired: false });
     });
   });
 });

@@ -1,3 +1,5 @@
+import { CliSessionRecordNotFoundError } from "@langwatch/auth-contract";
+
 import type { CliDeviceSessionRepository } from "../cli-device-session.repository.ts";
 
 /** In-process twin of Auth's Redis-backed CLI device-session cache. */
@@ -17,10 +19,12 @@ export class MemoryCliDeviceSessionRepository implements CliDeviceSessionReposit
     return new MemoryCliDeviceSessionRepository(options.now ?? Date.now);
   }
 
-  async tryGet(key: string): Promise<string | null> {
+  async get(key: string): Promise<string> {
     this.#expireValue(key);
+    const value = this.values.get(key);
+    if (value === undefined) throw new CliSessionRecordNotFoundError();
 
-    return this.values.get(key) ?? null;
+    return value;
   }
 
   async set(input: { key: string; value: string; ttlSeconds: number }): Promise<void> {

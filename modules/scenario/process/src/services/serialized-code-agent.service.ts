@@ -9,7 +9,7 @@ import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
 import type { CodeAgentData, RunParameterValues } from "@langwatch/scenario-contract";
-import { resolveFieldMappings, sourceFieldOf } from "@langwatch/scenario-contract";
+import { resolveFieldMappings, extractSourceField } from "@langwatch/scenario-contract";
 import { LATEST_SPEC_VERSION } from "@langwatch/workflow-contract";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
@@ -728,7 +728,7 @@ export class SerializedCodeAgentAdapter extends SerializedAgent {
     const record: Record<string, unknown> = {};
     for (const inp of declaredInputs) {
       const mapping = mappings[inp.identifier];
-      const isSession = mapping !== undefined && sourceFieldOf(mapping) === "session";
+      const isSession = mapping !== undefined && extractSourceField(mapping) === "session";
       record[inp.identifier] = isSession ? (session ?? null) : (resolved[inp.identifier] ?? "");
     }
     return record;

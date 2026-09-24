@@ -66,6 +66,45 @@ function cacheKey(panelKey: string, groupBy: string): string {
   return `${panelKey}::${groupBy}`;
 }
 
+function applyAutoExpansion({
+  key,
+  currentIds,
+  setExpandedIds,
+}: {
+  key: string;
+  currentIds: string[];
+  setExpandedIds: (ids: Set<string>) => void;
+}): void {
+  const cached = panelStateCache.get(key);
+
+  if (!cached) {
+    // First load — expand only the newest row, mark everything as seen
+    const newestId = currentIds[0];
+    const state: PanelState = {
+      expanded: new Set(newestId ? [newestId] : []),
+      seen: new Set(currentIds),
+    };
+    panelStateCache.set(key, state);
+    setExpandedIds(state.expanded);
+    persistToStorage();
+  } else {
+    // Subsequent updates — items arrive newest-first, so unseen ids in
+    // front of the first already-seen id are genuinely new arrivals and
+    // auto-expand. Unseen ids behind a seen one were paginated in (Load
+    // More / widened period): mark them seen without expanding, otherwise
+    // every Load More would mount the whole loaded page at once.
+    const unseenIds = currentIds.filter((id) => !cached.seen.has(id));
+    if (unseenIds.length === 0) return;
+    const firstSeenIndex = currentIds.findIndex((id) => cached.seen.has(id));
+    const newArrivals =
+      firstSeenIndex === -1 ? currentIds.slice(0, 1) : currentIds.slice(0, firstSeenIndex);
+    for (const id of unseenIds) cached.seen.add(id);
+    for (const id of newArrivals) cached.expanded.add(id);
+    setExpandedIds(new Set(cached.expanded));
+    persistToStorage();
+  }
+}
+
 export function useAutoExpansion({
   panelKey,
   groupBy,
@@ -100,34 +139,7 @@ export function useAutoExpansion({
       "batchRunId" in item ? item.batchRunId : (item as { groupKey: string }).groupKey,
     );
 
-    const cached = panelStateCache.get(key);
-
-    if (!cached) {
-      // First load — expand only the newest row, mark everything as seen
-      const newestId = currentIds[0];
-      const state: PanelState = {
-        expanded: new Set(newestId ? [newestId] : []),
-        seen: new Set(currentIds),
-      };
-      panelStateCache.set(key, state);
-      setExpandedIds(state.expanded);
-      persistToStorage();
-    } else {
-      // Subsequent updates — items arrive newest-first, so unseen ids in
-      // front of the first already-seen id are genuinely new arrivals and
-      // auto-expand. Unseen ids behind a seen one were paginated in (Load
-      // More / widened period): mark them seen without expanding, otherwise
-      // every Load More would mount the whole loaded page at once.
-      const unseenIds = currentIds.filter((id) => !cached.seen.has(id));
-      if (unseenIds.length === 0) return;
-      const firstSeenIndex = currentIds.findIndex((id) => cached.seen.has(id));
-      const newArrivals =
-        firstSeenIndex === -1 ? currentIds.slice(0, 1) : currentIds.slice(0, firstSeenIndex);
-      for (const id of unseenIds) cached.seen.add(id);
-      for (const id of newArrivals) cached.expanded.add(id);
-      setExpandedIds(new Set(cached.expanded));
-      persistToStorage();
-    }
+    applyAutoExpansion({ key, currentIds, setExpandedIds });
   }, [groupBy, batchRuns, groups, key]);
 
   // Sync cache on toggle

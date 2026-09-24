@@ -3,7 +3,7 @@ import { type BucketEntry, extendExtrema, resetOrGap } from "./rollup-row.ts";
 import {
   bigint,
   type MetricRollupSourcePoint,
-  previousPoint,
+  pickPreviousPoint,
   startsNewSequence,
 } from "./sequence.ts";
 
@@ -47,7 +47,7 @@ function coarsenExplicit({
  * the sequence reset/gapped. Bounds selection and differencing share this
  * predicate so they can never disagree about which points contribute.
  */
-function usablePredecessor({
+function pickUsablePredecessor({
   point,
   all,
   index,
@@ -57,7 +57,7 @@ function usablePredecessor({
   index: number;
 }): MetricRollupSourcePoint | undefined {
   if (point.aggregationTemporality !== "cumulative") return undefined;
-  const previous = previousPoint(all, index);
+  const previous = pickPreviousPoint(all, index);
   if (previous?.metricKind !== "histogram") return undefined;
   return startsNewSequence(previous, point) ? undefined : previous;
 }
@@ -72,14 +72,14 @@ function usablePredecessors({
 }): MetricRollupSourcePoint[] {
   const predecessors: MetricRollupSourcePoint[] = [];
   for (const { point, index } of entries) {
-    const previous = usablePredecessor({ point, all, index });
+    const previous = pickUsablePredecessor({ point, all, index });
     if (previous) predecessors.push(previous);
   }
   return predecessors;
 }
 
 /** Delta vs the coarsened predecessor, or null when the sequence reset/gapped. */
-function differenceHistogramPoint({
+function computeHistogramPointDifference({
   point,
   index,
   all,
@@ -90,7 +90,7 @@ function differenceHistogramPoint({
   all: MetricRollupSourcePoint[];
   bounds: number[];
 }): { counts: bigint[]; count: bigint; sum: number | null } | null {
-  const previous = usablePredecessor({ point, all, index });
+  const previous = pickUsablePredecessor({ point, all, index });
   if (!previous) return null;
   const previousCounts = coarsenExplicit({
     point: previous,
@@ -136,11 +136,11 @@ function buildHistogramRow({
     let sum = point.sum;
 
     if (point.aggregationTemporality === "cumulative") {
-      const delta = differenceHistogramPoint({ point, index, all, bounds });
+      const delta = computeHistogramPointDifference({ point, index, all, bounds });
       if (!delta) {
         resetOrGap({
           row,
-          previous: previousPoint(all, index),
+          previous: pickPreviousPoint(all, index),
           current: point,
         });
         usesWholePoint = true;

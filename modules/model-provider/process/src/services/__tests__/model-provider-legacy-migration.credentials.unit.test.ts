@@ -17,7 +17,7 @@ class RecordingCipher extends ModelProviderCredentialCipher {
 
 const cipher = new RecordingCipher();
 
-describe("ModelProviderLegacyMigrationService.tryMigrateModelProviderKeysRow", () => {
+describe("ModelProviderLegacyMigrationService.encodeModelProviderKeysRow", () => {
   describe("given a row with plaintext object customKeys", () => {
     describe("when migrating", () => {
       it("returns the encrypted string", () => {
@@ -27,7 +27,7 @@ describe("ModelProviderLegacyMigrationService.tryMigrateModelProviderKeysRow", (
           customKeys: { apiKey: "sk-123", orgId: "org-456" },
         };
 
-        const result = migrations.tryMigrateModelProviderKeysRow({ row, cipher });
+        const result = migrations.encodeModelProviderKeysRow({ row, cipher });
 
         expect(result).toBe(`encrypted:${JSON.stringify({ apiKey: "sk-123", orgId: "org-456" })}`);
       });
@@ -43,7 +43,7 @@ describe("ModelProviderLegacyMigrationService.tryMigrateModelProviderKeysRow", (
           customKeys: "abc123:def456:ghi789",
         };
 
-        const result = migrations.tryMigrateModelProviderKeysRow({ row, cipher });
+        const result = migrations.encodeModelProviderKeysRow({ row, cipher });
 
         expect(result).toBeNull();
       });
@@ -59,7 +59,7 @@ describe("ModelProviderLegacyMigrationService.tryMigrateModelProviderKeysRow", (
           customKeys: null,
         };
 
-        const result = migrations.tryMigrateModelProviderKeysRow({ row, cipher });
+        const result = migrations.encodeModelProviderKeysRow({ row, cipher });
 
         expect(result).toBeNull();
       });
@@ -75,7 +75,7 @@ describe("ModelProviderLegacyMigrationService.tryMigrateModelProviderKeysRow", (
           customKeys: undefined,
         };
 
-        const result = migrations.tryMigrateModelProviderKeysRow({ row, cipher });
+        const result = migrations.encodeModelProviderKeysRow({ row, cipher });
 
         expect(result).toBeNull();
       });

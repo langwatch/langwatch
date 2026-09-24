@@ -1,4 +1,5 @@
 import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { fromDate, type Instant } from "@langwatch/time";
 
 import type { ModelCostProject } from "../app/model-provider.members.ts";
@@ -24,12 +25,6 @@ export class ModelProviderProjectScopeService {
     return projectScopes(project.id, project.teamId, project.team.organizationId);
   }
 
-  async tryGetProjectScopes(projectId: string): Promise<ModelDefaultScope[] | null> {
-    const project = await this.projects.findWithTeam(projectId);
-
-    return project ? projectScopes(project.id, project.teamId, project.team.organizationId) : null;
-  }
-
   async getProjectSystemContext(projectId: string): Promise<ModelProviderProjectSystemContext> {
     const project = await this.projects.getWithTeam(projectId);
 
@@ -39,21 +34,21 @@ export class ModelProviderProjectScopeService {
     };
   }
 
-  async tryResolveAnchor(input: {
+  async getAnchorOrganizationId(input: {
     projectId?: string;
     organizationId?: string;
-  }): Promise<string | null> {
+  }): Promise<string> {
     if (input.organizationId) {
       return input.organizationId;
     }
 
     if (!input.projectId) {
-      return null;
+      throw new ProjectNotFoundError();
     }
 
-    const project = await this.projects.findWithTeam(input.projectId);
+    const project = await this.projects.getWithTeam(input.projectId);
 
-    return project?.team.organizationId ?? null;
+    return project.team.organizationId;
   }
 }
 

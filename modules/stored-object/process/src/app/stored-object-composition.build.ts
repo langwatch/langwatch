@@ -8,6 +8,7 @@ import type { Encryption, ObjectStorage } from "@langwatch/process-stores/member
 import {
   StoredObjectOwnerResolver,
   StoredObjectCapabilityUnavailableError,
+  StoredObjectNotFoundError,
   type StoredObjectDeliveryCapability,
   mintStoredObjectUri,
 } from "@langwatch/stored-object-contract";
@@ -122,12 +123,12 @@ class StoredObjectOwnerAbsence extends StoredObjectOwnerResolver {
     super();
   }
 
-  async tryResolve(input: { id: string }): Promise<{ projectId: string } | null> {
+  async getOwner(input: { id: string }): Promise<{ projectId: string }> {
     this.logger.warn(
       { storedObjectId: input.id },
       "API process composed no stored-object owner directory: an id-only stored-object reference cannot be resolved to a project here.",
     );
-    return null;
+    throw new StoredObjectNotFoundError();
   }
 }
 

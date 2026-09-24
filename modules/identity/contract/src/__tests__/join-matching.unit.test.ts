@@ -6,7 +6,7 @@ import {
   type JoinCandidateOrganization,
   type JoinLookupDecision,
   type JoinOffer,
-  joinDomainOf,
+  extractJoinDomain,
   organizationAdmitsDomain,
   organizationAdmitsDomainAutomatically,
   PUBLIC_EMAIL_DOMAINS,
@@ -121,8 +121,8 @@ describe("given a verified work address", () => {
       // A subdomain is a DIFFERENT domain, and that is settled before any
       // organization is consulted: the candidate list is built for whatever
       // this answers, so `mail.acme.com` never reads the `acme.com` list.
-      expect(joinDomainOf("  SAM+news@Acme.COM ")).toBe("acme.com");
-      expect(joinDomainOf("sam@mail.acme.com")).toBe("mail.acme.com");
+      expect(extractJoinDomain("  SAM+news@Acme.COM ")).toBe("acme.com");
+      expect(extractJoinDomain("sam@mail.acme.com")).toBe("mail.acme.com");
 
       // And with the list the repository would actually return for that
       // domain — nobody holds a verified `mail.acme.com` address — nothing is
@@ -366,9 +366,9 @@ describe("given an organization that admits its domain automatically", () => {
 describe("given the pure helpers the rules are built from", () => {
   describe("when a domain is read off an address", () => {
     it("folds the address the way attach does", () => {
-      expect(joinDomainOf("  SAM+news@Acme.COM ")).toBe("acme.com");
-      expect(joinDomainOf("not-an-address")).toBeNull();
-      expect(joinDomainOf("@acme.com")).toBeNull();
+      expect(extractJoinDomain("  SAM+news@Acme.COM ")).toBe("acme.com");
+      expect(extractJoinDomain("not-an-address")).toBeNull();
+      expect(extractJoinDomain("@acme.com")).toBeNull();
     });
   });
 

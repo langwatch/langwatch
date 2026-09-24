@@ -16,7 +16,11 @@ import {
 } from "@chakra-ui/react";
 import { Select } from "@langwatch/design-system/select";
 import { Currency as PrismaCurrency } from "@langwatch/enterprise-billing-contract";
-import { CONTACT_SALES_URL, type MemberType } from "@langwatch/enterprise-licensing-contract";
+import {
+  CONTACT_SALES_URL,
+  type MemberType,
+  type PlanInfo,
+} from "@langwatch/enterprise-licensing-contract";
 import { planSeatsAndVolume } from "@langwatch/plans";
 import { nowInstant } from "@langwatch/time";
 import { ArrowRight, Check } from "lucide-react";
@@ -61,6 +65,50 @@ const currencyOptions = [
   { label: "$ USD", value: PrismaCurrency.USD },
 ];
 const currencyCollection = createListCollection({ items: currencyOptions });
+
+function currentPlanNameFor({
+  plan,
+  isLicenseOverride,
+  isTieredPricingModel,
+  isDeveloperPlan,
+}: {
+  plan: PlanInfo;
+  isLicenseOverride: boolean;
+  isTieredPricingModel: boolean;
+  isDeveloperPlan: boolean;
+}): string {
+  if (isLicenseOverride) return `License: ${plan.name ?? formatPlanTypeLabel(plan.type)}`;
+  if (isTieredPricingModel) return plan.name ?? formatPlanTypeLabel(plan.type);
+  if (isDeveloperPlan) return "Free plan";
+  return "Growth plan";
+}
+
+function currentPlanFeaturesFor({
+  plan,
+  currency,
+  isEnterprisePlan,
+  isHeldCapabilityPlan,
+  isDeveloperPlan,
+}: {
+  plan: PlanInfo;
+  currency: Currency;
+  isEnterprisePlan: boolean;
+  isHeldCapabilityPlan: boolean;
+  isDeveloperPlan: boolean;
+}): string[] {
+  if (isEnterprisePlan) return buildEnterprisePlanFeatures(plan);
+  if (isHeldCapabilityPlan) {
+    return buildPlanCapabilities(
+      planSeatsAndVolume({
+        members: plan.maxMembers ?? 0,
+        membersLite: plan.maxMembersLite ?? 0,
+        messagesPerMonth: plan.maxMessagesPerMonth ?? 0,
+      }),
+    );
+  }
+  if (isDeveloperPlan) return DEVELOPER_FEATURES;
+  return getGrowthFeatures(currency);
+}
 
 /**
  * Main subscription page component
@@ -299,13 +347,12 @@ export function SubscriptionPage() {
     );
   }
 
-  const currentPlanName = isLicenseOverride
-    ? `License: ${plan.name ?? formatPlanTypeLabel(plan.type)}`
-    : isTieredPricingModel
-      ? (plan.name ?? formatPlanTypeLabel(plan.type))
-      : isDeveloperPlan
-        ? "Free plan"
-        : "Growth plan";
+  const currentPlanName = currentPlanNameFor({
+    plan,
+    isLicenseOverride,
+    isTieredPricingModel,
+    isDeveloperPlan,
+  });
   const currentPlanPricing =
     isTieredPricingModel || isDeveloperPlan || isLicenseOverride
       ? undefined
@@ -318,19 +365,13 @@ export function SubscriptionPage() {
   // enterprise list minus anything their contract withheld, and every other
   // held plan read from its own numbers rather than handed another tier's
   // marketing copy. Only a plan we are selling gets the tier's full pitch.
-  const currentPlanFeatures = isEnterprisePlan
-    ? buildEnterprisePlanFeatures(plan)
-    : isLicenseOverride || isTieredLegacyPaidPlan
-      ? buildPlanCapabilities(
-          planSeatsAndVolume({
-            members: plan?.maxMembers ?? 0,
-            membersLite: plan?.maxMembersLite ?? 0,
-            messagesPerMonth: plan?.maxMessagesPerMonth ?? 0,
-          }),
-        )
-      : isDeveloperPlan
-        ? DEVELOPER_FEATURES
-        : getGrowthFeatures(effectiveCurrency);
+  const currentPlanFeatures = currentPlanFeaturesFor({
+    plan,
+    currency: effectiveCurrency,
+    isEnterprisePlan,
+    isHeldCapabilityPlan: isLicenseOverride || isTieredLegacyPaidPlan,
+    isDeveloperPlan,
+  });
 
   const isUpgradeSeatsRequired =
     !isDeveloperPlan &&

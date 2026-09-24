@@ -8,7 +8,6 @@ import {
   type OrganizationUserRole,
   type TeamUserRole,
   CannotDisableSelfError,
-  MemberNotFoundError,
   MemberSeatLimitReachedError,
   PersonalWorkspaceNotManagedHereError,
 } from "@langwatch/organization-contract";
@@ -29,11 +28,11 @@ import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 import { EffectiveTeamRoleUpdatesService } from "./compute-effective-team-role-updates.service.ts";
 
 /**
- * The union of permissions granted by the custom roles behind these team bindings, or
- * undefined when none apply. Feeds seat classification, which treats a member whose custom
+ * The union of permissions granted by the custom roles behind these team bindings, empty
+ * when none apply. Feeds seat classification, which treats a member whose custom
  * roles grant only view permissions as a Lite Member.
  */
-async function collectCustomRolePermissions({
+async function findCustomRolePermissionGrants({
   repository,
   organizationId,
   currentTeamBindings,
@@ -41,12 +40,12 @@ async function collectCustomRolePermissions({
   repository: OrganizationMembershipRepository;
   organizationId: string;
   currentTeamBindings: { customRoleId: string | null }[];
-}): Promise<string[] | undefined> {
+}): Promise<string[]> {
   const customRoleIds = currentTeamBindings
     .map((binding) => binding.customRoleId)
     .filter((id): id is string => !!id);
   if (customRoleIds.length === 0) {
-    return undefined;
+    return [];
   }
 
   const permissionsPerRole = await repository.findCustomRolePermissions({
@@ -64,7 +63,7 @@ async function collectCustomRolePermissions({
     }
   }
 
-  return allPermissions.length > 0 ? allPermissions : undefined;
+  return allPermissions;
 }
 
 type OrganizationMemberRoleDependencies = {
@@ -99,13 +98,7 @@ export class OrganizationMemberRoleService {
       throw new CannotDisableSelfError();
     }
 
-    const membership = await this.repo.tryFindMembership({
-      organizationId,
-      userId,
-    });
-    if (!membership) {
-      throw new MemberNotFoundError(userId);
-    }
+    await this.repo.getMembership({ organizationId, userId });
 
     if (!disabled) {
       const result = await this.dependencies.seats.checkLimit({
@@ -169,18 +162,12 @@ export class OrganizationMemberRoleService {
   }): Promise<UpdateMemberRoleResult> {
     const { organizationId, userId, role, teamRoleUpdates, currentUserId } = params;
 
-    const currentMember = await this.repo.tryFindMembership({
-      organizationId,
-      userId,
-    });
-    if (!currentMember) {
-      throw new MemberNotFoundError(userId);
-    }
+    const currentMember = await this.repo.getMembership({ organizationId, userId });
 
     // A caller who names a personal workspace outright is told so. Without
     // this the shared-teams-only set below would answer "that team is not in
     // the organization", which is both wrong and no help.
-    const personalTeam = await this.repo.tryFindPersonalTeamInScopes({
+    const [personalTeam] = await this.repo.findPersonalTeamsInScopes({
       scopes: (teamRoleUpdates ?? []).map((update) => ({
         scopeType: RoleBindingScopeType.TEAM,
         scopeId: update.teamId,
@@ -208,11 +195,12 @@ export class OrganizationMemberRoleService {
       role: binding.role,
     }));
 
-    const userPermissions = await collectCustomRolePermissions({
+    const grantedPermissions = await findCustomRolePermissionGrants({
       repository: this.repo,
       organizationId,
       currentTeamBindings,
     });
+    const userPermissions = grantedPermissions.length > 0 ? grantedPermissions : undefined;
 
     await this.dependencies.seats.assertRoleChangeAllowed({
       organizationId,

@@ -13,11 +13,9 @@ const BIND_INLINE = /bindRest(?:Middleware|Header)\(\s*defineRestMiddleware\(\s*
 const BIND_NAMED = /bindRest(?:Middleware|Header)\(\s*([A-Za-z0-9_]+)/g;
 
 /** Declarations, their identifiers, and every binding, read out of one tree. */
-function scan(sources) {
+function readDeclarations(sources) {
   const declaredIn = new Map();
   const factOfIdentifier = new Map();
-  const bound = new Set();
-
   for (const [file, text] of sources) {
     for (const [, identifier, fact] of text.matchAll(DEFINE)) {
       factOfIdentifier.set(identifier, fact);
@@ -27,6 +25,12 @@ function scan(sources) {
       if (!declaredIn.has(fact)) declaredIn.set(fact, file);
     }
   }
+  return { declaredIn, factOfIdentifier };
+}
+
+function scan(sources) {
+  const { declaredIn, factOfIdentifier } = readDeclarations(sources);
+  const bound = new Set();
 
   for (const [, text] of sources) {
     for (const [, fact] of text.matchAll(BIND_INLINE)) bound.add(fact);

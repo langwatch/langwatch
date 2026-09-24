@@ -16,9 +16,11 @@ import {
   VOICE_TRANSPORT_PROVIDER,
   voiceAgentExternalId,
 } from "@langwatch/scenario-contract";
-import type {
-  VoiceTransport,
-  VoiceTransportRunner,
+import {
+  type VoiceTransport,
+  type VoiceTransportRunner,
+  VoiceAgentRowNotFoundError,
+  VoiceKeyMissingError,
 } from "@langwatch/scenario-contract/voice-runtime";
 import { getSuiteSetId } from "@langwatch/suite-contract";
 import { nowInstant } from "@langwatch/time";
@@ -30,10 +32,11 @@ import { nowInstant } from "@langwatch/time";
  */
 export interface VoiceSessionServices {
   agentService: {
+    /** Throws `agent_not_found` when the project has no such agent. */
     getById(input: {
       id: string;
       projectId: string;
-    }): Promise<{ id: string; type: string; config: unknown } | null>;
+    }): Promise<{ id: string; type: string; config: unknown }>;
     /** Creates the voice agent row deduped by its identity key, so a retried
      *  finish for a not-yet-saved agent reuses the one row (#8020). */
     createVoiceAgent(input: {
@@ -52,10 +55,8 @@ export interface VoiceSessionServices {
     }): Promise<boolean>;
   };
   scenarioService: {
-    getById(input: {
-      id: string;
-      projectId: string;
-    }): Promise<{ testSuiteId: string | null } | null>;
+    /** Throws `scenario_not_found` when the project has no such scenario. */
+    getById(input: { id: string; projectId: string }): Promise<{ testSuiteId: string | null }>;
   };
   /** The project's ElevenLabs key and host, or null when it has none
    *  configured. Owned by the Gateway feature; handed in as one read so this
@@ -99,13 +100,17 @@ function narrowPersistedRunFields(rawMetadata: unknown): {
   };
 }
 
-function createCredentialResolver(
+function createCredentialReader(
   credentials: VoiceSessionServices["elevenLabsCredentials"],
-): VoiceSessionInfrastructure["resolveCredential"] {
+  registry: VoiceSessionServices["registry"],
+): VoiceSessionInfrastructure["getCredential"] {
   return async ({ projectId, transport }) => {
-    if (VOICE_TRANSPORT_PROVIDER[transport] !== "elevenlabs") return null;
-    const credential = await credentials.resolveForProject({ projectId });
-    return credential ? { kind: "elevenlabs", ...credential } : null;
+    const credential =
+      VOICE_TRANSPORT_PROVIDER[transport] === "elevenlabs"
+        ? await credentials.resolveForProject({ projectId })
+        : null;
+    if (!credential) throw new VoiceKeyMissingError(registry[transport].missingKeyMessage);
+    return { kind: "elevenlabs", ...credential };
   };
 }
 
@@ -128,15 +133,15 @@ export function createVoiceSessionInfrastructureFromServices({
     /** Resolve the provider credential for a transport. Only ElevenLabs
      *  today; a new transport adds a branch here, not a change to the
      *  service. */
-    resolveCredential: createCredentialResolver(elevenLabsCredentials),
+    getCredential: createCredentialReader(elevenLabsCredentials, registry),
 
     /** Looks up the vendor agent id off a saved voice agent row: when a mint
      *  names a row, its stored id wins over anything the request body claims
-     *  (AC13/AC29). Null when the row does not exist in the project or is
-     *  not a voice agent. */
-    async resolveVoiceAgentRow({ projectId, agentRowId }) {
+     *  (AC13/AC29). Throws `agent_not_found` when the row does not exist in
+     *  the project or is not a voice agent. */
+    async getVoiceAgentRow({ projectId, agentRowId }) {
       const agent = await agentService.getById({ id: agentRowId, projectId });
-      if (agent?.type !== "voice") return null;
+      if (agent.type !== "voice") throw new VoiceAgentRowNotFoundError();
       const config = parseVoiceAgentConfig(agent.config);
       return { id: agent.id, agentExternalId: voiceAgentExternalId(config) };
     },
@@ -193,12 +198,11 @@ export function createVoiceSessionInfrastructureFromServices({
     // the scenario's test-suite set when it is filed in one, else the
     // project's on-platform set. This is the listing its simulated runs
     // share.
-    async resolveScenarioSet({ projectId, scenarioId }) {
+    async getScenarioSet({ projectId, scenarioId }) {
       const scenario = await scenarioService.getById({
         id: scenarioId,
         projectId,
       });
-      if (!scenario) return null;
       return {
         scenarioSetId: scenario.testSuiteId
           ? getSuiteSetId(scenario.testSuiteId)

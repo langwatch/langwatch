@@ -3,7 +3,7 @@
  * incoming trace, and may still map one of its inputs at the thread.
  */
 import type { MappingState } from "@langwatch/dataset-contract";
-import type { Trace } from "@langwatch/trace-contract";
+import type { Span, Trace } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { EvaluationSpanDigest } from "../../app/evaluation.members.ts";
@@ -12,11 +12,9 @@ import {
   resolveThreadMappingsIntoData,
 } from "../../rules/evaluation-thread-mapping-service.rules.ts";
 
-const spanDigest = {
-  format: vi.fn(async (spans: { name?: string }[]) =>
-    spans.map((span) => span.name ?? "span").join(" "),
-  ),
-} as unknown as EvaluationSpanDigest;
+const spanDigest: EvaluationSpanDigest = {
+  format: vi.fn(async (spans: Span[]) => spans.map((span) => span.name ?? "span").join(" ")),
+};
 
 function trace(overrides: Partial<Trace> = {}): Trace {
   return {
@@ -26,16 +24,24 @@ function trace(overrides: Partial<Trace> = {}): Trace {
     input: { value: "Hello" },
     output: { value: "Hi" },
     metadata: { thread_id: "abc" },
-    spans: [{ name: "root" }],
+    spans: [
+      {
+        span_id: "span-1",
+        trace_id: "trace-1",
+        type: "span",
+        name: "root",
+        timestamps: { started_at: 0, finished_at: 0 },
+      },
+    ],
     ...overrides,
-  } as unknown as Trace;
+  };
 }
 
 /** Every trace the thread holds, as the fetch callback answers with them. */
 function threadTraces(): Trace[] {
   return [
-    trace({ trace_id: "trace-1", input: { value: "Hello" }, output: { value: "Hi" } } as never),
-    trace({ trace_id: "trace-2", input: { value: "And?" }, output: { value: "So." } } as never),
+    trace({ trace_id: "trace-1", input: { value: "Hello" }, output: { value: "Hi" } }),
+    trace({ trace_id: "trace-2", input: { value: "And?" }, output: { value: "So." } }),
   ];
 }
 
@@ -45,7 +51,7 @@ const mixedMappings: MappingState = {
     conversation: { type: "thread", source: "formatted_traces" },
   },
   expansions: [],
-} as unknown as MappingState;
+};
 
 describe("thread mappings inside a trace-level evaluation", () => {
   describe("given a mapping state that mixes a trace source with a thread source", () => {
@@ -59,7 +65,7 @@ describe("thread mappings inside a trace-level evaluation", () => {
         hasThreadMappings({
           mapping: { input: { source: "input" } },
           expansions: [],
-        } as unknown as MappingState),
+        }),
       ).toBe(false);
     });
   });
@@ -78,7 +84,7 @@ describe("thread mappings inside a trace-level evaluation", () => {
             history: { type: "thread", source: "traces", selectedFields: ["input", "output"] },
           },
           expansions: [],
-        } as unknown as MappingState,
+        },
         getThreadTraces,
         spanDigest,
       });
@@ -119,7 +125,7 @@ describe("thread mappings inside a trace-level evaluation", () => {
 
       await resolveThreadMappingsIntoData({
         data,
-        trace: trace({ metadata: {} } as never),
+        trace: trace({ metadata: {} }),
         mappings: mixedMappings,
         getThreadTraces,
         spanDigest,

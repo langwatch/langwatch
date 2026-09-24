@@ -249,6 +249,8 @@ export function CodeEvaluatorEditorDrawer(props: CodeEvaluatorEditorDrawerProps)
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const form = useCodeEvaluatorForm(props);
   const isOpen = props.open !== false && props.open !== undefined;
+  const showDisabledReason = !props.onRemove && !!form.disabledReason;
+  const showFooterSpacer = !props.onRemove && !form.disabledReason;
 
   return (
     <Drawer.Root
@@ -284,7 +286,7 @@ export function CodeEvaluatorEditorDrawer(props: CodeEvaluatorEditorDrawerProps)
         </Drawer.Body>
         <Drawer.Footer borderTopWidth="1px" borderColor="border">
           <HStack width="full" justify="space-between" gap={3}>
-            {props.onRemove ? (
+            {props.onRemove && (
               <Button
                 variant="ghost"
                 colorPalette="red"
@@ -293,13 +295,13 @@ export function CodeEvaluatorEditorDrawer(props: CodeEvaluatorEditorDrawerProps)
               >
                 Remove evaluator
               </Button>
-            ) : form.disabledReason ? (
+            )}
+            {showDisabledReason && (
               <Text fontSize="sm" color="fg.muted" data-testid="code-evaluator-disabled-reason">
                 {form.disabledReason}
               </Text>
-            ) : (
-              <Box />
             )}
+            {showFooterSpacer && <Box />}
             <Button
               colorPalette="blue"
               onClick={form.handleSave}

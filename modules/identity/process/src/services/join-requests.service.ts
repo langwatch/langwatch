@@ -1,4 +1,5 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
+import { HandledError } from "@langwatch/handled-error";
 import {
   DOMAIN_AUTO_JOIN_POLICY_ID,
   isPublicEmailDomain,
@@ -8,7 +9,7 @@ import {
   type JoinRequestAggregateState,
   JoinRequestNotFoundError,
   type JoinSettingChange,
-  joinDomainOf,
+  extractJoinDomain,
   organizationAdmitsDomain,
   resolveJoinLookup,
 } from "@langwatch/identity-contract";
@@ -72,7 +73,7 @@ export class JoinRequestsService {
       return { outcome: "none" };
     }
 
-    const domain = joinDomainOf(verifiedEmail);
+    const domain = extractJoinDomain(verifiedEmail);
     if (!domain || isPublicEmailDomain(domain)) {
       return { outcome: "none" };
     }
@@ -119,7 +120,7 @@ export class JoinRequestsService {
     userId: string;
     verifiedEmail: string | null;
   }): Promise<JoinLookupDecision> {
-    const domain = verifiedEmail ? joinDomainOf(verifiedEmail) : null;
+    const domain = verifiedEmail ? extractJoinDomain(verifiedEmail) : null;
     if (!domain) {
       return { outcome: "none" };
     }
@@ -140,7 +141,7 @@ export class JoinRequestsService {
     userId: string;
     verifiedEmail: string | null;
   }): Promise<void> {
-    const domain = verifiedEmail ? joinDomainOf(verifiedEmail) : null;
+    const domain = verifiedEmail ? extractJoinDomain(verifiedEmail) : null;
     if (!domain) {
       return;
     }
@@ -163,11 +164,11 @@ export class JoinRequestsService {
     organizationId: string;
   }): Promise<{ joinRequestId: string; state: "PENDING" | "APPROVED" }> {
     const domain = this.guards.provenDomainOrRefuse({ verifiedEmail });
-    const candidate = await this.deps.candidates.tryFindCandidateOrganization({
+    const candidate = await this.deps.candidates.getCandidateOrganization({
       organizationId,
       domain,
     });
-    if (!candidate || !organizationAdmitsDomain({ organization: candidate, domain })) {
+    if (!organizationAdmitsDomain({ organization: candidate, domain })) {
       // The same refusal an organization that does not exist produces.
       throw new JoinNotAvailableError(`organization ${organizationId} is not open to ${domain}`);
     }
@@ -248,7 +249,7 @@ export class JoinRequestsService {
       return { organization: null };
     }
 
-    const domain = joinDomainOf(verifiedEmail ?? "");
+    const domain = extractJoinDomain(verifiedEmail ?? "");
     if (!domain) {
       return { organization: null };
     }
@@ -346,8 +347,8 @@ export class JoinRequestsService {
     joinRequestId: string;
     userId: string;
   }): Promise<void> {
-    const request = await this.deps.reads.tryFindRequest({ joinRequestId });
-    if (!request || request.userId !== userId) {
+    const request = await this.deps.reads.getRequest({ joinRequestId });
+    if (request.userId !== userId) {
       throw new JoinRequestNotFoundError(
         `join request ${joinRequestId} is not ${userId}'s to withdraw`,
       );
@@ -378,10 +379,13 @@ export class JoinRequestsService {
     organizationId: string;
     inviteId: string;
   }): Promise<void> {
-    const open = await this.deps.reads.tryFindPendingRequest({
-      userId,
-      organizationId,
-    });
+    const open = await this.deps.reads
+      .getPendingRequest({ userId, organizationId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "join_request_not_found")
+          return undefined;
+        throw error;
+      });
     if (!open) {
       return;
     }
@@ -416,10 +420,13 @@ export class JoinRequestsService {
     userId: string;
     organizationId: string;
   }): Promise<void> {
-    const open = await this.deps.reads.tryFindPendingRequest({
-      userId,
-      organizationId,
-    });
+    const open = await this.deps.reads
+      .getPendingRequest({ userId, organizationId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "join_request_not_found")
+          return undefined;
+        throw error;
+      });
     if (!open) {
       return;
     }

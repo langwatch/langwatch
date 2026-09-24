@@ -5,7 +5,7 @@
 
 import { Button, Field, HStack, Input, Stack, Text } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
-import { PASSWORD_REQUIREMENTS_HINT, passwordProblem } from "@langwatch/identity-contract";
+import { PASSWORD_REQUIREMENTS_HINT, describePasswordProblem } from "@langwatch/identity-contract";
 import { useEffect, useState } from "react";
 
 import { api } from "../../behavior/personal-workspace-api.ts";
@@ -23,7 +23,7 @@ const EMPTY: PasswordFields = { currentPassword: "", newPassword: "", confirmPas
 /**
  * What the form itself refuses, before anything is sent: that a current
  * password is present when one is changing, and the two new ones agree —
- * plus `passwordProblem`, the server's own rule, called rather than restated.
+ * plus `describePasswordProblem`, the server's own rule, called rather than restated.
  */
 export function validatePasswordForm(
   values: PasswordFields,
@@ -33,9 +33,9 @@ export function validatePasswordForm(
   if (!isSetting && !values.currentPassword) {
     problems.currentPassword = "Current password is required";
   }
-  const newProblem = passwordProblem(values.newPassword);
+  const newProblem = describePasswordProblem(values.newPassword);
   if (newProblem) problems.newPassword = newProblem;
-  const confirmProblem = passwordProblem(values.confirmPassword);
+  const confirmProblem = describePasswordProblem(values.confirmPassword);
   if (confirmProblem) {
     problems.confirmPassword = confirmProblem;
   } else if (values.newPassword !== values.confirmPassword) {

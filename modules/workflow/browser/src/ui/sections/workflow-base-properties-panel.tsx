@@ -519,6 +519,56 @@ export type WorkflowNodeNameProps = {
   cursor?: "pointer";
 };
 
+function NodeNameInput({
+  node,
+  name,
+  setName,
+  setIsEditingName,
+  handleNameChange,
+}: {
+  node: Node<Component>;
+  name: string | undefined;
+  setName: (name: string | undefined) => void;
+  setIsEditingName: (isEditingName: boolean) => void;
+  handleNameChange: (value: string, id: string) => void;
+}) {
+  return (
+    <Input
+      fontSize="15px"
+      marginLeft={1}
+      fontWeight={500}
+      variant="outline"
+      background="transparent"
+      value={name ?? getNodeDisplayName(node)}
+      borderRadius={5}
+      paddingLeft={1}
+      margin={0}
+      size="sm"
+      onBlur={() => {
+        setIsEditingName(false);
+        if (name) {
+          handleNameChange(name, node.id);
+        }
+      }}
+      onChange={(e) => {
+        setName(e.target.value);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          setIsEditingName(false);
+          if (name) {
+            handleNameChange(name, node.id);
+          }
+        }
+        if (e.key === "Escape") {
+          setIsEditingName(false);
+          setName(undefined);
+        }
+      }}
+    />
+  );
+}
+
 export function WorkflowBasePropertiesPanel({
   node,
   header,
@@ -644,38 +694,12 @@ export function WorkflowBasePropertiesPanel({
                       size: "lg",
                     })}
                   {isEditingName ? (
-                    <Input
-                      fontSize="15px"
-                      marginLeft={1}
-                      fontWeight={500}
-                      variant="outline"
-                      background="transparent"
-                      value={name ?? getNodeDisplayName(node)}
-                      borderRadius={5}
-                      paddingLeft={1}
-                      margin={0}
-                      size="sm"
-                      onBlur={() => {
-                        setIsEditingName(false);
-                        if (name) {
-                          handleNameChange(name, node.id);
-                        }
-                      }}
-                      onChange={(e) => {
-                        setName(e.target.value);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          setIsEditingName(false);
-                          if (name) {
-                            handleNameChange(name, node.id);
-                          }
-                        }
-                        if (e.key === "Escape") {
-                          setIsEditingName(false);
-                          setName(undefined);
-                        }
-                      }}
+                    <NodeNameInput
+                      node={node}
+                      name={name}
+                      setName={setName}
+                      setIsEditingName={setIsEditingName}
+                      handleNameChange={handleNameChange}
                     />
                   ) : (
                     (renderNodeName?.({

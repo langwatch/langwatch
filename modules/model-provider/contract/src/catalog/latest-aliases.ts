@@ -8,7 +8,7 @@ import {
   compareModelSortKeys,
   type ModelSortKey,
   type ModelVariant,
-  rankChatModel,
+  deriveChatModelRank,
 } from "./model-tiers.ts";
 
 const REGISTRY = llmModels.models;
@@ -47,7 +47,7 @@ export function pickChatModel(provider: string, variant: ModelVariant): string |
   const candidates: (ModelSortKey & { id: string })[] = [];
   for (const model of Object.values(REGISTRY)) {
     if (model.provider !== provider || model.mode !== "chat") continue;
-    const parsed = rankChatModel({ id: model.id, provider, variant });
+    const parsed = deriveChatModelRank({ id: model.id, provider, variant });
     if (parsed) candidates.push({ id: model.id, ...parsed });
   }
   candidates.sort(compareModelSortKeys);
@@ -59,7 +59,7 @@ export function pickChatModel(provider: string, variant: ModelVariant): string |
  * the catalog, the same pick `<provider>/latest` resolves to where that
  * alias exists. Provider-qualified, e.g. `openai/gpt-5.6-terra`.
  */
-export function recommendedChatModel(provider: string): string | null {
+export function pickRecommendedChatModel(provider: string): string | null {
   return pickChatModel(provider, "main");
 }
 

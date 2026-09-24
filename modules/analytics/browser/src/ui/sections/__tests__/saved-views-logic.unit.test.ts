@@ -46,7 +46,7 @@ describe("savedViewsLogic", () => {
         const val: FilterParam = {
           z: ["b", "a"],
           a: ["d", "c"],
-        } as unknown as FilterParam;
+        };
         const result = normalizeFilterValue(val);
         expect(result).toEqual({ a: ["c", "d"], z: ["a", "b"] });
       });

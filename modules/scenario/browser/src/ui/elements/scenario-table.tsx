@@ -42,6 +42,12 @@ export type ScenarioTableProps = {
 
 const columnHelper = createColumnHelper<ScenarioListItem>();
 
+function headerWidthProps(headerId: string): { width?: string } {
+  if (headerId === "select") return { width: "40px" };
+  if (headerId === "actions") return { width: "48px" };
+  return {};
+}
+
 const labelsFilterFn: FilterFn<ScenarioListItem> = (row, columnId, filterValue) => {
   const labels = row.getValue<string[]>(columnId);
   const activeLabels = Array.isArray(filterValue)
@@ -167,11 +173,7 @@ export function ScenarioTable({
                 cursor={header.column.getCanSort() ? "pointer" : "default"}
                 onClick={header.column.getToggleSortingHandler()}
                 userSelect="none"
-                {...(header.id === "select"
-                  ? { width: "40px" }
-                  : header.id === "actions"
-                    ? { width: "48px" }
-                    : {})}
+                {...headerWidthProps(header.id)}
               >
                 <HStack gap={1}>
                   {flexRender(header.column.columnDef.header, header.getContext())}

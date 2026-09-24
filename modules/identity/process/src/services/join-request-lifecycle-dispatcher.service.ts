@@ -1,4 +1,5 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
 import type {
@@ -19,7 +20,7 @@ const logger = createLogger("langwatch:identity:join-request-lifecycle");
  */
 export class JoinRequestLifecycleDispatcherAdapter implements JoinRequestLifecycle {
   static create(
-    reads: Pick<JoinRequestReadRepository, "tryFindRequest">,
+    reads: Pick<JoinRequestReadRepository, "getRequest">,
     notifier: JoinRequestNotifier,
     joinRequests: () => Pick<JoinRequestService, "expireJoin">,
   ): JoinRequestLifecycleDispatcherAdapter {
@@ -27,7 +28,7 @@ export class JoinRequestLifecycleDispatcherAdapter implements JoinRequestLifecyc
   }
 
   private constructor(
-    private readonly reads: Pick<JoinRequestReadRepository, "tryFindRequest">,
+    private readonly reads: Pick<JoinRequestReadRepository, "getRequest">,
     private readonly notifier: JoinRequestNotifier,
     private readonly joinRequests: () => Pick<JoinRequestService, "expireJoin">,
   ) {}
@@ -58,7 +59,11 @@ export class JoinRequestLifecycleDispatcherAdapter implements JoinRequestLifecyc
    */
   async prepareNotification({ payload }: { payload: JoinRequestNotification }): Promise<void> {
     const { joinRequestId, organizationId } = payload;
-    const request = await this.reads.tryFindRequest({ joinRequestId });
+    const request = await this.reads.getRequest({ joinRequestId }).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "join_request_not_found")
+        return undefined;
+      throw error;
+    });
 
     if (payload.kind === "requestStillWaiting") {
       if (request?.state !== "PENDING") return;

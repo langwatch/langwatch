@@ -232,7 +232,8 @@ export type GatewayBudgetOverviewForUser = {
 export type GatewayInternalCodexRefreshResult =
   | { status: "refreshed"; accessToken: string; accountId: string }
   | { status: "not_connected" }
-  | { status: "session_expired" };
+  | { status: "session_expired" }
+  | { status: "unavailable" };
 
 export type GatewayInternalSpendSubmission =
   | { status: "unavailable" }
@@ -289,7 +290,7 @@ export interface GatewayInternalProtocol {
     connect_services?: string[];
   }): { jwt: string; expiresAt: number };
   touchVirtualKeyUsage(id: string): Promise<void>;
-  refreshCodex(input: { providerRowId: string }): Promise<GatewayInternalCodexRefreshResult> | null;
+  refreshCodex(input: { providerRowId: string }): Promise<GatewayInternalCodexRefreshResult>;
   findVirtualKeyForConfig(id: string): Promise<VirtualKeyWithScopes | null>;
   configVersionToken(input: VirtualKeyWithScopes): Promise<string>;
   materialiseConfig(input: VirtualKeyWithScopes): Promise<unknown>;
@@ -320,12 +321,18 @@ export interface GatewayInternalProtocol {
       tools?: unknown;
       mcps?: unknown;
     };
-  }): Promise<{
-    decision: "allow" | "block" | "modify";
-    reason: string | null;
-    modified_content: Record<string, unknown> | null;
-    policies_triggered: string[];
-  }> | null;
+  }): Promise<
+    | { status: "unavailable" }
+    | {
+        status: "evaluated";
+        verdict: {
+          decision: "allow" | "block" | "modify";
+          reason: string | null;
+          modified_content: Record<string, unknown> | null;
+          policies_triggered: string[];
+        };
+      }
+  >;
   budgetBucketSpend(input: {
     budgetId: string;
     endUserId: string;
@@ -348,25 +355,27 @@ export interface GatewayInternalProtocol {
     traceId?: string;
     requestedModel?: string;
   }): Promise<
-    { ok: true } | { ok: false; reason: "session_limit"; open: number; limit: number } | null
+    | { ok: true }
+    | { ok: false; reason: "session_limit"; open: number; limit: number }
+    | { ok: false; reason: "unavailable" }
   >;
   correlateRealtimeSession(input: {
     sessionId: string;
     projectId: string;
     vendorConversationId: string;
-  }): Promise<boolean | null>;
+  }): Promise<"applied" | "not_found" | "unavailable">;
   releaseRealtimeSession(input: {
     sessionId: string;
     projectId: string;
     status: "FAILED" | "EXPIRED";
     reason: string;
-  }): Promise<boolean | null>;
+  }): Promise<"applied" | "not_found" | "unavailable">;
   reportRealtimeSessionUsage(input: {
     sessionId: string;
     projectId: string;
     virtualKeyId: string;
     usage: SpendUsage;
-  }): Promise<"already_closed" | "closed" | "not_found" | null>;
+  }): Promise<"already_closed" | "closed" | "not_found" | "unavailable">;
 }
 
 /**
@@ -438,11 +447,8 @@ export interface GatewayApi extends GatewayInternalProtocol {
     scopeTypes?: readonly string[] | undefined;
     externalId?: string | undefined;
   }): Promise<GatewayBudgetListWithHealth>;
-  /** One budget with live health, or null when it does not exist in this organization. */
-  tryGetBudgetWithHealth(input: {
-    id: string;
-    organizationId: string;
-  }): Promise<GatewayBudgetHealth | null>;
+  /** One budget with live health; throws `gateway_budget_not_found` outside this organization. */
+  getBudgetWithHealth(input: { id: string; organizationId: string }): Promise<GatewayBudgetHealth>;
   /** Whether any active key could produce traffic against this budget's own scope target. */
   budgetScopeReach(input: {
     organizationId: string;
@@ -502,14 +508,14 @@ export interface GatewayApi extends GatewayInternalProtocol {
    * One key for a by-id read under that same rule: a key outside the caller's
    * membership set is answered as not found, so nothing leaks its existence.
    */
-  requireVisibleVirtualKeyForUser(input: {
+  getVisibleVirtualKeyForUser(input: {
     organizationId: string;
     id: string;
     userId: string;
   }): Promise<GatewayVirtualKeyRecord>;
   findVirtualKeyById(id: string, organizationId: string): Promise<GatewayVirtualKeyRecord | null>;
   /** One key anchored to this organization, without any visibility rule. */
-  requireExistingVirtualKey(input: {
+  getExistingVirtualKey(input: {
     organizationId: string;
     id: string;
   }): Promise<GatewayVirtualKeyRecord>;
@@ -523,7 +529,7 @@ export interface GatewayApi extends GatewayInternalProtocol {
     virtualKeys: readonly GatewayVirtualKeyRecord[];
   }): GatewayVirtualKeyRecord[];
   /** One key under that same credential-visibility rule, or the not-found refusal. */
-  requireVisibleVirtualKeyForProjectCredential(input: {
+  getVisibleVirtualKeyForProjectCredential(input: {
     project: { id: string };
     id: string;
     organizationId: string;

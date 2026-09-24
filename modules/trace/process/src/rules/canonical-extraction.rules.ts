@@ -217,7 +217,7 @@ export type UsageTokenSources =
  * Takes each key in turn and stops at the first that reads as a number; the
  * last value taken is the answer, so an all-unreadable list gives null.
  */
-const takeFirstTokenCount = (ctx: ExtractorContext, keys: readonly string[]): number | null => {
+const pickFirstTokenCount = (ctx: ExtractorContext, keys: readonly string[]): number | null => {
   let count: number | null = null;
   for (const key of keys) {
     const val = ctx.bag.attrs.take(key);
@@ -245,9 +245,9 @@ export const extractUsageTokens = (
       outTok = asNumber(usageObj.completionTokens);
     }
   } else {
-    if (sources.input) inTok = takeFirstTokenCount(ctx, sources.input);
+    if (sources.input) inTok = pickFirstTokenCount(ctx, sources.input);
 
-    if (sources.output) outTok = takeFirstTokenCount(ctx, sources.output);
+    if (sources.output) outTok = pickFirstTokenCount(ctx, sources.output);
   }
 
   if (inTok !== null) {
@@ -320,7 +320,7 @@ export const extractErrorInfo = (ctx: ExtractorContext): void => {
   }
 };
 
-export const spanTypeToGenAiOperationName = (t: unknown): string | null => {
+export const mapSpanTypeToGenAiOperationName = (t: unknown): string | null => {
   if (typeof t !== "string") {
     return null;
   }

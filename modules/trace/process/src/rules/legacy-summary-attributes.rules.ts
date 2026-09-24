@@ -327,7 +327,7 @@ export function parseComputedOutput(
 /**
  * Creates an ErrorCapture from trace summary error information.
  */
-export function createError(
+export function buildErrorCapture(
   containsErrorStatus: boolean,
   errorMessage: string | null,
 ): ErrorCapture | null {

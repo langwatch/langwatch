@@ -138,7 +138,7 @@ export class TraceViewerProtectionService {
                   isProjectOwner,
                   groupIds: [],
                 }),
-            restrictVisibleTo: restrictLabelFor(resolved),
+            restrictVisibleTo: formatRestrictLabel(resolved),
           },
         ];
       }),
@@ -213,7 +213,7 @@ function uniformContentCategories(canSee: boolean): Protections["contentCategori
   ) as Protections["contentCategories"];
 }
 
-function restrictLabelFor(category: ResolvedCategory): string | null {
+function formatRestrictLabel(category: ResolvedCategory): string | null {
   return category.disposition === "restrict"
     ? describeAudience(category.audience, { groups: {} })
     : null;

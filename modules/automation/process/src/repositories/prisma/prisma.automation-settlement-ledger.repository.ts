@@ -2,7 +2,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { AutomationClock } from "../../app/automation.members.ts";
 import { AutomationSettlementLedgerService } from "../../services/automation-settlement-ledger.service.ts";
-import type { AutomationPersistCapRedis } from "../../services/persist-cap.service.ts";
+import type { AutomationPersistCapRepository } from "../automation-persist-cap.repository.ts";
 import type {
   AutomationSettlementBreach,
   AutomationSettlementPersistCap,
@@ -30,12 +30,8 @@ export class PrismaAutomationSettlementLedgerRepository {
     /** The one database client the composing process opened. */
     prisma: AutomationSettlementLedgerDatabase;
     clock: AutomationClock;
-    /**
-     * The shared Redis the daily ceiling counts in. Absent falls back to
-     * per-process counters, which is the application's own behaviour when Redis
-     * is down: a ceiling enforced per pod rather than per fleet.
-     */
-    redis?: AutomationPersistCapRedis | null;
+    /** Where the daily ceiling counts: a Redis one counts fleet-wide. */
+    persistCaps: AutomationPersistCapRepository;
     persistCap: AutomationSettlementPersistCap;
     breach: AutomationSettlementBreach;
   }): AutomationSettlementLedgerService {
@@ -46,7 +42,7 @@ export class PrismaAutomationSettlementLedgerRepository {
       suppressions: PrismaEmailSuppressionRepository.create(options.prisma),
       webhookDeliveries: PrismaWebhookDeliveryRepository.create(options.prisma),
       clock: options.clock,
-      redis: options.redis ?? null,
+      persistCaps: options.persistCaps,
       persistCap: options.persistCap,
       breach: options.breach,
     });

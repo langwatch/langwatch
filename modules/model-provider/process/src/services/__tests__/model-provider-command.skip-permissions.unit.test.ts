@@ -1,7 +1,11 @@
 // A regex pattern (ADR-129) that never compiles matches nothing, so storing it would leave the
 // operator believing a model is trusted when the gate always says no — the save must be refused.
 
-import { ModelProviderSkipPermissionsPatternInvalidError } from "@langwatch/model-provider-contract";
+import {
+  ModelProviderNotFoundError,
+  ModelProviderSkipPermissionsPatternInvalidError,
+} from "@langwatch/model-provider-contract";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
 import { ModelProviderCommandService } from "../model-provider-command.service.ts";
@@ -15,9 +19,10 @@ function serviceWith(
   const updated: unknown[] = [];
   const found: unknown[] = [];
   const repository = {
-    tryFindById: async (input: unknown) => {
+    getById: async (input: unknown) => {
       found.push(input);
-      return options.existing ?? null;
+      if (!options.existing) throw new ModelProviderNotFoundError();
+      return options.existing;
     },
     create: async (input: unknown) => {
       created.push(input);
@@ -29,13 +34,15 @@ function serviceWith(
     },
   };
   const scopes = {
-    tryGetProjectScopes: async () => null,
-    tryResolveAnchor: async () => "organization-1",
+    getProjectScopes: async () => {
+      throw new ProjectNotFoundError();
+    },
+    getAnchorOrganizationId: async () => "organization-1",
     getOrganizationIdForScopes: async () => "organization-1",
   };
   const catalog = {
     exists: () => true,
-    tryGetProviderDeprecation: () => null,
+    pickProviderDeprecation: () => null,
   };
   const ids = {
     generate: () => "provider-1",

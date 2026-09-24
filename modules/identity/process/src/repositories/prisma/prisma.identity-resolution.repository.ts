@@ -1,4 +1,7 @@
-import { LIVE_IDENTIFIER_STATES } from "@langwatch/identity-contract";
+import {
+  IdentityIdentifierNotFoundError,
+  LIVE_IDENTIFIER_STATES,
+} from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
@@ -38,11 +41,11 @@ export class PrismaIdentityResolutionRepository implements IdentityResolver {
 
   constructor(private readonly prisma: PrismaClient) {}
 
-  async tryResolveByIdentifierValue({
+  async getResolutionByIdentifierValue({
     normalizedValue,
   }: {
     normalizedValue: string;
-  }): Promise<IdentityResolution | null> {
+  }): Promise<IdentityResolution> {
     return this.resolve(
       Prisma.sql`i."value" = ${normalizedValue} AND i."state" IN (${Prisma.join(RESOLVABLE_STATES)})`,
     );
@@ -53,13 +56,13 @@ export class PrismaIdentityResolutionRepository implements IdentityResolver {
    * folded `provider` vocabulary — a subject is unique only WITHIN an issuer.
    * This is the pair `Account` is unique by.
    */
-  async tryResolveByProviderSubject({
+  async getResolutionByProviderSubject({
     providerId,
     providerAccountId,
   }: {
     providerId: string;
     providerAccountId: string;
-  }): Promise<IdentityResolution | null> {
+  }): Promise<IdentityResolution> {
     return this.resolve(
       Prisma.sql`i."providerId" = ${providerId} AND i."providerAccountId" = ${providerAccountId} AND i."state" IN (${Prisma.join([...LIVE_IDENTIFIER_STATES])})`,
     );
@@ -70,13 +73,13 @@ export class PrismaIdentityResolutionRepository implements IdentityResolver {
    * `@@index([issuer, providerAccountId])`. Returns `providerId` too: a
    * subject is unique only WITHIN an issuer, never derived from it alone.
    */
-  async resolveByIssuerSubject({
+  async getResolutionByIssuerSubject({
     issuer,
     providerAccountId,
   }: {
     issuer: string;
     providerAccountId: string;
-  }): Promise<IdentityIssuerResolution | null> {
+  }): Promise<IdentityIssuerResolution> {
     const rows = await this.prisma.$queryRaw<IssuerResolutionRow[]>`
       SELECT i."id" AS "identifierId", i."userId" AS "userId", i."providerId" AS "providerId", s."status" AS "status"
       FROM "Identifier" i
@@ -90,7 +93,9 @@ export class PrismaIdentityResolutionRepository implements IdentityResolver {
       LIMIT 1
     `;
     const row = rows[0];
-    if (row === undefined || row.providerId === null) return null;
+    if (row === undefined || row.providerId === null) {
+      throw new IdentityIdentifierNotFoundError("no live identifier for this issuer subject");
+    }
     this.touchLastUsed(row.identifierId);
     return {
       userId: row.userId,
@@ -99,7 +104,7 @@ export class PrismaIdentityResolutionRepository implements IdentityResolver {
     };
   }
 
-  private async resolve(match: Prisma.Sql): Promise<IdentityResolution | null> {
+  private async resolve(match: Prisma.Sql): Promise<IdentityResolution> {
     // `ORDER BY` fixes which row answers when more than one matches, so a resolution can never pick
     // differently between two reads - that would be a sign-in that works only sometimes. For the
     // provider-subject lookup a second match should now be impossible: a partial unique index on
@@ -115,7 +120,8 @@ export class PrismaIdentityResolutionRepository implements IdentityResolver {
       LIMIT 1
     `;
     const row = rows[0];
-    if (row === undefined) return null;
+    if (row === undefined)
+      throw new IdentityIdentifierNotFoundError("no resolvable identifier matched");
     this.touchLastUsed(row.identifierId);
     // `finalized` and nothing else, the same predicate the write gate uses:
     // `migrated` is HELD — the rows exist but the parity proof found them

@@ -140,6 +140,19 @@ export class GatewayBudgetNotFoundError extends HandledError {
   }
 }
 
+/** A voice provider has no usable API key stored; the same code the scenario voice session refuses with. */
+export class GatewayVoiceKeyMissingError extends HandledError {
+  declare readonly code: "voice_key_missing";
+
+  constructor() {
+    super("voice_key_missing", "No API key configured for this voice provider", {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "GatewayVoiceKeyMissingError";
+  }
+}
+
 /**
  * Scope does not belong to the request's organization; cross-tenant guard,
  * never a typo.

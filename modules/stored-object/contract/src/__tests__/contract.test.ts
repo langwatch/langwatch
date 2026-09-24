@@ -10,7 +10,7 @@ import {
   StoredObjectDeletedError,
   StoredObjectNotFoundError,
   UploadTooLargeError,
-  audienceForLegacyStoredObjectPurpose,
+  mapLegacyStoredObjectPurposeToAudience,
   storedObjectIdentitySchema,
   storedObjectProblemSchema,
   storedObjectReferenceSchema,
@@ -131,10 +131,10 @@ describe("Stored Objects IDs and references", () => {
   });
 
   it("maps only recognized legacy purposes to their closed audience", () => {
-    expect(audienceForLegacyStoredObjectPurpose("scenario_event")).toBe("scenarios:view");
-    expect(audienceForLegacyStoredObjectPurpose("trace_content")).toBe("traces:view");
-    expect(audienceForLegacyStoredObjectPurpose("evaluation_inputs")).toBe("evaluations:view");
-    expect(audienceForLegacyStoredObjectPurpose("unknown")).toBeUndefined();
+    expect(mapLegacyStoredObjectPurposeToAudience("scenario_event")).toBe("scenarios:view");
+    expect(mapLegacyStoredObjectPurposeToAudience("trace_content")).toBe("traces:view");
+    expect(mapLegacyStoredObjectPurposeToAudience("evaluation_inputs")).toBe("evaluations:view");
+    expect(mapLegacyStoredObjectPurposeToAudience("unknown")).toBeUndefined();
   });
 });
 

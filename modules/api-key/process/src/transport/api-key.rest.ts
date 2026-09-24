@@ -129,7 +129,7 @@ const callerCanReadAnyKey = async ({
  * was requested for (an admin-only choice) or the caller. An assignment on a
  * service key has nothing to bind to, so it is ignored, as tRPC ignores it.
  */
-const keyOwner = ({
+const deriveKeyOwner = ({
   isService,
   assignedToUserId,
   callerUserId,
@@ -178,7 +178,7 @@ const privilege = ({
 /**
  * A key nobody owns defaults to org-wide ADMIN; one minted for somebody else is
  * capped by THEIR access. Both take real adminness. Ownerlessness is
- * {@link keyOwner}'s answer: `keyType` alone would wave a "personal" key past.
+ * {@link deriveKeyOwner}'s answer: `keyType` alone would wave a "personal" key past.
  */
 const refuseNonAdminPrivilegedMint = async ({
   app,
@@ -194,7 +194,7 @@ const refuseNonAdminPrivilegedMint = async ({
   assignedToUserId?: string | undefined;
 }): Promise<void> => {
   const assignedToAnother = !isService && !!assignedToUserId && assignedToUserId !== caller.userId;
-  const owner = keyOwner({ isService, assignedToUserId, callerUserId: caller.userId });
+  const owner = deriveKeyOwner({ isService, assignedToUserId, callerUserId: caller.userId });
 
   if (owner !== null && !assignedToAnother) return;
   if (await callerIsAdmin({ app, caller, organizationId })) return;
@@ -290,7 +290,7 @@ export const apiKeyRest: Readonly<{
     const result = await app.create({
       name: input.name,
       description: input.description,
-      userId: keyOwner({
+      userId: deriveKeyOwner({
         isService,
         assignedToUserId: input.assignedToUserId,
         callerUserId: caller.userId,

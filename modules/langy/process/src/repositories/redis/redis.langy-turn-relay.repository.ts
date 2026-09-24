@@ -57,7 +57,9 @@ const NAVIGATE_RESOURCE = "navigate";
 const NAVIGATE_VERB = "open";
 
 /** The resource id a parsed invocation names, when it is `navigate open`. */
-function navigateResourceIdOf(invocation: LangwatchCommand | null): { resourceId: string } | null {
+function extractNavigateResourceId(
+  invocation: LangwatchCommand | null,
+): { resourceId: string } | null {
   if (
     !invocation ||
     invocation.resource !== NAVIGATE_RESOURCE ||
@@ -693,7 +695,7 @@ export class RedisLangyTurnRelayRepository {
     // Remember this resource's platform link — the ONLY thing a later `navigate` instruction may
     // resolve an address from.
     if (frame.phase === "end" && !call.isError) {
-      const command = this.cliEnvelope.tryShellCommandOf({
+      const command = this.cliEnvelope.extractShellCommand({
         id: frame.id,
         name: frame.name,
         phase: frame.phase,
@@ -794,7 +796,7 @@ export class RedisLangyTurnRelayRepository {
    * — the resource id it named.
    */
   private shellCommandOfFrame(frame: Extract<LangyRelayFrame, { type: "tool" }>): string | null {
-    return this.cliEnvelope.tryShellCommandOf({
+    return this.cliEnvelope.extractShellCommand({
       id: frame.id,
       name: frame.name,
       phase: frame.phase,
@@ -812,7 +814,7 @@ export class RedisLangyTurnRelayRepository {
   ): { resourceId: string } | null {
     const command = this.shellCommandOfFrame(frame);
     if (!command || !isSoleLangwatchInvocation(command)) return null;
-    return navigateResourceIdOf(parseLangwatchCommand(command));
+    return extractNavigateResourceId(parseLangwatchCommand(command));
   }
 
   /**
@@ -826,7 +828,7 @@ export class RedisLangyTurnRelayRepository {
     const command = this.shellCommandOfFrame(frame);
     if (!command) return [];
     return parseAllLangwatchCommands(command)
-      .map(navigateResourceIdOf)
+      .map(extractNavigateResourceId)
       .filter((inv): inv is { resourceId: string } => inv !== null);
   }
 

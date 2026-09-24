@@ -5,16 +5,16 @@
 import { describe, it, expect } from "vitest";
 
 import {
-  getReasoningConfig,
+  pickReasoningConfig,
   supportsReasoning,
   getAllowedReasoningValues,
-  getDefaultReasoningEffort,
+  pickDefaultReasoningEffort,
 } from "../reasoning-config.rules.ts";
 
 describe("Reasoning Config", () => {
   describe("given OpenAI models", () => {
     it("GPT-5.2 supports none through xhigh", () => {
-      const config = getReasoningConfig("openai/gpt-5.2");
+      const config = pickReasoningConfig("openai/gpt-5.2");
       expect(config).toBeDefined();
       expect(config?.allowedValues).toContain("none");
       expect(config?.allowedValues).toContain("low");
@@ -26,7 +26,7 @@ describe("Reasoning Config", () => {
     });
 
     it("GPT-5.2-pro only supports high", () => {
-      const config = getReasoningConfig("openai/gpt-5.2-pro");
+      const config = pickReasoningConfig("openai/gpt-5.2-pro");
       expect(config).toBeDefined();
       expect(config?.allowedValues).toEqual(["high"]);
       expect(config?.defaultValue).toBe("high");
@@ -34,7 +34,7 @@ describe("Reasoning Config", () => {
     });
 
     it("GPT-5.1 supports none through high (no xhigh)", () => {
-      const config = getReasoningConfig("openai/gpt-5.1");
+      const config = pickReasoningConfig("openai/gpt-5.1");
       expect(config).toBeDefined();
       expect(config?.allowedValues).toContain("none");
       expect(config?.allowedValues).toContain("low");
@@ -45,7 +45,7 @@ describe("Reasoning Config", () => {
     });
 
     it("o1 models support low through high", () => {
-      const config = getReasoningConfig("openai/o1-preview");
+      const config = pickReasoningConfig("openai/o1-preview");
       expect(config).toBeDefined();
       expect(config?.allowedValues).toEqual(["low", "medium", "high"]);
       expect(config?.defaultValue).toBe("medium");
@@ -53,20 +53,20 @@ describe("Reasoning Config", () => {
     });
 
     it("o3 models support low through high", () => {
-      const config = getReasoningConfig("openai/o3-mini");
+      const config = pickReasoningConfig("openai/o3-mini");
       expect(config).toBeDefined();
       expect(config?.allowedValues).toEqual(["low", "medium", "high"]);
     });
 
     it("GPT-4 models don't have reasoning config", () => {
-      const config = getReasoningConfig("openai/gpt-4o");
+      const config = pickReasoningConfig("openai/gpt-4o");
       expect(config).toBeUndefined();
     });
   });
 
   describe("given Anthropic models", () => {
     it("Claude Opus 4.5 supports low/medium/high", () => {
-      const config = getReasoningConfig("anthropic/claude-opus-4");
+      const config = pickReasoningConfig("anthropic/claude-opus-4");
       expect(config).toBeDefined();
       expect(config?.allowedValues).toEqual(["low", "medium", "high"]);
       expect(config?.defaultValue).toBe("high");
@@ -74,14 +74,14 @@ describe("Reasoning Config", () => {
     });
 
     it("Claude 3.5 doesn't have reasoning config", () => {
-      const config = getReasoningConfig("anthropic/claude-3.5-sonnet");
+      const config = pickReasoningConfig("anthropic/claude-3.5-sonnet");
       expect(config).toBeUndefined();
     });
   });
 
   describe("given Gemini models", () => {
     it("Gemini 2.5 Flash supports none/low/high and can disable", () => {
-      const config = getReasoningConfig("gemini/gemini-2.5-flash");
+      const config = pickReasoningConfig("gemini/gemini-2.5-flash");
       expect(config).toBeDefined();
       expect(config?.allowedValues).toContain("none");
       expect(config?.allowedValues).toContain("low");
@@ -91,14 +91,14 @@ describe("Reasoning Config", () => {
     });
 
     it("Gemini 2.5 Pro only supports low/high (cannot disable)", () => {
-      const config = getReasoningConfig("gemini/gemini-2.5-pro");
+      const config = pickReasoningConfig("gemini/gemini-2.5-pro");
       expect(config).toBeDefined();
       expect(config?.allowedValues).toEqual(["low", "high"]);
       expect(config?.canDisable).toBe(false);
     });
 
     it("Gemini 3 supports low/high", () => {
-      const config = getReasoningConfig("gemini/gemini-3-flash-preview");
+      const config = pickReasoningConfig("gemini/gemini-3-flash-preview");
       expect(config).toBeDefined();
       expect(config?.allowedValues).toEqual(["low", "high"]);
     });
@@ -106,20 +106,20 @@ describe("Reasoning Config", () => {
 
   describe("given xAI models", () => {
     it("Grok-3-mini supports low/high", () => {
-      const config = getReasoningConfig("xai/grok-3-mini");
+      const config = pickReasoningConfig("xai/grok-3-mini");
       expect(config).toBeDefined();
       expect(config?.allowedValues).toEqual(["low", "high"]);
     });
 
     it("Grok-3 (non-mini) doesn't have reasoning config", () => {
-      const config = getReasoningConfig("xai/grok-3");
+      const config = pickReasoningConfig("xai/grok-3");
       expect(config).toBeUndefined();
     });
   });
 
   describe("given DeepSeek models", () => {
     it("DeepSeek R1 supports reasoning", () => {
-      const config = getReasoningConfig("deepseek/deepseek-r1");
+      const config = pickReasoningConfig("deepseek/deepseek-r1");
       expect(config).toBeDefined();
       expect(config?.allowedValues).toContain("low");
       expect(config?.allowedValues).toContain("medium");
@@ -127,7 +127,7 @@ describe("Reasoning Config", () => {
     });
 
     it("DeepSeek chat doesn't have reasoning config", () => {
-      const config = getReasoningConfig("deepseek/deepseek-chat");
+      const config = pickReasoningConfig("deepseek/deepseek-chat");
       expect(config).toBeUndefined();
     });
   });
@@ -153,24 +153,24 @@ describe("Reasoning Config", () => {
       expect(values).toEqual([]);
     });
 
-    it("getDefaultReasoningEffort returns default for reasoning models", () => {
-      expect(getDefaultReasoningEffort("openai/gpt-5.2")).toBe("none");
-      expect(getDefaultReasoningEffort("openai/gpt-5.2-pro")).toBe("high");
+    it("pickDefaultReasoningEffort returns default for reasoning models", () => {
+      expect(pickDefaultReasoningEffort("openai/gpt-5.2")).toBe("none");
+      expect(pickDefaultReasoningEffort("openai/gpt-5.2-pro")).toBe("high");
     });
 
-    it("getDefaultReasoningEffort returns undefined for non-reasoning models", () => {
-      expect(getDefaultReasoningEffort("openai/gpt-4o")).toBeUndefined();
+    it("pickDefaultReasoningEffort returns undefined for non-reasoning models", () => {
+      expect(pickDefaultReasoningEffort("openai/gpt-4o")).toBeUndefined();
     });
   });
 
   describe("given case-insensitive model IDs", () => {
     it("handles uppercase model IDs", () => {
-      const config = getReasoningConfig("OPENAI/GPT-5.2");
+      const config = pickReasoningConfig("OPENAI/GPT-5.2");
       expect(config).toBeDefined();
     });
 
     it("handles mixed case", () => {
-      const config = getReasoningConfig("OpenAI/GPT-5.2-Pro");
+      const config = pickReasoningConfig("OpenAI/GPT-5.2-Pro");
       expect(config).toBeDefined();
     });
   });

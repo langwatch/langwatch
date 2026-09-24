@@ -1,10 +1,11 @@
+import { HandledError } from "@langwatch/handled-error";
 import {
   JoinAutoConnectionAdmitsError,
   JoinAutoDomainUnprovenError,
   JoinNotAvailableError,
   JoinRequestNotFoundError,
   JoinRequestThrottledError,
-  joinDomainOf,
+  extractJoinDomain,
   isPublicEmailDomain,
   type JoinRequestAggregateState,
 } from "@langwatch/identity-contract";
@@ -48,8 +49,8 @@ export class JoinRequestAdmissionGuardsService {
     joinRequestId: string;
     organizationId: string;
   }): Promise<JoinRequestAggregateState> {
-    const request = await this.deps.reads.tryFindRequest({ joinRequestId });
-    if (!request || request.organizationId !== organizationId) {
+    const request = await this.deps.reads.getRequest({ joinRequestId });
+    if (request.organizationId !== organizationId) {
       throw new JoinRequestNotFoundError(
         `join request ${joinRequestId} does not belong to ${organizationId}`,
       );
@@ -60,7 +61,7 @@ export class JoinRequestAdmissionGuardsService {
 
   /** The domain the caller has PROVED, or the universal nothing. */
   provenDomainOrRefuse({ verifiedEmail }: { verifiedEmail: string | null }): string {
-    const domain = verifiedEmail ? joinDomainOf(verifiedEmail) : null;
+    const domain = verifiedEmail ? extractJoinDomain(verifiedEmail) : null;
     if (!domain || isPublicEmailDomain(domain)) {
       throw new JoinNotAvailableError("no verified company address is available for this request");
     }
@@ -131,10 +132,13 @@ export class JoinRequestAdmissionGuardsService {
     userId: string;
     organizationId: string;
   }): Promise<number> {
-    const rejectedAt = await this.deps.reads.tryFindLastRejectionAt({
-      userId,
-      organizationId,
-    });
+    const rejectedAt = await this.deps.reads
+      .getLastRejectionAt({ userId, organizationId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "join_request_not_found")
+          return undefined;
+        throw error;
+      });
     if (!rejectedAt) {
       return 0;
     }
@@ -169,10 +173,13 @@ export class JoinRequestAdmissionGuardsService {
       );
     }
 
-    const candidate = await this.deps.candidates.tryFindCandidateOrganization({
-      organizationId,
-      domain,
-    });
+    // An organization that is no candidate refuses below as unproven, as it always has.
+    const candidate = await this.deps.candidates
+      .getCandidateOrganization({ organizationId, domain })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "join_not_available") return undefined;
+        throw error;
+      });
     if (candidate?.connectionAdmitsDomain) {
       throw new JoinAutoConnectionAdmitsError(
         `an active connection already admits ${domain} for ${organizationId}`,

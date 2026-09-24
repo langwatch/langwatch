@@ -1,6 +1,13 @@
 import { nowInstant } from "@langwatch/time";
 import { usePageVisibility, useFilterStore } from "@langwatch/trace-browser-kit";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  type Dispatch,
+  type SetStateAction,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { useRefreshUIStore } from "../../../../behavior/refresh-ui.store.ts";
 import { useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
@@ -29,6 +36,76 @@ function nextBackoffInterval(consecutiveZeros: number, current: number): number 
     return SLOW_MS;
   }
   return current;
+}
+
+// What a tab returning to view refetches depends on the operator's live-updates mode.
+function resumeLiveUpdates({
+  resetPolling,
+  refresh,
+  invalidateCount,
+}: {
+  resetPolling: () => void;
+  refresh: () => void;
+  invalidateCount: () => Promise<void>;
+}): void {
+  const mode = useSseStatusStore.getState().liveUpdatesMode;
+  if (mode !== "paused") resetPolling();
+  if (mode === "live") {
+    refresh();
+    return;
+  }
+  if (mode === "ask") void invalidateCount();
+}
+
+// Every zero-count poll steps the backoff; any new trace returns to the fast cadence.
+function stepZeroBackoff({
+  count,
+  consecutiveZeros,
+  setIntervalMs,
+}: {
+  count: number;
+  consecutiveZeros: { current: number };
+  setIntervalMs: Dispatch<SetStateAction<number>>;
+}): void {
+  if (count !== 0) {
+    consecutiveZeros.current = 0;
+    setIntervalMs(FAST_MS);
+    return;
+  }
+  consecutiveZeros.current += 1;
+  setIntervalMs((current) => nextBackoffInterval(consecutiveZeros.current, current));
+}
+
+function newCountQueryInput({
+  projectId,
+  timeRange,
+  since,
+  queryText,
+  evalRuns,
+}: {
+  projectId: string | undefined;
+  timeRange: { from: number; to: number; label?: string };
+  since: number;
+  queryText: string;
+  evalRuns: ReturnType<typeof useInstantEvalRuns>["evalRuns"];
+}) {
+  return {
+    projectId: projectId ?? "",
+    timeRange: {
+      from: timeRange.from,
+      to: timeRange.to,
+      live: !!timeRange.label,
+    },
+    since,
+    query: queryText || undefined,
+    ...(evalRuns ? { evalRuns } : {}),
+  };
+}
+
+// The 0→N transition in live mode; the first success in a new query context
+// (prev === null) is baseline only.
+function isFirstLiveArrival({ prev, count }: { prev: number | null; count: number }): boolean {
+  return prev === 0 && count > 0 && useSseStatusStore.getState().liveUpdatesMode === "live";
 }
 
 export function useTraceNewCount(): TraceNewCountResult {
@@ -63,16 +140,14 @@ export function useTraceNewCount(): TraceNewCountResult {
   const prevVisibleRef = useRef(isVisible);
   useEffect(() => {
     if (isVisible && !prevVisibleRef.current) {
-      const mode = useSseStatusStore.getState().liveUpdatesMode;
-      if (mode !== "paused") {
-        consecutiveZerosRef.current = 0;
-        setIntervalMs(FAST_MS);
-      }
-      if (mode === "live") {
-        refresh();
-      } else if (mode === "ask") {
-        void trpcUtils.traces.newCount.invalidate();
-      }
+      resumeLiveUpdates({
+        resetPolling: () => {
+          consecutiveZerosRef.current = 0;
+          setIntervalMs(FAST_MS);
+        },
+        refresh,
+        invalidateCount: () => trpcUtils.traces.newCount.invalidate(),
+      });
     }
     prevVisibleRef.current = isVisible;
   }, [isVisible, refresh, trpcUtils]);
@@ -99,17 +174,7 @@ export function useTraceNewCount(): TraceNewCountResult {
   }, [project?.id, timeRange.from, timeRange.to, timeRange.label, since, queryText, evalRuns]);
 
   const query = api.traces.newCount.useQuery(
-    {
-      projectId: project?.id ?? "",
-      timeRange: {
-        from: timeRange.from,
-        to: timeRange.to,
-        live: !!timeRange.label,
-      },
-      since,
-      query: queryText || undefined,
-      ...(evalRuns ? { evalRuns } : {}),
-    },
+    newCountQueryInput({ projectId: project?.id, timeRange, since, queryText, evalRuns }),
     {
       // Honour the store contract: paused = "no updates, no pill, no
       // polling". Stops the query from firing at all so a paused
@@ -131,13 +196,11 @@ export function useTraceNewCount(): TraceNewCountResult {
   const { data: countData, dataUpdatedAt, errorUpdatedAt } = query;
   useEffect(() => {
     if (!dataUpdatedAt || !countData) return;
-    if (countData.count === 0) {
-      consecutiveZerosRef.current += 1;
-      setIntervalMs((current) => nextBackoffInterval(consecutiveZerosRef.current, current));
-    } else {
-      consecutiveZerosRef.current = 0;
-      setIntervalMs(FAST_MS);
-    }
+    stepZeroBackoff({
+      count: countData.count,
+      consecutiveZeros: consecutiveZerosRef,
+      setIntervalMs,
+    });
     // Fire the aurora pulse only on the 0→N transition in live
     // mode. Ask mode stays quiet (the floating pill is the
     // operator's chosen signal). High-throughput projects no longer
@@ -145,13 +208,7 @@ export function useTraceNewCount(): TraceNewCountResult {
     // an actual UI change (new rows are about to land).
     const prev = prevCountRef.current;
     prevCountRef.current = countData.count;
-    if (
-      prev === 0 &&
-      countData.count > 0 &&
-      useSseStatusStore.getState().liveUpdatesMode === "live"
-    ) {
-      // First success in a new query context (prev === null) is
-      // baseline only — never pulses.
+    if (isFirstLiveArrival({ prev, count: countData.count })) {
       pulseRefresh();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -139,7 +139,7 @@ export function buildLangyInfrastructure(input: {
     },
     // The one turn port that answers for real here: rendering the composer's
     // context chips is pure, and the contract package owns it.
-    context: { tryRender: renderLangyTurnContext },
+    context: { render: renderLangyTurnContext },
     // Fails toward the closed channel: nothing here resolves a project's
     // rollout flag, so advertising the surface would be a lie.
     uiActionSurface: { resolve: () => Promise.resolve(false) },

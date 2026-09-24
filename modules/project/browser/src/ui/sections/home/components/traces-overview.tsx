@@ -230,27 +230,26 @@ export function TracesOverview({
               a named control that says what it will show and over what window,
               so the click is worth taking rather than a mystery chevron; in
               `trend` it is simply already there, and needs no control. */}
-          {trendIsMeaningful ? (
-            variant === "strip" ? (
-              <chakra.button
-                type="button"
-                onClick={() => setChartOpen((open) => !open)}
-                aria-expanded={chartOpen}
-                display="inline-flex"
-                alignItems="center"
-                gap={1}
-                fontSize="xs"
-                color="fg.muted"
-                background="transparent"
-                borderWidth={0}
-                cursor="pointer"
-                _hover={{ color: "fg" }}
-              >
-                {chartOpen ? <LuChevronDown size={12} /> : <LuChevronRight size={12} />}
-                {chartOpen ? "Hide the trend" : `Show the trend over ${periodPhrase}`}
-              </chakra.button>
-            ) : null
-          ) : (
+          {trendIsMeaningful && variant === "strip" && (
+            <chakra.button
+              type="button"
+              onClick={() => setChartOpen((open) => !open)}
+              aria-expanded={chartOpen}
+              display="inline-flex"
+              alignItems="center"
+              gap={1}
+              fontSize="xs"
+              color="fg.muted"
+              background="transparent"
+              borderWidth={0}
+              cursor="pointer"
+              _hover={{ color: "fg" }}
+            >
+              {chartOpen ? <LuChevronDown size={12} /> : <LuChevronRight size={12} />}
+              {chartOpen ? "Hide the trend" : `Show the trend over ${periodPhrase}`}
+            </chakra.button>
+          )}
+          {!trendIsMeaningful && (
             // Not enough readings to draw a shape. Rather than a chart that
             // invents one, offer the window that would show a real trend. The
             // offer is the better thing, not an explanation of the absence.

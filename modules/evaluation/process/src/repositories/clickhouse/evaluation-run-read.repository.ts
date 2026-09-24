@@ -1,5 +1,6 @@
 import {
   evaluationRunDataSchema,
+  EvaluationNotFoundError,
   evaluationSummarySchema,
   traceEvaluationDataSchema,
   type EvaluationRunData,
@@ -54,7 +55,7 @@ function validateTenant(tenantId: string, operation: string): void {
   EventUtils.validateTenantId({ tenantId }, operation);
 }
 
-function numberOrNull(value: number | string | null): number | null {
+function toNumberOrNull(value: number | string | null): number | null {
   return value === null ? null : Number(value);
 }
 
@@ -92,8 +93,9 @@ export class EvaluationRunClickHouseReadRepository {
     },
   ) {}
 
-  async tryFindByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null> {
-    validateTenant(input.tenantId, "EvaluationRunClickHouseReadRepository.tryFindByEvaluationId");
+  async getByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData> {
+    validateTenant(input.tenantId, "EvaluationRunClickHouseReadRepository.getByEvaluationId");
+    let row: ClickHouseEvaluationRunRecord | undefined;
     try {
       const { scheduledAtFrom, scheduledAtTo } = await this.resolveScheduledAtRange(input);
       const bounds = (column: string): string =>
@@ -142,8 +144,7 @@ export class EvaluationRunClickHouseReadRepository {
         },
         format: "JSONEachRow",
       });
-      const row = (await result.json<ClickHouseEvaluationRunRecord>())[0];
-      return row ? this.fromClickHouseRecord(row) : null;
+      row = (await result.json<ClickHouseEvaluationRunRecord>())[0];
     } catch (error) {
       logger.warn(
         { tenantId: input.tenantId, evaluationId: input.evaluationId, error },
@@ -151,6 +152,8 @@ export class EvaluationRunClickHouseReadRepository {
       );
       throw error;
     }
+    if (!row) throw new EvaluationNotFoundError(input.evaluationId);
+    return this.fromClickHouseRecord(row);
   }
 
   async findByTraceId(input: { tenantId: string; traceId: string }): Promise<EvaluationRunData[]> {
@@ -387,9 +390,9 @@ export class EvaluationRunClickHouseReadRepository {
           ? { inputs: parseObject(row.Inputs) }
           : {}),
         timestamps: {
-          scheduledAt: numberOrNull(row.ScheduledAt),
-          startedAt: numberOrNull(row.StartedAt),
-          completedAt: numberOrNull(row.CompletedAt),
+          scheduledAt: toNumberOrNull(row.ScheduledAt),
+          startedAt: toNumberOrNull(row.StartedAt),
+          completedAt: toNumberOrNull(row.CompletedAt),
         },
       });
       (output[row.TraceId] ??= []).push(traceEvaluation);
@@ -477,10 +480,10 @@ export class EvaluationRunClickHouseReadRepository {
       createdAt: Number(row.CreatedAt),
       updatedAt: Number(row.UpdatedAt),
       LastEventOccurredAt: Number(row.LastEventOccurredAt ?? 0),
-      archivedAt: numberOrNull(row.ArchivedAt),
-      scheduledAt: numberOrNull(row.ScheduledAt),
-      startedAt: numberOrNull(row.StartedAt),
-      completedAt: numberOrNull(row.CompletedAt),
+      archivedAt: toNumberOrNull(row.ArchivedAt),
+      scheduledAt: toNumberOrNull(row.ScheduledAt),
+      startedAt: toNumberOrNull(row.StartedAt),
+      completedAt: toNumberOrNull(row.CompletedAt),
       costId: row.CostId,
     });
   }

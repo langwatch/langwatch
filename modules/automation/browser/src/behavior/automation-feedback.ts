@@ -5,7 +5,7 @@
 
 import { useCallback, useMemo } from "react";
 
-import { useAutomationHost } from "../model/automation-host.ts";
+import { type AutomationHost, useAutomationHost } from "../model/automation-host.ts";
 
 /** The subset of the application toaster's create options this family uses. */
 export type AutomationToast = {
@@ -21,25 +21,27 @@ export function useAutomationToaster(): AutomationToaster {
   const host = useAutomationHost();
   return useMemo(
     () => ({
-      create: (toast: AutomationToast) => {
-        if (toast.type === "error") {
-          host.failed({
-            error: void 0,
-            fallbackTitle: toast.title,
-            ...(toast.description ? { title: toast.title } : {}),
-            ...(toast.id ? { id: toast.id } : {}),
-          });
-          return;
-        }
-        host.succeeded({
-          title: toast.title,
-          ...(toast.description ? { description: toast.description } : {}),
-          ...(toast.id ? { id: toast.id } : {}),
-        });
-      },
+      create: (toast: AutomationToast) => createToast({ host, toast }),
     }),
     [host],
   );
+}
+
+function createToast({ host, toast }: { host: AutomationHost; toast: AutomationToast }): void {
+  if (toast.type === "error") {
+    host.failed({
+      error: void 0,
+      fallbackTitle: toast.title,
+      ...(toast.description ? { title: toast.title } : {}),
+      ...(toast.id ? { id: toast.id } : {}),
+    });
+    return;
+  }
+  host.succeeded({
+    title: toast.title,
+    ...(toast.description ? { description: toast.description } : {}),
+    ...(toast.id ? { id: toast.id } : {}),
+  });
 }
 
 export type AutomationErrorToastOptions = {

@@ -17,15 +17,16 @@ const buildEvaluatorResultDispatch = dispatches.buildEvaluatorResultDispatch.bin
 const emptyAgents = new Map<string, TypedAgent>();
 
 describe("buildTargetMetadata given an evaluator target", () => {
-  const evaluatorTarget = () =>
-    [
-      {
-        id: "target-judge",
-        type: "evaluator",
-        targetEvaluatorId: "evaluator-1",
-        mappings: {},
-      },
-    ] as unknown as EvaluationsV3State["targets"];
+  const evaluatorTarget = (): EvaluationsV3State["targets"] => [
+    {
+      id: "target-judge",
+      type: "evaluator",
+      targetEvaluatorId: "evaluator-1",
+      inputs: [],
+      outputs: [],
+      mappings: {},
+    },
+  ];
 
   // The leaderboard's self-preference check asks whether the judge shares
   // a model family with a candidate. Reading the evaluator's live config

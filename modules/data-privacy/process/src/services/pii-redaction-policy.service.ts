@@ -37,6 +37,16 @@ export type BatchClearPIIFunction = (
   options: PIICheckOptions,
 ) => Promise<(string | null)[]>;
 
+/** The tenant's native-redaction context, or the analysis-service path when none applies. */
+export type NativeContext =
+  | { kind: "native"; policy: ResolvedDataPrivacy; level: PiiLevel }
+  | { kind: "analysis" };
+
+/** The options for one analysis-service call, or the reason nothing is sent. */
+export type RedactionOptions =
+  | { kind: "redact"; options: PIICheckOptions }
+  | { kind: "skip_redaction" };
+
 /**
  * Dependencies for OtlpSpanPiiRedactionService that can be injected for testing.
  */
@@ -72,11 +82,12 @@ const runGoogleDlpBatch = ({
 }): Promise<(string | null)[]> =>
   Promise.all(
     texts.map(async (text) => {
-      return transport.tryClearGoogleDlp({
+      const clearing = await transport.clearGoogleDlp({
         text,
         piiRedactionLevel,
         exceptPatterns,
       });
+      return clearing.kind === "redacted" ? clearing.text : null;
     }),
   );
 
@@ -165,13 +176,13 @@ export class PiiRedactionPolicyService {
   async resolveNativeContext(
     tenantId: TenantId | undefined,
     requestLevel: PIIRedactionLevel,
-  ): Promise<{ policy: ResolvedDataPrivacy; level: PiiLevel } | null> {
+  ): Promise<NativeContext> {
     if (!this.deps.nativePolicyEnforced) {
-      return null;
+      return { kind: "analysis" };
     }
 
     if (!tenantId) {
-      return null;
+      return { kind: "analysis" };
     }
 
     let resolved: ResolvedDataPrivacy;
@@ -183,12 +194,13 @@ export class PiiRedactionPolicyService {
         "Data-privacy resolution failed; falling back to the analysis-service PII path",
       );
 
-      return null;
+      return { kind: "analysis" };
     }
 
     const level = reconcilePiiLevel(resolved.pii.level, requestLevel);
 
     return {
+      kind: "native",
       policy: {
         ...resolved,
         pii: {
@@ -232,7 +244,7 @@ export class PiiRedactionPolicyService {
    * strict (its default entity list), `{ entities }` for a custom level that selected
    * analysis-service identifiers, or null to skip it.
    */
-  tryLambdaAfterNative(policy: ResolvedDataPrivacy): {
+  deriveLambdaAfterNative(policy: ResolvedDataPrivacy): {
     entities?: readonly string[];
     exceptPatterns?: readonly string[];
   } | null {
@@ -271,26 +283,25 @@ export class PiiRedactionPolicyService {
   }
 
   /**
-   * Returns PIICheckOptions for the redaction call, or null when redaction
-   * should be skipped (disabled, no langevals in dev, etc). Throws when
-   * langevals is required but unset in production.
+   * The options for the redaction call, or `skip_redaction` (disabled, no
+   * langevals in dev, etc). Throws when langevals is required but unset in production.
    */
-  async tryBuildOptions(
+  async resolveRedactionOptions(
     piiRedactionLevel: PIIRedactionLevel,
     entities?: readonly string[],
     exceptPatterns?: readonly string[],
-  ): Promise<PIICheckOptions | null> {
+  ): Promise<RedactionOptions> {
     const disabled = this.deps.featureFlags
       ? await this.deps.featureFlags.isEnabled("ops_pii_strict_presidio_redaction_disabled", {
           kind: "system",
         })
       : false;
     if (disabled) {
-      return null;
+      return { kind: "skip_redaction" };
     }
 
     if (piiRedactionLevel === "DISABLED") {
-      return null;
+      return { kind: "skip_redaction" };
     }
 
     const piiEnforced = this.deps.isProduction;
@@ -300,15 +311,18 @@ export class PiiRedactionPolicyService {
         throw new Error("LANGEVALS_ENDPOINT is not set, PII check cannot be performed");
       }
 
-      return null;
+      return { kind: "skip_redaction" };
     }
 
     return {
-      piiRedactionLevel,
-      enforced: piiEnforced,
-      mainMethod: "presidio",
-      ...(entities && entities.length > 0 ? { entities } : {}),
-      ...(exceptPatterns && exceptPatterns.length > 0 ? { exceptPatterns } : {}),
+      kind: "redact",
+      options: {
+        piiRedactionLevel,
+        enforced: piiEnforced,
+        mainMethod: "presidio",
+        ...(entities && entities.length > 0 ? { entities } : {}),
+        ...(exceptPatterns && exceptPatterns.length > 0 ? { exceptPatterns } : {}),
+      },
     };
   }
 }

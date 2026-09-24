@@ -8,18 +8,6 @@ export function resolveLangyMirrorTier(
   return mirrorProjectId === projectId ? "skip" : "content";
 }
 
-export function resolveWorkerCallbackUrl(
-  env: Record<string, string | undefined> = {},
-): string | undefined {
-  return env.LANGY_WORKER_CALLBACK_URL ?? env.LANGWATCH_ENDPOINT ?? env.LANGWATCH_API_URL;
-}
-
-export function resolveWorkerGatewayBaseUrl(
-  env: Record<string, string | undefined> = {},
-): string | undefined {
-  return env.LANGY_WORKER_GATEWAY_URL ?? env.LW_GATEWAY_PUBLIC_URL ?? env.LW_GATEWAY_BASE_URL;
-}
-
 export function ensureGatewayV1BaseUrl(baseUrl: string): string {
   const trimmed = baseUrl.replace(/\/+$/, "");
   return trimmed.endsWith("/v1") ? trimmed : `${trimmed}/v1`;

@@ -6,7 +6,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { RunViaApiDialog } from "../run-via-api-button.tsx";
 
@@ -44,12 +44,17 @@ describe("RunViaApiDialog (evaluations-v3)", () => {
   });
 
   describe("given the dialog is open", () => {
-    /** @scenario Python is the default language */
-    it("defaults to a Python snippet that runs the experiment", async () => {
+    let snippet: string;
+
+    beforeEach(async () => {
       renderDialog();
 
       await screen.findByRole("dialog");
-      const snippet = dialogText();
+      snippet = dialogText();
+    });
+
+    /** @scenario Python is the default language */
+    it("defaults to a Python snippet that runs the experiment", () => {
       expect(snippet).toContain('langwatch.experiment.run("my-experiment"');
       // Python is the default tab and reads the results back.
       expect(snippet).toContain("result.results");
@@ -57,11 +62,7 @@ describe("RunViaApiDialog (evaluations-v3)", () => {
     });
 
     /** @scenario The dialog shows how to read results back */
-    it("shows reading the per-row results and the run url", async () => {
-      renderDialog();
-
-      await screen.findByRole("dialog");
-      const snippet = dialogText();
+    it("shows reading the per-row results and the run url", () => {
       expect(snippet).toContain("result.results");
       expect(snippet).toContain("result.run_url");
     });

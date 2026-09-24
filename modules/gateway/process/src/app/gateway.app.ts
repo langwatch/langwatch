@@ -56,6 +56,7 @@ import {
   type GatewayInternalSpendCommandRecord,
   type GatewayInternalSpendSubmission,
   type GatewayVirtualKeyRecord,
+  GatewayBudgetNotFoundError,
 } from "@langwatch/gateway-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -425,7 +426,7 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
    * membership set is indistinguishable from nonexistent. Mutations don't use this — their
    * contract is permission-based, so an unauthorized caller gets FORBIDDEN instead.
    */
-  requireVisibleVirtualKeyForUser(input: {
+  getVisibleVirtualKeyForUser(input: {
     organizationId: string;
     id: string;
     userId: string;
@@ -440,13 +441,13 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
     virtualKeys: readonly VirtualKeyWithScopes[];
   }): VirtualKeyWithScopes[];
   /** One key under that same credential visibility rule, or the not-found refusal. */
-  requireVisibleVirtualKeyForProjectCredential(input: {
+  getVisibleVirtualKeyForProjectCredential(input: {
     project: ProjectIdentity;
     id: string;
     organizationId: string;
   }): Promise<VirtualKeyWithScopes>;
   /** One key anchored to this organization, without any visibility rule. */
-  requireExistingVirtualKey(input: {
+  getExistingVirtualKey(input: {
     organizationId: string;
     id: string;
   }): Promise<VirtualKeyWithScopes>;
@@ -480,19 +481,15 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
     organizationId: string;
     traceProjectId: string | null | undefined;
   }): Promise<void>;
-  /** Refuses a guardrail attachment the caller may not make in this project. */
+  /** Refuses a guardrail attachment the caller may not make in the key's guardrail project. */
   assertGuardrailAttachmentsAllowed(input: {
     actor: GatewayActor;
-    projectId: string | null;
-    attachments: readonly GuardrailAttachment[] | undefined;
-  }): Promise<void>;
-  /** The project a key's guardrail attachments are judged against. */
-  resolveVirtualKeyProjectId(input: {
     organizationId: string;
     virtualKeyId: string | null;
     scopes: readonly GatewayVirtualKeyScope[] | undefined;
     traceProjectId: string | null;
-  }): Promise<string | null>;
+    attachments: readonly GuardrailAttachment[] | undefined;
+  }): Promise<void>;
 
   // ── Projections and spend ────────────────────────────────────────────────
 
@@ -1044,22 +1041,27 @@ export class GatewayApp implements GatewayApi {
 
   /**
    * The spend-event ledger reader and the budget ledger, as the reconciliation
-   * routes read them. `undefined` when this process composed no gateway control
-   * plane — the routes refuse by name rather than answering with a confident zero.
+   * routes read them. Refused by name where this process composed no gateway control
+   * plane, rather than answering with a confident zero.
    */
-  spendEvents(): GatewaySpendEventsService | undefined {
-    return this.#coreDependencies?.spendEvents;
+  getSpendEvents(): GatewaySpendEventsService {
+    const spendEvents = this.#coreDependencies?.spendEvents;
+    if (!spendEvents) throw this.spendStoreUnavailable();
+    return spendEvents;
   }
 
   /** The usage report's figures (ADR-156 section 10); refused where no spend ledger is composed. */
-  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<GatewayUsageCount> {
-    const spendEvents = this.spendEvents();
-    if (!spendEvents) return Promise.reject(this.spendStoreUnavailable());
-    return spendEvents.countUsage(input);
+  async countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<GatewayUsageCount> {
+    return this.getSpendEvents().countUsage(input);
   }
 
-  budgetSpend(): GatewayBudgetSpend | undefined {
-    return this.#coreDependencies?.budgetSpend;
+  getBudgetSpend(): GatewayBudgetSpend {
+    const budgetSpend = this.#coreDependencies?.budgetSpend;
+    if (!budgetSpend) throw this.spendStoreUnavailable();
+    return budgetSpend;
   }
 
   get #spendCollaborators(): GatewaySpendCollaborators {
@@ -1126,11 +1128,13 @@ export class GatewayApp implements GatewayApi {
     return this.#dependencies.budgetDecisions.listPageWithHealth(input);
   }
 
-  tryGetBudgetWithHealth(input: {
+  async getBudgetWithHealth(input: {
     id: string;
     organizationId: string;
-  }): Promise<GatewayBudgetHealth | null> {
-    return this.#dependencies.budgetDecisions.findHealthById(input);
+  }): Promise<GatewayBudgetHealth> {
+    const found = await this.#dependencies.budgetDecisions.findHealthById(input);
+    if (!found) throw new GatewayBudgetNotFoundError();
+    return found;
   }
 
   budgetScopeReach(input: GatewayBudgetScopeReachInput): Promise<GatewayBudgetScopeReachResult> {
@@ -1387,10 +1391,6 @@ export class GatewayApp implements GatewayApi {
     return this.#dependencies.virtualKeys.enable(input);
   }
 
-  getVirtualKeySpendService(): GatewayVirtualKeySpend | undefined {
-    return this.#dependencies.virtualKeySpend;
-  }
-
   isSpendSourceAvailable(): boolean {
     return this.#dependencies.spendSourceAvailable;
   }
@@ -1486,12 +1486,12 @@ export class GatewayApp implements GatewayApi {
     return this.#dependencies.isVirtualKeyVisible(input);
   }
 
-  requireVisibleVirtualKeyForUser(input: {
+  getVisibleVirtualKeyForUser(input: {
     organizationId: string;
     id: string;
     userId: string;
   }): Promise<VirtualKeyWithScopes> {
-    return this.#dependencies.requireVisibleVirtualKeyForUser(input);
+    return this.#dependencies.getVisibleVirtualKeyForUser(input);
   }
 
   visibleToProjectCredential(input: {
@@ -1501,19 +1501,19 @@ export class GatewayApp implements GatewayApi {
     return this.#dependencies.visibleToProjectCredential(input);
   }
 
-  requireVisibleVirtualKeyForProjectCredential(input: {
+  getVisibleVirtualKeyForProjectCredential(input: {
     project: ProjectIdentity;
     id: string;
     organizationId: string;
   }): Promise<VirtualKeyWithScopes> {
-    return this.#dependencies.requireVisibleVirtualKeyForProjectCredential(input);
+    return this.#dependencies.getVisibleVirtualKeyForProjectCredential(input);
   }
 
-  requireExistingVirtualKey(input: {
+  getExistingVirtualKey(input: {
     organizationId: string;
     id: string;
   }): Promise<VirtualKeyWithScopes> {
-    return this.#dependencies.requireExistingVirtualKey(input);
+    return this.#dependencies.getExistingVirtualKey(input);
   }
 
   // ── Projections and spend ────────────────────────────────────────────────
@@ -1658,15 +1658,12 @@ export class GatewayApp implements GatewayApi {
         callerProjectId: input.callerProjectId,
       });
     }
-    const projectId = await this.#dependencies.resolveVirtualKeyProjectId({
+    await this.#dependencies.assertGuardrailAttachmentsAllowed({
+      actor,
       organizationId,
       virtualKeyId: null,
       scopes,
       traceProjectId: traceProjectId ?? null,
-    });
-    await this.#dependencies.assertGuardrailAttachmentsAllowed({
-      actor,
-      projectId,
       attachments: guardrailAttachments,
     });
   }
@@ -1685,7 +1682,7 @@ export class GatewayApp implements GatewayApi {
     guardrailAttachments?: readonly GuardrailAttachment[] | undefined;
   }): Promise<VirtualKeyWithScopes> {
     const { actor, organizationId, id, scopes, guardrailAttachments } = input;
-    const existing = await this.#dependencies.requireExistingVirtualKey({ organizationId, id });
+    const existing = await this.#dependencies.getExistingVirtualKey({ organizationId, id });
     await this.#dependencies.assertCanOperateOnAnyScope({
       actor,
       scopes: existing.scopes,
@@ -1710,19 +1707,20 @@ export class GatewayApp implements GatewayApi {
       }
     }
 
-    const projectId = await this.#dependencies.resolveVirtualKeyProjectId({
-      organizationId,
-      virtualKeyId: id,
-      scopes,
-      traceProjectId:
-        input.traceProjectId !== undefined ? input.traceProjectId : existing.traceProjectId,
-    });
     const attachments =
       guardrailAttachments ??
       (scopes !== undefined
         ? parseVirtualKeyConfig(existing.config).guardrailAttachments
         : undefined);
-    await this.#dependencies.assertGuardrailAttachmentsAllowed({ actor, projectId, attachments });
+    await this.#dependencies.assertGuardrailAttachmentsAllowed({
+      actor,
+      organizationId,
+      virtualKeyId: id,
+      scopes,
+      traceProjectId:
+        input.traceProjectId !== undefined ? input.traceProjectId : existing.traceProjectId,
+      attachments,
+    });
 
     return existing;
   }
@@ -1738,7 +1736,7 @@ export class GatewayApp implements GatewayApi {
     id: string;
     permission: AuthzPermission;
   }): Promise<VirtualKeyWithScopes> {
-    const existing = await this.#dependencies.requireExistingVirtualKey({
+    const existing = await this.#dependencies.getExistingVirtualKey({
       organizationId: input.organizationId,
       id: input.id,
     });

@@ -1,4 +1,4 @@
-import type { HandledError } from "@langwatch/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import type {
   LangyConversationStartedEventData,
   LangyMessagePart,
@@ -369,7 +369,15 @@ export class LangyConversationTurnService {
     projectId: string;
     conversationId: string;
   }): Promise<{ token: string; turnId: string } | null> {
-    return this.deps.repository.tryFindPendingHandoff({ projectId, conversationId });
+    return this.deps.repository
+      .getResumeState({ projectId, conversationId })
+      .then((state) => state.pendingHandoff)
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "langy_conversation_not_found") {
+          return null;
+        }
+        throw error;
+      });
   }
 
   /**

@@ -24,6 +24,14 @@ function makeGraph(overrides: Partial<CustomGraph> = {}): CustomGraph {
     name: "Traces per hour",
     projectId: "proj-1",
     filters: {},
+    kind: "builder",
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    dashboardId: null,
+    gridColumn: 0,
+    gridRow: 0,
+    colSpan: 1,
+    rowSpan: 1,
     graph: {
       graphId: "graph-1",
       graphType: "line",
@@ -32,7 +40,7 @@ function makeGraph(overrides: Partial<CustomGraph> = {}): CustomGraph {
       timeScale: 60,
     },
     ...overrides,
-  } as unknown as CustomGraph;
+  };
 }
 
 function makeDeps({
@@ -154,7 +162,7 @@ describe("ReportChartService.loadReportCharts", () => {
               includePrevious: false,
               timeScale: 60,
             },
-          } as unknown as Partial<CustomGraph>),
+          }),
         ],
         timeseries: {
           previousPeriod: [],

@@ -74,13 +74,13 @@ const messagesOf = ({
 };
 
 /** A mapped cell that holds a number, or nothing when it holds no number. */
-const numberValueOf = (value: unknown): number | undefined => {
+const coerceNumberValue = (value: unknown): number | undefined => {
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
 /** A mapped cell that holds a truth value, written either way round. */
-const booleanValueOf = (value: unknown): boolean | undefined => {
+const coerceBooleanValue = (value: unknown): boolean | undefined => {
   if (typeof value === "boolean") return value;
   const text = String(value).trim().toLowerCase();
   if (text === "true") return true;
@@ -93,7 +93,7 @@ const booleanValueOf = (value: unknown): boolean | undefined => {
  * empty cell and one the declared type can't read. Left out of the call so
  * the function's own default applies, not the agent seeing `NaN` or "undefined".
  */
-const parameterValueOf = ({
+const coerceParameterValue = ({
   value,
   definition,
 }: {
@@ -101,8 +101,8 @@ const parameterValueOf = ({
   definition: ScenarioParameterDefinition;
 }): string | number | boolean | undefined => {
   if (value === undefined || value === null || value === "") return undefined;
-  if (definition.type === "number") return numberValueOf(value);
-  if (definition.type === "boolean") return booleanValueOf(value);
+  if (definition.type === "number") return coerceNumberValue(value);
+  if (definition.type === "boolean") return coerceBooleanValue(value);
   return typeof value === "string" ? value : (JSON.stringify(value) ?? "");
 };
 
@@ -120,7 +120,7 @@ export const buildConnectedCall = ({
 }): ConnectedTargetCall => {
   const params: Record<string, string | number | boolean> = {};
   for (const definition of definitions) {
-    const value = parameterValueOf({
+    const value = coerceParameterValue({
       value: inputs[definition.name],
       definition,
     });
@@ -137,20 +137,20 @@ export const buildConnectedCall = ({
   };
 };
 
+/** The text of one content part: a string, or a part carrying `text`. */
+const partText = (part: unknown): string => {
+  if (typeof part === "string") return part;
+  if (typeof (part as { text?: unknown })?.text === "string")
+    return (part as { text: string }).text;
+  return "";
+};
+
 /** The text of one message, whatever shape its content has. */
 const contentText = (message: ProtocolMessage): string => {
   const content = (message as { content?: unknown }).content;
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
-    return content
-      .map((part) =>
-        typeof part === "string"
-          ? part
-          : typeof (part as { text?: unknown })?.text === "string"
-            ? (part as { text: string }).text
-            : "",
-      )
-      .join("");
+    return content.map(partText).join("");
   }
   return content === undefined ? "" : JSON.stringify(content);
 };

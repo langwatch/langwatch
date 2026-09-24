@@ -392,7 +392,7 @@ const FLAGS_BY_KEY: Map<string, FeatureFlagDefinition> = new Map(
  * family-prefix matches. Undefined means callers fall through to legacy
  * in-memory evaluation (back-compat for pre-registry flags).
  */
-export function resolveFlagDefinition(key: string): FeatureFlagDefinition | undefined {
+export function pickFlagDefinition(key: string): FeatureFlagDefinition | undefined {
   const explicit = FLAGS_BY_KEY.get(key);
   if (explicit) return explicit;
   for (const fam of FEATURE_FLAG_FAMILIES) {

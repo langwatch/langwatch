@@ -1,5 +1,6 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { type AuthzApi, AuthzGrantNotConfirmedError } from "@langwatch/authz-contract";
+import { HandledError } from "@langwatch/handled-error";
 import {
   looksLikeSsoConnectionId,
   type SsoArrivalPolicy,
@@ -205,7 +206,12 @@ export class SsoArrivalService {
       );
       return null;
     }
-    const connection = await this.deps.connections.tryFindConnection({ connectionId });
+    const connection = await this.deps.connections
+      .getConnection({ connectionId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "sso_connection_not_found") return null;
+        throw error;
+      });
     if (!connection) {
       logger.info(
         { reason: "connection_not_found", connectionId },

@@ -141,6 +141,12 @@ function welcomeTakeoverProps({
   };
 }
 
+function progressDotColor({ index, currentIndex }: { index: number; currentIndex: number }) {
+  if (index === currentIndex) return "orange.400";
+  if (index < currentIndex) return "orange.300";
+  return "gray.200";
+}
+
 export const WelcomeScreen: React.FC = () => {
   const host = useOnboardingHost();
   const analytics = useUiAnalytics();
@@ -427,13 +433,7 @@ export const WelcomeScreen: React.FC = () => {
                   w={currentVisibleIndex === idx ? "16px" : "5px"}
                   h="5px"
                   borderRadius="full"
-                  bg={
-                    currentVisibleIndex === idx
-                      ? "orange.400"
-                      : idx < currentVisibleIndex
-                        ? "orange.300"
-                        : "gray.200"
-                  }
+                  bg={progressDotColor({ index: idx, currentIndex: currentVisibleIndex })}
                   transition="all 0.3s ease"
                 />
               ))}

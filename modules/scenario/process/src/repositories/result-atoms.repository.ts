@@ -132,7 +132,7 @@ export abstract class ResultAtomsRepository {
   /** The number every run carries inside its plan, oldest first, over the window. */
   abstract findRunOrdinals(filter: ResultsFilter): Promise<RunOrdinalRow[]>;
   /** The stat strip counts, over every atom in scope. */
-  abstract aggregateTotals(filter: ResultsFilter): Promise<RawTotalsRow | null>;
+  abstract aggregateTotals(filter: ResultsFilter): Promise<RawTotalsRow>;
   /** One row per group, folded so volume never reaches the client. */
   abstract aggregateGroups: (input: {
     filter: ResultsFilter;

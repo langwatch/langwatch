@@ -70,6 +70,10 @@ export function EvaluatorPushToCopiesDialog({
       host.failed({ error, fallbackTitle: "Couldn't push the evaluator" });
     }
   };
+  const copiesFailed = !copies.isLoading && copies.isError;
+  const copiesReady = !copies.isLoading && !copies.isError;
+  const hasNoCopies = copiesReady && (copies.data?.length ?? 0) === 0;
+  const hasCopies = copiesReady && (copies.data?.length ?? 0) !== 0;
 
   return (
     <Dialog.Root open={open} onOpenChange={({ open: isOpen }) => !isOpen && onClose()}>
@@ -82,15 +86,14 @@ export function EvaluatorPushToCopiesDialog({
             <Text fontSize="sm" color="fg.muted">
               Select which replicas to push the latest config to:
             </Text>
-            {copies.isLoading ? (
-              <Text>Loading replicas...</Text>
-            ) : copies.isError ? (
+            {copies.isLoading && <Text>Loading replicas...</Text>}
+            {copiesFailed && (
               <Text role="alert" color="red.fg">
                 Couldn&apos;t load replicas.
               </Text>
-            ) : (copies.data?.length ?? 0) === 0 ? (
-              <Text color="fg.muted">No replicas found.</Text>
-            ) : (
+            )}
+            {hasNoCopies && <Text color="fg.muted">No replicas found.</Text>}
+            {hasCopies && (
               <VStack gap={2} align="start" width="full">
                 {copies.data?.map((copy) => (
                   <Checkbox

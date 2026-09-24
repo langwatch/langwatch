@@ -3,7 +3,7 @@ import { AskChip } from "@langwatch/design-system/ask-chip";
 import { selectLangySuggestions, useLangyStore } from "@langwatch/langy-browser-kit";
 
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
-import { useHomeDevState } from "./dev/home-dev-state.ts";
+import { type HomeDevState, useHomeDevState } from "./dev/home-dev-state.ts";
 
 import "./homeHeroScroll.css";
 import { HeroAskField } from "./hero-ask-field.tsx";
@@ -26,6 +26,33 @@ const ASK_MEASURE = "680px";
  */
 const ASK_ROW_MIN_HEIGHT = "26px";
 
+function isNewProjectFor(devState: HomeDevState | null, detected: boolean): boolean {
+  if (devState === "empty") return true;
+  if (devState === "populated") return false;
+  return detected;
+}
+
+type SuggestionReach = Parameters<typeof selectLangySuggestions>[0]["reach"];
+
+function suggestionReachFor(
+  devState: HomeDevState | null,
+  detected: SuggestionReach,
+): SuggestionReach {
+  if (devState === "empty") {
+    return { hasTraces: false, hasEvaluations: false, hasExperiments: false };
+  }
+  if (devState === "populated") {
+    return { hasTraces: true, hasEvaluations: true, hasExperiments: true };
+  }
+  return detected;
+}
+
+function askPlaceholder(canAsk: boolean, isNewProject: boolean): string {
+  if (!canAsk) return "Search, or jump to anything";
+  if (isNewProject) return "Ask Langy how to get started, or search";
+  return "Ask Langy, search, or jump to anything";
+}
+
 export function LangyHomeHero() {
   const devState = useHomeDevState();
 
@@ -33,8 +60,7 @@ export function LangyHomeHero() {
   const canAsk = devState === "read-only" ? false : realCanAsk;
 
   const reach = useProjectReach();
-  const isNewProject =
-    devState === "empty" ? true : devState === "populated" ? false : reach.isNewProject;
+  const isNewProject = isNewProjectFor(devState, reach.isNewProject);
 
   // Until the project's reach is known, "has nothing" and "has not answered
   // yet" look identical, and offering the empty-project asks to a project with
@@ -49,14 +75,7 @@ export function LangyHomeHero() {
   const leadWithOnboarding = reachKnown && isNewProject;
   const suggestions = !reachKnown
     ? []
-    : selectLangySuggestions({
-        reach:
-          devState === "empty"
-            ? { hasTraces: false, hasEvaluations: false, hasExperiments: false }
-            : devState === "populated"
-              ? { hasTraces: true, hasEvaluations: true, hasExperiments: true }
-              : reach,
-      });
+    : selectLangySuggestions({ reach: suggestionReachFor(devState, reach) });
 
   const askLangy = useLangyStore((s) => s.askLangy);
 
@@ -74,15 +93,7 @@ export function LangyHomeHero() {
       </Box>
 
       <VStack align="center" gap={3} width="full" maxWidth={ASK_MEASURE}>
-        <HeroAskField
-          placeholder={
-            canAsk
-              ? isNewProject
-                ? "Ask Langy how to get started, or search"
-                : "Ask Langy, search, or jump to anything"
-              : "Search, or jump to anything"
-          }
-        />
+        <HeroAskField placeholder={askPlaceholder(canAsk, isNewProject)} />
 
         {/* Prompts and onboarding action on separate centre lines, not one
             wrapping row. Row height fixed until project data arrives. */}

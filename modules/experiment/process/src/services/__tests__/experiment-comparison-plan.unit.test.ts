@@ -1,4 +1,4 @@
-import type { EvaluationsV3State } from "@langwatch/experiment-contract";
+import type { ComparisonEvaluatorConfig, EvaluationsV3State } from "@langwatch/experiment-contract";
 /**
  * Phase 2 cell generation: comparisons the user has not finished
  * configuring.
@@ -97,16 +97,17 @@ const createTestDataset = (rowCount = 3) =>
   }));
 
 describe("ExperimentRunOrchestratorService.generateComparisonCells given a comparison the user has not finished configuring", () => {
-  const columnTarget = (comparison: Record<string, unknown>): EvaluationsV3State["targets"][0] =>
-    ({
-      id: "comparison-column",
-      type: "evaluator",
-      targetEvaluatorId: "db-comparison-evaluator",
-      inputs: [],
-      outputs: [{ identifier: "label", type: "str" }],
-      mappings: {},
-      comparison,
-    }) as unknown as EvaluationsV3State["targets"][0];
+  const columnTarget = (
+    comparison: ComparisonEvaluatorConfig,
+  ): EvaluationsV3State["targets"][0] => ({
+    id: "comparison-column",
+    type: "evaluator",
+    targetEvaluatorId: "db-comparison-evaluator",
+    inputs: [],
+    outputs: [{ identifier: "label", type: "str" }],
+    mappings: {},
+    comparison,
+  });
 
   const runWith = (target: EvaluationsV3State["targets"][0]) => {
     const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
@@ -207,7 +208,7 @@ describe("ExperimentRunOrchestratorService.generateComparisonCells given a compa
           includeMetrics: [],
           randomizeOrder: true,
         },
-      } as unknown as EvaluationsV3State["evaluators"][0]);
+      });
 
       const { cells, skipReasons } = ExperimentRunOrchestratorService.generateComparisonCells({
         scopedRowIndices: [1],

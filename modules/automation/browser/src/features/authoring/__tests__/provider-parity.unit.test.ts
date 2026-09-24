@@ -199,24 +199,24 @@ describe("provider registry parity", () => {
     const contextForReport = (template: SlackBlockKitTemplateOption): Record<string, unknown> => {
       const sources = template.reportSources ?? [];
       if (sources.includes("dashboard")) {
-        return reportChartContext("dashboard") as unknown as Record<string, unknown>;
+        return { ...reportChartContext("dashboard") };
       }
       if (sources.includes("customGraph")) {
-        return reportChartContext("customGraph") as unknown as Record<string, unknown>;
+        return { ...reportChartContext("customGraph") };
       }
-      return reportTraceContext as unknown as Record<string, unknown>;
+      return { ...reportTraceContext };
     };
     const contextForTemplate = (
       template: SlackBlockKitTemplateOption,
       cadence: "immediate" | "digest",
     ): Record<string, unknown> => {
       if (template.kind === "graphAlert") {
-        return graphAlertContextFor(template.id) as unknown as Record<string, unknown>;
+        return { ...graphAlertContextFor(template.id) };
       }
       if (template.kind === "report") {
         return contextForReport(template);
       }
-      return contextsByCadence[cadence] as unknown as Record<string, unknown>;
+      return { ...contextsByCadence[cadence] };
     };
 
     describe("when each template renders against the example context for its kind and cadence", () => {
@@ -231,7 +231,7 @@ describe("provider registry parity", () => {
             const context = contextForTemplate(template, cadence);
             const { output } = await renderLiquid({
               template: template.source,
-              context: context as unknown as Record<string, unknown>,
+              context,
             });
             const blocks: unknown = JSON.parse(output);
             expect(Array.isArray(blocks)).toBe(true);
@@ -287,25 +287,20 @@ describe("provider registry parity", () => {
       },
     });
     const modernExamples: Record<string, () => Record<string, unknown>> = {
-      graph_alert_detailed: () =>
-        graphAlertContextFor("graph_alert_detailed") as unknown as Record<string, unknown>,
-      graph_alert_resolved: () =>
-        graphAlertContextFor("graph_alert_resolved") as unknown as Record<string, unknown>,
-      graph_alert_no_data: () =>
-        graphAlertContextFor("graph_alert_no_data") as unknown as Record<string, unknown>,
-      graph_alert_history_table: () =>
-        graphAlertContextFor("graph_alert_history_table") as unknown as Record<string, unknown>,
-      trace_card_rich: () => richTraceContext as unknown as Record<string, unknown>,
-      eval_failure_rich: () => richTraceContext as unknown as Record<string, unknown>,
-      digest_evaluator_rollup: () => digestTraceContext as unknown as Record<string, unknown>,
-      digest_table: () => digestTraceContext as unknown as Record<string, unknown>,
-      report_summary_card: () => reportTraceContext as unknown as Record<string, unknown>,
-      report_table: () => reportTraceContext as unknown as Record<string, unknown>,
-      report_digest: () => reportTraceContext as unknown as Record<string, unknown>,
-      report_chart: () => reportChartContext("customGraph") as unknown as Record<string, unknown>,
-      report_chart_card: () =>
-        reportChartContext("customGraph") as unknown as Record<string, unknown>,
-      report_dashboard: () => reportChartContext("dashboard") as unknown as Record<string, unknown>,
+      graph_alert_detailed: () => ({ ...graphAlertContextFor("graph_alert_detailed") }),
+      graph_alert_resolved: () => ({ ...graphAlertContextFor("graph_alert_resolved") }),
+      graph_alert_no_data: () => ({ ...graphAlertContextFor("graph_alert_no_data") }),
+      graph_alert_history_table: () => ({ ...graphAlertContextFor("graph_alert_history_table") }),
+      trace_card_rich: () => ({ ...richTraceContext }),
+      eval_failure_rich: () => ({ ...richTraceContext }),
+      digest_evaluator_rollup: () => ({ ...digestTraceContext }),
+      digest_table: () => ({ ...digestTraceContext }),
+      report_summary_card: () => ({ ...reportTraceContext }),
+      report_table: () => ({ ...reportTraceContext }),
+      report_digest: () => ({ ...reportTraceContext }),
+      report_chart: () => ({ ...reportChartContext("customGraph") }),
+      report_chart_card: () => ({ ...reportChartContext("customGraph") }),
+      report_dashboard: () => ({ ...reportChartContext("dashboard") }),
     };
 
     describe("when a modern-suite template (ADR-041) renders against a complete example", () => {

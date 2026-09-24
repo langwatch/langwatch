@@ -2,7 +2,10 @@ import { randomBytes } from "node:crypto";
 
 import { nowInstant } from "@langwatch/time";
 
-import { GithubTokenCacheRepository } from "../github-token-cache.repository.ts";
+import {
+  GithubTokenCacheRepository,
+  type GithubLockAcquisition,
+} from "../github-token-cache.repository.ts";
 import type { MemoryGithubDatabase } from "./memory.github.database.ts";
 
 const LOCK_TTL_SEC = 15;
@@ -46,14 +49,14 @@ export class MemoryGithubTokenCacheRepository extends GithubTokenCacheRepository
     this.write(`${input.installationId}:liveness`, input.value, input.ttlSec);
   }
 
-  async acquireLivenessLock(installationId: string): Promise<string | null> {
+  async acquireLivenessLock(installationId: string): Promise<GithubLockAcquisition> {
     return this.acquire(`${installationId}:liveness:lock`);
   }
 
   async acquireMintLock(input: {
     installationId: string;
     scopeKey: string;
-  }): Promise<string | null> {
+  }): Promise<GithubLockAcquisition> {
     return this.acquire(`${this.tokenKey(input)}:lock`);
   }
 
@@ -93,15 +96,15 @@ export class MemoryGithubTokenCacheRepository extends GithubTokenCacheRepository
     });
   }
 
-  private acquire(key: string): string | null {
+  private acquire(key: string): GithubLockAcquisition {
     if (this.read(key) !== null) {
-      return null;
+      return { acquired: false };
     }
 
     const token = randomBytes(16).toString("hex");
     this.write(key, token, LOCK_TTL_SEC);
 
-    return token;
+    return { acquired: true, token };
   }
 
   private release(key: string, token: string): void {

@@ -459,6 +459,56 @@ export function useFilterSidebarData() {
   };
 }
 
+// Keep a categorical section mounted when (a) it has buckets to show, (b) the AST
+// has an active filter on this field, or (c) it was synthesised as a placeholder.
+function keptCategoricalSections({
+  d,
+  activeFieldSet,
+}: {
+  d: Extract<Descriptors[number], { kind: "categorical" }>;
+  activeFieldSet: ReadonlySet<string>;
+}): CategoricalSection[] {
+  const isSynthetic = (d as { synthetic?: boolean }).synthetic;
+  const isKept = d.topValues.length > 0 || activeFieldSet.has(d.key) || isSynthetic;
+  if (!isKept) return [];
+  return [
+    {
+      kind: "cat",
+      key: d.key,
+      label: d.label,
+      group: d.group,
+      topValues: d.topValues,
+      synthetic: isSynthetic,
+    },
+  ];
+}
+
+// Keep range sections when (a) the span is non-zero, (b) the AST
+// has an active filter, or (c) it was synthesised as a placeholder.
+function keptRangeSections({
+  d,
+  activeFieldSet,
+}: {
+  d: Extract<Descriptors[number], { kind: "range" }>;
+  activeFieldSet: ReadonlySet<string>;
+}): RangeSectionData[] {
+  const isSynthetic = (d as { synthetic?: boolean }).synthetic;
+  const isKept = d.max > 0 || activeFieldSet.has(d.key) || isSynthetic;
+  if (!isKept) return [];
+  return [
+    {
+      kind: "range",
+      key: d.key,
+      label: d.label,
+      group: d.group,
+      min: d.min,
+      max: d.max,
+      discrete: d.discrete,
+      synthetic: isSynthetic,
+    },
+  ];
+}
+
 function partitionDescriptors(
   descriptors: ReturnType<typeof useTraceFacets>["data"],
   activeFieldSet: ReadonlySet<string>,
@@ -472,39 +522,12 @@ function partitionDescriptors(
 
   for (const d of descriptors) {
     if (d.kind === "categorical") {
-      // Keep a categorical section mounted when (a) it has buckets to show, (b) the AST
-      // has an active filter on this field, or (c) it was synthesised as a placeholder
-      // before traces arrive.
-      const isSynthetic = (d as { synthetic?: boolean }).synthetic;
-      if (d.topValues.length > 0 || activeFieldSet.has(d.key) || isSynthetic) {
-        cats.push({
-          kind: "cat",
-          key: d.key,
-          label: d.label,
-          group: d.group,
-          topValues: d.topValues,
-          synthetic: isSynthetic,
-        });
-      }
+      cats.push(...keptCategoricalSections({ d, activeFieldSet }));
       continue;
     }
 
     if (d.kind === "range") {
-      // Keep range sections when (a) the span is non-zero, (b) the AST
-      // has an active filter, or (c) it was synthesised as a placeholder.
-      const isSynthetic = (d as { synthetic?: boolean }).synthetic;
-      if (d.max > 0 || activeFieldSet.has(d.key) || isSynthetic) {
-        rngs.push({
-          kind: "range",
-          key: d.key,
-          label: d.label,
-          group: d.group,
-          min: d.min,
-          max: d.max,
-          discrete: d.discrete,
-          synthetic: isSynthetic,
-        });
-      }
+      rngs.push(...keptRangeSections({ d, activeFieldSet }));
       continue;
     }
 

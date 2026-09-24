@@ -1,4 +1,5 @@
 import {
+  ModelProviderNotFoundError,
   modelProviderSchema,
   readStoredSkipList,
   type Model,
@@ -75,11 +76,11 @@ export class PrismaModelProviderRepository implements ModelProviderRepository {
     };
   }
 
-  async tryFindById(input: {
+  async getById(input: {
     id: string;
     organizationId?: string;
     projectScopes?: ModelDefaultScope[];
-  }): Promise<ModelProvider | null> {
+  }): Promise<ModelProvider> {
     const row = await this.database.modelProvider.findFirst({
       where: {
         id: input.id,
@@ -96,13 +97,14 @@ export class PrismaModelProviderRepository implements ModelProviderRepository {
       },
       include: { scopes: true },
     });
-    return row ? PrismaModelProviderRepository.toModelProvider(row, this.credentials) : null;
+    if (!row) throw new ModelProviderNotFoundError();
+    return PrismaModelProviderRepository.toModelProvider(row, this.credentials);
   }
 
-  async tryFindByProviderForProject(input: {
+  async getByProviderForProject(input: {
     provider: string;
     projectScopes: ModelDefaultScope[];
-  }): Promise<ModelProvider | null> {
+  }): Promise<ModelProvider> {
     const row = await this.database.modelProvider.findFirst({
       where: {
         provider: input.provider,
@@ -115,10 +117,11 @@ export class PrismaModelProviderRepository implements ModelProviderRepository {
       include: { scopes: true },
       orderBy: { createdAt: "asc" },
     });
-    return row ? PrismaModelProviderRepository.toModelProvider(row, this.credentials) : null;
+    if (!row) throw new ModelProviderNotFoundError();
+    return PrismaModelProviderRepository.toModelProvider(row, this.credentials);
   }
 
-  async listForProject(projectScopes: ModelDefaultScope[]): Promise<ModelProvider[]> {
+  async findForProject(projectScopes: ModelDefaultScope[]): Promise<ModelProvider[]> {
     const rows = await this.database.modelProvider.findMany({
       where: {
         scopes: {
@@ -133,7 +136,7 @@ export class PrismaModelProviderRepository implements ModelProviderRepository {
     return rows.map((row) => PrismaModelProviderRepository.toModelProvider(row, this.credentials));
   }
 
-  async listForOrganization(organizationId: string): Promise<ModelProvider[]> {
+  async findForOrganization(organizationId: string): Promise<ModelProvider[]> {
     const rows = await this.database.modelProvider.findMany({
       where: { organizationId },
       include: { scopes: true },

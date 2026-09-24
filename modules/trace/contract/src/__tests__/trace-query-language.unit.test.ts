@@ -5,10 +5,10 @@ import {
   analyzeOrGroups,
   buildFacetStateLookup,
   getFacetValues,
-  getRangeValue,
+  extractRangeValue,
   type OrGroup,
   type OrGroupAnalysis,
-  validateAst,
+  describeAstProblem,
 } from "../trace-query-analysis.ts";
 import {
   addSameFieldOrValue,
@@ -379,11 +379,11 @@ describe("parse silent miscarriages — non-obvious shapes the validator must ca
   describe("given `status: error` (space after colon)", () => {
     it("parses as a LogicalExpression of `status:` (empty) AND `error` (free text)", () => {
       // The user's intent was `status:error` — but the space splits the
-      // clause. Liqe parses it without throwing; our `validateAst` is the
+      // clause. Liqe parses it without throwing; our `describeAstProblem` is the
       // backstop that surfaces "Missing value after `status:`".
       const ast = parse("status: error");
       expect(ast.type).toBe("LogicalExpression");
-      expect(validateAst(ast)).toBe("Missing value after `status:`");
+      expect(describeAstProblem(ast)).toBe("Missing value after `status:`");
     });
   });
 
@@ -391,7 +391,7 @@ describe("parse silent miscarriages — non-obvious shapes the validator must ca
     it("parses as a LogicalExpression of `cost:` (empty) AND `5` (free text)", () => {
       const ast = parse("cost:> 5");
       expect(ast.type).toBe("LogicalExpression");
-      expect(validateAst(ast)).toBe("Missing value after `cost:`");
+      expect(describeAstProblem(ast)).toBe("Missing value after `cost:`");
     });
   });
 
@@ -412,14 +412,14 @@ describe("parse silent miscarriages — non-obvious shapes the validator must ca
   });
 
   describe("given a trailing colon with no value", () => {
-    it("parses as a Tag with EmptyExpression — validateAst rejects with the field name", () => {
+    it("parses as a Tag with EmptyExpression — describeAstProblem rejects with the field name", () => {
       const ast = parse("status:");
-      expect(validateAst(ast)).toBe("Missing value after `status:`");
+      expect(describeAstProblem(ast)).toBe("Missing value after `status:`");
     });
 
     it("rejects mid-clause as well (`status:error AND model:`)", () => {
       const ast = parse("status:error AND model:");
-      expect(validateAst(ast)).toBe("Missing value after `model:`");
+      expect(describeAstProblem(ast)).toBe("Missing value after `model:`");
     });
   });
 
@@ -442,14 +442,14 @@ describe("parse silent miscarriages — non-obvious shapes the validator must ca
   });
 });
 
-describe("validateAst", () => {
+describe("describeAstProblem", () => {
   describe("given a parseable but semantically empty query", () => {
     it("returns null for a valid Tag", () => {
-      expect(validateAst(parse("status:error"))).toBeNull();
+      expect(describeAstProblem(parse("status:error"))).toBeNull();
     });
 
     it("returns the field-name error for `field:`", () => {
-      expect(validateAst(parse("status:"))).toBe("Missing value after `status:`");
+      expect(describeAstProblem(parse("status:"))).toBe("Missing value after `status:`");
     });
 
     it("returns the generic error when there is no field name", () => {
@@ -470,19 +470,21 @@ describe("validateAst", () => {
         location: { start: 0, end: 0 },
       };
 
-      expect(validateAst(ast)).toBe("Missing value after `:`");
+      expect(describeAstProblem(ast)).toBe("Missing value after `:`");
     });
 
     it("recurses into NOT operands", () => {
-      expect(validateAst(parse("NOT status:"))).toBe("Missing value after `status:`");
+      expect(describeAstProblem(parse("NOT status:"))).toBe("Missing value after `status:`");
     });
 
     it("recurses into both arms of a LogicalExpression", () => {
-      expect(validateAst(parse("status:error AND model:"))).toBe("Missing value after `model:`");
+      expect(describeAstProblem(parse("status:error AND model:"))).toBe(
+        "Missing value after `model:`",
+      );
     });
 
     it("recurses into parenthesised groups", () => {
-      expect(validateAst(parse("(status:error AND model:) OR origin:application"))).toBe(
+      expect(describeAstProblem(parse("(status:error AND model:) OR origin:application"))).toBe(
         "Missing value after `model:`",
       );
     });
@@ -538,10 +540,10 @@ describe("getFacetValues", () => {
   });
 });
 
-describe("getRangeValue", () => {
+describe("extractRangeValue", () => {
   describe("given a `[low TO high]` range", () => {
     it("returns both bounds", () => {
-      expect(getRangeValue(parse("cost:[1 TO 10]"), "cost")).toEqual({
+      expect(extractRangeValue(parse("cost:[1 TO 10]"), "cost")).toEqual({
         from: 1,
         to: 10,
       });
@@ -550,13 +552,13 @@ describe("getRangeValue", () => {
 
   describe("given a `>=` comparison", () => {
     it("returns only the `from` bound", () => {
-      expect(getRangeValue(parse("cost:>=5"), "cost")).toEqual({ from: 5 });
+      expect(extractRangeValue(parse("cost:>=5"), "cost")).toEqual({ from: 5 });
     });
   });
 
   describe("given a `<` comparison", () => {
     it("returns only the `to` bound", () => {
-      expect(getRangeValue(parse("duration:<5000"), "duration")).toEqual({
+      expect(extractRangeValue(parse("duration:<5000"), "duration")).toEqual({
         to: 5000,
       });
     });
@@ -564,7 +566,7 @@ describe("getRangeValue", () => {
 
   describe("given a negated comparison (NOT cost:>5)", () => {
     it("returns null — the helper deliberately ignores excluded ranges", () => {
-      expect(getRangeValue(parse("NOT cost:>5"), "cost")).toBeNull();
+      expect(extractRangeValue(parse("NOT cost:>5"), "cost")).toBeNull();
     });
   });
 
@@ -572,14 +574,14 @@ describe("getRangeValue", () => {
     it("returns null without throwing", () => {
       // `cost:>abc` — liqe parses but value isn't a number; we shouldn't
       // produce a NaN-bearing range.
-      expect(() => getRangeValue(parse("cost:abc"), "cost")).not.toThrow();
-      expect(getRangeValue(parse("cost:abc"), "cost")).toBeNull();
+      expect(() => extractRangeValue(parse("cost:abc"), "cost")).not.toThrow();
+      expect(extractRangeValue(parse("cost:abc"), "cost")).toBeNull();
     });
   });
 
   describe("when the field is missing", () => {
     it("returns null", () => {
-      expect(getRangeValue(parse("status:error"), "cost")).toBeNull();
+      expect(extractRangeValue(parse("status:error"), "cost")).toBeNull();
     });
   });
 });

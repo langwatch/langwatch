@@ -1,4 +1,4 @@
-import type { SsoConnectionState } from "@langwatch/identity-contract";
+import { SsoConnectionNotFoundError, type SsoConnectionState } from "@langwatch/identity-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type {
@@ -68,16 +68,13 @@ export class PrismaSsoConnectionBackofficeRepository implements SsoConnectionBac
     };
   }
 
-  async tryFindById({
-    connectionId,
-  }: {
-    connectionId: string;
-  }): Promise<SsoConnectionState | null> {
+  async getById({ connectionId }: { connectionId: string }): Promise<SsoConnectionState> {
     const row = await this.prisma.ssoConnection.findUnique({
       where: { id: connectionId },
     });
 
-    return row === null ? null : PrismaSsoConnectionProjectionRepository.rowToConnection(row);
+    if (row === null) throw new SsoConnectionNotFoundError(`no connection ${connectionId}`);
+    return PrismaSsoConnectionProjectionRepository.rowToConnection(row);
   }
 
   async findOrganizationNames({

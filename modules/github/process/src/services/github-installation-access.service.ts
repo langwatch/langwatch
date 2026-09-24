@@ -1,6 +1,7 @@
 import {
   GithubApiRateLimitedError,
   GithubInstallationSuspendedError,
+  GithubRepositoryNotAccessibleError,
   type GithubRepositoryRef,
   type GithubTurnToken,
 } from "@langwatch/github-contract";
@@ -26,11 +27,11 @@ const logger = createLogger("langwatch:github:installation-access");
 export interface GithubInstallationLookup {
   /** The organization a webhook's installation belongs to. */
   findByInstallationId(installationId: string): Promise<{ organizationId: string } | null>;
-  /** The installation and repository id that can be asked about a branch. */
-  resolveInstallationForRepository(input: {
+  /** The installation and repository id to ask about a branch; throws when none covers it. */
+  getInstallationForRepository(input: {
     organizationId: string;
     repositoryFullName: string;
-  }): Promise<{ installationId: string; repositoryId: string } | null>;
+  }): Promise<{ installationId: string; repositoryId: string }>;
 }
 
 type RepositoryResolution = {
@@ -89,12 +90,14 @@ export class GithubInstallationAccessService implements GithubInstallationLookup
     return repositories;
   }
 
-  async resolveInstallationForRepository(input: {
+  async getInstallationForRepository(input: {
     organizationId: string;
     repositoryFullName: string;
-  }): Promise<{ installationId: string; repositoryId: string } | null> {
+  }): Promise<{ installationId: string; repositoryId: string }> {
     if (!this.appTokens.configured) {
-      return null;
+      throw new GithubRepositoryNotAccessibleError({
+        repositoryFullName: input.repositoryFullName,
+      });
     }
 
     const installations = await this.usableInstallations(input.organizationId);
@@ -108,7 +111,7 @@ export class GithubInstallationAccessService implements GithubInstallationLookup
       }
     }
 
-    return null;
+    throw new GithubRepositoryNotAccessibleError({ repositoryFullName: input.repositoryFullName });
   }
 
   async coversRepository(input: {

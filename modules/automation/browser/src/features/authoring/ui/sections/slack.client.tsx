@@ -508,6 +508,7 @@ function SlackChannelField({
 }
 
 function templatesFromSlice(slice: SlackSlice) {
+  const template = slice.template.value;
   return {
     emailSubjectTemplate: null,
     emailBodyTemplate: null,
@@ -515,7 +516,7 @@ function templatesFromSlice(slice: SlackSlice) {
     // they wrote it, picked it from the gallery, or it was seeded from the
     // report's content source. An empty field means no template of our own, so
     // the framework default applies.
-    slackTemplate: slice.template.value.trim().length > 0 ? slice.template.value : null,
+    slackTemplate: template.trim().length > 0 ? template : null,
     // Always carry the toggle. A null `slackTemplate` paired with a
     // non-null `slackTemplateType` means "use the framework default for
     // this type" — without this the server can't tell apart a user who

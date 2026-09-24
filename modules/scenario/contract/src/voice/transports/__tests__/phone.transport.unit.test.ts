@@ -14,7 +14,7 @@ import {
   PHONE_NO_BROWSER_CALL_MESSAGE,
   PHONE_RESPONSE_TAIL_SILENCE_SECONDS,
   resolveHttpPort,
-  resolvePublicBaseUrl,
+  derivePublicBaseUrl,
   TWILIO_MAX_CALL_DURATION_CAP_SECONDS,
   type TwilioAdapterLike,
   type TwilioAgentFactory,
@@ -279,7 +279,7 @@ describe("phoneTransport", () => {
     describe("when VOICE_PUBLIC_BASE_URL is set", () => {
       it("uses it over the app's own base host", () => {
         expect(
-          resolvePublicBaseUrl({
+          derivePublicBaseUrl({
             VOICE_PUBLIC_BASE_URL: "https://voice.example.com",
             BASE_HOST: "https://app.example.com",
           }),
@@ -293,7 +293,7 @@ describe("phoneTransport", () => {
       // "no public media URL" fail-fast block below. This asserts the helper's
       // reporting behavior, not that a real call is allowed to use it.
       it("still reports the app's own base host from the resolver helper", () => {
-        expect(resolvePublicBaseUrl({ BASE_HOST: "https://app.example.com" })).toBe(
+        expect(derivePublicBaseUrl({ BASE_HOST: "https://app.example.com" })).toBe(
           "https://app.example.com",
         );
       });
@@ -301,14 +301,14 @@ describe("phoneTransport", () => {
 
     describe("when neither is set", () => {
       it("resolves to undefined", () => {
-        expect(resolvePublicBaseUrl({})).toBeUndefined();
+        expect(derivePublicBaseUrl({})).toBeUndefined();
       });
     });
 
     describe("when the value is a valid https URL", () => {
       it("passes through unchanged", () => {
         expect(
-          resolvePublicBaseUrl({
+          derivePublicBaseUrl({
             VOICE_PUBLIC_BASE_URL: "https://voice.example.com",
           }),
         ).toBe("https://voice.example.com");
@@ -318,7 +318,7 @@ describe("phoneTransport", () => {
     describe("when the value is a valid http URL", () => {
       it("passes through unchanged", () => {
         expect(
-          resolvePublicBaseUrl({
+          derivePublicBaseUrl({
             VOICE_PUBLIC_BASE_URL: "http://voice.example.com",
           }),
         ).toBe("http://voice.example.com");
@@ -328,7 +328,7 @@ describe("phoneTransport", () => {
     describe("when the value has a trailing slash", () => {
       it("behaves as it does today: passes through with the trailing slash intact", () => {
         expect(
-          resolvePublicBaseUrl({
+          derivePublicBaseUrl({
             VOICE_PUBLIC_BASE_URL: "https://voice.example.com/",
           }),
         ).toBe("https://voice.example.com/");
@@ -337,7 +337,7 @@ describe("phoneTransport", () => {
 
     describe("when VOICE_PUBLIC_BASE_URL is a scheme-less localhost value", () => {
       it("is normalized to an http URL", () => {
-        expect(resolvePublicBaseUrl({ VOICE_PUBLIC_BASE_URL: "localhost:3000" })).toBe(
+        expect(derivePublicBaseUrl({ VOICE_PUBLIC_BASE_URL: "localhost:3000" })).toBe(
           "http://localhost:3000",
         );
       });
@@ -345,7 +345,7 @@ describe("phoneTransport", () => {
 
     describe("when VOICE_PUBLIC_BASE_URL is a scheme-less non-local host", () => {
       it("is normalized to an https URL", () => {
-        expect(resolvePublicBaseUrl({ VOICE_PUBLIC_BASE_URL: "voice.example.com" })).toBe(
+        expect(derivePublicBaseUrl({ VOICE_PUBLIC_BASE_URL: "voice.example.com" })).toBe(
           "https://voice.example.com",
         );
       });
@@ -353,7 +353,7 @@ describe("phoneTransport", () => {
 
     describe("when VOICE_PUBLIC_BASE_URL is garbage", () => {
       it("throws naming VOICE_PUBLIC_BASE_URL", () => {
-        expect(() => resolvePublicBaseUrl({ VOICE_PUBLIC_BASE_URL: "not a url at all" })).toThrow(
+        expect(() => derivePublicBaseUrl({ VOICE_PUBLIC_BASE_URL: "not a url at all" })).toThrow(
           /VOICE_PUBLIC_BASE_URL/,
         );
       });
@@ -361,7 +361,7 @@ describe("phoneTransport", () => {
 
     describe("when BASE_HOST is malformed and VOICE_PUBLIC_BASE_URL is unset", () => {
       it("throws naming BASE_HOST rather than VOICE_PUBLIC_BASE_URL", () => {
-        expect(() => resolvePublicBaseUrl({ BASE_HOST: "not a valid url" })).toThrow(/BASE_HOST/);
+        expect(() => derivePublicBaseUrl({ BASE_HOST: "not a valid url" })).toThrow(/BASE_HOST/);
       });
     });
   });

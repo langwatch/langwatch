@@ -98,16 +98,17 @@ export function SpanDetails({
           <Text>
             <b>Span ID:</b> <Text as="code">{span.span_id}</Text>
           </Text>
-          {canOpenSpanInPromptStudio && promptRef ? (
+          {canOpenSpanInPromptStudio && promptRef && (
             <OpenInPromptsMenu spanId={span.span_id} promptRef={promptRef} buildUrl={buildUrl} />
-          ) : canOpenSpanInPromptStudio ? (
+          )}
+          {canOpenSpanInPromptStudio && !promptRef && (
             <Link href={buildUrl(span.span_id)?.toString() ?? ""} isExternal>
               <Button size="sm" colorPalette="orange">
                 <Play size={16} />
                 Open in Prompts
               </Button>
             </Link>
-          ) : null}
+          )}
         </HStack>
         <HStack>
           <Text>
@@ -380,6 +381,17 @@ export const getEvaluationResult = (span: Span): EvaluationResult | undefined =>
   return undefined;
 };
 
+function evaluationBadgeColor({
+  evaluationResult,
+  passed,
+}: {
+  evaluationResult: EvaluationResult | undefined;
+  passed: boolean | undefined;
+}) {
+  if (passed !== undefined) return passed ? "green" : "red";
+  return evaluationResult ? evaluationStatusColor(evaluationResult).split(".")[0] : "gray";
+}
+
 export const SpanTypeTag = ({ span }: { span: Span }) => {
   const evaluationResult = getEvaluationResult(span);
   const evaluationPassed_ = evaluationResult && evaluationPassed(evaluationResult);
@@ -406,14 +418,7 @@ export const SpanTypeTag = ({ span }: { span: Span }) => {
               consumer: "green",
               task: "orange",
               unknown: "gray",
-              evaluation:
-                evaluationPassed_ === undefined
-                  ? evaluationResult
-                    ? evaluationStatusColor(evaluationResult).split(".")[0]
-                    : "gray"
-                  : evaluationPassed_
-                    ? "green"
-                    : "red",
+              evaluation: evaluationBadgeColor({ evaluationResult, passed: evaluationPassed_ }),
             }[span.type]
       }
       backgroundColor={evaluationPassed_ === true ? "#ccf6c6" : undefined}

@@ -38,10 +38,14 @@ const GROUP_COLUMNS = "20px minmax(0,1fr) minmax(120px,190px) 70px 78px minmax(1
 const EXPANDED_RUN_LIMIT = 40;
 
 /** How a single execution ended, in words and colour. */
+function verdictOf(outcome: ResultRow["outcome"]): { text: string; passRate: number | null } {
+  if (outcome === "passed") return { text: "Passed", passRate: 100 };
+  if (outcome === "failed") return { text: "Failed", passRate: 0 };
+  return { text: "Running", passRate: null };
+}
+
 function Verdict({ row }: { row: ResultRow }) {
-  const text =
-    row.outcome === "passed" ? "Passed" : row.outcome === "failed" ? "Failed" : "Running";
-  const passRate = row.outcome === "passed" ? 100 : row.outcome === "failed" ? 0 : null;
+  const { text, passRate } = verdictOf(row.outcome);
 
   return (
     <Text

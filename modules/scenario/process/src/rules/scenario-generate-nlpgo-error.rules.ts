@@ -33,7 +33,7 @@ export function isAbortLikeError(error: unknown): boolean {
   return name === "AbortError" || name === "TimeoutError" || name === "ResponseAborted";
 }
 
-export function nlpgoHandledErrorFrom(error: unknown): HandledError | null {
+export function extractNlpgoHandledError(error: unknown): HandledError | null {
   const cause = RetryError.isInstance(error) ? error.lastError : error;
   if (!APICallError.isInstance(cause) || !cause.responseBody) {
     return null;

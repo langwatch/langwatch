@@ -264,6 +264,35 @@ type OutputRowProps = {
   typeOptions: { value: OutputType; label: string }[];
 };
 
+function focusInputOnNextFrame(inputRef: React.RefObject<HTMLInputElement | null>): void {
+  // Use requestAnimationFrame to ensure DOM is ready after render
+  requestAnimationFrame(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  });
+}
+
+function applyOutputTypeChange({
+  newType,
+  currentType,
+  onUpdate,
+  onEditJsonSchema,
+}: {
+  newType: OutputType;
+  currentType: OutputType;
+  onUpdate: OutputRowProps["onUpdate"];
+  onEditJsonSchema: () => void;
+}): void {
+  if (newType === "json_schema" && currentType !== "json_schema") {
+    onUpdate({ type: newType, json_schema: DEFAULT_JSON_SCHEMA });
+    onEditJsonSchema();
+  } else {
+    onUpdate({ type: newType });
+  }
+}
+
 const OutputRow = ({
   output,
   canRemove,
@@ -282,15 +311,7 @@ const OutputRow = ({
 
   // Focus input when editing starts
   useEffect(() => {
-    if (isEditing) {
-      // Use requestAnimationFrame to ensure DOM is ready after render
-      requestAnimationFrame(() => {
-        if (inputRef.current) {
-          inputRef.current.focus();
-          inputRef.current.select();
-        }
-      });
-    }
+    if (isEditing) focusInputOnNextFrame(inputRef);
   }, [isEditing]);
 
   const handleSave = () => {
@@ -323,15 +344,14 @@ const OutputRow = ({
       <FieldTypeSelect
         value={output.type}
         options={typeOptions}
-        onChange={(newTypeStr) => {
-          const newType = newTypeStr as OutputType;
-          if (newType === "json_schema" && output.type !== "json_schema") {
-            onUpdate({ type: newType, json_schema: DEFAULT_JSON_SCHEMA });
-            onEditJsonSchema();
-          } else {
-            onUpdate({ type: newType });
-          }
-        }}
+        onChange={(newTypeStr) =>
+          applyOutputTypeChange({
+            newType: newTypeStr as OutputType,
+            currentType: output.type,
+            onUpdate,
+            onEditJsonSchema,
+          })
+        }
         readOnly={readOnly}
         testId={`output-type-select-${output.identifier}`}
       />

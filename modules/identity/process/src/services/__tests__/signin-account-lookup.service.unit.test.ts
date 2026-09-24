@@ -2,7 +2,11 @@
  * What the sign-in router is told an address's account holds (ADR-117).
  * @see modules/identity/specs/signin-router.feature
  */
-import { emptyIdentityHeads, type IdentifierFact } from "@langwatch/identity-contract";
+import {
+  emptyIdentityHeads,
+  type IdentifierFact,
+  IdentityIdentifierNotFoundError,
+} from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
 import { IdentityHeadsRepository } from "../../repositories/identity-heads.repository.ts";
@@ -16,13 +20,14 @@ class SeededHeads extends IdentityHeadsRepository {
     super();
   }
 
-  async tryFindActiveIdentifierByValue({ normalizedValue }: { normalizedValue: string }) {
+  async getActiveIdentifierByValue({ normalizedValue }: { normalizedValue: string }) {
     const held = this.facts.find(
       (fact) =>
         fact.value === normalizedValue && (fact.state === "VERIFIED" || fact.state === "PRIMARY"),
     );
 
-    return held ? { userId: held.userId, identifierId: held.identifierId } : null;
+    if (!held) throw new IdentityIdentifierNotFoundError(`nobody holds ${normalizedValue}`);
+    return { userId: held.userId, identifierId: held.identifierId };
   }
 
   async findHeads({ userId }: { userId: string }) {
@@ -34,20 +39,20 @@ class SeededHeads extends IdentityHeadsRepository {
     return heads;
   }
 
-  async tryFindUserHashKey() {
-    return null;
+  async getUserHashKey() {
+    return { userHashKey: null };
   }
 
   async hasFolded() {
     return true;
   }
 
-  async tryFindIdentifier() {
-    return null;
+  async getIdentifier(): Promise<IdentifierFact> {
+    throw new IdentityIdentifierNotFoundError("no identifier");
   }
 
-  async tryFindIdentifierIdForAccount() {
-    return null;
+  async getIdentifierIdForAccount(): Promise<string> {
+    throw new IdentityIdentifierNotFoundError("no identifier mirrors it");
   }
 }
 

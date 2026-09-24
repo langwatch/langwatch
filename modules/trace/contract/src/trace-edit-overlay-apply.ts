@@ -135,7 +135,7 @@ function applySpanField({
  * The corrected span list, or null when the correction leaves it exactly as
  * captured.
  */
-function correctedSpans({
+function deriveCorrectedSpans({
   spans,
   patch,
 }: {
@@ -170,7 +170,7 @@ function correctedSpans({
  * Trace metadata with correction applied. Correction is an overlay: named keys
  * replace, null removes, unnamed stay. Null value clears entire metadata.
  */
-function correctedMetadata({
+function deriveCorrectedMetadata({
   trace,
   patch,
 }: {
@@ -202,10 +202,10 @@ export function applyOverlayToTrace({
 }): Trace {
   if (!patch || !patchHasAnyEdit(patch)) return trace;
 
-  const spans = correctedSpans({ spans: trace.spans ?? [], patch });
+  const spans = deriveCorrectedSpans({ spans: trace.spans ?? [], patch });
   const input = patch.trace?.input ?? trace.input;
   const output = patch.trace?.output ?? trace.output;
-  const metadata = correctedMetadata({ trace, patch });
+  const metadata = deriveCorrectedMetadata({ trace, patch });
 
   const unchanged = !spans && !metadata && input === trace.input && output === trace.output;
   if (unchanged) return trace;

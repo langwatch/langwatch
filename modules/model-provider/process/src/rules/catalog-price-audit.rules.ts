@@ -142,6 +142,38 @@ function compareEntry({
   return { mismatch, disagreements };
 }
 
+function checkModels({
+  models,
+  origin,
+  upstream,
+  unitMismatch,
+  into,
+}: {
+  models: Record<string, LLMModelEntry>;
+  origin: "overlay" | "generated";
+  upstream: Record<string, Record<string, LLMModelPricing>>;
+  unitMismatch: UnitMismatch[];
+  into: PriceDisagreement[];
+}): void {
+  for (const [modelId, entry] of Object.entries(models)) {
+    if (isPricedElsewhere(modelId)) continue;
+    if (!entry.pricing) continue;
+    for (const [source, byId] of Object.entries(upstream)) {
+      const upstreamPricing = byId[modelId];
+      if (!upstreamPricing) continue;
+      const result = compareEntry({
+        modelId,
+        origin,
+        catalog: entry.pricing,
+        upstream: upstreamPricing,
+        source,
+      });
+      if (result.mismatch) unitMismatch.push(result.mismatch);
+      into.push(...result.disagreements);
+    }
+  }
+}
+
 export function auditCatalog({
   overlay,
   generated,
@@ -159,32 +191,14 @@ export function auditCatalog({
   const crossSource: PriceDisagreement[] = [];
   const overriding: string[] = [];
 
-  const check = (
-    models: Record<string, LLMModelEntry>,
-    origin: "overlay" | "generated",
-    into: PriceDisagreement[],
-  ) => {
-    for (const [modelId, entry] of Object.entries(models)) {
-      if (isPricedElsewhere(modelId)) continue;
-      if (!entry.pricing) continue;
-      for (const [source, byId] of Object.entries(upstream)) {
-        const upstreamPricing = byId[modelId];
-        if (!upstreamPricing) continue;
-        const result = compareEntry({
-          modelId,
-          origin,
-          catalog: entry.pricing,
-          upstream: upstreamPricing,
-          source,
-        });
-        if (result.mismatch) unitMismatch.push(result.mismatch);
-        into.push(...result.disagreements);
-      }
-    }
-  };
-
-  check(overlay, "overlay", drift);
-  check(generated, "generated", crossSource);
+  checkModels({ models: overlay, origin: "overlay", upstream, unitMismatch, into: drift });
+  checkModels({
+    models: generated,
+    origin: "generated",
+    upstream,
+    unitMismatch,
+    into: crossSource,
+  });
 
   for (const modelId of Object.keys(overlay)) {
     if (generated[modelId]) overriding.push(modelId);

@@ -49,7 +49,7 @@ export interface GuidedOnboardingTurnFailedSubscriberDeps {
 }
 
 /** The failure a terminal event describes; a stop by the user is not one. */
-export function turnFailureOf(
+export function extractTurnFailure(
   event: LangyConversationProcessingEvent,
 ): { turnId: string; code: string } | null {
   if (event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED) {
@@ -88,10 +88,10 @@ export function createGuidedOnboardingTurnFailedSubscriber(
     ],
     options: {
       deduplication: { makeId: (event) => `guided-onboarding-turn-failed:${event.id}` },
-      enqueue: { filter: (event) => turnFailureOf(event) !== null },
+      enqueue: { filter: (event) => extractTurnFailure(event) !== null },
     },
     async handle(event): Promise<void> {
-      const failure = turnFailureOf(event);
+      const failure = extractTurnFailure(event);
       if (!failure) return;
       const projectId = event.tenantId;
       const conversationId = String(event.aggregateId);

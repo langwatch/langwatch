@@ -3,7 +3,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EditableHeading } from "../editable-heading.tsx";
 
@@ -55,22 +55,19 @@ describe("EditableHeading", () => {
   });
 
   describe("when clicking to edit", () => {
-    it("shows input field after clicking", async () => {
+    beforeEach(async () => {
       const user = userEvent.setup();
       renderWithProviders(<EditableHeading value="My Evaluation" onSave={mockOnSave} />);
 
       await user.click(screen.getByText("My Evaluation"));
+    });
 
+    it("shows input field after clicking", () => {
       expect(screen.getByRole("textbox")).toBeInTheDocument();
       expect(screen.getByRole("textbox")).toHaveValue("My Evaluation");
     });
 
-    it("focuses and selects the input text", async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<EditableHeading value="My Evaluation" onSave={mockOnSave} />);
-
-      await user.click(screen.getByText("My Evaluation"));
-
+    it("focuses and selects the input text", () => {
       const input = screen.getByRole("textbox");
       expect(document.activeElement).toBe(input);
     });
@@ -154,11 +151,16 @@ describe("EditableHeading", () => {
   });
 
   describe("when cancelling edit", () => {
-    it("does not call onSave when pressing Escape", async () => {
-      const user = userEvent.setup();
+    let user: ReturnType<typeof userEvent.setup>;
+
+    beforeEach(async () => {
+      user = userEvent.setup();
       renderWithProviders(<EditableHeading value="Old Name" onSave={mockOnSave} />);
 
       await user.click(screen.getByText("Old Name"));
+    });
+
+    it("does not call onSave when pressing Escape", async () => {
       const input = screen.getByRole("textbox");
       await user.clear(input);
       await user.type(input, "New Name");
@@ -168,10 +170,6 @@ describe("EditableHeading", () => {
     });
 
     it("returns to display mode when pressing Escape", async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<EditableHeading value="Old Name" onSave={mockOnSave} />);
-
-      await user.click(screen.getByText("Old Name"));
       await user.keyboard("{Escape}");
 
       expect(screen.queryByRole("textbox")).not.toBeInTheDocument();

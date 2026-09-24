@@ -29,9 +29,6 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import type { StoredObjectsTelemetry } from "../../app/stored-object.members.ts";
-import type { StoredObjectStorageRepository } from "../../repositories/stored-object-storage.repository.ts";
-import type { StoredObjectsRepository } from "../../repositories/stored-objects.repository.ts";
 import type { StoredObject } from "../../rules/stored-object-row.rules.ts";
 import { StoredObjectsService } from "../stored-objects.service.ts";
 
@@ -59,13 +56,17 @@ function makeService(): StoredObjectsService {
       findAllByProject: vi.fn(async () => []),
       deleteByProject: vi.fn(async () => undefined),
       deleteByIds: vi.fn(async () => undefined),
-    } as unknown as StoredObjectsRepository,
+      findLiveRowsByProjectPage: () =>
+        Promise.reject(new Error("findLiveRowsByProjectPage is not used here")),
+      sumSizeBytesByProject: () =>
+        Promise.reject(new Error("sumSizeBytesByProject is not used here")),
+    },
     registry: {
       get: vi.fn(async () => Readable.from([Buffer.from("bytes")])),
       put: vi.fn(async () => undefined),
       delete: vi.fn(async () => undefined),
       exists: vi.fn(async () => true),
-    } as unknown as StoredObjectStorageRepository,
+    },
     mintStorageUri: async ({ projectId, sha256 }) => `file:///tmp/${projectId}/${sha256}`,
     telemetry: {
       recordExtract: vi.fn(),
@@ -73,7 +74,7 @@ function makeService(): StoredObjectsService {
       recordWriteFailure: vi.fn(),
       recordReadFailure: vi.fn(),
       observeSizeBytes: vi.fn(),
-    } as unknown as StoredObjectsTelemetry,
+    },
   });
 }
 
@@ -101,9 +102,9 @@ describe("StoredObjectsService tracing", () => {
   describe("when the file surface reads an object back", () => {
     /** @scenario "OpenTelemetry spans wrap extraction during ingest and reads via /api/files/:id" */
     it("opens a span named for the read", async () => {
-      await makeService().tryGetById({ projectId: PROJECT_ID, id: "obj-1" });
+      await makeService().getById({ projectId: PROJECT_ID, id: "obj-1" });
 
-      expect(spanNames).toContain("StoredObjectsService.tryGetById");
+      expect(spanNames).toContain("StoredObjectsService.getById");
     });
   });
 });

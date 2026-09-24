@@ -249,6 +249,12 @@ export class PipelineBuilder<
     if ("handler" in definitionOrSpec) {
       const spec = definitionOrSpec;
       const deduplication = spec.dedup;
+      const dedupIdDeduplication = spec.dedupId
+        ? {
+            makeId: (event: EventType) => `subscriber:${subscriberName}:${spec.dedupId!(event)}`,
+            ttlMs: spec.ttl,
+          }
+        : undefined;
       definition = {
         name: subscriberName,
         eventTypes: spec.events ?? [],
@@ -262,12 +268,7 @@ export class PipelineBuilder<
                   ...deduplication,
                   makeId: (event) => deduplication.makeId(event),
                 }
-              : spec.dedupId
-                ? {
-                    makeId: (event) => `subscriber:${subscriberName}:${spec.dedupId!(event)}`,
-                    ttlMs: spec.ttl,
-                  }
-                : undefined,
+              : dedupIdDeduplication,
         },
         handle: async (event, context) => {
           const triggerContext = { ...context, state: undefined };

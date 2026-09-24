@@ -7,6 +7,7 @@ import {
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type { LangyWorker } from "../../app/langy.members.ts";
 import {
   LangyTurnService,
   type LangyTurnServiceDeps,
@@ -21,7 +22,7 @@ function makeFixture(over: Partial<LangyTurnServiceDeps> = {}) {
     status: LANGY_CONVERSATION_STATUS.IDLE,
   }));
   const findPendingHandoff = vi.fn(async () => null);
-  const dispatch = vi.fn(async () => "accepted" as const);
+  const dispatch = vi.fn<LangyWorker["dispatch"]>(async () => "accepted");
   const acceptTurn = vi.fn(async () => undefined);
 
   const deps = {
@@ -57,7 +58,7 @@ function makeFixture(over: Partial<LangyTurnServiceDeps> = {}) {
       mint: vi.fn(async () => ({ token: "session-key", apiKeyId: "key-1" })),
       revoke: vi.fn(async () => undefined),
     },
-    context: { tryRender: vi.fn(() => null) },
+    context: { render: vi.fn(() => null) },
     uiActionSurface: { resolve: vi.fn(async () => true) },
     metrics: { count: vi.fn() },
     admission: {
@@ -125,16 +126,16 @@ describe("LangyTurnService.startConversationTurn ui-action surface", () => {
 
     const promptFor = async (isSurfaceOpen: boolean) => {
       const fixture = makeFixture({
-        context: { tryRender: renderLangyTurnContext },
+        context: { render: renderLangyTurnContext },
         uiActionSurface: { resolve: vi.fn(async () => isSurfaceOpen) },
-      } as unknown as Partial<LangyTurnServiceDeps>);
+      });
       await LangyTurnService.create(fixture.deps).startConversationTurn({
         ...input,
         turnContext: experimentContext,
       });
       expect(fixture.dispatch).toHaveBeenCalledOnce();
-      const [dispatched] = fixture.dispatch.mock.calls[0] as unknown as [{ prompt: string }];
-      return dispatched.prompt;
+      const dispatched = fixture.dispatch.mock.calls[0]?.[0];
+      return dispatched?.prompt;
     };
 
     it("offers the UI-action commands while the surface is open", async () => {
@@ -154,22 +155,22 @@ describe("LangyTurnService.startConversationTurn ui-action surface", () => {
     /** @scenario A flag-store blip must not stop the turn, and must not advertise a surface it could not confirm */
     it("starts the turn with the channel closed when the flag store fails", async () => {
       const fixture = makeFixture({
-        context: { tryRender: renderLangyTurnContext },
+        context: { render: renderLangyTurnContext },
         uiActionSurface: {
           resolve: vi.fn(async () => {
             throw new Error("flag store unavailable");
           }),
         },
-      } as unknown as Partial<LangyTurnServiceDeps>);
+      });
 
       await LangyTurnService.create(fixture.deps).startConversationTurn({
         ...input,
         turnContext: experimentContext,
       });
 
-      const [dispatched] = fixture.dispatch.mock.calls[0] as unknown as [{ prompt: string }];
-      expect(dispatched.prompt).not.toContain("langwatch ui actions");
-      expect(dispatched.prompt).toContain("my-exp");
+      const dispatched = fixture.dispatch.mock.calls[0]?.[0];
+      expect(dispatched?.prompt).not.toContain("langwatch ui actions");
+      expect(dispatched?.prompt).toContain("my-exp");
     });
   });
 });
@@ -246,7 +247,7 @@ describe("LangyTurnPreparationService golden path", () => {
         warm: vi.fn(async () => undefined),
       },
       sessionKeys: { mint, revoke: vi.fn(async () => undefined) },
-    } as unknown as Partial<LangyTurnServiceDeps>);
+    });
 
     await LangyTurnService.create(fixture.deps).startConversationTurn(input);
 
@@ -462,10 +463,11 @@ describe("LangyTurnPreparationService golden path", () => {
           turnId: "turn-1",
         })),
         commit,
+        confirmAccepted: vi.fn(async () => undefined),
         abort: vi.fn(async () => undefined),
         release: vi.fn(async () => undefined),
       },
-    } as unknown as Partial<LangyTurnServiceDeps>);
+    });
 
     const result = LangyTurnService.create(fixture.deps).startConversationTurn(input);
     await vi.waitFor(() => expect(commit).toHaveBeenCalledOnce());
@@ -487,10 +489,11 @@ describe("LangyTurnPreparationService golden path", () => {
         commit: vi.fn(async () => {
           throw new Error("postgres unavailable");
         }),
+        confirmAccepted: vi.fn(async () => undefined),
         abort: vi.fn(async () => undefined),
         release: vi.fn(async () => undefined),
       },
-    } as unknown as Partial<LangyTurnServiceDeps>);
+    });
 
     await expect(
       LangyTurnService.create(fixture.deps).startConversationTurn(input),

@@ -19,7 +19,7 @@ import { PrismaPersonalTeamScopeRepository } from "./prisma.personal-team-scope.
 /** A root client, or the transaction-scoped client `$transaction` hands back. */
 type InviteClient = PrismaClient | Prisma.TransactionClient;
 
-function inviteJson(value: unknown): Prisma.InputJsonValue | undefined {
+function toInviteJson(value: unknown): Prisma.InputJsonValue | undefined {
   return value === undefined ? undefined : (value as Prisma.InputJsonValue);
 }
 
@@ -128,12 +128,12 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     });
   }
 
-  tryFindPersonalTeamInScopes({
+  findPersonalTeamsInScopes({
     scopes,
   }: {
     scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
-  }): Promise<{ name: string } | null> {
-    return PrismaPersonalTeamScopeRepository.create().tryFindPersonalTeamInScopes({
+  }): Promise<{ name: string }[]> {
+    return PrismaPersonalTeamScopeRepository.create().findPersonalTeamsInScopes({
       client: this.prisma,
       scopes,
     });
@@ -147,7 +147,7 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
         expiration: input.expiration,
         organizationId: input.organizationId,
         teamIds: input.teamIds,
-        teamAssignments: inviteJson(input.teamAssignments),
+        teamAssignments: toInviteJson(input.teamAssignments),
         role: input.role,
         status: "PENDING",
       },
@@ -164,7 +164,7 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
         expiration: input.expiration,
         organizationId: input.organizationId,
         teamIds: input.teamIds,
-        teamAssignments: inviteJson(input.teamAssignments),
+        teamAssignments: toInviteJson(input.teamAssignments),
         role: input.role,
         status: "PAYMENT_PENDING",
         subscriptionId: input.subscriptionId,

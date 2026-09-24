@@ -1,8 +1,29 @@
-import { getSimulationRun as apiGetSimulationRun } from "../langwatch-api-simulation-runs.js";
 import {
-  formatEvaluations,
-  pendingEvaluationNote,
-} from "./format-suite-details.js";
+  getSimulationRun as apiGetSimulationRun,
+  type SimulationRunSummary,
+} from "../langwatch-api-simulation-runs.js";
+import { formatEvaluations, pendingEvaluationNote } from "./format-suite-details.js";
+
+function resultLines(results: NonNullable<SimulationRunSummary["results"]>): string[] {
+  const lines = ["\n## Results"];
+  if (results.verdict) {
+    lines.push(`**Verdict**: ${results.verdict}`);
+  }
+  if (results.reasoning) {
+    lines.push(`**Reasoning**: ${results.reasoning}`);
+  }
+  if (results.metCriteria && results.metCriteria.length > 0) {
+    lines.push(`**Met Criteria**: ${results.metCriteria.join(", ")}`);
+  }
+  if (results.unmetCriteria && results.unmetCriteria.length > 0) {
+    lines.push(`**Unmet Criteria**: ${results.unmetCriteria.join(", ")}`);
+  }
+  if (results.error) {
+    lines.push(`**Error**: ${results.error}`);
+  }
+  lines.push(...formatEvaluations(results.evaluations));
+  return lines;
+}
 
 /**
  * Handles the platform_get_simulation_run MCP tool invocation.
@@ -36,23 +57,7 @@ export async function handleGetSimulationRun(params: {
   }
 
   if (run.results) {
-    lines.push("\n## Results");
-    if (run.results.verdict) {
-      lines.push(`**Verdict**: ${run.results.verdict}`);
-    }
-    if (run.results.reasoning) {
-      lines.push(`**Reasoning**: ${run.results.reasoning}`);
-    }
-    if (run.results.metCriteria && run.results.metCriteria.length > 0) {
-      lines.push(`**Met Criteria**: ${run.results.metCriteria.join(", ")}`);
-    }
-    if (run.results.unmetCriteria && run.results.unmetCriteria.length > 0) {
-      lines.push(`**Unmet Criteria**: ${run.results.unmetCriteria.join(", ")}`);
-    }
-    if (run.results.error) {
-      lines.push(`**Error**: ${run.results.error}`);
-    }
-    lines.push(...formatEvaluations(run.results.evaluations));
+    lines.push(...resultLines(run.results));
   }
 
   if (run.messages && run.messages.length > 0) {

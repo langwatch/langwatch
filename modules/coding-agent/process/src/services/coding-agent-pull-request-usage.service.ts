@@ -96,6 +96,62 @@ export class CodingAgentPullRequestUsageService {
     return row.inputTokens + row.outputTokens + row.cacheReadTokens + row.cacheCreationTokens;
   }
 
+  private newUsageRow({
+    session,
+    priced,
+    nonBilled,
+    projects,
+  }: {
+    session: CodingAgentSessionBranchRecord;
+    priced: boolean;
+    nonBilled: boolean;
+    projects: Record<string, CodingAgentContributorProject>;
+  }): CodingAgentUsageRow & { modelSet: Set<string> } {
+    return {
+      ...this.contributorFor(session.tenantId, projects),
+      agent: session.agent,
+      models: [],
+      modelSet: new Set(session.models),
+      sessionsCount: 1,
+      inputTokens: session.inputTokens,
+      outputTokens: session.outputTokens,
+      cacheReadTokens: session.cacheReadTokens,
+      cacheCreationTokens: session.cacheCreationTokens,
+      totalTokens: this.tokenTotal(session),
+      costUsd: priced ? session.costUsd : null,
+      billedCostUsd: priced ? billedShareOf(session.costUsd, !nonBilled) : null,
+      nonBilledCostUsd: priced ? billedShareOf(session.costUsd, nonBilled) : null,
+    };
+  }
+
+  private addToUsageRow({
+    row,
+    session,
+    priced,
+    nonBilled,
+  }: {
+    row: CodingAgentUsageRow & { modelSet: Set<string> };
+    session: CodingAgentSessionBranchRecord;
+    priced: boolean;
+    nonBilled: boolean;
+  }): void {
+    row.sessionsCount += 1;
+    row.inputTokens += session.inputTokens;
+    row.outputTokens += session.outputTokens;
+    row.cacheReadTokens += session.cacheReadTokens;
+    row.cacheCreationTokens += session.cacheCreationTokens;
+    row.totalTokens += this.tokenTotal(session);
+    if (priced) {
+      row.costUsd = (row.costUsd ?? 0) + session.costUsd;
+      row.billedCostUsd = (row.billedCostUsd ?? 0) + (nonBilled ? 0 : session.costUsd);
+      row.nonBilledCostUsd = (row.nonBilledCostUsd ?? 0) + (nonBilled ? session.costUsd : 0);
+    }
+
+    for (const model of session.models) {
+      row.modelSet.add(model);
+    }
+  }
+
   groupedRows({
     sessions,
     costProjects,
@@ -114,39 +170,11 @@ export class CodingAgentPullRequestUsageService {
       const nonBilled = nonBillableAgents.has(session.agent);
       const row = grouped.get(key);
       if (!row) {
-        grouped.set(key, {
-          ...this.contributorFor(session.tenantId, projects),
-          agent: session.agent,
-          models: [],
-          modelSet: new Set(session.models),
-          sessionsCount: 1,
-          inputTokens: session.inputTokens,
-          outputTokens: session.outputTokens,
-          cacheReadTokens: session.cacheReadTokens,
-          cacheCreationTokens: session.cacheCreationTokens,
-          totalTokens: this.tokenTotal(session),
-          costUsd: priced ? session.costUsd : null,
-          billedCostUsd: priced ? billedShareOf(session.costUsd, !nonBilled) : null,
-          nonBilledCostUsd: priced ? billedShareOf(session.costUsd, nonBilled) : null,
-        });
+        grouped.set(key, this.newUsageRow({ session, priced, nonBilled, projects }));
         continue;
       }
 
-      row.sessionsCount += 1;
-      row.inputTokens += session.inputTokens;
-      row.outputTokens += session.outputTokens;
-      row.cacheReadTokens += session.cacheReadTokens;
-      row.cacheCreationTokens += session.cacheCreationTokens;
-      row.totalTokens += this.tokenTotal(session);
-      if (priced) {
-        row.costUsd = (row.costUsd ?? 0) + session.costUsd;
-        row.billedCostUsd = (row.billedCostUsd ?? 0) + (nonBilled ? 0 : session.costUsd);
-        row.nonBilledCostUsd = (row.nonBilledCostUsd ?? 0) + (nonBilled ? session.costUsd : 0);
-      }
-
-      for (const model of session.models) {
-        row.modelSet.add(model);
-      }
+      this.addToUsageRow({ row, session, priced, nonBilled });
     }
 
     return [...grouped.values()].map(({ modelSet, ...row }) => ({

@@ -39,6 +39,7 @@ import type {
   ProposeLinkCommandData,
   VerifyIdentifierCommandData,
 } from "./facts.ts";
+import type { IdentityEmailResolution } from "./identity-email.service.ts";
 import type { DomainJoinSetting, JoinLookupDecision, JoinOffer } from "./join-matching.ts";
 import type {
   ApproveJoinCommandData,
@@ -48,7 +49,7 @@ import type {
   WithdrawJoinCommandData,
 } from "./join-request-commands.ts";
 import type { JoinRequestAggregateState, JoinRequestFactInput } from "./join-request.ts";
-import type { MatchableEmail } from "./matchable-emails.ts";
+import type { VerifiedEmailsResolution } from "./matchable-emails.ts";
 import type {
   ConfirmMfaCommandData,
   ConsumeBackupCodeCommandData,
@@ -669,10 +670,10 @@ export interface ScimSyncGuardsApi {
  * reconciliation, user-migration registry, SSO backoffice connection writer.
  */
 export interface IdentityApi {
-  /** Gets the identifier-backed address for this user, or null for legacy `User.email` holders. */
-  findEmail(input: { userId: string }): Promise<string | null>;
-  /** Gets every verified address this user has proven, or null for legacy `User.email` holders. */
-  verifiedEmailsOf(input: { userId: string }): Promise<MatchableEmail[] | null>;
+  /** The identifier-backed address, or `keep_legacy` for legacy `User.email` holders. */
+  resolveEmail(input: { userId: string }): Promise<IdentityEmailResolution>;
+  /** Every proven address, or `keep_legacy` for legacy `User.email` holders. */
+  verifiedEmailsOf(input: { userId: string }): Promise<VerifiedEmailsResolution>;
   /** Completes the session user's PKCE-bound, single-use email verification ceremony. */
   completeEmailVerification(input: {
     userId: string;
@@ -704,7 +705,6 @@ export interface IdentityApi {
   /** The USER-rooted migration registry (ADR-101 §6), in main's order. */
   userMigrations(): readonly SystemMigration[];
   joinRequestGuards(): JoinRequestGuardsApi;
-  joinRequestNotifications(): JoinRequestNotificationApi | null;
   ssoConnections(): SsoConnectionApi;
   ssoConnectionGuards(): SsoConnectionGuardsApi;
   ssoBackoffice(): SsoConnectionBackofficeApi;

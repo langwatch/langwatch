@@ -10,6 +10,41 @@ interface UseFirstTraceSpotlightTriggerArgs {
   hasAnyTraces: boolean | undefined;
 }
 
+function shouldMigrateLegacyTour({
+  attempted,
+  isDismissed,
+  isResolved,
+  hasLegacyHistory,
+}: {
+  attempted: boolean;
+  isDismissed: boolean;
+  isResolved: boolean;
+  hasLegacyHistory: boolean;
+}): boolean {
+  const alreadyHandled = attempted || isDismissed;
+  const canMigrate = isResolved && hasLegacyHistory;
+  return !alreadyHandled && canMigrate;
+}
+
+function startFirstTraceSpotlights(): void {
+  // Re-check inside the timer because the user could have
+  // navigated away or started spotlights manually during the
+  // breath. The first-trace flag stays unset until we actually
+  // fire, so a navigation away preserves the auto-start intent
+  // for the next visit.
+  const state = useOnboardingStore.getState();
+  if (state.spotlightsActive || state.tourActive) {
+    state.markFirstTraceSpotlightFired();
+    return;
+  }
+  const first = TRACE_EXPLORER_SPOTLIGHTS[0];
+  const firstId = first?.id ?? null;
+  state.setCurrentSpotlightId(firstId);
+  state.setSpotlightsActive(true);
+  writeSpotlightFragment(firstId);
+  state.markFirstTraceSpotlightFired();
+}
+
 /**
  * One-shot automatic effect: the moment `hasAnyTraces` flips to true in any project
  * where we have not auto-fired the spotlight tour, start the contextual walkthrough of
@@ -33,11 +68,13 @@ export function useFirstTraceSpotlightTrigger({
   const hasLegacyMigrationAttempted = useRef(false);
 
   useEffect(() => {
-    const alreadyHandled = hasLegacyMigrationAttempted.current || isDismissed;
-    const canMigrate = isResolved && hasLegacyTourHistoryOnMount;
-    if (alreadyHandled || !canMigrate) {
-      return;
-    }
+    const shouldMigrate = shouldMigrateLegacyTour({
+      attempted: hasLegacyMigrationAttempted.current,
+      isDismissed,
+      isResolved,
+      hasLegacyHistory: hasLegacyTourHistoryOnMount,
+    });
+    if (!shouldMigrate) return;
     hasLegacyMigrationAttempted.current = true;
     persistDismissal();
   }, [hasLegacyTourHistoryOnMount, isDismissed, isResolved, persistDismissal]);
@@ -60,24 +97,7 @@ export function useFirstTraceSpotlightTrigger({
     // arrives reads as pushy. 2s is enough to register "oh, my data
     // is here" without dragging.
     const ARRIVAL_BREATH_MS = 2000;
-    const timer = setTimeout(() => {
-      // Re-check inside the timer because the user could have
-      // navigated away or started spotlights manually during the
-      // breath. The first-trace flag stays unset until we actually
-      // fire, so a navigation away preserves the auto-start intent
-      // for the next visit.
-      const state = useOnboardingStore.getState();
-      if (state.spotlightsActive || state.tourActive) {
-        state.markFirstTraceSpotlightFired();
-        return;
-      }
-      const first = TRACE_EXPLORER_SPOTLIGHTS[0];
-      const firstId = first?.id ?? null;
-      state.setCurrentSpotlightId(firstId);
-      state.setSpotlightsActive(true);
-      writeSpotlightFragment(firstId);
-      state.markFirstTraceSpotlightFired();
-    }, ARRIVAL_BREATH_MS);
+    const timer = setTimeout(startFirstTraceSpotlights, ARRIVAL_BREATH_MS);
     return () => clearTimeout(timer);
   }, [
     projectId,

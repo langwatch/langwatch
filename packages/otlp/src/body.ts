@@ -34,11 +34,10 @@ export const otlpProtobufRoot: Record<string, any> =
 
 const root = otlpProtobufRoot;
 
-const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
-  .ExportTraceServiceRequest;
-const logRequestType = (root as any).opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest;
-const metricsRequestType = (root as any).opentelemetry.proto.collector.metrics.v1
-  .ExportMetricsServiceRequest;
+const traceRequestType = root.opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest;
+const logRequestType = root.opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest;
+const metricsRequestType =
+  root.opentelemetry.proto.collector.metrics.v1.ExportMetricsServiceRequest;
 
 function toArrayBuffer(buf: Buffer): ArrayBuffer {
   return new Uint8Array(buf).buffer as ArrayBuffer;

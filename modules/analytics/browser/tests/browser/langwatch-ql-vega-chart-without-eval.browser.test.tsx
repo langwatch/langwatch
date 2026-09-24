@@ -70,7 +70,7 @@ function forbidStringEvaluation(): Hardening {
   };
   refusingFunction.prototype = realFunction.prototype;
 
-  globalThis.eval = refusesStringEvaluation as unknown as typeof globalThis.eval;
+  globalThis.eval = refusesStringEvaluation;
   globalThis.Function = refusingFunction as unknown as FunctionConstructor;
 
   return {

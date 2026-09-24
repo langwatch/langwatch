@@ -50,6 +50,7 @@ vi.mock("@langwatch/authz-browser-kit", async () => {
       <button
         type="button"
         data-testid="pick-org-scope"
+        aria-label="Pick organization scope"
         onClick={() => onChange([{ scopeType: "ORGANIZATION", scopeId: "org-1" }])}
       />
     ),

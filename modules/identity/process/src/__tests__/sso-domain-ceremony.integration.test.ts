@@ -9,6 +9,7 @@ import {
   type SsoConnectionState,
   ssoDnsRecordName,
   ssoVerificationFileUrl,
+  SsoConnectionNotFoundError,
 } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -69,26 +70,24 @@ class LocalConnections implements SsoConnectionReadRepository, SsoConnectionRegi
 
   private readonly states = new Map<string, SsoConnectionState>();
 
-  async tryFindConnection({
-    connectionId,
-  }: {
-    connectionId: string;
-  }): Promise<SsoConnectionState | null> {
-    return this.states.get(connectionId) ?? null;
+  async getConnection({ connectionId }: { connectionId: string }): Promise<SsoConnectionState> {
+    const state = this.states.get(connectionId);
+    if (!state) throw new SsoConnectionNotFoundError(connectionId);
+    return state;
   }
 
-  async tryFindDomainOwner({
+  async getDomainOwner({
     domain,
   }: {
     domain: string;
-  }): Promise<{ connectionId: string; organizationId: string } | null> {
+  }): Promise<{ connectionId: string; organizationId: string }> {
     for (const state of this.states.values()) {
       if (state.state === "ACTIVE" && state.verifiedDomains.includes(domain)) {
         return { connectionId: state.connectionId, organizationId: state.organizationId };
       }
     }
 
-    return null;
+    throw new SsoConnectionNotFoundError(domain);
   }
 
   async findForOrganization({
@@ -185,7 +184,7 @@ async function codeOf(act: Promise<unknown>): Promise<string> {
 }
 
 function stateOf(connectionId = CONNECTION): Promise<SsoConnectionState | null> {
-  return connections.tryFindConnection({ connectionId });
+  return connections.getConnection({ connectionId });
 }
 
 /** A registered connection with one domain claimed, which is where the

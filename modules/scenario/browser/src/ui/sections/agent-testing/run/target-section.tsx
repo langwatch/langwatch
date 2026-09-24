@@ -55,6 +55,9 @@ function ConfigureAgentsLink() {
 /** The agent cards, the prompt picker, or the setup box. */
 export function TargetSection(props: TargetSectionProps) {
   const { mode, agents, prompts, target, onSelect } = props;
+  const showsPromptPicker = mode === "prompts";
+  const showsAgentBlocks = !showsPromptPicker && agents.length > 0;
+  const showsAgentSetup = !showsPromptPicker && agents.length === 0;
 
   return (
     <VStack align="stretch" gap={0} data-testid="run-dialog-target-section">
@@ -69,13 +72,11 @@ export function TargetSection(props: TargetSectionProps) {
           <ConfigureAgentsLink />
         )}
       </FieldLabel>
-      {mode === "prompts" ? (
+      {showsPromptPicker && (
         <PromptPicker prompts={prompts} selected={target} onSelect={onSelect} />
-      ) : agents.length > 0 ? (
-        <AgentBlocks agents={agents} selected={target} onSelect={onSelect} />
-      ) : (
-        <SetupAgentBox onSetup={props.onSetupAgent} />
       )}
+      {showsAgentBlocks && <AgentBlocks agents={agents} selected={target} onSelect={onSelect} />}
+      {showsAgentSetup && <SetupAgentBox onSetup={props.onSetupAgent} />}
     </VStack>
   );
 }

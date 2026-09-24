@@ -121,6 +121,9 @@ export default function SecretsScreen() {
     }
   };
 
+  const showEmpty = !secretsQuery.isLoading && secrets.length === 0;
+  const showSecrets = !secretsQuery.isLoading && secrets.length > 0;
+
   return (
     <VStack gap={6} width="full" align="start">
       <HStack width="full" marginTop={2}>
@@ -136,9 +139,8 @@ export default function SecretsScreen() {
         )}
       </HStack>
 
-      {secretsQuery.isLoading ? (
-        <Spinner />
-      ) : secrets.length === 0 ? (
+      {secretsQuery.isLoading && <Spinner />}
+      {showEmpty && (
         <EmptyState.Root width="full">
           <EmptyState.Content>
             <EmptyState.Indicator>
@@ -150,7 +152,8 @@ export default function SecretsScreen() {
             </VStack>
           </EmptyState.Content>
         </EmptyState.Root>
-      ) : (
+      )}
+      {showSecrets && (
         <Card.Root width="full" overflow="hidden">
           <Card.Body paddingY={0} paddingX={0} overflowX="auto">
             <Table.Root width="full">

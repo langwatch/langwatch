@@ -6,10 +6,13 @@ import { randomBytes } from "node:crypto";
  */
 import type { CliKeySelection } from "@langwatch/api-key-contract";
 import {
+  CliDeviceFlowRefusedError,
+  CliSessionRecordNotFoundError,
   cliAccessTokenKey,
   cliRefreshTokenKey,
   cliUserTokensIndexKey,
 } from "@langwatch/auth-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { nowInstant } from "@langwatch/time";
 
 import type { CliDeviceSessionRepository } from "../repositories/cli-device-session.repository.ts";
@@ -184,7 +187,7 @@ export class CliDeviceSessionService {
   /**
    * Extract the bearer access token from an `Authorization` header, or null.
    */
-  static tryBearerCliAccessToken(authHeader: string | null | undefined): string | null {
+  static extractBearerCliAccessToken(authHeader: string | null | undefined): string | null {
     if (!authHeader) {
       return null;
     }
@@ -243,28 +246,46 @@ export class CliDeviceSessionService {
     return record;
   }
 
-  /** The device-code record behind one device code, or nothing. */
-  async tryFindDeviceCode(deviceCode: string): Promise<CliDeviceCodeRecord | null> {
-    const raw = await this.store.tryGet(deviceCodeKey(deviceCode));
-    if (!raw) {
-      return null;
-    }
+  /**
+   * The record behind the device code the CLI polls with. Never minted, or
+   * evicted, refuses with RFC 8628's recommended `expired_token`.
+   */
+  getDeviceCode(deviceCode: string): Promise<CliDeviceCodeRecord> {
+    return this.#storedDeviceCode(deviceCode).catch((error: unknown) => {
+      if (!isRecordNotFound(error)) throw error;
 
-    return JSON.parse(raw) as CliDeviceCodeRecord;
+      throw new CliDeviceFlowRefusedError({
+        refusal: { error: "expired_token", error_description: "Device code expired or unknown" },
+        httpStatus: 408,
+      });
+    });
   }
 
   /**
-   * The device-code record behind a user-typed short code, or nothing.
-   *
-   * Case-folded because the code is read off a screen and typed back in.
+   * The record behind a user-typed short code, refusing an unknown one as
+   * `not_found` with the caller's own description. Case-folded because the
+   * code is read off a screen and typed back in.
    */
-  async tryFindDeviceCodeByUserCode(userCode: string): Promise<CliDeviceCodeRecord | null> {
-    const deviceCode = await this.store.tryGet(userCodeKey(userCode.toUpperCase()));
-    if (!deviceCode) {
-      return null;
-    }
+  getDeviceCodeByUserCode(input: {
+    userCode: string;
+    unknownDescription: string;
+  }): Promise<CliDeviceCodeRecord> {
+    return this.#storedDeviceCodeByUserCode(input.userCode).catch((error: unknown) => {
+      if (!isRecordNotFound(error)) throw error;
 
-    return this.tryFindDeviceCode(deviceCode);
+      throw new CliDeviceFlowRefusedError({
+        refusal: { error: "not_found", error_description: input.unknownDescription },
+        httpStatus: 404,
+      });
+    });
+  }
+
+  async #storedDeviceCode(deviceCode: string): Promise<CliDeviceCodeRecord> {
+    return JSON.parse(await this.store.get(deviceCodeKey(deviceCode))) as CliDeviceCodeRecord;
+  }
+
+  async #storedDeviceCodeByUserCode(userCode: string): Promise<CliDeviceCodeRecord> {
+    return this.#storedDeviceCode(await this.store.get(userCodeKey(userCode.toUpperCase())));
   }
 
   /**
@@ -325,7 +346,10 @@ export class CliDeviceSessionService {
     projectApiKey?: CliDeviceCodeRecord["project_api_key"];
     keySelection?: CliKeySelection | undefined;
   }): Promise<{ approved: boolean }> {
-    const record = await this.tryFindDeviceCode(input.deviceCode);
+    const record = await this.#storedDeviceCode(input.deviceCode).catch((error: unknown) => {
+      if (isRecordNotFound(error)) return undefined;
+      throw error;
+    });
     if (!record) {
       return { approved: false };
     }
@@ -351,9 +375,15 @@ export class CliDeviceSessionService {
     return { approved: true };
   }
 
-  /** Flips a device code to `denied`, leaving the CLI's poll to report it. */
-  async denyDeviceCode(deviceCode: string): Promise<void> {
-    const record = await this.tryFindDeviceCode(deviceCode);
+  /**
+   * Flips the device code behind a user-typed short code to `denied`, leaving
+   * the CLI's poll to report it. Idempotent: denying an unknown code is a no-op.
+   */
+  async denyDeviceCodeByUserCode(userCode: string): Promise<void> {
+    const record = await this.#storedDeviceCodeByUserCode(userCode).catch((error: unknown) => {
+      if (isRecordNotFound(error)) return undefined;
+      throw error;
+    });
     if (!record) {
       return;
     }
@@ -422,14 +452,28 @@ export class CliDeviceSessionService {
     };
   }
 
-  /** The refresh record behind one refresh token, or nothing. */
-  async findRefreshToken(refreshToken: string): Promise<CliRefreshTokenRecord | null> {
-    const raw = await this.store.tryGet(cliRefreshTokenKey(refreshToken));
-    if (!raw) {
-      return null;
+  /**
+   * The refresh record behind one refresh token. Unknown, revoked or
+   * unreadable refuses as `invalid_grant`, on which the CLI wipes local state.
+   */
+  async getRefreshToken(refreshToken: string): Promise<CliRefreshTokenRecord> {
+    const raw = await this.store.get(cliRefreshTokenKey(refreshToken)).catch((error: unknown) => {
+      if (isRecordNotFound(error)) return undefined;
+      throw error;
+    });
+    const record =
+      raw === undefined ? null : CliDeviceSessionService.decodeSession<CliRefreshTokenRecord>(raw);
+    if (!record) {
+      throw new CliDeviceFlowRefusedError({
+        refusal: {
+          error: "invalid_grant",
+          error_description: "Refresh token is invalid or revoked",
+        },
+        httpStatus: 401,
+      });
     }
 
-    return CliDeviceSessionService.decodeSession<CliRefreshTokenRecord>(raw);
+    return record;
   }
 
   /**
@@ -451,30 +495,26 @@ export class CliDeviceSessionService {
   }
 
   /**
-   * Resolves a bearer access token to its record, or nothing.
+   * The record behind a bearer access token. No bearer, an unknown or
+   * unreadable record, or an expired one all throw `CliSessionRecordNotFoundError`.
    */
-  async resolveAccessToken(
-    authHeader: string | null | undefined,
-  ): Promise<CliAccessTokenRecord | null> {
-    const token = CliDeviceSessionService.tryBearerCliAccessToken(authHeader);
+  async getAccessToken(authHeader: string | null | undefined): Promise<CliAccessTokenRecord> {
+    const token = CliDeviceSessionService.extractBearerCliAccessToken(authHeader);
     if (!token) {
-      return null;
+      throw new CliSessionRecordNotFoundError();
     }
 
-    const raw = await this.store.tryGet(cliAccessTokenKey(token));
-    if (!raw) {
-      return null;
-    }
-
-    const record = CliDeviceSessionService.decodeSession<CliAccessTokenRecord>(raw);
+    const record = CliDeviceSessionService.decodeSession<CliAccessTokenRecord>(
+      await this.store.get(cliAccessTokenKey(token)),
+    );
     if (!record) {
-      return null;
+      throw new CliSessionRecordNotFoundError();
     }
 
     if (nowInstant().epochMilliseconds > record.expires_at) {
       await this.store.delete(cliAccessTokenKey(token));
 
-      return null;
+      throw new CliSessionRecordNotFoundError();
     }
 
     return record;
@@ -487,7 +527,7 @@ export class CliDeviceSessionService {
     authHeader: string | null | undefined;
     userId: string;
   }): Promise<void> {
-    const token = CliDeviceSessionService.tryBearerCliAccessToken(input.authHeader);
+    const token = CliDeviceSessionService.extractBearerCliAccessToken(input.authHeader);
     if (!token) {
       return;
     }
@@ -516,8 +556,11 @@ export class CliDeviceSessionService {
         continue;
       }
 
-      const raw = await this.store.tryGet(keyFor(token));
-      if (raw) {
+      const raw = await this.store.get(keyFor(token)).catch((error: unknown) => {
+        if (isRecordNotFound(error)) return undefined;
+        throw error;
+      });
+      if (raw !== undefined) {
         try {
           records.push(JSON.parse(raw) as CliRefreshTokenRecord);
         } catch (error) {
@@ -532,4 +575,8 @@ export class CliDeviceSessionService {
 
     return records;
   }
+}
+
+function isRecordNotFound(error: unknown): boolean {
+  return HandledError.isHandled(error) && error.code === "cli_session_record_not_found";
 }

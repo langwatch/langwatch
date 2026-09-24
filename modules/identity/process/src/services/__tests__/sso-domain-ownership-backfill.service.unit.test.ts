@@ -87,7 +87,7 @@ describe("the SSO domain-ownership backfill", () => {
         status: "finalized",
         report: { kind: "sso_domain_ownership", connections: 1, refused: [] },
       });
-      expect(await reads.tryFindDomainOwner({ domain: DOMAIN })).toEqual({
+      expect(await reads.getDomainOwner({ domain: DOMAIN })).toEqual({
         connectionId: "ssoc_acme",
         organizationId: "org_acme",
       });

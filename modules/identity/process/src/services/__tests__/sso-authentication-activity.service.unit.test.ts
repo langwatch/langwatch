@@ -4,7 +4,11 @@
  * reads for its test sign-in, and the quiet period is measured from.
  * Corresponds to specs/identity/sso-activation.feature.
  */
-import { emptySsoConnection, type SsoConnectionState } from "@langwatch/identity-contract";
+import {
+  emptySsoConnection,
+  SsoConnectionNotFoundError,
+  type SsoConnectionState,
+} from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
@@ -19,15 +23,13 @@ class StubConnectionReads extends SsoConnectionReadRepository {
   constructor(private readonly known: SsoConnectionState | null) {
     super();
   }
-  async tryFindConnection({
-    connectionId,
-  }: {
-    connectionId: string;
-  }): Promise<SsoConnectionState | null> {
-    return this.known?.connectionId === connectionId ? this.known : null;
+  async getConnection({ connectionId }: { connectionId: string }): Promise<SsoConnectionState> {
+    if (this.known?.connectionId !== connectionId)
+      throw new SsoConnectionNotFoundError(connectionId);
+    return this.known;
   }
-  async tryFindDomainOwner(): Promise<null> {
-    return null;
+  async getDomainOwner({ domain }: { domain: string }): Promise<never> {
+    throw new SsoConnectionNotFoundError(domain);
   }
   async findForOrganization(): Promise<SsoConnectionState[]> {
     return [];

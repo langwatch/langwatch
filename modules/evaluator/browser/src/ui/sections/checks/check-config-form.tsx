@@ -219,7 +219,7 @@ export default function CheckConfigForm({
       form.setValue("name", checkType.includes("custom") ? "" : (defaultName ?? ""));
     }
 
-    const setDefaultSettings = (defaultValues: Record<string, any>, prefix: string) => {
+    const setDefaultSettings = (defaultValues: object, prefix: string) => {
       if (!defaultValues) return;
 
       Object.entries(defaultValues).forEach(([key, value]) => {
@@ -271,6 +271,17 @@ export default function CheckConfigForm({
       ...(evaluatorDefinition?.optionalFields ?? []),
     ];
   }, [evaluatorDefinition]);
+
+  const showsRunOnHint =
+    preconditions?.length === 0 && !evaluatorDefinition?.requiredFields.includes("contexts");
+  const runOnHint =
+    sample === 1 ? (
+      runOn
+    ) : (
+      <Text color="fg.muted" fontStyle="italic">
+        No preconditions defined
+      </Text>
+    );
 
   return (
     <FormProvider {...form}>
@@ -433,18 +444,7 @@ export default function CheckConfigForm({
                           />
                         </HorizontalFormControl>
                         <PreconditionsField
-                          runOn={
-                            preconditions?.length === 0 &&
-                            !evaluatorDefinition?.requiredFields.includes("contexts") ? (
-                              sample === 1 ? (
-                                runOn
-                              ) : (
-                                <Text color="fg.muted" fontStyle="italic">
-                                  No preconditions defined
-                                </Text>
-                              )
-                            ) : null
-                          }
+                          runOn={showsRunOnHint ? runOnHint : null}
                           append={appendPrecondition}
                           remove={removePrecondition}
                           fields={fieldsPrecondition}

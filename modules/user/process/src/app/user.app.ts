@@ -3,7 +3,7 @@ import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contra
 import { ValidationError } from "@langwatch/handled-error";
 import {
   IdentityApi,
-  passwordProblem,
+  describePasswordProblem,
   type IdentityApi as IdentityApiContract,
   routesToOrganizationConnection,
 } from "@langwatch/identity-contract";
@@ -366,7 +366,7 @@ export class UserApp implements UserApi {
     // The same rules the form ran, from the same module, so the two cannot
     // drift into accepting different passwords. Carried as `fieldErrors` so the
     // refusal lands on the password box rather than in a banner over it.
-    const problem = passwordProblem(input.password);
+    const problem = describePasswordProblem(input.password);
 
     if (problem) {
       throw new ValidationError(problem, { meta: { fieldErrors: { password: [problem] } } });
@@ -432,7 +432,7 @@ export class UserApp implements UserApi {
     // the same rule.
     if (input.caller.impersonated) throw new ImpersonationCannotChangeCredentialsError();
 
-    const problem = passwordProblem(input.password);
+    const problem = describePasswordProblem(input.password);
 
     if (problem) {
       throw new ValidationError(problem, { meta: { fieldErrors: { password: [problem] } } });

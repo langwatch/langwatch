@@ -47,7 +47,7 @@ const normalise = (value: FilterParam, dropEmpty: boolean): FilterParam => {
         if (dropEmpty && Object.keys(kept).length === 0) return [];
         return [[key, kept]];
       }
-      return [[key, [nested as unknown as string]]];
+      return [[key, [nested]]];
     }),
   ) as FilterParam;
 };

@@ -1,7 +1,7 @@
 import type { LangWatchSpan } from "@/observability-sdk";
 import { shouldCaptureInput, shouldCaptureOutput } from "@/observability-sdk";
 
-import { type PromptsApiService } from "../prompts-api.service";
+import { type PromptsApiService, type SyncResult } from "../prompts-api.service";
 import type { CreatePromptBody, UpdatePromptBody, PromptResponse } from "../types";
 
 /**
@@ -86,7 +86,7 @@ export class PromptServiceTracingDecorator {
   async upsert(
     span: LangWatchSpan,
     handle: string,
-    config: any,
+    config: Parameters<PromptsApiService["upsert"]>[1],
   ): Promise<{ created: boolean; prompt: PromptResponse }> {
     if (shouldCaptureInput()) {
       span.setInput(config);
@@ -106,7 +106,10 @@ export class PromptServiceTracingDecorator {
     return result;
   }
 
-  async sync(span: LangWatchSpan, params: any): Promise<any> {
+  async sync(
+    span: LangWatchSpan,
+    params: Parameters<PromptsApiService["sync"]>[0],
+  ): Promise<SyncResult> {
     if (shouldCaptureInput()) {
       span.setInput(params);
     }

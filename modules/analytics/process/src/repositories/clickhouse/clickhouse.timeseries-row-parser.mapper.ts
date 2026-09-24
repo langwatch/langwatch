@@ -12,7 +12,7 @@ const aliasFor = (index: number, series: AnalyticsSeries): string => {
   return parts.join("__");
 };
 
-const numberOrNull = (value: unknown): number | null => {
+const toNumberOrNull = (value: unknown): number | null => {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
   if (typeof value !== "string" || value.length === 0) return null;
   const parsed = Number(value);
@@ -26,13 +26,10 @@ const zeroWhenAbsent = (series: AnalyticsSeries): boolean =>
       series.aggregation === "terms" ||
       series.aggregation === "sum";
 
-/** Decode JSONEachRow without allowing malformed cells to become analytics. */
-export function parseTimeseriesRows(input: {
-  readonly rows: readonly unknown[];
-  readonly series: readonly AnalyticsSeries[];
-  readonly groupBy: string | undefined;
-  readonly timeScale: number | "full" | undefined;
-}): AnalyticsTimeseriesResult {
+function bucketRowsByPeriod(input: Parameters<typeof parseTimeseriesRows>[0]): {
+  current: Map<string, Record<string, unknown>>;
+  previous: Map<string, Record<string, unknown>>;
+} {
   const rows = input.rows.map((row) => analyticsTimeseriesRowSchema.parse(row));
   const current = new Map<string, Record<string, unknown>>();
   const previous = new Map<string, Record<string, unknown>>();
@@ -50,10 +47,21 @@ export function parseTimeseriesRows(input: {
         ] ??= {})
       : bucket;
     for (const [index, series] of input.series.entries()) {
-      const value = numberOrNull(row[aliasFor(index, series)]);
+      const value = toNumberOrNull(row[aliasFor(index, series)]);
       if (value !== null) target[buildSeriesName(series, index)] = value;
     }
   }
+  return { current, previous };
+}
+
+/** Decode JSONEachRow without allowing malformed cells to become analytics. */
+export function parseTimeseriesRows(input: {
+  readonly rows: readonly unknown[];
+  readonly series: readonly AnalyticsSeries[];
+  readonly groupBy: string | undefined;
+  readonly timeScale: number | "full" | undefined;
+}): AnalyticsTimeseriesResult {
+  const { current, previous } = bucketRowsByPeriod(input);
 
   const sorted = (period: Map<string, Record<string, unknown>>) =>
     [...period.entries()]

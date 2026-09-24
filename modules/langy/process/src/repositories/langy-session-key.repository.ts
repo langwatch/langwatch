@@ -10,15 +10,14 @@ export type LangySessionKeyRecord = {
 };
 
 export abstract class LangySessionKeyRepository extends LangySessionKeyReapRepository {
-  abstract tryFindProjectScope(projectId: string): Promise<{
+  /** Throws `ProjectNotFoundError` when the project or its team is missing. */
+  abstract getProjectScope(projectId: string): Promise<{
     teamId: string;
     organizationId: string;
-  } | null>;
+  }>;
 
-  abstract tryFindById(input: {
-    apiKeyId: string;
-    projectId: string;
-  }): Promise<LangySessionKeyRecord | null>;
+  /** Throws `ApiKeyNotFoundError` when no key has this id. */
+  abstract getById(input: { apiKeyId: string; projectId: string }): Promise<LangySessionKeyRecord>;
 
   abstract revoke(apiKeyId: string, revokedAt: Instant): Promise<void>;
 }

@@ -40,13 +40,13 @@ export function isTraceMetadataKeyEditable(key: string): boolean {
  * Metadata key one summary attribute row corrects (filtering out run-describing
  * attributes like service.name, gen_ai.*, telemetry.*).
  */
-export function traceMetadataKeyForAttribute(attributeKey: string): string | null {
-  const key = bareMetadataKey(attributeKey);
+export function mapAttributeToTraceMetadataKey(attributeKey: string): string | null {
+  const key = extractBareMetadataKey(attributeKey);
   if (key === null) return null;
   return isTraceMetadataKeyEditable(key) ? key : null;
 }
 
-function bareMetadataKey(attributeKey: string): string | null {
+function extractBareMetadataKey(attributeKey: string): string | null {
   if (attributeKey === LABELS_ATTRIBUTE) return LABELS_METADATA_KEY;
   if (attributeKey.startsWith(METADATA_ATTRIBUTE_PREFIX)) {
     const bare = attributeKey.slice(METADATA_ATTRIBUTE_PREFIX.length);

@@ -35,7 +35,7 @@ function makeOtlpSpanWithEvaluation(evalPayload: Record<string, unknown>): OtlpS
     droppedAttributesCount: 0,
     droppedEventsCount: 0,
     droppedLinksCount: 0,
-  } as unknown as OtlpSpan;
+  };
 }
 
 describe("SpanNormalizationPipelineService — SDK evaluation events", () => {

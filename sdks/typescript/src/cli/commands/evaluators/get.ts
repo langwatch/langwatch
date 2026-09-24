@@ -8,6 +8,17 @@ import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
 
+const printEvaluatorSettings = (settings: Record<string, unknown> | undefined): void => {
+  if (!settings || Object.keys(settings).length === 0) return;
+  console.log();
+  console.log(chalk.bold("  Settings:"));
+  for (const [key, value] of Object.entries(settings)) {
+    const displayValue =
+      typeof value === "object" ? JSON.stringify(value) : `${value as string | number | boolean}`;
+    console.log(`    ${chalk.gray(key + ":")} ${displayValue}`);
+  }
+};
+
 const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
   const config = evaluator.config as
     | { evaluatorType?: string; settings?: Record<string, unknown> }
@@ -51,15 +62,7 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
     });
   }
 
-  if (config?.settings && Object.keys(config.settings).length > 0) {
-    console.log();
-    console.log(chalk.bold("  Settings:"));
-    for (const [key, value] of Object.entries(config.settings)) {
-      const displayValue =
-        typeof value === "object" ? JSON.stringify(value) : `${value as string | number | boolean}`;
-      console.log(`    ${chalk.gray(key + ":")} ${displayValue}`);
-    }
-  }
+  printEvaluatorSettings(config?.settings);
 
   if (evaluator.platformUrl) {
     console.log(`  ${chalk.bold("View:")}  ${chalk.underline(evaluator.platformUrl)}`);

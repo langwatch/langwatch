@@ -248,6 +248,35 @@ type DropReason =
 const dropReasonOf = (err: unknown): DecodeFailureReason | "unknown" =>
   err instanceof DecodeFailureError ? err.reason : "unknown";
 
+function attemptSource({
+  attempt,
+  jobAttempt,
+}: {
+  attempt: number;
+  jobAttempt: number;
+}): "fresh" | "job" | "group" {
+  if (attempt === 1) return "fresh";
+  return jobAttempt >= attempt ? "job" : "group";
+}
+
+function countStagedPerGroup<Payload>({
+  jobsToStage,
+  payloads,
+}: {
+  jobsToStage: readonly { groupId: string }[];
+  payloads: readonly Payload[];
+}): Map<string, { payload: Payload; count: number }> {
+  const perGroup = new Map<string, { payload: Payload; count: number }>();
+  for (const [index, job] of jobsToStage.entries()) {
+    const current = perGroup.get(job.groupId);
+    perGroup.set(job.groupId, {
+      payload: payloads[index]!,
+      count: (current?.count ?? 0) + 1,
+    });
+  }
+  return perGroup;
+}
+
 /**
  * Per-group FIFO with cross-group parallelism: send() stages into Redis,
  * dispatch() hands work to fastq, which runs it with concurrency-limited
@@ -650,6 +679,36 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     );
   }
 
+  private recordStaged({
+    newStagedCount,
+    effectiveDelay,
+    jobsToStage,
+    payloads,
+  }: {
+    newStagedCount: number;
+    effectiveDelay: number | undefined;
+    jobsToStage: readonly { groupId: string }[];
+    payloads: readonly Payload[];
+  }): void {
+    gqJobsStagedTotal.inc({ queue_name: this.queueName }, newStagedCount);
+    if (effectiveDelay && effectiveDelay > 0) {
+      gqJobsDelayedTotal.inc({ queue_name: this.queueName }, newStagedCount);
+      for (let i = 0; i < newStagedCount; i++) {
+        gqJobDelayMilliseconds.observe({ queue_name: this.queueName }, effectiveDelay);
+      }
+    }
+    for (const [group, value] of countStagedPerGroup({ jobsToStage, payloads })) {
+      void Promise.resolve(
+        this.activity?.staged({
+          queue: this.queueName,
+          group,
+          payload: value.payload,
+          count: value.count,
+        }),
+      ).catch(() => {});
+    }
+  }
+
   async sendBatch(payloads: Payload[], options?: QueueSendOptions<Payload>): Promise<void> {
     if (this.stagingClosed) {
       throw new GroupQueueError(
@@ -727,32 +786,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
 
     const dedupedCount = payloads.length - newStagedCount;
     if (newStagedCount > 0) {
-      gqJobsStagedTotal.inc({ queue_name: this.queueName }, newStagedCount);
-      const effectiveDelay = options?.delay ?? this.delay;
-      if (effectiveDelay && effectiveDelay > 0) {
-        gqJobsDelayedTotal.inc({ queue_name: this.queueName }, newStagedCount);
-        for (let i = 0; i < newStagedCount; i++) {
-          gqJobDelayMilliseconds.observe({ queue_name: this.queueName }, effectiveDelay);
-        }
-      }
-      const perGroup = new Map<string, { payload: Payload; count: number }>();
-      for (const [index, job] of jobsToStage.entries()) {
-        const current = perGroup.get(job.groupId);
-        perGroup.set(job.groupId, {
-          payload: payloads[index]!,
-          count: (current?.count ?? 0) + 1,
-        });
-      }
-      for (const [group, value] of perGroup) {
-        void Promise.resolve(
-          this.activity?.staged({
-            queue: this.queueName,
-            group,
-            payload: value.payload,
-            count: value.count,
-          }),
-        ).catch(() => {});
-      }
+      this.recordStaged({
+        newStagedCount,
+        effectiveDelay: options?.delay ?? this.delay,
+        jobsToStage,
+        payloads,
+      });
     }
     if (dedupedCount > 0) {
       gqJobsDedupedTotal.inc({ queue_name: this.queueName }, dedupedCount);
@@ -1136,7 +1175,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
         "queue.attempt": attempt,
         // Which source won `Math.max(jobAttempt, groupAttempt)`. Distinguishes
         // a genuine first delivery from a chain whose counter was lost.
-        "queue.attempt_source": attempt === 1 ? "fresh" : jobAttempt >= attempt ? "job" : "group",
+        "queue.attempt_source": attemptSource({ attempt, jobAttempt }),
       };
 
       Object.assign(spanAttributes, this.customSpanAttributes(payload));

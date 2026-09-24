@@ -7,6 +7,7 @@ import {
   emptySsoConnection,
   type SsoConnectionState,
   type SsoDomainVerification,
+  SsoConnectionNotFoundError,
 } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -30,11 +31,11 @@ import { SsoAssertionService } from "../sso-assertion.service.ts";
 
 /** Only the one read the gate makes; the other two are never reached here. */
 class OneConnectionReads extends SsoConnectionReadRepository {
-  constructor(readonly tryFindConnection: SsoConnectionReadRepository["tryFindConnection"]) {
+  constructor(readonly getConnection: SsoConnectionReadRepository["getConnection"]) {
     super();
   }
 
-  tryFindDomainOwner(): never {
+  getDomainOwner(): never {
     throw new Error("the gate never asks who owns a domain");
   }
 
@@ -98,7 +99,10 @@ function serviceOver({
   members?: { userId: string; address: string }[];
   boundIdentities?: { connectionId: string; accountId: string; address: string }[];
 }) {
-  const tryFindConnection = vi.fn().mockResolvedValue(row);
+  const getConnection = vi.fn(async ({ connectionId }: { connectionId: string }) => {
+    if (!row) throw new SsoConnectionNotFoundError(connectionId);
+    return row;
+  });
   const findRegistrantAtAddress = vi.fn(
     async ({ userId, email }: { userId: string; email: string }) =>
       members.some(
@@ -127,11 +131,11 @@ function serviceOver({
 
   return {
     service: SsoAssertionService.create({
-      connections: new OneConnectionReads(tryFindConnection),
+      connections: new OneConnectionReads(getConnection),
       registrants: { findRegistrantAtAddress, findBoundMemberIdentity },
       reproof: { requestReproof },
     }),
-    tryFindConnection,
+    getConnection,
     findRegistrantAtAddress,
     findBoundMemberIdentity,
     requestReproof,
@@ -345,12 +349,12 @@ describe("given an assertion that names no connection we hold", () => {
   });
 
   it("refuses an id that is not a connection id at all, without a read", async () => {
-    const { service, tryFindConnection } = serviceOver({ row: connection() });
+    const { service, getConnection } = serviceOver({ row: connection() });
 
     await expect(
       service.decide({ providerId: "google", email: "ana@acme.com" }),
     ).resolves.toMatchObject({ action: "reject" });
-    expect(tryFindConnection).not.toHaveBeenCalled();
+    expect(getConnection).not.toHaveBeenCalled();
   });
 });
 

@@ -151,7 +151,7 @@ export class GatewaySpendFiltersAdapter {
    * intersect. Naming a key directly and via external id is one narrowing said
    * twice; naming two different keys that way is unanswerable, not wider.
    */
-  intersectIds(a: string[] | undefined, b: string[] | undefined): string[] | undefined {
+  computeIdIntersection(a: string[] | undefined, b: string[] | undefined): string[] | undefined {
     if (a === undefined) return b;
     if (b === undefined) return a;
     const inB = new Set(b);
@@ -171,7 +171,7 @@ export class GatewaySpendFiltersAdapter {
     overrides?: { virtualKeyIds?: string[] };
   }): SpendFilters {
     return {
-      virtualKeyIds: this.intersectIds(query.virtual_key_id, overrides?.virtualKeyIds),
+      virtualKeyIds: this.computeIdIntersection(query.virtual_key_id, overrides?.virtualKeyIds),
       endUserIds: query.end_user_id,
       principalUserIds: query.principal_user_id,
       models: query.model,

@@ -2,14 +2,14 @@ import type { MetricRollupRow } from "../schemas/metric-processing/metric-data-p
 import { addStats, type BucketEntry, resetOrGap } from "./rollup-row.ts";
 import {
   type MetricRollupSourcePoint,
-  numberValue,
-  previousPoint,
+  toNumberValue,
+  pickPreviousPoint,
   startsNewSequence,
 } from "./sequence.ts";
 
 function buildGaugeRow({ row, entries }: { row: MetricRollupRow; entries: BucketEntry[] }): void {
   for (const { point } of entries) {
-    const value = numberValue(point);
+    const value = toNumberValue(point);
     addStats(row, value);
     // A valueless point must not clobber the last observed gauge value.
     if (value !== null) row.gaugeLast = value;
@@ -26,15 +26,15 @@ function buildSumRow({
   all: MetricRollupSourcePoint[];
 }): void {
   for (const { point, index } of entries) {
-    const current = numberValue(point);
+    const current = toNumberValue(point);
     if (current === null) continue;
     if (point.aggregationTemporality !== "cumulative") {
       addStats(row, current);
       continue;
     }
-    const previous = previousPoint(all, index);
+    const previous = pickPreviousPoint(all, index);
     const starts = startsNewSequence(previous, point);
-    const previousValue = previous ? numberValue(previous) : null;
+    const previousValue = previous ? toNumberValue(previous) : null;
     const decreased =
       point.isMonotonic === true && previousValue !== null && current < previousValue;
     if (starts || decreased || previousValue === null) {

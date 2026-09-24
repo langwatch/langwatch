@@ -1,6 +1,7 @@
 import { Readable } from "node:stream";
 
 import { PermissionDeniedError, type AuthzApi } from "@langwatch/authz-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import {
   StoredObjectBytesMissingError,
@@ -150,31 +151,35 @@ export class StoredObjectService {
     if (!value) return this.options.legacy.headById(input);
     if (value.status !== "available") return { status: "not_found" };
 
-    const bytes = value.storage
-      ? await StoredObjectUploadService.storageCall(() =>
-          this.options.storage.tryRead({
-            projectId: input.projectId,
-            address: this.getStorage(value),
-          }),
-        )
-      : null;
-    await bytes?.[Symbol.asyncIterator]().return?.();
+    const facts = { mediaType: value.mediaType, purpose: value.purpose };
+    if (!value.storage) return { status: "missing", ...facts };
 
-    return {
-      status: bytes ? "available" : "missing",
-      mediaType: value.mediaType,
-      purpose: value.purpose,
-    };
+    try {
+      const bytes = await StoredObjectUploadService.storageCall(() =>
+        this.options.storage.getBytes({
+          projectId: input.projectId,
+          address: this.getStorage(value),
+        }),
+      );
+      await bytes[Symbol.asyncIterator]().return?.();
+    } catch (error) {
+      if (error instanceof HandledError && error.code === "stored_object_not_found") {
+        return { status: "missing", ...facts };
+      }
+      throw error;
+    }
+
+    return { status: "available", ...facts };
   }
 
-  /** The row and its bytes for the file route: Postgres first, then the legacy index. */
-  async readById(input: {
-    projectId: string;
-    id: string;
-  }): Promise<StoredObjectFileStreamRead | null> {
+  /**
+   * The row and its bytes for the file route: Postgres first, then the legacy
+   * index. Throws `StoredObjectNotFoundError` when neither holds an available row.
+   */
+  async readById(input: { projectId: string; id: string }): Promise<StoredObjectFileStreamRead> {
     const value = await this.options.records.findById({ tenantId: input.projectId, id: input.id });
-    if (!value) return this.options.legacy.tryGetById(input);
-    if (value.status !== "available") return null;
+    if (!value) return this.options.legacy.getById(input);
+    if (value.status !== "available") throw new StoredObjectNotFoundError();
 
     const row = {
       id: value.id,
@@ -183,11 +188,20 @@ export class StoredObjectService {
       media_type: value.mediaType,
       size_bytes: value.byteLength,
     };
-    const bytes = value.storage
-      ? await this.options.storage.tryRead({ projectId: input.projectId, address: value.storage })
-      : null;
+    if (!value.storage) return { row, status: "missing" };
 
-    return bytes ? { row, stream: Readable.from(bytes) } : { row, status: "missing" };
+    try {
+      const bytes = await this.options.storage.getBytes({
+        projectId: input.projectId,
+        address: value.storage,
+      });
+      return { row, stream: Readable.from(bytes) };
+    } catch (error) {
+      if (error instanceof HandledError && error.code === "stored_object_not_found") {
+        return { row, status: "missing" };
+      }
+      throw error;
+    }
   }
 
   async getMetadata(input: { projectId: string; id: string }): Promise<StoredObjectMetadata> {
@@ -198,11 +212,13 @@ export class StoredObjectService {
     const value = await this.getAvailable(input);
     const address = this.getStorage(value);
     const bytes = await StoredObjectUploadService.storageCall(() =>
-      this.options.storage.tryRead({ projectId: input.projectId, address }),
-    );
-    if (!bytes) {
-      throw new StoredObjectBytesMissingError(input.projectId, input.id);
-    }
+      this.options.storage.getBytes({ projectId: input.projectId, address }),
+    ).catch((error: unknown) => {
+      if (error instanceof HandledError && error.code === "stored_object_not_found") {
+        throw new StoredObjectBytesMissingError(input.projectId, input.id);
+      }
+      throw error;
+    });
 
     return { metadata: storedObjectMetadataOf(value), bytes };
   }

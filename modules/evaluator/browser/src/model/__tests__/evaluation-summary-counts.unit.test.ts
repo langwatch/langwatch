@@ -21,8 +21,9 @@ function makeEvaluation(overrides: Partial<ElasticSearchEvaluation> = {}): Elast
     passed: true,
     score: null,
     label: null,
+    timestamps: {},
     ...overrides,
-  } as unknown as ElasticSearchEvaluation;
+  };
 }
 
 describe("summarizeEvaluationsTag", () => {

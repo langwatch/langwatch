@@ -220,38 +220,53 @@ function serverFindings({
 
   if (legacyRuntime) add("legacy-transport-runtime", legacyRuntime);
 
-  const repositories = join(src, "repositories");
-
-  if (isDirectory(repositories)) {
-    const registered = files(repositories).some((name) => name.endsWith(".registry.ts"));
-    if (!registered) add("unregistered-repositories", repositories);
-
-    const prisma = join(repositories, "prisma");
-    const memory = join(repositories, "memory");
-    const memoryTwinMissing = isDirectory(prisma) && !isDirectory(memory);
-    if (memoryTwinMissing) add("postgres-without-memory", prisma);
-
-    const contractTested =
-      isDirectory(join(memory, "__tests__")) ||
-      files(join(repositories, "__tests__")).some((name) => name.endsWith(".contract.test.ts"));
-
-    if (isDirectory(memory) && !contractTested) add("memory-twin-untested", memory);
-  }
-
-  const channels = join(src, "channels");
-
-  if (isDirectory(channels)) {
-    const registered = files(channels).some((name) => name.endsWith(".registry.ts"));
-    if (!registered) add("unregistered-channels", channels);
-
-    const tiers = subdirectories(channels).filter((name) => !TEST_DIRECTORIES.has(name));
-    const live = tiers.filter((name) => name !== "memory");
-    const [firstLive] = live;
-    const twinMissing = firstLive !== undefined && !tiers.includes("memory");
-    if (twinMissing) add("unregistered-channels", join(channels, firstLive));
-  }
+  addRepositoryFindings({ repositories: join(src, "repositories"), add });
+  addChannelFindings({ channels: join(src, "channels"), add });
 
   return findings;
+}
+
+function addRepositoryFindings({
+  repositories,
+  add,
+}: {
+  repositories: string;
+  add: (kind: FeatureShapeLegacyKind, path: string) => void;
+}): void {
+  if (!isDirectory(repositories)) return;
+
+  const registered = files(repositories).some((name) => name.endsWith(".registry.ts"));
+  if (!registered) add("unregistered-repositories", repositories);
+
+  const prisma = join(repositories, "prisma");
+  const memory = join(repositories, "memory");
+  const memoryTwinMissing = isDirectory(prisma) && !isDirectory(memory);
+  if (memoryTwinMissing) add("postgres-without-memory", prisma);
+
+  const contractTested =
+    isDirectory(join(memory, "__tests__")) ||
+    files(join(repositories, "__tests__")).some((name) => name.endsWith(".contract.test.ts"));
+
+  if (isDirectory(memory) && !contractTested) add("memory-twin-untested", memory);
+}
+
+function addChannelFindings({
+  channels,
+  add,
+}: {
+  channels: string;
+  add: (kind: FeatureShapeLegacyKind, path: string) => void;
+}): void {
+  if (!isDirectory(channels)) return;
+
+  const registered = files(channels).some((name) => name.endsWith(".registry.ts"));
+  if (!registered) add("unregistered-channels", channels);
+
+  const tiers = subdirectories(channels).filter((name) => !TEST_DIRECTORIES.has(name));
+  const live = tiers.filter((name) => name !== "memory");
+  const [firstLive] = live;
+  const twinMissing = firstLive !== undefined && !tiers.includes("memory");
+  if (twinMissing) add("unregistered-channels", join(channels, firstLive));
 }
 
 function webFindings(root: string, feature: string, pkg: ClassifiedPackage): FeatureShapeFinding[] {

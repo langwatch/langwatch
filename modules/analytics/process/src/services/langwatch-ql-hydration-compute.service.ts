@@ -75,7 +75,7 @@ const MESSAGES_SIDES: Readonly<Record<string, LangWatchQLMessagesSide>> = {
  * re-checked loudly: a mismatch would otherwise reach a renderer as NaN and
  * produce a plausible wrong budget.
  */
-function numberOption({
+function pickNumberOption({
   definition,
   options,
   at,
@@ -225,7 +225,7 @@ export class LangWatchQLHydrationComputeService {
     const transcript = await this.renderer.renderThreadTranscript({
       threadKey,
       traces: ordered,
-      ...(isBounded ? { maxTokens: numberOption({ definition, options, at: 0 }) } : {}),
+      ...(isBounded ? { maxTokens: pickNumberOption({ definition, options, at: 0 }) } : {}),
     });
 
     return { value: transcript, isTruncated: false, isResolved: true };
@@ -247,7 +247,7 @@ export class LangWatchQLHydrationComputeService {
     if (name === "llm_readable_trace") {
       const value = await this.renderer.renderReadableTrace({
         trace,
-        maxTokens: numberOption({ definition, options, at: 0 }),
+        maxTokens: pickNumberOption({ definition, options, at: 0 }),
       });
       return { value, isTruncated: false, isResolved: true };
     }

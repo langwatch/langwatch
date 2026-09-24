@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
   isTraceMetadataKeyEditable,
   traceAttributeKeyForMetadata,
-  traceMetadataKeyForAttribute,
+  mapAttributeToTraceMetadataKey,
 } from "../trace-metadata-editable-keys.ts";
 
 describe("trace metadata editable keys", () => {
@@ -44,34 +44,34 @@ describe("trace metadata editable keys", () => {
     describe("when it is a key the caller sent", () => {
       /** @scenario "Which metadata keys a reviewer may correct is one rule" */
       it("corrects the bare metadata key underneath it", () => {
-        expect(traceMetadataKeyForAttribute("metadata.environment")).toBe("environment");
-        expect(traceMetadataKeyForAttribute("metadata.review.note")).toBe("review.note");
+        expect(mapAttributeToTraceMetadataKey("metadata.environment")).toBe("environment");
+        expect(mapAttributeToTraceMetadataKey("metadata.review.note")).toBe("review.note");
       });
     });
 
     describe("when it is the labels row", () => {
       /** @scenario "Which metadata keys a reviewer may correct is one rule" */
       it("corrects the labels metadata key", () => {
-        expect(traceMetadataKeyForAttribute("langwatch.labels")).toBe("labels");
+        expect(mapAttributeToTraceMetadataKey("langwatch.labels")).toBe("labels");
       });
     });
 
     describe("when it describes the run rather than the trace", () => {
       /** @scenario "Which metadata keys a reviewer may correct is one rule" */
       it("corrects nothing", () => {
-        expect(traceMetadataKeyForAttribute("service.name")).toBeNull();
-        expect(traceMetadataKeyForAttribute("gen_ai.conversation.id")).toBeNull();
-        expect(traceMetadataKeyForAttribute("langwatch.user_id")).toBeNull();
-        expect(traceMetadataKeyForAttribute("scenario.run_id")).toBeNull();
-        expect(traceMetadataKeyForAttribute("thread_id")).toBeNull();
-        expect(traceMetadataKeyForAttribute("metadata.")).toBeNull();
+        expect(mapAttributeToTraceMetadataKey("service.name")).toBeNull();
+        expect(mapAttributeToTraceMetadataKey("gen_ai.conversation.id")).toBeNull();
+        expect(mapAttributeToTraceMetadataKey("langwatch.user_id")).toBeNull();
+        expect(mapAttributeToTraceMetadataKey("scenario.run_id")).toBeNull();
+        expect(mapAttributeToTraceMetadataKey("thread_id")).toBeNull();
+        expect(mapAttributeToTraceMetadataKey("metadata.")).toBeNull();
       });
     });
 
     describe("when it is a bare key with no namespace", () => {
       /** @scenario "Which metadata keys a reviewer may correct is one rule" */
       it("corrects the key itself", () => {
-        expect(traceMetadataKeyForAttribute("reviewed_by")).toBe("reviewed_by");
+        expect(mapAttributeToTraceMetadataKey("reviewed_by")).toBe("reviewed_by");
       });
     });
   });

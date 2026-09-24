@@ -63,7 +63,7 @@ export function LangyPlanCard({
 
       {cardOpen && (
         <>
-          <VStack align="stretch" gap={1.5} role="list">
+          <VStack align="stretch" gap={1.5} as="ul">
             {plan.items.map((item, index) => (
               <PlanStep
                 key={`${index}:${item.content}`}
@@ -78,11 +78,11 @@ export function LangyPlanCard({
             // The thinking steps the model narrated between calls: part of
             // the turn's process record, so they live in the same expanded
             // area as the steps, quieter (they claim thought, not work).
-            <VStack align="stretch" gap={0} role="list">
+            <VStack align="stretch" gap={0} as="ul">
               {reasoningTitles.map((title, index) => (
                 <Text
                   key={`thought-${index}`}
-                  role="listitem"
+                  as="li"
                   textStyle="xs"
                   color="fg.subtle"
                   fontStyle="italic"

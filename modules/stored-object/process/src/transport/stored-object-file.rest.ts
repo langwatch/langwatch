@@ -100,15 +100,15 @@ export interface StoredObjectFileApi {
     windowSeconds: number;
     max: number;
   }): Promise<StoredObjectFileAllowance>;
-  requireProjectPermission(input: {
+  assertProjectPermission(input: {
     userId: string;
     projectId: string;
     permission: StoredObjectFileViewPermission;
   }): Promise<void>;
-  /** Which project owns an object, for a URL that does not say. */
-  resolveOwner(input: { id: string }): Promise<{ projectId: string } | null>;
-  /** One object's row and, when the bytes are there, a stream of them. */
-  readById(input: { projectId: string; id: string }): Promise<StoredObjectFileStreamRead | null>;
+  /** Which project owns an object, for a URL that does not say. Throws when none does. */
+  resolveOwner(input: { id: string }): Promise<{ projectId: string }>;
+  /** One object's row and, when the bytes are there, a stream of them. Throws when absent. */
+  readById(input: { projectId: string; id: string }): Promise<StoredObjectFileStreamRead>;
 }
 
 export const StoredObjectFileApi = moduleApi<StoredObjectFileApi>()("stored-object");
@@ -211,8 +211,8 @@ async function serveStoredObjectBytes({
 
   const owner = await ownerOf({ app, id, claimedProjectId });
 
-  if (!owner) return jsonResponse({ status: "not_found" }, 404);
-  if (owner.unavailable) return unavailable();
+  if (owner.status === "not_found") return jsonResponse({ status: "not_found" }, 404);
+  if (owner.status === "unavailable") return unavailable();
 
   // Pinned once: the gate below and the read after it MUST use the same value,
   // or a future edit could authorize one project and read another.
@@ -222,8 +222,11 @@ async function serveStoredObjectBytes({
 
   const result = await readOf({ app, ownerProjectId, id });
 
-  if (!result) return jsonResponse({ status: "not_found" }, 404);
-  if (!("row" in result)) return unavailable();
+  if (!("row" in result)) {
+    return result.status === "not_found"
+      ? jsonResponse({ status: "not_found" }, 404)
+      : unavailable();
+  }
 
   await authorizeFilePurpose({ app, caller, ownerProjectId, purpose: result.row.purpose });
 
@@ -260,8 +263,19 @@ async function countCaller({
 
 /** A degraded instance must not read as a deleted object. */
 type ResolvedOwner =
-  | Readonly<{ projectId: string; unavailable?: undefined }>
-  | Readonly<{ projectId?: undefined; unavailable: true }>;
+  | Readonly<{ status: "found"; projectId: string }>
+  | Readonly<{ status: "not_found" }>
+  | Readonly<{ status: "unavailable" }>;
+
+/** A read that found no row, or an outage the handler must not report as a deletion. */
+type FileReadOutcome =
+  | StoredObjectFileStreamRead
+  | Readonly<{ status: "not_found" }>
+  | Readonly<{ status: "unavailable" }>;
+
+function isStoredObjectNotFound(err: unknown): boolean {
+  return err instanceof HandledError && err.code === "stored_object_not_found";
+}
 
 /**
  * The project-scoped URL carries the claimed owner, so it is taken directly:
@@ -276,15 +290,16 @@ async function ownerOf({
   app: StoredObjectFileApi;
   id: string;
   claimedProjectId?: string | undefined;
-}): Promise<ResolvedOwner | null> {
-  if (claimedProjectId) return { projectId: claimedProjectId };
+}): Promise<ResolvedOwner> {
+  if (claimedProjectId) return { status: "found", projectId: claimedProjectId };
 
   try {
     const owner = await app.resolveOwner({ id });
 
-    return owner ? { projectId: owner.projectId } : null;
+    return { status: "found", projectId: owner.projectId };
   } catch (err) {
-    if (err instanceof StoredObjectOwnerLookupUnavailableError) return { unavailable: true };
+    if (isStoredObjectNotFound(err)) return { status: "not_found" };
+    if (err instanceof StoredObjectOwnerLookupUnavailableError) return { status: "unavailable" };
 
     throw err;
   }
@@ -299,11 +314,13 @@ async function readOf({
   app: StoredObjectFileApi;
   ownerProjectId: string;
   id: string;
-}): Promise<StoredObjectFileStreamRead | { unavailable: true } | null> {
+}): Promise<FileReadOutcome> {
   try {
     return await app.readById({ projectId: ownerProjectId, id });
-  } catch {
-    return { unavailable: true };
+  } catch (err) {
+    if (isStoredObjectNotFound(err)) return { status: "not_found" };
+
+    return { status: "unavailable" };
   }
 }
 
@@ -335,7 +352,7 @@ async function authorizeFileRead({
 
   for (const permission of FILE_VIEW_PERMISSIONS) {
     try {
-      await app.requireProjectPermission({ userId, projectId: ownerProjectId, permission });
+      await app.assertProjectPermission({ userId, projectId: ownerProjectId, permission });
 
       return;
     } catch (err) {
@@ -373,7 +390,7 @@ async function authorizeFilePurpose({
   if (!userId) return;
 
   try {
-    await app.requireProjectPermission({ userId, projectId: ownerProjectId, permission });
+    await app.assertProjectPermission({ userId, projectId: ownerProjectId, permission });
   } catch (err) {
     if (!isPermissionDenial(err)) throw err;
 

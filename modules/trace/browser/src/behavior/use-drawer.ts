@@ -97,6 +97,76 @@ function serialisable(value: unknown): string | undefined {
   return void 0;
 }
 
+function drawerAddress({
+  asPath,
+  drawer,
+  params,
+}: {
+  asPath: string;
+  drawer: DrawerType;
+  params: Record<string, unknown>;
+}): string {
+  const { path, query } = readAddress(asPath);
+  for (const key of Array.from(query.keys())) {
+    if (key.startsWith("drawer.")) query.delete(key);
+  }
+  query.set("drawer.open", drawer);
+  for (const [key, value] of Object.entries(params)) {
+    const written = serialisable(value);
+    if (written !== void 0) query.set(`drawer.${key}`, written);
+  }
+  return buildAddress(path, query);
+}
+
+function closedAddress(asPath: string): string {
+  const { path, query } = readAddress(asPath);
+  for (const key of Array.from(query.keys())) {
+    if (key.startsWith("drawer.") || key === "span") query.delete(key);
+  }
+  return buildAddress(path, query);
+}
+
+function stackOverOpenDrawer({
+  drawer,
+  params,
+  openNow,
+  query,
+}: {
+  drawer: DrawerType;
+  params: Record<string, unknown>;
+  openNow: unknown;
+  query: Record<string, unknown>;
+}): void {
+  // An empty stack means the open overlay came from a deep link or
+  // outlived a reload, so seed it from the address the browser is
+  // actually on and back navigation can return there.
+  if (drawerStack.length === 0) {
+    const openInUrl = openDrawerInLocation();
+    if (openInUrl) drawerStack.push({ drawer: openInUrl, params: {} });
+  }
+
+  // Snapshot the current address onto the entry being left, so going back
+  // restores the whole state and not only the overlay's name.
+  const top = drawerStack[drawerStack.length - 1];
+  if (top && top.drawer === openNow) {
+    const carried: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(query)) {
+      if (key.startsWith("drawer.") && key !== "drawer.open") {
+        carried[key.slice("drawer.".length)] = value;
+      }
+    }
+    top.params = carried;
+  }
+
+  // An overlay appears in the stack once: opening one that is already in it
+  // returns to that entry rather than stacking a second copy, so closing a
+  // trace never walks back into a dataset drawer the reader had already left.
+  const existing = drawerStack.findIndex((entry) => entry.drawer === drawer);
+  if (existing !== -1) drawerStack.length = existing;
+
+  drawerStack.push({ drawer, params });
+}
+
 export function useDrawer() {
   const router = useRouter();
   const currentDrawer = router.query["drawer.open"];
@@ -104,16 +174,8 @@ export function useDrawer() {
   /** Writes one overlay's address, clearing whatever `drawer.*` keys stood before it. */
   const writeDrawer = useCallback(
     (drawer: DrawerType, params: Record<string, unknown>, options: { replace?: boolean } = {}) => {
-      const { path, query } = readAddress(router.asPath);
-      for (const key of Array.from(query.keys())) {
-        if (key.startsWith("drawer.")) query.delete(key);
-      }
-      query.set("drawer.open", drawer);
-      for (const [key, value] of Object.entries(params)) {
-        const written = serialisable(value);
-        if (written !== void 0) query.set(`drawer.${key}`, written);
-      }
-      void router[options.replace ? "replace" : "push"](buildAddress(path, query));
+      const address = drawerAddress({ asPath: router.asPath, drawer, params });
+      void router[options.replace ? "replace" : "push"](address);
     },
     [router],
   );
@@ -135,36 +197,7 @@ export function useDrawer() {
       if (options.resetStack || !openNow) {
         drawerStack = [{ drawer, params }];
       } else {
-        // An empty stack means the open overlay came from a deep link or
-        // outlived a reload, so seed it from the address the browser is
-        // actually on and back navigation can return there.
-        if (drawerStack.length === 0) {
-          const openInUrl = openDrawerInLocation();
-          if (openInUrl) drawerStack.push({ drawer: openInUrl, params: {} });
-        }
-
-        // Snapshot the current address onto the entry being left, so going back
-        // restores the whole state and not only the overlay's name.
-        const top = drawerStack[drawerStack.length - 1];
-        if (top && top.drawer === openNow) {
-          const carried: Record<string, unknown> = {};
-          for (const [key, value] of Object.entries(router.query)) {
-            if (key.startsWith("drawer.") && key !== "drawer.open") {
-              carried[key.slice("drawer.".length)] = value;
-            }
-          }
-          top.params = carried;
-        }
-
-        // An overlay appears in the stack once: opening one that is already in
-        // it returns to that entry rather than stacking a second copy. Without
-        // this, reading a trace, adding it to a dataset and then clicking
-        // another trace leaves trace -> dataset -> trace, and closing that trace
-        // walks back into a dataset drawer the reader had already left.
-        const existing = drawerStack.findIndex((entry) => entry.drawer === drawer);
-        if (existing !== -1) drawerStack.length = existing;
-
-        drawerStack.push({ drawer, params });
+        stackOverOpenDrawer({ drawer, params, openNow, query: router.query });
       }
 
       writeDrawer(drawer, params, { replace: options.replace });
@@ -174,11 +207,7 @@ export function useDrawer() {
 
   const closeDrawer = useCallback(() => {
     drawerStack = [];
-    const { path, query } = readAddress(router.asPath);
-    for (const key of Array.from(query.keys())) {
-      if (key.startsWith("drawer.") || key === "span") query.delete(key);
-    }
-    void router.push(buildAddress(path, query));
+    void router.push(closedAddress(router.asPath));
   }, [router]);
 
   /**

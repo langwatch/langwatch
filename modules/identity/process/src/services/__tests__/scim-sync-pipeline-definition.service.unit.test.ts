@@ -1,5 +1,10 @@
 import { type Command, createTenantId, validateEventAggregateType } from "@langwatch/eventing";
-import { emptyScimSync, type ScimSyncState, scimSyncIdFor } from "@langwatch/identity-contract";
+import {
+  emptyScimSync,
+  ScimSyncNotFoundError,
+  type ScimSyncState,
+  scimSyncIdFor,
+} from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -20,7 +25,10 @@ const T0 = 1_690_000_000_000;
 function guardsOver(state: ScimSyncState | null) {
   return ScimSyncGuardsService.create({
     syncs: {
-      tryFindSync: async () => state,
+      getSync: async ({ scimSyncId }) => {
+        if (!state) throw new ScimSyncNotFoundError(scimSyncId);
+        return state;
+      },
       findForOrganization: async () => [],
       findPageForOperator: async () => ({ syncs: [], total: 0 }),
       findByConnectionForOperator: async () => [],
@@ -41,7 +49,7 @@ function command<T>(data: T): Command<T> {
     aggregateId: SYNC,
     type: "lw.identity.test",
     data,
-  } as unknown as Command<T>;
+  };
 }
 
 const base = {

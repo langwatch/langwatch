@@ -131,9 +131,9 @@ describe.skipIf(!DB_URL)(
       await prisma.$disconnect();
     });
 
-    describe("when getAllForUser is called for a user whose org has both kinds of projects", () => {
+    describe("when findAllForUser is called for a user whose org has both kinds of projects", () => {
       it("returns the application project", async () => {
-        const orgs = await repository.getAllForUser({
+        const orgs = await repository.findAllForUser({
           userId: testUser.id,
           isDemo: false,
           demoProjectUserId: "",
@@ -151,7 +151,7 @@ describe.skipIf(!DB_URL)(
 
       /** @scenario Lane-B test suite asserts every Project consumer filters */
       it("filters out the internal_governance project", async () => {
-        const orgs = await repository.getAllForUser({
+        const orgs = await repository.findAllForUser({
           userId: testUser.id,
           isDemo: false,
           demoProjectUserId: "",

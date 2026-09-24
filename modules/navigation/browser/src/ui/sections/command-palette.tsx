@@ -435,6 +435,7 @@ export function CommandPalette({
     />
   );
 
+  const showInlineOverlay = inline && active;
   return (
     <>
       <CommandBarInput
@@ -449,44 +450,43 @@ export function CommandPalette({
         size={inline ? "hero" : "dialog"}
       />
 
-      {inline ? (
-        active ? (
-          // Overlaid, never in the flow: the home's results are a temporary
-          // layer over the page, so opening them cannot push the figures and
-          // recent work down and closing them cannot pull them back up.
-          <Box
-            ref={panelRef}
-            position="absolute"
-            top="calc(100% + 8px)"
-            left={0}
-            right={0}
-            zIndex={20}
-            background={{ base: "bg.panel/50", _dark: "bg.panel/70" }}
-            backdropFilter="blur(20px)"
-            borderWidth="1px"
-            borderColor="border.muted"
-            borderRadius="16px"
-            boxShadow="0 2px 8px rgba(20, 20, 23, 0.08), 0 24px 70px -20px rgba(20, 20, 23, 0.35)"
-            overflow="hidden"
-            paddingTop={2}
-            // Capped to the room actually left below the field, so a long list
-            // scrolls inside the panel instead of running off the page where
-            // its last rows — and the footer's shortcuts — cannot be reached.
-            {...(panelMaxHeight !== null ? { maxHeight: `${panelMaxHeight}px` } : {})}
-            display="flex"
-            flexDirection="column"
-          >
-            {/* The list is the part that scrolls; the footer stays put, since
+      {showInlineOverlay && (
+        // Overlaid, never in the flow: the home's results are a temporary
+        // layer over the page, so opening them cannot push the figures and
+        // recent work down and closing them cannot pull them back up.
+        <Box
+          ref={panelRef}
+          position="absolute"
+          top="calc(100% + 8px)"
+          left={0}
+          right={0}
+          zIndex={20}
+          background={{ base: "bg.panel/50", _dark: "bg.panel/70" }}
+          backdropFilter="blur(20px)"
+          borderWidth="1px"
+          borderColor="border.muted"
+          borderRadius="16px"
+          boxShadow="0 2px 8px rgba(20, 20, 23, 0.08), 0 24px 70px -20px rgba(20, 20, 23, 0.35)"
+          overflow="hidden"
+          paddingTop={2}
+          // Capped to the room actually left below the field, so a long list
+          // scrolls inside the panel instead of running off the page where
+          // its last rows — and the footer's shortcuts — cannot be reached.
+          {...(panelMaxHeight !== null ? { maxHeight: `${panelMaxHeight}px` } : {})}
+          display="flex"
+          flexDirection="column"
+        >
+          {/* The list is the part that scrolls; the footer stays put, since
                 a legend you have to scroll to reach teaches nobody anything. */}
-            <Box overflowY="auto" minHeight={0} flex="1 1 auto">
-              {results}
-            </Box>
-            <Box flexShrink={0}>
-              <CommandBarFooter isMac={isMac} />
-            </Box>
+          <Box overflowY="auto" minHeight={0} flex="1 1 auto">
+            {results}
           </Box>
-        ) : null
-      ) : (
+          <Box flexShrink={0}>
+            <CommandBarFooter isMac={isMac} />
+          </Box>
+        </Box>
+      )}
+      {!inline && (
         <>
           {results}
           <HintsSection />

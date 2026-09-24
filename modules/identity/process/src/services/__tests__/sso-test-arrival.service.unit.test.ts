@@ -8,6 +8,7 @@ import {
   emptySsoConnection,
   type SsoConnectionLifecycleState,
   type SsoConnectionState,
+  SsoConnectionNotFoundError,
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -26,11 +27,11 @@ const ABANDONED: SsoConnectionLifecycleState[] = [
 
 /** Only the one read this service makes; the other two are never reached. */
 class OneConnectionReads extends SsoConnectionReadRepository {
-  constructor(readonly tryFindConnection: SsoConnectionReadRepository["tryFindConnection"]) {
+  constructor(readonly getConnection: SsoConnectionReadRepository["getConnection"]) {
     super();
   }
 
-  tryFindDomainOwner(): never {
+  getDomainOwner(): never {
     throw new Error("a test arrival never asks who owns a domain");
   }
 
@@ -63,13 +64,16 @@ function serviceOver({
   member?: boolean;
   organization?: { id: string; name: string } | null;
 }) {
-  const tryFindConnection = vi.fn().mockResolvedValue(row);
+  const getConnection = vi.fn(async ({ connectionId }: { connectionId: string }) => {
+    if (!row) throw new SsoConnectionNotFoundError(connectionId);
+    return row;
+  });
 
   return {
-    tryFindConnection,
+    getConnection,
     service: SsoTestArrivalService.create({
       accounts: { findAccountProvidersForUser: vi.fn().mockResolvedValue(providers) },
-      connections: new OneConnectionReads(tryFindConnection),
+      connections: new OneConnectionReads(getConnection),
       memberships: {
         hasAnyMembership: vi.fn().mockResolvedValue(member),
         findOrganization: vi.fn().mockResolvedValue(organization),
@@ -134,10 +138,10 @@ describe("given no account through any connection", () => {
   it("answers with nothing, whatever the browser claims", async () => {
     // Nothing this service reads comes from the request, so a browser
     // asserting `?ssoTest=<id>` has nowhere to assert it.
-    const { service, tryFindConnection } = serviceOver({ providers: ["credential", "google"] });
+    const { service, getConnection } = serviceOver({ providers: ["credential", "google"] });
 
     await expect(service.standingFor({ userId: USER_ID })).resolves.toEqual({ testing: false });
-    expect(tryFindConnection).not.toHaveBeenCalled();
+    expect(getConnection).not.toHaveBeenCalled();
   });
 });
 

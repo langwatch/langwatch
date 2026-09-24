@@ -40,7 +40,7 @@ function pickCausalityDepth(span: {
  * needs both pieces (32-hex trace_id + 16-hex root span_id) so its emitted spans land as
  * children of the parent trace in Studio's waterfall rather than as a separate orphan trace.
  */
-export function tryExtractParentTraceForNlpgo(
+export function extractParentTraceForNlpgo(
   trace: Trace | undefined,
 ): { traceId: string; parentSpanId: string } | undefined {
   if (!trace?.trace_id || !TRACE_ID_HEX.test(trace.trace_id)) {

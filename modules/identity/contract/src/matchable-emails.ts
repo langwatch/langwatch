@@ -10,6 +10,11 @@ export interface MatchableEmail {
   provider: IdentifierFact["provider"];
 }
 
+/** Every proven address, or the instruction to keep the legacy `User.email` (ADR-146). */
+export type VerifiedEmailsResolution =
+  | { kind: "resolved"; emails: MatchableEmail[] }
+  | { kind: "keep_legacy" };
+
 /** Gets every verified address the user has proven. Only PRIMARY and VERIFIED are eligible for
  * invite acceptance, sorted by identifier id for deterministic results.
  */

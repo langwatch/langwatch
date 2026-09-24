@@ -54,8 +54,8 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
     return this.writer.upsertBatch(input);
   }
 
-  tryFindByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null> {
-    return this.reader.tryFindByEvaluationId(input);
+  getByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData> {
+    return this.reader.getByEvaluationId(input);
   }
 
   findByTraceId(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[]> {

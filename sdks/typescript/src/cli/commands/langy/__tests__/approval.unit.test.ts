@@ -81,6 +81,12 @@ const bashCall = (command: string): LocalCall => ({
   params: { command },
 });
 
+const paramsFor = (tool: LocalCall["tool"]) => {
+  if (tool === "local_bash") return { command: "x" };
+  if (tool === "local_edit") return { path: ".env", edits: [] };
+  return { path: ".env" };
+};
+
 const card: ApprovalCard = approvalCardFor({
   call: bashCall("uv run pytest"),
   workspaceName: "acme-support-dogfood",
@@ -449,12 +455,7 @@ describe("the card a file call produces", () => {
         const call = {
           ...envelope,
           tool,
-          params:
-            tool === "local_bash"
-              ? { command: "x" }
-              : tool === "local_edit"
-                ? { path: ".env", edits: [] }
-                : { path: ".env" },
+          params: paramsFor(tool),
         } as LocalCall;
 
         expect(

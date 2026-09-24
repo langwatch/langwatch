@@ -70,14 +70,14 @@ export function normalizeTodoStatus(status: unknown): TodoStatus {
  * `{ todos: [...] }` wrapper AND a bare array, the status synonyms above, and
  * drops empty-content rows.
  */
+function todoRowsOf(params: unknown): unknown[] {
+  if (Array.isArray(params)) return params;
+  if (typeof params !== "object" || params === null || !("todos" in params)) return [];
+  return Array.isArray(params.todos) ? params.todos : [];
+}
+
 export function normalizeTodos(params: unknown): TodoItem[] {
-  const rows: unknown[] = Array.isArray(params)
-    ? params
-    : typeof params === "object" &&
-        params !== null &&
-        Array.isArray((params as { todos?: unknown }).todos)
-      ? (params as { todos: unknown[] }).todos
-      : [];
+  const rows = todoRowsOf(params);
   const items: TodoItem[] = [];
   for (const row of rows) {
     if (typeof row !== "object" || row === null) continue;
@@ -99,6 +99,25 @@ export function renderTodoList(todos: TodoItem[]): string {
   return todos.map((t) => `${marks[t.status]} ${t.content}`).join("\n");
 }
 
+function todosFromBranch(ctx: ExtensionContext): TodoItem[] {
+  let todos: TodoItem[] = [];
+  for (const entry of ctx.sessionManager.getBranch()) {
+    if (entry.type !== "message") continue;
+    const message = entry.message as {
+      role?: string;
+      toolName?: string;
+      details?: { todos?: TodoItem[] };
+    };
+    if (message.role !== "toolResult" || message.toolName !== TODOWRITE_TOOL_NAME) continue;
+    // A session file written by another worker version can carry statuses
+    // this build does not know, so it is validated and copied, not adopted.
+    if (Array.isArray(message.details?.todos)) {
+      todos = normalizeTodos(message.details.todos);
+    }
+  }
+  return todos;
+}
+
 export function createTodowriteExtension(): InlineExtension {
   return {
     name: "langy-todowrite",
@@ -109,21 +128,7 @@ export function createTodowriteExtension(): InlineExtension {
       // its plan (same pattern as pi's official todo example: state lives in
       // tool result details, which follows branching correctly).
       const reconstructState = (ctx: ExtensionContext) => {
-        todos = [];
-        for (const entry of ctx.sessionManager.getBranch()) {
-          if (entry.type !== "message") continue;
-          const message = entry.message as {
-            role?: string;
-            toolName?: string;
-            details?: { todos?: TodoItem[] };
-          };
-          if (message.role !== "toolResult" || message.toolName !== TODOWRITE_TOOL_NAME) continue;
-          // A session file written by another worker version can carry statuses
-          // this build does not know, so it is validated and copied, not adopted.
-          if (Array.isArray(message.details?.todos)) {
-            todos = normalizeTodos(message.details.todos);
-          }
-        }
+        todos = todosFromBranch(ctx);
       };
 
       pi.on("session_start", async (_event, ctx) => reconstructState(ctx));

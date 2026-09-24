@@ -1,5 +1,9 @@
 import { createLogger } from "@langwatch/observability";
-import { ScenarioTabRegistry, type ScenarioTabRegistration } from "@langwatch/scenario-contract";
+import {
+  ScenarioTabRegistry,
+  type ScenarioTabRegistration,
+  type TakenPendingNavigate,
+} from "@langwatch/scenario-contract";
 
 import type { ScenarioClock, ScenarioTabStore } from "../app/scenario.app.ts";
 
@@ -132,7 +136,7 @@ export class ScenarioTabRegistryService extends ScenarioTabRegistry {
     projectId: string;
     tabKey: string;
     now?: number;
-  }): Promise<string | null> {
+  }): Promise<TakenPendingNavigate> {
     const key = ScenarioTabRegistryService.pendingKey(input.projectId, input.tabKey);
     const now = input.now ?? this.options.clock.now().epochMilliseconds;
     const store = this.options.store;
@@ -140,19 +144,10 @@ export class ScenarioTabRegistryService extends ScenarioTabRegistry {
       const entry = this.memoryPending.get(key);
       this.memoryPending.delete(key);
 
-      return entry && entry.expiresAt > now ? entry.url : null;
+      return entry && entry.expiresAt > now ? { taken: true, url: entry.url } : { taken: false };
     }
 
-    try {
-      return await store.takePending(key);
-    } catch (error) {
-      logger.warn(
-        { error, projectId: input.projectId },
-        "Failed to read parked Scenario tab handoff",
-      );
-
-      return null;
-    }
+    return store.takePending(key);
   }
 
   private memoryEntry(key: string): Map<string, number> {

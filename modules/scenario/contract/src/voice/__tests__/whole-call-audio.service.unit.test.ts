@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   ELEVENLABS_CONVERSATION_ID_ATTR,
-  resolveWholeCallAudio,
+  getWholeCallAudio,
   TWILIO_CALL_SID_ATTR,
   type WholeCallAudioInfrastructure,
 } from "../whole-call-audio.service.ts";
@@ -26,7 +26,7 @@ function fakeInfrastructure({
   };
 }
 
-describe("resolveWholeCallAudio", () => {
+describe("getWholeCallAudio", () => {
   describe("given a run whose spans carry a Twilio call sid", () => {
     describe("when the whole-call audio is resolved", () => {
       /** @scenario "A phone run's whole-call audio is resolved from the call's own trace" */
@@ -38,7 +38,7 @@ describe("resolveWholeCallAudio", () => {
           },
         });
 
-        const handle = await resolveWholeCallAudio({
+        const handle = await getWholeCallAudio({
           projectId: "project_1",
           scenarioRunId: "run_1",
           infrastructure,
@@ -58,7 +58,7 @@ describe("resolveWholeCallAudio", () => {
           },
         });
 
-        const handle = await resolveWholeCallAudio({
+        const handle = await getWholeCallAudio({
           projectId: "project_1",
           scenarioRunId: "run_1",
           infrastructure,
@@ -75,18 +75,18 @@ describe("resolveWholeCallAudio", () => {
   describe("given a run whose spans carry no call handle", () => {
     describe("when the whole-call audio is resolved", () => {
       /** @scenario "A run against a voice agent with no call handle has no whole-call audio" */
-      it("resolves to null", async () => {
+      it("throws the recording-unavailable error", async () => {
         const infrastructure = fakeInfrastructure({
           spansByTrace: { trace_0: [{ "gen_ai.request.model": "gpt" }] },
         });
 
-        const handle = await resolveWholeCallAudio({
-          projectId: "project_1",
-          scenarioRunId: "run_1",
-          infrastructure,
-        });
-
-        expect(handle).toBeNull();
+        await expect(
+          getWholeCallAudio({
+            projectId: "project_1",
+            scenarioRunId: "run_1",
+            infrastructure,
+          }),
+        ).rejects.toMatchObject({ code: "voice_recording_unavailable" });
       });
     });
   });
@@ -102,7 +102,7 @@ describe("resolveWholeCallAudio", () => {
           },
         });
 
-        const handle = await resolveWholeCallAudio({
+        const handle = await getWholeCallAudio({
           projectId: "project_1",
           scenarioRunId: "run_1",
           infrastructure,
@@ -120,13 +120,13 @@ describe("resolveWholeCallAudio", () => {
           spansByTrace: { trace_0: [{ [TWILIO_CALL_SID_ATTR]: "" }] },
         });
 
-        const handle = await resolveWholeCallAudio({
-          projectId: "project_1",
-          scenarioRunId: "run_1",
-          infrastructure,
-        });
-
-        expect(handle).toBeNull();
+        await expect(
+          getWholeCallAudio({
+            projectId: "project_1",
+            scenarioRunId: "run_1",
+            infrastructure,
+          }),
+        ).rejects.toMatchObject({ code: "voice_recording_unavailable" });
       });
     });
   });

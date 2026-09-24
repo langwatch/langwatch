@@ -48,7 +48,7 @@ export const serverModuleMembers = {
   scenario: ["clickhouse", "encryption", "publicBaseUrl", "rateLimiter"],
   secret: ["encryption"],
   share: ["redis"],
-  "stored-object": ["clickhouse", "encryption", "logger", "objectStorage", "publicBaseUrl"],
+  "stored-object": ["clickhouse", "encryption", "logger", "objectStorage", "publicBaseUrl", "rateLimiter"],
   suite: ["clickhouse", "publicBaseUrl", "redis"],
   topic: [],
   trace: [

@@ -7,7 +7,7 @@ import { Filter } from "react-feather";
 import { ClampedText } from "./clamped-text.tsx";
 
 interface FilterDisplayProps {
-  filters: string | Record<string, any>;
+  filters: string | Record<string, unknown>;
   hasBorder?: boolean;
 }
 
@@ -90,7 +90,7 @@ function describeNestedFilter(value: Record<string, unknown>): string[] {
 }
 
 export const FilterDisplay = ({ filters, hasBorder = false }: FilterDisplayProps) => {
-  const applyFilters = (filters: string | Record<string, any>) => {
+  const applyFilters = (filters: string | Record<string, unknown>) => {
     const obj = typeof filters === "string" ? JSON.parse(filters) : filters;
     const result = [];
 

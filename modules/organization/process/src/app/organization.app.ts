@@ -472,8 +472,8 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     });
     application.#personalTeamScope = PersonalTeamScopeService.create(
       setup.personalTeamScope ?? {
-        tryFindPersonalTeamInScopes: async () => null,
-        tryFindForeignPersonalTeamInScopes: async () => null,
+        findPersonalTeamsInScopes: async () => [],
+        findForeignPersonalTeamsInScopes: async () => [],
       },
     );
     application.#invitationDoor = members.invitations

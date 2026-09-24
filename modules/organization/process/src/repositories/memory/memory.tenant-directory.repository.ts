@@ -1,5 +1,6 @@
 import type { TenantDirectory } from "@langwatch/clickhouse-client";
 import { PLATFORM_TENANT } from "@langwatch/clickhouse-client";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 
 import type { TenantOwnershipReader } from "../../services/tenant-directory.service.ts";
 import type { MemoryOrganizationDatabase } from "./memory.organization.database.ts";
@@ -13,18 +14,24 @@ export class MemoryTenantDirectoryRepository implements TenantDirectory, TenantO
   }
 
   async organizationForTenant(tenantId: string): Promise<string | null> {
-    const projectOrganizationId = await this.tryFindProjectOrganizationId(tenantId);
+    const project = this.memory.projects.get(tenantId);
+    const projectOrganizationId = project
+      ? this.memory.teams.get(project.teamId)?.organizationId
+      : undefined;
     if (projectOrganizationId) return projectOrganizationId;
     if (await this.organizationExists(tenantId)) return tenantId;
     if (await this.userExists(tenantId)) return PLATFORM_TENANT;
     return null;
   }
 
-  async tryFindProjectOrganizationId(tenantId: string): Promise<string | null> {
+  async getProjectOrganizationId(tenantId: string): Promise<string> {
     const project = this.memory.projects.get(tenantId);
-    if (!project) return null;
-    const team = this.memory.teams.get(project.teamId);
-    return team?.organizationId ?? null;
+    const organizationId = project
+      ? this.memory.teams.get(project.teamId)?.organizationId
+      : undefined;
+    if (!organizationId)
+      throw new ProjectNotFoundError("Project not found", { meta: { tenantId } });
+    return organizationId;
   }
 
   async organizationExists(tenantId: string): Promise<boolean> {

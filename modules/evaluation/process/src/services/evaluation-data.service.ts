@@ -87,7 +87,7 @@ export class EvaluationDataService {
     if (isThreadLevel) {
       data = await this.buildThreadData(projectId, trace, mappings);
     } else {
-      const mappedData = switchMapping(trace, mappings ?? DEFAULT_MAPPINGS);
+      const mappedData = mapTraceFields(trace, mappings ?? DEFAULT_MAPPINGS);
       if (!mappedData) {
         throw new TraceNotEvaluatableError(trace.trace_id);
       }
@@ -237,7 +237,7 @@ export class EvaluationDataService {
   }
 }
 
-function switchMapping(
+function mapTraceFields(
   trace: Trace,
   mapping_: MappingState,
 ): Record<string, string | number> | undefined {

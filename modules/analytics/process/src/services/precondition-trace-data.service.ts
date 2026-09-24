@@ -132,7 +132,7 @@ const BARE_KEY_EXCLUDED_PREFIXES = [
   "otel.",
 ];
 
-function resolveCustomMetadataKey(key: string): {
+function parseCustomMetadataKey(key: string): {
   customKey: string;
   priority: number;
 } | null {
@@ -188,7 +188,7 @@ function extractCustomMetadata(attrs: Record<string, string>): Record<string, st
   const priorities: Record<string, number> = {};
 
   for (const [key, value] of Object.entries(attrs)) {
-    const resolved = resolveCustomMetadataKey(key);
+    const resolved = parseCustomMetadataKey(key);
     if (!resolved) {
       continue;
     }

@@ -39,7 +39,7 @@ const textOption = (lookup: OptionLookup): string => {
   return typeof value === "string" ? value : "";
 };
 
-const numberOption = (lookup: OptionLookup): number | null => {
+const pickNumberOption = (lookup: OptionLookup): number | null => {
   const value = optionNamed(lookup);
 
   return typeof value === "number" ? value : null;
@@ -88,8 +88,8 @@ function judgementAsked({
   }
 
   if (kind === "score") {
-    const min = numberOption({ definition, options, name: "min" });
-    const max = numberOption({ definition, options, name: "max" });
+    const min = pickNumberOption({ definition, options, name: "min" });
+    const max = pickNumberOption({ definition, options, name: "max" });
     if (min === null || max === null) {
       throw new Error(`lwql judgement: "${definition.name}" needs both ends of its scale`);
     }
@@ -113,7 +113,7 @@ function thresholdOf({
   options: readonly LangWatchQLAppFunctionOption[];
 }): number {
   return (
-    numberOption({ definition, options, name: "threshold" }) ?? LWQL_DEFAULT_JUDGEMENT_THRESHOLD
+    pickNumberOption({ definition, options, name: "threshold" }) ?? LWQL_DEFAULT_JUDGEMENT_THRESHOLD
   );
 }
 

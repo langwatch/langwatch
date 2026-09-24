@@ -102,6 +102,21 @@ const isRunInterrupted = (timestamps: BatchRunSummary["timestamps"]): boolean =>
   return false;
 };
 
+/** Red for stopped runs, orange for interrupted, otherwise the stable colour from the parent. */
+const resolveRunColor = ({
+  run,
+  interrupted,
+  runColors,
+}: {
+  run: BatchRunSummary;
+  interrupted: boolean;
+  runColors: Record<string, string>;
+}): string => {
+  if (run.timestamps.stoppedAt) return "red.400";
+  if (interrupted) return "orange.400";
+  return runColors[run.runId] ?? getColorForString("colors", run.runId).color;
+};
+
 /**
  * Format evaluation summary for display
  */
@@ -292,13 +307,12 @@ export function BatchRunsSidebar({
             const isSelectedForComparison = selectedRunIds.includes(run.runId);
             const interrupted = isRunInterrupted(run.timestamps);
 
-            // Use stable color from parent (based on position in full runs list)
-            // Override with red for stopped runs, orange for interrupted
-            const runColor = run.timestamps.stoppedAt
-              ? "red.400"
-              : interrupted
-                ? "orange.400"
-                : (runColors[run.runId] ?? getColorForString("colors", run.runId).color);
+            const runColor = resolveRunColor({
+              run,
+              interrupted,
+              runColors,
+            });
+            const isHighlighted = (compareMode && isSelectedForComparison) || isSelected;
 
             return (
               <HStack
@@ -307,24 +321,11 @@ export function BatchRunsSidebar({
                 paddingY={2}
                 cursor="pointer"
                 role="button"
-                bg={
-                  compareMode && isSelectedForComparison
-                    ? "blue.subtle"
-                    : isSelected
-                      ? "blue.subtle"
-                      : "transparent"
-                }
-                color={
-                  compareMode && isSelectedForComparison ? "blue.fg" : isSelected ? "blue.fg" : "fg"
-                }
+                bg={isHighlighted ? "blue.subtle" : "transparent"}
+                color={isHighlighted ? "blue.fg" : "fg"}
                 borderRadius="md"
                 _hover={{
-                  bg:
-                    compareMode && isSelectedForComparison
-                      ? "blue.muted"
-                      : isSelected
-                        ? "blue.muted"
-                        : "bg.muted",
+                  bg: isHighlighted ? "blue.muted" : "bg.muted",
                 }}
                 onClick={(e) => handleRunClick(run.runId, e)}
                 gap={2}

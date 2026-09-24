@@ -27,7 +27,7 @@ function runAgainst({
   agentInstance,
 }: {
   referenceId: string;
-  targetType?: string;
+  targetType?: NonNullable<NonNullable<ScenarioRunData["metadata"]>["langwatch"]>["targetType"];
   agentInstance?: { hostname: string; label: string | null };
 }): ScenarioRunData {
   return {
@@ -46,7 +46,7 @@ function runAgainst({
         ...(agentInstance ? { agentInstance } : {}),
       },
     },
-  } as unknown as ScenarioRunData;
+  };
 }
 
 const IDENTITIES = new Map<string, TargetIdentity>([

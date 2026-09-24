@@ -71,7 +71,7 @@ describe("StoredObjectOwnerLookupService over the ClickHouse owner read", () => 
 
     const { service: resolver, telemetry } = service();
 
-    await expect(resolver.tryResolve({ id: "obj-1" })).resolves.toEqual({ projectId: "proj_a" });
+    await expect(resolver.getOwner({ id: "obj-1" })).resolves.toEqual({ projectId: "proj_a" });
     expect(telemetry.inputIds).toEqual(["obj-1"]);
     expect(telemetry.attributes).toEqual(
       new Map<string, string | number | boolean>([
@@ -95,7 +95,7 @@ describe("StoredObjectOwnerLookupService over the ClickHouse owner read", () => 
 
     const { service: resolver } = service();
 
-    await expect(resolver.tryResolve({ id: "obj-byoc" })).resolves.toEqual({
+    await expect(resolver.getOwner({ id: "obj-byoc" })).resolves.toEqual({
       projectId: "proj_byoc",
     });
   });
@@ -110,7 +110,9 @@ describe("StoredObjectOwnerLookupService over the ClickHouse owner read", () => 
 
     const { service: resolver } = service();
 
-    await expect(resolver.tryResolve({ id: "unknown" })).resolves.toBeNull();
+    await expect(resolver.getOwner({ id: "unknown" })).rejects.toMatchObject({
+      code: "stored_object_not_found",
+    });
     expect(shared.query).toHaveBeenCalledTimes(1);
     expect(privateClient.query).toHaveBeenCalledTimes(1);
   });
@@ -127,7 +129,7 @@ describe("StoredObjectOwnerLookupService over the ClickHouse owner read", () => 
 
     const { service: resolver, telemetry } = service();
 
-    await expect(resolver.tryResolve({ id: "obj-x" })).resolves.toEqual({
+    await expect(resolver.getOwner({ id: "obj-x" })).resolves.toEqual({
       projectId: "proj_shared",
     });
     expect(telemetry.attributes.get("clickhouse.instances_failed")).toBe(1);
@@ -143,7 +145,7 @@ describe("StoredObjectOwnerLookupService over the ClickHouse owner read", () => 
 
     const { service: resolver, telemetry } = service();
 
-    await expect(resolver.tryResolve({ id: "obj-x" })).rejects.toMatchObject({
+    await expect(resolver.getOwner({ id: "obj-x" })).rejects.toMatchObject({
       failedTargets: ["org_byoc_down"],
     });
     expect(telemetry.attributes.get("result.degraded")).toBe(true);
@@ -158,7 +160,7 @@ describe("StoredObjectOwnerLookupService over the ClickHouse owner read", () => 
 
     const { service: resolver } = service();
 
-    await expect(resolver.tryResolve({ id: "obj-x" })).rejects.toBeInstanceOf(
+    await expect(resolver.getOwner({ id: "obj-x" })).rejects.toBeInstanceOf(
       StoredObjectOwnerLookupUnavailableError,
     );
   });
@@ -168,7 +170,7 @@ describe("StoredObjectOwnerLookupService over the ClickHouse owner read", () => 
 
     const { service: resolver } = service();
 
-    await expect(resolver.tryResolve({ id: "obj-1" })).rejects.toThrow(
+    await expect(resolver.getOwner({ id: "obj-1" })).rejects.toThrow(
       /ClickHouse is not configured/,
     );
   });

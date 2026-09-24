@@ -57,6 +57,7 @@ import type { AutomationGraphNotifier } from "../channels/automation-graph-alert
 import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
 import type { SchedulerWake } from "../channels/automation-scheduler-wake.channel.ts";
 import type { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
+import type { AutomationPersistCapRepository } from "../repositories/automation-persist-cap.repository.ts";
 import type { AutomationRunaway } from "../repositories/automation-runaway.repository.ts";
 import type { AutomationScheduledJobRepository } from "../repositories/automation-scheduled-job.repository.ts";
 import type { AutomationRepositories } from "../repositories/automation.repositories.ts";
@@ -77,7 +78,6 @@ import { AutomationTemplateService } from "../services/automation-template.servi
 import type { AutomationWebhookStoredParams } from "../services/automation-webhook-secrets.service.ts";
 import { AutomationService } from "../services/automation.service.ts";
 import { AutomationPersistCapService } from "../services/persist-cap.service.ts";
-import type { AutomationPersistCapRedis } from "../services/persist-cap.service.ts";
 import { ReportScheduleService } from "../services/report-schedule.service.ts";
 import { AutomationGraphService } from "../services/trigger-graph.service.ts";
 import { HmacUnsubscribeTokenAdapter } from "../services/unsubscribe-token.service.ts";
@@ -188,7 +188,7 @@ export type AutomationInfrastructure = Readonly<{
   heartbeat: AutomationHeartbeat;
   runaway: AutomationRunaway & AutomationRunawayNotice & AutomationRunawaySignals;
   testFire: AutomationTestFire;
-  redis: AutomationPersistCapRedis | null;
+  persistCaps: AutomationPersistCapRepository;
   providers: AutomationProviderSecrets;
   slackChannels: AutomationSlackDirectory;
   traceFilters: AutomationTraceFilterCompiler;
@@ -301,7 +301,7 @@ export class AutomationApp implements AutomationApi {
         paid: config.persistDailyCapPaid,
         enterprise: config.persistDailyCapEnterprise,
       },
-      redis: members.redis,
+      slots: members.persistCaps,
     });
     const graph = AutomationGraphService.create({
       triggers: repositories.triggers,

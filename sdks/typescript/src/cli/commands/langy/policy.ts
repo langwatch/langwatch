@@ -831,13 +831,9 @@ function isReadOnlyPart(part: CommandPart): boolean {
   if (name === undefined || name === "") return false;
   if (isEnvironmentAssignment(name)) return false;
   if (part.hasRedirect) return false;
-  for (const argument of args) {
-    if (WRITE_FLAGS.has(argument)) return false;
-  }
+  if (args.some((argument) => WRITE_FLAGS.has(argument))) return false;
   if (namesAPath(name)) return false;
-  for (const argument of args) {
-    if (DIRECTORY_FLAGS.has(argument)) return false;
-  }
+  if (args.some((argument) => DIRECTORY_FLAGS.has(argument))) return false;
 
   if (name === "git") return isReadOnlyGit(args);
 
@@ -857,19 +853,28 @@ function isReadOnlyPart(part: CommandPart): boolean {
   if (name === "env") return isReadOnlyEnv(part);
 
   const rule = READ_ONLY_COMMAND_RULES.get(name);
-  if (rule !== undefined) {
-    if (rule.writeOptions !== undefined) {
-      const writeOptions = rule.writeOptions;
-      for (const argument of args) {
-        if (carriesOption(argument, writeOptions)) return false;
-      }
-    }
-    const operands = args.filter((argument) => !argument.startsWith("-"));
-    if (rule.maxOperands !== undefined && operands.length > rule.maxOperands) {
-      return false;
+  if (rule === undefined) return true;
+  return commandRuleAllows({ args, ...rule });
+}
+
+function commandRuleAllows({
+  args,
+  writeOptions,
+  maxOperands,
+}: {
+  args: string[];
+  writeOptions?: ReadonlySet<string>;
+  maxOperands?: number;
+}): boolean {
+  if (writeOptions !== undefined) {
+    for (const argument of args) {
+      if (carriesOption(argument, writeOptions)) return false;
     }
   }
-
+  const operands = args.filter((argument) => !argument.startsWith("-"));
+  if (maxOperands !== undefined && operands.length > maxOperands) {
+    return false;
+  }
   return true;
 }
 
@@ -1120,9 +1125,7 @@ export function effectOf(part: CommandPart): CommandEffect {
   const [name, ...args] = part.tokens;
   if (name === undefined || name === "") return "runs_program";
   if (part.hasRedirect) return "writes_files";
-  for (const argument of args) {
-    if (WRITE_FLAGS.has(argument)) return "writes_files";
-  }
+  if (args.some((argument) => WRITE_FLAGS.has(argument))) return "writes_files";
 
   const verb = args.find((argument) => !argument.startsWith("-"));
 
@@ -1131,28 +1134,24 @@ export function effectOf(part: CommandPart): CommandEffect {
     return "reads_environment";
   }
 
-  if (name === "git") {
-    const destructive = gitDestructiveForm(args);
-    if (destructive !== null) return destructive.effect;
-    if (verb !== undefined && GIT_NETWORK_SUBCOMMANDS.has(verb)) {
-      return "reaches_network";
-    }
-    return "changes_repository";
+  if (name === "git") return gitEffectOf({ args, verb });
+  if (PACKAGE_MANAGERS.has(name) && verb !== undefined && INSTALL_VERBS.has(verb)) {
+    return "installs_packages";
   }
-  if (PACKAGE_MANAGERS.has(name)) {
-    if (verb !== undefined) {
-      if (INSTALL_VERBS.has(verb)) {
-        return "installs_packages";
-      }
-    }
-  }
-  for (const argument of args) {
-    if (CHECK_TOKENS.has(argument)) return "runs_checks";
-  }
+  if (args.some((argument) => CHECK_TOKENS.has(argument))) return "runs_checks";
   if (CHECK_TOKENS.has(name)) return "runs_checks";
   if (NETWORK_COMMANDS.has(name)) return "reaches_network";
   if (FILE_WRITE_COMMANDS.has(name)) return "writes_files";
   return "runs_program";
+}
+
+function gitEffectOf({ args, verb }: { args: string[]; verb: string | undefined }): CommandEffect {
+  const destructive = gitDestructiveForm(args);
+  if (destructive !== null) return destructive.effect;
+  if (verb !== undefined && GIT_NETWORK_SUBCOMMANDS.has(verb)) {
+    return "reaches_network";
+  }
+  return "changes_repository";
 }
 
 /**

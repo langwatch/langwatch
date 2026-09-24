@@ -15,15 +15,23 @@ const PROJECT_ID = "project_1";
 type Row = { id: string; environment: string; online: boolean; ownerUserId?: string };
 
 function agentsOver(rows: readonly Row[]): AgentApi {
-  const asAgent = (row: Row): Agent =>
-    ({
-      id: row.id,
-      projectId: PROJECT_ID,
-      name: "support-agent",
-      type: "connected",
-      environment: row.environment,
-      ownerUserId: row.ownerUserId ?? null,
-    }) as unknown as Agent;
+  const asAgent = (row: Row): Agent => ({
+    id: row.id,
+    projectId: PROJECT_ID,
+    name: "support-agent",
+    type: "connected",
+    config: {
+      parameters: [],
+      sdk: { name: "langwatch", version: "1.0.0", language: "python" },
+    },
+    workflowId: null,
+    copiedFromAgentId: null,
+    archivedAt: null,
+    createdAt: new Date("2026-01-01T00:00:00Z"),
+    updatedAt: new Date("2026-01-01T00:00:00Z"),
+    environment: row.environment,
+    ownerUserId: row.ownerUserId ?? null,
+  });
   return createApiFixture<AgentApi>({
     getConnectedByName: async ({ name }: { name: string }) =>
       name === "support-agent" ? rows.map(asAgent) : [],

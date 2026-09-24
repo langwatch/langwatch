@@ -1,4 +1,5 @@
 import {
+  StoredObjectNotFoundError,
   StoredObjectOwnerLookupUnavailableError,
   StoredObjectOwnerResolver,
 } from "@langwatch/stored-object-contract";
@@ -31,7 +32,7 @@ export class StoredObjectOwnerLookupService extends StoredObjectOwnerResolver {
     super();
   }
 
-  tryResolve(input: { id: string }): Promise<{ projectId: string } | null> {
+  getOwner(input: { id: string }): Promise<{ projectId: string }> {
     return this.telemetry.withLookupSpan(input, async (span) => {
       const result = await this.repository.findOwner(input.id);
       this.recordResult(span, result);
@@ -44,7 +45,7 @@ export class StoredObjectOwnerLookupService extends StoredObjectOwnerResolver {
         throw new StoredObjectOwnerLookupUnavailableError(result.failedTargets);
       }
 
-      return null;
+      throw new StoredObjectNotFoundError();
     });
   }
 

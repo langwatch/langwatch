@@ -54,8 +54,12 @@ function itemCounts({ status, verdict }: { status: string; verdict: string | und
   };
 }
 
-function passRateBpsOf({ passed, graded }: { passed: number; graded: number }): number | null {
+function computePassRateBps({ passed, graded }: { passed: number; graded: number }): number | null {
   return graded > 0 ? Math.round((passed / graded) * 10000) : null;
+}
+
+function terminalStatusOf(failedCount: number): "FAILURE" | "SUCCESS" {
+  return failedCount > 0 ? "FAILURE" : "SUCCESS";
 }
 
 /**
@@ -152,7 +156,7 @@ export class SuiteRunStateFoldProjection
       }
     }
 
-    const passRateBps = passRateBpsOf({ passed: passedCount, graded: gradedCount });
+    const passRateBps = computePassRateBps({ passed: passedCount, graded: gradedCount });
 
     const progress = completedCount + failedCount;
     const allDone = state.Total > 0 && progress >= state.Total;
@@ -161,7 +165,7 @@ export class SuiteRunStateFoldProjection
     let finishedAt = state.FinishedAt;
     if (allDone) {
       finishedAt = event.occurredAt;
-      status = failedCount > 0 ? "FAILURE" : "SUCCESS";
+      status = terminalStatusOf(failedCount);
     }
 
     return {
@@ -206,8 +210,8 @@ export class SuiteRunStateFoldProjection
       Progress: completedCount + failedCount,
       GradedCount: gradedCount,
       PassedCount: passedCount,
-      PassRateBps: passRateBpsOf({ passed: passedCount, graded: gradedCount }),
-      Status: finished ? (failedCount > 0 ? "FAILURE" : "SUCCESS") : state.Status,
+      PassRateBps: computePassRateBps({ passed: passedCount, graded: gradedCount }),
+      Status: finished ? terminalStatusOf(failedCount) : state.Status,
     };
   }
 }

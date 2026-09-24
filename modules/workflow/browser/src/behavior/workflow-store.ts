@@ -1033,10 +1033,8 @@ export const store = (
     }
   },
   checkIfUnreachableErrorMessage: (message: string | undefined) => {
-    if (
-      get().socketStatus === "connected" &&
-      message?.toLowerCase().includes("runtime is unreachable")
-    ) {
+    const socketStatus = get().socketStatus;
+    if (socketStatus === "connected" && message?.toLowerCase().includes("runtime is unreachable")) {
       get().setSocketStatus("connecting-python");
     }
   },

@@ -169,6 +169,21 @@ const renderExecutionError = (executionState: ExecutionState) => {
   );
 };
 
+function outputTextColor({
+  isSkipped,
+  isFail,
+  isSuccess,
+}: {
+  isSkipped: boolean;
+  isFail: boolean;
+  isSuccess: boolean;
+}): string {
+  if (isSkipped) return "yellow.600";
+  if (isFail) return "red.600";
+  if (isSuccess) return "green.600";
+  return "gray.600";
+}
+
 /**
  * Renders successful execution outputs
  */
@@ -203,13 +218,8 @@ const renderExecutionOutputs = (executionState: ExecutionState, nodeType?: strin
       const isSkipped = nodeType === "evaluator" && identifier === "status" && value === "skipped";
       const isSuccess = nodeType === "evaluator" && identifier === "passed" && value === true;
 
-      const textColor = isSkipped
-        ? "yellow.600"
-        : isFail
-          ? "red.600"
-          : isSuccess
-            ? "green.600"
-            : "gray.600";
+      const hasTone = isSkipped || isFail || isSuccess;
+      const textColor = outputTextColor({ isSkipped, isFail, isSuccess });
 
       return (
         <VStack
@@ -217,9 +227,7 @@ const renderExecutionOutputs = (executionState: ExecutionState, nodeType?: strin
           align="start"
           key={identifier}
           gap={3}
-          color={
-            isSkipped ? "yellow.600" : isFail ? "red.600" : isSuccess ? "green.600" : undefined
-          }
+          color={hasTone ? textColor : undefined}
         >
           <Text fontSize="13px" fontWeight="bold" textTransform="uppercase" color={textColor}>
             {identifier}
@@ -233,7 +241,7 @@ const renderExecutionOutputs = (executionState: ExecutionState, nodeType?: strin
 /**
  * Renders a formatted output box with proper styling
  */
-const OutputBox = ({ value, ...props }: { value: any } & BoxProps) => {
+const OutputBox = ({ value, ...props }: { value: unknown } & BoxProps) => {
   return (
     <Box
       as="pre"

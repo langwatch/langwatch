@@ -9,15 +9,31 @@ import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { describe, expect, it } from "vitest";
 
 import type { DatasetChunkRepository } from "../../repositories/dataset-chunk.repository.ts";
-import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
+import type {
+  CreateDatasetInput,
+  UpdateDatasetInput,
+} from "../../repositories/dataset-content.repository.ts";
 import type { DatasetRecordContentRepository } from "../../repositories/dataset-record-content.repository.ts";
 import type { DatasetRow } from "../../repositories/dataset.repository.ts";
+import { MemoryDatasetContentRepository } from "../../repositories/memory/memory.dataset-content.repository.ts";
+import { MemoryDatasetDatabase } from "../../repositories/memory/memory.dataset.database.ts";
 import { DatasetUploadService } from "../dataset-upload.service.ts";
 
 const PROJECT_ID = "project-1";
 const NULL_BYTE = String.fromCharCode(0);
 
-type WrittenRecord = { id: string; entry: Record<string, unknown> };
+type WrittenRecord = { id: string; entry: unknown };
+
+function writtenRecord(line: unknown): WrittenRecord {
+  if (typeof line !== "object" || line === null || !("id" in line) || !("entry" in line)) {
+    throw new Error("storage received a line that is not an { id, entry } record");
+  }
+  return { id: String(line.id), entry: line.entry };
+}
+
+const unwired = (member: string) => () => {
+  throw new Error(`storage.${member} is not wired in this test`);
+};
 
 function datasetRow(overrides: Partial<DatasetRow> = {}): DatasetRow {
   return {
@@ -58,41 +74,66 @@ function harness({
   row = null,
   storageFails = false,
 }: { row?: DatasetRow | null; storageFails?: boolean } = {}) {
-  const created: Record<string, unknown>[] = [];
+  const created: CreateDatasetInput[] = [];
   const inlineRecords: WrittenRecord[] = [];
   const chunkLines: WrittenRecord[] = [];
   let failing = storageFails;
 
-  const updated: Record<string, unknown>[] = [];
-  const datasets = {
-    findOne: async ({ id }: { id: string }) => (row && row.id === id ? row : null),
-    findBySlug: async ({ slug }: { slug: string }) => (row && row.slug === slug ? row : null),
-    create: async (input: Record<string, unknown>) => {
+  const updated: UpdateDatasetInput[] = [];
+  const database = MemoryDatasetDatabase.create();
+  const stored = MemoryDatasetContentRepository.create({ database });
+  const datasets = Object.assign(MemoryDatasetContentRepository.create({ database }), {
+    findOne: async ({ id }: { id: string; projectId: string }) =>
+      row && row.id === id ? row : null,
+    findBySlug: async ({ slug }: { slug: string; projectId: string }) =>
+      row && row.slug === slug ? row : null,
+    create: async (input: CreateDatasetInput) => {
       created.push(input);
-      return datasetRow({ ...(input as Partial<DatasetRow>) });
+      return stored.create(input);
     },
-    update: async (input: Record<string, unknown>) => {
+    update: async (input: UpdateDatasetInput) => {
       updated.push(input);
       return datasetRow();
     },
-  } as unknown as DatasetContentRepository;
+  });
 
-  const records = {
-    createMany: async ({ records: written }: { records: WrittenRecord[] }) => {
+  const records: DatasetRecordContentRepository = {
+    createMany: async ({ records: written, datasetId, projectId }) => {
       inlineRecords.push(...written);
-      return written;
+      return written.map(({ id }) => ({
+        id,
+        datasetId,
+        projectId,
+        entry: {},
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+      }));
     },
-  } as unknown as DatasetRecordContentRepository;
+  };
 
   const storageError = new Error("object storage is unavailable");
-  const storage = {
-    writeChunks: async ({ records: lines }: { records: WrittenRecord[] }) => {
+  const storage: DatasetChunkRepository = {
+    writeChunks: async ({ records: lines }) => {
       if (failing) throw storageError;
-      chunkLines.push(...lines);
-      return [{ index: 0, rowCount: lines.length, byteSize: lines.length * 10 }];
+      chunkLines.push(...lines.map(writtenRecord));
+      return [
+        {
+          index: 0,
+          jsonl: "",
+          rowCount: lines.length,
+          byteSize: lines.length * 10,
+          startRow: 0,
+          endRow: lines.length,
+        },
+      ];
     },
     deleteChunksFrom: async () => undefined,
-  } as unknown as DatasetChunkRepository;
+    readChunks: unwired("readChunks"),
+    readChunk: unwired("readChunk"),
+    rewriteChunk: unwired("rewriteChunk"),
+    readStagedUpload: unwired("readStagedUpload"),
+    removeStagedUpload: unwired("removeStagedUpload"),
+  };
 
   return {
     adapter: DatasetUploadService.create({

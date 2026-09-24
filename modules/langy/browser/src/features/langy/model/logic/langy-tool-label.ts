@@ -1,4 +1,4 @@
-import { githubStepOf, parseLangwatchCommand } from "@langwatch/langy-contract";
+import { classifyGithubStep, parseLangwatchCommand } from "@langwatch/langy-contract";
 
 import { findSkill } from "../../../../model/shared/langy/langy-skills.ts";
 import { resolveCapabilityProgress } from "../capabilities/capability-registry.ts";
@@ -230,7 +230,7 @@ function describeCapabilityTool(name: string, input: unknown): LangyToolLabel | 
 function describeShellTool(name: string, input: unknown): LangyToolLabel | null {
   const command = shellCommandOf(name, input);
   if (!command) return null;
-  const step = githubStepOf(command);
+  const step = classifyGithubStep(command);
   if (step) {
     return {
       title: GITHUB_STAGE_TITLE[step.end] ?? "Working with GitHub",

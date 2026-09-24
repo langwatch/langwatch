@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import {
   APPROVE_JOIN_COMMAND_TYPE,
   type ApproveJoinCommandData,
@@ -64,9 +65,13 @@ export class JoinRequestGuardsService {
    * duplicate.
    */
   async requestJoin(data: RequestJoinCommandData): Promise<JoinRequestFactInput[]> {
-    const existing = await this.requests.tryFindRequest({
-      joinRequestId: data.joinRequestId,
-    });
+    const existing = await this.requests
+      .getRequest({ joinRequestId: data.joinRequestId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "join_request_not_found")
+          return undefined;
+        throw error;
+      });
     // The retry leg: the same command id names the same aggregate, and a
     // second pass costs no event.
     if (existing) {
@@ -81,10 +86,13 @@ export class JoinRequestGuardsService {
       throw new JoinNotAvailableError(`join request refused: ${domain} is a public email domain`);
     }
 
-    const open = await this.requests.tryFindPendingRequest({
-      userId: data.userId,
-      organizationId: data.organizationId,
-    });
+    const open = await this.requests
+      .getPendingRequest({ userId: data.userId, organizationId: data.organizationId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "join_request_not_found")
+          return undefined;
+        throw error;
+      });
     if (open) {
       throw new JoinRequestAlreadyPendingError(
         `user ${data.userId} already has a pending request to ${data.organizationId}`,
@@ -113,9 +121,13 @@ export class JoinRequestGuardsService {
    * request.
    */
   async approveJoin(data: ApproveJoinCommandData): Promise<JoinRequestFactInput[]> {
-    const held = await this.requests.tryFindRequest({
-      joinRequestId: data.joinRequestId,
-    });
+    const held = await this.requests
+      .getRequest({ joinRequestId: data.joinRequestId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "join_request_not_found")
+          return undefined;
+        throw error;
+      });
     // The retry leg, and the reason an approval is safe to re-run: an
     // approval that already landed from the SAME resolver states nothing
     // rather than refusing. The membership attach behind it is idempotent
@@ -202,9 +214,13 @@ export class JoinRequestGuardsService {
    * decides WHEN; this still decides whether.
    */
   async expireJoin(data: ExpireJoinCommandData): Promise<JoinRequestFactInput[]> {
-    const state = await this.requests.tryFindRequest({
-      joinRequestId: data.joinRequestId,
-    });
+    const state = await this.requests
+      .getRequest({ joinRequestId: data.joinRequestId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "join_request_not_found")
+          return undefined;
+        throw error;
+      });
     // A request that already ended, by any of the other four routes, has
     // nothing left to expire. Silence rather than a refusal: nobody is
     // waiting on this answer, and a wake is not a person to tell.
@@ -235,7 +251,11 @@ export class JoinRequestGuardsService {
     joinRequestId: string;
     verb: JoinRequestCommandType;
   }): Promise<JoinRequestAggregateState | null> {
-    const state = await this.requests.tryFindRequest({ joinRequestId });
+    const state = await this.requests.getRequest({ joinRequestId }).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "join_request_not_found")
+        return undefined;
+      throw error;
+    });
     if (!state) {
       return null;
     }

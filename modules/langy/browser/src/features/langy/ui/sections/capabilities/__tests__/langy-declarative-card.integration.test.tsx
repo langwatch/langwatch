@@ -143,17 +143,16 @@ const originalMatchMedia = window.matchMedia;
 
 /** Point `prefers-reduced-motion` at a fixed answer for one test. */
 function mockReducedMotion(matches: boolean) {
-  window.matchMedia = (query: string): MediaQueryList =>
-    ({
-      matches: query.includes("prefers-reduced-motion") ? matches : false,
-      media: query,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }) as unknown as MediaQueryList;
+  window.matchMedia = (query: string): MediaQueryList => ({
+    matches: query.includes("prefers-reduced-motion") ? matches : false,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  });
 }
 
 afterEach(() => {

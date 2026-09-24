@@ -41,7 +41,7 @@ export class MigrationBlobS3Repository implements StoredObjectStorageDriver {
    * A custom endpoint that is not AWS gets `"auto"`: an S3-compatible service
    * has no region, and the SDK refuses to sign without one.
    */
-  static resolveRegion(config: MigrationS3RegionConfiguration): string | undefined {
+  static deriveRegion(config: MigrationS3RegionConfiguration): string | undefined {
     return (
       config.region ?? (config.endpoint && !isAwsS3Endpoint(config.endpoint) ? "auto" : undefined)
     );
@@ -50,7 +50,7 @@ export class MigrationBlobS3Repository implements StoredObjectStorageDriver {
   private readonly client: S3Client;
 
   private constructor(aws: AwsClientProcessRuntime, config: MigrationS3Configuration) {
-    const region = MigrationBlobS3Repository.resolveRegion(config);
+    const region = MigrationBlobS3Repository.deriveRegion(config);
     this.client = new S3Client({
       ...aws.build({
         region,

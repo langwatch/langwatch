@@ -13,7 +13,7 @@ import {
 import { disconnectMessage } from "../rules/langy-local-session-text.rules.ts";
 
 /** A nudge from another pod, or null when it is not one this build understands. */
-function safeNudge(raw: string): WorkspaceNudge | null {
+function parseWorkspaceNudge(raw: string): WorkspaceNudge | null {
   try {
     const parsed = workspaceNudgeSchema.safeParse(JSON.parse(raw));
 
@@ -165,7 +165,7 @@ export class LocalControlLifecycleService {
     raw: string,
     send: (frame: PlatformFrame) => void,
   ): Promise<void> {
-    const parsed = safeNudge(raw);
+    const parsed = parseWorkspaceNudge(raw);
     if (!parsed) {
       return;
     }

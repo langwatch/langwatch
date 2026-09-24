@@ -130,6 +130,13 @@ export function AgentPropertiesPanel({ node }: { node: Node<AgentComponent> }) {
 // DB-backed Agent Panel
 // ---------------------------------------------------------------------------
 
+function agentTypeBadge({ agentType }: { agentType?: string | null }): string {
+  if (agentType === "http") return "HTTP";
+  if (agentType === "code") return "Code";
+  if (agentType === "workflow") return "Workflow";
+  return "Agent";
+}
+
 function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef: string }) {
   const { project } = useOrganizationTeamProject();
   const updateNodeInternals = useUpdateNodeInternals();
@@ -625,14 +632,7 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
     );
   }
 
-  const typeBadge =
-    agentType === "http"
-      ? "HTTP"
-      : agentType === "code"
-        ? "Code"
-        : agentType === "workflow"
-          ? "Workflow"
-          : "Agent";
+  const typeBadge = agentTypeBadge({ agentType });
 
   return (
     <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs paddingX={0}>

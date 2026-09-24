@@ -31,14 +31,9 @@ const IDS = { conversationId: CONVERSATION, turnId: TURN };
  * One recorded step, in the only form both sides agree on: identity, the two
  * clocks, the type and the payload. Everything else on either side is rig.
  */
-interface RecordedStep {
-  id: string;
-  createdAt: number;
-  occurredAt: number;
-  type: string;
-  version: string;
-  data: Record<string, unknown>;
-}
+type RecordedStep<E = LangyConversationProcessingEvent> = E extends LangyConversationProcessingEvent
+  ? Pick<E, "id" | "createdAt" | "occurredAt" | "type" | "version" | "data">
+  : never;
 
 /** A whole turn: accepted → tool call → plan → answer. */
 const RECORDED_STEPS: RecordedStep[] = [
@@ -114,7 +109,7 @@ function asServerEvent(step: RecordedStep): LangyConversationProcessingEvent {
     aggregateId: CONVERSATION,
     aggregateType: "langy_conversation",
     tenantId: TENANT,
-  } as unknown as LangyConversationProcessingEvent;
+  };
 }
 
 /**

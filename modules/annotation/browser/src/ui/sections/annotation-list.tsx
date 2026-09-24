@@ -283,6 +283,8 @@ export function AnnotationList({
   }, [activeScoreTypes, copy.dateColumnLabel, pageRows]);
 
   const selectedCount = selectedRows.length;
+  const showEmptyState = !isLoading && pageRows.length === 0;
+  const showTable = !isLoading && pageRows.length > 0;
 
   return (
     <Flex direction="column" width="full" minWidth={0} height="full" flex={1}>
@@ -346,9 +348,8 @@ export function AnnotationList({
         </Button>
       </HStack>
 
-      {isLoading ? (
-        <AnnotationTableSkeleton />
-      ) : pageRows.length === 0 ? (
+      {isLoading && <AnnotationTableSkeleton />}
+      {showEmptyState && (
         <NoDataInfoBlock
           title={copy.noDataTitle}
           description={copy.noDataDescription}
@@ -367,7 +368,8 @@ export function AnnotationList({
           }
           icon={<SquarePen />}
         />
-      ) : (
+      )}
+      {showTable && (
         <>
           {/* The one element that scrolls sideways: the header controls above
               and the pager below stay put however wide the columns get. */}

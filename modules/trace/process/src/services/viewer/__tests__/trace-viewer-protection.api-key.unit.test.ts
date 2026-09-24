@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
@@ -25,7 +26,7 @@ const anonymous: Protections = {
 
 function serviceWith(hasApiKeyPermission: AuthzApi["hasApiKeyPermission"]) {
   const service = TraceViewerProtectionService.create({
-    authz: { hasApiKeyPermission } as unknown as AuthzApi,
+    authz: createApiFixture<AuthzApi>({ hasApiKeyPermission }),
     projects: {} as ProjectApi,
     plans: {} as PlanProvider,
     dataPrivacy: {} as DataPrivacyApi,

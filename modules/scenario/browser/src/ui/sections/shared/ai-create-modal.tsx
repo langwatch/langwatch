@@ -102,6 +102,10 @@ export function AICreateModal({
     description,
     onGenerate,
   });
+  const isIdle = modalState === "idle";
+  const showsAssistFooter = isIdle && !!assistant && startMode === "assist";
+  const showsManualFooter = isIdle && !!assistant && startMode !== "assist";
+  const showsIdleFooter = isIdle && !assistant;
 
   // Reset state when modal opens
   useEffect(() => {
@@ -177,26 +181,23 @@ export function AICreateModal({
           {modalState === "error" && <ErrorState error={capturedError} />}
         </Dialog.Body>
         <Dialog.Footer>
-          {modalState === "idle" &&
-            (assistant ? (
-              startMode === "assist" ? (
-                <AssistFooter
-                  onGenerate={handleGenerate}
-                  isGenerateDisabled={!description.trim()}
-                  footerHint={footerHint}
-                  assistant={assistant}
-                />
-              ) : (
-                <ManualFooter onSkip={handleSkip} />
-              )
-            ) : (
-              <IdleFooter
-                onSkip={handleSkip}
-                onGenerate={handleGenerate}
-                isGenerateDisabled={!description.trim()}
-                footerHint={footerHint}
-              />
-            ))}
+          {showsAssistFooter && (
+            <AssistFooter
+              onGenerate={handleGenerate}
+              isGenerateDisabled={!description.trim()}
+              footerHint={footerHint}
+              assistant={assistant}
+            />
+          )}
+          {showsManualFooter && <ManualFooter onSkip={handleSkip} />}
+          {showsIdleFooter && (
+            <IdleFooter
+              onSkip={handleSkip}
+              onGenerate={handleGenerate}
+              isGenerateDisabled={!description.trim()}
+              footerHint={footerHint}
+            />
+          )}
 
           {modalState === "error" && (
             <ErrorFooter
@@ -615,6 +616,7 @@ function StartModeButton({
   onClick: () => void;
   children: React.ReactNode;
 }) {
+  const activeColor = accent ? "orange.fg" : "fg";
   return (
     <chakra.button
       type="button"
@@ -630,7 +632,7 @@ function StartModeButton({
       whiteSpace="nowrap"
       cursor="pointer"
       transition="color 120ms ease, background 120ms ease, box-shadow 120ms ease"
-      color={active ? (accent ? "orange.fg" : "fg") : "fg.muted"}
+      color={active ? activeColor : "fg.muted"}
       bg={active ? "bg.surface" : "transparent"}
       boxShadow={active ? "0 1px 2px rgba(2, 6, 23, 0.12)" : "none"}
       _hover={active ? undefined : { color: "fg" }}

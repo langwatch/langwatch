@@ -12,6 +12,8 @@ import {
   DEFAULT_AZURE_API_VERSION,
   expandLatestAlias,
   ModelProviderCredentialsUnreadableError,
+  ModelProviderNotFoundError,
+  ModelDefaultNotFoundError,
 } from "@langwatch/model-provider-contract";
 import { OrganizationService, type OrganizationApi } from "@langwatch/organization-contract";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
@@ -71,22 +73,25 @@ class Providers implements ModelProviderRepository {
   deleted: string[] = [];
   storedCredentialIds = new Set<string>();
   updates: ModelProvider[] = [];
-  tryFindById(input: { id: string; organizationId?: string }): Promise<ModelProvider | null> {
-    return Promise.resolve(
+  getById(input: { id: string; organizationId?: string }): Promise<ModelProvider> {
+    return Providers.oneOrNotFound(
       this.rows.find(
         (row) =>
           row.id === input.id &&
           (!input.organizationId || row.organizationId === input.organizationId),
-      ) ?? null,
+      ),
     );
   }
-  tryFindByProviderForProject(input: { provider: string }): Promise<ModelProvider | null> {
-    return Promise.resolve(this.rows.find((row) => row.provider === input.provider) ?? null);
+  getByProviderForProject(input: { provider: string }): Promise<ModelProvider> {
+    return Providers.oneOrNotFound(this.rows.find((row) => row.provider === input.provider));
   }
-  listForProject(): Promise<ModelProvider[]> {
+  private static oneOrNotFound(row: ModelProvider | undefined): Promise<ModelProvider> {
+    return row ? Promise.resolve(row) : Promise.reject(new ModelProviderNotFoundError());
+  }
+  findForProject(): Promise<ModelProvider[]> {
     return Promise.resolve(this.rows);
   }
-  listForOrganization(): Promise<ModelProvider[]> {
+  findForOrganization(): Promise<ModelProvider[]> {
     return Promise.resolve(this.rows);
   }
   create(input: ModelProvider): Promise<ModelProvider> {
@@ -543,23 +548,28 @@ function authorizationApi(authorization = new Authorization()): AuthzApi {
 
 class Defaults implements ModelDefaultRepository {
   configs: ModelDefaultConfig[] = [];
-  listForProject(): Promise<ModelDefaultConfig[]> {
+  findForProject(): Promise<ModelDefaultConfig[]> {
     return Promise.resolve(this.configs);
   }
-  listForOrganization(): Promise<ModelDefaultConfig[]> {
+  findForOrganization(): Promise<ModelDefaultConfig[]> {
     return Promise.resolve(this.configs);
   }
-  tryGetById(id: string): Promise<ModelDefaultConfig | null> {
-    return Promise.resolve(this.configs.find((config) => config.id === id) ?? null);
+  getById(id: string): Promise<ModelDefaultConfig> {
+    return Defaults.oneOrNotFound(this.configs.find((config) => config.id === id));
   }
-  tryFindByScope(scope: ModelDefaultConfig["scopes"][number]): Promise<ModelDefaultConfig | null> {
-    return Promise.resolve(
+  getByScope(scope: ModelDefaultConfig["scopes"][number]): Promise<ModelDefaultConfig> {
+    return Defaults.oneOrNotFound(
       this.configs.find((config) =>
         config.scopes.some(
           (item) => item.scopeType === scope.scopeType && item.scopeId === scope.scopeId,
         ),
-      ) ?? null,
+      ),
     );
+  }
+  private static oneOrNotFound(
+    config: ModelDefaultConfig | undefined,
+  ): Promise<ModelDefaultConfig> {
+    return config ? Promise.resolve(config) : Promise.reject(new ModelDefaultNotFoundError());
   }
   save(input: ModelDefaultConfigSaveInput): Promise<ModelDefaultConfig> {
     const saved = {
@@ -624,14 +634,14 @@ class Catalog extends ModelProviderCatalog {
     const value = input.customKeys?.[input.key];
     return typeof value === "string" ? value : null;
   }
-  tryGetStoredExecutionValue(input: {
+  pickStoredExecutionValue(input: {
     customKeys: Record<string, unknown> | null;
     key: string;
   }): string | null {
     const value = input.customKeys?.[input.key];
     return typeof value === "string" ? value : null;
   }
-  tryGetExecutionDefinition(_input: {
+  pickExecutionDefinition(_input: {
     provider: string;
   }): { apiKey: string; endpointKey: string | null } | null {
     return { apiKey: "OPENAI_API_KEY", endpointKey: "OPENAI_BASE_URL" };
@@ -642,7 +652,7 @@ class DeprecatedCatalog extends Catalog {
     return providerName === "gemini" || providerName === "google_agent_platform";
   }
 
-  tryGetProviderDeprecation(providerName: string): { replacement?: string } | null {
+  pickProviderDeprecation(providerName: string): { replacement?: string } | null {
     return providerName === "google_agent_platform" ? { replacement: "gemini" } : null;
   }
 }
@@ -652,11 +662,11 @@ class UncheckableCatalog extends Catalog {
   }
 }
 class RoutingCatalog extends Catalog {
-  tryNormalizeRoutingHandle(input: string | null): string | null {
+  normalizeRoutingHandle(input: string | null): string | null {
     return input?.trim().toLowerCase() || null;
   }
 
-  tryGetRoutingHandleProblem(handle: string | null): "shape" | "reserved" | null {
+  classifyRoutingHandleProblem(handle: string | null): "shape" | "reserved" | null {
     return handle === "openai" ? "reserved" : null;
   }
 }
@@ -681,10 +691,10 @@ class ExecutionCatalog extends Catalog {
     customKeys: Record<string, unknown> | null;
     key: string;
   }): string | null {
-    return this.tryGetStoredExecutionValue(input) ?? this.environment[input.key] ?? null;
+    return this.pickStoredExecutionValue(input) ?? this.environment[input.key] ?? null;
   }
 
-  tryGetExecutionDefinition(input: {
+  pickExecutionDefinition(input: {
     provider: string;
   }): { apiKey: string; endpointKey: string | null } | null {
     const definitions: Record<string, { apiKey: string; endpointKey: string | null }> = {

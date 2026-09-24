@@ -437,12 +437,7 @@ export class ApplicationBuilder<
           members: membersFor(members, declaration.requiredMembers) as Members,
           repositorySelection: selections.get(declaration.name),
           role,
-          resolve: (token) =>
-            provided.has(token)
-              ? provided.get(token)
-              : token instanceof ModuleApiToken
-                ? apis.reference(token)
-                : void 0,
+          resolve: (token) => resolveInstallToken({ token, provided, apis }),
         });
         featureServices.push(...resources.sealServices());
         this.bindProviders({ declaration, state, apis, provided });
@@ -672,8 +667,7 @@ function roleContributions(
   const declaredBy = new Map<unknown, string>();
   const contributions: unknown[] = [];
   for (const declaration of declarations) {
-    const declared =
-      role === "worker" ? declaration.workers : role === "tasks" ? declaration.tasks : [];
+    const declared = contributionsFor({ declaration, role });
     for (const contribution of declared) {
       contributions.push(contribution);
       if (typeof contribution === "object" && contribution !== null) {
@@ -682,6 +676,32 @@ function roleContributions(
     }
   }
   return { contributions, declaredBy };
+}
+
+function contributionsFor({
+  declaration,
+  role,
+}: {
+  declaration: DeclaredFeature;
+  role: ServerRole;
+}): readonly unknown[] {
+  if (role === "worker") return declaration.workers;
+  if (role === "tasks") return declaration.tasks;
+  return [];
+}
+
+function resolveInstallToken({
+  token,
+  provided,
+  apis,
+}: {
+  token: TokenIdentity;
+  provided: ReadonlyMap<TokenIdentity, unknown>;
+  apis: LocalFeatureApis;
+}): unknown {
+  if (provided.has(token)) return provided.get(token);
+  if (token instanceof ModuleApiToken) return apis.reference(token);
+  return void 0;
 }
 
 /** Verify each module's tier has required members; no inference from environment. */

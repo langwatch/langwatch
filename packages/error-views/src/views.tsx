@@ -14,7 +14,7 @@ import type { ReactNode } from "react";
  */
 type MinimalForm = {
   /** Not read here — it is what identifies the value as a form at all. */
-  setError: (name: any, error: { type: string; message: string }) => void;
+  setError: (name: never, error: { type: string; message: string }) => void;
   formState?: { errors: Record<string, unknown> };
 };
 

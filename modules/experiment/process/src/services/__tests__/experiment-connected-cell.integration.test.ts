@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   EvaluatorConfig,
   EvaluationsV3State,
@@ -51,15 +52,21 @@ const ports = {
 } as unknown as ExperimentRunCollaborators;
 
 /** The enrichment the run does before posting: identity, in a test. */
-const workflows = {
-  enrichStudioEvent: async ({ event }: { event: unknown }) => event,
-  prepareStudioEvent: async ({ event }: { event: unknown }) => event,
-} as unknown as WorkflowApi;
+const workflows = createApiFixture<WorkflowApi>({
+  enrichStudioEvent: async ({ event }) => event,
+  prepareStudioEvent: async ({ event }) => event,
+});
 
-const agent = {
+const agent: TypedAgent = {
   id: "agent_1",
+  projectId: "project_1",
   name: "support-agent",
   type: "connected",
+  workflowId: null,
+  copiedFromAgentId: null,
+  archivedAt: null,
+  createdAt: new Date("2026-01-01T00:00:00Z"),
+  updatedAt: new Date("2026-01-01T00:00:00Z"),
   environment: "production",
   config: {
     parameters: [
@@ -68,7 +75,7 @@ const agent = {
     ],
     sdk: { name: "langwatch", version: "1.0.0", language: "python" },
   },
-} as unknown as TypedAgent;
+};
 
 const answered = (output: string): CallOutcome => ({
   output,
@@ -241,7 +248,7 @@ describe("given a connected agent column", () => {
             },
           },
         },
-      ] as unknown as StudioServerEvent[];
+      ];
 
       const events = await run({
         cell: makeCell({ evaluatorConfigs: [gradingEvaluator] }),
@@ -385,11 +392,11 @@ describe("given two columns of the same agent", () => {
 });
 
 describe("given a personal development agent of another person", () => {
-  const personalAgent = {
+  const personalAgent: TypedAgent = {
     ...agent,
     environment: "development",
     ownerUserId: "user_someone_else",
-  } as unknown as typeof agent;
+  };
 
   /**
    * The rule itself lives in the Suite feature and is composed onto this port in apps/api.

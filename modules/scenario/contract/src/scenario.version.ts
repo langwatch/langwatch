@@ -72,7 +72,7 @@ export function snapshotFieldsOf(
     judgeModel: scenario.judgeModel,
     maxTurns: scenario.maxTurns,
     minTurns: scenario.minTurns,
-    fields: fieldValuesOrNull(scenario.fields),
+    fields: normalizeFieldValues(scenario.fields),
   };
 }
 
@@ -81,7 +81,7 @@ export function snapshotFieldsOf(
  * empty record (cleared); the snapshot keeps one spelling so the two never
  * diff as a change.
  */
-function fieldValuesOrNull(raw: unknown): ScenarioFieldValues | null {
+function normalizeFieldValues(raw: unknown): ScenarioFieldValues | null {
   const parsed = parseScenarioFieldValues(raw);
   return Object.keys(parsed).length === 0 ? null : parsed;
 }

@@ -54,7 +54,7 @@ import {
   expandLatestAlias,
   isLatestAlias,
   parseLatestAlias,
-  recommendedChatModel,
+  pickRecommendedChatModel,
   resolveLatestAlias,
 } from "../latest-aliases.ts";
 
@@ -129,10 +129,10 @@ describe("given latest-alias model resolution", () => {
   describe("when a provider without an alias asks for its recommendation", () => {
     /** @scenario DeepSeek recommends V4 Pro through the same ranking */
     it("recommends the newest main-tier model through the same ranking", () => {
-      expect(recommendedChatModel("deepseek")).toBe("deepseek/deepseek-v4-pro");
+      expect(pickRecommendedChatModel("deepseek")).toBe("deepseek/deepseek-v4-pro");
     });
     it("recommends nothing for a provider the grammar does not read", () => {
-      expect(recommendedChatModel("groq")).toBeNull();
+      expect(pickRecommendedChatModel("groq")).toBeNull();
     });
   });
 

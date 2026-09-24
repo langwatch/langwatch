@@ -367,11 +367,11 @@ export function routingWire({
   mp: ModelProvider;
   assembly: GatewayConfigAssembly;
 }): Pick<ProviderSlot, "handle" | "models"> {
-  const models = assembly.tryDeclaredModelsForProvider(mp);
+  const models = assembly.findDeclaredModelsForProvider(mp);
 
   return {
     ...(mp.routingHandle ? { handle: mp.routingHandle } : {}),
-    ...(models ? { models } : {}),
+    ...(models.length > 0 ? { models } : {}),
   };
 }
 
@@ -446,7 +446,7 @@ export function providerExclusionWire(mp: ModelProvider): ProviderExclusionWire 
  * if never. Milliseconds would put the date tens of thousands of years out and lift the expiry cap
  * off the key.
  */
-export function expiresAtWire(expiresAt: Instant | null): number | null {
+export function toExpiresAtWire(expiresAt: Instant | null): number | null {
   return expiresAt ? Math.floor(expiresAt.epochMilliseconds / 1000) : null;
 }
 

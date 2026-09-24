@@ -22,42 +22,49 @@ vi.mock("../../../../../behavior/use-prompt-project.ts", () => ({
   usePromptProject: () => ({ project: { id: "test-project" } }),
 }));
 
-// Mock API - partial versions for testing (full type not needed for this test)
-const mockVersions = [
-  {
+function versionedPrompt(overrides: Partial<WireVersionedPrompt>): WireVersionedPrompt {
+  return {
     id: "config-1",
-    versionId: "version-3",
+    name: "test-prompt",
     handle: "test-prompt",
+    scope: "PROJECT",
+    version: 1,
+    versionId: "version-1",
+    versionCreatedAt: "2026-08-18T09:00:00.000Z",
+    model: "openai/gpt-5-mini",
+    prompt: "",
+    projectId: "test-project",
+    organizationId: "test-organization",
+    messages: [{ role: "system", content: "You are a helpful assistant." }],
+    authorId: "user-1",
+    author: { id: "user-1", name: "User 1", email: null, image: null },
+    inputs: [],
+    outputs: [],
+    commitMessage: "Initial version",
+    updatedAt: "2026-08-18T09:00:00.000Z",
+    createdAt: "2026-08-18T09:00:00.000Z",
+    tags: [],
+    parameters: {},
+    ...overrides,
+  };
+}
+
+const mockVersions: WireVersionedPrompt[] = [
+  versionedPrompt({
+    versionId: "version-3",
     version: 3,
     commitMessage: "Latest version",
     versionCreatedAt: "2026-08-20T09:00:00.000Z",
-    author: { name: "User 1" },
-    model: "openai/gpt-5-mini",
     messages: [{ role: "system", content: "You are a terse assistant." }],
-  },
-  {
-    id: "config-1",
+  }),
+  versionedPrompt({
     versionId: "version-2",
-    handle: "test-prompt",
     version: 2,
     commitMessage: "Second version",
     versionCreatedAt: "2026-08-19T09:00:00.000Z",
-    author: { name: "User 1" },
-    model: "openai/gpt-5-mini",
-    messages: [{ role: "system", content: "You are a helpful assistant." }],
-  },
-  {
-    id: "config-1",
-    versionId: "version-1",
-    handle: "test-prompt",
-    version: 1,
-    commitMessage: "Initial version",
-    versionCreatedAt: "2026-08-18T09:00:00.000Z",
-    author: { name: "User 1" },
-    model: "openai/gpt-5-mini",
-    messages: [{ role: "system", content: "You are a helpful assistant." }],
-  },
-] as unknown as WireVersionedPrompt[];
+  }),
+  versionedPrompt({}),
+];
 
 const { mockUseQuery } = vi.hoisted(() => ({
   mockUseQuery: vi.fn(),
@@ -238,16 +245,7 @@ describe("VersionHistoryListPopover", () => {
     it("shows how long ago each version was saved", async () => {
       const savedAt = Temporal.Now.instant().subtract({ hours: 3 }).toString();
       mockUseQuery.mockReturnValue({
-        data: [
-          {
-            id: "config-1",
-            versionId: "version-1",
-            version: 1,
-            commitMessage: "Initial version",
-            versionCreatedAt: savedAt,
-            author: { name: "User 1" },
-          },
-        ] as unknown as WireVersionedPrompt[],
+        data: [versionedPrompt({ versionCreatedAt: savedAt })],
         isLoading: false,
       });
 

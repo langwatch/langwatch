@@ -109,11 +109,11 @@ export class GatewayConfigAssemblyAdapter implements GatewayConfigAssembly {
     return withTiers;
   }
 
-  tryDeclaredModelsForProvider(mp: {
+  findDeclaredModelsForProvider(mp: {
     provider: string;
     customModels: unknown;
     customEmbeddingsModels: unknown;
-  }): string[] | undefined {
+  }): string[] {
     const declared = new Set<string>();
 
     const chat = toLegacyCompatibleCustomModels(mp.customModels, "chat");
@@ -132,7 +132,6 @@ export class GatewayConfigAssemblyAdapter implements GatewayConfigAssembly {
       declared.add(id);
     }
 
-    if (declared.size === 0) return void 0;
     return [...declared].toSorted();
   }
 

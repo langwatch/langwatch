@@ -13,9 +13,9 @@ export type MapCommands<T extends Record<string, EventSourcedQueueProcessor<any>
 export function mapCommands<T extends Record<string, EventSourcedQueueProcessor<any>>>(
   commands: T,
 ): MapCommands<T> {
-  const result = {} as Record<string, MappedCommand<any>>;
+  const result = {} as Record<string, MappedCommand<unknown>>;
   for (const [name, processor] of Object.entries(commands)) {
-    const command = ((data, options) => processor.send(data, options)) as MappedCommand<any>;
+    const command = ((data, options) => processor.send(data, options)) as MappedCommand<unknown>;
     command.sendBatch = (data, options) => processor.sendBatch(data, options);
     result[name] = command;
   }

@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { runActorFromRequest, withActor } from "../run-actor.ts";
+import { deriveRunActor, withActor } from "../run-actor.ts";
 
 describe("the actor of a REST run", () => {
   describe("when the key belongs to a person", () => {
@@ -15,19 +15,19 @@ describe("the actor of a REST run", () => {
      */
     it("records that person, through the surface the request declared", () => {
       expect(
-        runActorFromRequest({
+        deriveRunActor({
           userId: "user_lena",
           surfaceHeader: "cli",
         }),
       ).toEqual({ id: "user_lena", label: "cli" });
 
-      expect(runActorFromRequest({ userId: "user_lena", surfaceHeader: undefined })).toEqual({
+      expect(deriveRunActor({ userId: "user_lena", surfaceHeader: undefined })).toEqual({
         id: "user_lena",
         label: "api",
       });
 
       // Only "cli" is honored, so a caller cannot claim the in-app surface.
-      expect(runActorFromRequest({ userId: "user_lena", surfaceHeader: "user" })).toEqual({
+      expect(deriveRunActor({ userId: "user_lena", surfaceHeader: "user" })).toEqual({
         id: "user_lena",
         label: "api",
       });
@@ -41,8 +41,8 @@ describe("the actor of a REST run", () => {
      */
     /** @scenario "A REST run with a key that belongs to no person records no actor" */
     it("names no actor, whatever surface the request declares", () => {
-      expect(runActorFromRequest({ userId: null, surfaceHeader: "cli" })).toBeUndefined();
-      expect(runActorFromRequest({ userId: undefined, surfaceHeader: undefined })).toBeUndefined();
+      expect(deriveRunActor({ userId: null, surfaceHeader: "cli" })).toBeUndefined();
+      expect(deriveRunActor({ userId: undefined, surfaceHeader: undefined })).toBeUndefined();
     });
   });
 });

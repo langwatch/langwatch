@@ -92,32 +92,57 @@ function importedBindings(source: ts.SourceFile): Bindings {
     if (!imported) continue;
 
     if (module === REPOSITORY_MODULE) {
-      if (ts.isNamespaceImport(imported)) {
-        repositoryNamespaces.add(imported.name.text);
-      } else {
-        for (const binding of imported.elements) {
-          if ((binding.propertyName ?? binding.name).text === "PrismaRepository") {
-            repositoryBases.add(binding.name.text);
-          }
-        }
-      }
+      addRepositoryBindings({ imported, repositoryBases, repositoryNamespaces });
     }
 
     if (module !== OWNERSHIP_MODULE) continue;
 
-    if (ts.isNamespaceImport(imported)) {
-      namespaces.add(imported.name.text);
-      continue;
-    }
-
-    for (const binding of imported.elements) {
-      if ((binding.propertyName ?? binding.name).text === "prismaTables") {
-        named.add(binding.name.text);
-      }
-    }
+    addOwnershipBindings({ imported, named, namespaces });
   }
 
   return { named, namespaces, repositoryBases, repositoryNamespaces };
+}
+
+function addRepositoryBindings({
+  imported,
+  repositoryBases,
+  repositoryNamespaces,
+}: {
+  imported: ts.NamedImportBindings;
+  repositoryBases: Set<string>;
+  repositoryNamespaces: Set<string>;
+}): void {
+  if (ts.isNamespaceImport(imported)) {
+    repositoryNamespaces.add(imported.name.text);
+    return;
+  }
+
+  for (const binding of imported.elements) {
+    if ((binding.propertyName ?? binding.name).text === "PrismaRepository") {
+      repositoryBases.add(binding.name.text);
+    }
+  }
+}
+
+function addOwnershipBindings({
+  imported,
+  named,
+  namespaces,
+}: {
+  imported: ts.NamedImportBindings;
+  named: Set<string>;
+  namespaces: Set<string>;
+}): void {
+  if (ts.isNamespaceImport(imported)) {
+    namespaces.add(imported.name.text);
+    return;
+  }
+
+  for (const binding of imported.elements) {
+    if ((binding.propertyName ?? binding.name).text === "prismaTables") {
+      named.add(binding.name.text);
+    }
+  }
 }
 
 function isRepositoryBase(node: ts.Expression, bindings: Bindings): boolean {

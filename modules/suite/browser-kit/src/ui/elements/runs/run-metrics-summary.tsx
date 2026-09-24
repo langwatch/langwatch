@@ -92,6 +92,8 @@ function buildCompletedDetail(summary: RunGroupSummary): string | null {
 
 function TooltipContent({ summary }: { summary: RunGroupSummary }) {
   const detail = buildCompletedDetail(summary);
+  const showPlainAgentLatency =
+    !summary.agentLatencyStats && summary.averageAgentLatencyMs !== null;
 
   return (
     <VStack align="stretch" gap={0} fontSize="12px" minWidth="220px" color="fg">
@@ -121,7 +123,7 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
         </HStack>
 
         {/* Avg Agent Latency — expandable with percentile stats */}
-        {summary.agentLatencyStats ? (
+        {summary.agentLatencyStats && (
           <Tooltip
             content={
               <StatsTooltip
@@ -151,7 +153,8 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
               </HStack>
             </HStack>
           </Tooltip>
-        ) : summary.averageAgentLatencyMs !== null ? (
+        )}
+        {showPlainAgentLatency && (
           <HStack justify="space-between">
             <Text color="fg.muted">Avg Agent Latency</Text>
             <HStack gap={1}>
@@ -159,7 +162,7 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
               <Text fontWeight="medium">{formatLatency(summary.averageAgentLatencyMs)}</Text>
             </HStack>
           </HStack>
-        ) : null}
+        )}
 
         {/* Avg Agent Cost — expandable with percentile stats */}
         {summary.agentCostStats ? (

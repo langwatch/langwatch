@@ -12,7 +12,7 @@ export function canonicaliseLangWatchMetrics(ctx: ExtractorContext): void {
 }
 
 /** The metrics record a span carries, whether wrapped in a structured value or sent bare. */
-function readMetricsValue(rawMetrics: unknown): Record<string, unknown> | null {
+function parseMetricsValue(rawMetrics: unknown): Record<string, unknown> | null {
   const structured = isLangWatchStructuredValue(rawMetrics) ? rawMetrics : null;
   if (structured && isRecord(structured.value)) return structured.value;
   if (isRecord(rawMetrics)) return rawMetrics;
@@ -73,7 +73,7 @@ function canonicaliseMetrics(ctx: ExtractorContext): void {
   const rawMetrics = ctx.bag.attrs.take(ATTR_KEYS.LANGWATCH_METRICS);
   if (rawMetrics === void 0) return;
 
-  const metricsValue = readMetricsValue(rawMetrics);
+  const metricsValue = parseMetricsValue(rawMetrics);
   if (!metricsValue) return;
 
   for (const field of METRIC_FIELDS) {

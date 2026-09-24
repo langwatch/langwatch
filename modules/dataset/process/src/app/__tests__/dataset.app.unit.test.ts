@@ -19,12 +19,28 @@ import {
   datasetTestExperiment,
 } from "./dataset.fixture.ts";
 
-const replacing = {
+const replacing: Dataset = {
   id: "dataset_existing",
+  projectId: "project-1",
   name: "Original",
   slug: "original",
   columnTypes: [{ name: "input", type: "string" }],
-} as unknown as Dataset;
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+  archivedAt: null,
+  mapping: null,
+  useS3: false,
+  s3RecordCount: null,
+  contentLayout: "postgres",
+  status: "ready",
+  statusError: null,
+  stagingKey: null,
+  uploadFilename: null,
+  rowCount: null,
+  sizeBytes: null,
+  chunkCount: null,
+  chunkOffsets: null,
+};
 
 function harness({
   dataset = {},

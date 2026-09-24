@@ -137,13 +137,15 @@ const target = (type: TargetConfig["type"], referenceId = "agent-1"): TargetConf
   referenceId,
 });
 
+const TARGET_NOT_FOUND = { code: "scenario_target_not_found" };
+
 const fetchFor = (
   service: ScenarioTargetPrefetchService,
   type: TargetConfig["type"],
   runSecretValues: Record<string, string> = {},
-) => service.fetch({ projectId: PROJECT_ID, target: target(type), runSecretValues });
+) => service.getTargetAdapter({ projectId: PROJECT_ID, target: target(type), runSecretValues });
 
-describe("ScenarioTargetPrefetchService.tryFetch", () => {
+describe("ScenarioTargetPrefetchService.getTargetAdapter", () => {
   describe("given a prompt target", () => {
     it("packs the prompt the run will send", async () => {
       const service = serviceAnswering({
@@ -157,19 +159,25 @@ describe("ScenarioTargetPrefetchService.tryFetch", () => {
       });
     });
 
-    it("answers with nothing when the prompt is gone", async () => {
-      await expect(fetchFor(serviceAnswering({ prompt: null }), "prompt")).resolves.toBeNull();
+    it("throws target not found when the prompt is gone", async () => {
+      await expect(fetchFor(serviceAnswering({ prompt: null }), "prompt")).rejects.toMatchObject(
+        TARGET_NOT_FOUND,
+      );
     });
   });
 
   describe("given an agent target that no longer exists", () => {
-    it("answers with nothing rather than throwing", async () => {
+    it("throws target not found, which the prefetch turns into a failed run", async () => {
       // One deleted agent must not fail the prefetch for the whole batch.
-      await expect(fetchFor(serviceAnswering({ agent: "missing" }), "http")).resolves.toBeNull();
-      await expect(fetchFor(serviceAnswering({ agent: "missing" }), "code")).resolves.toBeNull();
+      await expect(fetchFor(serviceAnswering({ agent: "missing" }), "http")).rejects.toMatchObject(
+        TARGET_NOT_FOUND,
+      );
+      await expect(fetchFor(serviceAnswering({ agent: "missing" }), "code")).rejects.toMatchObject(
+        TARGET_NOT_FOUND,
+      );
       await expect(
         fetchFor(serviceAnswering({ agent: "missing" }), "workflow"),
-      ).resolves.toBeNull();
+      ).rejects.toMatchObject(TARGET_NOT_FOUND);
     });
   });
 
@@ -223,12 +231,12 @@ describe("ScenarioTargetPrefetchService.tryFetch", () => {
       });
     });
 
-    it("answers with nothing when the configuration will not parse", async () => {
+    it("throws target not found when the configuration will not parse", async () => {
       // A half-configured agent cannot be run, and saying so here is cheaper
       // than a request that fails inside the sandbox.
       const service = serviceAnswering({ agent: httpAgent({ method: "POST" }) });
 
-      await expect(fetchFor(service, "http")).resolves.toBeNull();
+      await expect(fetchFor(service, "http")).rejects.toMatchObject(TARGET_NOT_FOUND);
     });
   });
 
@@ -246,12 +254,12 @@ describe("ScenarioTargetPrefetchService.tryFetch", () => {
   });
 
   describe("given the agent is not the type the target claims", () => {
-    it("answers with nothing", async () => {
+    it("throws target not found", async () => {
       const service = serviceAnswering({
         agent: httpAgent({ url: "https://acme.test", method: "POST" }),
       });
 
-      await expect(fetchFor(service, "code")).resolves.toBeNull();
+      await expect(fetchFor(service, "code")).rejects.toMatchObject(TARGET_NOT_FOUND);
     });
   });
 });

@@ -22,6 +22,18 @@ interface CapabilityProps {
   absolute?: boolean;
 }
 
+function capabilityHref({
+  capability,
+  projectSlug,
+}: {
+  capability: CapabilityProps;
+  projectSlug: string | undefined;
+}) {
+  if (capability.absolute) return capability.path;
+  if (projectSlug) return `/${projectSlug}${capability.path}`;
+  return "#";
+}
+
 const capabilities: CapabilityProps[] = [
   {
     icon: Activity,
@@ -134,7 +146,7 @@ export function ViaPlatformScreen(): React.ReactElement {
             <GridItem key={cap.title} display="flex">
               <CapabilityCard
                 {...cap}
-                href={cap.absolute ? cap.path : project?.slug ? `/${project.slug}${cap.path}` : "#"}
+                href={capabilityHref({ capability: cap, projectSlug: project?.slug })}
               />
             </GridItem>
           ))}

@@ -1,4 +1,4 @@
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError } from "@langwatch/handled-error";
 
 import type { SsoMigrationBlockerView } from "./sso-migration.ts";
 
@@ -890,5 +890,16 @@ export class SsoTestArrivalCannotCreateOrganizationError extends HandledError {
       { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
     );
     this.name = "SsoTestArrivalCannotCreateOrganizationError";
+  }
+}
+
+/** No sync folded for this connection in this organization yet; a foreign
+ *  organization's sync reads the same, so the difference is no oracle. */
+export class ScimSyncNotFoundError extends NotFoundError {
+  declare readonly code: "scim_sync_not_found";
+
+  constructor(scimSyncId: string) {
+    super("scim_sync_not_found", "SCIM sync", scimSyncId, { meta: { scimSyncId } });
+    this.name = "ScimSyncNotFoundError";
   }
 }

@@ -23,7 +23,6 @@ export const EmptyResultsPane: React.FC = React.memo(() => {
   return (
     <Flex
       as="main"
-      role="main"
       aria-label="Set up tracing"
       direction="column"
       flex={1}

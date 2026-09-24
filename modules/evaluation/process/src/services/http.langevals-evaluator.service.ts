@@ -19,6 +19,37 @@ import { NullLangevalsEvaluatorClient } from "./null.langevals-evaluator.service
 
 const logger = createLogger("langwatch:langevals-http-client");
 
+function throwFetchFailure({
+  error,
+  url,
+  timeoutMs,
+  evaluatorType,
+}: {
+  error: unknown;
+  url: string;
+  timeoutMs: number;
+  evaluatorType: string;
+}): never {
+  if (error instanceof Error && error.name === "AbortError") {
+    logger.warn({ url, timeoutMs }, "Evaluator request timed out");
+    // The address dialled stays in the log line above: `meta` rides the
+    // experiment SSE stream to the browser, and it is a deployment's own
+    // internal service address.
+    throw new EvaluatorExecutionError(`Evaluator timed out after ${timeoutMs}ms`, {
+      meta: { evaluatorType, timeoutMs },
+    });
+  }
+
+  if (error instanceof Error && error.message.includes("fetch failed")) {
+    logger.warn({ error, url }, "Evaluator cannot be reached");
+    throw new EvaluatorExecutionError("Evaluator cannot be reached", {
+      meta: { evaluatorType },
+    });
+  }
+
+  throw error;
+}
+
 /**
  * What the transport needs from the deployment: where the evaluator service
  * lives, how long a call may take and how many times a 5xx is retried.
@@ -90,24 +121,7 @@ export class HttpLangevalsEvaluatorAdapter implements EvaluationLangevals {
         }),
       });
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        logger.warn({ url, timeoutMs: this.config.timeoutMs }, "Evaluator request timed out");
-        // The address dialled stays in the log line above: `meta` rides the
-        // experiment SSE stream to the browser, and it is a deployment's own
-        // internal service address.
-        throw new EvaluatorExecutionError(`Evaluator timed out after ${this.config.timeoutMs}ms`, {
-          meta: { evaluatorType, timeoutMs: this.config.timeoutMs },
-        });
-      }
-
-      if (error instanceof Error && error.message.includes("fetch failed")) {
-        logger.warn({ error, url }, "Evaluator cannot be reached");
-        throw new EvaluatorExecutionError("Evaluator cannot be reached", {
-          meta: { evaluatorType },
-        });
-      }
-
-      throw error;
+      throwFetchFailure({ error, url, timeoutMs: this.config.timeoutMs, evaluatorType });
     } finally {
       clearTimeout(timeout);
     }

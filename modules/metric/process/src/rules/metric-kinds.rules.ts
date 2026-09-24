@@ -16,7 +16,7 @@ const KINDS_BY_DATA_KEY: [string, MetricKind][] = Object.entries(METRIC_KIND_DAT
 );
 
 /** A metric carries exactly one data container; anything else is ambiguous. */
-export function metricKind(metric: UnknownRecord): MetricKind | null {
+export function classifyMetricKind(metric: UnknownRecord): MetricKind | null {
   const present = KINDS_BY_DATA_KEY.filter(([key]) => isRecord(metric[key]));
   return present.length === 1 ? present[0]![1] : null;
 }

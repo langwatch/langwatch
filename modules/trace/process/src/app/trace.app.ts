@@ -118,6 +118,7 @@ import type { z } from "zod";
 
 import { ClickHouseTraceQueryLangWatchQLRepository } from "../repositories/clickhouse/clickhouse.trace-query-langwatch-ql.repository.ts";
 import { ClickHouseTraceQueryRepository } from "../repositories/clickhouse/clickhouse.trace-query.repository.ts";
+import { RedisTraceSpanDedupRepository } from "../repositories/redis/redis.trace-span-dedup.repository.ts";
 import type { TraceExistenceRepository } from "../repositories/trace-existence.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import {
@@ -143,6 +144,7 @@ import { ClaudeCodeLogEnrichmentService } from "../services/claude-code-log-enri
 import { TrackedEventSpanService } from "../services/ingestion-tracked-event-span.service.ts";
 import { TraceCollectorSpanService } from "../services/trace-collector-span.service.ts";
 import { TraceContentReadService as ConcreteTraceContentReadService } from "../services/trace-content-read.service.ts";
+import type { TraceEditRemoval } from "../services/trace-edit-overlay.service.ts";
 import {
   TraceExportBoundsService,
   type TraceExportBounds,
@@ -367,7 +369,7 @@ export type TraceEditOverlayStore = Readonly<{
       field: "input" | "output";
       userId: string | null;
     }>,
-  ): Promise<TraceEditOverlayDto | null>;
+  ): Promise<TraceEditRemoval>;
   mergeSpanFieldEdit(
     input: Readonly<{
       projectId: string;
@@ -386,7 +388,7 @@ export type TraceEditOverlayStore = Readonly<{
       field: "input" | "output";
       userId: string | null;
     }>,
-  ): Promise<TraceEditOverlayDto | null>;
+  ): Promise<TraceEditRemoval>;
 }>;
 
 /**
@@ -595,6 +597,10 @@ export class TraceApp implements TraceApi, CollectorApp {
         publicBaseUrl: input.members.publicBaseUrl,
         registersProcessingPipeline: input.members.producesPipelines,
       },
+      dedup: RedisTraceSpanDedupRepository.create({
+        connection: input.members.redis,
+        logger: input.members.logger,
+      }),
     });
     return new TraceApp(
       composeTraceAppDependencies({

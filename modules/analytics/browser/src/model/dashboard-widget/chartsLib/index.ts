@@ -213,7 +213,7 @@ function recharts() {
   return window.Recharts;
 }
 
-function h(type: any, props: any, ...children: any[]) {
+function h(type: unknown, props: unknown, ...children: unknown[]) {
   return react().createElement(type, props, ...children);
 }
 
@@ -1115,16 +1115,16 @@ interface InferredShape {
   y: string[];
 }
 
+function asColumnList(y: string | string[]): string[] {
+  return Array.isArray(y) ? y : [y];
+}
+
 // Independent shape-detection rules over the data's columns; branches don't interact.
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: independent rules.
 function inferShape(data: Row[], x?: string, y?: string | string[]): InferredShape {
   const cols = columnsOf(data);
   const explicitX = x ?? cols[0];
-  const explicitY = y
-    ? Array.isArray(y)
-      ? y
-      : [y]
-    : numericColumns(data, explicitX ? [explicitX] : []);
+  const explicitY = y ? asColumnList(y) : numericColumns(data, explicitX ? [explicitX] : []);
 
   if (explicitX && isTimeLikeColumn(data, explicitX)) {
     return {
@@ -1166,7 +1166,7 @@ export function LwqlChart({
   const inferred = inferShape(data, x, y);
   const resolvedKind = kind ?? inferred.kind;
   const resolvedX = x ?? inferred.x;
-  const resolvedY = y ? (Array.isArray(y) ? y : [y]) : inferred.y;
+  const resolvedY = y ? asColumnList(y) : inferred.y;
 
   switch (resolvedKind) {
     case "area":

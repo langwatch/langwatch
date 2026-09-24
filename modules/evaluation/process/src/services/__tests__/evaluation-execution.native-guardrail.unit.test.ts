@@ -6,8 +6,10 @@ import {
   type NativeEvaluatorExecutionInput,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
-import { describe, expect, it, vi } from "vitest";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
+import { describe, expect, it, type Mock, vi } from "vitest";
 
+import type { EvaluationLangevals } from "../../app/evaluation.members.ts";
 import {
   EvaluationExecutionService,
   type EvaluationExecutionDeps,
@@ -34,18 +36,28 @@ function createFakeEvaluatorApi() {
   return { api: createApiFixture<EvaluatorApi>({ executeNative, augmentResult }), executeNative };
 }
 
-function buildService(langevalsEvaluate: ReturnType<typeof vi.fn>) {
+function unused(member: string) {
+  return (): never => {
+    throw new Error(`${member} is not reached by the guardrail dispatch`);
+  };
+}
+
+function buildService(langevalsEvaluate: Mock<EvaluationLangevals["evaluate"]>) {
   const { api: evaluators, executeNative } = createFakeEvaluatorApi();
-  const deps = {
-    traceService: {} as never,
-    spanDigest: {} as never,
-    modelEnvResolver: {} as never,
+  const deps: EvaluationExecutionDeps = {
+    traceService: {
+      getTracesWithSpans: unused("traceService.getTracesWithSpans"),
+      getEvaluationsMultiple: unused("traceService.getEvaluationsMultiple"),
+      getTracesWithSpansByThreadIds: unused("traceService.getTracesWithSpansByThreadIds"),
+    },
+    spanDigest: { format: unused("spanDigest.format") },
+    modelEnvResolver: { resolveForEvaluator: unused("modelEnvResolver.resolveForEvaluator") },
     langevalsClient: { evaluate: langevalsEvaluate },
-    workflows: {} as never,
+    workflows: createApiFixture<WorkflowApi>({}),
     evaluators,
-    workflowExecutor: {} as never,
-    installEnvironment: {} as never,
-  } as unknown as EvaluationExecutionDeps;
+    workflowExecutor: { runEvaluationWorkflow: unused("workflowExecutor.runEvaluationWorkflow") },
+    installEnvironment: {},
+  };
 
   return { service: EvaluationExecutionService.create(deps), executeNative };
 }
@@ -54,7 +66,7 @@ describe("EvaluationExecutionService guardrail dispatch", () => {
   describe("given a guardrail call to a native evaluator with a leaked key", () => {
     /** @scenario The secrets evaluator runs in-process as a guardrail */
     it("responds with a failed evaluation without calling the analysis service", async () => {
-      const langevalsEvaluate = vi.fn();
+      const langevalsEvaluate = vi.fn<EvaluationLangevals["evaluate"]>();
       const { service, executeNative } = buildService(langevalsEvaluate);
 
       const result = await service.executeForData({

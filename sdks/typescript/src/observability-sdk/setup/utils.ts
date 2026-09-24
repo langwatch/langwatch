@@ -36,14 +36,32 @@ export function createMergedResource(
   return (givenResource ?? defaultResource()).merge(langwatchResource).merge(userResource);
 }
 
+export function readMember(value: unknown, key: string): unknown {
+  if (value === null || value === undefined) return undefined;
+  return Reflect.get(Object(value), key);
+}
+
+export function callMember(target: unknown, key: string, args: unknown[]): unknown {
+  const member = readMember(target, key);
+  if (typeof member !== "function") throw new TypeError(`${key} is not a function`);
+  return Reflect.apply(member, target, args);
+}
+
+export function listProcessorRegistryCandidates(provider: unknown): unknown[] {
+  return [
+    readMember(readMember(provider, "_activeSpanProcessor"), "_spanProcessors"),
+    readMember(readMember(provider, "activeSpanProcessor"), "_spanProcessors"),
+    readMember(provider, "_registeredSpanProcessors"),
+  ];
+}
+
 function hasAttachableProcessorRegistry(obj: unknown): boolean {
   if (!obj || typeof obj !== "object") return false;
-  const candidates = [
-    (obj as any)?._activeSpanProcessor?._spanProcessors,
-    (obj as any)?.activeSpanProcessor?._spanProcessors,
-    (obj as any)?._registeredSpanProcessors,
-  ];
-  return candidates.some(Array.isArray);
+  return listProcessorRegistryCandidates(obj).some(Array.isArray);
+}
+
+function isConcreteProviderName(name: unknown): boolean {
+  return typeof name === "string" && ["NodeTracerProvider", "BasicTracerProvider"].includes(name);
 }
 
 /**
@@ -54,11 +72,11 @@ export function getConcreteProvider(provider: unknown): unknown {
   if (!provider || typeof provider !== "object") return undefined;
 
   // Check provider itself
-  const constructorName = (provider as any).constructor?.name;
-  if (["NodeTracerProvider", "BasicTracerProvider"].includes(constructorName)) {
+  const constructorName = readMember(provider.constructor, "name");
+  if (isConcreteProviderName(constructorName)) {
     return provider;
   }
-  if (typeof (provider as any).addSpanProcessor === "function") {
+  if (typeof readMember(provider, "addSpanProcessor") === "function") {
     return provider;
   }
   if (hasAttachableProcessorRegistry(provider)) {
@@ -66,24 +84,24 @@ export function getConcreteProvider(provider: unknown): unknown {
   }
 
   // Check one level of delegate (ProxyTracerProvider pattern)
-  let delegate;
-  if (typeof (provider as any).getDelegate === "function") {
-    delegate = (provider as any).getDelegate();
-  } else if ((provider as any).delegate) {
-    delegate = (provider as any).delegate;
-  } else if ((provider as any)._delegate) {
+  let delegate: unknown;
+  if (typeof readMember(provider, "getDelegate") === "function") {
+    delegate = callMember(provider, "getDelegate", []);
+  } else if (readMember(provider, "delegate")) {
+    delegate = readMember(provider, "delegate");
+  } else if (readMember(provider, "_delegate")) {
     // Also check for _delegate (OpenTelemetry's actual property name)
     // See: https://github.com/langwatch/langwatch/issues/753
-    delegate = (provider as any)._delegate;
+    delegate = readMember(provider, "_delegate");
   }
 
   if (!delegate || typeof delegate !== "object") return void 0;
 
-  const delegateConstructorName = delegate.constructor?.name;
-  if (["NodeTracerProvider", "BasicTracerProvider"].includes(delegateConstructorName)) {
+  const delegateConstructorName = readMember(delegate.constructor, "name");
+  if (isConcreteProviderName(delegateConstructorName)) {
     return delegate;
   }
-  if (typeof delegate.addSpanProcessor === "function") {
+  if (typeof readMember(delegate, "addSpanProcessor") === "function") {
     return delegate;
   }
   if (hasAttachableProcessorRegistry(delegate)) {

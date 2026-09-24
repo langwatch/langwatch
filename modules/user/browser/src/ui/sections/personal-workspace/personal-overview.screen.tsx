@@ -4,7 +4,10 @@ import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import numeral from "numeral";
 import { useState } from "react";
 
-import { usePersonalContext } from "../../../behavior/use-personal-context.ts";
+import {
+  type PersonalContext,
+  usePersonalContext,
+} from "../../../behavior/use-personal-context.ts";
 import {
   PERSONAL_AI_TOOLS_ANCHOR,
   PERSONAL_TRACE_INGEST_ANCHOR,
@@ -218,67 +221,15 @@ export function PersonalOverviewScreen() {
                 onToggleTheoretical={() => setShowTheoretical((v) => !v)}
                 onToggleBilled={() => setShowBilled((v) => !v)}
               />
-              {spendByTool.map((tool) => {
-                const theoreticalPct = (tool.usd / maxTool) * 100;
-                const billedPct = (tool.billedUsd / maxTool) * 100;
-                return (
-                  <HStack key={tool.tool} gap={3}>
-                    <Text fontSize="sm" minWidth="120px">
-                      {tool.tool}
-                    </Text>
-                    <Tooltip
-                      openDelay={100}
-                      positioning={{ placement: "top" }}
-                      content={
-                        <VStack gap={0.5} align="start">
-                          <Text fontWeight="semibold">{tool.tool}</Text>
-                          <Text>Theoretical: {fmtUsd(tool.usd)}</Text>
-                          <Text>Billed: {fmtUsd(tool.billedUsd)}</Text>
-                        </VStack>
-                      }
-                    >
-                      <Box
-                        flex={1}
-                        height="14px"
-                        backgroundColor="bg.muted"
-                        borderRadius="sm"
-                        overflow="hidden"
-                        position="relative"
-                        cursor="default"
-                      >
-                        {showTheoretical && (
-                          <Box
-                            position="absolute"
-                            left={0}
-                            top={0}
-                            height="full"
-                            width={`${Math.max(tool.usd > 0 ? 2 : 0, theoreticalPct)}%`}
-                            backgroundColor="blue.200"
-                          />
-                        )}
-                        {showBilled && (
-                          <Box
-                            position="absolute"
-                            left={0}
-                            top={0}
-                            height="full"
-                            width={`${Math.max(tool.billedUsd > 0 ? 2 : 0, billedPct)}%`}
-                            backgroundColor="blue.400"
-                          />
-                        )}
-                      </Box>
-                    </Tooltip>
-                    <VStack gap={0} align="end" minWidth="90px" fontSize="sm">
-                      {showBilled && <Text>{fmtUsd(tool.billedUsd)}</Text>}
-                      {showTheoretical && tool.usd - tool.billedUsd > 1e-6 && (
-                        <Text color="fg.subtle" fontSize="xs">
-                          {fmtUsd(tool.usd - tool.billedUsd)} bundled
-                        </Text>
-                      )}
-                    </VStack>
-                  </HStack>
-                );
-              })}
+              {spendByTool.map((tool) => (
+                <ToolSpendRow
+                  key={tool.tool}
+                  tool={tool}
+                  maxTool={maxTool}
+                  showTheoretical={showTheoretical}
+                  showBilled={showBilled}
+                />
+              ))}
             </VStack>
           )}
         </SectionCard>
@@ -544,6 +495,78 @@ function LegendChip({
       <Text color="fg.muted" textDecoration={active ? undefined : "line-through"}>
         {label}
       </Text>
+    </HStack>
+  );
+}
+
+function ToolSpendRow({
+  tool,
+  maxTool,
+  showTheoretical,
+  showBilled,
+}: {
+  tool: PersonalContext["spendByTool"][number];
+  maxTool: number;
+  showTheoretical: boolean;
+  showBilled: boolean;
+}) {
+  const theoreticalPct = (tool.usd / maxTool) * 100;
+  const billedPct = (tool.billedUsd / maxTool) * 100;
+  return (
+    <HStack gap={3}>
+      <Text fontSize="sm" minWidth="120px">
+        {tool.tool}
+      </Text>
+      <Tooltip
+        openDelay={100}
+        positioning={{ placement: "top" }}
+        content={
+          <VStack gap={0.5} align="start">
+            <Text fontWeight="semibold">{tool.tool}</Text>
+            <Text>Theoretical: {fmtUsd(tool.usd)}</Text>
+            <Text>Billed: {fmtUsd(tool.billedUsd)}</Text>
+          </VStack>
+        }
+      >
+        <Box
+          flex={1}
+          height="14px"
+          backgroundColor="bg.muted"
+          borderRadius="sm"
+          overflow="hidden"
+          position="relative"
+          cursor="default"
+        >
+          {showTheoretical && (
+            <Box
+              position="absolute"
+              left={0}
+              top={0}
+              height="full"
+              width={`${Math.max(tool.usd > 0 ? 2 : 0, theoreticalPct)}%`}
+              backgroundColor="blue.200"
+            />
+          )}
+          {showBilled && (
+            <Box
+              position="absolute"
+              left={0}
+              top={0}
+              height="full"
+              width={`${Math.max(tool.billedUsd > 0 ? 2 : 0, billedPct)}%`}
+              backgroundColor="blue.400"
+            />
+          )}
+        </Box>
+      </Tooltip>
+      <VStack gap={0} align="end" minWidth="90px" fontSize="sm">
+        {showBilled && <Text>{fmtUsd(tool.billedUsd)}</Text>}
+        {showTheoretical && tool.usd - tool.billedUsd > 1e-6 && (
+          <Text color="fg.subtle" fontSize="xs">
+            {fmtUsd(tool.usd - tool.billedUsd)} bundled
+          </Text>
+        )}
+      </VStack>
     </HStack>
   );
 }

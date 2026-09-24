@@ -50,7 +50,7 @@ export class EmailProviderService {
    * Gateway selection: EMAIL_PROVIDER authoritative; fails loudly on
    * misconfiguration.
    */
-  tryResolveName(): EmailProviderName | null {
+  pickProviderName(): EmailProviderName | null {
     const configured = this.configuration.provider?.trim().toLowerCase();
     const available = this.configured();
 

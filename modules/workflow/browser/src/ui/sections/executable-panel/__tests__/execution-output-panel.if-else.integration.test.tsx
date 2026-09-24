@@ -26,12 +26,11 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-const successState = (outputs: Record<string, unknown>) =>
-  ({
-    status: "success",
-    timestamps: { started_at: 1000, finished_at: 1016 },
-    outputs,
-  }) as unknown as ExecutionState;
+const successState = (outputs: Record<string, unknown>): ExecutionState => ({
+  status: "success",
+  timestamps: { started_at: 1000, finished_at: 1016 },
+  outputs,
+});
 
 describe("ExecutionOutputPanel - if/else outputs", () => {
   afterEach(() => cleanup());
@@ -75,11 +74,11 @@ describe("ExecutionOutputPanel - if/else outputs", () => {
   describe("given an if/else run that completed in under a millisecond", () => {
     /** @scenario A sub-millisecond run still shows its duration */
     it("shows a 0ms duration instead of hiding the timing line", () => {
-      const zeroDuration = {
+      const zeroDuration: ExecutionState = {
         status: "success",
         timestamps: { started_at: 1700000000000, finished_at: 1700000000000 },
         outputs: { true: false, false: true },
-      } as unknown as ExecutionState;
+      };
 
       render(<ExecutionOutputPanel executionState={zeroDuration} nodeType="if_else" />, {
         wrapper: Wrapper,

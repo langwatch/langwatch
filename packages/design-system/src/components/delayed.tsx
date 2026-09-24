@@ -15,5 +15,7 @@ export function Delayed({
     return () => clearTimeout(mountTimeout);
   }, [delay]);
 
-  return isMounted ? children : takeSpace ? <span style={{ opacity: 0 }}>{children}</span> : null;
+  if (isMounted) return children;
+  if (takeSpace) return <span style={{ opacity: 0 }}>{children}</span>;
+  return null;
 }

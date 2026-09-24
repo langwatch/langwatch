@@ -37,10 +37,9 @@ export const computeExecutionCells = ({
   targetIds,
   datasetRows,
 }: ComputeExecutionCellsParams): CellId[] => {
-  const cells: CellId[] = [];
-
   // Handle evaluator-all-rows scope: cells are determined by precomputedTargetOutputs keys
   if (scope.type === "evaluator-all-rows") {
+    const cells: CellId[] = [];
     for (const rowIndexStr of Object.keys(scope.precomputedTargetOutputs)) {
       const rowIndex = Number(rowIndexStr);
       if (rowIndex >= 0 && rowIndex < datasetRows.length) {
@@ -96,24 +95,36 @@ export const computeExecutionCells = ({
       scopeTargetIds = [];
   }
 
-  // Generate cells, skipping empty rows
+  return cellsForRows({ rowIndices, scopeTargetIds, targetIds, datasetRows });
+};
+
+/** The cells for `rowIndices` × `scopeTargetIds`, skipping empty rows and unknown targets. */
+function cellsForRows({
+  rowIndices,
+  scopeTargetIds,
+  targetIds,
+  datasetRows,
+}: {
+  rowIndices: number[];
+  scopeTargetIds: string[];
+  targetIds: string[];
+  datasetRows: ComputeExecutionCellsParams["datasetRows"];
+}): CellId[] {
+  const cells: CellId[] = [];
   for (const rowIndex of rowIndices) {
     const row = datasetRows[rowIndex];
     if (!row) continue;
 
-    // Skip empty rows
     if (isRowEmpty(row)) continue;
 
     for (const targetId of scopeTargetIds) {
-      // Verify target exists
       if (!targetIds.includes(targetId)) continue;
 
       cells.push({ rowIndex, targetId });
     }
   }
-
   return cells;
-};
+}
 
 /**
  * Creates a Set for fast lookup of cells being executed.

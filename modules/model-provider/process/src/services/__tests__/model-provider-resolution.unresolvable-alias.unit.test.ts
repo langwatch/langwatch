@@ -25,7 +25,7 @@ const PLAYGROUND = "prompt.create_default";
 function resolver() {
   return ModelProviderResolutionService.create({
     defaults: {
-      listForOrganization: async () => [
+      findForOrganization: async () => [
         {
           id: "config-proj-1",
           config: { DEFAULT: UNRESOLVABLE_ALIAS },
@@ -34,7 +34,7 @@ function resolver() {
           createdAt: new Date("2026-05-15T00:00:00.000Z"),
         },
       ],
-      listForProject: async () => [],
+      findForProject: async () => [],
     },
     catalog: {
       defaultFeatures: () => [

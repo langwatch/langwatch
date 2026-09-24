@@ -43,7 +43,7 @@ const col = createColumnHelper<TraceListItem>();
  * non-resizable. Its body cells are empty (no registry cell is keyed to ADD_COLUMN_ID,
  * so the registry renders nothing); only the header carries the picker trigger.
  */
-export const addColumnColumnDef: ColumnDef<TraceListItem, any> = col.display({
+export const addColumnColumnDef: ColumnDef<TraceListItem, unknown> = col.display({
   id: ADD_COLUMN_ID,
   header: () => <AddColumnHeader />,
   size: 44,

@@ -10,7 +10,7 @@ import {
   SIMULATION_PROJECTION_VERSIONS,
   type GatedVerdict,
   gatedStatus,
-  gatedVerdict,
+  computeGatedVerdict,
   runAwaitsEvaluations,
   ScenarioRunStatus,
   simulationMessageSchema,
@@ -54,7 +54,7 @@ const MAX_MESSAGE_REST_BYTES = 64 * 1024;
  * Serialise run metadata without encrypted secrets (queued event carries those).
  * `secretParameterNames` stays for readback.
  */
-function storedMetadata(metadata: Record<string, unknown> | undefined): string | null {
+function serializeStoredMetadata(metadata: Record<string, unknown> | undefined): string | null {
   if (!metadata) return null;
   const { secretParameters: _secretParameters, ...rest } = metadata;
   return JSON.stringify(rest);
@@ -259,7 +259,7 @@ function settledOnFinish({
   attachmentCount: number;
 }): { status: string; verdict: string | null } {
   if (!hasOwnEvaluations && state.Evaluations.length > 0) {
-    const gated = gatedVerdict({
+    const gated = computeGatedVerdict({
       evaluations: state.Evaluations,
       judgeVerdict: verdict ?? undefined,
     });
@@ -429,7 +429,7 @@ export class SimulationRunStateFoldProjection
       Name: event.data.name ?? null,
       Status: statusAfter({ state, candidate: "QUEUED" }),
       Description: event.data.description ?? null,
-      Metadata: storedMetadata(event.data.metadata),
+      Metadata: serializeStoredMetadata(event.data.metadata),
       QueuedAt: event.occurredAt,
     };
   }
@@ -446,7 +446,7 @@ export class SimulationRunStateFoldProjection
       ScenarioSetId: state.ScenarioSetId || event.data.scenarioSetId,
       Name: state.Name ?? event.data.name ?? null,
       Description: state.Description ?? event.data.description ?? null,
-      Metadata: state.Metadata ?? storedMetadata(event.data.metadata),
+      Metadata: state.Metadata ?? serializeStoredMetadata(event.data.metadata),
       Status: statusAfter({ state, candidate: "IN_PROGRESS" }),
       StartedAt: event.occurredAt,
     };

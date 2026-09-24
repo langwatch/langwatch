@@ -8,7 +8,7 @@
 import {
   parseTraceQuerySyntax,
   TRACE_FILTER_EXAMPLES,
-  validateAst,
+  describeAstProblem,
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
@@ -31,7 +31,7 @@ describe("given the published trace filter examples", () => {
     it.each(TRACE_FILTER_EXAMPLES.map((example) => [example.id, example.text] as const))(
       "[%s] parses, passes the save-time check and compiles",
       (_id, text) => {
-        expect(validateAst(parseTraceQuerySyntax(text))).toBeNull();
+        expect(describeAstProblem(parseTraceQuerySyntax(text))).toBeNull();
         const compiled = traceQueryRepository.translateFilter({
           queryText: text,
           tenantId: TENANT,

@@ -4,14 +4,15 @@ import {
   type AuthzBindingForSynthesis,
   type GrantsLedgerActor,
 } from "@langwatch/authz-contract";
-import {
-  SsoTestArrivalCannotCreateOrganizationError,
-  type SsoTestArrivalStanding,
-} from "@langwatch/identity-contract";
 /**
  * The organization surface the canonical contract does not carry: membership,
  * seats, role cascades, provisioning and the audit trail.
  */
+import { HandledError } from "@langwatch/handled-error";
+import {
+  SsoTestArrivalCannotCreateOrganizationError,
+  type SsoTestArrivalStanding,
+} from "@langwatch/identity-contract";
 import { generate } from "@langwatch/ksuid";
 import {
   type OrganizationAdministrator,
@@ -24,7 +25,6 @@ import {
   type User,
   CannotRemoveLastAdminError,
   CannotRemoveSelfError,
-  MemberNotFoundError,
 } from "@langwatch/organization-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 import slugify from "slugify";
@@ -173,13 +173,6 @@ export class OrganizationMembershipService {
 
   private get repo(): OrganizationMembershipRepository {
     return this.dependencies.repository;
-  }
-
-  async tryGetUserOrgRole(params: {
-    userId: string;
-    organizationId: string;
-  }): Promise<OrganizationUserRole | null> {
-    return this.repo.tryGetUserOrgRole(params);
   }
 
   async findUserOrgRoleByTeamId(params: {
@@ -368,7 +361,7 @@ export class OrganizationMembershipService {
     demoProjectUserId: string;
     demoProjectId: string;
   }): Promise<FullyLoadedOrganization[]> {
-    return this.repo.getAllForUser(params);
+    return this.repo.findAllForUser(params);
   }
 
   /**
@@ -400,7 +393,7 @@ export class OrganizationMembershipService {
    * Returns all active (non-deactivated) users in an organization.
    */
   async getAllMembers(organizationId: string): Promise<User[]> {
-    return this.repo.getAllMembers(organizationId);
+    return this.repo.findActiveMemberUsers(organizationId);
   }
 
   /** Every administrator who can still sign in, named. Both halves are read
@@ -412,7 +405,7 @@ export class OrganizationMembershipService {
     organizationId: string;
   }): Promise<OrganizationAdministrator[]> {
     const administrators = new Set(await this.repo.findActiveAdministratorIds({ organizationId }));
-    const members = await this.repo.getAllMembers(organizationId);
+    const members = await this.repo.findActiveMemberUsers(organizationId);
 
     return members
       .filter((member) => administrators.has(member.id))
@@ -451,11 +444,7 @@ export class OrganizationMembershipService {
     organizationId: string;
     userId: string;
   }): Promise<OrganizationMemberSummary & { teams: MemberTeamBinding[] }> {
-    const membership = await this.repo.tryFindMembership(params);
-    if (!membership) {
-      throw new MemberNotFoundError(params.userId);
-    }
-
+    const membership = await this.repo.getMembership(params);
     const teams = await this.repo.findMemberTeamBindings(params);
 
     return { ...membership, teams };
@@ -473,13 +462,10 @@ export class OrganizationMembershipService {
       throw new CannotRemoveSelfError();
     }
 
-    const membership = await this.repo.tryFindMembership({
+    await this.repo.getMembership({
       organizationId: params.organizationId,
       userId: params.userId,
     });
-    if (!membership) {
-      throw new MemberNotFoundError(params.userId);
-    }
 
     return this.repo.deleteMember({
       organizationId: params.organizationId,
@@ -539,7 +525,10 @@ export class OrganizationMembershipService {
     organizationId: string;
     userId: string;
   }): Promise<void> {
-    const membership = await this.repo.tryFindMembership(params);
+    const membership = await this.repo.getMembership(params).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "member_not_found") return undefined;
+      throw error;
+    });
     // Not a member, or not an administrator who can sign in: there is no
     // administrator to lose, so there is nothing to refuse.
     if (!membership) return;

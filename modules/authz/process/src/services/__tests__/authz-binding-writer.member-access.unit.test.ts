@@ -139,7 +139,7 @@ class MemberAccessStore {
       isApiKeyInOrganization: async () => true,
       findBinding: async ({ bindingId }: { bindingId: string }) =>
         this.rows.find((row) => row.id === bindingId) ?? null,
-    } as unknown as AuthzBindingRepository;
+    };
   }
 
   ledger(): AuthzCompatibilityLedger {
@@ -185,7 +185,28 @@ class MemberAccessStore {
           if (index >= 0) this.rows.splice(index, 1);
         }
       },
-    } as unknown as AuthzCompatibilityLedger;
+      attachResourceGrant: async () => {
+        throw new Error("unused");
+      },
+      revokeResourceGrants: async () => {
+        throw new Error("unused");
+      },
+      changeBindingRole: async () => {
+        throw new Error("unused");
+      },
+      revokeBindingsWhere: async () => {
+        throw new Error("unused");
+      },
+      offboardMember: async () => {
+        throw new Error("unused");
+      },
+      defineRole: async () => {
+        throw new Error("unused");
+      },
+      deleteRole: async () => {
+        throw new Error("unused");
+      },
+    };
   }
 }
 

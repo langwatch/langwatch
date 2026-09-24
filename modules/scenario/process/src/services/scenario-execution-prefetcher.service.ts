@@ -151,7 +151,7 @@ export class ScenarioExecutionPrefetcherService {
     return {
       childEnvironment: Promise.all([lookups.scenario, lookups.project])
         .then(([scenario, project]) => {
-          if (!scenario || !project.success) {
+          if (!project.success) {
             return null;
           }
 
@@ -197,18 +197,18 @@ export class ScenarioExecutionPrefetcherService {
     const { context, target } = input;
 
     return {
-      scenario: this.lookups.fetchScenario({
+      scenario: this.lookups.getScenarioExecution({
         projectId: context.projectId,
         scenarioId: context.scenarioId,
         suppliedParameters: context.parameters,
       }),
       project: this.lookups.fetchProject(context.projectId),
-      adapter: this.targets.fetch({
+      adapter: this.targets.getTargetAdapter({
         projectId: context.projectId,
         target,
         runSecretValues,
       }),
-      suite: this.lookups.fetchSuite({ setId: context.setId, projectId: context.projectId }),
+      suite: this.lookups.getRunSuite({ setId: context.setId, projectId: context.projectId }),
     };
   }
 }

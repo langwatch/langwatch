@@ -75,7 +75,7 @@ export type UseModelProviderFormState = {
   routingHandle: string;
   useApiGateway: boolean;
   customKeys: Record<string, string>;
-  displayKeys: Record<string, any>;
+  displayKeys: Record<string, unknown>;
   initialKeys: Record<string, unknown>;
   extraHeaders: ExtraHeader[];
   customModels: CustomModelEntry[];

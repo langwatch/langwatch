@@ -222,7 +222,9 @@ export function BatchEvaluationV2EvaluationResult({
 
     for (const column of evaluationResultsColumnsOrdered) {
       const isDetails = column === "details";
-      const formatEvalValue = (value: any) => {
+      const formatEvalValue = (
+        value: ExperimentRunWithItems["evaluations"][number][(typeof evalResultPreferredOrder)[number]],
+      ) => {
         if (value === false) return "false";
         if (value === true) return "true";
         return !Number.isNaN(Number(value))
@@ -235,7 +237,7 @@ export function BatchEvaluationV2EvaluationResult({
         header: titleCase(column),
         minWidth: isDetails ? 240 : 120,
         render: (row) => {
-          const evaluation = row.evaluationsForEntry[evaluator] as Record<string, any> | undefined;
+          const evaluation = row.evaluationsForEntry[evaluator];
           if (isDetails) {
             return (
               <HoverableBigText lineClamp={1} maxWidth="300px" whiteSpace="pre-wrap">
@@ -248,14 +250,14 @@ export function BatchEvaluationV2EvaluationResult({
           return formatEvalValue(evaluation?.[column]);
         },
         text: (row) => {
-          const evaluation = row.evaluationsForEntry[evaluator] as Record<string, any> | undefined;
+          const evaluation = row.evaluationsForEntry[evaluator];
           if (!isDetails && evaluation?.status === "error") return evaluation?.details ?? "Error";
           if (!isDetails && evaluation?.status === "skipped")
             return evaluation?.details ?? "Skipped";
           return `${formatEvalValue(evaluation?.[column])}`;
         },
         cellState: (row) => {
-          const evaluation = row.evaluationsForEntry[evaluator] as Record<string, any> | undefined;
+          const evaluation = row.evaluationsForEntry[evaluator];
           if (isDetails) return undefined;
           if (evaluation?.status === "error") return "error";
           if (evaluation?.status === "skipped") return "skipped";

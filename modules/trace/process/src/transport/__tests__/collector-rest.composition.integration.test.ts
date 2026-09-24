@@ -28,10 +28,10 @@ import { describe, expect, it } from "vitest";
 import { composeTraceAppDependencies } from "../../app/trace-read.composition.ts";
 import { TraceApp } from "../../app/trace.app.ts";
 import type { TraceProcessingCommands } from "../../app/trace.members.ts";
+import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { TraceBlobStoreService } from "../../services/trace-blob-store.service.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
-import { NullTraceSpanDedupAdapter } from "../../services/trace-span-dedup.service.ts";
 import { traceServer } from "../../trace.server.ts";
 import { CollectorApi, collectorRest } from "../collector.rest.ts";
 
@@ -168,7 +168,7 @@ function deployment(access: CollectorAccess = {}) {
         resolveS3Client: () => Promise.reject(new Error("no object store in this test")),
         resolveClickHouseClient: () => Promise.reject(new Error("no ClickHouse in this test")),
       }),
-      dedup: NullTraceSpanDedupAdapter.create(),
+      dedup: MemoryTraceSpanDedupRepository.create(),
       commands,
       broadcast: {
         getTenantEmitter: () => {

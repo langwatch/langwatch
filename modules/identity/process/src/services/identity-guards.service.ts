@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import {
   type AttachIdentifierCommandData,
   arrivalStateForProvider,
@@ -16,7 +17,7 @@ import {
   IdentityPrimaryMustDemoteFirstError,
   IdentityPrimaryRequiresVerifiedError,
   type IdentityFactInput,
-  identifierDomain,
+  extractIdentifierDomain,
   LINK_PROPOSED_EVENT_TYPE,
   type MarkPrimaryCommandData,
   normalizeIdentifierValue,
@@ -33,24 +34,24 @@ import type { IdentityUsersRepository } from "../repositories/identity-users.rep
 import { computeIdentifierHash } from "../rules/identifier-hash.rules.ts";
 
 /**
- * Why removing this identifier would strand the person, or null. Pure and
+ * Refuses removing an identifier that would strand the person. Pure and
  * exported so the detach guard and the Remove control share ONE answer,
  * never a screen's own drifting rule. Reads only what would be LEFT.
  */
-export function detachStrandsUser({
+export function assertDetachKeepsWayBack({
   heads,
   identifierId,
 }: {
   heads: IdentityHeads;
   identifierId: string;
-}): IdentityDetachStrandsUserError | null {
+}): void {
   const remaining = Object.values(heads.identifiers).filter(
     (candidate) =>
       candidate.identifierId !== identifierId &&
       (candidate.state === "VERIFIED" || candidate.state === "PRIMARY"),
   );
   if (remaining.length === 0) {
-    return new IdentityDetachStrandsUserError(
+    throw new IdentityDetachStrandsUserError(
       `detach_identifier: ${identifierId} is the last verified identifier for this user`,
     );
   }
@@ -58,11 +59,10 @@ export function detachStrandsUser({
   // holding only passkeys has nowhere a recovery message could reach them.
   // The remedy the screen offers is a verified email.
   if (remaining.every((candidate) => candidate.provider === "passkey")) {
-    return new IdentityDetachStrandsUserError(
+    throw new IdentityDetachStrandsUserError(
       `detach_identifier: removing ${identifierId} would leave this user with passkeys only and no recovery address`,
     );
   }
-  return null;
 }
 
 /**
@@ -176,8 +176,8 @@ export class IdentityGuardsService {
       return;
     }
 
-    const holder = await this.users.tryFindUserIdByEmail({ normalizedValue });
-    if (holder === null || holder === userId) {
+    const holders = await this.users.findUserIdsByEmail({ normalizedValue });
+    if (!holders.some((holder) => holder !== userId)) {
       return;
     }
 
@@ -217,7 +217,12 @@ export class IdentityGuardsService {
       return [];
     }
 
-    const userHashKey = await this.heads.tryFindUserHashKey({ userId });
+    const { userHashKey } = await this.heads.getUserHashKey({ userId }).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "user_not_found") {
+        return { userHashKey: null };
+      }
+      throw error;
+    });
     // Non-email providers arrive VERIFIED with no verify ceremony to re-check them, so the
     // attach itself is where a cross-user race resolves — and the address lock is what resolves
     // it, atomically. The loser arrives ATTACHED and dead-ends in the same emission, which is
@@ -245,7 +250,7 @@ export class IdentityGuardsService {
         value: normalizedValue,
         identifierHash:
           userHashKey === null ? null : computeIdentifierHash({ userHashKey, normalizedValue }),
-        domain: identifierDomain(normalizedValue),
+        domain: extractIdentifierDomain(normalizedValue),
         connectionId: null,
         state,
         actor,
@@ -299,9 +304,13 @@ export class IdentityGuardsService {
     const holder =
       head.value === null
         ? null
-        : await this.heads.tryFindActiveIdentifierByValue({
-            normalizedValue: head.value,
-          });
+        : await this.heads
+            .getActiveIdentifierByValue({ normalizedValue: head.value })
+            .catch((error: unknown) => {
+              if (HandledError.isHandled(error) && error.code === "identity_identifier_not_found")
+                return null;
+              throw error;
+            });
     if (holder && holder.userId !== userId) {
       throw new IdentityEmailInUseError(
         "verify_identifier: another user already holds this address as a proven identifier",
@@ -387,8 +396,7 @@ export class IdentityGuardsService {
     // are actually usable: detaching an unverified address strands nobody,
     // because nobody could have signed in with it.
     if (head.state === "VERIFIED") {
-      const strands = detachStrandsUser({ heads, identifierId });
-      if (strands) throw strands;
+      assertDetachKeepsWayBack({ heads, identifierId });
     }
 
     return [{ type: IDENTIFIER_DETACHED_EVENT_TYPE, data: { identifierId, actor } }];
@@ -423,7 +431,7 @@ export class IdentityGuardsService {
           provider,
           providerAccountId,
           value: normalizedValue,
-          domain: identifierDomain(normalizedValue),
+          domain: extractIdentifierDomain(normalizedValue),
           reason,
           actor,
         },

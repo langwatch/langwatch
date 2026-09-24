@@ -92,8 +92,8 @@ export function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
     sizeBytes: row.sizeBytes ?? 0,
     input: row.computedInput,
     output: row.computedOutput,
-    inputMediaRefs: presentMediaRefs(row.attributes[RESERVED_INPUT_MEDIA_REFS]),
-    outputMediaRefs: presentMediaRefs(row.attributes[RESERVED_OUTPUT_MEDIA_REFS]),
+    inputMediaRefs: parsePresentMediaRefs(row.attributes[RESERVED_INPUT_MEDIA_REFS]),
+    outputMediaRefs: parsePresentMediaRefs(row.attributes[RESERVED_OUTPUT_MEDIA_REFS]),
     error: row.errorMessage,
     conversationId: row.attributes["gen_ai.conversation.id"] ?? null,
     userId: row.attributes["langwatch.user_id"] ?? null,
@@ -163,7 +163,7 @@ export function cursorForTraceRow(
 }
 
 /** Parsed refs, or undefined so media-free rows serialize without the field. */
-function presentMediaRefs(serialized: string | undefined): TraceMediaRef[] | undefined {
+function parsePresentMediaRefs(serialized: string | undefined): TraceMediaRef[] | undefined {
   const refs = parseMediaRefs(serialized);
 
   return refs.length > 0 ? refs : undefined;

@@ -22,7 +22,13 @@ import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import { allModelOptions } from "@langwatch/model-provider-browser-kit";
 import React, { useMemo } from "react";
 import { Info, Plus, Trash2, X } from "react-feather";
-import { Controller, type FieldErrors, useFieldArray, useFormContext } from "react-hook-form";
+import {
+  Controller,
+  type ControllerRenderProps,
+  type FieldErrors,
+  useFieldArray,
+  useFormContext,
+} from "react-hook-form";
 import { type ZodType, z } from "zod";
 
 import { ModelSelector } from "../../../behavior/lent-model-provider.tsx";
@@ -36,7 +42,7 @@ const EvaluatorModelSelector = ({
   variant,
 }: {
   selectorOptions: string[];
-  field: any;
+  field: Pick<ControllerRenderProps, "value" | "onChange">;
   fieldName: string;
   variant: string;
 }) => (
@@ -151,6 +157,68 @@ const MetricToggleField = ({
   );
 };
 
+function defaultArrayElementValues(element: ZodType) {
+  return element instanceof z.ZodObject
+    ? Object.fromEntries(
+        Object.entries(element.shape).flatMap(([key, value]) => {
+          if (value instanceof z.ZodUnion && value.options.length > 0) {
+            const firstOption = value.options[0];
+            if (firstOption instanceof z.ZodLiteral) {
+              return [[key, firstOption.value]];
+            }
+          }
+
+          return [];
+        }),
+      )
+    : {};
+}
+
+const isSelectLiteral = (value: z.util.Literal): value is string | number =>
+  typeof value === "string" || typeof value === "number";
+
+function selectOptionsFor(schema: ZodType): { value: string | number }[] {
+  if (schema instanceof z.ZodUnion) {
+    return schema.options.flatMap((option) =>
+      option instanceof z.ZodLiteral
+        ? [...option.values].filter(isSelectLiteral).map((value) => ({ value }))
+        : [],
+    );
+  }
+  if (schema instanceof z.ZodLiteral) {
+    return [...schema.values].filter(isSelectLiteral).map((value) => ({ value }));
+  }
+  return allModelOptions.map((option) => ({ value: option }));
+}
+
+function compositeLlmConfigField({
+  variant,
+  prefix,
+}: {
+  variant: "default" | "studio";
+  prefix: string;
+}) {
+  if (variant === "studio") {
+    return (
+      <VStack key="llm-config" as="form" align="start" gap={3} width="full">
+        <HStack width="full">
+          <PropertySectionTitle>Model</PropertySectionTitle>
+        </HStack>
+        <Field.Root>
+          <EvaluatorLLMConfigField prefix={prefix} />
+        </Field.Root>
+      </VStack>
+    );
+  }
+  return (
+    <React.Fragment key="llm-config">
+      <HorizontalFormControl label="Model" tooltip="The model to use for evaluation">
+        <EvaluatorLLMConfigField prefix={prefix} />
+      </HorizontalFormControl>
+    </React.Fragment>
+  );
+}
+
 // Separate component for array fields to handle useFieldArray hook
 const ArrayField = <T extends EvaluatorTypes>({
   fieldSchema,
@@ -180,24 +248,12 @@ const ArrayField = <T extends EvaluatorTypes>({
   });
 
   // Cast to ZodArray to access element property
-  const arraySchema = fieldSchema as z.ZodArray<any>;
+  const arraySchema = fieldSchema as z.ZodArray<ZodType>;
 
-  const defaultValues = useMemo(() => {
-    return arraySchema.element instanceof z.ZodObject
-      ? Object.fromEntries(
-          Object.entries(arraySchema.element.shape).flatMap(([key, value]) => {
-            if (value instanceof z.ZodUnion && value.options.length > 0) {
-              const firstOption = value.options[0];
-              if (firstOption instanceof z.ZodLiteral) {
-                return [[key, firstOption.value]];
-              }
-            }
-
-            return [];
-          }),
-        )
-      : {};
-  }, [arraySchema.element]);
+  const defaultValues = useMemo(
+    () => defaultArrayElementValues(arraySchema.element),
+    [arraySchema.element],
+  );
 
   return (
     <VStack align="start" width="full">
@@ -315,6 +371,7 @@ const DynamicZodForm = ({
     const fieldSchema_ = fieldSchema instanceof z.ZodOptional ? fieldSchema.unwrap() : fieldSchema;
 
     const fieldKey = fieldName.split(".").reverse()[0] ?? "";
+    const isModelFieldName = fieldName === "model" || fieldName === "embeddings_model";
 
     if (fieldSchema_ instanceof z.ZodDefault) {
       const innerSchema = fieldSchema_.unwrap();
@@ -372,21 +429,9 @@ const DynamicZodForm = ({
     } else if (
       fieldSchema_ instanceof z.ZodUnion ||
       fieldSchema_ instanceof z.ZodLiteral ||
-      (fieldSchema_ instanceof z.ZodString &&
-        (fieldName === "model" || fieldName === "embeddings_model"))
+      (fieldSchema_ instanceof z.ZodString && isModelFieldName)
     ) {
-      const isSelectLiteral = (value: z.util.Literal): value is string | number =>
-        typeof value === "string" || typeof value === "number";
-      const options: { value: string | number }[] =
-        fieldSchema_ instanceof z.ZodUnion
-          ? fieldSchema_.options.flatMap((option) =>
-              option instanceof z.ZodLiteral
-                ? [...option.values].filter(isSelectLiteral).map((value) => ({ value }))
-                : [],
-            )
-          : fieldSchema_ instanceof z.ZodLiteral
-            ? [...fieldSchema_.values].filter(isSelectLiteral).map((value) => ({ value }))
-            : allModelOptions.map((option) => ({ value: option }));
+      const options = selectOptionsFor(fieldSchema_);
       if (
         (fieldName === "model" || fieldName === "embeddings_model") &&
         evaluator?.name !== "OpenAI Moderation"
@@ -423,7 +468,7 @@ const DynamicZodForm = ({
               <NativeSelect.Field
                 {...field}
                 onChange={(e) => {
-                  const literalValues = options.map((option: any) => option.value);
+                  const literalValues = options.map((option) => option.value);
 
                   if (e.target.value === "") {
                     field.onChange(undefined);
@@ -434,7 +479,9 @@ const DynamicZodForm = ({
                   }
                 }}
               >
-                {fieldSchema instanceof z.ZodOptional && <option value=""></option>}
+                {fieldSchema instanceof z.ZodOptional && (
+                  <option value="" aria-label="None"></option>
+                )}
                 {options.map((option, index) => (
                   <option key={index} value={option.value}>
                     {option.value}
@@ -458,8 +505,7 @@ const DynamicZodForm = ({
       // and over-fits to large open-ended arrays.
       const element = fieldSchema_.element;
       const isLiteralUnion =
-        element instanceof z.ZodUnion &&
-        element.options.every((o: any) => o instanceof z.ZodLiteral);
+        element instanceof z.ZodUnion && element.options.every((o) => o instanceof z.ZodLiteral);
       if (fieldKey === "include_metrics" && isLiteralUnion) {
         const options = (element.options as z.ZodLiteral<string>[]).map((o) => o.value);
         return <MetricToggleField fieldName={fullPath} options={options} variant={variant} />;
@@ -518,24 +564,9 @@ const DynamicZodForm = ({
         : keys;
 
       // Render the composite LLM config field (if applicable)
-      const compositeField = shouldUseCompositeField ? (
-        variant === "studio" ? (
-          <VStack key="llm-config" as="form" align="start" gap={3} width="full">
-            <HStack width="full">
-              <PropertySectionTitle>Model</PropertySectionTitle>
-            </HStack>
-            <Field.Root>
-              <EvaluatorLLMConfigField prefix={prefix} />
-            </Field.Root>
-          </VStack>
-        ) : (
-          <React.Fragment key="llm-config">
-            <HorizontalFormControl label="Model" tooltip="The model to use for evaluation">
-              <EvaluatorLLMConfigField prefix={prefix} />
-            </HorizontalFormControl>
-          </React.Fragment>
-        )
-      ) : null;
+      const compositeField = shouldUseCompositeField
+        ? compositeLlmConfigField({ variant, prefix })
+        : null;
 
       // Render remaining fields
       const renderedFields = fieldsToRender

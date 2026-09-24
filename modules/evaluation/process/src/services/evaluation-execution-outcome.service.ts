@@ -2,7 +2,7 @@ import type {
   EvaluationProcessingEvent,
   ExecuteEvaluationCommandData,
 } from "@langwatch/evaluation-contract";
-import { verdictPassedOf, verdictScoreOf } from "@langwatch/evaluation-contract";
+import { deriveVerdictPassed, deriveVerdictScore } from "@langwatch/evaluation-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
@@ -79,8 +79,8 @@ export class EvaluationExecutionOutcomeService {
       return [];
     }
 
-    const score = verdictScoreOf(result) ?? void 0;
-    const passed = verdictPassedOf(result) ?? void 0;
+    const score = deriveVerdictScore(result) ?? void 0;
+    const passed = deriveVerdictPassed(result) ?? void 0;
     const label = result.status === "processed" ? result.label : void 0;
     const details = result.status === "error" ? void 0 : result.details;
     const resultError =

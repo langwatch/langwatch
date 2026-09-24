@@ -183,7 +183,7 @@ export function SelectableIconCard(props: SelectableIconCardProps): React.ReactE
         h={cardSize}
         flexShrink={0}
         borderRadius="lg"
-        borderWidth={isDark ? "1px" : selected ? "2px" : "1px"}
+        borderWidth={cardBorderWidth({ isDark, selected })}
         borderStyle="solid"
         borderColor={selected ? selectedBorderColor : "border.subtle"}
         bg={selected ? selectedBg : "bg.panel"}
@@ -194,7 +194,7 @@ export function SelectableIconCard(props: SelectableIconCardProps): React.ReactE
         transition="all 0.2s ease"
         _hover={{
           borderColor: selected ? hoverSelectedBorder : "border.emphasized",
-          bg: selected ? selectedBg : isDark ? "bg.muted" : "gray.50",
+          bg: selected ? selectedBg : unselectedHoverBg(isDark),
           boxShadow: selected ? selectedShadow : "sm",
           transform: "translateY(-1px)",
         }}
@@ -223,4 +223,13 @@ export function SelectableIconCard(props: SelectableIconCardProps): React.ReactE
       </Box>
     </Tooltip>
   );
+}
+
+function cardBorderWidth({ isDark, selected }: { isDark: boolean; selected: boolean }): string {
+  if (isDark) return "1px";
+  return selected ? "2px" : "1px";
+}
+
+function unselectedHoverBg(isDark: boolean): string {
+  return isDark ? "bg.muted" : "gray.50";
 }

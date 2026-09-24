@@ -51,8 +51,7 @@ function fromSerializedPayload(err: unknown): HandledErrorShape | null {
   if (!isRecord(err)) return null;
   if (typeof err.httpStatus !== "number") return null;
 
-  const code =
-    typeof err.code === "string" ? err.code : typeof err.kind === "string" ? err.kind : null;
+  const code = str(err.code) ?? str(err.kind) ?? null;
   if (code === null) return null;
   if (!KNOWN_CODES.has(code) && !SLUG_SHAPED.test(code)) return null;
 
@@ -162,12 +161,7 @@ function fromTrpcEnvelope(err: unknown): HandledErrorShape | null {
   // `kind` is the deprecated pre-`HandledError` discriminant — read it as a
   // fallback so a payload from an older server (or an older client reading a
   // newer server) still resolves during the transition.
-  const code =
-    typeof candidate.code === "string"
-      ? candidate.code
-      : typeof candidate.kind === "string"
-        ? candidate.kind
-        : null;
+  const code = str(candidate.code) ?? str(candidate.kind) ?? null;
   if (code === null) return null;
   if (typeof candidate.httpStatus !== "number") return null;
 
@@ -200,15 +194,7 @@ function fromRestBody(err: unknown): HandledErrorShape | null {
 
   return {
     code,
-    // The flat body carries no status of its own — it IS the HTTP status, which
-    // lives on the response rather than in it. Read one if a fetch wrapper
-    // stamped it; nothing in the presentation layer needs it either way.
-    httpStatus:
-      typeof err.httpStatus === "number"
-        ? err.httpStatus
-        : typeof err.status === "number"
-          ? err.status
-          : 0,
+    httpStatus: stampedStatus(err),
     meta: restMeta(err),
     fault: safeFault(err.fault),
     retryable: err.retryable === true,

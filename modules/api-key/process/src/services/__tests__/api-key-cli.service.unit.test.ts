@@ -6,17 +6,38 @@ import { fromDate } from "@langwatch/time";
  */
 import { describe, expect, it, vi } from "vitest";
 
-import type { ApiKeyRepository, StoredApiKey } from "../../repositories/api-key.repository.ts";
+import type { StoredApiKey } from "../../repositories/api-key.repository.ts";
+import { MemoryApiKeyDatabase } from "../../repositories/memory/memory.api-key.database.ts";
+import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key.repository.ts";
 import { ApiKeyCliService } from "../api-key-cli.service.ts";
 import type { ApiKeyGrantPolicyService } from "../api-key-grant-policy.service.ts";
 import type { ApiKeyLifecycleService } from "../api-key-lifecycle.service.ts";
 
-const OLD_KEY = {
-  id: "apikey-old",
-  name: "CLI login - laptop",
-  createdByDeviceLabel: "laptop",
-  createdAt: new Date("2026-01-01T00:00:00Z"),
-} as unknown as StoredApiKey;
+function loginKey(overrides: Pick<StoredApiKey, "id" | "createdAt">): StoredApiKey {
+  return {
+    name: "CLI login - laptop",
+    description: null,
+    organizationId: "org_1",
+    userId: "user_1",
+    createdByUserId: "user_1",
+    createdByDeviceLabel: "laptop",
+    parentApiKeyId: null,
+    lookupId: "lookup",
+    permissionMode: "all",
+    expiresAt: null,
+    revokedAt: null,
+    revocationCause: null,
+    lastUsedAt: null,
+    ingestSourceType: null,
+    ingestionTemplateId: null,
+    updatedAt: overrides.createdAt,
+    roleBindings: [],
+    hashedSecret: "hashed",
+    ...overrides,
+  };
+}
+
+const OLD_KEY = loginKey({ id: "apikey-old", createdAt: new Date("2026-01-01T00:00:00Z") });
 
 function serviceWith(options: {
   listForUser?: () => Promise<StoredApiKey[]>;
@@ -33,10 +54,13 @@ function serviceWith(options: {
   };
   create.mockResolvedValue({ token: "sk-lw-minted", apiKey: created });
 
-  const repository = {
-    listForUser: options.listForUser ?? (() => Promise.resolve([])),
-    extendLoginKeyExpiry,
-  } as unknown as ApiKeyRepository;
+  const repository = Object.assign(
+    MemoryApiKeyRepository.create({ memory: MemoryApiKeyDatabase.create() }),
+    {
+      listForUser: options.listForUser ?? (() => Promise.resolve([])),
+      extendLoginKeyExpiry,
+    },
+  );
 
   const lifecycle = {
     create,
@@ -106,24 +130,18 @@ describe("given a CLI login key mint", () => {
   describe("when two logins for one device label race", () => {
     /** @scenario "two logins racing on one device leave the newer key alive" */
     it("revokes only the keys created before its own mint", async () => {
-      const staleKey = {
+      const staleKey = loginKey({
         id: "apikey-stale",
-        name: "CLI login - laptop",
-        createdByDeviceLabel: "laptop",
         createdAt: new Date("2025-12-31T00:00:00Z"),
-      } as unknown as StoredApiKey;
-      const firstKey = {
+      });
+      const firstKey = loginKey({
         id: "apikey-first",
-        name: "CLI login - laptop",
-        createdByDeviceLabel: "laptop",
         createdAt: new Date("2026-01-01T00:00:00Z"),
-      } as unknown as StoredApiKey;
-      const secondKey = {
+      });
+      const secondKey = loginKey({
         id: "apikey-second",
-        name: "CLI login - laptop",
-        createdByDeviceLabel: "laptop",
         createdAt: new Date("2026-01-01T00:00:05Z"),
-      } as unknown as StoredApiKey;
+      });
 
       const { service, revoke } = serviceWith({
         listForUser: () => Promise.resolve([staleKey, firstKey, secondKey]),

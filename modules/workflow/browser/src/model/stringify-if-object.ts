@@ -3,7 +3,7 @@
  * @param value - The value to stringify if it is an object.
  * @returns The value as a string.
  */
-export const stringifyIfObject = (value: any) => {
+export const stringifyIfObject = (value: unknown) => {
   if (typeof value === "object") {
     return JSON.stringify(value);
   }

@@ -94,74 +94,75 @@ const DEEPSEEK_R1: ReasoningConfig = {
   canDisable: false,
 };
 
+/** Ordered: the first rule whose model-id test matches decides the configuration. */
+const REASONING_RULES: readonly { matches: (id: string) => boolean; config: ReasoningConfig }[] = [
+  {
+    matches: (id) => id.includes("openai/") && includesAny(id, ["gpt-5-pro", "gpt-5.2-pro"]),
+    config: OPENAI_GPT5_PRO,
+  },
+  {
+    matches: (id) => id.includes("openai/") && includesAny(id, ["gpt-5.2", "gpt-5.3"]),
+    config: OPENAI_GPT52,
+  },
+  {
+    matches: (id) => id.includes("openai/") && id.includes("gpt-5.1-codex-max"),
+    config: OPENAI_GPT51_CODEX_MAX,
+  },
+  { matches: (id) => id.includes("openai/") && id.includes("gpt-5.1"), config: OPENAI_GPT51 },
+  {
+    matches: (id) => id.includes("openai/") && id.includes("gpt-5") && !id.includes("gpt-5."),
+    config: OPENAI_O_SERIES,
+  },
+  {
+    matches: (id) => id.includes("openai/") && includesAny(id, ["/o1", "/o3"]),
+    config: OPENAI_O_SERIES,
+  },
+  {
+    matches: (id) =>
+      id.includes("anthropic/") && includesAny(id, ["claude-opus-4", "claude-4", "claude-5"]),
+    config: ANTHROPIC_CLAUDE_OPUS_45,
+  },
+  {
+    matches: (id) => includesAny(id, ["gemini/", "google/"]) && id.includes("gemini-3"),
+    config: GEMINI_3,
+  },
+  {
+    matches: (id) => includesAny(id, ["gemini/", "google/"]) && id.includes("gemini-2.5-pro"),
+    config: GEMINI_25_PRO,
+  },
+  {
+    matches: (id) => includesAny(id, ["gemini/", "google/"]) && id.includes("gemini-2.5-flash"),
+    config: GEMINI_25_FLASH,
+  },
+  {
+    matches: (id) => includesAny(id, ["xai/", "x-ai/"]) && id.includes("grok-3-mini"),
+    config: XAI_GROK3_MINI,
+  },
+  {
+    matches: (id) => id.includes("deepseek/") && includesAny(id, ["-r1", "reasoner"]),
+    config: DEEPSEEK_R1,
+  },
+];
+
 /** Reasoning configuration for a model id, or undefined if it takes none. */
-export function getReasoningConfig(modelId: string): ReasoningConfig | undefined {
+export function pickReasoningConfig(modelId: string): ReasoningConfig | undefined {
   const lowerModelId = modelId.toLowerCase();
-
-  if (lowerModelId.includes("openai/")) {
-    if (lowerModelId.includes("gpt-5-pro") || lowerModelId.includes("gpt-5.2-pro")) {
-      return OPENAI_GPT5_PRO;
-    }
-    if (lowerModelId.includes("gpt-5.2") || lowerModelId.includes("gpt-5.3")) {
-      return OPENAI_GPT52;
-    }
-    if (lowerModelId.includes("gpt-5.1-codex-max")) {
-      return OPENAI_GPT51_CODEX_MAX;
-    }
-    if (lowerModelId.includes("gpt-5.1")) {
-      return OPENAI_GPT51;
-    }
-    if (lowerModelId.includes("gpt-5") && !lowerModelId.includes("gpt-5.")) {
-      return OPENAI_O_SERIES;
-    }
-    if (lowerModelId.includes("/o1") || lowerModelId.includes("/o3")) {
-      return OPENAI_O_SERIES;
-    }
-  }
-
-  const isLongThinkingClaude = includesAny(lowerModelId, ["claude-opus-4", "claude-4", "claude-5"]);
-  if (lowerModelId.includes("anthropic/") && isLongThinkingClaude) {
-    return ANTHROPIC_CLAUDE_OPUS_45;
-  }
-
-  if (lowerModelId.includes("gemini/") || lowerModelId.includes("google/")) {
-    if (lowerModelId.includes("gemini-3")) {
-      return GEMINI_3;
-    }
-    if (lowerModelId.includes("gemini-2.5-pro") || lowerModelId.includes("gemini-2.5-pro-")) {
-      return GEMINI_25_PRO;
-    }
-    if (lowerModelId.includes("gemini-2.5-flash") || lowerModelId.includes("gemini-2.5-flash-")) {
-      return GEMINI_25_FLASH;
-    }
-  }
-
-  const isXai = includesAny(lowerModelId, ["xai/", "x-ai/"]);
-  if (isXai && lowerModelId.includes("grok-3-mini")) {
-    return XAI_GROK3_MINI;
-  }
-
-  const isDeepseekReasoner = includesAny(lowerModelId, ["-r1", "reasoner"]);
-  if (lowerModelId.includes("deepseek/") && isDeepseekReasoner) {
-    return DEEPSEEK_R1;
-  }
-
-  return undefined;
+  return REASONING_RULES.find((rule) => rule.matches(lowerModelId))?.config;
 }
 
 /** Whether a model takes a reasoning parameter at all. */
 export function supportsReasoning(modelId: string): boolean {
-  return getReasoningConfig(modelId) !== undefined;
+  return pickReasoningConfig(modelId) !== undefined;
 }
 
 /** Allowed reasoning-effort values for a model, or empty if it takes none. */
 export function getAllowedReasoningValues(modelId: string): readonly ReasoningEffortOption[] {
-  return getReasoningConfig(modelId)?.allowedValues ?? [];
+  return pickReasoningConfig(modelId)?.allowedValues ?? [];
 }
 
 /** Default reasoning effort for a model, or undefined if it takes none. */
-export function getDefaultReasoningEffort(modelId: string): ReasoningEffortOption | undefined {
-  return getReasoningConfig(modelId)?.defaultValue;
+export function pickDefaultReasoningEffort(modelId: string): ReasoningEffortOption | undefined {
+  return pickReasoningConfig(modelId)?.defaultValue;
 }
 
 function includesAny(text: string, needles: readonly string[]): boolean {

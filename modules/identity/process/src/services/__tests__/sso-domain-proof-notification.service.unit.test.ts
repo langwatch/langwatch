@@ -1,5 +1,6 @@
 /** @vitest-environment node */
 
+import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { SsoDomainProofMail } from "../../app/identity.members.ts";
@@ -27,7 +28,7 @@ function audience() {
       "ana@acme.example",
       "bo@acme.example",
     ]),
-    tryFindOrganizationName: vi.fn<SsoDomainProofAudience["tryFindOrganizationName"]>(
+    getOrganizationName: vi.fn<SsoDomainProofAudience["getOrganizationName"]>(
       async () => "Acme Corp",
     ),
   };
@@ -101,7 +102,7 @@ describe("who is told a domain's proof went missing", () => {
     it("names the organization something when its row no longer does", async () => {
       const sent = mail();
       const reads = audience();
-      reads.tryFindOrganizationName.mockResolvedValue(null);
+      reads.getOrganizationName.mockRejectedValue(new OrganizationNotFoundError("org-1"));
       const service = SsoDomainProofNotificationService.create({ audience: reads, mail: sent });
 
       await service.proofWavering(WAVERING);

@@ -23,12 +23,13 @@ const ROOT = "/work/acme";
 const HOME = "/home/dev";
 
 /** `/work/acme/outside-link` is a symlink to `/work/other`. */
-const realpath = (target: string): string =>
-  target === `${ROOT}/outside-link`
-    ? "/work/other"
-    : target.startsWith(`${ROOT}/outside-link/`)
-      ? target.replace(`${ROOT}/outside-link`, "/work/other")
-      : target;
+const realpath = (target: string): string => {
+  if (target === `${ROOT}/outside-link`) return "/work/other";
+  if (target.startsWith(`${ROOT}/outside-link/`)) {
+    return target.replace(`${ROOT}/outside-link`, "/work/other");
+  }
+  return target;
+};
 
 const at = (
   call: LocalToolCall,

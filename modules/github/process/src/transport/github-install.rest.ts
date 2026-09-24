@@ -27,9 +27,6 @@ import { resolveRequestBound } from "@langwatch/plans";
 import { nowInstant } from "@langwatch/time";
 import { HTTPException } from "hono/http-exception";
 
-/** Who is signed in, as this process resolves a browser session. */
-export type GithubInstallSession = Readonly<{ user: Readonly<{ id: string }> }>;
-
 /**
  * What the installation flow reaches. The GitHub capability is this module's;
  * the session, the organization-management answer, the audit trail and the
@@ -38,12 +35,8 @@ export type GithubInstallSession = Readonly<{ user: Readonly<{ id: string }> }>;
 export interface GithubInstallApi {
   /** The SAME capability the `github.*` procedures read. */
   github(): GithubApi;
-  /**
-   * The browser session behind this request. An operation the handler CALLS
-   * rather than a declared fact: an instance that registered no App answers
-   * 503 before it reads a session at all, and a fact resolves first.
-   */
-  resolveSession(input: { request: Request }): Promise<GithubInstallSession | null>;
+  /** Whether the person who started the flow is the one signed in on this request. */
+  isSignedInAs(input: { request: Request; userId: string }): Promise<boolean>;
   /**
    * Whether this person may connect GitHub for that organization. Connecting
    * grants repository access to the whole organization, so it takes
@@ -335,7 +328,7 @@ async function completeInstallation({
 }): Promise<GithubAnswer> {
   const service = app.github();
   const query = queryOf(request);
-  const state = service.verifyInstallState(query.get("state"));
+  const state = service.parseInstallState(query.get("state"));
   const installationId = query.get("installation_id");
 
   if (!state || !installationId) {
@@ -347,9 +340,9 @@ async function completeInstallation({
     });
   }
 
-  const rejection = await rejectUnauthorizedSetup({ app, request, state });
+  const setup = await rejectUnauthorizedSetup({ app, request, state });
 
-  if (rejection) return rejection;
+  if (setup.rejected) return setup.answer;
 
   return recordInstallation({ app, state, installationId });
 }
@@ -404,7 +397,7 @@ async function recordInstallation({
 
 /**
  * Every re-check standing between `/install` and GitHub's redirect back here.
- * Answers the response that rejects the flow, or null to let it proceed.
+ * Answers the response that rejects the flow, or that the flow may proceed.
  */
 async function rejectUnauthorizedSetup({
   app,
@@ -414,20 +407,18 @@ async function rejectUnauthorizedSetup({
   app: GithubInstallApi;
   request: Request;
   state: GithubInstallStatePayload;
-}): Promise<GithubAnswer | null> {
+}): Promise<{ rejected: true; answer: GithubAnswer } | { rejected: false }> {
   // Re-bind the session to the state's user.
-  const session = await app.resolveSession({ request });
-
-  if (!session?.user || session.user.id !== state.userId) {
-    return setupError({ app, state, errorMessage: "Session changed mid-flow", status: 401 });
+  if (!(await app.isSignedInAs({ request, userId: state.userId }))) {
+    return rejectWith({ app, state, errorMessage: "Session changed mid-flow", status: 401 });
   }
 
   // Burn the single-use nonce (skipped when Redis was down at `/install`).
   if (state.nonceRegistered) {
     const consumed = await app.github().consumeInstallNonce(state.nonce);
 
-    if (consumed === false) {
-      return setupError({
+    if (consumed === "spent") {
+      return rejectWith({
         app,
         state,
         errorMessage: "Installation link already used",
@@ -443,7 +434,7 @@ async function rejectUnauthorizedSetup({
   });
 
   if (!isMember) {
-    return setupError({
+    return rejectWith({
       app,
       state,
       errorMessage: "Not a member of this organization",
@@ -458,9 +449,17 @@ async function rejectUnauthorizedSetup({
     organizationId: state.organizationId,
   });
 
-  if (!canManage) return setupError({ app, state, errorMessage: "Forbidden", status: 403 });
+  if (!canManage) return rejectWith({ app, state, errorMessage: "Forbidden", status: 403 });
 
-  return null;
+  return { rejected: false };
+}
+
+/** A setup rejection carrying the error answer for the flow's mode. */
+function rejectWith(input: Parameters<typeof setupError>[0]): {
+  rejected: true;
+  answer: GithubAnswer;
+} {
+  return { rejected: true, answer: setupError(input) };
 }
 
 /** The setup error path, worded the same way in popup and redirect modes. */
@@ -493,7 +492,7 @@ type BlockedInstallationClaim = Readonly<{
  * The refused claim behind a failure, or null when the failure was not one.
  * Each guard names its own audit action, so the three refusals are told apart.
  */
-function blockedClaimOf(err: unknown): BlockedInstallationClaim | null {
+function classifyBlockedClaim(err: unknown): BlockedInstallationClaim | null {
   if (err instanceof GithubInstallationConflictError) {
     return { action: "github.connection.install.rejected_cross_tenant", ...claimOf(err) };
   }
@@ -533,7 +532,7 @@ async function reportInstallationFailure({
   app: GithubInstallApi;
   state: GithubInstallStatePayload;
 }): Promise<void> {
-  const claim = blockedClaimOf(err);
+  const claim = classifyBlockedClaim(err);
 
   if (!claim) {
     logger.warn({ err }, "github installation record failed");

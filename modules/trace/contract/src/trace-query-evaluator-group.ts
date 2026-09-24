@@ -41,7 +41,7 @@ export interface EvaluatorGroup {
   score: ScoreSub | null;
 }
 
-function tagFieldName(node: TagToken): string | null {
+function extractTagFieldName(node: TagToken): string | null {
   if (node.field.type === "ImplicitField") {
     return null;
   }
@@ -88,7 +88,7 @@ function findGroupNode(ast: LiqeQuery, evaluatorId: string): LiqeQuery | null {
 function groupContainsEvaluator(node: LiqeQuery, evaluatorId: string): boolean {
   if (node.type === "Tag") {
     return (
-      tagFieldName(node) === EVALUATOR_FIELD &&
+      extractTagFieldName(node) === EVALUATOR_FIELD &&
       node.expression.type === "LiteralExpression" &&
       String(node.expression.value) === evaluatorId
     );
@@ -106,7 +106,7 @@ function groupContainsEvaluator(node: LiqeQuery, evaluatorId: string): boolean {
 }
 
 /** The score bound a `score:[a TO b]` / `score:>n` sub-condition names, or none. */
-function readScoreBound(
+function parseScoreBound(
   tag: Extract<LiqeQuery, { type: "Tag" }>,
 ): { from?: number; to?: number } | null {
   if (tag.expression.type === "RangeExpression") {
@@ -130,7 +130,7 @@ function readSubCondition(
   negated: boolean,
   group: EvaluatorGroup,
 ): void {
-  const field = tagFieldName(tag);
+  const field = extractTagFieldName(tag);
   if (!field) return;
 
   if (CATEGORICAL_SUB_FIELDS.has(field)) {
@@ -141,7 +141,7 @@ function readSubCondition(
 
   if (field !== EVALUATOR_SCORE_FIELD || negated) return;
 
-  const score = readScoreBound(tag);
+  const score = parseScoreBound(tag);
   if (score) group.score = score;
 }
 
@@ -170,7 +170,7 @@ export function readEvaluatorGroupFromAst(ast: LiqeQuery, evaluatorId: string): 
       return;
     }
     const isEvaluatorAnchor =
-      tagFieldName(tag) === EVALUATOR_FIELD &&
+      extractTagFieldName(tag) === EVALUATOR_FIELD &&
       tag.expression.type === "LiteralExpression" &&
       String(tag.expression.value) === evaluatorId;
     if (isEvaluatorAnchor) {
@@ -252,7 +252,7 @@ function stripGroup(ast: LiqeQuery, evaluatorId: string): LiqeQuery {
     }
     // Also drop any bare (ungrouped) anchor for this evaluator.
     const isBareEvaluatorAnchor =
-      tagFieldName(n) === EVALUATOR_FIELD &&
+      extractTagFieldName(n) === EVALUATOR_FIELD &&
       n.expression.type === "LiteralExpression" &&
       String(n.expression.value) === evaluatorId;
     if (isBareEvaluatorAnchor) {

@@ -5,13 +5,16 @@
  * Spec: specs/projects/projects-management-door.feature
  */
 import type { ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
+import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { LocalFeatureApis, ResourceScope } from "@langwatch/kernel";
+import { LangyApi } from "@langwatch/langy-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { ShareApi } from "@langwatch/share-contract";
 import { TopicApi } from "@langwatch/topic-contract";
+import { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { ProjectApp } from "../../app/project.app.ts";
@@ -34,12 +37,18 @@ function unreachablePeers() {
   apis.declare(ShareApi);
   apis.declare(TopicApi);
   apis.declare(AuthzApi);
+  apis.declare(TraceApi);
+  apis.declare(AuditLogApi);
+  apis.declare(LangyApi);
 
   return {
     organizations: apis.reference(OrganizationApi),
     share: apis.reference(ShareApi),
     topics: apis.reference(TopicApi),
     authorization: apis.reference(AuthzApi),
+    trace: apis.reference(TraceApi),
+    auditLog: apis.reference(AuditLogApi),
+    langy: apis.reference(LangyApi),
   };
 }
 

@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   createCheckoutLineItems,
   isGrowthInstantEvalPriceProvisioned,
-  resolveGrowthInstantEvalPriceId,
+  pickGrowthInstantEvalPriceId,
   type StripePriceMap,
 } from "../index.ts";
 
@@ -60,10 +60,10 @@ describe("given a Stripe mode where the Instant Evals price is provisioned", () 
 
   describe("when the price is asked for directly", () => {
     it("answers for dollars, refuses for euros, and reports the mode provisioned", () => {
-      expect(resolveGrowthInstantEvalPriceId({ currency: "USD", prices })).toBe(
+      expect(pickGrowthInstantEvalPriceId({ currency: "USD", prices })).toBe(
         "price_instant_eval_usd",
       );
-      expect(resolveGrowthInstantEvalPriceId({ currency: "EUR", prices })).toBeUndefined();
+      expect(pickGrowthInstantEvalPriceId({ currency: "EUR", prices })).toBeUndefined();
       expect(isGrowthInstantEvalPriceProvisioned({ prices })).toBe(true);
     });
   });

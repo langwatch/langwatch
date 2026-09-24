@@ -4,16 +4,18 @@
  * `resolveDynamicRunMembership`'s row lock.
  * Spec: specs/suites/run-plan-dynamic-scopes.feature
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import { PrismaSuiteRepository, type SuiteDatabase } from "../prisma.suite.repository.ts";
+
+type RawSql = (strings: readonly string[], ...values: unknown[]) => Promise<unknown>;
 
 function build(
   overrides: {
     scope?: { mode: string; [k: string]: unknown };
   } = {},
 ) {
-  const executeRaw = vi.fn().mockResolvedValue(undefined);
+  const executeRaw = vi.fn<RawSql>().mockResolvedValue(undefined);
   const findFirst = vi.fn().mockResolvedValue({
     scenarioIds: [],
     scope: overrides.scope ?? { mode: "labels", labels: ["billing"] },
@@ -41,8 +43,8 @@ function build(
 }
 
 /** The tagged-template SQL, collapsed to one line for a stable assertion. */
-function rawSqlFrom(executeRaw: ReturnType<typeof vi.fn>): string {
-  const strings = executeRaw.mock.calls[0]?.[0] as unknown as string[];
+function rawSqlFrom(executeRaw: Mock<RawSql>): string {
+  const strings = executeRaw.mock.calls[0]?.[0] ?? [];
   return strings.join("?").replace(/\s+/g, " ").trim();
 }
 

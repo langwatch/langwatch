@@ -50,6 +50,12 @@ export default function SimulationsPage() {
   );
 }
 
+const expandedPeriodDays = (daysAgo: number): number => {
+  if (daysAgo <= 30) return 30;
+  if (daysAgo <= 90) return 90;
+  return 365;
+};
+
 /**
  * The period control's host, bridged from this family's own.
  */
@@ -212,8 +218,7 @@ function SimulationsBoard() {
 
     if (lastRunTs && lastRunTs < period.startDate.getTime()) {
       const daysAgo = Math.ceil((nowInstant().epochMilliseconds - lastRunTs) / 86400000);
-      const newDays = daysAgo <= 30 ? 30 : daysAgo <= 90 ? 90 : 365;
-      setPeriod(subDays(toDate(nowInstant()), newDays), toDate(nowInstant()));
+      setPeriod(subDays(toDate(nowInstant()), expandedPeriodDays(daysAgo)), toDate(nowInstant()));
     }
   }, [selectedSuiteSlug]); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -24,7 +24,7 @@ const traceCol = createColumnHelper<TraceListItem>();
 const convCol = createColumnHelper<ConversationGroup>();
 const groupCol = createColumnHelper<TraceGroup>();
 
-export const traceSelectColumnDef: ColumnDef<TraceListItem, any> = traceCol.display({
+export const traceSelectColumnDef: ColumnDef<TraceListItem> = traceCol.display({
   id: SELECT_COLUMN_ID,
   size: SELECT_COLUMN_SIZE,
   minSize: SELECT_COLUMN_SIZE,
@@ -45,7 +45,7 @@ export const traceSelectColumnDef: ColumnDef<TraceListItem, any> = traceCol.disp
     ),
 });
 
-export const conversationSelectColumnDef: ColumnDef<ConversationGroup, any> = convCol.display({
+export const conversationSelectColumnDef: ColumnDef<ConversationGroup> = convCol.display({
   id: SELECT_COLUMN_ID,
   size: SELECT_COLUMN_SIZE,
   minSize: SELECT_COLUMN_SIZE,
@@ -62,7 +62,7 @@ export const conversationSelectColumnDef: ColumnDef<ConversationGroup, any> = co
   ),
 });
 
-export const groupSelectColumnDef: ColumnDef<TraceGroup, any> = groupCol.display({
+export const groupSelectColumnDef: ColumnDef<TraceGroup> = groupCol.display({
   id: SELECT_COLUMN_ID,
   size: SELECT_COLUMN_SIZE,
   minSize: SELECT_COLUMN_SIZE,

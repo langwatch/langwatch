@@ -338,8 +338,8 @@ export class SsoSetupCommandsService {
     organizationId: string;
     connectionId: string;
   }): Promise<SsoConnectionState> {
-    const state = await this.deps.reads.tryFindConnection({ connectionId });
-    if (!state || state.organizationId !== organizationId) {
+    const state = await this.deps.reads.getConnection({ connectionId });
+    if (state.organizationId !== organizationId) {
       throw new SsoConnectionNotFoundError(`connection ${connectionId} does not exist`);
     }
 

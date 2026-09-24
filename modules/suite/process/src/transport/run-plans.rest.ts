@@ -13,7 +13,7 @@ import {
   projectRestFacts,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
-import { runActorFromRequest } from "@langwatch/scenario-contract";
+import { deriveRunActor } from "@langwatch/scenario-contract";
 import {
   parseSuiteScope,
   SuiteApi,
@@ -121,7 +121,7 @@ async function runConfiguration(params: {
   surface: string | null;
 }): Promise<z.infer<typeof runPlanRunResultSchema>> {
   const { app, input, projectId } = params;
-  const actor = runActorFromRequest({
+  const actor = deriveRunActor({
     userId: params.project.viewerUserId,
     surfaceHeader: params.surface,
   });
@@ -154,7 +154,7 @@ async function rerunStoredPlan(params: {
 }): Promise<z.infer<typeof runPlanRunResultSchema>> {
   const { app, input, projectId } = params;
   const suite = await readPlan({ app, id: input.runPlanId, projectId });
-  const actor = runActorFromRequest({
+  const actor = deriveRunActor({
     userId: params.project.viewerUserId,
     surfaceHeader: params.surface,
   });

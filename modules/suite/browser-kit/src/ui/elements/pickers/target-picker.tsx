@@ -11,6 +11,13 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { SuiteTarget, SuiteTargetType } from "@langwatch/suite-contract";
 import { AlertTriangle, Plus, X } from "lucide-react";
 
+function targetTypeLabel(type: SuiteTargetType): string {
+  if (type === "http") return "HTTP";
+  if (type === "code") return "Code";
+  if (type === "workflow") return "Workflow";
+  return "Prompt";
+}
+
 export interface TargetPickerTarget {
   name: string;
   type: SuiteTargetType;
@@ -116,15 +123,7 @@ export function TargetPicker({
                     {target.name}
                   </Text>
                   <Text fontSize="xs" color="fg.muted">
-                    (
-                    {target.type === "http"
-                      ? "HTTP"
-                      : target.type === "code"
-                        ? "Code"
-                        : target.type === "workflow"
-                          ? "Workflow"
-                          : "Prompt"}
-                    )
+                    ({targetTypeLabel(target.type)})
                   </Text>
                 </HStack>
               </Checkbox>

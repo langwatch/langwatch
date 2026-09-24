@@ -8,7 +8,10 @@ import { Readable } from "node:stream";
 import { createRestRuntime } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { StoredObjectOwnerLookupUnavailableError } from "@langwatch/stored-object-contract";
+import {
+  StoredObjectNotFoundError,
+  StoredObjectOwnerLookupUnavailableError,
+} from "@langwatch/stored-object-contract";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
@@ -115,7 +118,24 @@ describe("given the /api/files family", () => {
   describe("when no row exists for the id", () => {
     /** @scenario "GET /api/files/:id returns 404 with status not_found when no row exists for the id" */
     it("answers 404 with a not-found status, distinct from a missing blob", async () => {
-      const api = mount({ owner: async () => null });
+      const api = mount({
+        owner: async () => {
+          throw new StoredObjectNotFoundError();
+        },
+      });
+
+      const response = await api.fetch(`/api/files/${OBJECT_ID}`);
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toEqual({ status: "not_found" });
+    });
+
+    it("answers 404 with a not-found status when the owner holds no row", async () => {
+      const api = mount({
+        read: async () => {
+          throw new StoredObjectNotFoundError();
+        },
+      });
 
       const response = await api.fetch(`/api/files/${OBJECT_ID}`);
 
@@ -169,7 +189,7 @@ describe("given the /api/files family", () => {
       const api = mount({
         read,
         caller: { userId: "user-1" },
-        requireProjectPermission: permissionCheck,
+        assertProjectPermission: permissionCheck,
       });
 
       const response = await api.fetch(`/api/files/${OBJECT_ID}`);
@@ -208,7 +228,7 @@ describe("given the /api/files family", () => {
       const api = mount({
         read: async () => availableRead(),
         caller: { userId: "user-1" },
-        requireProjectPermission: permissionCheck,
+        assertProjectPermission: permissionCheck,
       });
 
       const response = await api.fetch(`/api/files/${OBJECT_ID}`);
@@ -306,7 +326,7 @@ describe("given the /api/files family", () => {
       const api = mount({
         read: async () => availableRead(),
         caller: { apiKeyProjectId: OWNER_PROJECT },
-        requireProjectPermission: permissionCheck,
+        assertProjectPermission: permissionCheck,
       });
 
       const response = await api.fetch(`/api/files/${OBJECT_ID}`);
@@ -338,11 +358,11 @@ describe("given the /api/files family", () => {
 
 /** The family over one process's byte reads, verifier, counter and gate. */
 function mount(options: {
-  read?: () => Promise<StoredObjectFileStreamRead | null>;
-  owner?: () => Promise<{ projectId: string } | null>;
+  read?: () => Promise<StoredObjectFileStreamRead>;
+  owner?: () => Promise<{ projectId: string }>;
   caller?: { apiKeyProjectId?: string; userId?: string };
   apiKeyCeiling?: (permission: AuthzPermission) => Promise<void>;
-  requireProjectPermission?: FilesProjectPermissionCheck;
+  assertProjectPermission?: FilesProjectPermissionCheck;
   rateLimit?: FilesRateLimiter;
 }) {
   const caller = options.caller ?? { apiKeyProjectId: OWNER_PROJECT };
@@ -357,7 +377,7 @@ function mount(options: {
       ...(caller.userId ? { userId: caller.userId } : {}),
     }),
     countRead: options.rateLimit ?? (async () => ({ allowed: true, resetAt: 0 })),
-    requireProjectPermission: options.requireProjectPermission ?? (async () => undefined),
+    assertProjectPermission: options.assertProjectPermission ?? (async () => undefined),
     resolveOwner: options.owner ?? (async () => ({ projectId: OWNER_PROJECT })),
     readById: options.read ?? (async () => availableRead()),
   };

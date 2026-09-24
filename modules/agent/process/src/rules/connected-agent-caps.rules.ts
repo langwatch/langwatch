@@ -11,7 +11,7 @@ export function jsonByteLength(value: unknown): number {
 /**
  * The cap a result breaks, or nothing when it fits.
  */
-export function resultCapViolation({
+export function detectResultCapViolation({
   output,
   session,
   caps,

@@ -1,34 +1,14 @@
+import type { RedisConnection } from "@langwatch/redis-client";
+import type { TakenPendingNavigate } from "@langwatch/scenario-contract";
+
 import { type ScenarioTabStore } from "../../app/scenario.app.ts";
 
-export interface ScenarioTabRedisMulti {
-  zadd(key: string, score: number, member: string): ScenarioTabRedisMulti;
-  expire(key: string, seconds: number): ScenarioTabRedisMulti;
-  exec(): Promise<unknown>;
-}
-
-export interface ScenarioTabRedisConnection {
-  multi(): ScenarioTabRedisMulti;
-  zadd(
-    key: string,
-    exists: "XX",
-    comparison: "LT",
-    score: number,
-    member: string,
-  ): Promise<unknown>;
-  zremrangebyscore(key: string, min: string, max: number): Promise<unknown>;
-  zcard(key: string): Promise<number>;
-  set(key: string, value: string, expiry: "EX", seconds: number): Promise<unknown>;
-  getdel(key: string): Promise<string | null>;
-  get(key: string): Promise<string | null>;
-  del(key: string): Promise<unknown>;
-}
-
 export class RedisScenarioTabStoreRepository implements ScenarioTabStore {
-  static create(connection: ScenarioTabRedisConnection): RedisScenarioTabStoreRepository {
+  static create(connection: RedisConnection): RedisScenarioTabStoreRepository {
     return new RedisScenarioTabStoreRepository(connection);
   }
 
-  private constructor(private readonly connection: ScenarioTabRedisConnection) {}
+  private constructor(private readonly connection: RedisConnection) {}
 
   async refresh(input: {
     key: string;
@@ -56,17 +36,21 @@ export class RedisScenarioTabStoreRepository implements ScenarioTabStore {
     await this.connection.set(input.key, input.url, "EX", input.ttlSeconds);
   }
 
-  async takePending(key: string): Promise<string | null> {
+  async takePending(key: string): Promise<TakenPendingNavigate> {
     try {
-      return await this.connection.getdel(key);
+      return asTaken(await this.connection.getdel(key));
     } catch (error) {
       if (!isUnknownCommandError(error)) throw error;
     }
 
     const url = await this.connection.get(key);
     if (url) await this.connection.del(key);
-    return url;
+    return asTaken(url);
   }
+}
+
+function asTaken(url: string | null): TakenPendingNavigate {
+  return url ? { taken: true, url } : { taken: false };
 }
 
 function isUnknownCommandError(error: unknown): boolean {

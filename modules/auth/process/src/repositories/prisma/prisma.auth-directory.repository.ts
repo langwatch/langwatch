@@ -1,4 +1,6 @@
+import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { UserNotFoundError } from "@langwatch/user-contract";
 
 type Database = Pick<PrismaClient, "user" | "organization" | "organizationUser" | "project">;
 
@@ -9,30 +11,35 @@ export class PrismaAuthDirectoryRepository {
     return new PrismaAuthDirectoryRepository(database);
   }
 
-  async tryFindOrganizationIdBySsoDomain(domain: string): Promise<string | null> {
+  async getOrganizationIdBySsoDomain(domain: string): Promise<string> {
     const organization = await this.database.organization.findUnique({
       where: { ssoDomain: domain },
       select: { id: true },
     });
-    return organization?.id ?? null;
+    if (organization === null) throw new OrganizationNotFoundError();
+    return organization.id;
   }
 
-  async tryFindPerson(
+  async getPerson(
     userId: string,
-  ): Promise<{ id: string; email: string | null; name: string | null } | null> {
-    return this.database.user.findUnique({
+  ): Promise<{ id: string; email: string | null; name: string | null }> {
+    const person = await this.database.user.findUnique({
       where: { id: userId },
       select: { id: true, email: true, name: true },
     });
+    if (person === null) throw new UserNotFoundError(userId);
+    return person;
   }
 
-  async tryFindOrganization(
+  async getOrganization(
     organizationId: string,
-  ): Promise<{ id: string; name: string; slug: string } | null> {
-    return this.database.organization.findUnique({
+  ): Promise<{ id: string; name: string; slug: string }> {
+    const organization = await this.database.organization.findUnique({
       where: { id: organizationId },
       select: { id: true, name: true, slug: true },
     });
+    if (organization === null) throw new OrganizationNotFoundError(organizationId);
+    return organization;
   }
 
   async maxSessionDurationDays(organizationId: string): Promise<number> {

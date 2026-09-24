@@ -30,29 +30,15 @@ export function schemaVersionOf(value: string): SchemaVersion {
   throw new Error(`Unsupported prompt schema version: ${value}`);
 }
 
-export function latestVersion(
+/** A config's versions, newest first. */
+export function findVersions(
   state: MemoryPromptState,
   configId: string,
   projectId: string,
-): StoredVersion | null {
-  return (
-    [...state.versions.values()]
-      .filter((row) => row.configId === configId && row.projectId === projectId)
-      .toSorted((left, right) => right.createdAt.getTime() - left.createdAt.getTime())[0] ?? null
-  );
-}
-
-export function maxVersion(
-  state: MemoryPromptState,
-  configId: string,
-  projectId: string,
-): number | null {
-  let maximum: number | null = null;
-  for (const version of state.versions.values()) {
-    if (version.configId !== configId || version.projectId !== projectId) continue;
-    maximum = maximum === null ? version.version : Math.max(maximum, version.version);
-  }
-  return maximum;
+): StoredVersion[] {
+  return [...state.versions.values()]
+    .filter((row) => row.configId === configId && row.projectId === projectId)
+    .toSorted((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
 }
 
 export function storedHandle(params: {
@@ -76,7 +62,7 @@ export function visibleConfig(
   );
 }
 
-export function displayHandle(
+export function deriveDisplayHandle(
   config: StoredConfig,
   projectId: string,
   organizationId: string,

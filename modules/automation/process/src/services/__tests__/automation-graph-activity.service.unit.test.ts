@@ -1,5 +1,4 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -61,7 +60,7 @@ function compose(
       webhookDeliveries: PrismaWebhookDeliveryRepository.create(database.prisma as never),
     }),
     clock,
-    projects: new OneProject() as unknown as ProjectApi,
+    projects: new OneProject(),
     analytics: new BreachingAnalytics() as unknown as AnalyticsService,
     delivery,
     webhooks: AutomationWebhookSecretsService.create(crypto),

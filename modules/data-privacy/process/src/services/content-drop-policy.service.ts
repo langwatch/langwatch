@@ -62,7 +62,7 @@ export class ContentDropPolicyService {
    * a serialized conversation (LangWatch wrapper or bare array). Returns
    * `null`, untouched, when the value isn't a conversation — never thrown.
    */
-  tryStripRolesFromChatArrayJson(
+  deriveRoleStrippedChatArrayJson(
     json: string,
     roles: ReadonlySet<string>,
     stripToolCalls: boolean,

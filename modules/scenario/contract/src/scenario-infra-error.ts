@@ -222,7 +222,7 @@ function extractUserCodeDetail(raw: string): string {
   // sanitization or contain internals patterns that would leak our infrastructure.
   for (const candidate of [exceptionLine, declaredType, withoutHeadline.join(" ") || raw]) {
     if (!candidate) continue;
-    const summary = summarize(candidate);
+    const summary = deriveErrorSummary(candidate);
     if (summary) return summary;
   }
   return UNREADABLE_FAILURE_MESSAGE;
@@ -231,7 +231,7 @@ function extractUserCodeDetail(raw: string): string {
 /** Collapse raw error blob into single line, strip process wrapper and noise,
  * drop inline HTML, cap length; return undefined when nothing but noise remains.
  */
-function summarize(raw: string): string | undefined {
+function deriveErrorSummary(raw: string): string | undefined {
   const withoutWrapper = raw.replace(/^Child process exited with code \d+:\s*/i, "").trim();
   const meaningful = findMeaningfulLine(withoutWrapper);
   if (!meaningful || exposesInternals(meaningful)) return undefined;
@@ -618,7 +618,7 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
     // Network unreachable (connection refused / DNS / reset / undici fetch).
     needles: [...NETWORK_UNREACHABLE_NEEDLES],
     build: (text) => {
-      const host = targetHostFromTransportError(text);
+      const host = extractTargetHost(text);
       return {
         code: ScenarioInfraErrorCode.PlatformUnreachable,
         message: host
@@ -635,7 +635,7 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
  * is one. Carried through to the customer-facing copy since knowing which
  * target failed is most of what makes the message actionable.
  */
-function targetHostFromTransportError(text: string): string | undefined {
+function extractTargetHost(text: string): string | undefined {
   return /HTTP agent target (\S+) could not be reached/.exec(text)?.[1];
 }
 
@@ -675,7 +675,7 @@ export function classifyScenarioInfraError(raw: string | undefined): ScenarioErr
 
   return {
     code: ScenarioInfraErrorCode.Infra,
-    message: summarize(text) ?? UNREADABLE_FAILURE_MESSAGE,
+    message: deriveErrorSummary(text) ?? UNREADABLE_FAILURE_MESSAGE,
   };
 }
 
@@ -751,12 +751,12 @@ export function resolveScenarioError(raw: string): ScenarioErrorEnvelope {
  * customer-facing message says what happened; this says where — the SDK's
  * `{ name, message, stack }` payload's stack, or undefined for our own envelopes.
  */
-export function scenarioErrorDetail(raw: string | null | undefined): string | undefined {
+export function extractScenarioErrorDetail(raw: string | null | undefined): string | undefined {
   const trimmed = (raw ?? "").trim();
   if (trimmed.length === 0) return undefined;
   if (decodeScenarioError(trimmed)) return undefined;
   if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
-    return detailOfErrorPayload(trimmed) ?? trimmed;
+    return extractErrorPayloadDetail(trimmed) ?? trimmed;
   }
   return trimmed;
 }
@@ -766,7 +766,7 @@ export function scenarioErrorDetail(raw: string | null | undefined): string | un
  * the stack, or the message when the runner recorded none. An object of any
  * other shape is still shown, formatted rather than as one long line.
  */
-function detailOfErrorPayload(trimmed: string): string | undefined {
+function extractErrorPayloadDetail(trimmed: string): string | undefined {
   let parsed: unknown;
   try {
     parsed = JSON.parse(trimmed);

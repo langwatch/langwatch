@@ -43,6 +43,26 @@ export type CodexSessionResolution =
   | { kind: "ambiguous"; sessionIds: string[] }
   | { kind: "none" };
 
+async function newestRolloutPerSession(
+  files: readonly string[],
+): Promise<Map<string, { path: string; mtimeMs: number }>> {
+  const candidates = new Map<string, { path: string; mtimeMs: number }>();
+  for (const file of files) {
+    try {
+      const s = await stat(file);
+      const key = ROLLOUT_SESSION_ID.exec(basename(file))?.[1]?.toLowerCase() ?? file;
+      const seen = candidates.get(key);
+      if (!seen || s.mtimeMs > seen.mtimeMs) {
+        candidates.set(key, { path: file, mtimeMs: s.mtimeMs });
+      }
+    } catch {
+      /* raced with codex pruning its own sessions */
+      void 0;
+    }
+  }
+  return candidates;
+}
+
 /**
  * The codex session asking on this machine. One live rollout answers
  * alone; several answer only when exactly one is hot. Two hot rollouts, or
@@ -65,20 +85,7 @@ export async function resolveLiveCodexSession({
   // leave more than one rollout behind, and those are one session asking,
   // not two competing for the declaration. A file whose name carries no id
   // stands for itself until its transcript is read.
-  const candidates = new Map<string, { path: string; mtimeMs: number }>();
-  for (const file of files) {
-    try {
-      const s = await stat(file);
-      const key = ROLLOUT_SESSION_ID.exec(basename(file))?.[1]?.toLowerCase() ?? file;
-      const seen = candidates.get(key);
-      if (!seen || s.mtimeMs > seen.mtimeMs) {
-        candidates.set(key, { path: file, mtimeMs: s.mtimeMs });
-      }
-    } catch {
-      /* raced with codex pruning its own sessions */
-      void 0;
-    }
-  }
+  const candidates = await newestRolloutPerSession(files);
   if (candidates.size === 0) return { kind: "none" };
 
   let chosen: { path: string; mtimeMs: number };

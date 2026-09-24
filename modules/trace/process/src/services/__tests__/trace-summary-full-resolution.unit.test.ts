@@ -25,7 +25,10 @@ import {
   EVENTREF_ATTR_PREFIX,
 } from "@langwatch/trace-contract";
 
-import type { SpanStorageRepository } from "../../repositories/span-storage.repository.ts";
+import {
+  NullSpanStorageRepository,
+  type SpanStorageRepository,
+} from "../../repositories/span-storage.repository.ts";
 import type { TraceBlobStoreService } from "../trace-blob-store.service.ts";
 import { BlobNotFoundError } from "../trace-blob-store.service.ts";
 import { TraceIOExtractionService } from "../trace-io-extraction.service.ts";
@@ -96,9 +99,9 @@ const makeSummary = () => ({
 });
 
 function makeSpanRepo(spans: NormalizedSpan[]): SpanStorageRepository {
-  return {
+  return Object.assign(new NullSpanStorageRepository(), {
     findNormalizedSpansByTraceId: vi.fn().mockResolvedValue(spans),
-  } as unknown as SpanStorageRepository;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -247,11 +250,11 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
           upsert: vi.fn(),
         } as never,
         fullResolutionDeps: {
-          spanStorageRepository: {
+          spanStorageRepository: Object.assign(new NullSpanStorageRepository(), {
             findNormalizedSpansByTraceId: vi
               .fn()
               .mockRejectedValue(new Error("ClickHouse unavailable")),
-          } as unknown as SpanStorageRepository,
+          }),
           blobStore: fakeBlobStore({}),
           ioExtractionService: realIOService,
         },

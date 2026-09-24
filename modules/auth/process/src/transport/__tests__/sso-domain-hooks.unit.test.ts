@@ -21,7 +21,11 @@ import {
   afterUserCreate,
   tryBeforeAccountCreate,
 } from "../../channels/http/http.better-auth-hooks.channel.ts";
-import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
+import type {
+  BetterAuthHookOrganization,
+  BetterAuthHookUser,
+  BetterAuthHooksRepository,
+} from "../../repositories/better-auth-hooks.repository.ts";
 
 class LicensedFederation implements BetterAuthFederation {
   federationCapable(): boolean {
@@ -62,12 +66,36 @@ class RecordingAnnouncements implements BetterAuthAnnouncements {
 
 const ACME = { id: "org_acme", name: "Acme", ssoDomain: "acme.com", ssoProvider: "google" };
 
-function signupRepo(organization: typeof ACME | null) {
-  const mocks = {
-    tryFindOrganizationBySsoDomain: vi.fn().mockResolvedValue(organization),
-    createOrganizationMembership: vi.fn().mockResolvedValue("created"),
+function hooksRepo(members: Partial<BetterAuthHooksRepository>): BetterAuthHooksRepository {
+  const unused = (): never => {
+    throw new Error("this repository member is not used by this test");
   };
-  return { double: mocks as unknown as BetterAuthHooksRepository, mocks };
+  return {
+    tryFindUserForHooks: unused,
+    tryFindOrganizationBySsoDomain: unused,
+    countAccountsForUser: unused,
+    findFederatedAccountsForUser: unused,
+    findFederatedAccountsForUsers: unused,
+    deleteAccounts: unused,
+    flagPendingSsoSetup: unused,
+    createOrganizationMembership: unused,
+    reconcileSsoAccounts: unused,
+    recordLastLogin: unused,
+    countOrgMembershipsForUser: unused,
+    ...members,
+  };
+}
+
+function signupRepo(organization: BetterAuthHookOrganization | null) {
+  const mocks = {
+    tryFindOrganizationBySsoDomain: vi
+      .fn<BetterAuthHooksRepository["tryFindOrganizationBySsoDomain"]>()
+      .mockResolvedValue(organization),
+    createOrganizationMembership: vi
+      .fn<BetterAuthHooksRepository["createOrganizationMembership"]>()
+      .mockResolvedValue("created"),
+  };
+  return { double: hooksRepo(mocks), mocks };
 }
 
 function accountRepo({
@@ -75,19 +103,30 @@ function accountRepo({
   accountCount,
   user = { id: "user_1", email: "existing@acme.com", deactivatedAt: null },
 }: {
-  organization: typeof ACME | null;
+  organization: BetterAuthHookOrganization | null;
   accountCount: number;
-  user?: { id: string; email: string; deactivatedAt: Date | null };
+  user?: Pick<BetterAuthHookUser, "id" | "email" | "deactivatedAt">;
 }) {
   const mocks = {
     tryFindUserForHooks: vi
-      .fn()
-      .mockResolvedValue({ ...user, pendingSsoSetup: false, signupConfirmationPending: false }),
-    tryFindOrganizationBySsoDomain: vi.fn().mockResolvedValue(organization),
-    countAccountsForUser: vi.fn().mockResolvedValue(accountCount),
-    flagPendingSsoSetup: vi.fn().mockResolvedValue(undefined),
+      .fn<BetterAuthHooksRepository["tryFindUserForHooks"]>()
+      .mockResolvedValue({
+        ...user,
+        name: null,
+        pendingSsoSetup: false,
+        signupConfirmationPending: false,
+      }),
+    tryFindOrganizationBySsoDomain: vi
+      .fn<BetterAuthHooksRepository["tryFindOrganizationBySsoDomain"]>()
+      .mockResolvedValue(organization),
+    countAccountsForUser: vi
+      .fn<BetterAuthHooksRepository["countAccountsForUser"]>()
+      .mockResolvedValue(accountCount),
+    flagPendingSsoSetup: vi
+      .fn<BetterAuthHooksRepository["flagPendingSsoSetup"]>()
+      .mockResolvedValue(undefined),
   };
-  return { double: mocks as unknown as BetterAuthHooksRepository, mocks };
+  return { double: hooksRepo(mocks), mocks };
 }
 
 describe("signing in through a domain-matched organization's identity provider", () => {

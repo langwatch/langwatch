@@ -139,6 +139,15 @@ type ShutdownSignal = (typeof SHUTDOWN_SIGNALS)[number];
 
 const CLOSE_GRACE_MS = 500;
 
+const readCallTraceContext = (frame: CallFrame) => {
+  const parent = frame.traceparent
+    ? propagation.extract(context.active(), { traceparent: frame.traceparent })
+    : context.active();
+  const traceId =
+    trace.getSpanContext(parent)?.traceId ?? traceIdFromTraceparent(frame.traceparent) ?? "";
+  return { parent, traceId };
+};
+
 export class AgentClient {
   private readonly agents: AgentRuntime[] = [];
   private readonly byId = new Map<string, AgentRuntime>();
@@ -598,11 +607,7 @@ export class AgentClient {
     this.send({ type: "ack", protocol: PROTOCOL_VERSION, callId: frame.callId });
     this.armCallDeadline({ frame, entry, runtime });
 
-    const parent = frame.traceparent
-      ? propagation.extract(context.active(), { traceparent: frame.traceparent })
-      : context.active();
-    const traceId =
-      trace.getSpanContext(parent)?.traceId ?? traceIdFromTraceparent(frame.traceparent) ?? "";
+    const { parent, traceId } = readCallTraceContext(frame);
 
     const call: AgentCall<Record<string, AgentParameterValue>> = {
       messages: frame.messages,

@@ -9,7 +9,7 @@ import type {
 
 import {
   addOtelLogRecordCountAlias,
-  createError,
+  buildErrorCapture,
   FALLBACK_ATTRIBUTE_MAPPINGS,
   parseComputedInput,
   parseComputedOutput,
@@ -285,7 +285,7 @@ export function mapTraceSummaryToTrace({
       tokens_estimated: summary.tokensEstimated,
       ...tokenMetricsFromAttributes(summary.attributes),
     },
-    error: createError(summary.containsErrorStatus, summary.errorMessage),
+    error: buildErrorCapture(summary.containsErrorStatus, summary.errorMessage),
     events: events.length > 0 ? events : undefined,
     spans,
   };

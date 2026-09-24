@@ -73,7 +73,7 @@ function idKeysFor({ resource, verb }: { resource: string; verb: string }): stri
   return [...hinted, "id", "slug", ...singularIdKeys(resource), ...runKeys];
 }
 
-function idOf(row: unknown, idKeys: string[]): string | undefined {
+function extractId(row: unknown, idKeys: string[]): string | undefined {
   if (!row || typeof row !== "object") return undefined;
   const record = row as Record<string, unknown>;
   for (const key of idKeys) {
@@ -84,7 +84,7 @@ function idOf(row: unknown, idKeys: string[]): string | undefined {
   return undefined;
 }
 
-function nameOf(document: unknown, omit?: string): string | undefined {
+function extractName(document: unknown, omit?: string): string | undefined {
   if (!document || typeof document !== "object") return undefined;
   const record = document as Record<string, unknown>;
   for (const key of NAME_KEYS) {
@@ -101,7 +101,7 @@ function nameOf(document: unknown, omit?: string): string | undefined {
  * recognised collection key, markers and all. `total` is counted from this,
  * because the reduction's marker is the only record of the rows it removed.
  */
-function rawCollectionOf(document: unknown): unknown[] | null {
+function extractRawCollection(document: unknown): unknown[] | null {
   if (Array.isArray(document)) return document;
   return document && typeof document === "object"
     ? (COLLECTION_KEYS.map((key) => (document as Record<string, unknown>)[key]).find(
@@ -111,13 +111,13 @@ function rawCollectionOf(document: unknown): unknown[] | null {
 }
 
 /** Only the rows that are results. `returned` counts these. */
-function collectionRowsOf(document: unknown): unknown[] | null {
-  const raw = rawCollectionOf(document);
+function extractCollectionRows(document: unknown): unknown[] | null {
+  const raw = extractRawCollection(document);
   if (!raw) return null;
   return raw.filter((row) => !!row && typeof row === "object");
 }
 
-function paginationOf(document: unknown): Pagination | undefined {
+function extractPagination(document: unknown): Pagination | undefined {
   if (!document || typeof document !== "object" || Array.isArray(document)) {
     return undefined;
   }
@@ -164,15 +164,17 @@ export function extractDigest({
   }
 
   const idKeys = idKeysFor({ resource, verb });
-  const rows = collectionRowsOf(document);
+  const rows = extractCollectionRows(document);
 
   if (rows) {
-    const ids = rows.map((row) => idOf(row, idKeys)).filter((id): id is string => id !== undefined);
+    const ids = rows
+      .map((row) => extractId(row, idKeys))
+      .filter((id): id is string => id !== undefined);
     const counts = {
       returned: rows.length,
       total: resolveTotal({
-        pagination: paginationOf(document),
-        rows: rawCollectionOf(document) ?? rows,
+        pagination: extractPagination(document),
+        rows: extractRawCollection(document) ?? rows,
       }),
     };
     if (ids.length === 0) {
@@ -186,8 +188,8 @@ export function extractDigest({
     };
   }
 
-  const id = idOf(document, idKeys);
-  const name = nameOf(document, id);
+  const id = extractId(document, idKeys);
+  const name = extractName(document, id);
   if (id === undefined) {
     return {
       ...base,

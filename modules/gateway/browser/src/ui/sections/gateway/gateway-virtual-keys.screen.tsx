@@ -155,12 +155,12 @@ function VirtualKeysPage() {
     scopes.map((s) => ({
       scopeType: s.scopeType,
       scopeId: s.scopeId,
-      name:
-        s.scopeType === "ORGANIZATION"
-          ? organization?.name
-          : s.scopeType === "TEAM"
-            ? teamNameById.get(s.scopeId)
-            : projectNameById.get(s.scopeId),
+      name: scopeDisplayName({
+        scope: s,
+        organizationName: organization?.name,
+        teamNameById,
+        projectNameById,
+      }),
     }));
   const rotateMutation = api.virtualKeys.rotate.useMutation({
     onSuccess: () => utils.virtualKeys.list.invalidate({ organizationId: orgId }),
@@ -187,6 +187,11 @@ function VirtualKeysPage() {
   const activeRows = useMemo(() => allRows.filter((vk) => vk.status !== "revoked"), [allRows]);
   const revokedRows = useMemo(() => allRows.filter((vk) => vk.status === "revoked"), [allRows]);
   const rows = statusTab === "active" ? activeRows : revokedRows;
+  const listView = resolveListView({
+    isLoading: listQuery.isLoading,
+    isError: listQuery.isError,
+    rowCount: allRows.length,
+  });
 
   // Keys whose traces can actually be opened. A key missing from this map
   // gets no "View traces" action, because the link would only lead to a
@@ -251,15 +256,15 @@ function VirtualKeysPage() {
         </PageLayout.Header>
 
         <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
-          {listQuery.isLoading ? (
-            <Spinner />
-          ) : listQuery.isError ? (
+          {listView === "loading" && <Spinner />}
+          {listView === "error" && (
             <GatewayErrorPanel
               title="Failed to load virtual keys"
               error={listQuery.error}
               onRetry={() => listQuery.refetch()}
             />
-          ) : allRows.length === 0 ? (
+          )}
+          {listView === "empty" && (
             <VStack gap={6} align="center" maxWidth="640px" marginX="auto" paddingY={8}>
               <EmptyState.Root>
                 <EmptyState.Content>
@@ -280,7 +285,8 @@ function VirtualKeysPage() {
               </EmptyState.Root>
               <GatewayCapabilityPreview />
             </VStack>
-          ) : (
+          )}
+          {listView === "list" && (
             <VStack align="stretch" gap={3} width="full">
               {revokedRows.length > 0 && (
                 <Tabs.Root
@@ -324,8 +330,8 @@ function VirtualKeysPage() {
                     paddingY={0}
                     paddingX={0}
                     overflowX="auto"
+                    as="section"
                     tabIndex={0}
-                    role="region"
                     aria-label="Virtual keys table"
                   >
                     <Table.Root variant="line" size="md" width="full">
@@ -423,19 +429,11 @@ function VirtualKeysPage() {
                               />
                             </Table.Cell>
                             <Table.Cell>
-                              {vk.routingPolicyId ? (
-                                <Badge variant="subtle" colorPalette="purple">
-                                  {policyNameById.get(vk.routingPolicyId) ?? vk.routingPolicyId}
-                                </Badge>
-                              ) : vk.routingMode === "FALLBACK_ALL" ? (
-                                <Text fontSize="xs" color="fg.muted">
-                                  fallback
-                                </Text>
-                              ) : (
-                                <Text fontSize="xs" color="fg.muted">
-                                  {"—"}
-                                </Text>
-                              )}
+                              <RoutingPolicyCell
+                                routingPolicyId={vk.routingPolicyId}
+                                routingMode={vk.routingMode}
+                                policyNameById={policyNameById}
+                              />
                             </Table.Cell>
                             <Table.Cell
                               onClick={(e) => e.stopPropagation()}
@@ -454,21 +452,16 @@ function VirtualKeysPage() {
                                     <Text
                                       fontSize="sm"
                                       fontVariantNumeric="tabular-nums"
-                                      color={
-                                        spendByKeyId.get(vk.id) &&
-                                        Number.parseFloat(spendByKeyId.get(vk.id)!) > 0
-                                          ? "fg"
-                                          : "fg.muted"
-                                      }
+                                      color={spendTone(spendByKeyId.get(vk.id))}
                                       _groupHover={{
                                         textDecoration: "underline",
                                       }}
                                     >
-                                      {spendQuery.isLoading
-                                        ? "…"
-                                        : spendQuery.isError
-                                          ? "n/a"
-                                          : formatBudgetUsd(spendByKeyId.get(vk.id) ?? "0")}
+                                      {spendLabel({
+                                        isLoading: spendQuery.isLoading,
+                                        isError: spendQuery.isError,
+                                        spend: spendByKeyId.get(vk.id),
+                                      })}
                                     </Text>
                                     <Box
                                       as="span"
@@ -710,3 +703,82 @@ function GatewayCapabilityPreview() {
 }
 
 export default VirtualKeysPage;
+
+function scopeDisplayName({
+  scope,
+  organizationName,
+  teamNameById,
+  projectNameById,
+}: {
+  scope: ScopeEntry;
+  organizationName: string | undefined;
+  teamNameById: Map<string, string>;
+  projectNameById: Map<string, string>;
+}) {
+  if (scope.scopeType === "ORGANIZATION") return organizationName;
+  if (scope.scopeType === "TEAM") return teamNameById.get(scope.scopeId);
+  return projectNameById.get(scope.scopeId);
+}
+
+function resolveListView({
+  isLoading,
+  isError,
+  rowCount,
+}: {
+  isLoading: boolean;
+  isError: boolean;
+  rowCount: number;
+}): "loading" | "error" | "empty" | "list" {
+  if (isLoading) return "loading";
+  if (isError) return "error";
+  if (rowCount === 0) return "empty";
+  return "list";
+}
+
+function RoutingPolicyCell({
+  routingPolicyId,
+  routingMode,
+  policyNameById,
+}: {
+  routingPolicyId: string | null;
+  routingMode: string;
+  policyNameById: Map<string, string>;
+}) {
+  if (routingPolicyId) {
+    return (
+      <Badge variant="subtle" colorPalette="purple">
+        {policyNameById.get(routingPolicyId) ?? routingPolicyId}
+      </Badge>
+    );
+  }
+  if (routingMode === "FALLBACK_ALL") {
+    return (
+      <Text fontSize="xs" color="fg.muted">
+        fallback
+      </Text>
+    );
+  }
+  return (
+    <Text fontSize="xs" color="fg.muted">
+      {"—"}
+    </Text>
+  );
+}
+
+function spendTone(spend: string | undefined): "fg" | "fg.muted" {
+  return spend && Number.parseFloat(spend) > 0 ? "fg" : "fg.muted";
+}
+
+function spendLabel({
+  isLoading,
+  isError,
+  spend,
+}: {
+  isLoading: boolean;
+  isError: boolean;
+  spend: string | undefined;
+}): string {
+  if (isLoading) return "…";
+  if (isError) return "n/a";
+  return formatBudgetUsd(spend ?? "0");
+}

@@ -46,6 +46,9 @@ export function VirtualKeyExpirationSection({
   // (refused as virtual_key_expiry_in_past); any interaction re-renders it.
   const minDate = earliestCustomDate();
 
+  const unresolvedSummary =
+    value.preset === "custom" ? "Pick the last day this key works." : "This key never expires.";
+
   return (
     <VStack align="stretch" gap={2}>
       <HStack>
@@ -96,11 +99,7 @@ export function VirtualKeyExpirationSection({
         )}
       </HStack>
       <Text fontSize="xs" color="fg.muted" data-testid="vk-expiration-resolved">
-        {resolved
-          ? `Expires ${formatExpiry(resolved)}`
-          : value.preset === "custom"
-            ? "Pick the last day this key works."
-            : "This key never expires."}
+        {resolved ? `Expires ${formatExpiry(resolved)}` : unresolvedSummary}
       </Text>
     </VStack>
   );

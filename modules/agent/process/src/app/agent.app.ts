@@ -141,13 +141,11 @@ export class AgentApp implements AgentApi {
   readonly #users: UserApi;
   readonly #workflows: WorkflowApi;
   readonly #publicBaseUrl: string;
-  readonly #relayMaxPayloadMb: number | undefined;
 
   private constructor({ repositories, dependencies, members, config, resources }: AgentSetup) {
     this.#agents = AgentService.create(repositories.agents);
     this.#copies = AgentCopyService.create(repositories.agents, dependencies.workflows);
     this.#publicBaseUrl = members.publicBaseUrl ?? "";
-    this.#relayMaxPayloadMb = config.relayMaxPayloadMb;
     this.#auditLog = dependencies.auditLog;
     this.#permissions = dependencies.permissions;
     this.#projects = dependencies.projects;
@@ -179,10 +177,6 @@ export class AgentApp implements AgentApi {
 
   platformUrl(input: { projectSlug: string; agentId: string; agentType: string }): string {
     return agentPlatformUrl({ publicBaseUrl: this.#publicBaseUrl, ...input });
-  }
-
-  relayMaxPayloadMb(): number | undefined {
-    return this.#relayMaxPayloadMb;
   }
 
   async getAll(

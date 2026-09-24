@@ -6,7 +6,7 @@ import {
   type ModelProvider,
   PROVIDER_BUCKET_SEPARATOR,
   bucketScopeIdFor,
-  budgetPeriodFloorMs,
+  computeBudgetPeriodFloorMs,
   type GatewayBudgetLedgerStatus,
   type GatewayBudgetResource,
   type GatewayBudgetScopeType,
@@ -191,7 +191,7 @@ export function budgetSpendTargetsFor({
           // MANUAL windows, anchored cycles and mid-period resets all move
           // the boundary; the list must total the CURRENT period, same as
           // enforcement does.
-          periodFloorMs: budgetPeriodFloorMs(b, now),
+          periodFloorMs: computeBudgetPeriodFloorMs(b, now),
         }
       : {
           budgetId: b.id,
@@ -199,7 +199,7 @@ export function budgetSpendTargetsFor({
           scopeId: bucketScopeIdFor(b, b.scopeId),
           window: b.window,
           match: "exact" as const,
-          periodFloorMs: budgetPeriodFloorMs(b, now),
+          periodFloorMs: computeBudgetPeriodFloorMs(b, now),
         },
   );
 }
@@ -345,12 +345,12 @@ export interface GatewayConfigAssembly {
     defaultModel: string | null;
   }): Record<string, string>;
 
-  /** The models a provider row declares, or undefined when it declares none. */
-  tryDeclaredModelsForProvider(modelProvider: {
+  /** The models a provider row declares; empty when it declares none. */
+  findDeclaredModelsForProvider(modelProvider: {
     provider: string;
     customModels: unknown;
     customEmbeddingsModels: unknown;
-  }): string[] | undefined;
+  }): string[];
 
   /** One provider row's decrypted credentials, in the gateway's wire shape. */
   buildCredentials(

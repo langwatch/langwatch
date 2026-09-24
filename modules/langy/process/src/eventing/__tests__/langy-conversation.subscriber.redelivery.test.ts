@@ -8,7 +8,7 @@ import {
   LANGY_CONVERSATION_EVENT_VERSIONS,
   LANGY_CONVERSATION_STATUS,
 } from "@langwatch/langy-contract";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 import type { LangyConversationProcessingEvent } from "../langy-conversation-state.projection.ts";
 import type { LangyConversationLivenessRecord } from "../langy-conversation.subscriber.ts";
@@ -29,8 +29,16 @@ const context: EventSubscriberContext = {
   aggregateId: "ignored_context_conversation",
 };
 
+type EventBody<E = LangyConversationProcessingEvent> = E extends LangyConversationProcessingEvent
+  ? Pick<E, "type" | "version" | "data">
+  : never;
+
 function makeEvent(
-  overrides: Partial<LangyConversationProcessingEvent> = {},
+  body: EventBody = {
+    type: LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED,
+    version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_ACCEPTED,
+    data: { conversationId: CONVERSATION_ID, turnId: TURN_ID, questionParts: [] },
+  },
 ): LangyConversationProcessingEvent {
   return {
     id: "evt_1",
@@ -39,11 +47,8 @@ function makeEvent(
     tenantId: createTenantId(PROJECT_ID),
     createdAt: OCCURRED_AT,
     occurredAt: OCCURRED_AT,
-    type: LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED,
-    version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_ACCEPTED,
-    data: { conversationId: CONVERSATION_ID, turnId: TURN_ID, questionParts: [] },
-    ...overrides,
-  } as unknown as LangyConversationProcessingEvent;
+    ...body,
+  };
 }
 
 const cursorAt = (eventId: string) => ({ acceptedAt: OCCURRED_AT, eventId });
@@ -131,7 +136,11 @@ describe("langyConversationUpdateBroadcast redelivery", () => {
       },
       broadcast: { broadcastToTenant },
     });
-    const event = makeEvent({ type: LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED });
+    const event = makeEvent({
+      type: LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED,
+      version: LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_STARTED,
+      data: { conversationId: CONVERSATION_ID, userId: "user_1" },
+    });
 
     await subscriber.handle!(event, context);
     await subscriber.handle!(event, context);
@@ -147,12 +156,19 @@ describe("langyConversationUpdateBroadcast redelivery", () => {
 });
 
 describe("langyTurnAdmissionLifecycle redelivery", () => {
-  it("confirms the same turn on both deliveries rather than a different one", async () => {
-    const confirmAccepted = vi.fn(async () => undefined);
-    const release = vi.fn(async () => undefined);
-    const subscriber = createLangyTurnAdmissionLifecycleSubscriber({
+  let confirmAccepted: Mock<() => Promise<undefined>>;
+  let release: Mock<() => Promise<undefined>>;
+  let subscriber: ReturnType<typeof createLangyTurnAdmissionLifecycleSubscriber>;
+
+  beforeEach(() => {
+    confirmAccepted = vi.fn(async () => undefined);
+    release = vi.fn(async () => undefined);
+    subscriber = createLangyTurnAdmissionLifecycleSubscriber({
       admissions: { confirmAccepted, release },
     });
+  });
+
+  it("confirms the same turn on both deliveries rather than a different one", async () => {
     const event = makeEvent();
 
     await subscriber.handle!(event, context);
@@ -170,13 +186,9 @@ describe("langyTurnAdmissionLifecycle redelivery", () => {
   });
 
   it("releases the same turn on both deliveries of a terminal event", async () => {
-    const confirmAccepted = vi.fn(async () => undefined);
-    const release = vi.fn(async () => undefined);
-    const subscriber = createLangyTurnAdmissionLifecycleSubscriber({
-      admissions: { confirmAccepted, release },
-    });
     const event = makeEvent({
       type: LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED,
+      version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
       data: {
         conversationId: CONVERSATION_ID,
         turnId: TURN_ID,
@@ -185,7 +197,7 @@ describe("langyTurnAdmissionLifecycle redelivery", () => {
         parts: [],
         outcome: "completed",
       },
-    } as Partial<LangyConversationProcessingEvent>);
+    });
 
     await subscriber.handle!(event, context);
     await subscriber.handle!(event, context);

@@ -39,7 +39,10 @@ import type {
   BetterAuthPendingInvite,
 } from "../../channels/better-auth.channel.ts";
 import { afterUserCreate } from "../../channels/http/http.better-auth-hooks.channel.ts";
-import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
+import type {
+  BetterAuthHookOrganization,
+  BetterAuthHooksRepository,
+} from "../../repositories/better-auth-hooks.repository.ts";
 
 /** Minimal grants ledger double: nothing in these scenarios reads its output. */
 class StubAuthzGrantsService extends AuthzGrantsService {
@@ -116,13 +119,37 @@ class StubAnnouncements implements BetterAuthAnnouncements {
   }
 }
 
-function organizationRepo(
-  organization: { id: string; ssoDomain: string } | null,
-): BetterAuthHooksRepository {
+function hooksRepo(members: Partial<BetterAuthHooksRepository>): BetterAuthHooksRepository {
+  const unused = (): never => {
+    throw new Error("this repository member is not used by this test");
+  };
   return {
-    tryFindOrganizationBySsoDomain: vi.fn().mockResolvedValue(organization),
-    createOrganizationMembership: vi.fn().mockResolvedValue("created"),
-  } as unknown as BetterAuthHooksRepository;
+    tryFindUserForHooks: unused,
+    tryFindOrganizationBySsoDomain: unused,
+    countAccountsForUser: unused,
+    findFederatedAccountsForUser: unused,
+    findFederatedAccountsForUsers: unused,
+    deleteAccounts: unused,
+    flagPendingSsoSetup: unused,
+    createOrganizationMembership: unused,
+    reconcileSsoAccounts: unused,
+    recordLastLogin: unused,
+    countOrgMembershipsForUser: unused,
+    ...members,
+  };
+}
+
+function organizationRepo(
+  organization: BetterAuthHookOrganization | null,
+): BetterAuthHooksRepository {
+  return hooksRepo({
+    tryFindOrganizationBySsoDomain: vi
+      .fn<BetterAuthHooksRepository["tryFindOrganizationBySsoDomain"]>()
+      .mockResolvedValue(organization),
+    createOrganizationMembership: vi
+      .fn<BetterAuthHooksRepository["createOrganizationMembership"]>()
+      .mockResolvedValue("created"),
+  });
 }
 
 describe("afterUserCreate", () => {
@@ -167,7 +194,7 @@ describe("afterUserCreate", () => {
     /** @scenario PostHog signed_up still fires when the SSO auto-add path runs */
     it("tracks signed_up even when the SSO auto-add path runs", async () => {
       await afterUserCreate({
-        repo: organizationRepo({ id: "org_1", ssoDomain: "acme.com" }),
+        repo: organizationRepo({ id: "org_1", name: "Acme", ssoProvider: null }),
         user: { id: "user_2", email: "new@acme.com", name: "New User", emailVerified: true },
         collaborators: collaborators(),
       });
@@ -196,7 +223,7 @@ describe("afterUserCreate", () => {
     /** @scenario PostHog signed_up still fires when the signup is unverified */
     it("tracks signed_up even when the verified-email gate skips org admission", async () => {
       await afterUserCreate({
-        repo: organizationRepo({ id: "org_1", ssoDomain: "acme.com" }),
+        repo: organizationRepo({ id: "org_1", name: "Acme", ssoProvider: null }),
         user: { id: "user_4", email: "new@acme.com", name: "New User", emailVerified: false },
         collaborators: collaborators(),
       });

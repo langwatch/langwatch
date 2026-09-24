@@ -62,6 +62,18 @@ import { Link } from "../../../ui/elements/organization-link.tsx";
 /** The grant the plan read is gated on, matching what every plan reader asks. */
 const ORGANIZATION_VIEW_PERMISSION = "organization:view";
 
+function auditLogsView({
+  isLoading,
+  rowCount,
+}: {
+  isLoading: boolean;
+  rowCount: number;
+}): "loading" | "empty" | "table" {
+  if (isLoading) return "loading";
+  if (rowCount === 0) return "empty";
+  return "table";
+}
+
 export default function AuditLogScreen() {
   const host = useOrganizationHost();
   const scope = host.scope();
@@ -149,6 +161,8 @@ export default function AuditLogScreen() {
   const projects = (organization?.teams ?? []).flatMap((team) =>
     team.projects.map((project) => ({ id: project.id, label: project.name, teamName: team.name })),
   );
+
+  const logsView = auditLogsView({ isLoading: auditLogs.isLoading, rowCount: rows.length });
 
   const handleUserSearchChange = (value: string) => {
     setUserSearch(value);
@@ -314,16 +328,18 @@ export default function AuditLogScreen() {
         </PageLayout.HeaderButton>
       </HStack>
 
-      {auditLogs.isLoading ? (
+      {logsView === "loading" && (
         <VStack padding={8}>
           <Spinner />
           <Text>Loading audit logs...</Text>
         </VStack>
-      ) : rows.length === 0 ? (
+      )}
+      {logsView === "empty" && (
         <VStack padding={8}>
           <Text color="fg.muted">No audit logs found</Text>
         </VStack>
-      ) : (
+      )}
+      {logsView === "table" && (
         <>
           <Box width="full" overflowX="auto">
             <Table.Root variant="line" width="full">
@@ -341,96 +357,7 @@ export default function AuditLogScreen() {
               </Table.Header>
               <Table.Body>
                 {rows.map((log) => (
-                  <Table.Row key={log.id}>
-                    <Table.Cell>
-                      <VStack align="start" gap={0}>
-                        <Text fontSize="sm">{readableDate(log.createdAt).toLocaleString()}</Text>
-                        <Text fontSize="xs" color="fg.muted">
-                          {formatDistanceToNow(readableDate(log.createdAt), { addSuffix: true })}
-                        </Text>
-                      </VStack>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Badge
-                        size="sm"
-                        variant="subtle"
-                        colorPalette={log.source === "gateway" ? "purple" : "gray"}
-                      >
-                        {log.source === "gateway" ? "Gateway" : "Platform"}
-                      </Badge>
-                    </Table.Cell>
-                    <Table.Cell>
-                      {log.user ? (
-                        <VStack align="start" gap={0}>
-                          <Text fontSize="sm" fontWeight="medium">
-                            {log.user.name ?? "Unknown"}
-                          </Text>
-                          <Text fontSize="xs" color="fg.muted">
-                            {log.user.email}
-                          </Text>
-                        </VStack>
-                      ) : (
-                        <Text fontSize="sm" color="fg.subtle">
-                          User not found
-                        </Text>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Text fontSize="sm" fontFamily="mono">
-                        {log.action}
-                      </Text>
-                    </Table.Cell>
-                    <Table.Cell>
-                      {log.targetKind && log.targetId ? (
-                        <VStack align="start" gap={0}>
-                          <Text fontSize="xs" color="fg.muted">
-                            {log.targetKind}
-                          </Text>
-                          <Text fontSize="xs" fontFamily="mono">
-                            {log.targetId.slice(0, 16)}…
-                          </Text>
-                        </VStack>
-                      ) : (
-                        <Text fontSize="sm" color="fg.subtle">
-                          —
-                        </Text>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell>
-                      {log.projectId ? (
-                        <Text fontSize="sm">
-                          {projects.find((project) => project.id === log.projectId)?.label ??
-                            log.projectId}
-                        </Text>
-                      ) : (
-                        <Text fontSize="sm" color="fg.subtle">
-                          —
-                        </Text>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell>
-                      {log.ipAddress ? (
-                        <Text fontSize="sm" fontFamily="mono">
-                          {log.ipAddress}
-                        </Text>
-                      ) : (
-                        <Text fontSize="sm" color="fg.subtle">
-                          —
-                        </Text>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell>
-                      {log.error ? (
-                        <Text fontSize="sm" color="red.600">
-                          {log.error}
-                        </Text>
-                      ) : (
-                        <Text fontSize="sm" color="fg.subtle">
-                          —
-                        </Text>
-                      )}
-                    </Table.Cell>
-                  </Table.Row>
+                  <AuditLogRow key={log.id} log={log} projects={projects} />
                 ))}
               </Table.Body>
             </Table.Root>
@@ -449,5 +376,105 @@ export default function AuditLogScreen() {
         </>
       )}
     </VStack>
+  );
+}
+
+function AuditLogRow({
+  log,
+  projects,
+}: {
+  log: EnrichedAuditLog;
+  projects: { id: string; label: string }[];
+}) {
+  return (
+    <Table.Row>
+      <Table.Cell>
+        <VStack align="start" gap={0}>
+          <Text fontSize="sm">{readableDate(log.createdAt).toLocaleString()}</Text>
+          <Text fontSize="xs" color="fg.muted">
+            {formatDistanceToNow(readableDate(log.createdAt), { addSuffix: true })}
+          </Text>
+        </VStack>
+      </Table.Cell>
+      <Table.Cell>
+        <Badge
+          size="sm"
+          variant="subtle"
+          colorPalette={log.source === "gateway" ? "purple" : "gray"}
+        >
+          {log.source === "gateway" ? "Gateway" : "Platform"}
+        </Badge>
+      </Table.Cell>
+      <Table.Cell>
+        {log.user ? (
+          <VStack align="start" gap={0}>
+            <Text fontSize="sm" fontWeight="medium">
+              {log.user.name ?? "Unknown"}
+            </Text>
+            <Text fontSize="xs" color="fg.muted">
+              {log.user.email}
+            </Text>
+          </VStack>
+        ) : (
+          <Text fontSize="sm" color="fg.subtle">
+            User not found
+          </Text>
+        )}
+      </Table.Cell>
+      <Table.Cell>
+        <Text fontSize="sm" fontFamily="mono">
+          {log.action}
+        </Text>
+      </Table.Cell>
+      <Table.Cell>
+        {log.targetKind && log.targetId ? (
+          <VStack align="start" gap={0}>
+            <Text fontSize="xs" color="fg.muted">
+              {log.targetKind}
+            </Text>
+            <Text fontSize="xs" fontFamily="mono">
+              {log.targetId.slice(0, 16)}…
+            </Text>
+          </VStack>
+        ) : (
+          <Text fontSize="sm" color="fg.subtle">
+            —
+          </Text>
+        )}
+      </Table.Cell>
+      <Table.Cell>
+        {log.projectId ? (
+          <Text fontSize="sm">
+            {projects.find((project) => project.id === log.projectId)?.label ?? log.projectId}
+          </Text>
+        ) : (
+          <Text fontSize="sm" color="fg.subtle">
+            —
+          </Text>
+        )}
+      </Table.Cell>
+      <Table.Cell>
+        {log.ipAddress ? (
+          <Text fontSize="sm" fontFamily="mono">
+            {log.ipAddress}
+          </Text>
+        ) : (
+          <Text fontSize="sm" color="fg.subtle">
+            —
+          </Text>
+        )}
+      </Table.Cell>
+      <Table.Cell>
+        {log.error ? (
+          <Text fontSize="sm" color="red.600">
+            {log.error}
+          </Text>
+        ) : (
+          <Text fontSize="sm" color="fg.subtle">
+            —
+          </Text>
+        )}
+      </Table.Cell>
+    </Table.Row>
   );
 }

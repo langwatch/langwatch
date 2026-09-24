@@ -16,13 +16,13 @@ import { createLogTestService } from "./log.fixture.ts";
  * the recorder it was given; nothing here reads a record back, so the store
  * refuses rather than pretending to hold one.
  */
-const unreadableLogRecords = {
+const unreadableLogRecords: CanonicalLogRecordRepository = {
   ensureLogRecord: async () => undefined,
   ensureLogRecords: async () => undefined,
   getLogsByTraceId: async () => {
     throw new Error("this suite reads no log back");
   },
-} as unknown as CanonicalLogRecordRepository;
+};
 
 /** Every request below asks for no redaction, so the port never rewrites. */
 const disabledRedaction: LogRedaction = { redactLog: async () => {} };

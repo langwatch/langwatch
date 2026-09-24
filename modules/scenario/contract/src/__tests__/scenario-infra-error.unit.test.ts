@@ -19,7 +19,7 @@ import {
   isTransportLevelScenarioFailure,
   resolveScenarioError,
   ScenarioInfraErrorCode,
-  scenarioErrorDetail,
+  extractScenarioErrorDetail,
   scenarioErrorTitle,
 } from "../index.ts";
 
@@ -798,12 +798,14 @@ describe("classifyScenarioInfraError session cap", () => {
   });
 });
 
-describe("scenarioErrorDetail", () => {
+describe("extractScenarioErrorDetail", () => {
   describe("when the runner recorded a stack", () => {
     /** @scenario "The stack of a run failure is kept as the detail" */
     it("answers with the stack the runner recorded", () => {
       const stack = "Error: boom\n    at ScenarioExecution.callAgent (/app/dist/index.js:1:1)";
-      const detail = scenarioErrorDetail(JSON.stringify({ name: "Error", message: "boom", stack }));
+      const detail = extractScenarioErrorDetail(
+        JSON.stringify({ name: "Error", message: "boom", stack }),
+      );
       expect(detail).toBe(stack);
       expect(detail).toContain("\n");
     });
@@ -811,7 +813,9 @@ describe("scenarioErrorDetail", () => {
 
   describe("when the runner recorded no stack", () => {
     it("falls back to the message", () => {
-      expect(scenarioErrorDetail(JSON.stringify({ name: "Error", message: "boom" }))).toBe("boom");
+      expect(extractScenarioErrorDetail(JSON.stringify({ name: "Error", message: "boom" }))).toBe(
+        "boom",
+      );
     });
   });
 
@@ -821,20 +825,20 @@ describe("scenarioErrorDetail", () => {
       const encoded = encodeScenarioError(
         classifyScenarioInfraError("self-signed certificate in certificate chain"),
       );
-      expect(scenarioErrorDetail(encoded)).toBeUndefined();
+      expect(extractScenarioErrorDetail(encoded)).toBeUndefined();
     });
   });
 
   describe("when there is no error at all", () => {
     it("answers with nothing", () => {
-      expect(scenarioErrorDetail("")).toBeUndefined();
-      expect(scenarioErrorDetail(null)).toBeUndefined();
+      expect(extractScenarioErrorDetail("")).toBeUndefined();
+      expect(extractScenarioErrorDetail(null)).toBeUndefined();
     });
   });
 
   describe("when the error is a plain sentence", () => {
     it("keeps it as it is", () => {
-      expect(scenarioErrorDetail("Child process exited with code 1")).toBe(
+      expect(extractScenarioErrorDetail("Child process exited with code 1")).toBe(
         "Child process exited with code 1",
       );
     });

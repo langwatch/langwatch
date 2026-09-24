@@ -19,6 +19,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
+  ProjectNotFoundError,
   type PaginatedProjects,
   type Project,
   type ProjectIdentity,
@@ -71,7 +72,7 @@ export class PrismaProjects extends TestProjectApi {
 
   override async getWithTeam(id: string): Promise<ProjectWithTeam> {
     const project = await this.findWithTeam(id);
-    if (!project) throw new Error("no project");
+    if (!project) throw new ProjectNotFoundError();
     return project;
   }
 

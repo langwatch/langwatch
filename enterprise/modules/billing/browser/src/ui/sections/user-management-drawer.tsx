@@ -34,6 +34,17 @@ import {
 
 let plannedUserSequence = 0;
 
+function invalidEmailErrors(plannedUsers: PlannedUser[]): Record<string, string> {
+  const errors: Record<string, string> = {};
+  for (const user of plannedUsers) {
+    const trimmed = user.email.trim();
+    if (trimmed !== "" && !isValidEmail(trimmed)) {
+      errors[user.id] = "Please enter a valid email address";
+    }
+  }
+  return errors;
+}
+
 export function UserManagementDrawer({
   open,
   onClose,
@@ -122,13 +133,7 @@ export function UserManagementDrawer({
   };
 
   const handleSave = () => {
-    const errors: Record<string, string> = {};
-    for (const user of localPlannedUsers) {
-      const trimmed = user.email.trim();
-      if (trimmed !== "" && !isValidEmail(trimmed)) {
-        errors[user.id] = "Please enter a valid email address";
-      }
-    }
+    const errors = invalidEmailErrors(localPlannedUsers);
     if (Object.keys(errors).length > 0) {
       setEmailErrors(errors);
       return;
@@ -180,68 +185,10 @@ export function UserManagementDrawer({
           ) : (
             <VStack align="start" gap={6} width="full">
               {/* Current Members section - collapsible */}
-              <Collapsible.Root width="full">
-                <HStack justify="flex-start" width="full">
-                  <Collapsible.Trigger asChild>
-                    <Button variant="ghost" size="xs" color="fg.muted" fontSize="xs">
-                      Show members ({editableUsers.length + pendingInvitesWithMemberType.length}
-                      )
-                      <ChevronDown size={12} />
-                    </Button>
-                  </Collapsible.Trigger>
-                </HStack>
-                <Collapsible.Content>
-                  <Box as="table" width="full" style={{ borderCollapse: "collapse" }}>
-                    <Box as="tbody">
-                      {editableUsers.map((user) => (
-                        <Box as="tr" key={user.id}>
-                          <Box as="td" paddingY={2} verticalAlign="top">
-                            <Text fontSize="sm" fontWeight="medium" color="fg">
-                              {user.email}
-                            </Text>
-                            <Text fontSize="xs" color="fg.muted">
-                              Active
-                            </Text>
-                          </Box>
-                          <Box as="td" paddingY={2} textAlign="right" verticalAlign="middle">
-                            <Badge
-                              colorPalette={user.memberType === "FullMember" ? "blue" : "yellow"}
-                              variant="outline"
-                            >
-                              {user.memberType === "FullMember" ? "Full Member" : "Lite Member"}
-                            </Badge>
-                          </Box>
-                        </Box>
-                      ))}
-                      {pendingInvitesWithMemberType.map((invite) => (
-                        <Box
-                          as="tr"
-                          key={invite.id}
-                          opacity={0.8}
-                          data-testid={`pending-invite-${invite.email}`}
-                        >
-                          <Box as="td" paddingY={2} verticalAlign="top">
-                            <Text fontSize="sm" fontWeight="medium" color="fg">
-                              {invite.email}
-                            </Text>
-                            <Text fontSize="xs" color="fg.muted">
-                              Invited - Waiting for acceptance
-                            </Text>
-                          </Box>
-                          <Box as="td" paddingY={2} textAlign="right" verticalAlign="middle">
-                            <Badge
-                              colorPalette={invite.memberType === "FullMember" ? "blue" : "yellow"}
-                              variant="outline"
-                            >
-                              {invite.memberType === "FullMember" ? "Full Member" : "Lite Member"}
-                            </Badge>
-                          </Box>
-                        </Box>
-                      ))}
-                    </Box>
-                  </Box>
-                </Collapsible.Content>
-              </Collapsible.Root>
+              <CurrentMembersSection
+                editableUsers={editableUsers}
+                pendingInvitesWithMemberType={pendingInvitesWithMemberType}
+              />
 
               {/* New Planned Seats section (editable) */}
               <VStack align="start" gap={3} width="full">
@@ -343,5 +290,78 @@ export function UserManagementDrawer({
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+function CurrentMembersSection({
+  editableUsers,
+  pendingInvitesWithMemberType,
+}: {
+  editableUsers: SubscriptionUser[];
+  pendingInvitesWithMemberType: PendingInviteWithMemberType[];
+}) {
+  return (
+    <Collapsible.Root width="full">
+      <HStack justify="flex-start" width="full">
+        <Collapsible.Trigger asChild>
+          <Button variant="ghost" size="xs" color="fg.muted" fontSize="xs">
+            Show members ({editableUsers.length + pendingInvitesWithMemberType.length}
+            )
+            <ChevronDown size={12} />
+          </Button>
+        </Collapsible.Trigger>
+      </HStack>
+      <Collapsible.Content>
+        <Box as="table" width="full" style={{ borderCollapse: "collapse" }}>
+          <Box as="tbody">
+            {editableUsers.map((user) => (
+              <Box as="tr" key={user.id}>
+                <Box as="td" paddingY={2} verticalAlign="top">
+                  <Text fontSize="sm" fontWeight="medium" color="fg">
+                    {user.email}
+                  </Text>
+                  <Text fontSize="xs" color="fg.muted">
+                    Active
+                  </Text>
+                </Box>
+                <Box as="td" paddingY={2} textAlign="right" verticalAlign="middle">
+                  <Badge
+                    colorPalette={user.memberType === "FullMember" ? "blue" : "yellow"}
+                    variant="outline"
+                  >
+                    {user.memberType === "FullMember" ? "Full Member" : "Lite Member"}
+                  </Badge>
+                </Box>
+              </Box>
+            ))}
+            {pendingInvitesWithMemberType.map((invite) => (
+              <Box
+                as="tr"
+                key={invite.id}
+                opacity={0.8}
+                data-testid={`pending-invite-${invite.email}`}
+              >
+                <Box as="td" paddingY={2} verticalAlign="top">
+                  <Text fontSize="sm" fontWeight="medium" color="fg">
+                    {invite.email}
+                  </Text>
+                  <Text fontSize="xs" color="fg.muted">
+                    Invited - Waiting for acceptance
+                  </Text>
+                </Box>
+                <Box as="td" paddingY={2} textAlign="right" verticalAlign="middle">
+                  <Badge
+                    colorPalette={invite.memberType === "FullMember" ? "blue" : "yellow"}
+                    variant="outline"
+                  >
+                    {invite.memberType === "FullMember" ? "Full Member" : "Lite Member"}
+                  </Badge>
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        </Box>
+      </Collapsible.Content>
+    </Collapsible.Root>
   );
 }

@@ -1,3 +1,4 @@
+import { GatewayVoiceKeyMissingError } from "@langwatch/gateway-contract";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -5,6 +6,7 @@ import {
   GatewayRealtimeSessionReconciliationService,
   realtimeSessionReconciliationConfig,
   type ElevenLabsConversationReader,
+  type ElevenLabsCredentialReader,
   type RealtimeSessionReconciliationRepository,
 } from "../../services/gateway-realtime-session-reconciliation.service.ts";
 
@@ -25,6 +27,7 @@ const session = {
 function buildWorker(options?: {
   conversation?: ElevenLabsConversationReader;
   sessions?: (typeof session)[];
+  credentials?: ElevenLabsCredentialReader;
 }) {
   const repository = {
     expireStaleSessions: vi.fn().mockResolvedValue(2),
@@ -40,8 +43,8 @@ function buildWorker(options?: {
   };
   const worker = GatewayRealtimeSessionReconciliationService.create({
     repository,
-    credentials: {
-      tryGetApiCredential: vi.fn().mockResolvedValue({
+    credentials: options?.credentials ?? {
+      getApiCredential: vi.fn().mockResolvedValue({
         apiKey: "key",
         baseUrl: "https://api.elevenlabs.io",
       }),
@@ -113,6 +116,18 @@ describe("GatewayRealtimeSessionReconciliationService", () => {
     await expect(worker.poll()).resolves.toMatchObject({ confirmed: 0 });
     expect(repository.confirmSession).not.toHaveBeenCalled();
     expect(repository.releaseMissingVendorConversation).not.toHaveBeenCalled();
+  });
+
+  it("leaves a session open when its voice provider has no API key", async () => {
+    const { worker, repository, conversations } = buildWorker({
+      credentials: {
+        getApiCredential: vi.fn().mockRejectedValue(new GatewayVoiceKeyMissingError()),
+      },
+    });
+
+    await expect(worker.poll()).resolves.toMatchObject({ examined: 1, confirmed: 0 });
+    expect(conversations.readConversation).not.toHaveBeenCalled();
+    expect(repository.confirmSession).not.toHaveBeenCalled();
   });
 
   it("does not poll before start is called", async () => {

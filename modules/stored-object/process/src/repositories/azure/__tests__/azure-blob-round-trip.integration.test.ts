@@ -10,14 +10,13 @@ import { TieredBlobStore } from "@langwatch/group-queue/operational";
 import { mintStoredObjectUri } from "@langwatch/stored-object-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { StoredObjectsTelemetry } from "#app/stored-object.members";
 import { AzureBlobStoredObjectDriverAdapter } from "#repositories/azure/azure.stored-object-blob.repository";
-import type { StoredObjectsRepository } from "#repositories/stored-objects.repository";
 import type { StoredObject } from "#rules/stored-object-row.rules";
 import {
   StoredObjectAzureDestination,
   StoredObjectDestinationPolicyAdapter,
   StoredObjectProjectS3Config,
+  type StoredObjectProjectBucket,
 } from "#services/stored-object-destination-policy.service";
 import { StoredObjectStorageRegistryAdapter } from "#services/stored-object-storage-registry.service";
 import { StoredObjectsService } from "#services/stored-objects.service";
@@ -93,8 +92,8 @@ function azureOnlyRegistry(): StoredObjectStorageRegistryAdapter {
 }
 
 class NoPrivateBucket extends StoredObjectProjectS3Config {
-  async tryGet(): Promise<null> {
-    return null;
+  async resolveBucket(): Promise<StoredObjectProjectBucket> {
+    return { kind: "platform" };
   }
 }
 
@@ -140,7 +139,11 @@ describe("given a deployment whose object storage is Azure Blob and nothing else
           findAllByProject: vi.fn(async () => []),
           deleteByProject: vi.fn(async () => undefined),
           deleteByIds: vi.fn(async () => undefined),
-        } as unknown as StoredObjectsRepository,
+          findLiveRowsByProjectPage: () =>
+            Promise.reject(new Error("findLiveRowsByProjectPage is not used here")),
+          sumSizeBytesByProject: () =>
+            Promise.reject(new Error("sumSizeBytesByProject is not used here")),
+        },
         registry: azureOnlyRegistry(),
         mintStorageUri: async ({ projectId, sha256 }) =>
           mintStoredObjectUri({
@@ -153,7 +156,7 @@ describe("given a deployment whose object storage is Azure Blob and nothing else
           recordWriteFailure: vi.fn(),
           recordReadFailure: vi.fn(),
           observeSizeBytes: vi.fn(),
-        } as unknown as StoredObjectsTelemetry,
+        },
       });
 
       const stored = await service.storeFromBytes({
@@ -172,7 +175,7 @@ describe("given a deployment whose object storage is Azure Blob and nothing else
           .digest("hex")}`,
       );
 
-      const read = await service.tryGetById({ projectId: PROJECT_ID, id: stored.id });
+      const read = await service.getById({ projectId: PROJECT_ID, id: stored.id });
       expect(read && "stream" in read).toBe(true);
       await expect(drain((read as { stream: Readable }).stream)).resolves.toBe(bytes.toString());
     });
@@ -188,7 +191,7 @@ describe("given a deployment whose object storage is Azure Blob and nothing else
           get: vi.fn(async () => null),
           peek: vi.fn(async () => null),
           delete: vi.fn(async () => undefined),
-        } as unknown as ConstructorParameters<typeof TieredBlobStore>[0]["redisBlobs"],
+        },
         objectStoreFor: () => azureOnlyRegistry(),
         resolveDestination: (projectId) => azureOnlyPolicy().resolve(projectId),
         s3ThresholdBytes: threshold,

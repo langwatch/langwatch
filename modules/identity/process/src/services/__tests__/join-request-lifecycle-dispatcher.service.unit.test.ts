@@ -3,7 +3,11 @@
  * (ADR-135), so the expiry wake only dispatches the guarded command and the
  * requester is told when the expiry fact itself is folded.
  */
-import { emptyJoinRequest, type JoinRequestState } from "@langwatch/identity-contract";
+import {
+  emptyJoinRequest,
+  JoinRequestNotFoundError,
+  type JoinRequestState,
+} from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { JoinRequestNotification } from "../../eventing/join-request-lifecycle.process.ts";
@@ -51,18 +55,17 @@ let expireJoin: ReturnType<typeof vi.fn<JoinRequestService["expireJoin"]>>;
 
 function readsAnswering(
   state: JoinRequestState | null,
-): Pick<PrismaJoinRequestReadRepository, "tryFindRequest"> {
+): Pick<PrismaJoinRequestReadRepository, "getRequest"> {
   return {
-    tryFindRequest: vi.fn(async () =>
-      state === null
-        ? null
-        : {
-            ...emptyJoinRequest({ joinRequestId: JOIN_REQUEST_ID }),
-            userId: REQUESTER_ID,
-            domain: "acme.com",
-            state,
-          },
-    ),
+    getRequest: vi.fn(async () => {
+      if (state === null) throw new JoinRequestNotFoundError("no such request");
+      return {
+        ...emptyJoinRequest({ joinRequestId: JOIN_REQUEST_ID }),
+        userId: REQUESTER_ID,
+        domain: "acme.com",
+        state,
+      };
+    }),
   };
 }
 

@@ -7,6 +7,7 @@ import {
   Heading,
   HStack,
   Input,
+  type ListCollection,
   Spacer,
   Spinner,
   Table,
@@ -18,6 +19,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { HelpCircle, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
+  type Control,
   Controller,
   type SubmitHandler,
   type UseFormReturn,
@@ -106,6 +108,76 @@ export type TeamFormData = {
   }[];
 };
 
+type UserOption = { label: string; value: string };
+
+function MemberUserPicker({
+  control,
+  index,
+  perRowCollection,
+  userOptions,
+}: {
+  control: Control<TeamFormData, unknown, TeamFormData>;
+  index: number;
+  perRowCollection: ListCollection<UserOption> | undefined;
+  userOptions: UserOption[];
+}) {
+  return (
+    <>
+      <Controller
+        control={control}
+        name={`members.${index}.userId`}
+        rules={{ required: "User is required" }}
+        render={({ field }) => {
+          const rowCollection = perRowCollection ?? createListCollection({ items: userOptions });
+          return (
+            <Select.Root
+              collection={rowCollection}
+              value={field.value ? [field.value.value] : []}
+              onValueChange={(details) => {
+                const selectedValue = details.value[0];
+                if (selectedValue) {
+                  const selectedOption = userOptions.find((o) => o.value === selectedValue);
+                  if (selectedOption) {
+                    field.onChange(selectedOption);
+                  }
+                }
+              }}
+            >
+              <Select.Trigger width="full" background="bg">
+                <Select.ValueText placeholder="Select..." />
+              </Select.Trigger>
+              <Select.Content paddingY={2}>
+                {rowCollection.items.map((option) => (
+                  <Select.Item key={option.value} item={option}>
+                    {option.label}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+          );
+        }}
+      />
+      <Tooltip
+        content={
+          <>
+            <Text>Those are existing members of your organization.</Text>
+            <Text paddingTop={2}>
+              Want to add a team member that is not listed yet? You can create the team first and
+              invite them later to the organization
+            </Text>
+          </>
+        }
+        positioning={{ placement: "top" }}
+        showArrow
+      >
+        <Box>
+          <HelpCircle width="14px" />
+        </Box>
+      </Tooltip>
+    </>
+  );
+}
+
 export const TeamForm = ({
   organizationId,
   team,
@@ -115,7 +187,7 @@ export const TeamForm = ({
 }: {
   organizationId: string;
   team?: TeamWithProjectsAndMembers;
-  form: UseFormReturn<TeamFormData, any, TeamFormData>;
+  form: UseFormReturn<TeamFormData, unknown, TeamFormData>;
   onSubmit: SubmitHandler<TeamFormData>;
   isLoading: boolean;
 }) => {
@@ -240,63 +312,12 @@ export const TeamForm = ({
                             <Text>{member.userId?.label}</Text>
                           </>
                         ) : (
-                          <>
-                            <Controller
-                              control={control}
-                              name={`members.${index}.userId`}
-                              rules={{ required: "User is required" }}
-                              render={({ field }) => {
-                                const rowCollection =
-                                  perRowCollections[index] ??
-                                  createListCollection({ items: userOptions });
-                                return (
-                                  <Select.Root
-                                    collection={rowCollection}
-                                    value={field.value ? [field.value.value] : []}
-                                    onValueChange={(details) => {
-                                      const selectedValue = details.value[0];
-                                      if (selectedValue) {
-                                        const selectedOption = userOptions.find(
-                                          (o) => o.value === selectedValue,
-                                        );
-                                        if (selectedOption) {
-                                          field.onChange(selectedOption);
-                                        }
-                                      }
-                                    }}
-                                  >
-                                    <Select.Trigger width="full" background="bg">
-                                      <Select.ValueText placeholder="Select..." />
-                                    </Select.Trigger>
-                                    <Select.Content paddingY={2}>
-                                      {rowCollection.items.map((option) => (
-                                        <Select.Item key={option.value} item={option}>
-                                          {option.label}
-                                        </Select.Item>
-                                      ))}
-                                    </Select.Content>
-                                  </Select.Root>
-                                );
-                              }}
-                            />
-                            <Tooltip
-                              content={
-                                <>
-                                  <Text>Those are existing members of your organization.</Text>
-                                  <Text paddingTop={2}>
-                                    Want to add a team member that is not listed yet? You can create
-                                    the team first and invite them later to the organization
-                                  </Text>
-                                </>
-                              }
-                              positioning={{ placement: "top" }}
-                              showArrow
-                            >
-                              <Box>
-                                <HelpCircle width="14px" />
-                              </Box>
-                            </Tooltip>
-                          </>
+                          <MemberUserPicker
+                            control={control}
+                            index={index}
+                            perRowCollection={perRowCollections[index]}
+                            userOptions={userOptions}
+                          />
                         )}
                       </HStack>
                     </Table.Cell>

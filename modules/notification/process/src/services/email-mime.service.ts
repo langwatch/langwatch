@@ -60,7 +60,7 @@ export class EmailMimeService {
    * Caller-supplied headers, cleaned for wire use. Returns undefined when
    * there is nothing to send so callers can omit the field entirely.
    */
-  trySanitizeHeaders(
+  normalizeHeaders(
     headers: Record<string, string> | undefined,
   ): Record<string, string> | undefined {
     if (!headers) {
@@ -138,7 +138,7 @@ export class EmailMimeService {
       // header block. Routed through the same helper the other gateways use,
       // so a name carrying a colon or leading space cannot misparse or fold
       // this header.
-      ...Object.entries(this.trySanitizeHeaders(headers) ?? {}).map(
+      ...Object.entries(this.normalizeHeaders(headers) ?? {}).map(
         ([name, value]) => `${name}: ${value}`,
       ),
       `Subject: ${this.rfc2047EncodeHeader(subject)}`,

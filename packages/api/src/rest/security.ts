@@ -6,7 +6,7 @@
 import { timingSafeEqual } from "node:crypto";
 
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { Context, ErrorHandler, Hono, MiddlewareHandler } from "hono";
+import type { Context, ErrorHandler, MiddlewareHandler } from "hono";
 
 import type { AccessPolicy, CredentialClass } from "../access-policy.ts";
 import type { Credential } from "../access/access.ts";
@@ -251,7 +251,7 @@ function registeredAddresses(registry: readonly RegisteredRoute[]): {
  * that path does not serve, so it is no more an endpoint than a sub-app mount.
  */
 export function undeclaredRoutes(options: {
-  app: MountedRouteTable | Hono<any, any, any>;
+  app: MountedRouteTable;
   registry: readonly RegisteredRoute[];
 }): string[] {
   const { addresses, paths } = registeredAddresses(options.registry);
@@ -274,7 +274,7 @@ export function undeclaredRoutes(options: {
  * A plain `Error`: a wiring defect of ours, not one a caller can act on.
  */
 export function assertEveryRouteDeclared(options: {
-  app: MountedRouteTable | Hono<any, any, any>;
+  app: MountedRouteTable;
   registry: readonly RegisteredRoute[];
 }): void {
   const undeclared = undeclaredRoutes(options);

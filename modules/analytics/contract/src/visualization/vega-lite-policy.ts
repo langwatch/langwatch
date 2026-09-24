@@ -13,7 +13,7 @@ import {
   type JsonObjectNode,
   joinPointer,
   measureJsonDepth,
-  measureSpecBytes,
+  computeSpecBytes,
   measureUtf8Bytes,
   visitJsonObjects,
   visitPredicate,
@@ -287,7 +287,7 @@ function limitError({
 export function checkSpecEnvelopeLimits(spec: unknown): VegaValidationError[] {
   const errors: VegaValidationError[] = [];
 
-  const bytes = measureSpecBytes(spec);
+  const bytes = computeSpecBytes(spec);
   if (bytes === null || bytes > LWQL_VEGA_LIMITS.maxSpecBytes) {
     errors.push(
       limitError({
@@ -630,7 +630,7 @@ function checkTransforms(objects: readonly JsonObjectNode[]): VegaValidationErro
   }
 
   for (const { path, step } of steps) {
-    if (identifyTransform(step) !== null) continue;
+    if (classifyTransform(step) !== null) continue;
     errors.push(
       lwqlVegaError({
         rule: "transform.unknown",
@@ -649,7 +649,7 @@ function checkTransforms(objects: readonly JsonObjectNode[]): VegaValidationErro
  * more than one — a step carrying two signature keys is refused rather than
  * guessed at.
  */
-export function identifyTransform(step: Record<string, unknown>): string | null {
+export function classifyTransform(step: Record<string, unknown>): string | null {
   const matched = Object.keys(step).filter((key) => ALLOWED_TRANSFORM_SET.has(key));
   return matched.length === 1 ? (matched[0] ?? null) : null;
 }

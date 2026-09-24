@@ -4,7 +4,7 @@
  * @example
  */
 
-import { trace, SpanStatusCode, context as otelContext } from "@opentelemetry/api";
+import { trace, SpanStatusCode, context as otelContext, type Span } from "@opentelemetry/api";
 
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
@@ -19,6 +19,70 @@ type EvaluationsFacadeConfig = {
   apiKey: string;
   logger: Logger;
 };
+
+function toEvaluationResult(responseData: EvaluateResponse): EvaluationResult {
+  return {
+    status: responseData.status,
+    ...(responseData.passed !== null &&
+      responseData.passed !== undefined && { passed: responseData.passed }),
+    ...(responseData.score !== null &&
+      responseData.score !== undefined && { score: responseData.score }),
+    ...(responseData.details !== null &&
+      responseData.details !== undefined && { details: responseData.details }),
+    ...(responseData.label !== null &&
+      responseData.label !== undefined && { label: responseData.label }),
+    ...(responseData.cost !== null &&
+      responseData.cost !== undefined && { cost: responseData.cost }),
+  };
+}
+
+function throwEvaluationFailure({
+  error,
+  slug,
+  asGuardrail,
+  langwatchSpan,
+  otelSpan,
+}: {
+  error: unknown;
+  slug: string;
+  asGuardrail: boolean | undefined;
+  langwatchSpan: ReturnType<typeof createLangWatchSpan>;
+  otelSpan: Span;
+}): never {
+  const errorResult: EvaluationResult = {
+    status: "error",
+    details: error instanceof Error ? error.message : String(error),
+  };
+
+  // For guardrails, default to passed=true on error to avoid blocking
+  if (asGuardrail) {
+    errorResult.passed = true;
+  }
+
+  langwatchSpan.setOutput({
+    type: asGuardrail ? "guardrail_result" : "evaluation_result",
+    value: errorResult,
+  });
+
+  otelSpan.setStatus({
+    code: SpanStatusCode.ERROR,
+    message: errorResult.details,
+  });
+
+  if (error instanceof Error) {
+    otelSpan.recordException(error);
+  }
+
+  if (
+    error instanceof EvaluatorNotFoundError ||
+    error instanceof EvaluationsApiError ||
+    error instanceof EvaluatorCallError
+  ) {
+    throw error;
+  }
+
+  throw new EvaluatorCallError(slug, error instanceof Error ? error.message : String(error));
+}
 
 export class EvaluationsFacade {
   readonly #endpoint: string;
@@ -110,19 +174,7 @@ export class EvaluationsFacade {
       const responseData = (await response.json()) as EvaluateResponse;
 
       // Map response to result
-      const result: EvaluationResult = {
-        status: responseData.status,
-        ...(responseData.passed !== null &&
-          responseData.passed !== undefined && { passed: responseData.passed }),
-        ...(responseData.score !== null &&
-          responseData.score !== undefined && { score: responseData.score }),
-        ...(responseData.details !== null &&
-          responseData.details !== undefined && { details: responseData.details }),
-        ...(responseData.label !== null &&
-          responseData.label !== undefined && { label: responseData.label }),
-        ...(responseData.cost !== null &&
-          responseData.cost !== undefined && { cost: responseData.cost }),
-      };
+      const result = toEvaluationResult(responseData);
 
       // Update span with output
       langwatchSpan.setOutput({
@@ -142,43 +194,7 @@ export class EvaluationsFacade {
 
       return result;
     } catch (error) {
-      // Handle errors
-      const errorResult: EvaluationResult = {
-        status: "error",
-        details: error instanceof Error ? error.message : String(error),
-      };
-
-      // For guardrails, default to passed=true on error to avoid blocking
-      if (asGuardrail) {
-        errorResult.passed = true;
-      }
-
-      // Update span with error
-      langwatchSpan.setOutput({
-        type: asGuardrail ? "guardrail_result" : "evaluation_result",
-        value: errorResult,
-      });
-
-      otelSpan.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: errorResult.details,
-      });
-
-      if (error instanceof Error) {
-        otelSpan.recordException(error);
-      }
-
-      // Re-throw known errors
-      if (
-        error instanceof EvaluatorNotFoundError ||
-        error instanceof EvaluationsApiError ||
-        error instanceof EvaluatorCallError
-      ) {
-        throw error;
-      }
-
-      // Wrap unknown errors
-      throw new EvaluatorCallError(slug, error instanceof Error ? error.message : String(error));
+      throwEvaluationFailure({ error, slug, asGuardrail, langwatchSpan, otelSpan });
     } finally {
       // Always end the span
       otelSpan.end();

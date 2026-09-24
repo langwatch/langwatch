@@ -147,6 +147,11 @@ export default function OnlineEvaluationsScreen() {
     host.openOverlay({ drawer: "onlineEvaluation", params: { monitorId } });
   };
 
+  const isLoadingMonitors = monitors.isLoading;
+  const showMonitorsError = !isLoadingMonitors && monitors.isError;
+  const showMonitorsEmpty = !isLoadingMonitors && !monitors.isError && rows.length === 0;
+  const showMonitors = !isLoadingMonitors && !monitors.isError && rows.length !== 0;
+
   return (
     <>
       <PageLayout.Header>
@@ -157,15 +162,17 @@ export default function OnlineEvaluationsScreen() {
         </HStack>
       </PageLayout.Header>
 
-      {monitors.isLoading ? (
+      {isLoadingMonitors && (
         <Box display="flex" justifyContent="center" paddingY={8}>
           <Spinner />
         </Box>
-      ) : monitors.isError ? (
+      )}
+      {showMonitorsError && (
         <Box padding={6}>
           <Text color="red.500">Error loading online evaluations</Text>
         </Box>
-      ) : rows.length === 0 ? (
+      )}
+      {showMonitorsEmpty && (
         <PageLayout.Container>
           <PageLayout.Content>
             <NoDataInfoBlock
@@ -193,7 +200,8 @@ export default function OnlineEvaluationsScreen() {
             </NoDataInfoBlock>
           </PageLayout.Content>
         </PageLayout.Container>
-      ) : (
+      )}
+      {showMonitors && (
         <FullWidthListPageContent>
           <VStack width="full" gap={4} align="stretch">
             <VStack align="start" gap={1}>

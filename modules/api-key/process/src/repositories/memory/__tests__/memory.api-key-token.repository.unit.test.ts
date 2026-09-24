@@ -2,7 +2,7 @@ import {
   API_KEY_PREFIX,
   getTokenType,
   INGEST_KEY_PREFIX,
-  splitApiKeyToken,
+  parseApiKeyToken,
 } from "@langwatch/api-key-contract";
 import { describe, expect, it } from "vitest";
 
@@ -43,11 +43,11 @@ describe("generateApiKeyToken", () => {
   });
 });
 
-describe("splitApiKeyToken", () => {
+describe("parseApiKeyToken", () => {
   describe("when given a new sk-lw- token", () => {
     it("extracts lookupId and secret", () => {
       const { token, lookupId } = generateToken();
-      const parts = splitApiKeyToken(token);
+      const parts = parseApiKeyToken(token);
       expect(parts).not.toBeNull();
       expect(parts!.lookupId).toBe(lookupId);
       expect(parts!.secret).toBeTruthy();
@@ -57,7 +57,7 @@ describe("splitApiKeyToken", () => {
   describe("when given an old pat-lw- token", () => {
     /** @scenario "Old pat-lw- tokens still authenticate" */
     it("extracts lookupId and secret (backward compat)", () => {
-      const result = splitApiKeyToken(
+      const result = parseApiKeyToken(
         "pat-lw-abcdefghijklmnop_secretsecretsecretsecretsecretsecretsecretsecretsecretsecr",
       );
       expect(result).not.toBeNull();
@@ -70,7 +70,7 @@ describe("splitApiKeyToken", () => {
       const { token, lookupId } = generateToken({
         prefix: INGEST_KEY_PREFIX,
       });
-      const parts = splitApiKeyToken(token);
+      const parts = parseApiKeyToken(token);
       expect(parts).not.toBeNull();
       expect(parts!.lookupId).toBe(lookupId);
       expect(parts!.secret).toBeTruthy();
@@ -79,19 +79,19 @@ describe("splitApiKeyToken", () => {
 
   describe("when given a legacy project key (no underscore)", () => {
     it("returns null", () => {
-      expect(splitApiKeyToken("sk-lw-abc123def456")).toBeNull();
+      expect(parseApiKeyToken("sk-lw-abc123def456")).toBeNull();
     });
   });
 
   describe("when given an unknown prefix", () => {
     it("returns null", () => {
-      expect(splitApiKeyToken("unknown-prefix-token")).toBeNull();
+      expect(parseApiKeyToken("unknown-prefix-token")).toBeNull();
     });
   });
 
   describe("when given an empty string", () => {
     it("returns null", () => {
-      expect(splitApiKeyToken("")).toBeNull();
+      expect(parseApiKeyToken("")).toBeNull();
     });
   });
 });

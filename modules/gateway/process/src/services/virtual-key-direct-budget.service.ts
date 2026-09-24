@@ -72,10 +72,12 @@ function winsOver(candidate: GatewayBudget, incumbent: GatewayBudget | undefined
   return !incumbent.managedByVirtualKeyId && !!candidate.managedByVirtualKeyId;
 }
 
+/** The rollup either totalled every chosen budget or could not be read at all. */
+type PeriodSpend = { totalled: true; byBudgetId: Map<string, string> } | { totalled: false };
+
 /**
- * Current-period spend for every chosen budget in one read. Null means
- * the rollup could not be totalled, which the bar renders as an unknown
- * rather than as a confident zero.
+ * Current-period spend for every chosen budget in one read. An untotalled
+ * rollup renders as an unknown on the bar rather than as a confident zero.
  */
 async function loadPeriodSpend(args: {
   repository: VirtualKeyDirectBudgetRepository;
@@ -83,10 +85,10 @@ async function loadPeriodSpend(args: {
   budgets: GatewayBudget[];
   chRepo: GatewayBudgetSpend | undefined;
   now: Instant;
-}): Promise<Map<string, string> | null> {
+}): Promise<PeriodSpend> {
   const { repository, organizationId, budgets, chRepo, now } = args;
   if (!chRepo) {
-    return null;
+    return { totalled: false };
   }
 
   const projectIds = await repository.findProjectIdsInOrganization({ organizationId });
@@ -97,7 +99,7 @@ async function loadPeriodSpend(args: {
       now,
     );
 
-    return new Map(spends.map((s) => [s.budgetId, s.spentUsd]));
+    return { totalled: true, byBudgetId: new Map(spends.map((s) => [s.budgetId, s.spentUsd])) };
   } catch (error) {
     // The bar degrades to "unknown" either way, but a broken rollup read
     // and an expected gap must not look the same to whoever is on call.
@@ -110,7 +112,7 @@ async function loadPeriodSpend(args: {
       "the direct-budget spend rollup could not be read; the bar degrades to unknown",
     );
 
-    return null;
+    return { totalled: false };
   }
 }
 
@@ -156,7 +158,7 @@ export class VirtualKeyDirectBudgetService {
       return out;
     }
 
-    const spentByBudgetId = await loadPeriodSpend({
+    const periodSpend = await loadPeriodSpend({
       repository: this.repository,
       organizationId: args.organizationId,
       budgets: [...chosen.values()],
@@ -169,7 +171,9 @@ export class VirtualKeyDirectBudgetService {
         budgetId: budget.id,
         window: budget.window,
         limitUsd: budget.limitUsd.toFixed(6),
-        periodSpentUsd: spentByBudgetId ? (spentByBudgetId.get(budget.id) ?? "0") : null,
+        periodSpentUsd: periodSpend.totalled
+          ? (periodSpend.byBudgetId.get(budget.id) ?? "0")
+          : null,
         // Recomputed from the window rather than read off the row: the
         // stored instant is only rewritten when the window changes, so a
         // budget that has been running for days carries a reset moment

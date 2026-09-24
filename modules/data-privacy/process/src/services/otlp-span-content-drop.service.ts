@@ -176,7 +176,7 @@ export class OtlpSpanContentDropService {
         return attr;
       }
 
-      const result = this.policies.tryStripRolesFromChatArrayJson(
+      const result = this.policies.deriveRoleStrippedChatArrayJson(
         stringValue,
         roleStrip.roles,
         roleStrip.stripToolCalls,

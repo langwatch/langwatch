@@ -3,7 +3,7 @@ import type { PromptStudioSpanResult } from "@langwatch/trace-contract";
 type ChatMessage = PromptStudioSpanResult["messages"][number];
 
 /** One decoded turn, or nothing when the value carried no string content. */
-function turnOf(value: unknown, defaultRole: "user" | "assistant"): ChatMessage | null {
+function toTurn(value: unknown, defaultRole: "user" | "assistant"): ChatMessage | null {
   if (!value || typeof value !== "object") {
     return null;
   }
@@ -28,10 +28,10 @@ function turnsOf(parsed: unknown, defaultRole: "user" | "assistant"): ChatMessag
       ? envelope.value
       : parsed;
   if (Array.isArray(items)) {
-    return items.map((item) => turnOf(item, defaultRole)).filter((turn) => turn !== null);
+    return items.map((item) => toTurn(item, defaultRole)).filter((turn) => turn !== null);
   }
 
-  const single = turnOf(parsed, defaultRole);
+  const single = toTurn(parsed, defaultRole);
   if (single) {
     return [single];
   }

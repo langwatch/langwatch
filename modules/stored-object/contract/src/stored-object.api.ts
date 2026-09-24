@@ -122,8 +122,10 @@ export interface StoredObjectApi {
     input: { projectId: string; id: string },
     by: Readonly<{ id: string }>,
   ): Promise<StoredObjectHead>;
-  readById(input: { projectId: string; id: string }): Promise<StoredObjectFileRead | null>;
-  resolveOwner(input: { id: string }): Promise<{ projectId: string } | null>;
+  /** Throws `StoredObjectNotFoundError` when the project holds no such row. */
+  readById(input: { projectId: string; id: string }): Promise<StoredObjectFileRead>;
+  /** Throws `StoredObjectNotFoundError` when no instance holds the id. */
+  resolveOwner(input: { id: string }): Promise<{ projectId: string }>;
   /** Where this project's objects are written, for the checkup. */
   getStorageDestination(input: {
     projectId: StoredObjectProjectId;

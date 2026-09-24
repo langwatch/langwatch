@@ -112,6 +112,11 @@ function CacheRulesPage() {
 
   const rows = listQuery.data ?? [];
 
+  const isLoadingRules = listQuery.isLoading;
+  const showRulesError = !isLoadingRules && listQuery.isError;
+  const showRulesEmpty = !isLoadingRules && !listQuery.isError && rows.length === 0;
+  const showRules = !isLoadingRules && !listQuery.isError && rows.length !== 0;
+
   return (
     <AiGatewayLayout>
       <>
@@ -132,15 +137,15 @@ function CacheRulesPage() {
             rule always wins over the per-virtual-key default. Changes propagate to the gateway
             within 30 s via the /changes long-poll.
           </Text>
-          {listQuery.isLoading ? (
-            <Spinner />
-          ) : listQuery.isError ? (
+          {isLoadingRules && <Spinner />}
+          {showRulesError && (
             <GatewayErrorPanel
               title="Failed to load cache rules"
               error={listQuery.error}
               onRetry={() => listQuery.refetch()}
             />
-          ) : rows.length === 0 ? (
+          )}
+          {showRulesEmpty && (
             <EmptyState.Root>
               <EmptyState.Content>
                 <EmptyState.Indicator>
@@ -159,7 +164,8 @@ function CacheRulesPage() {
                 )}
               </EmptyState.Content>
             </EmptyState.Root>
-          ) : (
+          )}
+          {showRules && (
             <Card.Root width="full" overflow="hidden">
               <Card.Body paddingY={0} paddingX={0}>
                 <Table.Root variant="line" size="md" width="full">
@@ -318,6 +324,12 @@ function MatcherSummary({ matchers }: { matchers: unknown }) {
   );
 }
 
+function modeTone(modeEnum: "RESPECT" | "FORCE" | "DISABLE"): "orange" | "red" | "green" {
+  if (modeEnum === "FORCE") return "orange";
+  if (modeEnum === "DISABLE") return "red";
+  return "green";
+}
+
 function ActionBadge({
   action,
   modeEnum,
@@ -326,7 +338,7 @@ function ActionBadge({
   modeEnum: "RESPECT" | "FORCE" | "DISABLE";
 }) {
   const a = (action ?? {}) as Record<string, unknown>;
-  const tone = modeEnum === "FORCE" ? "orange" : modeEnum === "DISABLE" ? "red" : "green";
+  const tone = modeTone(modeEnum);
   return (
     <HStack gap={1}>
       <Badge colorPalette={tone}>{modeEnum.toLowerCase()}</Badge>

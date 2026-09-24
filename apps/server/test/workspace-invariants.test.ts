@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { APP_PACKAGE_NAMES, workspaceInstallArgs } from "../src/services/node-deps.ts";
 
@@ -12,6 +13,10 @@ const repoRoot = join(__dirname, "..", "..", "..");
 
 function readJson(relPath: string): Record<string, unknown> {
   return JSON.parse(readFileSync(join(repoRoot, relPath), "utf8"));
+}
+
+function readShippedFiles(): string[] {
+  return z.array(z.string()).parse(readJson("apps/server/distribution-files.json"));
 }
 
 function gitLsFiles(pattern: string): string[] {
@@ -40,7 +45,8 @@ function workspaceMembers(): string[] {
       members.push(entry[1]);
       continue;
     }
-    if (line.trim() === "" || line.trimStart().startsWith("#")) continue;
+    if (line.trim() === "") continue;
+    if (line.trimStart().startsWith("#")) continue;
     break; // the next top-level key ends the list
   }
   return members;
@@ -54,7 +60,8 @@ function rootOverrideKeys(): string[] {
 
   const keys: string[] = [];
   for (const line of lines.slice(start + 1)) {
-    if (line.trim() === "" || line.trimStart().startsWith("#")) continue;
+    if (line.trim() === "") continue;
+    if (line.trimStart().startsWith("#")) continue;
     if (!/^\s/.test(line)) break; // next top-level key
     const m = /^\s+"?([^"]+?)"?:/.exec(line);
     if (m?.[1]) keys.push(m[1]);
@@ -72,7 +79,8 @@ function patchedDependencyPaths(): string[] {
 
   const paths: string[] = [];
   for (const line of lines.slice(start + 1)) {
-    if (line.trim() === "" || line.trimStart().startsWith("#")) continue;
+    if (line.trim() === "") continue;
+    if (line.trimStart().startsWith("#")) continue;
     if (!/^\s/.test(line)) break; // next top-level key
     const target = /:\s*"?([^"\s]+)"?\s*$/.exec(line);
     if (target?.[1]) paths.push(target[1]);
@@ -327,7 +335,7 @@ describe("the repo is a single pnpm workspace", () => {
 
     /** @scenario The published package carries every input its install reads */
     it("ships every patch the workspace applies", () => {
-      const shipped = readJson("apps/server/distribution-files.json") as unknown as string[];
+      const shipped = readShippedFiles();
       const patches = patchedDependencyPaths();
 
       // A patch the package does not carry is not a weaker install, it is no
@@ -350,7 +358,7 @@ describe("the repo is a single pnpm workspace", () => {
       // tsconfig.base.json) that the sibling completeness checks above
       // don't track as shipped — missing it crashes `prisma generate` at
       // first boot.
-      const shipped = readJson("apps/server/distribution-files.json") as unknown as string[];
+      const shipped = readShippedFiles();
       const isShipped = (relPath: string): boolean =>
         shipped.some((f) => relPath === f || relPath.startsWith(f.endsWith("/") ? f : `${f}/`));
 
@@ -375,7 +383,7 @@ describe("the repo is a single pnpm workspace", () => {
 
     /** @scenario Every project the lockfile mentions is resolvable */
     it("ships a manifest for every workspace member", () => {
-      const shipped = readJson("apps/server/distribution-files.json") as unknown as string[];
+      const shipped = readShippedFiles();
 
       // Workspace members only — `sdks/typescript/examples/*` carry a
       // package.json but are not members, so the lockfile never mentions

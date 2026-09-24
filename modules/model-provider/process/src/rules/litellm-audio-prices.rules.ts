@@ -1,4 +1,5 @@
 import type { LLMModelEntry, LLMModelPricing } from "@langwatch/model-provider-contract";
+import { z } from "zod";
 
 /**
  * Audio/transcription/realtime prices from litellm's registry — OpenRouter routes none of these
@@ -6,23 +7,22 @@ import type { LLMModelEntry, LLMModelPricing } from "@langwatch/model-provider-c
  * `unrepresentable` rather than dropped, so it never bills confidently on a partial price.
  */
 
-export const LITELLM_PRICES_URL =
-  "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json";
+/** The subset of a litellm price entry this mapper reads, parsed where the body enters. */
+export const litellmPriceEntrySchema = z.object({
+  mode: z.string().optional(),
+  litellm_provider: z.string().optional(),
+  input_cost_per_character: z.number().optional(),
+  input_cost_per_second: z.number().optional(),
+  input_cost_per_token: z.number().optional(),
+  input_cost_per_audio_token: z.number().optional(),
+  output_cost_per_token: z.number().optional(),
+  output_cost_per_audio_token: z.number().optional(),
+  output_cost_per_second: z.number().optional(),
+  output_cost_per_character: z.number().optional(),
+  cache_read_input_token_cost: z.number().optional(),
+});
 
-/** The subset of a litellm price entry this mapper reads. */
-export type LitellmPriceEntry = {
-  mode?: string;
-  litellm_provider?: string;
-  input_cost_per_character?: number;
-  input_cost_per_second?: number;
-  input_cost_per_token?: number;
-  input_cost_per_audio_token?: number;
-  output_cost_per_token?: number;
-  output_cost_per_audio_token?: number;
-  output_cost_per_second?: number;
-  output_cost_per_character?: number;
-  cache_read_input_token_cost?: number;
-};
+export type LitellmPriceEntry = z.infer<typeof litellmPriceEntrySchema>;
 
 /** A model upstream prices but the catalog cannot express yet. */
 export type UnrepresentableModel = {
@@ -44,7 +44,7 @@ const AUDIO_MODES = ["audio_speech", "audio_transcription", "realtime"];
 /** Dated snapshot ids (e.g. gpt-4o-mini-transcribe-2025-03-20) are noise. */
 const DATED_VARIANT = /-\d{4}-\d{2}-\d{2}$/;
 
-const positive = (value: number | undefined): number | undefined =>
+const pickPositive = (value: number | undefined): number | undefined =>
   typeof value === "number" && value > 0 ? value : undefined;
 
 /**
@@ -55,7 +55,7 @@ const positive = (value: number | undefined): number | undefined =>
 function unrepresentableFields(price: LitellmPriceEntry): string[] {
   const fields: string[] = [];
   const differs = (a: number | undefined, b: number | undefined): boolean =>
-    positive(a) !== undefined && positive(a) !== positive(b);
+    pickPositive(a) !== undefined && pickPositive(a) !== pickPositive(b);
 
   if (differs(price.output_cost_per_second, price.input_cost_per_second)) {
     fields.push("output_cost_per_second");
@@ -69,23 +69,23 @@ function unrepresentableFields(price: LitellmPriceEntry): string[] {
 /** Maps the litellm rate set onto catalog pricing fields. */
 function toPricing(price: LitellmPriceEntry): LLMModelPricing | null {
   const pricing: LLMModelPricing = {
-    inputCostPerToken: positive(price.input_cost_per_token) ?? 0,
-    outputCostPerToken: positive(price.output_cost_per_token) ?? 0,
+    inputCostPerToken: pickPositive(price.input_cost_per_token) ?? 0,
+    outputCostPerToken: pickPositive(price.output_cost_per_token) ?? 0,
   };
 
-  const perCharacter = positive(price.input_cost_per_character);
+  const perCharacter = pickPositive(price.input_cost_per_character);
   if (perCharacter !== undefined) pricing.inputCostPerCharacter = perCharacter;
 
-  const perSecond = positive(price.input_cost_per_second);
+  const perSecond = pickPositive(price.input_cost_per_second);
   if (perSecond !== undefined) pricing.inputCostPerSecond = perSecond;
 
-  const perAudioToken = positive(price.input_cost_per_audio_token);
+  const perAudioToken = pickPositive(price.input_cost_per_audio_token);
   if (perAudioToken !== undefined) pricing.audioCostPerToken = perAudioToken;
 
-  const perAudioOutputToken = positive(price.output_cost_per_audio_token);
+  const perAudioOutputToken = pickPositive(price.output_cost_per_audio_token);
   if (perAudioOutputToken !== undefined) pricing.audioOutputCostPerToken = perAudioOutputToken;
 
-  const cacheRead = positive(price.cache_read_input_token_cost);
+  const cacheRead = pickPositive(price.cache_read_input_token_cost);
   if (cacheRead !== undefined) pricing.inputCacheReadPerToken = cacheRead;
 
   const priced =
@@ -180,17 +180,6 @@ export function litellmPricingById(
     byId[rawId.includes("/") ? rawId : `${provider}/${rawId}`] = pricing;
   }
   return byId;
-}
-
-/** Fetches litellm's price registry. Returns null on any transport failure. */
-export async function fetchLitellmPrices(): Promise<Record<string, LitellmPriceEntry> | null> {
-  try {
-    const response = await fetch(LITELLM_PRICES_URL);
-    if (!response.ok) return null;
-    return (await response.json()) as Record<string, LitellmPriceEntry>;
-  } catch {
-    return null;
-  }
 }
 
 function audioModalityOf({ isRealtime, isSpeech }: { isRealtime: boolean; isSpeech: boolean }) {

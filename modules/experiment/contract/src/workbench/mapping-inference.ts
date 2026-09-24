@@ -197,31 +197,17 @@ export const propagateMappingsToNewDataset = (
       }
     }
 
-    if (targetColumnName) {
-      // Try to find this column (or semantic equivalent) in the new dataset
-      const matchingColumn =
-        findMatchingColumn(targetColumnName, newDataset.columns) ??
-        findMatchingColumn(field.identifier, newDataset.columns);
-
-      if (matchingColumn) {
-        newMappings[field.identifier] = {
-          type: "source",
-          source: "dataset",
-          sourceId: newDataset.id,
-          sourceField: matchingColumn,
-        };
-      }
-    } else {
-      // No existing mapping - try basic inference
-      const matchingColumn = findMatchingColumn(field.identifier, newDataset.columns);
-      if (matchingColumn) {
-        newMappings[field.identifier] = {
-          type: "source",
-          source: "dataset",
-          sourceId: newDataset.id,
-          sourceField: matchingColumn,
-        };
-      }
+    // The previously mapped column (or a semantic equivalent) first, then basic inference
+    const matchingColumn =
+      (targetColumnName ? findMatchingColumn(targetColumnName, newDataset.columns) : undefined) ??
+      findMatchingColumn(field.identifier, newDataset.columns);
+    if (matchingColumn) {
+      newMappings[field.identifier] = {
+        type: "source",
+        source: "dataset",
+        sourceId: newDataset.id,
+        sourceField: matchingColumn,
+      };
     }
   }
 

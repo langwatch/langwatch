@@ -169,21 +169,24 @@ export function parseSimpleDictEntries(body: string): DictEntry[] {
   return entries;
 }
 
-function advancePastEntry(body: string, from: number): number {
-  let depth = 0;
-  let inStr: false | '"' | "'" = false;
+function closingQuoteIndex(body: string, from: number, quote: '"' | "'"): number {
   for (let k = from; k < body.length; k++) {
     const c = body[k];
-    if (inStr) {
-      if (c === "\\") {
-        k++;
-        continue;
-      }
-      if (c === inStr) inStr = false;
+    if (c === "\\") {
+      k++;
       continue;
     }
+    if (c === quote) return k;
+  }
+  return body.length;
+}
+
+function advancePastEntry(body: string, from: number): number {
+  let depth = 0;
+  for (let k = from; k < body.length; k++) {
+    const c = body[k];
     if (c === '"' || c === "'") {
-      inStr = c;
+      k = closingQuoteIndex(body, k + 1, c);
       continue;
     }
     if (c === "{" || c === "[" || c === "(") depth++;

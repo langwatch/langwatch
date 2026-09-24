@@ -94,6 +94,23 @@ type BuildColumnsOptions = {
   renderDatasetImage?: RenderDatasetImage;
 };
 
+/** Infer a dataset column's type from its first non-null value. */
+const inferDatasetColumnType = ({
+  rows,
+  columnName,
+}: {
+  rows: BatchResultRow[];
+  columnName: string;
+}): string => {
+  for (const row of rows) {
+    const value = row.datasetEntry[columnName];
+    if (value !== null && value !== undefined) {
+      return inferColumnType(value);
+    }
+  }
+  return "string";
+};
+
 /**
  * Build columns for single run mode
  */
@@ -141,15 +158,7 @@ const buildColumns = ({
   for (const col of datasetColumns) {
     if (hiddenColumns.has(col.name)) continue;
 
-    // Infer column type from first non-null value
-    let columnType = "string";
-    for (const row of rows) {
-      const value = row.datasetEntry[col.name];
-      if (value !== null && value !== undefined) {
-        columnType = inferColumnType(value);
-        break;
-      }
-    }
+    const columnType = inferDatasetColumnType({ rows, columnName: col.name });
 
     columns.push(
       columnHelper.accessor((row) => row.datasetEntry[col.name], {

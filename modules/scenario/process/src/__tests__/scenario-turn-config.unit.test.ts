@@ -134,10 +134,10 @@ describe("ChildProcessJobDataSchema turn config threading", () => {
 });
 
 // ============================================================================
-// Layer 3: fetchScenario maps turn fields from DB to ScenarioConfig
+// Layer 3: getScenarioExecution maps turn fields from DB to ScenarioConfig
 // ============================================================================
 
-describe("fetchScenario turn config mapping", () => {
+describe("getScenarioExecution turn config mapping", () => {
   it("maps maxTurns and minTurns from DB row to ScenarioConfig", async () => {
     const { createMockDepsForTurnConfig } =
       await import("./support/scenario-turn-config.fixture.ts");

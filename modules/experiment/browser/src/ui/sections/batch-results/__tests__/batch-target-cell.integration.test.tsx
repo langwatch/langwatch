@@ -97,10 +97,10 @@ describe("BatchTargetCell", () => {
         "gateway chat/completions: provider_error: the upstream model " +
         "returned an error after exhausting all retries. " +
         "Detail: rate limit exceeded for organization on requests per minute.";
+      let user: ReturnType<typeof userEvent.setup>;
 
-      /** @scenario Reveal full error message on hover */
-      it("shows the full error in a tooltip on hover", async () => {
-        const user = userEvent.setup();
+      beforeEach(() => {
+        user = userEvent.setup();
         const targetOutput = createTargetOutput({
           output: null,
           error: longError,
@@ -109,7 +109,10 @@ describe("BatchTargetCell", () => {
         render(<BatchTargetCell targetOutput={targetOutput} />, {
           wrapper: Wrapper,
         });
+      });
 
+      /** @scenario Reveal full error message on hover */
+      it("shows the full error in a tooltip on hover", async () => {
         await user.hover(screen.getByTestId("error-output-target-1"));
 
         expect(await screen.findByTestId("error-tooltip-target-1")).toHaveTextContent(longError);
@@ -117,16 +120,6 @@ describe("BatchTargetCell", () => {
 
       /** @scenario Expand full error message on click */
       it("expands the full error into the overlay on click", async () => {
-        const user = userEvent.setup();
-        const targetOutput = createTargetOutput({
-          output: null,
-          error: longError,
-        });
-
-        render(<BatchTargetCell targetOutput={targetOutput} />, {
-          wrapper: Wrapper,
-        });
-
         await user.click(screen.getByTestId("error-output-target-1"));
 
         expect(screen.getByTestId("expanded-cell-backdrop")).toBeInTheDocument();
@@ -137,16 +130,6 @@ describe("BatchTargetCell", () => {
       // until the reader happens to click the backdrop.
       /** @scenario Expand full error message on click */
       it("closes the expanded error on Escape, taking the backdrop with it", async () => {
-        const user = userEvent.setup();
-        const targetOutput = createTargetOutput({
-          output: null,
-          error: longError,
-        });
-
-        render(<BatchTargetCell targetOutput={targetOutput} />, {
-          wrapper: Wrapper,
-        });
-
         await user.click(screen.getByTestId("error-output-target-1"));
         expect(screen.getByTestId("expanded-cell-backdrop")).toBeInTheDocument();
 

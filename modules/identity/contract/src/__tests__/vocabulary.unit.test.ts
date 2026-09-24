@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { identifierDomain, normalizeIdentifierValue } from "../identifier.ts";
+import { extractIdentifierDomain, normalizeIdentifierValue } from "../identifier.ts";
 import {
   arrivalStateForProvider,
   identifierProviderFor,
@@ -21,17 +21,17 @@ describe("identifier normalization", () => {
       expect(tagged).not.toBe(normalizeIdentifierValue("sam@acme.com"));
       // The DOMAIN is unchanged, which is what routing reads: a tagged
       // address still reaches its organization's connection.
-      expect(identifierDomain(tagged)).toBe("acme.com");
+      expect(extractIdentifierDomain(tagged)).toBe("acme.com");
     });
 
     it("keeps a value that is not email-shaped as a folded string", () => {
       expect(normalizeIdentifierValue(" GID-123 ")).toBe("gid-123");
-      expect(identifierDomain("gid-123")).toBeNull();
+      expect(extractIdentifierDomain("gid-123")).toBeNull();
     });
 
     it("reads the domain off an email-shaped value only", () => {
-      expect(identifierDomain("sam@acme.com")).toBe("acme.com");
-      expect(identifierDomain("sam@")).toBeNull();
+      expect(extractIdentifierDomain("sam@acme.com")).toBe("acme.com");
+      expect(extractIdentifierDomain("sam@")).toBeNull();
     });
   });
 });

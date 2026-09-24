@@ -780,7 +780,7 @@ describe("TargetCellContent", () => {
       ];
     };
 
-    it("registers onMappingChange on the evaluatorEditor flow callbacks", async () => {
+    beforeEach(async () => {
       seedStoreWithEvaluatorAndDataset();
       const user = userEvent.setup();
 
@@ -795,7 +795,9 @@ describe("TargetCellContent", () => {
       );
 
       await user.click(screen.getByTestId("evaluator-chip-stub-eval-1"));
+    });
 
+    it("registers onMappingChange on the evaluatorEditor flow callbacks", () => {
       expect(mockSetFlowCallbacks).toHaveBeenCalledWith(
         "evaluatorEditor",
         expect.objectContaining({
@@ -805,21 +807,6 @@ describe("TargetCellContent", () => {
     });
 
     it("opens the evaluatorEditor drawer with a mappingsConfig containing availableSources and initialMappings", async () => {
-      seedStoreWithEvaluatorAndDataset();
-      const user = userEvent.setup();
-
-      render(
-        <TargetCellContent
-          target={targetWithEvaluator()}
-          output="some output"
-          evaluatorResults={{}}
-          row={0}
-        />,
-        { wrapper: Wrapper },
-      );
-
-      await user.click(screen.getByTestId("evaluator-chip-stub-eval-1"));
-
       await waitFor(() => {
         expect(mockOpenDrawer).toHaveBeenCalledWith(
           "evaluatorEditor",
@@ -834,22 +821,7 @@ describe("TargetCellContent", () => {
       });
     });
 
-    it("keeps onMappingChange OUT of mappingsConfig (serializable complexProps constraint, see #3087)", async () => {
-      seedStoreWithEvaluatorAndDataset();
-      const user = userEvent.setup();
-
-      render(
-        <TargetCellContent
-          target={targetWithEvaluator()}
-          output="some output"
-          evaluatorResults={{}}
-          row={0}
-        />,
-        { wrapper: Wrapper },
-      );
-
-      await user.click(screen.getByTestId("evaluator-chip-stub-eval-1"));
-
+    it("keeps onMappingChange OUT of mappingsConfig (serializable complexProps constraint, see #3087)", () => {
       expect(mockOpenDrawer).toHaveBeenCalledWith(
         "evaluatorEditor",
         expect.objectContaining({

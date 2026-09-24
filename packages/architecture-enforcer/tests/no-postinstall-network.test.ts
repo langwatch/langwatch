@@ -84,7 +84,8 @@ describe("every tracked package.json", () => {
       const offenders: string[] = [];
       for (const { path, pkg } of manifests) {
         for (const [key, script] of Object.entries(pkg.scripts ?? {})) {
-          if (key.toLowerCase().includes("install") && hasNetworkCall(script)) {
+          if (!key.toLowerCase().includes("install")) continue;
+          if (hasNetworkCall(script)) {
             offenders.push(`${path} scripts["${key}"]: ${script}`);
           }
         }

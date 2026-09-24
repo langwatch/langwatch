@@ -70,9 +70,9 @@ export const backfillCatalogDefaults = (raw: Record<string, unknown>): Record<st
   return raw;
 };
 
-const readCatalog = (outputPath: string): StripePricesFile | null => {
+const readCatalog = (outputPath: string): StripePricesFile => {
   if (!fs.existsSync(outputPath)) {
-    return null;
+    return createEmptyCatalog();
   }
 
   const raw = JSON.parse(fs.readFileSync(outputPath, "utf8")) as Record<string, unknown>;
@@ -84,7 +84,7 @@ const readCatalog = (outputPath: string): StripePricesFile | null => {
       { errors: result.error.issues.length, outputPath },
       "Existing catalog failed validation, rebuilding from scratch",
     );
-    return null;
+    return createEmptyCatalog();
   }
 
   return result.data;
@@ -207,7 +207,7 @@ export const transformPrice = (price: Stripe.Price): StripePriceDetail => {
   };
 };
 
-const chooseLookupMappedPriceId = (
+const pickLookupMappedPriceId = (
   fetchedPrices: StripePriceDetail[],
   key: StripePriceName,
 ): string | undefined => {
@@ -237,7 +237,7 @@ const resolveRequiredMappings = (params: {
   const fetchedPrices = Object.values(fetchedPricesById);
 
   for (const key of STRIPE_PRICE_NAMES) {
-    const lookupMappedId = chooseLookupMappedPriceId(fetchedPrices, key);
+    const lookupMappedId = pickLookupMappedPriceId(fetchedPrices, key);
     const selectedDetail = lookupMappedId ? fetchedPricesById[lookupMappedId] : undefined;
 
     if (!lookupMappedId || !selectedDetail) {
@@ -421,7 +421,7 @@ export const syncStripePrices = async (params: {
     Object.fromEntries(fetchedPrices.map((price) => [price.id, transformPrice(price)])),
   );
 
-  const existingCatalog = readCatalog(outputPath) ?? createEmptyCatalog();
+  const existingCatalog = readCatalog(outputPath);
   const mappingResolution = resolveRequiredMappings({ environment, fetchedPricesById });
   const meterResolution = resolveRequiredMeterMappings({ environment, fetchedMeters });
 

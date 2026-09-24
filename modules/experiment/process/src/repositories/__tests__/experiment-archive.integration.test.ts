@@ -25,8 +25,8 @@ import {
   type ExperimentService as ExperimentServiceContract,
   UnavailableExperimentExecution,
 } from "../../services/experiment.service.ts";
-import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
-import { ExperimentRunRepository } from "../experiment-run.repository.ts";
+import type { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
+import type { ExperimentRunRepository } from "../experiment-run.repository.ts";
 import { PrismaExperimentRepository } from "../prisma/prisma.experiment.repository.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -61,11 +61,29 @@ const references = {
   dataset: {} as DatasetApi,
 };
 
+const notReached = (): never => {
+  throw new Error("this test never reads runs or DSPy steps");
+};
+
+const unusedRunRepository: ExperimentRunRepository = {
+  findAll: notReached,
+  findAggregates: notReached,
+  findPage: notReached,
+  findRun: notReached,
+  findWorkflowVersions: notReached,
+};
+
+const unusedDspyRepository: ExperimentDspyRepository = {
+  upsert: notReached,
+  findAll: notReached,
+  findStep: notReached,
+};
+
 const service = (): ExperimentServiceContract =>
   ExperimentService.create({
     repository: PrismaExperimentRepository.create(database()),
-    runRepository: Object.create(ExperimentRunRepository.prototype) as ExperimentRunRepository,
-    dspyRepository: Object.create(ExperimentDspyRepository.prototype) as ExperimentDspyRepository,
+    runRepository: unusedRunRepository,
+    dspyRepository: unusedDspyRepository,
     slugify: (value) =>
       value
         .toLowerCase()

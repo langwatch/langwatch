@@ -4,6 +4,7 @@
  * authz-context-taking model provider service does not fit. Nothing here throws.
  */
 
+import { GatewayVoiceKeyMissingError } from "@langwatch/gateway-contract";
 import { isElevenLabsHost } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 
@@ -87,23 +88,19 @@ export class GatewayElevenLabsCredentialService {
   }
 
   /**
-   * API key and host to read a conversation back with. The host is validated here as well as on
-   * write, since a row stored before the registry constrained the field could send the customer's
-   * key anywhere. A bad host falls back to the vendor default rather than refusing.
+   * API key and host to read a conversation back with, or GatewayVoiceKeyMissingError. The host is
+   * re-validated here since a row stored before the registry constrained it could send the key
+   * anywhere; a bad host falls back to the vendor default rather than refusing.
    */
-  async tryGetApiCredential({
+  async getApiCredential({
     modelProviderId,
   }: {
     modelProviderId: string;
-  }): Promise<ElevenLabsApiCredential | null> {
+  }): Promise<ElevenLabsApiCredential> {
     const row = await this.elevenLabsKeys(modelProviderId);
-    if (!row) {
-      return null;
-    }
-
-    const apiKey = row.keys.ELEVENLABS_API_KEY;
-    if (typeof apiKey !== "string" || apiKey.length === 0) {
-      return null;
+    const apiKey = row?.keys.ELEVENLABS_API_KEY;
+    if (!row || typeof apiKey !== "string" || apiKey.length === 0) {
+      throw new GatewayVoiceKeyMissingError();
     }
 
     const configured = row.keys.ELEVENLABS_BASE_URL;

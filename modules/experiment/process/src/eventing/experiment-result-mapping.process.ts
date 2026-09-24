@@ -146,7 +146,7 @@ export const extractTargetOutput = (
  * Wall-clock duration from a pair of epoch-millisecond timestamps.
  * Guards on `undefined` rather than truthiness to avoid treating 0 as "no timestamp".
  */
-const durationOf = (
+const computeDuration = (
   timestamps: { started_at?: number; finished_at?: number } | undefined,
 ): number | undefined =>
   timestamps?.started_at !== undefined && timestamps?.finished_at !== undefined
@@ -177,7 +177,7 @@ export const mapTargetResult = ({
 }): EvaluationV3Event => {
   const { targetId } = parseNodeId(nodeId);
 
-  const duration = durationOf(executionState.timestamps);
+  const duration = computeDuration(executionState.timestamps);
 
   // A coded engine failure travels the handled channel; the raw `error`
   // string is kept only as a legacy fallback for engines that don't send a
@@ -210,7 +210,7 @@ export const mapTargetResult = ({
  * Persists only candidate IDs from an evaluator's request; other fields duplicate data already
  * stored per target. Returns undefined for non-Comparison evaluators.
  */
-const persistableInputs = (
+const pickPersistableInputs = (
   inputs: Record<string, unknown> | undefined,
 ): Record<string, unknown> | undefined => {
   const candidates = inputs?.candidates;
@@ -229,7 +229,7 @@ const persistableInputs = (
  * zero cost: 0 says it spent nothing, absent says it does not know, and the
  * stored row keeps them apart.
  */
-const billedCost = (cost: number | undefined): { currency: "USD"; amount: number } | undefined =>
+const toBilledCost = (cost: number | undefined): { currency: "USD"; amount: number } | undefined =>
   typeof cost === "number" ? { currency: "USD", amount: cost } : undefined;
 
 /**
@@ -241,7 +241,7 @@ const skippedResult = (executionState: {
   outputs?: Record<string, unknown>;
   cost?: number;
 }): SingleEvaluationResult => {
-  const cost = billedCost(executionState.cost);
+  const cost = toBilledCost(executionState.cost);
   return {
     status: "skipped",
     ...(typeof executionState.outputs?.details === "string" && executionState.outputs.details
@@ -290,7 +290,7 @@ const processedResult = (
     typeof executionState.outputs?.details === "string" && executionState.outputs.details
       ? executionState.outputs.details
       : undefined,
-  cost: billedCost(executionState.cost),
+  cost: toBilledCost(executionState.cost),
 });
 
 /**
@@ -329,7 +329,7 @@ export const mapEvaluatorResult = ({
     throw new Error(`Expected evaluator node ID but got: ${nodeId}`);
   }
 
-  const duration = durationOf(executionState.timestamps);
+  const duration = computeDuration(executionState.timestamps);
 
   // Check for errors: either execution-level error OR evaluator returned error status in outputs
   const hasEvaluatorError = !!executionState.error || executionState.outputs?.status === "error";
@@ -352,7 +352,7 @@ export const mapEvaluatorResult = ({
     evaluatorId,
     result,
     duration,
-    inputs: persistableInputs(options?.inputs),
+    inputs: pickPersistableInputs(options?.inputs),
   };
 };
 

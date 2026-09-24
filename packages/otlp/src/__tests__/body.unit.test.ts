@@ -104,6 +104,12 @@ function spanCountOf(parsed: {
   ).length;
 }
 
+function compressWith({ encoding, payload }: { encoding: string; payload: Buffer }): Buffer {
+  if (encoding === "gzip") return gzipSync(payload);
+  if (encoding === "deflate") return deflateSync(payload);
+  return brotliCompressSync(payload);
+}
+
 describe("readOtlpBody", () => {
   describe("when Content-Encoding is identity or absent", () => {
     it("returns the body unchanged (no header)", async () => {
@@ -191,12 +197,7 @@ describe("readOtlpBody", () => {
 
     it.each(["gzip", "deflate", "br"])("applies the cap to %s as well", async (encoding) => {
       const payload = Buffer.alloc(OTLP_MAX_BODY_BYTES + 1024, 0);
-      const compressed =
-        encoding === "gzip"
-          ? gzipSync(payload)
-          : encoding === "deflate"
-            ? deflateSync(payload)
-            : brotliCompressSync(payload);
+      const compressed = compressWith({ encoding, payload });
       const req = makeRequest(compressed, { "content-encoding": encoding });
 
       await expect(readOtlpBody(req)).rejects.toBeInstanceOf(OtlpBodyTooLargeError);

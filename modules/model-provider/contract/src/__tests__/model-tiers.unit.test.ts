@@ -1,7 +1,7 @@
 import {
   compareModelSortKeys,
   type ModelVariant,
-  rankChatModel,
+  deriveChatModelRank,
   TIERED_PROVIDERS,
 } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
@@ -14,12 +14,12 @@ const ranks = ({
   id: string;
   variant: ModelVariant;
   provider?: string;
-}) => rankChatModel({ id, provider, variant }) !== null;
+}) => deriveChatModelRank({ id, provider, variant }) !== null;
 
 const sorted = (ids: string[], variant: ModelVariant) =>
   ids
     .flatMap((id) => {
-      const key = rankChatModel({ id, provider: id.split("/")[0]!, variant });
+      const key = deriveChatModelRank({ id, provider: id.split("/")[0]!, variant });
       return key ? [{ id, ...key }] : [];
     })
     .toSorted(compareModelSortKeys)
@@ -62,7 +62,9 @@ describe("given the OpenAI chat model tier grammar", () => {
     });
 
     it("reads a generation with no minor version as its first release", () => {
-      expect(rankChatModel({ id: "openai/gpt-6", provider: "openai", variant: "main" })).toEqual({
+      expect(
+        deriveChatModelRank({ id: "openai/gpt-6", provider: "openai", variant: "main" }),
+      ).toEqual({
         major: 6,
         minor: 0,
         rank: 0,

@@ -138,14 +138,14 @@ export class OtlpRecordPiiRedactionService {
     tenantId?: TenantId,
   ): Promise<void> {
     const native = await this.policy.resolveNativeContext(tenantId, piiRedactionLevel);
-    if (!native) {
+    if (native.kind === "analysis") {
       await this.lambdaRedactLog(log, piiRedactionLevel);
 
       return;
     }
 
     this.applyNativeLogPass(log, native.policy);
-    const lambda = this.policy.tryLambdaAfterNative(native.policy);
+    const lambda = this.policy.deriveLambdaAfterNative(native.policy);
     if (lambda) {
       await this.lambdaRedactLog(log, "STRICT", {
         entities: lambda.entities,
@@ -167,14 +167,15 @@ export class OtlpRecordPiiRedactionService {
       exceptPatterns?: readonly string[];
     },
   ): Promise<void> {
-    const options = await this.policy.tryBuildOptions(
+    const redaction = await this.policy.resolveRedactionOptions(
       piiRedactionLevel,
       lambda?.entities,
       lambda?.exceptPatterns,
     );
-    if (!options) {
+    if (redaction.kind === "skip_redaction") {
       return;
     }
+    const { options } = redaction;
 
     const batch = this.createRedactionBatch();
     // The body is free text, not an attribute value, so no hold-out applies:
@@ -205,7 +206,7 @@ export class OtlpRecordPiiRedactionService {
     tenantId?: TenantId,
   ): Promise<void> {
     const native = await this.policy.resolveNativeContext(tenantId, piiRedactionLevel);
-    if (!native) {
+    if (native.kind === "analysis") {
       await this.lambdaRedactMetricAttributes(metric, piiRedactionLevel);
 
       return;
@@ -226,7 +227,7 @@ export class OtlpRecordPiiRedactionService {
       });
     }
 
-    const lambda = this.policy.tryLambdaAfterNative(native.policy);
+    const lambda = this.policy.deriveLambdaAfterNative(native.policy);
     if (lambda) {
       await this.lambdaRedactMetricAttributes(metric, "STRICT", {
         entities: lambda.entities,
@@ -247,14 +248,15 @@ export class OtlpRecordPiiRedactionService {
       exceptPatterns?: readonly string[];
     },
   ): Promise<void> {
-    const options = await this.policy.tryBuildOptions(
+    const redaction = await this.policy.resolveRedactionOptions(
       piiRedactionLevel,
       lambda?.entities,
       lambda?.exceptPatterns,
     );
-    if (!options) {
+    if (redaction.kind === "skip_redaction") {
       return;
     }
+    const { options } = redaction;
 
     const batch = this.createRedactionBatch();
     this.collectRecordEntries(batch, metric.attributes, metric.attributeNames);

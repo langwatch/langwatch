@@ -402,9 +402,9 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
   tryFindOrganizationWithMembers = unsupported<
     OrganizationInviteRepository["tryFindOrganizationWithMembers"]
   >("tryFindOrganizationWithMembers");
-  tryFindPersonalTeamInScopes = unsupported<
-    OrganizationInviteRepository["tryFindPersonalTeamInScopes"]
-  >("tryFindPersonalTeamInScopes");
+  findPersonalTeamsInScopes = unsupported<
+    OrganizationInviteRepository["findPersonalTeamsInScopes"]
+  >("findPersonalTeamsInScopes");
   findListableInvites =
     unsupported<OrganizationInviteRepository["findListableInvites"]>("findListableInvites");
   revokeOpenInvite =

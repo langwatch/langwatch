@@ -3,7 +3,7 @@ import { type BucketEntry, resetOrGap } from "./rollup-row.ts";
 import {
   bigint,
   type MetricRollupSourcePoint,
-  previousPoint,
+  pickPreviousPoint,
   startsNewSequence,
 } from "./sequence.ts";
 
@@ -27,7 +27,7 @@ function buildSummaryRow({
 
   for (const { point, index } of entries) {
     const currentCount = bigint(point.count);
-    const previous = previousPoint(all, index);
+    const previous = pickPreviousPoint(all, index);
     const starts = startsNewSequence(previous, point);
     const compatible = previous?.metricKind === "summary";
     const previousCount = compatible ? bigint(previous.count) : 0n;

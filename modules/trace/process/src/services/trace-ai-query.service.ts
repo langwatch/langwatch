@@ -10,7 +10,7 @@ import {
   type AiActionResult,
   type AiQueryResult,
   type TraceApi,
-  validateAst,
+  describeAstProblem,
 } from "@langwatch/trace-contract";
 import { generateObject, generateText, type LanguageModel, type ModelMessage } from "ai";
 import { z } from "zod";
@@ -114,7 +114,7 @@ function validateQuery(query: string): { ok: true } | { ok: false; error: string
       return { ok: false, error: "Empty query." };
     }
 
-    const semanticError = validateAst(ast);
+    const semanticError = describeAstProblem(ast);
     if (semanticError) {
       return { ok: false, error: semanticError };
     }

@@ -6,6 +6,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { createApp } from "@langwatch/kernel";
 import { memoryStores } from "@langwatch/process-stores";
+import type { RateLimiter } from "@langwatch/process-stores/members";
 import { StoredObjectApi, StoredObjectNotFoundError } from "@langwatch/stored-object-contract";
 import { describe, expect, it } from "vitest";
 
@@ -32,6 +33,7 @@ function installation(role: "api" | "worker" | "tasks") {
       decrypt: (value: string) => value,
     })
     .withMember("publicBaseUrl", "https://app.example")
+    .withMember("rateLimiter", createApiFixture<RateLimiter>({}))
     .provide({ authz: createApiFixture<AuthzApi>() })
     .withAnalytical(unavailable("analytical store"))
     .withObservability((observability) => observability.withLogging(unavailable("logger")));

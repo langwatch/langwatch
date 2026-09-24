@@ -5,7 +5,7 @@
  */
 
 import {
-  decimalUsdToNanoUsd,
+  convertDecimalUsdToNanoUsd,
   nanoUsdToDecimalString,
   usdDisplayString,
   usdToNanoUsd,
@@ -101,7 +101,7 @@ describe("usdDisplayString", () => {
     // Large: the widest a `Decimal(18,6)` budget column can hold, which is
     // past the safe integer range in nano and so has no `_nano_usd` figure.
     expect(usdDisplayString("999999999999.999999")).toBe("999999999999.999999");
-    expect(decimalUsdToNanoUsd("999999999999.999999")).toBeNull();
+    expect(convertDecimalUsdToNanoUsd("999999999999.999999")).toBeNull();
   });
 
   /** @scenario A Float64 spend sum publishes the amount, not its measurement drift */
@@ -113,32 +113,32 @@ describe("usdDisplayString", () => {
       "25.5",
       "9007199.254740991",
     ]) {
-      const nano = decimalUsdToNanoUsd(amount);
+      const nano = convertDecimalUsdToNanoUsd(amount);
       expect(nano).not.toBeNull();
       expect(usdDisplayString(amount)).toBe(nanoUsdToDecimalString(nano!));
     }
   });
 });
 
-describe("decimalUsdToNanoUsd", () => {
+describe("convertDecimalUsdToNanoUsd", () => {
   /** @scenario A budget amount converts to nano-USD without float drift */
   it("scales the decimal string exactly", () => {
     // 0.1 + 0.2 arithmetic is why this scales the STRING: `toNumber() * 1e9`
     // on these lands fractions of a cent away from the true integer.
-    expect(decimalUsdToNanoUsd(new Prisma.Decimal("25.500000"))).toBe(25_500_000_000);
-    expect(decimalUsdToNanoUsd(new Prisma.Decimal("0.000001"))).toBe(1_000);
-    expect(decimalUsdToNanoUsd(new Prisma.Decimal("0.070000"))).toBe(70_000_000);
-    expect(decimalUsdToNanoUsd(new Prisma.Decimal("0"))).toBe(0);
+    expect(convertDecimalUsdToNanoUsd(new Prisma.Decimal("25.500000"))).toBe(25_500_000_000);
+    expect(convertDecimalUsdToNanoUsd(new Prisma.Decimal("0.000001"))).toBe(1_000);
+    expect(convertDecimalUsdToNanoUsd(new Prisma.Decimal("0.070000"))).toBe(70_000_000);
+    expect(convertDecimalUsdToNanoUsd(new Prisma.Decimal("0"))).toBe(0);
   });
 
   /** @scenario An amount past the safe integer range reports no nano figure */
   it("returns null rather than a silently rounded number", () => {
     // Past 2^53 nano-USD a JSON number has already lost the low digits, and a
     // wrong money figure is worse than an absent one.
-    expect(decimalUsdToNanoUsd(new Prisma.Decimal("9007199.254740991"))).toBe(
+    expect(convertDecimalUsdToNanoUsd(new Prisma.Decimal("9007199.254740991"))).toBe(
       9_007_199_254_740_991,
     );
-    expect(decimalUsdToNanoUsd(new Prisma.Decimal("10000000"))).toBeNull();
+    expect(convertDecimalUsdToNanoUsd(new Prisma.Decimal("10000000"))).toBeNull();
     // The display string keeps reading where the integer cannot.
     expect(usdDisplayString(new Prisma.Decimal("10000000"))).toBe("10000000");
   });

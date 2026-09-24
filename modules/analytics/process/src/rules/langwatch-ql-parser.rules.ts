@@ -30,7 +30,7 @@ export interface LangWatchQLParser {
 /**
  * Reads a `location` off a thrown parser error without trusting its shape.
  */
-function positionOfThrown(error: unknown): SqlSourcePosition | undefined {
+function extractThrownPosition(error: unknown): SqlSourcePosition | undefined {
   if (typeof error !== "object" || error === null) return undefined;
   const start = (error as { location?: { start?: unknown } }).location?.start;
   if (typeof start !== "object" || start === null) return undefined;
@@ -55,7 +55,7 @@ export const clickHouseSqlParser: LangWatchQLParser = {
         statements: statements.map((statement) => ({ ...statement })),
       };
     } catch (error) {
-      return { ok: false, at: positionOfThrown(error) };
+      return { ok: false, at: extractThrownPosition(error) };
     }
   },
 };

@@ -198,14 +198,10 @@ export function resolveMockSpecifier({
   if (specifier === undefined) return { kind: "dynamic" };
 
   const aliased = applyAliases({ specifier, aliases });
-  const base = isAbsolute(aliased)
-    ? aliased
-    : aliased.startsWith(".")
-      ? resolve(fromDir, aliased)
-      : undefined;
   // A bare specifier is a package name: node resolves it, and whether it is
   // installed is not this scanner's question.
-  if (base === undefined) return { kind: "package" };
+  if (!isAbsolute(aliased) && !aliased.startsWith(".")) return { kind: "package" };
+  const base = isAbsolute(aliased) ? aliased : resolve(fromDir, aliased);
 
   const candidates = candidatesFor({ base });
   for (const candidate of candidates) {

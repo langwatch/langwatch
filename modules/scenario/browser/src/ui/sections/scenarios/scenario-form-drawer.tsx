@@ -216,6 +216,8 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   // A read that fails ends the wait without producing a record, so the form would come
   // back with every field at its default.
   const hasReadFailed = !!scenarioId && isScenarioReadFailed && !scenario;
+  const showsFormSkeleton = !hasReadFailed && isHydrating;
+  const showsFormFields = !hasReadFailed && !isHydrating;
   // The version this form is editing. A save sends it as the expected
   // version, so a save over somebody else's newer save is refused rather
   // than written.
@@ -617,14 +619,14 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           <Grid templateColumns="1fr 320px" height="full" overflow="hidden">
             {/* Left: Form */}
             <GridItem overflowY="auto" padding={6} borderRightWidth="1px" borderColor="border">
-              {hasReadFailed ? (
+              {hasReadFailed && (
                 <ScenarioReadError
                   error={scenarioReadError}
                   onRetry={() => void refetchScenario()}
                 />
-              ) : isHydrating ? (
-                <ScenarioFormSkeleton />
-              ) : (
+              )}
+              {showsFormSkeleton && <ScenarioFormSkeleton />}
+              {showsFormFields && (
                 <>
                   {formInstance && <FormServerError form={formInstance} />}
                   {staleVersion !== null && (

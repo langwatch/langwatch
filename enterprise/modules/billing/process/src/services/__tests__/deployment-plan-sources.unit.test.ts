@@ -7,6 +7,8 @@ import type { EntitlementSource, Plan } from "@langwatch/entitlement-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { MemoryBillingStore } from "../../repositories/memory/memory.billing.store.ts";
+import { MemoryBillingSubscription } from "../../repositories/memory/memory.subscription.repository.ts";
 import type {
   BillingSubscriptionRecord,
   BillingSubscription,
@@ -37,9 +39,9 @@ const subscription = (
 
 /** The one read the subscription source makes; nothing else is exercised. */
 function subscriptions(active: BillingSubscriptionRecord | null): BillingSubscription {
-  return {
-    findActive: async () => active,
-  } as unknown as BillingSubscription;
+  const store = MemoryBillingStore.create();
+  if (active) store.subscriptions.push(active);
+  return MemoryBillingSubscription.create(store);
 }
 
 describe("given the plan sources a deployment resolves through", () => {

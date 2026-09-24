@@ -132,9 +132,7 @@ describe("the sso connection write surface", () => {
           expect(fact.data.actor).toEqual(OPS);
         }
       }
-      expect((await connections.tryFindConnection({ connectionId: CONNECTION }))?.state).toBe(
-        "ACTIVE",
-      );
+      expect((await connections.getConnection({ connectionId: CONNECTION })).state).toBe("ACTIVE");
     });
 
     /** @scenario "Backoffice edits go through commands like everyone else's" */

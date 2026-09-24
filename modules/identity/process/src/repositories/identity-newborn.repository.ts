@@ -13,8 +13,8 @@ export abstract class IdentityNewbornRepository {
    * find.
    */
   abstract claim: (args: { userId: string }) => Promise<void>;
-  /** The user already sitting at the derived id, or null when it is free. */
-  abstract tryFindUserAtPinnedId(args: { userId: string }): Promise<{ id: string } | null>;
+  /** Whether a user already sits at the derived id. */
+  abstract hasUserAtPinnedId(args: { userId: string }): Promise<boolean>;
   /** The user row and its `finalized` state row, in one transaction. */
   abstract commitNewborn: (args: {
     userId: string;

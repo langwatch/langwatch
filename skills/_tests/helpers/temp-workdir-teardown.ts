@@ -51,17 +51,29 @@ export default function setup(): () => void {
     }
 
     for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      if (!entry.name.startsWith("langwatch-skill-")) continue;
-
-      const workDir = path.join(tempRoot, entry.name);
-      try {
-        if (fs.statSync(workDir).mtimeMs > idleCutoff) continue;
-        if (hasActivitySince(workDir, idleCutoff)) continue;
-        fs.rmSync(workDir, { recursive: true, force: true });
-      } catch {
-        // A workspace another run owns, or one already gone. Both are fine.
-      }
+      removeIdleWorkspace({ tempRoot, entry, idleCutoff });
     }
   };
+}
+
+function removeIdleWorkspace({
+  tempRoot,
+  entry,
+  idleCutoff,
+}: {
+  tempRoot: string;
+  entry: fs.Dirent;
+  idleCutoff: number;
+}): void {
+  if (!entry.isDirectory()) return;
+  if (!entry.name.startsWith("langwatch-skill-")) return;
+
+  const workDir = path.join(tempRoot, entry.name);
+  try {
+    if (fs.statSync(workDir).mtimeMs > idleCutoff) return;
+    if (hasActivitySince(workDir, idleCutoff)) return;
+    fs.rmSync(workDir, { recursive: true, force: true });
+  } catch {
+    // A workspace another run owns, or one already gone. Both are fine.
+  }
 }

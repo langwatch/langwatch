@@ -328,7 +328,7 @@ type ProviderWithCustomModels = {
  * The completion-token ceiling a model may be called with: a custom model's own limit where the
  * project declared one, and the catalogue's otherwise.
  */
-export function resolveMaxTokensCeiling(
+export function pickMaxTokensCeiling(
   modelId: string,
   modelProvider: ProviderWithCustomModels | null | undefined,
 ): number | undefined {

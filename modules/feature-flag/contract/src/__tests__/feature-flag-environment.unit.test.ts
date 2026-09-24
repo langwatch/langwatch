@@ -2,17 +2,17 @@ import { describe, expect, it } from "vitest";
 
 import {
   deriveFeatureFlagEnvVarName,
-  resolveFeatureFlagEnvOverride,
+  parseFeatureFlagEnvOverride,
 } from "../feature-flag-environment.ts";
 
 function reader(values: Record<string, string>) {
   return (name: string): string | undefined => values[name];
 }
 
-describe("resolveFeatureFlagEnvOverride()", () => {
+describe("parseFeatureFlagEnvOverride()", () => {
   describe("when the derived variable is set to 1", () => {
     it("returns true", () => {
-      const override = resolveFeatureFlagEnvOverride({
+      const override = parseFeatureFlagEnvOverride({
         read: reader({ RELEASE_UI_SIMULATIONS_MENU_ENABLED: "1" }),
         flagKey: "release_ui_simulations_menu_enabled",
       });
@@ -23,7 +23,7 @@ describe("resolveFeatureFlagEnvOverride()", () => {
 
   describe("when the derived variable is set to 0", () => {
     it("returns false", () => {
-      const override = resolveFeatureFlagEnvOverride({
+      const override = parseFeatureFlagEnvOverride({
         read: reader({ RELEASE_UI_SIMULATIONS_MENU_ENABLED: "0" }),
         flagKey: "release_ui_simulations_menu_enabled",
       });
@@ -34,7 +34,7 @@ describe("resolveFeatureFlagEnvOverride()", () => {
 
   describe("when the derived variable is not set", () => {
     it("returns undefined so resolution continues", () => {
-      const override = resolveFeatureFlagEnvOverride({
+      const override = parseFeatureFlagEnvOverride({
         read: reader({}),
         flagKey: "release_ui_simulations_menu_enabled",
       });
@@ -45,7 +45,7 @@ describe("resolveFeatureFlagEnvOverride()", () => {
 
   describe("when the derived variable holds a value other than 1 or 0", () => {
     it.each(["true", "false", ""])("returns undefined for %j", (value) => {
-      const override = resolveFeatureFlagEnvOverride({
+      const override = parseFeatureFlagEnvOverride({
         read: reader({ RELEASE_UI_SIMULATIONS_MENU_ENABLED: value }),
         flagKey: "release_ui_simulations_menu_enabled",
       });
@@ -56,7 +56,7 @@ describe("resolveFeatureFlagEnvOverride()", () => {
 
   describe("when the flag key carries dashes", () => {
     it("uppercases and converts them to underscores", () => {
-      const override = resolveFeatureFlagEnvOverride({
+      const override = parseFeatureFlagEnvOverride({
         read: reader({ MY_FEATURE_FLAG: "1" }),
         flagKey: "my-feature-flag",
       });
@@ -67,7 +67,7 @@ describe("resolveFeatureFlagEnvOverride()", () => {
 
   describe("when the flag key mixes case and dashes", () => {
     it("normalises the whole key", () => {
-      const override = resolveFeatureFlagEnvOverride({
+      const override = parseFeatureFlagEnvOverride({
         read: reader({ ES_TRACE_PROCESSING_COMMAND_RECORDSPAN_KILLSWITCH: "0" }),
         flagKey: "es-trace_processing-command-recordSpan-killSwitch",
       });
@@ -78,7 +78,7 @@ describe("resolveFeatureFlagEnvOverride()", () => {
 
   describe("when a legacy alias is declared", () => {
     it("honours its looser truthy semantics", () => {
-      const override = resolveFeatureFlagEnvOverride({
+      const override = parseFeatureFlagEnvOverride({
         read: reader({ LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD: "yes" }),
         flagKey: "ops_es_causality_loop_guard_disabled",
         legacyEnvVar: "LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD",
@@ -88,7 +88,7 @@ describe("resolveFeatureFlagEnvOverride()", () => {
     });
 
     it.each(["", "0", "false"])("reads %j as off", (value) => {
-      const override = resolveFeatureFlagEnvOverride({
+      const override = parseFeatureFlagEnvOverride({
         read: reader({ LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD: value }),
         flagKey: "ops_es_causality_loop_guard_disabled",
         legacyEnvVar: "LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD",
@@ -98,7 +98,7 @@ describe("resolveFeatureFlagEnvOverride()", () => {
     });
 
     it("lets the derived variable win over the alias", () => {
-      const override = resolveFeatureFlagEnvOverride({
+      const override = parseFeatureFlagEnvOverride({
         read: reader({
           OPS_ES_CAUSALITY_LOOP_GUARD_DISABLED: "0",
           LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD: "1",

@@ -219,6 +219,9 @@ export function SimulationCard({
   const isComplete = status ? SCENARIO_RUN_STATUS_CONFIG[status].isComplete : false;
 
   const shouldDim = isComplete && !isActive;
+  const showSkeleton = !!isLoading;
+  const showAwaitingState = !isLoading && !!isAwaitingMessages;
+  const showContent = !isLoading && !isAwaitingMessages;
 
   return (
     <Card.Root
@@ -266,13 +269,9 @@ export function SimulationCard({
           // line of the preview isn't hidden underneath it.
           paddingBottom={status ? "40px" : undefined}
         >
-          {isLoading ? (
-            <SimulationCardSkeleton />
-          ) : isAwaitingMessages ? (
-            <SimulationCardAwaitingState description={description} />
-          ) : (
-            <SimulationCardContent>{children}</SimulationCardContent>
-          )}
+          {showSkeleton && <SimulationCardSkeleton />}
+          {showAwaitingState && <SimulationCardAwaitingState description={description} />}
+          {showContent && <SimulationCardContent>{children}</SimulationCardContent>}
         </Box>
       </VStack>
       {isComplete && status && <SimulationStatusOverlay status={status} />}

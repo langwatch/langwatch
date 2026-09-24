@@ -125,7 +125,7 @@ const RAG_SPAN_TYPE = "rag";
  * The name a tool span was called by: the `gen_ai.tool.name` attribute when
  * the emitter set it, else the span's own name.
  */
-export function toolNameOf(span: Span): string | null {
+export function extractToolName(span: Span): string | null {
   const params = span.params as Record<string, unknown> | null | undefined;
   const genAi = params?.gen_ai as Record<string, unknown> | undefined;
   const tool = genAi?.tool as Record<string, unknown> | undefined;
@@ -139,7 +139,7 @@ const startedAtOf = (span: Span): number => span.timestamps?.started_at ?? Numbe
 /** The tool spans called by the given name, in the order they started. */
 export function toolCallsNamed({ spans, toolName }: { spans: Span[]; toolName: string }): Span[] {
   return spans
-    .filter((span) => span.type === TOOL_SPAN_TYPE && toolNameOf(span) === toolName)
+    .filter((span) => span.type === TOOL_SPAN_TYPE && extractToolName(span) === toolName)
     .toSorted((a, b) => startedAtOf(a) - startedAtOf(b));
 }
 

@@ -2,6 +2,7 @@
  * bounded (200 rows at a time). Caller told when capped.
  */
 
+import type { Dataset, DatasetRecord } from "@langwatch/dataset-contract";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 
@@ -9,26 +10,38 @@ import {
   createDatasetTestAttachments,
   createDatasetTestRequestBounds,
 } from "../../app/__tests__/dataset.fixture.ts";
-import type { DatasetRecordRepository } from "../../repositories/dataset-record.repository.ts";
-import type { DatasetRepository } from "../../repositories/dataset.repository.ts";
+import { MemoryDatasetRecordRepository } from "../../repositories/memory/memory.dataset-record.repository.ts";
+import { MemoryDatasetDatabase } from "../../repositories/memory/memory.dataset.database.ts";
+import { MemoryDatasetRepository } from "../../repositories/memory/memory.dataset.repository.ts";
 import { DatasetService } from "../dataset.service.ts";
 
 const PROJECT_ID = "project-1";
 
-const dataset = {
+const dataset: Dataset = {
   id: "dataset-1",
   projectId: PROJECT_ID,
   name: "Refunds",
   slug: "refunds",
   columnTypes: [],
-  contentLayout: "inline",
+  contentLayout: "postgres",
   status: "ready",
   createdAt: new Date(0),
   updatedAt: new Date(0),
+  archivedAt: null,
+  mapping: null,
+  useS3: false,
+  s3RecordCount: null,
+  statusError: null,
+  stagingKey: null,
+  uploadFilename: null,
+  rowCount: null,
+  sizeBytes: null,
+  chunkCount: null,
+  chunkOffsets: null,
 };
 
 /** `entry` is what the byte cap measures, so its size is the knob under test. */
-const record = (id: string, entrySize = 10) => ({
+const record = (id: string, entrySize = 10): DatasetRecord => ({
   id,
   datasetId: dataset.id,
   projectId: PROJECT_ID,
@@ -37,18 +50,19 @@ const record = (id: string, entrySize = 10) => ({
   updatedAt: new Date(0),
 });
 
-function serviceHolding(records: ReturnType<typeof record>[]) {
-  const repository = {
-    findById: async () => null,
-    findBySlug: async () => dataset,
-  } as unknown as DatasetRepository;
+function serviceHolding(records: DatasetRecord[]) {
+  const database = MemoryDatasetDatabase.create();
+  const repository = Object.assign(MemoryDatasetRepository.create({ database }), {
+    findById: async (): Promise<Dataset | null> => null,
+    findBySlug: async (): Promise<Dataset | null> => dataset,
+  });
 
-  const recordsRepository = {
+  const recordsRepository = Object.assign(MemoryDatasetRecordRepository.create({ database }), {
     findAll: async ({ page, limit }: { page: number; limit: number }) => ({
       records: records.slice((page - 1) * limit, page * limit),
       total: records.length,
     }),
-  } as unknown as DatasetRecordRepository;
+  });
 
   return DatasetService.create({
     repository,
@@ -59,7 +73,7 @@ function serviceHolding(records: ReturnType<typeof record>[]) {
 }
 
 const read = (
-  records: ReturnType<typeof record>[],
+  records: DatasetRecord[],
   over: { limitMb?: number | null; entrySelection?: unknown } = {},
 ) =>
   serviceHolding(records).getDatasetWithRecords({

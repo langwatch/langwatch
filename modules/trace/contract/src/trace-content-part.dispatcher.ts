@@ -1,6 +1,6 @@
 import {
-  openAiFilePayloadToBinaryPart,
-  mediaTypeToAudioFormat,
+  decodeOpenAiFilePayloadToBinaryPart,
+  mapMediaTypeToAudioFormat,
 } from "./trace-content-part.file-decoder.ts";
 import { toMediaPart } from "./trace-content-part.provider-source.ts";
 import { parseRecord } from "./trace-content-part.record-schema.ts";
@@ -22,7 +22,7 @@ function asString(value: unknown): string | undefined {
  * What every shape falls back to: a bare `image` string, then the visitor's own `unknown`. A
  * shape that recognises its `type` but not its payload lands here too.
  */
-function unclaimedPart<R>(
+function visitUnclaimedPart<R>(
   o: Record<string, unknown>,
   part: unknown,
   visitor: AsyncContentPartVisitor<R>,
@@ -35,7 +35,7 @@ function unclaimedPart<R>(
   return visitor.unknown?.(part);
 }
 
-function textPart<R>(
+function visitTextPart<R>(
   o: Record<string, unknown>,
   visitor: AsyncContentPartVisitor<R>,
 ): R | Promise<R> | undefined {
@@ -44,7 +44,7 @@ function textPart<R>(
   return visitor.text(typeof o.text === "string" ? o.text : contentText);
 }
 
-function inputAudioPart<R>(
+function visitInputAudioPart<R>(
   o: Record<string, unknown>,
   part: unknown,
   visitor: AsyncContentPartVisitor<R>,
@@ -54,7 +54,7 @@ function inputAudioPart<R>(
 
   const data = asString(ia.data);
   const url = asString(ia.url);
-  if (!data && !url) return unclaimedPart(o, part, visitor);
+  if (!data && !url) return visitUnclaimedPart(o, part, visitor);
   if (!visitor.inputAudio) return visitor.unknown?.(part);
 
   return visitor.inputAudio({
@@ -66,7 +66,7 @@ function inputAudioPart<R>(
 }
 
 /** A `file` part carrying its payload inline, under `mediaType` + `data`/`url`. */
-function inlineFilePart<R>({
+function visitInlineFilePart<R>({
   o,
   part,
   visitor,
@@ -81,7 +81,7 @@ function inlineFilePart<R>({
   if (mimeType.startsWith("audio/")) {
     if (!visitor.inputAudio) return visitor.unknown?.(part);
 
-    return visitor.inputAudio({ data, url, format: mediaTypeToAudioFormat(mimeType), mimeType });
+    return visitor.inputAudio({ data, url, format: mapMediaTypeToAudioFormat(mimeType), mimeType });
   }
 
   return visitor.binary({
@@ -95,7 +95,7 @@ function inlineFilePart<R>({
 }
 
 /** OpenAI's own shape: the payload sits under `file`, base64 with a filename. */
-function openAiFilePart<R>(
+function visitOpenAiFilePart<R>(
   o: Record<string, unknown>,
   part: unknown,
   visitor: AsyncContentPartVisitor<R>,
@@ -103,19 +103,19 @@ function openAiFilePart<R>(
   const file = parseRecord(o.file);
   if (!file) return visitor.unknown?.(part);
 
-  const binPart = openAiFilePayloadToBinaryPart(file);
+  const binPart = decodeOpenAiFilePayloadToBinaryPart(file);
   if (!binPart) return visitor.unknown?.(part);
   if (!binPart.mimeType.startsWith("audio/")) return visitor.binary(binPart);
   if (!visitor.inputAudio) return visitor.unknown?.(part);
 
   return visitor.inputAudio({
     data: binPart.data,
-    format: mediaTypeToAudioFormat(binPart.mimeType),
+    format: mapMediaTypeToAudioFormat(binPart.mimeType),
     mimeType: binPart.mimeType,
   });
 }
 
-function filePart<R>(
+function visitFilePart<R>(
   o: Record<string, unknown>,
   part: unknown,
   visitor: AsyncContentPartVisitor<R>,
@@ -124,7 +124,7 @@ function filePart<R>(
     const data = asString(o.data);
     const url = asString(o.url);
     if (data || url) {
-      return inlineFilePart({
+      return visitInlineFilePart({
         o,
         part,
         visitor,
@@ -133,15 +133,15 @@ function filePart<R>(
     }
   }
 
-  return openAiFilePart(o, part, visitor);
+  return visitOpenAiFilePart(o, part, visitor);
 }
 
-function binaryPart<R>(
+function visitBinaryPart<R>(
   o: Record<string, unknown>,
   part: unknown,
   visitor: AsyncContentPartVisitor<R>,
 ): R | Promise<R> | undefined {
-  if (typeof o.mimeType !== "string") return unclaimedPart(o, part, visitor);
+  if (typeof o.mimeType !== "string") return visitUnclaimedPart(o, part, visitor);
 
   return visitor.binary({
     type: "binary",
@@ -153,34 +153,34 @@ function binaryPart<R>(
   });
 }
 
-function imageUrlPart<R>(
+function visitImageUrlPart<R>(
   o: Record<string, unknown>,
   part: unknown,
   visitor: AsyncContentPartVisitor<R>,
 ): R | Promise<R> | undefined {
-  const url = imageUrlFromPart(o);
-  if (url === null) return unclaimedPart(o, part, visitor);
+  const url = extractImageUrlFromPart(o);
+  if (url === null) return visitUnclaimedPart(o, part, visitor);
 
   return visitor.imageUrl ? visitor.imageUrl(url) : visitor.unknown?.(part);
 }
 
-function dispatchRecordPart<R>(
+function visitRecordPart<R>(
   o: Record<string, unknown>,
   part: unknown,
   visitor: AsyncContentPartVisitor<R>,
 ): R | Promise<R> | undefined {
-  if (o.type === "text" || (!o.type && o.text)) return textPart(o, visitor);
+  if (o.type === "text" || (!o.type && o.text)) return visitTextPart(o, visitor);
 
   const mediaPart = toMediaPart(o);
   if (mediaPart) return visitor.media(mediaPart);
 
   switch (o.type) {
     case "input_audio":
-      return inputAudioPart(o, part, visitor);
+      return visitInputAudioPart(o, part, visitor);
     case "file":
-      return filePart(o, part, visitor);
+      return visitFilePart(o, part, visitor);
     case "binary":
-      return binaryPart(o, part, visitor);
+      return visitBinaryPart(o, part, visitor);
     case "tool_use":
     case "tool_call":
       return visitor.toolCall({
@@ -190,21 +190,21 @@ function dispatchRecordPart<R>(
     case "tool_result":
       return visitor.toolResult({ result: o.content ?? o.result });
     case "image_url":
-      return imageUrlPart(o, part, visitor);
+      return visitImageUrlPart(o, part, visitor);
     default:
-      return unclaimedPart(o, part, visitor);
+      return visitUnclaimedPart(o, part, visitor);
   }
 }
 
-export function dispatchContentPart<R>(
+export function visitAnyContentPart<R>(
   part: unknown,
   visitor: ContentPartVisitor<R>,
 ): R | undefined;
-export function dispatchContentPart<R>(
+export function visitAnyContentPart<R>(
   part: unknown,
   visitor: AsyncContentPartVisitor<R>,
 ): R | Promise<R> | undefined;
-export function dispatchContentPart<R>(
+export function visitAnyContentPart<R>(
   part: unknown,
   visitor: AsyncContentPartVisitor<R>,
 ): R | Promise<R> | undefined {
@@ -217,14 +217,14 @@ export function dispatchContentPart<R>(
     return visitor.unknown?.(part);
   }
 
-  return dispatchRecordPart(o, part, visitor);
+  return visitRecordPart(o, part, visitor);
 }
 
 export function visitContentPart<R>(part: unknown, visitor: ContentPartVisitor<R>): R | undefined {
-  return dispatchContentPart(part, visitor);
+  return visitAnyContentPart(part, visitor);
 }
 
-function imageUrlFromPart(o: Record<string, unknown>): string | null {
+function extractImageUrlFromPart(o: Record<string, unknown>): string | null {
   if (o.type !== "image_url") return null;
   const carrier = o.image_url;
   if (typeof carrier === "string" && carrier) return carrier;

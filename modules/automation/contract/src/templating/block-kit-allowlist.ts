@@ -349,20 +349,32 @@ function findSanitizedPieChart(chart: Record<string, unknown>): Record<string, u
   return { type: "pie", segments };
 }
 
+function sanitizeChartPoints(points: unknown[]): { label: string; value: number }[] {
+  return points
+    .map((point) => {
+      if (!isBlock(point)) return null;
+      const label = findLabel(point.label);
+      if (label === null || typeof point.value !== "number") return null;
+      return { label, value: point.value };
+    })
+    .filter((x): x is { label: string; value: number } => x !== null)
+    .slice(0, MAX_CHART_POINTS);
+}
+
+function sanitizeChartCategories(categories: unknown): string[] {
+  if (!Array.isArray(categories)) return [];
+  return categories
+    .map(findLabel)
+    .filter((x): x is string => x !== null)
+    .slice(0, MAX_CHART_CATEGORIES);
+}
+
 function findSanitizedSeriesChart(chart: Record<string, unknown>): Record<string, unknown> | null {
   if (!Array.isArray(chart.series) || !isBlock(chart.axis_config)) return null;
   const series = chart.series
     .map((s) => {
       if (!isBlock(s) || typeof s.name !== "string" || !Array.isArray(s.data)) return null;
-      const data = s.data
-        .map((point) => {
-          if (!isBlock(point)) return null;
-          const label = findLabel(point.label);
-          if (label === null || typeof point.value !== "number") return null;
-          return { label, value: point.value };
-        })
-        .filter((x): x is { label: string; value: number } => x !== null)
-        .slice(0, MAX_CHART_POINTS);
+      const data = sanitizeChartPoints(s.data);
       if (data.length === 0) return null;
       return { name: s.name, data };
     })
@@ -370,12 +382,7 @@ function findSanitizedSeriesChart(chart: Record<string, unknown>): Record<string
     .slice(0, MAX_CHART_SERIES);
   if (series.length === 0) return null;
 
-  const categories = Array.isArray(chart.axis_config.categories)
-    ? chart.axis_config.categories
-        .map(findLabel)
-        .filter((x): x is string => x !== null)
-        .slice(0, MAX_CHART_CATEGORIES)
-    : [];
+  const categories = sanitizeChartCategories(chart.axis_config.categories);
   if (categories.length === 0) return null;
   const axis_config: Record<string, unknown> = { categories };
   if (typeof chart.axis_config.x_label === "string")

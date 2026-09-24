@@ -19,7 +19,7 @@ import type {
 } from "../../repositories/scenario.repository.ts";
 import { ResultAtomsService, __testing } from "../result-atoms.service.ts";
 
-const { bucketSecondsFor, rate } = __testing;
+const { bucketSecondsFor, computePassRate } = __testing;
 
 const now = Date.UTC(2026, 1, 15);
 const startDate = now - 30 * 24 * 60 * 60 * 1000;
@@ -31,7 +31,7 @@ interface FakeData {
   trend?: RawTrendRow[];
   atoms?: RawAtomRow[];
   series?: { Bucket: string; Passed: string; Settled: string }[];
-  totals?: Record<string, string> | null;
+  totals?: Record<string, string>;
   runTargets?: RawRunTargetRow[];
 }
 
@@ -635,16 +635,16 @@ describe("the target of a group", () => {
   });
 });
 
-describe("rate", () => {
+describe("computePassRate", () => {
   describe("when nothing settled", () => {
     it("is null, not zero", () => {
-      expect(rate(0, 0)).toBeNull();
+      expect(computePassRate(0, 0)).toBeNull();
     });
   });
 
   describe("when everything settled and passed", () => {
     it("is a hundred", () => {
-      expect(rate(3, 3)).toBe(100);
+      expect(computePassRate(3, 3)).toBe(100);
     });
   });
 });

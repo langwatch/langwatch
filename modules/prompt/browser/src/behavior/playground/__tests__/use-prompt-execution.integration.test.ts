@@ -13,8 +13,11 @@ const { fetchSSEMock } = vi.hoisted(() => ({ fetchSSEMock: vi.fn() }));
 
 vi.mock("@langwatch/workflow-browser/fetch-sse", () => ({ fetchSSE: fetchSSEMock }));
 
-const formValues = {
+const formValues: PromptConfigFormValues = {
+  handle: null,
+  scope: "PROJECT",
   version: {
+    parameters: {},
     configData: {
       llm: { model: "openai/gpt-5-mini" },
       messages: [{ role: "user", content: "answer it" }],
@@ -22,7 +25,7 @@ const formValues = {
       outputs: [{ identifier: "output", type: "str" }],
     },
   },
-} as unknown as PromptConfigFormValues;
+};
 
 /** Drives the hook's event handler with a scripted stream. */
 function respondWith(events: Record<string, unknown>[]) {

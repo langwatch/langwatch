@@ -25,12 +25,12 @@ function buildScenarios(
 }
 
 function buildModelProviders(defaults: Record<string, string>) {
-  return {
-    findResolvedDefault: vi.fn(async ({ featureKey }: { featureKey: string }) => {
+  return createApiFixture<ModelProviderApi>({
+    findResolvedDefault: vi.fn<ModelProviderApi["findResolvedDefault"]>(async ({ featureKey }) => {
       const model = defaults[featureKey];
       return model ? { model, source: "role_default", scope: "project" } : null;
     }),
-  } as unknown as ModelProviderApi;
+  });
 }
 
 describe("SuiteRunModelsService.resolve", () => {

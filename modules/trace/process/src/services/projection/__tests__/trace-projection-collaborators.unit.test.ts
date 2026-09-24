@@ -1,13 +1,24 @@
+import { createTenantId } from "@langwatch/eventing";
 import {
   NormalizedSpanKind,
   NormalizedStatusCode,
   EVENTREF_ATTR_PREFIX,
   COMMAND_INLINE_THRESHOLD,
   LOG_RECORD_RECEIVED_EVENT_TYPE,
+  LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
+  type LogRecordReceivedEvent,
   type NormalizedSpan,
+  type SpanReceivedEvent,
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import {
+  createOtlpSpan,
+  createSpanReceivedEvent,
+  OCCURRED_AT,
+  TENANT_ID,
+  TRACE_ID,
+} from "../../../eventing/__tests__/trace-subscriber.fixtures.ts";
 import { ModelCatalogTraceModelCostAdapter } from "../../model-catalog.trace-model-cost.service.ts";
 import { SpanCostService } from "../../span-cost.service.ts";
 import { TraceCanonicalisationService } from "../../trace-canonicalisation.service.ts";
@@ -223,16 +234,13 @@ describe("given the lean projection payload transform", () => {
   const overBudget = "x".repeat(IO_PREVIEW_BYTES + 1024);
 
   function spanReceivedEvent(attributes: { key: string; value: { stringValue: string } }[]) {
-    return {
-      id: "evt_1",
-      type: "lw.obs.trace.span_received",
-      tenantId: "tenant-1",
-      aggregateId: "trace-1",
-      data: {
-        span: { attributes, events: [], links: [] },
-        resource: null,
-      },
-    } as never;
+    return createSpanReceivedEvent({ ...createOtlpSpan(), attributes }, { id: "evt_1" });
+  }
+
+  function attributeStrings(event: SpanReceivedEvent): Record<string, string> {
+    return Object.fromEntries(
+      event.data.span.attributes.map((a) => [a.key, a.value.stringValue ?? ""]),
+    );
   }
 
   describe("when the attribute keys that earn the wide budget are read", () => {
@@ -256,12 +264,7 @@ describe("given the lean projection payload transform", () => {
         { key: "langwatch.input", value: { stringValue: overBudget } },
       ]);
 
-      const leaned = TraceProjectionLeanService.leanForProjection(event) as unknown as {
-        data: { span: { attributes: { key: string; value: { stringValue: string } }[] } };
-      };
-      const attrs = Object.fromEntries(
-        leaned.data.span.attributes.map((a) => [a.key, a.value.stringValue]),
-      );
+      const attrs = attributeStrings(TraceProjectionLeanService.leanForProjection(event));
 
       // The byte cut backs off to a codepoint boundary and then appends the
       // ellipsis, so a preview is at most the budget plus that character.
@@ -281,11 +284,8 @@ describe("given the lean projection payload transform", () => {
 
       TraceProjectionLeanService.leanForProjection(event);
 
-      const original = event as unknown as {
-        data: { span: { attributes: { value: { stringValue: string } }[] } };
-      };
-      expect(original.data.span.attributes[0]!.value.stringValue).toBe(overBudget);
-      expect(original.data.span.attributes).toHaveLength(1);
+      expect(event.data.span.attributes[0]!.value.stringValue).toBe(overBudget);
+      expect(event.data.span.attributes).toHaveLength(1);
     });
   });
 
@@ -303,17 +303,32 @@ describe("given the lean projection payload transform", () => {
   describe("when an oversized log record body is prepared for projection", () => {
     /** @scenario "an oversized input is previewed and left a pointer" */
     it("previews the body and points at the event carrying it", () => {
-      const event = {
+      const event: LogRecordReceivedEvent = {
         id: "evt_2",
+        aggregateId: TRACE_ID,
+        aggregateType: "trace",
+        tenantId: createTenantId(TENANT_ID),
+        createdAt: OCCURRED_AT,
+        occurredAt: OCCURRED_AT,
         type: LOG_RECORD_RECEIVED_EVENT_TYPE,
-        tenantId: "tenant-1",
-        aggregateId: "trace-1",
-        data: { body: overBudget, attributes: {} },
-      } as never;
-
-      const leaned = TraceProjectionLeanService.leanForProjection(event) as unknown as {
-        data: { body: string; attributes: Record<string, string> };
+        version: LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
+        data: {
+          traceId: TRACE_ID,
+          spanId: "span-1",
+          timeUnixMs: OCCURRED_AT,
+          severityNumber: 9,
+          severityText: "INFO",
+          body: overBudget,
+          attributes: {},
+          resourceAttributes: {},
+          scopeName: "test.scope",
+          scopeVersion: null,
+          piiRedactionLevel: "STRICT",
+        },
+        metadata: {},
       };
+
+      const leaned = TraceProjectionLeanService.leanForProjection(event);
 
       expect(Buffer.byteLength(leaned.data.body, "utf8")).toBe(IO_PREVIEW_BYTES + 3);
       expect(leaned.data.attributes["langwatch.reserved.eventref.body"]).toBe(

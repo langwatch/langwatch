@@ -427,7 +427,7 @@ describe("useEvaluationsV3Store", () => {
           includeMetrics: [],
           randomizeOrder: true,
         },
-      } as unknown as EvaluatorConfig);
+      });
 
       store.removeTarget("target-1");
 

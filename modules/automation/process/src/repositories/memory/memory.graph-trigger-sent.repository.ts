@@ -84,7 +84,8 @@ export class MemoryGraphTriggerSentRepository extends GraphTriggerSentRepository
     projectId: string;
     customGraphId: string;
   }): Promise<OpenGraphTriggerSent | "already-claimed"> {
-    if (this.open().some((row) => this.matches(row, params))) {
+    const alreadyOpen = this.open().some((row) => this.matches(row, params));
+    if (alreadyOpen) {
       return Promise.resolve("already-claimed");
     }
     const incident = {

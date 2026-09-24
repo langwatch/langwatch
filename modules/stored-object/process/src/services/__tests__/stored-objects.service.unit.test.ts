@@ -63,7 +63,11 @@ function makeRepository(): StoredObjectsRepository {
     findAllByProject: vi.fn().mockResolvedValue([]),
     deleteByProject: vi.fn().mockResolvedValue(undefined),
     deleteByIds: vi.fn().mockResolvedValue(undefined),
-  } as unknown as StoredObjectsRepository;
+    findLiveRowsByProjectPage: () =>
+      Promise.reject(new Error("findLiveRowsByProjectPage is not used here")),
+    sumSizeBytesByProject: () =>
+      Promise.reject(new Error("sumSizeBytesByProject is not used here")),
+  };
 }
 
 function makeRegistry(): StoredObjectStorageRepository {
@@ -72,7 +76,7 @@ function makeRegistry(): StoredObjectStorageRepository {
     put: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
     exists: vi.fn().mockResolvedValue(true),
-  } as unknown as StoredObjectStorageRepository;
+  };
 }
 
 function makeTelemetry(): StoredObjectsTelemetry {
@@ -82,7 +86,7 @@ function makeTelemetry(): StoredObjectsTelemetry {
     recordWriteFailure: vi.fn(),
     recordReadFailure: vi.fn(),
     observeSizeBytes: vi.fn(),
-  } as unknown as StoredObjectsTelemetry;
+  };
 }
 
 function makeRow(overrides: Partial<StoredObject> = {}): StoredObject {
@@ -351,7 +355,7 @@ describe("storeFromBytes", () => {
   });
 });
 
-describe("tryGetById", () => {
+describe("getById", () => {
   let repo: StoredObjectsRepository;
   let registry: StoredObjectStorageRepository;
   let service: StoredObjectsService;
@@ -369,12 +373,11 @@ describe("tryGetById", () => {
       vi.mocked(repo.tryFindById).mockResolvedValue(row);
       vi.mocked(registry.get).mockResolvedValue(stream);
 
-      const result = await service.tryGetById({
+      const result = await service.getById({
         projectId: PROJECT_ID,
         id: "obj-1",
       });
 
-      expect(result).not.toBeNull();
       expect(result).toMatchObject({ row });
       expect((result as { stream: Readable }).stream).toBe(stream);
     });
@@ -388,27 +391,23 @@ describe("tryGetById", () => {
         new ObjectNotFoundError("file:///var/lib/langwatch/objects/proj-1/abc"),
       );
 
-      const result = await service.tryGetById({
+      const result = await service.getById({
         projectId: PROJECT_ID,
         id: "obj-1",
       });
 
-      expect(result).not.toBeNull();
       expect(result).toMatchObject({ row, status: "missing" });
       expect((result as { status: string }).status).toBe("missing");
     });
   });
 
   describe("when the row does not exist", () => {
-    it("returns null", async () => {
+    it("throws the not-found error", async () => {
       vi.mocked(repo.tryFindById).mockResolvedValue(null);
 
-      const result = await service.tryGetById({
-        projectId: PROJECT_ID,
-        id: "unknown-id",
-      });
-
-      expect(result).toBeNull();
+      await expect(
+        service.getById({ projectId: PROJECT_ID, id: "unknown-id" }),
+      ).rejects.toMatchObject({ code: "stored_object_not_found" });
     });
   });
 
@@ -419,7 +418,7 @@ describe("tryGetById", () => {
       vi.mocked(repo.tryFindById).mockResolvedValue(row);
       vi.mocked(registry.get).mockRejectedValue(networkError);
 
-      await expect(service.tryGetById({ projectId: PROJECT_ID, id: "obj-1" })).rejects.toThrow(
+      await expect(service.getById({ projectId: PROJECT_ID, id: "obj-1" })).rejects.toThrow(
         "network timeout",
       );
     });
@@ -594,7 +593,7 @@ describe("the service surface a caller composes against", () => {
       vi.mocked(repo.tryFindById).mockResolvedValue(row);
       const readStream = Readable.from(["hello"]);
       vi.mocked(registry.get).mockResolvedValue(readStream);
-      const read = await service.tryGetById({ projectId: PROJECT_ID, id: stored.id });
+      const read = await service.getById({ projectId: PROJECT_ID, id: stored.id });
 
       vi.mocked(registry.exists).mockResolvedValue(true);
       const head = await service.headById({ projectId: PROJECT_ID, id: stored.id });

@@ -152,7 +152,7 @@ describe("ClickHouseEvaluationRepository", () => {
       [row],
     ]);
     await expect(
-      repository.tryFindByEvaluationId({
+      repository.getByEvaluationId({
         tenantId: "org_1",
         evaluationId: "evaluation_1",
       }),
@@ -174,10 +174,9 @@ describe("ClickHouseEvaluationRepository", () => {
       const scheduledAtMs = Date.now() - 60_000;
       const { client, repository } = harness([[{ scheduledAtMs }], []]);
 
-      await repository.tryFindByEvaluationId({
-        tenantId: "org_1",
-        evaluationId: "evaluation_1",
-      });
+      await expect(
+        repository.getByEvaluationId({ tenantId: "org_1", evaluationId: "evaluation_1" }),
+      ).rejects.toMatchObject({ code: "evaluation_not_found" });
 
       const resolverQueries = client.queries.filter((query) =>
         query.includes("argMax(ScheduledAt"),
@@ -204,10 +203,9 @@ describe("ClickHouseEvaluationRepository", () => {
       ]);
       floor.getFloorMs.mockResolvedValueOnce(1_500_000_000_000);
 
-      await repository.tryFindByEvaluationId({
-        tenantId: "org_1",
-        evaluationId: "missing",
-      });
+      await expect(
+        repository.getByEvaluationId({ tenantId: "org_1", evaluationId: "missing" }),
+      ).rejects.toMatchObject({ code: "evaluation_not_found" });
 
       const resolverRequests = client.queries
         .map((query, index) => ({ query, params: client.queryParams[index]! }))

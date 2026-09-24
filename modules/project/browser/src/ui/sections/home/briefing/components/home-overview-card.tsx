@@ -160,6 +160,24 @@ const PULSE_MS = 900;
 /** A cell pulses at most once per window, however often fresh data lands. */
 const PULSE_COOLDOWN_MS = 5_000;
 
+const TONE_DOT: Partial<Record<StatusCell["tone"], string>> = {
+  good: "green.solid",
+  bad: "red.solid",
+};
+
+const TONE_VALUE_COLOR: Record<StatusCell["tone"], string> = {
+  good: "green.fg",
+  bad: "red.fg",
+  neutral: "fg",
+  vanity: "fg",
+};
+
+function deltaColor(deltaTone: StatusCell["deltaTone"]): string {
+  if (deltaTone === "bad") return "red.fg";
+  if (deltaTone === "good") return "green.fg";
+  return "fg.muted";
+}
+
 function OverviewCell({ cell }: { cell: StatusCell }) {
   const reduceMotion = useProjectHomeHost().reducedMotion();
   // Live data lands on a poll; when THIS cell's value actually changed, its
@@ -178,11 +196,11 @@ function OverviewCell({ cell }: { cell: StatusCell }) {
   }, [cell.value]);
 
   const vanity = cell.tone === "vanity";
-  const dot = cell.tone === "good" ? "green.solid" : cell.tone === "bad" ? "red.solid" : undefined;
+  const dot = TONE_DOT[cell.tone];
   // The figures ARE the content — even the table-stakes ones render in full
   // foreground so the eye lands on the number, not the label. `vanity` keeps
   // only its smaller size and lighter weight.
-  const valueColor = cell.tone === "good" ? "green.fg" : cell.tone === "bad" ? "red.fg" : "fg";
+  const valueColor = TONE_VALUE_COLOR[cell.tone];
 
   return (
     <VStack align="start" gap={2.5}>
@@ -235,13 +253,7 @@ function OverviewCell({ cell }: { cell: StatusCell }) {
             fontWeight="600"
             fontVariantNumeric="tabular-nums"
             whiteSpace="nowrap"
-            color={
-              cell.deltaTone === "bad"
-                ? "red.fg"
-                : cell.deltaTone === "good"
-                  ? "green.fg"
-                  : "fg.muted"
-            }
+            color={deltaColor(cell.deltaTone)}
           >
             {cell.delta.startsWith("+") ? "▲" : "▼"} {cell.delta}
           </Text>

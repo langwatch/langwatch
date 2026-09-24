@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   EvaluatorConfig,
   EvaluationV3Event,
@@ -45,10 +46,10 @@ const ports = {
   },
 } as unknown as ExperimentRunCollaborators;
 
-const workflows = {
-  enrichStudioEvent: async ({ event }: { event: unknown }) => event,
-  prepareStudioEvent: async ({ event }: { event: unknown }) => event,
-} as unknown as WorkflowApi;
+const workflows = createApiFixture<WorkflowApi>({
+  enrichStudioEvent: async ({ event }) => event,
+  prepareStudioEvent: async ({ event }) => event,
+});
 
 const gradingEvaluator = (isMapped: boolean): EvaluatorConfig => ({
   id: "eval-1",
@@ -99,7 +100,7 @@ const makeCell = (evaluator: EvaluatorConfig): ExecutionCell => ({
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],
     },
-  } as unknown as ExecutionCell["targetConfig"],
+  },
   evaluatorConfigs: [evaluator],
   datasetEntry: {
     _datasetId: "dataset-1",
@@ -171,7 +172,7 @@ describe("given an evaluator attached to a target column", () => {
             },
           },
         },
-      ] as unknown as StudioServerEvent[];
+      ];
 
       const events = await runCell(makeCell(gradingEvaluator(true)));
 
@@ -233,7 +234,7 @@ describe("given an evaluator run as its own column", () => {
             },
           }
         : {},
-    } as unknown as ExecutionCell["targetConfig"],
+    },
     evaluatorConfigs: [],
     datasetEntry: {
       _datasetId: "dataset-1",
@@ -289,7 +290,7 @@ describe("given an evaluator run as its own column", () => {
             },
           },
         },
-      ] as unknown as StudioServerEvent[];
+      ];
 
       const events = await runColumn(evaluatorColumn(true));
 

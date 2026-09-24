@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { identifierDomain, normalizeIdentifierValue } from "./identifier.ts";
+import { extractIdentifierDomain, normalizeIdentifierValue } from "./identifier.ts";
 
 /**
  * The identifier-first sign-in router (D03, ADR-117 §1): a PURE decision engine — email in,
@@ -118,7 +118,7 @@ export interface RoutingIdentifier {
  */
 export function routingIdentifierOf(raw: string): RoutingIdentifier {
   const normalized = normalizeIdentifierValue(raw);
-  return { normalized, domain: identifierDomain(normalized) };
+  return { normalized, domain: extractIdentifierDomain(normalized) };
 }
 
 export const SIGNIN_ROUTING_OUTCOMES = [

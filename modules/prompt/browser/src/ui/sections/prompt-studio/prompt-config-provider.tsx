@@ -9,6 +9,21 @@ import type { ChangeHandleFormValues } from "../../../prompt-form.ts";
 import { ChangeHandleDialog } from "./dialogs/change-handle-dialog.tsx";
 import { type SaveDialogFormValues, SaveVersionDialog } from "./dialogs/save-version-dialog.tsx";
 
+/** Keeps the dialog open when a global handler will show its own modal. */
+function closeUnlessHandledGlobally({
+  error,
+  onError,
+  close,
+}: {
+  error: unknown;
+  onError?: (error: Error) => void;
+  close: () => void;
+}): void {
+  onError?.(error as Error);
+  const isHandledGlobally = isLimitExceeded(error) || isLiteMemberRestriction(error);
+  if (!isHandledGlobally) close();
+}
+
 /**
  * Provider for prompt configuration operations.
  * Single Responsibility: Manages dialog-based prompt operations with closures.
@@ -46,12 +61,11 @@ export function PromptConfigProvider({ children }: { children: React.ReactNode }
           onSuccess?.(prompt);
           setSaveVersionDialogProps(null);
         } catch (error) {
-          onError?.(error as Error);
-          // Don't close the dialog if a global handler will show a modal
-          const isHandledGlobally = isLimitExceeded(error) || isLiteMemberRestriction(error);
-          if (!isHandledGlobally) {
-            setSaveVersionDialogProps(null);
-          }
+          closeUnlessHandledGlobally({
+            error,
+            onError,
+            close: () => setSaveVersionDialogProps(null),
+          });
         }
       };
 
@@ -81,12 +95,11 @@ export function PromptConfigProvider({ children }: { children: React.ReactNode }
           onSuccess?.(prompt);
           setCreatePromptDialogProps(null);
         } catch (error) {
-          onError?.(error as Error);
-          // Don't close the dialog if a global handler will show a modal
-          const isHandledGlobally = isLimitExceeded(error) || isLiteMemberRestriction(error);
-          if (!isHandledGlobally) {
-            setCreatePromptDialogProps(null);
-          }
+          closeUnlessHandledGlobally({
+            error,
+            onError,
+            close: () => setCreatePromptDialogProps(null),
+          });
         }
       };
 
@@ -119,12 +132,11 @@ export function PromptConfigProvider({ children }: { children: React.ReactNode }
               onSuccess?.(updatedPrompt);
               setChangeHandleDialogProps(null);
             } catch (error) {
-              onError?.(error as Error);
-              // Don't close the dialog if a global handler will show a modal
-              const isHandledGlobally = isLimitExceeded(error) || isLiteMemberRestriction(error);
-              if (!isHandledGlobally) {
-                setChangeHandleDialogProps(null);
-              }
+              closeUnlessHandledGlobally({
+                error,
+                onError,
+                close: () => setChangeHandleDialogProps(null),
+              });
             }
           };
 

@@ -4,8 +4,8 @@
  * images, video, and file-attachment chips.
  */
 import {
-  rawPcmBase64ToWavBase64,
-  resolveRawPcmFormat,
+  convertRawPcmBase64ToWavBase64,
+  detectRawPcmFormat,
   isMediaPartRole,
   type MediaPartRole,
   type TraceMediaRef,
@@ -169,9 +169,9 @@ function mapInputAudioPart(part: {
   format?: string;
   mimeType?: string;
 }): MediaPartData | null {
-  const rawFormat = resolveRawPcmFormat(part.format, part.mimeType);
+  const rawFormat = detectRawPcmFormat(part.format, part.mimeType);
   if (part.data && rawFormat) {
-    const wav = rawPcmBase64ToWavBase64(part.data, rawFormat);
+    const wav = convertRawPcmBase64ToWavBase64(part.data, rawFormat);
     return wav
       ? {
           type: "audio",
@@ -209,7 +209,7 @@ const MEDIA_PART_VISITOR: ContentPartVisitor<MediaPartData | null> = {
 };
 
 /** Map a single raw content part to `MediaPartData`, or null when it is not media. */
-export function mediaPartToMediaData(part: unknown): MediaPartData | null {
+export function convertMediaPartToMediaData(part: unknown): MediaPartData | null {
   const result = visitContentPart(part, MEDIA_PART_VISITOR);
   return result ?? null;
 }
@@ -232,7 +232,7 @@ export function mediaRefToMediaData(ref: TraceMediaRef): MediaPartData {
 
 /** Map a single raw content part to audio `MediaPartData`, or null when it is not audio. */
 export function audioPartToMediaData(part: unknown): MediaPartData | null {
-  const media = mediaPartToMediaData(part);
+  const media = convertMediaPartToMediaData(part);
   if (!media) return null;
   if (media.type === "audio") return media;
   const isAudioBinary =
@@ -270,7 +270,7 @@ function containsRenderableMediaHints(value: string): boolean {
  * A string whose ENTIRE value is one media reference — a base64 `data:` URI or an
  * externalized `/api/files/` URL — synthesized into a renderable part.
  */
-function bareStringToMediaData(value: string): MediaPartData | null {
+function convertBareStringToMediaData(value: string): MediaPartData | null {
   const trimmed = value.trim();
   if (trimmed.length === 0 || /\s/.test(trimmed)) return null;
   if (trimmed.startsWith("data:")) {
@@ -345,7 +345,7 @@ function collectStringInto({
   out: CollectedMediaPart[];
   role?: MediaPartRole;
 }): void {
-  const bare = bareStringToMediaData(value);
+  const bare = convertBareStringToMediaData(value);
   if (bare) {
     emitCollectedMedia({ media: bare, out, role });
     return;
@@ -376,7 +376,7 @@ function collectObjectInto({
   out: CollectedMediaPart[];
   role?: MediaPartRole;
 }): void {
-  const media = mediaPartToMediaData(value);
+  const media = convertMediaPartToMediaData(value);
   if (media) {
     emitCollectedMedia({ media, out, role });
     return;

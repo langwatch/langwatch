@@ -130,6 +130,18 @@ export function buildEnterprisePlanFeatures(
   ).map((entry) => entry.label);
 }
 
+function eventsCapabilityText(maxMessagesPerMonth: number): string {
+  if (maxMessagesPerMonth >= UNLIMITED_MESSAGES) return "Unlimited events";
+  if (maxMessagesPerMonth > 0) return `${formatNumber(maxMessagesPerMonth)} events included`;
+  return "Custom event limits";
+}
+
+function liteUsersCapabilityText(maxMembersLite: number): string {
+  if (maxMembersLite >= 9999) return "Unlimited lite users";
+  if (maxMembersLite > 0) return `Up to ${formatNumber(maxMembersLite)} lite users`;
+  return "Custom lite user limits";
+}
+
 export function buildPlanCapabilities({
   maxMembers,
   maxMessagesPerMonth,
@@ -141,17 +153,7 @@ export function buildPlanCapabilities({
 }) {
   const coreUsersText =
     maxMembers > 0 ? `Up to ${formatNumber(maxMembers)} core users` : "Custom core user limits";
-  const eventsText =
-    maxMessagesPerMonth >= UNLIMITED_MESSAGES
-      ? "Unlimited events"
-      : maxMessagesPerMonth > 0
-        ? `${formatNumber(maxMessagesPerMonth)} events included`
-        : "Custom event limits";
-  const liteUsersText =
-    maxMembersLite >= 9999
-      ? "Unlimited lite users"
-      : maxMembersLite > 0
-        ? `Up to ${formatNumber(maxMembersLite)} lite users`
-        : "Custom lite user limits";
+  const eventsText = eventsCapabilityText(maxMessagesPerMonth);
+  const liteUsersText = liteUsersCapabilityText(maxMembersLite);
   return [coreUsersText, eventsText, liteUsersText];
 }

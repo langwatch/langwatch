@@ -38,26 +38,25 @@ export class PrismaPersonalTeamScopeRepository {
   }
 
   /**
-   * The personal team a set of scopes reaches, by the name its owner sees, or null when they
+   * The personal teams a set of scopes reaches, by the name each owner sees; empty when they
    * reach only shared ground. Both TEAM and PROJECT scopes are resolved, so naming the project
    * rather than the team cannot be the way around the refusal.
    */
-  async tryFindPersonalTeamInScopes({
+  async findPersonalTeamsInScopes({
     client,
     scopes,
   }: {
     client: PersonalTeamScopeClient;
     scopes: RoleBindingScope[];
-  }): Promise<{ name: string } | null> {
+  }): Promise<{ name: string }[]> {
     return this.findPersonalTeamMatching({ client, scopes, teamWhere: {} });
   }
 
   /**
-   * The personal team a set of scopes reaches that does NOT belong to the given
-   * user, or null. `null` owns no personal workspace, so every personal scope
-   * matches.
+   * The personal teams a set of scopes reaches that do NOT belong to the given
+   * user. `null` owns no personal workspace, so every personal scope matches.
    */
-  async tryFindForeignPersonalTeamInScopes({
+  async findForeignPersonalTeamsInScopes({
     client,
     scopes,
     ownerUserId,
@@ -65,7 +64,7 @@ export class PrismaPersonalTeamScopeRepository {
     client: PersonalTeamScopeClient;
     scopes: RoleBindingScope[];
     ownerUserId: string | null;
-  }): Promise<{ name: string } | null> {
+  }): Promise<{ name: string }[]> {
     return this.findPersonalTeamMatching({
       client,
       scopes,
@@ -81,22 +80,21 @@ export class PrismaPersonalTeamScopeRepository {
     client: PersonalTeamScopeClient;
     scopes: RoleBindingScope[];
     teamWhere: Prisma.TeamWhereInput;
-  }): Promise<{ name: string } | null> {
+  }): Promise<{ name: string }[]> {
     const idsOfType = (scopeType: RoleBindingScopeType) => [
       ...new Set(
         scopes.filter((scope) => scope.scopeType === scopeType).map((scope) => scope.scopeId),
       ),
     ];
 
+    const reached: { name: string }[] = [];
     const teamIds = idsOfType(RoleBindingScopeType.TEAM);
     if (teamIds.length > 0) {
-      const personalTeam = await client.team.findFirst({
+      const personalTeams = await client.team.findMany({
         where: { id: { in: teamIds }, isPersonal: true, AND: [teamWhere] },
         select: { name: true },
       });
-      if (personalTeam) {
-        return personalTeam;
-      }
+      reached.push(...personalTeams);
     }
 
     // A project-scoped binding on the personal project reaches the same private
@@ -104,7 +102,7 @@ export class PrismaPersonalTeamScopeRepository {
     // cannot be the way around this.
     const projectIds = idsOfType(RoleBindingScopeType.PROJECT);
     if (projectIds.length > 0) {
-      const personalProject = await client.project.findFirst({
+      const personalProjects = await client.project.findMany({
         where: {
           id: { in: projectIds },
           OR: [{ isPersonal: true }, { team: { isPersonal: true } }],
@@ -112,12 +110,10 @@ export class PrismaPersonalTeamScopeRepository {
         },
         select: { team: { select: { name: true } } },
       });
-      if (personalProject) {
-        return personalProject.team;
-      }
+      reached.push(...personalProjects.map((project) => project.team));
     }
 
-    return null;
+    return reached;
   }
 
   /**
@@ -138,9 +134,9 @@ export class PrismaPersonalTeamScopeRepository {
 export function bindPersonalTeamScopeReader(database: PrismaClient): PersonalTeamScopeReader {
   const scopes = PrismaPersonalTeamScopeRepository.create();
   return {
-    tryFindPersonalTeamInScopes: (input) =>
-      scopes.tryFindPersonalTeamInScopes({ client: database, ...input }),
-    tryFindForeignPersonalTeamInScopes: (input) =>
-      scopes.tryFindForeignPersonalTeamInScopes({ client: database, ...input }),
+    findPersonalTeamsInScopes: (input) =>
+      scopes.findPersonalTeamsInScopes({ client: database, ...input }),
+    findForeignPersonalTeamsInScopes: (input) =>
+      scopes.findForeignPersonalTeamsInScopes({ client: database, ...input }),
   };
 }

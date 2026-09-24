@@ -51,8 +51,16 @@ export const toastActionColor = (type: string | undefined) => {
   return onPanelOnly(status, STATUS[status].action);
 };
 
-function StatusIcon({ status }: { status: ToastStatus }) {
+function StatusGlyph({ status }: { status: ToastStatus }) {
   const props = { size: 15, "aria-hidden": true } as const;
+  if (status === "loading") return <Spinner size="xs" color="inherit" />;
+  if (status === "success") return <CheckCircle2 {...props} />;
+  if (status === "error") return <AlertCircle {...props} />;
+  if (status === "warning") return <TriangleAlert {...props} />;
+  return <Info {...props} />;
+}
+
+function StatusIcon({ status }: { status: ToastStatus }) {
   return (
     <Box
       color={onPanelOnly(status, STATUS[status].fg)}
@@ -61,17 +69,7 @@ function StatusIcon({ status }: { status: ToastStatus }) {
       height="5"
       flexShrink={0}
     >
-      {status === "loading" ? (
-        <Spinner size="xs" color="inherit" />
-      ) : status === "success" ? (
-        <CheckCircle2 {...props} />
-      ) : status === "error" ? (
-        <AlertCircle {...props} />
-      ) : status === "warning" ? (
-        <TriangleAlert {...props} />
-      ) : (
-        <Info {...props} />
-      )}
+      <StatusGlyph status={status} />
     </Box>
   );
 }

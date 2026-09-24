@@ -97,7 +97,7 @@ export class SmtpEmailGatewayAdapter extends EmailGateway {
     ));
 
     const bccAddresses = EmailGateway.recipients(content.bcc);
-    const sanitizedHeaders = this.mime.trySanitizeHeaders(content.headers);
+    const sanitizedHeaders = this.mime.normalizeHeaders(content.headers);
     const from = content.from ?? defaultFrom;
     const toAddresses = EmailGateway.recipients(content.to);
 

@@ -296,11 +296,11 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
   async matchToAcceptor(
     input: Readonly<{ inviteEmail: string; sessionEmail: string; userId: string }>,
   ): Promise<Readonly<{ matches: boolean; viaIdentifierId?: string | null }>> {
-    const matchable = await this.options.identity.verifiedEmailsOf({ userId: input.userId });
+    const verified = await this.options.identity.verifiedEmailsOf({ userId: input.userId });
     return InviteService.matchInviteToAcceptor({
       inviteEmail: input.inviteEmail,
       sessionEmail: input.sessionEmail,
-      matchable,
+      matchable: verified.kind === "resolved" ? verified.emails : null,
     });
   }
 
@@ -523,7 +523,7 @@ function organizationDirectory(options: {
   return {
     findVerifiedEmail: async ({ userId }) => {
       const verified = await options.identity.verifiedEmailsOf({ userId });
-      if (verified !== null) return verified[0]?.value ?? null;
+      if (verified.kind === "resolved") return verified.emails[0]?.value ?? null;
       return options.userDirectory.findLegacyVerifiedEmail(userId);
     },
     // Names only: the local part of a requester's address is not the

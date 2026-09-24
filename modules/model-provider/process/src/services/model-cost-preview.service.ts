@@ -9,7 +9,6 @@ import {
   type CostRuleMatchingSpansPreview,
   type CostRulePreviewInput,
   type CostRulePreviewSampleSpan,
-  type ModelCost,
   type ModelCostRate,
 } from "@langwatch/model-provider-contract";
 import { nowInstant } from "@langwatch/time";
@@ -63,16 +62,6 @@ export type ModelCostPreviewSpanReader = Readonly<{
   >;
 }>;
 
-/**
- * The rates the unmapped-cost hint checks a span's model against: the
- * project's own rules first, then the platform registry — the same order and
- * the same two sources record-time pricing reads.
- */
-export type ModelCostRuleReader = Readonly<{
-  listCosts(input: { projectId: string }): Promise<ModelCost[]>;
-  staticCostRates(): readonly ModelCostRate[];
-}>;
-
 /** The rule being typed, as one catalogue rate. */
 function candidateRate(input: CostRulePreviewInput): ModelCostRate {
   return {
@@ -92,25 +81,6 @@ function candidateRate(input: CostRulePreviewInput): ModelCostRate {
       : {}),
     ...(input.cacheCreation1hCostPerToken !== undefined
       ? { cacheCreation1hCostPerToken: input.cacheCreation1hCostPerToken }
-      : {}),
-  };
-}
-
-/** A stored rule as the matching cascade reads it. */
-function storedRate(cost: ModelCost): ModelCostRate {
-  return {
-    model: cost.model,
-    regex: cost.regex,
-    ...(cost.inputCostPerToken !== null ? { inputCostPerToken: cost.inputCostPerToken } : {}),
-    ...(cost.outputCostPerToken !== null ? { outputCostPerToken: cost.outputCostPerToken } : {}),
-    ...(cost.cacheReadCostPerToken !== null
-      ? { cacheReadCostPerToken: cost.cacheReadCostPerToken }
-      : {}),
-    ...(cost.cacheCreationCostPerToken !== null
-      ? { cacheCreationCostPerToken: cost.cacheCreationCostPerToken }
-      : {}),
-    ...(cost.cacheCreation1hCostPerToken !== null
-      ? { cacheCreation1hCostPerToken: cost.cacheCreation1hCostPerToken }
       : {}),
   };
 }
@@ -200,46 +170,5 @@ export class ModelCostPreviewService {
       sampleSpans,
       unmatchedModels,
     };
-  }
-
-  /**
-   * Whether a span's detail view should suggest a cost mapping: model + token usage present, no
-   * cost computed, and no stored rule matches — the last check excludes spans older than a rule.
-   */
-  async tryDeriveUnmappedCostSuggestion({
-    costs,
-    projectId,
-    model,
-    cost,
-    promptTokens,
-    completionTokens,
-  }: {
-    costs: ModelCostRuleReader;
-    projectId: string;
-    model: string | null;
-    cost: number | null | undefined;
-    promptTokens: number | null | undefined;
-    completionTokens: number | null | undefined;
-  }): Promise<{ model: string } | null> {
-    if (!model) {
-      return null;
-    }
-
-    if (cost != null) {
-      return null;
-    }
-
-    const hasTokens = (promptTokens ?? 0) > 0 || (completionTokens ?? 0) > 0;
-    if (!hasTokens) {
-      return null;
-    }
-
-    const stored = await costs.listCosts({ projectId });
-    const rates = [...stored.map(storedRate), ...costs.staticCostRates()];
-    if (matchModelCost(model, rates)) {
-      return null;
-    }
-
-    return { model };
   }
 }

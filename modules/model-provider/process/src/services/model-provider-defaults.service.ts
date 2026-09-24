@@ -1,4 +1,5 @@
 import {
+  ModelDefaultNotFoundError,
   ModelProviderInvalidError,
   modelDefaultResolveInputSchema,
   modelDefaultSnapshotInputSchema,
@@ -117,7 +118,7 @@ export class ModelProviderDefaultsService {
     return { inherited, referenceScope: reference };
   }
 
-  async tryGetResolved(input: ModelDefaultResolveInput): Promise<ModelDefaultEffective | null> {
+  async getResolved(input: ModelDefaultResolveInput): Promise<ModelDefaultEffective> {
     const parsed = modelDefaultResolveInputSchema.parse({
       projectId: input.projectId,
       featureKey: input.featureKey,
@@ -131,14 +132,18 @@ export class ModelProviderDefaultsService {
     const feature = this.options.catalog
       .defaultFeatures()
       .find((candidate) => candidate.key === parsed.featureKey);
-    const roleDefault = feature ? (snapshot.effective[feature.role] ?? null) : null;
+    const roleDefault = feature ? snapshot.effective[feature.role] : undefined;
     if (roleDefault) {
       return roleDefault;
     }
 
-    return parsed.featureKey === "langy.chat"
-      ? (snapshot.effective["prompt.create_default"] ?? null)
-      : null;
+    const langyFallback =
+      parsed.featureKey === "langy.chat" ? snapshot.effective["prompt.create_default"] : undefined;
+    if (langyFallback) {
+      return langyFallback;
+    }
+
+    throw new ModelDefaultNotFoundError();
   }
 
   /** Every scope the caller can reach, by id, for labelling a snapshot. */
@@ -254,7 +259,7 @@ export class ModelProviderDefaultsService {
     }
 
     const projectScopes = await this.options.scopes.getProjectScopes(projectId);
-    const providers = await this.options.providers.listForProject(projectScopes);
+    const providers = await this.options.providers.findForProject(projectScopes);
     const provider = providers
       .filter((candidate) => candidate.enabled)
       .toSorted((left, right) => left.createdAt.getTime() - right.createdAt.getTime())[0];
@@ -350,7 +355,7 @@ export class ModelProviderDefaultsService {
   }
 
   private normalizeModel(key: string, model: string): string | null {
-    return this.options.catalog.tryNormalizeDefaultModel({ key, model });
+    return this.options.catalog.normalizeDefaultModel({ key, model });
   }
 
   private async getConfigs(
@@ -358,12 +363,12 @@ export class ModelProviderDefaultsService {
     organizationId: string | null,
   ): Promise<ModelDefaultConfig[]> {
     if (organizationId) {
-      return this.options.defaults.listForOrganization(organizationId);
+      return this.options.defaults.findForOrganization(organizationId);
     }
 
     const projectScopes = await this.options.scopes.getProjectScopes(projectId);
 
-    return this.options.defaults.listForProject(projectScopes);
+    return this.options.defaults.findForProject(projectScopes);
   }
 
   private async getAvailableScopes(input: {

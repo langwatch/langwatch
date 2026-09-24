@@ -315,9 +315,8 @@ export function detectUnknownVariables(text: string, variables: VariableInfo[]):
 
     const token = idMatch[0];
     const root = rootOf(token);
-    if (KEYWORDS.has(token) || KEYWORDS.has(root) || known.has(root)) {
-      continue;
-    }
+    if (KEYWORDS.has(token)) continue;
+    if (KEYWORDS.has(root) || known.has(root)) continue;
 
     const tokenOffset = match[0].indexOf(expr) + expr.indexOf(firstPart) + firstPart.indexOf(token);
     found.push({ root, token, index: match.index + tokenOffset, knownRoots });
@@ -609,9 +608,9 @@ export function setupLiquidJsonSchema(params: {
   };
 
   const onShadowMarkers = monaco.editor.onDidChangeMarkers((resources: readonly Uri[]) => {
-    if (resources.some((r) => r.toString() === shadowResource.toString())) {
-      mirrorMarkers();
-    }
+    const shadowUri = shadowResource.toString();
+    const touched = resources.some((r) => r.toString() === shadowUri);
+    if (touched) mirrorMarkers();
   });
 
   const onRealChange = realModel.onDidChangeContent(() => {

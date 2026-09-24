@@ -1,3 +1,4 @@
+import { IdentityVerificationInvalidError } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
 
@@ -74,18 +75,18 @@ export class PrismaIdentityVerificationRepository implements IdentityVerificatio
     ]);
   }
 
-  async tryFindByIdentifierId({
+  async getByIdentifierId({
     identifierId,
   }: {
     identifierId: string;
-  }): Promise<IdentityVerificationRecord | null> {
+  }): Promise<IdentityVerificationRecord> {
     const row = await this.prisma.verificationToken.findFirst({
       where: { identifier: keyFor(identifierId) },
       orderBy: { createdAt: "desc" },
     });
-    if (!row) return null;
+    if (!row) throw new IdentityVerificationInvalidError();
     const payload = parsePayload(row.token);
-    if (!payload) return null;
+    if (!payload) throw new IdentityVerificationInvalidError();
     return {
       verificationId: payload.verificationId,
       userId: payload.userId,
@@ -109,7 +110,7 @@ export class PrismaIdentityVerificationRepository implements IdentityVerificatio
         where: { identifier },
         orderBy: { createdAt: "desc" },
       });
-      // The same newest-row rule `tryFindByIdentifierId` reads by, so completion
+      // The same newest-row rule `getByIdentifierId` reads by, so completion
       // is checked against the record it was offered.
       const current = rows[0];
       if (!current) return false;

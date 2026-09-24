@@ -9,6 +9,23 @@ const TEST_ID = {
   "not captured": "media-part-not-captured",
 } as const;
 
+function unavailableMessage({
+  noun,
+  state,
+  sizeBytes,
+}: {
+  noun: string;
+  state: "missing" | "error" | "not captured";
+  sizeBytes?: number;
+}): string {
+  if (state === "missing") return `This ${noun} is no longer available`;
+  if (state === "error") return `This ${noun} could not be loaded`;
+  if (sizeBytes !== undefined) {
+    return `This ${noun} was too large to capture (${formatBytes(sizeBytes)})`;
+  }
+  return `This ${noun} was not captured`;
+}
+
 export function MediaUnavailable({
   category,
   state,
@@ -19,14 +36,7 @@ export function MediaUnavailable({
   sizeBytes?: number;
 }) {
   const noun = category === "binary" ? "file" : category;
-  const message =
-    state === "missing"
-      ? `This ${noun} is no longer available`
-      : state === "error"
-        ? `This ${noun} could not be loaded`
-        : sizeBytes !== undefined
-          ? `This ${noun} was too large to capture (${formatBytes(sizeBytes)})`
-          : `This ${noun} was not captured`;
+  const message = unavailableMessage({ noun, state, sizeBytes });
 
   return (
     <HStack

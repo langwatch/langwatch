@@ -314,14 +314,9 @@ export function pullCadenceCronError(cron: string): string | null {
 
   const dayOfMonth = /^\d+$/.test(fields[2] ?? "") ? Number(fields[2]) : null;
   const month = /^\d+$/.test(fields[3] ?? "") ? Number(fields[3]) : null;
-  if (
-    dayOfMonth !== null &&
-    month !== null &&
-    month >= 1 &&
-    month <= 12 &&
-    dayOfMonth >= 1 &&
-    dayOfMonth <= 31
-  ) {
+  const namesCalendarDate =
+    dayOfMonth !== null && month !== null && isMonthNumber(month) && isDayOfMonthNumber(dayOfMonth);
+  if (namesCalendarDate) {
     // A leap year gives February its widest legitimate range. Anything
     // still rolling into another month can never be reached by any year.
     const widestCalendarDate = Temporal.PlainDate.from(
@@ -351,4 +346,12 @@ export function composerCadenceError({
   if (!PULL_ADAPTER_FOR_SOURCE[sourceType]) return null;
   if (pullSchedule.trim() === "") return null;
   return pullCadenceCronError(pullSchedule);
+}
+
+function isMonthNumber(month: number): boolean {
+  return month >= 1 && month <= 12;
+}
+
+function isDayOfMonthNumber(day: number): boolean {
+  return day >= 1 && day <= 31;
 }

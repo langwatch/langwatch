@@ -195,7 +195,7 @@ const chatMessagesToText = (messages: any[], last: boolean): string => {
 // — applied RECURSIVELY so a shell like `{ output: { content: "" } }` is treated as empty
 // at the top-level special-key check, letting the loop fall through to the next sibling key
 // (e.g. `answer`). Without recursion, any object with keys short- circuited
-// specialKeysMapping and the real payload on the next key was never seen.
+// mapSpecialKeys and the real payload on the next key was never seen.
 const hasNonEmptyValue = (value: unknown, seen: WeakSet<object> = new WeakSet()): boolean => {
   if (value === undefined || value === null) return false;
   if (typeof value === "string") return value.length > 0;
@@ -227,7 +227,7 @@ const SPECIAL_TEXT_KEYS = [
   "prompt",
 ] as const;
 
-const readSpecialTextKey = (json: any): string | undefined => {
+const extractSpecialTextKey = (json: any): string | undefined => {
   for (const key of SPECIAL_TEXT_KEYS) {
     if (!hasNonEmptyValue(json[key])) continue;
     // `message` is only taken when it is the text itself, not a message object.
@@ -240,7 +240,7 @@ const readSpecialTextKey = (json: any): string | undefined => {
 };
 
 /** Langgraph on Flowise, and LangChain's agent return values. */
-const readFlowiseMessages = (json: any): string | undefined => {
+const extractFlowiseMessages = (json: any): string | undefined => {
   if (
     json.messages?.length > 0 &&
     hasNonEmptyValue(json.messages?.[json.messages?.length - 1]?.content)
@@ -261,7 +261,7 @@ const LANGCHAIN_INPUT_KEYS = ["input", "text", "query", "question"] as const;
 // for the `inputs`/`outputs` wrapper paths. `RunnableSequence` legitimately produces
 // `{ inputs: { input: "" } }` and the caller (getFirstInputAsText) relies on the
 // returned "" to trigger a fallback to the next span in the sequence.
-const readLangChainWrapper = (json: any): string | undefined => {
+const extractLangChainWrapper = (json: any): string | undefined => {
   if (typeof json.inputs === "object") {
     for (const key of LANGCHAIN_INPUT_KEYS) {
       if (json.inputs[key] !== undefined) return json.inputs[key];
@@ -284,7 +284,7 @@ const readLangChainWrapper = (json: any): string | undefined => {
 };
 
 /** Langgraph.js keeps the answer on the last `AIMessage`'s kwargs. */
-const readLanggraphMessage = (json: any): string | undefined => {
+const extractLanggraphMessage = (json: any): string | undefined => {
   if (!Array.isArray(json.messages)) return undefined;
 
   const lastMessage = json.messages.at(-1);
@@ -297,22 +297,22 @@ const readLanggraphMessage = (json: any): string | undefined => {
   return undefined;
 };
 
-const specialKeysMapping = (json: any): string | undefined => {
-  const direct = readSpecialTextKey(json);
+const mapSpecialKeys = (json: any): string | undefined => {
+  const direct = extractSpecialTextKey(json);
   if (direct !== undefined) return direct;
 
-  const flowise = readFlowiseMessages(json);
+  const flowise = extractFlowiseMessages(json);
   if (flowise !== undefined) return flowise;
 
-  const langchain = readLangChainWrapper(json);
+  const langchain = extractLangChainWrapper(json);
   if (langchain !== undefined) return langchain;
 
-  const langgraph = readLanggraphMessage(json);
+  const langgraph = extractLanggraphMessage(json);
   if (langgraph !== undefined) return langgraph;
 
   // Optimization Studio
   if (json.end !== undefined) {
-    return specialKeysMapping(json.end) ?? json.end;
+    return mapSpecialKeys(json.end) ?? json.end;
   }
 
   return undefined;
@@ -321,7 +321,7 @@ const specialKeysMapping = (json: any): string | undefined => {
 const firstAndOnlyKey = (json: any) => {
   if (typeof json === "object" && !Array.isArray(json) && Object.keys(json).length === 1) {
     const firstItem = json[Object.keys(json)[0]!];
-    const mapped = typeof firstItem === "object" ? specialKeysMapping(firstItem) : undefined;
+    const mapped = typeof firstItem === "object" ? mapSpecialKeys(firstItem) : undefined;
     if (mapped !== undefined) {
       return stringified(mapped);
     }
@@ -352,10 +352,10 @@ const roleArrayToText = (json: any[], last: boolean, preferRole: string | undefi
 
 const mapJsonValue = (json: any): string | undefined => {
   if (Array.isArray(json) && json.length === 1) {
-    return typeof json[0] === "string" ? json[0] : specialKeysMapping(json[0]);
+    return typeof json[0] === "string" ? json[0] : mapSpecialKeys(json[0]);
   }
 
-  return specialKeysMapping(json);
+  return mapSpecialKeys(json);
 };
 
 const jsonToText = (value: unknown, last: boolean, preferRole: string | undefined): string => {

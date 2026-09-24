@@ -1,3 +1,4 @@
+import { DatasetNotFoundError } from "@langwatch/dataset-contract";
 import { toDate, type Instant } from "@langwatch/time";
 
 import type {
@@ -60,7 +61,12 @@ export class MemoryDatasetContentRepository implements DatasetContentRepository 
   }
 
   async findOne(input: { id: string; projectId: string }): Promise<DatasetRow | null> {
-    return this.#database.dataset(input.projectId, input.id) ?? null;
+    try {
+      return this.#database.getDataset(input.projectId, input.id);
+    } catch (error) {
+      if (error instanceof DatasetNotFoundError) return null;
+      throw error;
+    }
   }
 
   async getOne(input: { id: string; projectId: string }): Promise<DatasetRow> {
@@ -109,8 +115,14 @@ export class MemoryDatasetContentRepository implements DatasetContentRepository 
   }
 
   async update(input: UpdateDatasetInput): Promise<DatasetRow> {
-    const row = this.#database.dataset(input.projectId, input.id);
-    if (!row) throw new Error(`No Dataset found for id ${input.id}`);
+    let row: DatasetRow;
+    try {
+      row = this.#database.getDataset(input.projectId, input.id);
+    } catch (error) {
+      if (error instanceof DatasetNotFoundError)
+        throw new Error(`No Dataset found for id ${input.id}`);
+      throw error;
+    }
 
     const updated: DatasetRow = {
       ...row,
@@ -128,8 +140,14 @@ export class MemoryDatasetContentRepository implements DatasetContentRepository 
     projectId: string;
     content: DatasetContentUpdate;
   }): Promise<DatasetRow> {
-    const row = this.#database.dataset(input.projectId, input.id);
-    if (!row) throw new Error(`No Dataset found for id ${input.id}`);
+    let row: DatasetRow;
+    try {
+      row = this.#database.getDataset(input.projectId, input.id);
+    } catch (error) {
+      if (error instanceof DatasetNotFoundError)
+        throw new Error(`No Dataset found for id ${input.id}`);
+      throw error;
+    }
 
     const updated: DatasetRow = {
       ...row,
@@ -143,8 +161,14 @@ export class MemoryDatasetContentRepository implements DatasetContentRepository 
   }
 
   async deletePendingUpload(input: { id: string; projectId: string }): Promise<number> {
-    const row = this.#database.dataset(input.projectId, input.id);
-    if (!row || row.status !== "uploading") return 0;
+    let row: DatasetRow;
+    try {
+      row = this.#database.getDataset(input.projectId, input.id);
+    } catch (error) {
+      if (error instanceof DatasetNotFoundError) return 0;
+      throw error;
+    }
+    if (row.status !== "uploading") return 0;
 
     return this.#database.removeDataset(input.projectId, input.id) ? 1 : 0;
   }
@@ -161,8 +185,14 @@ export class MemoryDatasetContentRepository implements DatasetContentRepository 
   }
 
   async claimForProcessing(input: { id: string; projectId: string }): Promise<number> {
-    const row = this.#database.dataset(input.projectId, input.id);
-    if (!row || row.status !== "uploading" || row.archivedAt) return 0;
+    let row: DatasetRow;
+    try {
+      row = this.#database.getDataset(input.projectId, input.id);
+    } catch (error) {
+      if (error instanceof DatasetNotFoundError) return 0;
+      throw error;
+    }
+    if (row.status !== "uploading" || row.archivedAt) return 0;
 
     this.#database.putDataset({ ...row, status: "processing", updatedAt: this.#database.now() });
 
@@ -270,8 +300,14 @@ export class MemoryDatasetContentRepository implements DatasetContentRepository 
     status: string,
     data: Partial<DatasetRow>,
   ): Promise<number> {
-    const row = this.#database.dataset(input.projectId, input.id);
-    if (!row || row.status !== status) return 0;
+    let row: DatasetRow;
+    try {
+      row = this.#database.getDataset(input.projectId, input.id);
+    } catch (error) {
+      if (error instanceof DatasetNotFoundError) return 0;
+      throw error;
+    }
+    if (row.status !== status) return 0;
 
     this.#database.putDataset({ ...row, ...data, updatedAt: this.#database.now() });
 

@@ -1,17 +1,17 @@
 import { SpanKind } from "@opentelemetry/api";
 
-import { type LangWatchTracer } from "@/observability-sdk";
+import { type LangWatchSpan, type LangWatchTracer } from "@/observability-sdk";
 
 // Type for decorator methods that receive span as first parameter
-type DecoratorMethodWithSpan<T extends (...args: any[]) => any> = (
-  span: any,
+type DecoratorMethodWithSpan<T extends (...args: never[]) => unknown> = (
+  span: LangWatchSpan,
   ...args: Parameters<T>
 ) => ReturnType<T>;
 
 // Type for decorator class that maps original methods to span-aware versions
 // Only requires methods that are actually implemented in the decorator
 type DecoratorClass<T> = new (target: T) => Partial<{
-  [K in keyof T]: T[K] extends (...args: any[]) => any ? DecoratorMethodWithSpan<T[K]> : T[K];
+  [K in keyof T]: T[K] extends (...args: never[]) => unknown ? DecoratorMethodWithSpan<T[K]> : T[K];
 }>;
 
 /**
@@ -73,7 +73,7 @@ export function createTracingProxy<
 }
 
 // Helper function to check if a property is a getter or setter
-const isGetterOrSetter = (target: any, prop: string | symbol): boolean => {
+const isGetterOrSetter = (target: object, prop: string | symbol): boolean => {
   // First check own properties
   let descriptor = Object.getOwnPropertyDescriptor(target, prop);
 

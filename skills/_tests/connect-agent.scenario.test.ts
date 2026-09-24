@@ -1,14 +1,16 @@
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+import { openai } from "@ai-sdk/openai";
 import scenario, {
   type ScenarioExecutionStateLike,
   assertSkillWasRead,
   bashCommands,
 } from "@langwatch/scenario";
-import fs from "fs";
-import { describe, it, expect } from "vitest";
 import dotenv from "dotenv";
-import path from "path";
-import { fileURLToPath } from "url";
-import { openai } from "@ai-sdk/openai";
+import { describe, it, expect } from "vitest";
+
 import {
   copyFixtureToWorkDir,
   createClaudeCodeAgent,
@@ -33,13 +35,9 @@ function findFiles(dir: string, pattern: RegExp): string[] {
 
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const fullPath = path.join(dir, entry.name);
-    if (
-      entry.isDirectory() &&
-      entry.name !== "node_modules" &&
-      entry.name !== ".venv" &&
-      entry.name !== "venv" &&
-      entry.name !== ".git"
-    ) {
+    const isSearchableDirectory =
+      entry.isDirectory() && !["node_modules", ".venv", "venv", ".git"].includes(entry.name);
+    if (isSearchableDirectory) {
       results.push(...findFiles(fullPath, pattern));
     } else if (entry.isFile() && pattern.test(entry.name)) {
       results.push(fullPath);

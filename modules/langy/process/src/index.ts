@@ -31,12 +31,7 @@ export type {
   OpenLangyRelay,
 } from "./services/langy.service.ts";
 export type { LangyTurnAdmissionCapability } from "@langwatch/langy-contract";
-export type {
-  LangyEgressState,
-  LangyRedis,
-  LangyTurnRequest,
-  LangyTurnStream,
-} from "./app/langy.app.ts";
+export type { LangyEgressState, LangyRedis, LangyTurnRequest } from "./app/langy.app.ts";
 // `langy.*` and `langyEgress.*` are not exported: they still name the deleted
 // legacy builder, so nothing may reach them until each is converted to the
 // declared `defineTrpcRouter` shape. `setupSkills.*` is converted and exported

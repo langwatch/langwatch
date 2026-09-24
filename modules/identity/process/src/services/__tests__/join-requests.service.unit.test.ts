@@ -3,7 +3,12 @@ import type {
   JoinCandidateOrganization,
   JoinRequestAggregateState,
 } from "@langwatch/identity-contract";
-import { DEFAULT_DOMAIN_JOIN_SETTING, emptyJoinRequest } from "@langwatch/identity-contract";
+import {
+  DEFAULT_DOMAIN_JOIN_SETTING,
+  emptyJoinRequest,
+  JoinNotAvailableError,
+  JoinRequestNotFoundError,
+} from "@langwatch/identity-contract";
 import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -100,9 +105,18 @@ function harness({
     ? Temporal.Instant.fromEpochMilliseconds(lastRejectionAt.getTime())
     : null;
   const reads = {
-    tryFindRequest: vi.fn(async () => held),
-    tryFindPendingRequest: vi.fn(async () => pending),
-    tryFindLastRejectionAt: vi.fn(async () => rejectedAt),
+    getRequest: vi.fn(async () => {
+      if (!held) throw new JoinRequestNotFoundError("no such request");
+      return held;
+    }),
+    getPendingRequest: vi.fn(async () => {
+      if (!pending) throw new JoinRequestNotFoundError("nothing pending");
+      return pending;
+    }),
+    getLastRejectionAt: vi.fn(async () => {
+      if (!rejectedAt) throw new JoinRequestNotFoundError("never rejected");
+      return rejectedAt;
+    }),
     findPendingForOrganization: vi.fn(async () => []),
     findPendingForUser: vi.fn(async () => []),
     findAutomaticJoinsForOrganization: vi.fn(async () => []),
@@ -122,10 +136,11 @@ function harness({
     reads,
     candidates: {
       findCandidateOrganizations: vi.fn(async () => candidates),
-      tryFindCandidateOrganization: vi.fn(
-        async ({ organizationId }: { organizationId: string }) =>
-          candidates.find((candidate) => candidate.organizationId === organizationId) ?? null,
-      ),
+      getCandidateOrganization: vi.fn(async ({ organizationId }: { organizationId: string }) => {
+        const candidate = candidates.find((row) => row.organizationId === organizationId);
+        if (!candidate) throw new JoinNotAvailableError("not a candidate");
+        return candidate;
+      }),
     },
     membership,
     settings,

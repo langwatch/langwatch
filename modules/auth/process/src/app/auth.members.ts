@@ -4,15 +4,18 @@
  * whether a membership is still active.
  */
 export abstract class AuthDirectory {
-  abstract tryFindOrganizationIdBySsoDomain(domain: string): Promise<string | null>;
+  /** Throws `OrganizationNotFoundError` when no organization claims the domain. */
+  abstract getOrganizationIdBySsoDomain(domain: string): Promise<string>;
 
-  abstract tryFindPerson(
+  /** Throws `UserNotFoundError`. */
+  abstract getPerson(
     userId: string,
-  ): Promise<{ id: string; email: string | null; name: string | null } | null>;
+  ): Promise<{ id: string; email: string | null; name: string | null }>;
 
-  abstract tryFindOrganization(
+  /** Throws `OrganizationNotFoundError`. */
+  abstract getOrganization(
     organizationId: string,
-  ): Promise<{ id: string; name: string; slug: string } | null>;
+  ): Promise<{ id: string; name: string; slug: string }>;
 
   abstract maxSessionDurationDays(organizationId: string): Promise<number>;
 

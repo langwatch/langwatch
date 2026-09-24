@@ -2,7 +2,7 @@ import { ATTR_KEYS } from "@langwatch/trace-contract";
 
 import type { ExtractorContext } from "../services/canonical-attributes.service.ts";
 import { recordValueType } from "./canonical-extraction.rules.ts";
-import { asNumber, isNonEmptyString, isRecord, safeJsonParse } from "./canonical-guard.rules.ts";
+import { asNumber, isNonEmptyString, isRecord, parseJsonSafely } from "./canonical-guard.rules.ts";
 import { convertGeminiContent } from "./gemini-content.rules.ts";
 import { setIfMissing, VERTEX_ADK_KEYS, VERTEX_ADK_RULE_PREFIX } from "./vertex-adk-core.rules.ts";
 
@@ -75,7 +75,7 @@ function recordFinishReason(ctx: ExtractorContext, response: Record<string, unkn
 export function canonicaliseVertexAdkResponse(ctx: ExtractorContext): void {
   const { attrs } = ctx.bag;
 
-  const response = safeJsonParse(attrs.get(VERTEX_ADK_KEYS.LLM_RESPONSE));
+  const response = parseJsonSafely(attrs.get(VERTEX_ADK_KEYS.LLM_RESPONSE));
   if (!isRecord(response)) {
     return;
   }

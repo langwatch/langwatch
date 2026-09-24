@@ -138,10 +138,12 @@ describe("MemoryCliDeviceSessionRepository", () => {
 
     await repository.set({ key: "device", value: "pending", ttlSeconds: 1 });
     now += 999;
-    await expect(repository.tryGet("device")).resolves.toBe("pending");
+    await expect(repository.get("device")).resolves.toBe("pending");
 
     now += 1;
-    await expect(repository.tryGet("device")).resolves.toBeNull();
+    await expect(repository.get("device")).rejects.toMatchObject({
+      code: "cli_session_record_not_found",
+    });
   });
 
   it("releases an expired exclusive claim for the next exchange", async () => {

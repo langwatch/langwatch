@@ -81,7 +81,7 @@ const CHAT_ROLE_SET: ReadonlySet<string> = new Set(CHAT_ROLES);
  * re-parsing a 60 KB blob. The parse remains as fallback for pre-derivation
  * records, and because it keeps `tool_use` markers the derived text drops.
  */
-function outputBodyText(
+function extractOutputBodyText(
   log: ClaudeContentLog,
   traceCanonicalisation: TraceCanonicalisationService,
 ): string | null {
@@ -121,7 +121,7 @@ export function buildOutputIndex(
   for (const log of logs) {
     if (!isFirstLogOfKind(log, OUTPUT_BODY_EVENT, byRequestId)) continue;
 
-    const text = outputBodyText(log, traceCanonicalisation);
+    const text = extractOutputBodyText(log, traceCanonicalisation);
     if (text !== null) {
       byRequestId.set(log.requestId, { type: "text", value: text });
     }
@@ -226,7 +226,7 @@ function dedupeRepeatedSystemMessages({
     callNumber++;
     const messages = input.value as ChatMessage[];
     for (const [i, message] of messages.entries()) {
-      const seenAtCall = firstSystemCall({
+      const seenAtCall = pickFirstSystemCall({
         message,
         callNumber,
         firstCallByContent,
@@ -245,7 +245,7 @@ function dedupeRepeatedSystemMessages({
  * null when the message is not a system string or is being seen for the first
  * time (in which case this call is recorded as its origin).
  */
-function firstSystemCall({
+function pickFirstSystemCall({
   message,
   callNumber,
   firstCallByContent,

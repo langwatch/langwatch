@@ -44,8 +44,8 @@ export function contractTermsOf({
     maximumUsdCents: commitUsdCents + overageUsdCents,
     overageEnabled: counted.some((license) => license.overageEnabled),
     services: entitledConnectServices([...new Set(counted.flatMap((license) => license.services))]),
-    termEndsAt: latest(counted.map((license) => license.expiresAt)),
-    termStartsAt: earliest(counted.map((license) => license.issuedAt)),
+    termEndsAt: pickLatest(counted.map((license) => license.expiresAt)),
+    termStartsAt: pickEarliest(counted.map((license) => license.issuedAt)),
   };
 }
 
@@ -53,13 +53,13 @@ function sum(values: number[]): number {
   return values.reduce((total, value) => total + value, 0);
 }
 
-function latest(instants: Instant[]): string | null {
+function pickLatest(instants: Instant[]): string | null {
   return instants.length === 0
     ? null
     : instants.reduce((a, b) => (Temporal.Instant.compare(a, b) >= 0 ? a : b)).toString();
 }
 
-function earliest(instants: Instant[]): string | null {
+function pickEarliest(instants: Instant[]): string | null {
   return instants.length === 0
     ? null
     : instants.reduce((a, b) => (Temporal.Instant.compare(a, b) <= 0 ? a : b)).toString();

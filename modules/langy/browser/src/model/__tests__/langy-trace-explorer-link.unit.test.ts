@@ -188,23 +188,19 @@ describe("asFreeTextTerm", () => {
         const ast = parse(asFreeTextTerm("status:error"));
 
         expect(ast.type).toBe("Tag");
-        const tag = ast as unknown as {
-          field: { type: string };
-          expression: { value: unknown };
-        };
-        expect(tag.field.type).toBe("ImplicitField");
-        expect(tag.expression.value).toBe("status:error");
+        expect(ast).toMatchObject({
+          field: { type: "ImplicitField" },
+          expression: { value: "status:error" },
+        });
       });
 
       it("survives a plain multi-word query", () => {
         const ast = parse(asFreeTextTerm("checkout failed"));
 
-        const tag = ast as unknown as {
-          field: { type: string };
-          expression: { value: unknown };
-        };
-        expect(tag.field.type).toBe("ImplicitField");
-        expect(tag.expression.value).toBe("checkout failed");
+        expect(ast).toMatchObject({
+          field: { type: "ImplicitField" },
+          expression: { value: "checkout failed" },
+        });
       });
     });
   });
@@ -233,15 +229,11 @@ describe("buildExplorerQuery", () => {
     });
 
     it("parses as a real OR group, not two field filters ANDed together", () => {
-      const ast = parse(
-        buildExplorerQuery({ origins: ["evaluation", "simulation"] })!,
-      ) as unknown as {
-        type: string;
-        expression: { type: string; operator: { operator: string } };
-      };
-      expect(ast.type).toBe("ParenthesizedExpression");
-      expect(ast.expression.type).toBe("LogicalExpression");
-      expect(ast.expression.operator.operator).toBe("OR");
+      const ast = parse(buildExplorerQuery({ origins: ["evaluation", "simulation"] })!);
+      expect(ast).toMatchObject({
+        type: "ParenthesizedExpression",
+        expression: { type: "LogicalExpression", operator: { operator: "OR" } },
+      });
     });
   });
 
@@ -255,8 +247,7 @@ describe("buildExplorerQuery", () => {
     it("parses as an AND, so a trace must match both", () => {
       const ast = parse(buildExplorerQuery({ query: "timeout", origins: ["gateway"] })!);
       expect(ast.type).toBe("LogicalExpression");
-      const node = ast as unknown as { operator: { operator: string } };
-      expect(node.operator.operator).toBe("AND");
+      expect(ast).toMatchObject({ operator: { operator: "AND" } });
     });
   });
 
@@ -539,12 +530,10 @@ describe("buildAutomationHref", () => {
         );
 
         const ast = parse(params.get("drawer.initialFilterQuery")!);
-        const tag = ast as unknown as {
-          field: { type: string };
-          expression: { value: unknown };
-        };
-        expect(tag.field.type).toBe("ImplicitField");
-        expect(tag.expression.value).toBe("status:error");
+        expect(ast).toMatchObject({
+          field: { type: "ImplicitField" },
+          expression: { value: "status:error" },
+        });
       });
 
       it("lands on the Explorer showing the very traces the alert would match", () => {

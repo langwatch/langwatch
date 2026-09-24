@@ -14,7 +14,7 @@ import {
   type ExtractedIO,
   type FlattenMode,
   getSpanType,
-  messagesToText,
+  convertMessagesToText,
   normalizeChatPayload,
   shouldExcludeSpan,
   type SpanTreeNode,
@@ -256,7 +256,7 @@ export class TraceIOExtractionService {
     const genAiValue = attrs[keys.genAi];
     if (genAiValue !== undefined && genAiValue !== null) {
       const normalized = normalizeChatPayload(genAiValue);
-      const text = messagesToText(normalized, type, this.traceCanonicalisation);
+      const text = convertMessagesToText(normalized, type, this.traceCanonicalisation);
       if (text) {
         return { raw: normalized, text, source: "gen_ai" };
       }
@@ -270,7 +270,7 @@ export class TraceIOExtractionService {
     const langwatchValue = attrs[keys.langwatch];
     if (langwatchValue !== undefined && langwatchValue !== null) {
       const normalized = normalizeChatPayload(langwatchValue);
-      const text = messagesToText(normalized, type, this.traceCanonicalisation);
+      const text = convertMessagesToText(normalized, type, this.traceCanonicalisation);
       if (text) {
         return { raw: normalized, text, source: "langwatch" };
       }

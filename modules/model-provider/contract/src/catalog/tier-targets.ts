@@ -41,7 +41,7 @@ function supportsReasoning(entry: LLMModelEntry): boolean {
   return REASONING_PARAMETERS.some((parameter) => entry.supportedParameters.includes(parameter));
 }
 
-function blendedCostPerToken(entry: LLMModelEntry): number | null {
+function computeBlendedCostPerToken(entry: LLMModelEntry): number | null {
   const pricing = entry.pricing;
   if (!pricing) return null;
   const input = pricing.inputCostPerToken ?? 0;
@@ -51,11 +51,11 @@ function blendedCostPerToken(entry: LLMModelEntry): number | null {
 }
 
 export function isRankableByPrice(entry: LLMModelEntry): boolean {
-  return blendedCostPerToken(entry) !== null;
+  return computeBlendedCostPerToken(entry) !== null;
 }
 
 function priceOf(entry: LLMModelEntry): number {
-  return blendedCostPerToken(entry) ?? 0;
+  return computeBlendedCostPerToken(entry) ?? 0;
 }
 
 function providerAllowed(

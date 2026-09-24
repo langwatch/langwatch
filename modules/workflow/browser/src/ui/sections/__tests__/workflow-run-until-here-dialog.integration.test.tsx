@@ -63,9 +63,9 @@ const datasetColumns = [
 const stubDatasetPreview = ({ rows, onRowClick }: WorkflowDatasetPreviewProps) => (
   <div>
     {rows.map((row, index) => (
-      <div key={row.id ?? index} onClick={() => onRowClick(index)}>
+      <button type="button" key={row.id ?? index} onClick={() => onRowClick(index)}>
         {String(row.question)}
-      </div>
+      </button>
     ))}
   </div>
 );

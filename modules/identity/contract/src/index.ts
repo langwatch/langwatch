@@ -328,6 +328,7 @@ export {
   SsoSamlNotSelfServeError,
   SsoSetupAddressMismatchError,
   SsoSignInRefusedError,
+  ScimSyncNotFoundError,
   SsoTestArrivalCannotCreateOrganizationError,
 } from "./identity.errors.ts";
 export {
@@ -348,7 +349,7 @@ export {
   type OrganizationSsoConnection,
   type SsoConnectionHistoryEntryView,
 } from "./sso-connection-history.ts";
-export { IdentityEmailService } from "./identity-email.service.ts";
+export { type IdentityEmailResolution, IdentityEmailService } from "./identity-email.service.ts";
 export {
   coarseColleagueCount,
   DEFAULT_DOMAIN_JOIN_SETTING,
@@ -360,7 +361,7 @@ export {
   type JoinLookupDecision,
   type JoinLookupInput,
   type JoinOffer,
-  joinDomainOf,
+  extractJoinDomain,
   organizationAdmitsDomain,
   organizationAdmitsDomainAutomatically,
   PUBLIC_EMAIL_DOMAINS,
@@ -478,7 +479,11 @@ export {
   type VerifyIdentifierCommandData,
   verifyIdentifierCommandDataSchema,
 } from "./facts.ts";
-export { identifierDomain, normalizeDomain, normalizeIdentifierValue } from "./identifier.ts";
+export {
+  extractIdentifierDomain,
+  normalizeDomain,
+  normalizeIdentifierValue,
+} from "./identifier.ts";
 export {
   type IdentifierHead,
   type IdentityStream,
@@ -487,7 +492,11 @@ export {
   reduceIdentifier,
   userErasureFacts,
 } from "./identifier-aggregate.ts";
-export { type MatchableEmail, matchableEmailsOf } from "./matchable-emails.ts";
+export {
+  type MatchableEmail,
+  matchableEmailsOf,
+  type VerifiedEmailsResolution,
+} from "./matchable-emails.ts";
 export {
   BACKUP_CODE_CONSUMED_EVENT_TYPE,
   BACKUP_CODES_REGENERATED_EVENT_TYPE,
@@ -580,9 +589,9 @@ export {
   PASSWORD_MAXIMUM_BYTES,
   PASSWORD_MINIMUM_LENGTH,
   PASSWORD_REQUIREMENTS_HINT,
-  passwordProblem,
+  describePasswordProblem,
 } from "./password-policy.ts";
-export { primaryEmailOf } from "./primary-email.ts";
+export { pickPrimaryEmail } from "./primary-email.ts";
 export {
   LOCAL_METHOD_SET,
   PASSKEY_METHOD,

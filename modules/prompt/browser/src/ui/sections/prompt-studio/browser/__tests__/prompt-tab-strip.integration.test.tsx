@@ -31,7 +31,19 @@ vi.mock("../tab/use-prompt-browser-tab-controller.ts", () => ({
 const overflowOf = vi.mocked(useIsOverflowing);
 const controllerOf = vi.mocked(usePromptBrowserTabController);
 
-const TABS = [{ id: "summarizer" }, { id: "classifier" }] as unknown as Tab[];
+function tabNamed(id: string): Tab {
+  return {
+    id,
+    data: {
+      chat: { initialMessagesFromSpanData: [] },
+      form: { currentValues: {} },
+      meta: { title: null },
+      variableValues: {},
+    },
+  };
+}
+
+const TABS = [tabNamed("summarizer"), tabNamed("classifier")];
 
 function renderStrip({ isStripOverflowing }: { isStripOverflowing: boolean }) {
   overflowOf.mockReturnValue(isStripOverflowing);
@@ -61,7 +73,7 @@ beforeEach(() => {
   controllerOf.mockImplementation(() => {
     const tabId = useTabId();
     return {
-      tab: { id: tabId },
+      tab: tabNamed(tabId),
       title: tabId,
       hasUnsavedChanges: false,
       handleClose: vi.fn(),
@@ -70,7 +82,7 @@ beforeEach(() => {
       isOutdated: false,
       handleUpgrade: vi.fn(),
       showVersionBadge: false,
-    } as unknown as ReturnType<typeof usePromptBrowserTabController>;
+    };
   });
 });
 

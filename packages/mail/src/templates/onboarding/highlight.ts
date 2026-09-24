@@ -34,6 +34,11 @@ const KEYWORDS: Record<HighlightLanguage, readonly string[]> = {
 const SCANNER =
   /(#[^\n]*|\/\/[^\n]*)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|(\d+(?:\.\d+)?)|([A-Za-z_][A-Za-z0-9_]*)/g;
 
+const wordKind = ({ isKeyword, callee }: { isKeyword: boolean; callee: boolean }): TokenKind => {
+  if (isKeyword) return "keyword";
+  return callee ? "call" : "plain";
+};
+
 export const tokenize = (code: string, language: HighlightLanguage): Token[] => {
   const keywords = new Set(KEYWORDS[language]);
   const tokens: Token[] = [];
@@ -51,7 +56,7 @@ export const tokenize = (code: string, language: HighlightLanguage): Token[] => 
     else if (number) tokens.push({ kind: "number", text });
     else if (word) {
       const callee = code[cursor] === "(";
-      tokens.push({ kind: keywords.has(word) ? "keyword" : callee ? "call" : "plain", text });
+      tokens.push({ kind: wordKind({ isKeyword: keywords.has(word), callee }), text });
     }
   }
 

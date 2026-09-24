@@ -73,6 +73,53 @@ import { ChartTooltip } from "../analytics/chart-tooltip.tsx";
 import { FeedbackLink } from "../feedback-link.tsx";
 import { MetadataTag } from "../metadata-tag.tsx";
 
+type QueryView = "loading" | "error" | "empty" | "ready";
+
+function queryViewOf({
+  isLoading,
+  error,
+  isEmpty,
+}: {
+  isLoading: boolean;
+  error: unknown;
+  isEmpty: boolean;
+}): QueryView {
+  if (isLoading) return "loading";
+  if (error) return "error";
+  if (isEmpty) return "empty";
+  return "ready";
+}
+
+function optimizerHeading(optimizerNames: string[]): string {
+  if (optimizerNames.length === 1) return optimizerNames[0]!;
+  if (optimizerNames.length > 1) return "Multiple Optimizers";
+  return "Waiting for the first completed step to arrive...";
+}
+
+function nextSelectedRuns({
+  selectedRuns,
+  runId,
+  isHoldingShift,
+}: {
+  selectedRuns: string[] | null;
+  runId: string;
+  isHoldingShift: boolean;
+}): string[] {
+  if (selectedRuns?.includes(runId)) return selectedRuns.filter((id) => id !== runId);
+  if (isHoldingShift) return [...(selectedRuns ?? []), runId];
+  return [runId];
+}
+
+function ZeroCallCost({ cached }: { cached: boolean }) {
+  if (!cached) return "-";
+  return (
+    <HStack align="start">
+      <Text>$0.00</Text>
+      <Text color="fg.subtle">(cached)</Text>
+    </HStack>
+  );
+}
+
 export function DSPyExperiment({
   project,
   experiment,
@@ -94,6 +141,11 @@ export function DSPyExperiment({
     labelNames,
     runsById,
   } = useDSPyExperimentState({ project, experiment });
+  const runsView = queryViewOf({
+    isLoading: dspyRuns.isLoading,
+    error: dspyRuns.error,
+    isEmpty: dspyRuns.data?.length === 0,
+  });
 
   return (
     <HStack align="start" width="full" height="full" gap={0}>
@@ -113,54 +165,47 @@ export function DSPyExperiment({
             <Spacer />
             <FeedbackLink />
           </HStack>
-          {dspyRuns.isLoading ? (
-            <Skeleton width="100%" height="30px" />
-          ) : dspyRuns.error ? (
+          {runsView === "loading" && <Skeleton width="100%" height="30px" />}
+          {runsView === "error" && (
             <Alert.Root>
               <Alert.Indicator />
               Error loading experiment runs
             </Alert.Root>
-          ) : dspyRuns.data?.length === 0 ? (
-            <Text>Waiting for the first completed step to arrive...</Text>
-          ) : (
-            dspyRuns.data && (
-              <>
+          )}
+          {runsView === "empty" && <Text>Waiting for the first completed step to arrive...</Text>}
+          {runsView === "ready" && dspyRuns.data && (
+            <>
+              <Card.Root width="100%">
+                <Card.Header>
+                  <Heading as="h2" size="md">
+                    {optimizerHeading(optimizerNames)}
+                  </Heading>
+                </Card.Header>
+                <Card.Body>
+                  <DSPyRunsScoresChart
+                    dspyRuns={dspyRuns.data}
+                    selectedPoint={selectedPoint}
+                    setSelectedPoint={setSelectedPoint}
+                    highlightedRun={highlightedRun}
+                    selectedRuns={selectedRuns}
+                    stepToDisplay={stepToDisplay}
+                    labelNames={labelNames}
+                  />
+                </Card.Body>
+              </Card.Root>
+              {stepToDisplay && (!highlightedRun || highlightedRun === stepToDisplay.run_id) && (
                 <Card.Root width="100%">
-                  <Card.Header>
-                    <Heading as="h2" size="md">
-                      {optimizerNames.length === 1
-                        ? optimizerNames[0]!
-                        : optimizerNames.length > 1
-                          ? "Multiple Optimizers"
-                          : "Waiting for the first completed step to arrive..."}
-                    </Heading>
-                  </Card.Header>
-                  <Card.Body>
-                    <DSPyRunsScoresChart
-                      dspyRuns={dspyRuns.data}
-                      selectedPoint={selectedPoint}
-                      setSelectedPoint={setSelectedPoint}
-                      highlightedRun={highlightedRun}
-                      selectedRuns={selectedRuns}
-                      stepToDisplay={stepToDisplay}
-                      labelNames={labelNames}
+                  <Card.Body padding={0}>
+                    <RunDetails
+                      project={project}
+                      experiment={experiment}
+                      dspyStepSummary={stepToDisplay}
+                      workflowVersion={runsById?.[stepToDisplay.run_id]?.workflow_version}
                     />
                   </Card.Body>
                 </Card.Root>
-                {stepToDisplay && (!highlightedRun || highlightedRun === stepToDisplay.run_id) && (
-                  <Card.Root width="100%">
-                    <Card.Body padding={0}>
-                      <RunDetails
-                        project={project}
-                        experiment={experiment}
-                        dspyStepSummary={stepToDisplay}
-                        workflowVersion={runsById?.[stepToDisplay.run_id]?.workflow_version}
-                      />
-                    </Card.Body>
-                  </Card.Root>
-                )}
-              </>
-            )
+              )}
+            </>
           )}
         </VStack>
         {runsById && selectedRuns?.length === 1 && (
@@ -338,6 +383,12 @@ export function DSPyExperimentRunList({
     [dspyRuns.data],
   );
 
+  const runsView = queryViewOf({
+    isLoading: dspyRuns.isLoading,
+    error: dspyRuns.error,
+    isEmpty: dspyRuns.data?.length === 0,
+  });
+
   return (
     <VStack
       align="start"
@@ -357,7 +408,7 @@ export function DSPyExperimentRunList({
           DSPy Optimizer Runs
         </Heading>
       )}
-      {dspyRuns.isLoading ? (
+      {runsView === "loading" && (
         <>
           {Array.from({ length: 3 }).map((_, index) => (
             <HStack key={index} paddingX={6} paddingY={2} width="100%">
@@ -365,16 +416,19 @@ export function DSPyExperimentRunList({
             </HStack>
           ))}
         </>
-      ) : dspyRuns.error ? (
+      )}
+      {runsView === "error" && (
         <Alert.Root>
           <Alert.Indicator />
           Error loading experiment runs
         </Alert.Root>
-      ) : dspyRuns.data?.length === 0 ? (
+      )}
+      {runsView === "empty" && (
         <Text paddingX={6} paddingY={4}>
           Waiting for runs...
         </Text>
-      ) : (
+      )}
+      {runsView === "ready" &&
         dspyRunsPlusIncoming?.slice(0, 21).map((run) => {
           const runCost = run.steps
             ?.map((step) => step.llm_calls_summary.total_cost)
@@ -407,11 +461,7 @@ export function DSPyExperimentRunList({
                 }
 
                 setSelectedRuns?.(
-                  selectedRuns?.includes(run.runId)
-                    ? selectedRuns.filter((id) => id !== run.runId)
-                    : isHoldingShift
-                      ? [...(selectedRuns ?? []), run.runId]
-                      : [run.runId],
+                  nextSelectedRuns({ selectedRuns, runId: run.runId, isHoldingShift }),
                 );
                 setHighlightedRun(null);
               }}
@@ -429,68 +479,89 @@ export function DSPyExperimentRunList({
                   </VStack>
                 </>
               ) : (
-                <>
-                  {run.workflow_version ? (
-                    <VersionBox
-                      version={run.workflow_version}
-                      minWidth={hasAnyVersion ? "48px" : "0"}
-                    />
-                  ) : (
-                    <Box
-                      width="24px"
-                      height="24px"
-                      minWidth="24px"
-                      minHeight="24px"
-                      background="gray.300"
-                      borderRadius="100%"
-                      backgroundColor={getColorForString("colors", run.runId).color}
-                    />
-                  )}
-                  <VStack width="full" align="start" gap={0} paddingRight={2}>
-                    <HStack width="full">
-                      {run.workflow_version && (
-                        <Box
-                          width="12px"
-                          height="12px"
-                          minWidth="12px"
-                          minHeight="12px"
-                          background="gray.300"
-                          borderRadius="100%"
-                          backgroundColor={getColorForString("colors", run.runId).color}
-                        />
-                      )}
-                      <Text fontSize={size === "sm" ? "13px" : "14px"}>{runName}</Text>
-                      {(incomingRunIds ?? []).includes(run.runId) && (
-                        <>
-                          <Spacer />
-                          <Spinner size="xs" />
-                        </>
-                      )}
-                    </HStack>
-
-                    <HStack color="fg.subtle" fontSize={size === "sm" ? "12px" : "13px"}>
-                      <Text>
-                        {run.created_at
-                          ? formatTimeAgo(run.created_at, "yyyy-MM-dd HH:mm", 5)
-                          : "Waiting for steps..."}
-                      </Text>
-                      {runCost && (
-                        <>
-                          <Text>·</Text>
-                          <Text>
-                            {formatMoney({ amount: runCost, currency: "USD" }, "$0.00[0]")}
-                          </Text>
-                        </>
-                      )}
-                    </HStack>
-                  </VStack>
-                </>
+                <LoadedRunSummary
+                  run={run}
+                  runName={runName}
+                  runCost={runCost}
+                  hasAnyVersion={hasAnyVersion}
+                  size={size}
+                  incomingRunIds={incomingRunIds}
+                />
               )}
             </HStack>
           );
-        })
-      )}
+        })}
     </VStack>
+  );
+}
+
+function LoadedRunSummary({
+  run,
+  runName,
+  runCost,
+  hasAnyVersion,
+  size,
+  incomingRunIds,
+}: {
+  run: { runId: string } & Partial<DSPyRunsSummary>;
+  runName: string;
+  runCost: number | undefined;
+  hasAnyVersion: boolean | undefined;
+  size: "md" | "sm";
+  incomingRunIds: string[];
+}) {
+  return (
+    <>
+      {run.workflow_version ? (
+        <VersionBox version={run.workflow_version} minWidth={hasAnyVersion ? "48px" : "0"} />
+      ) : (
+        <Box
+          width="24px"
+          height="24px"
+          minWidth="24px"
+          minHeight="24px"
+          background="gray.300"
+          borderRadius="100%"
+          backgroundColor={getColorForString("colors", run.runId).color}
+        />
+      )}
+      <VStack width="full" align="start" gap={0} paddingRight={2}>
+        <HStack width="full">
+          {run.workflow_version && (
+            <Box
+              width="12px"
+              height="12px"
+              minWidth="12px"
+              minHeight="12px"
+              background="gray.300"
+              borderRadius="100%"
+              backgroundColor={getColorForString("colors", run.runId).color}
+            />
+          )}
+          <Text fontSize={size === "sm" ? "13px" : "14px"}>{runName}</Text>
+          {(incomingRunIds ?? []).includes(run.runId) && (
+            <>
+              <Spacer />
+              <Spinner size="xs" />
+            </>
+          )}
+        </HStack>
+
+        <HStack color="fg.subtle" fontSize={size === "sm" ? "12px" : "13px"}>
+          <Text>
+            {run.created_at
+              ? formatTimeAgo(run.created_at, "yyyy-MM-dd HH:mm", 5)
+              : "Waiting for steps..."}
+          </Text>
+          {runCost && (
+            <>
+              <Text>·</Text>
+              <Text>{formatMoney({ amount: runCost, currency: "USD" }, "$0.00[0]")}</Text>
+            </>
+          )}
+        </HStack>
+      </VStack>
+    </>
   );
 }
 
@@ -524,6 +595,26 @@ export const RunDetails = React.memo(
     const [displayRawParams, setDisplayRawParams] = useState(false);
     const hasTrace = dspyStep.data?.examples.some((example) => example.trace);
     const runName = workflowVersion?.commitMessage ?? dspyStepSummary.run_id;
+    const stepView = queryViewOf({
+      isLoading: dspyStep.isLoading,
+      error: dspyStep.error,
+      isEmpty: false,
+    });
+    const predictorsView = queryViewOf({
+      isLoading: dspyStep.isLoading,
+      error: dspyStep.error,
+      isEmpty: dspyStep.data?.predictors.length === 0,
+    });
+    const examplesView = queryViewOf({
+      isLoading: dspyStep.isLoading,
+      error: dspyStep.error,
+      isEmpty: dspyStep.data?.examples.length === 0,
+    });
+    const llmCallsView = queryViewOf({
+      isLoading: dspyStep.isLoading,
+      error: dspyStep.error,
+      isEmpty: dspyStep.data?.llm_calls.length === 0,
+    });
 
     return (
       <VStack width="full" height="full" gap={0} minWidth="0">
@@ -672,19 +763,20 @@ export const RunDetails = React.memo(
             padding={0}
             paddingTop={displayRawParams ? 4 : 0}
           >
-            {dspyStep.isLoading ? (
-              <Skeleton width="100%" height="30px" />
-            ) : dspyStep.error ? (
+            {stepView === "loading" && <Skeleton width="100%" height="30px" />}
+            {stepView === "error" && (
               <Alert.Root>
                 <Alert.Indicator />
                 Error loading step data
               </Alert.Root>
-            ) : dspyStep.data && displayRawParams ? (
+            )}
+            {stepView === "ready" && dspyStep.data && displayRawParams && (
               <RenderInputOutput
                 value={JSON.stringify(dspyStep.data?.predictors)}
                 collapseStringsAfterLength={140}
               />
-            ) : dspyStep.data ? (
+            )}
+            {stepView === "ready" && dspyStep.data && !displayRawParams && (
               <Table.Root
                 height="fit-content"
                 // @ts-expect-error: Chakra Table.Root prop types don't include
@@ -716,7 +808,7 @@ export const RunDetails = React.memo(
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                  {dspyStep.isLoading ? (
+                  {predictorsView === "loading" &&
                     Array.from({ length: 3 }).map((_, index) => (
                       <Table.Row key={index}>
                         <Table.Cell background="gray.50">&nbsp;</Table.Cell>
@@ -733,18 +825,21 @@ export const RunDetails = React.memo(
                           <Skeleton width="100%" height="30px" />
                         </Table.Cell>
                       </Table.Row>
-                    ))
-                  ) : dspyStep.error ? (
+                    ))}
+                  {predictorsView === "error" && (
                     <Table.Row>
                       <Table.Cell colSpan={5} color="red.600">
                         Error loading step data
                       </Table.Cell>
                     </Table.Row>
-                  ) : dspyStep.data.predictors.length === 0 ? (
+                  )}
+                  {predictorsView === "empty" && (
                     <Table.Row>
                       <Table.Cell colSpan={5}>No entries</Table.Cell>
                     </Table.Row>
-                  ) : dspyStep.data ? (
+                  )}
+                  {predictorsView === "ready" &&
+                    dspyStep.data &&
                     dspyStep.data.predictors.map(({ name, predictor }, index) => {
                       const signature = predictor?.extended_signature ?? predictor?.signature;
                       return (
@@ -779,11 +874,10 @@ export const RunDetails = React.memo(
                           </Table.Cell>
                         </Table.Row>
                       );
-                    })
-                  ) : null}
+                    })}
                 </Table.Body>
               </Table.Root>
-            ) : null}
+            )}
           </Tabs.Content>
           <Tabs.Content
             value="1"
@@ -828,7 +922,7 @@ export const RunDetails = React.memo(
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                  {dspyStep.isLoading ? (
+                  {examplesView === "loading" &&
                     Array.from({ length: 3 }).map((_, index) => (
                       <Table.Row key={index}>
                         <Table.Cell background="gray.50">&nbsp;</Table.Cell>
@@ -842,18 +936,21 @@ export const RunDetails = React.memo(
                           <Skeleton width="100%" height="30px" />
                         </Table.Cell>
                       </Table.Row>
-                    ))
-                  ) : dspyStep.error ? (
+                    ))}
+                  {examplesView === "error" && (
                     <Table.Row>
                       <Table.Cell colSpan={4} color="red.600">
                         Error loading step data
                       </Table.Cell>
                     </Table.Row>
-                  ) : dspyStep.data?.examples.length === 0 ? (
+                  )}
+                  {examplesView === "empty" && (
                     <Table.Row>
                       <Table.Cell colSpan={4}>No entries</Table.Cell>
                     </Table.Row>
-                  ) : dspyStep.data ? (
+                  )}
+                  {examplesView === "ready" &&
+                    dspyStep.data &&
                     dspyStep.data.examples.map((example, index) => (
                       <Table.Row key={index}>
                         <Table.Cell background="gray.50" textAlign="center">
@@ -882,8 +979,7 @@ export const RunDetails = React.memo(
                           </Table.Cell>
                         )}
                       </Table.Row>
-                    ))
-                  ) : null}
+                    ))}
                 </Table.Body>
               </Table.Root>
             )}
@@ -928,7 +1024,7 @@ export const RunDetails = React.memo(
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {dspyStep.isLoading ? (
+                {llmCallsView === "loading" &&
                   Array.from({ length: 3 }).map((_, index) => (
                     <Table.Row key={index}>
                       <Table.Cell background="gray.50">&nbsp;</Table.Cell>
@@ -945,18 +1041,21 @@ export const RunDetails = React.memo(
                         <Skeleton width="100%" height="30px" />
                       </Table.Cell>
                     </Table.Row>
-                  ))
-                ) : dspyStep.error ? (
+                  ))}
+                {llmCallsView === "error" && (
                   <Table.Row>
                     <Table.Cell colSpan={6} color="red.600">
                       Error loading step data
                     </Table.Cell>
                   </Table.Row>
-                ) : dspyStep.data?.llm_calls.length === 0 ? (
+                )}
+                {llmCallsView === "empty" && (
                   <Table.Row>
                     <Table.Cell colSpan={6}>No entries</Table.Cell>
                   </Table.Row>
-                ) : dspyStep.data ? (
+                )}
+                {llmCallsView === "ready" &&
+                  dspyStep.data &&
                   dspyStep.data.llm_calls.map((llmCall, index) => {
                     const response =
                       llmCall.response?.choices?.[0]?.message?.content ?? llmCall.response?.output;
@@ -989,19 +1088,13 @@ export const RunDetails = React.memo(
                         <Table.Cell>
                           {llmCall.cost ? (
                             formatMoney({ amount: llmCall.cost, currency: "USD" }, "$0.00[0000]")
-                          ) : llmCall.response.cached ? (
-                            <HStack align="start">
-                              <Text>$0.00</Text>
-                              <Text color="fg.subtle">(cached)</Text>
-                            </HStack>
                           ) : (
-                            "-"
+                            <ZeroCallCost cached={!!llmCall.response.cached} />
                           )}
                         </Table.Cell>
                       </Table.Row>
                     );
-                  })
-                ) : null}
+                  })}
               </Table.Body>
             </Table.Root>
           </Tabs.Content>

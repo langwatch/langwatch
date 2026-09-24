@@ -62,13 +62,10 @@ export function EditorStatusBar({
         setWarningCount(0);
         return;
       }
-      const markers = monaco.editor.getModelMarkers({ resource: model.uri });
-      let errors = 0;
-      let warnings = 0;
-      for (const m of markers) {
-        if (m.severity === monaco.MarkerSeverity.Error) errors++;
-        else if (m.severity === monaco.MarkerSeverity.Warning) warnings++;
-      }
+      const { errors, warnings } = countMarkers(
+        monaco.editor.getModelMarkers({ resource: model.uri }),
+        monaco,
+      );
       setErrorCount(errors);
       setWarningCount(warnings);
     };
@@ -77,12 +74,7 @@ export function EditorStatusBar({
     return () => sub.dispose();
   }, [editorInstance, monaco]);
 
-  const problemsLabel =
-    errorCount + warningCount === 0
-      ? "No problems"
-      : `${errorCount > 0 ? `${errorCount} error${errorCount === 1 ? "" : "s"}` : ""}${
-          errorCount > 0 && warningCount > 0 ? ", " : ""
-        }${warningCount > 0 ? `${warningCount} warning${warningCount === 1 ? "" : "s"}` : ""}`;
+  const problemsLabel = problemsLabelFor({ errorCount, warningCount });
 
   const warningColor = warningCount > 0 ? "orange.500" : undefined;
   const problemsColor = errorCount > 0 ? "red.500" : warningColor;
@@ -133,6 +125,34 @@ export function EditorStatusBar({
       </HStack>
     </HStack>
   );
+}
+
+function countMarkers(
+  markers: editor.IMarker[],
+  monaco: Monaco,
+): { errors: number; warnings: number } {
+  let errors = 0;
+  let warnings = 0;
+  for (const m of markers) {
+    if (m.severity === monaco.MarkerSeverity.Error) errors++;
+    else if (m.severity === monaco.MarkerSeverity.Warning) warnings++;
+  }
+  return { errors, warnings };
+}
+
+function problemsLabelFor({
+  errorCount,
+  warningCount,
+}: {
+  errorCount: number;
+  warningCount: number;
+}): string {
+  if (errorCount + warningCount === 0) return "No problems";
+  const errorsPart = errorCount > 0 ? `${errorCount} error${errorCount === 1 ? "" : "s"}` : "";
+  const separator = errorCount > 0 && warningCount > 0 ? ", " : "";
+  const warningsPart =
+    warningCount > 0 ? `${warningCount} warning${warningCount === 1 ? "" : "s"}` : "";
+  return `${errorsPart}${separator}${warningsPart}`;
 }
 
 /**

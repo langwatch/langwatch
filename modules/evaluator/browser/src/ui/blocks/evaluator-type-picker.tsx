@@ -100,13 +100,7 @@ export function EvaluatorTypePicker({
               name={evaluator.name}
               description={evaluator.description}
               disabled={isDisabled}
-              disabledTooltip={
-                unavailable
-                  ? `${unavailable.reason} ${unavailable.howToEnable}`
-                  : isDisabled
-                    ? "Configure Azure Safety provider in Settings → Model Providers"
-                    : undefined
-              }
+              disabledTooltip={disabledTooltipFor({ unavailable, isDisabled })}
               disabledCta={
                 isDisabled && !unavailable && onConfigureAzureSafety
                   ? {
@@ -122,6 +116,18 @@ export function EvaluatorTypePicker({
       </VStack>
     </VStack>
   );
+}
+
+function disabledTooltipFor({
+  unavailable,
+  isDisabled,
+}: {
+  unavailable: { reason: string; howToEnable: string } | undefined;
+  isDisabled: boolean;
+}): string | undefined {
+  if (unavailable) return `${unavailable.reason} ${unavailable.howToEnable}`;
+  if (isDisabled) return "Configure Azure Safety provider in Settings → Model Providers";
+  return undefined;
 }
 
 function EvaluatorTypeCard({

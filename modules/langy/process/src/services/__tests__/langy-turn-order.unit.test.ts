@@ -8,9 +8,13 @@ import { describe, expect, it } from "vitest";
 
 import { LangyTurnOrderService } from "../langy-turn-order.service.ts";
 
-const delta = (text: string) => ({ type: "delta", text }) as LangyStreamEntry;
-const tool = (id: string, phase: "start" | "end", name = "bash") =>
-  ({ type: "tool", id, name, phase }) as unknown as LangyStreamEntry;
+const delta = (text: string): LangyStreamEntry => ({ type: "delta", text });
+const tool = (id: string, phase: "start" | "end", name = "bash"): LangyStreamEntry => ({
+  type: "tool",
+  id,
+  name,
+  phase,
+});
 
 describe("turnOrderFromStream", () => {
   describe("given a turn that wrote, called, wrote again, and called again", () => {

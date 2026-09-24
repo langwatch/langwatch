@@ -100,6 +100,17 @@ export class SimulationRunNotFoundError extends NotFoundError {
   }
 }
 
+export class ScenarioTargetNotFoundError extends NotFoundError {
+  declare readonly code: "scenario_target_not_found";
+
+  constructor(input: { targetType: string; referenceId: string }) {
+    super("scenario_target_not_found", "Scenario target", input.referenceId, {
+      meta: { targetType: input.targetType, referenceId: input.referenceId },
+    });
+    this.name = "ScenarioTargetNotFoundError";
+  }
+}
+
 /** A peer call omitted the archive scope the REST schema makes mandatory. */
 export class ScenarioEventArchiveScopeError extends HandledError {
   declare readonly code: "scenario_event_archive_scope_invalid";

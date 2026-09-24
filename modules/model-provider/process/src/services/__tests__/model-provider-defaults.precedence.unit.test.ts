@@ -47,13 +47,13 @@ function serviceOver(configs: Config[]) {
       getProjectScopes: async () => [],
     },
     defaults: {
-      listForOrganization: async () => configs,
-      listForProject: async () => configs,
+      findForOrganization: async () => configs,
+      findForProject: async () => configs,
     },
     catalog: {
       defaultFeatures: () => FEATURES,
       // Identity: normalisation is the catalogue's business, not this one's.
-      tryNormalizeDefaultModel: ({ model }: { model: string }) => model,
+      normalizeDefaultModel: ({ model }: { model: string }) => model,
     },
     providers: {},
     authorization: {},

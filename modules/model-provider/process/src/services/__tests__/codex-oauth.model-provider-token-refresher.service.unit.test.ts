@@ -175,9 +175,9 @@ describe("CodexAccountService", () => {
     });
 
     it("keeps a network failure retryable instead of declaring the session dead", async () => {
-      const impl = (async () => {
+      const impl: typeof fetch = async () => {
         throw new TypeError("fetch failed: getaddrinfo ENOTFOUND");
-      }) as unknown as typeof fetch;
+      };
       const service = new CodexAccountService(impl, "https://issuer.test");
       await expect(service.refresh(storedKeys)).rejects.toMatchObject({
         name: "CodexAuthError",

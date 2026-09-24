@@ -101,20 +101,19 @@ export type GatewaySpendWebhookDelivery = {
  */
 export type GatewaySpendApp = Readonly<{
   /**
-   * The ledger reads. Undefined on a deployment without ClickHouse, where
-   * there are no figures to report at all — the routes refuse rather than
-   * answering a reconciliation query with a confident zero.
+   * The ledger reads. Refused on a deployment without ClickHouse, where there
+   * are no figures to report at all, rather than answering with a confident zero.
    */
-  spendEvents(): GatewaySpendEventsService | undefined;
+  getSpendEvents(): GatewaySpendEventsService;
   /** The budget ledger the per-end-user caps are read against. */
-  budgetSpend(): GatewayBudgetSpend | undefined;
+  getBudgetSpend(): GatewayBudgetSpend;
 
   /** The endpoint registry a replay names its destination in. */
   webhookEndpoints(): GatewaySpendWebhookEndpoints;
   /** The emitted-envelope log a replay walks. */
-  webhookEvents(): GatewaySpendWebhookEvents | undefined;
+  webhookEvents(): GatewaySpendWebhookEvents;
   /** The live delivery path a replay appends to. */
-  webhookDelivery(): GatewaySpendWebhookDelivery | undefined;
+  webhookDelivery(): GatewaySpendWebhookDelivery;
 
   /**
    * One spend row rendered as the canonical billing envelope. The wire format
@@ -148,13 +147,6 @@ export type GatewaySpendApp = Readonly<{
     virtualKeyId?: string;
     budgetRepository: GatewayBudgetSpend;
   }): Promise<GatewayEndUserCap[]>;
-
-  /**
-   * The application's own refusal for "the store these figures live in is not
-   * reachable". It carries the code and the status the boundary renders, and
-   * naming it here would put a second taxonomy on the same failure.
-   */
-  spendStoreUnavailable(): Error;
 }>;
 
 export const GatewaySpendApi = moduleApi<GatewaySpendApp>()("gateway");
@@ -168,13 +160,6 @@ export const gatewaySpendBillingPlanGate = defineRestMiddleware(
   "gatewaySpendBillingPlanGate",
   z.object({}),
 );
-
-/** The ledger is the only store spend accrues in; without it we say so, not a zero. */
-function spendEvents(app: GatewaySpendApp): GatewaySpendEventsService {
-  const service = app.spendEvents();
-  if (!service) throw app.spendStoreUnavailable();
-  return service;
-}
 
 /** Milliseconds, not seconds: a seconds epoch silently lands in 1970 and reads empty. */
 const epochMs = z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER).meta({
@@ -597,7 +582,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
       teamIds: input.team_id,
       externalIds: input.external_id,
     });
-    const page = await spendEvents(app).getSpendSummaries({
+    const page = await app.getSpendEvents().getSpendSummaries({
       tenantIds: resolved.tenantIds,
       groupBy: input.group_by,
       bucket: input.bucket,
@@ -663,7 +648,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
       teamIds: input.team_id,
       externalIds: input.external_id,
     });
-    const page = await spendEvents(app).walkSpendEvents({
+    const page = await app.getSpendEvents().walkSpendEvents({
       tenantIds: resolved.tenantIds,
       fromMs: input.from,
       toMs: input.to,
@@ -699,19 +684,14 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
     const fromMs = input.from ?? now - END_USER_WINDOWS[input.window];
     const toMs = input.to ?? now;
     const { tenantIds } = await app.resolveSpendScope({ organizationId: scope.id });
-    const rollup = await spendEvents(app).getEndUserSpend({
+    const rollup = await app.getSpendEvents().getEndUserSpend({
       tenantIds,
       endUserId,
       fromMs,
       toMs,
       virtualKeyId: input.virtual_key_id,
     });
-    const budgetRepository = app.budgetSpend();
-    if (!budgetRepository) {
-      // The ledger is the only store spend accrues in, so without ClickHouse
-      // there are no figures to report against these caps.
-      throw app.spendStoreUnavailable();
-    }
+    const budgetRepository = app.getBudgetSpend();
     const caps = await app.endUserCaps({
       budgetRepository,
       organizationId: scope.id,
@@ -768,9 +748,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
     }
 
     const events = app.webhookEvents();
-    if (!events) throw app.spendStoreUnavailable();
     const delivery = app.webhookDelivery();
-    if (!delivery) throw app.spendStoreUnavailable();
 
     // One replay identity per call: it salts batch ids and inbox source
     // ids so redelivered envelopes cannot collide with their historical

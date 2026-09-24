@@ -10,6 +10,7 @@ import type {
   AuthzPermission,
   PermissionDecision,
 } from "@langwatch/authz-contract";
+import { StoredObjectNotFoundError } from "@langwatch/stored-object-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
@@ -41,8 +42,8 @@ class PurposeFiles implements StoredObjectFileReader {
     return this.rows.get(input.id) ?? { status: "not_found" };
   }
 
-  async tryGetById(): Promise<StoredObjectFileStreamRead | null> {
-    return null;
+  async getById(): Promise<StoredObjectFileStreamRead> {
+    throw new StoredObjectNotFoundError();
   }
 }
 

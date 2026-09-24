@@ -1299,30 +1299,58 @@ function ToolCall({
       </HStack>
 
       <ResultLine>
-        {patch ? (
-          <TerminalPatch hunks={patch} filePath={ran?.filePath ?? undefined} />
-        ) : synthesizedDiff ? (
-          <TerminalDiff
-            oldText={synthesizedDiff.oldText}
-            newText={synthesizedDiff.newText}
-            filePath={synthesizedDiff.filePath}
-          />
-        ) : // A real file with a real extension gets a real editor's syntax
-        // highlighting — Bash stdout isn't code in any one language, so
-        // only Read/Write's own `content` field (never `output`) qualifies.
-        ran?.content && ran.filePath ? (
-          <SyntaxHighlightedCode code={ran.content} filePath={ran.filePath} />
-        ) : ranOutput !== null ? (
-          <TerminalOutput text={ranOutput} isError={isError} />
-        ) : transcriptOutput !== null && transcriptOutput.trim() !== "" ? (
-          <TerminalOutput text={transcriptOutput} isError={isError} />
-        ) : (
-          <Text {...CELL} color={TERMINAL_TOKENS.faint}>
-            (no output)
-          </Text>
-        )}
+        <ToolResultBody
+          patch={patch}
+          synthesizedDiff={synthesizedDiff}
+          ran={ran}
+          ranOutput={ranOutput}
+          transcriptOutput={transcriptOutput}
+          isError={isError}
+        />
       </ResultLine>
     </VStack>
+  );
+}
+
+function ToolResultBody({
+  patch,
+  synthesizedDiff,
+  ran,
+  ranOutput,
+  transcriptOutput,
+  isError,
+}: {
+  patch: ReturnType<typeof parsePatchHunks>;
+  synthesizedDiff: ReturnType<typeof extractDiffFromToolInput>;
+  ran: TerminalToolSpan | null;
+  ranOutput: string | null;
+  transcriptOutput: string | null;
+  isError: boolean;
+}) {
+  if (patch) return <TerminalPatch hunks={patch} filePath={ran?.filePath ?? undefined} />;
+  if (synthesizedDiff) {
+    return (
+      <TerminalDiff
+        oldText={synthesizedDiff.oldText}
+        newText={synthesizedDiff.newText}
+        filePath={synthesizedDiff.filePath}
+      />
+    );
+  }
+  // A real file with a real extension gets a real editor's syntax
+  // highlighting — Bash stdout isn't code in any one language, so
+  // only Read/Write's own `content` field (never `output`) qualifies.
+  if (ran?.content && ran.filePath) {
+    return <SyntaxHighlightedCode code={ran.content} filePath={ran.filePath} />;
+  }
+  if (ranOutput !== null) return <TerminalOutput text={ranOutput} isError={isError} />;
+  if (transcriptOutput !== null && transcriptOutput.trim() !== "") {
+    return <TerminalOutput text={transcriptOutput} isError={isError} />;
+  }
+  return (
+    <Text {...CELL} color={TERMINAL_TOKENS.faint}>
+      (no output)
+    </Text>
   );
 }
 
@@ -1347,13 +1375,14 @@ function RejectedLine({ name, reason }: { name: string | null; reason: string | 
  * mid-session context compaction. These live only in the logs, so without them
  * the session reads as if they never happened.
  */
+function noteLineColor(level: "info" | "warning" | "error"): string {
+  if (level === "error") return TERMINAL_TOKENS.red;
+  if (level === "warning") return TERMINAL_TOKENS.yellow;
+  return TERMINAL_TOKENS.faint;
+}
+
 function NoteLine({ level, text }: { level: "info" | "warning" | "error"; text: string }) {
-  const color =
-    level === "error"
-      ? TERMINAL_TOKENS.red
-      : level === "warning"
-        ? TERMINAL_TOKENS.yellow
-        : TERMINAL_TOKENS.faint;
+  const color = noteLineColor(level);
   return (
     <HStack align="flex-start" gap={2}>
       <Glyph char={level === "error" ? GLYPH.bullet : GLYPH.note} color={color} />

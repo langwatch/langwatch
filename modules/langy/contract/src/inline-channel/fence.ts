@@ -26,7 +26,7 @@ export function mightContainLangyCardFence(text: string): boolean {
 }
 
 /** `["```", "langy-card"]` for a fence line, or null. */
-function fenceLine(line: string): { ticks: number; tag: string } | null {
+function parseFenceLine(line: string): { ticks: number; tag: string } | null {
   const match = /^ {0,3}(`{3,})([^`]*)$/.exec(line);
   if (!match) return null;
   return { ticks: match[1]!.length, tag: match[2]!.trim() };
@@ -63,7 +63,7 @@ export function splitLangyCardFences(text: string): LangyCardFenceSegment[] {
   };
 
   for (const line of lines) {
-    const fence = fenceLine(line);
+    const fence = parseFenceLine(line);
 
     if (fenceLines !== null) {
       // Inside a langy-card fence: only an untagged closing fence ends it.

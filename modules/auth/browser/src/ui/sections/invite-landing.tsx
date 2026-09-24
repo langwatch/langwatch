@@ -120,7 +120,8 @@ function SignedOutInvite({
   inviterName: string | null;
 }) {
   const routing = useSignInRouting();
-  const { decide } = routing;
+  const { decide, decision } = routing;
+  const showRoutingRetry = !decision && Boolean(routing.error);
   const asked = useRef(false);
   // A refused passkey ceremony, reported by the rail and drawn once at the top.
   const [passkeyError, setPasskeyError] = useState<unknown>(null);
@@ -155,10 +156,10 @@ function SignedOutInvite({
           ? `${inviterName} invited you to ${organizationName} on LangWatch.`
           : `You have been invited to ${organizationName} on LangWatch.`}
       </Text>
-      {routing.decision ? (
+      {decision ? (
         <SignInMethodPicker
-          methodSet={routing.decision.methodSet}
-          reasonCode={routing.decision.reasonCode}
+          methodSet={decision.methodSet}
+          reasonCode={decision.reasonCode}
           callbackUrl={callbackUrl}
           onPasskeyError={setPasskeyError}
           onFederatedMethodChosen={(method) => void signIn(method.id, { callbackUrl })}
@@ -183,7 +184,8 @@ function SignedOutInvite({
             </HStack>
           )}
         />
-      ) : routing.error ? (
+      ) : null}
+      {showRoutingRetry ? (
         // A routing failure used to leave this card empty below the inviter's
         // name — no picker, no retry. The sibling sign-in screen gives the
         // same failure a retry via its address form staying live; there's no

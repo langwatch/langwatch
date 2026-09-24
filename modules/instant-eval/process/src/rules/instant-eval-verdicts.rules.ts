@@ -34,7 +34,7 @@ export const EMPTY_INSTANT_EVAL_VERDICT: InstantEvalVerdictColumns = {
   probabilities: "",
 };
 
-const numberCell = (cell: unknown): number | null => (typeof cell === "number" ? cell : null);
+const coerceNumberCell = (cell: unknown): number | null => (typeof cell === "number" ? cell : null);
 
 const textCell = (cell: unknown): string => (typeof cell === "string" && cell !== "" ? cell : "");
 
@@ -44,7 +44,7 @@ const VERDICT_READERS: Record<
   (input: { cell: unknown; question: InstantEvalRunQuestion }) => InstantEvalVerdictColumns
 > = {
   probability: ({ cell, question }) => {
-    const probability = numberCell(cell);
+    const probability = coerceNumberCell(cell);
     if (probability === null) return EMPTY_INSTANT_EVAL_VERDICT;
     const threshold = question.threshold ?? INSTANT_EVAL_DEFAULT_THRESHOLD;
 
@@ -54,8 +54,8 @@ const VERDICT_READERS: Record<
       passed: probability >= threshold ? 1 : 0,
     };
   },
-  passed: ({ cell }) => ({ ...EMPTY_INSTANT_EVAL_VERDICT, passed: numberCell(cell) }),
-  score: ({ cell }) => ({ ...EMPTY_INSTANT_EVAL_VERDICT, score: numberCell(cell) }),
+  passed: ({ cell }) => ({ ...EMPTY_INSTANT_EVAL_VERDICT, passed: coerceNumberCell(cell) }),
+  score: ({ cell }) => ({ ...EMPTY_INSTANT_EVAL_VERDICT, score: coerceNumberCell(cell) }),
   label: ({ cell }) => ({ ...EMPTY_INSTANT_EVAL_VERDICT, label: textCell(cell) }),
   probabilities: ({ cell }) => ({
     ...EMPTY_INSTANT_EVAL_VERDICT,

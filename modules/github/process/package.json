@@ -22,7 +22,10 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/audit-log-contract": "workspace:*",
+    "@langwatch/auth-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/github-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",

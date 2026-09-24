@@ -7,7 +7,7 @@ import {
   getFacetIcon,
   getRangeFormatter,
 } from "@langwatch/trace-browser-kit";
-import { getFacetValueState, getRangeValue } from "@langwatch/trace-contract";
+import { getFacetValueState, extractRangeValue } from "@langwatch/trace-contract";
 import type { LiqeQuery } from "liqe";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type React from "react";
@@ -90,6 +90,20 @@ const ExpandChevron: React.FC<{
   </Box>
 );
 
+function pickSectionRenderer<T>({
+  sectionKey,
+  event,
+  evaluator,
+}: {
+  sectionKey: string;
+  event: T;
+  evaluator: T;
+}): T | undefined {
+  if (sectionKey === "event") return event;
+  if (sectionKey === "evaluator") return evaluator;
+  return undefined;
+}
+
 const SectionRendererInner: React.FC<SectionRendererProps> = ({
   section,
   ast,
@@ -122,97 +136,105 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
     // Evaluator section gets an inline drilldown rendered under each ACTIVE evaluator
     // row — verdict pills, score range, label flag — sourced from the `aggregates` the
     // discover endpoint already attached to each evaluator value. No second query.
-    const renderActiveRowExtras =
-      section.key === "event"
-        ? (item: FacetItem) =>
-            item.eventMetrics ? (
-              <EventDrilldown item={item} ast={ast} toggleFacet={toggleFacet} />
-            ) : null
-        : section.key === "evaluator"
-          ? (item: FacetItem) =>
-              item.aggregates ? (
-                <EvaluatorDrilldown
-                  item={item}
-                  ast={ast}
-                  toggleSubFilter={({ field, value }) =>
-                    toggleEvaluatorSubFilter({
-                      evaluatorId: item.value,
-                      field,
-                      value,
-                    })
-                  }
-                  setScoreRange={({ from, to }) =>
-                    setEvaluatorScoreRange({
-                      evaluatorId: item.value,
-                      from,
-                      to,
-                    })
-                  }
-                  removeScoreRange={() => removeEvaluatorScoreRange({ evaluatorId: item.value })}
-                />
-              ) : null
-          : undefined;
+    const eventActiveRowExtras = (item: FacetItem) =>
+      item.eventMetrics ? <EventDrilldown item={item} ast={ast} toggleFacet={toggleFacet} /> : null;
+    const evaluatorActiveRowExtras = (item: FacetItem) =>
+      item.aggregates ? (
+        <EvaluatorDrilldown
+          item={item}
+          ast={ast}
+          toggleSubFilter={({ field, value }) =>
+            toggleEvaluatorSubFilter({
+              evaluatorId: item.value,
+              field,
+              value,
+            })
+          }
+          setScoreRange={({ from, to }) =>
+            setEvaluatorScoreRange({
+              evaluatorId: item.value,
+              from,
+              to,
+            })
+          }
+          removeScoreRange={() => removeEvaluatorScoreRange({ evaluatorId: item.value })}
+        />
+      ) : null;
+    const renderActiveRowExtras = pickSectionRenderer({
+      sectionKey: section.key,
+      event: eventActiveRowExtras,
+      evaluator: evaluatorActiveRowExtras,
+    });
 
     // INACTIVE evaluator rows also get a drilldown affordance: a small chevron expand
     // toggle.
-    const renderInactiveRowExtras =
-      section.key === "event"
-        ? (item: FacetItem, isExpanded: boolean, onToggleExpand: () => void) => {
-            // No metrics on this event type → no expand affordance (same
-            // gating the evaluator applies via `aggregates`).
-            if (!item.eventMetrics) return null;
-            return {
-              trailing: (
-                <ExpandChevron
-                  isExpanded={isExpanded}
-                  onToggleExpand={onToggleExpand}
-                  subject="event metric"
-                />
-              ),
-              below: isExpanded ? (
-                <EventDrilldown item={item} ast={ast} toggleFacet={toggleFacet} />
-              ) : null,
-            };
-          }
-        : section.key === "evaluator"
-          ? (item: FacetItem, isExpanded: boolean, onToggleExpand: () => void) => {
-              if (!item.aggregates) return null;
-              // Picking a verdict / score / label on an inactive evaluator
-              // also enables the `evaluator:<id>` anchor — the group mutation
-              // adds it automatically, so no explicit activation wrapper is
-              // needed here.
-              return {
-                trailing: (
-                  <ExpandChevron
-                    isExpanded={isExpanded}
-                    onToggleExpand={onToggleExpand}
-                    subject="evaluator"
-                  />
-                ),
-                below: isExpanded ? (
-                  <EvaluatorDrilldown
-                    item={item}
-                    ast={ast}
-                    toggleSubFilter={({ field, value }) =>
-                      toggleEvaluatorSubFilter({
-                        evaluatorId: item.value,
-                        field,
-                        value,
-                      })
-                    }
-                    setScoreRange={({ from, to }) =>
-                      setEvaluatorScoreRange({
-                        evaluatorId: item.value,
-                        from,
-                        to,
-                      })
-                    }
-                    removeScoreRange={() => removeEvaluatorScoreRange({ evaluatorId: item.value })}
-                  />
-                ) : null,
-              };
+    const eventInactiveRowExtras = (
+      item: FacetItem,
+      isExpanded: boolean,
+      onToggleExpand: () => void,
+    ) => {
+      // No metrics on this event type → no expand affordance (same
+      // gating the evaluator applies via `aggregates`).
+      if (!item.eventMetrics) return null;
+      return {
+        trailing: (
+          <ExpandChevron
+            isExpanded={isExpanded}
+            onToggleExpand={onToggleExpand}
+            subject="event metric"
+          />
+        ),
+        below: isExpanded ? (
+          <EventDrilldown item={item} ast={ast} toggleFacet={toggleFacet} />
+        ) : null,
+      };
+    };
+    const evaluatorInactiveRowExtras = (
+      item: FacetItem,
+      isExpanded: boolean,
+      onToggleExpand: () => void,
+    ) => {
+      if (!item.aggregates) return null;
+      // Picking a verdict / score / label on an inactive evaluator
+      // also enables the `evaluator:<id>` anchor — the group mutation
+      // adds it automatically, so no explicit activation wrapper is
+      // needed here.
+      return {
+        trailing: (
+          <ExpandChevron
+            isExpanded={isExpanded}
+            onToggleExpand={onToggleExpand}
+            subject="evaluator"
+          />
+        ),
+        below: isExpanded ? (
+          <EvaluatorDrilldown
+            item={item}
+            ast={ast}
+            toggleSubFilter={({ field, value }) =>
+              toggleEvaluatorSubFilter({
+                evaluatorId: item.value,
+                field,
+                value,
+              })
             }
-          : undefined;
+            setScoreRange={({ from, to }) =>
+              setEvaluatorScoreRange({
+                evaluatorId: item.value,
+                from,
+                to,
+              })
+            }
+            removeScoreRange={() => removeEvaluatorScoreRange({ evaluatorId: item.value })}
+          />
+        ) : null,
+      };
+    };
+    const renderInactiveRowExtras = pickSectionRenderer({
+      sectionKey: section.key,
+      event: eventInactiveRowExtras,
+      evaluator: evaluatorInactiveRowExtras,
+    });
 
     const facetSection = (
       <FacetSection
@@ -283,7 +305,7 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
       );
     }
 
-    const current = getRangeValue(ast, section.key);
+    const current = extractRangeValue(ast, section.key);
     return (
       <RangeSection
         title={section.label}

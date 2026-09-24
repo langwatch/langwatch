@@ -144,7 +144,7 @@ export class OtlpSpanPiiRedactionService {
     tenantId?: TenantId;
   }): Promise<void> {
     const native = await this.policy.resolveNativeContext(tenantId, piiRedactionLevel);
-    if (!native) {
+    if (native.kind === "analysis") {
       await this.lambdaRedactSpan({
         span,
         resource,
@@ -155,7 +155,7 @@ export class OtlpSpanPiiRedactionService {
     }
 
     this.applyNativeSpanPass(span, resource, native.policy);
-    const lambda = this.policy.tryLambdaAfterNative(native.policy);
+    const lambda = this.policy.deriveLambdaAfterNative(native.policy);
     if (lambda) {
       try {
         const ran = await this.lambdaRedactSpan({
@@ -226,7 +226,7 @@ export class OtlpSpanPiiRedactionService {
       exceptPatterns?: readonly string[];
     };
   }): Promise<boolean> {
-    const options = await this.policy.tryBuildOptions(
+    const redaction = await this.policy.resolveRedactionOptions(
       piiRedactionLevel,
       lambda?.entities,
       lambda?.exceptPatterns,
@@ -234,9 +234,10 @@ export class OtlpSpanPiiRedactionService {
     // No options means the analysis pass was skipped (disabled, or the service
     // is not configured outside production) — report that it did not run so the
     // caller can mark a requested strict pass as incomplete.
-    if (!options) {
+    if (redaction.kind === "skip_redaction") {
       return false;
     }
+    const { options } = redaction;
 
     const { entries, anySkipped, anyRedacted } = this.collectSpanEntries(span, resource);
 

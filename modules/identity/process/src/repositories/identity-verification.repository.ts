@@ -18,9 +18,9 @@ export abstract class IdentityVerificationRepository {
   /** Minting replaces any prior record for the same identifier — a newer
    *  mint invalidates every older link. */
   abstract replaceForIdentifier(record: IdentityVerificationRecord): Promise<void>;
-  abstract tryFindByIdentifierId(args: {
-    identifierId: string;
-  }): Promise<IdentityVerificationRecord | null>;
+  /** The newest record; `IdentityVerificationInvalidError` when no ceremony is in flight, since
+   *  every pin/proof failure answers that one code. */
+  abstract getByIdentifierId(args: { identifierId: string }): Promise<IdentityVerificationRecord>;
   /** Deletes the record if and only if it still names this verification;
    *  false means already consumed (or superseded) — single-use enforcement. */
   abstract consume(args: { identifierId: string; verificationId: string }): Promise<boolean>;

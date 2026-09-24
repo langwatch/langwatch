@@ -70,7 +70,7 @@ export const mcpAuthorizeRest = defineRestRouter(McpAuthorizeApi)
     if (!actor || actor.type !== "user")
       return { status: 401, body: { error: "Not authenticated" } };
 
-    const posted = postedApproval(raw);
+    const posted = parsePostedApproval(raw);
 
     if (!posted) return { status: 400, body: { error: "Invalid body" } };
 
@@ -212,7 +212,7 @@ function redirectWith(
 }
 
 /** The posted document, or nothing where the body was not a JSON object. */
-function postedApproval(raw: string): Record<string, unknown> | null {
+function parsePostedApproval(raw: string): Record<string, unknown> | null {
   try {
     const parsed: unknown = JSON.parse(raw);
 

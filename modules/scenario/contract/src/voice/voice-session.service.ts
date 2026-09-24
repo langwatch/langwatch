@@ -158,18 +158,19 @@ export class VoiceRecordingKeyMissingError extends HandledError {
 }
 
 export interface VoiceSessionInfrastructure {
-  /** The provider key and host for this project's transport, or null. */
-  resolveCredential(input: {
+  /** The provider key and host for this project's transport. Throws
+   *  `VoiceKeyMissingError`, with the transport's own message, when none is set. */
+  getCredential(input: {
     projectId: string;
     transport: VoiceTransport;
-  }): Promise<VoiceTransportCredential | null>;
-  /** The vendor agent id stored on the project's voice agent row, or null
-   *  when the row does not exist or is not type "voice". This — never the
-   *  request body — is what a mint is minted against. */
-  resolveVoiceAgentRow(input: {
+  }): Promise<VoiceTransportCredential>;
+  /** The vendor agent id stored on the project's voice agent row; throws
+   *  `agent_not_found` when the row is missing or not type "voice". This —
+   *  never the request body — is what a mint is minted against. */
+  getVoiceAgentRow(input: {
     projectId: string;
     agentRowId: string;
-  }): Promise<{ id: string; agentExternalId: string } | null>;
+  }): Promise<{ id: string; agentExternalId: string }>;
   /** Whether this project saved a voice agent for the given vendor agent id,
    *  matched on the row's identity key. A drawer call writes no run to check
    *  playback against (#8020), so this is what authorizes its recording. */
@@ -228,12 +229,12 @@ export interface VoiceSessionInfrastructure {
     turnTraceIds: readonly string[];
   }): Promise<void>;
   /** The set a scenario's runs are listed under, so a "Call it myself" run
-   *  lands beside that scenario's simulated runs. Null when the scenario is
-   *  gone. Absent when the deployment never runs scenario calls. */
-  resolveScenarioSet?(input: {
+   *  lands beside its simulated runs. Throws `scenario_not_found` when the
+   *  scenario is gone. Absent when the deployment never runs scenario calls. */
+  getScenarioSet?(input: {
     projectId: string;
     scenarioId: string;
-  }): Promise<{ scenarioSetId: string } | null>;
+  }): Promise<{ scenarioSetId: string }>;
   /** Same-origin proxy path the browser plays the recording through. Carries
    *  the project so the proxy can authorise the fetch. */
   audioProxyUrl(input: { conversationId: string; projectId: string }): string;
@@ -285,14 +286,12 @@ export async function mintVoiceSession({
   agentRowId?: string;
   maxDurationSeconds: number;
 }): Promise<MintResult> {
-  const row = agentRowId ? await ports.resolveVoiceAgentRow({ projectId, agentRowId }) : null;
-  if (agentRowId && !row) throw new VoiceAgentRowNotFoundError();
+  const row = agentRowId ? await ports.getVoiceAgentRow({ projectId, agentRowId }) : undefined;
   const agentId = row?.agentExternalId ?? bodyAgentId;
 
   const runner = runnerFor(ports, transport);
   runner.assertAvailable?.();
-  const credential = await ports.resolveCredential({ projectId, transport });
-  if (!credential) throw new VoiceKeyMissingError(runner.missingKeyMessage);
+  const credential = await ports.getCredential({ projectId, transport });
 
   let connect: { signedUrl: string };
   try {
@@ -354,8 +353,15 @@ async function fetchProviderRecord(
 ): Promise<{ record: CallRecord | null; hasFetchFailed: boolean }> {
   const runner = runnerFor(ports, transport);
   runner.assertAvailable?.();
-  const credential = await ports.resolveCredential({ projectId, transport });
-  if (!credential) return { record: null, hasFetchFailed: false };
+  let credential: VoiceTransportCredential;
+  try {
+    credential = await ports.getCredential({ projectId, transport });
+  } catch (error) {
+    if (HandledError.isHandled(error) && error.code === "voice_key_missing") {
+      return { record: null, hasFetchFailed: false };
+    }
+    throw error;
+  }
   try {
     const record = await runner.fetchCallRecord({
       conversationId,
@@ -423,8 +429,8 @@ async function resolveScenarioContext(
   ports: VoiceSessionInfrastructure,
   { projectId, scenarioId }: { projectId: string; scenarioId: string },
 ): Promise<{ scenarioId: string; scenarioSetId: string }> {
-  const scenario = await ports.resolveScenarioSet?.({ projectId, scenarioId });
-  if (!scenario) throw new VoiceScenarioNotFoundError();
+  if (!ports.getScenarioSet) throw new VoiceScenarioNotFoundError();
+  const scenario = await ports.getScenarioSet({ projectId, scenarioId });
   return { scenarioId, scenarioSetId: scenario.scenarioSetId };
 }
 
@@ -789,8 +795,15 @@ export async function authorizeRecordingPlayback({
     scenarioRunId: scenarioRunIdForConversation(conversationId),
   });
 
-  const credential = await ports.resolveCredential({ projectId, transport });
-  if (!credential) throw new VoiceRecordingKeyMissingError();
+  let credential: VoiceTransportCredential;
+  try {
+    credential = await ports.getCredential({ projectId, transport });
+  } catch (error) {
+    if (HandledError.isHandled(error) && error.code === "voice_key_missing") {
+      throw new VoiceRecordingKeyMissingError();
+    }
+    throw error;
+  }
   // Recording playback only exists for ElevenLabs conversations; a credential
   // of another kind reaching here is a wiring bug (transport is hardcoded
   // above), not a customer-facing failure.

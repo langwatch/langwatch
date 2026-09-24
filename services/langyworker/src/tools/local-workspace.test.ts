@@ -418,6 +418,46 @@ describe("the folder facts code_access renders", () => {
   });
 });
 
+/** One app whose workspace read says "not found" a given number of times first. */
+function appWithLaggingProjection(notFoundReads: number) {
+  let workspaceReads = 0;
+  const fetchMock = vi.fn(async (url: string) => {
+    const path = new URL(url).pathname;
+    if (path === "/api/langy/local/workspace") {
+      workspaceReads += 1;
+      if (workspaceReads <= notFoundReads) {
+        return {
+          ok: false,
+          status: 404,
+          json: async () => ({ error: { code: "langy_conversation_not_found" } }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          connected: false,
+          codeAccessPreference: null,
+          github: { installed: false },
+        }),
+      };
+    }
+    if (path === "/api/langy/local/requests") {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          request: { id: "req_1", expiresAt: "2026-09-03T10:00:00.000Z" },
+          command: "npx langwatch@latest langy --share-control",
+        }),
+      };
+    }
+    throw new Error(`no fake answer for ${path}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return { fetchMock, workspaceReads: () => workspaceReads };
+}
+
 describe("the local workspace tools", () => {
   describe("given the extension is registered", () => {
     /** @scenario "The worker carries one local tool for each built-in it mirrors" */
@@ -698,46 +738,6 @@ describe("the local workspace tools", () => {
   });
 
   describe("when code access is asked for in the conversation's first seconds", () => {
-    /** One app whose workspace read says "not found" a given number of times first. */
-    function appWithLaggingProjection(notFoundReads: number) {
-      let workspaceReads = 0;
-      const fetchMock = vi.fn(async (url: string) => {
-        const path = new URL(url).pathname;
-        if (path === "/api/langy/local/workspace") {
-          workspaceReads += 1;
-          if (workspaceReads <= notFoundReads) {
-            return {
-              ok: false,
-              status: 404,
-              json: async () => ({ error: { code: "langy_conversation_not_found" } }),
-            };
-          }
-          return {
-            ok: true,
-            status: 200,
-            json: async () => ({
-              connected: false,
-              codeAccessPreference: null,
-              github: { installed: false },
-            }),
-          };
-        }
-        if (path === "/api/langy/local/requests") {
-          return {
-            ok: true,
-            status: 200,
-            json: async () => ({
-              request: { id: "req_1", expiresAt: "2026-09-03T10:00:00.000Z" },
-              command: "npx langwatch@latest langy --share-control",
-            }),
-          };
-        }
-        throw new Error(`no fake answer for ${path}`);
-      });
-      vi.stubGlobal("fetch", fetchMock);
-      return { fetchMock, workspaceReads: () => workspaceReads };
-    }
-
     /** @scenario "A code access check that beats the conversation projection waits for it" */
     it("repeats the read until the projection answers, then raises the card", async () => {
       const app = appWithLaggingProjection(2);

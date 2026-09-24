@@ -113,9 +113,12 @@ export { ScenarioRoleMetricsDerivationService } from "./services/scenario-role-m
 export {
   TraceSpanCollectionService,
   TraceIngressCommand,
-  TraceSpanDedup,
-  type SpanDedupRef,
 } from "./services/trace-ingestion.service.ts";
+export {
+  TraceSpanDedupRepository,
+  type SpanDedupClaim,
+  type SpanDedupRef,
+} from "./repositories/trace-span-dedup.repository.ts";
 export { TrackedEventSpanService } from "./services/tracked-event-span.service.ts";
 export { TraceSummaryProjectionClickHouseRepository } from "./repositories/clickhouse/trace-summary.repository.ts";
 export { TraceAnalyticsClickHouseRepository } from "./repositories/clickhouse/trace-metrics-analytics.repository.ts";

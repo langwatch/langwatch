@@ -20,7 +20,7 @@ export const LWQL_CATALOG_SKIPPED_TABLES: Record<string, string> = {
 };
 
 /** The reason a table is skipped by family, or `undefined` when no family matches. */
-export function matchesSkipPattern(table: string): string | undefined {
+export function detectSkipPattern(table: string): string | undefined {
   if (table.endsWith("_mv") || table.includes(".inner")) {
     return "materialised-view internal, not a customer-facing table";
   }
@@ -31,9 +31,9 @@ export function matchesSkipPattern(table: string): string | undefined {
  * The reason a table is off the derived catalog, or `undefined` if it should be
  * catalogued. Consults the exact map first, then the family patterns.
  */
-export function skipReason(
+export function deriveSkipReason(
   table: string,
   skip: Record<string, string> = LWQL_CATALOG_SKIPPED_TABLES,
 ): string | undefined {
-  return skip[table] ?? matchesSkipPattern(table);
+  return skip[table] ?? detectSkipPattern(table);
 }

@@ -61,6 +61,23 @@ async function ensureEnvFile(
   return runtime.scaffoldEnv(ctx, opts);
 }
 
+function printDryRunAndExit(portBase: string): never {
+  const base = Number.parseInt(portBase, 10);
+  const ports = allocatePorts(base);
+  console.log(chalk.bold("dry-run — no work performed"));
+  console.log("");
+  console.log(chalk.bold("port-base:"), base);
+  console.log(chalk.bold("ports:"));
+  for (const [k, v] of Object.entries(ports)) {
+    if (k === "base") continue;
+    console.log(`  ${k.padEnd(18)} ${v}`);
+  }
+  console.log("");
+  console.log(chalk.bold("paths:"));
+  for (const [k, v] of Object.entries(paths)) console.log(`  ${k.padEnd(18)} ${v}`);
+  process.exit(0);
+}
+
 const program = new Command();
 
 program
@@ -86,22 +103,7 @@ program
     printBanner(VERSION);
     const orchestrator = resolveLocalOrchestratorConfig(process.env);
 
-    if (opts.dryRun) {
-      const base = Number.parseInt(opts.portBase, 10);
-      const ports = allocatePorts(base);
-      console.log(chalk.bold("dry-run — no work performed"));
-      console.log("");
-      console.log(chalk.bold("port-base:"), base);
-      console.log(chalk.bold("ports:"));
-      for (const [k, v] of Object.entries(ports)) {
-        if (k === "base") continue;
-        console.log(`  ${k.padEnd(18)} ${v}`);
-      }
-      console.log("");
-      console.log(chalk.bold("paths:"));
-      for (const [k, v] of Object.entries(paths)) console.log(`  ${k.padEnd(18)} ${v}`);
-      process.exit(0);
-    }
+    if (opts.dryRun) printDryRunAndExit(opts.portBase);
 
     const base = Number.parseInt(opts.portBase, 10);
     const { base: resolvedBase } = await resolvePortConflicts({

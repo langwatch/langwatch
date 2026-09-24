@@ -38,7 +38,7 @@ export function sanitizeRoutingHandleInput(input: string): string {
     .slice(0, ROUTING_HANDLE_MAX_LENGTH);
 }
 
-export function routingHandleProblem(handle: string | null): RoutingHandleProblem | null {
+export function classifyRoutingHandleProblem(handle: string | null): RoutingHandleProblem | null {
   if (handle === null) {
     return null;
   }

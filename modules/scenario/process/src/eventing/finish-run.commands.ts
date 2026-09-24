@@ -110,7 +110,7 @@ function classifyUnjudgedResults({
  * Results envelope for finished event: infrastructure callers (watchdog,
  * cancel-grace) supply bare error, classified on the way in.
  */
-function resolveFinishResults({
+function buildFinishResults({
   data,
 }: {
   data: FinishRunCommandData;
@@ -147,7 +147,7 @@ export class FinishRunAdapter implements CommandHandler<
     const { scenarioRunId } = data;
 
     const ecst = await this.backfillEcstFields(tenantIdStr, data);
-    const results = resolveFinishResults({ data });
+    const results = buildFinishResults({ data });
 
     const eventData: SimulationRunFinishedEventData = {
       scenarioRunId,

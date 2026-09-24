@@ -278,6 +278,8 @@ export function ResultsList({
 
   // The empty state is about the window, not about the plan list.
   const isEmptyWindow = !hasAnyPlans && results.totals.executions === 0;
+  const showsNoRunsYet = !isLoading && isEmptyWindow;
+  const showsResults = !isLoading && !isEmptyWindow;
 
   const openRun = (row: ResultRow) => onSelectRun(row.planSlug, row.runId);
 
@@ -288,11 +290,9 @@ export function ResultsList({
     >
       <ResultsHeader executionCount={results.totals.executions} onNewRunPlan={onNewRunPlan} />
 
-      {isLoading ? (
-        <LoadingRows />
-      ) : isEmptyWindow ? (
-        <NoRunsYet period={period} setRelativePeriod={setRelativePeriod} />
-      ) : (
+      {isLoading && <LoadingRows />}
+      {showsNoRunsYet && <NoRunsYet period={period} setRelativePeriod={setRelativePeriod} />}
+      {showsResults && (
         <ResultsBody
           view={view}
           results={results}

@@ -186,6 +186,28 @@ function addIfAssertionHelper(
   if (nodeContainsAssertion(fn.body)) helpers.add(name);
 }
 
+function addVariableAssertionHelper({
+  helpers,
+  declaration,
+}: {
+  helpers: Set<string>;
+  declaration: ts.VariableDeclaration;
+}): void {
+  if (!ts.isIdentifier(declaration.name)) return;
+
+  const initializer = declaration.initializer;
+
+  if (!initializer) return;
+
+  if (ts.isArrowFunction(initializer)) {
+    addIfAssertionHelper(helpers, declaration.name.text, initializer);
+  }
+
+  if (ts.isFunctionExpression(initializer)) {
+    addIfAssertionHelper(helpers, declaration.name.text, initializer);
+  }
+}
+
 function collectAssertionHelpers(source: ts.SourceFile): Set<string> {
   const helpers = new Set<string>();
 
@@ -195,19 +217,7 @@ function collectAssertionHelpers(source: ts.SourceFile): Set<string> {
 
       if (nodeContainsAssertion(node.body)) helpers.add(node.name.text);
     } else if (ts.isVariableDeclaration(node)) {
-      if (ts.isIdentifier(node.name)) {
-        const initializer = node.initializer;
-
-        if (initializer) {
-          if (ts.isArrowFunction(initializer)) {
-            addIfAssertionHelper(helpers, node.name.text, initializer);
-          }
-
-          if (ts.isFunctionExpression(initializer)) {
-            addIfAssertionHelper(helpers, node.name.text, initializer);
-          }
-        }
-      }
+      addVariableAssertionHelper({ helpers, declaration: node });
     }
 
     ts.forEachChild(node, visit);
@@ -373,6 +383,29 @@ function isEmptySnapshotAssertion(node: ts.CallExpression): boolean {
   return ts.isStringLiteral(snapshot) && ['""', "[]", "{}"].includes(snapshot.text);
 }
 
+function importClauseBindings({
+  clause,
+  module,
+}: {
+  clause: ts.ImportClause;
+  module: string;
+}): ImportBinding[] {
+  const bindings: ImportBinding[] = [];
+
+  if (clause.name) bindings.push({ name: clause.name.text, module });
+
+  const named = clause.namedBindings;
+  if (named && ts.isNamespaceImport(named)) bindings.push({ name: named.name.text, module });
+
+  if (named && ts.isNamedImports(named)) {
+    for (const element of named.elements) {
+      if (!element.isTypeOnly) bindings.push({ name: element.name.text, module });
+    }
+  }
+
+  return bindings;
+}
+
 function collectImportBindings(source: ts.SourceFile): ImportBinding[] {
   const bindings: ImportBinding[] = [];
 
@@ -384,17 +417,7 @@ function collectImportBindings(source: ts.SourceFile): ImportBinding[] {
     const clause = statement.importClause;
     if (!clause || clause.isTypeOnly) continue;
 
-    const module = statement.moduleSpecifier.text;
-    if (clause.name) bindings.push({ name: clause.name.text, module });
-
-    const named = clause.namedBindings;
-    if (named && ts.isNamespaceImport(named)) bindings.push({ name: named.name.text, module });
-
-    if (named && ts.isNamedImports(named)) {
-      for (const element of named.elements) {
-        if (!element.isTypeOnly) bindings.push({ name: element.name.text, module });
-      }
-    }
+    bindings.push(...importClauseBindings({ clause, module: statement.moduleSpecifier.text }));
   }
 
   return bindings;

@@ -265,7 +265,9 @@ export class PrismaLlmConfigVersionsRepository extends LlmConfigVersionsReposito
     } catch (error) {
       // The uniqueness on (configId, version) lives here, so the refusal is
       // named here too rather than reaching the boundary as a database failure.
-      if (uniqueConstraintTargets(error).some((target) => target.includes("version"))) {
+      const conflictTargets = uniqueConstraintTargets(error);
+      const isVersionConflict = conflictTargets.some((target) => target.includes("version"));
+      if (isVersionConflict) {
         throw new PromptVersionConflictError();
       }
 

@@ -3,6 +3,7 @@
  * list, create and delete a custom prompt tag.
  * @see specs/features/prompts/custom-prompt-tags.feature
  */
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { PromptTag } from "@langwatch/prisma-client/generated";
 import {
   PromptTagMissingError,
@@ -106,7 +107,7 @@ function buildApi() {
 
   // The three tag operations the routes reach, delegated exactly as
   // `PromptApp` delegates them, plus the cascade guard the two writes ask.
-  const app = {
+  const app = createApiFixture<PromptApi>({
     listTags: (input: { organizationId: string }) => tags.getAll(input),
     createTag: (input: { organizationId: string; name: string }) => tags.create(input),
     deleteTagByName: (input: { organizationId: string; name: string }) =>
@@ -120,7 +121,7 @@ function buildApi() {
         throw error;
       }),
     assertMayManageTagCatalog: async () => undefined,
-  } as unknown as PromptApi;
+  });
 
   const family = mountPromptRest({ app });
 

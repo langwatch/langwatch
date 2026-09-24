@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import {
   compareConnectionRouting,
   type ConnectionRoutingComparison,
@@ -19,10 +20,10 @@ import type { SsoConnectionService } from "./sso-connection.service.ts";
 
 /** Where the legacy strings are read from. */
 export interface LegacySsoOrganizationRepository {
-  tryFindLegacySso(args: { organizationId: string }): Promise<{
-    ssoDomain: string;
-    ssoProvider: string;
-  } | null>;
+  /** `SsoConnectionNotFoundError` when the organization carries no complete legacy pair. */
+  getLegacySso(args: {
+    organizationId: string;
+  }): Promise<{ ssoDomain: string; ssoProvider: string }>;
 }
 
 export type SsoConnectionGrandfatherOutcome =
@@ -80,7 +81,13 @@ export class SsoConnectionGrandfatherService {
   }: {
     organizationId: string;
   }): Promise<SsoConnectionGrandfatherOutcome> {
-    const legacy = await this.deps.legacy.tryFindLegacySso({ organizationId });
+    const legacy = await this.deps.legacy
+      .getLegacySso({ organizationId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "sso_connection_not_found")
+          return undefined;
+        throw error;
+      });
     // Nothing to grandfather is a finished organization, not a skipped one:
     // there is no legacy path left for it to be held on.
     if (!legacy) {

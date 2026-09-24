@@ -43,7 +43,9 @@ const isProxyBypassed = (noProxy: string | undefined, targetHost: string): boole
  * pools and file descriptors under a burst of alerts. `HTTPS_PROXY` wins
  * over `HTTP_PROXY` because this gateway uses TLS.
  */
-const proxyDispatcher = (proxyConfig: EmailOutboundProxyConfig): EnvHttpProxyAgent | undefined => {
+const buildProxyDispatcher = (
+  proxyConfig: EmailOutboundProxyConfig,
+): EnvHttpProxyAgent | undefined => {
   const proxy = proxyConfig.httpsProxy ?? proxyConfig.httpProxy;
   if (!proxy || isProxyBypassed(proxyConfig.noProxy, RESEND_API_HOST)) return undefined;
   return new EnvHttpProxyAgent({
@@ -68,7 +70,7 @@ const encodeAttachments = (attachments: EmailContent["attachments"]) => {
  */
 const buildPayload = (content: EmailContent, defaultFrom: string, mime: EmailMimeService) => {
   const bccAddresses = EmailGateway.recipients(content.bcc);
-  const headers = mime.trySanitizeHeaders(content.headers);
+  const headers = mime.normalizeHeaders(content.headers);
   const attachments = encodeAttachments(content.attachments);
 
   return {
@@ -124,7 +126,7 @@ export class ResendEmailGatewayAdapter extends EmailGateway {
     logger.info("Sending email using Resend");
     const bccAddresses = EmailGateway.recipients(content.bcc);
     const payload = buildPayload(content, defaultFrom, this.mime);
-    this.dispatcher ??= proxyDispatcher(this.outboundProxy);
+    this.dispatcher ??= buildProxyDispatcher(this.outboundProxy);
     const dispatcher = this.dispatcher;
 
     try {

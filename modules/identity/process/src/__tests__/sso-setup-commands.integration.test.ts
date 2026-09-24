@@ -136,7 +136,7 @@ describe("given an administrator registering their identity provider", () => {
         },
       });
 
-      const state = await connections.tryFindConnection({ connectionId });
+      const state = await connections.getConnection({ connectionId });
       expect(state?.idpMetadata).toMatchObject({
         issuer: "https://idp.example",
         providerId: "acme-okta",
@@ -163,7 +163,7 @@ describe("given an administrator registering their identity provider", () => {
         },
       });
 
-      const state = await connections.tryFindConnection({ connectionId });
+      const state = await connections.getConnection({ connectionId });
       expect(state?.arrivalPolicy).toBe("refuse");
       expect(state?.arrivalPolicyDecidedAtMs).toBeNull();
     });
@@ -184,7 +184,7 @@ describe("given an administrator registering their identity provider", () => {
         },
       });
 
-      const state = await connections.tryFindConnection({ connectionId });
+      const state = await connections.getConnection({ connectionId });
       expect(state?.idpMetadata.certRefs).toEqual(["cred_1"]);
       expect(state?.idpMetadata.issuer).toBe("urn:acme");
       expect(vault.kept.get("cred_1")?.kind).toBe("saml-idp-config");
@@ -225,7 +225,7 @@ describe("given a connection somebody presses remove on", () => {
           graceMs: 86_400_000,
         }),
       ).resolves.toEqual({ removal: "discarded" });
-      expect((await connections.tryFindConnection({ connectionId: CONNECTION }))?.state).toBe(
+      expect((await connections.getConnection({ connectionId: CONNECTION })).state).toBe(
         "DISCARDED",
       );
     });
@@ -245,7 +245,7 @@ describe("given a connection somebody presses remove on", () => {
           graceMs: 86_400_000,
         }),
       ).resolves.toEqual({ removal: "teardown-requested" });
-      const state = await connections.tryFindConnection({ connectionId: CONNECTION });
+      const state = await connections.getConnection({ connectionId: CONNECTION });
       expect(state?.state).toBe("TEARDOWN_PENDING");
       expect(state?.tearDownAfterMs).toBe(T0 + 86_400_000);
     });
@@ -266,7 +266,7 @@ describe("given a connection somebody presses remove on", () => {
       await expect(commands.removeConnection({ ...ask, graceMs: 3_600_000 })).resolves.toEqual({
         removal: "teardown-requested",
       });
-      const state = await connections.tryFindConnection({ connectionId: CONNECTION });
+      const state = await connections.getConnection({ connectionId: CONNECTION });
       expect(state?.state).toBe("TEARDOWN_PENDING");
       expect(state?.tearDownAfterMs).toBe(T0 + 3_600_000);
     });
@@ -301,7 +301,7 @@ describe("given an administrator deciding who a connection admits", () => {
       arrivalPolicy: "request",
     });
 
-    const state = await connections.tryFindConnection({ connectionId: CONNECTION });
+    const state = await connections.getConnection({ connectionId: CONNECTION });
     expect(state?.arrivalPolicy).toBe("request");
     expect(state?.arrivalPolicyDecidedAtMs).toBe(T0);
   });

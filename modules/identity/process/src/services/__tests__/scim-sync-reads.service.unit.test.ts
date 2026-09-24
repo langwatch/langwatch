@@ -3,7 +3,11 @@
  * Identity says where each connection's sync stands, scoped to the asking
  * organization. Corresponds to specs/identity/scim-connection-sync.feature.
  */
-import { emptyScimSync, type ScimSyncState } from "@langwatch/identity-contract";
+import {
+  emptyScimSync,
+  ScimSyncNotFoundError,
+  type ScimSyncState,
+} from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
 import { ScimSyncReadRepository } from "../../repositories/scim-sync.repository.ts";
@@ -27,8 +31,8 @@ function sync({
 
 function readsOver(states: ScimSyncState[]) {
   class StubSyncs extends ScimSyncReadRepository {
-    async tryFindSync(): Promise<null> {
-      return null;
+    async getSync({ scimSyncId }: { scimSyncId: string }): Promise<ScimSyncState> {
+      throw new ScimSyncNotFoundError(scimSyncId);
     }
     async findPageForOperator(): Promise<{ syncs: ScimSyncState[]; total: number }> {
       return { syncs: states, total: states.length };

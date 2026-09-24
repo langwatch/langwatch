@@ -17,7 +17,7 @@ import {
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 
-const experiment = {
+const experiment: Experiment = {
   id: "experiment-1",
   projectId: PROJECT_ID,
   slug: "support-email-classifier",
@@ -26,7 +26,10 @@ const experiment = {
   workflowId: null,
   createdAt: NOW,
   updatedAt: NOW,
-} as unknown as Experiment;
+  archivedAt: null,
+  workbenchState: null,
+  workbenchVersion: 0,
+};
 
 const listing = {
   getPage: vi.fn(async () => ({ experiments: [experiment], totalHits: 1 })),

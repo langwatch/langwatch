@@ -2,7 +2,7 @@
  * @vitest-environment node
  * @see specs/api-reference/run-plans-rest-api.feature
  */
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { errorCodeOf, mountSuiteFamilies } from "./suite-rest.harness.ts";
 
@@ -232,23 +232,29 @@ describe("given a configuration over one scenario and one agent", () => {
   });
 
   describe("when the key behind the run belongs to a person", () => {
+    let mounted: ReturnType<typeof mountSuiteFamilies>;
+    let scenarioId: string;
+    let agentId: string;
+
+    beforeEach(() => {
+      mounted = mountSuiteFamilies({ caller: { userId: "user-runner" } });
+      scenarioId = mounted.world.addScenario({ name: "Refund Flow" }).id;
+      agentId = mounted.world.addAgent().id;
+    });
+
     /** @scenario "A run started with a key that names a person records the api actor" */
     it("records the api actor on the queued run", async () => {
-      const { api, world, commands } = mountSuiteFamilies({ caller: { userId: "user-runner" } });
-      const scenario = world.addScenario({ name: "Refund Flow" });
-      const agent = world.addAgent();
-
-      const response = await api.post(`${BASE}/run`, {
+      const response = await mounted.api.post(`${BASE}/run`, {
         config: {
           scope: { mode: "scenarios" },
-          scenarioIds: [scenario.id],
-          targets: [{ type: "http", referenceId: agent.id }],
+          scenarioIds: [scenarioId],
+          targets: [{ type: "http", referenceId: agentId }],
         },
         idempotencyKey: "run-plan-actor-2",
       });
 
       expect(response.status).toBe(200);
-      expect(langwatchMetadata(commands.queued[0]?.metadata)).toMatchObject({
+      expect(langwatchMetadata(mounted.commands.queued[0]?.metadata)).toMatchObject({
         actorId: "user-runner",
         actorLabel: "api",
       });
@@ -256,17 +262,13 @@ describe("given a configuration over one scenario and one agent", () => {
 
     /** @scenario "A run started from the command line records the cli actor" */
     it("records the cli actor when the surface header says so", async () => {
-      const { api, world, commands } = mountSuiteFamilies({ caller: { userId: "user-runner" } });
-      const scenario = world.addScenario({ name: "Refund Flow" });
-      const agent = world.addAgent();
-
-      const response = await api.post(
+      const response = await mounted.api.post(
         `${BASE}/run`,
         {
           config: {
             scope: { mode: "scenarios" },
-            scenarioIds: [scenario.id],
-            targets: [{ type: "http", referenceId: agent.id }],
+            scenarioIds: [scenarioId],
+            targets: [{ type: "http", referenceId: agentId }],
           },
           idempotencyKey: "run-plan-actor-3",
         },
@@ -274,7 +276,7 @@ describe("given a configuration over one scenario and one agent", () => {
       );
 
       expect(response.status).toBe(200);
-      expect(langwatchMetadata(commands.queued[0]?.metadata)).toMatchObject({
+      expect(langwatchMetadata(mounted.commands.queued[0]?.metadata)).toMatchObject({
         actorId: "user-runner",
         actorLabel: "cli",
       });

@@ -65,6 +65,15 @@ export default function DataRetentionScreen() {
   return <DataRetentionPage host={host} projectId={projectId} />;
 }
 
+function storageDescriptionFor(scopeFilter: ReturnType<typeof resolveScopeFilter>): string {
+  if (scopeFilter.kind === "all") return "How much space everything you can see uses today.";
+  if (scopeFilter.scopeType === "ORGANIZATION") {
+    return "How much space this organization's data uses today.";
+  }
+  if (scopeFilter.scopeType === "TEAM") return "How much space this team's data uses today.";
+  return "How much space this project's data uses today.";
+}
+
 function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; projectId: string }) {
   const { organizationId, teamId } = host.scope();
   const utils = dataRetentionApi.useUtils();
@@ -99,24 +108,18 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
   // active filter to a concrete scope: a specific pick passes through; "all you
   // can see" resolves to the whole org (or just this project for a personal
   // account with no org).
+  const everythingScope = organizationId
+    ? { scopeType: "ORGANIZATION" as const, scopeId: organizationId }
+    : { scopeType: "PROJECT" as const, scopeId: projectId };
   const storageScope =
     resolvedScopeFilter.kind === "specific"
       ? {
           scopeType: resolvedScopeFilter.scopeType,
           scopeId: resolvedScopeFilter.scopeId,
         }
-      : organizationId
-        ? { scopeType: "ORGANIZATION" as const, scopeId: organizationId }
-        : { scopeType: "PROJECT" as const, scopeId: projectId };
+      : everythingScope;
 
-  const storageDescription =
-    resolvedScopeFilter.kind === "all"
-      ? "How much space everything you can see uses today."
-      : resolvedScopeFilter.scopeType === "ORGANIZATION"
-        ? "How much space this organization's data uses today."
-        : resolvedScopeFilter.scopeType === "TEAM"
-          ? "How much space this team's data uses today."
-          : "How much space this project's data uses today.";
+  const storageDescription = storageDescriptionFor(resolvedScopeFilter);
 
   const storageQuery = dataRetentionApi.dataRetention.getScopeStorageUsage.useQuery({
     projectId,
@@ -337,7 +340,7 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
         />
       )}
 
-      {snapshot && snapshot.rules.length === 0 ? (
+      {snapshot && snapshot.rules.length === 0 && (
         <Card.Root width="full">
           <Card.Body>
             <EmptyState.Root width="full">
@@ -367,7 +370,8 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
             </EmptyState.Root>
           </Card.Body>
         </Card.Root>
-      ) : snapshot && snapshot.rules.length > 0 && scopeGroups.length === 0 ? (
+      )}
+      {snapshot && snapshot.rules.length > 0 && scopeGroups.length === 0 && (
         <Card.Root width="full">
           <Card.Body>
             <Text fontSize="sm" color="fg.muted" textAlign="center">
@@ -375,69 +379,67 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
             </Text>
           </Card.Body>
         </Card.Root>
-      ) : (
-        snapshot &&
-        scopeGroups.length > 0 && (
-          <Card.Root width="full" overflow="hidden">
-            <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-              <Table.Root variant="line" size="md" width="full">
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeader>Scope</Table.ColumnHeader>
-                    <Table.ColumnHeader>Policy</Table.ColumnHeader>
-                    <Table.ColumnHeader />
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {scopeGroups.map((group) => {
-                    const Icon = SCOPE_ICON[group.scopeType];
-                    return (
-                      <Table.Row key={`${group.scopeType}:${group.scopeId}`}>
-                        <Table.Cell>
-                          <HStack gap={2}>
-                            <Icon size={14} />
-                            <Text>{group.name}</Text>
-                            <Badge size="sm" colorPalette="gray">
-                              {group.scopeType.toLowerCase()}
-                            </Badge>
-                          </HStack>
-                        </Table.Cell>
-                        <Table.Cell>{renderPolicyValue(group.byCategory)}</Table.Cell>
-                        <Table.Cell textAlign="end">
-                          {canWrite && (
-                            <Menu.Root>
-                              <Menu.Trigger asChild>
-                                <Button
-                                  size="xs"
-                                  variant="ghost"
-                                  aria-label={`Actions for ${group.name}`}
-                                >
-                                  <MoreVertical size={14} />
-                                </Button>
-                              </Menu.Trigger>
-                              <Menu.Content>
-                                <Menu.Item value="edit" onClick={() => openEditForGroup(group)}>
-                                  <Pencil size={14} /> Edit
-                                </Menu.Item>
-                                <Menu.Item
-                                  value="remove"
-                                  color="red.500"
-                                  onClick={() => setRemoveTarget(group)}
-                                >
-                                  <Trash2 size={14} /> Remove
-                                </Menu.Item>
-                              </Menu.Content>
-                            </Menu.Root>
-                          )}
-                        </Table.Cell>
-                      </Table.Row>
-                    );
-                  })}
-                </Table.Body>
-              </Table.Root>
-            </Card.Body>
-          </Card.Root>
-        )
+      )}
+      {snapshot && snapshot.rules.length !== 0 && scopeGroups.length > 0 && (
+        <Card.Root width="full" overflow="hidden">
+          <Card.Body paddingY={0} paddingX={0} overflowX="auto">
+            <Table.Root variant="line" size="md" width="full">
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader>Scope</Table.ColumnHeader>
+                  <Table.ColumnHeader>Policy</Table.ColumnHeader>
+                  <Table.ColumnHeader />
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {scopeGroups.map((group) => {
+                  const Icon = SCOPE_ICON[group.scopeType];
+                  return (
+                    <Table.Row key={`${group.scopeType}:${group.scopeId}`}>
+                      <Table.Cell>
+                        <HStack gap={2}>
+                          <Icon size={14} />
+                          <Text>{group.name}</Text>
+                          <Badge size="sm" colorPalette="gray">
+                            {group.scopeType.toLowerCase()}
+                          </Badge>
+                        </HStack>
+                      </Table.Cell>
+                      <Table.Cell>{renderPolicyValue(group.byCategory)}</Table.Cell>
+                      <Table.Cell textAlign="end">
+                        {canWrite && (
+                          <Menu.Root>
+                            <Menu.Trigger asChild>
+                              <Button
+                                size="xs"
+                                variant="ghost"
+                                aria-label={`Actions for ${group.name}`}
+                              >
+                                <MoreVertical size={14} />
+                              </Button>
+                            </Menu.Trigger>
+                            <Menu.Content>
+                              <Menu.Item value="edit" onClick={() => openEditForGroup(group)}>
+                                <Pencil size={14} /> Edit
+                              </Menu.Item>
+                              <Menu.Item
+                                value="remove"
+                                color="red.500"
+                                onClick={() => setRemoveTarget(group)}
+                              >
+                                <Trash2 size={14} /> Remove
+                              </Menu.Item>
+                            </Menu.Content>
+                          </Menu.Root>
+                        )}
+                      </Table.Cell>
+                    </Table.Row>
+                  );
+                })}
+              </Table.Body>
+            </Table.Root>
+          </Card.Body>
+        </Card.Root>
       )}
 
       <RetroactiveProgressCard

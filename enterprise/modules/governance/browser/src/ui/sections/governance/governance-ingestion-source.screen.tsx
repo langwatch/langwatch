@@ -740,7 +740,7 @@ function EmptyEventsHint({ source }: { source: Source }) {
     typeof window !== "undefined" ? window.location.origin : "https://langwatch.invalid";
   const isOtel = source.sourceType === "otel_generic" || source.sourceType === "claude_cowork";
   const isWebhook = source.sourceType === "workato";
-  const mode = isOtel ? "otel" : isWebhook ? "webhook" : "<mode>";
+  const mode = ingestEndpointMode({ isOtel, isWebhook });
   const endpoint = `${baseUrl}/api/ingest/${mode}/${source.id}`;
   return (
     <VStack align="stretch" gap={3}>
@@ -1033,3 +1033,14 @@ function SecretRevealModal({
 }
 
 export default IngestionSourceDetailPage;
+
+function ingestEndpointMode({
+  isOtel,
+  isWebhook,
+}: {
+  isOtel: boolean;
+  isWebhook: boolean;
+}): string {
+  if (isOtel) return "otel";
+  return isWebhook ? "webhook" : "<mode>";
+}

@@ -82,6 +82,13 @@ export function BatchEvaluationV2({
     tenantId: project.id,
   });
 
+  const showRunsSkeleton =
+    batchEvaluationRuns.isLoading || batchEvaluationRuns.error?.data?.httpStatus === 404;
+  const showRunsError = !showRunsSkeleton && !!batchEvaluationRuns.error;
+  const showWaitingForResults =
+    !showRunsSkeleton && !batchEvaluationRuns.error && batchEvaluationRuns.data?.runs.length === 0;
+  const showResults = !showRunsSkeleton && !batchEvaluationRuns.error && !showWaitingForResults;
+
   return (
     <HStack align="start" width="full" height="full" gap={0}>
       <BatchEvaluationV2RunList
@@ -133,17 +140,15 @@ export function BatchEvaluationV2({
               </Link>
             )}
           </HStack>
-          {batchEvaluationRuns.isLoading ||
-          (batchEvaluationRuns.error && batchEvaluationRuns.error.data?.httpStatus === 404) ? (
-            <Skeleton width="100%" height="30px" />
-          ) : batchEvaluationRuns.error ? (
+          {showRunsSkeleton && <Skeleton width="100%" height="30px" />}
+          {showRunsError && (
             <Alert.Root status="error">
               <Alert.Indicator />
               Error loading experiment runs
             </Alert.Root>
-          ) : batchEvaluationRuns.data?.runs.length === 0 ? (
-            <Text>Waiting for results...</Text>
-          ) : (
+          )}
+          {showWaitingForResults && <Text>Waiting for results...</Text>}
+          {showResults && (
             <>
               <Card.Root width="100%" overflow="hidden">
                 <Card.Header>
@@ -198,6 +203,14 @@ export function BatchEvaluationV2RunList({
 } & StackProps) {
   const hasAnyVersion = batchEvaluationRuns.data?.runs.some((run: any) => run.workflowVersion);
 
+  const showRunsError = !batchEvaluationRuns.isLoading && !!batchEvaluationRuns.error;
+  const showWaitingForRuns =
+    !batchEvaluationRuns.isLoading &&
+    !batchEvaluationRuns.error &&
+    batchEvaluationRuns.data?.runs.length === 0;
+  const showRuns =
+    !batchEvaluationRuns.isLoading && !batchEvaluationRuns.error && !showWaitingForRuns;
+
   return (
     <VStack
       align="start"
@@ -218,7 +231,7 @@ export function BatchEvaluationV2RunList({
           Evaluation Runs
         </Heading>
       )}
-      {batchEvaluationRuns.isLoading ? (
+      {batchEvaluationRuns.isLoading && (
         <>
           {Array.from({ length: 3 }).map((_, index) => (
             <HStack key={index} paddingX={6} paddingY={2} width="100%">
@@ -226,16 +239,19 @@ export function BatchEvaluationV2RunList({
             </HStack>
           ))}
         </>
-      ) : batchEvaluationRuns.error ? (
+      )}
+      {showRunsError && (
         <Alert.Root status="error">
           <Alert.Indicator />
           Error loading experiment runs
         </Alert.Root>
-      ) : batchEvaluationRuns.data?.runs.length === 0 ? (
+      )}
+      {showWaitingForRuns && (
         <Text paddingX={6} paddingY={4}>
           Waiting for runs...
         </Text>
-      ) : (
+      )}
+      {showRuns && (
         <>
           {!batchEvaluationRuns.data?.runs.find((r: any) => r.runId === selectedRunId) && (
             <HStack

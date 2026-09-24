@@ -20,6 +20,7 @@ import { createTenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 
 import { DataPrivacyResolutionFake } from "../../app/__tests__/data-privacy.fixture.ts";
+import type { PiiClearing } from "../../app/data-privacy.members.ts";
 
 const TENANT = createTenantId("project-web-app");
 
@@ -70,7 +71,10 @@ function resolverFor(policy: ResolvedDataPrivacy) {
 
 function transportFor(batch: BatchClearPIIFunction) {
   return {
-    tryClearGoogleDlp: async ({ text }: { text: string }) => (await batch([text], {}))[0] ?? null,
+    clearGoogleDlp: async ({ text }: { text: string }): Promise<PiiClearing> => {
+      const redacted = (await batch([text], {}))[0];
+      return redacted == null ? { kind: "unchanged" } : { kind: "redacted", text: redacted };
+    },
     clearPresidio: async (
       texts: string[],
       piiRedactionLevel: "ESSENTIAL" | "STRICT" | "DISABLED",

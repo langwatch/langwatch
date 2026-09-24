@@ -42,6 +42,18 @@ export interface RunHistoryState {
   hydrateFromUrl: (query: QueryLike) => void;
 }
 
+function copyDefinedQueryParams(source: QueryLike): Record<string, string | string[]> {
+  const query: Record<string, string | string[]> = {};
+  for (const [key, val] of Object.entries(source)) {
+    if (typeof val === "string") {
+      query[key] = val;
+    } else if (Array.isArray(val)) {
+      query[key] = val;
+    }
+  }
+  return query;
+}
+
 function extractStringParam(query: QueryLike, key: string): string {
   const value = query[key];
   if (Array.isArray(value)) return value[0] ?? "";
@@ -84,14 +96,7 @@ export function createRunHistoryStore() {
 
       // Preserve all existing query params (including dynamic path params
       // like "project" and array params like "path" for catch-all routes).
-      const query: Record<string, string | string[]> = {};
-      for (const [key, val] of Object.entries(router.query)) {
-        if (typeof val === "string") {
-          query[key] = val;
-        } else if (Array.isArray(val)) {
-          query[key] = val;
-        }
-      }
+      const query = copyDefinedQueryParams(router.query);
 
       // Serialize groupBy (omit when "none")
       if (groupBy !== "none") {

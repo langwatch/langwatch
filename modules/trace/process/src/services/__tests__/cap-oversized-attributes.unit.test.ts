@@ -21,7 +21,7 @@ function makeSpan(attributes: OtlpSpan["attributes"]): OtlpSpan {
     droppedAttributesCount: 0,
     droppedEventsCount: 0,
     droppedLinksCount: 0,
-  } as unknown as OtlpSpan;
+  };
 }
 
 /** Builds a `data:image/png;base64,...` URL whose byte size exceeds the cap. */
@@ -124,7 +124,7 @@ describe("capOversizedAttributes", () => {
         name: "evt",
         attributes: [{ key: "big", value: { stringValue: big } }],
       },
-    ] as unknown as OtlpSpan["events"];
+    ];
     span.links = [
       {
         traceId: "t",
@@ -132,12 +132,12 @@ describe("capOversizedAttributes", () => {
         attributes: [{ key: "big", value: { stringValue: big } }],
         droppedAttributesCount: 0,
       },
-    ] as unknown as OtlpSpan["links"];
-    const resource = {
+    ];
+    const resource: OtlpResource = {
       attributes: [{ key: "big", value: { stringValue: big } }],
     };
 
-    const cappedCount = traceAttributeCapService.capOversizedAttributes(span, resource as never);
+    const cappedCount = traceAttributeCapService.capOversizedAttributes(span, resource);
 
     expect(cappedCount).toBe(3);
   });
@@ -163,8 +163,9 @@ describe("capOversizedAttributes with copilot content-capture payloads", () => {
   it("caps an oversized gen_ai content value on a span event and keeps the span intact", () => {
     const big = "m".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1);
     const span = makeSpan([{ key: "gen_ai.request.model", value: { stringValue: "gpt-5-mini" } }]);
-    (span as unknown as { events: unknown[] }).events = [
+    span.events = [
       {
+        timeUnixNano: { low: 0, high: 0 },
         name: "gen_ai.content",
         attributes: [{ key: "gen_ai.input.messages", value: { stringValue: big } }],
       },
@@ -173,13 +174,7 @@ describe("capOversizedAttributes with copilot content-capture payloads", () => {
     const cappedCount = traceAttributeCapService.capOversizedAttributes(span, null);
 
     expect(cappedCount).toBe(1);
-    const eventAttr = (
-      span as unknown as {
-        events: {
-          attributes: { value: { stringValue: string } }[];
-        }[];
-      }
-    ).events[0]!.attributes[0]!;
+    const eventAttr = span.events[0]!.attributes[0]!;
     expect(eventAttr.value.stringValue).toMatch(/^\[truncated: \d+ bytes/);
     // The span itself (model attr) is untouched.
     expect(span.attributes[0]!.value.stringValue).toBe("gpt-5-mini");
@@ -193,7 +188,7 @@ describe("capOversizedAttributes with copilot content-capture payloads", () => {
     const big = "n".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1);
     const spans = Array.from({ length: 100 }, (_, i) => {
       const span = makeSpan([{ key: "gen_ai.output.messages", value: { stringValue: big } }]);
-      (span as unknown as { spanId: string }).spanId = `span-${i}`;
+      span.spanId = `span-${i}`;
       return span;
     });
 
@@ -391,7 +386,7 @@ describe("hasOversizedAttribute", () => {
             name: "evt",
             attributes: [{ key: "event.attr", value: { stringValue: big } }],
           },
-        ] as unknown as OtlpSpan["events"];
+        ];
 
         expect(traceAttributeCapService.hasOversizedAttribute(span, null)).toBe(true);
       });
@@ -409,7 +404,7 @@ describe("hasOversizedAttribute", () => {
             attributes: [{ key: "link.attr", value: { stringValue: big } }],
             droppedAttributesCount: 0,
           },
-        ] as unknown as OtlpSpan["links"];
+        ];
 
         expect(traceAttributeCapService.hasOversizedAttribute(span, null)).toBe(true);
       });
@@ -422,7 +417,7 @@ describe("hasOversizedAttribute", () => {
         const span = makeSpan([{ key: "custom.small", value: { stringValue: small } }]);
         const resource: OtlpResource = {
           attributes: [{ key: "service.name", value: { stringValue: big } }],
-        } as unknown as OtlpResource;
+        };
 
         expect(traceAttributeCapService.hasOversizedAttribute(span, resource)).toBe(true);
       });
@@ -467,7 +462,7 @@ describe("hasOversizedAttribute", () => {
               },
             ],
           },
-        ] as unknown as OtlpSpan["events"];
+        ];
 
         expect(traceAttributeCapService.hasOversizedAttribute(span, null)).toBe(true);
       });

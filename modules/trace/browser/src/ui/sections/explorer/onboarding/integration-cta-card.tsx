@@ -65,6 +65,7 @@ export const IntegrationCTACard: React.FC = () => {
   return (
     <>
       <Box
+        as="section"
         borderWidth="1px"
         borderColor="orange.muted"
         borderRadius="lg"
@@ -73,7 +74,6 @@ export const IntegrationCTACard: React.FC = () => {
         paddingY={4}
         marginX={4}
         marginY={3}
-        role="region"
         aria-label="Integrate your code"
         data-testid="integration-cta-card"
       >

@@ -40,8 +40,8 @@ export class OrganizationSsoConnectionsService {
     organizationId: string;
     connectionId: string;
   }): Promise<SsoConnectionProviderReading> {
-    const connection = await this.connections.tryFindConnection({ connectionId });
-    if (!connection || connection.organizationId !== organizationId) {
+    const connection = await this.connections.getConnection({ connectionId });
+    if (connection.organizationId !== organizationId) {
       throw new SsoConnectionNotFoundError(
         `Connection ${connectionId} is not one of organization ${organizationId}'s.`,
       );
@@ -57,11 +57,7 @@ export class OrganizationSsoConnectionsService {
   }: {
     connectionId: string;
   }): Promise<{ organizationId: string }> {
-    const connection = await this.connections.tryFindConnection({ connectionId });
-    if (!connection) {
-      throw new SsoConnectionNotFoundError(`Connection ${connectionId} is not registered.`);
-    }
-
+    const connection = await this.connections.getConnection({ connectionId });
     return { organizationId: connection.organizationId };
   }
 }

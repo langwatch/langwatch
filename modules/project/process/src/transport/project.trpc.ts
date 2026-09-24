@@ -55,8 +55,11 @@ export interface ProjectBrowserApi {
     scope: ProjectPermissionScope;
     by: Readonly<{ id: string }>;
   }): Promise<boolean>;
-  /** The caller's captured-content visibility for the project. */
-  getFieldProtections(input: { projectId: string }): Promise<ProjectFieldProtections>;
+  /** `by`'s captured-content visibility for the project; `by` travels as in `probePermission`. */
+  getFieldProtections(input: {
+    projectId: string;
+    by: Readonly<{ id: string }>;
+  }): Promise<ProjectFieldProtections>;
   /**
    * Mints Langy's gateway virtual key for a freshly created project. Best
    * effort by contract: a failure is reported and never fails the creation,
@@ -194,8 +197,8 @@ export const projectTrpcTransport = defineTrpcRouter(ProjectBrowserApi, projectT
 
   .procedure("getFieldRedactionStatus")
   .withPermission("project:view")
-  .handle(async ({ app, input }) => {
-    const protections = await app.getFieldProtections({ projectId: input.projectId });
+  .handle(async ({ app, input, actor }) => {
+    const protections = await app.getFieldProtections({ projectId: input.projectId, by: actor });
 
     return {
       isRedacted: {

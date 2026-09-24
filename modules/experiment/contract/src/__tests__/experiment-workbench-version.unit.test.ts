@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { PersistedEvaluationsV3State } from "../experiment-workbench-persistence.ts";
 import {
   parseWorkbenchState,
-  repairWorkbenchState,
+  normalizeWorkbenchState,
   stripWorkbenchResults,
 } from "../experiment-workbench-version.ts";
 
@@ -85,7 +85,7 @@ describe("Experiment workbench contract", () => {
   });
 
   it("repairs a legacy pairwise evaluator without touching live results", () => {
-    const repaired = repairWorkbenchState(
+    const repaired = normalizeWorkbenchState(
       state({
         evaluators: [
           {

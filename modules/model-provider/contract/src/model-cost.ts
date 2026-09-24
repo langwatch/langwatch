@@ -125,7 +125,7 @@ export const normalizeModelName = (model: string): string => {
 const regexCache = new Map<string, RegExp | null>();
 const REGEX_CACHE_MAX_ENTRIES = 5_000;
 
-const tryRegex = (pattern: string): RegExp | null => {
+const buildSafeRegex = (pattern: string): RegExp | null => {
   const cached = regexCache.get(pattern);
   if (cached !== undefined) return cached;
 
@@ -145,7 +145,7 @@ const findModelCost = (
   model: string,
   costs: readonly ModelCostRate[],
 ): ModelCostRate | undefined => {
-  const matched = costs.find((cost) => tryRegex(cost.regex)?.test(model));
+  const matched = costs.find((cost) => buildSafeRegex(cost.regex)?.test(model));
   if (matched) return matched;
   if (model.includes("/")) return findModelCost(model.slice(model.indexOf("/") + 1), costs);
   return undefined;
@@ -289,10 +289,10 @@ export const estimateModelCost = (
     outputAudioTokens > 0 ||
     inputImageTokens > 0 ||
     outputImageTokens > 0;
-  if (resolvedModel && hasUsage) {
-    const matched = matchModelCost(resolvedModel, staticCosts);
-    if (matched) {
-      const computed = estimateCost({
+  const matched =
+    resolvedModel && hasUsage ? matchModelCost(resolvedModel, staticCosts) : undefined;
+  const computed = matched
+    ? (estimateCost({
         rate: matched,
         inputTokens,
         outputTokens,
@@ -305,29 +305,28 @@ export const estimateModelCost = (
         outputImageTokens,
         inputCharacters,
         audioSeconds,
-      });
-      if (computed !== undefined && computed > 0) return computed;
-    }
-  }
+      }) ?? 0)
+    : 0;
+  if (computed > 0) return computed;
 
-  if (attrs[ATTR.spanType] === "guardrail") {
-    const output = attrs[ATTR.output];
-    if (isRecord(output)) {
-      const value = output.cost;
-      if (isRecord(value)) {
-        const amount = value.amount;
-        const currency = value.currency;
-        if (currency === "USD" && typeof amount === "number" && amount > 0) return amount;
-      }
-    }
-  }
+  if (attrs[ATTR.spanType] === "guardrail") return guardrailReportedCost(attrs[ATTR.output]);
 
   return 0;
 };
+
+function guardrailReportedCost(output: unknown): number {
+  if (!isRecord(output)) return 0;
+  const value = output.cost;
+  if (!isRecord(value)) return 0;
+  const amount = value.amount;
+  const currency = value.currency;
+  if (currency === "USD" && typeof amount === "number" && amount > 0) return amount;
+  return 0;
+}
 
 /**
  * Whether a customer-written cost-rule pattern is safe to run: it compiles and
  * is free of catastrophic backtracking. The tRPC shapes carrying a
  * caller-supplied `regex` refuse one that is not.
  */
-export const isSafeCostRegex = (pattern: string): boolean => tryRegex(pattern) !== null;
+export const isSafeCostRegex = (pattern: string): boolean => buildSafeRegex(pattern) !== null;

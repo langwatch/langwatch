@@ -66,7 +66,7 @@ export class EmailDeliveryAdapter extends EmailDelivery {
   private resolveGateway(): EmailGateway | undefined {
     if (this.gateway) return this.gateway;
 
-    const providerName = EmailProviderService.create(this.configuration).tryResolveName();
+    const providerName = EmailProviderService.create(this.configuration).pickProviderName();
     if (!providerName) return undefined;
 
     this.gateway = this.createGateway(providerName);

@@ -7,8 +7,8 @@
 import { isReadbackSafe } from "@langwatch/stored-object-contract";
 import {
   parseBase64DataUri,
-  resolveRawPcmFormat,
-  wrapRawPcmToWav,
+  detectRawPcmFormat,
+  encodeRawPcmAsWav,
   isInlineDataCarrier,
 } from "@langwatch/trace-contract";
 import { z } from "zod";
@@ -237,9 +237,9 @@ export async function extractInputAudioPart(
   let mimeType = audioPart.mimeType ?? (format ? AUDIO_FORMAT_MIME_TYPES[format] : void 0);
   mimeType ??= "application/octet-stream";
   let bytes = Buffer.from(audioPart.data, "base64");
-  const rawFormat = resolveRawPcmFormat(format, mimeType);
+  const rawFormat = detectRawPcmFormat(format, mimeType);
   if (rawFormat) {
-    const wrapped = wrapRawPcmToWav(new Uint8Array(bytes), rawFormat);
+    const wrapped = encodeRawPcmAsWav(new Uint8Array(bytes), rawFormat);
     if (wrapped) {
       bytes = Buffer.from(wrapped);
       mimeType = "audio/wav";

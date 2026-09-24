@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { targetKeyOf } from "@langwatch/suite-contract";
 /**
@@ -9,15 +10,15 @@ import { describe, expect, it } from "vitest";
 import type { QueueSimulationRunCommandData } from "../../app/suite.app.ts";
 import { SuiteExecutionService } from "../suite-execution.service.ts";
 
-const noopScenarios = {
-  resolveRunParametersForScenarios: async ({ scenarios }: { scenarios: { id: string }[] }) =>
+const noopScenarios = createApiFixture<ScenarioApi>({
+  resolveRunParametersForScenarios: async ({ scenarios }) =>
     scenarios.map((scenario) => ({
       scenarioId: scenario.id,
       parameters: {},
       secretParameters: {},
       scenarioVersion: 1,
     })),
-} as unknown as ScenarioApi;
+});
 
 async function queueOne(input: {
   scenarioId: string;
@@ -117,21 +118,15 @@ describe("given a batch run against one agent twice, once with an override", () 
           queued.push(data);
         },
       },
-      scenarios: {
-        resolveRunParametersForScenarios: async ({
-          scenarios,
-          values,
-        }: {
-          scenarios: { id: string }[];
-          values?: Record<string, unknown>;
-        }) =>
+      scenarios: createApiFixture<ScenarioApi>({
+        resolveRunParametersForScenarios: async ({ scenarios, values }) =>
           scenarios.map((scenario) => ({
             scenarioId: scenario.id,
             parameters: { region: "eu", model: "gpt-5", ...values },
             secretParameters: {},
             scenarioVersion: 1,
           })),
-      } as unknown as ScenarioApi,
+      }),
     });
 
     await service.execute({

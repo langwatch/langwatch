@@ -135,6 +135,10 @@ export function SeatProrationPreview({
     }
   };
 
+  const isPreviewLoading = preview.isLoading;
+  const isPreviewError = !isPreviewLoading && preview.isError;
+  const isPreviewReady = !isPreviewLoading && !preview.isError;
+
   return (
     <>
       <Dialog.Header>
@@ -142,11 +146,12 @@ export function SeatProrationPreview({
         <Dialog.Title>Confirm seat update</Dialog.Title>
       </Dialog.Header>
       <Dialog.Body>
-        {preview.isLoading ? (
+        {isPreviewLoading && (
           <HStack justify="center" width="100%" paddingY={6}>
             <Spinner />
           </HStack>
-        ) : preview.isError ? (
+        )}
+        {isPreviewError && (
           <Box role="alert" borderWidth="1px" borderColor="red.solid" borderRadius="md" padding={3}>
             <Text>
               {describeError({
@@ -155,7 +160,8 @@ export function SeatProrationPreview({
               })}
             </Text>
           </Box>
-        ) : (
+        )}
+        {isPreviewReady && (
           <PreviewBody
             quote={quoteOf(preview.data)}
             currentSeats={variant.currentSeats}

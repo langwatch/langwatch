@@ -11,7 +11,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Check, Copy, Eye, EyeOff, WandSparkles } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
-import { createHighlighter, type HighlighterGeneric } from "shiki";
+import { createHighlighter } from "shiki";
 
 import { copyToClipboard } from "../../../behavior/shared/copy-to-clipboard.ts";
 import { InlineCopyButton } from "../shared/inline-copy-button.tsx";
@@ -103,9 +103,10 @@ export function CodePreview({
   const [internalIsVisible, setInternalIsVisible] = useState(false);
 
   const isVisible = controlledIsVisible !== void 0 ? controlledIsVisible : internalIsVisible;
+  const visibilityLabel = isVisible ? "Hide sensitive values" : "Show sensitive values";
 
   const shikiAdapter = useMemo(() => {
-    return createShikiAdapter<HighlighterGeneric<any, any>>({
+    return createShikiAdapter<Awaited<ReturnType<typeof createHighlighter>>>({
       async load() {
         return createHighlighter({
           langs: [
@@ -206,16 +207,12 @@ export function CodePreview({
                     snippet — the canonical mint CTA lives in the
                     surrounding banner instead. */}
                 {!disableActions && enableVisibilityToggle && (
-                  <Tooltip
-                    content={isVisible ? "Hide sensitive values" : "Show sensitive values"}
-                    openDelay={0}
-                    showArrow
-                  >
+                  <Tooltip content={visibilityLabel} openDelay={0} showArrow>
                     <IconButton
                       size="2xs"
                       variant="ghost"
                       onClick={toggleVisibility}
-                      aria-label={isVisible ? "Hide sensitive values" : "Show sensitive values"}
+                      aria-label={visibilityLabel}
                     >
                       {isVisible ? <EyeOff /> : <Eye />}
                     </IconButton>

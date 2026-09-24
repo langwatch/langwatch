@@ -1,9 +1,10 @@
-import type { LangyUsageCount } from "@langwatch/langy-contract";
+import { LangyConversationNotFoundError, type LangyUsageCount } from "@langwatch/langy-contract";
 import type { Prisma } from "@langwatch/prisma-client/generated";
 
 import { LangyConversationRepository } from "../langy-conversation-projection.repository.ts";
 import type {
   LangyConversationListCursor,
+  LangyConversationResumeState,
   LangyConversationRow,
 } from "../langy-conversation-projection.repository.ts";
 import type { LangyDatabase } from "./langy-database.mapper.ts";
@@ -97,7 +98,7 @@ export class PrismaLangyConversationRepository extends LangyConversationReposito
     };
   }
 
-  async tryFindVisibleById({
+  async getVisibleById({
     id: ConversationId,
     projectId,
     userId,
@@ -105,7 +106,7 @@ export class PrismaLangyConversationRepository extends LangyConversationReposito
     id: string;
     projectId: string;
     userId: string;
-  }): Promise<LangyConversationRow | null> {
+  }): Promise<LangyConversationRow> {
     const row = await this.prisma.langyConversationProjection.findFirst({
       where: {
         projectId,
@@ -114,7 +115,8 @@ export class PrismaLangyConversationRepository extends LangyConversationReposito
         OR: [{ UserId: userId }, { IsShared: true }],
       },
     });
-    return row ? toRow(row) : null;
+    if (!row) throw new LangyConversationNotFoundError(ConversationId);
+    return toRow(row);
   }
 
   async findOwnership({
@@ -187,33 +189,25 @@ export class PrismaLangyConversationRepository extends LangyConversationReposito
     return rows.map((row: { ConversationId: string }) => row.ConversationId);
   }
 
-  async tryFindPendingHandoff({
+  async getResumeState({
     projectId,
     conversationId: ConversationId,
   }: {
     projectId: string;
     conversationId: string;
-  }): Promise<{ token: string; turnId: string } | null> {
+  }): Promise<LangyConversationResumeState> {
     const row = await this.prisma.langyConversationProjection.findFirst({
       where: { projectId, ConversationId, ArchivedAt: null },
-      select: { PendingHandoffToken: true, PendingHandoffTurnId: true },
+      select: { PendingHandoffToken: true, PendingHandoffTurnId: true, RunToken: true },
     });
-    if (!row?.PendingHandoffToken || !row.PendingHandoffTurnId) return null;
-    return { token: row.PendingHandoffToken, turnId: row.PendingHandoffTurnId };
-  }
-
-  async tryFindRunToken({
-    projectId,
-    conversationId: ConversationId,
-  }: {
-    projectId: string;
-    conversationId: string;
-  }): Promise<string | null> {
-    const row = await this.prisma.langyConversationProjection.findFirst({
-      where: { projectId, ConversationId, ArchivedAt: null },
-      select: { RunToken: true },
-    });
-    return row?.RunToken ?? null;
+    if (!row) throw new LangyConversationNotFoundError(ConversationId);
+    return {
+      pendingHandoff:
+        row.PendingHandoffToken && row.PendingHandoffTurnId
+          ? { token: row.PendingHandoffToken, turnId: row.PendingHandoffTurnId }
+          : null,
+      runToken: row.RunToken,
+    };
   }
 
   async hasAdmittedTurn({

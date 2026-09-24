@@ -75,7 +75,7 @@ export const coerceToStringArray = (v: unknown): string[] | null => {
  * Best-effort JSON parse for edge cases where a value might still be
  * a JSON string (e.g., event attributes that bypass normalization).
  */
-export const safeJsonParse = (v: unknown): unknown => {
+export const parseJsonSafely = (v: unknown): unknown => {
   if (typeof v !== "string") {
     return v;
   }
@@ -98,7 +98,7 @@ export const safeJsonParse = (v: unknown): unknown => {
   }
 };
 
-export const safeStringify = (value: unknown): string | null => {
+export const stringifySafely = (value: unknown): string | null => {
   try {
     const s = JSON.stringify(value);
     return typeof s === "string" ? s : null;

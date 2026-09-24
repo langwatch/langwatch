@@ -32,7 +32,7 @@ export type NavigatePage = { scope: "project" | "organization"; path: string };
  * The page this name addresses, or null when the name is not a page. Matched
  * case-insensitively: these are words an agent types, not ids.
  */
-export function navigatePageFor(name: string): NavigatePage | null {
+export function pickNavigatePage(name: string): NavigatePage | null {
   const key = name.toLowerCase();
   const projectPath = NAVIGATE_PROJECT_PAGES[key];
   if (projectPath) return { scope: "project", path: projectPath };

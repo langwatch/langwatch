@@ -58,14 +58,14 @@ export function scopeFilterFromAddress({
   if (scopeType !== "ORGANIZATION" && scopeType !== "TEAM" && scopeType !== "PROJECT") {
     return { kind: "all" };
   }
-  const name =
-    scopeType === "ORGANIZATION"
-      ? available.organization?.id === scopeId
-        ? available.organization.name
-        : void 0
-      : scopeType === "TEAM"
-        ? available.teams.find((team) => team.id === scopeId)?.name
-        : available.projects.find((project) => project.id === scopeId)?.name;
+  let name: string | undefined;
+  if (scopeType === "ORGANIZATION") {
+    name = available.organization?.id === scopeId ? available.organization.name : void 0;
+  } else if (scopeType === "TEAM") {
+    name = available.teams.find((team) => team.id === scopeId)?.name;
+  } else {
+    name = available.projects.find((project) => project.id === scopeId)?.name;
+  }
   // A scope the org graph no longer offers came from a stale link. Falling back
   // to "all" is what keeps the label from reading "Team: undefined".
   if (name === void 0) return { kind: "all" };

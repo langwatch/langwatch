@@ -11,7 +11,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   type GatedVerdict,
   gatedStatus,
-  gatedVerdict,
+  computeGatedVerdict,
   type ScenarioEvaluationResult,
   type RecordEvaluationsCommandData,
   recordEvaluationsCommandDataSchema,
@@ -188,7 +188,7 @@ export class RecordEvaluationsCommand implements CommandHandler<
       lastEvaluated,
     });
 
-    const verdict = gatedVerdict({ evaluations, judgeVerdict });
+    const verdict = computeGatedVerdict({ evaluations, judgeVerdict });
     const status = gatedStatus({ status: judgeStatus, verdict });
 
     const eventData = buildEvaluatedEventData({

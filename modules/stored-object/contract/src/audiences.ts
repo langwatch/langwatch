@@ -45,7 +45,7 @@ export const legacyStoredObjectPurposeSchema = z.enum([
 export type LegacyStoredObjectPurpose = z.infer<typeof legacyStoredObjectPurposeSchema>;
 
 /** Unknown legacy purposes intentionally have no broad fallback audience. */
-export function audienceForLegacyStoredObjectPurpose(
+export function mapLegacyStoredObjectPurposeToAudience(
   purpose: string,
 ): StoredObjectDeliveryAudience | undefined {
   if (!(purpose in LEGACY_PURPOSE_AUDIENCE)) return undefined;

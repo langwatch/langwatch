@@ -363,11 +363,11 @@ const formatter = createTrpcErrorFormatter({
   traceIds: { find: () => "trace-1" } as never,
 });
 
-const internalShape = {
+const internalShape: TRPCDefaultErrorShape = {
   message: "the framework's own words",
   code: -32603,
   data: { code: "INTERNAL_SERVER_ERROR", httpStatus: 500, stack: "…", path: "x" },
-} as unknown as TRPCDefaultErrorShape;
+};
 
 const format = (cause: unknown) =>
   formatter({ shape: internalShape, error: { cause, code: "INTERNAL_SERVER_ERROR" } });

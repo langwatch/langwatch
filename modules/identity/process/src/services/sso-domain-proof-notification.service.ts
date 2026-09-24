@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import {
   SSO_DNS_RECORD_NAME,
   SSO_DNS_RECORD_TYPE,
@@ -21,7 +22,7 @@ const UNNAMED_ORGANIZATION = "your organization";
  */
 export type SsoDomainProofAudience = Pick<
   JoinRequestAudience,
-  "findAdminEmails" | "tryFindOrganizationName"
+  "findAdminEmails" | "getOrganizationName"
 >;
 
 /**
@@ -100,10 +101,14 @@ export class SsoDomainProofNotificationService implements SsoDomainProofNotifica
     admins: readonly string[];
   }> {
     const [organizationName, admins] = await Promise.all([
-      this.audience.tryFindOrganizationName({ organizationId }),
+      this.audience.getOrganizationName({ organizationId }).catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "organization_not_found")
+          return UNNAMED_ORGANIZATION;
+        throw error;
+      }),
       this.audience.findAdminEmails({ organizationId }),
     ]);
-    return { organizationName: organizationName ?? UNNAMED_ORGANIZATION, admins };
+    return { organizationName, admins };
   }
 
   private async fanOut({

@@ -298,6 +298,50 @@ export class ProjectionRouter<
     });
   }
 
+  private subscriberQueueDefinitions({
+    subscribersByParent,
+    parentType,
+  }: {
+    subscribersByParent: Map<string, SubscriberDispatchDefinition<EventType>[]>;
+    parentType: "fold" | "map";
+  }) {
+    const definitions = [];
+    for (const [parentProjection, subscribers] of subscribersByParent) {
+      for (const subscriber of subscribers) {
+        if (this.isSubscriberExcluded(subscriber)) continue;
+        definitions.push({
+          name: subscriber.name,
+          parentProjection,
+          parentType,
+          handler: {
+            handle: async (payload: { event: EventType; foldState: unknown }) => {
+              await subscriber.handle(payload.event, {
+                tenantId: payload.event.tenantId,
+                aggregateId: String(payload.event.aggregateId),
+                foldState: payload.foldState,
+                isReplay: LIVE_DISPATCH_IS_REPLAY,
+              });
+            },
+          },
+          groupKeyFn: subscriber.options?.groupKeyFn,
+          options: {
+            disabled: subscriber.options?.disabled,
+            delay: subscriber.options?.delay,
+            deduplication:
+              subscriber.options?.deduplication ??
+              (subscriber.options?.makeJobId
+                ? {
+                    makeId: subscriber.options.makeJobId,
+                    ttlMs: subscriber.options.ttl,
+                  }
+                : undefined),
+          },
+        });
+      }
+    }
+    return definitions;
+  }
+
   /**
    * Initialize queue processors for projection subscribers.
    * Each subscriber gets a SimpleQueue for async dispatch.
@@ -326,72 +370,17 @@ export class ProjectionRouter<
       }
     > = {};
 
-    for (const [foldName, subscribers] of this.subscribersForFold) {
-      for (const subscriber of subscribers) {
-        if (this.isSubscriberExcluded(subscriber)) continue;
-        subscriberDefs[subscriber.name] = {
-          name: subscriber.name,
-          parentProjection: foldName,
-          parentType: "fold" as const,
-          handler: {
-            handle: async (payload: { event: EventType; foldState: unknown }) => {
-              await subscriber.handle(payload.event, {
-                tenantId: payload.event.tenantId,
-                aggregateId: String(payload.event.aggregateId),
-                foldState: payload.foldState,
-                isReplay: LIVE_DISPATCH_IS_REPLAY,
-              });
-            },
-          },
-          groupKeyFn: subscriber.options?.groupKeyFn,
-          options: {
-            disabled: subscriber.options?.disabled,
-            delay: subscriber.options?.delay,
-            deduplication:
-              subscriber.options?.deduplication ??
-              (subscriber.options?.makeJobId
-                ? {
-                    makeId: subscriber.options.makeJobId,
-                    ttlMs: subscriber.options.ttl,
-                  }
-                : undefined),
-          },
-        };
-      }
-    }
-
-    for (const [mapName, subscribers] of this.subscribersForMap) {
-      for (const subscriber of subscribers) {
-        if (this.isSubscriberExcluded(subscriber)) continue;
-        subscriberDefs[subscriber.name] = {
-          name: subscriber.name,
-          parentProjection: mapName,
-          parentType: "map" as const,
-          handler: {
-            handle: async (payload: { event: EventType; foldState: unknown }) => {
-              await subscriber.handle(payload.event, {
-                tenantId: payload.event.tenantId,
-                aggregateId: String(payload.event.aggregateId),
-                foldState: payload.foldState,
-                isReplay: LIVE_DISPATCH_IS_REPLAY,
-              });
-            },
-          },
-          groupKeyFn: subscriber.options?.groupKeyFn,
-          options: {
-            disabled: subscriber.options?.disabled,
-            delay: subscriber.options?.delay,
-            deduplication:
-              subscriber.options?.deduplication ??
-              (subscriber.options?.makeJobId
-                ? {
-                    makeId: subscriber.options.makeJobId,
-                    ttlMs: subscriber.options.ttl,
-                  }
-                : undefined),
-          },
-        };
-      }
+    for (const def of [
+      ...this.subscriberQueueDefinitions({
+        subscribersByParent: this.subscribersForFold,
+        parentType: "fold",
+      }),
+      ...this.subscriberQueueDefinitions({
+        subscribersByParent: this.subscribersForMap,
+        parentType: "map",
+      }),
+    ]) {
+      subscriberDefs[def.name] = def;
     }
 
     this.queueManager.initializeProjectionSubscriberQueues(
@@ -586,7 +575,9 @@ export class ProjectionRouter<
           handle: (event: EventType) => Promise<void>;
           handleBatch: (events: EventType[]) => Promise<void>;
         };
-        options: any;
+        options: Parameters<
+          QueueManager<EventType>["initializeHandlerQueues"]
+        >[0][string]["options"];
       }
     > = {};
 
@@ -906,6 +897,37 @@ export class ProjectionRouter<
     }
   }
 
+  private async sendToStateProjection({
+    name,
+    projection,
+    matching,
+    context,
+    queued,
+  }: {
+    name: string;
+    projection: StateProjectionDefinition<unknown, EventType>;
+    matching: EventType[];
+    context: EventStoreReadContext<EventType>;
+    queued: boolean;
+  }): Promise<void> {
+    if (queued) {
+      const queue = this.queueManager.getStateProjectionQueue(name);
+      if (queue) {
+        await queue.sendBatch(matching);
+        return;
+      }
+    }
+
+    for (const event of matching) {
+      await this.processStateProjectionEvents({
+        projectionName: name,
+        projection,
+        events: [event],
+        context,
+      });
+    }
+  }
+
   private async dispatchToStateProjections(
     events: readonly EventType[],
     context: EventStoreReadContext<EventType>,
@@ -921,22 +943,7 @@ export class ProjectionRouter<
       if (matching.length === 0) continue;
 
       try {
-        if (queued) {
-          const queue = this.queueManager.getStateProjectionQueue(name);
-          if (queue) {
-            await queue.sendBatch(matching);
-            continue;
-          }
-        }
-
-        for (const event of matching) {
-          await this.processStateProjectionEvents({
-            projectionName: name,
-            projection,
-            events: [event],
-            context,
-          });
-        }
+        await this.sendToStateProjection({ name, projection, matching, context, queued });
       } catch (error) {
         this.logger.error(
           {
@@ -1371,6 +1378,22 @@ export class ProjectionRouter<
     );
   }
 
+  private async withoutReplaySkipped({
+    projectionName,
+    events,
+  }: {
+    projectionName: string;
+    events: EventType[];
+  }): Promise<EventType[]> {
+    if (!this.replayMarkerChecker) return events;
+    const kept: EventType[] = [];
+    for (const event of events) {
+      const decision = await this.replayMarkerChecker.check(projectionName, event);
+      if (decision !== "skip") kept.push(event);
+    }
+    return kept;
+  }
+
   private async processStateProjectionEvents({
     projectionName,
     projection,
@@ -1421,15 +1444,7 @@ export class ProjectionRouter<
           return;
         }
 
-        let toApply = events;
-        if (this.replayMarkerChecker) {
-          const kept: EventType[] = [];
-          for (const event of events) {
-            const decision = await this.replayMarkerChecker.check(projectionName, event);
-            if (decision !== "skip") kept.push(event);
-          }
-          toApply = kept;
-        }
+        const toApply = await this.withoutReplaySkipped({ projectionName, events });
         if (toApply.length === 0) return;
 
         const key = projection.key ? projection.key(toApply[0]!) : undefined;
@@ -1711,15 +1726,7 @@ export class ProjectionRouter<
         }
 
         // Defer or skip events for which projection-replay is active.
-        let toApply = events;
-        if (this.replayMarkerChecker) {
-          const kept: EventType[] = [];
-          for (const event of events) {
-            const decision = await this.replayMarkerChecker.check(projectionName, event);
-            if (decision !== "skip") kept.push(event);
-          }
-          toApply = kept;
-        }
+        let toApply = await this.withoutReplaySkipped({ projectionName, events });
         if (toApply.length === 0) return;
 
         // Apply (and dispatch subscribers) in occurredAt order — the same order
@@ -1883,6 +1890,24 @@ export class ProjectionRouter<
    * `shouldDispatch` BEFORE collapsing, so an aggregate-keyed subscriber gets
    * the last event it cared about, not the last event in the batch.
    */
+  private relevantDeliveries({
+    subscriber,
+    deliveries,
+  }: {
+    subscriber: SubscriberDispatchDefinition<EventType>;
+    deliveries: SubscriberDelivery<EventType>[];
+  }): SubscriberDelivery<EventType>[] {
+    const relevant: SubscriberDelivery<EventType>[] = [];
+    for (const delivery of deliveries) {
+      if (this.subscriberShouldDispatch(subscriber, delivery.event, delivery.foldState)) {
+        relevant.push(delivery);
+      } else {
+        incrementEsReactorTotal(this.pipelineName, subscriber.name, "skipped");
+      }
+    }
+    return relevant;
+  }
+
   private async dispatchToSubscribers({
     projectionName,
     subscribers,
@@ -1898,14 +1923,7 @@ export class ProjectionRouter<
       if (subscriber.options?.disabled) continue;
       if (this.isSubscriberExcluded(subscriber)) continue;
 
-      const relevant: SubscriberDelivery<EventType>[] = [];
-      for (const delivery of deliveries) {
-        if (this.subscriberShouldDispatch(subscriber, delivery.event, delivery.foldState)) {
-          relevant.push(delivery);
-        } else {
-          incrementEsReactorTotal(this.pipelineName, subscriber.name, "skipped");
-        }
-      }
+      const relevant = this.relevantDeliveries({ subscriber, deliveries });
       if (relevant.length === 0) continue;
 
       for (const { event, foldState } of this.collapseByJobId({
@@ -1973,65 +1991,71 @@ export class ProjectionRouter<
           },
           "Subscriber queue not found, falling back to inline execution",
         );
-        try {
-          await withMetrics({
-            fn: () =>
-              subscriber.handle(event, this.buildSubscriberDispatchContext({ event, foldState })),
-            onComplete: (ms) => {
-              incrementEsReactorTotal(this.pipelineName, subscriber.name, "completed");
-              observeEsReactorDuration(this.pipelineName, subscriber.name, ms);
-            },
-            onFail: (ms) => {
-              incrementEsReactorTotal(this.pipelineName, subscriber.name, "failed");
-              observeEsReactorDuration(this.pipelineName, subscriber.name, ms);
-            },
-          });
-        } catch (error) {
-          this.logger.error(
-            {
-              subscriberName: subscriber.name,
-              projectionName,
-              eventId: event.id,
-              eventType: event.type,
-              aggregateId: String(event.aggregateId),
-              tenantId: event.tenantId,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            "Subscriber failed during inline fallback execution",
-          );
-          errors.push(toError(error));
-        }
+        await this.runSubscriberInline({
+          projectionName,
+          subscriber,
+          event,
+          foldState,
+          errors,
+          failureMessage: "Subscriber failed during inline fallback execution",
+        });
       }
     } else {
       // Inline mode: call subscriber directly
-      try {
-        await withMetrics({
-          fn: () =>
-            subscriber.handle(event, this.buildSubscriberDispatchContext({ event, foldState })),
-          onComplete: (ms) => {
-            incrementEsReactorTotal(this.pipelineName, subscriber.name, "completed");
-            observeEsReactorDuration(this.pipelineName, subscriber.name, ms);
-          },
-          onFail: (ms) => {
-            incrementEsReactorTotal(this.pipelineName, subscriber.name, "failed");
-            observeEsReactorDuration(this.pipelineName, subscriber.name, ms);
-          },
-        });
-      } catch (error) {
-        this.logger.error(
-          {
-            subscriberName: subscriber.name,
-            projectionName,
-            eventId: event.id,
-            eventType: event.type,
-            aggregateId: String(event.aggregateId),
-            tenantId: event.tenantId,
-            error: error instanceof Error ? error.message : String(error),
-          },
+      await this.runSubscriberInline({
+        projectionName,
+        subscriber,
+        event,
+        foldState,
+        errors,
+        failureMessage:
           "Subscriber failed during inline execution — fold state persisted in CH but subscriber side-effect (e.g. ES sync) was lost",
-        );
-        errors.push(toError(error));
-      }
+      });
+    }
+  }
+
+  private async runSubscriberInline({
+    projectionName,
+    subscriber,
+    event,
+    foldState,
+    errors,
+    failureMessage,
+  }: {
+    projectionName: string;
+    subscriber: SubscriberDispatchDefinition<EventType>;
+    event: EventType;
+    foldState: unknown;
+    errors: Error[];
+    failureMessage: string;
+  }): Promise<void> {
+    try {
+      await withMetrics({
+        fn: () =>
+          subscriber.handle(event, this.buildSubscriberDispatchContext({ event, foldState })),
+        onComplete: (ms) => {
+          incrementEsReactorTotal(this.pipelineName, subscriber.name, "completed");
+          observeEsReactorDuration(this.pipelineName, subscriber.name, ms);
+        },
+        onFail: (ms) => {
+          incrementEsReactorTotal(this.pipelineName, subscriber.name, "failed");
+          observeEsReactorDuration(this.pipelineName, subscriber.name, ms);
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        {
+          subscriberName: subscriber.name,
+          projectionName,
+          eventId: event.id,
+          eventType: event.type,
+          aggregateId: String(event.aggregateId),
+          tenantId: event.tenantId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        failureMessage,
+      );
+      errors.push(toError(error));
     }
   }
 

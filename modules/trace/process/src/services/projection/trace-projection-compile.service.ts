@@ -41,7 +41,7 @@ function resolveSelectedFields(select: string[]): ResolvedField[] {
     }
 
     seen.add(path);
-    const resolved = TraceProjectionCatalogService.resolveField(path);
+    const resolved = TraceProjectionCatalogService.mapField(path);
     if (resolved) {
       fields.push(resolved);
     } else {

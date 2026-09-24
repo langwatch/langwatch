@@ -52,11 +52,22 @@ vi.mock("../../use-organization-team-project.ts", () => ({
 function buildSuite(): SimulationSuite {
   return {
     id: "suite_1",
+    projectId: "project_1",
     name: "Regression Tests",
+    slug: "regression-tests",
+    description: null,
     scenarioIds: ["scenario_1", "scenario_2"],
     targets: [{ type: "prompt", referenceId: "prompt_1" }],
     repeatCount: 1,
-  } as unknown as SimulationSuite;
+    labels: [],
+    simulatorModel: null,
+    judgeModel: null,
+    kind: "custom",
+    scope: null,
+    archivedAt: null,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  };
 }
 
 /** Mirrors how SimulationsPage wires the hook to the dialog. */

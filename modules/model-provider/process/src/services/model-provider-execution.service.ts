@@ -72,15 +72,10 @@ export class ModelProviderExecutionService {
     }
 
     if (reference.kind === "row") {
-      const provider = await this.options.query.tryGetByIdForProject({
+      return this.options.query.getByIdForProject({
         id: reference.id,
         projectId: input.projectId,
       });
-      if (!provider) {
-        throw new ModelProviderNotFoundError();
-      }
-
-      return provider;
     }
 
     const providers = await this.options.query.getExecutionProviders({
@@ -122,7 +117,7 @@ export class ModelProviderExecutionService {
     parameters: ModelProviderExecutionParameters,
     provider: ModelProvider | ModelProviderExecution,
   ): void {
-    const definition = this.options.catalog.tryGetExecutionDefinition({
+    const definition = this.options.catalog.pickExecutionDefinition({
       provider: provider.provider,
     });
     const apiKey = definition ? this.executionValue(provider, definition.apiKey) : null;
@@ -256,7 +251,7 @@ export class ModelProviderExecutionService {
     provider: ModelProvider | ModelProviderExecution,
     key: string,
   ): string | null {
-    return this.options.catalog.tryGetStoredExecutionValue({
+    return this.options.catalog.pickStoredExecutionValue({
       customKeys: provider.customKeys,
       key,
     });

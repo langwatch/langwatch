@@ -6,6 +6,27 @@ const TYPING_MS = 70;
 const ERASING_MS = 40;
 const HOLD_MS = 2600;
 
+interface TypewriterState {
+  index: number;
+  charIndex: number;
+  phase: "type" | "hold" | "erase";
+}
+
+function typeStep(state: TypewriterState, word: string): number {
+  state.charIndex++;
+  if (state.charIndex < word.length) return TYPING_MS;
+  state.phase = "hold";
+  return HOLD_MS;
+}
+
+function eraseStep(state: TypewriterState, exampleCount: number): void {
+  state.charIndex--;
+  if (state.charIndex > 0) return;
+  state.index = (state.index + 1) % exampleCount;
+  state.charIndex = 0;
+  state.phase = "type";
+}
+
 /**
  * Cycle through `examples`, typing each one out, holding, then erasing — used as an AI
  * composer placeholder while idle. Returns the first example with no animation under
@@ -23,39 +44,31 @@ export function useTypewriterPlaceholder(active: boolean, examples: readonly str
 
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    let index = 0;
-    let charIndex = (examples[0] ?? "").length;
-    let phase: "type" | "hold" | "erase" = "hold";
+    const state: TypewriterState = {
+      index: 0,
+      charIndex: (examples[0] ?? "").length,
+      phase: "hold",
+    };
 
     const tick = () => {
       if (cancelled) return;
-      const word = examples[index] ?? "";
+      const word = examples[state.index] ?? "";
 
-      if (phase === "type") {
-        charIndex++;
-        setText(word.slice(0, charIndex));
-        if (charIndex >= word.length) {
-          phase = "hold";
-          timer = setTimeout(tick, HOLD_MS);
-        } else {
-          timer = setTimeout(tick, TYPING_MS);
-        }
+      if (state.phase === "type") {
+        const delay = typeStep(state, word);
+        setText(word.slice(0, state.charIndex));
+        timer = setTimeout(tick, delay);
         return;
       }
 
-      if (phase === "hold") {
-        phase = "erase";
+      if (state.phase === "hold") {
+        state.phase = "erase";
         timer = setTimeout(tick, ERASING_MS);
         return;
       }
 
-      charIndex--;
-      setText(word.slice(0, Math.max(charIndex, 0)));
-      if (charIndex <= 0) {
-        index = (index + 1) % examples.length;
-        charIndex = 0;
-        phase = "type";
-      }
+      eraseStep(state, examples.length);
+      setText(word.slice(0, Math.max(state.charIndex, 0)));
       timer = setTimeout(tick, ERASING_MS);
     };
 

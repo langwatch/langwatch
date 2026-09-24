@@ -54,17 +54,17 @@ import { MessageContent } from "../message-content.tsx";
 
 afterEach(cleanup);
 
-const emptyAssistantMessage = {
+const emptyAssistantMessage: UIMessage = {
   id: "m-assistant",
   role: "assistant",
   parts: [],
-} as unknown as UIMessage;
+};
 
-const partialAssistantMessage = {
+const partialAssistantMessage: UIMessage = {
   id: "m-assistant-partial",
   role: "assistant",
   parts: [{ type: "text", text: "The slowest traces are" }],
-} as unknown as UIMessage;
+};
 
 function renderMessage({
   interrupted,

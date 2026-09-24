@@ -119,10 +119,10 @@ export class InviteService {
     return new InviteService({ ...this.deps, invites });
   }
 
-  async tryCheckDuplicateInvite(
-    params: Parameters<InviteCreationService["tryCheckDuplicateInvite"]>[0],
-  ): ReturnType<InviteCreationService["tryCheckDuplicateInvite"]> {
-    return this.creation.tryCheckDuplicateInvite(params);
+  async hasOpenInvite(
+    params: Parameters<InviteCreationService["hasOpenInvite"]>[0],
+  ): ReturnType<InviteCreationService["hasOpenInvite"]> {
+    return this.creation.hasOpenInvite(params);
   }
 
   async assertNotAlreadyMembers(
@@ -285,20 +285,10 @@ export class InviteService {
     organizationId: string;
     email: string;
   }): Promise<OrganizationPendingInviteApplied> {
-    const pending = await this.tryFindPendingByOrgAndEmail({ organizationId, email });
+    const pending = await this.invites.tryFindPendingInviteForEmail({ organizationId, email });
     if (!pending) return { applied: false };
 
     await this.applyInvite({ userId, invite: pending });
     return { applied: true, inviteId: pending.id };
-  }
-
-  async tryFindPendingByOrgAndEmail({
-    organizationId,
-    email,
-  }: {
-    organizationId: string;
-    email: string;
-  }): Promise<OrganizationInvite | null> {
-    return this.invites.tryFindPendingInviteForEmail({ organizationId, email });
   }
 }

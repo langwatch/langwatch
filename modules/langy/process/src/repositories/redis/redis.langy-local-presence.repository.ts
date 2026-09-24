@@ -77,7 +77,7 @@ export class LangyLocalPresenceRedisRepository extends LangyLocalPresence {
   async read(conversationId: string): Promise<ConnectedWorkspace | null> {
     const raw = await this.store.tryGet(presenceKey(conversationId));
     if (!raw) return null;
-    const parsed = safeParse(raw);
+    const parsed = parseConnectedWorkspace(raw);
     if (!parsed) return null;
     // The key's own expiry is the primary clock. This second check is what
     // keeps a memory store, whose expiry a test drives by hand, honest.
@@ -141,7 +141,7 @@ export class LangyLocalPresenceRedisRepository extends LangyLocalPresence {
   async readOwedConnectTurn(conversationId: string): Promise<OwedConnectTurn | null> {
     const raw = await this.store.tryGet(owedConnectTurnKey(conversationId));
     if (!raw) return null;
-    const parsed = safeParseOwed(raw);
+    const parsed = parseOwedConnectTurn(raw);
     return parsed;
   }
 
@@ -154,7 +154,7 @@ export class LangyLocalPresenceRedisRepository extends LangyLocalPresence {
   }
 }
 
-function safeParse(raw: string): ConnectedWorkspace | null {
+function parseConnectedWorkspace(raw: string): ConnectedWorkspace | null {
   try {
     const parsed = connectedWorkspaceSchema.safeParse(JSON.parse(raw));
     return parsed.success ? parsed.data : null;
@@ -163,7 +163,7 @@ function safeParse(raw: string): ConnectedWorkspace | null {
   }
 }
 
-function safeParseOwed(raw: string): OwedConnectTurn | null {
+function parseOwedConnectTurn(raw: string): OwedConnectTurn | null {
   try {
     const parsed = owedConnectTurnSchema.safeParse(JSON.parse(raw));
     return parsed.success ? parsed.data : null;

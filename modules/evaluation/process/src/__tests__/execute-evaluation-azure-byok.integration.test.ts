@@ -55,7 +55,7 @@ function buildCommandWithMocks({
   return {
     command,
     evaluations: deps.evaluations,
-    azureSafetyCredentials: deps.azureSafetyCredentials.tryGetForTenant,
+    azureSafetyCredentials: deps.azureSafetyCredentials.resolveForTenant,
   };
 }
 

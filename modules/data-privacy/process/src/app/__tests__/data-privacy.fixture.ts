@@ -10,7 +10,7 @@ import {
   type DataPrivacyOrganizationDirectory,
   type DataPrivacyProjectLineage,
 } from "../data-privacy.app.ts";
-import type { DataPrivacyResolution, PiiAnalysis } from "../data-privacy.members.ts";
+import type { DataPrivacyResolution, PiiAnalysis, PiiClearing } from "../data-privacy.members.ts";
 
 /** The policy source the redaction cases drive their PII cases over. */
 export class DataPrivacyResolutionFake implements DataPrivacyResolution {
@@ -61,7 +61,7 @@ export class UnusedPiiAnalysis implements PiiAnalysis {
     return new UnusedPiiAnalysis();
   }
 
-  async tryClearGoogleDlp(): Promise<string | null> {
+  async clearGoogleDlp(): Promise<PiiClearing> {
     throw new Error("the PII analysis transport is not configured for this test");
   }
 

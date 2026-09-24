@@ -764,7 +764,7 @@ const CustomGraph_ = React.memo(
               labelLine={false}
               label={pieChartPercentageLabel as any}
               innerRadius={input.graphType === "donnut" ? "50%" : 0}
-              onClick={(data: any, index: number) => {
+              onClick={(data, index: number) => {
                 const isClickableSlice =
                   handleDataPointClick && data && typeof index === "number" && pieData[index];
                 if (isClickableSlice) {
@@ -865,7 +865,7 @@ const CustomGraph_ = React.memo(
             <Bar
               dataKey="value"
               minPointSize={4}
-              onClick={(item: any) => {
+              onClick={(item) => {
                 if (handleDataPointClick && item?.payload?.key) {
                   const key = item.payload.key;
                   const { series, groupKey } = getSeries(seriesByKey, key);

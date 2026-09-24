@@ -54,7 +54,7 @@ export class LangyCliEnvelopeService {
    * not a copy), so the caller can treat this as a transparent pass-through.
    */
   normalizeToolFrame({ frame }: { frame: LangyToolFrame }): LangyToolFrame {
-    const command = this.tryShellCommandOf(frame);
+    const command = this.extractShellCommand(frame);
     if (!command) {
       return frame;
     }
@@ -202,7 +202,7 @@ export class LangyCliEnvelopeService {
    * a shell call. Public because it is the ONE place that knows which tools
    * are shells and where a command hides in a tool input.
    */
-  tryShellCommandOf(frame: LangyToolFrame): string | null {
+  extractShellCommand(frame: LangyToolFrame): string | null {
     const toolName = frame.name.trim().toLowerCase();
     if (!SHELL_TOOL_NAMES.has(toolName)) {
       return null;

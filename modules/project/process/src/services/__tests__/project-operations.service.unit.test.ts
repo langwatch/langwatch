@@ -4,7 +4,9 @@
  * revokes outstanding trace shares when sharing is turned OFF. Characterized
  * here because it is the application's decision, not one door's.
  */
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
@@ -135,6 +137,8 @@ function characterizationOperations(options: {
     topics: refusingTopics(),
     topicClustering: { requestClustering: async () => {} },
     now: () => 0,
+    auditLog: createApiFixture<AuditLogApi>({}),
+    logger: { error: () => undefined },
   });
 }
 

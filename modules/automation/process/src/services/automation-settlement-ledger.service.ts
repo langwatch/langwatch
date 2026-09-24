@@ -7,6 +7,7 @@ import type {
 import { type Instant } from "@langwatch/time";
 
 import type { AutomationClock } from "../app/automation.members.ts";
+import type { AutomationPersistCapRepository } from "../repositories/automation-persist-cap.repository.ts";
 import {
   AutomationSettlementLedger,
   type AutomationSettlementBreach,
@@ -15,11 +16,8 @@ import {
 import type { EmailSuppressionRepository } from "../repositories/email-suppression.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import type { WebhookDeliveryRepository } from "../repositories/webhook-delivery.repository.ts";
+import { decidePersistCap } from "../rules/persist-cap.rules.ts";
 import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
-import {
-  AutomationPersistCapService,
-  type AutomationPersistCapRedis,
-} from "./persist-cap.service.ts";
 
 /**
  * Settlement reads/writes must use {@link ActiveTriggerCacheService} to prevent
@@ -31,7 +29,7 @@ export class AutomationSettlementLedgerService extends AutomationSettlementLedge
     suppressions: EmailSuppressionRepository;
     webhookDeliveries: WebhookDeliveryRepository;
     clock: AutomationClock;
-    redis?: AutomationPersistCapRedis | null;
+    persistCaps: AutomationPersistCapRepository;
     persistCap: AutomationSettlementPersistCap;
     breach: AutomationSettlementBreach;
   }): AutomationSettlementLedgerService {
@@ -40,7 +38,7 @@ export class AutomationSettlementLedgerService extends AutomationSettlementLedge
       active: ActiveTriggerCacheService.create({ triggers: input.triggers, clock: input.clock }),
       suppressions: input.suppressions,
       webhookDeliveries: input.webhookDeliveries,
-      redis: input.redis ?? null,
+      persistCaps: input.persistCaps,
       persistCap: input.persistCap,
       breach: input.breach,
     });
@@ -54,7 +52,7 @@ export class AutomationSettlementLedgerService extends AutomationSettlementLedge
 
   private readonly webhookDeliveries: WebhookDeliveryRepository;
 
-  private readonly redis: AutomationPersistCapRedis | null;
+  private readonly persistCaps: AutomationPersistCapRepository;
 
   private readonly persistCap: AutomationSettlementPersistCap;
 
@@ -65,7 +63,7 @@ export class AutomationSettlementLedgerService extends AutomationSettlementLedge
     active,
     suppressions,
     webhookDeliveries,
-    redis,
+    persistCaps,
     persistCap,
     breach,
   }: {
@@ -73,7 +71,7 @@ export class AutomationSettlementLedgerService extends AutomationSettlementLedge
     active: ActiveTriggerCacheService;
     suppressions: EmailSuppressionRepository;
     webhookDeliveries: WebhookDeliveryRepository;
-    redis: AutomationPersistCapRedis | null;
+    persistCaps: AutomationPersistCapRepository;
     persistCap: AutomationSettlementPersistCap;
     breach: AutomationSettlementBreach;
   }) {
@@ -87,7 +85,7 @@ export class AutomationSettlementLedgerService extends AutomationSettlementLedge
 
     this.webhookDeliveries = webhookDeliveries;
 
-    this.redis = redis;
+    this.persistCaps = persistCaps;
 
     this.persistCap = persistCap;
 
@@ -146,17 +144,15 @@ export class AutomationSettlementLedgerService extends AutomationSettlementLedge
       : this.persistCap.resolve(projectId);
   }
 
-  consumePersistCapSlot(input: {
+  async consumePersistCapSlot(input: {
     projectId: string;
     triggerId: string;
     now: Instant;
     cap: number;
     dedupKey: string;
   }): Promise<AutomationPersistCapDecision> {
-    return AutomationPersistCapService.consumePersistCapSlot({
-      ...input,
-      redis: this.redis,
-    });
+    const slot = await this.persistCaps.consumeSlot(input);
+    return decidePersistCap({ count: slot.count, cap: input.cap });
   }
 
   handlePersistCapBreach(input: AutomationPersistCapBreach): Promise<void> {

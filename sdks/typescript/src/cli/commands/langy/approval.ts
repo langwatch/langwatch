@@ -206,14 +206,9 @@ export function renderBox<T>({
   plain("");
   plain(`   ${card.question}`);
   card.options.forEach((option, index) => {
-    const chosen = index === selected;
-    const marker = `${chosen ? " ❯ " : "   "}${index + 1}. `;
-    // A label of a chain names every pattern, so it is wrapped like any other
-    // line rather than pushed through the frame.
-    wrapWords(option.label, textWidth - marker.length + 3).forEach((line, part) => {
-      const row = `${part === 0 ? marker : " ".repeat(marker.length)}${line}`;
-      plain(row, chosen ? chalk.cyan(row) : row);
-    });
+    for (const row of optionRows({ label: option.label, index, selected, textWidth })) {
+      plain(row.text, row.painted);
+    }
   });
   const coverage = grantCoverageSentence(card.patterns ?? []);
   if (coverage !== null) {
@@ -242,6 +237,27 @@ export function renderBox<T>({
   ];
 }
 
+function optionRows({
+  label,
+  index,
+  selected,
+  textWidth,
+}: {
+  label: string;
+  index: number;
+  selected: number;
+  textWidth: number;
+}): { text: string; painted: string }[] {
+  const chosen = index === selected;
+  const marker = `${chosen ? " ❯ " : "   "}${index + 1}. `;
+  // A label of a chain names every pattern, so it is wrapped like any other
+  // line rather than pushed through the frame.
+  return wrapWords(label, textWidth - marker.length + 3).map((line, part) => {
+    const row = `${part === 0 ? marker : " ".repeat(marker.length)}${line}`;
+    return { text: row, painted: chosen ? chalk.cyan(row) : row };
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Reading the answer
 // ---------------------------------------------------------------------------
@@ -260,8 +276,7 @@ export function createStdinKeySource(stdin: NodeJS.ReadStream = process.stdin): 
       const handler = (_: string, key: KeyEvent | undefined): void => {
         if (!key) return;
         if (key.ctrl === true && key.name === "c") {
-          if (process.listenerCount("SIGINT") === 0) process.exit(130);
-          process.emit("SIGINT");
+          raiseInterrupt();
           return;
         }
         onKey(key);
@@ -275,6 +290,11 @@ export function createStdinKeySource(stdin: NodeJS.ReadStream = process.stdin): 
       };
     },
   };
+}
+
+function raiseInterrupt(): void {
+  if (process.listenerCount("SIGINT") === 0) process.exit(130);
+  process.emit("SIGINT");
 }
 
 /** One line of text from the terminal, with the question in front of it. */

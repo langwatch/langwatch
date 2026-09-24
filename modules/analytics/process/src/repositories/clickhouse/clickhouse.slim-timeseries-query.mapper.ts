@@ -111,7 +111,7 @@ function isSlimGroupByKey(groupBy: string): groupBy is SlimGroupByKey {
 /**
  * Slim GROUP BY expressions — typed columns + Attributes map reads.
  */
-function slimGroupByExpression(groupBy?: string): string | null {
+function buildSlimGroupByExpression(groupBy?: string): string | null {
   if (!groupBy) return null;
   if (!isSlimGroupByKey(groupBy)) {
     throw new Error(`Slim builder cannot group by "${groupBy}".`);
@@ -360,7 +360,7 @@ export function buildSlimTimeseriesQuery(
     selectExprs.push(`${dateTrunc(`${ta}.OccurredAt`, input.timeScale, timeZone)} AS date`);
   }
 
-  const groupByColumn = slimGroupByExpression(input.groupBy);
+  const groupByColumn = buildSlimGroupByExpression(input.groupBy);
   if (groupByColumn) {
     selectExprs.push(
       `if(${groupByColumn} IS NULL, 'unknown', toString(${groupByColumn})) AS group_key`,

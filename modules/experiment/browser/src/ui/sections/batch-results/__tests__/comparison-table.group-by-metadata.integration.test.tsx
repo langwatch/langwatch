@@ -13,7 +13,7 @@ import {
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -142,25 +142,24 @@ describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => 
 
   describe("given a 2-run comparison whose rows carry city + difficulty metadata", () => {
     describe("when the user opens the Group rows by dropdown", () => {
-      /** @scenario "The Group rows by dropdown lists every metadata key from the dataset" */
-      it("lists every metadata key discovered from the dataset entries", async () => {
+      let dropdown: HTMLElement;
+
+      beforeEach(async () => {
         const user = userEvent.setup();
         renderGroupable();
-
         await user.click(screen.getByTestId("group-by-row-button"));
+        dropdown = screen.getByTestId("group-by-row-dropdown");
+      });
 
-        const dropdown = screen.getByTestId("group-by-row-dropdown");
+      /** @scenario "The Group rows by dropdown lists every metadata key from the dataset" */
+      it("lists every metadata key discovered from the dataset entries", () => {
         expect(within(dropdown).getByTestId("group-by-row-option-none")).toBeInTheDocument();
         expect(within(dropdown).getByTestId("group-by-row-option-city")).toBeInTheDocument();
         expect(within(dropdown).getByTestId("group-by-row-option-difficulty")).toBeInTheDocument();
       });
 
       /** @scenario "Dropdown only offers keys present on the current runs' dataset entries" */
-      it("does not list the input column as a grouping option", async () => {
-        const user = userEvent.setup();
-        renderGroupable();
-        await user.click(screen.getByTestId("group-by-row-button"));
-        const dropdown = screen.getByTestId("group-by-row-dropdown");
+      it("does not list the input column as a grouping option", () => {
         // 'input' is a column but a row-unique payload, not a slicing dimension.
         // Discovery must include only fields with repeat values across rows.
         expect(within(dropdown).queryByTestId("group-by-row-option-input")).not.toBeInTheDocument();

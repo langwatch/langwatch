@@ -4,10 +4,12 @@
  * Spec: modules/api-key/specs/api-key.feature
  */
 import { ApiKeyAlreadyRevokedError } from "@langwatch/api-key-contract";
-import { Temporal, type Instant } from "@langwatch/time";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ApiKeyRepository } from "../../repositories/api-key.repository.ts";
+import { MemoryApiKeyDatabase } from "../../repositories/memory/memory.api-key.database.ts";
+import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key.repository.ts";
 import { CliLoginKeyReapService } from "../cli-login-key-reap.service.ts";
 
 const NOW = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
@@ -15,8 +17,11 @@ const NOW = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 function repositoryDouble(
   elapsed: { id: string; userId: string | null; organizationId: string }[] = [],
 ) {
-  const findElapsedLoginKeys = vi.fn(async (_input: { now: Instant }) => elapsed);
-  const repository = { findElapsedLoginKeys } as unknown as ApiKeyRepository;
+  const findElapsedLoginKeys = vi.fn<ApiKeyRepository["findElapsedLoginKeys"]>(async () => elapsed);
+  const repository = Object.assign(
+    MemoryApiKeyRepository.create({ memory: MemoryApiKeyDatabase.create() }),
+    { findElapsedLoginKeys },
+  );
   return { repository, findElapsedLoginKeys };
 }
 

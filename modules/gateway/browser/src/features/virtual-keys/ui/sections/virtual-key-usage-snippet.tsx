@@ -11,7 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { useMemo } from "react";
-import type { HighlighterGeneric } from "shiki";
+import type { BundledLanguage, BundledTheme, HighlighterGeneric } from "shiki";
 
 import { useGatewayDeployment } from "../../../../behavior/gateway-session.ts";
 import { resolveSnippetGatewayBaseUrl } from "../../model/gateway-snippet-url.ts";
@@ -174,7 +174,7 @@ func main() {
   const otherTabs = tabItems.filter((t) => t.key !== tabs.value);
 
   const shikiAdapter = useMemo(() => {
-    return createShikiAdapter<HighlighterGeneric<any, any>>({
+    return createShikiAdapter<HighlighterGeneric<BundledLanguage, BundledTheme>>({
       async load() {
         const { createHighlighter } = await import("shiki");
         return createHighlighter({

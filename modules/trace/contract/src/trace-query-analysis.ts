@@ -15,7 +15,7 @@ import { isEmptyAST, parse, serialize } from "./trace-query-parser.ts";
  * (no value) becomes an `EmptyExpression` Tag the backend 422s on. Catching
  * it here lets the SearchBar show red-border feedback before commit.
  */
-function missingValueMessage(ast: Extract<LiqeQuery, { type: "Tag" }>): string | null {
+function describeMissingValue(ast: Extract<LiqeQuery, { type: "Tag" }>): string | null {
   if (ast.expression.type !== "EmptyExpression") return null;
 
   const fieldName = ast.field.type === "ImplicitField" ? "" : ast.field.name;
@@ -71,19 +71,19 @@ export function countFilterNodes(ast: LiqeQuery): number {
   }
 }
 
-export function validateAst(ast: LiqeQuery): string | null {
+export function describeAstProblem(ast: LiqeQuery): string | null {
   if (countFilterNodes(ast) > MAX_FILTER_NODE_COUNT) {
     return FILTER_TOO_COMPLEX_MESSAGE;
   }
   switch (ast.type) {
     case "Tag":
-      return missingValueMessage(ast);
+      return describeMissingValue(ast);
     case "UnaryOperator":
-      return validateAst(ast.operand);
+      return describeAstProblem(ast.operand);
     case "LogicalExpression":
-      return validateAst(ast.left) ?? validateAst(ast.right);
+      return describeAstProblem(ast.left) ?? describeAstProblem(ast.right);
     case "ParenthesizedExpression":
-      return validateAst(ast.expression);
+      return describeAstProblem(ast.expression);
     default:
       return null;
   }
@@ -162,7 +162,7 @@ export function buildFacetStateLookup(ast: LiqeQuery): ReadonlyMap<string, Facet
 }
 
 /** The explicit `field:[a TO b]` range on one Tag, or none when it is not one. */
-function explicitRange(
+function extractExplicitRange(
   node: Extract<LiqeQuery, { type: "Tag" }>,
 ): { from?: number; to?: number } | null {
   if (node.expression.type !== "RangeExpression") return null;
@@ -171,7 +171,7 @@ function explicitRange(
 }
 
 /** The open-ended range a `field:>n` / `field:<n` comparison stands for. */
-function comparisonRange(
+function deriveComparisonRange(
   node: Extract<LiqeQuery, { type: "Tag" }>,
 ): { from?: number; to?: number } | null {
   if (node.expression.type !== "LiteralExpression") return null;
@@ -205,7 +205,7 @@ function isRangeCandidate(
  * Get a range value for a field. Last matching node wins — the AST is
  * expected to hold a single range/comparison per field after a setRange call.
  */
-export function getRangeValue(
+export function extractRangeValue(
   ast: LiqeQuery,
   fieldName: string,
 ): { from?: number; to?: number } | null {
@@ -214,7 +214,7 @@ export function getRangeValue(
   walkAST(ast, (node, negated) => {
     if (!isRangeCandidate(node, negated, fieldName)) return;
 
-    const range = explicitRange(node) ?? comparisonRange(node);
+    const range = extractExplicitRange(node) ?? deriveComparisonRange(node);
     if (range) result = range;
   });
 

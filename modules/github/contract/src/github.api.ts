@@ -32,9 +32,9 @@ export interface GithubApi {
   getAppInstallUrl(): string;
   getInstallStateTtlMs(): number;
   registerInstallNonce(input: { nonce: string; ttlSec: number }): Promise<boolean>;
-  consumeInstallNonce(nonce: string): Promise<boolean | null>;
+  consumeInstallNonce(nonce: string): Promise<"consumed" | "spent" | "unavailable">;
   signInstallState(payload: GithubInstallStatePayload): string;
-  verifyInstallState(token: string | null | undefined): GithubInstallStatePayload | null;
+  parseInstallState(token: string | null | undefined): GithubInstallStatePayload | null;
   popupResponseHtml(login: string): string;
   popupErrorHtml(message: string): string;
   parsePullRequestEvent(payload: unknown): GithubPullRequestEvent | null;

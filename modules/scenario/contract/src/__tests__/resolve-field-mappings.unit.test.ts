@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeBestMatchMappings,
   resolveFieldMappings,
-  sourceFieldOf,
+  extractSourceField,
 } from "../resolve-field-mappings.ts";
 
 const makeAgentInput = (overrides: Partial<ScenarioInput> = {}): ScenarioInput => ({
@@ -197,7 +197,7 @@ describe("resolveFieldMappings", () => {
     });
 
     it("reports session as the source field", () => {
-      expect(sourceFieldOf(fieldMappings.memory!)).toBe("session");
+      expect(extractSourceField(fieldMappings.memory!)).toBe("session");
     });
   });
 });

@@ -121,6 +121,12 @@ const MetricGroup: React.FC<{
   );
 };
 
+function metricStateLabel(state: "neutral" | "include" | "exclude"): string {
+  if (state === "include") return "included";
+  if (state === "exclude") return "excluded";
+  return "click to filter";
+}
+
 /**
  * One clickable metric value in the sidebar's compact row language, pared
  * down from the evaluator drilldown's value row: no dot, and state comes
@@ -143,8 +149,7 @@ const MetricValueRow: React.FC<{
   // The key qualifies the value: two metrics on one event may share a value
   // ("1" under both `vote` and `rating`). The state word says which way the
   // filter points — "active" alone cannot tell include from exclude.
-  const stateLabel =
-    state === "include" ? "included" : state === "exclude" ? "excluded" : "click to filter";
+  const stateLabel = metricStateLabel(state);
   return (
     <RowButton
       type="button"

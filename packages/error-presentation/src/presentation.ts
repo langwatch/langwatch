@@ -511,6 +511,10 @@ const presentations = {
     describe: () =>
       "This is a temporary gap on our side, not a setting in your workspace. Try again shortly, or contact support if it persists.",
   },
+  cli_device_flow_refused: {
+    title: "This sign-in code can no longer be used",
+    describe: () => "Run langwatch login again to start a new sign-in.",
+  },
   cli_key_selection_invalid: {
     title: "Check the access selection",
     describe: (error) => {
@@ -525,6 +529,10 @@ const presentations = {
       }
       return "The selected scopes and permissions aren't valid.";
     },
+  },
+  cli_session_record_not_found: {
+    title: "This sign-in session has ended",
+    describe: () => "Run langwatch login again to sign the command line back in.",
   },
   clickhouse_unavailable: {
     // Every surface that reads the analytics store raises this code: a trace
@@ -1959,6 +1967,10 @@ const presentations = {
     title: "That organization slug is already in use",
     describe: () => "Pick a different slug, or leave it out to generate one from the name.",
   },
+  scim_sync_not_found: {
+    title: "Directory sync not found",
+    describe: () => "This connection has not synced anyone yet. Reload to see where it stands.",
+  },
   scim_token_not_found: {
     title: "SCIM token not found",
     describe: () => "It may already be revoked. Reload to see the current tokens.",
@@ -2248,6 +2260,11 @@ const presentations = {
         ? `${rejected} You can set ${listLabels(declared)}.`
         : `${rejected} This run declares no parameters at all.`;
     },
+  },
+  scenario_target_not_found: {
+    title: "That agent or prompt is no longer available",
+    describe: () =>
+      "The scenario points at an agent or prompt that was removed or can no longer run. Pick another one and run it again.",
   },
   scenario_test_suite_not_found: {
     title: "That test suite isn't available",

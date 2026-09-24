@@ -13,8 +13,8 @@ import type { OtlpIngestCredential, OtlpIngestCredentialInput } from "@langwatch
 
 import type { CollectorCredential } from "../transport/collector.rest.ts";
 import {
-  readTraceIngestCredentials,
-  readTraceLegacyRequestCredentials,
+  extractTraceIngestCredentials,
+  extractTraceLegacyRequestCredentials,
   type TraceLegacyRequestCredentials,
 } from "./trace-legacy-credential.service.ts";
 
@@ -70,7 +70,7 @@ export class TraceIngestCredentialService {
 
   /** The receiver's credential, plus the identity it stamps provenance from. */
   async resolveForOtlp(input: OtlpIngestCredentialInput): Promise<OtlpIngestCredential> {
-    const { resolved } = await this.#authenticateCredentials(readTraceIngestCredentials(input));
+    const { resolved } = await this.#authenticateCredentials(extractTraceIngestCredentials(input));
     const project = projectOf(resolved);
 
     return {
@@ -102,7 +102,7 @@ export class TraceIngestCredentialService {
    * caller with no credential at all is never told a permission is missing.
    */
   async #authenticate(request: Request): Promise<TraceIngestResolution> {
-    return this.#authenticateCredentials(readTraceLegacyRequestCredentials(request));
+    return this.#authenticateCredentials(extractTraceLegacyRequestCredentials(request));
   }
 
   async #authenticateCredentials(

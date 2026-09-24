@@ -16,7 +16,7 @@ const ORG_ID = "org_1";
 const USER_ID = "user_1";
 const EXISTING_ID = "key_existing";
 
-const existing = {
+const existing: StoredApiKey = {
   id: EXISTING_ID,
   name: "Existing Key",
   description: null,
@@ -26,6 +26,15 @@ const existing = {
   createdByDeviceLabel: null,
   permissionMode: "all",
   revokedAt: null,
+  parentApiKeyId: null,
+  lookupId: "lookup",
+  expiresAt: null,
+  revocationCause: null,
+  lastUsedAt: null,
+  ingestSourceType: null,
+  ingestionTemplateId: null,
+  createdAt: new Date("2026-01-01T00:00:00Z"),
+  updatedAt: new Date("2026-01-01T00:00:00Z"),
   hashedSecret: "hashed",
   roleBindings: [
     {
@@ -36,7 +45,7 @@ const existing = {
       scopeId: ORG_ID,
     },
   ],
-} as unknown as StoredApiKey;
+};
 
 type LedgerFailure = "attach" | "role" | null;
 

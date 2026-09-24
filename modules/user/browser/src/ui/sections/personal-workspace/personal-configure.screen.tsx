@@ -164,6 +164,8 @@ export function PersonalConfigureScreen() {
     revokeMutation.mutate({ organizationId: ctx.organizationId, id });
   };
 
+  const hasBudgets = ctx.budgetOverview.budgets.length > 0;
+
   return (
     <PersonalWorkspaceLayout>
       <VStack align="stretch" gap={6} width="full">
@@ -356,9 +358,8 @@ export function PersonalConfigureScreen() {
 
         {ctx.budgetOverview.gatewayAccess && (
           <SectionCard title="Budgets that apply to you">
-            {ctx.budgetOverview.budgets.length > 0 ? (
-              <BudgetOverviewList items={ctx.budgetOverview.budgets} />
-            ) : ctx.budgetOverview.isResolved ? (
+            {hasBudgets && <BudgetOverviewList items={ctx.budgetOverview.budgets} />}
+            {!hasBudgets && ctx.budgetOverview.isResolved && (
               <VStack align="start" gap={1}>
                 <Text fontSize="sm" color="fg.muted">
                   No budgets apply to your usage yet.
@@ -367,7 +368,7 @@ export function PersonalConfigureScreen() {
                   If you'd like one, ask your admin.
                 </Text>
               </VStack>
-            ) : null}
+            )}
           </SectionCard>
         )}
       </VStack>
@@ -425,6 +426,12 @@ function Field({ label, value, hint }: { label: string; value: React.ReactNode; 
   );
 }
 
+function osIcon(os: PersonalApiKeyRow["os"]) {
+  if (os === "macOS" || os === "Windows") return Laptop;
+  if (os === "Linux") return Monitor;
+  return Server;
+}
+
 function ApiKeyRow({
   apiKey,
   isPendingRevoke,
@@ -440,12 +447,7 @@ function ApiKeyRow({
   onCancelRevoke: () => void;
   onConfirmRevoke: () => void;
 }) {
-  const Icon =
-    apiKey.os === "macOS" || apiKey.os === "Windows"
-      ? Laptop
-      : apiKey.os === "Linux"
-        ? Monitor
-        : Server;
+  const Icon = osIcon(apiKey.os);
 
   return (
     <VStack

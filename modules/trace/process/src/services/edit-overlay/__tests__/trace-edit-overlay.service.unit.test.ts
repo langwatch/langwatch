@@ -7,11 +7,11 @@ import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
  */
 import { describe, expect, it, vi } from "vitest";
 
-import type {
-  TraceEditOverlayRepository,
-  TraceEditOverlayRow,
-} from "../../../repositories/trace-edit-overlay.repository.ts";
-import { TraceEditOverlayService } from "../../trace-edit-overlay.service.ts";
+import type { TraceEditOverlayRow } from "../../../repositories/trace-edit-overlay.repository.ts";
+import {
+  TraceEditOverlayService,
+  type TraceEditRemoval,
+} from "../../trace-edit-overlay.service.ts";
 
 const row = (patch: unknown): TraceEditOverlayRow =>
   ({
@@ -35,7 +35,7 @@ const buildService = (stored: unknown) => {
     findAllByProjectAndTraces: vi.fn(async () => (stored ? [row(stored)] : [])),
     upsert,
     delete: deleteRow,
-  } as unknown as TraceEditOverlayRepository;
+  };
 
   return {
     service: TraceEditOverlayService.create(repository),
@@ -43,6 +43,13 @@ const buildService = (stored: unknown) => {
     upsert,
     deleteRow,
   };
+};
+
+const updatedPatch = (removal: TraceEditRemoval): TraceEditOverlayPatch => {
+  if (removal.outcome !== "updated") {
+    throw new Error(`expected the correction to remain, got ${removal.outcome}`);
+  }
+  return removal.overlay.patch;
 };
 
 const removeOutput = (service: TraceEditOverlayService) =>
@@ -148,7 +155,7 @@ describe("TraceEditOverlayService", () => {
 
         const remaining = await removeInput(service);
 
-        expect(remaining?.patch.trace).toEqual({
+        expect(updatedPatch(remaining).trace).toEqual({
           output: { value: "the right answer" },
         });
         expect(deleteRow).not.toHaveBeenCalled();
@@ -185,7 +192,7 @@ describe("TraceEditOverlayService", () => {
           trace: { input: { value: "the real question" } },
         });
 
-        expect(await removeInput(service)).toBeNull();
+        expect(await removeInput(service)).toEqual({ outcome: "cleared" });
         expect(deleteRow).toHaveBeenCalledTimes(1);
         expect(upsert).not.toHaveBeenCalled();
       });
@@ -198,7 +205,7 @@ describe("TraceEditOverlayService", () => {
           trace: { output: { value: "the right answer" } },
         });
 
-        expect(await removeInput(service)).toBeNull();
+        expect(await removeInput(service)).toEqual({ outcome: "absent" });
         expect(deleteRow).not.toHaveBeenCalled();
         expect(upsert).not.toHaveBeenCalled();
       });
@@ -258,7 +265,7 @@ describe("TraceEditOverlayService", () => {
           trace: { output: { value: "the right answer" } },
         });
 
-        expect(await removeOutput(service)).toBeNull();
+        expect(await removeOutput(service)).toEqual({ outcome: "cleared" });
         expect(deleteRow).toHaveBeenCalledTimes(1);
         expect(upsert).not.toHaveBeenCalled();
       });
@@ -280,7 +287,7 @@ describe("TraceEditOverlayService", () => {
 
         const remaining = await removeOutput(service);
 
-        expect(remaining?.patch.trace).toEqual({
+        expect(updatedPatch(remaining).trace).toEqual({
           input: { value: "the real question" },
         });
         expect(deleteRow).not.toHaveBeenCalled();
@@ -315,7 +322,7 @@ describe("TraceEditOverlayService", () => {
 
         const remaining = await removeOutput(service);
 
-        expect(remaining?.patch.trace).toEqual({
+        expect(updatedPatch(remaining).trace).toEqual({
           metadata: { labels: ["reviewed"] },
         });
         expect(deleteRow).not.toHaveBeenCalled();
@@ -347,9 +354,9 @@ describe("TraceEditOverlayService", () => {
 
         const remaining = await removeOutput(service);
 
-        expect(remaining?.patch.trace).toBeUndefined();
-        expect(remaining?.patch.spans).toEqual([{ spanId: "span-1", name: "cleaned up" }]);
-        expect(remaining?.patch.deletedSpanIds).toEqual(["span-noise"]);
+        expect(updatedPatch(remaining).trace).toBeUndefined();
+        expect(updatedPatch(remaining).spans).toEqual([{ spanId: "span-1", name: "cleaned up" }]);
+        expect(updatedPatch(remaining).deletedSpanIds).toEqual(["span-noise"]);
         expect(deleteRow).not.toHaveBeenCalled();
         expect(upsert).toHaveBeenCalledWith({
           projectId: "project-1",
@@ -370,7 +377,7 @@ describe("TraceEditOverlayService", () => {
       it("writes nothing when the trace has no correction", async () => {
         const { service, deleteRow, upsert } = buildService(null);
 
-        expect(await removeOutput(service)).toBeNull();
+        expect(await removeOutput(service)).toEqual({ outcome: "absent" });
         expect(deleteRow).not.toHaveBeenCalled();
         expect(upsert).not.toHaveBeenCalled();
       });
@@ -382,7 +389,7 @@ describe("TraceEditOverlayService", () => {
           deletedSpanIds: [],
         });
 
-        expect(await removeOutput(service)).toBeNull();
+        expect(await removeOutput(service)).toEqual({ outcome: "absent" });
         expect(deleteRow).not.toHaveBeenCalled();
         expect(upsert).not.toHaveBeenCalled();
       });
@@ -514,7 +521,7 @@ describe("TraceEditOverlayService", () => {
           userId: "user-2",
         });
 
-        expect(remaining?.patch.spans).toEqual([{ spanId: "span-1", name: "cleaned up" }]);
+        expect(updatedPatch(remaining).spans).toEqual([{ spanId: "span-1", name: "cleaned up" }]);
         expect(deleteRow).not.toHaveBeenCalled();
       });
 
@@ -539,7 +546,7 @@ describe("TraceEditOverlayService", () => {
           userId: "user-2",
         });
 
-        expect(remaining?.patch.spans).toEqual([{ spanId: "span-2", name: "cleaned up" }]);
+        expect(updatedPatch(remaining).spans).toEqual([{ spanId: "span-2", name: "cleaned up" }]);
       });
 
       it("returns the trace to uncorrected when the field was the whole correction", async () => {
@@ -562,7 +569,7 @@ describe("TraceEditOverlayService", () => {
             field: "output",
             userId: "user-2",
           }),
-        ).toBeNull();
+        ).toEqual({ outcome: "cleared" });
         expect(deleteRow).toHaveBeenCalledTimes(1);
         expect(upsert).not.toHaveBeenCalled();
       });
@@ -588,10 +595,10 @@ describe("TraceEditOverlayService", () => {
           userId: "user-2",
         });
 
-        expect(remaining?.patch.trace).toEqual({
+        expect(updatedPatch(remaining).trace).toEqual({
           output: { value: "corrected in the drawer" },
         });
-        expect(remaining?.patch.spans).toEqual([]);
+        expect(updatedPatch(remaining).spans).toEqual([]);
       });
     });
 
@@ -607,7 +614,7 @@ describe("TraceEditOverlayService", () => {
             field: "input",
             userId: "user-2",
           }),
-        ).toBeNull();
+        ).toEqual({ outcome: "absent" });
         expect(deleteRow).not.toHaveBeenCalled();
         expect(upsert).not.toHaveBeenCalled();
       });
@@ -623,7 +630,7 @@ describe("TraceEditOverlayService", () => {
             field: "output",
             userId: "user-2",
           }),
-        ).toBeNull();
+        ).toEqual({ outcome: "absent" });
         expect(deleteRow).not.toHaveBeenCalled();
         expect(upsert).not.toHaveBeenCalled();
       });
@@ -724,9 +731,10 @@ describe("TraceEditOverlayService", () => {
       );
       const repository = {
         findByProjectAndTrace: vi.fn(async () => null),
+        findAllByProjectAndTraces: vi.fn(async () => []),
         upsert,
-        delete: vi.fn(),
-      } as unknown as TraceEditOverlayRepository;
+        delete: vi.fn(async () => undefined),
+      };
       const service = TraceEditOverlayService.create(repository);
 
       await service.upsert({
@@ -800,7 +808,9 @@ describe("TraceEditOverlayService", () => {
       const repository = {
         findAllByProjectAndTraces,
         findByProjectAndTrace: vi.fn(async () => null),
-      } as unknown as TraceEditOverlayRepository;
+        upsert: vi.fn(async ({ patch }: { patch: TraceEditOverlayPatch }) => row(patch)),
+        delete: vi.fn(async () => undefined),
+      };
       const service = TraceEditOverlayService.create(repository);
 
       const patches = await service.getPatchesByTraceIds({

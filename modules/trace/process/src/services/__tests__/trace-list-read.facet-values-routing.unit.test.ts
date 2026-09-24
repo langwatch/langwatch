@@ -4,23 +4,19 @@
  * span.attribute) to their respective stores.
  */
 
-import type { TraceListRead } from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MemoryNullTraceListRepository } from "../../repositories/memory/memory.null-trace-list.repository.ts";
 import { TraceListService } from "../trace-list-read.service.ts";
 
 const emptyResult = { values: [], totalDistinct: 0 };
 
 function makeService() {
-  const repository = {
+  const repository = Object.assign(MemoryNullTraceListRepository.create(), {
     findAttributeValues: vi.fn().mockResolvedValue(emptyResult),
     findEventAttributeValues: vi.fn().mockResolvedValue(emptyResult),
     findSpanAttributeValues: vi.fn().mockResolvedValue(emptyResult),
-  } as unknown as TraceListRead & {
-    findAttributeValues: ReturnType<typeof vi.fn>;
-    findEventAttributeValues: ReturnType<typeof vi.fn>;
-    findSpanAttributeValues: ReturnType<typeof vi.fn>;
-  };
+  });
   const service = TraceListService.create({
     repository,
     evaluations: undefined as never,

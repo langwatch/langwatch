@@ -22,12 +22,11 @@ const CONVERSATION = "conv-1";
 const TURN = "turn-1";
 const RUN_TOKEN = "rt-super-secret-never-show-the-client";
 
-function event(
-  typeKey: keyof typeof LANGY_CONVERSATION_EVENT_TYPES,
-  version: string,
-  data: Record<string, unknown>,
-  occurredAt: number,
-): LangyConversationProcessingEvent {
+type EventBody<E = LangyConversationProcessingEvent> = E extends LangyConversationProcessingEvent
+  ? Pick<E, "type" | "version" | "data">
+  : never;
+
+function event(body: EventBody, occurredAt: number): LangyConversationProcessingEvent {
   return {
     id: `event-${occurredAt}`,
     aggregateId: CONVERSATION,
@@ -35,10 +34,8 @@ function event(
     tenantId: TENANT,
     createdAt: occurredAt,
     occurredAt,
-    type: LANGY_CONVERSATION_EVENT_TYPES[typeKey],
-    version,
-    data: { conversationId: CONVERSATION, ...data },
-  } as unknown as LangyConversationProcessingEvent;
+    ...body,
+  };
 }
 
 const stateStore: StateProjectionStore<LangyConversationStateData> = {
@@ -55,9 +52,11 @@ const hasRunTokenKey = (o: object) => Object.keys(o).some((k) => /run.?token/i.t
 describe("runToken projection exclusion", () => {
   describe("given a conversation created with a runToken", () => {
     const startedEvent = event(
-      "CONVERSATION_STARTED",
-      LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_STARTED,
-      { userId: "alice", runToken: RUN_TOKEN },
+      {
+        type: LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED,
+        version: LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_STARTED,
+        data: { conversationId: CONVERSATION, userId: "alice", runToken: RUN_TOKEN },
+      },
       1000,
     );
 
@@ -79,21 +78,26 @@ describe("runToken projection exclusion", () => {
       // serialised doc so a future leak (a stray field, a spread of state) fails.
       for (const e of [
         event(
-          "AGENT_TURN_ACCEPTED",
-          LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_ACCEPTED,
-          { turnId: TURN },
+          {
+            type: LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED,
+            version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_ACCEPTED,
+            data: { conversationId: CONVERSATION, turnId: TURN },
+          },
           2000,
         ),
         event(
-          "AGENT_RESPONDED",
-          LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
           {
-            turnId: TURN,
-            messageId: "m1",
-            role: "assistant",
-            parts: [{ type: "text", text: "hi" }],
-            outcome: "completed",
-            error: null,
+            type: LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED,
+            version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
+            data: {
+              conversationId: CONVERSATION,
+              turnId: TURN,
+              messageId: "m1",
+              role: "assistant",
+              parts: [{ type: "text", text: "hi" }],
+              outcome: "completed",
+              error: null,
+            },
           },
           3000,
         ),

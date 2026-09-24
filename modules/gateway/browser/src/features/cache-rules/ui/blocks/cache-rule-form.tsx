@@ -86,14 +86,13 @@ export function validateForm(state: CacheRuleFormState): CacheRuleFormComplaint 
       message: "Request metadata needs both a key and a value",
     };
   }
-  if (
-    !state.matchVkId &&
-    !state.matchVkPrefix &&
-    !state.matchVkTagsCsv.trim() &&
-    !state.matchPrincipalId &&
-    !state.matchModel &&
-    !state.matchMetadataKey
-  ) {
+  const matchesByKey = Boolean(
+    state.matchVkId || state.matchVkPrefix || state.matchVkTagsCsv.trim(),
+  );
+  const matchesByRequest = Boolean(
+    state.matchPrincipalId || state.matchModel || state.matchMetadataKey,
+  );
+  if (!matchesByKey && !matchesByRequest) {
     return {
       // About the matcher block as a whole — no one input is at fault.
       field: null,

@@ -12,7 +12,9 @@ export function parseBase64DataUri(uri: string): { mimeType: string; base64: str
   return { mimeType, base64: uri.slice(commaIdx + 1) };
 }
 
-export function openAiFilePayloadToBinaryPart(file: Record<string, unknown>): BinaryPart | null {
+export function decodeOpenAiFilePayloadToBinaryPart(
+  file: Record<string, unknown>,
+): BinaryPart | null {
   const fileData = typeof file.file_data === "string" ? file.file_data : undefined;
   if (!fileData) return null;
   const filename = typeof file.filename === "string" ? file.filename : undefined;
@@ -71,7 +73,7 @@ function mimeTypeFromFilename(filename: string | undefined): string {
   }
 }
 
-export function mediaTypeToAudioFormat(mediaType: string): string | undefined {
+export function mapMediaTypeToAudioFormat(mediaType: string): string | undefined {
   switch (mediaType.toLowerCase()) {
     case "audio/wav":
     case "audio/x-wav":

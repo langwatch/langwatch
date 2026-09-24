@@ -589,6 +589,17 @@ export function formatReportRowLine(row: ReportTraceRow): string {
   return row.input ? `${row.traceId} — ${row.input}` : row.traceId;
 }
 
+function exampleChartTitles(sourceKind: ReportSourceKind): string[] {
+  if (sourceKind === "dashboard") return ["Traces per hour", "Cost by model"];
+  return ["Traces per hour"];
+}
+
+function exampleSourceLabel(sourceKind: ReportSourceKind): string {
+  if (sourceKind === "traceQuery") return "Top 5 matching traces";
+  if (sourceKind === "dashboard") return "Dashboard";
+  return "Custom graph";
+}
+
 /**
  * Example report context for the drawer's preview and unknown-variable check —
  * without it, a preview renders against the TRACE context and every variable
@@ -655,11 +666,7 @@ export function buildExampleReportTemplateContext({
       : [];
 
   const titles =
-    chartTitles && chartTitles.length > 0
-      ? chartTitles
-      : sourceKind === "dashboard"
-        ? ["Traces per hour", "Cost by model"]
-        : ["Traces per hour"];
+    chartTitles && chartTitles.length > 0 ? chartTitles : exampleChartTitles(sourceKind);
   const exampleCharts: ReportChart[] =
     sourceKind === "traceQuery"
       ? []
@@ -693,13 +700,7 @@ export function buildExampleReportTemplateContext({
     },
     report: {
       sourceKind,
-      sourceLabel:
-        sourceLabel ??
-        (sourceKind === "traceQuery"
-          ? "Top 5 matching traces"
-          : sourceKind === "dashboard"
-            ? "Dashboard"
-            : "Custom graph"),
+      sourceLabel: sourceLabel ?? exampleSourceLabel(sourceKind),
       scheduleLabel: scheduleLabel ?? "every Monday at 09:00 (UTC)",
     },
     viewUrl:

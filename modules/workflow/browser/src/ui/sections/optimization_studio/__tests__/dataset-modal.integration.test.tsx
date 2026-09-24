@@ -101,18 +101,20 @@ import type * as reactModule from "@xyflow/react";
 import { _useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import { DatasetModal } from "../dataset-modal.tsx";
 
+const ENTRY_DATA: Entry = {
+  name: "Entry point",
+  entry_selection: "first",
+  train_size: 0.8,
+  test_size: 0.2,
+  seed: 42,
+  outputs: [],
+};
+
 const ENTRY_NODE = {
   id: "entry",
   type: "entry",
   position: { x: 0, y: 0 },
-  data: {
-    name: "Entry point",
-    entry_selection: "first",
-    train_size: 0.8,
-    test_size: 0.2,
-    seed: 42,
-    outputs: [],
-  } as unknown as Entry,
+  data: ENTRY_DATA,
 };
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

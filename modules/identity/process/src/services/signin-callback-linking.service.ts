@@ -1,5 +1,5 @@
 import {
-  identifierDomain,
+  extractIdentifierDomain,
   type IdentifierProvider,
   type LinkProposalReason,
   normalizeIdentifierValue,
@@ -231,7 +231,7 @@ export class SignInCallbackLinkingService {
     }
 
     const vouched = assertion.email
-      ? identifierDomain(normalizeIdentifierValue(assertion.email))
+      ? extractIdentifierDomain(normalizeIdentifierValue(assertion.email))
       : null;
     const unvouched = target.identifierDomains.filter((domain) => domain !== vouched);
 
@@ -252,7 +252,7 @@ export class SignInCallbackLinkingService {
       connectionId: assertion.connectionId,
       provider: assertion.provider,
       subject: assertion.subject,
-      domain: identifierDomain(normalizedEmail),
+      domain: extractIdentifierDomain(normalizedEmail),
     };
     this.audit.linkAttempted(record);
     await this.directory.linkProviderAccount({

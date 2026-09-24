@@ -20,12 +20,16 @@ const envExampleLines: string[] = readFileSync(ENV_EXAMPLE_PATH, "utf-8").split(
  * Returns the value part (RHS) for the first line matching `^KEY=(.*)$`.
  * Returns null if the key is not found.
  */
+function isWrappedIn(raw: string, quote: string): boolean {
+  return raw.startsWith(quote) && raw.endsWith(quote);
+}
+
 function getSentinelValue(key: string): string | null {
   const prefix = `${key}=`;
   const line = envExampleLines.find((l) => l.startsWith(prefix));
   if (line === undefined) return null;
   const raw = line.slice(prefix.length).trim();
-  if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
+  if (isWrappedIn(raw, '"') || isWrappedIn(raw, "'")) {
     return raw.slice(1, -1).trim();
   }
   return raw;

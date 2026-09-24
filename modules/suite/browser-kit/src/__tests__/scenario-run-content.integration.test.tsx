@@ -19,9 +19,9 @@ vi.mock("../ui/elements/runs/scenario-grid-card.tsx", () => ({
     scenarioRun: { scenarioRunId: string; name: string };
     onClick: () => void;
   }) => (
-    <div data-testid={`grid-card-${scenarioRun.scenarioRunId}`} onClick={onClick}>
+    <button type="button" data-testid={`grid-card-${scenarioRun.scenarioRunId}`} onClick={onClick}>
       {scenarioRun.name}
-    </div>
+    </button>
   ),
 }));
 
@@ -33,9 +33,9 @@ vi.mock("../ui/elements/runs/scenario-target-row.tsx", () => ({
     scenarioRun: { scenarioRunId: string; name: string };
     onClick: () => void;
   }) => (
-    <div data-testid={`list-row-${scenarioRun.scenarioRunId}`} onClick={onClick}>
+    <button type="button" data-testid={`list-row-${scenarioRun.scenarioRunId}`} onClick={onClick}>
       {scenarioRun.name}
-    </div>
+    </button>
   ),
 }));
 

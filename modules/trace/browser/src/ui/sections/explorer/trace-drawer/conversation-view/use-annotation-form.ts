@@ -47,6 +47,37 @@ function saveCallbacks({
   };
 }
 
+function annotationPayload({
+  projectId,
+  traceId,
+  mode,
+  values,
+}: {
+  projectId: string;
+  traceId: string;
+  mode: AnnotationMode;
+  values: AnnotationDraftValues;
+}) {
+  return {
+    projectId,
+    traceId,
+    comment: values.comment,
+    scoreOptions: stripUnratedScores(values.scoreOptions),
+    // Rating a turn says nothing about its suggested output, so the field is
+    // left out rather than sent empty, which would withdraw the suggestion.
+    expectedOutput: mode === "suggest" ? values.expectedOutput : undefined,
+  };
+}
+
+function recordCreatedAnnotation(traceId: string): void {
+  useAnnotationSessionStore.getState().recordSaved();
+  // Annotating a turn is what a sitting at the queue is for, so the
+  // trace it was left on is counted into that sitting by the act of
+  // annotating it.
+  const queueSession = useAnnotationQueueSessionStore.getState();
+  if (queueSession.active) queueSession.noteAnnotationSaved(traceId);
+}
+
 /**
  * Reads and writes for one turn's annotation: the annotation being edited, the
  * project's active score keys, and the create / update / delete calls with their toasts
@@ -98,15 +129,7 @@ export function useAnnotationMutations({
 
   const save = (values: AnnotationDraftValues) => {
     if (!project?.id || isSaveBlocked) return;
-    const payload = {
-      projectId: project.id,
-      traceId,
-      comment: values.comment,
-      scoreOptions: stripUnratedScores(values.scoreOptions),
-      // Rating a turn says nothing about its suggested output, so the field is
-      // left out rather than sent empty, which would withdraw the suggestion.
-      expectedOutput: mode === "suggest" ? values.expectedOutput : undefined,
-    };
+    const payload = annotationPayload({ projectId: project.id, traceId, mode, values });
     const { onSuccess, onError } = saveCallbacks({
       isEdit,
       invalidateTraceReads,
@@ -122,12 +145,7 @@ export function useAnnotationMutations({
         { ...payload, anchorKind, anchorId, anchorPath },
         {
           onSuccess: () => {
-            useAnnotationSessionStore.getState().recordSaved();
-            // Annotating a turn is what a sitting at the queue is for, so the
-            // trace it was left on is counted into that sitting by the act of
-            // annotating it.
-            const queueSession = useAnnotationQueueSessionStore.getState();
-            if (queueSession.active) queueSession.noteAnnotationSaved(traceId);
+            recordCreatedAnnotation(traceId);
             onSuccess();
           },
           onError,

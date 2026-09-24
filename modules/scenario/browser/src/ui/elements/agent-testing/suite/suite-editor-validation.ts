@@ -41,11 +41,10 @@ function fieldRowRefusal({ row, seen }: { row: SuiteFieldRow; seen: Set<string> 
     type: row.type,
   });
   const issues = parsed.success ? [] : parsed.error.issues;
-  const error = issues[0]
-    ? issues[0].message
-    : seen.has(identifier)
-      ? SUITE_FIELD_IDENTIFIER_DUPLICATE_MESSAGE
-      : undefined;
+  const duplicateError = seen.has(identifier)
+    ? SUITE_FIELD_IDENTIFIER_DUPLICATE_MESSAGE
+    : undefined;
+  const error = issues[0] ? issues[0].message : duplicateError;
   seen.add(identifier);
   return { ...row, error };
 }

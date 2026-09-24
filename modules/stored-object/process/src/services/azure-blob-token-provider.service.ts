@@ -39,7 +39,7 @@ const tokenCache = new Map<string, CacheEntry>();
  */
 const AADSTS_CODE = /\bAADSTS\d{4,6}\b/;
 
-function aadstsCodeOf(error: unknown): string | undefined {
+function extractAadstsCode(error: unknown): string | undefined {
   if (!(error instanceof Error)) return undefined;
   return AADSTS_CODE.exec(error.message)?.[0];
 }
@@ -118,7 +118,7 @@ async function exchangeToken(credentials: TokenModeCredentials): Promise<Exchang
     // one thing that tells an operator which knob is wrong.
     throw new AzureTokenExchangeError(
       error instanceof Error ? error.name : undefined,
-      aadstsCodeOf(error),
+      extractAadstsCode(error),
     );
   }
   if (!accessToken) {
@@ -131,9 +131,6 @@ async function exchangeToken(credentials: TokenModeCredentials): Promise<Exchang
 }
 
 function startExchange(key: string, credentials: TokenModeCredentials): CacheEntry {
-  const entry: CacheEntry = {
-    promise: undefined as unknown as Promise<ExchangeResult>,
-  };
   const promise = exchangeToken(credentials).then((result) => {
     // Only record the resolved expiry if we're still the active entry for
     // this key — a later refresh may already have replaced us.
@@ -142,7 +139,7 @@ function startExchange(key: string, credentials: TokenModeCredentials): CacheEnt
     }
     return result;
   });
-  entry.promise = promise;
+  const entry: CacheEntry = { promise };
   // Clear the cache on failure so the NEXT call retries instead of
   // replaying a cached rejection forever.
   promise.catch(() => {

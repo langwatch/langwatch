@@ -105,29 +105,49 @@ export function PullRequestDetailDrawer({
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
-          {detailQuery.isLoading ? (
-            <VStack align="stretch" gap={4}>
-              <Skeleton height="72px" borderRadius="md" />
-              <Skeleton height="160px" borderRadius="md" />
-              <Skeleton height="160px" borderRadius="md" />
-            </VStack>
-          ) : detailQuery.isError || !detail ? (
-            <Text fontSize="sm" color="fg.error">
-              Couldn&apos;t load this pull request
-            </Text>
-          ) : (
-            <VStack align="stretch" gap={6}>
-              <SummaryRow detail={detail} />
-              <ContributorsSection contributors={detail.contributors} />
-              <ModelsSection models={detail.modelBreakdown} />
-              <SessionsSection projectId={projectId} sessions={detail.sessions} />
-            </VStack>
-          )}
+          <PullRequestDetailBody
+            isLoading={detailQuery.isLoading}
+            isError={detailQuery.isError}
+            detail={detail}
+            projectId={projectId}
+          />
         </Drawer.Body>
       </Drawer.Content>
     </Drawer.Root>
   );
 }
+
+const PullRequestDetailBody: React.FC<{
+  isLoading: boolean;
+  isError: boolean;
+  detail: DetailPayload | undefined;
+  projectId: string;
+}> = ({ isLoading, isError, detail, projectId }) => {
+  if (isLoading) {
+    return (
+      <VStack align="stretch" gap={4}>
+        <Skeleton height="72px" borderRadius="md" />
+        <Skeleton height="160px" borderRadius="md" />
+        <Skeleton height="160px" borderRadius="md" />
+      </VStack>
+    );
+  }
+  if (isError || !detail) {
+    return (
+      <Text fontSize="sm" color="fg.error">
+        Couldn&apos;t load this pull request
+      </Text>
+    );
+  }
+  return (
+    <VStack align="stretch" gap={6}>
+      <SummaryRow detail={detail} />
+      <ContributorsSection contributors={detail.contributors} />
+      <ModelsSection models={detail.modelBreakdown} />
+      <SessionsSection projectId={projectId} sessions={detail.sessions} />
+    </VStack>
+  );
+};
 
 const Stat: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <VStack align="start" gap={0} flex={1} minWidth="120px">
@@ -137,6 +157,46 @@ const Stat: React.FC<{ label: string; children: React.ReactNode }> = ({ label, c
     {children}
   </VStack>
 );
+
+const TokenCostValue: React.FC<{
+  totals: DetailPayload["totals"];
+  nonBilled: number;
+  isBundled: boolean;
+}> = ({ totals, nonBilled, isBundled }) => {
+  if (totals.costUsd === null) {
+    return (
+      <Text fontSize="lg" fontWeight="medium" color="fg.subtle">
+        {MISSING_VALUE}
+      </Text>
+    );
+  }
+  if (!isBundled) {
+    return (
+      <Text fontSize="lg" fontWeight="medium">
+        {formatCost(totals.costUsd)}
+      </Text>
+    );
+  }
+  // Bundled money is the same list price as any other, so it reads
+  // the same and explains itself on hover instead.
+  return (
+    <Tooltip
+      content={
+        <CostBreakdownTooltipContent
+          isBundled
+          billedCost={totals.billedCostUsd ?? 0}
+          nonBilledCost={nonBilled}
+          grandCost={totals.costUsd}
+        />
+      }
+    >
+      {/* The split lives only in the hover, so it gets a tab stop. */}
+      <Text fontSize="lg" fontWeight="medium" cursor="help" tabIndex={0}>
+        {formatCost(totals.costUsd)}
+      </Text>
+    </Tooltip>
+  );
+};
 
 const SummaryRow: React.FC<{ detail: DetailPayload }> = ({ detail }) => {
   const totals = detail.totals;
@@ -157,33 +217,7 @@ const SummaryRow: React.FC<{ detail: DetailPayload }> = ({ detail }) => {
           </Text>
         </Stat>
         <Stat label="Token cost">
-          {totals.costUsd === null ? (
-            <Text fontSize="lg" fontWeight="medium" color="fg.subtle">
-              {MISSING_VALUE}
-            </Text>
-          ) : isBundled ? (
-            // Bundled money is the same list price as any other, so it reads
-            // the same and explains itself on hover instead.
-            <Tooltip
-              content={
-                <CostBreakdownTooltipContent
-                  isBundled
-                  billedCost={totals.billedCostUsd ?? 0}
-                  nonBilledCost={nonBilled}
-                  grandCost={totals.costUsd}
-                />
-              }
-            >
-              {/* The split lives only in the hover, so it gets a tab stop. */}
-              <Text fontSize="lg" fontWeight="medium" cursor="help" tabIndex={0}>
-                {formatCost(totals.costUsd)}
-              </Text>
-            </Tooltip>
-          ) : (
-            <Text fontSize="lg" fontWeight="medium">
-              {formatCost(totals.costUsd)}
-            </Text>
-          )}
+          <TokenCostValue totals={totals} nonBilled={nonBilled} isBundled={isBundled} />
         </Stat>
         <Stat label="Opened">
           <Text fontSize="lg" fontWeight="medium">

@@ -13,6 +13,29 @@ import {
   type LoadedWorkflow,
 } from "./experiment-execution-data.service.ts";
 
+/** A loaded agent, with the Studio workflow it wraps when it is a workflow-type agent. */
+function loadedDataForAgent({
+  agent,
+  loadedWorkflows,
+}: {
+  agent: TypedAgent;
+  loadedWorkflows?: Map<string, LoadedWorkflow>;
+}): { agent: TypedAgent; workflow?: LoadedWorkflow } {
+  if (agent.type !== "workflow") return { agent };
+  // A workflow-type agent has no code of its own — it wraps a Studio
+  // workflow, resolved by dataLoader and cached under the linked
+  // workflow's id (see loadPublishedWorkflow).
+  const linkedWorkflowId =
+    agent.workflowId ?? (agent.config as { workflow_id?: string }).workflow_id;
+  const workflow = linkedWorkflowId
+    ? loadedWorkflows?.get(
+        ExperimentExecutionDataService.workflowLoadKey({ workflowId: linkedWorkflowId }),
+      )
+    : undefined;
+
+  return { agent, workflow };
+}
+
 export class ExperimentTargetDataService {
   private constructor() {}
 
@@ -46,22 +69,7 @@ export class ExperimentTargetDataService {
     if (targetConfig.type === "agent" && targetConfig.dbAgentId) {
       const agent = loadedAgents.get(targetConfig.dbAgentId);
       if (agent) {
-        // A workflow-type agent has no code of its own — it wraps a Studio
-        // workflow, resolved by dataLoader and cached under the linked
-        // workflow's id (see loadPublishedWorkflow).
-        if (agent.type === "workflow") {
-          const linkedWorkflowId =
-            agent.workflowId ?? (agent.config as { workflow_id?: string }).workflow_id;
-          const workflow = linkedWorkflowId
-            ? loadedWorkflows?.get(
-                ExperimentExecutionDataService.workflowLoadKey({ workflowId: linkedWorkflowId }),
-              )
-            : undefined;
-
-          return { agent, workflow };
-        }
-
-        return { agent };
+        return loadedDataForAgent({ agent, loadedWorkflows });
       }
     }
 

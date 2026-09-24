@@ -38,14 +38,19 @@ interface SeenCall {
   acceptHeader: string | undefined;
 }
 
+function requestUrl(input: Parameters<typeof fetch>[0]): string {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.toString();
+  return input.url;
+}
+
 function spyFetch(response: Response): {
   fetchImpl: typeof fetch;
   seen: SeenCall[];
 } {
   const seen: SeenCall[] = [];
   const fetchImpl: typeof fetch = async (input, init) => {
-    const url =
-      typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    const url = requestUrl(input);
     const headers = (init?.headers ?? {}) as Record<string, string>;
     seen.push({
       url,
@@ -455,8 +460,7 @@ describe("cli-api — request shape", () => {
     } => {
       const seen: SeenCall[] = [];
       const fetchImpl: typeof fetch = async (input, init) => {
-        const url =
-          typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+        const url = requestUrl(input);
         const headers = (init?.headers ?? {}) as Record<string, string>;
         seen.push({
           url,

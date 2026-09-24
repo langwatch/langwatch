@@ -4,8 +4,9 @@ import type { StudioServerEvent } from "@langwatch/workflow-contract";
  */
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { create } from "zustand";
 
-import type { WorkflowStore } from "../../../../behavior/workflow-store.ts";
+import { store, type WorkflowStore } from "../../../../behavior/workflow-store.ts";
 
 const { toastCreate } = vi.hoisted(() => ({ toastCreate: vi.fn() }));
 
@@ -65,6 +66,7 @@ function handleErroredExecution(
 
 function createMockStore(overrides: Partial<WorkflowStore> = {}): WorkflowStore {
   return {
+    ...create<WorkflowStore>()(store).getState(),
     setSocketStatus: vi.fn(),
     getWorkflow: vi.fn().mockReturnValue({
       state: { execution: {} },
@@ -81,7 +83,7 @@ function createMockStore(overrides: Partial<WorkflowStore> = {}): WorkflowStore 
     setSelectedNode: vi.fn(),
     setPropertiesExpanded: vi.fn(),
     ...overrides,
-  } as unknown as WorkflowStore;
+  };
 }
 
 describe("useHandleServerMessage", () => {
@@ -126,7 +128,7 @@ describe("useHandleServerMessage", () => {
           nodes: [],
           edges: [],
         }),
-      } as unknown as Partial<WorkflowStore>);
+      });
       const alertOnComponent = vi.fn();
 
       const { result } = renderHook(() =>
@@ -195,7 +197,7 @@ describe("useHandleServerMessage", () => {
             ],
             edges: [],
           }),
-        } as unknown as Partial<WorkflowStore>);
+        });
 
         const { result } = renderHook(() =>
           useHandleServerMessage({
@@ -225,7 +227,7 @@ describe("useHandleServerMessage", () => {
             nodes: [{ id: "end-node", data: {} }],
             edges: [],
           }),
-        } as unknown as Partial<WorkflowStore>);
+        });
 
         const { result } = renderHook(() =>
           useHandleServerMessage({

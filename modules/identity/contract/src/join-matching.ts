@@ -1,4 +1,4 @@
-import { identifierDomain, normalizeIdentifierValue } from "./identifier.ts";
+import { extractIdentifierDomain, normalizeIdentifierValue } from "./identifier.ts";
 
 /** Determines which organizations will accept an address for joining based on domain verification,
  * member status, and join settings. See ADR-117 D12 for the security model.
@@ -115,8 +115,8 @@ export function isPublicEmailDomain(domain: string): boolean {
  * does (NFKC fold, lowercase, trim, plus-tag stripped). Null when not
  * email-shaped.
  */
-export function joinDomainOf(email: string): string | null {
-  return identifierDomain(normalizeIdentifierValue(email));
+export function extractJoinDomain(email: string): string | null {
+  return extractIdentifierDomain(normalizeIdentifierValue(email));
 }
 
 /** One organization, as the matcher needs to see it. Everything here is a
@@ -210,7 +210,7 @@ export function resolveJoinLookup({
 }: JoinLookupInput): JoinLookupDecision {
   if (!verified) return { outcome: "none" };
 
-  const domain = joinDomainOf(email);
+  const domain = extractJoinDomain(email);
   if (!domain) return { outcome: "none" };
   if (isPublicEmailDomain(domain)) return { outcome: "none" };
 

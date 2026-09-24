@@ -180,7 +180,7 @@ const TRACE_METRIC_PREFIXES = [
   "traces.",
 ] as const;
 
-export function getMetricSource(metric: string): AnalyticsMetricSource | undefined {
+export function classifyMetricSource(metric: string): AnalyticsMetricSource | undefined {
   if (metric.startsWith("evaluations.")) return "evaluation";
 
   return TRACE_METRIC_PREFIXES.some((prefix) => metric.startsWith(prefix)) ? "trace" : void 0;

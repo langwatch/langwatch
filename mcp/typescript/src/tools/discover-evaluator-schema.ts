@@ -50,6 +50,19 @@ function formatEvaluatorOverview(): string {
   return lines.join("\n");
 }
 
+function settingsSection(settingsEntries: [string, unknown][]): string[] {
+  if (settingsEntries.length === 0) return [];
+  const lines = ["\n## Settings\n"];
+  for (const [key, setting] of settingsEntries) {
+    const s = setting as { description?: string; default: unknown };
+    const defaultStr = JSON.stringify(s.default);
+    const desc = s.description ? ` - ${s.description}` : "";
+    lines.push(`- **${key}**${desc}`);
+    lines.push(`  Default: \`${defaultStr}\``);
+  }
+  return lines;
+}
+
 /**
  * Returns the full schema for a specific evaluator type: settings, required/optional
  * fields, env vars, and result fields.
@@ -85,18 +98,8 @@ function formatEvaluatorDetail(evaluatorType: string): string {
     lines.push(`**Optional**: ${def.optionalFields.join(", ")}`);
   }
 
-  // Settings
   const settingsEntries = Object.entries(def.settings);
-  if (settingsEntries.length > 0) {
-    lines.push("\n## Settings\n");
-    for (const [key, setting] of settingsEntries) {
-      const s = setting as { description?: string; default: unknown };
-      const defaultStr = JSON.stringify(s.default);
-      const desc = s.description ? ` - ${s.description}` : "";
-      lines.push(`- **${key}**${desc}`);
-      lines.push(`  Default: \`${defaultStr}\``);
-    }
-  }
+  lines.push(...settingsSection(settingsEntries));
 
   // Env vars
   if (def.envVars.length > 0) {

@@ -10,11 +10,11 @@ export {
   FEATURE_FLAGS,
   listFeatureFlagFamilies,
   listFeatureFlags,
-  resolveFlagDefinition,
+  pickFlagDefinition,
 } from "./feature-flag.ts";
 export {
   deriveFeatureFlagEnvVarName,
-  resolveFeatureFlagEnvOverride,
+  parseFeatureFlagEnvOverride,
 } from "./feature-flag-environment.ts";
 export type { FeatureFlagConfig, FeatureFlagServerConfig } from "./feature-flag.config.ts";
 export { featureFlagConfig } from "./feature-flag.config.ts";
@@ -74,12 +74,12 @@ export {
   isWithinRolloutPercentage,
 } from "./feature-flag-bucketing.ts";
 export {
-  bucketingIdForTarget,
+  pickBucketingId,
   distinctIdForTarget,
   authenticatedFeatureFlagTargetInputSchema,
   anonymousFeatureFlagTargetSchema,
   featureFlagTargetInputSchema,
-  organizationIdForTarget,
+  pickTargetOrganizationId,
   projectIdForTarget,
   ruleContextForTarget,
   SYSTEM_DISTINCT_ID,

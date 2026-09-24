@@ -83,3 +83,27 @@ Groups: **identity** (identity, auth, authz, organization, user, api-key, projec
 - **Wires stay fixed.** `rest-route` path-parameter renames are safe; status/body changes are not.
 - **Cost.** No langwatch rule has an autofix. W0 and the file-move halves of W3 are where one change clears many;
   W4/W5 are one change per finding. Every lane stays on the model its manifest names.
+
+## Status 2026-09-24 02:30 — simple lint exhausted
+
+Whole-tree oxlint 7,673 → 5,561 (−2,112) in 118 simple lanes (S2-01a…S2-39b, `lane-opus-medium`, 70-call budget), each
+committed with `--only`. The planner now finds **0 simple lanes**. What remains is parked or belongs to the queued design lanes.
+
+| wave | lanes | fixed | parked |
+| --- | --- | --- | --- |
+| W1 correctness | 6 | 91 | 66 |
+| W3 shape and naming | 18 | 347 | 213 |
+| W4 test doubles | 41 | 796 | 654 |
+| W5 readability | 53 | 879 | 1,013 |
+
+Parked ledger: `.claude/handoffs/parked/lint-fix-S2-*.tsv` (≈2,000 rows, file · line · rule · reason) plus 109 class-parked rows
+(depth-bound complexity, one block carrying ≥60% of a score, eventing `any`). Largest decision groups: complexity needing a real
+restructure (~430), eventing/framework type erasure and public generics (~300), Prisma/ClickHouse/ioredis/Stripe client
+stand-ins that need shared doubles (~260), a11y element swaps that change look or keyboard behaviour (~170), classes with private
+members that need shared doubles (~150), new contract/row types (~100), the untyped browser tRPC client (~100), deliberately
+wrong-typed guard inputs (~80, need a ruling on how guard tests are written).
+
+Pre-existing defects found by lanes (not lint): SDK virtual-keys header spread drops array/`Headers` input; SDK still calls bare
+`/api` paths; graph-trigger retry re-dispatches (ADR-034 P1); `ScenarioRunData` lacks the `voice` target type its event schema
+allows; `mcp/typescript` has 15 tsc errors and no typecheck script; langyworker build fails on its own tsconfig (TS5096);
+`governance-cli.rest.ts` fails typecheck (14 errors); error-code registry drift (F8).

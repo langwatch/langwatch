@@ -8,9 +8,8 @@ const mockFollow = vi.fn();
 
 const { LangyTurnSettlementWaiterService } =
   await import("../langy-turn-settlement-waiter.service.ts");
-const tryAwaitTurnSettlement: typeof LangyTurnSettlementWaiterService.tryAwaitTurnSettlement = (
-  input,
-) => LangyTurnSettlementWaiterService.tryAwaitTurnSettlement(input);
+const awaitTurnSettlement: typeof LangyTurnSettlementWaiterService.awaitTurnSettlement = (input) =>
+  LangyTurnSettlementWaiterService.awaitTurnSettlement(input);
 
 const emptyPage = {
   events: [],
@@ -52,7 +51,7 @@ const args = {
   userId: "user-1",
 };
 
-describe("tryAwaitTurnSettlement", () => {
+describe("awaitTurnSettlement", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockReadTail.mockResolvedValue({ reads: [], lastId: "0" });
@@ -64,17 +63,15 @@ describe("tryAwaitTurnSettlement", () => {
       yield { id: "1-1", entry: { type: "end" } };
     });
 
-    const settlement = await tryAwaitTurnSettlement({
+    const settlement = await awaitTurnSettlement({
       ...args,
       signal: AbortSignal.timeout(5_000),
       pollIntervalMs: 5,
     });
 
     expect(settlement).toEqual({
-      succeeded: true,
-      outcome: "completed",
-      text: "from the fold",
-      error: null,
+      kind: "settled",
+      settlement: { succeeded: true, outcome: "completed", text: "from the fold", error: null },
     });
     expect(mockDisconnect).toHaveBeenCalled();
   });
@@ -86,13 +83,13 @@ describe("tryAwaitTurnSettlement", () => {
     });
     mockGetEventsAfter.mockResolvedValue(settledPage);
 
-    const settlement = await tryAwaitTurnSettlement({
+    const settlement = await awaitTurnSettlement({
       ...args,
       signal: AbortSignal.timeout(5_000),
       pollIntervalMs: 5,
     });
 
-    expect(settlement).toMatchObject({ succeeded: true });
+    expect(settlement).toMatchObject({ kind: "settled", settlement: { succeeded: true } });
   });
 
   it("returns null on abort without treating an ended follow as a terminal", async () => {
@@ -104,13 +101,13 @@ describe("tryAwaitTurnSettlement", () => {
       yield* [];
     });
 
-    const settlement = await tryAwaitTurnSettlement({
+    const settlement = await awaitTurnSettlement({
       ...args,
       signal: AbortSignal.timeout(50),
       pollIntervalMs: 5,
     });
 
-    expect(settlement).toBeNull();
+    expect(settlement).toEqual({ kind: "stopped" });
     expect(mockDisconnect).toHaveBeenCalled();
   });
 });

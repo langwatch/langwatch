@@ -348,6 +348,14 @@ function startBackground({
   };
 }
 
+function endLog({ log, done }: { log: fs.WriteStream; done: () => void }): void {
+  if (log.destroyed || log.writableEnded) {
+    done();
+    return;
+  }
+  log.end(done);
+}
+
 function startForeground({
   command,
   root,
@@ -399,13 +407,7 @@ function startForeground({
     // The log is closed before the result settles, so a caller that reads the
     // file the moment the command answers finds every line in it. A stream
     // that already failed is past closing, so the result settles at once.
-    const closeLog = (then: () => void) => {
-      if (log.destroyed || log.writableEnded) {
-        then();
-        return;
-      }
-      log.end(then);
-    };
+    const closeLog = (then: () => void) => endLog({ log, done: then });
 
     child.on("error", (error) => {
       clearTimeout(limit);

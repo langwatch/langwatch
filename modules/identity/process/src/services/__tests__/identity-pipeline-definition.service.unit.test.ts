@@ -3,6 +3,7 @@ import {
   emptyIdentityHeads,
   type IdentifierFact,
   type IdentityHeads,
+  IdentityIdentifierNotFoundError,
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
@@ -45,8 +46,8 @@ function fact(overrides: Partial<IdentifierFact>): IdentifierFact {
 class HeadsOf implements IdentityHeadsRepository {
   constructor(private readonly heads: IdentityHeads) {}
 
-  async tryFindUserHashKey() {
-    return "key_material";
+  async getUserHashKey() {
+    return { userHashKey: "key_material" };
   }
 
   /** Folded: these doubles hold no provisional newborn rows. */
@@ -58,16 +59,18 @@ class HeadsOf implements IdentityHeadsRepository {
     return this.heads;
   }
 
-  async tryFindActiveIdentifierByValue() {
-    return null;
+  async getActiveIdentifierByValue(): Promise<{ userId: string; identifierId: string }> {
+    throw new IdentityIdentifierNotFoundError("nobody holds it");
   }
 
-  async tryFindIdentifier({ identifierId }: { identifierId: string }) {
-    return this.heads.identifiers[identifierId] ?? null;
+  async getIdentifier({ identifierId }: { identifierId: string }) {
+    const fact = this.heads.identifiers[identifierId];
+    if (!fact) throw new IdentityIdentifierNotFoundError(`no identifier ${identifierId}`);
+    return fact;
   }
 
-  async tryFindIdentifierIdForAccount() {
-    return null;
+  async getIdentifierIdForAccount(): Promise<string> {
+    throw new IdentityIdentifierNotFoundError("no identifier mirrors it");
   }
 }
 
@@ -77,7 +80,7 @@ function command<T>(data: T): Command<T> {
     aggregateId: USER,
     type: "lw.identity.test",
     data,
-  } as unknown as Command<T>;
+  };
 }
 
 const held: IdentityHeads = {

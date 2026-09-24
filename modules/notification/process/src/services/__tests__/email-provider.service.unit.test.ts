@@ -24,7 +24,7 @@ describe("given a mailer configuration naming one provider", () => {
       ["smtp", configuration({ provider: "smtp", smtp: { host: "smtp.internal" } })],
       ["resend", configuration({ provider: "resend", resend: { apiKey: "re_test" } })],
     ])("selects the named %s gateway", (provider, input) => {
-      expect(EmailProviderService.create(input).tryResolveName()).toBe(provider);
+      expect(EmailProviderService.create(input).pickProviderName()).toBe(provider);
     });
 
     /** @scenario "The gateway named by the deployment is the one that sends" */
@@ -37,7 +37,7 @@ describe("given a mailer configuration naming one provider", () => {
             sendgrid: { apiKey: "SG.test" },
             smtp: { url: "smtp://localhost:1025" },
           }),
-        ).tryResolveName(),
+        ).pickProviderName(),
       ).toBe("smtp");
     });
 
@@ -49,12 +49,12 @@ describe("given a mailer configuration naming one provider", () => {
             ses: { enabled: true, region: "eu-central-1" },
             sendgrid: { apiKey: "SG.test" },
           }),
-        ).tryResolveName(),
+        ).pickProviderName(),
       ).toBe("ses");
       expect(
         EmailProviderService.create(
           configuration({ smtp: { host: "smtp.internal" }, resend: { apiKey: "re_test" } }),
-        ).tryResolveName(),
+        ).pickProviderName(),
       ).toBeNull();
     });
   });
@@ -65,7 +65,7 @@ describe("given a mailer configuration naming a provider whose credentials are a
     /** @scenario "A named but unusable gateway refuses instead of falling back" */
     it("refuses naming the setting the operator must supply", () => {
       expect(() =>
-        EmailProviderService.create(configuration({ provider: "resend" })).tryResolveName(),
+        EmailProviderService.create(configuration({ provider: "resend" })).pickProviderName(),
       ).toThrow(/RESEND_API_KEY/);
     });
 
@@ -74,14 +74,16 @@ describe("given a mailer configuration naming a provider whose credentials are a
       expect(() =>
         EmailProviderService.create(
           configuration({ provider: "resend", sendgrid: { apiKey: "SG.test" } }),
-        ).tryResolveName(),
+        ).pickProviderName(),
       ).toThrow(/did you mean EMAIL_PROVIDER=sendgrid/);
     });
 
     /** @scenario "A named but unusable gateway refuses instead of falling back" */
     it("rejects a name no gateway answers to", () => {
       expect(() =>
-        EmailProviderService.create(configuration({ provider: "carrier-pigeon" })).tryResolveName(),
+        EmailProviderService.create(
+          configuration({ provider: "carrier-pigeon" }),
+        ).pickProviderName(),
       ).toThrow(/ses, sendgrid, smtp, resend/);
     });
   });

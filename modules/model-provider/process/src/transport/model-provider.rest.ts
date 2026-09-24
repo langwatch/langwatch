@@ -82,7 +82,7 @@ export const modelProviderRest = defineRestRouter(ModelProviderApi)
       customModels: toCanonicalCustomModelList(data.customModels, "chat"),
       customEmbeddingsModels: toCanonicalCustomModelList(data.customEmbeddingsModels, "embedding"),
       extraHeaders: data.extraHeaders,
-      defaultModel: qualifiedDefaultModel({ provider, model: data.defaultModel }),
+      defaultModel: deriveQualifiedDefaultModel({ provider, model: data.defaultModel }),
     });
 
     const providers = await app.getForProject({ projectId: scope.id });
@@ -97,7 +97,7 @@ export const modelProviderRest = defineRestRouter(ModelProviderApi)
  * litellm routes on `provider/model`, so a bare model id is qualified with the
  * provider the path named before it is stored.
  */
-function qualifiedDefaultModel({
+function deriveQualifiedDefaultModel({
   provider,
   model,
 }: {

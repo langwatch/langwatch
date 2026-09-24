@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import {
   LANGY_CONVERSATION_STATUS,
   LangyConversationNotFoundError,
@@ -224,7 +225,15 @@ export class LangyConversationLifecycleService {
     projectId: string;
     conversationId: string;
   }): Promise<string | null> {
-    return this.deps.repository.tryFindRunToken({ projectId, conversationId });
+    return this.deps.repository
+      .getResumeState({ projectId, conversationId })
+      .then((state) => state.runToken)
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "langy_conversation_not_found") {
+          return null;
+        }
+        throw error;
+      });
   }
 
   async deleteById({

@@ -13,15 +13,15 @@ export function normalizeContentSource(source: unknown): ContentSource | null {
   const mimeType = findFirstString(s, "mimeType", "media_type")?.toLowerCase();
 
   if (s.type === "url") {
-    return typedSource("url", findFirstString(s, "value", "url"), mimeType);
+    return extractTypedSource("url", findFirstString(s, "value", "url"), mimeType);
   }
   if (s.type === "data" || s.type === "base64") {
-    return typedSource("data", findFirstString(s, "value", "data"), mimeType);
+    return extractTypedSource("data", findFirstString(s, "value", "data"), mimeType);
   }
   return null;
 }
 
-function typedSource(
+function extractTypedSource(
   type: "url" | "data",
   value: string | undefined,
   mimeType: string | undefined,
@@ -45,7 +45,9 @@ function mediaKindForMimeType(mimeType: string): "image" | "audio" | "video" | "
   return "document";
 }
 
-export function inlineDataToMediaPart(o: Record<string, unknown>): NormalizedMediaPart | null {
+export function convertInlineDataToMediaPart(
+  o: Record<string, unknown>,
+): NormalizedMediaPart | null {
   const carrier = o.inline_data ?? o.inlineData;
   const c = parseRecord(carrier);
   if (!c) return null;
@@ -69,7 +71,7 @@ function toMediaPart(o: Record<string, unknown>): NormalizedMediaPart | null {
     const source = normalizeContentSource(o.source);
     return source ? { type, source } : null;
   }
-  return inlineDataToMediaPart(o);
+  return convertInlineDataToMediaPart(o);
 }
 
 export function isInlineDataCarrier(part: unknown): boolean {

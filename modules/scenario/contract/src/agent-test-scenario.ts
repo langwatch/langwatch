@@ -53,7 +53,7 @@ export function agentTestScenarioConfig({ agentName }: { agentName: string }): {
  * The target a test points at, or nothing for a kind no run targets.
  * A prompt or a signature has none, so "Test agent" refuses both.
  */
-export function agentTestTarget(agent: { id: string; type: string }): TargetConfig | null {
+export function mapAgentTestTarget(agent: { id: string; type: string }): TargetConfig | null {
   switch (agent.type) {
     case "http":
     case "code":

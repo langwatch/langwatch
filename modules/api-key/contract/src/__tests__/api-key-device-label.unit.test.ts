@@ -8,36 +8,36 @@ import { describe, expect, it } from "vitest";
 import {
   CLI_LOGIN_UNKNOWN_DEVICE_LABEL,
   deviceLabelForSession,
-  sanitizeDeviceLabel,
+  normalizeDeviceLabel,
 } from "../api-key.device-label.ts";
 
-describe("sanitizeDeviceLabel", () => {
+describe("normalizeDeviceLabel", () => {
   describe("given a raw label with characters a key name cannot carry", () => {
     /** @scenario "A device label is reduced to the charset a key name carries" */
     it("lowercases and collapses everything outside a-z0-9- into single dashes", () => {
-      expect(sanitizeDeviceLabel("Rogerio's MacBook Pro!!")).toBe("rogerio-s-macbook-pro");
+      expect(normalizeDeviceLabel("Rogerio's MacBook Pro!!")).toBe("rogerio-s-macbook-pro");
     });
 
     it("trims to 24 characters", () => {
-      expect(sanitizeDeviceLabel("a".repeat(40))).toBe("a".repeat(24));
+      expect(normalizeDeviceLabel("a".repeat(40))).toBe("a".repeat(24));
     });
 
     it("strips leading and trailing dashes left by the collapse", () => {
-      expect(sanitizeDeviceLabel("!!!laptop!!!")).toBe("laptop");
+      expect(normalizeDeviceLabel("!!!laptop!!!")).toBe("laptop");
     });
   });
 
   describe("given nothing usable", () => {
     it("returns null for an empty string", () => {
-      expect(sanitizeDeviceLabel("")).toBeNull();
+      expect(normalizeDeviceLabel("")).toBeNull();
     });
 
     it("returns null for undefined", () => {
-      expect(sanitizeDeviceLabel(void 0)).toBeNull();
+      expect(normalizeDeviceLabel(void 0)).toBeNull();
     });
 
     it("returns null when only unsupported characters were given", () => {
-      expect(sanitizeDeviceLabel("!!!")).toBeNull();
+      expect(normalizeDeviceLabel("!!!")).toBeNull();
     });
   });
 });

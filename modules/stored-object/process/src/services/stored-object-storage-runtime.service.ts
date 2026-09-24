@@ -27,10 +27,7 @@ export type StoredObjectStorageRuntimeOptions = {
   destination: StoredObjectProjectDestinationResolver;
   s3ForProject(projectId: string, aws: AwsClientProcessRuntime): StoredObjectStorageDriver;
   fileForProject(projectId: string, aws: AwsClientProcessRuntime): StoredObjectStorageDriver;
-  azureForProject?(
-    projectId: string,
-    aws: AwsClientProcessRuntime,
-  ): StoredObjectStorageDriver | undefined;
+  azureForProject?: (projectId: string, aws: AwsClientProcessRuntime) => StoredObjectStorageDriver;
 };
 
 /** Creates project-scoped storage views from one canonical registry policy. */
@@ -42,12 +39,11 @@ export class StoredObjectStorageRuntimeAdapter {
   private constructor(private readonly options: StoredObjectStorageRuntimeOptions) {}
 
   forProject(projectId: string, aws: AwsClientProcessRuntime): StoredObjectStorageProject {
+    const azureForProject = this.options.azureForProject;
     const registry = StoredObjectStorageRegistryAdapter.create({
       s3: this.options.s3ForProject(projectId, aws),
       file: this.options.fileForProject(projectId, aws),
-      ...(this.options.azureForProject
-        ? { "azure-blob": () => this.options.azureForProject?.(projectId, aws) }
-        : {}),
+      ...(azureForProject ? { "azure-blob": () => azureForProject(projectId, aws) } : {}),
     });
     return {
       objectStore: registry,

@@ -499,35 +499,23 @@ export const getEvaluatorMissingMappings = (
   let missingRequiredCount = 0;
 
   for (const input of evaluator.inputs) {
-    const hasMapping = targetMappings[input.identifier] !== undefined;
-
-    if (hasMapping) {
+    if (targetMappings[input.identifier] !== undefined) {
       hasAnyMapping = true;
-    } else {
-      const isRequired = requiredFieldsSet.has(input.identifier);
-      const isOptional = optionalFieldsSet.has(input.identifier);
-
-      // Only add to missing if it's a required field
-      if (isRequired) {
-        missingRequiredCount++;
-        missingMappings.push({
-          fieldId: input.identifier,
-          fieldName: input.identifier,
-          isRequired: true,
-        });
-      } else if (isOptional) {
-        // Optional fields are not added to missingMappings
-        // They don't block validation
-      } else {
-        // Unknown field (not in either list) - treat as required for safety
-        missingRequiredCount++;
-        missingMappings.push({
-          fieldId: input.identifier,
-          fieldName: input.identifier,
-          isRequired: true,
-        });
-      }
+      continue;
     }
+
+    // Optional fields don't block validation; an unknown field (in neither
+    // list) is treated as required for safety.
+    const isOptionalOnly =
+      !requiredFieldsSet.has(input.identifier) && optionalFieldsSet.has(input.identifier);
+    if (isOptionalOnly) continue;
+
+    missingRequiredCount++;
+    missingMappings.push({
+      fieldId: input.identifier,
+      fieldName: input.identifier,
+      isRequired: true,
+    });
   }
 
   // Invalid if:

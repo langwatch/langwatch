@@ -18,7 +18,7 @@ import { NodeLicenseCryptographyAdapter } from "../node-license-cryptography.ser
 
 /** The license row, as `PrismaOrganizationLicenseRepository` would read it. */
 function licenses(licenseKey: string | null): OrganizationLicense {
-  return { tryReadLicense: async () => licenseKey };
+  return { getOrganizationLicense: async () => ({ licenseKey }) };
 }
 
 function cloudSource(licenseKey: string | null): LicensingEntitlementSourceAdapter {

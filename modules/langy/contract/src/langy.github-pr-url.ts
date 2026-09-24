@@ -25,6 +25,6 @@ export function pullRequestUrlsIn(output: unknown): PullRequestUrl[] {
 }
 
 /** The first pull request URL in a command's output, if it printed one. */
-export function firstPullRequestUrlIn(output: unknown): string | undefined {
+export function extractFirstPullRequestUrl(output: unknown): string | undefined {
   return pullRequestUrlsIn(output)[0]?.url;
 }

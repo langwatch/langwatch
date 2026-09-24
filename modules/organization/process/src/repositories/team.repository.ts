@@ -13,16 +13,12 @@ export abstract class TeamRepository {
    */
   abstract findOrganizationId(input: { teamId: string }): Promise<string | null>;
   abstract getBySlug(input: { slug: string; organizationId: string }): Promise<OrganizationTeam>;
-  abstract list(input: {
+  abstract findPage(input: {
     organizationId: string;
     page: number;
     limit: number;
   }): Promise<OrganizationTeamPage>;
-  abstract tryFindBySlug(input: {
-    slug: string;
-    organizationId: string;
-  }): Promise<OrganizationTeam | null>;
-  abstract listActive(input: {
+  abstract findActive(input: {
     organizationId: string;
     visibleToUserId?: string;
   }): Promise<OrganizationTeam[]>;

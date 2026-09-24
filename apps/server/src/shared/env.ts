@@ -262,7 +262,8 @@ function writePersistedSecrets(path: string, envBody: string): void {
   for (const line of envBody.split("\n")) {
     const m = line.match(/^([^=]+)=(.*)$/);
     if (!m) continue;
-    const [, key, value] = m as unknown as [string, string, string];
+    const [, key, value] = m;
+    if (key === undefined || value === undefined) continue;
     if ((PERSISTENT_SECRET_KEYS as readonly string[]).includes(key)) {
       found[key] = value;
     }

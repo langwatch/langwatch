@@ -10,7 +10,7 @@ import { createCanonicalAutomationApp } from "../../app/__tests__/automation-app
 import { createAutomationRest } from "../automation.rest.ts";
 import { mountAutomationRest } from "./automation-rest.harness.ts";
 
-const storedTrigger = {
+const storedTrigger: Trigger = {
   id: "trigger_1",
   projectId: "project_1",
   name: "Nightly",
@@ -20,11 +20,24 @@ const storedTrigger = {
   filterQuery: "",
   filters: { topics: ["billing"] },
   active: true,
+  deleted: false,
+  pausedReason: null,
+  pausedAt: null,
   message: null,
   alertType: null,
+  customGraphId: null,
+  notificationCadence: "immediate",
+  traceDebounceMs: 0,
+  templates: {
+    slackTemplateType: null,
+    slackTemplate: null,
+    emailSubjectTemplate: null,
+    emailBodyTemplate: null,
+  },
   createdAt: new Date("2026-09-01T00:00:00.000Z"),
   updatedAt: new Date("2026-09-02T00:00:00.000Z"),
-} as unknown as Trigger;
+  lastRunAt: null,
+};
 
 const resources: ReturnType<typeof createCanonicalAutomationApp>["resources"][] = [];
 

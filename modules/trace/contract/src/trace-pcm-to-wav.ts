@@ -17,7 +17,7 @@ const G711_SAMPLE_RATE = 8000;
  * and/or mimeType. Returns null for container formats and anything
  * unrecognised — those are already playable and pass through untouched.
  */
-export function resolveRawPcmFormat(format?: string, mimeType?: string): RawPcmFormat | null {
+export function detectRawPcmFormat(format?: string, mimeType?: string): RawPcmFormat | null {
   const f = format?.toLowerCase();
   if (f === "pcm16" || f === "g711_ulaw" || f === "g711_alaw") return f;
 
@@ -38,8 +38,8 @@ export function resolveRawPcmFormat(format?: string, mimeType?: string): RawPcmF
  * return the result as base64, ready for a `data:audio/wav;base64,…` URI.
  * Returns null when the payload is empty or cannot be decoded.
  */
-export function pcm16ToWavBase64(dataBase64: string): string | null {
-  return rawPcmBase64ToWavBase64(dataBase64, "pcm16");
+export function convertPcm16ToWavBase64(dataBase64: string): string | null {
+  return convertRawPcmBase64ToWavBase64(dataBase64, "pcm16");
 }
 
 /**
@@ -47,10 +47,13 @@ export function pcm16ToWavBase64(dataBase64: string): string | null {
  * ready for a `data:audio/wav;base64,…` URI. Returns null when the payload
  * is empty or cannot be decoded.
  */
-export function rawPcmBase64ToWavBase64(dataBase64: string, format: RawPcmFormat): string | null {
+export function convertRawPcmBase64ToWavBase64(
+  dataBase64: string,
+  format: RawPcmFormat,
+): string | null {
   try {
     const samples = base64ToBytes(dataBase64);
-    const wrapped = wrapRawPcmToWav(samples, format);
+    const wrapped = encodeRawPcmAsWav(samples, format);
     return wrapped ? bytesToBase64(wrapped) : null;
   } catch {
     return null;
@@ -99,7 +102,7 @@ function g711ToPcm16(samples: Uint8Array, format: "g711_ulaw" | "g711_alaw"): Ui
  * untouched; G.711 is expanded to linear PCM16 first (browser WAV decoders
  * are PCM-only — fmt codes 6/7 would produce a dead player).
  */
-export function wrapRawPcmToWav(samples: Uint8Array, format: RawPcmFormat): Uint8Array | null {
+export function encodeRawPcmAsWav(samples: Uint8Array, format: RawPcmFormat): Uint8Array | null {
   if (samples.length === 0) return null;
   const pcm = format === "pcm16" ? samples : g711ToPcm16(samples, format);
   const sampleRate = format === "pcm16" ? PCM16_SAMPLE_RATE : G711_SAMPLE_RATE;

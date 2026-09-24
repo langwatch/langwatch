@@ -303,8 +303,8 @@ export function useEvaluatorEditorController(
   const effectiveEvaluatorDef = useMemo(() => {
     const fields = evaluatorQuery.data?.fields;
     if (fields && fields.length > 0) {
-      const requiredFields = fields.filter((f: any) => !f.optional).map((f: any) => f.identifier);
-      const optionalFields = fields.filter((f: any) => f.optional).map((f: any) => f.identifier);
+      const requiredFields = fields.filter((f) => !f.optional).map((f) => f.identifier);
+      const optionalFields = fields.filter((f) => f.optional).map((f) => f.identifier);
       return { requiredFields, optionalFields };
     }
     return evaluatorDef;

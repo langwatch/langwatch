@@ -1,7 +1,7 @@
 import type { MetricKind } from "@langwatch/metric-contract";
 
 import {
-  finiteNumber,
+  toFiniteNumber,
   finiteNumbers,
   integerDecimal,
   integerDecimals,
@@ -50,8 +50,8 @@ function canonicalQuantiles(value: unknown): CanonicalPointValues["quantileValue
   return value.map((entry) => {
     const quantile = isRecord(entry) ? entry : {};
     return {
-      quantile: finiteNumber(quantile.quantile),
-      value: finiteNumber(quantile.value),
+      quantile: toFiniteNumber(quantile.quantile),
+      value: toFiniteNumber(quantile.value),
     };
   });
 }
@@ -78,15 +78,15 @@ export function canonicalPointValues({
   return {
     valueType,
     valueInt: hasInt ? integerDecimal(point.asInt, { signed: true }) : null,
-    valueDouble: hasDouble ? finiteNumber(point.asDouble) : null,
+    valueDouble: hasDouble ? toFiniteNumber(point.asDouble) : null,
     count: isCounted ? integerDecimal(point.count) : null,
-    sum: finiteNumber(point.sum),
-    min: finiteNumber(point.min),
-    max: finiteNumber(point.max),
+    sum: toFiniteNumber(point.sum),
+    min: toFiniteNumber(point.min),
+    max: toFiniteNumber(point.max),
     explicitBounds: finiteNumbers(point.explicitBounds),
     bucketCounts: integerDecimals(point.bucketCounts),
     exponentialScale: isExponential ? Number(point.scale ?? 0) : null,
-    exponentialZeroThreshold: isExponential ? finiteNumber(point.zeroThreshold ?? 0) : null,
+    exponentialZeroThreshold: isExponential ? toFiniteNumber(point.zeroThreshold ?? 0) : null,
     zeroCount: isExponential ? integerDecimal(point.zeroCount) : null,
     positiveOffset: isExponential ? Number(positive.offset ?? 0) : null,
     positiveBucketCounts: integerDecimals(positive.bucketCounts),

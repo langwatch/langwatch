@@ -132,7 +132,7 @@ function buildDeps(
     stopRun: vi.fn(),
     findRunState: vi.fn(),
     deleteRun: vi.fn(),
-  } as unknown as ExperimentRunProgressRepository;
+  };
 
   const deps: WorkflowEvaluationDependencies = {
     experiments: { findOrCreateForWorkflow } as never,

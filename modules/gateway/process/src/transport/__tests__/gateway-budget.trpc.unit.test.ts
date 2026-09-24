@@ -129,7 +129,8 @@ const virtualKeyFindMany = vi.fn(async (args: { where: { id?: { in: string[] } }
   // is a legitimate answer there, since no test needs a reach fact.
   if (!args.where.id) return [];
 
-  return args.where.id.in.includes(ANCHOR_VK_ID)
+  const requestedIds = args.where.id.in;
+  return requestedIds.includes(ANCHOR_VK_ID)
     ? [{ id: ANCHOR_VK_ID, name: "prod-openai", displayPrefix: "lw_sk_ab" }]
     : [];
 });
