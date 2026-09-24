@@ -31,6 +31,83 @@ export interface FeatureEventingSetup<Repositories, App, ProcessStore> {
   /** The process state this graph leases and prunes. Another graph's store
    * would prune another process's outbox rows. */
   readonly processStore: ProcessStore;
+  /** Earlier events of this pipeline's own aggregate; absent only in a hand-built test setup. */
+  readonly priorEvents?: PriorEventsRead;
+}
+
+/** One aggregate of the reading pipeline's own type; `accepts` keeps the events it declared. */
+export interface PriorEventsQuery<Event> {
+  readonly tenantId: string;
+  readonly aggregateId: string;
+  readonly accepts: (event: unknown) => event is Event;
+}
+
+/** A command's read of its own aggregate's earlier events, oldest first (WP-5 ruling 2). */
+export type PriorEventsRead = <Event>(query: PriorEventsQuery<Event>) => Promise<readonly Event[]>;
+
+/** The one event-log read the kernel takes off a runtime; the kernel binds the aggregate type. */
+export interface AggregateEventLog {
+  getEvents(
+    aggregateId: string,
+    context: Readonly<{ tenantId: string }>,
+    aggregateType: string,
+  ): Promise<readonly unknown[]>;
+}
+
+/** The aggregate a built definition declares, read without asserting a shape it may not have. */
+function aggregateTypeOf(definition: unknown): string | undefined {
+  if (typeof definition !== "object" || definition === null) return void 0;
+  if (!("aggregate" in definition)) return void 0;
+  const aggregate = definition.aggregate;
+  if (typeof aggregate !== "object" || aggregate === null || !("type" in aggregate)) return void 0;
+  return typeof aggregate.type === "string" ? aggregate.type : void 0;
+}
+
+/** A pipeline's read of its own aggregate, bound to the type its definition declares once built. */
+class OwnAggregateHistory {
+  #aggregateType: string | undefined;
+
+  constructor(
+    private readonly log: () => AggregateEventLog | undefined,
+    private readonly pipeline: string,
+  ) {}
+
+  readonly read: PriorEventsRead = async ({ tenantId, aggregateId, accepts }) => {
+    const aggregateType = this.#aggregateType;
+    if (aggregateType === void 0) {
+      throw new Error(
+        `${this.pipeline} read its earlier events before its definition named an aggregate.`,
+      );
+    }
+    const log = this.log();
+    if (log === void 0) {
+      throw new Error(
+        `${this.pipeline} reads its earlier events, but this process's eventing holds no event log.`,
+      );
+    }
+    const events = await log.getEvents(aggregateId, { tenantId }, aggregateType);
+    return events.filter(accepts);
+  };
+
+  bindTo(definition: unknown): void {
+    if (definition instanceof PendingPipelines) {
+      definition.readHistoryFrom(this.log);
+      return;
+    }
+    this.#aggregateType = aggregateTypeOf(definition);
+  }
+}
+
+/** Builds a module's eventing with each pipeline's read bound to its own aggregate. */
+export function buildModuleEventing(input: {
+  readonly eventing: FeatureEventing;
+  readonly setup: Omit<FeatureEventingSetup<unknown, unknown, unknown>, "priorEvents">;
+  readonly log: () => AggregateEventLog | undefined;
+}): unknown {
+  const history = new OwnAggregateHistory(input.log, input.eventing.pipeline);
+  const definition = input.eventing.build({ ...input.setup, priorEvents: history.read });
+  history.bindTo(definition);
+  return definition;
 }
 
 /** What a registered pipeline answers with, as composition reads it back. */
@@ -71,14 +148,25 @@ class ModulePipelines implements FeatureEventing {
 
 /** Built one at a time at registration, so each connects before the next builds. */
 class PendingPipelines {
+  #log: () => AggregateEventLog | undefined = () => void 0;
+
   constructor(
     private readonly declarations: readonly FeatureEventing[],
     private readonly setup: FeatureEventingSetup<unknown, unknown, unknown>,
   ) {}
 
+  readHistoryFrom(log: () => AggregateEventLog | undefined): void {
+    this.#log = log;
+  }
+
   registerEach(register: (definition: unknown) => unknown): void {
     for (const declaration of this.declarations) {
-      const registration = register(declaration.build(this.setup));
+      const definition = buildModuleEventing({
+        eventing: declaration,
+        setup: this.setup,
+        log: this.#log,
+      });
+      const registration = register(definition);
       declaration.connect?.({ app: this.setup.app, commands: commandsOf(registration) });
     }
   }
@@ -102,6 +190,8 @@ export function withAnotherPipeline(
 export interface EventingHost {
   readonly participation: EventingParticipation;
   readonly processStore: unknown;
+  /** Read at call time: a runtime opens its event store only once it initialises. */
+  readonly eventStore?: AggregateEventLog;
   register(definition: unknown): unknown;
 }
 
@@ -121,6 +211,9 @@ export function eventingHostFrom(pool: unknown, role: ServerRole): EventingHost 
     participation:
       stated === "produce" || stated === "consume" ? stated : participationForRole(role),
     processStore: host.processStore,
+    get eventStore() {
+      return host.eventStore;
+    },
     register: registerPipelines(host.register.bind(candidate)),
   };
 }

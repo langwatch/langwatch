@@ -30,6 +30,7 @@ import { LocalFeatureApis } from "./local-feature-api.ts";
 import { ModuleApiToken, type FeatureApiIdentity } from "./module-api-token.ts";
 import {
   commandsOf,
+  buildModuleEventing,
   eventingHostFrom,
   type EventingHost,
   type FeatureEventing,
@@ -645,11 +646,15 @@ function installModuleEventing(
 ): void {
   const module = declaration.eventing;
   if (!module || !eventing) return;
-  const definition = module.build({
-    participation: eventing.participation,
-    repositories: state.repositories,
-    app: state.provided,
-    processStore: eventing.processStore,
+  const definition = buildModuleEventing({
+    eventing: module,
+    setup: {
+      participation: eventing.participation,
+      repositories: state.repositories,
+      app: state.provided,
+      processStore: eventing.processStore,
+    },
+    log: () => eventing.eventStore,
   });
   const registration = eventing.register(definition);
   module.connect?.({ app: state.provided, commands: commandsOf(registration) });

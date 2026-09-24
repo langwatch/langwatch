@@ -88,6 +88,13 @@ Feature: Composing a process declaratively
     And the senders registration answers with reach the module
 
   @unit
+  Scenario: A pipeline reads its own aggregate's earlier events
+    Given a module whose pipeline declares the simulation_run aggregate
+    When one of its commands reads a run's earlier events through its eventing setup
+    Then the process's event log is read for that run under the simulation_run aggregate type only
+    And only the events the command's guard accepts come back
+
+  @unit
   Scenario: A module hosts several pipelines
     Given a module that calls withEventing once for each of three pipelines
     When the process boots with an eventing runtime on its pool

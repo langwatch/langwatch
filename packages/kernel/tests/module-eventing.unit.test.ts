@@ -186,6 +186,52 @@ describe("given a module that declares its event sourcing with withEventing", ()
     });
   });
 
+  describe("when a pipeline reads its own aggregate's earlier events", () => {
+    /** @scenario "A pipeline reads its own aggregate's earlier events" */
+    it("reads the event log under the aggregate type its definition declares", async () => {
+      const reads: unknown[][] = [];
+      const setups: FeatureEventingSetup<KeyRepositories, KeyApp, unknown>[] = [];
+      const pipeline = (
+        name: string,
+        aggregate: string,
+      ): FeatureEventing<KeyRepositories, KeyApp> => ({
+        pipeline: name,
+        build: (setup) => {
+          setups.push(setup);
+          return { name, aggregate: { type: aggregate } };
+        },
+      });
+      const host = {
+        processStore: {},
+        eventStore: {
+          getEvents: (...args: unknown[]) => {
+            reads.push(args);
+            return Promise.resolve([{ type: "queued" }, "not an event", { type: "finished" }]);
+          },
+        },
+        register: () => ({}),
+      };
+      const module = defineServerModule("api-key")
+        .withRepositories(keyRepositories)
+        .withApp(ComposedKeyApp)
+        .withEventing(pipeline("scenario_lifecycle", "scenario"))
+        .withEventing(pipeline("simulation_processing", "simulation_run"));
+
+      await createApp({ role: "worker", members: memberSourceOf({ eventing: host }) })
+        .withModules([module])
+        .boot();
+
+      const events = await setups[1]!.priorEvents!({
+        tenantId: "project_1",
+        aggregateId: "run_1",
+        accepts: (event): event is { type: string } =>
+          typeof event === "object" && event !== null && "type" in event,
+      });
+      expect(reads).toEqual([["run_1", { tenantId: "project_1" }, "simulation_run"]]);
+      expect(events).toEqual([{ type: "queued" }, { type: "finished" }]);
+    });
+  });
+
   describe("when the runtime states no participation of its own", () => {
     /** @scenario "The role decides which half a process installs" */
     it("installs the worker's declaration as a consumer", async () => {

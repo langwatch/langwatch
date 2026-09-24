@@ -55,6 +55,8 @@ export {
   type FeatureEventing,
   type FeatureEventingRegistration,
   type FeatureEventingSetup,
+  type PriorEventsQuery,
+  type PriorEventsRead,
 } from "./module-eventing.ts";
 export { moduleApi, ModuleApiToken, type OperationsOnly } from "./module-api-token.ts";
 export { supplyToken, SupplyToken } from "./supply-token.ts";
