@@ -552,6 +552,28 @@ const presentations = {
   },
 
   // ---- workflows ----
+  workflow_not_a_copy: {
+    title: "This workflow isn't a copy",
+    describe: () =>
+      "It has no source workflow to sync from. Copy it from the workflow you want to follow instead.",
+  },
+  workflow_has_no_copies: {
+    title: "Nothing has been copied from this workflow",
+    describe: () => "There's nothing to push changes to yet.",
+  },
+  workflow_has_no_latest_version: {
+    title: "This workflow has no saved version yet",
+    describe: () => "Save a version first, then push it to its copies.",
+  },
+  workflow_no_copies_selected: {
+    title: "Choose which copies to update",
+    describe: () =>
+      "None of the workflows you picked is a copy of this one. Reload to see its current copies, then pick again.",
+  },
+  workflow_version_not_found: {
+    title: "That version is gone",
+    describe: () => "Reload to see this workflow's current versions.",
+  },
   workflow_not_found: {
     title: "Workflow not found",
     describe: () => "It may have been deleted. Reload to see the current list.",

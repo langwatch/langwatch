@@ -1,4 +1,5 @@
 import type { DatasetApi } from "@langwatch/dataset-contract";
+import { NotFoundError } from "@langwatch/handled-error";
 import { nowInstant, toDate } from "@langwatch/time";
 import {
   archiveWorkflowCommandSchema,
@@ -205,7 +206,7 @@ export class WorkflowService {
       projectId: input.projectId,
     });
     if (!version) {
-      throw new WorkflowVersionNotFoundError(input.versionId);
+      throw new NotFoundError("workflow_version_not_found", "Workflow version", input.versionId);
     }
 
     const workflow = await this.options.repository.findById({

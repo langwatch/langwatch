@@ -19,8 +19,10 @@ import type {
 } from "./workflow.commands.ts";
 import type {
   WorkflowCascadeArchive,
+  WorkflowCopyRow,
   WorkflowListRow,
   WorkflowProjectPath,
+  WorkflowPushToCopies,
   WorkflowRelatedEntities,
 } from "./workflow.trpc-schemas.ts";
 import type {
@@ -174,6 +176,11 @@ export interface WorkflowApi {
     projectId: string;
     includeVersion?: boolean;
   }): Promise<WorkflowWithVersion>;
+  /** One workflow with its current version, the graph upgraded to the current DSL. */
+  getWithMigratedDsl(input: {
+    workflowId: string;
+    projectId: string;
+  }): Promise<WorkflowWithVersion>;
   assertInProject(input: { workflowId: string; projectId: string }): Promise<void>;
   listFields(input: {
     projectId: string;
@@ -190,6 +197,11 @@ export interface WorkflowApi {
     by: WorkflowCaller,
   ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }>;
   copy(
+    input: Omit<CopyWorkflowCommand, "authorId">,
+    by: WorkflowCaller,
+  ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }>;
+  /** Copies a workflow once the caller may create workflows in its source project too. */
+  copyFromPermittedSource(
     input: Omit<CopyWorkflowCommand, "authorId">,
     by: WorkflowCaller,
   ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }>;
@@ -304,6 +316,21 @@ export interface WorkflowApi {
     workflowId: string;
     projectId: string;
   }): Promise<Readonly<{ version: string | null }> | null>;
+  /** The copies of a workflow the caller may push to. */
+  listPermittedCopies(
+    input: { workflowId: string; projectId: string },
+    by: WorkflowCaller,
+  ): Promise<WorkflowCopyRow[]>;
+  /** Pulls the source's latest graph into this copy as its next major version. */
+  syncFromSource(
+    input: { workflowId: string; projectId: string },
+    by: WorkflowCaller,
+  ): Promise<{ workflow: WorkflowSourceRow; version: WorkflowVersion }>;
+  /** Pushes this workflow's latest graph to the copies the caller may update. */
+  pushToCopies(
+    input: { workflowId: string; projectId: string; copyIds?: string[] },
+    by: WorkflowCaller,
+  ): Promise<WorkflowPushToCopies>;
   /** What archiving this workflow would take with it. */
   getRelatedEntities(input: {
     workflowId: string;

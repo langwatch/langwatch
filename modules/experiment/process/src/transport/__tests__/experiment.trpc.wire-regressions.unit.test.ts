@@ -1,11 +1,13 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 /** @vitest-environment node */
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
-import type {
-  Experiment,
-  ExperimentApi,
-  ExperimentPublishedMonitor,
-  PersistedEvaluationsV3State,
+import {
+  ExperimentNotFoundError,
+  ExperimentTypeMismatchError,
+  type Experiment,
+  type ExperimentApi,
+  type ExperimentPublishedMonitor,
+  type PersistedEvaluationsV3State,
 } from "@langwatch/experiment-contract";
 import type { WorkflowWithVersion } from "@langwatch/workflow-contract";
 import { initTRPC } from "@trpc/server";
@@ -178,6 +180,48 @@ describe("given the experiments tRPC wire", () => {
         caller.saveAsMonitor({ projectId: "project-1", experimentId: "experiment-1" }),
       ).resolves.toEqual(MONITOR);
       expect(publishAsMonitor).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("when the experiment is missing or of another kind", () => {
+    it("answers a missing experiment as NOT_FOUND with its own message", async () => {
+      const caller = mount(
+        createApiFixture<ExperimentApi>({
+          getBySlug: async () => {
+            throw new ExperimentNotFoundError("support-classifier");
+          },
+          getWorkbenchState: async () => {
+            throw new ExperimentNotFoundError("support-classifier");
+          },
+        }),
+      );
+
+      await expect(
+        caller.getEvaluationsV3BySlug({
+          projectId: "project-1",
+          experimentSlug: "support-classifier",
+        }),
+      ).rejects.toMatchObject({
+        code: "NOT_FOUND",
+        message: "Experiment not found: support-classifier",
+      });
+    });
+
+    it("answers an experiment of another kind as BAD_REQUEST with its own message", async () => {
+      const caller = mount(
+        createApiFixture<ExperimentApi>({
+          archive: async () => {
+            throw new ExperimentTypeMismatchError();
+          },
+        }),
+      );
+
+      await expect(
+        caller.deleteExperiment({ projectId: "project-1", experimentId: "experiment-1" }),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        message: "This experiment is not an evaluation workbench",
+      });
     });
   });
 });

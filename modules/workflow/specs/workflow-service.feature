@@ -157,3 +157,45 @@ Feature: Workflow service boundary
     When the server executor dispatches it through injected nlpgo infrastructure
     Then it validates required entry inputs and model credentials
     And application composition supplies nlpgo and model-provider adapters
+
+  @unit
+  Scenario: Copying from a project the caller cannot create workflows in is refused
+    Given the caller cannot create workflows in the source project
+    When they copy a workflow from it
+    Then permission_denied is reported with status 401 and nothing is copied
+
+  @unit
+  Scenario: A workflow that is not a copy has nothing to sync from
+    Given a workflow that was never copied from another
+    When the caller syncs it from its source
+    Then workflow_not_a_copy is reported with status 400
+
+  @unit
+  Scenario: A synced copy continues its own version history
+    Given a copy at version 4.2 whose source the caller may view
+    When the caller syncs it from its source
+    Then the source graph is written into the copy as version 5
+
+  @unit
+  Scenario: A push reaching no copy the caller may update is refused
+    Given every copy lives in a project the caller cannot update
+    When the caller pushes to the copies
+    Then permission_denied is reported with status 401 and no copy changes
+
+  @unit
+  Scenario: A push with nothing to push to is refused
+    Given a workflow nothing has been copied from
+    When the caller pushes to its copies
+    Then workflow_has_no_copies is reported with status 400
+
+  @unit
+  Scenario: Listing the copies of a missing workflow answers not found
+    Given no workflow with the requested id in the project
+    When the caller lists its copies
+    Then workflow_not_found is reported with status 404
+
+  @unit
+  Scenario: Restoring a version the project does not hold answers not found
+    Given no workflow version with the requested id in the project
+    When the caller restores it
+    Then workflow_version_not_found is reported with status 404

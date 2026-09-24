@@ -93,3 +93,69 @@ export class NlpLambdaFleetNotComposedError extends Error {
     this.name = "NlpLambdaFleetNotComposedError";
   }
 }
+
+/**
+ * The caller may not act in a project the workflow's copy lineage reaches.
+ * 401, not 403: the status this refusal has answered since shipping.
+ */
+export class WorkflowPermissionDeniedError extends HandledError {
+  declare readonly code: "permission_denied";
+
+  constructor({ permission, message }: { permission: string; message: string }) {
+    super("permission_denied", message, {
+      httpStatus: 401,
+      fault: "customer",
+      meta: { permission },
+    });
+    this.name = "WorkflowPermissionDeniedError";
+  }
+}
+
+/** The workflow was never copied from anywhere, so there is nothing to sync from. */
+export class WorkflowNotACopyError extends HandledError {
+  declare readonly code: "workflow_not_a_copy";
+
+  constructor() {
+    super("workflow_not_a_copy", "This workflow is not a copy and has no source to sync from", {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "WorkflowNotACopyError";
+  }
+}
+
+export class WorkflowHasNoLatestVersionError extends HandledError {
+  declare readonly code: "workflow_has_no_latest_version";
+
+  constructor() {
+    super("workflow_has_no_latest_version", "This workflow has no latest version to push", {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "WorkflowHasNoLatestVersionError";
+  }
+}
+
+export class WorkflowHasNoCopiesError extends HandledError {
+  declare readonly code: "workflow_has_no_copies";
+
+  constructor() {
+    super("workflow_has_no_copies", "This workflow has no copies to push to", {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "WorkflowHasNoCopiesError";
+  }
+}
+
+export class WorkflowNoCopiesSelectedError extends HandledError {
+  declare readonly code: "workflow_no_copies_selected";
+
+  constructor() {
+    super("workflow_no_copies_selected", "No valid copies selected to push to", {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "WorkflowNoCopiesSelectedError";
+  }
+}

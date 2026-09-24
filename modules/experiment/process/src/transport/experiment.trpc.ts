@@ -1,5 +1,5 @@
 /**
- * Server transport for experiments.*: permission, error translation, delegation.
+ * Server transport for experiments.*: permission and delegation.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import type { Dataset } from "@langwatch/dataset-contract";
@@ -11,7 +11,6 @@ import {
   type DSPyStep,
   type SaveExperimentInput,
 } from "@langwatch/experiment-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import {
   parseStudioWorkflow,
@@ -20,21 +19,6 @@ import {
 } from "@langwatch/workflow-contract";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-
-/**
- * Maps experiment domain errors to `TRPCError` using the code discriminant.
- * Only the two that have to change shape are listed; every other handled error
- * travels on unchanged, keeping its code and meta intact.
- */
-const mapExperimentError = (error: unknown): never => {
-  if (HandledError.isHandled(error) && error.code === "experiment_not_found") {
-    throw new TRPCError({ code: "NOT_FOUND", message: error.message });
-  }
-  if (HandledError.isHandled(error) && error.code === "experiment_type_mismatch") {
-    throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
-  }
-  throw error;
-};
 
 /** The dataset a workflow's entry node draws from, when it names one. */
 const extractDatasetId = (dsl: unknown): string | undefined => {
@@ -173,9 +157,10 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
     const name = state.name ?? (await app.findNextDraftName({ projectId: input.projectId }));
 
     if (input.experimentId) {
-      const currentExperiment = await app
-        .getById({ projectId: input.projectId, id: input.experimentId })
-        .catch(mapExperimentError);
+      const currentExperiment = await app.getById({
+        projectId: input.projectId,
+        id: input.experimentId,
+      });
 
       if (currentExperiment.workflowId) {
         const workflow = await app.findWorkflow({
@@ -235,20 +220,18 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
 
     const experimentId = input.experimentId ?? generate("experiment").toString();
 
-    return app
-      .save({
-        id: experimentId,
-        projectId: input.projectId,
-        name,
-        type: "BATCH_EVALUATION_V2",
-        requestedSlug: app.slugFor(name),
-        slugMode: input.experimentId ? "preserve-existing" : "deduplicate",
-        workflowId,
-        // The stored state is whatever the declaration admitted, which is JSON
-        // by construction; the service stores it verbatim.
-        workbenchState: input.workbenchState as SaveExperimentInput["workbenchState"],
-      })
-      .catch(mapExperimentError);
+    return app.save({
+      id: experimentId,
+      projectId: input.projectId,
+      name,
+      type: "BATCH_EVALUATION_V2",
+      requestedSlug: app.slugFor(name),
+      slugMode: input.experimentId ? "preserve-existing" : "deduplicate",
+      workflowId,
+      // The stored state is whatever the declaration admitted, which is JSON
+      // by construction; the service stores it verbatim.
+      workbenchState: input.workbenchState as SaveExperimentInput["workbenchState"],
+    });
   })
 
   .procedure("saveEvaluationsV3")
@@ -256,22 +239,19 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
   .handle(async ({ app, input, actor }) => {
     const experimentId = input.experimentId ?? generate("experiment").toString();
 
-    const saved = await app
-      .saveWorkbenchState(
-        {
-          projectId: input.projectId,
-          id: experimentId,
-          state: input.state,
-          ...(input.expectedVersion === undefined
-            ? {}
-            : { expectedVersion: input.expectedVersion }),
-        },
-        { kind: "user", id: actor.id },
-      )
-      .catch(mapExperimentError);
-    const updatedExperiment = await app
-      .getById({ projectId: input.projectId, id: saved.experimentId })
-      .catch(mapExperimentError);
+    const saved = await app.saveWorkbenchState(
+      {
+        projectId: input.projectId,
+        id: experimentId,
+        state: input.state,
+        ...(input.expectedVersion === undefined ? {} : { expectedVersion: input.expectedVersion }),
+      },
+      { kind: "user", id: actor.id },
+    );
+    const updatedExperiment = await app.getById({
+      projectId: input.projectId,
+      id: saved.experimentId,
+    });
 
     // The row does not carry the version this save landed on - the counter it
     // holds is whatever the last read saw. Autosave compares the version its
@@ -284,12 +264,8 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
   .withPermission("experiments:view")
   .handle(async ({ app, input }) => {
     const [experiment, workbenchState] = await Promise.all([
-      app
-        .getBySlug({ projectId: input.projectId, slug: input.experimentSlug })
-        .catch(mapExperimentError),
-      app
-        .getWorkbenchState({ projectId: input.projectId, slug: input.experimentSlug })
-        .catch(mapExperimentError),
+      app.getBySlug({ projectId: input.projectId, slug: input.experimentSlug }),
+      app.getWorkbenchState({ projectId: input.projectId, slug: input.experimentSlug }),
     ]);
 
     return {
@@ -305,9 +281,10 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
   .procedure("getWorkbenchVersion")
   .withPermission("experiments:view")
   .handle(async ({ app, input }) => {
-    const workbenchState = await app
-      .getWorkbenchState({ projectId: input.projectId, slug: input.experimentSlug })
-      .catch(mapExperimentError);
+    const workbenchState = await app.getWorkbenchState({
+      projectId: input.projectId,
+      slug: input.experimentSlug,
+    });
 
     return {
       experimentId: workbenchState.experimentId,
@@ -330,14 +307,12 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
   .procedure("listWorkbenchVersions")
   .withPermission("experiments:view")
   .handle(async ({ app, input }) => {
-    const page = await app
-      .listWorkbenchVersions({
-        projectId: input.projectId,
-        id: input.experimentId,
-        ...(input.limit === undefined ? {} : { limit: input.limit }),
-        ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
-      })
-      .catch(mapExperimentError);
+    const page = await app.listWorkbenchVersions({
+      projectId: input.projectId,
+      id: input.experimentId,
+      ...(input.limit === undefined ? {} : { limit: input.limit }),
+      ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
+    });
 
     // The history names the person who saved each version, and the service
     // stores only their id.
@@ -361,35 +336,29 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
   .procedure("commitWorkbenchVersion")
   .withPermission("experiments:update")
   .handle(({ app, input, actor }) =>
-    app
-      .commitWorkbenchVersion(
-        {
-          projectId: input.projectId,
-          id: input.experimentId,
-          commitMessage: input.commitMessage,
-        },
-        { kind: "user", id: actor.id },
-      )
-      .catch(mapExperimentError),
+    app.commitWorkbenchVersion(
+      {
+        projectId: input.projectId,
+        id: input.experimentId,
+        commitMessage: input.commitMessage,
+      },
+      { kind: "user", id: actor.id },
+    ),
   )
 
   .procedure("restoreWorkbenchVersion")
   .withPermission("experiments:update")
   .handle(({ app, input, actor }) =>
-    app
-      .restoreWorkbenchVersion(
-        { projectId: input.projectId, id: input.experimentId, version: input.version },
-        { kind: "user", id: actor.id },
-      )
-      .catch(mapExperimentError),
+    app.restoreWorkbenchVersion(
+      { projectId: input.projectId, id: input.experimentId, version: input.version },
+      { kind: "user", id: actor.id },
+    ),
   )
 
   .procedure("saveAsMonitor")
   .withPermission("workflows:create")
   .handle(async ({ app, input }) => {
-    const experiment = await app
-      .getById({ projectId: input.projectId, id: input.experimentId })
-      .catch(mapExperimentError);
+    const experiment = await app.getById({ projectId: input.projectId, id: input.experimentId });
     const workflow = experiment.workflowId
       ? await app.findWorkflow({
           id: experiment.workflowId,
@@ -437,14 +406,10 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
   .withPermission("experiments:view")
   .handle(async ({ app, input }) => {
     if (input.experimentId) {
-      return app
-        .getById({ projectId: input.projectId, id: input.experimentId })
-        .catch(mapExperimentError);
+      return app.getById({ projectId: input.projectId, id: input.experimentId });
     }
     if (input.experimentSlug) {
-      return app
-        .getBySlug({ projectId: input.projectId, slug: input.experimentSlug })
-        .catch(mapExperimentError);
+      return app.getBySlug({ projectId: input.projectId, slug: input.experimentSlug });
     }
 
     throw new TRPCError({
@@ -456,9 +421,10 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
   .procedure("getExperimentWithDSLBySlug")
   .withPermission("experiments:view")
   .handle(async ({ app, input }) => {
-    const experiment = await app
-      .getBySlug({ projectId: input.projectId, slug: input.experimentSlug })
-      .catch(mapExperimentError);
+    const experiment = await app.getBySlug({
+      projectId: input.projectId,
+      slug: input.experimentSlug,
+    });
 
     const workflow = experiment.workflowId
       ? await app.findWorkflow({
@@ -559,7 +525,7 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
     // monitor it was published as - is one act, and it is the application's. A
     // second door sequencing the same three writes is a second chance to
     // sequence them differently.
-    app.archive({ projectId: input.projectId, id: input.experimentId }).catch(mapExperimentError),
+    app.archive({ projectId: input.projectId, id: input.experimentId }),
   )
 
   .procedure("copy")
@@ -579,9 +545,10 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
       });
     }
 
-    const experiment = await app
-      .getById({ projectId: input.sourceProjectId, id: input.experimentId })
-      .catch(mapExperimentError);
+    const experiment = await app.getById({
+      projectId: input.sourceProjectId,
+      id: input.experimentId,
+    });
 
     // V3 experiments have no workflow; their state lives in workbenchState.
     if (experiment.type === "EVALUATIONS_V3") {
@@ -666,9 +633,10 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
   .procedure("getExperimentDSPyRuns")
   .withPermission("experiments:view")
   .handle(async ({ app, input }) => {
-    const experiment = await app
-      .getBySlug({ projectId: input.projectId, slug: input.experimentSlug })
-      .catch(mapExperimentError);
+    const experiment = await app.getBySlug({
+      projectId: input.projectId,
+      slug: input.experimentSlug,
+    });
 
     return app.listDspyRuns({ tenantId: input.projectId, experimentId: experiment.id });
   })
@@ -676,9 +644,10 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
   .procedure("getExperimentDSPyStep")
   .withPermission("experiments:view")
   .handle(async ({ app, input }) => {
-    const experiment = await app
-      .getBySlug({ projectId: input.projectId, slug: input.experimentSlug })
-      .catch(mapExperimentError);
+    const experiment = await app.getBySlug({
+      projectId: input.projectId,
+      slug: input.experimentSlug,
+    });
 
     try {
       const step = await app.getDspyStep({
@@ -724,9 +693,7 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
   .procedure("getExperimentBatchEvaluationRuns")
   .withPermission("experiments:view")
   .handle(async ({ app, input }) => {
-    const experiment = await app
-      .getById({ projectId: input.projectId, id: input.experimentId })
-      .catch(mapExperimentError);
+    const experiment = await app.getById({ projectId: input.projectId, id: input.experimentId });
 
     const runsByExperimentId = await app.listRuns({
       projectId: input.projectId,
@@ -739,9 +706,7 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
   .procedure("getExperimentBatchEvaluationRun")
   .withPermission("experiments:view")
   .handle(async ({ app, input }) => {
-    const experiment = await app
-      .getById({ projectId: input.projectId, id: input.experimentId })
-      .catch(mapExperimentError);
+    const experiment = await app.getById({ projectId: input.projectId, id: input.experimentId });
 
     return app.findRun({
       projectId: input.projectId,

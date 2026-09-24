@@ -713,7 +713,12 @@ export const APP_ERROR_CODES = [
   "webhook_event_not_found",
   "webhook_test_rate_limited",
   "workflow_execution_failed",
+  "workflow_has_no_copies",
+  "workflow_has_no_latest_version",
+  "workflow_no_copies_selected",
+  "workflow_not_a_copy",
   "workflow_not_found",
+  "workflow_version_not_found",
 ] as const;
 
 export type AppErrorCode = (typeof APP_ERROR_CODES)[number];

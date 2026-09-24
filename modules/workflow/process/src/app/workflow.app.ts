@@ -41,7 +41,9 @@ import {
   type WorkflowCopiesRow,
   type WorkflowCodeCompletionResponse,
   type WorkflowRestEnvelope,
+  type WorkflowCopyRow,
   type WorkflowCopyWithPath,
+  type WorkflowPushToCopies,
   type WorkflowDsl,
   type WorkflowEvaluatorFields,
   type WorkflowEvaluationRequest,
@@ -76,6 +78,7 @@ import { workflowPlatformUrl } from "../rules/workflow-platform-url.rules.ts";
 import { NlpLambdaCleanupService } from "../services/nlp-lambda-cleanup.service.ts";
 import { StudioEventPreparerService } from "../services/studio-event-preparer.service.ts";
 import { WorkflowAgentMappingService } from "../services/workflow-agent-mapping.service.ts";
+import { WorkflowCopyLineageService } from "../services/workflow-copy-lineage.service.ts";
 import { ContractWorkflowDslMigrationService } from "../services/workflow-dsl-migration.service.ts";
 import { WorkflowNlpExecutionService } from "../services/workflow-nlp-execution.service.ts";
 import { WorkflowProjectEnvironmentService } from "../services/workflow-project-environment.service.ts";
@@ -440,6 +443,7 @@ export class WorkflowApp implements WorkflowApi {
   #studioVersions: WorkflowStudioVersionService;
   #studioCopies: WorkflowStudioCopyService;
   #publication: WorkflowPublicationService;
+  #copyLineage: WorkflowCopyLineageService;
 
   private constructor(members: WorkflowInfrastructure) {
     this.#members = members;
@@ -454,6 +458,12 @@ export class WorkflowApp implements WorkflowApi {
     });
     this.#publication = WorkflowPublicationService.create({
       publications: members.publications,
+    });
+    this.#copyLineage = WorkflowCopyLineageService.create({
+      lineage: members.lineage,
+      permissions: members.permissions,
+      workflows: members.workflows,
+      studioVersions: this.#studioVersions,
     });
   }
 
@@ -479,6 +489,14 @@ export class WorkflowApp implements WorkflowApi {
     includeVersion?: boolean;
   }): Promise<WorkflowWithVersion> {
     return this.#members.workflows.getById(input);
+  }
+
+  /** One workflow with its current version, the graph upgraded to the current DSL. */
+  getWithMigratedDsl(input: {
+    workflowId: string;
+    projectId: string;
+  }): Promise<WorkflowWithVersion> {
+    return this.#studioVersions.getWithMigratedDsl(input);
   }
 
   /** Verifies that a workflow belongs to the requested project. */
@@ -554,6 +572,14 @@ export class WorkflowApp implements WorkflowApi {
     by: WorkflowCaller,
   ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }> {
     return this.#members.workflows.copy({ ...input, authorId: by.id });
+  }
+
+  /** Copies a workflow once the caller may create workflows in its source project too. */
+  copyFromPermittedSource(
+    input: Omit<CopyWorkflowCommand, "authorId">,
+    by: WorkflowCaller,
+  ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }> {
+    return this.#copyLineage.copyFromPermittedSource(input, by);
   }
 
   /** Changes a workflow's own metadata: its name, its icon, its description. */
@@ -877,6 +903,30 @@ export class WorkflowApp implements WorkflowApi {
     projectId: string;
   }): Promise<Readonly<{ version: string | null }> | null> {
     return this.#members.lineage.findLatestVersionNumber(input);
+  }
+
+  /** The copies of a workflow the caller may push to. */
+  listPermittedCopies(
+    input: { workflowId: string; projectId: string },
+    by: WorkflowCaller,
+  ): Promise<WorkflowCopyRow[]> {
+    return this.#copyLineage.listPermittedCopies(input, by);
+  }
+
+  /** Pulls the source's latest graph into this copy as its next major version. */
+  syncFromSource(
+    input: { workflowId: string; projectId: string },
+    by: WorkflowCaller,
+  ): Promise<{ workflow: WorkflowSourceRow; version: WorkflowVersion }> {
+    return this.#copyLineage.syncFromSource(input, by);
+  }
+
+  /** Pushes this workflow's latest graph to the copies the caller may update. */
+  pushToCopies(
+    input: { workflowId: string; projectId: string; copyIds?: string[] },
+    by: WorkflowCaller,
+  ): Promise<WorkflowPushToCopies> {
+    return this.#copyLineage.pushToCopies(input, by);
   }
 
   /**

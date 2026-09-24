@@ -426,6 +426,16 @@ describe("WorkflowService", () => {
     ]);
   });
 
+  /** @scenario "Restoring a version the project does not hold answers not found" */
+  it("answers a restore of an unknown version as not found", async () => {
+    await expect(
+      service(new FakeWorkflowRepository()).restoreVersion({
+        versionId: "missing",
+        projectId: "project_1",
+      }),
+    ).rejects.toMatchObject({ code: "workflow_version_not_found", httpStatus: 404 });
+  });
+
   /** @scenario "Restoring an old version migrates its graph" */
   it("restores the migrated graph and updates the workflow display metadata", async () => {
     const repository = new FakeWorkflowRepository();

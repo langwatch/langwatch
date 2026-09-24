@@ -1,7 +1,12 @@
 /** Save workflow graph as version: prepare → write → update agent mappings. See
  * modules/workflow/specs/workflow-service.feature. */
 import { createLogger } from "@langwatch/observability";
-import type { StudioWorkflow, WorkflowVersion } from "@langwatch/workflow-contract";
+import {
+  migrateDSLVersion,
+  type StudioWorkflow,
+  type WorkflowVersion,
+  type WorkflowWithVersion,
+} from "@langwatch/workflow-contract";
 
 import type { WorkflowAgentMapping, WorkflowStudioDsl } from "../app/workflow.app.ts";
 import type { WorkflowService } from "./workflow.service.ts";
@@ -34,6 +39,24 @@ export class WorkflowStudioVersionService {
   /** Prepares a graph the way saving one does, without writing anything. */
   prepareDsl(input: { projectId: string; dsl: StudioWorkflow }): Promise<StudioWorkflow> {
     return this.options.studioDsl.prepare(input);
+  }
+
+  /** One workflow with its current version, the graph upgraded to the current DSL. */
+  async getWithMigratedDsl(input: {
+    workflowId: string;
+    projectId: string;
+  }): Promise<WorkflowWithVersion> {
+    const workflow = await this.options.workflows.getById({
+      id: input.workflowId,
+      projectId: input.projectId,
+      includeVersion: true,
+    });
+
+    if (workflow.currentVersion) {
+      workflow.currentVersion.dsl = migrateDSLVersion(workflow.currentVersion.dsl);
+    }
+
+    return workflow;
   }
 
   async saveOrCommit(input: SaveStudioWorkflowVersionInput): Promise<WorkflowVersion> {
