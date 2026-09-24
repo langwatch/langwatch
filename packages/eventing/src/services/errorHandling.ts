@@ -153,6 +153,35 @@ export class QueueTenantMismatchError extends NonRetryableGroupQueueError {
 }
 
 /**
+ * A queued command payload failed its schema at dispatch. It was validated at
+ * send, so this is corruption or schema drift and cannot heal on re-delivery:
+ * non-retryable, so the queue dead-letters it.
+ */
+export class QueuedCommandPayloadInvalidError extends NonRetryableGroupQueueError {
+  override readonly name = "QueuedCommandPayloadInvalidError";
+  readonly pipelineName: string;
+  readonly commandName: string;
+  readonly commandType: string;
+  readonly issues: { path: string; code: string; message: string }[];
+
+  constructor(params: {
+    pipelineName: string;
+    commandName: string;
+    commandType: string;
+    issues: { path: string; code: string; message: string }[];
+  }) {
+    super(
+      `Queued payload for command "${params.commandName}" (${params.commandType}) on pipeline ` +
+        `"${params.pipelineName}" failed its schema at dispatch; refusing it so the queue dead-letters it`,
+    );
+    this.pipelineName = params.pipelineName;
+    this.commandName = params.commandName;
+    this.commandType = params.commandType;
+    this.issues = params.issues;
+  }
+}
+
+/**
  * Error thrown when validation fails (invalid data, missing fields, etc.).
  */
 export class ValidationError extends CriticalError {

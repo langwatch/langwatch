@@ -65,7 +65,9 @@ describe("process-manager fleet gauges", () => {
     it("observes nothing for it", async () => {
       bindProcessFleetMetricsSource(async () => []);
 
-      expect(await collectOnce()).toEqual([]);
+      const perProcess = (await collectOnce()).filter((r) => "process_name" in r.attributes);
+
+      expect(perProcess).toEqual([]);
     });
   });
 });

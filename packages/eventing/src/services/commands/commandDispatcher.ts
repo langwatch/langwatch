@@ -1,6 +1,6 @@
 import { performance } from "node:perf_hooks";
 
-import type { createLogger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability";
 
 import type { Command, CommandHandler } from "../../commands/command.ts";
 import { createCommand } from "../../commands/command.ts";
@@ -23,7 +23,9 @@ import type { DeduplicationStrategy } from "../../queues/index.ts";
 import type { EventStoreReadContext } from "../../stores/eventStore.types.ts";
 import { mapValidationIssues } from "../../utils/errors.ts";
 import { EventUtils } from "../../utils/event.utils.ts";
-import { ValidationError } from "../errorHandling.ts";
+import { QueuedCommandPayloadInvalidError, ValidationError } from "../errorHandling.ts";
+
+const dispatchLogger = createLogger("langwatch:event-sourcing:command-dispatcher");
 
 /**
  * Parameters for the extracted processCommand function.
@@ -32,7 +34,7 @@ export interface ProcessCommandParams<
   EventType extends Event,
   Payload extends TenantScopedPayload,
 > {
-  payload: Record<string, unknown>;
+  payload: unknown;
   commandType: CommandType;
   commandSchema: CommandSchema<Payload, CommandType>;
   handler: CommandHandler<Command<Payload>, EventType>;
@@ -105,6 +107,26 @@ function validateHandlerEvents(events: unknown, commandType: CommandType): void 
   }
 }
 
+/** Parses a queued payload once, at dispatch; a failure is refused non-retryably (dead-letter). */
+function parseQueuedPayload<EventType extends Event, Payload extends TenantScopedPayload>(
+  params: Omit<ProcessCommandParams<EventType, Payload>, "payload">,
+  payload: unknown,
+): Payload {
+  const validation = params.commandSchema.validate(payload);
+  if (validation.success) return validation.data;
+  const identity = {
+    pipelineName: params.pipelineName,
+    commandName: params.commandName,
+    commandType: params.commandType,
+    issues: mapValidationIssues(validation.error.issues),
+  };
+  (params.logger ?? dispatchLogger).error(
+    identity,
+    "Queued command payload failed its schema at dispatch; refusing it so the queue dead-letters it",
+  );
+  throw new QueuedCommandPayloadInvalidError(identity);
+}
+
 /**
  * Processes a command: validates the payload, invokes the handler, validates
  * resulting events, and stores them. Extracted for reuse in shared command
@@ -116,7 +138,6 @@ export async function processCommand<EventType extends Event, Payload extends Te
   const {
     payload,
     commandType,
-    commandSchema,
     handler,
     getAggregateId,
     storeEventsFn,
@@ -128,20 +149,7 @@ export async function processCommand<EventType extends Event, Payload extends Te
     logger: log,
   } = params;
 
-  const validation = commandSchema.validate(payload);
-  if (!validation.success) {
-    throw new ValidationError(
-      `Invalid payload for command type "${commandType}". Validation failed.`,
-      "payload",
-      undefined,
-      {
-        commandType,
-        zodIssues: mapValidationIssues(validation.error.issues),
-      },
-    );
-  }
-
-  const validated = validation.data;
+  const validated = parseQueuedPayload(params, payload);
   const tenantId = createTenantId(String(validated.tenantId));
   const aggregateId = getAggregateId(validated);
 
@@ -210,7 +218,7 @@ export interface ProcessCommandBatchParams<
   Payload extends TenantScopedPayload,
 > extends Omit<ProcessCommandParams<EventType, Payload>, "payload"> {
   /** Same-command payloads to coalesce, in dispatch (occurredAt) order. */
-  payloads: Record<string, unknown>[];
+  payloads: unknown[];
 }
 
 /**
@@ -223,29 +231,13 @@ interface BatchProgress {
 }
 
 /**
- * Schema-validate every payload up front (Phase 1). A failure throws (like the
- * single path), failing the whole batch; downstream idempotency keys make the
- * batch's retry safe.
+ * Parse every payload up front (Phase 1). A failure refuses the whole batch
+ * non-retryably, like the single path; nothing is stored.
  */
 function validateBatchPayloads<EventType extends Event, Payload extends TenantScopedPayload>(
   params: ProcessCommandBatchParams<EventType, Payload>,
 ): Payload[] {
-  const { payloads, commandSchema, commandType } = params;
-  return payloads.map((payload) => {
-    const validation = commandSchema.validate(payload);
-    if (!validation.success) {
-      throw new ValidationError(
-        `Invalid payload for command type "${commandType}". Validation failed.`,
-        "payload",
-        undefined,
-        {
-          commandType,
-          zodIssues: mapValidationIssues(validation.error.issues),
-        },
-      );
-    }
-    return validation.data;
-  });
+  return params.payloads.map((payload) => parseQueuedPayload(params, payload));
 }
 
 /**

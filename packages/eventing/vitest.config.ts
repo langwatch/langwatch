@@ -3,6 +3,7 @@ import { configDefaults } from "vitest/config";
 
 export default defineModuleVitestConfig({
   kind: "node",
+  isolate: true,
   test: {
     environment: "node",
     testTimeout: 30_000,

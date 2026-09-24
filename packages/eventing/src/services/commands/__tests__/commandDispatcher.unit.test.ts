@@ -13,7 +13,7 @@ import {
   createTestTenantId,
   TEST_CONSTANTS,
 } from "../../__tests__/testHelpers.ts";
-import { ValidationError } from "../../errorHandling.ts";
+import { QueuedCommandPayloadInvalidError, ValidationError } from "../../errorHandling.ts";
 import type { ProcessCommandBatchParams, ProcessCommandParams } from "../commandDispatcher.ts";
 import { processCommand, processCommandBatch } from "../commandDispatcher.ts";
 
@@ -117,7 +117,7 @@ describe("processCommand", () => {
   // ─── 2. Schema validation failure ──────────────────────────────
 
   describe("when schema validation fails", () => {
-    it("throws ValidationError when commandSchema.validate returns failure", async () => {
+    it("refuses it non-retryably, naming the command, so the queue dead-letters it", async () => {
       const commandSchema = createMockCommandSchema({
         validate: vi.fn().mockReturnValue({
           success: false,
@@ -129,8 +129,9 @@ describe("processCommand", () => {
 
       const params = createDefaultParams({ commandSchema });
 
-      await expect(processCommand(params)).rejects.toThrow(ValidationError);
-      await expect(processCommand(params)).rejects.toThrow(/Invalid payload for command type/);
+      const refusal = await processCommand(params).catch((error: unknown) => error);
+      expect(refusal).toBeInstanceOf(QueuedCommandPayloadInvalidError);
+      expect(refusal).toMatchObject({ retryable: false, commandName, commandType });
     });
   });
 
@@ -361,7 +362,7 @@ describe("processCommandBatch", () => {
 
   describe("given a payload that fails schema validation", () => {
     describe("when the batch is processed", () => {
-      it("throws ValidationError and stores nothing", async () => {
+      it("refuses the batch non-retryably and stores nothing", async () => {
         const storeEventsFn = vi.fn();
         const commandSchema = createEchoCommandSchema({
           validate: vi.fn().mockImplementation((p: any) =>
@@ -381,7 +382,9 @@ describe("processCommandBatch", () => {
           storeEventsFn,
         });
 
-        await expect(processCommandBatch(params)).rejects.toThrow(ValidationError);
+        const refusal = await processCommandBatch(params).catch((error: unknown) => error);
+        expect(refusal).toBeInstanceOf(QueuedCommandPayloadInvalidError);
+        expect(refusal).toMatchObject({ retryable: false });
         expect(storeEventsFn).not.toHaveBeenCalled();
       });
     });
