@@ -1,16 +1,16 @@
 /**
- * The Postgres catalog derivation: tenant scope, safe defaults and label
+ * The Postgres catalog per-model builder: tenant scope, safe defaults and label
  * columns.
  *
  * These bind the @unit scenarios of `specs/lwql/postgres-catalog.feature` that
- * are about the derivation itself — naming/type helpers move to
- * `./derivePostgresCatalog.naming.unit.test.ts`, override handling (the six
- * formerly-hand-written views, re-admits, the skip-list guard) to
- * `./derivePostgresCatalog.overrides.unit.test.ts`, the coverage guard lives
- * in `./tenantModelCoverage.unit.test.ts`, and the content-gating and
+ * are about the per-model build itself — naming/type helpers move to
+ * `./defineCatalogModel.naming.unit.test.ts`, override handling (the six
+ * formerly-hand-written views, re-admits) to
+ * `./defineCatalogModel.overrides.unit.test.ts`, the opt-in negative case
+ * lives in `./catalogInclusion.unit.test.ts`, and the content-gating and
  * ground-truth scenarios bind elsewhere.
  *
- * @see ../derivePostgresCatalog.ts — the code under test
+ * @see ../defineCatalogModel.ts — the code under test
  * @see specs/lwql/postgres-catalog.feature
  */
 
@@ -20,20 +20,15 @@ import {
   teamTenantPath,
 } from "../../provisioning/postgresMapping";
 import {
-  derivePostgresCatalog,
+  type DerivedPostgresView,
   isStrippedByDefault,
   resolveTenantScope,
   sanitizeDescription,
-} from "../derivePostgresCatalog";
-import { LWQL_POSTGRES_SKIPPED_MODELS } from "../postgresSkippedModels";
-import { LWQL_POSTGRES_ALL_OVERRIDES } from "../postgresViews";
+} from "../defineCatalogModel";
+import { LWQL_POSTGRES_CATALOG } from "../postgresViews";
 import { LWQL_PRISMA_MANIFEST, prismaManifestModel } from "../prismaManifest";
 
-const catalog = derivePostgresCatalog({
-  manifest: LWQL_PRISMA_MANIFEST,
-  skip: LWQL_POSTGRES_SKIPPED_MODELS,
-  overrides: LWQL_POSTGRES_ALL_OVERRIDES,
-});
+const catalog = LWQL_POSTGRES_CATALOG as readonly DerivedPostgresView[];
 const byModel = new Map(
   catalog.map((view) => [view.postgres!.baseRelation, view]),
 );
@@ -108,7 +103,8 @@ describe("given the derived Postgres catalog", () => {
       expect(view.postgres!.tenantPath?.slice(1)).toEqual(
         organizationTenantPath(),
       );
-      expect(LWQL_POSTGRES_SKIPPED_MODELS.GatewayBudgetLedger).toBeUndefined();
+      // Catalogued through its parent — no entry needed on any skip list.
+      expect(byName.has("gateway_budget_ledgers")).toBe(true);
     });
   });
 
@@ -196,7 +192,7 @@ describe("given the derived Postgres catalog", () => {
      * Prisma flattens an enum and a free-text `String` to the same ClickHouse
      * `String`, so a label would be gated `output` by the name-blind default and
      * — because the validator gates a bare name catalog-wide — withhold the same
-     * name on the ClickHouse half. The derivation recognises the two label shapes
+     * name on the ClickHouse half. The builder recognises the two label shapes
      * explicitly so they stay ungated.
      */
     it("leaves an enum column ungated", () => {

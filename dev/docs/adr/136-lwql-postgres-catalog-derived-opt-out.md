@@ -140,11 +140,9 @@ change and is a known manual step, not an oversight.
 ## Consequences
 
 - **Positive.** Topics, datasets, workflows, gateway objects, and governance
-  objects become queryable. `docs/api-reference/query/overview.mdx` and
-  `infra/clickhouse-serverless/internal/render/lwql_catalog.json` are
-  regenerated from the catalog rather than hand-maintained, and both are
-  parity-tested against it, so the published docs and the deployed render
-  config cannot drift from what the catalog actually contains.
+  objects become queryable. `docs/api-reference/query/overview.mdx` is
+  regenerated from the catalog rather than hand-maintained, and the app
+  catalog is the single source of truth for all deployments (per [ADR-142](./142-the-app-owns-the-lwql-access-model.md)), so the published docs cannot drift from what the catalog actually contains.
 - **Negative.** The provisioning surface is bigger: more approved views, more
   engine tables, more row policies, all generated per model instead of
   hand-counted at six. The PostgreSQL connection budget grows with the

@@ -8,11 +8,11 @@
  * self-referential parent is exposed as `ParentTopicId` so a caller can walk
  * the topic tree.
  *
- * @see ../derivePostgresCatalog.ts — the derivation this refines
+ * @see ../defineCatalogModel.ts — the per-model builder this refines
  * @see specs/lwql/postgres-catalog.feature — "Topic clustering internals are not exposed"
  */
 
-import type { PostgresDatasetOverride } from "../derivePostgresCatalog";
+import type { PostgresDatasetOverride } from "../defineCatalogModel";
 
 /** The topics override, keyed by its Prisma model name. */
 export const TOPICS_POSTGRES_OVERRIDES: Record<

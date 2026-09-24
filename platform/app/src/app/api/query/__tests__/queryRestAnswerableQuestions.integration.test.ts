@@ -55,6 +55,7 @@ import {
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
 } from "~/server/analytics/lwql/__tests__/lwqlClickHouseHarness";
+import { LWQL_VIEW_CATALOG } from "~/server/analytics/lwql/catalog/lwqlViews";
 import {
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
@@ -790,6 +791,12 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
         dedup: SHIPPED_LWQL_DEDUP,
       }),
     );
+    // Grants and source-table policies for the whole catalog, from the single
+    // access-model emitter (#8258) — the view statements are structural only.
+    await harness.applyAccessModel({
+      views: LWQL_VIEW_CATALOG,
+      sourceDatabase: facts,
+    });
 
     await resetApp();
     const eventSourcing = createAuthzTestEventSourcing(prisma);

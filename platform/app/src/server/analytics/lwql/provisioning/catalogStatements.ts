@@ -67,8 +67,6 @@ import {
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
   type LangWatchQLTable,
-  lwqlGrantStatement,
-  lwqlRowPolicyStatement,
 } from "./accessModel";
 import {
   DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
@@ -273,7 +271,8 @@ function sourceRelation({
  *
  * It reads the key map with no `WHERE` of its own because the key map polices
  * *itself* — the restricted identity sees exactly the row its own hash matches
- * (`lwqlKeyMapRowPolicyStatement`). So the subquery yields this caller's
+ * (the key-map self policy the access-model definition carries). So the subquery
+ * yields this caller's
  * tenant and nothing else, and an unknown or empty key yields no row at all,
  * which ClickHouse folds to `NULL` and PostgreSQL matches nothing against. The
  * dependency is load-bearing: without the key map's self-policy this subquery
@@ -750,54 +749,6 @@ export function lwqlSourceTables({
 }
 
 /**
- * The columns the restricted identity is granted on each ClickHouse source
- * table, keyed by table — the single source of truth the Go chart renderer
- * mirrors so its SaaS grants are column-scoped like the self-hosted ones.
- *
- * The exact set {@link lwqlSourceColumnGrantStatement} (primary) and
- * {@link lwqlJoinSourceColumnGrantStatement} (joined side) grant, unioned per
- * table and sorted, so a table read by two views is granted the union both
- * need. PostgreSQL-resident sources are absent: their engine table carries
- * exactly the exposed columns already and takes the whole-object grant
- * ({@link lwqlGrantStatement}), which the Go renderer emits for any table this
- * map omits — matching the whole-table grant the views themselves take.
- *
- * Emitted into `lwql_catalog.json` and asserted equal there by
- * `../catalog/__tests__/manifestParity.unit.test.ts`, so the Go binary grants
- * exactly the columns this catalog exposes rather than every column of the
- * source table.
- */
-export function lwqlSourceColumnGrants({
-  views = LWQL_VIEW_CATALOG,
-}: {
-  views?: readonly LangWatchQLViewDefinition[];
-} = {}): Record<string, string[]> {
-  const byTable = new Map<string, Set<string>>();
-  const add = (table: string, columns: readonly string[]): void => {
-    const set = byTable.get(table) ?? new Set<string>();
-    for (const column of columns) set.add(column);
-    byTable.set(table, set);
-  };
-  for (const view of views) {
-    // A PostgreSQL-engine table takes the whole-object grant, not a column-scoped
-    // one, so it contributes no entry and renders as a whole-table grant in Go.
-    if (isPostgresResident(view)) continue;
-    add(view.sourceTable, lwqlGrantedSourceColumns(view));
-    if (view.join) {
-      add(view.join.table, [
-        ...view.join.sourceColumns,
-        ...(view.join.onSourceColumns?.joined ?? []),
-      ]);
-    }
-  }
-  const out: Record<string, string[]> = {};
-  for (const [table, columns] of byTable) {
-    out[table] = [...columns].sort();
-  }
-  return out;
-}
-
-/**
  * The approved PostgreSQL views the catalog's PostgreSQL-resident datasets
  * read, as statements to run *against PostgreSQL*.
  *
@@ -855,9 +806,8 @@ export function lwqlPostgresApprovedViewStatements({
 /**
  * The approved views the reader role must be granted, in catalog order.
  *
- * Called for real by self-hosted provisioning (`selfProvisioning.ts`, issue
- * #6635); on cloud the same access model is infra-owned (langwatch-saas#1126) and this
- * is the reference implementation terraform must match.
+ * Provisioned by the application on every distribution (issue #8258) — it owns
+ * the access model, so there is no infra-owned copy to keep in parity.
  */
 export function lwqlApprovedPostgresViewNames(
   views: readonly LangWatchQLViewDefinition[] = LWQL_VIEW_CATALOG,
@@ -878,9 +828,8 @@ export function lwqlApprovedPostgresViewNames(
  * Headroom on top of the pools' total demand, for the connection a
  * re-provisioning run or an operator's `psql` needs while the pools are full.
  *
- * Called for real by self-hosted provisioning (`selfProvisioning.ts`, issue
- * #6635); on cloud the same reader role is infra-owned (langwatch-saas#1126) and this
- * is the reference implementation terraform must match.
+ * Provisioned by the application on every distribution (issue #8258) — it owns
+ * the reader role, so there is no infra-owned copy to keep in parity.
  */
 export function lwqlPostgresReaderConnectionLimit({
   views = LWQL_VIEW_CATALOG,
@@ -915,12 +864,9 @@ export function lwqlPostgresReaderConnectionLimit({
  * Run before {@link lwqlViewSetupStatements}, which builds the LangWatchQL
  * views over them, and after the named collection exists.
  *
- * Two callers, two ownership models. Self-hosted deployments run this for
- * real via `selfProvisioning.ts` under `LWQL_SELF_PROVISION` (issue #6635),
- * so it is a production path. On cloud the same tables are
- * owned by infra (langwatch-saas#1126) and this stays the reference
- * implementation terraform must match — keep it and its tests in sync with
- * both.
+ * The application provisions this on every distribution (issue #8258): it owns
+ * these tables on both self-hosted and cloud, so there is one definition and no
+ * rendered copy to keep in parity.
  */
 export function lwqlPostgresEngineTableStatements({
   names,
@@ -972,23 +918,16 @@ function singleSourceColumn(
 }
 
 /**
- * Every statement that provisions the LangWatchQL views, in dependency order.
+ * The `CREATE VIEW` statements that expose the LangWatchQL views — the
+ * structural half. The access model over these views (their grants and the
+ * source-table row policies) is NOT emitted here: it is single-sourced from the
+ * definition and rendered by `renderLwqlAccessModelDdl`, or shipped as per-pod
+ * `users.d` config (issue #8258), so there is one code path for access DDL.
  *
- * Runs *after* `lwqlClickHouseSetupStatements`, which mints the restricted
- * user: a grant created before the user still points at the replaced access
- * entity, so the ordering between the two is load-bearing in exactly the way
- * the setup list documents.
- *
- * The source tables themselves are not created here — the ClickHouse ones come
- * from migrations, and the PostgreSQL-engine ones from
- * {@link lwqlPostgresEngineTableStatements}, which must have run first.
- * This function only exposes them.
- *
- * Two callers, two ownership models. Self-hosted deployments run this for real
- * via `selfProvisioning.ts` under `LWQL_SELF_PROVISION` (issue #6635), so it is
- * a production path. On cloud the same views' grants and access model are
- * owned by infra (langwatch-saas#1126) and this stays the reference
- * implementation terraform must match — keep it and its tests in sync with both.
+ * The source tables themselves are not created here either — the ClickHouse ones
+ * come from migrations, and the PostgreSQL-engine ones from
+ * {@link lwqlPostgresEngineTableStatements}, which must have run first. This
+ * function only exposes them.
  */
 export function lwqlViewSetupStatements({
   names,
@@ -1001,48 +940,7 @@ export function lwqlViewSetupStatements({
   views?: readonly LangWatchQLViewDefinition[];
   dedup: LangWatchQLDedupStrategy;
 }): string[] {
-  return [
-    ...views.map((view) =>
-      lwqlViewStatement({ names, sourceDatabase, view, dedup }),
-    ),
-    // Row policies BEFORE the grants they constrain, and this order is
-    // load-bearing rather than cosmetic. In ClickHouse a table carrying a
-    // `SELECT` grant and no row policy returns every row, so grants-first
-    // leaves a window in which the restricted identity reads across every
-    // tenant — and provisioning is not atomic. A caller that dies midway (a
-    // dropped connection, a refused statement) can leave that window standing
-    // indefinitely, and `provisionLwql` deliberately swallows the error and
-    // continues booting, so nothing downstream would close it.
-    //
-    // Emitting policies first inverts the failure: a partial run leaves the
-    // identity policed but not yet granted, which refuses reads rather than
-    // widening them. Safe to hoist because every table named here already
-    // exists by this point — fact tables come from migrations, and the
-    // PostgreSQL-engine tables are created earlier in the same batch.
-    ...lwqlSourceTables({ names, sourceDatabase, views }).map((lwqlTable) =>
-      lwqlRowPolicyStatement({ names, lwqlTable, sourceDatabase }),
-    ),
-    // A fact table carries far more than the catalog exposes, so its grant is
-    // column-scoped. A PostgreSQL-engine table was *created from* the catalog
-    // and its whole column list is the exposed surface, so it takes the
-    // whole-object grant the key map and the views take — which is also what
-    // keeps `SHOW CREATE TABLE` answerable, the surface the credential-leak
-    // assertion inspects.
-    ...views.map((view) =>
-      isPostgresResident(view)
-        ? lwqlGrantStatement({ names, table: view.sourceTable })
-        : lwqlSourceColumnGrantStatement({ names, sourceDatabase, view }),
-    ),
-    // The joined side's column grant, for the views that span two tables. Empty
-    // for every single-table view, so the emitted statements are unchanged.
-    ...views.flatMap((view) => {
-      const grant = lwqlJoinSourceColumnGrantStatement({
-        names,
-        sourceDatabase,
-        view,
-      });
-      return grant ? [grant] : [];
-    }),
-    ...views.map((view) => lwqlGrantStatement({ names, table: view.name })),
-  ];
+  return views.map((view) =>
+    lwqlViewStatement({ names, sourceDatabase, view, dedup }),
+  );
 }

@@ -20,7 +20,7 @@
  *    `organizationId`, or the foreign key to a parent it reaches a tenant
  *    through) is set to the tenant spine the harness already seeded, so the
  *    join lands on the caller's project;
- *  - a column the derivation *strips* (absent from the view) is given a
+ *  - a column the builder *strips* (absent from the view) is given a
  *    recognisable `excluded-…` marker, which is what lets the isolation test
  *    assert a `SELECT *` over the view never contains one;
  *  - a nullable column not covered by any of the above stays SQL `NULL` — the
@@ -39,7 +39,7 @@
  * `relationMode = "prisma"`, no database FKs) insert cleanly.
  *
  * @see ./lwqlClickHouseHarness.ts — `postgresTenantSeedStatements` (the explicit seeds this complements) and `startLangWatchQLPostgres` (the caller)
- * @see ../catalog/derivePostgresCatalog.ts — the derivation whose views this seeds
+ * @see ../catalog/defineCatalogModel.ts — the per-model builder whose views this seeds
  */
 
 import { prismaManifestEnum } from "../catalog/prismaManifest";
@@ -52,9 +52,9 @@ import type {
 /**
  * The subset of a derived view this seeder reads, structural to stay decoupled.
  *
- * A supertype of the derivation's `DerivedPostgresView`: `postgres` is optional
+ * A supertype of the builder's `DerivedPostgresView`: `postgres` is optional
  * here to match its `LangWatchQLViewDefinition.postgres?` origin, so the
- * derivation's output feeds this seeder without a cast — and the entry point
+ * builder's output feeds this seeder without a cast — and the entry point
  * takes this structural type, not the concrete one, so the decoupling is real.
  * The seeder only ever receives real derived views, every one of which carries
  * `postgres`, so the internals read it non-null.
@@ -72,7 +72,7 @@ export interface SeedableView {
       readonly on: { readonly from: string; readonly to: string };
     }[];
   };
-  /** Source columns the derivation stripped, mapped to the reason. */
+  /** Source columns the builder stripped, mapped to the reason. */
   readonly skipColumns: Readonly<Record<string, string>>;
 }
 

@@ -24,6 +24,8 @@ import {
   lwqlAppFunctionGrantAuditQuery,
   lwqlClickHouseSetupStatements,
 } from "../accessModel";
+import { renderLwqlAccessModelDdl } from "../accessModelDdl";
+import { buildLwqlAccessModelDefinition } from "../accessModelDefinition";
 import {
   LWQL_SQL_UDF_ORIGIN,
   lwqlAppFunctionBody,
@@ -33,6 +35,7 @@ import {
   lwqlAppFunctionStatement,
   lwqlAppFunctionStatements,
 } from "../appFunctionStatements";
+import type { PostgresNamedCollection } from "../postgresMapping";
 
 const NAMES = {
   database: "lwql_test",
@@ -40,6 +43,15 @@ const NAMES = {
   settingsProfile: "lwql_test_profile",
   keyMapTable: "api_key_tenants",
   tenantSetting: "custom_api_key_hash",
+};
+
+const NAMED_COLLECTION: PostgresNamedCollection = {
+  collection: "lwql_postgres",
+  host: "pg.internal",
+  port: 5432,
+  database: "lwql_test",
+  user: "lwql_ro",
+  password: "reader-secret",
 };
 
 const singleKey = (definition: LangWatchQLAppFunctionDefinition): boolean =>
@@ -129,18 +141,13 @@ describe("given the app-function catalog", () => {
     });
   });
 
-  describe("when the access model's setup statements are built", () => {
-    it("includes every function's DDL before the first grant", () => {
+  describe("when the structural setup statements are built", () => {
+    it("includes every function's create statement", () => {
       const statements = lwqlClickHouseSetupStatements({
         names: NAMES,
-        password: "secret",
-        lwqlTables: [],
+        sourceDatabase: NAMES.database,
       });
-      const firstGrant = statements.findIndex((statement) =>
-        statement.startsWith("GRANT"),
-      );
 
-      expect(firstGrant).toBeGreaterThan(0);
       for (const definition of LWQL_APP_FUNCTION_CATALOG) {
         const at = statements.findIndex((statement) =>
           statement.includes(`FUNCTION ${definition.name} AS (`),
@@ -149,16 +156,20 @@ describe("given the app-function catalog", () => {
           at,
           `${definition.name} has no create statement`,
         ).toBeGreaterThan(-1);
-        expect(at).toBeLessThan(firstGrant);
       }
     });
 
     it("grants the restricted identity nothing on any function", () => {
-      const statements = lwqlClickHouseSetupStatements({
-        names: NAMES,
-        password: "secret",
-        lwqlTables: [],
-      });
+      // The access model is single-sourced from the definition now; assert the
+      // grant set it renders never names a function.
+      const statements = renderLwqlAccessModelDdl(
+        buildLwqlAccessModelDefinition({
+          names: NAMES,
+          passwordSha256Hex: "a".repeat(64),
+          namedCollection: NAMED_COLLECTION,
+          sourceDatabase: NAMES.database,
+        }),
+      );
 
       for (const statement of statements) {
         if (!statement.startsWith("GRANT")) continue;

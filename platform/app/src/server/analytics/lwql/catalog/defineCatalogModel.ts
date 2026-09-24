@@ -1,24 +1,24 @@
 /**
- * Derives the PostgreSQL-resident half of the LangWatchQL catalog from the
- * Prisma manifest, opt-*out* exactly as {@link ./defineDatasetFromTable#deriveDefaultCatalog}
+ * Builds the PostgreSQL-resident half of the LangWatchQL catalog opt-*in* from
+ * the Prisma manifest, exactly as {@link ./defineDatasetFromTable#defineCatalogTable}
  * does for the ClickHouse half.
  *
- * Every tenant-scoped Prisma model becomes a {@link LangWatchQLViewDefinition}
- * unless it is on {@link ./postgresSkippedModels#LWQL_POSTGRES_SKIPPED_MODELS}
- * with a reason. A model earns a view by carrying an owning project — directly
- * (`projectId`), through its team or organization (fanned out to one row per
- * project), or through a declared parent (`tenantVia`). The safe defaults
- * strip secrets and person emails, gate free-text/cost columns, and never
- * expose a raw internal `tenantId`; an override refines any of it and may
- * re-admit a stripped column with a stated reason.
+ * {@link defineCatalogModel} turns one named Prisma model into a
+ * {@link LangWatchQLViewDefinition}: `LWQL_POSTGRES_CATALOG` lists every model
+ * with an explicit call, and a model not listed is not in the catalog. A model
+ * earns a view by carrying an owning project — directly (`projectId`), through
+ * its team or organization (fanned out to one row per project), or through a
+ * declared parent (`tenantVia`). The safe defaults strip secrets and person
+ * emails, gate free-text/cost columns, and never expose a raw internal
+ * `tenantId`; an override refines any of it and may re-admit a stripped column
+ * with a stated reason.
  *
  * The output is shape-identical to a hand-written entry, so the same consumers
  * (schema endpoint, AST validator, provisioning generators) read it without
- * knowing it was derived — and the six views that used to be hand-written in
- * `postgresViews.ts` are now overrides on this derivation.
+ * knowing it was built from the manifest.
  *
  * @see ./prismaManifest.ts — the model/field facts this reads
- * @see ./postgresSkippedModels.ts — what opt-out leaves off, and why
+ * @see ./postgresViews.ts — the explicit catalog that lists every model
  * @see ../provisioning/postgresMapping.ts — the tenant join-chain helpers
  * @see specs/lwql/postgres-catalog.feature
  */
@@ -32,11 +32,7 @@ import {
   teamTenantPath,
 } from "../provisioning/postgresMapping";
 import { defaultColumnGates } from "./defineDatasetFromTable";
-import {
-  type PostgresSkipMap,
-  postgresSkipReason,
-} from "./postgresSkippedModels";
-import { prismaManifestModel } from "./prismaManifest";
+import { LWQL_PRISMA_MANIFEST, prismaManifestModel } from "./prismaManifest";
 import type { PrismaField, PrismaManifest, PrismaModel } from "./prismaSchema";
 import type {
   LangWatchQLColumnUnit,
@@ -275,7 +271,7 @@ export function isStrippedByDefault(name: string): string | undefined {
 /**
  * Postgres String columns whose value is a categorical label, not free text.
  *
- * The ClickHouse derivation tells a label from a body by its *type*: a label is
+ * The ClickHouse builder tells a label from a body by its *type*: a label is
  * a `LowCardinality(String)`, which {@link ./defineDatasetFromTable#isContentType}
  * reads as "not content" and leaves ungated. Prisma carries no such wrapper — an
  * enum and a free-text `String` both map to a plain `String` (see
@@ -1015,27 +1011,35 @@ function assertAnnotationsExposed(
 // ---------------------------------------------------------------------------
 
 /**
- * Every tenant-scoped Prisma model that is not skipped, as a derived view
- * definition, in manifest order (the caller sorts by name).
+ * One catalog entry, built opt-*in* from a named Prisma model and its override.
  *
- * A model earns a view by carrying an owning project; it stays off only by
- * being in `skip` with a reason. Defaults are safe — secrets and emails
- * stripped, free-text and cost columns gated, an internal `tenantId` never
- * exposed — and an override refines any of them.
+ * This is the only way a Prisma model enters the Postgres half of the catalog:
+ * `LWQL_POSTGRES_CATALOG` calls it once per listed model. It looks that one
+ * model up in the manifest, resolves its tenant scope (using the other models'
+ * overrides to follow a `tenantVia` parent chain) and builds its view with the
+ * safe defaults — secrets and emails stripped, free-text and cost columns
+ * gated, an internal `tenantId` never exposed — which the override refines.
+ * There is no loop over the manifest and no skip list: a model not named in an
+ * explicit call is simply not in the catalog, not queryable, and not granted.
  */
-export function derivePostgresCatalog({
-  manifest,
-  skip,
+export function defineCatalogModel({
+  model,
+  override = {},
   overrides = {},
+  manifest = LWQL_PRISMA_MANIFEST,
 }: {
-  manifest: PrismaManifest;
-  skip: PostgresSkipMap;
-  overrides?: Readonly<Record<string, PostgresDatasetOverride>>;
-}): DerivedPostgresView[] {
+  /** The Prisma model name to build a view for. */
+  readonly model: string;
+  /** This model's own refinements. */
+  readonly override?: PostgresDatasetOverride;
+  /** Every model's overrides, so a `tenantVia` parent chain resolves. */
+  readonly overrides?: Readonly<Record<string, PostgresDatasetOverride>>;
+  readonly manifest?: PrismaManifest;
+}): DerivedPostgresView {
   const context: TenantResolveContext = { manifest, overrides };
-  return manifest.models
-    .filter((model) => postgresSkipReason(model.name, skip) === undefined)
-    .map((model) =>
-      deriveModel({ model, override: overrides[model.name] ?? {}, context }),
-    );
+  return deriveModel({
+    model: prismaManifestModel(manifest, model),
+    override,
+    context,
+  });
 }

@@ -8,10 +8,10 @@
  * these models be *derived* rather than skipped — a true tenant path exists, so
  * the opt-out contract exposes them.
  *
- * @see ../derivePostgresCatalog.ts#resolveTenantScope — how a parent path resolves
+ * @see ../defineCatalogModel.ts#resolveTenantScope — how a parent path resolves
  */
 
-import type { PostgresDatasetOverride } from "../derivePostgresCatalog";
+import type { PostgresDatasetOverride } from "../defineCatalogModel";
 
 /** Tenant-less models, each reaching a tenant through a parent foreign key. */
 export const PARENTS_POSTGRES_OVERRIDES: Record<
