@@ -15,22 +15,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GovernanceHttpClient } from "../../app/governance.members.ts";
 import {
+  copilotBotsAsAgents,
+  HttpCopilotBotsChannel,
+  MAX_BOT_PAGES,
+  readBotRows,
+} from "../../channels/http/http.copilot-bots.channel.ts";
+import { HttpGenieSpacesChannel } from "../../channels/http/http.genie-spaces.channel.ts";
+import {
   agentsListed,
   agentsRefused,
   refusalFromStatus,
   refusalFromThrown,
 } from "../../rules/agent-listing.rules.ts";
-import {
-  copilotBotsAsAgents,
-  listCopilotAgents,
-  MAX_BOT_PAGES,
-  readBotRows,
-  readCopilotBots,
-} from "../copilot-bots.service.ts";
-import {
-  genieSpacesAsAgents,
-  listGenieAgents as listGenieAgentsWithHttp,
-} from "../genie-spaces.service.ts";
+import { genieSpacesAsAgents } from "../../rules/genie-spaces.rules.ts";
 import type { SsrfSafeResponse } from "../ssrf-safe-fetch.ts";
 
 vi.mock("../ssrf-safe-fetch.ts", () => ({
@@ -39,7 +36,7 @@ vi.mock("../ssrf-safe-fetch.ts", () => ({
 const { ssrfSafeFetch } = await import("../ssrf-safe-fetch.ts");
 const fetchMock = vi.mocked(ssrfSafeFetch);
 
-const genieHttp: GovernanceHttpClient = {
+const testHttp: GovernanceHttpClient = {
   async fetch(url, init) {
     const response = await ssrfSafeFetch(url, init);
     return {
@@ -52,9 +49,15 @@ const genieHttp: GovernanceHttpClient = {
   },
 };
 
-function listGenieAgents(input: Omit<Parameters<typeof listGenieAgentsWithHttp>[0], "http">) {
-  return listGenieAgentsWithHttp({ ...input, http: genieHttp });
-}
+const copilotBots = HttpCopilotBotsChannel.create({ http: testHttp });
+const genieSpaces = HttpGenieSpacesChannel.create({ http: testHttp });
+
+type BotsArgs = Parameters<HttpCopilotBotsChannel["readBots"]>[0];
+const readCopilotBots = (input: BotsArgs) => copilotBots.readBots(input);
+const listCopilotAgents = (input: Omit<BotsArgs, "shouldFollowPages">) =>
+  copilotBots.listAgents(input);
+const listGenieAgents = (input: Parameters<HttpGenieSpacesChannel["listAgents"]>[0]) =>
+  genieSpaces.listAgents(input);
 
 const reply = (params: { ok: boolean; status: number; body?: unknown }): SsrfSafeResponse => ({
   ok: params.ok,

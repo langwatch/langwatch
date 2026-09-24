@@ -13,20 +13,24 @@ import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GovernanceHttpClient, GovernanceHttpResponse } from "../../app/governance.members.ts";
+import { HttpAdminApiUsersChannel } from "../../channels/http/http.admin-api-users.channel.ts";
+import {
+  HttpDatabricksScimUsersChannel,
+  scimUsersAsPeople,
+} from "../../channels/http/http.databricks-scim-users.channel.ts";
+import {
+  directoryUsersAsPeople,
+  HttpMicrosoftDirectoryChannel,
+} from "../../channels/http/http.microsoft-directory.channel.ts";
+import { DIRECTORY_REPORT_ACTION } from "../../rules/microsoft-graph-directory.rules.ts";
+import {
+  listingDay,
+  peopleListed,
+  peopleRefused,
+  personListingEvents,
+} from "../../rules/people-listing.rules.ts";
 
 const fetchMock = vi.fn();
-vi.mock("../ssrf-safe-fetch.ts", () => ({
-  ssrfSafeFetch: (...args: unknown[]) => fetchMock(...args),
-}));
-
-const { listAnthropicPeople, listOpenAiPeople } = await import("../admin-api-users.service.ts");
-const { listDatabricksPeople: listDatabricksPeopleWithHttp, scimUsersAsPeople } =
-  await import("../databricks-scim-users.service.ts");
-const { directoryUsersAsPeople, listMicrosoftPeople } =
-  await import("../microsoft-directory-read.service.ts");
-const { listingDay, peopleListed, peopleRefused, personListingEvents } =
-  await import("../../rules/people-listing.rules.ts");
-const { DIRECTORY_REPORT_ACTION } = await import("../../rules/microsoft-graph-directory.rules.ts");
 
 const testHttp: GovernanceHttpClient = {
   async fetch(url, init): Promise<GovernanceHttpResponse> {
@@ -34,11 +38,15 @@ const testHttp: GovernanceHttpClient = {
   },
 };
 
-function listDatabricksPeople(
-  input: Omit<Parameters<typeof listDatabricksPeopleWithHttp>[0], "http">,
-) {
-  return listDatabricksPeopleWithHttp({ ...input, http: testHttp });
-}
+const adminApiUsers = HttpAdminApiUsersChannel.create({ http: testHttp });
+const microsoftDirectory = HttpMicrosoftDirectoryChannel.create({ http: testHttp });
+const databricksScimUsers = HttpDatabricksScimUsersChannel.create({ http: testHttp });
+
+const listAnthropicPeople = (input: { apiKey: string }) => adminApiUsers.listAnthropicPeople(input);
+const listOpenAiPeople = (input: { apiKey: string }) => adminApiUsers.listOpenAiPeople(input);
+const listMicrosoftPeople = (input: { token: string }) => microsoftDirectory.listPeople(input);
+const listDatabricksPeople = (input: { workspaceUrl: string; token: string }) =>
+  databricksScimUsers.listPeople(input);
 
 /** A reply the ssrf-safe fetch helper would have produced. */
 function reply({

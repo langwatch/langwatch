@@ -26,6 +26,8 @@
  * answering it differently.
  */
 
+import { ProviderSignInError } from "@langwatch/enterprise-governance-contract";
+
 /**
  * Why a provider would not list. A code rather than prose, for two reasons: a
  * later job renders the copy, and upstream error bodies can carry credentials
@@ -141,6 +143,7 @@ export function refusalFromStatus(status: number): ListingRefusal {
  * and this value is destined for a screen.
  */
 export function refusalFromThrown(error: unknown): ListingRefusal {
+  if (error instanceof ProviderSignInError) return refusalFromSignIn(error);
   const name = error instanceof Error ? error.name : "";
   // A zod parse failure on a 2xx body is the captive-portal case: the request
   // reached something, and that something is not the provider's documented API.
@@ -148,4 +151,14 @@ export function refusalFromThrown(error: unknown): ListingRefusal {
     return { reason: "malformed_response", status: null };
   }
   return { reason: "unreachable", status: null };
+}
+
+/** A sign-in failure as a refusal: a refused secret reads as unauthorized, not as a network problem. */
+function refusalFromSignIn(error: ProviderSignInError): ListingRefusal {
+  if (error.reason === "not_configured") return { reason: "not_configured", status: null };
+  if (error.reason === "malformed_response") return { reason: "malformed_response", status: null };
+  const status = error.status;
+  if (status === 401 || status === 403 || status === null)
+    return { reason: "unauthorized", status };
+  return { reason: "unavailable", status };
 }

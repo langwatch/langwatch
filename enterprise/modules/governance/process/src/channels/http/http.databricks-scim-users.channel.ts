@@ -39,13 +39,14 @@
 
 import { z } from "zod";
 
-import type { GovernanceHttpClient } from "../app/governance.members.ts";
-import type { DiscoveredPersonRecord, PeopleListing } from "../rules/people-listing.rules.ts";
-import { peopleListed, peopleRefused } from "../rules/people-listing.rules.ts";
-import { refusalFromStatus, refusalFromThrown } from "../rules/provider-listing.rules.ts";
-import { GenieHttpError, genieGet } from "./genie-spaces.service.ts";
+import type { GovernanceHttpClient } from "../../app/governance.members.ts";
+import type { DiscoveredPersonRecord, PeopleListing } from "../../rules/people-listing.rules.ts";
+import { peopleListed, peopleRefused } from "../../rules/people-listing.rules.ts";
+import { refusalFromStatus, refusalFromThrown } from "../../rules/provider-listing.rules.ts";
+import type { DatabricksScimUsersChannel } from "../databricks-scim-users.channel.ts";
+import { GenieHttpError, genieGet } from "./http.genie-spaces.channel.ts";
 
-export const DATABRICKS_SCIM_USERS_PATH = "/api/2.0/preview/scim/v2/Users";
+const DATABRICKS_SCIM_USERS_PATH = "/api/2.0/preview/scim/v2/Users";
 
 const LISTING_TIMEOUT_MS = 15_000;
 const PAGE_SIZE = 100;
@@ -298,14 +299,7 @@ function refusalFromPageRead(error: unknown): PeopleListing {
   );
 }
 
-/**
- * Every user a workspace token can enumerate.
- *
- * Never throws. See the note at the top of this file: this endpoint is
- * unproven for bulk use, so a workspace that will not serve it has to produce
- * a refusal an admin can read rather than an error an effect retries.
- */
-export async function listDatabricksPeople(params: {
+async function listDatabricksPeople(params: {
   http: GovernanceHttpClient;
   workspaceUrl: string;
   token: string;
@@ -380,4 +374,25 @@ export async function listDatabricksPeople(params: {
   // pressing Sync again reads the same pages and stops in the same place, so a
   // screen that claimed completeness here would go on claiming it.
   return peopleRefused({ reason: "too_many_pages", status: null });
+}
+
+/**
+ * Every user a workspace token can enumerate. Never throws: bulk SCIM is
+ * unproven, so a workspace that will not serve it is a refusal an admin can
+ * read, not an error an effect retries.
+ */
+export class HttpDatabricksScimUsersChannel implements DatabricksScimUsersChannel {
+  private constructor(private readonly http: GovernanceHttpClient) {}
+
+  static create({ http }: { http: GovernanceHttpClient }): HttpDatabricksScimUsersChannel {
+    return new HttpDatabricksScimUsersChannel(http);
+  }
+
+  async listPeople(params: {
+    workspaceUrl: string;
+    token: string;
+    signal?: AbortSignal;
+  }): Promise<PeopleListing> {
+    return listDatabricksPeople({ http: this.http, ...params });
+  }
 }

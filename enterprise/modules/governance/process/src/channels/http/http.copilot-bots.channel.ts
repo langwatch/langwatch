@@ -19,6 +19,7 @@
 
 import { z } from "zod";
 
+import type { GovernanceHttpClient } from "../../app/governance.members.ts";
 import {
   type AgentListing,
   type AgentListingRefusal,
@@ -27,13 +28,13 @@ import {
   type DiscoveredAgentRecord,
   refusalFromStatus,
   refusalFromThrown,
-} from "../rules/agent-listing.rules.ts";
+} from "../../rules/agent-listing.rules.ts";
 import {
   DATAVERSE_API_VERSION,
   dataverseHeaders,
   isEnvironmentOrigin,
-} from "../rules/dataverse-environment-service.rules.ts";
-import { ssrfSafeFetch } from "./ssrf-safe-fetch.ts";
+} from "../../rules/dataverse-environment-service.rules.ts";
+import type { CopilotBotsChannel, CopilotBotsRead } from "../copilot-bots.channel.ts";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 
@@ -46,7 +47,7 @@ const REQUEST_TIMEOUT_MS = 30_000;
  * for a screen claiming to list the organization's agents a truncated list is
  * not a lesser answer, it is a wrong one.
  */
-export const MAX_BOTS = 500;
+const MAX_BOTS = 500;
 
 /**
  * How many pages one inventory walk will follow.
@@ -75,7 +76,7 @@ function isSameOrigin(candidate: string, environmentUrl: string): boolean {
  * One row of the `bot` table, read once per run to put a name on each
  * conversation.
  */
-export const botRowSchema = z
+const botRowSchema = z
   .object({
     botid: z.string(),
     name: z.string().nullable().optional(),
@@ -84,7 +85,7 @@ export const botRowSchema = z
   .passthrough();
 
 /** The envelope every OData collection read comes back in. */
-export const odataPageSchema = z.object({
+const odataPageSchema = z.object({
   value: z.array(z.unknown()).default([]),
   "@odata.nextLink": z.string().optional(),
 });
@@ -120,25 +121,8 @@ export function readBotRows(rows: unknown[]): Map<string, BotRecord> {
   return bots;
 }
 
-/**
- * The read itself, answering which of the three things happened rather than
- * throwing or collapsing to an empty list.
- *
- * `hasMorePages` is separate from the rows because a caller cannot tell a short
- * list from a whole one by looking at it. The walk reads one page and warns.
- * The inventory asks for every page, and a `true` here after that means the
- * walk hit its own bound rather than the end of the collection -- which it
- * reports as a refusal rather than as a list.
- */
-export type CopilotBotsRead =
-  | {
-      ok: true;
-      rows: unknown[];
-      hasMorePages: boolean;
-    }
-  | { ok: false; refusal: AgentListingRefusal };
-
-export async function readCopilotBots(params: {
+async function readCopilotBots(params: {
+  http: GovernanceHttpClient;
   environmentUrl: string;
   token: string;
   signal?: AbortSignal;
@@ -152,7 +136,7 @@ export async function readCopilotBots(params: {
    */
   shouldFollowPages?: boolean;
 }): Promise<CopilotBotsRead> {
-  const { environmentUrl, token, signal, shouldFollowPages = false } = params;
+  const { http, environmentUrl, token, signal, shouldFollowPages = false } = params;
 
   // The same rule the adapter's validateConfig runs, applied here because this
   // read is reached without it: the listing path safeParses the config schema,
@@ -174,7 +158,7 @@ export async function readCopilotBots(params: {
   let url = `${base}?${query}`;
 
   for (let page = 0; page < MAX_BOT_PAGES; page++) {
-    const read = await readBotPage({ url, token, signal });
+    const read = await readBotPage({ http, url, token, signal });
     if (!read.ok) return read;
     rows.push(...read.rows);
 
@@ -207,18 +191,19 @@ type CopilotBotPage =
   | { ok: false; refusal: AgentListingRefusal };
 
 async function readBotPage(params: {
+  http: GovernanceHttpClient;
   url: string;
   token: string;
   signal?: AbortSignal;
 }): Promise<CopilotBotPage> {
-  const { url, token, signal } = params;
+  const { http, url, token, signal } = params;
   // Re-armed per request rather than shared across the walk: one budget
   // spanning every page would abort a healthy later page for the time the
   // earlier ones spent.
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await ssrfSafeFetch(url, {
+    const response = await http.fetch(url, {
       method: "GET",
       headers: dataverseHeaders(token),
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
@@ -270,14 +255,8 @@ export function copilotBotsAsAgents(params: {
   return agents;
 }
 
-/**
- * Every Copilot Studio agent one credential can see in an environment.
- *
- * Distinguishes an environment with no agents from one that refused to say.
- * The transcript walk cannot, because for its purposes both mean the same
- * thing, and that is exactly the distinction this listing exists to keep.
- */
-export async function listCopilotAgents(params: {
+async function listCopilotAgents(params: {
+  http: GovernanceHttpClient;
   environmentUrl: string;
   token: string;
   signal?: AbortSignal;
@@ -299,4 +278,34 @@ export async function listCopilotAgents(params: {
       environmentUrl: params.environmentUrl,
     }),
   );
+}
+
+/**
+ * The `bot` table over the process's HTTP client. `listAgents` keeps an
+ * environment with no agents apart from one that refused to say; the
+ * transcript walk cannot, and that distinction is what the listing is for.
+ */
+export class HttpCopilotBotsChannel implements CopilotBotsChannel {
+  private constructor(private readonly http: GovernanceHttpClient) {}
+
+  static create({ http }: { http: GovernanceHttpClient }): HttpCopilotBotsChannel {
+    return new HttpCopilotBotsChannel(http);
+  }
+
+  async readBots(params: {
+    environmentUrl: string;
+    token: string;
+    signal?: AbortSignal;
+    shouldFollowPages?: boolean;
+  }): Promise<CopilotBotsRead> {
+    return readCopilotBots({ http: this.http, ...params });
+  }
+
+  async listAgents(params: {
+    environmentUrl: string;
+    token: string;
+    signal?: AbortSignal;
+  }): Promise<AgentListing> {
+    return listCopilotAgents({ http: this.http, ...params });
+  }
 }

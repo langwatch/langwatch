@@ -21,11 +21,12 @@
 
 import { z } from "zod";
 
-import type { DiscoveredPersonRecord, PeopleListing } from "../rules/people-listing.rules.ts";
-import { peopleListed, peopleRefused } from "../rules/people-listing.rules.ts";
-import type { ListingRefusal } from "../rules/provider-listing.rules.ts";
-import { refusalFromStatus, refusalFromThrown } from "../rules/provider-listing.rules.ts";
-import { ssrfSafeFetch } from "./ssrf-safe-fetch.ts";
+import type { GovernanceHttpClient } from "../../app/governance.members.ts";
+import type { DiscoveredPersonRecord, PeopleListing } from "../../rules/people-listing.rules.ts";
+import { peopleListed, peopleRefused } from "../../rules/people-listing.rules.ts";
+import type { ListingRefusal } from "../../rules/provider-listing.rules.ts";
+import { refusalFromStatus, refusalFromThrown } from "../../rules/provider-listing.rules.ts";
+import type { AdminApiUsersChannel } from "../admin-api-users.channel.ts";
 
 const LISTING_TIMEOUT_MS = 15_000;
 const PAGE_SIZE = 100;
@@ -36,8 +37,8 @@ const PAGE_SIZE = 100;
  */
 const MAX_PAGES = 100;
 
-export const ANTHROPIC_USERS_URL = "https://api.anthropic.com/v1/organizations/users";
-export const OPENAI_USERS_URL = "https://api.openai.com/v1/organization/users";
+const ANTHROPIC_USERS_URL = "https://api.anthropic.com/v1/organizations/users";
+const OPENAI_USERS_URL = "https://api.openai.com/v1/organization/users";
 
 const ANTHROPIC_VERSION = "2023-06-01";
 
@@ -115,20 +116,21 @@ type MemberPageRead =
   | { ok: false; refusal: ListingRefusal };
 
 async function fetchMemberPage(params: {
+  http: GovernanceHttpClient;
   baseUrl: string;
   headers: Record<string, string>;
   cursorParam: string;
   cursor: string | null;
   signal?: AbortSignal;
 }): Promise<MemberPageRead> {
-  const { baseUrl, headers, cursorParam, cursor, signal } = params;
+  const { http, baseUrl, headers, cursorParam, cursor, signal } = params;
 
   const url = new URL(baseUrl);
   url.searchParams.set("limit", String(PAGE_SIZE));
   if (cursor !== null) url.searchParams.set(cursorParam, cursor);
 
   const timeout = AbortSignal.timeout(LISTING_TIMEOUT_MS);
-  const response = await ssrfSafeFetch(url.toString(), {
+  const response = await http.fetch(url.toString(), {
     method: "GET",
     headers: { ...headers, Accept: "application/json" },
     signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
@@ -153,6 +155,7 @@ async function fetchMemberPage(params: {
 
 /** Walks one admin API's member list to the end, or to a refusal. */
 async function listAdminApiPeople(params: {
+  http: GovernanceHttpClient;
   baseUrl: string;
   headers: Record<string, string>;
   /** `after_id` for Anthropic, `after` for OpenAI. */
@@ -189,31 +192,39 @@ async function listAdminApiPeople(params: {
   return peopleListed(people);
 }
 
-/** Every member of an Anthropic organization one admin key can enumerate. */
-export async function listAnthropicPeople(params: {
-  apiKey: string;
-  signal?: AbortSignal;
-}): Promise<PeopleListing> {
-  return listAdminApiPeople({
-    baseUrl: ANTHROPIC_USERS_URL,
-    headers: {
-      "x-api-key": params.apiKey,
-      "anthropic-version": ANTHROPIC_VERSION,
-    },
-    cursorParam: "after_id",
-    signal: params.signal,
-  });
-}
+/** The admin lists, over the process's HTTP client. */
+export class HttpAdminApiUsersChannel implements AdminApiUsersChannel {
+  private constructor(private readonly http: GovernanceHttpClient) {}
 
-/** Every member of an OpenAI organization one admin key can enumerate. */
-export async function listOpenAiPeople(params: {
-  apiKey: string;
-  signal?: AbortSignal;
-}): Promise<PeopleListing> {
-  return listAdminApiPeople({
-    baseUrl: OPENAI_USERS_URL,
-    headers: { Authorization: `Bearer ${params.apiKey}` },
-    cursorParam: "after",
-    signal: params.signal,
-  });
+  static create({ http }: { http: GovernanceHttpClient }): HttpAdminApiUsersChannel {
+    return new HttpAdminApiUsersChannel(http);
+  }
+
+  /** Every member of an Anthropic organization one admin key can enumerate. */
+  async listAnthropicPeople(params: {
+    apiKey: string;
+    signal?: AbortSignal;
+  }): Promise<PeopleListing> {
+    return listAdminApiPeople({
+      http: this.http,
+      baseUrl: ANTHROPIC_USERS_URL,
+      headers: {
+        "x-api-key": params.apiKey,
+        "anthropic-version": ANTHROPIC_VERSION,
+      },
+      cursorParam: "after_id",
+      signal: params.signal,
+    });
+  }
+
+  /** Every member of an OpenAI organization one admin key can enumerate. */
+  async listOpenAiPeople(params: { apiKey: string; signal?: AbortSignal }): Promise<PeopleListing> {
+    return listAdminApiPeople({
+      http: this.http,
+      baseUrl: OPENAI_USERS_URL,
+      headers: { Authorization: `Bearer ${params.apiKey}` },
+      cursorParam: "after",
+      signal: params.signal,
+    });
+  }
 }

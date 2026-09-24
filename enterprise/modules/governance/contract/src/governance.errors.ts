@@ -291,3 +291,24 @@ export class IngestionKeyRevokeIncompleteError extends HandledError {
     this.name = "IngestionKeyRevokeIncompleteError";
   }
 }
+
+/**
+ * A puller could not obtain the bearer its provider calls need. Three reasons
+ * because they are three next actions: fill the credential in, fix it, or try
+ * again. `message` names the status at most, never the provider's reply.
+ */
+export class ProviderSignInError extends Error {
+  readonly reason: "not_configured" | "refused" | "malformed_response";
+  /** The sign-in endpoint's status, when the failure had one. */
+  readonly status: number | null;
+
+  constructor(
+    message: string,
+    params: { reason: "not_configured" | "refused" | "malformed_response"; status?: number },
+  ) {
+    super(message);
+    this.name = "ProviderSignInError";
+    this.reason = params.reason;
+    this.status = params.status ?? null;
+  }
+}

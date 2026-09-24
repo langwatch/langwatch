@@ -32,6 +32,7 @@ import {
   type PullRunOptions,
   copilotStudioDataversePullConfigSchema,
   type CopilotStudioDataversePullConfig,
+  ProviderSignInError,
 } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, nowInstant } from "@langwatch/time";
@@ -57,13 +58,10 @@ import {
   isSameEnvironment,
 } from "../../rules/dataverse-environment-service.rules.ts";
 import {
-  DIRECTORY_USERS_FIRST_PAGE,
   type DirectoryUser,
   directoryReadIsDue,
-  isMicrosoftGraphUrl,
   microsoftDirectoryEvents,
   nextDirectoryCursor,
-  readDirectoryUserRows,
 } from "../../rules/microsoft-graph-directory.rules.ts";
 import {
   MICROSOFT_GRAPH_SCOPE,
@@ -74,7 +72,19 @@ import {
   seatsReportDay,
 } from "../../rules/microsoft-graph-seats.rules.ts";
 export { copilotStudioDataversePullConfigSchema } from "@langwatch/enterprise-governance-contract";
+import type { CopilotBotsChannel } from "../copilot-bots.channel.ts";
 import type { CopilotStudioDataversePullerChannel } from "../copilot-studio-dataverse.channel.ts";
+import type {
+  MicrosoftDirectoryChannel,
+  MicrosoftDirectoryFailure,
+} from "../microsoft-directory.channel.ts";
+import {
+  type BotRecord,
+  botKey,
+  HttpCopilotBotsChannel,
+  readBotRows,
+} from "./http.copilot-bots.channel.ts";
+import { HttpMicrosoftDirectoryChannel } from "./http.microsoft-directory.channel.ts";
 
 const logger = createLogger("langwatch:puller:copilot_studio_dataverse");
 
@@ -110,7 +120,6 @@ const MAX_PAGES_PER_RUN = 50;
  * follow a second page of them — it says so in the log instead, because the
  * cost of going over is conversations with no agent name, not a failed run.
  */
-const MAX_BOTS = 500;
 
 /** Web API version this adapter's query shape is written against. */
 const API_VERSION = "v9.2";
@@ -180,29 +189,11 @@ const transcriptRowSchema = cursorRowSchema
   })
   .passthrough();
 
-/**
- * One row of the `bot` table, read once per run to put a name on each
- * conversation.
- */
-const botRowSchema = z
-  .object({
-    botid: z.string(),
-    name: z.string().nullable().optional(),
-    modifiedon: z.string().nullable().optional(),
-  })
-  .passthrough();
-
 /** The envelope every OData collection read comes back in. */
 const odataPageSchema = z.object({
   value: z.array(z.unknown()).default([]),
   "@odata.nextLink": z.string().optional(),
 });
-
-/** What the run knows about one agent, keyed by its lookup id. */
-interface BotRecord {
-  botName?: string;
-  botModifiedOn?: string;
-}
 
 /**
  * The cursor. `createdon` alone is not enough — rows written in the same
@@ -296,10 +287,18 @@ export class HttpCopilotStudioDataverseChannel
 {
   readonly id: string = COPILOT_STUDIO_DATAVERSE_ADAPTER_ID;
 
-  private constructor(private readonly http: GovernanceHttpClient) {}
+  private constructor(
+    private readonly http: GovernanceHttpClient,
+    private readonly directory: MicrosoftDirectoryChannel,
+    private readonly copilotBots: CopilotBotsChannel,
+  ) {}
 
   static create(http: GovernanceHttpClient): HttpCopilotStudioDataverseChannel {
-    return new HttpCopilotStudioDataverseChannel(http);
+    return new HttpCopilotStudioDataverseChannel(
+      http,
+      HttpMicrosoftDirectoryChannel.create({ http }),
+      HttpCopilotBotsChannel.create({ http }),
+    );
   }
 
   validateConfig(config: unknown): CopilotStudioDataverseConfig {
@@ -670,56 +669,44 @@ export class HttpCopilotStudioDataverseChannel
     token: string;
     options: PullRunOptions;
   }): Promise<DirectoryUser[] | null> {
-    const { token, options } = params;
-    const users: DirectoryUser[] = [];
-    let unreadableRows = 0;
-    let url: string = DIRECTORY_USERS_FIRST_PAGE;
-
-    for (let page = 0; page < MAX_DIRECTORY_PAGES; page += 1) {
-      const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-      const response = await this.http.fetch(url, {
-        method: "GET",
-        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-        signal: options.signal ? AbortSignal.any([options.signal, timeout]) : timeout,
-        followRedirects: false,
-      });
-      if (!response.ok) {
-        logger.warn(
-          { status: response.status },
-          response.status === 403
-            ? "copilot studio dataverse: the tenant has not consented to the directory read (HTTP 403); holding the day"
-            : "copilot studio dataverse: Microsoft Graph refused the directory read; holding the day",
-        );
-        return null;
-      }
-      const read = readDirectoryUserRows({ response: await response.json() });
-      if (read.malformed) {
-        logger.warn(
-          "copilot studio dataverse: Microsoft Graph answered the directory read with an unrecognised body; holding the day",
-        );
-        return null;
-      }
-      users.push(...read.users);
-      unreadableRows += read.unreadableRows;
-
-      if (read.nextLink === null) {
-        return HttpCopilotStudioDataverseChannel.completeDirectoryList({ users, unreadableRows });
-      }
-      if (!isMicrosoftGraphUrl(read.nextLink)) {
-        logger.error(
-          { refusedHost: HttpCopilotStudioDataverseChannel.hostOf(read.nextLink) },
-          "copilot studio dataverse: refusing a directory next-page link that is not Microsoft Graph; holding the day",
-        );
-        return null;
-      }
-      url = read.nextLink;
+    const read = await this.directory.readDirectory({
+      token: params.token,
+      signal: params.options.signal,
+    });
+    if (!read.ok) {
+      HttpCopilotStudioDataverseChannel.logDirectoryFailure(read.failure);
+      return null;
     }
+    if (read.truncated) {
+      logger.error(
+        { pagesRead: MAX_DIRECTORY_PAGES, usersRead: read.users.length },
+        "copilot studio dataverse: the directory did not fit the page budget; holding the day",
+      );
+      return null;
+    }
+    return HttpCopilotStudioDataverseChannel.completeDirectoryList(read);
+  }
 
+  private static logDirectoryFailure(failure: MicrosoftDirectoryFailure): void {
+    if (failure.cause === "http") {
+      logger.warn(
+        { status: failure.status },
+        failure.status === 403
+          ? "copilot studio dataverse: the tenant has not consented to the directory read (HTTP 403); holding the day"
+          : "copilot studio dataverse: Microsoft Graph refused the directory read; holding the day",
+      );
+      return;
+    }
+    if (failure.cause === "malformed") {
+      logger.warn(
+        "copilot studio dataverse: Microsoft Graph answered the directory read with an unrecognised body; holding the day",
+      );
+      return;
+    }
     logger.error(
-      { pagesRead: MAX_DIRECTORY_PAGES, usersRead: users.length },
-      "copilot studio dataverse: the directory did not fit the page budget; holding the day",
+      { refusedHost: HttpCopilotStudioDataverseChannel.hostOf(failure.nextLink) },
+      "copilot studio dataverse: refusing a directory next-page link that is not Microsoft Graph; holding the day",
     );
-    return null;
   }
 
   private static completeDirectoryList({
@@ -819,61 +806,20 @@ export class HttpCopilotStudioDataverseChannel
     token: string;
     signal?: AbortSignal;
   }): Promise<Map<string, BotRecord>> {
-    const { environmentUrl, token, signal } = params;
-
-    try {
-      const page = await this.fetchBotsPage({ environmentUrl, token, signal });
-      if (!page) return new Map();
-
-      const bots = HttpCopilotStudioDataverseChannel.readBotRows(page.value);
-      HttpCopilotStudioDataverseChannel.warnAboutIncompleteBotList({
-        botCount: bots.size,
-        hasMorePages: Boolean(page["@odata.nextLink"]),
-      });
-      return bots;
-    } catch (error) {
+    const read = await this.copilotBots.readBots(params);
+    if (!read.ok) {
       logger.warn(
-        { error: error instanceof Error ? error.message : String(error) },
+        { status: read.refusal.status, reason: read.refusal.reason },
         "copilot studio dataverse: could not read the agent list; conversations keep their agent id but get no name",
       );
       return new Map();
     }
-  }
-
-  /**
-   * The one read of the `bot` table, or null when the environment refused it.
-   *
-   * A refusal is null rather than a throw because it is the ordinary case
-   * here: the caller treats "no list" and "an unreadable list" the same way,
-   * and neither is worth an error count.
-   */
-  private async fetchBotsPage(params: {
-    environmentUrl: string;
-    token: string;
-    signal?: AbortSignal;
-  }): Promise<z.infer<typeof odataPageSchema> | null> {
-    const { environmentUrl, token, signal } = params;
-    const base = `${environmentUrl.replace(/\/+$/, "")}/api/data/${API_VERSION}/bots`;
-    const query = `$select=${encodeURIComponent("botid,name,modifiedon")}&$top=${MAX_BOTS}`;
-    const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-
-    const response = await this.http.fetch(`${base}?${query}`, {
-      method: "GET",
-      headers: HttpCopilotStudioDataverseChannel.dataverseHeaders(token),
-      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-      // Same reasoning as the transcript read: this request carries the
-      // token, and a redirect would hand it to whoever answers.
-      followRedirects: false,
+    const bots = readBotRows(read.rows);
+    HttpCopilotStudioDataverseChannel.warnAboutIncompleteBotList({
+      botCount: bots.size,
+      hasMorePages: read.hasMorePages,
     });
-
-    if (!response.ok) {
-      logger.warn(
-        { status: response.status },
-        "copilot studio dataverse: could not read the agent list; conversations keep their agent id but get no name",
-      );
-      return null;
-    }
-    return odataPageSchema.parse(await response.json());
+    return bots;
   }
 
   private async fetchPage(params: {
@@ -998,9 +944,10 @@ export class HttpCopilotStudioDataverseChannel
     const clientSecret = credentials?.clientSecret;
 
     if (!tenantId || !clientId || !clientSecret) {
-      throw new Error(
+      throw new ProviderSignInError(
         "copilot studio dataverse puller needs credentials.tenantId, " +
           "credentials.clientId and credentials.clientSecret from the app registration",
+        { reason: "not_configured" },
       );
     }
 
@@ -1029,9 +976,10 @@ export class HttpCopilotStudioDataverseChannel
     if (!response.ok) {
       // The status alone, never the body: a token endpoint may echo the request
       // back, and this reason is logged and shown on the source.
-      throw new Error(
+      throw new ProviderSignInError(
         "copilot studio dataverse puller could not sign in: Microsoft refused " +
           `the application's credentials (HTTP ${response.status})`,
+        { reason: "refused", status: response.status },
       );
     }
 
@@ -1040,9 +988,10 @@ export class HttpCopilotStudioDataverseChannel
       // A proxy or captive portal answering 200 with something that is not a
       // token must not be carried forward as one — it would fail later as an
       // unauthorised Dataverse call and read as a permissions problem.
-      throw new Error(
+      throw new ProviderSignInError(
         "copilot studio dataverse puller could not sign in: Microsoft answered " +
           "the sign-in without an access token",
+        { reason: "malformed_response" },
       );
     }
     return parsed.data.access_token;
@@ -1122,31 +1071,6 @@ export class HttpCopilotStudioDataverseChannel
   }
 
   /**
-   * Dataverse writes lookup ids in one case and there is no promise both sides of
-   * a join agree on it, so the key is folded before it is stored or read. A miss
-   * here is silent — a conversation with no agent name — which is exactly the
-   * kind of fault that survives a review.
-   */
-  private static botKey(id: string): string {
-    return id.toLowerCase();
-  }
-
-  /** The agents on one page of the `bot` table, keyed by folded lookup id. */
-  private static readBotRows(rows: unknown[]): Map<string, BotRecord> {
-    const bots = new Map<string, BotRecord>();
-    for (const raw of rows) {
-      const parsed = botRowSchema.safeParse(raw);
-      if (!parsed.success) continue;
-      const row = parsed.data;
-      bots.set(HttpCopilotStudioDataverseChannel.botKey(row.botid), {
-        botName: row.name ?? undefined,
-        botModifiedOn: row.modifiedon ?? undefined,
-      });
-    }
-    return bots;
-  }
-
-  /**
    * Say so when the agent list came back short, in either of the two ways it can.
    *
    * Neither is an error — the conversations are the point and a name is a
@@ -1186,7 +1110,7 @@ export class HttpCopilotStudioDataverseChannel
     const { row, bots } = params;
     const id = row._bot_conversationtranscriptid_value;
     if (!id) return {};
-    const record = bots.get(HttpCopilotStudioDataverseChannel.botKey(id));
+    const record = bots.get(botKey(id));
     if (!record) return {};
     const facts: Record<string, string> = {};
     if (record.botName) facts.botName = record.botName;

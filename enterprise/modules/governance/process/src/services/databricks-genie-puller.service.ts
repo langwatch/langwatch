@@ -55,7 +55,10 @@
 
 import { Buffer } from "node:buffer";
 
-import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
+import {
+  PULLED_USAGE_HINT_KEY,
+  ProviderSignInError,
+} from "@langwatch/enterprise-governance-contract";
 import type {
   GovernancePuller as PullerAdapter,
   NormalizedPullEvent,
@@ -67,6 +70,8 @@ import { Temporal, nowInstant, toEpochMs } from "@langwatch/time";
 import { z } from "zod";
 
 import type { GovernanceHttpClient } from "../app/governance.members.ts";
+import { GENIE_SPACES_PATH, walkGenieSpaces } from "../rules/genie-spaces.rules.ts";
+import type { GenieSpace } from "../rules/genie-spaces.rules.ts";
 import { TERMINAL_MESSAGE_STATUSES } from "../rules/genie-trace-mapper-service.rules.ts";
 import {
   GENIE_CLIENT_APPLICATION,
@@ -76,8 +81,6 @@ import {
   type WarehousePricedStatement,
   warehouseCostRowSchema,
 } from "../rules/warehouse-cost.rules.ts";
-import { GENIE_SPACES_PATH, walkGenieSpaces } from "./genie-spaces.service.ts";
-import type { GenieSpace } from "./genie-spaces.service.ts";
 import { DATABRICKS_GENIE_ADAPTER_ID } from "./pull-destination.service.ts";
 import { DatabricksWarehouseCostService } from "./puller-databricks-warehouse-cost.service.ts";
 
@@ -3210,9 +3213,10 @@ export class DatabricksGeniePullerService implements PullerAdapter<DatabricksGen
     const clientId = credentials?.clientId;
     const clientSecret = credentials?.clientSecret;
     if (!clientId || !clientSecret) {
-      throw new Error(
+      throw new ProviderSignInError(
         "databricks genie puller needs either a workspace token in credentials.token, " +
           "or a service principal's credentials.clientId and credentials.clientSecret",
+        { reason: "not_configured" },
       );
     }
 
@@ -3237,9 +3241,10 @@ export class DatabricksGeniePullerService implements PullerAdapter<DatabricksGen
     if (!response.ok) {
       // The status alone, never the body: a token endpoint may echo the request
       // back, and this reason is logged and shown on the source.
-      throw new Error(
+      throw new ProviderSignInError(
         `databricks genie puller could not sign in: the workspace refused the ` +
           `service principal's credentials (HTTP ${response.status})`,
+        { reason: "refused", status: response.status },
       );
     }
 
@@ -3248,9 +3253,10 @@ export class DatabricksGeniePullerService implements PullerAdapter<DatabricksGen
       // A proxy or captive portal answering 200 with something that is not a
       // token must not be carried forward as one — it would fail later as an
       // unauthorised Genie call and read as a permissions problem.
-      throw new Error(
+      throw new ProviderSignInError(
         "databricks genie puller could not sign in: the workspace answered the " +
           "sign-in without an access token",
+        { reason: "malformed_response" },
       );
     }
 
