@@ -24,6 +24,7 @@ import {
   LWQL_PERIOD_GRANULARITY_PARAMETER,
   LWQL_PERIOD_START_PARAMETER,
 } from "@langwatch/analytics-contract";
+import { Temporal } from "@langwatch/time";
 
 import type { LangWatchQLParameter } from "../rules/langwatch-ql-validation-shape.rules.ts";
 
@@ -187,7 +188,11 @@ function resolveAgainstBudget({
 }): LangWatchQLGranularityResolution {
   const windowSeconds = Math.max(
     0,
-    Math.ceil((timeWindow.end.getTime() - timeWindow.start.getTime()) / 1000),
+    Math.ceil(
+      (Temporal.Instant.from(timeWindow.end).epochMilliseconds -
+        Temporal.Instant.from(timeWindow.start).epochMilliseconds) /
+        1000,
+    ),
   );
   const requestedBuckets = bucketCount(windowSeconds, granularitySeconds);
 

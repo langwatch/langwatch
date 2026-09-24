@@ -137,8 +137,8 @@ export function useRunPlanResultsColumn({
   const exportRuns = useExportScenarioRuns({
     projectId: project?.id,
     scenarioSetId: plan.scenarioSetId,
-    startDate: periodControls.period.startDate.getTime(),
-    endDate: periodControls.period.endDate.getTime(),
+    startDate: periodControls.period.startDate.epochMilliseconds,
+    endDate: periodControls.period.endDate.epochMilliseconds,
   });
 
   return {

@@ -5,6 +5,7 @@
  * @see specs/features/suites/suite-bugfixes-1956.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { Temporal } from "@langwatch/time";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -92,8 +93,8 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 const period = {
-  startDate: new Date("2025-01-01"),
-  endDate: new Date("2025-01-31"),
+  startDate: Temporal.Instant.from("2025-01-01T00:00:00Z"),
+  endDate: Temporal.Instant.from("2025-01-31T00:00:00Z"),
 };
 
 describe("<ExternalSetDetailPanel/>", () => {

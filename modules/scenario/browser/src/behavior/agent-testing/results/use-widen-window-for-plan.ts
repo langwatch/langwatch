@@ -27,7 +27,7 @@ export function useWidenWindowForPlan({
 }): void {
   useEffect(() => {
     if (!planSlug || !lastRunTimestamp) return;
-    if (lastRunTimestamp >= period.startDate.getTime()) return;
+    if (lastRunTimestamp >= period.startDate.epochMilliseconds) return;
     const end = nowInstant();
     const now = end.epochMilliseconds;
     setPeriod(fromDate(subDays(now, widenedWindowDays(lastRunTimestamp, now))), end);

@@ -6,6 +6,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { ScenarioRunStatus, Verdict, type ScenarioRunData } from "@langwatch/scenario-contract";
 import { getSuiteSetId, targetKeyOf } from "@langwatch/suite-contract";
+import { Temporal } from "@langwatch/time";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
@@ -213,8 +214,8 @@ const suitePlan: RunPlan = {
 };
 
 const period = {
-  startDate: new Date(NOW - 30 * 86_400_000),
-  endDate: new Date(NOW),
+  startDate: Temporal.Instant.fromEpochMilliseconds(NOW - 30 * 86_400_000),
+  endDate: Temporal.Instant.fromEpochMilliseconds(NOW),
 };
 
 function makeRun(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {

@@ -28,8 +28,8 @@ export function CaseRecentRunsButton({ scenarioId }: { scenarioId: string }) {
     {
       projectId: project?.id ?? "",
       scenarioIds: [scenarioId],
-      startDate: period.startDate.getTime(),
-      endDate: period.endDate.getTime(),
+      startDate: period.startDate.epochMilliseconds,
+      endDate: period.endDate.epochMilliseconds,
     },
     { enabled: !!project },
   );

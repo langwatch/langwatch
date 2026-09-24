@@ -5,6 +5,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { Temporal } from "@langwatch/time";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
@@ -294,8 +295,8 @@ function renderList({
         hasAnyPlans={true}
         isPlansLoading={false}
         period={{
-          startDate: new Date(NOW - 30 * 86_400_000),
-          endDate: new Date(NOW),
+          startDate: Temporal.Instant.fromEpochMilliseconds(NOW - 30 * 86_400_000),
+          endDate: Temporal.Instant.fromEpochMilliseconds(NOW),
         }}
         periodMode="relative"
         setPeriod={vi.fn()}

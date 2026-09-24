@@ -4,6 +4,7 @@
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
+import { currentTimeZone, Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { LangWatchQLTimeWindowService } from "../../services/langwatch-ql-time-window.service.ts";
@@ -23,8 +24,8 @@ const PERIOD: LangWatchQLParameter[] = [
 ];
 
 const WINDOW = {
-  start: new Date("2026-02-20T00:00:00.000Z"),
-  end: new Date("2026-02-27T00:00:00.000Z"),
+  start: "2026-02-20T00:00:00.000Z",
+  end: "2026-02-27T00:00:00.000Z",
 };
 
 /** The `code` of a thrown handled error, or the reason there is none. */
@@ -59,7 +60,7 @@ describe("given an instant to hand the database", () => {
   describe("when it is formatted as a bound parameter", () => {
     /** @scenario "Reserved period parameters are filled only when declared" */
     it("spells it as a space-separated UTC date-time with no zone designator", () => {
-      expect(formatLangWatchQLDateTimeParameter(new Date("2026-02-20T12:34:56.000Z"))).toBe(
+      expect(formatLangWatchQLDateTimeParameter("2026-02-20T12:34:56.000Z")).toBe(
         "2026-02-20 12:34:56",
       );
     });
@@ -69,8 +70,11 @@ describe("given an instant to hand the database", () => {
       // 2026-02-21 01:30 UTC is 2026-02-20 22:30 in the pinned zone, so the
       // hour AND the calendar day differ. Reading the local getters would spell
       // this "2026-02-20 22:30:00" and this case would go red.
-      const acrossMidnight = new Date("2026-02-21T01:30:00.000Z");
-      expect(new Date(acrossMidnight).getDate(), NON_UTC_ZONE).toBe(20);
+      const acrossMidnight = "2026-02-21T01:30:00.000Z";
+      expect(
+        Temporal.Instant.from(acrossMidnight).toZonedDateTimeISO(currentTimeZone()).day,
+        NON_UTC_ZONE,
+      ).toBe(20);
 
       expect(formatLangWatchQLDateTimeParameter(acrossMidnight)).toBe("2026-02-21 01:30:00");
       // The same instant written the way `toISOString` would: the `T` and the
@@ -81,15 +85,13 @@ describe("given an instant to hand the database", () => {
 
     /** @scenario "Reserved period parameters are filled only when declared" */
     it("truncates below the second and pads every field to its width", () => {
-      expect(formatLangWatchQLDateTimeParameter(new Date("2026-02-03T04:05:06.789Z"))).toBe(
+      expect(formatLangWatchQLDateTimeParameter("2026-02-03T04:05:06.789Z")).toBe(
         "2026-02-03 04:05:06",
       );
     });
 
     it("refuses an invalid date rather than spelling it as text", () => {
-      expect(() => formatLangWatchQLDateTimeParameter(new Date("nonsense"))).toThrow(
-        /invalid date/,
-      );
+      expect(() => formatLangWatchQLDateTimeParameter("nonsense")).toThrow(/invalid date/);
     });
   });
 });

@@ -33,7 +33,7 @@ export function useRunPlanBatches({
   isSseConnected: boolean;
 }) {
   const { project } = useOrganizationTeamProject();
-  const startDateMs = period.startDate.getTime();
+  const startDateMs = period.startDate.epochMilliseconds;
 
   const pagination = useRunHistoryPagination({
     scenarioSetId: plan.scenarioSetId,

@@ -53,8 +53,8 @@ export function useSuiteRecentRuns({
 }): SuiteRecentRuns {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
-  const startDate = period.startDate.getTime();
-  const endDate = period.endDate.getTime();
+  const startDate = period.startDate.epochMilliseconds;
+  const endDate = period.endDate.epochMilliseconds;
   const isEnabled = enabled && !!project && scenarioIds.length > 0;
 
   const { data, isLoading } = api.scenarios.getSuiteRunData.useQuery(

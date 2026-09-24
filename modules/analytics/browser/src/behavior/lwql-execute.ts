@@ -5,7 +5,7 @@
  */
 
 import type { LangWatchQLQueryResult, LangWatchQLTimeWindow } from "@langwatch/analytics-contract";
-import { Temporal, toDate } from "@langwatch/time";
+import { Temporal } from "@langwatch/time";
 
 import type { LangWatchQLExecute } from "../model/lwql-request-controller.ts";
 import type { LangWatchQLParameterValue } from "../model/lwql-request-state.ts";
@@ -16,6 +16,9 @@ export interface LangWatchQLQueryInput {
   parameters?: Readonly<Record<string, LangWatchQLParameterValue>>;
   timeWindow?: LangWatchQLTimeWindow;
 }
+
+const isoInstant = (epochMs: number): string =>
+  Temporal.Instant.fromEpochMilliseconds(epochMs).toString({ fractionalSecondDigits: 3 });
 
 export interface LangWatchQLQueryTransport {
   mutate(
@@ -40,14 +43,13 @@ export function createLangWatchQLExecute({
     transport.mutate(
       {
         ...request,
-        // Instants on the wire, milliseconds in the draft: the draft compares
-        // snapshots by value, and the endpoint reads a window. Converting here
-        // keeps each side holding the shape it needs rather than the other's.
+        // ISO instants on the wire, milliseconds in the draft: the draft
+        // compares snapshots by value, and the endpoint reads a window.
         ...(timeWindow
           ? {
               timeWindow: {
-                start: toDate(Temporal.Instant.fromEpochMilliseconds(timeWindow.start)),
-                end: toDate(Temporal.Instant.fromEpochMilliseconds(timeWindow.end)),
+                start: isoInstant(timeWindow.start),
+                end: isoInstant(timeWindow.end),
               },
             }
           : {}),

@@ -33,8 +33,8 @@ export function useDraggableGraphCard({
   // every render (the same reasoning DashboardWidgetFrame applies).
   const timeWindow = useMemo(
     () => ({
-      start: period.startDate.getTime(),
-      end: period.endDate.getTime(),
+      start: period.startDate.epochMilliseconds,
+      end: period.endDate.epochMilliseconds,
     }),
     [period.startDate, period.endDate],
   );

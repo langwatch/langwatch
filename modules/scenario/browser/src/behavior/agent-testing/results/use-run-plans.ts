@@ -25,8 +25,8 @@ export type UseRunPlansResult = {
 export function useRunPlans({ period }: { period: Period }): UseRunPlansResult {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
-  const startDate = period.startDate.getTime();
-  const endDate = period.endDate.getTime();
+  const startDate = period.startDate.epochMilliseconds;
+  const endDate = period.endDate.epochMilliseconds;
 
   // Both kinds: the run plan rows are the plans, and the test suites are read only
   // for the names a plan's scope may point at.

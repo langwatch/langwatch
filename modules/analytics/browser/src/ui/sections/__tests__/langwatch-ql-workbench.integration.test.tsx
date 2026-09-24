@@ -171,8 +171,8 @@ const PAGE_PERIOD = {
 
 /** What the workbench sends for {@link PAGE_PERIOD}. */
 const PAGE_WINDOW = {
-  start: new Date(PAGE_PERIOD.startDate),
-  end: new Date(PAGE_PERIOD.endDate),
+  start: PAGE_PERIOD.startDate,
+  end: PAGE_PERIOD.endDate,
 };
 
 /**
@@ -846,7 +846,7 @@ describe("the LangWatchQL workbench", () => {
 
         await waitFor(() => expect(harness.mutation).toHaveBeenCalledTimes(2));
         const overridden = {
-          start: new Date("2026-02-24T09:00:00.000Z"),
+          start: "2026-02-24T09:00:00.000Z",
           end: PAGE_WINDOW.end,
         };
         for (const call of harness.mutation.mock.calls) {

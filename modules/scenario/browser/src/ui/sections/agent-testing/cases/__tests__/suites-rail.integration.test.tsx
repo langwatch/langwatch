@@ -64,7 +64,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-const THIRTY_DAYS = computeRelativeWindow("30d", new Date());
+const THIRTY_DAYS = computeRelativeWindow("30d", Temporal.Now.instant());
 
 /** The last run of a suite, as the rail is handed it. */
 function makeLastRun(overrides: Partial<SuiteLastRun> = {}): SuiteLastRun {

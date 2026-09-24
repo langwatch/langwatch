@@ -122,8 +122,8 @@ function useResultsScope({
   return useMemo(
     () => ({
       projectId,
-      startDate: period.startDate.getTime(),
-      endDate: periodMode === "absolute" ? period.endDate.getTime() : undefined,
+      startDate: period.startDate.epochMilliseconds,
+      endDate: periodMode === "absolute" ? period.endDate.epochMilliseconds : undefined,
       scenarioIds: filters.scenarioIds.length ? filters.scenarioIds : undefined,
       labels: filters.labels.length ? filters.labels : undefined,
       targetKeys: filters.targetKeys.length ? filters.targetKeys : undefined,

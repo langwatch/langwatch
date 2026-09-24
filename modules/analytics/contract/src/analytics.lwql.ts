@@ -143,7 +143,8 @@ const lwqlTimeWindowBound = z
       return year >= MIN_UTC_YEAR && year <= MAX_UTC_YEAR;
     },
     { message: `UTC year must be between ${MIN_UTC_YEAR} and ${MAX_UTC_YEAR}.` },
-  );
+  )
+  .transform((value) => value.toISOString());
 
 export const lwqlTimeWindowSchema: z.ZodType<LangWatchQLTimeWindow> = z
   .object({

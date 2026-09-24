@@ -4,6 +4,7 @@
  * @see specs/features/suites/suite-empty-state.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { Temporal } from "@langwatch/time";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -81,8 +82,8 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 const widePeriod = {
-  startDate: new Date("2024-01-01T00:00:00Z"),
-  endDate: new Date("2024-12-31T23:59:59Z"),
+  startDate: Temporal.Instant.from("2024-01-01T00:00:00Z"),
+  endDate: Temporal.Instant.from("2024-12-31T23:59:59Z"),
 };
 
 const scenarioSetId = "__internal__suite_1__suite";
@@ -172,8 +173,8 @@ describe("<RunHistoryPanel/> empty state", () => {
           <RunHistoryPanel
             scenarioSetId={scenarioSetId}
             period={{
-              startDate: new Date("2024-06-01T00:00:00Z"),
-              endDate: new Date("2024-06-30T23:59:59Z"),
+              startDate: Temporal.Instant.from("2024-06-01T00:00:00Z"),
+              endDate: Temporal.Instant.from("2024-06-30T23:59:59Z"),
             }}
           />,
           { wrapper: Wrapper },

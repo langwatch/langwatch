@@ -15,7 +15,7 @@ import {
   LWQL_PERIOD_END_PARAMETER,
   LWQL_PERIOD_START_PARAMETER,
 } from "@langwatch/analytics-contract";
-import { Temporal, toDate } from "@langwatch/time";
+import { Temporal } from "@langwatch/time";
 import { useEffect, useState } from "react";
 
 import type { LangWatchQLTimeWindowValues } from "../../model/lwql-request-state.ts";
@@ -46,7 +46,7 @@ export function parseLangWatchQLTimeWindowText(text: string): number | undefined
 
   const typed = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   const spelledBack = formatLangWatchQLDateTimeParameter(
-    toDate(Temporal.Instant.fromEpochMilliseconds(parsed)),
+    Temporal.Instant.fromEpochMilliseconds(parsed).toString(),
   );
   return spelledBack === typed ? parsed : void 0;
 }
@@ -59,10 +59,10 @@ interface WindowText {
 function textOf(window: LangWatchQLTimeWindowValues): WindowText {
   return {
     start: formatLangWatchQLDateTimeParameter(
-      toDate(Temporal.Instant.fromEpochMilliseconds(window.start)),
+      Temporal.Instant.fromEpochMilliseconds(window.start).toString(),
     ),
     end: formatLangWatchQLDateTimeParameter(
-      toDate(Temporal.Instant.fromEpochMilliseconds(window.end)),
+      Temporal.Instant.fromEpochMilliseconds(window.end).toString(),
     ),
   };
 }

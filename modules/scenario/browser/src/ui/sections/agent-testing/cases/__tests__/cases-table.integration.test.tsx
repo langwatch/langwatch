@@ -76,8 +76,8 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 const PERIOD = {
-  startDate: new Date("2026-07-01T00:00:00.000Z"),
-  endDate: new Date("2026-07-31T00:00:00.000Z"),
+  startDate: Temporal.Instant.from("2026-07-01T00:00:00.000Z"),
+  endDate: Temporal.Instant.from("2026-07-31T00:00:00.000Z"),
 };
 
 const DEFAULT_SUITE: TestSuiteEntry = {
@@ -372,8 +372,8 @@ describe("the scenarios table", () => {
           useTestCasesView({
             selection: { kind: "suite", slug: "refunds" },
             period: {
-              startDate: new Date("2026-07-01T00:00:00.000Z"),
-              endDate: new Date("2026-07-31T00:00:00.000Z"),
+              startDate: Temporal.Instant.from("2026-07-01T00:00:00.000Z"),
+              endDate: Temporal.Instant.from("2026-07-31T00:00:00.000Z"),
             },
             suites: props.suites,
             cases,

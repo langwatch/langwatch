@@ -132,8 +132,8 @@ export function ExternalSetDetailPanel({
       projectId,
       scenarioSetId,
       limit: 100,
-      startDate: period.startDate.getTime(),
-      endDate: period.endDate.getTime(),
+      startDate: period.startDate.epochMilliseconds,
+      endDate: period.endDate.epochMilliseconds,
     },
     {
       enabled: !!project,
@@ -147,8 +147,8 @@ export function ExternalSetDetailPanel({
 
   useSuiteRunFreshness({
     scenarioSetId,
-    startDateMs: period.startDate.getTime(),
-    endDateMs: period.endDate.getTime(),
+    startDateMs: period.startDate.epochMilliseconds,
+    endDateMs: period.endDate.epochMilliseconds,
     runs: runData ?? [],
     enabled: !!project,
     sseConnected,

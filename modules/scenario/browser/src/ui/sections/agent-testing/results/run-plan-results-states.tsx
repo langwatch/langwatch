@@ -21,7 +21,9 @@ export function nextWiderWindow(period: Period): {
   key: RelativePresetKey;
   label: string;
 } {
-  const days = Math.round((period.endDate.getTime() - period.startDate.getTime()) / DAY_MS);
+  const days = Math.round(
+    (period.endDate.epochMilliseconds - period.startDate.epochMilliseconds) / DAY_MS,
+  );
   if (days < 90) return { key: "90d", label: "Show the last 90 days" };
   return { key: "1y", label: "Show the last year" };
 }

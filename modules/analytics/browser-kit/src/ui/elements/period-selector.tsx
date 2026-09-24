@@ -2,13 +2,21 @@ import type { ButtonProps, PopoverRootProps } from "@chakra-ui/react";
 import { Box, Button, Field, HStack, Input, Text, useDisclosure, VStack } from "@chakra-ui/react";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { Popover } from "@langwatch/design-system/popover";
-import { differenceInCalendarDays, format, startOfDay, subDays } from "@langwatch/time";
+import {
+  currentTimeZone,
+  differenceInCalendarDays,
+  format,
+  nowInstant,
+  Temporal,
+  toEpochMs,
+  type Instant,
+} from "@langwatch/time";
 import { useCallback, useMemo } from "react";
 import { ChevronDown } from "react-feather";
 import { LuCalendar } from "react-icons/lu";
 
 /** Date range used for time-based filtering across the app. */
-export type Period = { startDate: Date; endDate: Date };
+export type Period = { startDate: Instant; endDate: Instant };
 
 /**
  * Relative range presets. The key is what gets serialised into the URL as `?period=<key>`.
@@ -36,12 +44,16 @@ const RELATIVE_PRESETS_BY_KEY = new Map(RELATIVE_PRESETS.map((preset) => [preset
 const isRelativePresetKey = (value: unknown): value is RelativePresetKey =>
   typeof value === "string" && RELATIVE_PRESETS_BY_KEY.has(value as RelativePresetKey);
 
-const getDaysDifference = (startDate: Date, endDate: Date) =>
-  differenceInCalendarDays(endDate, startDate) + 1;
+const getDaysDifference = (startDate: Instant, endDate: Instant) =>
+  differenceInCalendarDays(endDate.epochMilliseconds, startDate.epochMilliseconds) + 1;
 
-const isValidDateString = (dateString: string) => {
-  const d = new Date(dateString);
-  return d instanceof Date && !isNaN(d.getTime());
+const startOfDayDaysBefore = (now: Instant, days: number): Instant =>
+  now.toZonedDateTimeISO(currentTimeZone()).subtract({ days }).startOfDay().toInstant();
+
+/** A moment read leniently from text, or `fallback` when the text does not hold one. */
+const instantFromText = (text: string, fallback: Instant): Instant => {
+  const epochMs = toEpochMs(text);
+  return Number.isFinite(epochMs) ? Temporal.Instant.fromEpochMilliseconds(epochMs) : fallback;
 };
 
 /**
@@ -49,19 +61,17 @@ const isValidDateString = (dateString: string) => {
  * Day-based presets snap the start to start-of-day to match the historical
  * behaviour of the day quick selectors.
  */
-export const computeRelativeWindow = (presetKey: RelativePresetKey, now: Date): Period => {
+export const computeRelativeWindow = (presetKey: RelativePresetKey, now: Instant): Period => {
   const preset = RELATIVE_PRESETS_BY_KEY.get(presetKey);
   if (!preset) {
-    return { startDate: startOfDay(subDays(now, 29)), endDate: now };
+    return { startDate: startOfDayDaysBefore(now, 29), endDate: now };
   }
 
   if (preset.minutes !== null) {
-    const startDate = new Date(now.getTime() - preset.minutes * 60 * 1000);
-    return { startDate, endDate: now };
+    return { startDate: now.subtract({ minutes: preset.minutes }), endDate: now };
   }
 
-  const startDate = startOfDay(subDays(now, preset.days - 1));
-  return { startDate, endDate: now };
+  return { startDate: startOfDayDaysBefore(now, preset.days - 1), endDate: now };
 };
 
 const defaultPresetForDays = (defaultNDays: number): RelativePresetKey => {
@@ -82,20 +92,16 @@ function readPeriodFromAddress({
   queryStartDate,
 }: {
   defaultNDays: number;
-  now: Date;
+  now: Instant;
   queryEndDate: unknown;
   queryPeriod: unknown;
   queryStartDate: unknown;
 }): { period: Period; mode: PeriodMode; isDefault: boolean } {
-  const hasAbsoluteRange =
-    typeof queryStartDate === "string" &&
-    typeof queryEndDate === "string" &&
-    isValidDateString(queryStartDate) &&
-    isValidDateString(queryEndDate);
-  if (hasAbsoluteRange) {
-    const startDate = new Date(queryStartDate);
-    const endDate = new Date(queryEndDate);
-    const safeStart = startDate > endDate ? endDate : startDate;
+  const startMs = typeof queryStartDate === "string" ? toEpochMs(queryStartDate) : Number.NaN;
+  const endMs = typeof queryEndDate === "string" ? toEpochMs(queryEndDate) : Number.NaN;
+  if (Number.isFinite(startMs) && Number.isFinite(endMs)) {
+    const endDate = Temporal.Instant.fromEpochMilliseconds(endMs);
+    const safeStart = startMs > endMs ? endDate : Temporal.Instant.fromEpochMilliseconds(startMs);
 
     return { period: { startDate: safeStart, endDate }, mode: "absolute", isDefault: false };
   }
@@ -113,7 +119,7 @@ export const usePeriodSelector = (defaultNDays = 30) => {
   // The useMemo below excludes `now` from its deps, so the returned `period`
   // stays referentially stable across renders unless query params change.
   // Page re-mounts (refresh, route change) get a fresh `now` for free.
-  const now = new Date();
+  const now = nowInstant();
 
   const queryPeriod = router.query.period;
   const queryStartDate = router.query.startDate;
@@ -133,24 +139,16 @@ export const usePeriodSelector = (defaultNDays = 30) => {
   );
 
   const setPeriod = useCallback(
-    (startDate: Date, endDate: Date) => {
-      const hasValidEnd = endDate instanceof Date && !isNaN(endDate.getTime());
-      const validEndDate = hasValidEnd ? endDate : new Date();
-
-      const hasValidStart = startDate instanceof Date && !isNaN(startDate.getTime());
-      let validStartDate = hasValidStart ? startDate : new Date();
-
-      if (validStartDate > validEndDate) {
-        validStartDate = validEndDate;
-      }
+    (startDate: Instant, endDate: Instant) => {
+      const validStartDate = Temporal.Instant.compare(startDate, endDate) > 0 ? endDate : startDate;
 
       const { period: _omitPeriod, ...rest } = router.query;
       void router.push(
         {
           query: {
             ...rest,
-            startDate: validStartDate.toISOString(),
-            endDate: validEndDate.toISOString(),
+            startDate: validStartDate.toString({ fractionalSecondDigits: 3 }),
+            endDate: endDate.toString({ fractionalSecondDigits: 3 }),
           },
         },
         undefined,
@@ -195,9 +193,9 @@ export const usePeriodSelector = (defaultNDays = 30) => {
 };
 
 const getPresetForRange = (
-  startDate: Date,
-  endDate: Date,
-  now: Date,
+  startDate: Instant,
+  endDate: Instant,
+  now: Instant,
 ): (typeof RELATIVE_PRESETS)[number] | undefined => {
   const daysDifference = getDaysDifference(startDate, endDate);
   const daysFromToday = getDaysDifference(endDate, now);
@@ -221,10 +219,10 @@ export const matchPeriodPreset = ({
 }): (typeof RELATIVE_PRESETS)[number] | undefined => {
   if (mode !== "relative") return undefined;
 
-  const matchedByDays = getPresetForRange(startDate, endDate, new Date());
+  const matchedByDays = getPresetForRange(startDate, endDate, nowInstant());
   if (matchedByDays) return matchedByDays;
 
-  const minutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
+  const minutes = Math.round((endDate.epochMilliseconds - startDate.epochMilliseconds) / 60000);
   return RELATIVE_PRESETS.find((preset) => preset.minutes === minutes);
 };
 
@@ -236,7 +234,7 @@ export const describePeriod = ({ period, mode }: { period: Period; mode: PeriodM
   const preset = matchPeriodPreset({ period, mode });
   if (preset) return preset.label;
 
-  return `${format(period.startDate, "MMM d")} - ${format(period.endDate, "MMM d")}`;
+  return `${format(period.startDate.epochMilliseconds, "MMM d")} - ${format(period.endDate.epochMilliseconds, "MMM d")}`;
 };
 
 /** Where the range list opens, relative to the trigger. */
@@ -264,7 +262,7 @@ export function PeriodSelector({
    * applying.
    */
   label?: string;
-  setPeriod: (startDate: Date, endDate: Date) => void;
+  setPeriod: (startDate: Instant, endDate: Instant) => void;
   setRelativePeriod: (presetKey: RelativePresetKey) => void;
   /**
    * Takes the range back off, offered as "All time". Only surfaces that show
@@ -328,16 +326,20 @@ export function PeriodSelector({
                 <Field.Label>Start Date</Field.Label>
                 <Input
                   type="datetime-local"
-                  value={format(startDate, "yyyy-MM-dd'T'HH:mm")}
-                  onChange={(e) => setPeriod(new Date(e.target.value), endDate)}
+                  value={format(startDate.epochMilliseconds, "yyyy-MM-dd'T'HH:mm")}
+                  onChange={(e) =>
+                    setPeriod(instantFromText(e.target.value, nowInstant()), endDate)
+                  }
                 />
               </Field.Root>
               <Field.Root>
                 <Field.Label>End Date</Field.Label>
                 <Input
                   type="datetime-local"
-                  value={format(endDate, "yyyy-MM-dd'T'HH:mm")}
-                  onChange={(e) => setPeriod(startDate, new Date(e.target.value))}
+                  value={format(endDate.epochMilliseconds, "yyyy-MM-dd'T'HH:mm")}
+                  onChange={(e) =>
+                    setPeriod(startDate, instantFromText(e.target.value, nowInstant()))
+                  }
                 />
               </Field.Root>
             </VStack>

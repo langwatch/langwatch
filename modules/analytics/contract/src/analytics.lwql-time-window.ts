@@ -3,10 +3,10 @@
  * both browsers and servers; must stay bundle-clean.
  */
 
-/** The window a surface hands a statement, as instants. Half-open: `[start, end)`. */
+/** The window a surface hands a statement, as UTC ISO instants. Half-open: `[start, end)`. */
 export interface LangWatchQLTimeWindow {
-  readonly start: Date;
-  readonly end: Date;
+  readonly start: string;
+  readonly end: string;
 }
 
 /** Inclusive lower bound of the period the surface is showing. */
@@ -118,20 +118,16 @@ export function isLangWatchQLDateTimeParameterType(type: string): boolean {
   return LWQL_DATE_TIME_TYPE.test(type.trim());
 }
 
-function pad(value: number, width = 2): string {
-  return String(value).padStart(width, "0");
-}
+/** A UTC ISO instant with a four-digit year, as the window schema emits it. */
+const LWQL_UTC_ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
 
 /**
- * Format instant as ClickHouse `DateTime`: YYYY-MM-DD HH:MM:SS UTC. Not
+ * Format a UTC ISO instant as ClickHouse `DateTime`: YYYY-MM-DD HH:MM:SS. Not
  * ISO—ClickHouse DateTime binding is zone-naive.
  */
-export function formatLangWatchQLDateTimeParameter(date: Date): string {
-  if (Number.isNaN(date.getTime())) {
+export function formatLangWatchQLDateTimeParameter(instant: string): string {
+  if (!LWQL_UTC_ISO_INSTANT.test(instant)) {
     throw new Error("A LangWatchQL time window cannot carry an invalid date.");
   }
-  return (
-    `${pad(date.getUTCFullYear(), 4)}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ` +
-    `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}`
-  );
+  return `${instant.slice(0, 10)} ${instant.slice(11, 19)}`;
 }

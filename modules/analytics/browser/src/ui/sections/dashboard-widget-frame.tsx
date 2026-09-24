@@ -53,8 +53,8 @@ export function DashboardWidgetFrame({
   // same reasoning `LangWatchQLDashboardWidget` applies to its own run hook.
   const timeWindow = useMemo(
     () => ({
-      start: period.startDate.getTime(),
-      end: period.endDate.getTime(),
+      start: period.startDate.epochMilliseconds,
+      end: period.endDate.epochMilliseconds,
     }),
     [period.startDate, period.endDate],
   );

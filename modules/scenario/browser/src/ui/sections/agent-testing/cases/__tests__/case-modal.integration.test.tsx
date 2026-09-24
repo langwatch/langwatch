@@ -6,6 +6,7 @@
  * @see specs/features/agents/voice-agents-v1.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { Temporal } from "@langwatch/time";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
@@ -171,7 +172,10 @@ vi.mock("@langwatch/analytics-browser-kit", async (importOriginal) => {
   return {
     ...mod,
     usePeriodSelector: () => ({
-      period: { startDate: new Date("2026-07-01"), endDate: new Date("2026-07-08") },
+      period: {
+        startDate: Temporal.Instant.from("2026-07-01T00:00:00Z"),
+        endDate: Temporal.Instant.from("2026-07-08T00:00:00Z"),
+      },
       mode: "relative" as const,
       setPeriod: vi.fn(),
       setRelativePeriod: vi.fn(),

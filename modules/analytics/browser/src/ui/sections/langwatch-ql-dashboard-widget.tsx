@@ -58,8 +58,8 @@ export function LangWatchQLDashboardWidget({
     chartId,
     projectId,
     isChartLoaded: !!chartQuery.data,
-    start: period.startDate.getTime(),
-    end: period.endDate.getTime(),
+    start: period.startDate.epochMilliseconds,
+    end: period.endDate.epochMilliseconds,
     granularitySeconds: granularitySeconds ?? LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS,
     ...(refreshedAt === undefined ? {} : { refreshedAt }),
   });

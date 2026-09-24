@@ -10,8 +10,7 @@ import {
   PeriodSelector,
   type RelativePresetKey,
 } from "@langwatch/analytics-browser-kit";
-import type { Instant } from "@langwatch/time";
-import { differenceInCalendarDays, fromDate } from "@langwatch/time";
+import { differenceInCalendarDays, type Instant } from "@langwatch/time";
 
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 
@@ -21,7 +20,10 @@ import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
  * both of those days.
  */
 export function periodDays(period: Period): number {
-  return differenceInCalendarDays(period.endDate, period.startDate) + 1;
+  return (
+    differenceInCalendarDays(period.endDate.epochMilliseconds, period.startDate.epochMilliseconds) +
+    1
+  );
 }
 
 /**
@@ -59,7 +61,7 @@ export function AgentTestingPeriodPicker({
     <PeriodSelector
       period={period}
       mode={periodMode}
-      setPeriod={(startDate, endDate) => setPeriod(fromDate(startDate), fromDate(endDate))}
+      setPeriod={setPeriod}
       setRelativePeriod={setRelativePeriod}
       size={compact ? "xs" : "sm"}
       triggerVariant={compact ? "ghost" : "outline"}

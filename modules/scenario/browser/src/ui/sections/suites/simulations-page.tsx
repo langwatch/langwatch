@@ -16,7 +16,7 @@ import {
   SuiteRunConfirmationDialog,
   NowProvider,
 } from "@langwatch/suite-browser-kit";
-import { nowInstant, subDays, toDate } from "@langwatch/time";
+import { fromDate, nowInstant, subDays } from "@langwatch/time";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -121,8 +121,8 @@ function SimulationsBoard() {
     api.scenarios.getExternalSetSummaries.useQuery(
       {
         projectId: project?.id ?? "",
-        startDate: period.startDate.getTime(),
-        endDate: period.endDate.getTime(),
+        startDate: period.startDate.epochMilliseconds,
+        endDate: period.endDate.epochMilliseconds,
       },
       { enabled: !!project, refetchInterval: 15000 },
     );
@@ -130,8 +130,8 @@ function SimulationsBoard() {
   const { data: suiteSummariesData } = api.suites.getSummaries.useQuery(
     {
       projectId: project?.id ?? "",
-      startDate: period.startDate.getTime(),
-      endDate: period.endDate.getTime(),
+      startDate: period.startDate.epochMilliseconds,
+      endDate: period.endDate.epochMilliseconds,
     },
     { enabled: !!project, refetchInterval: 30_000 },
   );
@@ -215,9 +215,10 @@ function SimulationsBoard() {
       lastRunTs = runSummaries.get(selectedSuite.id)?.lastRunTimestamp ?? null;
     }
 
-    if (lastRunTs && lastRunTs < period.startDate.getTime()) {
-      const daysAgo = Math.ceil((nowInstant().epochMilliseconds - lastRunTs) / 86400000);
-      setPeriod(subDays(toDate(nowInstant()), expandedPeriodDays(daysAgo)), toDate(nowInstant()));
+    if (lastRunTs && lastRunTs < period.startDate.epochMilliseconds) {
+      const now = nowInstant();
+      const daysAgo = Math.ceil((now.epochMilliseconds - lastRunTs) / 86400000);
+      setPeriod(fromDate(subDays(now.epochMilliseconds, expandedPeriodDays(daysAgo))), now);
     }
   }, [selectedSuiteSlug]); // eslint-disable-line react-hooks/exhaustive-deps
 

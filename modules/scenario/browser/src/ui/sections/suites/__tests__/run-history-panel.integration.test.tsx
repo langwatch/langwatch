@@ -3,6 +3,7 @@
  * @see specs/features/suites/{all-runs-panel,all-runs-group-by,suite-bugfixes-1956}.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { Temporal } from "@langwatch/time";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -90,8 +91,8 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 const defaultPeriod = {
-  startDate: new Date("2024-01-01T00:00:00Z"),
-  endDate: new Date("2024-12-31T23:59:59Z"),
+  startDate: Temporal.Instant.from("2024-01-01T00:00:00Z"),
+  endDate: Temporal.Instant.from("2024-12-31T23:59:59Z"),
 };
 
 describe("<RunHistoryPanel/> (all-runs view)", () => {

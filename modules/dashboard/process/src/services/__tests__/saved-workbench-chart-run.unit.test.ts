@@ -13,8 +13,8 @@ import { SavedWorkbenchChartService } from "../saved-workbench-chart.service.ts"
 
 const PROJECT = { id: "project_1", lwqlKey: "restricted-project-key" };
 const WEEK = {
-  start: new Date("2026-02-01T00:00:00.000Z"),
-  end: new Date("2026-02-08T00:00:00.000Z"),
+  start: "2026-02-01T00:00:00.000Z",
+  end: "2026-02-08T00:00:00.000Z",
 };
 const TIMESERIES_SQL =
   "SELECT toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket, " +

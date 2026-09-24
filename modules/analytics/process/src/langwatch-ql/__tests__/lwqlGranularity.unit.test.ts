@@ -10,6 +10,7 @@ import {
   LangWatchQLReservedGranularityTypeError,
   LWQL_GRANULARITY_STEPS,
 } from "@langwatch/analytics-contract";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -30,8 +31,8 @@ const PERIOD: LangWatchQLParameter[] = [
 ];
 
 const WINDOW = {
-  start: new Date("2026-02-20T00:00:00.000Z"),
-  end: new Date("2026-02-27T00:00:00.000Z"),
+  start: "2026-02-20T00:00:00.000Z",
+  end: "2026-02-27T00:00:00.000Z",
 };
 
 /** Seven days, in seconds. */
@@ -326,11 +327,10 @@ describe("resolveLangWatchQLGranularity", () => {
           // Exactly 10,000 hours: the widest window whose one-hour floor
           // still fits the ceiling, so every step resolves rather than
           // refusing (a wider window refuses -- pinned below).
-          start: new Date("2026-02-20T00:00:00.000Z"),
-          end: new Date(
-            new Date("2026-02-20T00:00:00.000Z").getTime() +
-              LWQL_GRANULARITY_MAX_BUCKETS * 3600 * 1000,
-          ),
+          start: "2026-02-20T00:00:00.000Z",
+          end: Temporal.Instant.from("2026-02-20T00:00:00.000Z")
+            .add({ hours: LWQL_GRANULARITY_MAX_BUCKETS })
+            .toString(),
         },
       ];
 
@@ -364,8 +364,8 @@ describe("resolveLangWatchQLGranularity", () => {
       // the ceiling is a hard browser-safety cap -- an answer carrying nine
       // times the budget must not come back looking in-budget.
       const decade = {
-        start: new Date("2026-02-20T00:00:00.000Z"),
-        end: new Date("2036-02-20T00:00:00.000Z"),
+        start: "2026-02-20T00:00:00.000Z",
+        end: "2036-02-20T00:00:00.000Z",
       };
       const run = () =>
         timeWindows.resolveGranularity({
@@ -391,8 +391,8 @@ describe("resolveLangWatchQLGranularity", () => {
       // window even the coarsest step overflows refuses on the coarsen door
       // exactly as it does on the refuse door.
       const decade = {
-        start: new Date("2026-02-20T00:00:00.000Z"),
-        end: new Date("2036-02-20T00:00:00.000Z"),
+        start: "2026-02-20T00:00:00.000Z",
+        end: "2036-02-20T00:00:00.000Z",
       };
       const coarsest = LWQL_GRANULARITY_STEPS[LWQL_GRANULARITY_STEPS.length - 1];
 
@@ -417,8 +417,10 @@ describe("resolveLangWatchQLGranularity", () => {
       // A 10,000-second window at one-second steps: exactly the ceiling.
       // Integer-exact by construction -- the float-division route (% !== 0)
       // was itself a test bug, not a property of the contract.
-      const start = new Date("2026-02-20T00:00:00.000Z");
-      const end = new Date(start.getTime() + LWQL_GRANULARITY_MAX_BUCKETS * 1000);
+      const start = "2026-02-20T00:00:00.000Z";
+      const end = Temporal.Instant.from(start)
+        .add({ seconds: LWQL_GRANULARITY_MAX_BUCKETS })
+        .toString();
       const resolution = timeWindows.resolveGranularity({
         declared: [...PERIOD, ...GRANULARITY],
         timeWindow: { start, end },
@@ -430,8 +432,10 @@ describe("resolveLangWatchQLGranularity", () => {
     });
 
     it("refuses one bucket past the ceiling", () => {
-      const start = new Date("2026-02-20T00:00:00.000Z");
-      const end = new Date(start.getTime() + (LWQL_GRANULARITY_MAX_BUCKETS + 1) * 1000);
+      const start = "2026-02-20T00:00:00.000Z";
+      const end = Temporal.Instant.from(start)
+        .add({ seconds: LWQL_GRANULARITY_MAX_BUCKETS + 1 })
+        .toString();
       expect(() =>
         timeWindows.resolveGranularity({
           declared: [...PERIOD, ...GRANULARITY],

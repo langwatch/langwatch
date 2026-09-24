@@ -143,8 +143,8 @@ export function RunHistoryPanel({
   });
 
   // Pagination
-  const startDateMs = period.startDate.getTime();
-  const endDateMs = period.endDate.getTime();
+  const startDateMs = period.startDate.epochMilliseconds;
+  const endDateMs = period.endDate.epochMilliseconds;
   const { allRuns, allScenarioSetIds, hasMore, loadMore, isLoading, error, refetch } =
     useRunHistoryPagination({ scenarioSetId, startDateMs, sseConnected });
 

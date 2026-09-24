@@ -230,8 +230,8 @@ export const useFilterParams = () => {
 
   const filterParams = {
     projectId: project?.id ?? "",
-    startDate: startDate.getTime(),
-    endDate: endDate.getTime(),
+    startDate: startDate.epochMilliseconds,
+    endDate: endDate.epochMilliseconds,
     filters: filters,
     ...(queryParams.query ? { query: queryParams.query as string } : {}),
     ...(queryParams.negateFilters === "true" ? { negateFilters: true } : {}),
@@ -268,12 +268,7 @@ export const useFilterParams = () => {
     filterCount,
     hasAnyFilters,
     queryOpts: {
-      enabled:
-        !!project &&
-        !!startDate &&
-        !isNaN(startDate.getTime()) &&
-        !!endDate &&
-        !isNaN(endDate.getTime()),
+      enabled: !!project,
       refetchOnMount: false,
       refetchOnWindowFocus: false,
       trpc: {

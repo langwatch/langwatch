@@ -63,8 +63,8 @@ export type TestCasesData = {
 function useTestCasesQueries(period: Period) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
-  const startDate = period.startDate.getTime();
-  const endDate = period.endDate.getTime();
+  const startDate = period.startDate.epochMilliseconds;
+  const endDate = period.endDate.epochMilliseconds;
   const runWindow = { projectId, startDate, endDate };
 
   const { data: testSuites, isLoading: isTestSuitesLoading } =
@@ -270,8 +270,8 @@ export function useExternalSetCases({
       projectId: project?.id ?? "",
       scenarioSetId: setId,
       limit: 100,
-      startDate: period.startDate.getTime(),
-      endDate: period.endDate.getTime(),
+      startDate: period.startDate.epochMilliseconds,
+      endDate: period.endDate.epochMilliseconds,
     },
     { enabled: enabled && !!project && !!setId },
   );
