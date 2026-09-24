@@ -1071,6 +1071,9 @@ narrow its pipeline's event type (Alex, 2026-09-24).
 The pipeline builder's type carries each registered fold's name mapped to its state, so a projection
 subscriber named by its fold is typed with that fold's state through the name; a sealed projection
 exposes a read-only `definition` view beside its `open` closure (Alex, 2026-09-24).
+The builder's overload implementation keeps one `any` where the state crosses the name lookup —
+callers stay typed; it carries a disable comment naming why. A map projection declares the subset of
+its pipeline's events it consumes, which types its key and map functions (Alex, 2026-09-24).
 
 A module may host several pipelines: it calls `.withEventing(...)` once per
 pipeline, each a `defineEventingModule` declaration over the same app and
