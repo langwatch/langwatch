@@ -435,7 +435,7 @@ export class MemoryProjectRepository implements ProjectRepository {
     scopeId: string;
   }): Promise<{ ownerUserId: string | null } | null> {
     const project = this.#database.findProject(input.scopeId);
-    if (!project || project.archivedAt !== null) return null;
+    if (!project) return null;
     const owningTeam = this.#database.findTeam(project.teamId);
     if (!owningTeam || owningTeam.organizationId !== input.organizationId) return null;
     if (!project.isPersonal && !owningTeam.isPersonal) return null;

@@ -526,7 +526,6 @@ export class PrismaProjectRepository
         id: input.scopeId,
         team: { organizationId: input.organizationId },
         OR: [{ isPersonal: true }, { team: { isPersonal: true } }],
-        archivedAt: null,
       },
       select: { team: { select: { ownerUserId: true } } },
     });

@@ -298,6 +298,25 @@ describe("MemoryProjectRepository", () => {
       ).toEqual({ ownerUserId: "user_1" });
     });
 
+    it("answers the owner of an archived personal project, as main did", async () => {
+      const { database, repository } = seeded();
+      database.putTeam(team({ id: "team_personal", isPersonal: true, ownerUserId: "user_1" }));
+      await repository.create({
+        ...creation,
+        id: "project_archived",
+        slug: "archived",
+        teamId: "team_personal",
+      });
+      await repository.archive({ id: "project_archived", organizationId: ORGANIZATION_ID });
+
+      expect(
+        await repository.findPersonalProjectOwner({
+          organizationId: ORGANIZATION_ID,
+          scopeId: "project_archived",
+        }),
+      ).toEqual({ ownerUserId: "user_1" });
+    });
+
     it("answers null for a scope in another organization", async () => {
       const { database, repository } = seeded();
       database.putTeam(

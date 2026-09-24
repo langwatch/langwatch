@@ -99,7 +99,7 @@ export interface ProjectRepository {
   findIdByLegacyApiKey(input: { token: string }): Promise<string | null>;
   /** False when no live row took the write, which is how the caller learns nothing rotated. */
   rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean>;
-  /** Who owns the workspace a live personal project, or one in a personal team, sits in. */
+  /** Main `personal-team-scope.ts:90-97`: a personal project's owner, archived or not. */
   findPersonalProjectOwner(input: {
     organizationId: string;
     scopeId: string;
