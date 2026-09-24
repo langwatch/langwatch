@@ -17,10 +17,12 @@ import type {
 } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 
+import type { AnomalyRateTrackerRepository } from "../repositories/anomaly.repository.ts";
 import type { OpsMetricsRepository } from "../repositories/ops-metrics.repository.ts";
 import type { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metrics-source.repository.ts";
 import { totalInFlight as computeTotalInFlight } from "../rules/ops-in-flight.rules.ts";
 import { computeEngineCpuPercent } from "../rules/ops-redis-engine-cpu.rules.ts";
+import { countWaitingJobsByTenant } from "../rules/ops-tenant-backlog.rules.ts";
 import { OpsDashboardViewService } from "./ops-dashboard-view.service.ts";
 import { OpsMetricsPublicationService } from "./ops-metrics-publication.service.ts";
 import { OpsMetricsSamplingService } from "./ops-metrics-sampling.service.ts";
@@ -56,6 +58,7 @@ export class OpsMetricsCollectorService {
   private isCollecting = false;
 
   private readonly ops: OpsQueueMetricsSourceRepository;
+  private readonly rateTracker: AnomalyRateTrackerRepository;
   private snapshots: OpsSnapshotService | null;
   /** Identity of this writer in the lease and in every artifact it stamps. */
   private readonly writerId: string;
@@ -79,6 +82,7 @@ export class OpsMetricsCollectorService {
   static create(params: {
     metrics: OpsMetricsRepository;
     ops: OpsQueueMetricsSourceRepository;
+    rateTracker: AnomalyRateTrackerRepository;
     snapshots?: OpsSnapshotService | null;
     writerId?: string;
   }): OpsMetricsCollectorService {
@@ -89,6 +93,7 @@ export class OpsMetricsCollectorService {
   static getSingleton(params: {
     metrics: OpsMetricsRepository;
     ops: OpsQueueMetricsSourceRepository;
+    rateTracker: AnomalyRateTrackerRepository;
     snapshots?: OpsSnapshotService | null;
   }): OpsMetricsCollectorService {
     if (!OpsMetricsCollectorService.singleton) {
@@ -117,11 +122,13 @@ export class OpsMetricsCollectorService {
   private constructor(params: {
     metrics: OpsMetricsRepository;
     ops: OpsQueueMetricsSourceRepository;
+    rateTracker: AnomalyRateTrackerRepository;
     snapshots?: OpsSnapshotService | null;
     writerId?: string;
   }) {
     this.metrics = params.metrics;
     this.ops = params.ops;
+    this.rateTracker = params.rateTracker;
     this.snapshots = params.snapshots ?? null;
     this.writerId = params.writerId ?? `${os.hostname()}:${process.pid}`;
     this.sampling = OpsMetricsSamplingService.create({ metrics: this.metrics });
@@ -273,6 +280,7 @@ export class OpsMetricsCollectorService {
       });
       await this.recordKnownPipelinePaths(queues);
       await this.recordCycleRates(queues);
+      await this.recordTenantBacklogs(queues);
       this.recordProcessCpu();
       this.window.pruneStaleCounters(this.groupQueueNames);
       this.window.persist(this.metrics).catch((err) => {
@@ -421,6 +429,18 @@ export class OpsMetricsCollectorService {
     if (this.window.throughputBuffer.length > THROUGHPUT_BUFFER_SIZE) {
       this.window.throughputBuffer.shift();
     }
+  }
+
+  /**
+   * What anomaly detection reads: each tenant's waiting jobs as this cycle saw them, recorded once
+   * across the fleet because only the lease holder scans. Main counted at enqueue instead; the
+   * difference is in specs/event-queue-anomaly-detection.feature.
+   */
+  private async recordTenantBacklogs(queues: QueueInfo[]): Promise<void> {
+    const backlogs = countWaitingJobsByTenant({ queues });
+    await Promise.all(
+      [...backlogs].map(([tenantId, count]) => this.rateTracker.record(tenantId, count)),
+    );
   }
 
   /** This process's own CPU share since the last cycle. */

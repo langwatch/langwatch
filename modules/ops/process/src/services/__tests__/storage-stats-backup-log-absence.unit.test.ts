@@ -3,33 +3,18 @@
  * without a backup_log table. Don't warn repeatedly for this expected
  * absence. Spec: specs/ops/clickhouse-backup-metrics.feature
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createTestLogger } from "@langwatch/test-harness";
+import { describe, expect, it } from "vitest";
 
-const loggerInfo = vi.hoisted(() => vi.fn());
-const loggerWarn = vi.hoisted(() => vi.fn());
-
-vi.mock("@langwatch/observability", () => ({
-  createLogger: () => ({
-    debug: vi.fn(),
-    info: loggerInfo,
-    warn: loggerWarn,
-    error: vi.fn(),
-  }),
-}));
-
-import type { StorageStatsMetrics } from "../../app/ops.app.ts";
+import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
+import { MemoryStorageStatsReadingsRepository } from "../../repositories/memory/memory.storage-stats-readings.repository.ts";
 import {
   StorageStatsCollectionService,
   type StorageStatsClickHouseClient,
 } from "../storage-stats-collection.service.ts";
 
-class SilentMetrics implements StorageStatsMetrics {
-  beginTick(): void {}
-  recordTable(): void {}
-  recordDisk(): void {}
-  recordBackupStatus(): void {}
-  recordLastBackup(): void {}
-}
+const INFO = 30;
+const WARN = 40;
 
 /** ClickHouse's own refusal when the table the first backup would create is not there. */
 function unknownTable(): Error & { code: string; type: string } {
@@ -43,37 +28,36 @@ function clientRefusingBackupLog(failure: () => Error): StorageStatsClickHouseCl
   return {
     query: async ({ query }) => {
       if (query.includes("system.backup_log")) throw failure();
-      return { json: async () => ({ data: [] }) };
+      return { data: [] };
     },
   } as StorageStatsClickHouseClient;
 }
 
-function collectorOver(client: StorageStatsClickHouseClient): StorageStatsCollectionService {
-  return StorageStatsCollectionService.create({
+function collectorOver(client: StorageStatsClickHouseClient) {
+  const { logger, lines } = createTestLogger();
+  const collector = StorageStatsCollectionService.create({
     resolveInstances: async () => [{ target: "shared", client }],
-    metrics: new SilentMetrics(),
+    readings: MemoryStorageStatsReadingsRepository.create({ store: MemoryOpsStore.create() }),
     collectBackups: true,
+    logger,
   });
+  return { collector, lines };
 }
-
-beforeEach(() => {
-  loggerInfo.mockClear();
-  loggerWarn.mockClear();
-});
 
 describe("given a ClickHouse that has never taken a backup", () => {
   describe("when the collector ticks repeatedly", () => {
     /** @scenario "an instance with no backup log names the absence once at info" */
     it("names the absent table once at info and never warns", async () => {
-      const collector = collectorOver(clientRefusingBackupLog(unknownTable));
+      const { collector, lines } = collectorOver(clientRefusingBackupLog(unknownTable));
 
       await collector.collect();
       await collector.collect();
       await collector.collect();
 
-      expect(loggerWarn).not.toHaveBeenCalled();
-      expect(loggerInfo).toHaveBeenCalledTimes(1);
-      expect(loggerInfo.mock.calls[0]?.[1]).toContain("system.backup_log");
+      const info = lines.filter((line) => line.level === INFO);
+      expect(lines.filter((line) => line.level === WARN)).toEqual([]);
+      expect(info).toHaveLength(1);
+      expect(info[0]?.msg).toContain("system.backup_log");
     });
   });
 });
@@ -82,14 +66,14 @@ describe("given a backup log that fails for any other reason", () => {
   describe("when the collector ticks repeatedly", () => {
     /** @scenario "transient backup-log failure warns once until recovery" */
     it("still warns once for the failure streak", async () => {
-      const collector = collectorOver(
+      const { collector, lines } = collectorOver(
         clientRefusingBackupLog(() => new Error("connection refused")),
       );
 
       await collector.collect();
       await collector.collect();
 
-      expect(loggerWarn).toHaveBeenCalledTimes(1);
+      expect(lines.filter((line) => line.level === WARN)).toHaveLength(1);
     });
   });
 });

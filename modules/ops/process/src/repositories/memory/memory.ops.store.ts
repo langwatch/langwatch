@@ -8,6 +8,8 @@ import {
   type ReplayStatus,
 } from "@langwatch/ops-contract";
 
+import type { StorageStatsReading } from "../storage-stats-readings.repository.ts";
+
 /** One event as the in-memory event log keeps it, with the columns the explorer reads by. */
 export interface MemoryEventRow {
   eventId: string;
@@ -66,6 +68,9 @@ export class MemoryOpsStore {
   /** Per tenant, the ingest count for each epoch minute. */
   readonly tenantRateMinutes = new Map<string, Map<number, number>>();
   readonly rateBaselines = new Map<string, number>();
+  /** Per ClickHouse endpoint, the last storage reading and the last backup it saw. */
+  readonly storageReadings = new Map<string, Omit<StorageStatsReading, "lastBackup">>();
+  readonly storageLastBackups = new Map<string, NonNullable<StorageStatsReading["lastBackup"]>>();
   /** The operator trails, newest act last. */
   readonly processAudit: ProcessAuditEntryView[] = [];
   readonly schedulerAudit: SchedulerAuditEntryView[] = [];

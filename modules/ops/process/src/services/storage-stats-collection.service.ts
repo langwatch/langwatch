@@ -3,12 +3,13 @@
  * @see specs/ops/clickhouse-storage-metrics.feature
  */
 
-import { createLogger } from "@langwatch/observability";
+import type { Logger } from "@langwatch/observability";
 import { toEpochMs } from "@langwatch/time";
 
-import type { StorageStatsMetrics } from "../app/ops.app.ts";
-
-const logger = createLogger("langwatch:ops:storage-stats");
+import type {
+  StorageStatsReading,
+  StorageStatsReadingsRepository,
+} from "../repositories/storage-stats-readings.repository.ts";
 
 /** The tables whose footprint the size and retention alerts are built on. */
 const MONITORED_TABLES = [
@@ -23,16 +24,14 @@ const MONITORED_TABLES = [
   "stored_objects",
 ] as const;
 
-const DEFAULT_INTERVAL_MS = 15_000;
-
 /** The narrow read a system-table query needs, as this service asks it. */
 export interface StorageStatsClickHouseClient {
-  query(input: {
+  query<Row>(input: {
     query: string;
     query_params?: Record<string, readonly string[]>;
     /** Set when the statement genuinely spans tenants; see the tenant-scope guard. */
     unscoped?: { reason: string };
-  }): Promise<{ json<Row>(): Promise<{ data: Row[] }> }>;
+  }): Promise<{ data: Row[] }>;
 }
 
 export interface StorageStatsInstance {
@@ -40,18 +39,13 @@ export interface StorageStatsInstance {
   client: StorageStatsClickHouseClient;
 }
 
-export interface StorageStatsCollectionHandle {
-  stop(): void;
-}
-
 export interface StorageStatsCollectionOptions {
   resolveInstances: () => Promise<readonly StorageStatsInstance[]>;
-  metrics: StorageStatsMetrics;
-  /**
-   * Whether the backup log is read at all.
-   */
+  /** Where each endpoint's reading goes, for every process's gauges to read. */
+  readings: StorageStatsReadingsRepository;
+  /** Whether the backup log is read at all. */
   collectBackups: boolean;
-  intervalMs?: number;
+  logger: Pick<Logger, "debug" | "info" | "warn" | "error">;
 }
 
 export class StorageStatsCollectionService {
@@ -59,19 +53,21 @@ export class StorageStatsCollectionService {
     return new StorageStatsCollectionService(options);
   }
 
-  private timer: ReturnType<typeof setInterval> | undefined;
   private backupsFailing = false;
   private backupLogAbsent = false;
 
   private constructor(private readonly options: StorageStatsCollectionOptions) {}
 
-  /** One pass over every configured endpoint. Exported for a test to drive. */
+  /** One pass over every configured endpoint; each `ops_storage_stats` wake runs one. */
   async collect(): Promise<void> {
     let instances: readonly StorageStatsInstance[];
     try {
       instances = await this.options.resolveInstances();
     } catch (error) {
-      logger.error({ error }, "could not enumerate ClickHouse endpoints for storage stats");
+      this.options.logger.error(
+        { error },
+        "could not enumerate ClickHouse endpoints for storage stats",
+      );
 
       return;
     }
@@ -82,7 +78,7 @@ export class StorageStatsCollectionService {
       try {
         await this.collectInstance(instance);
       } catch (error) {
-        logger.error(
+        this.options.logger.error(
           { error, instance: instance.target },
           "failed to collect ClickHouse storage stats",
         );
@@ -90,28 +86,13 @@ export class StorageStatsCollectionService {
     }
   }
 
-  start(): StorageStatsCollectionHandle {
-    if (!this.timer) {
-      void this.collect();
-      this.timer = setInterval(
-        () => void this.collect(),
-        this.options.intervalMs ?? DEFAULT_INTERVAL_MS,
-      );
-    }
-
-    return {
-      stop: () => {
-        if (this.timer) {
-          clearInterval(this.timer);
-        }
-
-        this.timer = undefined;
-      },
-    };
-  }
-
   private async collectInstance(instance: StorageStatsInstance): Promise<void> {
-    const tables = await instance.client.query({
+    const tableRows = await instance.client.query<{
+      table: string;
+      total_rows: string;
+      total_bytes: string;
+      parts_count: string;
+    }>({
       query: `
         SELECT
           table,
@@ -130,35 +111,35 @@ export class StorageStatsCollectionService {
           "system.parts carries no tenant column: this is per-table storage size for the operator's dashboards.",
       },
     });
-    const tableRows = await tables.json<{
-      table: string;
-      total_rows: string;
-      total_bytes: string;
-      parts_count: string;
-    }>();
 
-    // Cleared only once the query has resolved, so a failed read keeps the
+    // Saved only once the table read has resolved, so a failed read keeps the
     // last known values rather than zeroing a live table.
-    this.options.metrics.beginTick(instance.target);
-    for (const row of tableRows.data) {
-      this.options.metrics.recordTable({
-        instance: instance.target,
+    const reading: StorageStatsReading = {
+      instance: instance.target,
+      tables: tableRows.data.map((row) => ({
         table: row.table,
         rows: Number.parseInt(row.total_rows, 10),
         bytes: Number.parseInt(row.total_bytes, 10),
         parts: Number.parseInt(row.parts_count, 10),
-      });
+      })),
+      disks: await this.readDisks(instance),
+      backupStatuses: [],
+    };
+    if (this.options.collectBackups) {
+      await this.readBackups({ instance, reading });
     }
 
-    await this.collectDisks(instance);
-    if (this.options.collectBackups) {
-      await this.collectBackups(instance);
-    }
+    await this.options.readings.save(reading);
   }
 
-  private async collectDisks(instance: StorageStatsInstance): Promise<void> {
+  private async readDisks(instance: StorageStatsInstance): Promise<StorageStatsReading["disks"]> {
     try {
-      const disks = await instance.client.query({
+      const rows = await instance.client.query<{
+        name: string;
+        total_space: string;
+        free_space: string;
+        used_space: string;
+      }>({
         query: `
           SELECT name, total_space, free_space, (total_space - free_space) as used_space
           FROM system.disks
@@ -167,32 +148,38 @@ export class StorageStatsCollectionService {
           reason: "system.disks carries no tenant column: this is the instance's disk capacity.",
         },
       });
-      const rows = await disks.json<{
-        name: string;
-        total_space: string;
-        free_space: string;
-        used_space: string;
-      }>();
-      for (const row of rows.data) {
-        this.options.metrics.recordDisk({
-          instance: instance.target,
-          disk: row.name,
-          totalBytes: Number.parseInt(row.total_space, 10),
-          usedBytes: Number.parseInt(row.used_space, 10),
-          freeBytes: Number.parseInt(row.free_space, 10),
-        });
-      }
+      return rows.data.map((row) => ({
+        disk: row.name,
+        totalBytes: Number.parseInt(row.total_space, 10),
+        usedBytes: Number.parseInt(row.used_space, 10),
+        freeBytes: Number.parseInt(row.free_space, 10),
+      }));
     } catch (error) {
-      logger.debug({ error, instance: instance.target }, "failed to collect ClickHouse disk stats");
+      this.options.logger.debug(
+        { error, instance: instance.target },
+        "failed to collect ClickHouse disk stats",
+      );
+      return [];
     }
   }
 
   /**
    * The backup log, read from `system.backup_log` rather than `system.backups`.
    */
-  private async collectBackups(instance: StorageStatsInstance): Promise<void> {
+  private async readBackups({
+    instance,
+    reading,
+  }: {
+    instance: StorageStatsInstance;
+    reading: StorageStatsReading;
+  }): Promise<void> {
     try {
-      const backups = await instance.client.query({
+      const rows = await instance.client.query<{
+        status: string;
+        cnt: string;
+        last_success_time: string;
+        last_success_size: string;
+      }>({
         query: `
           SELECT
             status,
@@ -207,19 +194,16 @@ export class StorageStatsCollectionService {
             "system.backup_log carries no tenant column: this is the instance's backup history.",
         },
       });
-      const rows = await backups.json<{
-        status: string;
-        cnt: string;
-        last_success_time: string;
-        last_success_size: string;
-      }>();
 
       for (const row of rows.data) {
-        this.recordBackupRow({ instance, row });
+        this.readBackupRow({ reading, row });
       }
 
       if (this.backupsFailing || this.backupLogAbsent) {
-        logger.info({ instance: instance.target }, "ClickHouse backup stats collection recovered");
+        this.options.logger.info(
+          { instance: instance.target },
+          "ClickHouse backup stats collection recovered",
+        );
         this.backupsFailing = false;
         this.backupLogAbsent = false;
       }
@@ -229,18 +213,14 @@ export class StorageStatsCollectionService {
   }
 
   /** One status row: its count always, and the last success only when it names a real time. */
-  private recordBackupRow({
-    instance,
+  private readBackupRow({
+    reading,
     row,
   }: {
-    instance: StorageStatsInstance;
+    reading: StorageStatsReading;
     row: { status: string; cnt: string; last_success_time: string; last_success_size: string };
   }): void {
-    this.options.metrics.recordBackupStatus({
-      instance: instance.target,
-      status: row.status,
-      count: Number.parseInt(row.cnt, 10),
-    });
+    reading.backupStatuses.push({ status: row.status, count: Number.parseInt(row.cnt, 10) });
     if (row.status !== "BACKUP_CREATED" || !row.last_success_time) {
       return;
     }
@@ -251,11 +231,10 @@ export class StorageStatsCollectionService {
     }
 
     const sizeBytes = Number.parseInt(row.last_success_size, 10);
-    this.options.metrics.recordLastBackup({
-      instance: instance.target,
+    reading.lastBackup = {
       succeededAtSeconds,
       sizeBytes: Number.isFinite(sizeBytes) ? sizeBytes : 0,
-    });
+    };
   }
 
   /**
@@ -275,7 +254,7 @@ export class StorageStatsCollectionService {
         return;
       }
 
-      logger.info(
+      this.options.logger.info(
         { instance: instance.target },
         "ClickHouse has no system.backup_log, so no backup status is collected; this instance has never taken a backup",
       );
@@ -285,12 +264,12 @@ export class StorageStatsCollectionService {
     }
 
     if (this.backupsFailing) {
-      logger.debug({ error }, "failed to collect ClickHouse backup stats");
+      this.options.logger.debug({ error }, "failed to collect ClickHouse backup stats");
 
       return;
     }
 
-    logger.warn(
+    this.options.logger.warn(
       { error, instance: instance.target },
       "failed to collect ClickHouse backup stats from system.backup_log (further failures suppressed until recovery)",
     );

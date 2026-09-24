@@ -1,6 +1,6 @@
 Feature: Per-tenant rate anomaly detection
   As an operator running multi-tenant event-sourcing infrastructure
-  I want to be notified when a single tenant's enqueue rate spikes far
+  I want to be notified when a single tenant's queue load spikes far
   above its own baseline
   So that a noisy neighbour (e.g. evaluator-recursion loop, accidental
   fan-out) can be caught within minutes rather than hours.
@@ -18,9 +18,51 @@ Feature: Per-tenant rate anomaly detection
   # Baseline = p95 of per-minute counts across a 7-day window.
   # Cached for 1h so the worker tick stays cheap on multi-tenant clusters.
 
+  # Where the rates come from on this branch (ruled 2026-09-23): main counted
+  # each tenant's jobs at enqueue, inside the GroupQueue. Here the queue-metrics
+  # writer, which already scans every queue each 2s cycle under its fleet
+  # lease, records each tenant's waiting jobs from that scan into the same
+  # rate tracker. Window, tier and baseline constants are main's, unchanged.
+
   Background:
-    Given the GroupQueue is recording per-tenant enqueues
+    Given the queue-metrics writer is recording each tenant's waiting jobs
     And the AnomalyDetector worker is running
+
+  @unit @anomaly-detection @rates
+  Scenario: The queue-metrics writer records each tenant's waiting jobs from its scan
+    Given the writer's scan holds waiting jobs for tenants "proj_a" and "proj_b"
+    When the writer's cycle runs
+    Then both tenants are active for the detector
+    And each tenant's count for this minute is its waiting jobs
+
+  @unit @anomaly-detection @rates
+  Scenario: A group id names its tenant before its first slash
+    Given groups keyed "<tenant>/<job path>/<domain key>" and "<tenant>/job/<name>"
+    And a group keyed by a bare id with no slash
+    When the writer counts a scan's waiting jobs
+    Then each keyed group counts toward the tenant before its first slash
+    And the bare-id group counts toward no tenant
+
+  @unit @anomaly-detection @rates
+  Scenario: A backlog spike the writer sees surfaces through the detector
+    Given two hours of steady backlog for "proj_runaway" and "proj_quiet"
+    When "proj_runaway"'s backlog jumps tenfold for five minutes
+    Then the detector surfaces a surface-tier anomaly for "proj_runaway" only
+
+  # The observed rate is not main's enqueue rate, and these differences are
+  # not hidden: a job waiting through N cycles counts N times (a minute is
+  # ~30 cycles, so a minute's count is ~30x the average backlog); a job that
+  # arrives and finishes between two scans counts zero; the scan samples 200
+  # groups from each end of a queue's ready set plus 200 blocked groups, so
+  # groups beyond the sample go unseen; and a tenant's parked groups are not
+  # in the scan. The tiers compare a tenant with its own baseline, so the
+  # constant factor cancels; MIN_BASELINE_RATE (5/min) now means an average
+  # backlog of about one sixth of a job.
+  @unit @anomaly-detection @rates
+  Scenario: A job waiting across cycles is counted in every cycle, where main counted it once at enqueue
+    Given tenant "proj_a" has one job waiting
+    When the writer scans twice before it is processed
+    Then "proj_a"'s count for this minute is two
 
   @unit @anomaly-detection @kill-switch
   Scenario: Kill-switch FF disables anomaly detection for one tenant without a redeploy
@@ -39,7 +81,7 @@ Feature: Per-tenant rate anomaly detection
   @unit @anomaly-detection @kill-switch
   Scenario: Kill-switch FF makes the rate tracker record() a no-op on the hot path
     Given the PostHog flag is enabled for tenant "proj_killed"
-    When the GroupQueue records an enqueue for tenant "proj_killed"
+    When the rate tracker records waiting jobs for tenant "proj_killed"
     Then no Redis write is issued and the tenant does not appear in the active-tenants index
 
   @unit @anomaly-detection @baseline-cache

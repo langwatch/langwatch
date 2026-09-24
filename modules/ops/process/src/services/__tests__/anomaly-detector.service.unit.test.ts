@@ -24,6 +24,7 @@ function projectIdOf(target: FeatureFlagTarget): string | undefined {
 
 class RateTrackerFake extends AnomalyRateTrackerRepository {
   readonly baselines = new Map<string, number>();
+  readonly record = vi.fn<(tenantId: string, count?: number) => Promise<void>>(async () => {});
   readonly listActiveTenants = vi.fn<() => Promise<string[]>>(async () => []);
   readonly currentWindowCount = vi.fn<(tenantId: string, seconds: number) => Promise<number>>(
     async () => 0,
@@ -91,10 +92,7 @@ describe("AnomalyDetectorService", () => {
     expect(values).toEqual([10, 1, 5, 8, 2, 7, 3, 9, 4, 6]);
   });
 
-  /**
-   * @scenario "Insufficient history is cached briefly so quiet tenants are not re-read
-   * every tick"
-   */
+  /** @scenario "Insufficient history is cached briefly so quiet tenants are not re-read every tick" */
   it("caches an insufficient-history verdict with its short retry TTL", async () => {
     const { detector, rateTracker, anomalyState } = createDetector();
     rateTracker.listActiveTenants.mockResolvedValue(["proj_new"]);

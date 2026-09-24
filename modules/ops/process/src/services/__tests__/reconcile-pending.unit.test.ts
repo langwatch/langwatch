@@ -1,6 +1,8 @@
 import type * as ioredisModule from "ioredis";
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryAnomalyRateTrackerRepository } from "../../repositories/memory/memory.anomaly-rate-tracker.repository.ts";
+import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
 import { RedisOpsMetricsRepository } from "../../repositories/redis/redis.ops-metrics.repository.ts";
 import { OpsMetricsCollectorService } from "../ops-metrics-collector.service.ts";
 import { OpsMetricsTestAdapter } from "./ops-metrics.fixture.ts";
@@ -30,6 +32,7 @@ const runReconcile = async (ops: OpsMetricsTestAdapter) => {
   const collector = OpsMetricsCollectorService.create({
     metrics: RedisOpsMetricsRepository.create({ redis: createMockRedis() }),
     ops,
+    rateTracker: MemoryAnomalyRateTrackerRepository.create({ store: MemoryOpsStore.create() }),
   });
   await collector.discoverQueues();
   // Access via bracket notation to avoid exposing a test-only public API.

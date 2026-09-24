@@ -9,6 +9,8 @@ import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import type { OpsSnapshotRedis } from "../app/ops.app.ts";
+import { MemoryAnomalyRateTrackerRepository } from "../repositories/memory/memory.anomaly-rate-tracker.repository.ts";
+import { MemoryOpsStore } from "../repositories/memory/memory.ops.store.ts";
 import { RedisOpsMetricsRepository } from "../repositories/redis/redis.ops-metrics.repository.ts";
 import { RedisOpsSnapshotRepository } from "../repositories/redis/redis.ops-snapshot.repository.ts";
 import { OpsMetricsTestAdapter } from "../services/__tests__/ops-metrics.fixture.ts";
@@ -113,6 +115,9 @@ describe.skipIf(!hasRedis)("Ops dashboard latency tiles", () => {
         const collector = OpsMetricsCollectorService.create({
           metrics: RedisOpsMetricsRepository.create({ redis }),
           ops,
+          rateTracker: MemoryAnomalyRateTrackerRepository.create({
+            store: MemoryOpsStore.create(),
+          }),
           snapshots,
         });
         try {

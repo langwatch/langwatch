@@ -148,12 +148,19 @@ import { PrismaPostgresHealthRepository } from "../repositories/prisma/prisma.da
 import { RedisAnomalyRateTrackerRepository } from "../repositories/redis/redis.anomaly-rate-tracker.repository.ts";
 import { RedisAnomalyStateRepository } from "../repositories/redis/redis.anomaly-state.repository.ts";
 import { RedisRedisHealthRepository } from "../repositories/redis/redis.datastore-health.repository.ts";
+import { RedisStorageStatsReadingsRepository } from "../repositories/redis/redis.storage-stats-readings.repository.ts";
 import { buildExplainQuery, redactQueryForAudit } from "../rules/ops-clickhouse-explain.rules.ts";
 import { withKillSwitchDescriptors } from "../rules/ops-kill-switch-catalogue.rules.ts";
 import { AnomalyDetectorService } from "../services/anomaly-detector.service.ts";
 import { OpsCheckupService } from "../services/ops-checkup.service.ts";
 import type { OpsService } from "../services/ops.service.ts";
-import { buildOpsInfrastructure, type OpsProcessMembers } from "./ops-composition.build.ts";
+import { StorageStatsCollectionService } from "../services/storage-stats-collection.service.ts";
+import { StorageStatsGaugesService } from "../services/storage-stats-gauges.service.ts";
+import {
+  buildOpsInfrastructure,
+  type OpsProcessMembers,
+  sharedStorageStatsInstance,
+} from "./ops-composition.build.ts";
 /**
  * Who an operator request is attributed to: the impersonator where there is
  * one, so a back-office read is recorded against the human who made it rather
@@ -536,6 +543,8 @@ type OpsRuntimeDependencies = Readonly<{
   checkup: OpsCheckupService | undefined;
   /** The detector `ops_anomaly_detection` ticks; absent where a composition built none. */
   anomalies: AnomalyDetectorService | undefined;
+  /** The measurement `ops_storage_stats` runs; absent where a composition built none. */
+  storageStats: StorageStatsCollectionService | undefined;
   findOpsApiKey(): string | null;
   findProductAnalyticsTargets(): ProductAnalyticsTarget[];
   isProduction: boolean;
@@ -614,11 +623,17 @@ export class OpsApp implements OpsApi {
    * does — what a hand composition (or a test) still supplies directly.
    */
   static create(setup: OpsSetup): OpsApp {
+    // One tracker: the queue-metrics writer records into it, the detector reads it.
+    const rateTracker = RedisAnomalyRateTrackerRepository.create({
+      redis: setup.members.redis,
+      featureFlags: setup.dependencies.featureFlags,
+    });
     const infrastructure = buildOpsInfrastructure({
       members: setup.members,
       config: setup.config,
       resources: setup.resources,
       processStore: setup.repositories.processStore,
+      rateTracker,
     });
 
     const { dependencies } = setup;
@@ -650,12 +665,19 @@ export class OpsApp implements OpsApi {
     });
 
     const anomalies = AnomalyDetectorService.create({
-      rateTracker: RedisAnomalyRateTrackerRepository.create({
-        redis: members.redis,
-        featureFlags: dependencies.featureFlags,
-      }),
+      rateTracker,
       anomalyState: RedisAnomalyStateRepository.create(members.redis),
       featureFlags: dependencies.featureFlags,
+    });
+
+    // Every process exports the gauges; only the process running `ops_storage_stats` measures.
+    const storageReadings = RedisStorageStatsReadingsRepository.create({ redis: members.redis });
+    StorageStatsGaugesService.create({ readings: storageReadings }).publish();
+    const storageStats = StorageStatsCollectionService.create({
+      resolveInstances: async () => [sharedStorageStatsInstance(members.clickhouse)],
+      readings: storageReadings,
+      collectBackups: setup.config.collectClickHouseBackupMetrics,
+      logger: members.logger,
     });
 
     return OpsApp.fromInfrastructure({
@@ -664,6 +686,7 @@ export class OpsApp implements OpsApi {
       repositories: setup.repositories,
       checkup,
       anomalies,
+      storageStats,
     });
   }
 
@@ -678,6 +701,7 @@ export class OpsApp implements OpsApi {
     repositories: OpsRepositories;
     checkup?: OpsCheckupService;
     anomalies?: AnomalyDetectorService;
+    storageStats?: StorageStatsCollectionService;
   }): OpsApp {
     const { infrastructure: members, dependencies, repositories } = setup;
 
@@ -712,6 +736,7 @@ export class OpsApp implements OpsApi {
       }),
       checkup: setup.checkup,
       anomalies: setup.anomalies,
+      storageStats: setup.storageStats,
       findOpsApiKey: () => members.findOpsApiKey(),
       findProductAnalyticsTargets: () => members.findProductAnalyticsTargets(),
       isProduction: members.isProduction,
@@ -1763,6 +1788,13 @@ export class OpsApp implements OpsApi {
     return anomalies.tick();
   }
 
+  /** One pass of `ops_storage_stats`: measures every endpoint and saves the readings. */
+  measureStorage(): Promise<void> {
+    const { storageStats } = this.#dependencies;
+    if (!storageStats) throw new OpsCapabilityUnavailableError("storage stats");
+    return storageStats.collect();
+  }
+
   get #checkup(): OpsCheckupService {
     const { checkup } = this.#dependencies;
     if (!checkup) throw new OpsCapabilityUnavailableError("the checkup");
@@ -1919,36 +1951,4 @@ export interface OpsReplayRuntimeFactory {
 /** Wakes the scheduler loop after an operator makes work due. */
 export interface SchedulerWake {
   wake(): void;
-}
-
-/**
- * Where a storage-stats tick writes what it read.
- */
-export interface StorageStatsMetrics {
-  /** Clears the per-table and per-disk series this tick is about to rewrite. */
-  beginTick(instance: string): void;
-
-  recordTable(input: {
-    instance: string;
-    table: string;
-    rows: number;
-    bytes: number;
-    parts: number;
-  }): void;
-
-  recordDisk(input: {
-    instance: string;
-    disk: string;
-    totalBytes: number;
-    usedBytes: number;
-    freeBytes: number;
-  }): void;
-
-  recordBackupStatus(input: { instance: string; status: string; count: number }): void;
-
-  recordLastBackup(input: {
-    instance: string;
-    succeededAtSeconds: number;
-    sizeBytes: number;
-  }): void;
 }

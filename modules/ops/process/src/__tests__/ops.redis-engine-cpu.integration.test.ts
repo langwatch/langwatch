@@ -5,6 +5,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MemoryAnomalyRateTrackerRepository } from "../repositories/memory/memory.anomaly-rate-tracker.repository.ts";
+import { MemoryOpsStore } from "../repositories/memory/memory.ops.store.ts";
 import type {
   OpsLatencyHistograms,
   OpsQueueTotals,
@@ -79,6 +81,7 @@ const collectorOver = (infoTexts: string[]): OpsMetricsCollectorService =>
   OpsMetricsCollectorService.create({
     metrics: new ScriptedMetricsRepository(infoTexts),
     ops: OpsMetricsTestAdapter.create(),
+    rateTracker: MemoryAnomalyRateTrackerRepository.create({ store: MemoryOpsStore.create() }),
     snapshots: null,
     writerId: "test-writer",
   });

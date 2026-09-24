@@ -3,6 +3,7 @@ import { defineServerModule } from "@langwatch/kernel";
 
 import { OpsApp } from "#app/ops.app";
 import { anomalyDetectionEventing } from "#eventing/ops-anomaly-detection.pipeline";
+import { storageStatsEventing } from "#eventing/ops-storage-stats.pipeline";
 import { usageReportEventing } from "#eventing/ops-usage-report.pipeline";
 import { opsRepositories } from "#repositories/ops-repositories.registry";
 import { adminRest } from "#transport/admin.rest";
@@ -39,7 +40,8 @@ export const opsServer = defineServerModule("ops")
     ),
   ])
   .withEventing(usageReportEventing)
-  .withEventing(anomalyDetectionEventing);
+  .withEventing(anomalyDetectionEventing)
+  .withEventing(storageStatsEventing);
 
 /** One request's presented project credential, unverified, or none at all. */
 function apiKeyRequestCredentialOf(

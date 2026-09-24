@@ -1,6 +1,8 @@
 import type { OpsSnapshotService } from "@langwatch/ops-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryAnomalyRateTrackerRepository } from "../../repositories/memory/memory.anomaly-rate-tracker.repository.ts";
+import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
 import { RedisOpsMetricsRepository } from "../../repositories/redis/redis.ops-metrics.repository.ts";
 import { OpsMetricsCollectorService } from "../ops-metrics-collector.service.ts";
 import { OpsMetricsTestAdapter } from "./ops-metrics.fixture.ts";
@@ -93,6 +95,7 @@ const makeWriter = (held: boolean) => {
   const collector = OpsMetricsCollectorService.create({
     metrics: RedisOpsMetricsRepository.create({ redis: redisStub as any }),
     ops,
+    rateTracker: MemoryAnomalyRateTrackerRepository.create({ store: MemoryOpsStore.create() }),
     snapshots,
     writerId: held ? "holder" : "loser",
   });
@@ -156,6 +159,7 @@ describe("snapshot writer lease gate", () => {
       const collector = OpsMetricsCollectorService.create({
         metrics: RedisOpsMetricsRepository.create({ redis: redis as any }),
         ops: makeOps(),
+        rateTracker: MemoryAnomalyRateTrackerRepository.create({ store: MemoryOpsStore.create() }),
         snapshots,
         writerId: "taking-over",
       });
@@ -182,6 +186,7 @@ describe("snapshot writer lease gate", () => {
       const collector = OpsMetricsCollectorService.create({
         metrics: RedisOpsMetricsRepository.create({ redis: redis as any }),
         ops: makeOps(),
+        rateTracker: MemoryAnomalyRateTrackerRepository.create({ store: MemoryOpsStore.create() }),
         snapshots: makeSnapshots(true),
         writerId: "taking-over",
       });
@@ -207,6 +212,7 @@ describe("snapshot writer lease gate", () => {
       const collector = OpsMetricsCollectorService.create({
         metrics: RedisOpsMetricsRepository.create({ redis: redisStub as any }),
         ops: makeOps(),
+        rateTracker: MemoryAnomalyRateTrackerRepository.create({ store: MemoryOpsStore.create() }),
         snapshots,
         writerId: "fenced-out",
       });

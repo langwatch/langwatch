@@ -29,15 +29,6 @@ export {
 } from "./services/admin-access.service.ts";
 export type { RedisCpuSample } from "./rules/ops-redis-engine-cpu.rules.ts";
 export type { AnomalyHardTierAlert } from "./app/ops.app.ts";
-export type { StorageStatsMetrics } from "./app/ops.app.ts";
-export { OtelStorageStatsMetricsAdapter } from "./services/otel.storage-stats-metrics.service.ts";
-export {
-  StorageStatsCollectionService,
-  type StorageStatsClickHouseClient,
-  type StorageStatsCollectionHandle,
-  type StorageStatsCollectionOptions,
-  type StorageStatsInstance,
-} from "./services/storage-stats-collection.service.ts";
 export type { QueuePayloadDecoder } from "./app/ops.app.ts";
 
 /** The operations explorers and the replay runner, moved off the application. */

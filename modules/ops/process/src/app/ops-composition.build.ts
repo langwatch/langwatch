@@ -12,6 +12,7 @@ import { OpsCapabilityUnavailableError, type OpsServerConfig } from "@langwatch/
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { RedisConnection } from "@langwatch/redis-client";
 
+import type { AnomalyRateTrackerRepository } from "../repositories/anomaly.repository.ts";
 import { EventExplorerClickHouseRepository } from "../repositories/clickhouse/clickhouse.event-explorer.repository.ts";
 import type { EventExplorerClickHouseClient } from "../repositories/clickhouse/clickhouse.event-explorer.repository.ts";
 import { OpsClickHouseRuntime } from "../repositories/clickhouse/clickhouse.ops-explain.repository.ts";
@@ -34,6 +35,10 @@ import { DefaultOpsSnapshotService } from "../services/ops-snapshot-reader.servi
 import { QueueOpsMetricsSourceAdapter } from "../services/queue.ops-queue-metrics-source.service.ts";
 import { QueueService } from "../services/queue.service.ts";
 import { NoopSchedulerWakeService } from "../services/scheduler-wake.service.ts";
+import type {
+  StorageStatsClickHouseClient,
+  StorageStatsInstance,
+} from "../services/storage-stats-collection.service.ts";
 import { OpsOperations } from "./ops-operations.ts";
 import type {
   OpsAppDependencies,
@@ -104,6 +109,32 @@ class RoutedEventExplorerClickHouseClient implements EventExplorerClickHouseClie
   }
 }
 
+/** The storage-stats reads, unscoped, on the shared server (`tenantId: ""`) as main read them. */
+class SharedStorageStatsClickHouseClient implements StorageStatsClickHouseClient {
+  constructor(private readonly clickhouse: ClickHouseQueryClient) {}
+
+  async query<Row>(input: {
+    query: string;
+    query_params?: Record<string, readonly string[]>;
+    unscoped?: { reason: string };
+  }): Promise<{ data: Row[] }> {
+    const result = await this.clickhouse.query<Row>({
+      tenantId: "",
+      sql: input.query,
+      ...(input.query_params ? { params: input.query_params } : {}),
+      ...(input.unscoped ? { unscoped: input.unscoped } : {}),
+    });
+    return { data: result.rows };
+  }
+}
+
+/** The one endpoint storage stats measure: the shared ClickHouse, as main's worker did. */
+export function sharedStorageStatsInstance(
+  clickhouse: ClickHouseQueryClient,
+): StorageStatsInstance {
+  return { target: "shared", client: new SharedStorageStatsClickHouseClient(clickhouse) };
+}
+
 /**
  * The dedicated `langwatch_ops` readonly account, lazily opened from config.
  * Null when unconfigured — the api never falls back to a shared client here.
@@ -164,6 +195,7 @@ export function buildOpsInfrastructure(input: {
   config: OpsServerConfig;
   resources: ResourceOwnership;
   processStore: ProcessStore;
+  rateTracker: AnomalyRateTrackerRepository;
 }): OpsAppInfrastructure {
   const { members, config, resources } = input;
   const introspection = EventingOpsIntrospectionAdapter.create(() => members.eventing.definitions);
@@ -185,6 +217,7 @@ export function buildOpsInfrastructure(input: {
     ops: QueueOpsMetricsSourceAdapter.create(
       QueueService.create({ repo: QueueRedisRepository.create({ redis: members.redis }) }),
     ),
+    rateTracker: input.rateTracker,
     snapshots: DefaultOpsSnapshotService.create(
       RedisOpsSnapshotRepository.create(new MemberOpsSnapshotRedis(members.redis)),
     ),

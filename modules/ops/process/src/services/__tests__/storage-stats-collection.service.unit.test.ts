@@ -3,38 +3,24 @@
  * alerts. Two failure modes: reporting a dropped table, and letting one
  * bad endpoint affect others. Spec: specs/ops/worker-operational-loops.feature
  */
+import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
-import type { StorageStatsMetrics } from "../../app/ops.app.ts";
+import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
+import { MemoryStorageStatsReadingsRepository } from "../../repositories/memory/memory.storage-stats-readings.repository.ts";
 import {
   StorageStatsCollectionService,
   type StorageStatsClickHouseClient,
 } from "../storage-stats-collection.service.ts";
 
-type TableSeries = { instance: string; table: string; rows: number; bytes: number; parts: number };
-type DiskSeries = { instance: string; disk: string };
+function sharedReadings() {
+  return MemoryStorageStatsReadingsRepository.create({ store: MemoryOpsStore.create() });
+}
 
-class RecordingMetrics implements StorageStatsMetrics {
-  readonly tables = new Map<string, TableSeries>();
-  readonly disks = new Map<string, DiskSeries>();
-
-  beginTick(instance: string): void {
-    for (const [key, value] of this.tables) {
-      if (value.instance === instance) this.tables.delete(key);
-    }
-  }
-
-  recordTable(input: TableSeries): void {
-    this.tables.set(`${input.instance} ${input.table}`, input);
-  }
-
-  recordDisk(input: DiskSeries): void {
-    this.disks.set(`${input.instance} ${input.disk}`, input);
-  }
-
-  recordBackupStatus(): void {}
-
-  recordLastBackup(): void {}
+async function tablesOf(readings: MemoryStorageStatsReadingsRepository): Promise<string[]> {
+  return (await readings.findAll()).flatMap((reading) =>
+    reading.tables.map((table) => `${reading.instance} ${table.table}`),
+  );
 }
 
 /** Answers each system-table query from a script, by the table it names. */
@@ -47,7 +33,7 @@ function clientReturning(script: {
     query: async ({ query }) => {
       if (script.refuse) throw new Error("connection refused");
       const data = query.includes("system.disks") ? (script.disks ?? []) : (script.parts ?? []);
-      return { json: async () => ({ data }) };
+      return { data };
     },
   } as StorageStatsClickHouseClient;
 }
@@ -60,7 +46,7 @@ describe("given an endpoint holding rows in monitored tables", () => {
   describe("when the collection ticks", () => {
     /** @scenario "Every monitored table is reported with its endpoint" */
     it("records each table's rows, bytes and parts against that endpoint", async () => {
-      const metrics = new RecordingMetrics();
+      const readings = sharedReadings();
       const service = StorageStatsCollectionService.create({
         resolveInstances: async () => [
           {
@@ -71,24 +57,28 @@ describe("given an endpoint holding rows in monitored tables", () => {
             }),
           },
         ],
-        metrics,
+        readings,
         collectBackups: false,
+        logger: createTestLogger().logger,
       });
 
       await service.collect();
 
-      expect([...metrics.tables.values()]).toEqual([
-        { instance: "shared", table: "stored_spans", rows: 10, bytes: 2048, parts: 3 },
-        { instance: "shared", table: "trace_summaries", rows: 4, bytes: 2048, parts: 3 },
+      const [reading] = await readings.findAll();
+      expect(reading?.tables).toEqual([
+        { table: "stored_spans", rows: 10, bytes: 2048, parts: 3 },
+        { table: "trace_summaries", rows: 4, bytes: 2048, parts: 3 },
       ]);
-      expect([...metrics.disks.keys()]).toEqual(["shared default"]);
+      expect(reading?.disks.map((disk) => `${reading.instance} ${disk.disk}`)).toEqual([
+        "shared default",
+      ]);
     });
   });
 
   describe("when the next tick no longer finds a table", () => {
     /** @scenario "A table that has dropped to nothing stops being reported" */
     it("stops reporting it rather than holding it at its last size", async () => {
-      const metrics = new RecordingMetrics();
+      const readings = sharedReadings();
       let parts = [tableRow("stored_spans", "10"), tableRow("events", "7")];
       const service = StorageStatsCollectionService.create({
         resolveInstances: async () => [
@@ -101,15 +91,16 @@ describe("given an endpoint holding rows in monitored tables", () => {
             }),
           },
         ],
-        metrics,
+        readings,
         collectBackups: false,
+        logger: createTestLogger().logger,
       });
 
       await service.collect();
       parts = [tableRow("stored_spans", "10")];
       await service.collect();
 
-      expect([...metrics.tables.keys()]).toEqual(["shared stored_spans"]);
+      expect(await tablesOf(readings)).toEqual(["shared stored_spans"]);
     });
   });
 });
@@ -118,19 +109,20 @@ describe("given two configured endpoints, one of which refuses the read", () => 
   describe("when the collection ticks", () => {
     /** @scenario "An unreachable endpoint does not take the others with it" */
     it("still reports the reachable endpoint", async () => {
-      const metrics = new RecordingMetrics();
+      const readings = sharedReadings();
       const service = StorageStatsCollectionService.create({
         resolveInstances: async () => [
           { target: "private-acme", client: clientReturning({ refuse: true }) },
           { target: "shared", client: clientReturning({ parts: [tableRow("event_log", "1")] }) },
         ],
-        metrics,
+        readings,
         collectBackups: false,
+        logger: createTestLogger().logger,
       });
 
       await service.collect();
 
-      expect([...metrics.tables.keys()]).toEqual(["shared event_log"]);
+      expect(await tablesOf(readings)).toEqual(["shared event_log"]);
     });
   });
 });

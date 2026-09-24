@@ -15,6 +15,7 @@ export abstract class AnomalyStateRepository {
  * writers increment, and the cached baseline a tick derives from it.
  */
 export abstract class AnomalyRateTrackerRepository {
+  abstract record(tenantId: string, count?: number): Promise<void>;
   abstract listActiveTenants(): Promise<string[]>;
   abstract currentWindowCount(tenantId: string, windowSeconds: number): Promise<number>;
   abstract findCachedBaseline(tenantId: string): Promise<number | null>;
