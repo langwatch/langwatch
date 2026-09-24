@@ -1,12 +1,13 @@
 import { PLATFORM_TENANT } from "@langwatch/clickhouse-client";
+import { HandledError } from "@langwatch/handled-error";
 
 /**
  * The three reads that place a tenant, in the order the rule below asks them. A reader rather
  * than a database client, so the rule is testable without one.
  */
 export interface TenantOwnershipReader {
-  /** The organization a project belongs to, or null when the id is no project. */
-  tryFindProjectOrganizationId(tenantId: string): Promise<string | null>;
+  /** The organization a project belongs to; throws `ProjectNotFoundError` for any other id. */
+  getProjectOrganizationId(tenantId: string): Promise<string>;
   /** Whether the id names an organization. */
   organizationExists(tenantId: string): Promise<boolean>;
   /** Whether the id names a user. */
@@ -30,9 +31,10 @@ export class TenantDirectoryService {
    * instance chosen by accident.
    */
   async tryFindOrganizationForTenant(tenantId: string): Promise<string | null> {
-    const projectOrganizationId = await this.reader.tryFindProjectOrganizationId(tenantId);
-    if (projectOrganizationId) {
-      return projectOrganizationId;
+    try {
+      return await this.reader.getProjectOrganizationId(tenantId);
+    } catch (error) {
+      if (!HandledError.isHandled(error) || error.code !== "project_not_found") throw error;
     }
 
     if (await this.reader.organizationExists(tenantId)) {

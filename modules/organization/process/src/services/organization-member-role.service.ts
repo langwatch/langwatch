@@ -8,7 +8,6 @@ import {
   type OrganizationUserRole,
   type TeamUserRole,
   CannotDisableSelfError,
-  MemberNotFoundError,
   MemberSeatLimitReachedError,
   PersonalWorkspaceNotManagedHereError,
 } from "@langwatch/organization-contract";
@@ -99,13 +98,7 @@ export class OrganizationMemberRoleService {
       throw new CannotDisableSelfError();
     }
 
-    const membership = await this.repo.tryFindMembership({
-      organizationId,
-      userId,
-    });
-    if (!membership) {
-      throw new MemberNotFoundError(userId);
-    }
+    await this.repo.getMembership({ organizationId, userId });
 
     if (!disabled) {
       const result = await this.dependencies.seats.checkLimit({
@@ -169,18 +162,12 @@ export class OrganizationMemberRoleService {
   }): Promise<UpdateMemberRoleResult> {
     const { organizationId, userId, role, teamRoleUpdates, currentUserId } = params;
 
-    const currentMember = await this.repo.tryFindMembership({
-      organizationId,
-      userId,
-    });
-    if (!currentMember) {
-      throw new MemberNotFoundError(userId);
-    }
+    const currentMember = await this.repo.getMembership({ organizationId, userId });
 
     // A caller who names a personal workspace outright is told so. Without
     // this the shared-teams-only set below would answer "that team is not in
     // the organization", which is both wrong and no help.
-    const personalTeam = await this.repo.tryFindPersonalTeamInScopes({
+    const [personalTeam] = await this.repo.findPersonalTeamsInScopes({
       scopes: (teamRoleUpdates ?? []).map((update) => ({
         scopeType: RoleBindingScopeType.TEAM,
         scopeId: update.teamId,

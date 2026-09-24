@@ -1,5 +1,6 @@
 import { extractEmailDomain, normalizedRequestPathname } from "@langwatch/auth-contract";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
 import type { AuthDirectory } from "../../app/auth.members.ts";
@@ -38,16 +39,13 @@ export async function isBornFinalizedSignUp({
   if (email === null) return false;
 
   try {
-    const organizationId = await organizationForDomain({ directory, email });
+    const target = await getSignUpFlagTarget({ directory, email });
     // Sign-up time: the person has no project and no user id yet, and an
     // organization only when their email domain matches one. With no
     // organization the read carries no targeting identity at all, so no rule
     // naming a project or an organization can match it and the registry
     // default (off) stands — which is the safe direction this gate wants.
-    return await featureFlags.isEnabled(
-      BORN_FINALIZED_SIGNUP_FLAG,
-      organizationId === null ? { kind: "system" } : { kind: "organization", organizationId },
-    );
+    return await featureFlags.isEnabled(BORN_FINALIZED_SIGNUP_FLAG, target);
   } catch (error) {
     // Never fail the sign-up over the flag itself: an unreadable flag means
     // the user is created the way every user was created before this
@@ -73,15 +71,23 @@ async function extractSignUpEmail(request: Request): Promise<string | null> {
   }
 }
 
-/** The organization the address's domain names, when one claims it. */
-async function organizationForDomain({
+/** The organization the address's domain names, or the system when none claims it. */
+async function getSignUpFlagTarget({
   directory,
   email,
 }: {
   directory: AuthDirectory;
   email: string;
-}): Promise<string | null> {
+}): Promise<FeatureFlagTarget> {
   const domain = extractEmailDomain(email);
-  if (domain === null) return null;
-  return directory.tryFindOrganizationIdBySsoDomain(domain);
+  if (domain === null) return { kind: "system" };
+  try {
+    const organizationId = await directory.getOrganizationIdBySsoDomain(domain);
+    return { kind: "organization", organizationId };
+  } catch (error) {
+    if (HandledError.isHandled(error) && error.code === "organization_not_found") {
+      return { kind: "system" };
+    }
+    throw error;
+  }
 }

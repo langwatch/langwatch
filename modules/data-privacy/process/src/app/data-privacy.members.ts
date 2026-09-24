@@ -36,16 +36,19 @@ export interface PiiAnalysisMetrics {
   analysisFinished(outcome: PiiAnalysisOutcome): void;
 }
 
+/** One text through an analysis service: its redacted form, or left as it was. */
+export type PiiClearing = { kind: "redacted"; text: string } | { kind: "unchanged" };
+
 /**
  * External PII analysis capability: members interface because processes
  * compose clients differently; close is needed for DLP's gRPC channel.
  */
 export interface PiiAnalysis {
-  tryClearGoogleDlp(input: {
+  clearGoogleDlp(input: {
     text: string;
     piiRedactionLevel: PIIRedactionLevel;
     exceptPatterns?: readonly string[];
-  }): Promise<string | null>;
+  }): Promise<PiiClearing>;
   clearPresidio(
     texts: string[],
     piiRedactionLevel: PIIRedactionLevel,

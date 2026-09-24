@@ -46,7 +46,7 @@ function fakeInviteRepository(options: { teamsInOrganization?: readonly string[]
     tryFindMemberEmail: async () => null,
     tryFindOpenInviteForEmail: async () => null,
     findCustomRolePermissions: async () => [],
-    tryFindPersonalTeamInScopes: async () => null,
+    findPersonalTeamsInScopes: async () => [],
     findTeamIdsInOrganization: async ({
       teamIds,
     }: {

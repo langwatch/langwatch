@@ -278,10 +278,10 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     private readonly writer: AuthzGrantsService,
   ) {}
 
-  tryFindPersonalTeamInScopes(params: {
+  findPersonalTeamsInScopes(params: {
     scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
-  }): Promise<{ name: string } | null> {
-    return personalTeamScope.tryFindPersonalTeamInScopes({
+  }): Promise<{ name: string }[]> {
+    return personalTeamScope.findPersonalTeamsInScopes({
       client: this.prisma,
       scopes: params.scopes,
     });
@@ -324,23 +324,6 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     });
 
     return roles.map((role) => role.permissions);
-  }
-
-  async tryGetUserOrgRole({
-    userId,
-    organizationId,
-  }: {
-    userId: string;
-    organizationId: string;
-  }): Promise<OrganizationUserRole | null> {
-    const orgUser = await this.prisma.organizationUser.findUnique({
-      where: { userId_organizationId: { userId, organizationId } },
-      select: { role: true, disabledAt: true },
-    });
-    // A disabled membership carries no role: this is the gate that makes
-    // disabling actually revoke access rather than only free a seat.
-    if (!orgUser || orgUser.disabledAt) return null;
-    return orgUser.role;
   }
 
   async findUserOrgRoleByTeamId({
@@ -563,7 +546,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     });
   }
 
-  async getAllForUser(params: {
+  async findAllForUser(params: {
     userId: string;
     isDemo: boolean;
     demoProjectUserId: string;
@@ -739,7 +722,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     return rows.flatMap((row) => (row.acceptedByUserId === null ? [] : [row.acceptedByUserId]));
   }
 
-  async getAllMembers(organizationId: string): Promise<User[]> {
+  async findActiveMemberUsers(organizationId: string): Promise<User[]> {
     return this.prisma.user.findMany({
       where: {
         deactivatedAt: null,
@@ -753,12 +736,12 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     });
   }
 
-  async tryFindMembership(params: {
+  async getMembership(params: {
     organizationId: string;
     userId: string;
-  }): Promise<OrganizationMemberSummary | null> {
+  }): Promise<OrganizationMemberSummary> {
     const { organizationId, userId } = params;
-    return this.prisma.organizationUser.findUnique({
+    const membership = await this.prisma.organizationUser.findUnique({
       where: { userId_organizationId: { userId, organizationId } },
       select: {
         userId: true,
@@ -770,6 +753,8 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         user: { select: { id: true, name: true, email: true } },
       },
     });
+    if (!membership) throw new MemberNotFoundError(userId);
+    return membership;
   }
 
   async findActiveAdministratorIds(params: { organizationId: string }): Promise<string[]> {

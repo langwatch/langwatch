@@ -1,4 +1,5 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { HandledError } from "@langwatch/handled-error";
 import type { GuidedOnboardingRecord } from "@langwatch/onboarding-contract";
 import {
   type JoinRequestJoining,
@@ -352,17 +353,22 @@ export class OrganizationService extends OrganizationServiceContract {
   }
 
   listTeams(input: ListOrganizationTeamsInput): Promise<OrganizationTeamPage> {
-    return this.teams.list(listOrganizationTeamsInputSchema.parse(input));
+    return this.teams.findPage(listOrganizationTeamsInputSchema.parse(input));
   }
 
   async createTeam(input: CreateOrganizationTeamInput): Promise<OrganizationTeam> {
     const parsed = createOrganizationTeamInputSchema.parse(input);
     const identity = this.teamIdentities.createTeam({ name: parsed.name });
-    const duplicate = await this.teams.tryFindBySlug({
-      organizationId: parsed.organizationId,
-      slug: identity.slug,
-    });
-    if (duplicate) {
+    const slugTaken = await this.teams
+      .getBySlug({ organizationId: parsed.organizationId, slug: identity.slug })
+      .then(
+        () => true,
+        (error: unknown) => {
+          if (HandledError.isHandled(error) && error.code === "team_not_found") return false;
+          throw error;
+        },
+      );
+    if (slugTaken) {
       throw new TeamSlugConflictError();
     }
 

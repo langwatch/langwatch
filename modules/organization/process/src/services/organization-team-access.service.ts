@@ -33,7 +33,7 @@ export class OrganizationTeamAccessService {
 
   async listTeamAccess(input: ListOrganizationTeamAccessInput): Promise<OrganizationTeamAccess[]> {
     const parsed = listOrganizationTeamAccessInputSchema.parse(input);
-    const teams = await this.deps.teams.listActive({
+    const teams = await this.deps.teams.findActive({
       organizationId: parsed.organizationId,
     });
     const teamIds = teams.map(({ id }) => id);

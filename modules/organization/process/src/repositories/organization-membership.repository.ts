@@ -260,10 +260,6 @@ export interface UpdateTeamMemberRoleInput {
 }
 
 export abstract class OrganizationMembershipRepository {
-  abstract tryGetUserOrgRole(params: {
-    userId: string;
-    organizationId: string;
-  }): Promise<OrganizationUserRole | null>;
   abstract findUserOrgRoleByTeamId(params: {
     userId: string;
     teamId: string;
@@ -308,7 +304,7 @@ export abstract class OrganizationMembershipRepository {
     organizationId: string,
   ): Promise<{ userId: string; organizationName: string }[]>;
 
-  abstract getAllForUser(params: {
+  abstract findAllForUser(params: {
     userId: string;
     isDemo: boolean;
     demoProjectUserId: string;
@@ -327,17 +323,17 @@ export abstract class OrganizationMembershipRepository {
     currentUserId: string;
   }): Promise<OrganizationMemberWithUser | null>;
 
-  abstract getAllMembers(organizationId: string): Promise<User[]>;
+  abstract findActiveMemberUsers(organizationId: string): Promise<User[]>;
 
   /**
-   * A single membership row with its user, disabled or not. Unlike
+   * A single membership row with its user, disabled or not; throws `MemberNotFoundError`. Unlike
    * `findMemberById` there is no caller pre-check: the management surface
    * authenticates through the organization credential, not a session user.
    */
-  abstract tryFindMembership: (params: {
+  abstract getMembership: (params: {
     organizationId: string;
     userId: string;
-  }) => Promise<OrganizationMemberSummary | null>;
+  }) => Promise<OrganizationMemberSummary>;
 
   // findAllMembers and the members through updateTeamMemberRole below are
   // function-typed properties, not method shorthand, so test mocks can be
@@ -392,13 +388,13 @@ export abstract class OrganizationMembershipRepository {
   abstract setMemberDisabled: (input: SetMemberDisabledInput) => Promise<void>;
 
   /**
-   * The personal team a set of role-binding scopes reaches, by the name its
-   * owner sees, or null when they reach only shared ground. Both TEAM and
+   * The personal teams a set of role-binding scopes reaches, by the name each
+   * owner sees; empty when they reach only shared ground. Both TEAM and
    * PROJECT scopes resolve to the same private space.
    */
-  abstract tryFindPersonalTeamInScopes: (params: {
+  abstract findPersonalTeamsInScopes: (params: {
     scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
-  }) => Promise<{ name: string } | null>;
+  }) => Promise<{ name: string }[]>;
 
   /**
    * The teams an organization actually shares, which is every team except the

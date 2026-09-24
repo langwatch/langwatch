@@ -306,7 +306,7 @@ describe.each(backends)("given the $name organization repositories", ({ create }
   });
 
   describe("when personal team scope is checked", () => {
-    it("returns null when no personal team is in the scopes", async () => {
+    it("returns no team when no personal team is in the scopes", async () => {
       const team = await repositories.team.create({
         teamId: TEAM_ID,
         name: "Shared Team",
@@ -314,11 +314,11 @@ describe.each(backends)("given the $name organization repositories", ({ create }
         organizationId: ORGANIZATION_ID,
       });
 
-      const personalTeam = await repositories.personalTeamScope.tryFindPersonalTeamInScopes({
+      const personalTeams = await repositories.personalTeamScope.findPersonalTeamsInScopes({
         scopes: [{ scopeType: "TEAM", scopeId: team.id }],
       });
 
-      expect(personalTeam).toBeNull();
+      expect(personalTeams).toEqual([]);
     });
 
     it("returns the personal team when it appears in the scopes", async () => {
@@ -338,11 +338,11 @@ describe.each(backends)("given the $name organization repositories", ({ create }
         teamRow.ownerUserId = USER_ID;
       }
 
-      const found = await repositories.personalTeamScope.tryFindPersonalTeamInScopes({
+      const found = await repositories.personalTeamScope.findPersonalTeamsInScopes({
         scopes: [{ scopeType: "TEAM", scopeId: personalTeam.id }],
       });
 
-      expect(found).toMatchObject({ name: "Personal Workspace" });
+      expect(found).toEqual([{ name: "Personal Workspace" }]);
     });
   });
 
@@ -417,7 +417,7 @@ describe.each(backends)("given the $name organization repositories", ({ create }
         personalFeatures: null,
       });
 
-      const orgId = await repositories.tenantDirectory.tryFindProjectOrganizationId(projectId);
+      const orgId = await repositories.tenantDirectory.getProjectOrganizationId(projectId);
       expect(orgId).toBe(ORGANIZATION_ID);
     });
   });

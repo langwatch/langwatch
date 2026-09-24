@@ -10,7 +10,7 @@ import type {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DataPrivacyResolutionFake } from "../../app/__tests__/data-privacy.fixture.ts";
-import type { PIICheckOptions } from "../../app/data-privacy.members.ts";
+import type { PIICheckOptions, PiiClearing } from "../../app/data-privacy.members.ts";
 import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service.ts";
 import { DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH } from "../pii-redaction-policy.service.ts";
 
@@ -71,8 +71,10 @@ function createMockBatchClearPII(): {
 
 function transportFor(batch: BatchClearPIIFunction) {
   return {
-    tryClearGoogleDlp: async ({ text }: { text: string }) =>
-      (await batch([text], {} as PIICheckOptions))[0] ?? null,
+    clearGoogleDlp: async ({ text }: { text: string }): Promise<PiiClearing> => {
+      const redacted = (await batch([text], {} as PIICheckOptions))[0];
+      return redacted == null ? { kind: "unchanged" } : { kind: "redacted", text: redacted };
+    },
     clearPresidio: async (texts: string[]) => batch(texts, {} as PIICheckOptions),
     close: async () => undefined,
   };

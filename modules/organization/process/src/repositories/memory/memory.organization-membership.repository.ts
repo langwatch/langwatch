@@ -114,22 +114,14 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     return new MemoryOrganizationMembershipRepository(options.memory);
   }
 
-  async tryGetUserOrgRole(params: {
-    userId: string;
-    organizationId: string;
-  }): Promise<OrganizationUserRole | null> {
-    const row = this.membershipRow(params);
-    if (!row || row.disabledAt) return null;
-    return row.role;
-  }
-
   async findUserOrgRoleByTeamId(params: {
     userId: string;
     teamId: string;
   }): Promise<OrganizationUserRole | null> {
     const team = this.memory.teams.get(params.teamId);
     if (!team) return null;
-    return this.tryGetUserOrgRole({ userId: params.userId, organizationId: team.organizationId });
+    const row = this.membershipRow({ userId: params.userId, organizationId: team.organizationId });
+    return row && !row.disabledAt ? row.role : null;
   }
 
   async tryFindPrimaryIntentById(organizationId: string): Promise<OrganizationIntent | null> {
@@ -279,7 +271,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     this.memory.organizations.delete(organizationId);
   }
 
-  async getAllForUser(params: {
+  async findAllForUser(params: {
     userId: string;
     isDemo: boolean;
     demoProjectUserId: string;
@@ -358,7 +350,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     return [];
   }
 
-  async getAllMembers(organizationId: string): Promise<User[]> {
+  async findActiveMemberUsers(organizationId: string): Promise<User[]> {
     return this.memory.organizationUsers
       .filter((row) => row.organizationId === organizationId && row.disabledAt === null)
       .map((row) => this.userRow(row.userId))
@@ -366,12 +358,12 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       .map(toUser);
   }
 
-  async tryFindMembership(params: {
+  async getMembership(params: {
     organizationId: string;
     userId: string;
-  }): Promise<OrganizationMemberSummary | null> {
+  }): Promise<OrganizationMemberSummary> {
     const row = this.membershipRow(params);
-    if (!row) return null;
+    if (!row) throw new MemberNotFoundError(params.userId);
     return this.memberSummary(row);
   }
 
@@ -484,27 +476,22 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     row.updatedAt = toDate(nowInstant());
   }
 
-  async tryFindPersonalTeamInScopes(params: {
+  async findPersonalTeamsInScopes(params: {
     scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
-  }): Promise<{ name: string } | null> {
-    const teamIds = params.scopes
-      .filter((scope) => scope.scopeType === RoleBindingScopeType.TEAM)
-      .map((scope) => scope.scopeId);
-    for (const teamId of teamIds) {
-      const team = this.memory.teams.get(teamId);
-      if (team?.isPersonal) return { name: team.name };
+  }): Promise<{ name: string }[]> {
+    const reached: { name: string }[] = [];
+    for (const scope of params.scopes) {
+      if (scope.scopeType !== RoleBindingScopeType.TEAM) continue;
+      const team = this.memory.teams.get(scope.scopeId);
+      if (team?.isPersonal) reached.push({ name: team.name });
     }
-    const projectIds = params.scopes
-      .filter((scope) => scope.scopeType === RoleBindingScopeType.PROJECT)
-      .map((scope) => scope.scopeId);
-    for (const projectId of projectIds) {
-      const project = this.memory.projects.get(projectId);
+    for (const scope of params.scopes) {
+      if (scope.scopeType !== RoleBindingScopeType.PROJECT) continue;
+      const project = this.memory.projects.get(scope.scopeId);
       const team = project ? this.memory.teams.get(project.teamId) : undefined;
-      if (project?.isPersonal || team?.isPersonal) {
-        if (team) return { name: team.name };
-      }
+      if (team && (project?.isPersonal || team.isPersonal)) reached.push({ name: team.name });
     }
-    return null;
+    return reached;
   }
 
   async findSharedTeamIds({ organizationId }: { organizationId: string }): Promise<string[]> {

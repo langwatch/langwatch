@@ -33,6 +33,7 @@ import type {
   FeatureFlagKey,
   FeatureFlagTarget,
 } from "@langwatch/feature-flag-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
@@ -279,10 +280,11 @@ async function exchange({
   }
 
   const directory = app.directory();
-  const user = await directory.tryFindPerson(record.user_id);
-  const organization = await directory.tryFindOrganization(record.organization_id);
-
-  if (!user || !organization) {
+  const [user, organization] = await Promise.all([
+    directory.getPerson(record.user_id),
+    directory.getOrganization(record.organization_id),
+  ]).catch(async (error: unknown) => {
+    if (!isPersonOrOrganizationGone(error)) throw error;
     logger.error(
       `[auth-cli] approved device_code refers to missing user (${record.user_id}) or org (${record.organization_id})`,
     );
@@ -291,7 +293,7 @@ async function exchange({
     await app.sessions().releaseExchangeClaim(device_code);
 
     throw refused("server_error", "User or organization no longer exists", 500);
-  }
+  });
 
   // Membership is re-derived HERE, not trusted from approval time: an admin
   // can disable the seat between approve and exchange. Refused, the device
@@ -1027,6 +1029,14 @@ function posted(raw: string): unknown {
 }
 
 /** One OAuth refusal, in the two-field shape RFC 8628 clients parse. */
+/** Each directory read's own not-found code, and nothing else. */
+function isPersonOrOrganizationGone(error: unknown): boolean {
+  return (
+    HandledError.isHandled(error) &&
+    (error.code === "user_not_found" || error.code === "organization_not_found")
+  );
+}
+
 function refused(error: string, description: string, status: number): CliDeviceFlowRefusedError {
   return new CliDeviceFlowRefusedError({
     refusal: { error, error_description: description },

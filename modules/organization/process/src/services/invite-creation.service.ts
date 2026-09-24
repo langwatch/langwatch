@@ -388,7 +388,7 @@ export class InviteCreationService {
     const validInvites = preparedInvites.filter(
       (invite): invite is NonNullable<typeof invite> => invite !== null,
     );
-    const personalTeam = await this.invites.tryFindPersonalTeamInScopes({
+    const [personalTeam] = await this.invites.findPersonalTeamsInScopes({
       scopes: validInvites.flatMap(
         (invite) =>
           invite.teamAssignments?.map((assignment) => ({

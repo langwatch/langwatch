@@ -20,7 +20,7 @@ function serviceWithRecordingOrder() {
     tryFindOpenInviteForEmail: async () => null,
     findTeamIdsInOrganization: async ({ teamIds }: { teamIds: string[] }) => teamIds,
     findCustomRolePermissions: async () => [],
-    tryFindPersonalTeamInScopes: async () => null,
+    findPersonalTeamsInScopes: async () => [],
     createPendingInvite: async (input: { email: string }) => {
       order.push(`record:${input.email}`);
       return {

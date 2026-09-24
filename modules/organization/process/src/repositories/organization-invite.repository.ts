@@ -64,10 +64,10 @@ export abstract class OrganizationInviteRepository {
   abstract tryFindOrganizationWithMembers(input: {
     organizationId: string;
   }): Promise<(Organization & { members: OrganizationUser[] }) | null>;
-  /** The personal team a set of role-binding scopes reaches, by its owner's name for it. */
-  abstract tryFindPersonalTeamInScopes(input: {
+  /** The personal teams a set of role-binding scopes reaches, by each owner's name for it. */
+  abstract findPersonalTeamsInScopes(input: {
     scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
-  }): Promise<{ name: string } | null>;
+  }): Promise<{ name: string }[]>;
 
   abstract createPendingInvite(input: WriteInviteInput): Promise<OrganizationInvite>;
   abstract createPaymentPendingInvite(

@@ -6,6 +6,8 @@
 import { ApiKeyScopeViolationError } from "@langwatch/api-key-contract";
 import { createRestRuntime } from "@langwatch/api/rest";
 import { CliSessionRecordNotFoundError } from "@langwatch/auth-contract";
+import { OrganizationNotFoundError } from "@langwatch/organization-contract";
+import { UserNotFoundError } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import type { AuthDirectory } from "../../app/auth.members.ts";
@@ -570,12 +572,12 @@ function deviceFlowWorld(
   };
 
   const directory: AuthDirectory = {
-    tryFindOrganizationIdBySsoDomain: () => Promise.resolve(null),
-    tryFindPerson: () =>
-      Promise.resolve(
-        world.personExists ? { id: USER_ID, name: "Bob", email: "bob@example.test" } : null,
-      ),
-    tryFindOrganization: () => Promise.resolve({ id: ORGANIZATION_ID, name: "Acme", slug: "acme" }),
+    getOrganizationIdBySsoDomain: () => Promise.reject(new OrganizationNotFoundError()),
+    getPerson: (userId) =>
+      world.personExists
+        ? Promise.resolve({ id: USER_ID, name: "Bob", email: "bob@example.test" })
+        : Promise.reject(new UserNotFoundError(userId)),
+    getOrganization: () => Promise.resolve({ id: ORGANIZATION_ID, name: "Acme", slug: "acme" }),
     maxSessionDurationDays: () => Promise.resolve(0),
     hasActiveMembership: () => Promise.resolve(world.activeMembership),
     tryFindLiveProject: () => Promise.resolve(world.project),

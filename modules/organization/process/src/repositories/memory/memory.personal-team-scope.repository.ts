@@ -13,16 +13,16 @@ export class MemoryPersonalTeamScopeRepository implements PersonalTeamScopeReade
     return new MemoryPersonalTeamScopeRepository(options.memory);
   }
 
-  async tryFindPersonalTeamInScopes(input: {
+  async findPersonalTeamsInScopes(input: {
     scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
-  }): Promise<{ name: string } | null> {
+  }): Promise<{ name: string }[]> {
     return this.findMatching(input.scopes, () => true);
   }
 
-  async tryFindForeignPersonalTeamInScopes(input: {
+  async findForeignPersonalTeamsInScopes(input: {
     scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
     ownerUserId: string | null;
-  }): Promise<{ name: string } | null> {
+  }): Promise<{ name: string }[]> {
     return this.findMatching(
       input.scopes,
       (ownerUserId) => input.ownerUserId === null || ownerUserId !== input.ownerUserId,
@@ -32,14 +32,12 @@ export class MemoryPersonalTeamScopeRepository implements PersonalTeamScopeReade
   private findMatching(
     scopes: { scopeType: RoleBindingScopeType; scopeId: string }[],
     matchesOwner: (ownerUserId: string | null) => boolean,
-  ): { name: string } | null {
-    for (const scope of scopes) {
-      const match = personalTeamsReachedBy({ memory: this.memory, scope }).find((team) =>
-        matchesOwner(team.ownerUserId),
-      );
-      if (match) return { name: match.name };
-    }
-    return null;
+  ): { name: string }[] {
+    return scopes.flatMap((scope) =>
+      personalTeamsReachedBy({ memory: this.memory, scope })
+        .filter((team) => matchesOwner(team.ownerUserId))
+        .map((team) => ({ name: team.name })),
+    );
   }
 }
 

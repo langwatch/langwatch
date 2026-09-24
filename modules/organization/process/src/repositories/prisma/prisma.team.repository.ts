@@ -62,12 +62,19 @@ export class PrismaTeamRepository extends TeamRepository {
   }
 
   async getBySlug(input: { slug: string; organizationId: string }): Promise<OrganizationTeam> {
-    const team = await this.tryFindBySlug(input);
+    const team = await this.database.team.findFirst({
+      where: {
+        slug: input.slug,
+        organizationId: input.organizationId,
+        archivedAt: null,
+      },
+      select: teamSelect,
+    });
     if (!team) throw new TeamNotFoundError(input.slug);
     return team;
   }
 
-  async list(input: {
+  async findPage(input: {
     organizationId: string;
     page: number;
     limit: number;
@@ -89,18 +96,7 @@ export class PrismaTeamRepository extends TeamRepository {
     };
   }
 
-  tryFindBySlug(input: { slug: string; organizationId: string }): Promise<OrganizationTeam | null> {
-    return this.database.team.findFirst({
-      where: {
-        slug: input.slug,
-        organizationId: input.organizationId,
-        archivedAt: null,
-      },
-      select: teamSelect,
-    });
-  }
-
-  listActive(input: {
+  findActive(input: {
     organizationId: string;
     visibleToUserId?: string;
   }): Promise<OrganizationTeam[]> {

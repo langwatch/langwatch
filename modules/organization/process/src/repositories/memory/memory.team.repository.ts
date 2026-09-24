@@ -44,12 +44,12 @@ export class MemoryTeamRepository extends TeamRepository {
   }
 
   async getBySlug(input: { slug: string; organizationId: string }): Promise<OrganizationTeam> {
-    const team = await this.tryFindBySlug(input);
+    const team = this.activeTeamsOf(input.organizationId).find((row) => row.slug === input.slug);
     if (!team) throw new TeamNotFoundError(input.slug);
-    return team;
+    return toOrganizationTeam(team);
   }
 
-  async list(input: {
+  async findPage(input: {
     organizationId: string;
     page: number;
     limit: number;
@@ -64,15 +64,7 @@ export class MemoryTeamRepository extends TeamRepository {
     };
   }
 
-  async tryFindBySlug(input: {
-    slug: string;
-    organizationId: string;
-  }): Promise<OrganizationTeam | null> {
-    const team = this.activeTeamsOf(input.organizationId).find((row) => row.slug === input.slug);
-    return team ? toOrganizationTeam(team) : null;
-  }
-
-  async listActive(input: {
+  async findActive(input: {
     organizationId: string;
     visibleToUserId?: string;
   }): Promise<OrganizationTeam[]> {

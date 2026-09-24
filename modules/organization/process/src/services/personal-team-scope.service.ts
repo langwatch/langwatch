@@ -8,14 +8,12 @@ export interface RoleBindingScope {
 
 /** The two personal-workspace reads the refusals below rest on. */
 export interface PersonalTeamScopeReader {
-  tryFindPersonalTeamInScopes(input: {
-    scopes: RoleBindingScope[];
-  }): Promise<{ name: string } | null>;
+  findPersonalTeamsInScopes(input: { scopes: RoleBindingScope[] }): Promise<{ name: string }[]>;
 
-  tryFindForeignPersonalTeamInScopes(input: {
+  findForeignPersonalTeamsInScopes(input: {
     scopes: RoleBindingScope[];
     ownerUserId: string | null;
-  }): Promise<{ name: string } | null>;
+  }): Promise<{ name: string }[]>;
 }
 
 /** The personal-workspace invariants every role-binding write is held to. */
@@ -27,7 +25,7 @@ export class PersonalTeamScopeService {
   private constructor(private readonly reader: PersonalTeamScopeReader) {}
 
   async scopesTouchPersonalTeam({ scopes }: { scopes: RoleBindingScope[] }): Promise<boolean> {
-    return (await this.reader.tryFindPersonalTeamInScopes({ scopes })) !== null;
+    return (await this.reader.findPersonalTeamsInScopes({ scopes })).length > 0;
   }
 
   /**
@@ -35,7 +33,7 @@ export class PersonalTeamScopeService {
    * team holds exactly one member, its owner.
    */
   async assertNoPersonalTeamScope({ scopes }: { scopes: RoleBindingScope[] }): Promise<void> {
-    const personalTeam = await this.reader.tryFindPersonalTeamInScopes({ scopes });
+    const [personalTeam] = await this.reader.findPersonalTeamsInScopes({ scopes });
     if (personalTeam) {
       throw new PersonalWorkspaceNotManagedHereError(personalTeam.name);
     }
@@ -56,7 +54,7 @@ export class PersonalTeamScopeService {
      */
     ownerUserId: string | null;
   }): Promise<void> {
-    const foreignPersonalTeam = await this.reader.tryFindForeignPersonalTeamInScopes({
+    const [foreignPersonalTeam] = await this.reader.findForeignPersonalTeamsInScopes({
       scopes,
       ownerUserId,
     });

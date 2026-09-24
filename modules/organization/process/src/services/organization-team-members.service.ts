@@ -176,7 +176,7 @@ export class OrganizationTeamMembersService {
     input: ListOrganizationTeamsWithMembersInput,
   ): Promise<OrganizationTeamWithMembers[]> {
     const parsed = listOrganizationTeamsWithMembersInputSchema.parse(input);
-    const teams = await this.deps.teams.listActive({
+    const teams = await this.deps.teams.findActive({
       organizationId: parsed.organizationId,
       visibleToUserId: parsed.callerCanManage ? undefined : parsed.callerUserId,
     });

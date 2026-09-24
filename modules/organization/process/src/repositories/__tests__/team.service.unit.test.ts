@@ -99,14 +99,11 @@ class MemoryTeams extends TeamRepository {
   getBySlug(): Promise<OrganizationTeam> {
     return Promise.resolve(team);
   }
-  list(): never {
+  findPage(): never {
     throw new Error("not used");
   }
-  listActive(): Promise<OrganizationTeam[]> {
+  findActive(): Promise<OrganizationTeam[]> {
     return Promise.resolve([team]);
-  }
-  tryFindBySlug(): Promise<OrganizationTeam | null> {
-    return Promise.resolve(null);
   }
   create(): Promise<OrganizationTeam> {
     return Promise.resolve(team);

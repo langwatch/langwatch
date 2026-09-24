@@ -15,6 +15,7 @@ import {
   OrganizationNotFoundError,
   PersonalTeamProtectedError,
   TeamMembershipNotFoundError,
+  TeamNotFoundError,
   UserNotInOrganizationError,
   type OrganizationBillingProfile,
   type OrganizationTeam,
@@ -164,10 +165,7 @@ class UnusedTeams extends TeamRepository {
   findOrganizationId(): Promise<string | null> {
     throw new Error("not used by this test");
   }
-  list(): Promise<OrganizationTeamPage> {
-    throw new Error("not used by this test");
-  }
-  tryFindBySlug(): Promise<OrganizationTeam | null> {
+  findPage(): Promise<OrganizationTeamPage> {
     throw new Error("not used by this test");
   }
   create(): Promise<OrganizationTeam> {
@@ -195,7 +193,7 @@ class UnusedTeams extends TeamRepository {
   getBySlug(): Promise<OrganizationTeam> {
     throw new Error("not used by this test");
   }
-  listActive(): Promise<OrganizationTeam[]> {
+  findActive(): Promise<OrganizationTeam[]> {
     throw new Error("not used by this test");
   }
   fenceMembershipChange(): Promise<OrganizationTeam> {
@@ -363,14 +361,11 @@ class MemoryTeams extends TeamRepository {
   findOrganizationId({ teamId }: { teamId: string }): Promise<string | null> {
     return Promise.resolve(teamId === this.team.id ? this.team.organizationId : null);
   }
-  list(): Promise<OrganizationTeamPage> {
+  findPage(): Promise<OrganizationTeamPage> {
     return Promise.resolve({
       data: [this.team],
       pagination: { page: 1, limit: 50, total: 1 },
     });
-  }
-  tryFindBySlug(): Promise<OrganizationTeam | null> {
-    return Promise.resolve(null);
   }
   create(input: {
     teamId: string;
@@ -408,10 +403,12 @@ class MemoryTeams extends TeamRepository {
   getById(): Promise<OrganizationTeam> {
     return Promise.resolve(this.team);
   }
-  getBySlug(): Promise<OrganizationTeam> {
-    return Promise.resolve(this.team);
+  getBySlug(input: { slug: string }): Promise<OrganizationTeam> {
+    return input.slug === this.team.slug
+      ? Promise.resolve(this.team)
+      : Promise.reject(new TeamNotFoundError(input.slug));
   }
-  listActive(): Promise<OrganizationTeam[]> {
+  findActive(): Promise<OrganizationTeam[]> {
     return Promise.resolve([this.team]);
   }
   fenceMembershipChange(input: { name?: string }): Promise<OrganizationTeam> {

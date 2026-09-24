@@ -128,12 +128,12 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     });
   }
 
-  tryFindPersonalTeamInScopes({
+  findPersonalTeamsInScopes({
     scopes,
   }: {
     scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
-  }): Promise<{ name: string } | null> {
-    return PrismaPersonalTeamScopeRepository.create().tryFindPersonalTeamInScopes({
+  }): Promise<{ name: string }[]> {
+    return PrismaPersonalTeamScopeRepository.create().findPersonalTeamsInScopes({
       client: this.prisma,
       scopes,
     });
