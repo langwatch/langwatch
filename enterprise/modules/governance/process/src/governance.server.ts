@@ -85,12 +85,15 @@ import { IngestionPullLifecycleService } from "./services/ingestion-pull-lifecyc
 import { IngestionPullService } from "./services/ingestion-pull.service.ts";
 import { PulledUsageEventingAdapter } from "./services/pulled-usage-eventing.service.ts";
 import { SpendSpikeAnomalyEvaluatorService } from "./services/spend-spike-anomaly-evaluator.service.ts";
+import { anomalyRulesTrpcTransport } from "./transport/anomaly-rules.trpc.ts";
 import { departmentsTrpcTransport } from "./transport/departments.trpc.ts";
 import {
   governanceRest,
   governanceRestCaller,
   governanceRestSurface,
 } from "./transport/governance.rest.ts";
+import { governanceTrpcTransport } from "./transport/governance.trpc.ts";
+import { ingestionTemplatesTrpcTransport } from "./transport/ingestion-templates.trpc.ts";
 
 /**
  * The whole module, declared: one application and the REST family it answers.
@@ -108,7 +111,13 @@ import {
 export const governanceServer = defineServerModule("governance")
   .withRepositories(governanceRepositories)
   .withApp(GovernanceApp)
-  .withTransports(governanceRest, departmentsTrpcTransport)
+  .withTransports(
+    governanceRest,
+    departmentsTrpcTransport,
+    ingestionTemplatesTrpcTransport,
+    governanceTrpcTransport,
+    anomalyRulesTrpcTransport,
+  )
   // The member behind the project credential, and which surface asked. A
   // legacy project key names no member, which is what the admin routes refuse.
   .withTransportFacts(() => [

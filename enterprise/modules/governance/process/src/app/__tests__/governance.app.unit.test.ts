@@ -267,7 +267,13 @@ describe("GovernanceApp as the module a process installs", () => {
     it("answers every capability the declarations name from the one app", async () => {
       const { app } = await buildAppWithUnfinishedCapability();
 
-      expect(governanceServer.transports).toHaveLength(1);
+      expect(governanceServer.transports.map((transport) => transport.protocol)).toEqual([
+        "rest",
+        "trpc",
+        "trpc",
+        "trpc",
+        "trpc",
+      ]);
       expect(app.cliAccess().findCaller).toBeTypeOf("function");
       expect(app.cliCredentials().budgetStatus).toBeTypeOf("function");
       expect(app.cliActivity().sources).toBeTypeOf("function");

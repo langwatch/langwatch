@@ -53,6 +53,7 @@ import type {
   GovernanceIngestResponse,
   GovernanceIngestWebhookInput,
 } from "./governance-ingest-rest.schemas.ts";
+import type { GovernanceActorWorkspace } from "./governance.responses.ts";
 import type { GovernanceSetupState } from "./governance.ts";
 import type {
   ConfigureIngestionPullCommand,
@@ -383,6 +384,12 @@ export interface GovernanceTemplateDraft {
   ottlRules?: string;
 }
 
+/** The signed-in person a console call acts as, and the operator impersonating them, if any. */
+export interface GovernanceOperator {
+  readonly id: string;
+  readonly impersonatorId?: string;
+}
+
 /** The ingestion-template operations the governance REST family calls. */
 export interface GovernanceRestApi {
   cliBudgetStatus(input: GovernanceCliRequest): Promise<GovernanceCliBudgetStatusAnswer>;
@@ -432,6 +439,31 @@ export interface GovernanceRestApi {
     by: GovernanceProjectCaller,
   ): Promise<IngestionTemplate>;
 
+  anomalyRuleList(
+    input: { organizationId: string },
+    by: GovernanceOperator,
+  ): Promise<AnomalyRule[]>;
+  anomalyRuleGetById(
+    input: { id: string; organizationId: string },
+    by: GovernanceOperator,
+  ): Promise<AnomalyRule>;
+  anomalyRuleCreate(input: CreateAnomalyRuleInput, by: GovernanceOperator): Promise<AnomalyRule>;
+  anomalyRuleUpdate(input: UpdateAnomalyRuleInput, by: GovernanceOperator): Promise<AnomalyRule>;
+  anomalyRuleArchive(
+    input: { id: string; organizationId: string },
+    by: GovernanceOperator,
+  ): Promise<AnomalyRule>;
+  templateListForUser(input: { organizationId: string }): Promise<IngestionTemplate[]>;
+  templateListForOrgAdmin(input: { organizationId: string }): Promise<IngestionTemplate[]>;
+  templateGetByIdForOrg(input: { id: string; organizationId: string }): Promise<IngestionTemplate>;
+  templateCreateOrg(input: CreateIngestionTemplateInput): Promise<IngestionTemplate>;
+  templateUpdateOttlRules(input: UpdateIngestionTemplateOttlInput): Promise<IngestionTemplate>;
+  templateArchiveOrg(input: ArchiveIngestionTemplateInput): Promise<void>;
+  templateCloneFromPlatform(input: CloneIngestionTemplateInput): Promise<IngestionTemplate>;
+  findActorWorkspace(input: {
+    organizationId: string;
+    actor: string;
+  }): Promise<GovernanceActorWorkspace | null>;
   departmentList(input: { organizationId: string }): Promise<Department[]>;
   departmentAssignments(input: { organizationId: string }): Promise<DepartmentAssignments>;
   departmentCreate(input: { organizationId: string; name: string }): Promise<Department>;

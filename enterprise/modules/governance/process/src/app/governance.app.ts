@@ -78,6 +78,14 @@ import {
   type GovernanceProjectCaller,
   GovernanceRestApi,
   type IngestionTemplate,
+  type AnomalyRule,
+  type CreateAnomalyRuleInput,
+  type GovernanceOperator,
+  type UpdateAnomalyRuleInput,
+  type ArchiveIngestionTemplateInput,
+  type CloneIngestionTemplateInput,
+  type CreateIngestionTemplateInput,
+  type UpdateIngestionTemplateOttlInput,
   type IssuedPersonalVirtualKey,
   type ListPersonalVirtualKeysInput,
   type ListRoutingPoliciesInput,
@@ -91,9 +99,15 @@ import {
   governanceSecrets,
 } from "@langwatch/enterprise-governance-contract";
 import { ScimApi } from "@langwatch/enterprise-scim-contract";
-import { EntitlementApi } from "@langwatch/entitlement-contract";
+import {
+  assertEnterprisePlanType,
+  EntitlementApi,
+  type EnterpriseFeature,
+  ENTERPRISE_FEATURE_ERRORS,
+} from "@langwatch/entitlement-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import {
   OrganizationApi,
@@ -111,9 +125,11 @@ import { HttpCopilotStudioChannel } from "../channels/http/http.copilot-studio.c
 import { HttpPollingPullerAdapter } from "../channels/http/http.polling.channel.ts";
 import { IngestionPullProcess } from "../eventing/ingestion-pull.process.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
+import { anomalyRuleConfigComplaint } from "../rules/anomaly-rule-config-error.rules.ts";
 import { nextIngestionPullRunAt } from "../rules/ingestion-pull-schedule.rules.ts";
 import { ratePulledUsage } from "../rules/pulled-usage-rate.rules.ts";
 import { AgentDiscoveryService } from "../services/agent-discovery.service.ts";
+import { AnomalyRuleService } from "../services/anomaly-rule.service.ts";
 import { AnthropicAdminPullerAdapter } from "../services/anthropic-admin-puller.service.ts";
 import { DatabricksGeniePullerService } from "../services/databricks-genie-puller.service.ts";
 import { DepartmentService } from "../services/department.service.ts";
@@ -473,6 +489,7 @@ export class GovernanceApp implements GovernanceRestApi {
     this.dependencies = dependencies;
     this.repositories = repositories;
     this.encryption = encryption;
+    this.anomalyRules = AnomalyRuleService.create({ repository: repositories.anomalyRules });
     this.departments = DepartmentService.create({
       repository: repositories.departments,
       organizations: dependencies.organizations,
@@ -586,6 +603,7 @@ export class GovernanceApp implements GovernanceRestApi {
   }
 
   private readonly dependencies: GovernanceAppDependencies;
+  private readonly anomalyRules: AnomalyRuleService;
   private readonly departments: DepartmentService;
   private readonly agentDiscovery: AgentDiscoveryService;
   private readonly personListing: PersonListingService;
@@ -1004,6 +1022,135 @@ export class GovernanceApp implements GovernanceRestApi {
       sourceTemplateId: input.sourceTemplateId,
       surface: by.surface,
     });
+  }
+
+  // ── Anomaly rules: Enterprise-only, refused per organization as main's gate did ──
+
+  async anomalyRuleList(
+    input: { organizationId: string },
+    by: GovernanceOperator,
+  ): Promise<AnomalyRule[]> {
+    await this.assertEnterprise({
+      organizationId: input.organizationId,
+      by,
+      feature: "ANOMALY_RULES",
+    });
+    return this.anomalyRules.list(input.organizationId);
+  }
+
+  async anomalyRuleGetById(
+    input: { id: string; organizationId: string },
+    by: GovernanceOperator,
+  ): Promise<AnomalyRule> {
+    await this.assertEnterprise({
+      organizationId: input.organizationId,
+      by,
+      feature: "ANOMALY_RULES",
+    });
+    return this.anomalyRules.getById(input);
+  }
+
+  async anomalyRuleCreate(
+    input: CreateAnomalyRuleInput,
+    by: GovernanceOperator,
+  ): Promise<AnomalyRule> {
+    await this.assertEnterprise({
+      organizationId: input.organizationId,
+      by,
+      feature: "ANOMALY_RULES",
+    });
+    return this.anomalyRules.createRule(input).catch((error: unknown) => {
+      throw this.anomalyRuleConfigError(error, input.ruleType);
+    });
+  }
+
+  async anomalyRuleUpdate(
+    input: UpdateAnomalyRuleInput,
+    by: GovernanceOperator,
+  ): Promise<AnomalyRule> {
+    await this.assertEnterprise({
+      organizationId: input.organizationId,
+      by,
+      feature: "ANOMALY_RULES",
+    });
+    return this.anomalyRules.updateRule(input).catch((error: unknown) => {
+      throw this.anomalyRuleConfigError(error, input.ruleType);
+    });
+  }
+
+  async anomalyRuleArchive(
+    input: { id: string; organizationId: string },
+    by: GovernanceOperator,
+  ): Promise<AnomalyRule> {
+    await this.assertEnterprise({
+      organizationId: input.organizationId,
+      by,
+      feature: "ANOMALY_RULES",
+    });
+    return this.anomalyRules.archive(input);
+  }
+
+  /** A config that fails its schema is main's handled complaint; any other failure passes through. */
+  private anomalyRuleConfigError(error: unknown, ruleType?: string): unknown {
+    if (!isZodLikeError(error)) return error;
+    const complaint = anomalyRuleConfigComplaint({ issues: error.issues, ruleType });
+    return new ValidationError(complaint, { meta: { formErrors: [complaint] } });
+  }
+
+  private async assertEnterprise({
+    organizationId,
+    by,
+    feature,
+  }: {
+    organizationId: string;
+    by: GovernanceOperator;
+    feature: EnterpriseFeature;
+  }): Promise<void> {
+    const operator = by.impersonatorId
+      ? { id: by.id, impersonatorId: by.impersonatorId }
+      : { id: by.id };
+    const plan = await this.dependencies.entitlements.getActivePlan({ organizationId, operator });
+    assertEnterprisePlanType({
+      planType: plan.type,
+      errorMessage: ENTERPRISE_FEATURE_ERRORS[feature],
+    });
+  }
+
+  // ── Ingestion templates, organization-keyed (the console's tRPC) ──────────
+
+  templateListForUser(input: { organizationId: string }): Promise<IngestionTemplate[]> {
+    return this.templates.listForUser(input);
+  }
+
+  templateListForOrgAdmin(input: { organizationId: string }): Promise<IngestionTemplate[]> {
+    return this.templates.listForOrgAdmin(input);
+  }
+
+  templateGetByIdForOrg(input: { id: string; organizationId: string }): Promise<IngestionTemplate> {
+    return this.templates.getByIdForOrg(input);
+  }
+
+  /** An `otlp_token` credential is the default one, so it is stored as none, as on main. */
+  templateCreateOrg(input: CreateIngestionTemplateInput): Promise<IngestionTemplate> {
+    return this.templates.createOrgTemplate({
+      ...input,
+      description: input.description ?? null,
+      iconAsset: input.iconAsset ?? null,
+      credentialSchema:
+        input.credentialSchema === "otlp_token" ? null : (input.credentialSchema ?? null),
+    });
+  }
+
+  templateUpdateOttlRules(input: UpdateIngestionTemplateOttlInput): Promise<IngestionTemplate> {
+    return this.templates.updateOttlRules(input);
+  }
+
+  templateArchiveOrg(input: ArchiveIngestionTemplateInput): Promise<void> {
+    return this.templates.archiveOrgTemplate(input);
+  }
+
+  templateCloneFromPlatform(input: CloneIngestionTemplateInput): Promise<IngestionTemplate> {
+    return this.templates.cloneFromPlatform(input);
   }
 
   // ── Departments ────────────────────────────────────────────────────────────

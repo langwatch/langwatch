@@ -1,4 +1,5 @@
 export * from "./anomaly-rule.ts";
+export * from "./anomaly-rules.trpc.ts";
 export * from "./agents-listing.ts";
 export * from "./ingestion-source-activity.queries.ts";
 export * from "./admin-workspace-view-audit.ts";
@@ -22,9 +23,11 @@ export * from "./governance.config.ts";
 export * from "./session-policy.ts";
 export * from "./source-health.ts";
 export * from "./governance.responses.ts";
+export * from "./governance.trpc.ts";
 export * from "./ingestion-source.ts";
 export * from "./ingestion-source.commands.ts";
 export * from "./ingestion-template.ts";
+export * from "./ingestion-templates.trpc.ts";
 export * from "./ingestion-pull.commands.ts";
 export * from "./ingestion-pull.events.ts";
 export * from "./ingestion-source-key.commands.ts";
