@@ -11,14 +11,15 @@ import {
   PRIVACY_DROPPED_MARKER_ATTR,
 } from "~/server/data-privacy/dropKeyCatalog";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
-import type {
-  Event,
-  Span,
-  SpanInputOutput,
-  SpanMetrics,
-  Trace,
-  TraceInput,
-  TraceOutput,
+import {
+  type Event,
+  SPAN_IO_SHAPE_LITERALS,
+  type Span,
+  type SpanInputOutput,
+  type SpanMetrics,
+  type Trace,
+  type TraceInput,
+  type TraceOutput,
 } from "~/server/tracer/types";
 import type {
   CategoryVisibility,
@@ -68,36 +69,12 @@ export function collectDroppedCategories(spans: Span[] | undefined): string[] {
 }
 
 /**
- * The values a message's `role` or `type` takes to describe its shape, not
- * what anyone wrote. They are left out of the redaction set, or every
+ * Keys whose shape-describing values (`SPAN_IO_SHAPE_LITERALS`: "user",
+ * "text", "image_url", ...) are left out of the redaction set, or every
  * attribute that mentions a role would be blanked along with the content. Any
  * other value under those keys is content and is kept.
  */
 const STRUCTURAL_KEYS: ReadonlySet<string> = new Set(["role", "type"]);
-const STRUCTURAL_VALUES: ReadonlySet<string> = new Set([
-  "user",
-  "assistant",
-  "system",
-  "developer",
-  "tool",
-  "function",
-  "text",
-  "json",
-  "raw",
-  "list",
-  "chat_messages",
-  "image",
-  "image_url",
-  "input_audio",
-  "audio",
-  "file",
-  "tool_call",
-  "tool_calls",
-  "tool_use",
-  "tool_result",
-  "thinking",
-  "reasoning",
-]);
 
 /**
  * Below this length a hidden string is redacted inside another value only
@@ -145,7 +122,7 @@ export function extractRedactionsForObject(object: unknown): string[] {
           !(
             STRUCTURAL_KEYS.has(key) &&
             typeof value === "string" &&
-            STRUCTURAL_VALUES.has(value)
+            SPAN_IO_SHAPE_LITERALS.has(value)
           ),
       )
       .flatMap(([, value]) => extractRedactionsForObject(value));

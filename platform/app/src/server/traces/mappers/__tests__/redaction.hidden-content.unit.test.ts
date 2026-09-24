@@ -129,6 +129,26 @@ describe("applySpanProtections", () => {
     });
 
     /** @scenario "Hiding input does not blank unrelated attributes" */
+    it("keeps attributes naming shape words the input used, binary and unknown included", () => {
+      const span = makeSpan({
+        app: { mode: "binary", fallback: "unknown" },
+      });
+      span.input = {
+        type: "chat_messages",
+        value: [
+          {
+            role: "unknown",
+            content: [{ type: "binary", mimeType: "audio/wav", id: "f1" }],
+          },
+        ],
+      } as Span["input"];
+      const params = protect(span);
+
+      expect(at(params, "app.mode")).toBe("binary");
+      expect(at(params, "app.fallback")).toBe("unknown");
+    });
+
+    /** @scenario "Hiding input does not blank unrelated attributes" */
     it("keeps a value that only contains a short hidden word inside a longer word", () => {
       const params = protect(makeSpan({ app: { rule: "antifraud_v2" } }));
 
