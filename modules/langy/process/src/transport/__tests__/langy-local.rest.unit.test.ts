@@ -3,13 +3,19 @@
  * project door; the identity bridge on top is this family's own.
  * @see specs/langy/langy-local-control.feature
  */
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   bindRestMiddleware,
   createRestRuntime,
   recordProjectCredential,
   type RestResolvedProjectCredential,
 } from "@langwatch/api/rest";
-import { LangyLocalWorkspaceOfflineError } from "@langwatch/langy-contract";
+import {
+  type LangyApi,
+  type LangyConversationDetail,
+  LangyLocalWorkspaceOfflineError,
+} from "@langwatch/langy-contract";
+import { nowInstant } from "@langwatch/time";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
@@ -72,19 +78,31 @@ function projectDoor(granted: boolean) {
 
 function buildApi(options: { granted: boolean; own?: boolean }) {
   const authenticate = projectDoor(options.granted);
-  const tryFindVisible = vi.fn(async () => ({
+  const tryFindVisible = vi.fn(async (): Promise<LangyConversationDetail> => ({
     id: CONVERSATION_ID,
     title: "Instrument tracing",
-    lastModel: "gpt-5-mini",
+    isShared: false,
     isOwn: options.own ?? true,
+    lastActivityAt: nowInstant(),
+    messageCount: 1,
+    status: "idle",
+    currentTurnId: null,
+    lastError: null,
+    lastModel: "gpt-5-mini",
+    eventCursor: null,
   }));
 
-  const app = { findByIdVisible: tryFindVisible } as never;
+  const app = createApiFixture<LangyApi>({
+    findByIdVisible: tryFindVisible,
+    getLocalCaller: async () => ({
+      userId: USER_ID,
+      projectId: PROJECT_ID,
+      projectName: "Project",
+      projectSlug: "project",
+    }),
+  });
 
   const members: LangyLocalRestMembers = {
-    // The holder HAS Langy access: the refusal below must come from the
-    // key's own grants, not from the person failing the cohort gate.
-    featureFlags: () => ({ isEnabled: async () => true }) as never,
     runtime: () =>
       ({
         presence: {

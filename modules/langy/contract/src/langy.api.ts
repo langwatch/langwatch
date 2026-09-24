@@ -1,3 +1,4 @@
+import type { RestResolvedProjectCredential } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type { LangyLocalRecord } from "./event-sourcing/folds/turn-fold.ts";
@@ -25,6 +26,22 @@ export interface LangyUsageCount {
   readonly activeUsers: number;
   readonly firstTurnAt?: number;
 }
+
+/** A public Langy REST surface, each behind its own per-project rollout. */
+export type LangyRestSurface = "turns" | "ui_actions";
+
+/** The key's owner behind a public surface, or the dark rollout that answers nothing. */
+export type LangyRestCaller =
+  | Readonly<{ dark: true }>
+  | Readonly<{ dark: false; projectId: string; userId: string }>;
+
+/** The owner of a local worker's key, with the project facts its links name. */
+export type LangyLocalCaller = Readonly<{
+  userId: string;
+  projectId: string;
+  projectName: string;
+  projectSlug: string;
+}>;
 
 /** The portable, callable Langy capability shared by process transports. */
 export interface LangyApi {
@@ -167,6 +184,15 @@ export interface LangyApi {
   }): Promise<void>;
   /** The setup skill's prompt the empty states copy; an unknown skill throws `not_found`. */
   getSetupSkillPrompt(input: { projectId: string; skill: string }): Promise<{ body: string }>;
+  /** Rollout gate, then the key's owner; an unowned or unentitled key throws. */
+  getRestCaller(input: {
+    credential: RestResolvedProjectCredential;
+    surface: LangyRestSurface;
+  }): Promise<LangyRestCaller>;
+  /** The person an owner's turns are filed under; a missing one throws. */
+  getRestActor(input: { userId: string }): Promise<LangyCredentialSession>;
+  /** The owner of a local worker's key, proved against Langy access. */
+  getLocalCaller(input: { credential: RestResolvedProjectCredential }): Promise<LangyLocalCaller>;
 }
 
 export const LangyApi = moduleApi<LangyApi>()("langy");

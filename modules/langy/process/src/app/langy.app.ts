@@ -1,4 +1,8 @@
-import { BearerIdentity, type RestIdentity } from "@langwatch/api/rest";
+import {
+  BearerIdentity,
+  type RestIdentity,
+  type RestResolvedProjectCredential,
+} from "@langwatch/api/rest";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { Event, StaticPipelineDefinition } from "@langwatch/eventing";
 /**
@@ -43,6 +47,7 @@ import { PrismaLangySessionKeyReapRepository } from "../repositories/prisma/pris
 import { LangyInternalService } from "../services/langy-internal.service.ts";
 import { EventingLangyMaintenanceAdapter } from "../services/langy-maintenance.service.ts";
 import { PostgresLangyAdapter } from "../services/langy-postgres.service.ts";
+import { LangyRestCallerService } from "../services/langy-rest-caller.service.ts";
 import { OtelLangySessionKeyMetricsAdapter } from "../services/langy-session-key-metrics-otel.service.ts";
 import { LangySessionKeyReapService } from "../services/langy-session-key-reap.service.ts";
 import type { LangyChatMessageInput } from "../services/langy-turn-shared.service.ts";
@@ -86,6 +91,8 @@ type LangyAppDependencies = {
   virtualKeyProvisioning: LangyVirtualKeyProvisioningService;
   /** The maintenance sweep's own service: no aggregate, no commands, just the reap. */
   sessionKeyReap: LangySessionKeyReapService;
+  /** The rollout gate and key-owner bridge every key-authenticated door runs. */
+  callers: LangyRestCallerService;
 };
 
 /** The project's egress allow-list, told the way both egress procedures tell it. */
@@ -120,8 +127,7 @@ export class LangyApp implements LangyApiContract {
   static readonly contract: typeof LangyApi = LangyApi;
   /**
    * presence: same per-tenant fabric. featureFlags: deployment rollout store
-   * (used by REST doors not Langy app). Declared here so process boots refusing
-   * without it.
+   * the key-authenticated doors' rollout gate and owner bridge read.
    */
   static readonly dependencies = {
     presence: PresenceApi,
@@ -188,6 +194,10 @@ export class LangyApp implements LangyApiContract {
         repository: PrismaLangySessionKeyReapRepository.create(setup.members.prisma),
         metrics: OtelLangySessionKeyMetricsAdapter.create(),
       }),
+      callers: LangyRestCallerService.create({
+        featureFlags: setup.dependencies.featureFlags,
+        actors: setup.members.prisma,
+      }),
     });
   }
 
@@ -220,6 +230,23 @@ export class LangyApp implements LangyApiContract {
       langyRestPrometheusMetrics(),
       dependencies.redis !== null,
     );
+  }
+
+  getRestCaller(input: {
+    credential: RestResolvedProjectCredential;
+    surface: langyContractModule.LangyRestSurface;
+  }): Promise<langyContractModule.LangyRestCaller> {
+    return this.dependencies.callers.getCaller(input);
+  }
+
+  getRestActor(input: { userId: string }): Promise<LangyCredentialSession> {
+    return this.dependencies.callers.getActor(input);
+  }
+
+  getLocalCaller(input: {
+    credential: RestResolvedProjectCredential;
+  }): Promise<langyContractModule.LangyLocalCaller> {
+    return this.dependencies.callers.getLocalCaller(input);
   }
 
   ingestInternalTurnResult(input: langyContractModule.LangyTurnResultInput): Promise<{

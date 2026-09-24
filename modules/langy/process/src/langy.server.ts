@@ -18,7 +18,6 @@ import {
   LangyTurnHandoffRedisRepository,
   type LangyHandoffRedis,
 } from "./repositories/redis/redis.langy-turn-handoff.repository.ts";
-import { LangyRestCallerService } from "./services/langy-rest-caller.service.ts";
 import { LangySessionKeyReapService } from "./services/langy-session-key-reap.service.ts";
 import {
   LangyTitleGeneratorService,
@@ -85,21 +84,12 @@ export const langyServer = defineServerModule("langy")
   .withRepositories(langyRepositories)
   .withApp(LangyApp)
   .withTransports(langyTurnsRest, langyInternalRest, setupSkillsTrpcTransport)
-  .withTransportFacts(({ app, dependencies, members }) => {
+  .withTransportFacts(({ app, members }) => {
     if (!(app instanceof LangyApp))
       throw new TypeError("Langy transport requires its constructed application");
-    // Rollout gate then identity bridge, in that order - the chain both public
-    // Langy families share. `actors` is the same user directory the deleted
-    // `apps/api` mount passed straight through (`actors: prisma`).
-    const callers = LangyRestCallerService.create({
-      featureFlags: dependencies.featureFlags,
-      actors: members.prisma,
-    });
-
     return [
       bindRestCredential("internalSecret", () => app.internalDoor),
       bindRestMiddleware(langyTurnsMembers, () => ({
-        callers,
         // One `Prefer: wait` hold borrows a dedicated connection for its
         // blocking read and gives it back on release, so a held request never
         // takes the shared connection out of service for everything else.

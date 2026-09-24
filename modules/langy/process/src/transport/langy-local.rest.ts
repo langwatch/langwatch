@@ -11,14 +11,12 @@ import {
   MANAGEMENT_API_VERSION,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   BASH_DEFAULT_TIMEOUT_MS,
   CALL_POLL_HOLD_MS,
   createControlRequestResponseSchema,
   LangyApi,
-  LangyApiIdentityDeniedError,
   type LangyConversationDetail,
   LangyApiRequestInvalidError,
   LangyConversationNotFoundError,
@@ -37,7 +35,6 @@ import type { LocalControlRuntime } from "#repositories/redis/redis.langy-local-
 import type { ControlSkipGate } from "#rules/langy-local-session-contract.rules";
 import { conversationTitle, conversationUrl } from "#rules/langy-local-session-text.rules";
 import { reconcileSkipPolicy } from "#rules/langy-local-skip-policy.rules";
-import { LangyKeyIdentityService } from "#services/langy-key-identity.service";
 import { ControlRequestService } from "#services/langy-local-control-request.service";
 
 import type { UserWaitEvents } from "../rules/langy-local-user-wait-record.rules.ts";
@@ -86,12 +83,10 @@ export type LangyGithubInstallationReader = Readonly<{
 
 /**
  * Everything the local surface reaches that neither `LangyApi` nor the
- * framework's project door supplies: the flag store, local-control
- * runtime, and code-access sources. Credential and `langy:create` are the door's job now.
+ * framework's project door supplies: the local-control runtime and the
+ * code-access sources. Credential and `langy:create` are the door's job now.
  */
 export type LangyLocalRestMembers = Readonly<{
-  /** This deployment's flag store, for the identity bridge. */
-  featureFlags: () => FeatureFlagApi;
   /** This process's local-control runtime: presence, calls, waits, requests. */
   runtime: () => LocalControlRuntime;
   /** The durable record of a request and of a revoked skip policy. */
@@ -111,38 +106,6 @@ export const langyLocalRestMembers = defineRestMiddleware(
   "langyLocalRestMembers",
   z.custom<LangyLocalRestMembers>(),
 );
-
-/**
- * The door already authenticated the key and enforced `langy:create` as its
- * ceiling; this is the identity bridge on top - the owning user, proved
- * against the deployment's own Langy access decision.
- */
-async function resolveLocalCaller(input: {
-  request: Request;
-  members: LangyLocalRestMembers;
-}): Promise<{
-  userId: string;
-  projectId: string;
-  projectName: string;
-  projectSlug: string;
-}> {
-  const resolved = projectCredentialOfRequest(input.request);
-  const identity = await LangyKeyIdentityService.create({
-    featureFlags: input.members.featureFlags(),
-  }).resolve({ resolved });
-  if (!identity.ok) {
-    throw new LangyApiIdentityDeniedError(
-      identity.reason === "unowned" ? "langy_api_key_unowned" : "langy_api_key_no_langy_access",
-      identity.message,
-    );
-  }
-  return {
-    userId: identity.userId,
-    projectId: resolved.project.id,
-    projectName: resolved.project.name,
-    projectSlug: resolved.project.slug,
-  };
-}
 
 /**
  * The conversation the caller named, proved against the key: it must be the key's own
@@ -213,7 +176,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   })
   .withMiddleware(langyLocalRestMembers)
   .handle(async ({ app, input, request, response }, members) => {
-    const auth = await resolveLocalCaller({ request, members });
+    const auth = await app.getLocalCaller({ credential: projectCredentialOfRequest(request) });
     const conversationId = input.conversationId ?? "";
     await conversation({ app, conversationId, projectId: auth.projectId, userId: auth.userId });
 
@@ -261,7 +224,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   .withDocs({ description: "The recorded request and the command that approves it." })
   .withMiddleware(langyLocalRestMembers)
   .handle(async ({ app, input, request, response }, members) => {
-    const auth = await resolveLocalCaller({ request, members });
+    const auth = await app.getLocalCaller({ credential: projectCredentialOfRequest(request) });
     const resolvedConversation = await conversation({
       app,
       conversationId: input.conversationId,
@@ -313,7 +276,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   .withMiddleware(langyLocalRestMembers)
   .handle(async ({ app, raw, request, response }, members) => {
     const body = parseJsonBody(raw, langyLocalStartCallRequestSchema);
-    const auth = await resolveLocalCaller({ request, members });
+    const auth = await app.getLocalCaller({ credential: projectCredentialOfRequest(request) });
     const resolvedConversation = await conversation({
       app,
       conversationId: body.conversationId,
@@ -365,7 +328,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   .withDocs({ description: "The call's answer, or a plain 404 while it is still running." })
   .withMiddleware(langyLocalRestMembers)
   .handle(async ({ app, input, request, response, signal }, members) => {
-    const auth = await resolveLocalCaller({ request, members });
+    const auth = await app.getLocalCaller({ credential: projectCredentialOfRequest(request) });
     const runtime = members.runtime();
     const call = await runtime.dispatcher.read(input.id);
     if (!call || call.projectId !== auth.projectId) return response.write(HONO_NOT_FOUND);
@@ -396,7 +359,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   .withDocs({ description: "The cancelled call's own id." })
   .withMiddleware(langyLocalRestMembers)
   .handle(async ({ app, input, request, response }, members) => {
-    const auth = await resolveLocalCaller({ request, members });
+    const auth = await app.getLocalCaller({ credential: projectCredentialOfRequest(request) });
     const runtime = members.runtime();
     const call = await runtime.dispatcher.read(input.id);
     if (!call || call.projectId !== auth.projectId) return response.write(HONO_NOT_FOUND);
@@ -431,7 +394,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   .withMiddleware(langyLocalRestMembers)
   .handle(async ({ app, raw, request, response }, members) => {
     const body = parseJsonBody(raw, langyLocalStartWaitRequestSchema);
-    const auth = await resolveLocalCaller({ request, members });
+    const auth = await app.getLocalCaller({ credential: projectCredentialOfRequest(request) });
     await conversation({
       app,
       conversationId: body.conversationId,
@@ -460,7 +423,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   .withDocs({ description: "The answered question, or a plain 404 while it is still waiting." })
   .withMiddleware(langyLocalRestMembers)
   .handle(async ({ app, input, request, response, signal }, members) => {
-    const auth = await resolveLocalCaller({ request, members });
+    const auth = await app.getLocalCaller({ credential: projectCredentialOfRequest(request) });
     const runtime = members.runtime();
     const wait = await runtime.waits.getWait(input.id).catch((error: unknown) => {
       if (HandledError.isHandled(error) && error.code === "langy_local_record_not_found") {

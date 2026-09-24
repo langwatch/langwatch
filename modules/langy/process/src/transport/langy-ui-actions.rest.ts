@@ -11,7 +11,6 @@ import {
   MANAGEMENT_API_VERSION,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   LangyApi,
   LangyApiRequestInvalidError,
@@ -21,9 +20,6 @@ import { z } from "zod";
 
 import type { LangyApp } from "#app/langy.app";
 import { type LangyUiActionCatalog, type LangyUiActionDefinition } from "#app/langy.members";
-import { LANGY_UI_ACTIONS_FLAG } from "#app/langy.members";
-import type { LangyActorUserReader } from "#services/langy-actor-session.service";
-import { LangyRestCallerService } from "#services/langy-rest-caller.service";
 import {
   LangyUiActionService,
   type UiActionBackendRunner,
@@ -56,10 +52,6 @@ export abstract class LangyUiActionRestCatalog implements LangyUiActionCatalog {
  * the framework's own project door supplies.
  */
 export type LangyUiActionsRestMembers = Readonly<{
-  /** This deployment's flag store, for the rollout gate and the identity bridge. */
-  featureFlags: () => FeatureFlagApi;
-  /** The user directory a key's owner is read from. */
-  actors: () => LangyActorUserReader;
   /** Enforces one permission as the key's ceiling — the dispatched action's own. */
   enforceCeiling: LangyRestCeiling;
   /** The SAME application the browser's Langy procedures resolve on. */
@@ -116,12 +108,9 @@ export const langyUiActionsRest = defineRestRouter(LangyApi)
       "rollout is dark for the project.",
   })
   .withMiddleware(langyUiActionsRestMembers)
-  .handle(async ({ raw, request, response }, members) => {
+  .handle(async ({ app, raw, request, response }, members) => {
     const resolved = projectCredentialOfRequest(request);
-    const caller = await LangyRestCallerService.create({
-      featureFlags: members.featureFlags(),
-      actors: members.actors(),
-    }).resolve({ resolved, flag: LANGY_UI_ACTIONS_FLAG });
+    const caller = await app.getRestCaller({ credential: resolved, surface: "ui_actions" });
     if (caller.dark) return response.write(HONO_NOT_FOUND);
 
     let parsedRaw: unknown;
@@ -178,12 +167,11 @@ export const langyUiActionsRest = defineRestRouter(LangyApi)
       "reads as it stands.",
   })
   .withMiddleware(langyUiActionsRestMembers)
-  .handle(async ({ request, response }, members) => {
-    const resolved = projectCredentialOfRequest(request);
-    const caller = await LangyRestCallerService.create({
-      featureFlags: members.featureFlags(),
-      actors: members.actors(),
-    }).resolve({ resolved, flag: LANGY_UI_ACTIONS_FLAG });
+  .handle(async ({ app, request, response }, members) => {
+    const caller = await app.getRestCaller({
+      credential: projectCredentialOfRequest(request),
+      surface: "ui_actions",
+    });
     if (caller.dark) return response.write(HONO_NOT_FOUND);
 
     return response.write({

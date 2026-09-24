@@ -12,16 +12,12 @@ import {
 } from "@langwatch/api/rest";
 import {
   LangyApi,
-  LangyApiIdentityDeniedError,
   LangyApiRequestInvalidError,
   langyRestConversationParamsSchema,
   langyRestTurnBodySchema,
 } from "@langwatch/langy-contract";
 import { z } from "zod";
 
-import { LANGY_API_KEY_TURNS_FLAG } from "../rules/langy-rest-flags.rules.ts";
-import type { LangyIdentityToken } from "../services/langy-key-identity.service.ts";
-import type { LangyRestCallerService } from "../services/langy-rest-caller.service.ts";
 import {
   type LangyTurnBufferWatch,
   LangyTurnSettlementWaiterService,
@@ -41,8 +37,6 @@ const MAX_WAIT_SECONDS = 120;
 
 /** Everything the turn surface reaches that Langy does not own. */
 export type LangyTurnsRestMembers = Readonly<{
-  /** The credential chain both public Langy REST families share. */
-  callers: LangyRestCallerService;
   /**
    * One turn's live buffer, opened for the length of a `Prefer: wait` hold, or
    * null when this process composed no Redis: the hold is then served by fold
@@ -53,8 +47,7 @@ export type LangyTurnsRestMembers = Readonly<{
 
 /**
  * What the PROCESS supplies the turn surface beyond Langy's own
- * application: the rollout store, the user directory a key bridges
- * through, and this process's live turn buffer - none of it Langy's to own.
+ * application: this process's live turn buffer, which is not Langy's to own.
  */
 export const langyTurnsMembers = defineRestMiddleware(
   "langyTurnsMembers",
@@ -126,22 +119,20 @@ async function startTurn(input: {
   const { app, members, request, response, conversationId } = input;
   // The door already resolved this key and enforced `langy:create` as its
   // ceiling; reading its answer back here asks the key store nothing twice.
-  const resolved: LangyIdentityToken = projectCredentialOfRequest(request);
-  const caller = await members.callers.resolve({
-    resolved,
-    flag: LANGY_API_KEY_TURNS_FLAG,
+  const caller = await app.getRestCaller({
+    credential: projectCredentialOfRequest(request),
+    surface: "turns",
   });
   if (caller.dark) return response.write(HONO_NOT_FOUND);
 
-  const actor = await members.callers.resolveActor({ userId: caller.userId });
-  if (!actor.ok) throw new LangyApiIdentityDeniedError("langy_api_actor_missing", actor.message);
+  const session = await app.getRestActor({ userId: caller.userId });
 
   const body = parseTurnBody(input.raw, conversationId);
 
   const result = await app.startConversationTurn({
     projectId: caller.projectId,
     idempotencyKey: body.idempotencyKey,
-    session: actor.session,
+    session,
     requestedConversationId: conversationId,
     ...(body.adoptConversationId ? { adoptConversationId: true } : {}),
     messages: body.messages,
@@ -166,7 +157,7 @@ async function startTurn(input: {
       projectId: caller.projectId,
       conversationId: result.conversationId,
       turnId: result.turnId,
-      userId: actor.session.user.id,
+      userId: session.user.id,
       signal: AbortSignal.any([request.signal, AbortSignal.timeout(waitSeconds * 1000)]),
     });
 
