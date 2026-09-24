@@ -19,6 +19,7 @@ import { CustomGraphRepository } from "../../repositories/custom-graph.repositor
 import { EmailSuppressionNameRepository } from "../../repositories/email-suppression-name.repository.ts";
 import { EmailSuppressionRepository } from "../../repositories/email-suppression.repository.ts";
 import { GraphTriggerSentRepository } from "../../repositories/graph-trigger-sent.repository.ts";
+import { MemoryAutomationPersistCapRepository } from "../../repositories/memory/memory.automation-persist-cap.repository.ts";
 import { TriggerFireHistoryRepository } from "../../repositories/trigger-fire-history.repository.ts";
 import { TriggerRepository } from "../../repositories/trigger.repository.ts";
 import type { ReportScheduleTarget } from "../../repositories/trigger.repository.ts";
@@ -313,7 +314,7 @@ const makeService = (
         resolvePlanNextStep: vi.fn(),
       },
       config: { free: 100, paid: 1_000, enterprise: 10_000 },
-      redis: null,
+      slots: MemoryAutomationPersistCapRepository.create(),
     });
     return AutomationService.create({
       triggers,

@@ -1,5 +1,7 @@
 // Resolve the handle the whole-call audio player streams a run's recording by.
-// Reads run's traces, scans spans for vendor handle (Twilio or ElevenLabs), null if missing.
+// Reads run's traces, scans spans for vendor handle (Twilio or ElevenLabs); unavailable if missing.
+
+import { VoiceRecordingUnavailableError } from "./voice-session.service.ts";
 
 /** The span attribute a phone run stamps its Twilio call SID on. */
 export const TWILIO_CALL_SID_ATTR = "voice.twilio.call_sid";
@@ -47,10 +49,10 @@ function extractAttributesHandle(
 }
 
 /**
- * The whole-call audio handle for a run, resolved from the run's own trace
- * spans, or null when no span names one.
+ * The whole-call audio handle for a run, read from the run's own trace spans.
+ * Throws `VoiceRecordingUnavailableError` when no span names one.
  */
-export async function resolveWholeCallAudio({
+export async function getWholeCallAudio({
   projectId,
   scenarioRunId,
   infrastructure,
@@ -58,7 +60,7 @@ export async function resolveWholeCallAudio({
   projectId: string;
   scenarioRunId: string;
   infrastructure: WholeCallAudioInfrastructure;
-}): Promise<WholeCallAudioHandle | null> {
+}): Promise<WholeCallAudioHandle> {
   const traceIds = await infrastructure.loadRunTraceIds({
     projectId,
     scenarioRunId,
@@ -73,5 +75,5 @@ export async function resolveWholeCallAudio({
       if (handle) return handle;
     }
   }
-  return null;
+  throw new VoiceRecordingUnavailableError();
 }

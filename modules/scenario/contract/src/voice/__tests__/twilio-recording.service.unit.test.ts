@@ -4,10 +4,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  resolveTwilioRecordingWavUrl,
-  type TwilioCredential,
-} from "../twilio-recording.service.ts";
+import { getTwilioRecordingWavUrl, type TwilioCredential } from "../twilio-recording.service.ts";
 import { VOICE_HTTP_TIMEOUT_MS } from "../voice-limits.ts";
 
 const CREDENTIAL: TwilioCredential = {
@@ -15,14 +12,14 @@ const CREDENTIAL: TwilioCredential = {
   authToken: "tok-secret",
 };
 
-describe("resolveTwilioRecordingWavUrl", () => {
+describe("getTwilioRecordingWavUrl", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.useRealTimers();
   });
 
   describe("when the upstream withholds response headers past the timeout", () => {
-    it("aborts the fetch and returns null rather than hanging indefinitely", async () => {
+    it("aborts the fetch and rejects rather than hanging indefinitely", async () => {
       vi.useFakeTimers();
       vi.stubGlobal(
         "fetch",
@@ -36,20 +33,21 @@ describe("resolveTwilioRecordingWavUrl", () => {
         ),
       );
 
-      const promise = resolveTwilioRecordingWavUrl({
+      const promise = getTwilioRecordingWavUrl({
         credential: CREDENTIAL,
         callSid: "CA1",
         signal: new AbortController().signal,
       });
 
+      const settled = expect(promise).rejects.toMatchObject({ name: "AbortError" });
       await vi.advanceTimersByTimeAsync(VOICE_HTTP_TIMEOUT_MS);
 
-      await expect(promise).resolves.toBeNull();
+      await settled;
     });
   });
 
   describe("when the caller's signal is already aborted before the fetch starts", () => {
-    it("returns null promptly instead of waiting for the timeout", async () => {
+    it("rejects promptly instead of waiting for the timeout", async () => {
       vi.stubGlobal(
         "fetch",
         vi.fn(
@@ -69,13 +67,48 @@ describe("resolveTwilioRecordingWavUrl", () => {
       const controller = new AbortController();
       controller.abort();
 
-      const result = await resolveTwilioRecordingWavUrl({
+      await expect(
+        getTwilioRecordingWavUrl({
+          credential: CREDENTIAL,
+          callSid: "CA1",
+          signal: controller.signal,
+        }),
+      ).rejects.toMatchObject({ name: "AbortError" });
+    });
+  });
+
+  describe("when Twilio lists no recording for the call yet", () => {
+    it("throws the recording-unavailable error", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => Response.json({ recordings: [] })),
+      );
+
+      await expect(
+        getTwilioRecordingWavUrl({
+          credential: CREDENTIAL,
+          callSid: "CA1",
+          signal: new AbortController().signal,
+        }),
+      ).rejects.toMatchObject({ code: "voice_recording_unavailable" });
+    });
+  });
+
+  describe("when Twilio refuses the listing with a server error", () => {
+    it("propagates the failure instead of reading it as not ready", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response("down", { status: 503 })),
+      );
+
+      const failure = await getTwilioRecordingWavUrl({
         credential: CREDENTIAL,
         callSid: "CA1",
-        signal: controller.signal,
-      });
+        signal: new AbortController().signal,
+      }).catch((error: unknown) => error);
 
-      expect(result).toBeNull();
+      expect(failure).toBeInstanceOf(Error);
+      expect(failure).not.toMatchObject({ code: "voice_recording_unavailable" });
     });
   });
 });

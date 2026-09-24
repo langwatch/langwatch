@@ -16,6 +16,7 @@ import type { SchedulerWake } from "../../channels/automation-scheduler-wake.cha
 import type { AutomationTestFire } from "../../channels/automation-test-fire.channel.ts";
 import type { AutomationRunaway } from "../../repositories/automation-runaway.repository.ts";
 import type { AutomationScheduledJobRepository } from "../../repositories/automation-scheduled-job.repository.ts";
+import { MemoryAutomationPersistCapRepository } from "../../repositories/memory/memory.automation-persist-cap.repository.ts";
 import { PostgresAutomationRepositories } from "../../repositories/prisma/prisma.automation.repositories.ts";
 import type { AutomationLogger } from "../../services/automation-graph-runtime.service.ts";
 import type { AutomationRunawaySignals } from "../../services/automation-runaway-signals.service.ts";
@@ -177,7 +178,7 @@ export function createCanonicalAutomationApp(): {
     slackTokens: { findDecryptedToken: vi.fn() },
     dispatchErrors: { isTerminal: vi.fn(), createTerminal: vi.fn() },
     heartbeat: { findClickHouseClient: vi.fn() },
-    redis: null,
+    persistCaps: MemoryAutomationPersistCapRepository.create(),
     providers: {
       actionParamsSchemaFor: vi.fn<AutomationInfrastructure["providers"]["actionParamsSchemaFor"]>(
         () => ({ safeParse: (data: unknown) => ({ success: true, data }) }),

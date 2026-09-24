@@ -53,8 +53,8 @@ function fakePorts({
   over?: Partial<VoiceSessionInfrastructure>;
 }): VoiceSessionInfrastructure {
   return {
-    resolveCredential: vi.fn(async () => CREDENTIAL),
-    resolveVoiceAgentRow: vi.fn(async () => ({
+    getCredential: vi.fn(async () => CREDENTIAL),
+    getVoiceAgentRow: vi.fn(async () => ({
       id: "agent_row",
       agentExternalId: "agent_xyz",
     })),
@@ -69,7 +69,7 @@ function fakePorts({
     writeCallRun: vi.fn(async () => {}),
     // A scenario call resolves its set here; a drawer call never reaches it.
     // Individual tests override to assert it is or is not called.
-    resolveScenarioSet: vi.fn(async () => ({ scenarioSetId: "set_x" })),
+    getScenarioSet: vi.fn(async () => ({ scenarioSetId: "set_x" })),
     audioProxyUrl: ({ conversationId, projectId }) =>
       `/api/voice/session/${conversationId}/audio?projectId=${projectId}`,
     // A fake signer that round-trips the payload so tests can read the claims.
@@ -135,7 +135,7 @@ describe("mintVoiceSession", () => {
       });
 
       it("mints against the vendor id from the stored row, ignoring what a body would have named", async () => {
-        const resolveVoiceAgentRow = vi.fn(async () => ({
+        const getVoiceAgentRow = vi.fn(async () => ({
           id: "agent_row",
           agentExternalId: "agent_from_row",
         }));
@@ -144,7 +144,7 @@ describe("mintVoiceSession", () => {
         }));
         const ports = fakePorts({
           runner: fakeRunner({ mintSession: mintSpy }),
-          over: { resolveVoiceAgentRow },
+          over: { getVoiceAgentRow },
         });
 
         const result = await mintVoiceSession({
@@ -169,10 +169,10 @@ describe("mintVoiceSession", () => {
 
     describe("when there is no saved agent row yet (an unsaved draft)", () => {
       it("mints against the body's vendor agent id and carries a null row id", async () => {
-        const resolveVoiceAgentRow = vi.fn();
+        const getVoiceAgentRow = vi.fn();
         const ports = fakePorts({
           runner: fakeRunner(),
-          over: { resolveVoiceAgentRow },
+          over: { getVoiceAgentRow },
         });
 
         const result = await mintVoiceSession({
@@ -183,7 +183,7 @@ describe("mintVoiceSession", () => {
           maxDurationSeconds: 300,
         });
 
-        expect(resolveVoiceAgentRow).not.toHaveBeenCalled();
+        expect(getVoiceAgentRow).not.toHaveBeenCalled();
         expect(JSON.parse(result.sessionToken)).toMatchObject({
           agentExternalId: "agent_xyz",
           agentId: null,
@@ -197,7 +197,9 @@ describe("mintVoiceSession", () => {
         const ports = fakePorts({
           runner,
           over: {
-            resolveVoiceAgentRow: vi.fn(async () => null),
+            getVoiceAgentRow: vi.fn(async () => {
+              throw new VoiceAgentRowNotFoundError();
+            }),
           },
         });
 
@@ -221,7 +223,9 @@ describe("mintVoiceSession", () => {
         const ports = fakePorts({
           runner,
           over: {
-            resolveCredential: vi.fn(async () => null),
+            getCredential: vi.fn(async () => {
+              throw new VoiceKeyMissingError("No key");
+            }),
           },
         });
 
@@ -243,11 +247,11 @@ describe("mintVoiceSession", () => {
       /** @scenario "A browser mint of a phone target is refused with a clear message" */
       it("rejects with the unavailable error before any credential lookup", async () => {
         const runner = fakeRunner();
-        const resolveCredential = vi.fn(async () => CREDENTIAL);
+        const getCredential = vi.fn(async () => CREDENTIAL);
         const ports = fakePorts({
           runner,
           over: {
-            resolveCredential,
+            getCredential,
             registry: {
               elevenlabs_convai: runner,
               phone: createPhoneTransport({ processEnv: {} }),
@@ -275,7 +279,7 @@ describe("mintVoiceSession", () => {
             maxDurationSeconds: 300,
           }),
         ).rejects.toBeInstanceOf(VoicePhoneTransportUnavailableError);
-        expect(resolveCredential).not.toHaveBeenCalled();
+        expect(getCredential).not.toHaveBeenCalled();
       });
     });
   });
@@ -286,7 +290,7 @@ describe("finishVoiceSession", () => {
     // A "Call it myself" call names a scenario, so it is written as a run and
     // judged; a drawer "Talk to it" call names none and is never written as a
     // run (#8020). Most run-writing behaviour below is therefore exercised on
-    // the scenario path, with `scenarioId` set and `resolveScenarioSet`
+    // the scenario path, with `scenarioId` set and `getScenarioSet`
     // resolving it. The drawer path is exercised in its own block.
     const SCENARIO_FINISH = {
       ...FINISH_BASE,
@@ -476,12 +480,12 @@ describe("finishVoiceSession", () => {
         const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         // The scenario is gone: were it resolved, this would throw
         // scenario_not_found. The terminal short-circuit must run first.
-        const resolveScenarioSet = vi.fn(async () => null);
+        const getScenarioSet = vi.fn(async () => ({ scenarioSetId: "set_x" }));
         const ports = fakePorts({
           runner: fakeRunner(),
           over: {
             writeCallRun,
-            resolveScenarioSet,
+            getScenarioSet,
             findExistingRun: vi.fn(async () => ({
               agentId: "agent_existing",
               status: ScenarioRunStatus.SUCCESS,
@@ -499,7 +503,7 @@ describe("finishVoiceSession", () => {
           scenarioId: "scenario_gone",
         });
 
-        expect(resolveScenarioSet).not.toHaveBeenCalled();
+        expect(getScenarioSet).not.toHaveBeenCalled();
         expect(writeCallRun).not.toHaveBeenCalled();
         expect(result.runId).toBeTruthy();
       });
@@ -619,12 +623,12 @@ describe("finishVoiceSession", () => {
         const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         // Were it resolved now, the archived scenario would return null and the
         // run could never complete (#7973 AC1): the persisted set is reused.
-        const resolveScenarioSet = vi.fn(async () => null);
+        const getScenarioSet = vi.fn(async () => ({ scenarioSetId: "set_x" }));
         const ports = fakePorts({
           runner: fakeRunner(),
           over: {
             writeCallRun,
-            resolveScenarioSet,
+            getScenarioSet,
             findExistingRun: vi.fn(async () => ({
               agentId: "agent_row",
               status: ScenarioRunStatus.IN_PROGRESS,
@@ -642,7 +646,7 @@ describe("finishVoiceSession", () => {
           scenarioId: "scenario_archived",
         });
 
-        expect(resolveScenarioSet).not.toHaveBeenCalled();
+        expect(getScenarioSet).not.toHaveBeenCalled();
         expect(writeCallRun).toHaveBeenCalledWith(
           expect.objectContaining({
             scenario: {
@@ -701,15 +705,15 @@ describe("finishVoiceSession", () => {
     function createScoredCallSetup() {
       const runner = fakeRunner();
       const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
-      const resolveScenarioSet = vi.fn(async () => ({
+      const getScenarioSet = vi.fn(async () => ({
         scenarioSetId: "set_x",
       }));
       const ports = fakePorts({
         runner,
-        over: { writeCallRun, resolveScenarioSet },
+        over: { writeCallRun, getScenarioSet },
       });
 
-      return { ports, resolveScenarioSet, writeCallRun };
+      return { ports, getScenarioSet, writeCallRun };
     }
 
     describe("when the call is scored under a scenario", () => {
@@ -722,11 +726,11 @@ describe("finishVoiceSession", () => {
       /** @scenario "Call it myself against a scenario and be scored on its criteria" */
       /** @scenario "Call it myself still writes a run under its scenario after 8020" */
       it("writes the run under the scenario and its set so the scenario grades it", async () => {
-        const { ports, resolveScenarioSet, writeCallRun } = setup;
+        const { ports, getScenarioSet, writeCallRun } = setup;
 
         const result = await finishVoiceSession({ ports, ...SCENARIO_FINISH });
 
-        expect(resolveScenarioSet).toHaveBeenCalledWith({
+        expect(getScenarioSet).toHaveBeenCalledWith({
           projectId: "p1",
           scenarioId: "scenario_1",
         });
@@ -740,7 +744,7 @@ describe("finishVoiceSession", () => {
 
       /** @scenario "A drawer Talk to it call writes no run" */
       it("keeps a drawer call out of any scenario set and writes no run", async () => {
-        const { ports, resolveScenarioSet, writeCallRun } = setup;
+        const { ports, getScenarioSet, writeCallRun } = setup;
 
         const result = await finishVoiceSession({
           ports,
@@ -748,7 +752,7 @@ describe("finishVoiceSession", () => {
           token: { ...TOKEN, agentId: "agent_row" },
         });
 
-        expect(resolveScenarioSet).not.toHaveBeenCalled();
+        expect(getScenarioSet).not.toHaveBeenCalled();
         expect(writeCallRun).not.toHaveBeenCalled();
         expect(result.scenarioSetId).toBeUndefined();
       });
@@ -901,7 +905,9 @@ describe("finishVoiceSession", () => {
           runner,
           over: {
             writeCallRun,
-            resolveScenarioSet: vi.fn(async () => null),
+            getScenarioSet: vi.fn(async () => {
+              throw new VoiceScenarioNotFoundError();
+            }),
           },
         });
 
@@ -1127,7 +1133,11 @@ describe("authorizeRecordingPlayback", () => {
       it("refuses with the key-missing error", async () => {
         const ports = fakePorts({
           runner: fakeRunner(),
-          over: { resolveCredential: vi.fn(async () => null) },
+          over: {
+            getCredential: vi.fn(async () => {
+              throw new VoiceKeyMissingError("No key");
+            }),
+          },
         });
 
         await expect(
@@ -1146,7 +1156,7 @@ describe("authorizeRecordingPlayback", () => {
           const ports = fakePorts({
             runner: fakeRunner(),
             over: {
-              resolveCredential: vi.fn(async () => ({
+              getCredential: vi.fn(async () => ({
                 kind: "twilio" as const,
                 accountSid: "AC123",
                 authToken: "tok-secret",

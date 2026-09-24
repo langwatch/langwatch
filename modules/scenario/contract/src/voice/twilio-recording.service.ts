@@ -1,7 +1,9 @@
-// Resolve phone call's recording from Twilio REST API. Returns .wav media URL or null if not ready.
+// Resolve phone call's recording from Twilio REST API: the .wav media URL,
+// or unavailable when not ready.
 // Auth token basic-auth only; never logged, never leaves request to Twilio.
 
 import { VOICE_HTTP_TIMEOUT_MS } from "./voice-limits.ts";
+import { VoiceRecordingUnavailableError } from "./voice-session.service.ts";
 
 /**
  * The subset of the stored Twilio account credential this file reads to
@@ -26,11 +28,11 @@ export function twilioBasicAuthHeader({
 }
 
 /**
- * The `.wav` media URL of the call's first recording, or null when Twilio has
- * none yet (or the listing could not be read). A refused redirect, a non-ok
- * response and a network failure all read the same way: nothing to play yet.
+ * The `.wav` media URL of the call's first recording. Throws
+ * `VoiceRecordingUnavailableError` while Twilio has none; a network failure,
+ * a refused redirect or a non-404 refusal propagates as the failure it is.
  */
-export async function resolveTwilioRecordingWavUrl({
+export async function getTwilioRecordingWavUrl({
   credential,
   callSid,
   signal,
@@ -38,7 +40,7 @@ export async function resolveTwilioRecordingWavUrl({
   credential: TwilioCredential;
   callSid: string;
   signal: AbortSignal;
-}): Promise<string | null> {
+}): Promise<string> {
   const listUrl = `${TWILIO_API_BASE}/2010-04-01/Accounts/${encodeURIComponent(
     credential.accountSid,
   )}/Recordings.json?CallSid=${encodeURIComponent(callSid)}`;
@@ -63,19 +65,18 @@ export async function resolveTwilioRecordingWavUrl({
       signal: timeoutController.signal,
       redirect: "error",
     });
-  } catch {
-    return null;
   } finally {
     clearTimeout(timeout);
     signal.removeEventListener("abort", onCallerAbort);
   }
-  if (!response.ok) return null;
+  if (response.status === 404) throw new VoiceRecordingUnavailableError();
+  if (!response.ok) throw new Error(`Twilio recordings listing answered ${response.status}`);
 
-  const body = (await response.json().catch(() => null)) as {
+  const body = (await response.json()) as {
     recordings?: { uri?: unknown }[];
   } | null;
   const uri = body?.recordings?.[0]?.uri;
-  if (typeof uri !== "string" || uri.length === 0) return null;
+  if (typeof uri !== "string" || uri.length === 0) throw new VoiceRecordingUnavailableError();
 
   // The listing `uri` is the resource JSON path
   // (`/2010-04-01/.../Recordings/RE....json`); the media is the same path with

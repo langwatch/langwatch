@@ -185,14 +185,14 @@ function normalizeToHttpUrl(value: string): string | undefined {
 /** App's public base URL for Twilio media stream: VOICE_PUBLIC_BASE_URL or
  * BASE_HOST; normalized via normalizeToHttpUrl, throws if unparseable.
  */
-export function resolvePublicBaseUrl(processEnv: NodeJS.ProcessEnv): string | undefined {
-  const resolved = resolvePublicBaseUrlWithSource(processEnv);
+export function derivePublicBaseUrl(processEnv: NodeJS.ProcessEnv): string | undefined {
+  const resolved = derivePublicBaseUrlWithSource(processEnv);
   return resolved?.value;
 }
 
-/** Same resolution as {@link resolvePublicBaseUrl}, but also reports which env
+/** Same resolution as {@link derivePublicBaseUrl}, but also reports which env
  *  var the value came from, so a caller can log it alongside the value. */
-export function resolvePublicBaseUrlWithSource(
+export function derivePublicBaseUrlWithSource(
   processEnv: NodeJS.ProcessEnv,
 ): { value: string; source: PublicBaseUrlSource } | undefined {
   const fromWorker = processEnv.VOICE_PUBLIC_BASE_URL?.trim();
@@ -324,7 +324,7 @@ export function createPhoneTransport(deps: PhoneTransportDeps): VoiceTransportRu
       // The SDK caps an a-leg call at 300s and throws above it; a project whose
       // VOICE_CALL_MAX_SECONDS is higher is clamped down to the cap.
       const maxCallDurationSeconds = Math.min(maxCallSeconds, TWILIO_MAX_CALL_DURATION_CAP_SECONDS);
-      const resolvedBaseUrl = resolvePublicBaseUrlWithSource(deps.processEnv);
+      const resolvedBaseUrl = derivePublicBaseUrlWithSource(deps.processEnv);
       // A phone call must route Twilio's media stream to VOICE_PUBLIC_BASE_URL,
       // the worker's own listener; BASE_HOST is the app's origin, which runs
       // none, and dialling it hands Twilio a dead URL (prod 31920 failure).

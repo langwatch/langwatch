@@ -104,9 +104,9 @@ export type {
   PersistCapDecision,
   PersistCapDependencies,
   ReadPersistCapCountsInput,
-  AutomationPersistCapRedis,
 } from "./services/persist-cap.service.ts";
 export { AutomationEmailCapRepository } from "./repositories/automation-email-cap.repository.ts";
+export type { AutomationPersistCapRepository } from "./repositories/automation-persist-cap.repository.ts";
 export { AutomationGraphNotifier } from "./channels/automation-graph-alert.channel.ts";
 export type {
   GraphAlertDispatchInput,
