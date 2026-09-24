@@ -41,7 +41,7 @@ export class TraceViewerProtectionService {
     this.now = options.now ?? Date.now;
   }
 
-  async visibilityCutoffMs(projectId: string): Promise<number | null> {
+  async getVisibilityWindow(projectId: string): Promise<{ visibilityCutoffMs: number | null }> {
     const dayMs = 24 * 60 * 60 * 1000;
     try {
       const project = await this.options.projects.findWithTeam(projectId);
@@ -51,15 +51,15 @@ export class TraceViewerProtectionService {
           { projectId },
           "visibility window failing closed: project resolves to no organization",
         );
-        return this.now() - this.options.fallbackVisibilityDays * dayMs;
+        return { visibilityCutoffMs: this.now() - this.options.fallbackVisibilityDays * dayMs };
       }
-      return await this.window.getVisibilityCutoffMs({ organizationId });
+      return await this.window.getVisibilityWindow({ organizationId });
     } catch (error) {
       this.logger.error(
         { projectId, error },
         "visibility window failing closed: plan resolution failed",
       );
-      return this.now() - this.options.fallbackVisibilityDays * dayMs;
+      return { visibilityCutoffMs: this.now() - this.options.fallbackVisibilityDays * dayMs };
     }
   }
 
@@ -92,13 +92,14 @@ export class TraceViewerProtectionService {
   async resolve(
     input: Readonly<{ projectId: string; userId: string | undefined; publiclyShared: boolean }>,
   ): Promise<Protections> {
-    const [canSeeCosts, isMember, isAdmin, isProjectOwner, visibilityCutoffMs] = await Promise.all([
-      this.permitted(input, "cost:view"),
-      this.permitted(input, "traces:view"),
-      this.permitted(input, "project:update"),
-      this.isProjectOwner(input),
-      this.visibilityCutoffMs(input.projectId),
-    ]);
+    const [canSeeCosts, isMember, isAdmin, isProjectOwner, { visibilityCutoffMs }] =
+      await Promise.all([
+        this.permitted(input, "cost:view"),
+        this.permitted(input, "traces:view"),
+        this.permitted(input, "project:update"),
+        this.isProjectOwner(input),
+        this.getVisibilityWindow(input.projectId),
+      ]);
 
     let policy: ResolvedDataPrivacy;
     try {
@@ -162,14 +163,6 @@ export class TraceViewerProtectionService {
       })),
       visibilityCutoffMs,
     };
-  }
-
-  async resolveForShare(
-    input: Readonly<{ projectId: string; userId: string | undefined }>,
-  ): Promise<Protections | null> {
-    const project = await this.options.projects.findWithTeam(input.projectId);
-    if (!project) return null;
-    return this.resolve({ ...input, publiclyShared: true });
   }
 
   /** Whether the viewer owns the project; unknown ownership is not ownership. */

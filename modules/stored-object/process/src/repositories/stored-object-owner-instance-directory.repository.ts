@@ -17,5 +17,5 @@ export type StoredObjectOwnerClickHouseInstance = Readonly<{
 
 /** Process-composed directory of every ClickHouse instance eligible for legacy owner lookup. */
 export abstract class StoredObjectOwnerInstanceDirectoryRepository {
-  abstract listInstances(): Promise<readonly StoredObjectOwnerClickHouseInstance[]>;
+  abstract findInstances(): Promise<readonly StoredObjectOwnerClickHouseInstance[]>;
 }

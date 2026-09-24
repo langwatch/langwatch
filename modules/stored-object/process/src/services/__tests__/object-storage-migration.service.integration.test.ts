@@ -117,11 +117,11 @@ const setup = ({
     );
   };
   const inventory: ObjectStorageMigrationInventory = {
-    listProjectsPage: vi.fn(async (request) => pageById(projects, request)),
-    listStoredObjectsPage: vi.fn(async (projectId, request) =>
+    findProjectsPage: vi.fn(async (request) => pageById(projects, request)),
+    findStoredObjectsPage: vi.fn(async (projectId, request) =>
       pageById(rows.get(projectId) ?? [], request),
     ),
-    listDatasetsPage: vi.fn(async (projectId, request) =>
+    findDatasetsPage: vi.fn(async (projectId, request) =>
       pageById(
         datasetRows.filter((dataset) => dataset.projectId === projectId),
         request,

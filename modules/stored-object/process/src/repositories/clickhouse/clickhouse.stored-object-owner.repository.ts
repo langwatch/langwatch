@@ -24,7 +24,7 @@ export class ClickHouseStoredObjectOwnerRepository extends StoredObjectOwnerRepo
   }
 
   async findOwner(id: string): Promise<StoredObjectOwnerLookupResult> {
-    const instances = await this.instanceDirectory.listInstances();
+    const instances = await this.instanceDirectory.findInstances();
     if (instances.length === 0) {
       throw new Error(
         "ClickHouse is not configured — cannot resolve owner project for stored object",

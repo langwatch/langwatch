@@ -25,10 +25,10 @@ export type MigrationPageRequest = {
 };
 
 export abstract class ObjectStorageMigrationInventory {
-  abstract listProjectsPage(request: MigrationPageRequest): Promise<MigrationProject[]>;
+  abstract findProjectsPage(request: MigrationPageRequest): Promise<MigrationProject[]>;
 
   /** Returns a stable id-ordered page of latest ReplacingMergeTree versions. */
-  abstract listStoredObjectsPage(
+  abstract findStoredObjectsPage(
     projectId: string,
     request: MigrationPageRequest,
   ): Promise<StoredObject[]>;
@@ -38,7 +38,7 @@ export abstract class ObjectStorageMigrationInventory {
    * Per-project, because the Prisma multitenancy middleware rejects any Dataset
    * query without a projectId.
    */
-  abstract listDatasetsPage(
+  abstract findDatasetsPage(
     projectId: string,
     request: MigrationPageRequest,
   ): Promise<MigrationDataset[]>;

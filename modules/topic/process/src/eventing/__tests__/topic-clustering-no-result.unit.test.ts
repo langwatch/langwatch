@@ -68,34 +68,6 @@ describe("clusterTopicsForProject", () => {
 });
 
 describe("storeResults", () => {
-  describe("given the clustering call returned no result", () => {
-    describe("when storing in batch mode", () => {
-      it("leaves the existing topic model in place", async () => {
-        const deps = fakeRunnerDeps();
-        await storeResults({
-          deps,
-          projectId: "proj-1",
-          clusteringResult: undefined,
-          isIncremental: false,
-        });
-
-        expect(deps.commands.recordTopics).not.toHaveBeenCalled();
-      });
-
-      it("returns null so the caller can report a skip", async () => {
-        const deps = fakeRunnerDeps();
-        await expect(
-          storeResults({
-            deps,
-            projectId: "proj-1",
-            clusteringResult: undefined,
-            isIncremental: false,
-          }),
-        ).resolves.toBeNull();
-      });
-    });
-  });
-
   describe("given the clustering call returned an empty topic set", () => {
     describe("when storing in batch mode", () => {
       it("keeps the previous topics rather than replacing them with nothing", async () => {

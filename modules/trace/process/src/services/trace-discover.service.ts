@@ -32,7 +32,7 @@ import {
 } from "../rules/trace-list-cache-key.rules.ts";
 import { TraceFacetDescriptorService } from "./trace-facet-descriptor.service.ts";
 import type { TraceTopicNamingService } from "./trace-topic-naming.service.ts";
-import { TtlCache } from "./trace-ttl-cache.service.ts";
+import { TraceTtlCacheService } from "./trace-ttl-cache.service.ts";
 
 /**
  * Stale-while-revalidate cache for the full discover payload. The table view fires `discover` on
@@ -52,14 +52,14 @@ interface CachedDiscover {
   timestamp: number;
 }
 
-const DISCOVER_CACHE = new TtlCache<CachedDiscover>(DISCOVER_TTL_MS, "traces:discover:");
+const DISCOVER_CACHE = TraceTtlCacheService.create<CachedDiscover>(DISCOVER_TTL_MS);
 
 /**
- * Cross-pod refresh lock — a separate cache because the leadership lease needs a short TTL so a
+ * Refresh lock — a separate cache because the lease needs a short TTL so a
  * crashed refresher self-recovers quickly, while the value cache keeps a long one. Reusing the
  * value cache for locks would mean half an hour of stale data after a refresher crash.
  */
-const DISCOVER_REFRESH_LOCK_CACHE = new TtlCache<number>(60_000, "traces:discover:refresh-lock:");
+const DISCOVER_REFRESH_LOCK_CACHE = TraceTtlCacheService.create<number>(60_000);
 
 /**
  * Optional sink for "discover finished refreshing" pushes, registered once at bootstrap so the
@@ -240,9 +240,10 @@ export class TraceDiscoverService {
       timeRange: { from: snapped.from, to: snapped.to },
     };
     const cacheKey = discoverCacheKey(params.tenantId, snapped);
-    const cached = await DISCOVER_CACHE.get(cacheKey);
+    const lookup = await DISCOVER_CACHE.get(cacheKey);
 
-    if (cached) {
+    if (lookup.kind === "hit") {
+      const cached = lookup.value;
       // Stale-while-revalidate: hand back the cached payload and kick
       // off a background refresh when it's older than the 1-min
       // threshold. The refresh broadcasts `discover_updated` on
@@ -281,10 +282,8 @@ export class TraceDiscoverService {
   }
 
   private refreshDiscoverInBackground(params: DiscoverParams, cacheKey: string): void {
-    // Per-pod dedup: avoid stacking redundant background refreshes on the same key
-    // inside this process. Cross-pod dedup uses `DISCOVER_CACHE.claim()` (a Redis SET
-    // NX EX leadership lease) so only one pod pays the compute cost per refresh window;
-    // if we don't win the claim, another pod is already on it.
+    // Avoid stacking redundant background refreshes on the same key inside this process;
+    // the lock cache holds the claim for one refresh window.
     if (this.discoverRefreshing.has(cacheKey)) {
       return;
     }
@@ -293,10 +292,8 @@ export class TraceDiscoverService {
 
     void (async () => {
       try {
-        // 60s lease (dedicated lock cache) is enough for any single compute (5-8s on
-        // the slowest tenants) and self-clears on pod crash. We claim once per refresh
-        // attempt — if we lose the claim, another pod is already on it and its write
-        // will hydrate the value cache for every reader.
+        // 60s lease is enough for any single compute (5-8s on the slowest tenants); a lost
+        // claim means a refresh is already running and its write hydrates the value cache.
         const claimed = await DISCOVER_REFRESH_LOCK_CACHE.claim(
           cacheKey,
           nowInstant().epochMilliseconds,

@@ -1,239 +1,64 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { TraceTtlCacheService, TtlCache } from "../trace-ttl-cache.service.ts";
+import { TraceTtlCacheService } from "../trace-ttl-cache.service.ts";
 
-const mockRedisStore = new Map<string, { value: string; ttl: number }>();
-const mockRedis = {
-  get: vi.fn(async (key: string) => mockRedisStore.get(key)?.value ?? null),
-  setex: vi.fn(async (key: string, ttl: number, value: string) => {
-    mockRedisStore.set(key, { value, ttl });
-  }),
-  set: vi.fn(async (key: string, value: string, ex: string, ttl: number, nx: string) => {
-    if (nx === "NX" && mockRedisStore.has(key)) return null;
-    mockRedisStore.set(key, { value, ttl });
-    return "OK";
-  }),
-  del: vi.fn(async (key: string) => {
-    mockRedisStore.delete(key);
-  }),
-};
+describe("TraceTtlCacheService", () => {
+  describe("when a key was written", () => {
+    it("answers a hit carrying the value", async () => {
+      const cache = TraceTtlCacheService.create<{ name: string; count: number }>(30_000);
 
-describe("TtlCache", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockRedisStore.clear();
-    TraceTtlCacheService.setTraceCacheRedis(mockRedis);
-  });
+      await cache.set("key1", { name: "a", count: 1 });
 
-  describe("when Redis is available", () => {
-    it("stores and retrieves values from Redis", async () => {
-      const cache = new TtlCache<number>(30_000, "test:");
+      expect(await cache.get("key1")).toEqual({ kind: "hit", value: { name: "a", count: 1 } });
+    });
+
+    it("answers a miss once the entry's lifetime passes", async () => {
+      const cache = TraceTtlCacheService.create<number>(50);
 
       await cache.set("key1", 42);
-      const result = await cache.get("key1");
+      await new Promise((r) => setTimeout(r, 60));
 
-      expect(result).toBe(42);
-      expect(mockRedis.setex).toHaveBeenCalledOnce();
-      expect(mockRedis.get).toHaveBeenCalledOnce();
+      expect(await cache.get("key1")).toEqual({ kind: "miss" });
     });
 
-    it("returns undefined for missing keys", async () => {
-      const cache = new TtlCache<string>(30_000, "test:");
+    it("keeps an entry for the lifetime the caller named", async () => {
+      const cache = TraceTtlCacheService.create<number>(50);
 
-      const result = await cache.get("nonexistent");
+      await cache.set("key1", 42, 30_000);
+      await new Promise((r) => setTimeout(r, 60));
 
-      expect(result).toBeUndefined();
+      expect(await cache.get("key1")).toEqual({ kind: "hit", value: 42 });
     });
 
-    it("deletes from Redis", async () => {
-      const cache = new TtlCache<string>(30_000, "test:");
+    it("answers a miss after the key is deleted", async () => {
+      const cache = TraceTtlCacheService.create<number>(30_000);
 
-      await cache.set("key1", "value");
+      await cache.set("key1", 42);
       await cache.delete("key1");
-      const result = await cache.get("key1");
 
-      expect(result).toBeUndefined();
-      expect(mockRedis.del).toHaveBeenCalledOnce();
+      expect(await cache.get("key1")).toEqual({ kind: "miss" });
     });
+  });
 
-    it("uses the correct TTL in seconds", async () => {
-      const cache = new TtlCache<number>(45_000, "test:"); // 45s
+  describe("when a key was never written", () => {
+    it("answers a miss", async () => {
+      const cache = TraceTtlCacheService.create<string>(30_000);
 
-      await cache.set("key1", 1);
-
-      expect(mockRedis.setex).toHaveBeenCalledWith(expect.any(String), 45, expect.any(String));
-    });
-
-    it("uses custom prefix for Redis keys", async () => {
-      const cache = new TtlCache<number>(30_000, "my_prefix:");
-
-      await cache.set("key1", 1);
-
-      expect(mockRedis.setex).toHaveBeenCalledWith(
-        "my_prefix:key1",
-        expect.any(Number),
-        expect.any(String),
-      );
-    });
-
-    it("serializes complex objects to JSON", async () => {
-      const cache = new TtlCache<{ name: string; count: number }>(30_000, "test:");
-      const obj = { name: "test", count: 42 };
-
-      await cache.set("obj1", obj);
-      const result = await cache.get("obj1");
-
-      expect(result).toEqual(obj);
+      expect(await cache.get("nonexistent")).toEqual({ kind: "miss" });
     });
   });
 
   describe("when claiming a key", () => {
-    it("returns true and stores value when key is absent", async () => {
-      const cache = new TtlCache<boolean>(30_000, "test:");
-
-      const result = await cache.claim("lock1", true);
-
-      expect(result).toBe(true);
-      expect(await cache.get("lock1")).toBe(true);
-    });
-
-    it("returns false when key already exists", async () => {
-      const cache = new TtlCache<boolean>(30_000, "test:");
-
-      await cache.claim("lock1", true);
-      const second = await cache.claim("lock1", true);
-
-      expect(second).toBe(false);
-    });
-
-    it("uses SET NX EX on Redis", async () => {
-      const cache = new TtlCache<boolean>(60_000, "test:");
-
-      await cache.claim("lock1", true);
-
-      expect(mockRedis.set).toHaveBeenCalledWith(
-        "test:lock1",
-        JSON.stringify(true),
-        "EX",
-        60,
-        "NX",
-      );
-    });
-
-    it("carries the lifetime the caller named, not the cache's own", async () => {
-      const cache = new TtlCache<boolean>(60_000, "test:");
-
-      await cache.claim("lock1", true, 30_000);
-
-      expect(mockRedis.set).toHaveBeenCalledWith(
-        "test:lock1",
-        JSON.stringify(true),
-        "EX",
-        30,
-        "NX",
-      );
-    });
-  });
-
-  describe("when Redis fails on claim", () => {
-    /** @scenario "A claim the store cannot answer raises rather than naming a winner" */
-    it("raises rather than naming this caller the winner", async () => {
-      const cache = new TtlCache<boolean>(30_000, "test:");
-      mockRedis.set.mockRejectedValueOnce(new Error("connection reset"));
-
-      // A read and a write fall back to memory here, and the worst that
-      // costs is a stale answer. A claim that fell back the same way would
-      // name one winner per process, which is the one outcome it exists to
-      // prevent, so it refuses instead and the caller decides.
-      await expect(cache.claim("lock1", true)).rejects.toThrow("connection reset");
-
-      // Nothing was recorded, so no later read finds a key this process
-      // alone believes it holds.
-      mockRedis.get.mockRejectedValueOnce(new Error("connection reset"));
-      expect(await cache.get("lock1")).toBeUndefined();
-    });
-  });
-
-  describe("when Redis fails on get", () => {
-    it("falls back to in-memory cache", async () => {
-      const cache = new TtlCache<number>(30_000, "test:");
-
-      // Set succeeds (writes to both Redis and memory)
-      await cache.set("key1", 42);
-
-      // Redis get fails
-      mockRedis.get.mockRejectedValueOnce(new Error("connection reset"));
-
-      // Should fall back to memory
-      const result = await cache.get("key1");
-      expect(result).toBe(42);
-    });
-  });
-
-  describe("when Redis fails on set", () => {
-    it("still caches in memory", async () => {
-      const cache = new TtlCache<number>(30_000, "test:");
-
-      // Redis set fails
-      mockRedis.setex.mockRejectedValueOnce(new Error("connection reset"));
-      await cache.set("key1", 42);
-
-      // Redis get also fails
-      mockRedis.get.mockRejectedValueOnce(new Error("connection reset"));
-
-      // Should still return from memory
-      const result = await cache.get("key1");
-      expect(result).toBe(42);
-    });
-  });
-
-  describe("when Redis is not configured", () => {
-    beforeEach(() => {
-      TraceTtlCacheService.setTraceCacheRedis(null);
-    });
-
-    it("uses in-memory cache only", async () => {
-      const cache = new TtlCache<number>(30_000, "test:");
-
-      await cache.set("key1", 42);
-      const result = await cache.get("key1");
-
-      expect(result).toBe(42);
-      expect(mockRedis.get).not.toHaveBeenCalled();
-      expect(mockRedis.setex).not.toHaveBeenCalled();
-    });
-
-    it("respects TTL for in-memory entries", async () => {
-      const cache = new TtlCache<number>(50, "test:"); // 50ms
-
-      await cache.set("key1", 42);
-      expect(await cache.get("key1")).toBe(42);
-
-      await new Promise((r) => setTimeout(r, 60));
-      expect(await cache.get("key1")).toBeUndefined();
-    });
-
-    it("deletes from memory", async () => {
-      const cache = new TtlCache<number>(30_000, "test:");
-
-      await cache.set("key1", 42);
-      await cache.delete("key1");
-
-      expect(await cache.get("key1")).toBeUndefined();
-    });
-
-    // With no connection the memory map is the whole cache, so a claim
-    // inside the one process is atomic and answers rather than refusing.
-    it("claims in memory, and takes a key only once", async () => {
-      const cache = new TtlCache<boolean>(30_000, "test:");
+    it("takes a key only once", async () => {
+      const cache = TraceTtlCacheService.create<boolean>(30_000);
 
       expect(await cache.claim("lock1", true)).toBe(true);
       expect(await cache.claim("lock1", true)).toBe(false);
-      expect(mockRedis.set).not.toHaveBeenCalled();
+      expect(await cache.get("lock1")).toEqual({ kind: "hit", value: true });
     });
 
     it("frees a claimed key once its lifetime passes", async () => {
-      const cache = new TtlCache<boolean>(30_000, "test:");
+      const cache = TraceTtlCacheService.create<boolean>(30_000);
 
       expect(await cache.claim("lock1", true, 50)).toBe(true);
       await new Promise((r) => setTimeout(r, 60));

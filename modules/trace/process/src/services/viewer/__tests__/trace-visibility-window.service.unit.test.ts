@@ -234,16 +234,18 @@ describe("given the visibility window service", () => {
   };
 
   describe("when the plan has no visibility window", () => {
-    it("returns null so nothing is redacted", async () => {
+    it("answers a null cutoff so nothing is redacted", async () => {
       const service = makeService({ free: false, visibilityDays: null });
-      await expect(service.getVisibilityCutoffMs({ organizationId: "org-1" })).resolves.toBeNull();
+      await expect(service.getVisibilityWindow({ organizationId: "org-1" })).resolves.toEqual({
+        visibilityCutoffMs: null,
+      });
     });
   });
 
   describe("when the plan is free with a 14-day window", () => {
     it("returns a cutoff 14 days in the past", async () => {
       const service = makeService({ free: true, visibilityDays: 14 });
-      const cutoff = await service.getVisibilityCutoffMs({
+      const { visibilityCutoffMs: cutoff } = await service.getVisibilityWindow({
         organizationId: "org-1",
       });
       expect(cutoff).toBeGreaterThan(Date.now() - 14 * DAY_MS - 5000);
@@ -254,7 +256,7 @@ describe("given the visibility window service", () => {
   describe("when plan resolution throws", () => {
     it("propagates the error so the caller can fail closed without caching", async () => {
       const service = makeService(null, true);
-      await expect(service.getVisibilityCutoffMs({ organizationId: "org-1" })).rejects.toThrow(
+      await expect(service.getVisibilityWindow({ organizationId: "org-1" })).rejects.toThrow(
         "db down",
       );
     });

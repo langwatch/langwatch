@@ -27,7 +27,7 @@ class RecordingTelemetry implements StoredObjectOwnerLookupTelemetry {
 }
 
 class TestInstanceDirectory extends StoredObjectOwnerInstanceDirectory {
-  async listInstances() {
+  async findInstances() {
     return resolveInstances();
   }
 }

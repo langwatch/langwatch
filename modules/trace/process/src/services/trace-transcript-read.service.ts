@@ -21,8 +21,8 @@ import {
  * discard them would force the REST caller to name types it doesn't have.
  */
 export type TracesReadMembers = Readonly<{
-  /** The plan's visibility window for one project, or null when unbounded. */
-  getVisibilityCutoffMs(projectId: string): Promise<number | null>;
+  /** The plan's visibility window for one project; a null cutoff is an unbounded window. */
+  getVisibilityWindow(projectId: string): Promise<{ visibilityCutoffMs: number | null }>;
   /** The mapping and redaction ports the shared read mappers take. */
   mappers: TraceReadMapperMembers;
   /** The two ingest-derived content attribute prefixes. */
@@ -53,7 +53,7 @@ async function loadSpansFullWithProtections({
     projectId,
     traceId,
     occurredAtMs,
-    visibilityCutoffMs: await ports.getVisibilityCutoffMs(projectId),
+    visibilityCutoffMs: (await ports.getVisibilityWindow(projectId)).visibilityCutoffMs,
   });
   // Claude Code's real `llm_request` spans carry tokens + `request_id` but NO
   // message content, which lives in the trace's OTLP log records. Join it on
@@ -85,7 +85,7 @@ async function loadTraceLogsWithProtections({
   occurredAtMs?: number;
   protections: Protections;
 }): Promise<TraceLogRecordDto[]> {
-  const visibilityCutoffMs = await ports.getVisibilityCutoffMs(projectId);
+  const { visibilityCutoffMs } = await ports.getVisibilityWindow(projectId);
   const rows = await app.readTraceLogRecords({ projectId, traceId, occurredAtMs });
   return rows.map((row) =>
     gateTraceLogVisibility({

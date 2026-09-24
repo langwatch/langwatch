@@ -159,22 +159,22 @@ export class VisibilityWindowService {
   private constructor(private readonly planProvider: PlanProvider) {}
 
   /**
-   * Returns the epoch-ms cutoff before which content must be teased, or
+   * Answers the epoch-ms cutoff before which content must be teased; the cutoff is
    * `null` when the plan has no visibility window (all paid/licensed plans).
    * Throws when plan resolution fails — callers must fail closed.
    */
-  async getVisibilityCutoffMs({
+  async getVisibilityWindow({
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<number | null> {
+  }): Promise<{ visibilityCutoffMs: number | null }> {
     const plan = await this.planProvider.getActivePlan({ organizationId });
     const visibilityDays = plan?.visibilityDays;
     if (visibilityDays === null || visibilityDays === undefined) {
-      return null;
+      return { visibilityCutoffMs: null };
     }
 
-    return nowInstant().epochMilliseconds - visibilityDays * DAY_MS;
+    return { visibilityCutoffMs: nowInstant().epochMilliseconds - visibilityDays * DAY_MS };
   }
 
   /** True when a trace/span started before the cutoff (content must be teased). */

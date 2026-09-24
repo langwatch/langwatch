@@ -181,9 +181,10 @@ describe("topic clustering langevals requests", () => {
           json: () => Promise.resolve(body),
         });
 
-        await expect(fetchTopicsBatchClustering(deps, "proj-1", batchParams)).resolves.toEqual(
-          body,
-        );
+        await expect(fetchTopicsBatchClustering(deps, "proj-1", batchParams)).resolves.toEqual({
+          kind: "clustered",
+          response: body,
+        });
       });
 
       it("does not leave the deadline abort pending against a finished call", async () => {

@@ -22,7 +22,7 @@ export abstract class MetricDataPointRepository extends MetricDataPointAppendRep
    * delta-converged 30s rollups (sum IS the total regardless of temporality)
    * — the session-keyed read coding agents need, given no trace-correlating exemplars.
    */
-  abstract getSeriesTotalsByPointAttribute(args: {
+  abstract findSeriesTotalsByPointAttribute(args: {
     tenantId: string;
     attributeKey: string;
     attributeValue: string;

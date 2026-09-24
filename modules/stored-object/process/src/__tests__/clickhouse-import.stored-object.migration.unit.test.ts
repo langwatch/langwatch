@@ -9,7 +9,7 @@ import { StoredObjectLegacyWriterDrain } from "../repositories/stored-object-leg
 import { StoredObjectProjectSource } from "../repositories/stored-object-project-source.repository.ts";
 
 class OneProject extends StoredObjectProjectSource {
-  async listForOrganization() {
+  async findForOrganization() {
     return [{ id: "project_1" }];
   }
 }

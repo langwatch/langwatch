@@ -63,6 +63,15 @@ export interface ClusteringStoreSummary {
   subtopicsCount: number;
 }
 
+/** What a clustering call answered: its result, or that no clustering service is configured. */
+export type TopicClusteringFetch =
+  | { kind: "clustered"; response: TopicClusteringResponse }
+  | { kind: "not_configured" };
+
+export type ClusteringRunOutcome =
+  | { kind: "stored"; summary: ClusteringStoreSummary }
+  | { kind: "not_configured" };
+
 /**
  * Seeds one project's pre-ownership Topic rows onto its stream unless the
  * projection already owns the model. Structural (implemented by the
@@ -252,13 +261,13 @@ export const clusterTopicsForProject = async (
     };
   }
 
-  const summary = isIncrementalProcessing
+  const outcome = isIncrementalProcessing
     ? await incrementalClustering({ deps, projectId, traces, runContext })
     : await batchClusterTraces({ deps, projectId, traces, runContext });
 
   logger.info({ projectId }, "done! project");
 
-  if (!summary) {
+  if (outcome.kind === "not_configured") {
     // No topic model configured for this project/deployment — paging
     // further would keep hitting the same wall, so stop the walk here.
     return {
@@ -273,8 +282,8 @@ export const clusterTopicsForProject = async (
   return {
     mode,
     tracesProcessed: traces.length,
-    topicsCount: summary.topicsCount,
-    subtopicsCount: summary.subtopicsCount,
+    topicsCount: outcome.summary.topicsCount,
+    subtopicsCount: outcome.summary.subtopicsCount,
     ...(nextSearchAfter ? { nextSearchAfter } : {}),
   };
 };
@@ -572,15 +581,15 @@ export const batchClusterTraces = async ({
   projectId: string;
   traces: TopicClusteringTrace[];
   runContext?: ClusteringRunContext;
-}): Promise<ClusteringStoreSummary | null> => {
+}): Promise<ClusteringRunOutcome> => {
   logger.info({ tracesLength: traces.length, projectId }, "batch clustering topics");
 
   const topicModel = await getProjectTopicClusteringModelProvider(deps, projectId);
   if (!topicModel) {
-    return null;
+    return { kind: "not_configured" };
   }
   const embeddingsModel = await deps.models.resolveEmbeddingsModel(projectId);
-  const clusteringResult = await fetchTopicsBatchClustering(deps, projectId, {
+  const fetched = await fetchTopicsBatchClustering(deps, projectId, {
     project_id: projectId,
     litellm_params: await deps.models.prepareLitellmParams({
       model: topicModel.model,
@@ -598,7 +607,20 @@ export const batchClusterTraces = async ({
     traces,
   });
 
-  return storeResults({ deps, projectId, clusteringResult, isIncremental: false, runContext });
+  if (fetched.kind === "not_configured") {
+    return fetched;
+  }
+
+  return {
+    kind: "stored",
+    summary: await storeResults({
+      deps,
+      projectId,
+      clusteringResult: fetched.response,
+      isIncremental: false,
+      runContext,
+    }),
+  };
 };
 
 export const incrementalClustering = async ({
@@ -611,7 +633,7 @@ export const incrementalClustering = async ({
   projectId: string;
   traces: TopicClusteringTrace[];
   runContext?: ClusteringRunContext;
-}): Promise<ClusteringStoreSummary | null> => {
+}): Promise<ClusteringRunOutcome> => {
   logger.info({ tracesLength: traces.length, projectId }, "incremental topic clustering");
 
   const topics: TopicClusteringTopic[] = (await deps.repository.findModelTopics(projectId)).map(
@@ -635,10 +657,10 @@ export const incrementalClustering = async ({
 
   const topicModel = await getProjectTopicClusteringModelProvider(deps, projectId);
   if (!topicModel) {
-    return null;
+    return { kind: "not_configured" };
   }
   const embeddingsModel = await deps.models.resolveEmbeddingsModel(projectId);
-  const clusteringResult = await fetchTopicsIncrementalClustering(deps, projectId, {
+  const fetched = await fetchTopicsIncrementalClustering(deps, projectId, {
     project_id: projectId,
     litellm_params: await deps.models.prepareLitellmParams({
       model: topicModel.model,
@@ -658,7 +680,20 @@ export const incrementalClustering = async ({
     subtopics,
   });
 
-  return storeResults({ deps, projectId, clusteringResult, isIncremental: true, runContext });
+  if (fetched.kind === "not_configured") {
+    return fetched;
+  }
+
+  return {
+    kind: "stored",
+    summary: await storeResults({
+      deps,
+      projectId,
+      clusteringResult: fetched.response,
+      isIncremental: true,
+      runContext,
+    }),
+  };
 };
 
 const recordClusteredTopics = async ({
@@ -722,19 +757,10 @@ export const storeResults = async ({
 }: {
   deps: TopicClusteringRunnerDeps;
   projectId: string;
-  clusteringResult: TopicClusteringResponse | undefined;
+  clusteringResult: TopicClusteringResponse;
   isIncremental: boolean;
   runContext?: ClusteringRunContext;
-}): Promise<ClusteringStoreSummary | null> => {
-  // No result is a skip, not an empty run: return null (not deleting the model if endpoint unset).
-  if (!clusteringResult) {
-    logger.warn(
-      { projectId, isIncremental },
-      "clustering returned no result; storing nothing and leaving the existing topic model untouched",
-    );
-    return null;
-  }
-
+}): Promise<ClusteringStoreSummary> => {
   const { topics, subtopics, traces: tracesToAssign, cost } = clusteringResult;
 
   logger.info(
@@ -807,11 +833,11 @@ export const fetchTopicsBatchClustering = async (
   deps: TopicClusteringRunnerDeps,
   projectId: string,
   params: BatchClusteringParams,
-): Promise<TopicClusteringResponse | undefined> => {
+): Promise<TopicClusteringFetch> => {
   const baseUrl = deps.langevalsEndpoint;
   if (!baseUrl) {
     logger.warn({ projectId }, "Topic clustering service URL not set, skipping topic clustering");
-    return;
+    return { kind: "not_configured" };
   }
 
   const size = JSON.stringify(params).length;
@@ -822,23 +848,26 @@ export const fetchTopicsBatchClustering = async (
     "uploading traces data for project",
   );
 
-  return postToTopicClustering(deps, {
-    projectId,
-    url: `${baseUrl}/topics/batch_clustering`,
-    body: params,
-    kind: "topic_clustering_batch",
-  });
+  return {
+    kind: "clustered",
+    response: await postToTopicClustering(deps, {
+      projectId,
+      url: `${baseUrl}/topics/batch_clustering`,
+      body: params,
+      kind: "topic_clustering_batch",
+    }),
+  };
 };
 
 export const fetchTopicsIncrementalClustering = async (
   deps: TopicClusteringRunnerDeps,
   projectId: string,
   params: IncrementalClusteringParams,
-): Promise<TopicClusteringResponse | undefined> => {
+): Promise<TopicClusteringFetch> => {
   const baseUrl = deps.langevalsEndpoint;
   if (!baseUrl) {
     logger.warn({ projectId }, "Topic clustering service URL not set, skipping topic clustering");
-    return;
+    return { kind: "not_configured" };
   }
 
   const size = JSON.stringify(params).length;
@@ -849,12 +878,15 @@ export const fetchTopicsIncrementalClustering = async (
     "uploading traces data for project",
   );
 
-  return postToTopicClustering(deps, {
-    projectId,
-    url: `${baseUrl}/topics/incremental_clustering`,
-    body: params,
-    kind: "topic_clustering_incremental",
-  });
+  return {
+    kind: "clustered",
+    response: await postToTopicClustering(deps, {
+      projectId,
+      url: `${baseUrl}/topics/incremental_clustering`,
+      body: params,
+      kind: "topic_clustering_incremental",
+    }),
+  };
 };
 
 /**

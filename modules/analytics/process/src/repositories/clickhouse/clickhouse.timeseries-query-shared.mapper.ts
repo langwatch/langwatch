@@ -92,35 +92,6 @@ export function isPercentile(agg: "median" | "p90" | "p95" | "p99" | (string & {
   return agg === "median" || agg === "p90" || agg === "p95" || agg === "p99";
 }
 
-/**
- * Timeseries safety-net: when the bucket count from (endDate - startDate) /
- * timeScale would exceed `MAX_TIMESERIES_BUCKETS`, or `timeScale` is
- * undefined, coerce to a daily bucket so the response stays bounded.
- */
-export const MAX_TIMESERIES_BUCKETS = 1000;
-const MS_PER_MINUTE = 1000 * 60;
-
-export function adjustTimeScaleForBucketCap(params: {
-  timeScale: number | "full" | undefined;
-  startDate: Date;
-  endDate: Date;
-}): number | "full" | undefined {
-  const { timeScale, startDate, endDate } = params;
-  if (typeof timeScale === "number") {
-    const totalMinutes = (endDate.getTime() - startDate.getTime()) / MS_PER_MINUTE;
-    const estimatedBuckets = totalMinutes / timeScale;
-    if (estimatedBuckets > MAX_TIMESERIES_BUCKETS) {
-      return MINUTES_PER_DAY;
-    }
-    return timeScale;
-  }
-  if (timeScale === undefined) {
-    // Match the legacy default (daily granularity ⇔ ES 1d interval).
-    return MINUTES_PER_DAY;
-  }
-  return timeScale;
-}
-
 export function percentileFor(agg: string): number {
   switch (agg) {
     case "median":

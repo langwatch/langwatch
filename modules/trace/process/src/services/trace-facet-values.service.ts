@@ -23,7 +23,7 @@ import {
 } from "../rules/trace-list-cache-key.rules.ts";
 import { TraceAttributeRedactionService } from "./trace-attribute-redaction.service.ts";
 import type { TraceTopicNamingService } from "./trace-topic-naming.service.ts";
-import { TtlCache } from "./trace-ttl-cache.service.ts";
+import { TraceTtlCacheService } from "./trace-ttl-cache.service.ts";
 
 const facetValuesLogger = createLogger("langwatch:app-layer:traces:trace-list-facet-values");
 
@@ -85,10 +85,7 @@ interface CachedFacetValues {
   timestamp: number;
 }
 
-const FACET_VALUES_CACHE = new TtlCache<CachedFacetValues>(
-  FACET_VALUES_TTL_MS,
-  "traces:facetValues:",
-);
+const FACET_VALUES_CACHE = TraceTtlCacheService.create<CachedFacetValues>(FACET_VALUES_TTL_MS);
 
 export class TraceFacetValuesService {
   private constructor(
@@ -177,9 +174,10 @@ export class TraceFacetValuesService {
 
   async getFacetValues(params: FacetValuesParams): Promise<FacetValuesResult> {
     const cacheKey = facetValuesCacheKey(params);
-    const cached = await FACET_VALUES_CACHE.get(cacheKey);
+    const lookup = await FACET_VALUES_CACHE.get(cacheKey);
 
-    if (cached) {
+    if (lookup.kind === "hit") {
+      const cached = lookup.value;
       // Always serve the cached value immediately. If it's older than the
       // refresh threshold, fire-and-forget a recomputation so the next read
       // sees fresher data.

@@ -91,7 +91,7 @@ describe("ClickHouseMetricProcessingAdapter", () => {
       // what a `resolveOrganizationClient` reintroduced here would satisfy
       // again without anything failing.
       expect("queryUsageEstimates" in appendOnly).toBe(false);
-      expect("getSeriesTotalsByPointAttribute" in appendOnly).toBe(false);
+      expect("findSeriesTotalsByPointAttribute" in appendOnly).toBe(false);
     });
   });
 

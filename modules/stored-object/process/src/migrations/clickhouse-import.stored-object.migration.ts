@@ -68,7 +68,7 @@ export class ClickHouseImportStoredObjectMigration implements SystemMigration {
     signal?: AbortSignal;
   }): Promise<TenantMigrationOutcome> {
     const initialDrain = await this.options.drain.get({ organizationId: input.tenantId });
-    const projects = await this.options.projects.listForOrganization({
+    const projects = await this.options.projects.findForOrganization({
       organizationId: input.tenantId,
     });
     let scanned = 0;

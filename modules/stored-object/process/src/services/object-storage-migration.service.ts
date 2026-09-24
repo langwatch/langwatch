@@ -323,7 +323,7 @@ export class ObjectStorageMigrationService {
     const eligibleProjectIds = new Set<string>();
     const excludedProjects: string[] = [];
     for await (const project of paginate((request) =>
-      this.deps.inventory.listProjectsPage(request),
+      this.deps.inventory.findProjectsPage(request),
     )) {
       if (project.privateS3) {
         excludedProjects.push(project.id);
@@ -393,7 +393,7 @@ export class ObjectStorageMigrationService {
   ): AsyncGenerator<StoredObject> {
     for (const projectId of [...scope.eligibleProjectIds].toSorted()) {
       for await (const row of paginate((request) =>
-        this.deps.inventory.listStoredObjectsPage(projectId, request),
+        this.deps.inventory.findStoredObjectsPage(projectId, request),
       )) {
         const scheme = row.storage_uri.slice(0, row.storage_uri.indexOf(":"));
         const isMigrationScheme =
@@ -412,7 +412,7 @@ export class ObjectStorageMigrationService {
     // BYOC projects are excluded by never being asked for, and every page
     // query is tenant-scoped as the data layer requires.
     for (const projectId of [...scope.eligibleProjectIds].toSorted()) {
-      yield* paginate((request) => this.deps.inventory.listDatasetsPage(projectId, request));
+      yield* paginate((request) => this.deps.inventory.findDatasetsPage(projectId, request));
     }
   }
 

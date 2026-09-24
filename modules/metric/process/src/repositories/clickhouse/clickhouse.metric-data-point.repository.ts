@@ -99,7 +99,7 @@ export class MetricDataPointClickHouseRepository extends MetricDataPointReposito
     return MetricDataPointClickHouseRepository.queryMetricUsageEstimates({ client, query });
   }
 
-  async getSeriesTotalsByPointAttribute({
+  async findSeriesTotalsByPointAttribute({
     tenantId,
     attributeKey,
     attributeValue,
@@ -112,7 +112,7 @@ export class MetricDataPointClickHouseRepository extends MetricDataPointReposito
   }): Promise<SeriesTotalByPointAttribute[]> {
     if (!tenantId) {
       throw new SecurityError(
-        "MetricDataPointClickHouseRepository.getSeriesTotalsByPointAttribute",
+        "MetricDataPointClickHouseRepository.findSeriesTotalsByPointAttribute",
         "tenantId is required",
       );
     }
