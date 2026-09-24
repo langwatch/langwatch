@@ -2,6 +2,7 @@ import {
   type AppendStore,
   AbstractMapProjection,
   type MapEventHandlers,
+  type MapProjectionOptions,
 } from "@langwatch/eventing";
 import { type LangyMessageProjectionRecord, mapLangyMessageEvent } from "@langwatch/langy-contract";
 
@@ -32,9 +33,10 @@ export class LangyMessageOperationalMapProjection
   readonly store: AppendStore<LangyMessageProjectionRecord>;
   protected readonly events = messageEvents;
 
-  override options = {
-    groupKeyFn: (event: { data: { conversationId: string; messageId: string } }): string =>
-      `langy:${event.data.conversationId}:message:${event.data.messageId}`,
+  override options: MapProjectionOptions<
+    LangyMessageRecordedEvent | LangyAgentRespondedEvent | LangyMessageImportedEvent
+  > = {
+    groupKeyFn: (event) => `langy:${event.data.conversationId}:message:${event.data.messageId}`,
   };
 
   static create(deps: {

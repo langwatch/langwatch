@@ -67,7 +67,7 @@ export interface MapProjectionOptions<E extends Event = Event> {
   disabled?: boolean;
 
   /** Custom group key function for routing; enables per-item parallelism. */
-  groupKeyFn?: (event: any) => string;
+  groupKeyFn?: (event: E) => string;
 
   /**
    * Enqueue-time gate: an event this projection would map to `null` never

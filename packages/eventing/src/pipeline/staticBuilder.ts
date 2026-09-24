@@ -1,10 +1,9 @@
-import type { Command, CommandHandler } from "../commands/command.ts";
+import type { CommandHandler } from "../commands/command.ts";
 import type {
   CommandHandlerClass,
   CommandHandlerClassStatic,
   ExtractCommandHandlerPayload,
 } from "../commands/commandHandlerClass.ts";
-import type { CommandType } from "../domain/commandType.ts";
 import type { AggregateDefinition } from "../domain/definitions.ts";
 import type { Event, Projection } from "../domain/types.ts";
 import type {
@@ -134,8 +133,8 @@ export class PipelineBuilder<
   }
 
   /** Register a ClickHouse replacing/map projection. */
-  withClickHouseMapProjection<MapName extends string, MapRecord>(
-    definition: MapProjectionDefinition<MapRecord, EventType> & {
+  withClickHouseMapProjection<MapName extends string, MapRecord, Own extends Event>(
+    definition: MapProjectionDefinition<MapRecord, Own> & {
       readonly name: MapName;
     },
     options?: MapProjectionOptions,
@@ -196,9 +195,9 @@ export class PipelineBuilder<
    * @param options - Optional configuration for projection processing
    * @returns Builder instance for method chaining
    */
-  private registerMapProjection<MapName extends string, MapRecord>(
+  private registerMapProjection<MapName extends string, MapRecord, Own extends Event>(
     name: MapName,
-    definition: MapProjectionDefinition<MapRecord, EventType>,
+    definition: MapProjectionDefinition<MapRecord, Own>,
     options?: MapProjectionOptions,
   ): PipelineBuilder<
     EventType,
@@ -216,7 +215,10 @@ export class PipelineBuilder<
       );
     }
 
-    this.mapProjections.set(name, { ...sealMapProjection(definition), options });
+    this.mapProjections.set(name, {
+      ...sealMapProjection<MapRecord, Own, EventType>(definition),
+      options,
+    });
 
     return this;
   }
@@ -339,7 +341,7 @@ export class PipelineBuilder<
     );
   }
 
-  /** Register a subscriber that receives committed projection state, typed through its fold's name. */
+  /** Register a subscriber receiving committed projection state, typed through its fold's name. */
   withProjectionSubscriber<Name extends FoldNames & keyof RegisteredFoldStates & string>(
     subscriberName: string,
     spec: SubscriberSpec<EventType, RegisteredFoldStates[Name]> & { fold: Name; map?: never },
@@ -350,6 +352,7 @@ export class PipelineBuilder<
   ): this;
   withProjectionSubscriber(
     subscriberName: string,
+    // oxlint-disable-next-line typescript/no-explicit-any -- state crosses the fold-name lookup
     spec: SubscriberSpec<EventType, any> &
       ({ fold: FoldNames & string; map?: never } | { map: MapNames & string; fold?: never }),
   ): this {

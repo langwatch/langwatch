@@ -33,7 +33,7 @@ export class MetricDataPointStorageMapProjection
     super();
     this.store = deps.store;
     this.options = {
-      groupKeyFn: (event: MetricDataPointReceivedEvent) =>
+      groupKeyFn: (event) =>
         metricMapGroupKey({
           identity: event.data.pointId,
           shardCount: deps.shardCount,

@@ -33,7 +33,7 @@ export class MetricSeriesCatalogMapProjection
     super();
     this.store = deps.store;
     this.options = {
-      groupKeyFn: (event: MetricDataPointReceivedEvent) =>
+      groupKeyFn: (event) =>
         metricMapGroupKey({
           identity: event.data.seriesId,
           shardCount: deps.shardCount,

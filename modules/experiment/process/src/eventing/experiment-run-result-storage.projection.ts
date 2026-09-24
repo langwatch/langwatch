@@ -2,6 +2,7 @@ import {
   type AppendStore,
   AbstractMapProjection,
   type MapEventHandlers,
+  type MapProjectionOptions,
 } from "@langwatch/eventing";
 import { Temporal, toDate } from "@langwatch/time";
 
@@ -80,8 +81,8 @@ export class ExperimentRunResultStorageMapProjection
   readonly store: AppendStore<ClickHouseExperimentRunResultRecord>;
   protected readonly events = resultEvents;
 
-  override options = {
-    groupKeyFn: (event: { data: { experimentId: string; runId: string; index: number } }): string =>
+  override options: MapProjectionOptions<TargetResultEvent | EvaluatorResultEvent> = {
+    groupKeyFn: (event) =>
       `experiment:${event.data.experimentId}:result:${event.data.runId}:item:${event.data.index}`,
   };
 

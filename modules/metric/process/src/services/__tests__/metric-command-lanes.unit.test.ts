@@ -51,16 +51,20 @@ describe("metric command lanes", () => {
         }),
       });
 
-      const storage =
-        pipeline.mapProjections.get("metricDataPointStorage")?.definition.options?.groupKeyFn;
-      const catalog =
-        pipeline.mapProjections.get("metricSeriesCatalog")?.definition.options?.groupKeyFn;
-      const rollup =
-        pipeline.mapProjections.get("metricTimeRollup")?.definition.options?.groupKeyFn;
+      const keyOf = (name: string) =>
+        pipeline.mapProjections
+          .get(name)
+          ?.open((definition, consumes) =>
+            consumes(event) ? definition.options?.groupKeyFn?.(event) : undefined,
+          );
 
-      expect(storage?.(event)).toBe(metricMapGroupKey({ identity: "a".repeat(64), shardCount: 8 }));
-      expect(catalog?.(event)).toBe(metricMapGroupKey({ identity: "b".repeat(64), shardCount: 8 }));
-      expect(rollup?.(event)).toBe(catalog?.(event));
+      expect(keyOf("metricDataPointStorage")).toBe(
+        metricMapGroupKey({ identity: "a".repeat(64), shardCount: 8 }),
+      );
+      expect(keyOf("metricSeriesCatalog")).toBe(
+        metricMapGroupKey({ identity: "b".repeat(64), shardCount: 8 }),
+      );
+      expect(keyOf("metricTimeRollup")).toBe(keyOf("metricSeriesCatalog"));
     });
   });
 

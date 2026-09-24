@@ -49,8 +49,8 @@ export class ProjectionRegistry<EventType extends Event = Event> {
     this.foldProjections.set(projection.name, sealFoldProjection(projection));
   }
 
-  registerMapProjection<MapRecord>(
-    projection: MapProjectionDefinition<MapRecord, EventType>,
+  registerMapProjection<MapRecord, Own extends Event>(
+    projection: MapProjectionDefinition<MapRecord, Own>,
   ): void {
     if (this.mapProjections.has(projection.name)) {
       throw new ConfigurationError(
@@ -59,7 +59,10 @@ export class ProjectionRegistry<EventType extends Event = Event> {
         { projectionName: projection.name },
       );
     }
-    this.mapProjections.set(projection.name, sealMapProjection(projection));
+    this.mapProjections.set(
+      projection.name,
+      sealMapProjection<MapRecord, Own, EventType>(projection),
+    );
   }
 
   registerSubscriber(foldName: string, subscriber: SubscriberDispatchDefinition<EventType>): void {

@@ -1,5 +1,6 @@
 import type { z } from "zod";
 
+import type { Event } from "../domain/types.ts";
 import type { AnyEventSchema } from "./abstractFoldProjection.ts";
 import {
   type DotSnakeToPascal,
@@ -38,6 +39,12 @@ export type MapEventHandlers<
   }[number]
 >;
 
+/** The events a map projection declares it consumes, inferred from its schemas. */
+export type MapEventOf<Schemas extends readonly AnyEventSchema[]> = Extract<
+  z.infer<Schemas[number]>,
+  Event
+>;
+
 // ---------------------------------------------------------------------------
 // Abstract base class
 // ---------------------------------------------------------------------------
@@ -49,8 +56,8 @@ export abstract class AbstractMapProjection<Record, Schemas extends readonly Any
   abstract readonly store: AppendStore<Record>;
   protected abstract readonly events: Schemas;
 
-  /** Optional processing behavior configuration. */
-  options?: MapProjectionOptions;
+  /** Optional processing behavior configuration, typed over this projection's own events. */
+  options?: MapProjectionOptions<MapEventOf<Schemas>>;
 
   /** Lazily-built dispatch map: event type string → handler method name. */
   private _dispatchMap?: globalThis.Record<string, string>;

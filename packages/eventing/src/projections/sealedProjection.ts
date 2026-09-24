@@ -1,6 +1,6 @@
 import type { Event } from "../domain/types.ts";
 import type { FoldProjectionDefinition } from "./foldProjection.types.ts";
-import type { MapProjectionDefinition } from "./mapProjection.types.ts";
+import type { MapProjectionDefinition, MapProjectionOptions } from "./mapProjection.types.ts";
 import type { StateProjectionDefinition } from "./stateProjection.types.ts";
 
 /** Opens a fold whose state type was sealed in a closure at registration (ARCHITECTURE §9). */
@@ -8,9 +8,12 @@ export type OpenFoldProjection<E extends Event = Event> = <R>(
   use: <State>(fold: FoldProjectionDefinition<State, E>) => R,
 ) => R;
 
-/** Opens a map projection whose record type was sealed in a closure at registration. */
+/** Opens a map projection typed over its own events, with the guard admitting a pipeline event. */
 export type OpenMapProjection<E extends Event = Event> = <R>(
-  use: <MapRecord>(map: MapProjectionDefinition<MapRecord, E>) => R,
+  use: <MapRecord, Own extends Event>(
+    map: MapProjectionDefinition<MapRecord, Own>,
+    consumes: (event: E) => event is E & Own,
+  ) => R,
 ) => R;
 
 /** Opens a state projection whose state type was sealed in a closure at registration. */
@@ -23,10 +26,12 @@ export type FoldProjectionView<E extends Event = Event> = Omit<
   FoldProjectionDefinition<unknown, E>,
   "apply" | "store"
 >;
-export type MapProjectionView<E extends Event = Event> = Omit<
-  MapProjectionDefinition<unknown, E>,
-  "store"
->;
+export type MapProjectionView = Omit<
+  MapProjectionDefinition<unknown>,
+  "store" | "map" | "options"
+> & {
+  readonly options?: Omit<MapProjectionOptions, "groupKeyFn" | "enqueue">;
+};
 export type StateProjectionView<E extends Event = Event> = Omit<
   StateProjectionDefinition<unknown, E>,
   "apply" | "store"
@@ -39,7 +44,7 @@ export interface SealedFoldProjection<E extends Event = Event> {
 
 /** A registered map projection: its record-free view, and the closure that opens it typed. */
 export interface SealedMapProjection<E extends Event = Event> {
-  readonly definition: MapProjectionView<E>;
+  readonly definition: MapProjectionView;
   readonly open: OpenMapProjection<E>;
 }
 
@@ -55,10 +60,12 @@ export function sealFoldProjection<State, E extends Event>(
   return { definition: fold, open: (use) => use(fold) };
 }
 
-export function sealMapProjection<MapRecord, E extends Event>(
-  map: MapProjectionDefinition<MapRecord, E>,
+export function sealMapProjection<MapRecord, Own extends Event, E extends Event>(
+  map: MapProjectionDefinition<MapRecord, Own>,
 ): SealedMapProjection<E> {
-  return { definition: map, open: (use) => use(map) };
+  const consumes = (event: E): event is E & Own =>
+    map.eventTypes.length === 0 || map.eventTypes.includes(event.type);
+  return { definition: map, open: (use) => use(map, consumes) };
 }
 
 export function sealStateProjection<State, E extends Event>(

@@ -180,7 +180,8 @@ interface QueuedEventConsumerDefinition<E extends Event> {
     concurrency?: number;
     spanAttributes?: (event: E) => Record<string, string | number | boolean>;
     disabled?: boolean;
-    groupKeyFn?: (event: E) => string;
+    /** Answers undefined for an event it does not key, which then takes the aggregate's key. */
+    groupKeyFn?: (event: E) => string | undefined;
     coalesceMaxBatch?: number;
   };
 }
@@ -465,12 +466,14 @@ export class QueueManager<EventType extends Event = Event> {
 
       const customGroupKeyFn = handlerDef.options.groupKeyFn;
       const getTenantId = (event: EventType) => String(event.tenantId);
+      const aggregateKey = (event: EventType) =>
+        `${event.aggregateType}:${String(event.aggregateId)}`;
       const groupKeyFn = this.buildGroupKey({
         jobPath: `${jobPath}/${handlerName}`,
         getTenantId,
         domainKeyFn: customGroupKeyFn
-          ? (event: EventType) => customGroupKeyFn(event)
-          : (event: EventType) => `${event.aggregateType}:${String(event.aggregateId)}`,
+          ? (event: EventType) => customGroupKeyFn(event) ?? aggregateKey(event)
+          : aggregateKey,
       });
       const entry: JobRegistryEntry = {
         groupKeyFn,

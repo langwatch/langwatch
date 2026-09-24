@@ -1,11 +1,13 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { defineAggregate, defineEvents } from "../../domain/definitions.ts";
+import { createTenantId } from "../../domain/tenantId.ts";
 import type { Event } from "../../domain/types.ts";
 import type { SubscriberSpec, TriggerContext } from "../../pipeline/processManagerDefinition.ts";
 import { definePipeline } from "../../pipeline/staticBuilder.ts";
 import type { FoldProjectionDefinition } from "../foldProjection.types.ts";
-import { sealFoldProjection } from "../sealedProjection.ts";
+import type { MapProjectionDefinition } from "../mapProjection.types.ts";
+import { sealFoldProjection, sealMapProjection } from "../sealedProjection.ts";
 
 type Started = Event<{ at: number }> & { type: "run.started" };
 type Finished = Event<{ ok: boolean }> & { type: "run.finished" };
@@ -31,6 +33,26 @@ const outcome: FoldProjectionDefinition<{ ok: boolean }, RunEvent> & { name: "ou
   apply: (state) => state,
   store: { store: async () => {}, get: async () => ({ kind: "empty" }) },
 };
+
+const finishedOnly: MapProjectionDefinition<{ ok: boolean }, Finished> & { name: "finishedOnly" } =
+  {
+    name: "finishedOnly",
+    eventTypes: ["run.finished"],
+    map: (event) => ({ ok: event.data.ok }),
+    store: { append: async () => {} },
+    options: { groupKeyFn: (event) => `finished:${String(event.data.ok)}` },
+  };
+
+const envelope = {
+  aggregateId: "run_1",
+  aggregateType: "trace",
+  tenantId: createTenantId("tenant_1"),
+  createdAt: 1,
+  occurredAt: 1,
+  version: "1",
+} as const;
+const started: RunEvent = { ...envelope, id: "e1", type: "run.started", data: { at: 1 } };
+const finished: RunEvent = { ...envelope, id: "e2", type: "run.finished", data: { ok: true } };
 
 function runPipeline() {
   return definePipeline<RunEvent>({
@@ -80,8 +102,10 @@ describe("sealed projections (ARCHITECTURE §9)", () => {
 
   it("rejects a subscriber declaring another fold's state", () => {
     const onOutcome = async (_event: RunEvent, _context: TriggerContext<{ ok: boolean }>) => {};
-    // @ts-expect-error the counter fold's state is { count: number }, not the outcome fold's
-    runPipeline().withProjectionSubscriber("onCount", { fold: "counter", handler: onOutcome });
+    const register = () =>
+      // @ts-expect-error the counter fold's state is { count: number }, not the outcome fold's
+      runPipeline().withProjectionSubscriber("onCount", { fold: "counter", handler: onOutcome });
+    expect(register).not.toThrow();
   });
 
   it("rejects a subscriber naming a fold the pipeline never registered", () => {
@@ -90,5 +114,35 @@ describe("sealed projections (ARCHITECTURE §9)", () => {
       // @ts-expect-error "missing" is not a fold on this pipeline
       runPipeline().withProjectionSubscriber("onMissing", { fold: "missing", handler: ignore }),
     ).toThrow(/projection not found/);
+  });
+
+  it("types a map projection's key and map functions with the events it declares", () => {
+    const pipeline = runPipeline().withClickHouseMapProjection(finishedOnly);
+    expectTypeOf(finishedOnly.map).parameter(0).toEqualTypeOf<Finished>();
+    expect(pipeline.build().mapProjections.has("finishedOnly")).toBe(true);
+  });
+
+  it("admits to a map projection only the pipeline events it declares", () => {
+    const sealed = sealMapProjection<{ ok: boolean }, Finished, RunEvent>(finishedOnly);
+    const mapOf = (event: RunEvent) =>
+      sealed.open((map, consumes) => (consumes(event) ? map.map(event) : null));
+    const keyOf = (event: RunEvent) =>
+      sealed.open((map, consumes) =>
+        consumes(event) ? map.options?.groupKeyFn?.(event) : undefined,
+      );
+    expect(mapOf(started)).toBeNull();
+    expect(mapOf(finished)).toEqual({ ok: true });
+    expect(keyOf(started)).toBeUndefined();
+    expect(keyOf(finished)).toBe("finished:true");
+  });
+
+  it("rejects mapping a pipeline event the map projection has not admitted", () => {
+    const sealed = sealMapProjection<{ ok: boolean }, Finished, RunEvent>(finishedOnly);
+    const unguarded = (event: RunEvent) =>
+      sealed.open((map) =>
+        // @ts-expect-error a pipeline event reaches map() only through consumes()
+        map.map(event),
+      );
+    expect(unguarded).toBeTypeOf("function");
   });
 });

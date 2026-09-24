@@ -223,8 +223,9 @@ describe("langy-conversation-processing pipeline shape", () => {
         };
 
         // The framework's per-event step: pure map -> append. No prior read.
-        const record = await projection.open(async (definition) => {
-          const mapped = definition.map(event as LangyConversationProcessingEvent);
+        const record = await projection.open(async (definition, consumes) => {
+          const pipelineEvent = event as LangyConversationProcessingEvent;
+          const mapped = consumes(pipelineEvent) ? definition.map(pipelineEvent) : null;
           expect(mapped).not.toBeNull();
           await definition.store.append(mapped!, context);
           return mapped;
