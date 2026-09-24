@@ -91,7 +91,9 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { ScimApi } from "@langwatch/enterprise-scim-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { EventingCommandSender } from "@langwatch/eventing";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import {
   OrganizationApi,
   type OrganizationService,
@@ -101,8 +103,17 @@ import { reads } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 
 import { governanceListingChannels } from "../channels/governance-listing-channels.registry.ts";
+import { ClaudeComplianceReferencePullerAdapter } from "../channels/http/http.claude-compliance.channel.ts";
+import { HttpCopilotStudioDataverseChannel } from "../channels/http/http.copilot-studio-dataverse.channel.ts";
+import { HttpCopilotStudioChannel } from "../channels/http/http.copilot-studio.channel.ts";
+import { HttpPollingPullerAdapter } from "../channels/http/http.polling.channel.ts";
+import { IngestionPullProcess } from "../eventing/ingestion-pull.process.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
+import { nextIngestionPullRunAt } from "../rules/ingestion-pull-schedule.rules.ts";
+import { ratePulledUsage } from "../rules/pulled-usage-rate.rules.ts";
 import { AgentDiscoveryService } from "../services/agent-discovery.service.ts";
+import { AnthropicAdminPullerAdapter } from "../services/anthropic-admin-puller.service.ts";
+import { DatabricksGeniePullerService } from "../services/databricks-genie-puller.service.ts";
 import { DepartmentService } from "../services/department.service.ts";
 import { ErasureSuppressionService } from "../services/erasure-suppression.service.ts";
 import {
@@ -135,7 +146,18 @@ import { GovernanceIngestService } from "../services/governance-ingest.service.t
 import { IdentityMatchSuggestionService } from "../services/identity-match-suggestion.service.ts";
 import { IdentityMatchService } from "../services/identity-match.service.ts";
 import { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
+import {
+  IngestionPullEventingAdapter,
+  type IngestionPullDefinition,
+} from "../services/ingestion-pull-eventing.service.ts";
+import { IngestionPullListingService } from "../services/ingestion-pull-listing.service.ts";
+import { IngestionPullLogService } from "../services/ingestion-pull-log.service.ts";
+import { IngestionPullMetricsService } from "../services/ingestion-pull-metrics.service.ts";
+import { IngestionPullWorkerService } from "../services/ingestion-pull-worker.service.ts";
+import { IngestionPullService } from "../services/ingestion-pull.service.ts";
 import { IngestionTemplateService } from "../services/ingestion-template.service.ts";
+import { OpenAiAdminPullerAdapter } from "../services/openai-admin-puller.service.ts";
+import { OpenAiComplianceReferencePullerService } from "../services/openai-compliance-puller.service.ts";
 import type { OrganizationSupportContactService } from "../services/organization-support-contact.service.ts";
 import { PersonDiscoveryService } from "../services/person-discovery.service.ts";
 import { PersonListingService } from "../services/person-listing.service.ts";
@@ -143,6 +165,10 @@ import {
   PersonalUsageDashboardService,
   type PersonalUsageRollup,
 } from "../services/personal-usage-dashboard.service.ts";
+import { PulledUsagePricingService } from "../services/pulled-usage-pricing.service.ts";
+import { PulledUsageRecordService } from "../services/pulled-usage-record.service.ts";
+import { PullerRegistryService } from "../services/puller-registry.service.ts";
+import { S3PollingPullerService } from "../services/s3-puller.service.ts";
 import { SourceCredentialAccessService } from "../services/source-credential-access.service.ts";
 import { ssrfSafeFetch } from "../services/ssrf-safe-fetch.ts";
 import { SuppressionSnapshotService } from "../services/suppression-snapshot.service.ts";
@@ -153,6 +179,7 @@ import {
 import type {
   GovernanceEncryptor,
   GovernanceHttpClient,
+  PulledUsageDispatcher,
   GovernanceProjectDirectory,
 } from "./governance.members.ts";
 
@@ -163,6 +190,8 @@ import type {
  * existence checks the Governance service does not own: one reads organization
  * membership, the other the virtual-key uniqueness tuple.
  */
+type EventingSenders = Readonly<Record<string, EventingCommandSender<unknown>>>;
+
 export interface GovernancePersonalVirtualKeyMembers {
   /** Whether the caller belongs to this organization at all. */
   isOrganizationMember(input: { organizationId: string; userId: string }): Promise<boolean>;
@@ -262,7 +291,12 @@ export interface GovernanceAppDependencies {
    * and the organization's hidden governance project, which is the tenant an
    * ingestion source's usage rows land in.
    */
-  projects: Pick<ProjectApi, "getOrganizationId" | "findInternal">;
+  projects: Pick<
+    ProjectApi,
+    "getOrganizationId" | "findInternal" | "findWithTeam" | "ensureInternal"
+  >;
+  /** The release flag that decides whether an organization's pulled usage carries a cost. */
+  featureFlags: Pick<FeatureFlagApi, "isEnabled">;
   /** Auth owns CLI bearer validation and revocation. */
   auth: Pick<AuthApi, "findCliAccessSession" | "revokeCliAccessToken">;
   /** Entitlements resolve the actual caller organization, never a deployment-global plan. */
@@ -360,6 +394,7 @@ export class GovernanceApp implements GovernanceRestApi {
     organizations: OrganizationApi,
     permissions: AuthzApi,
     scim: ScimApi,
+    featureFlags: FeatureFlagApi,
   };
   static readonly secrets = governanceSecrets;
 
@@ -392,6 +427,7 @@ export class GovernanceApp implements GovernanceRestApi {
         organizations: dependencies.organizations,
         permissions: dependencies.permissions,
         scim: dependencies.scim,
+        featureFlags: dependencies.featureFlags,
       },
       repositories,
       erasureSuppression,
@@ -411,6 +447,8 @@ export class GovernanceApp implements GovernanceRestApi {
     encryption: GovernanceEncryptor;
   }) {
     this.dependencies = dependencies;
+    this.repositories = repositories;
+    this.encryption = encryption;
     this.departments = DepartmentService.create({ repository: repositories.departments });
     this.erasureSuppression = erasureSuppression;
     // One instance: the erasure refreshes the very snapshot the cost fold reads (ADR-128 §9 step 5).
@@ -439,6 +477,7 @@ export class GovernanceApp implements GovernanceRestApi {
       credentials: IngestionCredentialsService.create(encryption),
     });
     const http: GovernanceHttpClient = { fetch: ssrfSafeFetch };
+    this.http = http;
     const channels = governanceListingChannels.live;
     const signIn = channels.providerSignIn.create({ http });
     this.agentDiscovery = AgentDiscoveryService.create({
@@ -527,6 +566,11 @@ export class GovernanceApp implements GovernanceRestApi {
   private readonly suppressionSnapshot: SuppressionSnapshotService;
   private readonly identityMatches: IdentityMatchService;
   private readonly identityMatchSuggestions: IdentityMatchSuggestionService;
+  private readonly repositories: GovernanceRepositories;
+  private readonly encryption: GovernanceEncryptor;
+  private readonly http: GovernanceHttpClient;
+  private ingestionPullCommands: EventingSenders | undefined;
+  private pulledUsageCommands: EventingSenders | undefined;
   private readonly personalUsageDashboards?: PersonalUsageDashboardService;
   private readonly cliAccessService?: GovernanceCliAccessApi;
   private readonly cliCredentialService?: GovernanceCliCredentialApi;
@@ -574,6 +618,104 @@ export class GovernanceApp implements GovernanceRestApi {
   // ── The CLI governance plane ──────────────────────────────────────────────
 
   /** The bearer, the plan and the RBAC permission, in that order. */
+  /** ingestion_pull_processing for this role: the worker also hosts main's pull process manager. */
+  ingestionPullPipeline({
+    participation,
+  }: {
+    participation: EventingParticipation;
+  }): IngestionPullDefinition {
+    const runStatusStore = this.repositories.ingestionPullRuns;
+    if (participation === "produce") {
+      return IngestionPullEventingAdapter.create({ runStatusStore }).build();
+    }
+    return IngestionPullEventingAdapter.create({
+      runStatusStore,
+      process: this.ingestionPullProcess(),
+    }).build();
+  }
+
+  connectIngestionPull(commands: EventingSenders): void {
+    this.ingestionPullCommands = commands;
+  }
+
+  connectPulledUsage(commands: EventingSenders): void {
+    this.pulledUsageCommands = commands;
+  }
+
+  private ingestionPullSender(name: string) {
+    const sender = this.ingestionPullCommands?.[name];
+    if (!sender) throw new Error(`ingestion_pull_processing is not registered for ${name}`);
+    return sender;
+  }
+
+  private pulledUsageSender(name: string) {
+    const sender = this.pulledUsageCommands?.[name];
+    if (!sender) throw new Error(`pulled_usage_processing is not registered for ${name}`);
+    return sender;
+  }
+
+  /** Main's `pipelineSet.ts:76-130`: the runner, its outcome senders late-bound, and the listings. */
+  private ingestionPullProcess(): IngestionPullProcess {
+    const { repositories, http, dependencies } = this;
+    const diagnostics = IngestionPullLogService.create();
+    const objects = governanceListingChannels.live.objectStore.create();
+    const pullers = PullerRegistryService.create();
+    pullers.register(HttpPollingPullerAdapter.create({ http, diagnostics }));
+    pullers.register(S3PollingPullerService.create({ objects, diagnostics }));
+    pullers.register(HttpCopilotStudioChannel.create({ http }));
+    pullers.register(HttpCopilotStudioDataverseChannel.create(http));
+    pullers.register(OpenAiComplianceReferencePullerService.create({ objects, diagnostics }));
+    pullers.register(OpenAiAdminPullerAdapter.create(http));
+    pullers.register(ClaudeComplianceReferencePullerAdapter.create({ http, diagnostics }));
+    pullers.register(AnthropicAdminPullerAdapter.create(http));
+    pullers.register(DatabricksGeniePullerService.create(http));
+    const worker = IngestionPullWorkerService.create({
+      sources: repositories.ingestionSources,
+      registry: pullers,
+      credentials: IngestionCredentialsService.create(this.encryption),
+      projects: dependencies.projects,
+      sink: repositories.ocsfEvents,
+      usageEntitlement: {
+        isEnabled: (organizationId) =>
+          dependencies.featureFlags.isEnabled("release_pulled_usage_cost_enabled", {
+            kind: "organization",
+            organizationId,
+          }),
+      },
+      usageRecords: PulledUsageRecordService.create(
+        PulledUsagePricingService.create({ rate: ratePulledUsage }),
+      ),
+      diagnostics,
+    });
+    const pulledUsage: PulledUsageDispatcher = {
+      recordPulledUsage: (input) => this.pulledUsageSender("recordPulledUsage").send(input),
+    };
+    return IngestionPullProcess.create({
+      schedule: { nextRunAt: nextIngestionPullRunAt },
+      execution: IngestionPullService.create({
+        runPort: { run: (input) => worker.run({ ...input, pulledUsage }) },
+        outcomePort: {
+          completed: (input) => this.ingestionPullSender("recordRunCompleted").send(input),
+          failed: (input) => this.ingestionPullSender("recordRunFailed").send(input),
+        },
+        metrics: IngestionPullMetricsService.create(),
+      }),
+      listing: IngestionPullListingService.create({
+        sources: repositories.ingestionSources,
+        agents: this.agentDiscovery,
+        people: this.personListing,
+        outcomes: {
+          agentsListed: (input) => this.ingestionPullSender("recordAgentsListed").send(input),
+          agentsListingRefused: (input) =>
+            this.ingestionPullSender("recordAgentsListingRefused").send(input),
+          peopleListed: (input) => this.ingestionPullSender("recordPeopleListed").send(input),
+          peopleListingRefused: (input) =>
+            this.ingestionPullSender("recordPeopleListingRefused").send(input),
+        },
+      }),
+    });
+  }
+
   cliAccess(): GovernanceCliAccessApi {
     return this.cliAccessService ?? this.unfinishedCapability();
   }

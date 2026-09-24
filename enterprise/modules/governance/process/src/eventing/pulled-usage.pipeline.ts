@@ -11,4 +11,5 @@ export const pulledUsageEventing = defineEventingModule({
   pipeline: PULLED_USAGE_PIPELINE_NAME,
   build: (_setup: EventingSetup<GovernanceRepositories, GovernanceApp>) =>
     PulledUsageEventingAdapter.create().build(),
+  connect: ({ app, commands }) => app.connectPulledUsage(commands),
 });

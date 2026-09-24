@@ -578,6 +578,21 @@ describe("IngestionPullWorkerService run report", () => {
     });
   });
 
+  describe("given an event stamped without an offset", () => {
+    it("reads the stamp in UTC, as main did, rather than skipping it", async () => {
+      const { service } = worker({
+        runOnce: async () => ({
+          events: [{ ...event, event_timestamp: "2026-08-24T09:15:00" }],
+          cursor: "next",
+          errorCount: 0,
+        }),
+      });
+      await expect(service.run({ sourceId: "source-1", cursor: null })).resolves.toMatchObject({
+        readThroughAt: Date.parse("2026-08-24T09:15:00.000Z"),
+      });
+    });
+  });
+
   describe("given an adapter that states how far it read", () => {
     it("takes the adapter's statement over the events", async () => {
       const { service } = worker({

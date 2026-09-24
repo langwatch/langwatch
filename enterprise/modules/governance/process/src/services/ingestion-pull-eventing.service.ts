@@ -53,6 +53,12 @@ export type IngestionPullEventingAdapterOptions = {
   process?: IngestionPullProcess;
 };
 
+export type IngestionPullDefinition = StaticPipelineDefinition<
+  EventingIngestionPullEvent,
+  Record<string, Projection>,
+  RegisteredCommand
+>;
+
 export const INGESTION_PULL_PIPELINE_NAME = "ingestion_pull_processing" as const;
 
 export class IngestionPullEventingAdapter {
@@ -88,11 +94,7 @@ export class IngestionPullEventingAdapter {
     } as const;
   }
 
-  build(): StaticPipelineDefinition<
-    EventingIngestionPullEvent,
-    Record<string, Projection>,
-    RegisteredCommand
-  > {
+  build(): IngestionPullDefinition {
     const pipeline = definePipeline({
       name: INGESTION_PULL_PIPELINE_NAME,
       aggregate: defineAggregate({

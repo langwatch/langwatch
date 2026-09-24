@@ -5,13 +5,30 @@ import { Temporal } from "@langwatch/time";
 
 export type PullReadThrough = { outcome: "read-through"; at: number } | { outcome: "read-nowhere" };
 
-/** One stamp as epoch ms, or none when it is malformed: never read as the epoch. */
-function readableEpochMs(stamp: string): number[] {
+/** A stamp with an offset, as epoch ms; none when it carries no offset or is malformed. */
+function offsetEpochMs(stamp: string): number[] {
   try {
     return [Temporal.Instant.from(stamp).epochMilliseconds];
   } catch {
     return [];
   }
+}
+
+/** An offset-less stamp read in UTC, where main's `Date.parse` read it (the servers run in UTC). */
+function utcEpochMs(stamp: string): number[] {
+  try {
+    return [
+      Temporal.PlainDateTime.from(stamp).toZonedDateTime("UTC").toInstant().epochMilliseconds,
+    ];
+  } catch {
+    return [];
+  }
+}
+
+/** One stamp as epoch ms, or none when it is malformed: never read as the epoch. */
+function readableEpochMs(stamp: string): number[] {
+  const withOffset = offsetEpochMs(stamp);
+  return withOffset.length > 0 ? withOffset : utcEpochMs(stamp);
 }
 
 /**

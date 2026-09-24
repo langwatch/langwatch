@@ -20,6 +20,7 @@ import {
  */
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -130,6 +131,7 @@ async function buildApi(
       organizations: createApiFixture<OrganizationApi>(),
       permissions: createApiFixture<AuthzApi>(),
       scim: createApiFixture<ScimApi>(),
+      featureFlags: createApiFixture<FeatureFlagApi>(),
     },
     members: { prisma: unreachablePrisma, encryption: createApiFixture<GovernanceEncryptor>() },
     resources: new ResourceScope(),

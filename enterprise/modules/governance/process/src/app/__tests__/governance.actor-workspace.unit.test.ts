@@ -8,6 +8,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
  */
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import {
   type OrganizationApi,
@@ -77,6 +78,7 @@ async function buildApp(options: {
       organizations: createApiFixture<OrganizationApi>({ getPersonalWorkspace }),
       permissions: createApiFixture<AuthzApi>(),
       scim: createApiFixture<ScimApi>(),
+      featureFlags: createApiFixture<FeatureFlagApi>(),
     },
     members: { prisma, encryption: createApiFixture<GovernanceEncryptor>() },
     resources: new ResourceScope(),
