@@ -193,6 +193,10 @@ of:
    line — or the seam dies with the dead capability. A module never defaults
    its own availability.
 
+One unowned service has one owning module: evaluation owns the langevals boundary — its endpoint,
+the S3 staging of large payloads and their config — and topic and workflow reach langevals through
+`EvaluationApi` (Alex, 2026-09-25).
+
 ### 3.4 The browser half and the kit
 
 `trace-browser` layers: flat public entries → `model/` (pure) → `behavior/`
