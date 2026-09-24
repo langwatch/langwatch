@@ -29,6 +29,11 @@ import {
   type VerifiedBrowserSession,
   type AuthUsageCount,
 } from "@langwatch/auth-contract";
+import { ssoSecrets } from "@langwatch/enterprise-sso-contract";
+import {
+  configuredAuthProvider,
+  resolveSignInProviders,
+} from "@langwatch/enterprise-sso-contract/sign-in-providers";
 import {
   EnterprisePlanRequiredError,
   EntitlementApi,
@@ -160,9 +165,6 @@ export type AuthInfrastructure = MembersRead<typeof AUTH_CLOSED_READS> &
     /** This deployment's sign-in mode, ADR-027's single source of truth.
      * `undefined` until the front-door wiring lane supplies it. */
     authProvider: (() => Promise<string>) | undefined;
-    /** The federated provider id Better Auth's federation gate reads — distinct
-     * from `authProvider` above (ADR-027's resolver). Unresolved; see the handoff. */
-    federatedProvider: string | undefined;
     /** Whether this is the hosted product: the process's own fact, supplied
      * as a member. The flag itself has a ruling of its own pending. */
     isSaas: boolean;
@@ -212,6 +214,7 @@ export class AuthApp implements AuthApiContract {
   /** The browser-session key. Only the identity built from it ever escapes (ADR-132). */
   static readonly secrets = {
     session: sessionSecret,
+    ...ssoSecrets,
   } as const;
 
   readonly #sessions: BrowserSessionService;
@@ -296,7 +299,7 @@ export class AuthApp implements AuthApiContract {
     this.#signInSecurity = signInSecurity;
   }
 
-  static create(setup: AuthSetup): Promise<AuthApp> {
+  static async create(setup: AuthSetup): Promise<AuthApp> {
     const { members, repositories, dependencies, config } = setup;
     const now = members.now ?? nowInstant;
     const accountRows = PrismaBetterAuthHooksRepository.create(members.prisma);
@@ -347,6 +350,12 @@ export class AuthApp implements AuthApiContract {
       isProduction: members.nodeEnvironment === "production",
     });
 
+    const signInProviders = await resolveSignInProviders({
+      config: config.signInProviders,
+      into: setup.secrets.into,
+      baseUrl: config.sessionUrl ?? "",
+    });
+
     return setup.secrets.into(AuthApp.secrets.session, (sessionSecret) => {
       assertAuthServerConfig(config, sessionSecret);
 
@@ -384,7 +393,8 @@ export class AuthApp implements AuthApiContract {
           users: dependencies.users,
           identityApi: dependencies.identity,
           signInRouting: members.route ?? null,
-          authProvider: members.federatedProvider,
+          authProvider: configuredAuthProvider(config.signInProviders).provider,
+          signInProviders,
           isSaas: members.isSaas,
           localPasswords: config.localPasswords,
           trustedIdpOrigins: config.trustedIdpOrigins,
@@ -564,6 +574,7 @@ export class AuthApp implements AuthApiContract {
     return {
       userId: record.user_id,
       organizationId: record.organization_id,
+      ...(record.cli_api_key_id ? { cliApiKeyId: record.cli_api_key_id } : {}),
       ...(record.client_info
         ? {
             clientInfo: {

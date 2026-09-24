@@ -1,18 +1,14 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * Identity-provider wiring for enterprise SSO: the BetterAuth
- * `socialProviders` map (Google, GitHub, GitLab, Azure AD) and the
- * genericOAuth configs (Auth0, Okta, AWS Cognito, OneLogin, and any other
- * OpenID Connect provider).
- * `src/server/better-auth/index.ts` is
- * the assembly point that feeds these into `betterAuth()`; the federation
- * capability itself lives here, under the Enterprise license, alongside the
- * gate (`sso-gate.ts`) that decides whether a deployment may use it.
+ * The deployment's sign-in providers as BetterAuth mounts them: the social map
+ * and the genericOAuth configs. Pure over config and credentials, so auth
+ * (which builds BetterAuth) and sso (which reports whether one mounted) agree.
  */
-
-import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
+import type { SecretHandle } from "@langwatch/secrets/secret";
 import type { BetterAuthOptions } from "better-auth";
 import { auth0, type genericOAuth, okta } from "better-auth/plugins/generic-oauth";
+
+import { ssoSecrets, type SsoConfig, type SsoConfiguration } from "./sso.config.ts";
 
 /**
  * Derives a user display name from an OAuth profile, falling back through
@@ -599,3 +595,76 @@ const BetterAuthSsoAdapter = {
   oidcProviderConfig,
   buildGenericOAuthConfigs,
 };
+
+/**
+ * The sign-in provider under its supported name (#8143). `AUTH_PROVIDER` wins;
+ * the NextAuth-era `NEXTAUTH_PROVIDER` still applies but is deprecated, so a
+ * running install is never broken by the rename; neither set means email.
+ */
+export function configuredAuthProvider({
+  authProvider,
+  legacyProvider,
+}: {
+  authProvider: string | undefined;
+  legacyProvider: string | undefined;
+}): { provider: string; deprecatedNameUsed: boolean } {
+  if (authProvider) return { provider: authProvider, deprecatedNameUsed: false };
+  if (legacyProvider) return { provider: legacyProvider, deprecatedNameUsed: true };
+  return { provider: "email", deprecatedNameUsed: false };
+}
+
+type SecretInto = <Value, Out>(
+  handle: SecretHandle<Value>,
+  build: (value: Value) => Out | Promise<Out>,
+) => Promise<Out>;
+
+export type SignInProviderConfiguration = Omit<SsoConfiguration, "isSaas">;
+
+/** Every provider's public half from `config`, its secret through `into`, the callback base from `baseUrl`. */
+export async function resolveSignInProviders({
+  config,
+  into,
+  baseUrl,
+}: {
+  config: SsoConfig;
+  into: SecretInto;
+  baseUrl: string;
+}): Promise<SignInProviderConfiguration> {
+  const [
+    googleClientSecret,
+    githubClientSecret,
+    gitlabClientSecret,
+    azureAdClientSecret,
+    auth0ClientSecret,
+    oktaClientSecret,
+    cognitoClientSecret,
+    oneLoginClientSecret,
+    oidcClientSecret,
+  ] = await Promise.all([
+    into(ssoSecrets.googleClientSecret, (value) => value),
+    into(ssoSecrets.githubClientSecret, (value) => value),
+    into(ssoSecrets.gitlabClientSecret, (value) => value),
+    into(ssoSecrets.azureAdClientSecret, (value) => value),
+    into(ssoSecrets.auth0ClientSecret, (value) => value),
+    into(ssoSecrets.oktaClientSecret, (value) => value),
+    into(ssoSecrets.cognitoClientSecret, (value) => value),
+    into(ssoSecrets.oneLoginClientSecret, (value) => value),
+    into(ssoSecrets.oidcClientSecret, (value) => value),
+  ]);
+  const { authProvider: _named, legacyProvider: _legacy, ...publicHalves } = config;
+
+  return {
+    ...publicHalves,
+    provider: configuredAuthProvider(config).provider,
+    baseUrl,
+    googleClientSecret,
+    githubClientSecret,
+    gitlabClientSecret,
+    azureAdClientSecret,
+    auth0ClientSecret,
+    oktaClientSecret,
+    cognitoClientSecret,
+    oneLoginClientSecret,
+    oidcClientSecret,
+  };
+}

@@ -62,3 +62,31 @@ export const { gatewayPublicUrl, gatewayLegacyUrl } = Config.define((c) => ({
   gatewayPublicUrl: c.env("LW_GATEWAY_PUBLIC_URL", z.string().optional()),
   gatewayLegacyUrl: c.env("LW_GATEWAY_BASE_URL", z.string().optional()),
 }));
+
+const publicProviderField = z.string().min(1).optional();
+
+/**
+ * The sign-in providers this deployment names, under main's names: which one
+ * `AUTH_PROVIDER` selects and the public half of each registration. Read by
+ * sso (whether one is mounted) and auth (which builds them).
+ */
+export const signInProviders = Config.define((c) => ({
+  authProvider: c.env("AUTH_PROVIDER", publicProviderField),
+  /** The NextAuth-era name for `AUTH_PROVIDER`: deprecated, still applied. */
+  legacyProvider: c.env("NEXTAUTH_PROVIDER", publicProviderField),
+  googleClientId: c.env("GOOGLE_CLIENT_ID", publicProviderField),
+  githubClientId: c.env("GITHUB_CLIENT_ID", publicProviderField),
+  gitlabClientId: c.env("GITLAB_CLIENT_ID", publicProviderField),
+  azureAdClientId: c.env("AZURE_AD_CLIENT_ID", publicProviderField),
+  azureAdTenantId: c.env("AZURE_AD_TENANT_ID", publicProviderField),
+  auth0ClientId: c.env("AUTH0_CLIENT_ID", publicProviderField),
+  auth0Issuer: c.env("AUTH0_ISSUER", publicProviderField),
+  oktaClientId: c.env("OKTA_CLIENT_ID", publicProviderField),
+  oktaIssuer: c.env("OKTA_ISSUER", publicProviderField),
+  cognitoClientId: c.env("COGNITO_CLIENT_ID", publicProviderField),
+  cognitoIssuer: c.env("COGNITO_ISSUER", publicProviderField),
+  oneLoginClientId: c.env("ONELOGIN_CLIENT_ID", publicProviderField),
+  oneLoginIssuer: c.env("ONELOGIN_ISSUER", publicProviderField),
+  oidcClientId: c.env("OIDC_CLIENT_ID", publicProviderField),
+  oidcIssuer: c.env("OIDC_ISSUER", publicProviderField),
+}));

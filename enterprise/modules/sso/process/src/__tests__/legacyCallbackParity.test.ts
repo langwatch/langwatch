@@ -1,3 +1,9 @@
+import {
+  buildGenericOAuthConfigs,
+  LEGACY_CALLBACK_PROVIDER_IDS,
+  legacyCallbackUrl,
+  PLAIN_OIDC_PROVIDERS,
+} from "@langwatch/enterprise-sso-contract/sign-in-providers";
 import * as ssoServer from "@langwatch/enterprise-sso-process";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
@@ -15,13 +21,6 @@ import * as ssoServer from "@langwatch/enterprise-sso-process";
  * So this asserts the two halves agree, both ways.
  */
 import { describe, expect, it } from "vitest";
-
-import {
-  buildGenericOAuthConfigs,
-  LEGACY_CALLBACK_PROVIDER_IDS,
-  legacyCallbackUrl,
-  PLAIN_OIDC_PROVIDERS,
-} from "../rules/better-auth-sso-adapter.rules.ts";
 
 const BASE_URL = "https://langwatch.acme.test";
 

@@ -1,4 +1,4 @@
-import { Config, type ConfigOf } from "@langwatch/config";
+import { Config, signInProviders, type ConfigOf } from "@langwatch/config";
 import { z } from "zod";
 
 /**
@@ -35,6 +35,8 @@ export const authServerConfig = Config.define((c) => ({
   idpSimulatorUrl: c.env("LANGWATCH_IDPSIM_URL", z.string().optional()),
   /** D09: this deployment issues its own passwords beside a federated provider. */
   localPasswords: c.env("LOCAL_PASSWORDS_ENABLED", onOffSwitch),
+  /** The shared leaves sso reads too: which provider is named and its public half. */
+  signInProviders,
 }));
 
 export type AuthServerConfig = ConfigOf<typeof authServerConfig>;

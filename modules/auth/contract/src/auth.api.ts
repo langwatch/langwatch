@@ -21,6 +21,8 @@ import type {
 export type CliAccessSession = Readonly<{
   userId: string;
   organizationId: string;
+  /** The login key the session minted at sign-in, where it minted one. */
+  cliApiKeyId?: string | undefined;
   clientInfo?: Readonly<{
     deviceLabel?: string | undefined;
     hostname?: string | undefined;

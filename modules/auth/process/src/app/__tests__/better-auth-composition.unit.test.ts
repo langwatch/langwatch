@@ -17,6 +17,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
 import { AuthApp } from "../auth.app.ts";
+import { NO_SIGN_IN_PROVIDERS, type SignInProvidersConfig } from "./support/sign-in-providers.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
 const BROWSER_SESSION = {
@@ -33,8 +34,18 @@ const VERIFIED: VerifiedBrowserSession = {
   user: { id: "user_1" },
 } as VerifiedBrowserSession;
 
+function sessionSecretFor(named: boolean): string | undefined {
+  return named ? BROWSER_SESSION.secret : void 0;
+}
+
 /** `named` supplies NEXTAUTH_SECRET and NEXTAUTH_URL together, or neither. */
-async function appFor(named = false): Promise<AuthApp> {
+async function appFor(
+  named = false,
+  providers: {
+    config?: Partial<SignInProvidersConfig>;
+    secrets?: Partial<Record<string, string>>;
+  } = {},
+): Promise<AuthApp> {
   return AuthApp.create({
     config: {
       sessionUrl: named ? BROWSER_SESSION.baseUrl : undefined,
@@ -44,6 +55,7 @@ async function appFor(named = false): Promise<AuthApp> {
       trustedIdpOrigins: undefined,
       idpSimulatorUrl: undefined,
       localPasswords: false,
+      signInProviders: { ...NO_SIGN_IN_PROVIDERS, ...providers.config },
     },
     repositories: MemoryAuthRepositories.create(),
     dependencies: {
@@ -75,15 +87,14 @@ async function appFor(named = false): Promise<AuthApp> {
       signUp: null,
       invites: null,
       authProvider: undefined as never,
-      federatedProvider: undefined,
       isSaas: false,
       nodeEnvironment: undefined,
       processName: "langwatch-api",
     },
     resources: { own: () => undefined } as never,
     // The deployment's session key reaches the app through its declared handle.
-    secrets: new ScopedSecrets(async (_handle, build) =>
-      build(named ? BROWSER_SESSION.secret : void 0),
+    secrets: new ScopedSecrets(async (handle, build) =>
+      build({ ...providers.secrets, NEXTAUTH_SECRET: sessionSecretFor(named) }[handle.id]),
     ),
   });
 }
@@ -141,5 +152,85 @@ describe("when the born-finalized entrance is reached", () => {
     await expect(app.runWithIdentityBirth(async () => "unreached")).rejects.toThrowError(
       /identity birth context/,
     );
+  });
+});
+
+function mountedProviderIds(app: AuthApp): string[] {
+  const { options } = app.betterAuth();
+  const genericOAuth = options.plugins?.find((plugin) => plugin.id === "generic-oauth");
+  const configs = (genericOAuth?.options as { config?: { providerId: string }[] } | undefined)
+    ?.config;
+  return [
+    ...Object.keys(options.socialProviders ?? {}),
+    ...(configs ?? []).map((config) => config.providerId),
+  ];
+}
+
+describe("given a deployment that names no sign-in provider", () => {
+  /** @scenario "A deployment that names no provider mounts none" */
+  it("mounts no social or enterprise provider", async () => {
+    const app = await appFor(true);
+
+    expect(mountedProviderIds(app)).toEqual([]);
+  });
+});
+
+describe("given a deployment that names a provider and supplies its registration", () => {
+  it.each([
+    {
+      provider: "google",
+      config: { googleClientId: "google-id" },
+      secrets: { GOOGLE_CLIENT_SECRET: "google-secret" },
+    },
+    {
+      provider: "github",
+      config: { githubClientId: "github-id" },
+      secrets: { GITHUB_CLIENT_SECRET: "github-secret" },
+    },
+    {
+      provider: "auth0",
+      config: { auth0ClientId: "auth0-id", auth0Issuer: "https://tenant.auth0.test/" },
+      secrets: { AUTH0_CLIENT_SECRET: "auth0-secret" },
+    },
+  ])("mounts $provider", async ({ provider, config, secrets }) => {
+    const app = await appFor(true, { config: { authProvider: provider, ...config }, secrets });
+
+    expect(mountedProviderIds(app)).toEqual([provider]);
+  });
+
+  /** @scenario "A named provider with its credentials mounts on Better Auth" */
+  it("mounts auth0 with its stored-account issuer pin and ID-token verification", async () => {
+    const app = await appFor(true, {
+      config: {
+        authProvider: "auth0",
+        auth0ClientId: "auth0-id",
+        auth0Issuer: "https://tenant.auth0.test/",
+      },
+      secrets: { AUTH0_CLIENT_SECRET: "auth0-secret" },
+    });
+    const genericOAuth = app
+      .betterAuth()
+      .options.plugins?.find((plugin) => plugin.id === "generic-oauth");
+
+    expect(genericOAuth?.options).toMatchObject({
+      config: [
+        {
+          providerId: "auth0",
+          clientSecret: "auth0-secret",
+          accountIssuer: "local:oauth:auth0",
+          requireIdTokenVerification: true,
+          redirectURI: "https://app.langwatch.test/api/auth/callback/auth0",
+        },
+      ],
+    });
+  });
+
+  /** @scenario "A named provider without its secret mounts nothing" */
+  it("mounts nothing when the named provider's secret is missing", async () => {
+    const app = await appFor(true, {
+      config: { authProvider: "google", googleClientId: "google-id" },
+    });
+
+    expect(mountedProviderIds(app)).toEqual([]);
   });
 });

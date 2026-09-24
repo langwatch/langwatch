@@ -1,3 +1,9 @@
+import {
+  buildGenericOAuthConfigs,
+  discoveryUrlFor,
+  fallbackName,
+  PLAIN_OIDC_PROVIDERS,
+} from "@langwatch/enterprise-sso-contract/sign-in-providers";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Cognito and OneLogin are configured from a client id, a client secret and an
@@ -9,13 +15,6 @@
  * Covers specs/auth/sso-oidc-providers.feature.
  */
 import { describe, expect, it } from "vitest";
-
-import {
-  buildGenericOAuthConfigs,
-  discoveryUrlFor,
-  fallbackName,
-  PLAIN_OIDC_PROVIDERS,
-} from "../../rules/better-auth-sso-adapter.rules.ts";
 
 const BASE_URL = "https://langwatch.acme.test";
 

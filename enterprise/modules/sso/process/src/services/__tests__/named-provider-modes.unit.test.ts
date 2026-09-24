@@ -1,3 +1,7 @@
+import {
+  buildGenericOAuthConfigs,
+  buildSocialProviders,
+} from "@langwatch/enterprise-sso-contract/sign-in-providers";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The two provider modes an operator names by hand: auth0, which is an OIDC
@@ -8,11 +12,6 @@
  * Covers specs/auth/phase-1-better-auth-config.feature.
  */
 import { describe, expect, it } from "vitest";
-
-import {
-  buildGenericOAuthConfigs,
-  buildSocialProviders,
-} from "../../rules/better-auth-sso-adapter.rules.ts";
 
 const BASE_URL = "http://localhost:3000";
 

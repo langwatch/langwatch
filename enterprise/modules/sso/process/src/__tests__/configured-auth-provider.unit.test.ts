@@ -1,7 +1,6 @@
+import { configuredAuthProvider } from "@langwatch/enterprise-sso-contract/sign-in-providers";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { describe, expect, it } from "vitest";
-
-import { configuredAuthProvider } from "../configured-auth-provider.rules.ts";
 
 describe("configuredAuthProvider", () => {
   it("reads AUTH_PROVIDER without a word of complaint", () => {

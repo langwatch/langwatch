@@ -4,10 +4,10 @@ import {
   type PlatformLicenseAccess,
 } from "@langwatch/enterprise-licensing-contract";
 import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
+import * as BetterAuthSsoAdapter from "@langwatch/enterprise-sso-contract/sign-in-providers";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SsoGateLogger } from "../app/sso.members.ts";
-import * as BetterAuthSsoAdapter from "../rules/better-auth-sso-adapter.rules.ts";
 import { SsoGateService, SsoProviderMountInspector } from "../services/sso-gate.service.ts";
 
 class FakeLogger implements SsoGateLogger {

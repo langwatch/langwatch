@@ -13,9 +13,8 @@
  * `name: string`, non-nullable).
  */
 
+import { fallbackName } from "@langwatch/enterprise-sso-contract/sign-in-providers";
 import { describe, expect, it } from "vitest";
-
-import { fallbackName } from "../../rules/better-auth-sso-adapter.rules.ts";
 
 describe("fallbackName", () => {
   describe("when profile.name is set", () => {

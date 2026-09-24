@@ -14,6 +14,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./sign-in-providers": {
+      "types": "./dist/sso-sign-in-providers.d.ts",
+      "default": "./src/sso-sign-in-providers.ts"
     }
   },
   "scripts": {
@@ -25,6 +29,7 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/secrets": "workspace:*",
+    "better-auth": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

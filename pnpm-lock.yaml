@@ -3248,6 +3248,9 @@ importers:
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../../packages/secrets
+      better-auth:
+        specifier: 'catalog:'
+        version: 1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.0)
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -4690,6 +4693,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/enterprise-sso-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/sso/contract
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract

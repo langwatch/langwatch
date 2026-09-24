@@ -42,6 +42,9 @@
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/sso/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../entitlement/contract/tsconfig.build.json"
     },
     {

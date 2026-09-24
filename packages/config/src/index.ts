@@ -20,6 +20,7 @@ export {
   langevalsStagingThresholdBytes,
   langevalsStagingTtlSeconds,
   langwatchDefaultModel,
+  signInProviders,
 } from "./deployment-facts.ts";
 export {
   environmentBooleanSchema,

@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
 import { AuthApp } from "../auth.app.ts";
+import { NO_SIGN_IN_PROVIDERS } from "./support/sign-in-providers.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
 /** The limiter member, over a memory counter, remembering the window each check named. */
@@ -46,6 +47,7 @@ async function appFor(
       trustedIdpOrigins: undefined,
       idpSimulatorUrl: undefined,
       localPasswords: false,
+      signInProviders: NO_SIGN_IN_PROVIDERS,
     },
     repositories: MemoryAuthRepositories.create(),
     dependencies: {
@@ -77,7 +79,6 @@ async function appFor(
       signUp: null,
       invites: null,
       authProvider: undefined as never,
-      federatedProvider: undefined,
       isSaas: false,
       nodeEnvironment: undefined,
       processName: "langwatch-api",

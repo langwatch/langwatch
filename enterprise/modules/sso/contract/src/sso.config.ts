@@ -6,32 +6,11 @@
  * id and an issuer are not credentials. Every `*ClientSecret` resolves through
  * `ssoSecrets`; the platform license key is licensing's, asked through its API.
  */
-import { Config, type ConfigOf } from "@langwatch/config";
+import { Config, signInProviders, type ConfigOf } from "@langwatch/config";
 import { Secret } from "@langwatch/secrets/secret";
-import { z } from "zod";
 
-const publicField = z.string().min(1).optional();
-
-export const ssoConfig = Config.define((c) => ({
-  authProvider: c.env("AUTH_PROVIDER", z.string().min(1).optional()),
-  /** The NextAuth-era name for `AUTH_PROVIDER`: deprecated, still applied. */
-  legacyProvider: c.env("NEXTAUTH_PROVIDER", z.string().min(1).optional()),
-  googleClientId: c.env("GOOGLE_CLIENT_ID", publicField),
-  githubClientId: c.env("GITHUB_CLIENT_ID", publicField),
-  gitlabClientId: c.env("GITLAB_CLIENT_ID", publicField),
-  azureAdClientId: c.env("AZURE_AD_CLIENT_ID", publicField),
-  azureAdTenantId: c.env("AZURE_AD_TENANT_ID", publicField),
-  auth0ClientId: c.env("AUTH0_CLIENT_ID", publicField),
-  auth0Issuer: c.env("AUTH0_ISSUER", publicField),
-  oktaClientId: c.env("OKTA_CLIENT_ID", publicField),
-  oktaIssuer: c.env("OKTA_ISSUER", publicField),
-  cognitoClientId: c.env("COGNITO_CLIENT_ID", publicField),
-  cognitoIssuer: c.env("COGNITO_ISSUER", publicField),
-  oneLoginClientId: c.env("ONELOGIN_CLIENT_ID", publicField),
-  oneLoginIssuer: c.env("ONELOGIN_ISSUER", publicField),
-  oidcClientId: c.env("OIDC_CLIENT_ID", publicField),
-  oidcIssuer: c.env("OIDC_ISSUER", publicField),
-}));
+/** The shared leaves (`@langwatch/config`): auth reads the same ones to build the providers. */
+export const ssoConfig = Config.define(() => ({ ...signInProviders }));
 
 export type SsoConfig = ConfigOf<typeof ssoConfig>;
 

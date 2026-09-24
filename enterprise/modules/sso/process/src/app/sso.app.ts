@@ -58,6 +58,12 @@ import {
   type SsoSetupStartMigrationInput,
 } from "@langwatch/enterprise-sso-contract";
 import {
+  buildGenericOAuthConfigs,
+  buildSocialProviders,
+  configuredAuthProvider,
+  resolveSignInProviders,
+} from "@langwatch/enterprise-sso-contract/sign-in-providers";
+import {
   EntitlementApi,
   EnterprisePlanRequiredError,
   isEnterpriseTier,
@@ -67,11 +73,6 @@ import type { FeatureSetup } from "@langwatch/kernel";
 import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
 import { UserApi } from "@langwatch/user-contract";
 
-import {
-  buildGenericOAuthConfigs,
-  buildSocialProviders,
-} from "../rules/better-auth-sso-adapter.rules.ts";
-import { configuredAuthProvider } from "../rules/configured-auth-provider.rules.ts";
 import { ssoServiceProviderAddresses } from "../rules/sso-service-provider.rules.ts";
 import { SsoGateService, SsoProviderMountInspector } from "../services/sso-gate.service.ts";
 import { SsoHistoryActivityService } from "../services/sso-history-activity.service.ts";
@@ -129,29 +130,7 @@ async function resolveConfiguration(
   members: SsoInfrastructure,
   secrets: SsoSetup["secrets"],
 ): Promise<SsoConfiguration> {
-  const [
-    googleClientSecret,
-    githubClientSecret,
-    gitlabClientSecret,
-    azureAdClientSecret,
-    auth0ClientSecret,
-    oktaClientSecret,
-    cognitoClientSecret,
-    oneLoginClientSecret,
-    oidcClientSecret,
-  ] = await Promise.all([
-    secrets.into(ssoSecrets.googleClientSecret, (value) => value),
-    secrets.into(ssoSecrets.githubClientSecret, (value) => value),
-    secrets.into(ssoSecrets.gitlabClientSecret, (value) => value),
-    secrets.into(ssoSecrets.azureAdClientSecret, (value) => value),
-    secrets.into(ssoSecrets.auth0ClientSecret, (value) => value),
-    secrets.into(ssoSecrets.oktaClientSecret, (value) => value),
-    secrets.into(ssoSecrets.cognitoClientSecret, (value) => value),
-    secrets.into(ssoSecrets.oneLoginClientSecret, (value) => value),
-    secrets.into(ssoSecrets.oidcClientSecret, (value) => value),
-  ]);
-
-  const { provider, deprecatedNameUsed } = configuredAuthProvider(config);
+  const { deprecatedNameUsed } = configuredAuthProvider(config);
   if (deprecatedNameUsed) {
     members.logger.warn(
       { module: "sso" },
@@ -160,33 +139,12 @@ async function resolveConfiguration(
   }
 
   return {
+    ...(await resolveSignInProviders({
+      config,
+      into: secrets.into,
+      baseUrl: members.publicBaseUrl ?? "http://localhost",
+    })),
     isSaas: members.isSaas,
-    provider,
-    baseUrl: members.publicBaseUrl ?? "http://localhost",
-    googleClientId: config.googleClientId,
-    googleClientSecret,
-    githubClientId: config.githubClientId,
-    githubClientSecret,
-    gitlabClientId: config.gitlabClientId,
-    gitlabClientSecret,
-    azureAdClientId: config.azureAdClientId,
-    azureAdClientSecret,
-    azureAdTenantId: config.azureAdTenantId,
-    auth0ClientId: config.auth0ClientId,
-    auth0ClientSecret,
-    auth0Issuer: config.auth0Issuer,
-    oktaClientId: config.oktaClientId,
-    oktaClientSecret,
-    oktaIssuer: config.oktaIssuer,
-    cognitoClientId: config.cognitoClientId,
-    cognitoClientSecret,
-    cognitoIssuer: config.cognitoIssuer,
-    oneLoginClientId: config.oneLoginClientId,
-    oneLoginClientSecret,
-    oneLoginIssuer: config.oneLoginIssuer,
-    oidcClientId: config.oidcClientId,
-    oidcClientSecret,
-    oidcIssuer: config.oidcIssuer,
   };
 }
 

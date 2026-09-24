@@ -8,13 +8,12 @@ import { createSign, generateKeyPairSync, type KeyObject, randomUUID } from "nod
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 
+import { buildGenericOAuthConfigs } from "@langwatch/enterprise-sso-contract/sign-in-providers";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
-
-import { buildGenericOAuthConfigs } from "../../rules/better-auth-sso-adapter.rules.ts";
 
 type TokenVariant =
   | "valid"

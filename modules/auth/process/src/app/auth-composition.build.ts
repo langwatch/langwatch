@@ -5,6 +5,11 @@
 import type { AuthApi } from "@langwatch/auth-contract";
 import { AuthzGrantsService } from "@langwatch/authz-contract";
 import {
+  buildGenericOAuthConfigs,
+  buildSocialProviders,
+  type SignInProviderConfiguration,
+} from "@langwatch/enterprise-sso-contract/sign-in-providers";
+import {
   SignInMethodPolicyService,
   routesToOrganizationConnection,
   sealedProviderConfigCipher,
@@ -393,6 +398,8 @@ export type BuildBetterAuthOptions = Readonly<{
     | null;
   /** `"email"`, or the federated provider id this deployment mounted. */
   authProvider: string | undefined;
+  /** Every provider's registration, from which the ones this deployment names mount. */
+  signInProviders: SignInProviderConfiguration;
   /** Whether this is the hosted product rather than a self-hosted install. */
   isSaas: boolean;
   /** D09: whether this deployment issues its own passwords beside its provider. */
@@ -432,10 +439,9 @@ export function buildBetterAuth(options: BuildBetterAuthOptions): BetterAuthTran
         "password-reset-mail",
         "pending-invitations",
         "sign-in-router-shadow",
-        "sso-providers",
       ],
     },
-    "Better Auth composed by the auth module: federation reports unlicensed, it runs the stock Prisma storage engine, it cannot send a password-reset link, it applies no pending invitation on a domain auto-join, it runs no sign-in router shadow and it mounts no SSO provider",
+    "Better Auth composed by the auth module: federation reports unlicensed, it runs the stock Prisma storage engine, it cannot send a password-reset link, it applies no pending invitation on a domain auto-join and it runs no sign-in router shadow",
   );
 
   return createBetterAuthTransport({
@@ -460,12 +466,8 @@ export function buildBetterAuth(options: BuildBetterAuthOptions): BetterAuthTran
       trustedIdpOrigins: options.trustedIdpOrigins,
       idpSimulatorUrl: options.idpSimulatorUrl,
       isProduction: options.isProduction,
-      // No SSO provider is mounted here: building one needs the client
-      // credentials and issuer of an identity provider, and this module reads
-      // none. An empty pair is the honest answer, and it is the same one the
-      // licence gate above already gives.
-      socialProviders: {},
-      genericOAuthConfigs: [],
+      socialProviders: buildSocialProviders(options.signInProviders),
+      genericOAuthConfigs: buildGenericOAuthConfigs(options.signInProviders) ?? [],
     },
     federation: ModuleBetterAuthFederation.create({
       authProvider: options.authProvider,

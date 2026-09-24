@@ -16,6 +16,7 @@ import { describe, expect, it } from "vitest";
 
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
 import { AuthApp } from "../auth.app.ts";
+import { NO_SIGN_IN_PROVIDERS } from "./support/sign-in-providers.ts";
 
 const ACCESS_TOKEN = "lw_at_active";
 const AUTHORIZATION = `Bearer ${ACCESS_TOKEN}`;
@@ -37,6 +38,7 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
       trustedIdpOrigins: undefined,
       idpSimulatorUrl: undefined,
       localPasswords: false,
+      signInProviders: NO_SIGN_IN_PROVIDERS,
     },
     repositories,
     dependencies: {
@@ -61,7 +63,6 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
       signUp: null,
       invites: null,
       authProvider: void 0,
-      federatedProvider: void 0,
       isSaas: false,
       nodeEnvironment: undefined,
       processName: "langwatch-api",
