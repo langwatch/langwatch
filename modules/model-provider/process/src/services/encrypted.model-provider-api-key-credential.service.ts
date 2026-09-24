@@ -3,18 +3,11 @@ import { createLogger } from "@langwatch/observability";
 
 import {
   ModelProviderCredentialCodec,
+  type CustomKeysRead,
   type ModelProviderCredentialCipher,
 } from "../app/model-provider.members.ts";
 
 const logger = createLogger("langwatch:model-provider:credentials");
-
-/**
- * How a ModelProvider's `customKeys` column read back.
- */
-export interface CustomKeysRead {
-  state: "absent" | "read" | "unreadable";
-  keys: Record<string, unknown>;
-}
 
 const ABSENT: CustomKeysRead = { state: "absent", keys: {} };
 const UNREADABLE: CustomKeysRead = { state: "unreadable", keys: {} };
@@ -108,8 +101,7 @@ export class EncryptedModelProviderCredentialAdapter extends ModelProviderCreden
     return value === null ? null : this.cipher.encrypt(JSON.stringify(value));
   }
 
-  tryDecode(value: unknown): Record<string, unknown> | null {
-    const parsed = EncryptedModelProviderCredentialAdapter.readCustomKeys(value, this.cipher);
-    return parsed.state === "read" ? parsed.keys : null;
+  decode(value: unknown): CustomKeysRead {
+    return EncryptedModelProviderCredentialAdapter.readCustomKeys(value, this.cipher);
   }
 }

@@ -6,7 +6,7 @@ import type { GovernanceClickHouseResolver } from "../../../app/governance.membe
 import { PrismaActivityMonitorRepository } from "../prisma.ingestion-source-activity.repository.ts";
 
 class FakeClickHouseResolver implements GovernanceClickHouseResolver {
-  async tryResolve() {
+  async getClient() {
     return { query };
   }
 }

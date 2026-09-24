@@ -17,7 +17,10 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { ModelProviderCredentialCodec } from "../../../app/model-provider.members.ts";
+import {
+  ModelProviderCredentialCodec,
+  type CustomKeysRead,
+} from "../../../app/model-provider.members.ts";
 import { PrismaModelProviderRepository } from "../prisma.model-provider.repository.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -31,8 +34,10 @@ class Credentials extends ModelProviderCredentialCodec {
     return value === null ? null : JSON.stringify(value);
   }
 
-  tryDecode(value: unknown): Record<string, unknown> | null {
-    return typeof value === "string" ? JSON.parse(value) : null;
+  decode(value: unknown): CustomKeysRead {
+    return typeof value === "string"
+      ? { state: "read", keys: JSON.parse(value) }
+      : { state: "absent", keys: {} };
   }
 }
 

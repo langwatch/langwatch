@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { estimateCost, matchModelCost } from "../../model-cost.ts";
+import { computeCost, matchModelCost } from "../../model-cost.ts";
 import type { ModelCostRate } from "../../model-provider.ts";
 import {
   baseModelCatalog,
@@ -117,7 +117,7 @@ function findZeroRatedModels(costs: readonly ModelCostRate[]): string[] {
       zeroRated.push(`${id} (no cost rule matched)`);
       continue;
     }
-    const cost = estimateCost({
+    const cost = computeCost({
       rate: matched,
       ...ONE_OF_EVERYTHING,
     });

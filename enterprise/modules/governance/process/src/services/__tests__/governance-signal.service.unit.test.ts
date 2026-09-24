@@ -14,7 +14,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   type GovernanceBudgetCrossingData,
-  type GovernanceVkLifecycleData,
   type GatewayBudgetCrossingCandidate,
   type GatewayBudgetScope,
   type GatewayBudgetWindow,
@@ -67,16 +66,10 @@ class FakeGovernanceSignal implements GovernanceSignalChannel {
     return Temporal.Instant.from("2026-08-01T00:00:00.000Z");
   }
 
-  async tryResolveLifecycleTenant(): Promise<string | null> {
-    return null;
-  }
-
   async resolveBudgetCrossings(): Promise<GovernanceResolvedBudgetCrossing[]> {
     if (this.resolveError) throw this.resolveError;
     return this.resolvedRows;
   }
-
-  async appendVirtualKeyLifecycle(_data: GovernanceVkLifecycleData): Promise<void> {}
 
   async appendBudgetCrossing(data: GovernanceBudgetCrossingData): Promise<void> {
     this.appendedCrossings.push(data);

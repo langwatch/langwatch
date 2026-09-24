@@ -174,7 +174,10 @@ describe("EncryptedModelProviderCredentialAdapter", () => {
       // deployment's cipher made of the JSON, which is what makes a row this
       // process writes readable by the one that wrote the others.
       expect(encoded).toBe(cipher.encrypt(JSON.stringify({ OPENAI_API_KEY: "sk-secret" })));
-      expect(codec.tryDecode(encoded)).toEqual({ OPENAI_API_KEY: "sk-secret" });
+      expect(codec.decode(encoded)).toEqual({
+        state: "read",
+        keys: { OPENAI_API_KEY: "sk-secret" },
+      });
     });
 
     /** @scenario "Null customKeys are handled gracefully" */
@@ -185,8 +188,11 @@ describe("EncryptedModelProviderCredentialAdapter", () => {
 
   describe("given a column that cannot be read", () => {
     /** @scenario "Null customKeys are handled gracefully" */
-    it("decodes to null rather than to an empty bag", () => {
-      expect(codec.tryDecode("not-a-value-this-cipher-can-decrypt")).toBeNull();
+    it("decodes to unreadable rather than to an empty bag", () => {
+      expect(codec.decode("not-a-value-this-cipher-can-decrypt")).toEqual({
+        state: "unreadable",
+        keys: {},
+      });
     });
   });
 });

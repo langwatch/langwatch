@@ -33,9 +33,9 @@ class RecordedClickHouseClient implements GovernanceClickHouseClient {
 class RecordedClickHouseResolver implements GovernanceClickHouseResolver {
   readonly organizationIds: string[] = [];
 
-  constructor(private readonly client: GovernanceClickHouseClient | null) {}
+  constructor(private readonly client: GovernanceClickHouseClient) {}
 
-  async tryResolve(organizationId: string): Promise<GovernanceClickHouseClient | null> {
+  async getClient(organizationId: string): Promise<GovernanceClickHouseClient> {
     this.organizationIds.push(organizationId);
     return this.client;
   }

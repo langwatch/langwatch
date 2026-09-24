@@ -74,21 +74,21 @@ function memberClickHouseResolver(
 }
 
 /**
- * The same member, as the `tryResolve`-shaped resolver
+ * The same member, as the `getClient`-shaped resolver
  * `PrismaActivityMonitorRepository` takes for `activityClickhouse`
  * (`repositories/prisma/prisma.ingestion-source-activity.repository.ts:342,373`).
  * That repository resolves per organization id but scopes every statement it
  * sends by the org's hidden governance Project id instead — a different
- * value from the id `tryResolve` is called with — so this client reads the
+ * value from the id `getClient` is called with — so this client reads the
  * tenant each statement is actually scoped to out of the statement's own
- * `tenantId` query param rather than out of `tryResolve`'s argument. Never
+ * `tenantId` query param rather than out of `getClient`'s argument. Never
  * null: the member this factory closes over exists whenever it is called.
  */
 function memberGovernanceClickHouseResolver(
   clickhouse: ClickHouseQueryClient,
 ): GovernanceClickHouseResolver {
   return {
-    async tryResolve(): Promise<GovernanceClickHouseClient | null> {
+    async getClient(): Promise<GovernanceClickHouseClient> {
       return {
         async query(input) {
           const tenantId = input.query_params?.tenantId;

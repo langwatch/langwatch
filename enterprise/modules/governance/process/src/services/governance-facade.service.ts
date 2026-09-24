@@ -334,9 +334,6 @@ export class DefaultGovernanceService implements GovernanceApi {
   readonly routingPolicyDelete: GovernanceApi["routingPolicyDelete"] = (...args) =>
     this.lifecycle.routingPolicyDelete(...args);
 
-  readonly tryResolveDefaultRoutingPolicyForUser: GovernanceApi["tryResolveDefaultRoutingPolicyForUser"] =
-    (...args) => this.lifecycle.tryResolveDefaultRoutingPolicyForUser(...args);
-
   readonly personalVirtualKeyEnsureDefault: GovernanceApi["personalVirtualKeyEnsureDefault"] = (
     ...args
   ) => this.lifecycle.personalVirtualKeyEnsureDefault(...args);

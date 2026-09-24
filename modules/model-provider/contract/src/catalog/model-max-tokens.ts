@@ -3,7 +3,7 @@
  * `undefined` or a non-positive/unknown ceiling passes through unchanged,
  * rather than being clamped to a number nobody chose.
  */
-export function clampMaxTokens(
+export function computeClampedMaxTokens(
   value: number | undefined,
   ceiling: number | undefined,
 ): number | undefined {

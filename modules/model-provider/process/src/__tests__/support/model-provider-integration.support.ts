@@ -31,6 +31,7 @@ import {
 import {
   ModelProviderCatalog,
   ModelProviderCredentialCodec,
+  type CustomKeysRead,
 } from "../../app/model-provider.members.ts";
 import { PrefixedModelProviderIdAdapter } from "../../services/prefixed.model-provider-id.service.ts";
 import { TestProjectApi } from "./test-project-api.ts";
@@ -134,13 +135,12 @@ export class IdentityModelProviderCredentialCodec extends ModelProviderCredentia
     return value ? JSON.stringify(value) : null;
   }
 
-  tryDecode(value: unknown): Record<string, unknown> | null {
-    if (typeof value !== "string") return (value as Record<string, unknown> | null) ?? null;
-    try {
-      return JSON.parse(value) as Record<string, unknown>;
-    } catch {
-      return null;
+  decode(value: unknown): CustomKeysRead {
+    if (typeof value === "string") return { state: "read", keys: JSON.parse(value) };
+    if (typeof value === "object" && value !== null) {
+      return { state: "read", keys: Object.fromEntries(Object.entries(value)) };
     }
+    return { state: "absent", keys: {} };
   }
 }
 

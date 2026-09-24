@@ -10,7 +10,10 @@
 import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
-import { ModelProviderCredentialCodec } from "../../../app/model-provider.members.ts";
+import {
+  ModelProviderCredentialCodec,
+  type CustomKeysRead,
+} from "../../../app/model-provider.members.ts";
 import { PrismaModelProviderRepository } from "../prisma.model-provider.repository.ts";
 
 const ORGANIZATION_ID = "organization-1";
@@ -87,8 +90,8 @@ class PlainTextCredentials extends ModelProviderCredentialCodec {
     return null;
   }
 
-  tryDecode(): null {
-    return null;
+  decode(): CustomKeysRead {
+    return { state: "absent", keys: {} };
   }
 }
 

@@ -11,7 +11,7 @@ import {
   type ExperimentDspyStep,
 } from "@langwatch/experiment-contract";
 import {
-  estimateCost,
+  computeCost,
   matchModelCost,
   type ModelCostRate,
 } from "@langwatch/model-provider-contract";
@@ -113,7 +113,7 @@ function priceLlmCall(call: DSPyLLMCall, costs: readonly ModelCostRate[]): DSPyL
     prompt_tokens: promptTokens,
     completion_tokens: completionTokens,
     cost: rate
-      ? estimateCost({
+      ? computeCost({
           rate,
           inputTokens: promptTokens ?? 0,
           outputTokens: completionTokens ?? 0,

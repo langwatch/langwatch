@@ -398,12 +398,6 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
     return project?.id ?? null;
   }
 
-  private async tryGetClickhouse(
-    organizationId: string,
-  ): Promise<GovernanceClickHouseClient | null> {
-    return this.clickhouse.tryResolve(organizationId);
-  }
-
   async summary(input: { organizationId: string; windowDays: number }): Promise<SummaryResult> {
     const anomalyBreakdown = await this.openAnomalyBreakdown(input.organizationId);
     const openAnomalyCount =
@@ -414,10 +408,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
       return { ...EMPTY_SUMMARY, openAnomalyCount, anomalyBreakdown };
     }
 
-    const ch = await this.tryGetClickhouse(input.organizationId);
-    if (!ch) {
-      return { ...EMPTY_SUMMARY, openAnomalyCount, anomalyBreakdown };
-    }
+    const ch = await this.clickhouse.getClient(input.organizationId);
 
     const now = Date.now();
     const windowMs = input.windowDays * 24 * 60 * 60 * 1000;
@@ -508,8 +499,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
     const govProjectId = await this.tryResolveGovProjectId(input.organizationId);
     if (!govProjectId) return [];
 
-    const ch = await this.tryGetClickhouse(input.organizationId);
-    if (!ch) return [];
+    const ch = await this.clickhouse.getClient(input.organizationId);
 
     const now = Date.now();
     const windowMs = input.windowDays * 24 * 60 * 60 * 1000;
@@ -624,8 +614,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
     });
     if (projects.length === 0) return [];
 
-    const ch = await this.tryGetClickhouse(input.organizationId);
-    if (!ch) return [];
+    const ch = await this.clickhouse.getClient(input.organizationId);
 
     const projectDepartmentById = new Map(projects.map((p) => [p.id, p.departmentId] as const));
     const tenantIds = projects.map((p) => p.id);
@@ -834,8 +823,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
     const govProjectId = await this.tryResolveGovProjectId(input.organizationId);
     if (!govProjectId) return [];
 
-    const ch = await this.tryGetClickhouse(input.organizationId);
-    if (!ch) return [];
+    const ch = await this.clickhouse.getClient(input.organizationId);
 
     const now = Date.now();
     const windowMs = input.windowDays * 24 * 60 * 60 * 1000;
@@ -1008,12 +996,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
       };
     }
 
-    const ch = await this.tryGetClickhouse(input.organizationId);
-    if (!ch) {
-      return {
-        buckets: PrismaActivityMonitorRepository.emptyDenseBuckets(windowStart, windowDays),
-      };
-    }
+    const ch = await this.clickhouse.getClient(input.organizationId);
 
     let groupExpr: string;
     if (input.groupBy === "team") {
@@ -1341,12 +1324,11 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
     if (sources.length === 0) return [];
 
     const govProjectId = await this.tryResolveGovProjectId(input.organizationId);
-    const ch = govProjectId ? await this.tryGetClickhouse(input.organizationId) : null;
 
     const eventsBySource = new Map<string, number>();
-    if (ch && govProjectId) {
+    if (govProjectId) {
       const args = {
-        ch,
+        ch: await this.clickhouse.getClient(input.organizationId),
         tenantId: govProjectId,
         sourceIds: sources.map((s) => s.id),
         since: Date.now() - 24 * 60 * 60 * 1000,
@@ -1490,8 +1472,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
     const govProjectId = await this.tryResolveGovProjectId(input.organizationId);
     if (!govProjectId) return [];
 
-    const ch = await this.tryGetClickhouse(input.organizationId);
-    if (!ch) return [];
+    const ch = await this.clickhouse.getClient(input.organizationId);
 
     const limit = input.limit ?? 50;
     const args = {
@@ -1641,8 +1622,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
     const govProjectId = await this.tryResolveGovProjectId(input.organizationId);
     if (!govProjectId) return PrismaActivityMonitorRepository.emptySourceHealthMetrics();
 
-    const ch = await this.tryGetClickhouse(input.organizationId);
-    if (!ch) return PrismaActivityMonitorRepository.emptySourceHealthMetrics();
+    const ch = await this.clickhouse.getClient(input.organizationId);
 
     const now = Date.now();
     const day = 24 * 60 * 60 * 1000;

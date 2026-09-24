@@ -7,7 +7,6 @@ import type {
   GovernanceResolvedBudgetCrossing,
   GatewayBudgetCrossingCandidate,
   GovernanceBudgetCrossingData,
-  GovernanceVkLifecycleData,
 } from "../../app/governance.members.ts";
 import { GovernanceSignalService } from "../governance-signal.service.ts";
 
@@ -23,10 +22,8 @@ class RecordingDiagnostics implements GovernanceDiagnosticsSink {
 }
 
 class RecordingSignalChannel implements GovernanceSignalChannel {
-  readonly lifecycle: GovernanceVkLifecycleData[] = [];
   readonly crossings: GovernanceBudgetCrossingData[] = [];
   enabled = true;
-  tenantId: string | null = "project-1";
   resolved: GovernanceResolvedBudgetCrossing[] = [];
   failure: Error | null = null;
 
@@ -38,18 +35,9 @@ class RecordingSignalChannel implements GovernanceSignalChannel {
     return Temporal.Instant.from("2026-08-24T12:00:00.000Z");
   }
 
-  tryResolveLifecycleTenant(): Promise<string | null> {
-    return Promise.resolve(this.tenantId);
-  }
-
   resolveBudgetCrossings(): Promise<GovernanceResolvedBudgetCrossing[]> {
     if (this.failure) return Promise.reject(this.failure);
     return Promise.resolve(this.resolved);
-  }
-
-  appendVirtualKeyLifecycle(data: GovernanceVkLifecycleData): Promise<void> {
-    this.lifecycle.push(data);
-    return Promise.resolve();
   }
 
   appendBudgetCrossing(data: GovernanceBudgetCrossingData): Promise<void> {
@@ -83,31 +71,6 @@ function resolved(spentUsd: string): GovernanceResolvedBudgetCrossing {
 }
 
 describe("GovernanceSignalService", () => {
-  it("creates a lifecycle fact with resolved tenancy and one clock", async () => {
-    const channel = new RecordingSignalChannel();
-    await GovernanceSignalService.create(channel).emitVirtualKeyLifecycle({
-      virtualKey: {
-        id: "key-1",
-        organizationId: "org-1",
-        name: "production",
-        displayPrefix: "vk-lw-123",
-        traceProjectId: null,
-      },
-      action: "disabled",
-      reason: "operator hold",
-    });
-
-    expect(channel.lifecycle).toEqual([
-      expect.objectContaining({
-        tenantId: "project-1",
-        virtual_key_id: "key-1",
-        action: "disabled",
-        reason: "operator hold",
-        occurred_at: Date.parse("2026-08-24T12:00:00.000Z"),
-      }),
-    ]);
-  });
-
   it("emits only threshold and breach crossings", async () => {
     const channel = new RecordingSignalChannel();
     channel.resolved = [resolved("79"), resolved("80"), resolved("100")];

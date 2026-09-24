@@ -118,7 +118,6 @@ import type {
   DeleteRoutingPolicyInput,
   FindRoutingPolicyInput,
   ListRoutingPoliciesInput,
-  ResolveDefaultRoutingPolicyInput,
   RoutingPolicy,
   SetDefaultRoutingPolicyInput,
   UpdateRoutingPolicyInput,
@@ -300,9 +299,6 @@ export interface GovernanceApi {
   routingPolicyUpdate(input: UpdateRoutingPolicyInput): Promise<RoutingPolicy>;
   routingPolicySetDefault(input: SetDefaultRoutingPolicyInput): Promise<RoutingPolicy>;
   routingPolicyDelete(input: DeleteRoutingPolicyInput): Promise<void>;
-  tryResolveDefaultRoutingPolicyForUser(
-    input: ResolveDefaultRoutingPolicyInput,
-  ): Promise<RoutingPolicy | null>;
 
   personalVirtualKeyEnsureDefault(
     input: EnsureDefaultPersonalVirtualKeyInput,

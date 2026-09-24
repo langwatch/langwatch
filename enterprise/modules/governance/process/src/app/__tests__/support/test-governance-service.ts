@@ -119,7 +119,5 @@ export class TestGovernanceService implements GovernanceApi {
     unsupported<GovernanceApi["findIngestionSourceByIngestSecret"]>();
   findRoutingPolicyById = unsupported<GovernanceApi["findRoutingPolicyById"]>();
   findTemplateByIdForOrg = unsupported<GovernanceApi["findTemplateByIdForOrg"]>();
-  tryResolveDefaultRoutingPolicyForUser =
-    unsupported<GovernanceApi["tryResolveDefaultRoutingPolicyForUser"]>();
   usageRecord = unsupported<GovernanceApi["usageRecord"]>();
 }

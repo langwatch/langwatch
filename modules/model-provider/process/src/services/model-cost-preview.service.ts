@@ -4,7 +4,7 @@ import { ValidationError } from "@langwatch/handled-error";
  * for this model" hint.
  */
 import {
-  estimateCost,
+  computeCost,
   matchModelCost,
   type CostRuleMatchingSpansPreview,
   type CostRulePreviewInput,
@@ -149,7 +149,7 @@ export class ModelCostPreviewService {
           ...row,
           exampleCost: !hasTokenUsage
             ? null
-            : (estimateCost({
+            : (computeCost({
                 rate: candidate,
                 inputTokens: row.inputTokens ?? 0,
                 outputTokens: row.outputTokens ?? 0,

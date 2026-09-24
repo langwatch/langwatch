@@ -7,7 +7,6 @@ import {
   type GovernanceDiagnosticsSink,
   type GovernanceSignalChannel,
   type GovernanceResolvedBudgetCrossing,
-  type GovernanceVirtualKeyLifecycleSignal,
 } from "../app/governance.members.ts";
 import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 
@@ -22,39 +21,6 @@ export class GovernanceSignalService {
     diagnostics: GovernanceDiagnosticsSink = new NullGovernanceDiagnosticsAdapter(),
   ): GovernanceSignalService {
     return new GovernanceSignalService(port, diagnostics);
-  }
-
-  async emitVirtualKeyLifecycle(signal: GovernanceVirtualKeyLifecycleSignal): Promise<void> {
-    if (!this.port.available()) {
-      return;
-    }
-
-    try {
-      const tenantId = await this.port.tryResolveLifecycleTenant({
-        organizationId: signal.virtualKey.organizationId,
-        preferredProjectId: signal.virtualKey.traceProjectId,
-      });
-      if (!tenantId) {
-        return;
-      }
-
-      await this.port.appendVirtualKeyLifecycle({
-        tenantId,
-        organization_id: signal.virtualKey.organizationId,
-        virtual_key_id: signal.virtualKey.id,
-        action: signal.action,
-        name: signal.virtualKey.name,
-        display_prefix: signal.virtualKey.displayPrefix,
-        reason: signal.reason ?? null,
-        occurred_at: this.port.now().epochMilliseconds,
-      });
-    } catch (error) {
-      this.diagnostics.warn("failed to append vk lifecycle governance event (best effort)", {
-        virtualKeyId: signal.virtualKey.id,
-        action: signal.action,
-        error,
-      });
-    }
   }
 
   async detectBudgetCrossings(candidates: GatewayBudgetCrossingCandidate[]): Promise<void> {

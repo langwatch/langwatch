@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { estimateCost } from "../model-cost.ts";
+import { computeCost } from "../model-cost.ts";
 import type { ModelCostRate } from "../model-provider.ts";
 
 // Catalog rates under test (model-catalog.overlay.json), per token, from
@@ -29,12 +29,12 @@ const imageRate: ModelCostRate = {
   outputImageCostPerToken: IMAGE2_IMAGE_OUT,
 };
 
-describe("estimateCost with image token rates", () => {
+describe("computeCost with image token rates", () => {
   describe("given a generation that reports text in and image out", () => {
     /** @scenario a generation prices text in plus image out */
     it("prices a generation from text in and image out", () => {
       expect(
-        estimateCost({
+        computeCost({
           ...NO_TOKENS,
           rate: imageRate,
           inputTokens: 14,
@@ -48,7 +48,7 @@ describe("estimateCost with image token rates", () => {
     /** @scenario an edit prices text in, image in and image out */
     it("prices an edit from all three buckets", () => {
       expect(
-        estimateCost({
+        computeCost({
           ...NO_TOKENS,
           rate: imageRate,
           inputTokens: 14,
@@ -63,7 +63,7 @@ describe("estimateCost with image token rates", () => {
     /** @scenario a rule that prices only image tokens is a priced rule */
     it("treats an image-only rate as priced", () => {
       expect(
-        estimateCost({
+        computeCost({
           ...NO_TOKENS,
           rate: {
             model: "x",
@@ -80,7 +80,7 @@ describe("estimateCost with image token rates", () => {
     /** @scenario a model with no rate at all still reports "cannot price" */
     it("returns undefined for an unpriced model carrying image tokens", () => {
       expect(
-        estimateCost({
+        computeCost({
           ...NO_TOKENS,
           rate: { model: "x", regex: "^x" },
           outputImageTokens: 1600,
@@ -93,7 +93,7 @@ describe("estimateCost with image token rates", () => {
     /** @scenario a chat model never bills pixels it cannot produce */
     it("prices image tokens at zero on a model with no image rate", () => {
       expect(
-        estimateCost({
+        computeCost({
           ...NO_TOKENS,
           rate: {
             model: "openai/gpt-4o",

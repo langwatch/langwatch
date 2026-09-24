@@ -1,6 +1,6 @@
 import type { SpendUsage } from "@langwatch/gateway-contract";
 import {
-  estimateCost,
+  computeCost,
   getStaticModelCostRates,
   llmModels,
   matchModelCost,
@@ -12,7 +12,7 @@ import { type GatewaySpendRating } from "../app/gateway.members.ts";
 
 /**
  * Rating for the gateway spend pipeline: quantities in, integer nano-USD out,
- * via the same estimateCost cascade the trace pipeline uses. Deterministic
+ * via the same computeCost cascade the trace pipeline uses. Deterministic
  * per (model, quantities, rate_version) — a replay re-rates identically.
  */
 
@@ -132,7 +132,7 @@ export class ModelCatalogGatewaySpendRatingService implements GatewaySpendRating
   }): { costNanoUsd: number; rateVersion: string } {
     const rate = matchModelCost(model, getStaticModelCostRates());
     const usd = rate
-      ? estimateCost({
+      ? computeCost({
           rate,
           inputTokens: usage.input_tokens,
           outputTokens: usage.output_tokens,

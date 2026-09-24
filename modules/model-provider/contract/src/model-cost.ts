@@ -45,7 +45,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
  * its sample spans under the rate a customer is still typing, which has no catalogue entry to
  * look up.
  */
-export const estimateCost = (input: {
+export const computeCost = (input: {
   rate: ModelCostRate;
   inputTokens: number;
   outputTokens: number;
@@ -249,7 +249,7 @@ export const estimateModelCost = (
         : undefined;
 
     return (
-      estimateCost({
+      computeCost({
         rate: {
           model: "",
           regex: "",
@@ -292,7 +292,7 @@ export const estimateModelCost = (
   const matched =
     resolvedModel && hasUsage ? matchModelCost(resolvedModel, staticCosts) : undefined;
   const computed = matched
-    ? (estimateCost({
+    ? (computeCost({
         rate: matched,
         inputTokens,
         outputTokens,

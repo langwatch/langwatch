@@ -21,6 +21,7 @@ import {
   UnmanagedModelProviderGatewayAdapter,
   VercelAiModelTranslationAdapter,
   modelProviderConnectionPingChannels,
+  type CustomKeysRead,
 } from "@langwatch/model-provider-process";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -55,12 +56,15 @@ class IdentityCredentialCodec extends ModelProviderCredentialCodec {
     return value ? JSON.stringify(value) : null;
   }
 
-  tryDecode(value: unknown): Record<string, unknown> | null {
-    if (typeof value !== "string") return (value as Record<string, unknown> | null) ?? null;
+  decode(value: unknown): CustomKeysRead {
+    if (typeof value === "object" && value !== null) {
+      return { state: "read", keys: Object.fromEntries(Object.entries(value)) };
+    }
+    if (typeof value !== "string") return { state: "absent", keys: {} };
     try {
-      return JSON.parse(value) as Record<string, unknown>;
+      return { state: "read", keys: JSON.parse(value) };
     } catch {
-      return null;
+      return { state: "unreadable", keys: {} };
     }
   }
 }

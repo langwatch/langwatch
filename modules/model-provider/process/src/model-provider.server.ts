@@ -13,6 +13,7 @@ import type {
 } from "./app/model-provider.app.ts";
 import type {
   CodexTokenRefresher,
+  CustomKeysRead,
   ModelCostProject,
   ModelProviderCatalog,
   ModelProviderConnectionRateLimiter,
@@ -33,10 +34,7 @@ import {
   CodexAccountService,
   CodexOAuthModelProviderTokenRefresherAdapter,
 } from "./services/codex-oauth.model-provider-token-refresher.service.ts";
-import {
-  EncryptedModelProviderCredentialAdapter,
-  type CustomKeysRead,
-} from "./services/encrypted.model-provider-api-key-credential.service.ts";
+import { EncryptedModelProviderCredentialAdapter } from "./services/encrypted.model-provider-api-key-credential.service.ts";
 import { HttpModelProviderCredentialProbeAdapter } from "./services/http.model-provider-credential-probe.service.ts";
 import { ModelCostCatalogService } from "./services/model-cost-catalog.service.ts";
 import { ModelProviderExecutionHandleService } from "./services/model-provider-execution-handle.service.ts";

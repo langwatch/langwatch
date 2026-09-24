@@ -28,10 +28,16 @@ import type { ProjectWithTeam } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 import type { LanguageModel } from "ai";
 
+/** How a ModelProvider's `customKeys` column read back. */
+export interface CustomKeysRead {
+  state: "absent" | "read" | "unreadable";
+  keys: Record<string, unknown>;
+}
+
 /** Credential encoding is supplied by the application boundary. */
 export abstract class ModelProviderCredentialCodec {
   abstract encode(value: Record<string, unknown> | null): unknown;
-  abstract tryDecode(value: unknown): Record<string, unknown> | null;
+  abstract decode(value: unknown): CustomKeysRead;
 }
 
 /**

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { getStaticModelCostRates, deriveCacheWrite1hRate } from "../catalog/static-model-costs.ts";
 import {
-  estimateCost as estimateCostUnderOneRate,
+  computeCost as estimateCostUnderOneRate,
   matchModelCost,
   normalizeBedrockModelId,
   normalizeModelName,

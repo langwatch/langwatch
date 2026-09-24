@@ -25,13 +25,11 @@ export {
   ModelProviderIdService,
 } from "./app/model-provider.members.ts";
 export type {
+  CustomKeysRead,
   ModelProviderEgressRequest,
   ModelProviderEgressResponse,
 } from "./app/model-provider.members.ts";
-export {
-  EncryptedModelProviderCredentialAdapter,
-  type CustomKeysRead,
-} from "./services/encrypted.model-provider-api-key-credential.service.ts";
+export { EncryptedModelProviderCredentialAdapter } from "./services/encrypted.model-provider-api-key-credential.service.ts";
 export {
   RegistryModelProviderCatalogAdapter,
   type RegistryModelProviderCatalogOptions,

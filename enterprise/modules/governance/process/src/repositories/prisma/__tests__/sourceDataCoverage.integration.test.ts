@@ -119,7 +119,11 @@ describe("given a source that has been unhealthy since its last successful pull"
       const service = ActivityMonitorService.create(
         PrismaActivityMonitorRepository.create({
           prisma,
-          clickhouse: { tryResolve: async () => null },
+          clickhouse: {
+            getClient: async () => {
+              throw new Error("source coverage reads no ClickHouse");
+            },
+          },
         }),
       );
 
@@ -153,7 +157,11 @@ describe("given a source that has been unhealthy since its last successful pull"
       const service = ActivityMonitorService.create(
         PrismaActivityMonitorRepository.create({
           prisma,
-          clickhouse: { tryResolve: async () => null },
+          clickhouse: {
+            getClient: async () => {
+              throw new Error("source coverage reads no ClickHouse");
+            },
+          },
         }),
       );
 
@@ -193,7 +201,11 @@ describe("given a source whose runs are succeeding", () => {
       const service = ActivityMonitorService.create(
         PrismaActivityMonitorRepository.create({
           prisma,
-          clickhouse: { tryResolve: async () => null },
+          clickhouse: {
+            getClient: async () => {
+              throw new Error("source coverage reads no ClickHouse");
+            },
+          },
         }),
       );
 

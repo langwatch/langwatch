@@ -138,7 +138,7 @@ export type UserBudgetDecision = Readonly<{
 
 /**
  * The gateway governance stores behind /me. Owner: enterprise governance, as
- * `tryResolveDefaultRoutingPolicyForUser` and `personalVirtualKeyList`;
+ * `personalVirtualKeyList`;
  * `checkBudget` is a gateway service `GatewayApi` does not expose.
  */
 export interface UserGatewayGovernance {

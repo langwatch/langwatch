@@ -15,7 +15,10 @@ import {
 } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
 
-import type { ModelProviderCredentialCodec } from "../../app/model-provider.members.ts";
+import type {
+  CustomKeysRead,
+  ModelProviderCredentialCodec,
+} from "../../app/model-provider.members.ts";
 import type { ModelProviderRepository } from "../model-provider.repository.ts";
 
 type Database = Pick<PrismaClient, "modelProvider" | "gatewayChangeEvent" | "$transaction">;
@@ -322,6 +325,16 @@ export class PrismaModelProviderRepository implements ModelProviderRepository {
     );
   }
 
+  private static toCustomKeys(read: CustomKeysRead): Record<string, unknown> | null {
+    switch (read.state) {
+      case "read":
+        return read.keys;
+      case "absent":
+      case "unreadable":
+        return null;
+    }
+  }
+
   private static toModelProvider(
     row: PrismaModelProvider & { scopes: ModelProviderScope[] },
     credentials: ModelProviderCredentialCodec,
@@ -334,7 +347,7 @@ export class PrismaModelProviderRepository implements ModelProviderRepository {
       enabled: row.enabled,
       routingHandle: row.routingHandle ?? null,
       scopes: row.scopes.map(({ scopeType, scopeId }) => ({ scopeType, scopeId })),
-      customKeys: credentials.tryDecode(row.customKeys),
+      customKeys: PrismaModelProviderRepository.toCustomKeys(credentials.decode(row.customKeys)),
       customModels: PrismaModelProviderRepository.asModels(row.customModels, "chat"),
       customEmbeddingsModels: PrismaModelProviderRepository.asModels(
         row.customEmbeddingsModels,

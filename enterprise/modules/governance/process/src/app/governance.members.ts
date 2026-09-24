@@ -527,18 +527,6 @@ export interface GovernanceProjectDirectory {
   ensureInternal(input: InternalProjectQuery): Promise<InternalProject>;
 }
 
-export type GovernanceVirtualKeyLifecycleSignal = {
-  virtualKey: {
-    id: string;
-    organizationId: string;
-    name: string;
-    displayPrefix: string;
-    traceProjectId: string | null;
-  };
-  action: GovernanceVkLifecycleData["action"];
-  reason?: string | null;
-};
-
 export type GovernanceResolvedBudgetCrossing = {
   candidate: GatewayBudgetCrossingCandidate;
   budget: {
@@ -557,15 +545,10 @@ export type GovernanceResolvedBudgetCrossing = {
 export interface GovernanceSignalChannel {
   available(): boolean;
   now(): Instant;
-  tryResolveLifecycleTenant(input: {
-    organizationId: string;
-    preferredProjectId: string | null;
-  }): Promise<string | null>;
   resolveBudgetCrossings(
     candidates: GatewayBudgetCrossingCandidate[],
     now: Instant,
   ): Promise<GovernanceResolvedBudgetCrossing[]>;
-  appendVirtualKeyLifecycle(data: GovernanceVkLifecycleData): Promise<void>;
   appendBudgetCrossing(data: GovernanceBudgetCrossingData): Promise<void>;
 }
 
@@ -752,7 +735,7 @@ export interface GovernanceClickHouseClient {
 }
 
 export interface GovernanceClickHouseResolver {
-  tryResolve(organizationId: string): Promise<GovernanceClickHouseClient | null>;
+  getClient(organizationId: string): Promise<GovernanceClickHouseClient>;
 }
 
 export type StoredIngestionKey = {
