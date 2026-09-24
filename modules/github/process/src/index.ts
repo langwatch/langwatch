@@ -27,11 +27,7 @@ export {
 // The GitHub App installation flow's REST family: the session-gated start, the
 // protocol-mandated Setup URL and the HMAC-verified webhook, plus the two
 // `github-langy` aliases held by App registrations we do not own.
-export {
-  githubInstallRest,
-  type GithubInstallApi,
-  type GithubInstallSession,
-} from "./transport/github-install.rest.ts";
+export { githubInstallRest, type GithubInstallApi } from "./transport/github-install.rest.ts";
 
 // The `github.*` procedures: the connection, its repositories, the live
 // pull-request read and the disconnect.

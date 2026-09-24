@@ -52,5 +52,5 @@ export type GithubConnectionAuditEntry = Readonly<{
   userId: string;
   organizationId: string;
   action: string;
-  args: Readonly<Record<string, unknown>>;
+  args: Readonly<Record<string, string>>;
 }>;

@@ -1,8 +1,11 @@
+import { AuditLogApi } from "@langwatch/audit-log-contract";
+import { AuthApi } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
   GithubApi,
   type GithubApi as GithubApiContract,
   type GithubAppConfig,
+  type GithubConnectionAuditEntry,
   type GithubConnectionStatus,
   type GithubDisconnectResult,
   type GithubInstallation,
@@ -217,6 +220,8 @@ export class GithubApp implements GithubApiContract {
     organizations: OrganizationApi,
     projects: ProjectApi,
     permissions: AuthzApi,
+    auth: AuthApi,
+    auditLog: AuditLogApi,
   };
   static readonly config = githubConfig;
   static readonly secrets = {
@@ -228,17 +233,23 @@ export class GithubApp implements GithubApiContract {
   readonly #branchMaintenance: GithubBranchMaintenance;
   readonly #projects: ProjectApiContract;
   readonly #permissions: AuthzApi;
+  readonly #auth: AuthApi;
+  readonly #auditLog: AuditLogApi;
 
   private constructor(parts: {
     service: GithubApiContract;
     branchMaintenance: GithubBranchMaintenance;
     projects: ProjectApiContract;
     permissions: AuthzApi;
+    auth: AuthApi;
+    auditLog: AuditLogApi;
   }) {
     this.#service = parts.service;
     this.#branchMaintenance = parts.branchMaintenance;
     this.#projects = parts.projects;
     this.#permissions = parts.permissions;
+    this.#auth = parts.auth;
+    this.#auditLog = parts.auditLog;
   }
 
   /**
@@ -402,6 +413,8 @@ export class GithubApp implements GithubApiContract {
       }),
       projects: dependencies.projects,
       permissions: dependencies.permissions,
+      auth: dependencies.auth,
+      auditLog: dependencies.auditLog,
     });
   }
 
@@ -415,6 +428,16 @@ export class GithubApp implements GithubApiContract {
   }
   findOrganizationForProject(projectId: string): Promise<string | undefined> {
     return this.#projects.findOrganizationId(projectId);
+  }
+  /** Whether the person who started the install flow is the one signed in on this request. */
+  async isSignedInAs(input: { request: Request; userId: string }): Promise<boolean> {
+    const verified = await this.#auth.tryVerifyBrowserSession({ headers: input.request.headers });
+    const session = await this.#auth.tryResolveBrowserSession({ verified });
+
+    return session?.user.id === input.userId;
+  }
+  recordAudit(entry: GithubConnectionAuditEntry): Promise<void> {
+    return this.#auditLog.record(entry);
   }
 
   /** The fleet-wide branch sweep `github_maintenance` schedules. */

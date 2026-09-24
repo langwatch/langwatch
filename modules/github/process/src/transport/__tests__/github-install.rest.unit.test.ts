@@ -129,10 +129,11 @@ function mount(
 
       return githubStub(service);
     },
-    resolveSession: async () => {
+    isSignedInAs: async ({ userId }) => {
       sessionReads.count += 1;
+      const session = options.session === undefined ? { user: { id: "user_1" } } : options.session;
 
-      return options.session === undefined ? { user: { id: "user_1" } } : options.session;
+      return session?.user.id === userId;
     },
     canManageOrganization: async () => options.canManage ?? true,
     recordAudit: async (entry) => {

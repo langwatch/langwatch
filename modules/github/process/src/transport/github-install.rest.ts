@@ -27,9 +27,6 @@ import { resolveRequestBound } from "@langwatch/plans";
 import { nowInstant } from "@langwatch/time";
 import { HTTPException } from "hono/http-exception";
 
-/** Who is signed in, as this process resolves a browser session. */
-export type GithubInstallSession = Readonly<{ user: Readonly<{ id: string }> }>;
-
 /**
  * What the installation flow reaches. The GitHub capability is this module's;
  * the session, the organization-management answer, the audit trail and the
@@ -38,12 +35,8 @@ export type GithubInstallSession = Readonly<{ user: Readonly<{ id: string }> }>;
 export interface GithubInstallApi {
   /** The SAME capability the `github.*` procedures read. */
   github(): GithubApi;
-  /**
-   * The browser session behind this request. An operation the handler CALLS
-   * rather than a declared fact: an instance that registered no App answers
-   * 503 before it reads a session at all, and a fact resolves first.
-   */
-  resolveSession(input: { request: Request }): Promise<GithubInstallSession | null>;
+  /** Whether the person who started the flow is the one signed in on this request. */
+  isSignedInAs(input: { request: Request; userId: string }): Promise<boolean>;
   /**
    * Whether this person may connect GitHub for that organization. Connecting
    * grants repository access to the whole organization, so it takes
@@ -416,9 +409,7 @@ async function rejectUnauthorizedSetup({
   state: GithubInstallStatePayload;
 }): Promise<{ rejected: true; answer: GithubAnswer } | { rejected: false }> {
   // Re-bind the session to the state's user.
-  const session = await app.resolveSession({ request });
-
-  if (!session?.user || session.user.id !== state.userId) {
+  if (!(await app.isSignedInAs({ request, userId: state.userId }))) {
     return rejectWith({ app, state, errorMessage: "Session changed mid-flow", status: 401 });
   }
 
