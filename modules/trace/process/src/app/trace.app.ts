@@ -128,6 +128,7 @@ import {
   traceConfig,
   TraceIdAmbiguousError,
   TraceNotFoundError,
+  type TraceMetadataUpdate,
   type TracePreconditionSampleInput,
 } from "@langwatch/trace-contract";
 import {
@@ -181,6 +182,7 @@ import type { TraceIngestCredentialService } from "../services/trace-ingest-cred
 import type { TraceIngestionService } from "../services/trace-ingestion.service.ts";
 import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
 import type { TraceLegacyCredentialService } from "../services/trace-legacy-credential.service.ts";
+import { TraceMetadataWriteService } from "../services/trace-metadata-write.service.ts";
 import { TracePreconditionSampleService } from "../services/trace-precondition-sample.service.ts";
 import { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
 import { TraceProcessingPipelineService } from "../services/trace-processing-pipeline.service.ts";
@@ -1911,6 +1913,18 @@ export class TraceApp implements TraceApi, CollectorApp {
     });
 
     return this.#readTranscriptWithProtections({ ...input, protections });
+  }
+
+  async updateTraceMetadata(input: {
+    projectId: string;
+    traceId: string;
+    metadata: TraceMetadataUpdate;
+  }): Promise<void> {
+    const ingest = this.#dependencies.spanIngest;
+    if (!ingest) {
+      throw new TraceIngestionUnavailableError();
+    }
+    await TraceMetadataWriteService.updateTraceMetadata({ ingest, ...input });
   }
 
   /** Port of main's REST transcript route: the key's protections, the trace, its transcript. */

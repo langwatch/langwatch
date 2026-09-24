@@ -286,16 +286,6 @@ function resolveTraceFormat({
   return "json";
 }
 
-/** What a caller supplies beyond `TraceApi` itself; the member may be absent. */
-export type TracesRestOptions = Readonly<{
-  /** Absent where the process registered no command queue; the route is not registered at all. */
-  updateTraceMetadata?:
-    | ((
-        input: Readonly<{ projectId: string; traceId: string; metadata: unknown }>,
-      ) => Promise<void>)
-    | undefined;
-}>;
-
 /** The `/api/traces` and `/api/v1/traces` family. */
 /** One `POST /search` answer: the envelope, serialised once with its rows already JSON. */
 async function searchTraces({
@@ -390,13 +380,11 @@ async function searchTraces({
   return streamSearchEnvelope(serializedTraces, pagination, schemaSuffix);
 }
 
-export function createTracesRest(options: TracesRestOptions = {}): Readonly<{
+export function createTracesRest(): Readonly<{
   protocol: "rest";
   namespace: string;
   router: () => RestTransportDeclaration<TraceApi>;
 }> {
-  const { updateTraceMetadata } = options;
-
   let router = defineRestRouter(TraceApi)
     .withNamespace("traces")
     .withVersion(MANAGEMENT_API_VERSION)
@@ -479,27 +467,26 @@ export function createTracesRest(options: TracesRestOptions = {}): Readonly<{
       ),
     );
 
-  // PATCH /:traceId/metadata - registered only where the process registered a
-  // command queue for the amendment.
-  if (updateTraceMetadata) {
-    router = router
-      .patch("/:traceId/metadata", "updateTraceMetadata")
-      .withParams(traceIdParamsSchema)
-      .withInput(traceMetadataBodySchema)
-      .withPermission("traces:update")
-      .withOutput(traceMetadataResponseSchema)
-      .withDocs({
-        description:
-          "Update metadata on a trace after creation. Inserts a synthetic span carrying the new " +
-          "attributes through the standard ingestion pipeline. New keys are added, existing keys " +
-          "are updated, missing keys are preserved. Labels replace entirely.",
-      })
-      .handle(async ({ input, scope }) => {
-        const { traceId } = input;
-        await updateTraceMetadata({ projectId: scope.id, traceId, metadata: input.metadata });
-        return { traceId };
+  router = router
+    .patch("/:traceId/metadata", "updateTraceMetadata")
+    .withParams(traceIdParamsSchema)
+    .withInput(traceMetadataBodySchema)
+    .withPermission("traces:update")
+    .withOutput(traceMetadataResponseSchema)
+    .withDocs({
+      description:
+        "Update metadata on a trace after creation. Inserts a synthetic span carrying the new " +
+        "attributes through the standard ingestion pipeline. New keys are added, existing keys " +
+        "are updated, missing keys are preserved. Labels replace entirely.",
+    })
+    .handle(async ({ app, input, scope }) => {
+      await app.updateTraceMetadata({
+        projectId: scope.id,
+        traceId: input.traceId,
+        metadata: input.metadata,
       });
-  }
+      return { traceId: input.traceId };
+    });
 
   // GET /:traceId - LAST of the three, so the two literal sub-resources above
   // are not swallowed by the parameter.

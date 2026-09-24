@@ -85,7 +85,40 @@ describe("EvaluatorApp.findTraceIdsPassingPreconditions", () => {
           preconditions: [{ field: "input", rule: "sounds_like", value: "refund" }],
           traces: [],
         }),
-      ).rejects.toMatchObject({ code: "validation_error" });
+      ).rejects.toMatchObject({
+        code: "validation_error",
+        meta: { fieldErrors: { preconditions: expect.any(Array) } },
+      });
+    });
+
+    /** @scenario "A platform-native evaluator type is refused as main's catalogue refused it" */
+    it("refuses a type outside main's generated catalogue", async () => {
+      const { app } = createEvaluatorTestApp();
+
+      await expect(
+        app.findTraceIdsPassingPreconditions({
+          evaluatorType: "langwatch/api_keys_and_secrets_detection",
+          preconditions: [],
+          traces: [],
+        }),
+      ).rejects.toMatchObject({ meta: { fieldErrors: { evaluatorType: expect.any(Array) } } });
+    });
+  });
+
+  describe("given a precondition on the trace's origin", () => {
+    /** @scenario "An origin precondition reads a sampled trace as an application trace, as main did" */
+    it("matches origin application and nothing else", async () => {
+      const { app } = createEvaluatorTestApp();
+      const traces = [trace({ traceId: "t-1", input: "a" })];
+      const match = (value: string) =>
+        app.findTraceIdsPassingPreconditions({
+          evaluatorType: "custom/check",
+          preconditions: [{ field: "traces.origin", rule: "is", value }],
+          traces,
+        });
+
+      expect(await match("application")).toEqual(["t-1"]);
+      expect(await match("simulation")).toEqual([]);
     });
   });
 });

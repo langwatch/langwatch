@@ -32,7 +32,7 @@ import {
   type ResolvedEvaluatorExecution,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
-import { checkPreconditionsSchema } from "@langwatch/evaluator-contract/evaluation-types";
+import { preconditionMatchInputSchema } from "@langwatch/evaluator-contract/evaluation-types";
 import { ValidationError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
@@ -566,25 +566,20 @@ export class EvaluatorApp implements EvaluatorApi {
     return evaluatorPlatformUrl({ publicBaseUrl: this.#dependencies.publicBaseUrl, ...input });
   }
 
-  /** Main accepted a catalogue or a `custom/` evaluator and refused any other as invalid input. */
+  /** Main refused an unknown evaluator type or a malformed precondition as invalid input. */
   async findTraceIdsPassingPreconditions(input: {
     evaluatorType: string;
     preconditions: unknown;
     traces: readonly Trace[];
   }): Promise<string[]> {
-    const { evaluatorType, traces } = input;
-    if (
-      !Object.hasOwn(AVAILABLE_EVALUATORS, evaluatorType) &&
-      !evaluatorType.startsWith("custom/")
-    ) {
-      throw new ValidationError("The evaluator type names no known evaluator");
-    }
-    const preconditions = checkPreconditionsSchema.safeParse(input.preconditions);
-    if (!preconditions.success) throw new ValidationError("A precondition is not valid");
+    const parsed = preconditionMatchInputSchema.safeParse(input);
+    if (!parsed.success) throw ValidationError.fromZodError(parsed.error);
+    const { evaluatorType, preconditions } = parsed.data;
+    const { traces } = input;
 
     return findTraceIdsPassingPreconditions({
       evaluatorType,
-      preconditions: preconditions.data,
+      preconditions,
       traces,
     });
   }

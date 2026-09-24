@@ -1,10 +1,11 @@
 import { filterFieldsEnum } from "@langwatch/analytics-contract";
 import { z } from "zod";
 
-import type {
-  EvaluationResult,
-  EvaluationResultError,
-  EvaluationResultSkipped,
+import {
+  evaluatorsSchema,
+  type EvaluationResult,
+  type EvaluationResultError,
+  type EvaluationResultSkipped,
 } from "./evaluators.generated.ts";
 
 // ---------------------------------------------------------------------------
@@ -44,6 +45,12 @@ export type CheckPrecondition = z.infer<typeof checkPreconditionSchema>;
 export const checkPreconditionsSchema = z.array(checkPreconditionSchema);
 
 export type CheckPreconditions = z.infer<typeof checkPreconditionsSchema>;
+
+/** Main's `traces.getSampleTraces` check: a generated catalogue evaluator or a custom one. */
+export const preconditionMatchInputSchema = z.object({
+  evaluatorType: evaluatorsSchema.keyof().or(z.string().startsWith("custom/")),
+  preconditions: checkPreconditionsSchema,
+});
 
 export const conversationSchema = z.array(
   z.object({

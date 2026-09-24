@@ -43,6 +43,7 @@ import type {
 } from "./trace-query.contract.ts";
 import type { TraceLegacyListInput, TracesForProjectResult } from "./trace-read.contract.ts";
 import type { TraceRecord } from "./trace-record.ts";
+import type { TraceMetadataUpdate } from "./trace-rest.schemas.ts";
 import type {
   ScenarioRoleMetrics,
   ScenarioRoleMetricsInput,
@@ -521,6 +522,15 @@ export interface TraceApi extends TraceOtlpIngestApi {
     apiKeyId: string | null;
     userId: string | null;
   }): Promise<unknown>;
+  /**
+   * Main's `PATCH /api/traces/:traceId/metadata`: one synthetic span carrying the metadata,
+   * recorded through the collector's ingress command. Refuses by name where no recorder is.
+   */
+  updateTraceMetadata(input: {
+    projectId: string;
+    traceId: string;
+    metadata: TraceMetadataUpdate;
+  }): Promise<void>;
   /** One export's progress frames from the tenant broadcast, ending at `done` or `error`. */
   streamExportProgress(input: {
     projectId: string;
@@ -608,7 +618,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
   }): boolean;
   readTopicClusteringCounts(input: { projectId: string }): Promise<TraceTopicClusteringCounts>;
   readTopicClusteringPage(input: TraceTopicClusteringPageInput): Promise<TraceTopicClusteringPage>;
-  /** This UTC billing month's distinct traces per project; refuses a project foreign to the organization. */
+  /** This UTC billing month's distinct traces per project; refuses a foreign project. */
   countTracesByProjects(input: {
     organizationId: string;
     projectIds: string[];

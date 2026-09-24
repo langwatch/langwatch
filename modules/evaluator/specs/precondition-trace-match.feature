@@ -28,3 +28,15 @@ Feature: Which traces a check would run on
     Given a precondition with a rule the checks do not know
     When traces are matched against it
     Then the call is refused with validation_error
+
+  @unit
+  Scenario: A platform-native evaluator type is refused as main's catalogue refused it
+    Given an evaluator type the platform runs itself, which main's generated catalogue did not list
+    When traces are matched for it
+    Then the call is refused with validation_error naming evaluatorType
+
+  @unit
+  Scenario: An origin precondition reads a sampled trace as an application trace, as main did
+    Given a sampled trace, which carries no top-level origin as main's did not
+    When it is matched against a traces.origin precondition
+    Then it matches origin "application" and no other origin
