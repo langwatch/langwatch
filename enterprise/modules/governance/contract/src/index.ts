@@ -28,6 +28,7 @@ export * from "./governance.trpc.ts";
 export * from "./ingestion-source.ts";
 export * from "./ingestion-source.commands.ts";
 export * from "./ingestion-template.ts";
+export * from "./ingestion-key.trpc.ts";
 export * from "./ingestion-templates.trpc.ts";
 export * from "./ingestion-pull.commands.ts";
 export * from "./ingestion-pull.events.ts";

@@ -69,6 +69,11 @@ export abstract class ApiKeyRepository {
     organizationId: string;
     apiKeyIds: readonly string[];
   }): Promise<ApiKeyRow[]>;
+  /** The member's own live ingest keys, newest first. */
+  abstract findIngestKeysForUser(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<ApiKeyRow[]>;
   /**
    * Revokes every unrevoked key of one reserved name past expiry.
    * Cross-tenant by design (a fleet-wide sweep, not a request); the name is

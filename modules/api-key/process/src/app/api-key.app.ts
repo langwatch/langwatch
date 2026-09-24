@@ -270,6 +270,12 @@ export class ApiKeyApp implements ApiKeyApi {
   async findByLookupId(input: { lookupId: string }): Promise<ApiKey | null> {
     return this.#service.findByLookupId(input);
   }
+  async findIngestionKeysForUser(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<ApiKey[]> {
+    return this.#service.findIngestionKeysForUser(input);
+  }
   async validateCliSelection(input: {
     userId: string;
     organizationId: string;

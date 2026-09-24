@@ -222,6 +222,13 @@ export class ApiKeyService {
     return this.catalog.findByLookupId(input);
   }
 
+  async findIngestionKeysForUser(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<ApiKey[]> {
+    return this.catalog.findIngestionKeysForUser(input);
+  }
+
   async validateCliSelection(input: {
     userId: string;
     organizationId: string;

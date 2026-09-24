@@ -146,6 +146,19 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     );
   }
 
+  async findIngestKeysForUser(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<ApiKeyRow[]> {
+    return this.#list(
+      (key) =>
+        key.organizationId === input.organizationId &&
+        key.userId === input.userId &&
+        key.ingestSourceType !== null &&
+        key.revokedAt === null,
+    );
+  }
+
   async revokeExpiredByName(input: { name: string; now: Instant }): Promise<number> {
     const now = toDate(input.now);
     const elapsed = this.#database

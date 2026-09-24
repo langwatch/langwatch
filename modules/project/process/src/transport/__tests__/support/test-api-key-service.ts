@@ -32,6 +32,7 @@ export class TestApiKeyService implements ApiKeyApi {
   listAll = unsupported<ApiKeyApi["listAll"]>();
   listForCaller = unsupported<ApiKeyApi["listForCaller"]>();
   listCallerBindings = unsupported<ApiKeyApi["listCallerBindings"]>();
+  findIngestionKeysForUser = unsupported<ApiKeyApi["findIngestionKeysForUser"]>();
   listIngestionKeysForProject = unsupported<ApiKeyApi["listIngestionKeysForProject"]>();
   listKeys = unsupported<ApiKeyApi["listKeys"]>();
   listOrganizationMembers = unsupported<ApiKeyApi["listOrganizationMembers"]>();

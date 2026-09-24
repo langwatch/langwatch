@@ -53,6 +53,10 @@ import {
   type FindRoutingPolicyInput,
   type GovernanceBudgetOverviewForUser,
   type GovernanceApi,
+  type IssuedIngestionKey,
+  type PersonalIngestionKeyListing,
+  type PersonalIngestionKeyMint,
+  type RotatedIngestionKey,
   type GovernanceCliBudgetStatusAnswer,
   type GovernanceCliBootstrapAnswer,
   type GovernanceCliBudgetOverviewAnswer,
@@ -195,6 +199,7 @@ import { OpenAiComplianceReferencePullerService } from "../services/openai-compl
 import type { OrganizationSupportContactService } from "../services/organization-support-contact.service.ts";
 import { PersonDiscoveryService } from "../services/person-discovery.service.ts";
 import { PersonListingService } from "../services/person-listing.service.ts";
+import { PersonalIngestionKeyService } from "../services/personal-ingestion-key.service.ts";
 import {
   PersonalUsageDashboardService,
   type PersonalUsageRollup,
@@ -334,7 +339,10 @@ export interface GovernanceAppDependencies {
   featureFlags: Pick<FeatureFlagApi, "isEnabled">;
   /** Where a pulled Genie/Copilot conversation lands as a trace: the OTLP door main routed through. */
   traces: Pick<TraceApi, "otlpTraces">;
-  apiKeys: Pick<ApiKeyApi, "revokeCliSessionKey">;
+  apiKeys: Pick<
+    ApiKeyApi,
+    "revokeCliSessionKey" | "create" | "revoke" | "findById" | "findIngestionKeysForUser"
+  >;
   gateway: Pick<
     GatewayApi,
     "createVirtualKey" | "revokeVirtualKey" | "findPersonalVirtualKeys" | "findVirtualKeyById"
@@ -563,6 +571,11 @@ export class GovernanceApp implements GovernanceRestApi {
     this.templates = IngestionTemplateService.create({
       repository: repositories.ingestionTemplates,
     });
+    this.ingestionKeys = PersonalIngestionKeyService.create({
+      apiKeys: dependencies.apiKeys,
+      organizations: dependencies.organizations,
+      templates: repositories.ingestionTemplates,
+    });
     // Stored credentials seal under the process's CREDENTIALS_SECRET, the key main sealed them with.
     const sourceCredentials = SourceCredentialAccessService.create({
       sources: repositories.ingestionSources,
@@ -658,6 +671,7 @@ export class GovernanceApp implements GovernanceRestApi {
   private readonly agentDiscovery: AgentDiscoveryService;
   private readonly personListing: PersonListingService;
   private readonly templates: IngestionTemplateService;
+  private readonly ingestionKeys: PersonalIngestionKeyService;
   private readonly erasureSuppression: ErasureSuppressionService;
   private readonly suppressionSnapshot: SuppressionSnapshotService;
   private readonly identityMatches: IdentityMatchService;
@@ -1072,6 +1086,31 @@ export class GovernanceApp implements GovernanceRestApi {
       sourceTemplateId: input.sourceTemplateId,
       surface: by.surface,
     });
+  }
+
+  // ── Personal ingestion keys: the caller's own /me trace-ingest keys ──
+
+  async ingestionKeyList(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<PersonalIngestionKeyListing[]> {
+    return this.ingestionKeys.list(input);
+  }
+
+  async ingestionKeyInstall(input: PersonalIngestionKeyMint): Promise<IssuedIngestionKey> {
+    return this.ingestionKeys.mint(input);
+  }
+
+  async ingestionKeyRotate(input: PersonalIngestionKeyMint): Promise<RotatedIngestionKey> {
+    return this.ingestionKeys.rotate(input);
+  }
+
+  async ingestionKeyRevoke(input: {
+    organizationId: string;
+    userId: string;
+    apiKeyId: string;
+  }): Promise<void> {
+    return this.ingestionKeys.revoke(input);
   }
 
   // ── Personal CLI sessions: the caller's own devices, answered for their user id alone ──

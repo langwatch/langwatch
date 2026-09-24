@@ -150,6 +150,20 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
       orderBy: { createdAt: "desc" },
     });
   }
+  async findIngestKeysForUser(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<ApiKeyRow[]> {
+    return this.database.apiKey.findMany({
+      where: {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        ingestSourceType: { not: null },
+        revokedAt: null,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
   /**
    * One bounded UPDATE over (name, revokedAt, expiresAt). `expiresAt: {
    * not: null }` is explicit, not left to `lte`: a NULL treated as "before

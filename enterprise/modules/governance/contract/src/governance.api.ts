@@ -63,6 +63,11 @@ import type {
 import type { GovernanceActorWorkspace } from "./governance.responses.ts";
 import type { GovernanceSetupState } from "./governance.ts";
 import type {
+  PersonalIngestionKeyListing,
+  PersonalIngestionKeyMint,
+  RotatedIngestionKey,
+} from "./ingestion-key.trpc.ts";
+import type {
   ConfigureIngestionPullCommand,
   DisableIngestionPullCommand,
   RecordIngestionPullRunCompletedCommand,
@@ -496,6 +501,17 @@ export interface GovernanceRestApi {
     input: { organizationId: string; id: string },
     by: GovernanceCaller,
   ): Promise<void>;
+  ingestionKeyList(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<PersonalIngestionKeyListing[]>;
+  ingestionKeyInstall(input: PersonalIngestionKeyMint): Promise<IssuedIngestionKey>;
+  ingestionKeyRotate(input: PersonalIngestionKeyMint): Promise<RotatedIngestionKey>;
+  ingestionKeyRevoke(input: {
+    organizationId: string;
+    userId: string;
+    apiKeyId: string;
+  }): Promise<void>;
   cliSessionListForUser(input: CliUserInput): Promise<CliSessionCard[]>;
   cliSessionRevoke(input: RevokeCliSessionInput): Promise<CliSessionRevocation>;
   cliSessionRevokeAll(input: CliUserInput): Promise<CliSessionRevocation>;

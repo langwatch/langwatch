@@ -179,6 +179,9 @@ class MemoryApiKeys extends ApiKeyRepository {
   findIngestKeys(): Promise<ApiKeyRow[]> {
     return Promise.resolve([]);
   }
+  findIngestKeysForUser(): Promise<ApiKeyRow[]> {
+    return Promise.resolve([]);
+  }
   findLiveChildren(input: {
     parentApiKeyId: string;
     organizationId: string;

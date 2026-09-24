@@ -208,6 +208,15 @@ export class ApiKeyCatalogService {
     return (await this.bindings.attach(rows)).map(publicApiKey);
   }
 
+  async findIngestionKeysForUser(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<ApiKey[]> {
+    const rows = await this.repository.findIngestKeysForUser(input);
+
+    return (await this.bindings.attach(rows)).map(publicApiKey);
+  }
+
   async customRoles(ids: string[], organizationId: string): Promise<ApiKeyRoleSummary[]> {
     if (ids.length === 0) {
       return [];

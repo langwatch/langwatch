@@ -128,6 +128,8 @@ export interface ApiKeyApi {
     organizationId: string;
     projectId: string;
   }): Promise<ApiKey[]>;
+  /** The member's own live ingest keys in one organization, newest first. */
+  findIngestionKeysForUser(input: { organizationId: string; userId: string }): Promise<ApiKey[]>;
   /** One key by the lookup id embedded in its token, revoked or live. */
   findByLookupId(input: { lookupId: string }): Promise<ApiKey | null>;
   validateCliSelection(input: {
