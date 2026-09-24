@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * What this feature is configured with, as opposed to what it is handed.
- *
- * Five values, and no environment variable is named here: the process parses
- * this schema once at its entrypoint and hands the result down, so the module
- * never reads `process.env` and a test states its own values in one literal.
+ * What this feature is configured with, and the secret handles it resolves.
+ * The process parses the schema once and hands the result down; a secret is
+ * resolved only through its handle, never read from `process.env`.
  */
+import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
 
 /**
@@ -41,3 +40,8 @@ export const governanceAppConfigSchema = z.object({
 });
 
 export type GovernanceAppConfig = z.infer<typeof governanceAppConfigSchema>;
+
+/** Every stored erasure digest is a function of this value: set it once, never change it. */
+export const governanceSecrets = {
+  erasurePseudonymSecret: Secret.load("GOVERNANCE_ERASURE_PSEUDONYM_SECRET", { optional: true }),
+} as const;

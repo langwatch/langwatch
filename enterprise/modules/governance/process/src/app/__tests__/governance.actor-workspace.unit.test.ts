@@ -1,11 +1,12 @@
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { AuthApi } from "@langwatch/auth-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 /**
  * Resolving actor token to the person's workspace (for the bird's-eye /governance/users/[id] page).
  * Test verifies failed lookups return null (no info leak) and short-circuit.
  * Spec: specs/ai-gateway/governance/admin-trace-access.feature
  */
-import type { AuthApi } from "@langwatch/auth-contract";
-import type { AuthzApi } from "@langwatch/authz-contract";
+import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import {
@@ -14,6 +15,7 @@ import {
   TeamNotFoundError,
 } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it, vi } from "vitest";
 
 import type { GovernanceMemberDatabase } from "../../governance.server.ts";
@@ -42,7 +44,7 @@ const workspace: PersonalWorkspace = {
   },
 };
 
-function buildApp(options: {
+async function buildApp(options: {
   user?: GovernanceActorUser | null;
   isMember?: boolean;
   workspace?: PersonalWorkspace | null;
@@ -64,7 +66,7 @@ function buildApp(options: {
     virtualKey: { findFirst: unreachable<GovernanceMemberDatabase["virtualKey"]["findFirst"]>() },
   } as unknown as GovernanceMemberDatabase;
 
-  const app = GovernanceApp.create({
+  const app = await GovernanceApp.create({
     config: void 0,
     repositories: MemoryGovernanceRepositories.create(),
     dependencies: {
@@ -73,9 +75,11 @@ function buildApp(options: {
       entitlements: createApiFixture<EntitlementApi>(),
       organizations: createApiFixture<OrganizationApi>({ getPersonalWorkspace }),
       permissions: createApiFixture<AuthzApi>(),
+      scim: createApiFixture<ScimApi>(),
     },
     members: { prisma },
     resources: new ResourceScope(),
+    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
 
   return { app, tryFindUser, isOrganizationMember, getPersonalWorkspace };
@@ -84,7 +88,7 @@ function buildApp(options: {
 describe("GovernanceApp.tryResolveActorWorkspace", () => {
   describe("given an actor token that names a member with a personal workspace", () => {
     it("answers where that workspace lives", async () => {
-      const { app, tryFindUser } = buildApp({
+      const { app, tryFindUser } = await buildApp({
         user: { id: "user-1", name: "Ariana", email: "ariana@acme.com" },
         isMember: true,
         workspace,
@@ -109,7 +113,7 @@ describe("GovernanceApp.tryResolveActorWorkspace", () => {
     });
 
     it("falls back to the email, then the id, for a person with no name", async () => {
-      const { app } = buildApp({
+      const { app } = await buildApp({
         user: { id: "user-1", name: null, email: "ariana@acme.com" },
         isMember: true,
         workspace,
@@ -118,7 +122,7 @@ describe("GovernanceApp.tryResolveActorWorkspace", () => {
         app.findActorWorkspace({ organizationId: ORGANIZATION_ID, actor: "user-1" }),
       ).resolves.toMatchObject({ displayName: "ariana@acme.com" });
 
-      const nameless = buildApp({
+      const nameless = await buildApp({
         user: { id: "user-1", name: null, email: null },
         isMember: true,
         workspace,
@@ -134,7 +138,7 @@ describe("GovernanceApp.tryResolveActorWorkspace", () => {
 
   describe("given a token that names nobody", () => {
     it("answers null without asking about membership", async () => {
-      const { app, isOrganizationMember, getPersonalWorkspace } = buildApp({
+      const { app, isOrganizationMember, getPersonalWorkspace } = await buildApp({
         user: null,
       });
 
@@ -151,7 +155,7 @@ describe("GovernanceApp.tryResolveActorWorkspace", () => {
 
   describe("given a person who is not in this organization", () => {
     it("answers null without reading their workspace", async () => {
-      const { app, getPersonalWorkspace } = buildApp({
+      const { app, getPersonalWorkspace } = await buildApp({
         user: { id: "user-2", name: "Ben", email: "ben@other.com" },
         isMember: false,
         workspace,
@@ -169,7 +173,7 @@ describe("GovernanceApp.tryResolveActorWorkspace", () => {
 
   describe("given a member who has no personal workspace yet", () => {
     it("answers null rather than a half-resolved link", async () => {
-      const { app } = buildApp({
+      const { app } = await buildApp({
         user: { id: "user-3", name: "Cara", email: "cara@acme.com" },
         isMember: true,
         workspace: null,

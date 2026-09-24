@@ -7,6 +7,7 @@ import type {
   IngestionPullLifecycleRepository,
   IngestionPullLifecycleSource,
 } from "../repositories/ingestion-pull-lifecycle.repository.ts";
+import { schedulerWillPull } from "../rules/pull-schedule.rules.ts";
 import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 
 export class IngestionPullLifecycleService {
@@ -56,10 +57,7 @@ export class IngestionPullLifecycleService {
     const tenantId = await this.tenant.resolveTenantId(source.organizationId);
     const occurredAt = this.now();
     const configVersion = `${source.updatedAt.epochMilliseconds}:${source.status}:${source.pullSchedule}:${source.archivedAt?.epochMilliseconds ?? "live"}`;
-    const enabled =
-      source.pullSchedule !== null &&
-      source.archivedAt === null &&
-      (source.status === "active" || source.status === "awaiting_first_event");
+    const enabled = schedulerWillPull(source);
 
     if (enabled && source.pullSchedule) {
       await this.commands.configure({

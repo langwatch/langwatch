@@ -87,7 +87,9 @@ import {
   type RoutingPolicy,
   type SetDefaultRoutingPolicyInput,
   type UpdateRoutingPolicyInput,
+  governanceSecrets,
 } from "@langwatch/enterprise-governance-contract";
+import { ScimApi } from "@langwatch/enterprise-scim-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import {
@@ -100,6 +102,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import { DepartmentService } from "../services/department.service.ts";
+import { ErasureSuppressionService } from "../services/erasure-suppression.service.ts";
 import {
   GovernanceCliAccessService,
   type GovernanceCliAccessApi,
@@ -127,12 +130,15 @@ import {
   type GovernanceIngestTraceCollection,
 } from "../services/governance-ingest-receiver.service.ts";
 import { GovernanceIngestService } from "../services/governance-ingest.service.ts";
+import { IdentityMatchSuggestionService } from "../services/identity-match-suggestion.service.ts";
+import { IdentityMatchService } from "../services/identity-match.service.ts";
 import { IngestionTemplateService } from "../services/ingestion-template.service.ts";
 import type { OrganizationSupportContactService } from "../services/organization-support-contact.service.ts";
 import {
   PersonalUsageDashboardService,
   type PersonalUsageRollup,
 } from "../services/personal-usage-dashboard.service.ts";
+import { SuppressionSnapshotService } from "../services/suppression-snapshot.service.ts";
 import {
   createGovernanceMemberInfrastructure,
   type GovernanceMemberDatabase,
@@ -254,7 +260,10 @@ export interface GovernanceAppDependencies {
    * The member's personal workspace: created on demand when they mint their
    * first key, read as it stands when they open their own dashboard.
    */
-  organizations: Pick<OrganizationService, "ensurePersonalWorkspace" | "getPersonalWorkspace">;
+  organizations: Pick<OrganizationService, "ensurePersonalWorkspace" | "getPersonalWorkspace"> &
+    Pick<OrganizationApi, "findMembersIncludingDeactivated">;
+  /** The SSO directory's external ids, which the identity match reads as proof. */
+  scim: Pick<ScimApi, "findDirectoryExternalIds">;
   /**
    * The process's permission engine. Read directly rather than through a port
    * because the one question this feature asks it — may the caller see somebody
@@ -305,7 +314,7 @@ export interface GovernanceCaller {
  */
 export type GovernanceBespokeMembers = Omit<
   GovernanceAppDependencies,
-  "projects" | "organizations" | "permissions"
+  "projects" | "organizations" | "permissions" | "scim"
 >;
 
 /**
@@ -318,6 +327,7 @@ type GovernanceSetup = Readonly<{
   dependencies: FeatureSetup<typeof GovernanceApp.dependencies, never, undefined>["dependencies"];
   config: undefined;
   resources: FeatureSetup<typeof GovernanceApp.dependencies, never, undefined>["resources"];
+  secrets: FeatureSetup<typeof GovernanceApp.dependencies, never, undefined>["secrets"];
   members: Readonly<{ prisma: GovernanceMemberDatabase }> &
     Pick<GovernanceBespokeMembers, "governance" | "cli" | "ingest">;
   repositories: GovernanceRepositories;
@@ -327,7 +337,7 @@ export class GovernanceApp implements GovernanceRestApi {
   static readonly contract: typeof GovernanceRestApi = GovernanceRestApi;
   static readonly reads = reads("prisma");
   /**
-   * The three peer modules this application reads. A peer is never a member:
+   * The peer modules this application reads. A peer is never a member:
    * the process resolves each token and hands the app the peer's own API, so
    * governance names what it needs rather than being handed a narrowed copy
    * whichever composition root happened to build it.
@@ -338,10 +348,26 @@ export class GovernanceApp implements GovernanceRestApi {
     entitlements: EntitlementApi,
     organizations: OrganizationApi,
     permissions: AuthzApi,
+    scim: ScimApi,
   };
+  static readonly secrets = governanceSecrets;
 
-  static create({ members, dependencies, repositories }: GovernanceSetup): GovernanceApp {
+  static async create({
+    members,
+    dependencies,
+    repositories,
+    secrets,
+  }: GovernanceSetup): Promise<GovernanceApp> {
     const { personalVirtualKeys, actors } = createGovernanceMemberInfrastructure(members.prisma);
+    const erasureSuppression = await secrets.into(
+      governanceSecrets.erasurePseudonymSecret,
+      (erasureSecret) =>
+        ErasureSuppressionService.create({
+          suppressions: repositories.erasedIdentifierSuppressions,
+          tenantHistory: repositories.tenantHistory,
+          erasureSecret,
+        }),
+    );
     return new GovernanceApp(
       {
         personalVirtualKeys,
@@ -354,16 +380,37 @@ export class GovernanceApp implements GovernanceRestApi {
         entitlements: dependencies.entitlements,
         organizations: dependencies.organizations,
         permissions: dependencies.permissions,
+        scim: dependencies.scim,
       },
       repositories,
+      erasureSuppression,
     );
   }
 
   private constructor(
     private readonly dependencies: GovernanceAppDependencies,
     repositories: GovernanceRepositories,
+    erasureSuppression: ErasureSuppressionService,
   ) {
     this.departments = DepartmentService.create({ repository: repositories.departments });
+    this.erasureSuppression = erasureSuppression;
+    // One instance: the erasure refreshes the very snapshot the cost fold reads (ADR-128 §9 step 5).
+    this.suppressionSnapshot = SuppressionSnapshotService.create({
+      load: () => erasureSuppression.loadSnapshot(),
+    });
+    this.identityMatches = IdentityMatchService.create({
+      discoveredPeople: repositories.discoveredPeople,
+      matches: repositories.identityMatches,
+      suggestions: repositories.identityMatchSuggestions,
+      organizations: dependencies.organizations,
+      directory: dependencies.scim,
+    });
+    this.identityMatchSuggestions = IdentityMatchSuggestionService.create({
+      discoveredPeople: repositories.discoveredPeople,
+      matches: repositories.identityMatches,
+      suggestions: repositories.identityMatchSuggestions,
+      organizations: dependencies.organizations,
+    });
     this.templates = IngestionTemplateService.create({
       repository: repositories.ingestionTemplates,
     });
@@ -430,6 +477,10 @@ export class GovernanceApp implements GovernanceRestApi {
 
   private readonly departments: DepartmentService;
   private readonly templates: IngestionTemplateService;
+  private readonly erasureSuppression: ErasureSuppressionService;
+  private readonly suppressionSnapshot: SuppressionSnapshotService;
+  private readonly identityMatches: IdentityMatchService;
+  private readonly identityMatchSuggestions: IdentityMatchSuggestionService;
   private readonly personalUsageDashboards?: PersonalUsageDashboardService;
   private readonly cliAccessService?: GovernanceCliAccessApi;
   private readonly cliCredentialService?: GovernanceCliCredentialApi;

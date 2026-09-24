@@ -26,6 +26,7 @@
     "@langwatch/kernel": "workspace:*",
     "@langwatch/otlp": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/time": "workspace:*",
     "zod": "catalog:"
   },

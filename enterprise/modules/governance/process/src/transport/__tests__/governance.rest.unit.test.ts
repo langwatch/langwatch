@@ -1,10 +1,4 @@
 import { createApiFixture } from "@langwatch/api-fixture";
-/**
- * The governance REST door: access, wire body and dispatch per route. Ingestion templates go
- * through `IngestionTemplateService`, so `buildApi()` supplies no facade and tests seed the
- * repository.
- * @see specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
- */
 import {
   bindRestHeader,
   bindRestMiddleware,
@@ -18,11 +12,19 @@ import {
   PlatformTemplateImmutableError,
   TemplateNotFoundError,
 } from "@langwatch/enterprise-governance-contract";
+/**
+ * The governance REST door: access, wire body and dispatch per route. Ingestion templates go
+ * through `IngestionTemplateService`, so `buildApi()` supplies no facade and tests seed the
+ * repository.
+ * @see specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
+ */
+import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
@@ -109,7 +111,7 @@ class TestKeyPermissionError extends HandledError {
   }
 }
 
-function buildApi(
+async function buildApi(
   options: {
     grants?: readonly string[];
   } = {},
@@ -117,7 +119,7 @@ function buildApi(
   const getOrganizationId = vi.fn(async () => ORGANIZATION_ID);
   const repositories = MemoryGovernanceRepositories.create();
 
-  const app = GovernanceApp.create({
+  const app = await GovernanceApp.create({
     config: void 0,
     repositories,
     dependencies: {
@@ -126,9 +128,11 @@ function buildApi(
       entitlements: createApiFixture<EntitlementApi>(),
       organizations: createApiFixture<OrganizationApi>(),
       permissions: createApiFixture<AuthzApi>(),
+      scim: createApiFixture<ScimApi>(),
     },
     members: { prisma: unreachablePrisma },
     resources: new ResourceScope(),
+    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
 
   const granted = new Set(options.grants ?? ["aiTools:view", "aiTools:manage"]);
@@ -196,7 +200,7 @@ function buildApi(
 describe("the governance REST family", () => {
   describe("given no credential", () => {
     it("refuses before the request reaches the application", async () => {
-      const { hono, repositories } = buildApi();
+      const { hono, repositories } = await buildApi();
       const listUserVisible = vi.spyOn(repositories.ingestionTemplates, "listUserVisible");
 
       const response = await hono.request("/api/governance/ingestion-templates");
@@ -206,7 +210,7 @@ describe("the governance REST family", () => {
     });
 
     it("refuses a credential it does not recognise", async () => {
-      const { hono } = buildApi();
+      const { hono } = await buildApi();
 
       const response = await hono.request("/api/governance/ingestion-templates", {
         headers: { "X-Auth-Token": "not-a-real-key" },
@@ -218,7 +222,7 @@ describe("the governance REST family", () => {
 
   describe("given a legacy project key, which is bound to a project and not to a person", () => {
     it("still serves the member-facing template list", async () => {
-      const { asProjectKey, repositories } = buildApi();
+      const { asProjectKey, repositories } = await buildApi();
       const listUserVisible = vi.spyOn(repositories.ingestionTemplates, "listUserVisible");
 
       const response = await asProjectKey("/api/governance/ingestion-templates");
@@ -228,7 +232,7 @@ describe("the governance REST family", () => {
     });
 
     it("refuses the admin list as user_token_required and reads nothing", async () => {
-      const { asProjectKey, repositories } = buildApi();
+      const { asProjectKey, repositories } = await buildApi();
       const listAdminVisible = vi.spyOn(repositories.ingestionTemplates, "listAdminVisible");
 
       const response = await asProjectKey("/api/governance/ingestion-templates/admin");
@@ -242,7 +246,7 @@ describe("the governance REST family", () => {
     });
 
     it("refuses creating an organization template and writes nothing", async () => {
-      const { asProjectKey, repositories } = buildApi();
+      const { asProjectKey, repositories } = await buildApi();
       const createWithAudit = vi.spyOn(repositories.ingestionTemplates, "createWithAudit");
 
       const response = await asProjectKey("/api/governance/ingestion-templates", {
@@ -262,7 +266,7 @@ describe("the governance REST family", () => {
 
   describe("given a credential whose ceiling does not carry the route's permission", () => {
     it("refuses the manage routes and leaves the view routes reachable", async () => {
-      const { asUser, refusals, repositories } = buildApi({ grants: ["aiTools:view"] });
+      const { asUser, refusals, repositories } = await buildApi({ grants: ["aiTools:view"] });
       const listAdminVisible = vi.spyOn(repositories.ingestionTemplates, "listAdminVisible");
 
       const view = await asUser("/api/governance/ingestion-templates");
@@ -277,7 +281,7 @@ describe("the governance REST family", () => {
 
   describe("when the two listings are read", () => {
     it("routes the member list and the admin list to different reads", async () => {
-      const { asUser, repositories } = buildApi();
+      const { asUser, repositories } = await buildApi();
       const seeded = await repositories.ingestionTemplates.createWithAudit({
         template: newTemplateInput({ ottlRules: 'set(attributes["x"], "y")' }),
         callerUserId: "seed",
@@ -315,7 +319,7 @@ describe("the governance REST family", () => {
 
   describe("when an organization template is created", () => {
     it("answers 201 with the created row and attributes the write to the caller", async () => {
-      const { asUser, repositories } = buildApi();
+      const { asUser, repositories } = await buildApi();
       const createWithAudit = vi.spyOn(repositories.ingestionTemplates, "createWithAudit");
 
       const response = await asUser("/api/governance/ingestion-templates", {
@@ -354,7 +358,7 @@ describe("the governance REST family", () => {
     });
 
     it("reads its own name for 'no credential schema' as an absent one", async () => {
-      const { asUser, repositories } = buildApi();
+      const { asUser, repositories } = await buildApi();
       const createWithAudit = vi.spyOn(repositories.ingestionTemplates, "createWithAudit");
 
       await asUser("/api/governance/ingestion-templates", {
@@ -374,7 +378,7 @@ describe("the governance REST family", () => {
     });
 
     it("names the source type the domain refused, in the family's nested body", async () => {
-      const { asUser } = buildApi();
+      const { asUser } = await buildApi();
 
       const response = await asUser("/api/governance/ingestion-templates", {
         method: "POST",
@@ -389,7 +393,7 @@ describe("the governance REST family", () => {
     });
 
     it("refuses a body with no display name before the application sees it", async () => {
-      const { asUser, repositories } = buildApi();
+      const { asUser, repositories } = await buildApi();
       const createWithAudit = vi.spyOn(repositories.ingestionTemplates, "createWithAudit");
 
       const response = await asUser("/api/governance/ingestion-templates", {
@@ -411,7 +415,7 @@ describe("the governance REST family", () => {
      * any caller forge an audit row's provenance.
      */
     it("honours cli and ignores a claim to be an in-process surface", async () => {
-      const { asUser, repositories } = buildApi();
+      const { asUser, repositories } = await buildApi();
       const createWithAudit = vi.spyOn(repositories.ingestionTemplates, "createWithAudit");
 
       const create = (surface: string) =>
@@ -437,7 +441,7 @@ describe("the governance REST family", () => {
 
   describe("when a template's OTTL is replaced", () => {
     it("answers 200 with the updated row", async () => {
-      const { asUser, repositories } = buildApi();
+      const { asUser, repositories } = await buildApi();
       const seeded = await repositories.ingestionTemplates.createWithAudit({
         template: newTemplateInput(),
         callerUserId: "seed",
@@ -469,7 +473,7 @@ describe("the governance REST family", () => {
     });
 
     it("reports a platform-published row as immutable", async () => {
-      const { asUser, repositories } = buildApi();
+      const { asUser, repositories } = await buildApi();
       const platformTemplate = await repositories.ingestionTemplates.createWithAudit({
         template: newTemplateInput({ organizationId: null }),
         callerUserId: "seed",
@@ -489,7 +493,7 @@ describe("the governance REST family", () => {
 
   describe("when a template is archived", () => {
     it("answers 200 and reports the row archived", async () => {
-      const { asUser, repositories } = buildApi();
+      const { asUser, repositories } = await buildApi();
       const seeded = await repositories.ingestionTemplates.createWithAudit({
         template: newTemplateInput(),
         callerUserId: "seed",
@@ -509,7 +513,7 @@ describe("the governance REST family", () => {
     });
 
     it("reports an unknown id as not found", async () => {
-      const { asUser } = buildApi();
+      const { asUser } = await buildApi();
 
       const response = await asUser("/api/governance/ingestion-templates/nope", {
         method: "DELETE",
@@ -523,7 +527,7 @@ describe("the governance REST family", () => {
 
   describe("when a platform template is cloned", () => {
     it("answers 201 with the organization's own copy", async () => {
-      const { asUser, repositories } = buildApi();
+      const { asUser, repositories } = await buildApi();
       const source = await repositories.ingestionTemplates.createWithAudit({
         template: newTemplateInput({
           organizationId: null,
@@ -559,7 +563,7 @@ describe("the governance REST family", () => {
     });
 
     it("reports an unknown source as not found", async () => {
-      const { asUser } = buildApi();
+      const { asUser } = await buildApi();
 
       const response = await asUser("/api/governance/ingestion-templates/clone", {
         method: "POST",
@@ -572,7 +576,7 @@ describe("the governance REST family", () => {
 
   describe("when one template is read by id", () => {
     it("scopes the read to the project's organization", async () => {
-      const { asUser, repositories } = buildApi();
+      const { asUser, repositories } = await buildApi();
       const seeded = await repositories.ingestionTemplates.createWithAudit({
         template: newTemplateInput(),
         callerUserId: "seed",
@@ -595,7 +599,7 @@ describe("the governance REST family", () => {
      * close.
      */
     it("reports a row outside the organization as not found", async () => {
-      const { asUser } = buildApi();
+      const { asUser } = await buildApi();
 
       const response = await asUser("/api/governance/ingestion-templates/foreign");
 
@@ -612,7 +616,7 @@ describe("the governance REST family", () => {
      */
     /** @scenario Reading one ingestion template demands the same permission as reading them all */
     it("refuses a caller who may only view AI tools, and discloses no rules", async () => {
-      const { asUser, refusals, repositories } = buildApi({ grants: ["aiTools:view"] });
+      const { asUser, refusals, repositories } = await buildApi({ grants: ["aiTools:view"] });
       const seeded = await repositories.ingestionTemplates.createWithAudit({
         template: newTemplateInput(),
         callerUserId: "seed",
@@ -630,7 +634,7 @@ describe("the governance REST family", () => {
 
     /** @scenario A key with no user behind it cannot read an ingestion template by id */
     it("refuses a legacy project key, which the ceiling alone lets through", async () => {
-      const { asProjectKey, repositories } = buildApi();
+      const { asProjectKey, repositories } = await buildApi();
       const seeded = await repositories.ingestionTemplates.createWithAudit({
         template: newTemplateInput(),
         callerUserId: "seed",

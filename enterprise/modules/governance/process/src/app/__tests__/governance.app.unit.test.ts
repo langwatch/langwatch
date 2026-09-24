@@ -1,19 +1,21 @@
 import { createApiFixture } from "@langwatch/api-fixture";
-/**
- * Ingestion-template operations resolve the organization and attribute writes through
- * `IngestionTemplateService`, so `buildApp()` supplies no `governance`/`cli`/`ingest` member.
- * @see specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
- */
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type {
   GovernanceCallSurface,
   GovernanceProjectCaller,
 } from "@langwatch/enterprise-governance-contract";
+/**
+ * Ingestion-template operations resolve the organization and attribute writes through
+ * `IngestionTemplateService`, so `buildApp()` supplies no `governance`/`cli`/`ingest` member.
+ * @see specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
+ */
+import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it, vi } from "vitest";
 
 import { governanceServer } from "../../governance.server.ts";
@@ -43,11 +45,11 @@ const unreachablePrisma = {
 const ORGANIZATION_ID = "org-1";
 const PROJECT_ID = "project-1";
 
-function buildApp() {
+async function buildApp() {
   const getOrganizationId = vi.fn<ProjectApi["getOrganizationId"]>(async () => ORGANIZATION_ID);
   const repositories = MemoryGovernanceRepositories.create();
 
-  const app = GovernanceApp.create({
+  const app = await GovernanceApp.create({
     config: void 0,
     repositories,
     dependencies: {
@@ -56,16 +58,18 @@ function buildApp() {
       entitlements: createApiFixture<EntitlementApi>(),
       organizations: createApiFixture<OrganizationApi>(),
       permissions: createApiFixture<AuthzApi>(),
+      scim: createApiFixture<ScimApi>(),
     },
     members: { prisma: unreachablePrisma },
     resources: new ResourceScope(),
+    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
 
   return { app, getOrganizationId, repositories };
 }
 
 /** The one app in this file that also carries the still-unfinished bag. */
-function buildAppWithUnfinishedCapability(planType = "ENTERPRISE") {
+async function buildAppWithUnfinishedCapability(planType = "ENTERPRISE") {
   const repositories: GovernanceRepositories = MemoryGovernanceRepositories.create();
   const governance = new TestGovernanceService();
   const findCliAccessSession = vi.fn<AuthApi["findCliAccessSession"]>(async () => ({
@@ -80,7 +84,7 @@ function buildAppWithUnfinishedCapability(planType = "ENTERPRISE") {
       }) as never,
   );
 
-  const app = GovernanceApp.create({
+  const app = await GovernanceApp.create({
     config: void 0,
     repositories,
     dependencies: {
@@ -89,6 +93,7 @@ function buildAppWithUnfinishedCapability(planType = "ENTERPRISE") {
       entitlements: createApiFixture<EntitlementApi>({ getActivePlan }),
       organizations: createApiFixture<OrganizationApi>(),
       permissions: createApiFixture<AuthzApi>(),
+      scim: createApiFixture<ScimApi>(),
     },
     members: {
       prisma: unreachablePrisma,
@@ -105,6 +110,7 @@ function buildAppWithUnfinishedCapability(planType = "ENTERPRISE") {
       },
     },
     resources: new ResourceScope(),
+    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
 
   return { app, findCliAccessSession, getActivePlan };
@@ -113,7 +119,7 @@ function buildAppWithUnfinishedCapability(planType = "ENTERPRISE") {
 describe("GovernanceApp ingestion templates", () => {
   describe("given a caller who names only their project", () => {
     it("resolves the organization from the project rather than taking one", async () => {
-      const { app, getOrganizationId, repositories } = buildApp();
+      const { app, getOrganizationId, repositories } = await buildApp();
       const listUserVisible = vi.spyOn(repositories.ingestionTemplates, "listUserVisible");
 
       await app.listIngestionTemplatesForMember({ projectId: PROJECT_ID });
@@ -123,7 +129,7 @@ describe("GovernanceApp ingestion templates", () => {
     });
 
     it("resolves it the same way for every template operation", async () => {
-      const { app, getOrganizationId, repositories } = buildApp();
+      const { app, getOrganizationId, repositories } = await buildApp();
       const by: GovernanceProjectCaller = {
         projectId: PROJECT_ID,
         userId: "user-1",
@@ -169,7 +175,7 @@ describe("GovernanceApp ingestion templates", () => {
      * records the same string rather than each inventing its own.
      */
     it("attributes the write to the project itself", async () => {
-      const { app, repositories } = buildApp();
+      const { app, repositories } = await buildApp();
       const createWithAudit = vi.spyOn(repositories.ingestionTemplates, "createWithAudit");
 
       await app.createIngestionTemplate(
@@ -183,7 +189,7 @@ describe("GovernanceApp ingestion templates", () => {
     });
 
     it("attributes it to the member when the credential names one", async () => {
-      const { app, repositories } = buildApp();
+      const { app, repositories } = await buildApp();
       const createWithAudit = vi.spyOn(repositories.ingestionTemplates, "createWithAudit");
 
       await app.createIngestionTemplate(
@@ -200,7 +206,7 @@ describe("GovernanceApp ingestion templates", () => {
   describe("when the same creation arrives over each of the four surfaces", () => {
     /** @scenario "State-changing calls emit audit rows regardless of surface" */
     it("records four writes that differ only in the surface", async () => {
-      const { app, repositories } = buildApp();
+      const { app, repositories } = await buildApp();
       const createWithAudit = vi.spyOn(repositories.ingestionTemplates, "createWithAudit");
       const surfaces: GovernanceCallSurface[] = ["trpc", "hono", "cli", "mcp"];
 
@@ -250,8 +256,8 @@ describe("GovernanceApp ingestion templates", () => {
 
 describe("GovernanceApp as the module a process installs", () => {
   describe("given the one REST declaration the module mounts", () => {
-    it("answers every capability the declarations name from the one app", () => {
-      const { app } = buildAppWithUnfinishedCapability();
+    it("answers every capability the declarations name from the one app", async () => {
+      const { app } = await buildAppWithUnfinishedCapability();
 
       expect(governanceServer.transports).toHaveLength(1);
       expect(app.cliAccess().findCaller).toBeTypeOf("function");
@@ -265,7 +271,7 @@ describe("GovernanceApp as the module a process installs", () => {
     });
 
     it("resolves the CLI caller and Enterprise plan through the named peers", async () => {
-      const { app, findCliAccessSession, getActivePlan } = buildAppWithUnfinishedCapability();
+      const { app, findCliAccessSession, getActivePlan } = await buildAppWithUnfinishedCapability();
 
       await expect(app.cliAccess().findCaller("Bearer lw_at_token")).resolves.toEqual({
         user_id: "user-1",
@@ -284,7 +290,7 @@ describe("GovernanceApp as the module a process installs", () => {
     });
 
     it("refuses the caller organization when its plan is not Enterprise", async () => {
-      const { app, getActivePlan } = buildAppWithUnfinishedCapability("FREE");
+      const { app, getActivePlan } = await buildAppWithUnfinishedCapability("FREE");
 
       await expect(
         app.cliAccess().planDecision({
@@ -299,7 +305,7 @@ describe("GovernanceApp as the module a process installs", () => {
 
   describe("given a process that supplies none of the still-unfinished capability", () => {
     it("still constructs, and only the capability itself throws", async () => {
-      const { app } = buildApp();
+      const { app } = await buildApp();
 
       expect(() => app.governance()).toThrow(/governance/);
       await expect(app.listIngestionTemplatesForMember({ projectId: PROJECT_ID })).resolves.toEqual(

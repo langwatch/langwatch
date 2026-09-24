@@ -52,6 +52,7 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@opentelemetry/otlp-transformer": "catalog:",
