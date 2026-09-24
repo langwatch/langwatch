@@ -3,8 +3,8 @@
  * records (cache not table); single-key ops to avoid Redis CROSSSLOT.
  */
 export interface CliDeviceSessionRepository {
-  /** The stored value at one key, or nothing. */
-  tryGet(key: string): Promise<string | null>;
+  /** The stored value at one key; throws `CliSessionRecordNotFoundError` when none is held. */
+  get(key: string): Promise<string>;
 
   /** Writes one value with a lifetime, replacing whatever was there. */
   set(input: { key: string; value: string; ttlSeconds: number }): Promise<void>;

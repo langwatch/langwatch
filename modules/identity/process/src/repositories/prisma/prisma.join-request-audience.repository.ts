@@ -1,7 +1,12 @@
 import { JoinRequestNotFoundError } from "@langwatch/identity-contract";
+import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { UserNotFoundError } from "@langwatch/user-contract";
 
-import { JoinRequestAudience } from "../join-request-audience.repository.ts";
+import {
+  JoinRequestAudience,
+  type JoinRequestAudienceProfile,
+} from "../join-request-audience.repository.ts";
 
 /** Every model a join-request notification reads, and no other. */
 export type PrismaJoinRequestAudienceDatabase = Pick<
@@ -33,16 +38,13 @@ export class PrismaJoinRequestAudienceRepository extends JoinRequestAudience {
     return request.userId;
   }
 
-  async tryFindOrganizationName({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<string | null> {
+  async getOrganizationName({ organizationId }: { organizationId: string }): Promise<string> {
     const organization = await this.database.organization.findUnique({
       where: { id: organizationId },
       select: { name: true },
     });
-    return organization?.name ?? null;
+    if (!organization) throw new OrganizationNotFoundError(organizationId);
+    return organization.name;
   }
 
   async findAdminEmails({ organizationId }: { organizationId: string }): Promise<string[]> {
@@ -55,19 +57,12 @@ export class PrismaJoinRequestAudienceRepository extends JoinRequestAudience {
       .filter((email): email is string => Boolean(email));
   }
 
-  async tryFindDisplayName({ userId }: { userId: string }): Promise<string | null> {
+  async getUserProfile({ userId }: { userId: string }): Promise<JoinRequestAudienceProfile> {
     const user = await this.database.user.findUnique({
       where: { id: userId },
       select: { name: true, email: true },
     });
-    return user?.name ?? user?.email ?? null;
-  }
-
-  async tryFindEmail({ userId }: { userId: string }): Promise<string | null> {
-    const user = await this.database.user.findUnique({
-      where: { id: userId },
-      select: { email: true },
-    });
-    return user?.email ?? null;
+    if (!user) throw new UserNotFoundError(userId);
+    return { name: user.name, email: user.email };
   }
 }

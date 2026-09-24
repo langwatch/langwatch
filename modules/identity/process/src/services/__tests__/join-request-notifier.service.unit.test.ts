@@ -47,10 +47,9 @@ function fakeAudience(): JoinRequestAudience {
     getRequesterId: vi.fn(async () => {
       throw new JoinRequestNotFoundError("no such request");
     }),
-    tryFindOrganizationName: vi.fn(async () => "Acme Corp"),
+    getOrganizationName: vi.fn(async () => "Acme Corp"),
     findAdminEmails: vi.fn(async () => ["priya@acme.example"]),
-    tryFindDisplayName: vi.fn(async () => "Morgan Ellis"),
-    tryFindEmail: vi.fn(async () => "morgan@acme.example"),
+    getUserProfile: vi.fn(async () => ({ name: "Morgan Ellis", email: "morgan@acme.example" })),
   };
 }
 
@@ -58,9 +57,9 @@ function fakeContext(
   overrides: Record<string, unknown> = {},
 ): PrismaJoinRequestNotificationContextRepository {
   return {
-    tryFindOrganizationIntent: vi.fn(async () => null),
+    getOrganizationIntent: vi.fn(async () => ({ primaryIntent: null })),
     countApprovedFromDomain: vi.fn(async () => 0),
-    tryFindPersonalTeamSlug: vi.fn(async () => null),
+    findPersonalTeamSlugs: vi.fn(async () => []),
     ...overrides,
   } as unknown as PrismaJoinRequestNotificationContextRepository;
 }
@@ -98,7 +97,7 @@ describe("EmailJoinRequestNotifierAdapter", () => {
       const recording = recordingMail();
       const audience = fakeAudience();
       const context = fakeContext({
-        tryFindPersonalTeamSlug: vi.fn(async () => "personal-morgan-ellis"),
+        findPersonalTeamSlugs: vi.fn(async () => ["personal-morgan-ellis"]),
       });
       const adapter = EmailJoinRequestNotifierAdapter.create({
         audience,

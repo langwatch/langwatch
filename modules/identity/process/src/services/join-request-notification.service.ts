@@ -81,7 +81,13 @@ export class JoinRequestNotificationService {
   }): Promise<void> {
     const [organizationName, requesterEmail] = await Promise.all([
       this.organizationName({ organizationId }),
-      this.audience.tryFindEmail({ userId: requesterUserId }),
+      this.audience
+        .getUserProfile({ userId: requesterUserId })
+        .then((profile) => profile.email)
+        .catch((error: unknown) => {
+          if (HandledError.isHandled(error) && error.code === "user_not_found") return null;
+          throw error;
+        }),
     ]);
     if (!requesterEmail) {
       return;
@@ -116,12 +122,22 @@ export class JoinRequestNotificationService {
   }
 
   private async organizationName({ organizationId }: { organizationId: string }): Promise<string> {
-    return (
-      (await this.audience.tryFindOrganizationName({ organizationId })) ?? UNNAMED_ORGANIZATION
-    );
+    return this.audience.getOrganizationName({ organizationId }).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "organization_not_found")
+        return UNNAMED_ORGANIZATION;
+      throw error;
+    });
   }
 
   private async displayName({ userId }: { userId: string }): Promise<string> {
-    return (await this.audience.tryFindDisplayName({ userId })) ?? UNNAMED_REQUESTER;
+    return this.audience
+      .getUserProfile({ userId })
+      .then((profile) => profile.name ?? profile.email ?? UNNAMED_REQUESTER)
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "user_not_found") {
+          return UNNAMED_REQUESTER;
+        }
+        throw error;
+      });
   }
 }

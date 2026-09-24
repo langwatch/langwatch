@@ -14,10 +14,12 @@ import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   type RestProtocolProducer,
+  type RestProtocolRefusal,
   type RestAnswer,
 } from "@langwatch/api/rest";
 import type { clientInfoSchema } from "@langwatch/auth-contract";
 import {
+  CliDeviceFlowRefusedError,
   approveRequestSchema,
   denyRequestSchema,
   deviceCodeRequestSchema,
@@ -39,6 +41,7 @@ import type { z } from "zod";
 import type * as zodModule from "zod";
 
 import type { AuthDirectory } from "../app/auth.members.ts";
+import { cliDeviceFlowRefusalDocument } from "../rules/cli-device-flow-refusal.rules.ts";
 import {
   DEVICE_CODE_TTL_SECONDS,
   MIN_POLL_INTERVAL_SECONDS,
@@ -115,10 +118,7 @@ export const AuthCliDeviceFlowApi = moduleApi<AuthCliDeviceFlowApi>()("auth");
 
 const JSON_MEDIA_TYPE = "application/json";
 
-type CliDeviceFlowAnswer = Readonly<{
-  status: 200 | 400 | 401 | 403 | 404 | 408 | 409 | 410 | 428 | 429 | 500;
-  body: unknown;
-}>;
+type CliDeviceFlowAnswer = Readonly<{ status: 200; body: unknown }>;
 
 function protocolAnswer(
   response: RestProtocolProducer<"application/json">,
@@ -130,6 +130,22 @@ function protocolAnswer(
     body: JSON.stringify(answer.body),
   });
 }
+
+/**
+ * Every refusal on the family, the handler's and the runtime's alike, in the
+ * two-field body RFC 8628 clients parse; a shape they cannot parse reads as an outage.
+ */
+const cliDeviceFlowRefusal: RestProtocolRefusal = ({ failure, response }) => {
+  const { status, refusal } = cliDeviceFlowRefusalDocument(failure);
+
+  return response.write({ status, mediaType: JSON_MEDIA_TYPE, body: JSON.stringify(refusal) });
+};
+
+const CLI_DEVICE_FLOW_PROTOCOL = {
+  produces: JSON_MEDIA_TYPE,
+  because: "RFC 8628 device-grant clients require OAuth token and polling error bodies.",
+  refusal: cliDeviceFlowRefusal,
+} as const;
 
 /**
  * The device flow answers OAuth's own bodies — `authorization_pending`,
@@ -155,10 +171,7 @@ export const authCliDeviceFlowRest = defineRestRouter(AuthCliDeviceFlowApi)
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(CLI_DEVICE_FLOW_DOOR)
-  .withResponse("protocol", {
-    produces: JSON_MEDIA_TYPE,
-    because: "RFC 8628 device-grant clients require OAuth token and polling error bodies.",
-  })
+  .withResponse("protocol", CLI_DEVICE_FLOW_PROTOCOL)
   .handle(async ({ app, raw, response }) =>
     protocolAnswer(response, await startDeviceFlow({ app, raw })),
   )
@@ -167,20 +180,14 @@ export const authCliDeviceFlowRest = defineRestRouter(AuthCliDeviceFlowApi)
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(CLI_DEVICE_FLOW_DOOR)
-  .withResponse("protocol", {
-    produces: JSON_MEDIA_TYPE,
-    because: "RFC 8628 device-grant clients require OAuth token and polling error bodies.",
-  })
+  .withResponse("protocol", CLI_DEVICE_FLOW_PROTOCOL)
   .handle(async ({ app, raw, response }) => protocolAnswer(response, await exchange({ app, raw })))
 
   .post("/api/auth/cli/refresh", "refreshCliDeviceSession")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(CLI_DEVICE_FLOW_DOOR)
-  .withResponse("protocol", {
-    produces: JSON_MEDIA_TYPE,
-    because: "RFC 8628 device-grant clients require OAuth token and polling error bodies.",
-  })
+  .withResponse("protocol", CLI_DEVICE_FLOW_PROTOCOL)
   .handle(async ({ app, raw, response }) => protocolAnswer(response, await refresh({ app, raw })))
 
   /**
@@ -191,10 +198,7 @@ export const authCliDeviceFlowRest = defineRestRouter(AuthCliDeviceFlowApi)
   .get("/api/auth/cli/lookup", "lookupCliDeviceCode")
   .withQuery(lookupQuerySchema)
   .withAccess(CLI_DEVICE_FLOW_DOOR)
-  .withResponse("protocol", {
-    produces: JSON_MEDIA_TYPE,
-    because: "RFC 8628 device-grant clients require OAuth token and polling error bodies.",
-  })
+  .withResponse("protocol", CLI_DEVICE_FLOW_PROTOCOL)
   .handle(async ({ app, input, request, response }) =>
     protocolAnswer(response, await lookupDeviceFlow({ app, input, request })),
   )
@@ -203,10 +207,7 @@ export const authCliDeviceFlowRest = defineRestRouter(AuthCliDeviceFlowApi)
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(CLI_DEVICE_FLOW_DOOR)
-  .withResponse("protocol", {
-    produces: JSON_MEDIA_TYPE,
-    because: "RFC 8628 device-grant clients require OAuth token and polling error bodies.",
-  })
+  .withResponse("protocol", CLI_DEVICE_FLOW_PROTOCOL)
   .handle(async ({ app, raw, request, response }) =>
     protocolAnswer(response, await approve({ app, raw, request })),
   )
@@ -215,10 +216,7 @@ export const authCliDeviceFlowRest = defineRestRouter(AuthCliDeviceFlowApi)
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(CLI_DEVICE_FLOW_DOOR)
-  .withResponse("protocol", {
-    produces: JSON_MEDIA_TYPE,
-    because: "RFC 8628 device-grant clients require OAuth token and polling error bodies.",
-  })
+  .withResponse("protocol", CLI_DEVICE_FLOW_PROTOCOL)
   .handle(async ({ app, raw, request, response }) =>
     protocolAnswer(response, await denyDeviceFlow({ app, raw, request })),
   )
@@ -232,10 +230,7 @@ export const authCliDeviceFlowRest = defineRestRouter(AuthCliDeviceFlowApi)
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(CLI_DEVICE_FLOW_DOOR)
-  .withResponse("protocol", {
-    produces: JSON_MEDIA_TYPE,
-    because: "RFC 8628 device-grant clients require OAuth token and polling error bodies.",
-  })
+  .withResponse("protocol", CLI_DEVICE_FLOW_PROTOCOL)
   .handle(async ({ app, raw, response }) => protocolAnswer(response, await logout({ app, raw })))
   .build();
 
@@ -253,27 +248,19 @@ async function exchange({
 }): Promise<CliDeviceFlowAnswer> {
   const parsed = exchangeRequestSchema.safeParse(posted(raw));
 
-  if (!parsed.success) return refuse("invalid_request", "device_code is required", 400);
+  if (!parsed.success) throw refused("invalid_request", "device_code is required", 400);
 
   const { device_code } = parsed.data;
 
   // Per-device polling rate limit, claimed atomically: RFC 8628 says clients
   // respect the server-issued interval, but a defensive server enforces it.
   if (!(await app.sessions().claimPollWindow(device_code))) {
-    return refuse("slow_down", "Polling too fast. Increase your interval before retrying.", 429);
+    throw refused("slow_down", "Polling too fast. Increase your interval before retrying.", 429);
   }
 
-  const record = await app.sessions().tryFindDeviceCode(device_code);
+  const record = await app.sessions().getDeviceCode(device_code);
 
-  if (!record) {
-    // Either the device_code never existed or it expired and was evicted.
-    // RFC 8628 recommends `expired_token` here.
-    return refuse("expired_token", "Device code expired or unknown", 408);
-  }
-
-  const unready = await refusalForState({ app, record, deviceCode: device_code });
-
-  if (unready) return unready;
+  await assertExchangeable({ app, record, deviceCode: device_code });
 
   if (!record.user_id || !record.organization_id) {
     // Should not happen — approval always populates these. Treated as a
@@ -282,13 +269,13 @@ async function exchange({
       `[auth-cli] approved device_code ${device_code} missing user/org payload — returning pending`,
     );
 
-    return refuse("authorization_pending", "Approval received but session not ready yet", 428);
+    throw refused("authorization_pending", "Approval received but session not ready yet", 428);
   }
 
   // Exclusive redemption: poll pacing is not a credential fence, so the loser
   // gets the same retriable `slow_down` a too-fast poll gets.
   if (!(await app.sessions().claimExchange(device_code))) {
-    return refuse("slow_down", "Polling too fast. Increase your interval before retrying.", 429);
+    throw refused("slow_down", "Polling too fast. Increase your interval before retrying.", 429);
   }
 
   const directory = app.directory();
@@ -303,7 +290,7 @@ async function exchange({
     // the CLI makes next.
     await app.sessions().releaseExchangeClaim(device_code);
 
-    return refuse("server_error", "User or organization no longer exists", 500);
+    throw refused("server_error", "User or organization no longer exists", 500);
   }
 
   // Membership is re-derived HERE, not trusted from approval time: an admin
@@ -320,7 +307,7 @@ async function exchange({
     // The claim would otherwise outlive the code it was serialising.
     await app.sessions().releaseExchangeClaim(device_code);
 
-    return refuse("access_denied", "Not an active member of the organization", 410);
+    throw refused("access_denied", "Not an active member of the organization", 410);
   }
 
   const endpoint = controlPlaneBaseUrlOf(app);
@@ -329,7 +316,7 @@ async function exchange({
     return projectKeyAnswer({ app, record, user, organization, endpoint });
   }
 
-  const personalProject = await personalProjectOf({ app, user, organization });
+  const personalProject = await personalProjectFieldsOf({ app, user, organization });
   const minted = await mintCliKey({
     app,
     record,
@@ -337,14 +324,6 @@ async function exchange({
     organization,
     clientInfo: parsed.data.client_info,
   });
-
-  if ("refusal" in minted) {
-    // Nothing was handed out and the code was not consumed, so the claim goes
-    // back rather than blocking the CLI's next poll for half a minute.
-    await app.sessions().releaseExchangeClaim(device_code);
-
-    return minted.refusal;
-  }
 
   // Stamp the device info so the devices inventory can show a recognisable
   // entry. `session_started_at` is preserved through later rotations so the
@@ -375,7 +354,7 @@ async function exchange({
     user: { id: user.id, email: user.email, name: user.name },
     organization: { id: organization.id, name: organization.name, slug: organization.slug },
     default_personal_vk: record.personal_vk,
-    personal_project: personalProject,
+    ...personalProject,
     // The user-scoped key and its reach summary. Additive: an older CLI
     // ignores both and keeps using `personal_project` exactly as before.
     ...(minted.token && minted.scope
@@ -386,10 +365,10 @@ async function exchange({
 }
 
 /**
- * Why this grant cannot be exchanged yet, or at all, in RFC 8628's own codes.
- * Null once the record is approved and still inside its window.
+ * Refuses a grant that cannot be exchanged yet, or at all, in RFC 8628's own
+ * codes; returns once the record is approved and still inside its window.
  */
-async function refusalForState({
+async function assertExchangeable({
   app,
   record,
   deviceCode,
@@ -397,32 +376,32 @@ async function refusalForState({
   app: AuthCliDeviceFlowApi;
   record: CliDeviceCodeRecord;
   deviceCode: string;
-}): Promise<CliDeviceFlowAnswer | null> {
+}): Promise<void> {
   // Server-side expiry check, in case the store has not evicted yet.
   if (expired(record)) {
     await app.sessions().consumeDeviceCode({ record });
 
-    return refuse("expired_token", "Device code expired", 408);
+    throw refused("expired_token", "Device code expired", 408);
   }
 
   if (record.status === "denied") {
     await app.sessions().consumeDeviceCode({ record });
 
-    return refuse("access_denied", "Authorization request was denied by the user", 410);
+    throw refused("access_denied", "Authorization request was denied by the user", 410);
   }
 
   if (record.status === "pending") {
-    return refuse("authorization_pending", "User has not yet completed authorization", 428);
+    throw refused("authorization_pending", "User has not yet completed authorization", 428);
   }
 
-  if (record.status === "expired") return refuse("expired_token", "Device code expired", 408);
+  if (record.status === "expired") throw refused("expired_token", "Device code expired", 408);
 
-  if (record.status === "approved") return null;
+  if (record.status === "approved") return;
 
   // Defensive: an unrecognised status.
   logger.warn(`[auth-cli] device_code ${deviceCode} carries an unrecognised state`);
 
-  return refuse("server_error", "Unknown device code state", 500);
+  throw refused("server_error", "Unknown device code state", 500);
 }
 
 /** Returns the picked project's existing key after re-reading access and state. */
@@ -447,7 +426,7 @@ async function projectKeyAnswer({
     // next poll is not told to slow down for half a minute.
     await app.sessions().releaseExchangeClaim(record.device_code);
 
-    return refuse("authorization_pending", "Approval received but project key not ready yet", 428);
+    throw refused("authorization_pending", "Approval received but project key not ready yet", 428);
   }
 
   const project = await app.directory().tryFindLiveProject({
@@ -467,7 +446,7 @@ async function projectKeyAnswer({
     await app.sessions().consumeDeviceCode({ record, alsoPollWindow: true });
     await app.sessions().releaseExchangeClaim(record.device_code);
 
-    return refuse(
+    throw refused(
       "access_denied",
       "You no longer have administrator access to the selected project",
       410,
@@ -503,20 +482,15 @@ async function refresh({
 }): Promise<CliDeviceFlowAnswer> {
   const parsed = refreshRequestSchema.safeParse(posted(raw));
 
-  if (!parsed.success) return refuse("invalid_request", "refresh_token is required", 400);
+  if (!parsed.success) throw refused("invalid_request", "refresh_token is required", 400);
 
   const { refresh_token } = parsed.data;
-  const record = await app.sessions().findRefreshToken(refresh_token);
-
-  // Unknown or revoked. The CLI wipes local state on 401.
-  if (!record) {
-    return refuse("invalid_grant", "Refresh token is invalid or revoked", 401);
-  }
+  const record = await app.sessions().getRefreshToken(refresh_token);
 
   if (nowInstant().epochMilliseconds > record.expires_at) {
     await app.sessions().dropRefreshToken(refresh_token);
 
-    return refuse("invalid_grant", "Refresh token has expired", 401);
+    throw refused("invalid_grant", "Refresh token has expired", 401);
   }
 
   // Enforce the admin-configured maximum session duration. The anchor is
@@ -543,7 +517,7 @@ async function refresh({
         "rejecting refresh: session exceeded org max-duration policy",
       );
 
-      return refuse(
+      throw refused(
         "invalid_grant",
         `Session exceeded organization max-duration policy of ${maxDurationDays} days. Please run \`langwatch login\` to start a new session.`,
         401,
@@ -566,7 +540,7 @@ async function refresh({
       "rejecting refresh: caller is not an active member of the organization",
     );
 
-    return refuse(
+    throw refused(
       "invalid_grant",
       "Your access to this organization is no longer active. Please run `langwatch login` to start a new session.",
       401,
@@ -609,12 +583,12 @@ async function approve({
 }): Promise<CliDeviceFlowAnswer> {
   const person = await app.session(request);
 
-  if (!person) return refuse("unauthorized", "Sign in to continue", 401);
+  if (!person) throw refused("unauthorized", "Sign in to continue", 401);
 
   const parsed = approveRequestSchema.safeParse(posted(raw));
 
   if (!parsed.success) {
-    return refuse("invalid_request", "user_code and organization_id are required", 400);
+    throw refused("invalid_request", "user_code and organization_id are required", 400);
   }
 
   const { user_code, organization_id, project_id } = parsed.data;
@@ -628,17 +602,18 @@ async function approve({
   });
 
   if (!isMember) {
-    return refuse("forbidden", `Not a member of organization ${organization_id}`, 403);
+    throw refused("forbidden", `Not a member of organization ${organization_id}`, 403);
   }
 
-  const record = await app.sessions().tryFindDeviceCodeByUserCode(user_code);
+  const record = await app.sessions().getDeviceCodeByUserCode({
+    userCode: user_code,
+    unknownDescription: "Code not recognised",
+  });
 
-  if (!record) return refuse("not_found", "Code not recognised", 404);
-
-  if (expired(record)) return refuse("expired", "Code has expired", 410);
+  if (expired(record)) throw refused("expired", "Code has expired", 410);
 
   if (record.status !== "pending") {
-    return refuse(
+    throw refused(
       "already_resolved",
       `Code is in '${record.status}' state — restart langwatch login`,
       409,
@@ -667,14 +642,14 @@ async function approve({
     .catch(() => true);
 
   if (!governanceEnabled) {
-    return refuse(
+    throw refused(
       "governance_required",
       "AI-tools (device) login needs governance enabled for your organization. Re-run `langwatch login` and choose project login. It writes a project API key to your .env.",
       403,
     );
   }
 
-  const keySelection = await selectionFor({
+  const keySelection = await keySelectionFieldsFor({
     app,
     person,
     organizationId: organization_id,
@@ -685,7 +660,7 @@ async function approve({
     deviceCode: record.device_code,
     userId: person.id,
     organizationId: organization_id,
-    keySelection,
+    ...keySelection,
   });
 
   return answer({ ok: true, organization_id });
@@ -710,7 +685,7 @@ async function approveProjectKey({
   project_id: string | undefined;
 }): Promise<CliDeviceFlowAnswer> {
   if (!project_id) {
-    return refuse(
+    throw refused(
       "invalid_request",
       "project_id is required when credential_type is project_api_key",
       400,
@@ -727,11 +702,11 @@ async function approveProjectKey({
     .tryFindLiveProject({ projectId: project_id, organizationId });
 
   if (!project) {
-    return refuse("forbidden", "Project not found or unavailable in this organization", 403);
+    throw refused("forbidden", "Project not found or unavailable in this organization", 403);
   }
 
   if (project.isPersonal && project.ownerUserId !== person.id) {
-    return refuse(
+    throw refused(
       "personal_project_not_allowed",
       "Another user's personal project can't back your API key. Pick a shared team project, or your own personal workspace.",
       400,
@@ -739,7 +714,7 @@ async function approveProjectKey({
   }
 
   if (!(await app.canManageProject({ userId: person.id, projectId: project.id }))) {
-    return refuse(
+    throw refused(
       "forbidden",
       "You need to be an administrator of this project to retrieve its API key.",
       403,
@@ -814,18 +789,16 @@ async function logout({
   return answer({ ok: true });
 }
 
-/** What one exchange minted, or the refusal that ends the device code. */
-type MintedCliKey =
-  | Readonly<{
-      token?: string;
-      apiKeyId?: string;
-      scope?: Readonly<{
-        kind: "organization" | "projects";
-        project_ids: string[];
-        permissions: string[];
-      }>;
-    }>
-  | Readonly<{ refusal: CliDeviceFlowAnswer }>;
+/** What one exchange minted; nothing when the approval stamped no selection. */
+type MintedCliKey = Readonly<{
+  token?: string;
+  apiKeyId?: string;
+  scope?: Readonly<{
+    kind: "organization" | "projects";
+    project_ids: string[];
+    permissions: string[];
+  }>;
+}>;
 
 /**
  * The user-scoped CLI key, from the selection the approval stamped, so an
@@ -874,14 +847,15 @@ async function mintCliKey({
         "[auth-cli] CLI login key refused at exchange; terminating the device code",
       );
       await app.sessions().consumeDeviceCode({ record });
+      // Nothing was handed out, so the claim goes back rather than blocking
+      // the CLI's next poll for half a minute.
+      await app.sessions().releaseExchangeClaim(record.device_code);
 
-      return {
-        refusal: refuse(
-          "access_denied",
-          "Your access changed after you approved this login. Run `langwatch login` again.",
-          410,
-        ),
-      };
+      throw refused(
+        "access_denied",
+        "Your access changed after you approved this login. Run `langwatch login` again.",
+        410,
+      );
     }
 
     throw err;
@@ -903,7 +877,7 @@ async function mintCliKey({
  * with a normal key, ensured here (idempotent). Best-effort — a workspace
  * failure must not fail the login, and older CLIs ignore the field.
  */
-async function personalProjectOf({
+async function personalProjectFieldsOf({
   app,
   user,
   organization,
@@ -911,7 +885,11 @@ async function personalProjectOf({
   app: AuthCliDeviceFlowApi;
   user: Readonly<{ id: string; name?: string | null; email?: string | null }>;
   organization: Readonly<{ id: string }>;
-}): Promise<Readonly<{ id: string; slug: string; name: string; api_key: string }> | undefined> {
+}): Promise<
+  Readonly<{
+    personal_project?: Readonly<{ id: string; slug: string; name: string; api_key: string }>;
+  }>
+> {
   try {
     const workspace = await app.ensurePersonalWorkspace({
       organizationId: organization.id,
@@ -921,10 +899,12 @@ async function personalProjectOf({
     });
 
     return {
-      id: workspace.project.id,
-      slug: workspace.project.slug,
-      name: workspace.project.name,
-      api_key: workspace.project.apiKey,
+      personal_project: {
+        id: workspace.project.id,
+        slug: workspace.project.slug,
+        name: workspace.project.name,
+        api_key: workspace.project.apiKey,
+      },
     };
   } catch (err) {
     logger.error(
@@ -932,7 +912,7 @@ async function personalProjectOf({
       "[auth-cli] could not ensure personal workspace on exchange; device session ships without personal_project",
     );
 
-    return undefined;
+    return {};
   }
 }
 
@@ -941,7 +921,7 @@ async function personalProjectOf({
  * registry and the approver's own ceiling; a violation throws and stamps
  * nothing. A legacy client with none gets the default, best-effort.
  */
-async function selectionFor({
+async function keySelectionFieldsFor({
   app,
   person,
   organizationId,
@@ -951,9 +931,9 @@ async function selectionFor({
   person: CliBrowserSession;
   organizationId: string;
   requested: z.output<typeof approveRequestSchema>["key_selection"];
-}): Promise<CliKeySelection | undefined> {
+}): Promise<Readonly<{ keySelection?: CliKeySelection }>> {
   if (requested) {
-    return app.apiKeys().validateCliSelection({
+    const keySelection = await app.apiKeys().validateCliSelection({
       userId: person.id,
       organizationId,
       selection: {
@@ -964,6 +944,8 @@ async function selectionFor({
         permissions: requested.permissions,
       },
     });
+
+    return { keySelection };
   }
 
   // The personal workspace is ensured first so its team can be part of the
@@ -983,17 +965,18 @@ async function selectionFor({
   }
 
   try {
-    return (
-      (await app.apiKeys().findDefaultCliSelection({ userId: person.id, organizationId })) ??
-      undefined
-    );
+    const keySelection = await app
+      .apiKeys()
+      .findDefaultCliSelection({ userId: person.id, organizationId });
+
+    return keySelection ? { keySelection } : {};
   } catch (err) {
     logger.warn(
       { err, userId: person.id, organizationId },
       "[auth-cli] could not resolve the default key selection; device session proceeds without a scoped key",
     );
 
-    return undefined;
+    return {};
   }
 }
 
@@ -1044,17 +1027,16 @@ function posted(raw: string): unknown {
 }
 
 /** One OAuth refusal, in the two-field shape RFC 8628 clients parse. */
-function refuse(
-  error: string,
-  description: string,
-  status: CliDeviceFlowAnswer["status"],
-): CliDeviceFlowAnswer {
-  return answer({ error, error_description: description }, status);
+function refused(error: string, description: string, status: number): CliDeviceFlowRefusedError {
+  return new CliDeviceFlowRefusedError({
+    refusal: { error, error_description: description },
+    httpStatus: status,
+  });
 }
 
 /** A JSON body this family writes itself, exactly as its clients read it. */
-function answer(body: unknown, status: CliDeviceFlowAnswer["status"] = 200): CliDeviceFlowAnswer {
-  return { status, body };
+function answer(body: unknown): CliDeviceFlowAnswer {
+  return { status: 200, body };
 }
 
 async function startDeviceFlow({
@@ -1067,7 +1049,7 @@ async function startDeviceFlow({
   const parsed = deviceCodeRequestSchema.safeParse(posted(raw));
 
   if (!parsed.success) {
-    return refuse("invalid_request", parsed.error.issues[0]?.message ?? "invalid body", 400);
+    throw refused("invalid_request", parsed.error.issues[0]?.message ?? "invalid body", 400);
   }
 
   const record = await app.sessions().startDeviceCode({
@@ -1096,18 +1078,17 @@ async function lookupDeviceFlow({
 }): Promise<CliDeviceFlowAnswer> {
   const person = await app.session(request);
 
-  if (!person) return refuse("unauthorized", "Sign in to continue", 401);
+  if (!person) throw refused("unauthorized", "Sign in to continue", 401);
 
-  if (!input.user_code) return refuse("invalid_request", "user_code is required", 400);
+  if (!input.user_code) throw refused("invalid_request", "user_code is required", 400);
 
-  const record = await app.sessions().tryFindDeviceCodeByUserCode(input.user_code);
-
-  if (!record) {
-    return refuse("not_found", "Code not recognised — it may have expired", 404);
-  }
+  const record = await app.sessions().getDeviceCodeByUserCode({
+    userCode: input.user_code,
+    unknownDescription: "Code not recognised — it may have expired",
+  });
 
   if (expired(record)) {
-    return refuse("expired", "Code has expired — restart `langwatch login`", 410);
+    throw refused("expired", "Code has expired — restart `langwatch login`", 410);
   }
 
   return answer({
@@ -1133,18 +1114,13 @@ async function denyDeviceFlow({
 }): Promise<CliDeviceFlowAnswer> {
   const person = await app.session(request);
 
-  if (!person) return refuse("unauthorized", "Sign in to continue", 401);
+  if (!person) throw refused("unauthorized", "Sign in to continue", 401);
 
   const parsed = denyRequestSchema.safeParse(posted(raw));
 
-  if (!parsed.success) return refuse("invalid_request", "user_code is required", 400);
+  if (!parsed.success) throw refused("invalid_request", "user_code is required", 400);
 
-  const record = await app.sessions().tryFindDeviceCodeByUserCode(parsed.data.user_code);
-
-  // Idempotent — denying an unknown code is a no-op.
-  if (!record) return answer({ ok: true });
-
-  await app.sessions().denyDeviceCode(record.device_code);
+  await app.sessions().denyDeviceCodeByUserCode(parsed.data.user_code);
 
   return answer({ ok: true });
 }

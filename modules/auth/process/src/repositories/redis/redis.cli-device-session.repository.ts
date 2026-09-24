@@ -1,3 +1,5 @@
+import { CliSessionRecordNotFoundError } from "@langwatch/auth-contract";
+
 import type { CliDeviceSessionRepository } from "../cli-device-session.repository.ts";
 
 type CliDeviceSessionRedis = Readonly<{
@@ -24,8 +26,11 @@ export class RedisCliDeviceSessionRepository implements CliDeviceSessionReposito
     return new RedisCliDeviceSessionRepository(redis);
   }
 
-  tryGet(key: string): Promise<string | null> {
-    return this.redis.get(key);
+  async get(key: string): Promise<string> {
+    const value = await this.redis.get(key);
+    if (value === null) throw new CliSessionRecordNotFoundError();
+
+    return value;
   }
 
   async set(input: { key: string; value: string; ttlSeconds: number }): Promise<void> {

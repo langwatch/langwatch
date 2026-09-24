@@ -511,6 +511,10 @@ const presentations = {
     describe: () =>
       "This is a temporary gap on our side, not a setting in your workspace. Try again shortly, or contact support if it persists.",
   },
+  cli_device_flow_refused: {
+    title: "This sign-in code can no longer be used",
+    describe: () => "Run langwatch login again to start a new sign-in.",
+  },
   cli_key_selection_invalid: {
     title: "Check the access selection",
     describe: (error) => {
@@ -525,6 +529,10 @@ const presentations = {
       }
       return "The selected scopes and permissions aren't valid.";
     },
+  },
+  cli_session_record_not_found: {
+    title: "This sign-in session has ended",
+    describe: () => "Run langwatch login again to sign the command line back in.",
   },
   clickhouse_unavailable: {
     // Every surface that reads the analytics store raises this code: a trace

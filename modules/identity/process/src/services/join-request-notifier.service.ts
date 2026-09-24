@@ -263,22 +263,31 @@ export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
   }
 
   private async organizationName({ organizationId }: { organizationId: string }): Promise<string> {
-    const name = await this.audience.tryFindOrganizationName({ organizationId });
-    return name ?? "your organization";
+    return this.audience.getOrganizationName({ organizationId }).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "organization_not_found")
+        return "your organization";
+      throw error;
+    });
   }
 
   /**
    * Why the organization came, for the one message a new member reads first.
-   * Null is a supported answer — plenty of organizations never said.
+   * No intent is a supported answer — plenty of organizations never said.
    */
   private async organizationIntent({
     organizationId,
   }: {
     organizationId: string;
   }): Promise<{ intent?: "AGENT_GOVERNANCE" | "LLM_OPS" }> {
-    const intent = await this.context.tryFindOrganizationIntent(organizationId);
+    const organization = await this.context
+      .getOrganizationIntent(organizationId)
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "organization_not_found")
+          return undefined;
+        throw error;
+      });
 
-    return intent ? { intent } : {};
+    return organization?.primaryIntent ? { intent: organization.primaryIntent } : {};
   }
 
   private async adminEmails({ organizationId }: { organizationId: string }): Promise<string[]> {
@@ -286,12 +295,23 @@ export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
   }
 
   private async displayName({ userId }: { userId: string }): Promise<string> {
-    const name = await this.audience.tryFindDisplayName({ userId });
-    return name ?? "A colleague";
+    return this.audience
+      .getUserProfile({ userId })
+      .then((profile) => profile.name ?? profile.email ?? "A colleague")
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "user_not_found") return "A colleague";
+        throw error;
+      });
   }
 
   private async emailOf({ userId }: { userId: string }): Promise<string | null> {
-    return this.audience.tryFindEmail({ userId });
+    return this.audience
+      .getUserProfile({ userId })
+      .then((profile) => profile.email)
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "user_not_found") return null;
+        throw error;
+      });
   }
 
   /** How many join requests from this domain have already been approved. */
@@ -310,7 +330,7 @@ export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
    * this one. `undefined` when they have none yet, the ordinary case for a first sign-in.
    */
   private async tryPersonalProjectUrl({ userId }: { userId: string }): Promise<string | undefined> {
-    const slug = await this.context.tryFindPersonalTeamSlug(userId);
+    const [slug] = await this.context.findPersonalTeamSlugs(userId);
     return slug ? `${this.baseHost}/${slug}` : undefined;
   }
 

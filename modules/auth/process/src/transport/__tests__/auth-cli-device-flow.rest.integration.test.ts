@@ -5,6 +5,7 @@
  */
 import { ApiKeyScopeViolationError } from "@langwatch/api-key-contract";
 import { createRestRuntime } from "@langwatch/api/rest";
+import { CliSessionRecordNotFoundError } from "@langwatch/auth-contract";
 import { describe, expect, it } from "vitest";
 
 import type { AuthDirectory } from "../../app/auth.members.ts";
@@ -458,8 +459,12 @@ class InMemoryDeviceSessionStore implements CliDeviceSessionRepository {
   private readonly values = new Map<string, string>();
   private readonly sets = new Map<string, Set<string>>();
 
-  tryGet(key: string): Promise<string | null> {
-    return Promise.resolve(this.values.get(key) ?? null);
+  get(key: string): Promise<string> {
+    const value = this.values.get(key);
+
+    return value === undefined
+      ? Promise.reject(new CliSessionRecordNotFoundError())
+      : Promise.resolve(value);
   }
 
   set(input: { key: string; value: string }): Promise<void> {
@@ -679,3 +684,123 @@ function refusalOf(error: unknown): { code: string; status: 400 | 403 | 500 } | 
 
   return { code, status: status === 400 || status === 403 ? status : 500 };
 }
+
+describe("given a refusal on the device flow", () => {
+  const exactly = async (response: Response) => ({
+    status: response.status,
+    body: await response.text(),
+  });
+  const rfc = (status: number, error: string, description: string) => ({
+    status,
+    body: JSON.stringify({ error, error_description: description }),
+  });
+
+  describe("when the CLI polls with a device code nobody minted", () => {
+    /** @scenario "An unknown device code polled at exchange answers expired_token" */
+    it("answers 408 expired_token in the body released CLIs parse", async () => {
+      const api = mount(deviceFlowWorld());
+
+      const polled = await api.post("/api/auth/cli/exchange", { device_code: "never-minted" });
+
+      expect(await exactly(polled)).toEqual(
+        rfc(408, "expired_token", "Device code expired or unknown"),
+      );
+    });
+  });
+
+  describe("when the approval page looks up a user code nobody minted", () => {
+    /** @scenario "The approval page's lookup of an unknown code says it may have expired" */
+    it("answers 404 not_found with the expiry hint", async () => {
+      const api = mount(deviceFlowWorld());
+
+      const looked = await api.get("/api/auth/cli/lookup?user_code=ABCD-1234");
+
+      expect(await exactly(looked)).toEqual(
+        rfc(404, "not_found", "Code not recognised — it may have expired"),
+      );
+    });
+  });
+
+  describe("when a member approves a user code nobody minted", () => {
+    /** @scenario "Approving an unknown code answers not_found" */
+    it("answers 404 not_found without the expiry hint", async () => {
+      const api = mount(deviceFlowWorld());
+
+      const approved = await api.post("/api/auth/cli/approve", {
+        user_code: "ABCD-1234",
+        organization_id: ORGANIZATION_ID,
+      });
+
+      expect(await exactly(approved)).toEqual(rfc(404, "not_found", "Code not recognised"));
+    });
+  });
+
+  describe("when a person denies a user code nobody minted", () => {
+    /** @scenario "Denying an unknown code is a no-op" */
+    it("answers ok, as denying an unknown code always has", async () => {
+      const api = mount(deviceFlowWorld());
+
+      const denied = await api.post("/api/auth/cli/deny", { user_code: "ABCD-1234" });
+
+      expect(await exactly(denied)).toEqual({ status: 200, body: JSON.stringify({ ok: true }) });
+    });
+  });
+
+  describe("when the browser half is reached with no session", () => {
+    /** @scenario "The browser half refuses a caller with no session in the RFC 8628 shape" */
+    it("answers each route 401 unauthorized in the RFC 8628 shape", async () => {
+      const api = mount(deviceFlowWorld({ signedIn: false }));
+
+      const answers = await Promise.all([
+        api.get("/api/auth/cli/lookup?user_code=ABCD-1234").then(exactly),
+        api
+          .post("/api/auth/cli/approve", { user_code: "ABCD-1234", organization_id: "org-1" })
+          .then(exactly),
+        api.post("/api/auth/cli/deny", { user_code: "ABCD-1234" }).then(exactly),
+      ]);
+
+      expect(answers).toEqual(
+        Array.from({ length: 3 }, () => rfc(401, "unauthorized", "Sign in to continue")),
+      );
+    });
+  });
+
+  describe("when the CLI rotates a refresh token nobody minted", () => {
+    /** @scenario "An unknown refresh token answers invalid_grant" */
+    it("answers 401 invalid_grant, on which the CLI wipes local state", async () => {
+      const api = mount(deviceFlowWorld());
+
+      const rotated = await api.post("/api/auth/cli/refresh", { refresh_token: "lw_rt_unknown" });
+
+      expect(await exactly(rotated)).toEqual(
+        rfc(401, "invalid_grant", "Refresh token is invalid or revoked"),
+      );
+    });
+  });
+
+  describe("when a collaborator fails in a way the flow does not name", () => {
+    /** @scenario "A failure the flow did not name still answers in the RFC 8628 shape" */
+    it("answers 500 server_error and says nothing about the cause", async () => {
+      const world = deviceFlowWorld({
+        validateSelectionError: () => new Error("registry connection reset"),
+      });
+      const api = mount(world);
+      const grant = (await (await api.post("/api/auth/cli/device-code", {})).json()) as {
+        user_code: string;
+      };
+
+      const approved = await api.post("/api/auth/cli/approve", {
+        user_code: grant.user_code,
+        organization_id: ORGANIZATION_ID,
+        key_selection: {
+          bindings: [{ scope_type: "ORGANIZATION", scope_id: ORGANIZATION_ID }],
+          permissions: ["traces:view"],
+        },
+      });
+
+      expect(await exactly(approved)).toEqual(
+        rfc(500, "server_error", "The request could not be completed"),
+      );
+    });
+  });
+});

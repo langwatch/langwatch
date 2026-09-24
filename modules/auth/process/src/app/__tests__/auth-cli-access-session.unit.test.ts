@@ -117,8 +117,8 @@ describe("the Auth CLI access-session peer", () => {
     await app.revokeCliAccessToken({ authorization: AUTHORIZATION, userId: "user-1" });
 
     await expect(
-      repositories.cliSessions.tryGet(cliAccessTokenKey(ACCESS_TOKEN)),
-    ).resolves.toBeNull();
+      repositories.cliSessions.get(cliAccessTokenKey(ACCESS_TOKEN)),
+    ).rejects.toMatchObject({ code: "cli_session_record_not_found" });
     expect(repositories.cliSessions.tokenIndexes.get("lwcli:user:user-1:tokens")).toEqual(
       new Set(),
     );

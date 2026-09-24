@@ -109,3 +109,38 @@ export class SessionMaxLifetimeTooShortError extends HandledError {
     this.name = "SessionMaxLifetimeTooShortError";
   }
 }
+
+/** The two-field body RFC 8628 device-grant clients parse from every refusal. */
+export type CliDeviceFlowRefusal = Readonly<{ error: string; error_description: string }>;
+
+/**
+ * A device-grant refusal at the status the flow names, carrying the RFC 8628
+ * body released CLI builds parse. The route's refusal renderer writes it as is.
+ */
+export class CliDeviceFlowRefusedError extends HandledError {
+  declare readonly code: "cli_device_flow_refused";
+  readonly refusal: CliDeviceFlowRefusal;
+
+  constructor(input: { refusal: CliDeviceFlowRefusal; httpStatus: number }) {
+    super("cli_device_flow_refused", input.refusal.error_description, {
+      httpStatus: input.httpStatus,
+      fault: input.httpStatus >= 500 ? "platform" : "customer",
+      meta: { error: input.refusal.error },
+    });
+    this.name = "CliDeviceFlowRefusedError";
+    this.refusal = input.refusal;
+  }
+}
+
+/** No CLI session record at a key: never minted, expired, or already consumed. */
+export class CliSessionRecordNotFoundError extends HandledError {
+  declare readonly code: "cli_session_record_not_found";
+
+  constructor() {
+    super("cli_session_record_not_found", "This sign-in session no longer exists", {
+      httpStatus: 404,
+      fault: "customer",
+    });
+    this.name = "CliSessionRecordNotFoundError";
+  }
+}
