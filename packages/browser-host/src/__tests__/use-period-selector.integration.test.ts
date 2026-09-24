@@ -3,6 +3,7 @@
  *
  * @see specs/features/suites/suite-runs-time-filter.feature
  */
+import { Temporal } from "@langwatch/time";
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -32,7 +33,8 @@ describe("usePeriodSelector()", () => {
         const { result } = renderHook(() => usePeriodSelector(30));
 
         const { startDate, endDate } = result.current.period;
-        const diffDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+        const diffDays =
+          (endDate.epochMilliseconds - startDate.epochMilliseconds) / (1000 * 60 * 60 * 24);
 
         expect(diffDays).toBeGreaterThanOrEqual(28);
         expect(diffDays).toBeLessThanOrEqual(30);
@@ -52,14 +54,14 @@ describe("usePeriodSelector()", () => {
 
         const { result } = renderHook(() => usePeriodSelector(30));
 
-        expect(result.current.period.startDate.getTime()).toBeLessThanOrEqual(
-          result.current.period.endDate.getTime(),
+        expect(result.current.period.startDate.epochMilliseconds).toBeLessThanOrEqual(
+          result.current.period.endDate.epochMilliseconds,
         );
-        expect(result.current.period.startDate.getTime()).toBe(
-          new Date("2025-03-10T00:00:00Z").getTime(),
+        expect(result.current.period.startDate.epochMilliseconds).toBe(
+          Temporal.Instant.from("2025-03-10T00:00:00Z").epochMilliseconds,
         );
-        expect(result.current.period.endDate.getTime()).toBe(
-          new Date("2025-03-20T00:00:00Z").getTime(),
+        expect(result.current.period.endDate.epochMilliseconds).toBe(
+          Temporal.Instant.from("2025-03-20T00:00:00Z").epochMilliseconds,
         );
       });
     });
