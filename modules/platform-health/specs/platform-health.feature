@@ -192,3 +192,52 @@ Feature: One platform health answer for an external monitor
     Scenario: The scenario canary answers 503 with the named reason for a plan it cannot find
       When an orchestrator asks /api/health/scenarios for a run plan the project does not have
       Then it answers 503 with {"status":"unhealthy","reason":"run_failed","durationMs":0}, uncached
+
+  Rule: /api/health/langy sends one greeting turn as the key's owner and waits for it to settle, as main did
+
+    @unit
+    Scenario: The Langy canary classifies a settled turn as main did
+      Then a completed turn with text is healthy
+      And a failed or stopped turn is turn_failed
+      And a completed turn with only whitespace is empty_reply
+      And a wait the budget ended is timeout
+
+    @unit
+    Scenario: The Langy canary answers main's bodies
+      Then a healthy check answers 200 {"status":"ok","conversationId","turnId","durationMs"}
+      And an unhealthy check answers 503 with its reason and the turn's ids
+      And a busy caller answers 429 {"status":"busy"}
+
+    @unit
+    Scenario: The Langy canary sends the greeting as the key's owner with a fresh idempotency key
+      When two checks run one after the other
+      Then each starts one "Hi Langy." turn as the key's owner under a different idempotency key
+      And a healthy answer is not cacheable
+
+    @unit
+    Scenario: The Langy canary answers a dark surface with a plain 404 and starts no turn
+      Given the Langy turn surface is dark for the project
+      When the canary is asked
+      Then it answers the plain-text 404 an unmounted path gives, with no Cache-Control
+
+    @unit
+    Scenario: A Langy turn that does not settle inside the budget is timeout
+      When the settlement wait outlasts the budget
+      Then the canary reports unhealthy with the reason timeout and the turn's ids
+
+    @unit
+    Scenario: A Langy turn that cannot start is turn_failed
+      When starting the turn throws
+      Then the canary reports unhealthy with the reason turn_failed
+
+    @unit
+    Scenario: A second Langy check for the same caller while one is in flight is busy
+      Given a Langy check is in flight for a caller
+      When the same caller checks again
+      Then the second check is busy and starts no turn, while another caller is not blocked
+
+    @unit
+    Scenario: A Langy timeout reserves the caller's slot for one further budget
+      Given a Langy check timed out
+      When the same caller checks again inside one budget
+      Then it is busy, and once the budget has passed a check runs again

@@ -100,7 +100,7 @@ export function toCliToolResult({
   // has to SAY the outcome is unconfirmed, and it cannot say anything if the
   // call is demoted to an anonymous JSON receipt. So the card survives and
   // carries the verdict with it. See `namesCreatedResource`.
-  if (card === "resourceCreated" && resourceCardSchema.safeParse(payload).success) {
+  if (card === "resourceCreated" && resourceCardSchema.validate(payload)) {
     return {
       kind: "card",
       card,

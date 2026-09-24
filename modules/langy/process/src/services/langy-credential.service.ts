@@ -268,8 +268,7 @@ export class LangyCredentialService {
     projectId: string;
     allowlist: string[];
   }): Promise<string[] | null> {
-    const parsed = langyEgressAllowlistSchema.parse(allowlist);
-    const normalized = parsed.map((host) => host.trim().replace(/\.$/, "").toLowerCase());
+    const normalized = allowlist.map((host) => host.trim().replace(/\.$/, "").toLowerCase());
     const value = normalized.length > 0 ? normalized : null;
     await this.deps.repository.saveEgressAllowlist(projectId, value);
 

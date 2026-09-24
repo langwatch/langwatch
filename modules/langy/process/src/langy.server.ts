@@ -1,4 +1,4 @@
-import { bindRestMiddleware, bindRestCredential } from "@langwatch/api/rest";
+import { bindRestCredential } from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/kernel";
 
 import { LangyApp } from "./app/langy.app.ts";
@@ -28,7 +28,7 @@ import { langyLocalControlConnectRest } from "./transport/langy-local-control-co
 import { langyLocalControlRest } from "./transport/langy-local-control.rest.ts";
 import { createLangyLocalControlWebSocketProtocol } from "./transport/langy-local-control.ws.ts";
 import { langyLocalRest } from "./transport/langy-local.rest.ts";
-import { langyTurnsMembers, langyTurnsRest } from "./transport/langy-turns.rest.ts";
+import { langyTurnsRest } from "./transport/langy-turns.rest.ts";
 import { setupSkillsTrpcTransport } from "./transport/setup-skills.trpc.ts";
 
 // The seams below are process-graph factories: a composing worker calls one of these
@@ -96,28 +96,12 @@ export const langyServer = defineServerModule("langy")
     createLangyLocalControlWebSocketProtocol(),
     setupSkillsTrpcTransport,
   )
-  .withTransportFacts(({ app, members }) => {
+  .withTransportFacts(({ app }) => {
     if (!(app instanceof LangyApp))
       throw new TypeError("Langy transport requires its constructed application");
     return [
       bindRestCredential("internalSecret", () => app.internalDoor),
       bindRestCredential("sessionKey", () => app.sessionKeyDoor),
-      bindRestMiddleware(langyTurnsMembers, () => ({
-        // One `Prefer: wait` hold borrows a dedicated connection for its
-        // blocking read and gives it back on release, so a held request never
-        // takes the shared connection out of service for everything else.
-        openTurnBuffer: () => {
-          const blocking = members.redis.duplicate();
-
-          return {
-            buffer: LangyTokenBufferRedisRepository.create({
-              redis: members.redis,
-              blockingRedis: blocking,
-            }),
-            release: () => blocking.disconnect(),
-          };
-        },
-      })),
     ];
   })
   .withEventing(langyMaintenanceEventing);

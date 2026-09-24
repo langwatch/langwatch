@@ -5,18 +5,7 @@
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { NotFoundError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import {
-  generateBatchRunId,
-  generateScenarioRunId,
-  getOnPlatformSetId,
-  isInternalSetId,
-  ScenarioApi,
-  ScenarioNotFoundError,
-  ScenarioReservedSetIdError,
-  ScenarioRunRejectedError,
-  scenarioTrpc,
-  type RunActor,
-} from "@langwatch/scenario-contract";
+import { ScenarioApi, ScenarioNotFoundError, scenarioTrpc } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 
 import { filterRunsByTimestamp } from "../rules/simulation-run-timestamp-filter.rules.ts";
@@ -36,18 +25,6 @@ const resultsWindow = <Filter extends { startDate?: number }>(filter: Filter) =>
   ...filter,
   startDate: filter.startDate ?? nowInstant().epochMilliseconds - THIRTY_DAYS_MS,
 });
-
-/**
- * Refuses a run addressed into a set the platform reserves for itself. The
- * internal namespace holds the one-off bucket and every plan's address; a
- * run written into a plan's address would move its pass rate, cost and trend.
- */
-function assertWritableSetId(params: { setId: string; projectId: string }): void {
-  if (!isInternalSetId(params.setId)) return;
-  if (params.setId === getOnPlatformSetId(params.projectId)) return;
-
-  throw new ScenarioReservedSetIdError();
-}
 
 export const scenarioTrpcTransport = defineTrpcRouter(ScenarioApi, scenarioTrpc)
   // -- the cases a project defines -------------------------------------------
@@ -164,73 +141,9 @@ export const scenarioTrpcTransport = defineTrpcRouter(ScenarioApi, scenarioTrpc)
   // -- running one -----------------------------------------------------------
   .procedure("run")
   .withPermission("scenarios:manage")
-  .handle(async ({ app, input, actor }) => {
-    const setId = input.setId ?? getOnPlatformSetId(input.projectId);
-    assertWritableSetId({ setId, projectId: input.projectId });
-
-    const batchRunId = input.batchRunId ?? generateBatchRunId();
-    const runActor: RunActor = { id: actor.id, label: "user" };
-
-    const resolved = await app
-      .resolveRunParameters({
-        projectId: input.projectId,
-        scenarioId: input.scenarioId,
-        values: input.parameters,
-      })
-      .catch((error: unknown) => {
-        // A scenario the run names but the project does not hold is the
-        // caller's mistake, and has always answered 400 here rather than the
-        // 404 a direct read of that same scenario answers.
-        if (error instanceof ScenarioNotFoundError) {
-          throw new ScenarioRunRejectedError(error.message, { reasons: [error] });
-        }
-        throw error;
-      });
-
-    const prefetch = await app.prefetchExecution({
-      context: {
-        projectId: input.projectId,
-        scenarioId: input.scenarioId,
-        setId,
-        batchRunId,
-        parameters: resolved.parameters,
-        secretParameters: resolved.secretParameters,
-      },
-      target: input.target,
-    });
-
-    if (!prefetch.success) {
-      logger.warn(
-        { projectId: input.projectId, scenarioId: input.scenarioId, error: prefetch.error },
-        "Scenario validation failed",
-      );
-      throw new ScenarioRunRejectedError(prefetch.error);
-    }
-
-    const scenarioRunId = generateScenarioRunId();
-
-    await app.queueSimulationRun({
-      projectId: input.projectId,
-      scenarioId: input.scenarioId,
-      scenarioRunId,
-      batchRunId,
-      setId,
-      name: prefetch.data.scenario.name,
-      target: input.target,
-      parameters: resolved.parameters,
-      secretParameters: resolved.secretParameters,
-      note: input.note,
-      scenarioVersion: resolved.scenarioVersion,
-      actor: runActor,
-      resolvedModels: prefetch.resolvedModels,
-    });
-
-    // No explicit job scheduling: the execution subscriber picks the queued
-    // event off the group queue and spawns the child process.
-    logger.info({ batchRunId, scenarioRunId }, "Scenario queued via event-sourcing");
-
-    return { scheduled: true, setId, batchRunId, scenarioRunId };
-  })
+  .handle(({ app, input, actor }) =>
+    app.launchRun({ ...input, actor: { id: actor.id, label: "user" } }),
+  )
 
   .procedure("cancelJob")
   .withPermission("scenarios:manage")

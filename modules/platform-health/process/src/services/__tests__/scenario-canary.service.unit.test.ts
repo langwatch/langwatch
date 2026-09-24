@@ -1,6 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import {
-  ChildProcessJobDataSchema,
   type ScenarioApi,
   ScenarioRunStatus,
   simulationRunDataSchema,
@@ -66,30 +65,15 @@ function canary({
   suites?: Suite[];
   reads: ReturnType<typeof runData>[];
 }) {
-  const queueSimulationRun = vi.fn(async () => {});
+  let launched = 0;
+  const launchRun = vi.fn(async (input: { setId?: string }) => ({
+    scheduled: true as const,
+    setId: input.setId ?? "on-platform",
+    batchRunId: "batch-1",
+    scenarioRunId: `run-${++launched}`,
+  }));
   const findScenarioRunData = vi.fn(async () => reads.shift() ?? null);
-  const scenarios = createApiFixture<ScenarioApi>({
-    resolveRunParameters: async () => ({
-      parameters: {},
-      secretParameters: {},
-      scenarioVersion: 1,
-    }),
-    prefetchExecution: async (input) => ({
-      success: true,
-      data: ChildProcessJobDataSchema.parse({
-        context: input.context,
-        scenario: { id: "scenario-1", name: "Greets", situation: "", criteria: [], labels: [] },
-        adapterData: { type: "connected", agentId: "a", endpoint: "http://x", timeoutMs: 1 },
-        modelParams: { api_key: "k", model: "openai/gpt-5-mini" },
-        nlpServiceUrl: "http://nlp",
-        target: input.target,
-      }),
-      telemetry: { endpoint: "http://x", apiKey: "k" },
-      resolvedModels: null,
-    }),
-    queueSimulationRun,
-    findScenarioRunData,
-  });
+  const scenarios = createApiFixture<ScenarioApi>({ launchRun, findScenarioRunData });
   const suiteApi = createApiFixture<SuiteApi>({
     listByIds: async ({ ids }) => suites.filter((suite) => ids.includes(suite.id)),
     list: async () => suites,
@@ -98,13 +82,13 @@ function canary({
     peers: { scenarios, suites: suiteApi },
     clock: fakeClock(),
   });
-  return { service, queueSimulationRun };
+  return { service, launchRun };
 }
 
 describe("ScenarioCanaryService", () => {
   /** @scenario "The scenario canary reports healthy when the judged run succeeds" */
   it("reports healthy once the run is terminal and judged a success", async () => {
-    const { service, queueSimulationRun } = canary({
+    const { service, launchRun } = canary({
       reads: [
         runData(ScenarioRunStatus.RUNNING),
         runData(ScenarioRunStatus.SUCCESS, Verdict.SUCCESS),
@@ -114,14 +98,17 @@ describe("ScenarioCanaryService", () => {
     const result = await service.run({ projectId: PROJECT, runPlanId: "plan-1" });
 
     expect(result).toMatchObject({ healthy: true });
-    expect(queueSimulationRun).toHaveBeenCalledWith(
-      expect.objectContaining({ actor: { id: "scenario-canary", label: "api" }, name: "Greets" }),
+    expect(launchRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actor: { id: "scenario-canary", label: "api" },
+        note: "scenario canary health check",
+      }),
     );
   });
 
   /** @scenario "The scenario canary retries once after an unhealthy first run" */
   it("launches a second run when the first fails, and reports the second", async () => {
-    const { service, queueSimulationRun } = canary({
+    const { service, launchRun } = canary({
       reads: [
         runData(ScenarioRunStatus.ERROR),
         runData(ScenarioRunStatus.SUCCESS, Verdict.SUCCESS),
@@ -131,7 +118,7 @@ describe("ScenarioCanaryService", () => {
     const result = await service.run({ projectId: PROJECT, runPlanId: "plan-1" });
 
     expect(result).toMatchObject({ healthy: true });
-    expect(queueSimulationRun).toHaveBeenCalledTimes(2);
+    expect(launchRun).toHaveBeenCalledTimes(2);
   });
 
   /** @scenario "The scenario canary reports judge_failed when a successful run carries no verdict" */
@@ -156,7 +143,7 @@ describe("ScenarioCanaryService", () => {
 
   /** @scenario "A run plan that names more than one scenario launches nothing" */
   it("reports run_failed without launching for a plan with two scenarios", async () => {
-    const { service, queueSimulationRun } = canary({
+    const { service, launchRun } = canary({
       suites: [runPlan({ scenarioIds: ["a", "b"] })],
       reads: [],
     });
@@ -164,7 +151,7 @@ describe("ScenarioCanaryService", () => {
     const result = await service.run({ projectId: PROJECT, runPlanId: "plan-1" });
 
     expect(result).toEqual({ healthy: false, reason: "run_failed", durationMs: 0 });
-    expect(queueSimulationRun).not.toHaveBeenCalled();
+    expect(launchRun).not.toHaveBeenCalled();
   });
 
   /** @scenario "The scenario canary finds a run plan by its slug" */

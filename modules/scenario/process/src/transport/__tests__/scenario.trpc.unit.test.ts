@@ -12,6 +12,7 @@ import {
 } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { ScenarioRunLaunchService } from "../../services/scenario-run-launch.service.ts";
 import { scenarioTrpcTransport } from "../scenario.trpc.ts";
 import {
   scenarioTrpcCaller,
@@ -22,10 +23,13 @@ import {
 const PROJECT_ID = "project_1";
 const SCENARIO_ID = "scenario_1";
 
+/** The run door reaches `launchRun`, served here by the real launcher over the stubbed steps. */
 function harness(app: Partial<ScenarioApi>, permissions?: readonly AuthzPermission[]) {
+  const steps = stubScenarioApi(app);
+  const launcher = ScenarioRunLaunchService.create(steps);
   return scenarioTrpcCaller({
     declaration: scenarioTrpcTransport,
-    app: stubScenarioApi(app),
+    app: stubScenarioApi({ ...app, launchRun: (input) => launcher.launch(input) }),
     ...(permissions ? { permissions } : {}),
   });
 }

@@ -39,6 +39,8 @@ import {
   type LangyMessageRole,
   LangyApi,
   type LangyApi as LangyApiContract,
+  type LangyTurnSettlementWait,
+  type LangyTurnSettlementWaitInput,
   assertLangyServerConfig,
   langyConfig,
   langySecrets,
@@ -76,6 +78,7 @@ import { PostgresLangyAdapter } from "../services/langy-postgres.service.ts";
 import { LangyRestCallerService } from "../services/langy-rest-caller.service.ts";
 import { OtelLangySessionKeyMetricsAdapter } from "../services/langy-session-key-metrics-otel.service.ts";
 import { LangySessionKeyReapService } from "../services/langy-session-key-reap.service.ts";
+import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service.ts";
 import type { LangyChatMessageInput } from "../services/langy-turn-shared.service.ts";
 import { LangyTurnsBoundsService } from "../services/langy-turns-bounds.service.ts";
 import { LangyVirtualKeyProvisioningService } from "../services/langy-virtual-key-provisioning.service.ts";
@@ -572,6 +575,26 @@ export class LangyApp implements LangyApiContract {
     await this.dependencies.turnBounds.assertTurnWithinBounds({ projectId: input.projectId });
 
     return this.dependencies.langy.startConversationTurn(input);
+  }
+
+  /** A `Prefer: wait` hold borrows its own blocking connection and gives it back on release. */
+  awaitTurnSettlement(input: LangyTurnSettlementWaitInput): Promise<LangyTurnSettlementWait> {
+    const { redis, repositories } = this.dependencies;
+
+    return LangyTurnSettlementWaiterService.awaitTurnSettlement({
+      ...input,
+      langy: this,
+      openBuffer: redis
+        ? () => {
+            const blocking = redis.duplicate();
+
+            return {
+              buffer: repositories.tokenBuffer.open({ redis, blockingRedis: blocking }),
+              release: () => blocking.disconnect(),
+            };
+          }
+        : null,
+    });
   }
 
   warmConversationWorker(

@@ -31,25 +31,23 @@ describe("langyChoiceSelectionSchema", () => {
 
   describe("given a selection that answers nothing", () => {
     it("refuses an empty selection", () => {
-      expect(langyChoiceSelectionSchema.safeParse({ blockId: "b1", optionIds: [] }).success).toBe(
-        false,
-      );
+      expect(langyChoiceSelectionSchema.validate({ blockId: "b1", optionIds: [] })).toBe(false);
     });
 
     it("refuses whitespace-only other-text", () => {
       expect(
-        langyChoiceSelectionSchema.safeParse({
+        langyChoiceSelectionSchema.validate({
           blockId: "b1",
           optionIds: [],
           otherText: "   ",
-        }).success,
+        }),
       ).toBe(false);
     });
   });
 
   describe("given a selection without a blockId", () => {
     it("refuses it — the answer must bind to its exact question", () => {
-      expect(langyChoiceSelectionSchema.safeParse({ optionIds: ["a"] }).success).toBe(false);
+      expect(langyChoiceSelectionSchema.validate({ optionIds: ["a"] })).toBe(false);
     });
   });
 });

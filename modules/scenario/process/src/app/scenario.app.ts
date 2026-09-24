@@ -86,6 +86,8 @@ import {
   type SimulationProjectDateRangeInput,
   type SimulationBatchSummary,
   type QueueSimulationRunInput,
+  type ScenarioLaunchRunInput,
+  type ScenarioRunScheduled,
   type SimulationRunData,
   type SimulationScenarioRunInput,
   type SimulationScenarioSetRunsInput,
@@ -137,6 +139,7 @@ import { ScenarioGenerateBoundsService } from "../services/scenario-generate-bou
 import { ScenarioGenerationService } from "../services/scenario-generation.service.ts";
 import { ScenarioRunExportDownloadService } from "../services/scenario-run-export-download.service.ts";
 import { ScenarioRunExportService } from "../services/scenario-run-export.service.ts";
+import { ScenarioRunLaunchService } from "../services/scenario-run-launch.service.ts";
 import { ScenarioService } from "../services/scenario.service.ts";
 import { SimulationCommandDispatcherService } from "../services/simulation-command-dispatcher.service.ts";
 import {
@@ -381,6 +384,7 @@ export class ScenarioApp implements ScenarioApi {
   #lifecycleCommands: EventingCommands<ScenarioLifecyclePipeline> | undefined;
   readonly #simulationCommands: SimulationCommandDispatcherService;
   readonly #simulationProcessing: SimulationProcessingService;
+  readonly #runLaunch: ScenarioRunLaunchService;
 
   private constructor(
     dependencies: ScenarioAppDependencies & {
@@ -397,6 +401,7 @@ export class ScenarioApp implements ScenarioApi {
     this.#simulationCommands = simulationCommands;
     this.#simulationProcessing = simulationProcessing;
     this.#dependencies = rest;
+    this.#runLaunch = ScenarioRunLaunchService.create(this);
   }
 
   testAgentTurn(input: TestAgentTurnInput): Promise<AgentTestTurnResult> {
@@ -705,6 +710,10 @@ export class ScenarioApp implements ScenarioApi {
     input: ResolveScenarioRunParametersInput,
   ): Promise<ResolvedScenarioRunParameters> {
     return this.#dependencies.scenarios.resolveRunParameters(input);
+  }
+
+  launchRun(input: ScenarioLaunchRunInput): Promise<ScenarioRunScheduled> {
+    return this.#runLaunch.launch(input);
   }
 
   /** Validates a run against its target before anything is queued. */

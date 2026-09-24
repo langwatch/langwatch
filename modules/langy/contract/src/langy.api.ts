@@ -100,6 +100,25 @@ export type LangyControlPollInput = Readonly<{
 export type LangyControlFramesInput = Readonly<{ instanceToken: string; frames: CliFrame[] }>;
 export type LangyRestCallerInput = LangyKeyCaller & Readonly<{ surface: LangyRestSurface }>;
 
+/** How one turn settled: its reply text, or why it failed. */
+export type LangyTurnSettlement =
+  | { succeeded: true; outcome: "completed" | "stopped"; text: string; error: null }
+  | { succeeded: false; outcome: "failed"; text: null; error: string };
+
+/** One turn a caller holds for; `signal` is the caller's deadline and disconnect. */
+export type LangyTurnSettlementWaitInput = Readonly<{
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+  userId: string;
+  signal: AbortSignal;
+}>;
+
+/** `stopped`: the caller's signal ended the wait before the turn settled. */
+export type LangyTurnSettlementWait =
+  | { kind: "settled"; settlement: LangyTurnSettlement }
+  | { kind: "stopped" };
+
 /** The portable, callable Langy capability shared by process transports. */
 export interface LangyApi {
   ingestInternalTurnResult(input: LangyTurnResultInput): Promise<{ status: "accepted" }>;
@@ -174,6 +193,8 @@ export interface LangyApi {
     conversationId: string;
     turnId: string;
   }>;
+  /** Holds until one turn settles on the fold, or `signal` ends the wait. */
+  awaitTurnSettlement(input: LangyTurnSettlementWaitInput): Promise<LangyTurnSettlementWait>;
   warmConversationWorker(input: {
     projectId: string;
     session: LangyCredentialSession;

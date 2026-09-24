@@ -1,0 +1,149 @@
+import { createApiFixture } from "@langwatch/api-fixture";
+import type {
+  LangyApi,
+  LangyKeyCaller,
+  LangyStartConversationTurnInput,
+  LangyTurnSettlementWait,
+} from "@langwatch/langy-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import { LangyCanaryService } from "../langy-canary.service.ts";
+
+const KEY: LangyKeyCaller = { actor: { type: "user", id: "owner-1" }, projectId: "project-1" };
+const SETTLED: LangyTurnSettlementWait = {
+  kind: "settled",
+  settlement: { succeeded: true, outcome: "completed", text: "Hello!", error: null },
+};
+
+/** Waits until the signal ends the wait, as the real settlement waiter does. */
+const untilAborted = ({ signal }: { signal: AbortSignal }): Promise<LangyTurnSettlementWait> =>
+  new Promise((resolve) => {
+    signal.addEventListener("abort", () => resolve({ kind: "stopped" }), { once: true });
+  });
+
+function canary(options: {
+  dark?: boolean;
+  start?: LangyApi["startConversationTurn"];
+  settle?: LangyApi["awaitTurnSettlement"];
+  budgetMs?: number;
+  now?: () => number;
+}) {
+  let turns = 0;
+  const startConversationTurn = vi.fn(
+    options.start ??
+      (async (_input: LangyStartConversationTurnInput) => ({
+        conversationId: "conv-1",
+        turnId: `turn-${++turns}`,
+      })),
+  );
+  const langy = createApiFixture<LangyApi>({
+    getRestCaller: async (input) =>
+      options.dark
+        ? { dark: true }
+        : { dark: false, projectId: input.projectId, userId: `user-of-${input.projectId}` },
+    getRestActor: async ({ userId }) => ({ user: { id: userId } }),
+    startConversationTurn,
+    awaitTurnSettlement: options.settle ?? (async () => SETTLED),
+  });
+  const service = LangyCanaryService.create({
+    langy,
+    clock: { now: options.now ?? (() => Date.now()), budgetMs: options.budgetMs ?? 1_000 },
+  });
+  return { service, startConversationTurn };
+}
+
+describe("LangyCanaryService", () => {
+  /** @scenario "The Langy canary sends the greeting as the key's owner with a fresh idempotency key" */
+  it("starts one greeting turn per check as the key's owner, under fresh keys", async () => {
+    const { service, startConversationTurn } = canary({});
+
+    const first = await service.probe(KEY);
+    await service.probe(KEY);
+
+    expect(first.status).toBe(200);
+    expect(first.headers.get("cache-control")).toBe("no-store");
+    expect(await first.json()).toMatchObject({
+      status: "ok",
+      conversationId: "conv-1",
+      turnId: "turn-1",
+    });
+    const [a, b] = startConversationTurn.mock.calls.map(([input]) => input);
+    expect(a?.session.user.id).toBe("user-of-project-1");
+    expect(a?.messages).toEqual([{ role: "user", parts: [{ type: "text", text: "Hi Langy." }] }]);
+    expect(a?.idempotencyKey).not.toBe(b?.idempotencyKey);
+  });
+
+  /** @scenario "The Langy canary answers a dark surface with a plain 404 and starts no turn" */
+  it("answers the plain 404 without Cache-Control and starts nothing", async () => {
+    const { service, startConversationTurn } = canary({ dark: true });
+
+    const answer = await service.probe(KEY);
+
+    expect(answer.status).toBe(404);
+    expect(await answer.text()).toBe("404 Not Found");
+    expect(answer.headers.get("cache-control")).toBeNull();
+    expect(startConversationTurn).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "A Langy turn that does not settle inside the budget is timeout" */
+  it("reports timeout with the turn's ids when the wait outlasts the budget", async () => {
+    const { service } = canary({ settle: untilAborted, budgetMs: 20 });
+
+    const answer = await service.probe(KEY);
+
+    expect(answer.status).toBe(503);
+    expect(await answer.json()).toMatchObject({
+      status: "unhealthy",
+      reason: "timeout",
+      conversationId: "conv-1",
+      turnId: "turn-1",
+    });
+  });
+
+  /** @scenario "A Langy turn that cannot start is turn_failed" */
+  it("reports turn_failed when the start throws", async () => {
+    const { service } = canary({
+      start: async () => {
+        throw new Error("engine down");
+      },
+    });
+
+    expect(await (await service.probe(KEY)).json()).toMatchObject({ reason: "turn_failed" });
+  });
+
+  /** @scenario "A second Langy check for the same caller while one is in flight is busy" */
+  it("answers busy to the same caller in flight and runs another caller", async () => {
+    const releases: ((wait: LangyTurnSettlementWait) => void)[] = [];
+    const { service, startConversationTurn } = canary({
+      settle: () => new Promise((resolve) => releases.push(resolve)),
+    });
+
+    const first = service.probe(KEY);
+    await vi.waitFor(() => expect(startConversationTurn).toHaveBeenCalledTimes(1));
+    const busy = await service.probe(KEY);
+    const other = service.probe({ ...KEY, projectId: "project-2" });
+    await vi.waitFor(() => expect(releases).toHaveLength(2));
+    for (const release of releases) release(SETTLED);
+
+    expect(busy.status).toBe(429);
+    expect(await busy.json()).toEqual({ status: "busy" });
+    expect((await first).status).toBe(200);
+    expect((await other).status).toBe(200);
+  });
+
+  /** @scenario "A Langy timeout reserves the caller's slot for one further budget" */
+  it("holds the caller's slot one budget after a timeout, then runs again", async () => {
+    let clock = 0;
+    const { service, startConversationTurn } = canary({
+      settle: untilAborted,
+      budgetMs: 20,
+      now: () => clock,
+    });
+
+    expect((await service.probe(KEY)).status).toBe(503);
+    expect((await service.probe(KEY)).status).toBe(429);
+    clock = 21;
+    expect((await service.probe(KEY)).status).toBe(503);
+    expect(startConversationTurn).toHaveBeenCalledTimes(2);
+  });
+});

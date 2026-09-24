@@ -180,20 +180,11 @@ export type {
   LangyStreamRedis,
   LangyTokenBufferConnection,
 } from "./repositories/langy-token-buffer.repository.ts";
-export type {
-  LangyTurnSettlementReader,
-  OpenLangyTurnBuffer,
-  TurnSettlement,
-} from "./services/langy-turn-settlement-waiter.service.ts";
 export { LangyTurnsBoundsService } from "./services/langy-turns-bounds.service.ts";
 
 // --------------------------------------------------------------------------- The four public and
 // internal REST doors.
-export {
-  langyTurnsMembers,
-  langyTurnsRest,
-  type LangyTurnsRestMembers,
-} from "./transport/langy-turns.rest.ts";
+export { langyTurnsRest } from "./transport/langy-turns.rest.ts";
 export {
   langyUiActionsRest,
   langyUiActionsRestMembers,

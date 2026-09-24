@@ -1,10 +1,11 @@
 /**
- * `/api/health/{collector,evaluations,processor,triggers,workflows,scenarios}` - the project-keyed
- * probes an orchestrator points at, answering main's bodies at main's statuses.
+ * `/api/health/{collector,evaluations,processor,triggers,workflows,scenarios,langy}` - the
+ * project-keyed probes an orchestrator points at, answering main's bodies at main's statuses.
  */
 import { publicRoute } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/kernel/module-api";
+import type { LangyKeyCaller } from "@langwatch/langy-contract";
 import {
   healthProbeHeadersSchema,
   platformHealthQuerySchema,
@@ -12,9 +13,10 @@ import {
   type ProjectKeyedProbeRequest,
 } from "@langwatch/platform-health-contract";
 
-/** The one operation the probe door reaches. */
+/** The operations the probe doors reach. */
 export interface PlatformHealthProbeApi {
   probeWithProjectKey(request: ProjectKeyedProbeRequest): Promise<Response>;
+  probeLangy(key: LangyKeyCaller): Promise<Response>;
 }
 
 export const PlatformHealthProbeApi = moduleApi<PlatformHealthProbeApi>()("platform-health");
@@ -103,5 +105,27 @@ export const platformHealthProbeRest = defineRestRouter(PlatformHealthProbeApi)
     response.pass(
       await app.probeWithProjectKey({ check: "scenarios", headers, runPlanId: input.runPlanId }),
     ),
+  )
+  .build();
+
+const LANGY_ANSWERS = {
+  produces: ["application/json", "text/plain;charset=UTF-8"],
+  because:
+    "Main's Langy probe answers its canary status as JSON, and a dark surface as a plain 404.",
+} as const;
+
+/** `/api/health/langy`: the key's owner sends one greeting turn, refused as langy's turns are. */
+export const platformHealthLangyProbeRest = defineRestRouter(PlatformHealthProbeApi)
+  .withNamespace("health")
+  .withVersion(MANAGEMENT_API_VERSION)
+  .withCredential("project")
+  .withAddressing("literal", { v1Twin: false })
+
+  .get("/api/health/langy", "probeLangyHealth")
+  .withPermission("langy:create")
+  .withResponse("forwarded", LANGY_ANSWERS)
+  .withDocs({ hide: true })
+  .handle(async ({ app, actor, scope, response }) =>
+    response.pass(await app.probeLangy({ actor, projectId: scope.id })),
   )
   .build();

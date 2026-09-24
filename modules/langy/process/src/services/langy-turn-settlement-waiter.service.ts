@@ -6,23 +6,11 @@ import {
   LangyConversationNotFoundError,
   type LangyConversationTurnWireEvent,
   type LangyEventCursor,
+  type LangyTurnSettlement,
+  type LangyTurnSettlementWait,
 } from "@langwatch/langy-contract";
 
 import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
-
-export type TurnSettlement =
-  | {
-      succeeded: true;
-      outcome: "completed" | "stopped";
-      text: string;
-      error: null;
-    }
-  | { succeeded: false; outcome: "failed"; text: null; error: string };
-
-/** `stopped`: the caller's signal ended the wait before the turn settled. */
-export type TurnSettlementWait =
-  | { kind: "settled"; settlement: TurnSettlement }
-  | { kind: "stopped" };
 
 export type LangyTurnSettlementReader = {
   getEventsAfter(input: {
@@ -37,11 +25,7 @@ export type LangyTurnSettlementReader = {
   }>;
 };
 
-/**
- * One turn's live edge, opened by the caller. Handed in rather than built here: the buffer is a
- * Redis adapter, and which connection it duplicates for its blocking read is the composing
- * process's business, not this waiter's. `release` gives that connection back.
- */
+/** One turn's live edge over a borrowed blocking connection; `release` gives it back. */
 export type LangyTurnBufferWatch = { buffer: LangyTokenBuffer; release: () => void };
 export type OpenLangyTurnBuffer = () => LangyTurnBufferWatch | null;
 
@@ -78,7 +62,7 @@ export class LangyTurnSettlementWaiterService {
   static deriveSettlementFromEvents(
     events: LangyConversationTurnWireEvent[],
     turnId: string,
-  ): TurnSettlement | null {
+  ): LangyTurnSettlement | null {
     for (const event of events) {
       const settlement = LangyTurnSettlementWaiterService.settlementFromEvent(event, turnId);
       if (settlement) {
@@ -92,7 +76,7 @@ export class LangyTurnSettlementWaiterService {
   private static settlementFromEvent(
     event: LangyConversationTurnWireEvent,
     turnId: string,
-  ): TurnSettlement | null {
+  ): LangyTurnSettlement | null {
     if (
       event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED &&
       event.data.turnId === turnId
@@ -136,7 +120,7 @@ export class LangyTurnSettlementWaiterService {
     turnId: string;
     userId: string;
     signal: AbortSignal;
-  }): Promise<TurnSettlement | null> {
+  }): Promise<LangyTurnSettlement | null> {
     let cursor: LangyEventCursor = { acceptedAt: 0, eventId: "" };
 
     while (!input.signal.aborted) {
@@ -258,7 +242,7 @@ export class LangyTurnSettlementWaiterService {
     userId: string;
     signal: AbortSignal;
     pollIntervalMs?: number;
-  }): Promise<TurnSettlementWait> {
+  }): Promise<LangyTurnSettlementWait> {
     const armed = LangyTurnSettlementWaiterService.armBufferWatch(input);
     let terminalSeen = armed.terminalSeen;
     let pollMs = terminalSeen ? bufferedPollMs : (input.pollIntervalMs ?? fallbackPollMs);

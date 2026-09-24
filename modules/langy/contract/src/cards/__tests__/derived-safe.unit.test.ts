@@ -117,12 +117,12 @@ describe("langyDerivedCardSchema", () => {
       // A choices fence is therefore a kind the fence channel does not know.
       expect(DERIVED_SAFE_CARD_KINDS as readonly string[]).not.toContain("choices");
       expect(isDerivedSafeCardKind("choices")).toBe(false);
-      expect(langyModelEmittedCardSchema.safeParse(choices).success).toBe(false);
+      expect(langyModelEmittedCardSchema.validate(choices)).toBe(false);
     });
 
     it("keeps choices on the part channel, so the tool's card renders", () => {
       expect(RENDERED_CARD_KINDS as readonly string[]).toContain("choices");
-      expect(langyDerivedCardSchema.safeParse(choices).success).toBe(true);
+      expect(langyDerivedCardSchema.validate(choices)).toBe(true);
     });
 
     it("names only kinds the shared vocabulary knows", () => {
@@ -160,7 +160,7 @@ describe("langyDerivedCardSchema", () => {
       // reads as "the model emitted nothing" rather than as a missing schema.
       for (const kind of RENDERED_CARD_KINDS) {
         const sample = SAMPLE_BY_KIND[kind];
-        expect(langyDerivedCardSchema.safeParse(sample).success).toBe(true);
+        expect(langyDerivedCardSchema.validate(sample)).toBe(true);
       }
     });
   });
@@ -173,48 +173,48 @@ describe("langyDerivedCardSchema", () => {
       ["choices", choices],
     ])("refuses the %s card", (_kind, block) => {
       const { blockId: _dropped, ...withoutId } = block as Record<string, unknown>;
-      expect(langyDerivedCardSchema.safeParse(withoutId).success).toBe(false);
+      expect(langyDerivedCardSchema.validate(withoutId)).toBe(false);
     });
   });
 
   describe("given structurally wrong payloads", () => {
     it("refuses a timeseries with no series", () => {
       expect(
-        langyDerivedCardSchema.safeParse({
+        langyDerivedCardSchema.validate({
           ...timeseries,
           series: [],
-        }).success,
+        }),
       ).toBe(false);
     });
 
     it("refuses a timeseries whose points are not numbers", () => {
       expect(
-        langyDerivedCardSchema.safeParse({
+        langyDerivedCardSchema.validate({
           ...timeseries,
           series: [{ name: "cost", points: [{ t: "d1", v: "1.2" }] }],
-        }).success,
+        }),
       ).toBe(false);
     });
 
     it("refuses a table whose cells are nested structures", () => {
       expect(
-        langyDerivedCardSchema.safeParse({
+        langyDerivedCardSchema.validate({
           ...table,
           rows: [[{ nested: true }]],
-        }).success,
+        }),
       ).toBe(false);
     });
 
     it("refuses stats with an empty items list", () => {
-      expect(langyDerivedCardSchema.safeParse({ ...stats, items: [] }).success).toBe(false);
+      expect(langyDerivedCardSchema.validate({ ...stats, items: [] })).toBe(false);
     });
 
     it("accepts a ragged table row rather than failing the block", () => {
       expect(
-        langyDerivedCardSchema.safeParse({
+        langyDerivedCardSchema.validate({
           ...table,
           rows: [["only-one-cell"]],
-        }).success,
+        }),
       ).toBe(true);
     });
   });
@@ -268,19 +268,17 @@ describe("langyDerivedChoicesCardSchema", () => {
 
   describe("given an empty options list", () => {
     it("refuses the card", () => {
-      expect(langyDerivedChoicesCardSchema.safeParse({ ...choices, options: [] }).success).toBe(
-        false,
-      );
+      expect(langyDerivedChoicesCardSchema.validate({ ...choices, options: [] })).toBe(false);
     });
   });
 
   describe("given a ref missing its id", () => {
     it("refuses the card", () => {
       expect(
-        langyDerivedChoicesCardSchema.safeParse({
+        langyDerivedChoicesCardSchema.validate({
           ...choices,
           options: [{ id: "x", label: "X", ref: { type: "agent" } }],
-        }).success,
+        }),
       ).toBe(false);
     });
   });

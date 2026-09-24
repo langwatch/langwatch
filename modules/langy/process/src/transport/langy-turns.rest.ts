@@ -3,7 +3,6 @@ import { PayloadTooLargeError } from "@langwatch/api";
  * with /api/v1 twin. Refusal order: credential (401), API-key langy:create ceiling (403),
  * per-project rollout flag, identity bridge, then application. */
 import {
-  defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   type RestAnswer,
@@ -16,12 +15,7 @@ import {
   langyRestTurnBodySchema,
   type LangyKeyCaller,
 } from "@langwatch/langy-contract";
-import { z } from "zod";
-
-import {
-  type LangyTurnBufferWatch,
-  LangyTurnSettlementWaiterService,
-} from "../services/langy-turn-settlement-waiter.service.ts";
+import type { z } from "zod";
 
 /**
  * A turn is text plus small structured parts, never an upload.
@@ -34,25 +28,6 @@ const MAX_TURN_BODY_BYTES = 1024 * 1024;
  * back in the body.
  */
 const MAX_WAIT_SECONDS = 120;
-
-/** Everything the turn surface reaches that Langy does not own. */
-export type LangyTurnsRestMembers = Readonly<{
-  /**
-   * One turn's live buffer, opened for the length of a `Prefer: wait` hold, or
-   * null when this process composed no Redis: the hold is then served by fold
-   * reads alone, which is slower and correct rather than absent.
-   */
-  openTurnBuffer: () => LangyTurnBufferWatch | null;
-}>;
-
-/**
- * What the PROCESS supplies the turn surface beyond Langy's own
- * application: this process's live turn buffer, which is not Langy's to own.
- */
-export const langyTurnsMembers = defineRestMiddleware(
-  "langyTurnsMembers",
-  z.custom<LangyTurnsRestMembers>(),
-);
 
 /** Hono's own 404, byte-for-byte what an unmounted path returns. */
 const HONO_NOT_FOUND = {
@@ -111,13 +86,12 @@ function parseTurnBody(
 async function startTurn(input: {
   app: LangyApi;
   key: LangyKeyCaller;
-  members: LangyTurnsRestMembers;
   request: Request;
   response: RestProtocolProducer<typeof TURN_PRODUCES>;
   raw: string;
   conversationId: string | null;
 }): Promise<RestAnswer<"protocol">> {
-  const { app, members, request, response, conversationId } = input;
+  const { app, request, response, conversationId } = input;
   // The door already resolved this key and enforced `langy:create` as its
   // ceiling; reading its answer back here asks the key store nothing twice.
   const caller = await app.getRestCaller({ ...input.key, surface: "turns" });
@@ -149,9 +123,7 @@ async function startTurn(input: {
   if (waitSeconds && waitSeconds > 0) {
     // Client disconnect and the wait deadline are one signal: an abandoned
     // hold stops consuming fold reads (and its blocking Redis read) at once.
-    const wait = await LangyTurnSettlementWaiterService.awaitTurnSettlement({
-      langy: app,
-      openBuffer: members.openTurnBuffer,
+    const wait = await app.awaitTurnSettlement({
       projectId: caller.projectId,
       conversationId: result.conversationId,
       turnId: result.turnId,
@@ -209,12 +181,10 @@ export const langyTurnsRest = defineRestRouter(LangyApi)
   .withResponse("protocol", { produces: TURN_PRODUCES, because: TURN_ANSWER })
   .withBodyLimit({ maxBytes: MAX_TURN_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
   .withDocs({ description: `Start a Langy conversation with one turn. ${TURN_ANSWER}` })
-  .withMiddleware(langyTurnsMembers)
-  .handle(async ({ app, raw, request, response, actor, scope }, members) =>
+  .handle(async ({ app, raw, request, response, actor, scope }) =>
     startTurn({
       app,
       key: { actor, projectId: scope.id },
-      members,
       request,
       response,
       raw,
@@ -229,12 +199,10 @@ export const langyTurnsRest = defineRestRouter(LangyApi)
   .withResponse("protocol", { produces: TURN_PRODUCES, because: TURN_ANSWER })
   .withBodyLimit({ maxBytes: MAX_TURN_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
   .withDocs({ description: `Continue one Langy conversation with a turn. ${TURN_ANSWER}` })
-  .withMiddleware(langyTurnsMembers)
-  .handle(async ({ app, input, raw, request, response, actor, scope }, members) =>
+  .handle(async ({ app, input, raw, request, response, actor, scope }) =>
     startTurn({
       app,
       key: { actor, projectId: scope.id },
-      members,
       request,
       response,
       raw,

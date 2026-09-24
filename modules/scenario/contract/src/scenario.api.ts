@@ -5,6 +5,7 @@ import type {
 } from "@langwatch/agent-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import type { UserFullProfile, UserProfilesInput } from "@langwatch/user-contract";
+import type { z } from "zod";
 
 import type {
   CodeScenario,
@@ -32,7 +33,8 @@ import type {
 } from "./scenario-run-export.ts";
 import type { ScenarioTabPresence, ScenarioTabRegistration } from "./scenario-tab-presence.ts";
 import type { RunParameterValues } from "./scenario.parameters.ts";
-import type { RunConfigurationEntryResponse } from "./scenario.responses.ts";
+import type { RunConfigurationEntryResponse, ScenarioRunScheduled } from "./scenario.responses.ts";
+import type { scenarioTrpcRunSchema } from "./scenario.trpc.ts";
 import type {
   Scenario,
   ScenarioAuthorLabel,
@@ -202,6 +204,10 @@ export interface ScenarioUsageCount {
   readonly runs: number;
 }
 
+/** One run of one scenario, as the tRPC `run` input names it, started by `actor`. */
+export type ScenarioLaunchRunInput = z.infer<typeof scenarioTrpcRunSchema> &
+  Readonly<{ actor: RunActor }>;
+
 /** The scenario application: what every scenario door calls, and what peer
  * features such as Suite reach it by. */
 export interface ScenarioApi {
@@ -292,6 +298,8 @@ export interface ScenarioApi {
   getUserProfiles(input: UserProfilesInput): Promise<UserFullProfile[]>;
 
   // -- running one --------------------------------------------------------
+  /** Resolves, validates and queues one run: the tRPC `run` and the scenario canary share it. */
+  launchRun(input: ScenarioLaunchRunInput): Promise<ScenarioRunScheduled>;
   prefetchExecution(
     input: ScenarioExecutionPrefetchInput,
   ): Promise<ScenarioExecutionPrefetchResult>;

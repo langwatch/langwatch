@@ -1,6 +1,7 @@
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AutomationApi } from "@langwatch/automation-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { LangyApi, type LangyKeyCaller } from "@langwatch/langy-contract";
 import {
   PlatformHealthApi,
   type PlatformHealthApi as PlatformHealthApiContract,
@@ -17,6 +18,7 @@ import { fromDate } from "@langwatch/time";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { HttpSubsystemProbeChannel } from "../channels/http/http.subsystem-probe.channel.ts";
+import { LangyCanaryService } from "../services/langy-canary.service.ts";
 import { PlatformHealthKeyService } from "../services/platform-health-key.service.ts";
 import { PlatformHealthService } from "../services/platform-health.service.ts";
 import { ProjectKeyedProbeService } from "../services/project-keyed-probe.service.ts";
@@ -57,6 +59,8 @@ export class PlatformHealthApp implements PlatformHealthApiContract {
     scenarios: ScenarioApi,
     /** The run plan the scenario canary is pointed at, by id or slug. */
     suites: SuiteApi,
+    /** The Langy canary sends one greeting turn as the key's owner and awaits its settlement. */
+    langy: LangyApi,
   };
   /** Both names are from the process's vocabulary; boot refuses by name. */
   static readonly reads = ["secrets", "publicBaseUrl"] as const;
@@ -64,15 +68,18 @@ export class PlatformHealthApp implements PlatformHealthApiContract {
   readonly #health: PlatformHealthService;
   readonly #key: PlatformHealthKeyService;
   readonly #projectKeyed: ProjectKeyedProbeService;
+  readonly #langyCanary: LangyCanaryService;
 
-  private constructor(
-    health: PlatformHealthService,
-    key: PlatformHealthKeyService,
-    projectKeyed: ProjectKeyedProbeService,
-  ) {
-    this.#health = health;
-    this.#key = key;
-    this.#projectKeyed = projectKeyed;
+  private constructor(services: {
+    health: PlatformHealthService;
+    key: PlatformHealthKeyService;
+    projectKeyed: ProjectKeyedProbeService;
+    langyCanary: LangyCanaryService;
+  }) {
+    this.#health = services.health;
+    this.#key = services.key;
+    this.#projectKeyed = services.projectKeyed;
+    this.#langyCanary = services.langyCanary;
   }
 
   static create({ dependencies, members }: PlatformHealthSetup): PlatformHealthApp {
@@ -96,16 +103,16 @@ export class PlatformHealthApp implements PlatformHealthApiContract {
         dependencies.projects.findIdByLegacyApiKey({ token: probeApiKey }),
     };
 
-    return new PlatformHealthApp(
-      PlatformHealthService.create({
+    return new PlatformHealthApp({
+      health: PlatformHealthService.create({
         probes: PLATFORM_HEALTH_CHECK_NAMES.map((name) =>
           SubsystemProbeAdapter.create({ name, probes, credential }),
         ),
       }),
-      PlatformHealthKeyService.create({
+      key: PlatformHealthKeyService.create({
         apiKey: members.secrets.find("PLATFORM_HEALTH_API_KEY") ?? "",
       }),
-      ProjectKeyedProbeService.create({
+      projectKeyed: ProjectKeyedProbeService.create({
         probes,
         resolveProject: async (input) =>
           (await dependencies.apiKeys.findResolvedToken(input))?.project.id ?? null,
@@ -113,12 +120,18 @@ export class PlatformHealthApp implements PlatformHealthApiContract {
           peers: { scenarios: dependencies.scenarios, suites: dependencies.suites },
         }),
       }),
-    );
+      langyCanary: LangyCanaryService.create({ langy: dependencies.langy }),
+    });
   }
 
   /** `/api/health/*`: one probe, run as the caller's own project key, answered in main's words. */
   probeWithProjectKey(request: ProjectKeyedProbeRequest): Promise<Response> {
     return this.#projectKeyed.probe(request);
+  }
+
+  /** `/api/health/langy`: one greeting turn as the key's owner, answered in main's words. */
+  probeLangy(key: LangyKeyCaller): Promise<Response> {
+    return this.#langyCanary.probe(key);
   }
 
   checkAll(query: PlatformHealthQuery): Promise<PlatformHealthReport> {

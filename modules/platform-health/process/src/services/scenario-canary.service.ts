@@ -1,12 +1,6 @@
 /** The scenario canary, ported from main's `health-probes/scenario-canary.service.ts`. */
 import { createLogger } from "@langwatch/observability";
-import {
-  generateBatchRunId,
-  generateScenarioRunId,
-  getOnPlatformSetId,
-  isTerminalStatus,
-  type ScenarioApi,
-} from "@langwatch/scenario-contract";
+import { isTerminalStatus, type ScenarioApi } from "@langwatch/scenario-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -26,10 +20,7 @@ import {
 const logger = createLogger("langwatch:scenario-canary");
 
 export type ScenarioCanaryPeers = Readonly<{
-  scenarios: Pick<
-    ScenarioApi,
-    "resolveRunParameters" | "prefetchExecution" | "queueSimulationRun" | "findScenarioRunData"
-  >;
+  scenarios: Pick<ScenarioApi, "launchRun" | "findScenarioRunData">;
   suites: Pick<SuiteApi, "listByIds" | "list">;
 }>;
 
@@ -195,33 +186,12 @@ export class ScenarioCanaryService {
   }
 
   async #launch({ projectId, scenarioId, target }: CanaryConfig): Promise<string> {
-    const { scenarios } = this.peers;
-    const setId = getOnPlatformSetId(projectId);
-    const batchRunId = generateBatchRunId();
-    const resolved = await scenarios.resolveRunParameters({ projectId, scenarioId });
-    const runTarget = { type: target.type, referenceId: target.referenceId };
-    const { parameters, secretParameters } = resolved;
-    const prefetch = await scenarios.prefetchExecution({
-      context: { projectId, scenarioId, setId, batchRunId, parameters, secretParameters },
-      target: runTarget,
-    });
-    if (!prefetch.success) throw new Error(prefetch.error);
-
-    const scenarioRunId = generateScenarioRunId();
-    await scenarios.queueSimulationRun({
+    const { scenarioRunId } = await this.peers.scenarios.launchRun({
       projectId,
       scenarioId,
-      scenarioRunId,
-      batchRunId,
-      setId,
-      name: prefetch.data.scenario.name,
-      target: runTarget,
-      parameters,
-      secretParameters,
+      target: { type: target.type, referenceId: target.referenceId },
       note: "scenario canary health check",
-      scenarioVersion: resolved.scenarioVersion,
       actor: { id: "scenario-canary", label: "api" },
-      resolvedModels: prefetch.resolvedModels,
     });
     return scenarioRunId;
   }

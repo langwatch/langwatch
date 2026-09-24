@@ -25,7 +25,7 @@ export const langyTurnResultToolCallSchema = z.object({
   /** Canonical typed result; optional only for older workers during rollout. */
   result: z
     .custom<CliToolResult>(
-      (value) => cliToolResultSchema.safeParse(value).success,
+      (value) => cliToolResultSchema.validate(value),
       "Invalid CLI tool result",
     )
     .optional(),
@@ -92,8 +92,10 @@ export const langyLocalCreateRequestBodySchema = z.object({
 
 export const langyLocalStartCallRequestSchema =
   langyLocalConversationBodySchema.and(startCallBodySchema);
-export const langyLocalStartWaitRequestSchema =
-  langyLocalConversationBodySchema.and(startWaitBodySchema);
+export const langyLocalStartWaitRequestSchema = z.object({
+  ...langyLocalConversationBodySchema.shape,
+  ...startWaitBodySchema.shape,
+});
 
 // ── the local-control REST family, `/api/langy/control` ────────────────────
 
