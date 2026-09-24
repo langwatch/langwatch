@@ -13,7 +13,7 @@ import {
   isModelRole,
   normalizeRoutingHandle,
   providerDeprecation,
-  routingHandleProblem,
+  classifyRoutingHandleProblem,
   findModelProviderDefinition,
   type ModelCostRate,
   type ModelDefaultScope,
@@ -117,7 +117,7 @@ export abstract class ModelProviderCatalog {
     }));
   }
   /** Expand aliases and reject models that are not valid for a feature/role. */
-  tryNormalizeDefaultModel(input: { key: string; model: string }): string | null {
+  normalizeDefaultModel(input: { key: string; model: string }): string | null {
     const model = expandLatestAlias(input.model);
     if (isLatestAlias(input.model) && model === input.model) {
       return null;
@@ -175,11 +175,11 @@ export abstract class ModelProviderCatalog {
 
     return clean;
   }
-  tryNormalizeRoutingHandle(input: string | null): string | null {
+  normalizeRoutingHandle(input: string | null): string | null {
     return normalizeRoutingHandle(input);
   }
-  tryGetRoutingHandleProblem(handle: string | null): "shape" | "reserved" | null {
-    return routingHandleProblem(handle);
+  classifyRoutingHandleProblem(handle: string | null): "shape" | "reserved" | null {
+    return classifyRoutingHandleProblem(handle);
   }
   tryGetProviderDeprecation(provider: string): { replacement?: string } | null {
     const deprecation = providerDeprecation(provider);
@@ -204,7 +204,7 @@ export abstract class ModelProviderCatalog {
     customKeys: Record<string, unknown> | null;
     key: string;
   }): string | null;
-  tryGetStoredExecutionValue(input: {
+  pickStoredExecutionValue(input: {
     customKeys: Record<string, unknown> | null;
     key: string;
   }): string | null {

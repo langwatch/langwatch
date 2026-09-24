@@ -43,7 +43,7 @@ describe("given the memory model-provider repositories", () => {
         provider({ id: "mp_other", scopes: [{ scopeType: "PROJECT", scopeId: "project_2" }] }),
       );
 
-      const rows = await repositories.providers.listForProject([PROJECT_SCOPE]);
+      const rows = await repositories.providers.findForProject([PROJECT_SCOPE]);
 
       expect(rows.map((row) => row.id)).toEqual(["mp_1", "mp_2"]);
     });
@@ -52,12 +52,12 @@ describe("given the memory model-provider repositories", () => {
       const repositories = MemoryModelProviderRepositories.create();
       await repositories.providers.create(provider({ id: "mp_1" }));
 
-      const found = await repositories.providers.tryFindById({
-        id: "mp_1",
-        projectScopes: [{ scopeType: "PROJECT", scopeId: "project_2" }],
-      });
-
-      expect(found).toBeNull();
+      await expect(
+        repositories.providers.getById({
+          id: "mp_1",
+          projectScopes: [{ scopeType: "PROJECT", scopeId: "project_2" }],
+        }),
+      ).rejects.toMatchObject({ code: "model_provider_not_found" });
     });
 
     it("reports a stored credential only once one is written", async () => {
@@ -106,8 +106,10 @@ describe("given the memory model-provider repositories", () => {
         authorId: "user_1",
       });
 
-      expect(await repositories.defaults.tryGetById("mdc_1")).toBeNull();
-      expect((await repositories.defaults.tryFindByScope(PROJECT_SCOPE))?.id).toBe("mdc_2");
+      await expect(repositories.defaults.getById("mdc_1")).rejects.toMatchObject({
+        code: "model_default_not_found",
+      });
+      expect((await repositories.defaults.getByScope(PROJECT_SCOPE)).id).toBe("mdc_2");
     });
   });
 
@@ -132,7 +134,9 @@ describe("given the memory model-provider repositories", () => {
         authorId: "user_1",
       });
 
-      expect(await repositories.defaults.tryFindByScope(ORGANIZATION_SCOPE)).toBeNull();
+      await expect(repositories.defaults.getByScope(ORGANIZATION_SCOPE)).rejects.toMatchObject({
+        code: "model_default_not_found",
+      });
     });
   });
 

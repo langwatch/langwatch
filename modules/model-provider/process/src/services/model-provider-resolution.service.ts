@@ -141,12 +141,12 @@ export class ModelProviderResolutionService {
     organizationId: string | null,
   ): Promise<ModelDefaultConfig[]> {
     if (organizationId) {
-      return this.options.defaults.listForOrganization(organizationId);
+      return this.options.defaults.findForOrganization(organizationId);
     }
 
     const scopes = await this.options.scopes.getProjectScopes(projectId);
 
-    return this.options.defaults.listForProject(scopes);
+    return this.options.defaults.findForProject(scopes);
   }
 
   private chain(

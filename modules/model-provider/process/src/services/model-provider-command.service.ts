@@ -7,7 +7,7 @@ import {
   ModelProviderRoutingHandleTakenError,
   ModelProviderScopesRequiredError,
   ModelProviderSkipPermissionsPatternInvalidError,
-  firstInvalidSkipPattern,
+  detectInvalidSkipPattern,
   modelProviderApiKeyValidationInputSchema,
   modelProviderDeleteInputSchema,
   modelProviderSchema,
@@ -108,19 +108,16 @@ export class ModelProviderCommandService {
     const projectScopes = parsed.projectId
       ? await this.options.scopes.tryGetProjectScopes(parsed.projectId)
       : null;
-    const existingByProvider = async () =>
-      projectScopes
-        ? this.options.repository.tryFindByProviderForProject({
-            provider: parsed.provider,
-            projectScopes,
-          })
-        : null;
+    const existingByProvider = async () => {
+      if (!projectScopes) throw new ModelProviderNotFoundError();
+      return this.options.repository.getByProviderForProject({
+        provider: parsed.provider,
+        projectScopes,
+      });
+    };
     const existing = parsed.id
-      ? await this.options.repository.tryFindById({ id: parsed.id, organizationId })
+      ? await this.options.repository.getById({ id: parsed.id, organizationId })
       : await existingByProvider();
-    if (!existing) {
-      throw new ModelProviderNotFoundError();
-    }
 
     if (parsed.actorId) {
       await this.options.writeAuthorization.assertCanWrite(parsed.actorId, existing.scopes);
@@ -154,11 +151,11 @@ export class ModelProviderCommandService {
       throw new ModelProviderNotFoundError();
     }
 
-    const provider = await this.options.repository.tryFindById({
+    const provider = await this.options.repository.getById({
       id: parsed.modelProviderId,
       organizationId,
     });
-    if (!provider || provider.scopes.length === 0) {
+    if (provider.scopes.length === 0) {
       throw new ModelProviderNotFoundError();
     }
 
@@ -188,8 +185,8 @@ export class ModelProviderCommandService {
       return undefined;
     }
 
-    const normalized = this.options.catalog.tryNormalizeRoutingHandle(handle);
-    const problem = this.options.catalog.tryGetRoutingHandleProblem(normalized);
+    const normalized = this.options.catalog.normalizeRoutingHandle(handle);
+    const problem = this.options.catalog.classifyRoutingHandleProblem(normalized);
     if (problem) {
       throw new ModelProviderRoutingHandleInvalidError({
         handle: normalized ?? "",
@@ -210,7 +207,7 @@ export class ModelProviderCommandService {
       return;
     }
 
-    const invalid = firstInvalidSkipPattern(patterns);
+    const invalid = detectInvalidSkipPattern(patterns);
     if (invalid) {
       throw new ModelProviderSkipPermissionsPatternInvalidError(invalid);
     }
@@ -221,15 +218,12 @@ export class ModelProviderCommandService {
       ? await this.options.scopes.tryGetProjectScopes(input.projectId)
       : null;
     const existing = input.id
-      ? await this.options.repository.tryFindById({
+      ? await this.options.repository.getById({
           id: input.id,
           organizationId: input.organizationId,
           ...(projectScopes ? { projectScopes } : {}),
         })
       : null;
-    if (input.id && !existing) {
-      throw new ModelProviderNotFoundError();
-    }
 
     if (!existing) {
       const deprecation = this.options.catalog.tryGetProviderDeprecation(input.provider);

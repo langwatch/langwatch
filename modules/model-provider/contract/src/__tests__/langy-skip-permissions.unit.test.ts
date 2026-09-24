@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   defaultSkipListForProvider,
-  firstInvalidSkipPattern,
+  detectInvalidSkipPattern,
   matchesSkipList,
   parseSkipListInput,
   resolveSkipList,
@@ -75,14 +75,14 @@ describe("Feature: a provider says which models may skip Langy's permission chec
 
   describe("when a pattern does not compile", () => {
     it("names the first bad line, counting from one", () => {
-      expect(firstInvalidSkipPattern(["^ok$", "^also-ok", "^(unclosed"])).toEqual({
+      expect(detectInvalidSkipPattern(["^ok$", "^also-ok", "^(unclosed"])).toEqual({
         line: 3,
         pattern: "^(unclosed",
       });
     });
 
     it("names nothing when every pattern compiles", () => {
-      expect(firstInvalidSkipPattern(["^ok$"])).toBeNull();
+      expect(detectInvalidSkipPattern(["^ok$"])).toBeNull();
     });
 
     it("is ignored on the read side so one bad line denies nothing else", () => {

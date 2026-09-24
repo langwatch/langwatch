@@ -4,6 +4,7 @@
 
 import {
   expandLatestAlias,
+  ModelProviderNotFoundError,
   ModelRestrictedForExecutionError,
 } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
@@ -14,7 +15,10 @@ function executionWith(providers: Record<string, unknown>, rowById?: unknown) {
   return ModelProviderExecutionService.create({
     query: {
       getExecutionProviders: async () => providers,
-      tryGetByIdForProject: async () => rowById ?? null,
+      getByIdForProject: async () => {
+        if (!rowById) throw new ModelProviderNotFoundError();
+        return rowById;
+      },
       findRowServingModel: async () => null,
     },
     catalog: {
@@ -22,7 +26,7 @@ function executionWith(providers: Record<string, unknown>, rowById?: unknown) {
         parameters,
       tryGetExecutionDefinition: () => null,
       tryGetExecutionValue: () => null,
-      tryGetStoredExecutionValue: () => null,
+      pickStoredExecutionValue: () => null,
     },
   } as never);
 }

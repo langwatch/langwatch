@@ -1,4 +1,5 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { HandledError } from "@langwatch/handled-error";
 import {
   ModelProviderInvalidError,
   translateInputSchema,
@@ -287,7 +288,10 @@ export class ModelProviderService {
   }
 
   findDefaultConfig(input: { id: string }): Promise<ModelDefaultConfig | null> {
-    return this.defaultWrites.tryGet(input);
+    return this.defaultWrites.getById(input).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "model_default_not_found") return null;
+      throw error;
+    });
   }
 
   deleteDefaultConfig(input: ModelDefaultDeleteInput): Promise<void> {

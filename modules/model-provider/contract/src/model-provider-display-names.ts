@@ -47,7 +47,7 @@ function customEntriesOf(value: CustomModelEntry[] | null | undefined): CustomMo
   return Array.isArray(value) ? value : [];
 }
 
-function configuredDisplayName(entry: CustomModelEntry): string | null {
+function pickConfiguredDisplayName(entry: CustomModelEntry): string | null {
   const modelId = entry?.modelId;
   if (typeof modelId !== "string" || !modelId.trim()) return null;
   if (typeof entry.displayName !== "string") return null;
@@ -69,7 +69,7 @@ export function buildCustomModelDisplayNames(
       ...customEntriesOf(row.customEmbeddingsModels),
     ];
     for (const entry of entries) {
-      const displayName = configuredDisplayName(entry);
+      const displayName = pickConfiguredDisplayName(entry);
       if (!displayName) continue;
 
       const keys = [`${row.provider}/${entry.modelId}`];

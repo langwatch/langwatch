@@ -36,7 +36,7 @@ export async function runCustomModelsMigration({
     });
 
     for (const row of rows) {
-      const result = migrations.migrateCustomModelsRow({
+      const result = migrations.convertCustomModelsRow({
         row: row as {
           id: string;
           provider: string;

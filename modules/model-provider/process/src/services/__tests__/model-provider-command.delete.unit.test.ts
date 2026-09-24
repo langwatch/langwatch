@@ -24,10 +24,14 @@ function serviceWith(
   } = {},
 ) {
   const deleted: unknown[] = [];
+  const existingOrThrow = async () => {
+    if (!options.existing) throw new ModelProviderNotFoundError();
+    return options.existing;
+  };
   const authorized: unknown[] = [];
   const repository = {
-    tryFindById: async () => options.existing ?? null,
-    tryFindByProviderForProject: async () => options.existing ?? null,
+    getById: async () => existingOrThrow(),
+    getByProviderForProject: async () => existingOrThrow(),
     delete: async (input: unknown) => {
       deleted.push(input);
     },

@@ -1,4 +1,5 @@
 import {
+  ModelDefaultNotFoundError,
   modelDefaultConfigSchema,
   type ModelDefaultConfig,
   type ModelDefaultScope,
@@ -25,7 +26,7 @@ export class MemoryModelDefaultRepository implements ModelDefaultRepository {
 
   private constructor(private readonly database: MemoryModelProviderDatabase) {}
 
-  listForProject(projectScopes: ModelDefaultScope[]): Promise<ModelDefaultConfig[]> {
+  findForProject(projectScopes: ModelDefaultScope[]): Promise<ModelDefaultConfig[]> {
     return Promise.resolve(
       this.rows()
         .filter((row) => matchesAnyScope(row.scopes, projectScopes))
@@ -33,7 +34,7 @@ export class MemoryModelDefaultRepository implements ModelDefaultRepository {
     );
   }
 
-  listForOrganization(organizationId: string): Promise<ModelDefaultConfig[]> {
+  findForOrganization(organizationId: string): Promise<ModelDefaultConfig[]> {
     return Promise.resolve(
       this.rows()
         .filter((row) => row.organizationId === organizationId)
@@ -41,12 +42,16 @@ export class MemoryModelDefaultRepository implements ModelDefaultRepository {
     );
   }
 
-  tryGetById(id: string): Promise<ModelDefaultConfig | null> {
-    return Promise.resolve(this.database.defaults.get(id) ?? null);
+  getById(id: string): Promise<ModelDefaultConfig> {
+    return MemoryModelDefaultRepository.oneOrNotFound(this.database.defaults.get(id));
   }
 
-  tryFindByScope(scope: ModelDefaultScope): Promise<ModelDefaultConfig | null> {
-    return Promise.resolve(this.newestOnScope(scope));
+  getByScope(scope: ModelDefaultScope): Promise<ModelDefaultConfig> {
+    return MemoryModelDefaultRepository.oneOrNotFound(this.newestOnScope(scope) ?? undefined);
+  }
+
+  private static oneOrNotFound(row: ModelDefaultConfig | undefined): Promise<ModelDefaultConfig> {
+    return row ? Promise.resolve(row) : Promise.reject(new ModelDefaultNotFoundError());
   }
 
   save(input: ModelDefaultConfigSaveInput): Promise<ModelDefaultConfig> {

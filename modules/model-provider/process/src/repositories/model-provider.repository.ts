@@ -12,17 +12,17 @@ export type ModelProviderRecord = ModelProvider;
  * this repository: the app builds its services over it and hands out answers.
  */
 export interface ModelProviderRepository {
-  tryFindById(input: {
+  getById(input: {
     id: string;
     organizationId?: string;
     projectScopes?: ModelDefaultScope[];
-  }): Promise<ModelProvider | null>;
-  tryFindByProviderForProject(input: {
+  }): Promise<ModelProvider>;
+  getByProviderForProject(input: {
     provider: string;
     projectScopes: ModelDefaultScope[];
-  }): Promise<ModelProvider | null>;
-  listForProject(projectScopes: ModelDefaultScope[]): Promise<ModelProvider[]>;
-  listForOrganization(organizationId: string): Promise<ModelProvider[]>;
+  }): Promise<ModelProvider>;
+  findForProject(projectScopes: ModelDefaultScope[]): Promise<ModelProvider[]>;
+  findForOrganization(organizationId: string): Promise<ModelProvider[]>;
   create(input: ModelProviderRecord): Promise<ModelProvider>;
   update(input: ModelProviderRecord): Promise<ModelProvider>;
   delete(input: { id: string; organizationId?: string; projectId?: string }): Promise<void>;

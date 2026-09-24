@@ -1,4 +1,6 @@
+import { HandledError } from "@langwatch/handled-error";
 import {
+  ModelProviderNotFoundError,
   modelProviderExecutionSchema,
   modelProviderListOrganizationInputSchema,
   modelProviderListProjectInputSchema,
@@ -46,7 +48,7 @@ export class ModelProviderQueryService {
   async listForOrganization(input: { organizationId: string }): Promise<ModelProviderSummary[]> {
     const parsed = modelProviderListOrganizationInputSchema.parse(input);
     const [saved, referenceCreatedAt] = await Promise.all([
-      this.options.repository.listForOrganization(parsed.organizationId),
+      this.options.repository.findForOrganization(parsed.organizationId),
       this.options.scopes.tryGetOrganizationSystemReference(parsed.organizationId),
     ]);
     const system = referenceCreatedAt
@@ -93,22 +95,21 @@ export class ModelProviderQueryService {
       return null;
     }
 
-    return this.options.repository.tryFindByProviderForProject({
-      projectScopes,
-      provider: input.provider,
-    });
+    return this.options.repository
+      .getByProviderForProject({ projectScopes, provider: input.provider })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "model_provider_not_found") return null;
+        throw error;
+      });
   }
 
-  async tryGetByIdForProject(input: {
-    id: string;
-    projectId: string;
-  }): Promise<ModelProvider | null> {
+  async getByIdForProject(input: { id: string; projectId: string }): Promise<ModelProvider> {
     const projectScopes = await this.options.scopes.tryGetProjectScopes(input.projectId);
     if (!projectScopes) {
-      return null;
+      throw new ModelProviderNotFoundError();
     }
 
-    return this.options.repository.tryFindById({
+    return this.options.repository.getById({
       id: input.id,
       projectScopes,
     });
@@ -123,7 +124,7 @@ export class ModelProviderQueryService {
       projectId: input.projectId,
     });
     const chain = await this.getProjectScopeChain(parsed.projectId);
-    const rows = await this.options.repository.listForProject(chain);
+    const rows = await this.options.repository.findForProject(chain);
     const candidates = rows.filter(
       (row) =>
         row.provider === input.provider &&
@@ -169,7 +170,7 @@ export class ModelProviderQueryService {
   }> {
     const context = await this.options.scopes.getProjectSystemContext(projectId);
     const [saved, system] = await Promise.all([
-      this.options.repository.listForProject(context.scopes),
+      this.options.repository.findForProject(context.scopes),
       this.options.catalog.systemProviders({
         projectId,
         referenceCreatedAt: context.referenceCreatedAt,

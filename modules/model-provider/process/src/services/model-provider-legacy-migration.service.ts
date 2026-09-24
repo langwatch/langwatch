@@ -76,7 +76,7 @@ function convertStringToEntry({
  *
  * @returns The migrated array, or null if no migration is needed (already migrated or null input)
  */
-function migrateField({
+function convertLegacyCustomModelsField({
   value,
   mode,
   registryModelIds,
@@ -139,7 +139,7 @@ export class ModelProviderLegacyMigrationService {
   /**
    * Migrate a single ModelProvider row's custom models data.
    */
-  migrateCustomModelsRow({
+  convertCustomModelsRow({
     row,
     registryLookup,
   }: {
@@ -151,13 +151,13 @@ export class ModelProviderLegacyMigrationService {
       registryLookup(row.provider, "embedding").map((m) => m.value),
     );
 
-    const migratedCustomModels = migrateField({
+    const migratedCustomModels = convertLegacyCustomModelsField({
       value: row.customModels,
       mode: "chat",
       registryModelIds: chatRegistryIds,
     });
 
-    const migratedCustomEmbeddingsModels = migrateField({
+    const migratedCustomEmbeddingsModels = convertLegacyCustomModelsField({
       value: row.customEmbeddingsModels,
       mode: "embedding",
       registryModelIds: embeddingRegistryIds,
@@ -178,7 +178,7 @@ export class ModelProviderLegacyMigrationService {
    * The ciphertext one row's `customKeys` becomes, or `null` when the row needs
    * no update — already encrypted, or holding nothing.
    */
-  tryMigrateModelProviderKeysRow({
+  encodeModelProviderKeysRow({
     row,
     cipher,
   }: {

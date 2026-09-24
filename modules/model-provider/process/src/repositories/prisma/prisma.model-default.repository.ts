@@ -1,4 +1,5 @@
 import {
+  ModelDefaultNotFoundError,
   modelDefaultConfigSchema,
   type ModelDefaultConfig,
   type ModelDefaultScope,
@@ -31,7 +32,7 @@ export class PrismaModelDefaultRepository implements ModelDefaultRepository {
     return new PrismaModelDefaultRepository(database);
   }
 
-  async listForProject(scopes: ModelDefaultScope[]): Promise<ModelDefaultConfig[]> {
+  async findForProject(scopes: ModelDefaultScope[]): Promise<ModelDefaultConfig[]> {
     const rows = await this.database.modelDefaultConfig.findMany({
       where: { scopes: { some: { OR: scopes } } },
       include: { scopes: true },
@@ -41,7 +42,7 @@ export class PrismaModelDefaultRepository implements ModelDefaultRepository {
     return rows.map(toConfig);
   }
 
-  async listForOrganization(organizationId: string): Promise<ModelDefaultConfig[]> {
+  async findForOrganization(organizationId: string): Promise<ModelDefaultConfig[]> {
     const rows = await this.database.modelDefaultConfig.findMany({
       where: { organizationId },
       include: { scopes: true },
@@ -51,23 +52,25 @@ export class PrismaModelDefaultRepository implements ModelDefaultRepository {
     return rows.map(toConfig);
   }
 
-  async tryGetById(id: string): Promise<ModelDefaultConfig | null> {
+  async getById(id: string): Promise<ModelDefaultConfig> {
     const row = await this.database.modelDefaultConfig.findUnique({
       where: { id },
       include: { scopes: true },
     });
+    if (!row) throw new ModelDefaultNotFoundError();
 
-    return row ? toConfig(row) : null;
+    return toConfig(row);
   }
 
-  async tryFindByScope(scope: ModelDefaultScope): Promise<ModelDefaultConfig | null> {
+  async getByScope(scope: ModelDefaultScope): Promise<ModelDefaultConfig> {
     const row = await this.database.modelDefaultConfig.findFirst({
       where: { scopes: { some: scope } },
       include: { scopes: true },
       orderBy: { createdAt: "desc" },
     });
+    if (!row) throw new ModelDefaultNotFoundError();
 
-    return row ? toConfig(row) : null;
+    return toConfig(row);
   }
 
   async save(input: ModelDefaultConfigSaveInput): Promise<ModelDefaultConfig> {

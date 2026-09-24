@@ -35,7 +35,7 @@ export async function runModelProviderKeysMigration({
     });
 
     for (const row of rows) {
-      const encrypted = migrations.tryMigrateModelProviderKeysRow({
+      const encrypted = migrations.encodeModelProviderKeysRow({
         row: row as { id: string; customKeys: unknown },
         cipher,
       });

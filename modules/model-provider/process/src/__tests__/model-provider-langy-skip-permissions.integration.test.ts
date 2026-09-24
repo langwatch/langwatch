@@ -74,12 +74,12 @@ describe.skipIf(!DB_URL)(
         it("holds both patterns in the order they were written", async () => {
           const created = await repository.create(row(["^gpt-9$", "^gpt-10$"]));
 
-          const found = await repository.tryFindById({
+          const found = await repository.getById({
             id: created.id,
             organizationId: fixture.organizationId,
           });
 
-          expect(readStoredSkipList(found?.langySkipPermissionsModels)).toEqual([
+          expect(readStoredSkipList(found.langySkipPermissionsModels)).toEqual([
             "^gpt-9$",
             "^gpt-10$",
           ]);
@@ -92,12 +92,12 @@ describe.skipIf(!DB_URL)(
           const created = await repository.create(row(["^gpt-9$"]));
 
           await repository.update({ ...created, langySkipPermissionsModels: null });
-          const found = await repository.tryFindById({
+          const found = await repository.getById({
             id: created.id,
             organizationId: fixture.organizationId,
           });
 
-          expect(found?.langySkipPermissionsModels).toBeNull();
+          expect(found.langySkipPermissionsModels).toBeNull();
         });
       });
 
@@ -106,12 +106,12 @@ describe.skipIf(!DB_URL)(
           const created = await repository.create(row(["^gpt-9$"]));
 
           await repository.update({ ...created, enabled: false });
-          const found = await repository.tryFindById({
+          const found = await repository.getById({
             id: created.id,
             organizationId: fixture.organizationId,
           });
 
-          expect(readStoredSkipList(found?.langySkipPermissionsModels)).toEqual(["^gpt-9$"]);
+          expect(readStoredSkipList(found.langySkipPermissionsModels)).toEqual(["^gpt-9$"]);
         });
       });
     });

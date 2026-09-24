@@ -3,13 +3,13 @@ import { describe, expect, it } from "vitest";
 import {
   normalizeRoutingHandle,
   ROUTING_HANDLE_MAX_LENGTH,
-  routingHandleProblem,
+  classifyRoutingHandleProblem,
   sanitizeRoutingHandleInput,
 } from "../model-provider-routing-handle.ts";
 
 /** Reads a submitted handle the way the service does. */
 const check = (input: string | null | undefined) =>
-  routingHandleProblem(normalizeRoutingHandle(input));
+  classifyRoutingHandleProblem(normalizeRoutingHandle(input));
 
 describe("routing handle", () => {
   describe("when an operator typed a handle", () => {
@@ -38,7 +38,7 @@ describe("routing handle", () => {
       for (const typed of ["OpenRouter EU", "My Router!", "eu/west", "_x"]) {
         const shown = sanitizeRoutingHandleInput(typed);
         if (shown === "") continue;
-        expect(routingHandleProblem(shown)).not.toBe("shape");
+        expect(classifyRoutingHandleProblem(shown)).not.toBe("shape");
       }
     });
   });

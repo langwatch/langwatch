@@ -74,7 +74,7 @@ describe("PrismaModelProviderRepository", () => {
     );
 
     await expect(
-      repository.tryFindById({ id: "mp_1", organizationId: "org_1" }),
+      repository.getById({ id: "mp_1", organizationId: "org_1" }),
     ).resolves.toMatchObject({
       id: "mp_1",
       organizationId: "org_1",
@@ -181,7 +181,7 @@ describe("PrismaModelProviderRepository", () => {
     );
 
     await expect(
-      repository.listForProject([
+      repository.findForProject([
         { scopeType: "PROJECT", scopeId: "project_1" },
         { scopeType: "TEAM", scopeId: "team_1" },
         { scopeType: "ORGANIZATION", scopeId: "org_1" },

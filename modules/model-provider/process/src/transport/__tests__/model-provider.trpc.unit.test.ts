@@ -411,14 +411,14 @@ describe("the modelProvider tRPC namespace", () => {
           setAsCodingDefaults: true,
         });
 
-        const stored = await repositories.defaults.tryFindByScope({
+        const stored = await repositories.defaults.getByScope({
           scopeType: "ORGANIZATION",
           scopeId: "org-1",
         });
 
         // The Default role - playground, evaluators, workflows - is untouched:
         // those are not coding surfaces.
-        expect(Object.keys(stored?.config ?? {}).toSorted()).toEqual(["FAST", "LANGY"]);
+        expect(Object.keys(stored.config).toSorted()).toEqual(["FAST", "LANGY"]);
       });
     });
   });

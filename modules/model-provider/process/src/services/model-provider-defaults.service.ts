@@ -254,7 +254,7 @@ export class ModelProviderDefaultsService {
     }
 
     const projectScopes = await this.options.scopes.getProjectScopes(projectId);
-    const providers = await this.options.providers.listForProject(projectScopes);
+    const providers = await this.options.providers.findForProject(projectScopes);
     const provider = providers
       .filter((candidate) => candidate.enabled)
       .toSorted((left, right) => left.createdAt.getTime() - right.createdAt.getTime())[0];
@@ -350,7 +350,7 @@ export class ModelProviderDefaultsService {
   }
 
   private normalizeModel(key: string, model: string): string | null {
-    return this.options.catalog.tryNormalizeDefaultModel({ key, model });
+    return this.options.catalog.normalizeDefaultModel({ key, model });
   }
 
   private async getConfigs(
@@ -358,12 +358,12 @@ export class ModelProviderDefaultsService {
     organizationId: string | null,
   ): Promise<ModelDefaultConfig[]> {
     if (organizationId) {
-      return this.options.defaults.listForOrganization(organizationId);
+      return this.options.defaults.findForOrganization(organizationId);
     }
 
     const projectScopes = await this.options.scopes.getProjectScopes(projectId);
 
-    return this.options.defaults.listForProject(projectScopes);
+    return this.options.defaults.findForProject(projectScopes);
   }
 
   private async getAvailableScopes(input: {

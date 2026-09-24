@@ -103,7 +103,7 @@ describe("given a project attached to a team and organization", () => {
         new PlainTextCredentials(),
       );
 
-      const providers = await repository.listForProject(PROJECT_SCOPES);
+      const providers = await repository.findForProject(PROJECT_SCOPES);
 
       expect(providers.map((provider) => provider.id)).toEqual([
         "attached-to-the-project",
