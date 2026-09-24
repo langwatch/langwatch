@@ -14,6 +14,35 @@ Feature: Analytics timeseries service
       When the Analytics service executes it
       Then it returns the existing topDocuments and totalUniqueDocuments fields
 
+    @unit @regression
+    Scenario: Feedback and top-document reads ignore the toolbar's search and negation
+      Given the analytics toolbar sends a search query and negated filters with the shared filters
+      When the Analytics service reads feedbacks and top documents
+      Then both reads succeed instead of refusing the extra fields
+      And the repository receives only the project, date range and filters
+
+  Rule: Refuse a series its metric cannot aggregate, before any read (#8013)
+
+    @unit @regression
+    Scenario: A series with an aggregation its metric does not support is refused
+      Given a project timeseries query sums the evaluation runs metric, which only counts
+      When the Analytics service executes it
+      Then it refuses with validation_error naming the metric's allowed aggregations
+      And the repository is never asked for the timeseries
+
+    @unit
+    Scenario: A series naming a metric outside the analytics registry is refused
+      Given a project timeseries query names a metric the analytics registry does not define
+      When the Analytics service executes it
+      Then it refuses with validation_error on that series' metric field
+      And the repository is never asked for the timeseries
+
+    @unit
+    Scenario: The browser's metric registry offers exactly the aggregations the service accepts
+      Given the browser's analytics metric registry and the contract's metric aggregations
+      When every metric's allowed aggregations are compared
+      Then both name the same metrics with the same aggregations
+
   Rule: Route analytics reads conservatively
 
     @unit

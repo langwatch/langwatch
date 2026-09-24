@@ -1,12 +1,6 @@
 import {
-  analyticsEvaluationReadInputSchema,
-  analyticsEvaluationRollupAppendBatchInputSchema,
-  analyticsEvaluationRollupAppendInputSchema,
-  analyticsEvaluationUpsertBatchInputSchema,
-  analyticsEvaluationUpsertInputSchema,
+  analyticsMetricAggregations,
   analyticsTimeseriesInputSchema,
-  analyticsTimeseriesResultSchema,
-  analyticsReadInputSchema,
   AnalyticsService as AnalyticsServiceContract,
   type AnalyticsFeedbacksResult,
   type AnalyticsReadInput,
@@ -21,6 +15,7 @@ import {
   type AnalyticsEvaluationRollupAppendInput,
   type AnalyticsEvaluationUpsertInput,
 } from "@langwatch/analytics-contract";
+import { ValidationError } from "@langwatch/handled-error";
 import { addDays, differenceInCalendarDays, nowInstant } from "@langwatch/time";
 import { context, SpanStatusCode, trace } from "@opentelemetry/api";
 
@@ -82,6 +77,40 @@ function adjustTimeScaleForBucketCap({
   return estimatedBuckets > MAX_TIMESERIES_BUCKETS ? MINUTES_PER_DAY : timeScale;
 }
 
+/** Refused before any cache or repository read; ClickHouse would crash on the SQL (#8009). */
+function refuseDisallowedSeriesAggregations(input: AnalyticsTimeseriesInput): void {
+  for (const [index, series] of input.series.entries()) {
+    const allowedAggregations = analyticsMetricAggregations[series.metric];
+    if (!allowedAggregations) {
+      throw new ValidationError("Unknown analytics metric", {
+        meta: {
+          fieldErrors: {
+            [`series.${index}.metric`]: [
+              "This metric is not one of the supported analytics metrics.",
+            ],
+          },
+        },
+      });
+    }
+    if (!allowedAggregations.includes(series.aggregation)) {
+      throw new ValidationError(
+        `Metric "${series.metric}" does not support aggregation "${series.aggregation}" ` +
+          `(allowed: ${allowedAggregations.join(", ")})`,
+        {
+          meta: {
+            metric: series.metric,
+            aggregation: series.aggregation,
+            allowedAggregations,
+            fieldErrors: {
+              [`series.${index}.aggregation`]: ["This metric does not support this aggregation."],
+            },
+          },
+        },
+      );
+    }
+  }
+}
+
 export class AnalyticsService extends AnalyticsServiceContract {
   static create(options: {
     repository: AnalyticsRepository;
@@ -121,6 +150,7 @@ export class AnalyticsService extends AnalyticsServiceContract {
     return context.with(activeContext, async () => {
       try {
         const parsed = analyticsTimeseriesInputSchema.parse(input);
+        refuseDisallowedSeriesAggregations(parsed);
         const cacheKey = JSON.stringify({ input: parsed, options: options ?? null });
         const cached = this.cache.get(cacheKey);
         if (cached && cached.expiresAt > nowInstant().epochMilliseconds) {
@@ -178,7 +208,7 @@ export class AnalyticsService extends AnalyticsServiceContract {
       table === "evaluation_runs" ||
       !(await this.tripwire?.isEnabled(parsed.projectId))
     ) {
-      return analyticsTimeseriesResultSchema.parse(await this.repository.runTimeseries(query));
+      return this.repository.runTimeseries(query);
     }
 
     const isEvaluationSeries = Boolean(parsed.series[0]?.metric.startsWith("evaluations."));
@@ -194,11 +224,16 @@ export class AnalyticsService extends AnalyticsServiceContract {
       legacy,
     });
 
-    return analyticsTimeseriesResultSchema.parse(result);
+    return result;
   }
 
   async getFeedbacks(input: AnalyticsReadInput): Promise<AnalyticsFeedbacksResult> {
-    const parsed = analyticsReadInputSchema.parse(input);
+    const parsed = {
+      projectId: input.projectId,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      filters: input.filters,
+    };
     const span = this.tracer.startSpan("AnalyticsService.getFeedbacks", {
       attributes: { "tenant.id": parsed.projectId },
     });
@@ -222,7 +257,12 @@ export class AnalyticsService extends AnalyticsServiceContract {
   }
 
   async getTopUsedDocuments(input: AnalyticsReadInput): Promise<AnalyticsTopDocumentsResult> {
-    const parsed = analyticsReadInputSchema.parse(input);
+    const parsed = {
+      projectId: input.projectId,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      filters: input.filters,
+    };
     const span = this.tracer.startSpan("AnalyticsService.getTopUsedDocuments", {
       attributes: { "tenant.id": parsed.projectId },
     });
@@ -246,34 +286,28 @@ export class AnalyticsService extends AnalyticsServiceContract {
   }
 
   async upsertEvaluationAnalytics(input: AnalyticsEvaluationUpsertInput): Promise<void> {
-    await this.evaluationRepository.upsert(analyticsEvaluationUpsertInputSchema.parse(input));
+    await this.evaluationRepository.upsert(input);
   }
 
   async upsertEvaluationAnalyticsBatch(input: AnalyticsEvaluationUpsertInput[]): Promise<void> {
-    await this.evaluationRepository.upsertBatch(
-      analyticsEvaluationUpsertBatchInputSchema.parse(input),
-    );
+    await this.evaluationRepository.upsertBatch(input);
   }
 
   findEvaluationAnalytics(
     input: AnalyticsEvaluationReadInput,
   ): Promise<{ row: AnalyticsEvaluationRow; appliedEventIds: string[] } | null> {
-    return this.evaluationRepository.tryFind(analyticsEvaluationReadInputSchema.parse(input));
+    return this.evaluationRepository.tryFind(input);
   }
 
   async appendEvaluationAnalyticsRollup(
     input: AnalyticsEvaluationRollupAppendInput,
   ): Promise<void> {
-    await this.evaluationRepository.appendRollup(
-      analyticsEvaluationRollupAppendInputSchema.parse(input),
-    );
+    await this.evaluationRepository.appendRollup(input);
   }
 
   async appendEvaluationAnalyticsRollupBatch(
     input: AnalyticsEvaluationRollupAppendBatchInput,
   ): Promise<void> {
-    await this.evaluationRepository.appendRollupBatch(
-      analyticsEvaluationRollupAppendBatchInputSchema.parse(input),
-    );
+    await this.evaluationRepository.appendRollupBatch(input);
   }
 }

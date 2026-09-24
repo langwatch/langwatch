@@ -31,6 +31,7 @@ export * from "./analytics.query-shapes.ts";
 export * from "./analytics-query.errors.ts";
 export * from "./langwatch-ql.errors.ts";
 export * from "./analytics.input-schemas.ts";
+export * from "./analytics.metric-aggregations.ts";
 export * from "./dashboard-widget.errors.ts";
 export * from "./langwatch-ql-app-functions.ts";
 export * from "./langwatch-ql-app-function.errors.ts";

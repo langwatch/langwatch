@@ -4,6 +4,7 @@ import type {
   AnalyticsTable,
   AnalyticsTimeseriesInput,
   AnalyticsTimeseriesResult,
+  SharedFiltersInput,
 } from "@langwatch/analytics-contract";
 import { addDays, differenceInCalendarDays } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
@@ -251,6 +252,29 @@ describe("AnalyticsService", () => {
     });
   });
 
+  /** @scenario "Feedback and top-document reads ignore the toolbar's search and negation" */
+  it("reads feedbacks and top documents when the toolbar sends a search and negation", async () => {
+    const repository = new RecordingRepository();
+    const service = createService(repository);
+    const toolbarRead: SharedFiltersInput = {
+      projectId: "project-1",
+      startDate: 10,
+      endDate: 20,
+      filters: {},
+      query: "refund",
+      negateFilters: true,
+    };
+    const expected = { projectId: "project-1", startDate: 10, endDate: 20, filters: {} };
+
+    await expect(service.getFeedbacks(toolbarRead)).resolves.toEqual({ events: [] });
+    await expect(service.getTopUsedDocuments(toolbarRead)).resolves.toEqual({
+      topDocuments: [],
+      totalUniqueDocuments: 0,
+    });
+    expect(repository.lastFeedbackInput).toEqual(expected);
+    expect(repository.lastDocumentsInput).toEqual(expected);
+  });
+
   /** @scenario "Feedback reads preserve their existing result shape" */
   /** @scenario "Top-document reads preserve their existing result shape" */
   it("preserves legacy feedback decoding and document ordering", async () => {
@@ -372,5 +396,49 @@ describe("AnalyticsService", () => {
       }),
     ).resolves.toBeNull();
     expect(resolveClient).not.toHaveBeenCalled();
+  });
+
+  describe("given a series its metric cannot aggregate", () => {
+    /** @scenario "A series with an aggregation its metric does not support is refused" */
+    it("refuses a sum over evaluation runs before reading", async () => {
+      const repository = new RecordingRepository();
+      const service = createService(repository);
+
+      const refusal = service.getTimeseries(
+        input({ series: [{ metric: "evaluations.evaluation_runs", aggregation: "sum" }] }),
+      );
+
+      await expect(refusal).rejects.toMatchObject({
+        code: "validation_error",
+        meta: {
+          metric: "evaluations.evaluation_runs",
+          aggregation: "sum",
+          allowedAggregations: ["cardinality"],
+          fieldErrors: { "series.0.aggregation": expect.any(Array) },
+        },
+      });
+      expect(repository.lastQuery).toBeUndefined();
+    });
+
+    /** @scenario "A series naming a metric outside the analytics registry is refused" */
+    it("refuses a metric the registry does not define before reading", async () => {
+      const repository = new RecordingRepository();
+      const service = createService(repository);
+
+      const refusal = service.getTimeseries(
+        input({
+          series: [
+            { metric: "performance.total_cost", aggregation: "sum" },
+            { metric: "spans.metrics.prompt_tokens", aggregation: "sum" },
+          ],
+        }),
+      );
+
+      await expect(refusal).rejects.toMatchObject({
+        code: "validation_error",
+        meta: { fieldErrors: { "series.1.metric": expect.any(Array) } },
+      });
+      expect(repository.lastQuery).toBeUndefined();
+    });
   });
 });
