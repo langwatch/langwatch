@@ -59,21 +59,6 @@ export {
   type TopicClusteringClickHouseResolver,
 } from "./app/topic.members.ts";
 export type { TopicClusteringCommands } from "./app/topic.members.ts";
-export {
-  type LangevalsPayloadStaging,
-  STAGED_PAYLOAD_HEADER,
-  type StagedLangevalsPayload,
-} from "./app/topic.members.ts";
-export type {
-  LangevalsCallKind,
-  LangevalsStagedPayloadConfig,
-  StagedFetchOptions,
-} from "./services/langevals-staged-payload.service.ts";
-export {
-  type TopicClusteringLangevals,
-  type TopicClusteringLangevalsKind,
-  type TopicClusteringLangevalsResponse,
-} from "./app/topic.members.ts";
 export { RequestTopicClusteringTask } from "./eventing/run-topic-clustering.intent.ts";
 export { TopicClusteringRunTask } from "./tasks/topic-clustering-run.task.ts";
 export type { TopicClusteringScheduleReader } from "./app/topic.app.ts";

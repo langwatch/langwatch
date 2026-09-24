@@ -34,7 +34,9 @@ describe("clusterTopicsForProject", () => {
         // The deployment shape that triggers the bug: no clustering endpoint.
         return fakeRunnerDeps({
           resolveClickHouseClient: vi.fn().mockResolvedValue({ query: mockClickHouseQuery }),
-          langevalsEndpoint: null,
+          evaluations: {
+            requestTopicClustering: vi.fn().mockResolvedValue({ kind: "not_configured" }),
+          },
         });
       };
 
@@ -43,7 +45,6 @@ describe("clusterTopicsForProject", () => {
         await clusterTopicsForProject(deps, { projectId: "proj-1" });
 
         expect(deps.commands.recordTopics).not.toHaveBeenCalled();
-        expect(deps.langevals.postClustering).not.toHaveBeenCalled();
       });
 
       it("reports the run as skipped for missing configuration", async () => {

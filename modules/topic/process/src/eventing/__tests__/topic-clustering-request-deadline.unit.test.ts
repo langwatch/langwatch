@@ -1,3 +1,4 @@
+import { LangevalsClusteringError } from "@langwatch/evaluation-contract";
 import { CLUSTERING_ERROR_CODES } from "@langwatch/topic-contract";
 /**
  * Regression: langevals call needs deadline to avoid outliving the lease.
@@ -34,9 +35,9 @@ describe("topic clustering langevals requests", () => {
     vi.useRealTimers();
   });
 
-  /** A langevals port that never answers on its own — only the deadline ends it. */
+  /** A clustering exchange that never answers on its own — only the deadline ends it. */
   function hangUntilAborted(deps: ReturnType<typeof fakeRunnerDeps>) {
-    deps.langevals.postClustering.mockImplementation(
+    deps.evaluations.requestTopicClustering.mockImplementation(
       ({ signal }: { signal?: AbortSignal }) =>
         new Promise((_resolve, reject) => {
           signal?.addEventListener("abort", () => {
@@ -76,7 +77,7 @@ describe("topic clustering langevals requests", () => {
         await vi.advanceTimersByTimeAsync(TOPIC_CLUSTERING_REQUEST_DEADLINE_MS);
         await settled;
 
-        const signal = deps.langevals.postClustering.mock.calls[0]?.[0]?.signal as AbortSignal;
+        const signal = deps.evaluations.requestTopicClustering.mock.calls[0]?.[0]?.signal;
         expect(signal).toBeInstanceOf(AbortSignal);
         expect(signal.aborted).toBe(true);
       });
@@ -123,43 +124,26 @@ describe("topic clustering langevals requests", () => {
     });
   });
 
-  describe("given a response whose body never finishes streaming", () => {
-    describe("when the deadline elapses", () => {
-      it("aborts the body read instead of letting it outlive the lease", async () => {
-        // 200 headers arrive promptly; the JSON body trickles forever. The
-        // deadline used to be cleared the moment fetch resolved, so this
-        // exact shape ran unbounded — past the lease, into the double-lease
-        // batch-delete race the deadline exists to prevent.
+  describe("given langevals answered a clustering call with a non-2xx", () => {
+    describe("when the page runs", () => {
+      it("fails the page as a clustering-service fault carrying langevals' message", async () => {
         const deps = fakeRunnerDeps();
-        deps.langevals.postClustering.mockImplementation(({ signal }: { signal?: AbortSignal }) =>
-          Promise.resolve({
-            ok: true,
-            statusText: "OK",
-            text: () => Promise.resolve(""),
-            json: () =>
-              new Promise((_resolve, reject) => {
-                signal?.addEventListener("abort", () => {
-                  reject(
-                    Object.assign(new Error("The operation was aborted"), {
-                      name: "AbortError",
-                    }),
-                  );
-                });
-              }),
-          }),
-        );
+        const refusal = new LangevalsClusteringError({
+          mode: "batch",
+          statusText: "Internal Server Error",
+          body: "boom",
+        });
+        deps.evaluations.requestTopicClustering.mockRejectedValue(refusal);
 
-        const settled = fetchTopicsBatchClustering(deps, "proj-1", batchParams).catch(
-          (error) => error,
+        const error = await fetchTopicsBatchClustering(deps, "proj-1", batchParams).catch(
+          (caught: unknown) => caught,
         );
-
-        await vi.advanceTimersByTimeAsync(TOPIC_CLUSTERING_REQUEST_DEADLINE_MS);
-        const error = await settled;
 
         expect(classifyClusteringError(error)).toEqual({
           code: CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE,
           isUserActionable: false,
         });
+        expect(error).toMatchObject({ message: refusal.message });
       });
     });
   });
@@ -174,11 +158,9 @@ describe("topic clustering langevals requests", () => {
           cost: null,
         };
         const deps = fakeRunnerDeps();
-        deps.langevals.postClustering.mockResolvedValue({
-          ok: true,
-          statusText: "OK",
-          text: () => Promise.resolve(""),
-          json: () => Promise.resolve(body),
+        deps.evaluations.requestTopicClustering.mockResolvedValue({
+          kind: "clustered",
+          response: body,
         });
 
         await expect(fetchTopicsBatchClustering(deps, "proj-1", batchParams)).resolves.toEqual({
@@ -189,23 +171,10 @@ describe("topic clustering langevals requests", () => {
 
       it("does not leave the deadline abort pending against a finished call", async () => {
         const deps = fakeRunnerDeps();
-        deps.langevals.postClustering.mockResolvedValue({
-          ok: true,
-          statusText: "OK",
-          text: () => Promise.resolve(""),
-          json: () =>
-            Promise.resolve({
-              topics: [],
-              subtopics: [],
-              traces: [],
-              cost: null,
-            }),
-        });
-
         await fetchTopicsBatchClustering(deps, "proj-1", batchParams);
         await vi.advanceTimersByTimeAsync(TOPIC_CLUSTERING_REQUEST_DEADLINE_MS * 2);
 
-        const signal = deps.langevals.postClustering.mock.calls[0]?.[0]?.signal as AbortSignal;
+        const signal = deps.evaluations.requestTopicClustering.mock.calls[0]?.[0]?.signal;
         expect(signal.aborted).toBe(false);
       });
     });

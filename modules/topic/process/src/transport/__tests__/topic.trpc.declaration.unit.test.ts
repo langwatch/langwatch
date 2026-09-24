@@ -56,7 +56,7 @@ function valueImports(source: string): string[] {
   );
 }
 
-const DECLARATION_SOURCES = ["contract/src/topic.trpc.ts", "server/src/transport/topic.trpc.ts"];
+const DECLARATION_SOURCES = ["contract/src/topic.trpc.ts", "process/src/transport/topic.trpc.ts"];
 
 describe("the topic tRPC declaration", () => {
   describe("given the contract and the server it is bound to", () => {

@@ -13,7 +13,7 @@ export function makeProject(overrides: Record<string, unknown> = {}) {
 
 /**
  * Fake runner boundaries: production wires these to the model-provider
- * cascade, staged langevals fetch, guarded Prisma client, and pipeline
+ * cascade, evaluation's clustering op, guarded Prisma client, and pipeline
  * commands — here they're plain stubs, typed to keep vi.fn mock types.
  */
 export function fakeRunnerDeps(overrides: Partial<TopicClusteringRunnerDeps> = {}) {
@@ -28,15 +28,12 @@ export function fakeRunnerDeps(overrides: Partial<TopicClusteringRunnerDeps> = {
       }),
       prepareLitellmParams: vi.fn().mockResolvedValue({ model: "gpt-5-mini" }),
     },
-    langevals: {
-      postClustering: vi.fn().mockResolvedValue({
-        ok: true,
-        statusText: "OK",
-        text: () => Promise.resolve(""),
-        json: () => Promise.resolve({ topics: [], subtopics: [], traces: [], cost: null }),
+    evaluations: {
+      requestTopicClustering: vi.fn().mockResolvedValue({
+        kind: "clustered",
+        response: { topics: [], subtopics: [], traces: [], cost: null },
       }),
     },
-    langevalsEndpoint: "http://langevals.test" as string | null,
     repository: {
       findProject: vi.fn().mockResolvedValue(makeProject()),
       findTopicIndexRows: vi.fn().mockResolvedValue([]),

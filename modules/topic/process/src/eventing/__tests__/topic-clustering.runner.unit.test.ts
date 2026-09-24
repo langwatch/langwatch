@@ -92,7 +92,7 @@ describe("clusterTopicsForProject", () => {
       await clusterTopicsForProject(deps, { projectId: "proj-1" });
 
       // clustering service (langevals) was called
-      expect(deps.langevals.postClustering).toHaveBeenCalled();
+      expect(deps.evaluations.requestTopicClustering).toHaveBeenCalled();
     });
   });
 
@@ -234,8 +234,7 @@ describe("clusterTopicsForProject", () => {
       await clusterTopicsForProject(deps, { projectId: "proj-1" });
 
       // Traces with empty/null input should be filtered, leaving 10
-      const fetchCall = deps.langevals.postClustering.mock.calls[0];
-      const body = fetchCall?.[0]?.body as { traces: { input: string }[] } | undefined;
+      const body = deps.evaluations.requestTopicClustering.mock.calls[0]?.[0]?.params;
       expect(body?.traces).toHaveLength(10);
       expect(body?.traces[0]?.input).toBe("User message 0");
     });

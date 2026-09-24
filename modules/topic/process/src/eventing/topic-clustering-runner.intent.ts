@@ -1,3 +1,8 @@
+import {
+  type EvaluationApi,
+  LangevalsClusteringError,
+  type TopicClusteringRequest,
+} from "@langwatch/evaluation-contract";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, nowInstant } from "@langwatch/time";
 import {
@@ -18,8 +23,6 @@ import type {
   TopicClusteringClickHouse,
   TopicClusteringClickHouseResolver,
   TopicClusteringCommands,
-  TopicClusteringLangevalsKind,
-  TopicClusteringLangevals,
 } from "../app/topic.members.ts";
 import type { TopicClusteringRepository } from "../repositories/topic-clustering.repository.ts";
 import {
@@ -48,6 +51,11 @@ const CLUSTERING_FETCH_WINDOW_DAYS = 49;
 export const TOPIC_CLUSTERING_REQUEST_DEADLINE_MS = Math.floor(
   TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS * 0.6,
 );
+
+const PAYLOAD_KIND = {
+  batch: "topic_clustering_batch",
+  incremental: "topic_clustering_incremental",
+} as const;
 
 /** What one clustering page did; the run port's result. */
 export type ClusteringPageOutcome = TopicClusteringPageOutcome;
@@ -89,19 +97,18 @@ export interface TopicClusteringWritePathSeed {
 export interface TopicClusteringRunnerDeps {
   resolveClickHouseClient: TopicClusteringClickHouseResolver;
   models: TopicClusteringModels;
-  langevals: TopicClusteringLangevals;
-  /**
-   * The deployment's langevals base URL, or null when no clustering endpoint
-   * is configured — the caller warns and the run skips as `not_configured`.
-   */
-  langevalsEndpoint: string | null;
+  /** `not_configured` when the deployment names no langevals endpoint; evaluation logs it. */
+  evaluations: Pick<EvaluationApi, "requestTopicClustering">;
   repository: TopicClusteringRepository;
   /** The legacy import, for the write-path topic-model seed guard. */
   migration: TopicClusteringWritePathSeed;
   commands: TopicClusteringCommands;
   traceAssignments: TraceTopicAssignment;
   /** Payload-size histogram observation per langevals call kind. */
-  observePayloadSize: (kind: TopicClusteringLangevalsKind, sizeBytes: number) => void;
+  observePayloadSize: (
+    kind: (typeof PAYLOAD_KIND)[keyof typeof PAYLOAD_KIND],
+    sizeBytes: number,
+  ) => void;
 }
 
 /** One process-owned runner instance for Eventing intents and manual tasks. */
@@ -829,143 +836,68 @@ export const storeResults = async ({
   };
 };
 
-export const fetchTopicsBatchClustering = async (
+export const fetchTopicsBatchClustering = (
   deps: TopicClusteringRunnerDeps,
   projectId: string,
   params: BatchClusteringParams,
-): Promise<TopicClusteringFetch> => {
-  const baseUrl = deps.langevalsEndpoint;
-  if (!baseUrl) {
-    logger.warn({ projectId }, "Topic clustering service URL not set, skipping topic clustering");
-    return { kind: "not_configured" };
-  }
+): Promise<TopicClusteringFetch> => requestClustering(deps, { projectId, mode: "batch", params });
 
-  const size = JSON.stringify(params).length;
-  deps.observePayloadSize("topic_clustering_batch", size);
-
-  logger.info(
-    { sizeMb: size / 125000, projectId, engine: "langevals" },
-    "uploading traces data for project",
-  );
-
-  return {
-    kind: "clustered",
-    response: await postToTopicClustering(deps, {
-      projectId,
-      url: `${baseUrl}/topics/batch_clustering`,
-      body: params,
-      kind: "topic_clustering_batch",
-    }),
-  };
-};
-
-export const fetchTopicsIncrementalClustering = async (
+export const fetchTopicsIncrementalClustering = (
   deps: TopicClusteringRunnerDeps,
   projectId: string,
   params: IncrementalClusteringParams,
-): Promise<TopicClusteringFetch> => {
-  const baseUrl = deps.langevalsEndpoint;
-  if (!baseUrl) {
-    logger.warn({ projectId }, "Topic clustering service URL not set, skipping topic clustering");
-    return { kind: "not_configured" };
-  }
+): Promise<TopicClusteringFetch> =>
+  requestClustering(deps, { projectId, mode: "incremental", params });
 
-  const size = JSON.stringify(params).length;
-  deps.observePayloadSize("topic_clustering_incremental", size);
+type ClusteringCall = TopicClusteringRequest extends infer R
+  ? R extends TopicClusteringRequest
+    ? Omit<R, "signal">
+    : never
+  : never;
+
+/** The whole exchange, staging upload and body read included, lives inside the deadline. */
+const requestClustering = async (
+  deps: TopicClusteringRunnerDeps,
+  call: ClusteringCall,
+): Promise<TopicClusteringFetch> => {
+  const kind = PAYLOAD_KIND[call.mode];
+  const size = JSON.stringify(call.params).length;
+  deps.observePayloadSize(kind, size);
 
   logger.info(
-    { sizeMb: size / 125000, projectId, engine: "langevals" },
+    { sizeMb: size / 125000, projectId: call.projectId, engine: "langevals" },
     "uploading traces data for project",
   );
 
-  return {
-    kind: "clustered",
-    response: await postToTopicClustering(deps, {
-      projectId,
-      url: `${baseUrl}/topics/incremental_clustering`,
-      body: params,
-      kind: "topic_clustering_incremental",
-    }),
-  };
-};
-
-/**
- * The whole exchange lives inside the request deadline — staging upload,
- * request, and the body read.
- */
-const postToTopicClustering = async (
-  deps: TopicClusteringRunnerDeps,
-  opts: {
-    projectId: string;
-    url: string;
-    body: BatchClusteringParams | IncrementalClusteringParams;
-    kind: TopicClusteringLangevalsKind;
-  },
-): Promise<TopicClusteringResponse> => {
-  // Every clustering call carries a deadline — see
-  // TOPIC_CLUSTERING_REQUEST_DEADLINE_MS for why an unbounded one is a
-  // data-loss race, not just a slow request. An explicit controller (not
-  // AbortSignal.timeout()) drives it via an ordinary timer, so tests can
-  // advance it to exercise this branch for real instead of asserting around it.
+  // An explicit controller (not AbortSignal.timeout()) so tests can advance
+  // the timer; see TOPIC_CLUSTERING_REQUEST_DEADLINE_MS for why it exists.
   const controller = new AbortController();
   const deadline = setTimeout(() => {
     controller.abort();
   }, TOPIC_CLUSTERING_REQUEST_DEADLINE_MS);
   deadline.unref?.();
 
-  const label = opts.kind === "topic_clustering_batch" ? "batch" : "incremental";
-
-  // The WHOLE exchange lives inside the deadline: staging upload, request,
-  // and the body read. Clearing the timer as soon as fetch resolved left
-  // response.json() unbounded — a streaming upstream that returns 200
-  // headers then trickles a large body could outlive the 20-minute lease,
-  // reopening exactly the double-lease race the deadline exists to prevent.
   try {
-    const response = await deps.langevals.postClustering({
-      url: opts.url,
-      body: opts.body,
-      projectId: opts.projectId,
-      kind: opts.kind,
+    return await deps.evaluations.requestTopicClustering({
+      ...call,
       signal: controller.signal,
     });
-
-    if (!response.ok) {
-      let body = await response.text();
-      try {
-        body = JSON.stringify(JSON.parse(body), null, 2).split("\n").slice(0, 10).join("\n");
-      } catch {
-        /* this is just a safe json parse fallback */
-      }
-      // Ours by default. The body often quotes an upstream provider error,
-      // but quoting is not evidence — attributing a 5xx to the customer's
-      // credentials on the strength of it is how this used to tell people
-      // to rotate working keys during our own outages. Operators get the
-      // detail in the message; the customer is told the code only.
-      throw new ClusteringError(
-        CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE,
-        `Failed to fetch topics ${label} clustering (langevals): ${response.statusText}\n\n${body}`,
-      );
-    }
-
-    return (await response.json()) as TopicClusteringResponse;
   } catch (error) {
-    // Our own deadline firing is known at the throw site, so it's classified
-    // here rather than guessed at from the message later (see
-    // topic-clustering.errors.ts): ours, not the customer's, and worth
-    // retrying — the outbox redelivers with a fresh deadline. A
-    // ClusteringError from the !ok branch keeps its own identity regardless.
-    if (controller.signal.aborted && !(error instanceof ClusteringError)) {
+    // Ours by default: the body often quotes an upstream provider error, but
+    // quoting is not evidence, so the customer is told the code only.
+    if (error instanceof LangevalsClusteringError) {
+      throw new ClusteringError(CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE, error.message, {
+        cause: error,
+      });
+    }
+    if (controller.signal.aborted) {
       logger.warn(
-        {
-          projectId: opts.projectId,
-          kind: opts.kind,
-          deadlineMs: TOPIC_CLUSTERING_REQUEST_DEADLINE_MS,
-        },
+        { projectId: call.projectId, kind, deadlineMs: TOPIC_CLUSTERING_REQUEST_DEADLINE_MS },
         "Topic clustering request aborted at its deadline; failing the page so the outbox retries inside the lease",
       );
       throw new ClusteringError(
         CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE,
-        `Topic clustering request to langevals exceeded its ${TOPIC_CLUSTERING_REQUEST_DEADLINE_MS}ms deadline (${opts.kind})`,
+        `Topic clustering request to langevals exceeded its ${TOPIC_CLUSTERING_REQUEST_DEADLINE_MS}ms deadline (${kind})`,
         { cause: error },
       );
     }
