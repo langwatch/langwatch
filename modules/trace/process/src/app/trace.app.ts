@@ -123,6 +123,8 @@ import {
   type TraceTopicClusteringCounts,
   type TraceTopicClusteringPage,
   type TraceTopicClusteringPageInput,
+  type TraceServerConfig,
+  traceConfig,
 } from "@langwatch/trace-contract";
 import {
   buildParsedTurns,
@@ -130,6 +132,7 @@ import {
 } from "@langwatch/trace-contract/conversation";
 import type { z } from "zod";
 
+import { tokenCounterChannels } from "../channels/token-counter-channels.registry.ts";
 import { ClickhouseTraceQueryEvaluationRepository } from "../repositories/clickhouse/clickhouse.trace-query-evaluation.repository.ts";
 import { ClickHouseTraceQueryLangWatchQLRepository } from "../repositories/clickhouse/clickhouse.trace-query-langwatch-ql.repository.ts";
 import { ClickHouseTraceQueryRepository } from "../repositories/clickhouse/clickhouse.trace-query.repository.ts";
@@ -594,7 +597,7 @@ type TraceMembers = MembersRead<readonly ["clickhouse", "logger", "redis", "rate
 type TraceSetup = FeatureSetup<
   typeof traceDependencies,
   TraceMembers,
-  undefined,
+  TraceServerConfig,
   TraceRepositories
 >;
 
@@ -602,6 +605,7 @@ type TraceSetup = FeatureSetup<
 export class TraceApp implements TraceApi, CollectorApp {
   static readonly contract = TraceApiToken;
   static readonly dependencies = traceDependencies;
+  static readonly config = traceConfig;
   /**
    * Every name is from the process's vocabulary; boot refuses by name. ClickHouse holds every span,
    * `eventing` stages commands, and the logger names the process in a blob read's refusal.
@@ -659,8 +663,11 @@ export class TraceApp implements TraceApi, CollectorApp {
       }),
     );
     app.#processingCommands = commands;
+    const tokenizer = tokenCounterChannels.live.create(input.config.tokenizer);
+    input.resources.own("Trace tokenizer", () => tokenizer.close());
     app.#processing = TraceProcessingPipelineService.create({
       processName: input.members.processName,
+      tokenizer,
       peers: input.dependencies,
       repositories: input.repositories,
       canonicalisation: collaborators.canonicalisation,

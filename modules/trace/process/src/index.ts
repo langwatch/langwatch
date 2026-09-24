@@ -9,7 +9,6 @@ export type {
   TraceSpanPiiRedaction,
   TraceSpanSpool,
   TraceTenantBroadcast,
-  TraceTokenCounter,
 } from "./app/trace.members.ts";
 export {
   passesTraceOriginGuards,

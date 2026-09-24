@@ -70,3 +70,15 @@ Feature: Estimating token counts for LLM spans that arrived without them
     Given a fetch timeout that is not a positive number
     When the process resolves its configuration
     Then the application's default is used
+
+  @unit
+  Scenario: A model the tokenizer does not know is counted with o200k_base
+    Given a model name no encoding lists
+    When a span's text is counted
+    Then it is counted with the o200k_base table
+
+  @unit
+  Scenario: Encoding tables that cannot be loaded answer cannot count
+    Given no local table and a remote fetch that fails
+    When a span's text is counted
+    Then the count is absent rather than an error, and the span is left unestimated

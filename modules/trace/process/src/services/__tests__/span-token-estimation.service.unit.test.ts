@@ -2,7 +2,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { type TraceTokenCounter } from "../../app/trace.members.ts";
+import { type TraceTokenCounter } from "../../channels/token-counter.channel.ts";
 import { OtlpSpanTokenEstimationService } from "../span-token-estimation.service.ts";
 
 class CountingTokenizer implements TraceTokenCounter {
@@ -14,6 +14,8 @@ class CountingTokenizer implements TraceTokenCounter {
     this.calls.push({ model, text });
     return this.answer;
   }
+
+  async close(): Promise<void> {}
 }
 
 function flags(enabled: Record<string, boolean> = {}): FeatureFlagApi {

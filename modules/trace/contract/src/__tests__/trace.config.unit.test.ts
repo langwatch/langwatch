@@ -14,6 +14,15 @@ describe("trace server configuration", () => {
     });
   });
 
+  describe("given a deployment setting the tokenizer path and fetch timeout", () => {
+    /** @scenario "The two tokenizer variables are read at the application's spellings" */
+    it("reads TIKTOKENS_PATH and TIKTOKEN_FETCH_TIMEOUT_MS into the tokenizer slice", () => {
+      expect(
+        read({ TIKTOKENS_PATH: "/srv/bpe", TIKTOKEN_FETCH_TIMEOUT_MS: "2500" }).tokenizer,
+      ).toEqual({ bpeDirectory: "/srv/bpe", fetchTimeoutMs: "2500" });
+    });
+  });
+
   describe("given the span pipeline's lane count", () => {
     /** @scenario "One variable has one owner across every process" */
     it("carries it as written, so producer and consumer clamp it identically", () => {

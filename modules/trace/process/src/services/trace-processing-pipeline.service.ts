@@ -20,7 +20,9 @@ import {
 import type {
   TraceProcessingPipelineDefinition,
   TraceSpanCostEnrichment,
+  TraceSpanTokenEstimation,
 } from "../app/trace.members.ts";
+import type { TraceTokenCounter } from "../channels/token-counter.channel.ts";
 import { createCodingAgentSpanFactsDispatchSubscriber } from "../eventing/coding-agent-span-facts-dispatch.subscriber.ts";
 import { CustomEvaluationSync } from "../eventing/custom-evaluation-sync.subscriber.ts";
 import { createEvaluationTriggerSubscriber } from "../eventing/evaluation-trigger.subscriber.ts";
@@ -45,6 +47,7 @@ import { ModelCatalogTraceModelCostAdapter } from "./model-catalog.trace-model-c
 import { OtelTraceEvaluationLoopMetricsAdapter } from "./otel.trace-evaluation-loop-metrics.service.ts";
 import { TraceProjectionLeanService } from "./projection/trace-projection-lean.service.ts";
 import { OtlpSpanCostEnrichmentService } from "./span-cost-enrichment.service.ts";
+import { OtlpSpanTokenEstimationService } from "./span-token-estimation.service.ts";
 import { TraceIoExtractionAdapter } from "./trace-io-extraction-adapter.service.ts";
 import { TraceMediaReferenceAdapter } from "./trace-media-reference.service.ts";
 import type { TraceProcessingCommandsService } from "./trace-processing-commands.service.ts";
@@ -74,6 +77,7 @@ export interface TraceProcessingPeers {
 
 export interface TraceProcessingPipelineInput {
   processName: string;
+  tokenizer: TraceTokenCounter;
   peers: TraceProcessingPeers;
   repositories: Pick<
     TraceRepositories,
@@ -141,12 +145,17 @@ export class TraceProcessingPipelineService {
           drop: (span, projectId) => peers.dataPrivacy.dropSpanContent({ span, projectId }),
         },
         costEnrichment: this.#costEnrichment(),
-        tokenEstimation: {
-          estimate: () =>
-            Promise.reject(this.#refuse("span token estimation (no tokenizer installed)")),
-        },
+        tokenEstimation: this.#tokenEstimation(),
       }),
     }).build();
+  }
+
+  #tokenEstimation(): TraceSpanTokenEstimation {
+    const estimation = OtlpSpanTokenEstimationService.create({
+      tokenizer: this.input.tokenizer,
+      featureFlags: this.input.peers.featureFlags,
+    });
+    return { estimate: (span, tenantId) => estimation.estimateSpanTokens({ span, tenantId }) };
   }
 
   #costEnrichment(): TraceSpanCostEnrichment {

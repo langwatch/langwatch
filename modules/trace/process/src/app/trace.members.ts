@@ -384,13 +384,6 @@ export interface TraceSpoolLegacyObject {
   delete(input: { projectId: string; key: string }): Promise<void>;
 }
 
-/** How many tokens a model would charge for a piece of text. Undefined is the
- * deliberate "cannot count" answer, not an error; spans without usage stay as
- * they arrived, not stamped with a guess. */
-export interface TraceTokenCounter {
-  computeTokenCount(model: string, text: string | undefined): Promise<number | undefined>;
-}
-
 /** Process-composed sender for Trace's registered durable topic command. */
 export interface TraceTopicAssignmentCommand {
   sendAssignTopic(input: AssignTopicCommandData): Promise<void>;
