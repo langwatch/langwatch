@@ -21,6 +21,7 @@ import { mapValidationIssues } from "../../utils/errors.ts";
 import {
   type CommandHandlerOptions,
   processCommand,
+  type TenantScopedPayload,
   processCommandBatch,
 } from "../commands/commandDispatcher.ts";
 import { ConfigurationError, ValidationError } from "../errorHandling.ts";
@@ -92,15 +93,15 @@ export function resolveCoalesceMaxBatch(
   return bound ?? 1;
 }
 
-interface CommandRegistryEntry<EventType extends Event> {
-  handler: CommandHandler<Command<any>, EventType>;
-  schema: CommandSchema<any, CommandType>;
-  getAggregateId: (payload: any) => string;
-  getGroupKey?: (payload: any) => string;
-  options: CommandHandlerOptions<any>;
+interface CommandRegistryEntry<EventType extends Event, Payload extends TenantScopedPayload> {
+  handler: CommandHandler<Command<Payload>, EventType>;
+  schema: CommandSchema<Payload, CommandType>;
+  getAggregateId: (payload: Payload) => string;
+  getGroupKey?: (payload: Payload) => string;
+  options: CommandHandlerOptions<Payload>;
   commandName: string;
   commandType: CommandType;
-  spanAttributes?: (payload: any) => Record<string, string | number | boolean>;
+  spanAttributes?: (payload: Payload) => Record<string, string | number | boolean>;
 }
 
 /**
@@ -108,22 +109,22 @@ interface CommandRegistryEntry<EventType extends Event> {
  * `serializeByAggregate` opts in, otherwise by the command's own group
  * key (falling back to its aggregate id).
  */
-function resolveCommandDomainKey<EventType extends Event>(
-  cmdEntry: CommandRegistryEntry<EventType>,
-  payload: Record<string, unknown>,
+function resolveCommandDomainKey<EventType extends Event, Payload extends TenantScopedPayload>(
+  cmdEntry: CommandRegistryEntry<EventType, Payload>,
+  payload: Payload,
 ): string {
   if (cmdEntry.options.serializeByAggregate) return cmdEntry.getAggregateId(payload);
   if (cmdEntry.getGroupKey) return cmdEntry.getGroupKey(payload);
   return cmdEntry.getAggregateId(payload);
 }
 
-/** Throws a `ValidationError` if `payload` fails the command's schema. */
-function validateCommandPayload<EventType extends Event>(
-  cmdEntry: CommandRegistryEntry<EventType>,
+/** The payload as the command's schema reads it; a `ValidationError` when it fails the schema. */
+function validateCommandPayload<EventType extends Event, Payload extends TenantScopedPayload>(
+  cmdEntry: CommandRegistryEntry<EventType, Payload>,
   payload: Record<string, unknown>,
-): void {
+): Payload {
   const validation = cmdEntry.schema.validate(payload);
-  if (validation.success) return;
+  if (validation.success) return validation.data;
   throw new ValidationError(
     `Invalid payload for command type "${cmdEntry.commandType}". Validation failed.`,
     "payload",
@@ -137,14 +138,14 @@ function validateCommandPayload<EventType extends Event>(
  * migration preflight that claims groups BEFORE staging. Order matters:
  * an invalid payload never reaches preflight, and a refusal stops the send.
  */
-function buildValidatingCommandFacade<EventType extends Event>(
-  cmdEntry: CommandRegistryEntry<EventType>,
+function buildValidatingCommandFacade<EventType extends Event, Payload extends TenantScopedPayload>(
+  cmdEntry: CommandRegistryEntry<EventType, Payload>,
   baseFacade: EventSourcedQueueProcessor<Record<string, unknown>>,
   registerPreflight: (
     identities: readonly { tenantId: string; aggregateId: string }[],
   ) => Promise<void>,
 ): EventSourcedQueueProcessor<Record<string, unknown>> {
-  const identityOf = (payload: Record<string, unknown>) => ({
+  const identityOf = (payload: Payload) => ({
     tenantId: String(payload.tenantId),
     aggregateId: String(cmdEntry.getAggregateId(payload)),
   });
@@ -153,16 +154,16 @@ function buildValidatingCommandFacade<EventType extends Event>(
       payload: Record<string, unknown>,
       options?: QueueSendOptions<Record<string, unknown>>,
     ) => {
-      validateCommandPayload(cmdEntry, payload);
-      await registerPreflight([identityOf(payload)]);
+      const validated = validateCommandPayload(cmdEntry, payload);
+      await registerPreflight([identityOf(validated)]);
       return baseFacade.send(payload, options);
     },
     sendBatch: async (
       payloads: Record<string, unknown>[],
       options?: QueueSendOptions<Record<string, unknown>>,
     ) => {
-      for (const payload of payloads) validateCommandPayload(cmdEntry, payload);
-      await registerPreflight(payloads.map(identityOf));
+      const validated = payloads.map((payload) => validateCommandPayload(cmdEntry, payload));
+      await registerPreflight(validated.map(identityOf));
       return baseFacade.sendBatch(payloads, options);
     },
     close: baseFacade.close,
@@ -635,31 +636,28 @@ export class QueueManager<EventType extends Event = Event> {
       return;
     }
 
-    // Step 1: Build handler registry
-    const commandRegistry = new Map<string, CommandRegistryEntry<EventType>>();
+    // Step 1: resolve every command's name; a later registration of one name replaces the earlier
+    const commandRegistry = new Map<string, () => void>();
     for (const registration of commandRegistrations) {
-      this.registerCommandHandlerEntry(registration, commandRegistry);
-    }
-
-    if (commandRegistry.size === 0) {
-      return;
+      this.registerCommandHandlerEntry(registration, commandRegistry, storeEvents);
     }
 
     // Step 2: Register each command in the global queue and create facades
-    for (const [cmdName, cmdEntry] of commandRegistry) {
-      this.registerCommandQueueEntry(cmdName, cmdEntry, storeEvents);
+    for (const registerQueue of commandRegistry.values()) {
+      registerQueue();
     }
   }
 
   /** Registers a command's handler-registry entry (step 1 of `initializeCommandQueues`). */
-  private registerCommandHandlerEntry<Payload extends Record<string, unknown>>(
+  private registerCommandHandlerEntry<Payload extends TenantScopedPayload>(
     registration: {
       name: string;
-      handlerClass: CommandHandlerClass<any, any, EventType>;
-      handlerInstance?: CommandHandler<any, EventType>;
+      handlerClass: CommandHandlerClass<Payload, CommandType, EventType>;
+      handlerInstance?: CommandHandler<Command<Payload>, EventType>;
       options?: CommandHandlerOptions<Payload>;
     },
-    commandRegistry: Map<string, CommandRegistryEntry<EventType>>,
+    commandRegistry: Map<string, () => void>,
+    storeEvents: (events: EventType[], context: EventStoreReadContext<EventType>) => Promise<void>,
   ): void {
     const handlerClass = registration.handlerClass;
     const schema = handlerClass.schema;
@@ -683,7 +681,7 @@ export class QueueManager<EventType extends Event = Event> {
       );
     }
 
-    commandRegistry.set(commandName, {
+    const entry: CommandRegistryEntry<EventType, Payload> = {
       handler: handlerInstance,
       schema,
       getAggregateId,
@@ -693,13 +691,16 @@ export class QueueManager<EventType extends Event = Event> {
       commandType,
       spanAttributes:
         registration.options?.spanAttributes ?? handlerClass.getSpanAttributes?.bind(handlerClass),
-    });
+    };
+    commandRegistry.set(commandName, () =>
+      this.registerCommandQueueEntry(commandName, entry, storeEvents),
+    );
   }
 
   /** Registers one command's queue facade and job entry (step 2 of `initializeCommandQueues`). */
-  private registerCommandQueueEntry(
+  private registerCommandQueueEntry<Payload extends TenantScopedPayload>(
     cmdName: string,
-    cmdEntry: CommandRegistryEntry<EventType>,
+    cmdEntry: CommandRegistryEntry<EventType, Payload>,
     storeEvents: (events: EventType[], context: EventStoreReadContext<EventType>) => Promise<void>,
   ): void {
     const jobEntry = this.buildCommandJobEntry(cmdName, cmdEntry, storeEvents);
@@ -711,14 +712,14 @@ export class QueueManager<EventType extends Event = Event> {
   }
 
   /** Builds the job-registry entry (group key, score, process/processBatch) for one command. */
-  private buildCommandJobEntry(
+  private buildCommandJobEntry<Payload extends TenantScopedPayload>(
     cmdName: string,
-    cmdEntry: CommandRegistryEntry<EventType>,
+    cmdEntry: CommandRegistryEntry<EventType, Payload>,
     storeEvents: (events: EventType[], context: EventStoreReadContext<EventType>) => Promise<void>,
   ): JobRegistryEntry {
     const rawDedup = resolveDeduplicationStrategy(
-      cmdEntry.options.deduplication as DeduplicationStrategy<any> | undefined,
-      (payload: Record<string, unknown>) => {
+      cmdEntry.options.deduplication,
+      (payload: Payload) => {
         const key = cmdEntry.getGroupKey
           ? cmdEntry.getGroupKey(payload)
           : cmdEntry.getAggregateId(payload);
@@ -726,11 +727,11 @@ export class QueueManager<EventType extends Event = Event> {
       },
     );
 
-    const getTenantId = (payload: Record<string, unknown>) => String(payload.tenantId);
+    const getTenantId = (payload: Payload) => String(payload.tenantId);
     const commandGroupKeyFn = this.buildGroupKey({
       jobPath: cmdEntry.options.serializeByAggregate ? "command" : `command/${cmdName}`,
       getTenantId,
-      domainKeyFn: (payload: Record<string, unknown>) => {
+      domainKeyFn: (payload: Payload) => {
         const key = resolveCommandDomainKey(cmdEntry, payload);
         return `${this.aggregateType}:${String(key)}`;
       },

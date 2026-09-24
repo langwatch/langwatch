@@ -13,7 +13,11 @@ import {
   TEST_CONSTANTS,
 } from "../../__tests__/testHelpers.ts";
 import { ValidationError } from "../../errorHandling.ts";
-import type { ProcessCommandBatchParams, ProcessCommandParams } from "../commandDispatcher.ts";
+import type {
+  ProcessCommandBatchParams,
+  ProcessCommandParams,
+  TenantScopedPayload,
+} from "../commandDispatcher.ts";
 import { processCommand, processCommandBatch } from "../commandDispatcher.ts";
 
 describe("processCommand", () => {
@@ -62,8 +66,8 @@ describe("processCommand", () => {
   }
 
   function createDefaultParams(
-    overrides?: Partial<ProcessCommandParams<Event>>,
-  ): ProcessCommandParams<Event> {
+    overrides?: Partial<ProcessCommandParams<Event, TenantScopedPayload>>,
+  ): ProcessCommandParams<Event, TenantScopedPayload> {
     return {
       payload: validPayload,
       commandType,
@@ -303,8 +307,8 @@ describe("processCommandBatch", () => {
   }
 
   function createDefaultBatchParams(
-    overrides?: Partial<ProcessCommandBatchParams<Event>>,
-  ): ProcessCommandBatchParams<Event> {
+    overrides?: Partial<ProcessCommandBatchParams<Event, TenantScopedPayload>>,
+  ): ProcessCommandBatchParams<Event, TenantScopedPayload> {
     return {
       payloads: [payloadFor(0)],
       commandType,

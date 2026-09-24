@@ -24,21 +24,21 @@ import { mapValidationIssues } from "../../utils/errors.ts";
 import { EventUtils } from "../../utils/event.utils.ts";
 import { ValidationError } from "../errorHandling.ts";
 
-/**
- * Constraint interface for payloads that support command processing.
- * All command payloads must include a tenantId for tenant isolation
- * and occurredAt for global FIFO ordering.
- */
+/** Every command payload names its tenant; the dispatcher scopes the command by it. */
+export type TenantScopedPayload = { readonly tenantId: unknown };
 
 /**
  * Parameters for the extracted processCommand function.
  */
-export interface ProcessCommandParams<EventType extends Event> {
+export interface ProcessCommandParams<
+  EventType extends Event,
+  Payload extends TenantScopedPayload,
+> {
   payload: Record<string, unknown>;
   commandType: CommandType;
-  commandSchema: CommandSchema<any, CommandType>;
-  handler: CommandHandler<Command<any>, EventType>;
-  getAggregateId: (payload: any) => string;
+  commandSchema: CommandSchema<Payload, CommandType>;
+  handler: CommandHandler<Command<Payload>, EventType>;
+  getAggregateId: (payload: Payload) => string;
   storeEventsFn: (events: EventType[], context: EventStoreReadContext<EventType>) => Promise<void>;
   aggregateType: AggregateType;
   commandName: string;
@@ -112,8 +112,8 @@ function validateHandlerEvents(events: unknown, commandType: CommandType): void 
  * resulting events, and stores them. Extracted for reuse in shared command
  * queues.
  */
-export async function processCommand<EventType extends Event>(
-  params: ProcessCommandParams<EventType>,
+export async function processCommand<EventType extends Event, Payload extends TenantScopedPayload>(
+  params: ProcessCommandParams<EventType, Payload>,
 ): Promise<void> {
   const {
     payload,
@@ -207,10 +207,10 @@ export async function processCommand<EventType extends Event>(
  * {@link ProcessCommandParams} but with an ordered list of payloads instead of
  * one.
  */
-export interface ProcessCommandBatchParams<EventType extends Event> extends Omit<
-  ProcessCommandParams<EventType>,
-  "payload"
-> {
+export interface ProcessCommandBatchParams<
+  EventType extends Event,
+  Payload extends TenantScopedPayload,
+> extends Omit<ProcessCommandParams<EventType, Payload>, "payload"> {
   /** Same-command payloads to coalesce, in dispatch (occurredAt) order. */
   payloads: Record<string, unknown>[];
 }
@@ -229,9 +229,9 @@ interface BatchProgress {
  * single path), failing the whole batch; downstream idempotency keys make the
  * batch's retry safe.
  */
-function validateBatchPayloads<EventType extends Event>(
-  params: ProcessCommandBatchParams<EventType>,
-): any[] {
+function validateBatchPayloads<EventType extends Event, Payload extends TenantScopedPayload>(
+  params: ProcessCommandBatchParams<EventType, Payload>,
+): Payload[] {
   const { payloads, commandSchema, commandType } = params;
   return payloads.map((payload) => {
     const validation = commandSchema.validate(payload);
@@ -256,7 +256,7 @@ function validateBatchPayloads<EventType extends Event>(
  * fail loudly rather than write cross-tenant events under one insert.
  */
 function resolveBatchTenantId(args: {
-  validatedPayloads: any[];
+  validatedPayloads: readonly TenantScopedPayload[];
   commandType: CommandType;
 }): TenantId {
   const { validatedPayloads, commandType } = args;
@@ -279,15 +279,18 @@ function resolveBatchTenantId(args: {
  * `progress.attempted` counts validated payloads so the
  * caller's metrics (and its catch block) see the count even on a mid-loop throw.
  */
-async function handleBatchCommands<EventType extends Event>(args: {
-  params: ProcessCommandBatchParams<EventType>;
-  validatedPayloads: any[];
+async function handleBatchCommands<
+  EventType extends Event,
+  Payload extends TenantScopedPayload,
+>(args: {
+  params: ProcessCommandBatchParams<EventType, Payload>;
+  validatedPayloads: Payload[];
   progress: BatchProgress;
-}): Promise<{ handledCommands: Command<any>[]; allEvents: EventType[] }> {
+}): Promise<{ handledCommands: Command<Payload>[]; allEvents: EventType[] }> {
   const { params, validatedPayloads, progress } = args;
   const { getAggregateId, handler, commandType, aggregateType } = params;
 
-  const handledCommands: Command<any>[] = [];
+  const handledCommands: Command<Payload>[] = [];
   const allEvents: EventType[] = [];
   for (const validated of validatedPayloads) {
     const payloadTenantId = createTenantId(String(validated.tenantId));
@@ -339,11 +342,11 @@ async function handleBatchCommands<EventType extends Event>(args: {
  * best-effort post-store cleanup (ADR-022). A cleanup failure is logged and
  * swallowed — it must never roll back durable events.
  */
-async function persistBatch<EventType extends Event>(args: {
-  params: ProcessCommandBatchParams<EventType>;
+async function persistBatch<EventType extends Event, Payload extends TenantScopedPayload>(args: {
+  params: ProcessCommandBatchParams<EventType, Payload>;
   tenantId: TenantId;
   allEvents: EventType[];
-  handledCommands: Command<any>[];
+  handledCommands: Command<Payload>[];
 }): Promise<void> {
   const { params, tenantId, allEvents, handledCommands } = args;
   const { handler, storeEventsFn, commandType, logger: log } = params;
@@ -375,8 +378,8 @@ async function persistBatch<EventType extends Event>(args: {
  * The whole-batch time is amortised across attempts so each sample carries a
  * per-command time rather than N-commands of it.
  */
-function emitBatchMetrics<EventType extends Event>(args: {
-  params: ProcessCommandBatchParams<EventType>;
+function emitBatchMetrics<EventType extends Event, Payload extends TenantScopedPayload>(args: {
+  params: ProcessCommandBatchParams<EventType, Payload>;
   outcome: "completed" | "failed";
   attempted: number;
   durationMs: number;
@@ -394,9 +397,10 @@ function emitBatchMetrics<EventType extends Event>(args: {
  * Batched sibling of processCommand: collapses N single-row appends into one
  * multi-row insert. Handlers must be stateless per item (no read-your-writes).
  */
-export async function processCommandBatch<EventType extends Event>(
-  params: ProcessCommandBatchParams<EventType>,
-): Promise<void> {
+export async function processCommandBatch<
+  EventType extends Event,
+  Payload extends TenantScopedPayload,
+>(params: ProcessCommandBatchParams<EventType, Payload>): Promise<void> {
   if (params.payloads.length === 0) {
     return;
   }
