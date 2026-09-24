@@ -14,6 +14,22 @@
       "types": "./dist/clickhouse-test-endpoints.d.ts",
       "default": "./src/clickhouse-test-endpoints.ts"
     },
+    "./client-doubles/clickhouse": {
+      "types": "./dist/client-doubles/clickhouse.double.d.ts",
+      "default": "./src/client-doubles/clickhouse.double.ts"
+    },
+    "./client-doubles/prisma": {
+      "types": "./dist/client-doubles/prisma.double.d.ts",
+      "default": "./src/client-doubles/prisma.double.ts"
+    },
+    "./client-doubles/redis": {
+      "types": "./dist/client-doubles/redis.double.d.ts",
+      "default": "./src/client-doubles/redis.double.ts"
+    },
+    "./client-doubles/stripe": {
+      "types": "./dist/client-doubles/stripe.double.d.ts",
+      "default": "./src/client-doubles/stripe.double.ts"
+    },
     "./nlpgo": {
       "types": "./dist/nlpgo.d.ts",
       "default": "./src/nlpgo.ts"
@@ -34,13 +50,16 @@
   },
   "dependencies": {
     "@clickhouse/client": "catalog:",
+    "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@testcontainers/clickhouse": "catalog:",
+    "ioredis": "catalog:",
     "nanoid": "catalog:",
     "picomatch": "^4.0.4",
     "pino": "catalog:",
+    "stripe": "^15.12.0",
     "typescript": "catalog:"
   },
   "devDependencies": {

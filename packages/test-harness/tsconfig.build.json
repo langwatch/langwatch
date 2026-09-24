@@ -24,6 +24,9 @@
   ],
   "references": [
     {
+      "path": "../clickhouse-client/tsconfig.build.json"
+    },
+    {
       "path": "../prisma-client/tsconfig.build.json"
     },
     {
