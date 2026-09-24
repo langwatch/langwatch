@@ -20,7 +20,7 @@ export interface HttpWebhookDestinationAdapterOptions {
    * and the hourly dispatch cap all live on it, so a second instance here
    * would be a second budget and possibly a second fence.
    */
-  egress: WebhookEgressService;
+  egress: Pick<WebhookEgressService, "send">;
   /**
    * Whether this deployment permits a loopback or private destination. A
    * process-level escape hatch for local development, so the process decides
@@ -36,7 +36,7 @@ export class HttpWebhookDestinationAdapter implements WebhookDestination {
   readonly kind = "http" as const;
 
   private readonly url: string;
-  private readonly egress: WebhookEgressService;
+  private readonly egress: Pick<WebhookEgressService, "send">;
   private readonly allowInsecureLocal: boolean;
 
   private constructor(options: HttpWebhookDestinationAdapterOptions) {

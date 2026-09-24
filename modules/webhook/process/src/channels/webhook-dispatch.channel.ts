@@ -1,9 +1,6 @@
-import type { WebhookDispatchResult } from "../app/webhook.app.ts";
-import type { WebhookDeliveryProcessDeps } from "../services/webhook-delivery.service.ts";
+import type { WebhookSendInput, WebhookSendResult } from "@langwatch/egress";
 
-export type WebhookDispatchInput = Parameters<WebhookDeliveryProcessDeps["dispatch"]>[0];
-
-/** One endpoint's last hop: a frozen batch out to the receiver the endpoint names. */
+/** The bytes of one batch out to one receiver URL; the destination choice is the service's. */
 export interface WebhookDispatchChannel {
-  dispatch(input: WebhookDispatchInput): Promise<WebhookDispatchResult>;
+  send(input: WebhookSendInput): Promise<WebhookSendResult>;
 }

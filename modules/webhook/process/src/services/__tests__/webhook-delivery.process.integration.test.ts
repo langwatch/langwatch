@@ -22,6 +22,7 @@ import {
   InMemoryProcessStore,
   OutboxDispatcherService,
   ProcessManagerService,
+  type JsonValue,
   type ProcessDefinition,
   type ProcessEventEnvelope,
 } from "@langwatch/eventing";
@@ -117,7 +118,7 @@ function envelopeFor({
 }: {
   requestId: string;
   eventType: string;
-  data: Record<string, unknown>;
+  data: { [key: string]: JsonValue };
   occurredAt: number;
   inProject?: string;
 }): ProcessEventEnvelope {
@@ -134,7 +135,7 @@ function envelopeFor({
       sourceEventId,
       tenantId: tenant,
       spend: { type: eventType, data },
-    } as ProcessEventEnvelope["payload"],
+    },
   };
 }
 

@@ -18,7 +18,7 @@ import {
   type WebhookApi as WebhookApiContract,
 } from "@langwatch/webhook-contract";
 
-import { EgressWebhookDispatchChannel } from "../channels/egress/egress.webhook-dispatch.channel.ts";
+import { HttpWebhookDispatchChannel } from "../channels/http/http.webhook-dispatch.channel.ts";
 import {
   buildWebhookDeliveryPipeline,
   type WebhookDeliveryDefinition,
@@ -183,11 +183,13 @@ export class WebhookApp implements WebhookApiContract {
       retention: input.repositories.retention,
       getPlan: (organizationId) => entitlement.getActivePlan({ organizationId }),
       dispatch: () =>
-        EgressWebhookDispatchChannel.create({
-          redis: input.members.redis,
-          rejectUnauthorized: input.members.isSaas,
+        WebhookDeliveryService.dispatchThrough({
+          channel: HttpWebhookDispatchChannel.create({
+            redis: input.members.redis,
+            rejectUnauthorized: input.members.isSaas,
+          }),
           allowInsecureLocal: input.config.allowInsecureLocalUrls,
-        }).dispatch,
+        }),
     };
     return app;
   }

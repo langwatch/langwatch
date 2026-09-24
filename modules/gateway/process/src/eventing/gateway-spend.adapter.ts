@@ -42,7 +42,7 @@ import { GatewaySpendFoldProjection } from "./gateway-spend.projection.ts";
 /**
  * A process manager another feature owns, mounted here under the name its
  * durable rows are already keyed by — renaming loses inbox/state/outbox
- * rows. Webhook delivery (ADR-073) and debits live in packages this one may not depend on.
+ * rows. Debits live in a module this one may not depend on.
  */
 export interface GatewaySpendProcessManagerMount {
   name: string;
@@ -60,9 +60,6 @@ export interface EventingGatewaySpendAdapterOptions {
   cacheStore?: (
     inner: FoldProjectionStore<GatewaySpendState>,
   ) => FoldProjectionStore<GatewaySpendState>;
-  /** The ADR-073 delivery process manager; absent when webhooks are off
-   *  (the pipeline still projects, delivery just has no consumer). */
-  webhookDelivery?: GatewaySpendProcessManagerMount;
   /** Webhook's own delivery op; each committed spend step is handed to it (WP-6c). */
   webhookSpendDelivery?: Pick<WebhookApi, "requestSpendDelivery">;
   /** The gateway's budget debits; absent without the ClickHouse spend path
@@ -120,12 +117,6 @@ export class EventingGatewaySpendAdapter {
       pipeline = pipeline.withEventSubscriber(
         GATEWAY_SPEND_WEBHOOK_SUBSCRIBER_NAME,
         gatewaySpendWebhookSubscriber(this.options.webhookSpendDelivery),
-      );
-    }
-    if (this.options.webhookDelivery) {
-      pipeline = pipeline.withProcessManager(
-        this.options.webhookDelivery.name,
-        this.options.webhookDelivery.applier,
       );
     }
     if (this.options.gatewayDebits) {

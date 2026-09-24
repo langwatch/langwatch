@@ -1,9 +1,10 @@
-import type { WebhookDispatchResult } from "../../app/webhook.app.ts";
-import type { WebhookDispatchChannel, WebhookDispatchInput } from "../webhook-dispatch.channel.ts";
+import type { WebhookSendInput, WebhookSendResult } from "@langwatch/egress";
 
-/** The dispatch channel's memory twin: keeps every batch it was handed and answers success. */
+import type { WebhookDispatchChannel } from "../webhook-dispatch.channel.ts";
+
+/** The dispatch channel's memory twin: keeps every send it was handed and answers 200. */
 export class MemoryWebhookDispatchChannel implements WebhookDispatchChannel {
-  readonly #sent: WebhookDispatchInput[] = [];
+  readonly #sent: WebhookSendInput[] = [];
 
   static create(): MemoryWebhookDispatchChannel {
     return new MemoryWebhookDispatchChannel();
@@ -11,17 +12,16 @@ export class MemoryWebhookDispatchChannel implements WebhookDispatchChannel {
 
   private constructor() {}
 
-  get sent(): readonly WebhookDispatchInput[] {
+  get sent(): readonly WebhookSendInput[] {
     return this.#sent;
   }
 
-  dispatch = (input: WebhookDispatchInput): Promise<WebhookDispatchResult> => {
+  send(input: WebhookSendInput): Promise<WebhookSendResult> {
     this.#sent.push(input);
     return Promise.resolve({
-      verdict: "success",
-      status: input.destination.kind === "sqs" ? null : 200,
+      status: 200,
       body: "",
-      dispatchId: input.batchId,
+      eventId: input.eventId ?? `memory-dispatch-${this.#sent.length}`,
     });
-  };
+  }
 }

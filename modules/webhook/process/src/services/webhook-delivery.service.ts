@@ -14,6 +14,7 @@ import {
   type WebhookEndpointView,
 } from "@langwatch/webhook-contract";
 
+import type { WebhookDispatchChannel } from "../channels/webhook-dispatch.channel.ts";
 import type { WebhookSpendDeliveryRequestedEvent } from "../eventing/webhook-spend-delivery.intent.ts";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
@@ -49,6 +50,7 @@ import {
   failedDeliverPayload,
   settledDeliverPayload,
 } from "../rules/webhook-spend-payload.rules.ts";
+import { HttpWebhookDestinationAdapter } from "./http.webhook-destination.service.ts";
 import { WebhookBatchSendService } from "./webhook-batch-send.service.ts";
 import { WebhookDeliveryMaintenanceService } from "./webhook-delivery-maintenance.service.ts";
 import type { WebhookDestinationConfig } from "./webhook-destination.service.ts";
@@ -201,6 +203,43 @@ export class WebhookDeliveryService {
         })
         .transient()
         .outbox(WEBHOOK_DELIVERY_OUTBOX);
+  }
+
+  /**
+   * Main's `dispatchWebhookThrough` for a process with no AWS transport: an HTTPS endpoint
+   * sends through the channel, a queue endpoint answers main's terminal refusal.
+   */
+  static dispatchThrough(input: {
+    channel: WebhookDispatchChannel;
+    allowInsecureLocal: boolean;
+  }): WebhookDeliveryProcessDeps["dispatch"] {
+    return (request) => {
+      if (request.destination.kind === "sqs") {
+        logger.error(
+          { organizationId: request.organizationId, endpointId: request.endpointId },
+          "webhook endpoint delivers to a queue, and this process composes no AWS transport",
+        );
+        return Promise.resolve({
+          verdict: "terminal",
+          status: null,
+          body: "",
+          dispatchId: request.batchId,
+          error: "This process composes no AWS transport for queue webhook destinations.",
+        });
+      }
+      return HttpWebhookDestinationAdapter.create({
+        url: request.destination.url,
+        egress: input.channel,
+        allowInsecureLocal: input.allowInsecureLocal,
+      }).send({
+        organizationId: request.organizationId,
+        endpointId: request.endpointId,
+        body: request.body,
+        batchId: request.batchId,
+        attempt: request.attempt,
+        signingSecrets: request.signingSecrets,
+      });
+    };
   }
 
   /** The delay before the attempt after the 1-based `attempt` that just failed. */
