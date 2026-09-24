@@ -412,6 +412,22 @@ export class OrganizationMembershipService {
     return this.repo.findMemberUsersIncludingDeactivated(input);
   }
 
+  findMembersWithDepartments(input: {
+    organizationId: string;
+  }): Promise<
+    { userId: string; departmentId: string | null; user: { name: string | null; email: string | null } }[]
+  > {
+    return this.repo.findMembersWithDepartments(input);
+  }
+
+  assignMemberDepartment(input: {
+    organizationId: string;
+    userId: string;
+    departmentId: string | null;
+  }): Promise<boolean> {
+    return this.repo.assignMemberDepartment(input);
+  }
+
   findMemberDepartments(input: {
     organizationId: string;
     userIds: readonly string[];

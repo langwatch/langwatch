@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import { createDepartmentTestService } from "@langwatch/enterprise-governance-process/testing";
 import {
   SCIM_ENTERPRISE_USER_SCHEMA,
@@ -6,6 +7,7 @@ import {
 } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { createLogger } from "@langwatch/observability";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -69,7 +71,21 @@ describe.skipIf(!databaseUrl)("ScimService department auto-assignment", () => {
   const ns = `scim-dept-${nanoid(8)}`;
   const ORG_ID = `org-${ns}`;
 
-  const departments = () => createDepartmentTestService(prisma);
+  const memberDepartments = createApiFixture<OrganizationApi>({
+    findMembersWithDepartments: ({ organizationId }) =>
+      prisma.organizationUser.findMany({
+        where: { organizationId },
+        select: { userId: true, departmentId: true, user: { select: { name: true, email: true } } },
+      }),
+    assignMemberDepartment: async ({ organizationId, userId, departmentId }) =>
+      (
+        await prisma.organizationUser.updateMany({
+          where: { organizationId, userId },
+          data: { departmentId },
+        })
+      ).count > 0,
+  });
+  const departments = () => createDepartmentTestService(prisma, memberDepartments);
 
   /**
    * Everything SCIM asks of the user directory, over the same rows: creating

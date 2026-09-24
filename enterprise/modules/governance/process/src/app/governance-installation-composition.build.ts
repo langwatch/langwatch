@@ -5,6 +5,7 @@ import type {
   GovernanceOttlGateway,
   GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
+import type { DepartmentMemberDirectory } from "../services/department.service.ts";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -68,6 +69,7 @@ import type {
 export type GovernanceInstallationOptions = {
   database: ProcessMembers["prisma"];
   organizations: OrganizationService;
+  memberDepartments: DepartmentMemberDirectory;
   projects: ProjectApi;
   gatewayBaseUrl: string;
   eventing: GovernanceEventingChannel;
@@ -127,6 +129,7 @@ export class GovernanceInstallationComposition {
     });
     const departments = DepartmentService.create({
       repository: PrismaDepartmentRepository.create(this.options.database),
+      members: this.options.memberDepartments,
     });
     const personalUsage = DefaultGovernancePersonalUsageService.create({
       reader: this.options.personalUsageReader,

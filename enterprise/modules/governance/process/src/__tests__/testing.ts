@@ -12,7 +12,7 @@ import {
   PrismaActivityMonitorRepository,
   type ActivityMonitorDatabase,
 } from "../repositories/prisma/prisma.ingestion-source-activity.repository.ts";
-import { DepartmentService } from "../services/department.service.ts";
+import { type DepartmentMemberDirectory, DepartmentService } from "../services/department.service.ts";
 import { ActivityMonitorService } from "../services/ingestion-source-activity.service.ts";
 
 /**
@@ -27,6 +27,9 @@ export function createActivityMonitorTestService(options: {
 }
 
 /** The department directory over a suite's own Postgres connection. */
-export function createDepartmentTestService(database: DepartmentDatabase): DepartmentService {
-  return DepartmentService.create({ repository: PrismaDepartmentRepository.create(database) });
+export function createDepartmentTestService(
+  database: DepartmentDatabase,
+  members: DepartmentMemberDirectory,
+): DepartmentService {
+  return DepartmentService.create({ repository: PrismaDepartmentRepository.create(database), members });
 }

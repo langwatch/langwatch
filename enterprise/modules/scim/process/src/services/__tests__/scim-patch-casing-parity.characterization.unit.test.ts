@@ -186,10 +186,10 @@ describe("SCIM PATCH operation casing parity", () => {
 
   it("rejects a value that is not a SCIM operation", () => {
     expect(
-      scimPatchRequestSchema.safeParse({
+      scimPatchRequestSchema.validate({
         schemas: [patchSchema],
         Operations: [{ op: "Delete", value: {} }],
-      }).success,
+      }),
     ).toBe(false);
   });
 });

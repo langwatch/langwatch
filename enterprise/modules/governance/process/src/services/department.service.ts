@@ -5,13 +5,30 @@ import {
   type DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
 
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { type Instant, nowInstant } from "@langwatch/time";
+
 import type { DepartmentRepository } from "../repositories/department.repository.ts";
 
-export class DepartmentService {
-  private constructor(private readonly repository: DepartmentRepository) {}
+/** The member department column is organization's, so it is read and written there. */
+export type DepartmentMemberDirectory = Pick<
+  OrganizationApi,
+  "findMembersWithDepartments" | "assignMemberDepartment"
+>;
 
-  static create(options: { repository: DepartmentRepository }): DepartmentService {
-    return new DepartmentService(options.repository);
+export class DepartmentService {
+  private constructor(
+    private readonly repository: DepartmentRepository,
+    private readonly members: DepartmentMemberDirectory,
+    private readonly now: () => Instant,
+  ) {}
+
+  static create(options: {
+    repository: DepartmentRepository;
+    members: DepartmentMemberDirectory;
+    now?: () => Instant;
+  }): DepartmentService {
+    return new DepartmentService(options.repository, options.members, options.now ?? nowInstant);
   }
 
   getAll(input: { organizationId: string }): Promise<Department[]> {
@@ -22,8 +39,23 @@ export class DepartmentService {
     return this.repository.findById(input);
   }
 
-  getAssignments(input: { organizationId: string }): Promise<DepartmentAssignments> {
-    return this.repository.getAssignments(input.organizationId);
+  /** Main `department.service.ts:106-145`: a member with no display name shows their email. */
+  async getAssignments(input: { organizationId: string }): Promise<DepartmentAssignments> {
+    const [members, { teams, projects }] = await Promise.all([
+      this.members.findMembersWithDepartments(input),
+      this.repository.getTeamAndProjectAssignments(input.organizationId),
+    ]);
+    return {
+      users: members
+        .map((member) => ({
+          id: member.userId,
+          name: member.user.name ?? member.user.email ?? member.userId,
+          departmentId: member.departmentId,
+        }))
+        .toSorted((left, right) => left.name.localeCompare(right.name)),
+      teams,
+      projects,
+    };
   }
 
   departmentsOnDay(input: {
@@ -62,9 +94,10 @@ export class DepartmentService {
     departmentId: string | null;
   }): Promise<void> {
     await this.assertDepartmentInOrganization(input);
-    if (!(await this.repository.assignUser(input))) {
+    if (!(await this.members.assignMemberDepartment(input))) {
       throw new DepartmentAssignmentTargetNotFoundError("user");
     }
+    await this.repository.recordMembership({ ...input, at: this.now() });
   }
 
   async assignTeam(input: {

@@ -4,6 +4,7 @@ import {
   type DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { type Instant, toDate } from "@langwatch/time";
 
 import { DepartmentRepository } from "../department.repository.ts";
 
@@ -13,7 +14,7 @@ import { DepartmentRepository } from "../department.repository.ts";
  */
 export type DepartmentDatabase = Pick<
   PrismaClient,
-  "department" | "departmentMembershipHistory" | "organizationUser" | "project" | "team"
+  "department" | "departmentMembershipHistory" | "project" | "team" | "$transaction"
 >;
 
 export class PrismaDepartmentRepository extends DepartmentRepository {
@@ -40,16 +41,10 @@ export class PrismaDepartmentRepository extends DepartmentRepository {
     return row ? departmentSchema.parse(row) : null;
   }
 
-  async getAssignments(organizationId: string): Promise<DepartmentAssignments> {
-    const [members, teams, projects] = await Promise.all([
-      this.prisma.organizationUser.findMany({
-        where: { organizationId },
-        select: {
-          userId: true,
-          departmentId: true,
-          user: { select: { name: true, email: true } },
-        },
-      }),
+  async getTeamAndProjectAssignments(
+    organizationId: string,
+  ): Promise<Pick<DepartmentAssignments, "teams" | "projects">> {
+    const [teams, projects] = await Promise.all([
       this.prisma.team.findMany({
         where: { organizationId },
         select: { id: true, name: true, departmentId: true },
@@ -61,17 +56,7 @@ export class PrismaDepartmentRepository extends DepartmentRepository {
         orderBy: { name: "asc" },
       }),
     ]);
-    return {
-      users: members
-        .map((member) => ({
-          id: member.userId,
-          name: member.user.name ?? member.user.email ?? member.userId,
-          departmentId: member.departmentId,
-        }))
-        .toSorted((left, right) => left.name.localeCompare(right.name)),
-      teams,
-      projects,
-    };
+    return { teams, projects };
   }
 
   async departmentsOnDay(input: {
@@ -150,19 +135,36 @@ export class PrismaDepartmentRepository extends DepartmentRepository {
     return result.count > 0;
   }
 
-  async assignUser(input: {
+  async recordMembership(input: {
     organizationId: string;
     userId: string;
     departmentId: string | null;
-  }): Promise<boolean> {
-    const result = await this.prisma.organizationUser.updateMany({
-      where: {
-        userId: input.userId,
-        organizationId: input.organizationId,
-      },
-      data: { departmentId: input.departmentId },
+    at: Instant;
+  }): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const open = await tx.departmentMembershipHistory.findFirst({
+        where: { organizationId: input.organizationId, userId: input.userId, validTo: null },
+      });
+      if (open?.departmentId === input.departmentId) return;
+
+      const now = toDate(input.at);
+      if (open) {
+        await tx.departmentMembershipHistory.update({
+          where: { id: open.id },
+          data: { validTo: now },
+        });
+      }
+      if (input.departmentId !== null) {
+        await tx.departmentMembershipHistory.create({
+          data: {
+            organizationId: input.organizationId,
+            userId: input.userId,
+            departmentId: input.departmentId,
+            validFrom: now,
+          },
+        });
+      }
     });
-    return result.count > 0;
   }
 
   async assignTeam(input: {

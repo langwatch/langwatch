@@ -80,6 +80,9 @@
       "path": "../../../../modules/user/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/api-fixture/tsconfig.build.json"
+    },
+    {
       "path": "../../governance/process/tsconfig.build.json"
     },
     {

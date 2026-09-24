@@ -4,6 +4,9 @@ import {
   type Department,
   type DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { DepartmentRepository } from "../../repositories/department.repository.ts";
@@ -21,7 +24,8 @@ function department(overrides: Partial<Department> = {}): Department {
 }
 
 class MemoryDepartmentRepository extends DepartmentRepository {
-  readonly assignUser = vi.fn(async () => true);
+  readonly recordMembership = vi.fn(async () => undefined);
+  readonly findOpenMemberships = vi.fn(async () => []);
   readonly assignTeam = vi.fn(async () => true);
   readonly assignProject = vi.fn(async () => true);
   renameResult = true;
@@ -41,8 +45,8 @@ class MemoryDepartmentRepository extends DepartmentRepository {
       : null;
   }
 
-  async getAssignments(): Promise<DepartmentAssignments> {
-    return { users: [], teams: [], projects: [] };
+  async getTeamAndProjectAssignments(): Promise<Pick<DepartmentAssignments, "teams" | "projects">> {
+    return { teams: [], projects: [] };
   }
 
   async departmentsOnDay(): Promise<Map<string, string>> {
@@ -66,10 +70,17 @@ class MemoryDepartmentRepository extends DepartmentRepository {
   }
 }
 
+function members(assigned = true) {
+  return createApiFixture<OrganizationApi>({
+    findMembersWithDepartments: async () => [],
+    assignMemberDepartment: async () => assigned,
+  });
+}
+
 describe("DepartmentService", () => {
   it("rejects a department owned by another organization before assignment", async () => {
     const repository = new MemoryDepartmentRepository();
-    const service = DepartmentService.create({ repository });
+    const service = DepartmentService.create({ repository, members: members() });
 
     await expect(
       service.assignUser({
@@ -78,12 +89,12 @@ describe("DepartmentService", () => {
         departmentId: "department-1",
       }),
     ).rejects.toBeInstanceOf(DepartmentNotFoundError);
-    expect(repository.assignUser).not.toHaveBeenCalled();
+    expect(repository.recordMembership).not.toHaveBeenCalled();
   });
 
   it("allows clearing an assignment without looking up a department", async () => {
     const repository = new MemoryDepartmentRepository(null);
-    const service = DepartmentService.create({ repository });
+    const service = DepartmentService.create({ repository, members: members() });
 
     await service.assignTeam({
       organizationId: "organization-1",
@@ -97,7 +108,7 @@ describe("DepartmentService", () => {
   it("does not report a missing assignment target as success", async () => {
     const repository = new MemoryDepartmentRepository();
     repository.assignProject.mockResolvedValue(false);
-    const service = DepartmentService.create({ repository });
+    const service = DepartmentService.create({ repository, members: members() });
 
     await expect(
       service.assignProject({
@@ -110,7 +121,7 @@ describe("DepartmentService", () => {
 
   it("returns the tenant-scoped row after renaming", async () => {
     const repository = new MemoryDepartmentRepository();
-    const renamed = await DepartmentService.create({ repository }).rename({
+    const renamed = await DepartmentService.create({ repository, members: members() }).rename({
       id: "department-1",
       organizationId: "organization-1",
       name: "Platform",
@@ -124,10 +135,41 @@ describe("DepartmentService", () => {
     repository.archiveResult = false;
 
     await expect(
-      DepartmentService.create({ repository }).archive({
+      DepartmentService.create({ repository, members: members() }).archive({
         id: "department-1",
         organizationId: "organization-2",
       }),
     ).rejects.toBeInstanceOf(DepartmentNotFoundError);
+  });
+
+  describe("when a member is assigned", () => {
+    it("points the member through organization and dates the link in governance", async () => {
+      const repository = new MemoryDepartmentRepository();
+      const at = Temporal.Instant.from("2026-09-03T00:00:00Z");
+      const service = DepartmentService.create({ repository, members: members(), now: () => at });
+
+      await service.assignUser({
+        organizationId: "organization-1",
+        userId: "user-1",
+        departmentId: "department-1",
+      });
+
+      expect(repository.recordMembership).toHaveBeenCalledWith({
+        organizationId: "organization-1",
+        userId: "user-1",
+        departmentId: "department-1",
+        at,
+      });
+    });
+
+    it("refuses a member organization does not have, and dates nothing", async () => {
+      const repository = new MemoryDepartmentRepository();
+      const service = DepartmentService.create({ repository, members: members(false) });
+
+      await expect(
+        service.assignUser({ organizationId: "organization-1", userId: "ghost", departmentId: null }),
+      ).rejects.toBeInstanceOf(DepartmentAssignmentTargetNotFoundError);
+      expect(repository.recordMembership).not.toHaveBeenCalled();
+    });
   });
 });

@@ -311,7 +311,13 @@ export interface GovernanceAppDependencies {
    * first key, read as it stands when they open their own dashboard.
    */
   organizations: Pick<OrganizationService, "ensurePersonalWorkspace" | "getPersonalWorkspace"> &
-    Pick<OrganizationApi, "findMembersIncludingDeactivated">;
+    Pick<
+      OrganizationApi,
+      | "findMembersIncludingDeactivated"
+      | "findMemberDepartments"
+      | "findMembersWithDepartments"
+      | "assignMemberDepartment"
+    >;
   /** The SSO directory's external ids, which the identity match reads as proof. */
   scim: Pick<ScimApi, "findDirectoryExternalIds">;
   /**
@@ -456,7 +462,10 @@ export class GovernanceApp implements GovernanceRestApi {
     this.dependencies = dependencies;
     this.repositories = repositories;
     this.encryption = encryption;
-    this.departments = DepartmentService.create({ repository: repositories.departments });
+    this.departments = DepartmentService.create({
+      repository: repositories.departments,
+      members: dependencies.organizations,
+    });
     this.erasureSuppression = erasureSuppression;
     // One instance: the erasure refreshes the very snapshot the cost fold reads (ADR-128 §9 step 5).
     this.suppressionSnapshot = SuppressionSnapshotService.create({

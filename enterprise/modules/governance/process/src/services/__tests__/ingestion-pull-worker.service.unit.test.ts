@@ -9,7 +9,7 @@ import type {
   InternalProjectQuery,
   ProjectWithTeam,
 } from "@langwatch/project-contract";
-import { Temporal } from "@langwatch/time";
+import { type Instant, Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
@@ -200,6 +200,7 @@ function worker(input: {
   };
   const discover = vi.fn(input.discover ?? (async () => ({ discovered: 0 })));
   const identityMatch = vi.fn(input.runIdentityMatch ?? (async () => undefined));
+  const departmentSync = vi.fn(async (_input: { events: NormalizedPullEvent[] }) => ({ assigned: 0 }));
   const unpricedWindows = {
     getUnpricedUsageWindow: vi.fn(
       async (): Promise<UnpricedUsageWindow> =>
@@ -221,7 +222,7 @@ function worker(input: {
     discovery: { recordFromPulledEvents: async ({ events }) => discover(events) },
     identityMatch: { runFor: identityMatch },
     unpricedWindows,
-    departmentSync: { applyDirectoryEvents: async () => ({ assigned: 0 }) },
+    departmentSync: { applyDirectoryEvents: departmentSync },
     diagnostics,
     traceIngestion: input.traceIngestion,
     configuration: IngestionPullWorkerConfiguration.create({
@@ -229,7 +230,16 @@ function worker(input: {
     }),
     now: () => Date.parse("2026-08-24T10:00:00.000Z"),
   });
-  return { service, sink, entitlement, diagnostics, discover, identityMatch, unpricedWindows };
+  return {
+    service,
+    sink,
+    entitlement,
+    diagnostics,
+    discover,
+    identityMatch,
+    unpricedWindows,
+    departmentSync,
+  };
 }
 
 function traceDestination(organizationId = "org-1"): ProjectWithTeam {
@@ -715,6 +725,39 @@ describe("given a pull carrying an event that names an erased person", () => {
   });
 });
 
+describe("given a directory listing that names an erased person", () => {
+  /** @scenario "An erased identifier in the directory is skipped entirely" */
+  it("neither discovers them nor lets their department row through", async () => {
+    const { service, discover, departmentSync, sink } = worker({
+      erased: [ERASED],
+      runOnce: async () => ({
+        events: [
+          {
+            source_event_id: "msgraph_directory:erased:2026-08-20",
+            event_timestamp: "2026-08-20T10:00:00.000Z",
+            actor: ERASED,
+            action: "directory_report",
+            target: "Finance",
+            cost_usd: "0",
+            tokens_input: 0,
+            tokens_output: 0,
+            raw_payload: JSON.stringify({ id: ERASED, department: "Finance" }),
+            extra: { department: "Finance", displayName: "Leaver" },
+          },
+        ],
+        cursor: null,
+        errorCount: 0,
+      }),
+    });
+
+    await service.run({ sourceId: "source-1", cursor: null });
+
+    expect(sink.insertEvent).not.toHaveBeenCalled();
+    expect(JSON.stringify(discover.mock.calls)).not.toContain(ERASED);
+    expect(JSON.stringify(departmentSync.mock.calls)).not.toContain(ERASED);
+  });
+});
+
 describe("given a pull where person discovery itself breaks", () => {
   /** @scenario "Discovery failing does not cost the run its events" */
   it("still writes the audit row and exports the conversation", async () => {
@@ -793,7 +836,7 @@ const DAY_1 = "2026-08-20T00:00:00.000Z";
 const DAY_2 = "2026-08-22T00:00:00.000Z";
 const DAY_3 = "2026-08-24T00:00:00.000Z";
 
-function instant(iso: string): Temporal.Instant {
+function instant(iso: string): Instant {
   return Temporal.Instant.from(iso);
 }
 

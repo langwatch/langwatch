@@ -776,6 +776,27 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     return users.map(userFromRecord);
   }
 
+  async findMembersWithDepartments({ organizationId }: { organizationId: string }): Promise<
+    { userId: string; departmentId: string | null; user: { name: string | null; email: string | null } }[]
+  > {
+    return this.prisma.organizationUser.findMany({
+      where: { organizationId },
+      select: { userId: true, departmentId: true, user: { select: { name: true, email: true } } },
+    });
+  }
+
+  async assignMemberDepartment(input: {
+    organizationId: string;
+    userId: string;
+    departmentId: string | null;
+  }): Promise<boolean> {
+    const result = await this.prisma.organizationUser.updateMany({
+      where: { userId: input.userId, organizationId: input.organizationId },
+      data: { departmentId: input.departmentId },
+    });
+    return result.count > 0;
+  }
+
   async findMemberDepartments({
     organizationId,
     userIds,

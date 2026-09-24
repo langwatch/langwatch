@@ -2,7 +2,7 @@
 
 import type { Department, DepartmentAssignments } from "@langwatch/enterprise-governance-contract";
 import { generate } from "@langwatch/ksuid";
-import { nowInstant, toDate } from "@langwatch/time";
+import { type Instant, nowInstant, Temporal, toDate } from "@langwatch/time";
 
 import { DepartmentRepository } from "../department.repository.ts";
 import type { MemoryGovernanceStore } from "./memory.governance.store.ts";
@@ -38,14 +38,16 @@ export class MemoryDepartmentRepository extends DepartmentRepository {
     );
   }
 
-  async getAssignments(organizationId: string): Promise<DepartmentAssignments> {
+  async getTeamAndProjectAssignments(
+    organizationId: string,
+  ): Promise<Pick<DepartmentAssignments, "teams" | "projects">> {
     const owned = new Set(
       this.store.departments
         .filter((department) => department.organizationId === organizationId)
         .map((department) => department.id),
     );
 
-    const entries = (map: Map<string, string | null>): DepartmentAssignments["users"] =>
+    const entries = (map: Map<string, string | null>): DepartmentAssignments["teams"] =>
       [...map.entries()].map(([id, departmentId]) => ({
         id,
         name: id,
@@ -53,7 +55,6 @@ export class MemoryDepartmentRepository extends DepartmentRepository {
       }));
 
     return {
-      users: entries(this.store.departmentOfUser),
       teams: entries(this.store.departmentOfTeam),
       projects: entries(this.store.departmentOfProject),
     };
@@ -64,26 +65,63 @@ export class MemoryDepartmentRepository extends DepartmentRepository {
     userIds: readonly string[];
     dayUtc: string;
   }): Promise<Map<string, string>> {
-    const owned = new Set(
-      this.store.departments
-        .filter((department) => department.organizationId === input.organizationId)
-        .map((department) => department.id),
-    );
-    return new Map(
-      input.userIds.flatMap((userId) => {
-        const departmentId = this.store.departmentOfUser.get(userId);
-        return departmentId && owned.has(departmentId) ? [[userId, departmentId]] : [];
-      }),
-    );
+    const dayStartMs = Temporal.Instant.from(`${input.dayUtc}T00:00:00Z`).epochMilliseconds;
+    const dayEndMs = dayStartMs + 24 * 60 * 60 * 1000;
+    const wanted = new Set(input.userIds);
+    const rows = this.store.departmentMemberships
+      .filter(
+        (row) =>
+          row.organizationId === input.organizationId &&
+          wanted.has(row.userId) &&
+          row.validFromMs < dayEndMs &&
+          (row.validToMs === null || row.validToMs > dayStartMs),
+      )
+      .toSorted((left, right) => left.validFromMs - right.validFromMs);
+    return new Map(rows.map((row) => [row.userId, row.departmentId]));
   }
 
   async findOpenMemberships(input: {
     organizationId: string;
     userIds: readonly string[];
   }): Promise<{ userId: string; departmentId: string }[]> {
-    const onDay = await this.departmentsOnDay({ ...input, dayUtc: "" });
-    return [...onDay].map(([userId, departmentId]) => ({ userId, departmentId }));
+    const wanted = new Set(input.userIds);
+    return this.store.departmentMemberships
+      .filter(
+        (row) =>
+          row.organizationId === input.organizationId &&
+          wanted.has(row.userId) &&
+          row.validToMs === null,
+      )
+      .map(({ userId, departmentId }) => ({ userId, departmentId }));
   }
+
+  async recordMembership(input: {
+    organizationId: string;
+    userId: string;
+    departmentId: string | null;
+    at: Instant;
+  }): Promise<void> {
+    const open = this.store.departmentMemberships.find(
+      (row) =>
+        row.organizationId === input.organizationId &&
+        row.userId === input.userId &&
+        row.validToMs === null,
+    );
+    if (open?.departmentId === input.departmentId) return;
+
+    const nowMs = input.at.epochMilliseconds;
+    if (open) open.validToMs = nowMs;
+    if (input.departmentId !== null) {
+      this.store.departmentMemberships.push({
+        organizationId: input.organizationId,
+        userId: input.userId,
+        departmentId: input.departmentId,
+        validFromMs: nowMs,
+        validToMs: null,
+      });
+    }
+  }
+
 
   async create(input: { organizationId: string; name: string }): Promise<Department> {
     const now = toDate(nowInstant());
@@ -125,14 +163,6 @@ export class MemoryDepartmentRepository extends DepartmentRepository {
     if (index < 0) return false;
     this.store.departments.splice(index, 1);
     return true;
-  }
-
-  async assignUser(input: {
-    organizationId: string;
-    userId: string;
-    departmentId: string | null;
-  }): Promise<boolean> {
-    return this.assign(this.store.departmentOfUser, input.userId, input);
   }
 
   async assignTeam(input: {

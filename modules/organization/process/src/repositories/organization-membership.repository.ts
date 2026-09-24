@@ -331,6 +331,18 @@ export abstract class OrganizationMembershipRepository {
 
   abstract findMemberUsersIncludingDeactivated(input: { organizationId: string }): Promise<User[]>;
 
+  abstract findMembersWithDepartments(input: {
+    organizationId: string;
+  }): Promise<
+    { userId: string; departmentId: string | null; user: { name: string | null; email: string | null } }[]
+  >;
+
+  abstract assignMemberDepartment(input: {
+    organizationId: string;
+    userId: string;
+    departmentId: string | null;
+  }): Promise<boolean>;
+
   abstract findMemberDepartments(input: {
     organizationId: string;
     userIds: readonly string[];

@@ -1,4 +1,6 @@
 import { DepartmentAssignmentTargetNotFoundError } from "@langwatch/enterprise-governance-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   OrganizationUserRole,
   Prisma,
@@ -27,8 +29,22 @@ describe.skipIf(!databaseUrl)("DepartmentService", () => {
   const PROJECT_ID = `proj-${ns}`;
   const ROBIN = `usr-robin-${ns}`;
 
+  const members = createApiFixture<OrganizationApi>({
+    findMembersWithDepartments: ({ organizationId }) =>
+      prisma.organizationUser.findMany({
+        where: { organizationId },
+        select: { userId: true, departmentId: true, user: { select: { name: true, email: true } } },
+      }),
+    assignMemberDepartment: async ({ organizationId, userId, departmentId }) =>
+      (
+        await prisma.organizationUser.updateMany({
+          where: { organizationId, userId },
+          data: { departmentId },
+        })
+      ).count > 0,
+  });
   const service = () =>
-    DepartmentService.create({ repository: PrismaDepartmentRepository.create(prisma) });
+    DepartmentService.create({ repository: PrismaDepartmentRepository.create(prisma), members });
 
   beforeAll(async () => {
     await prisma.organization.createMany({

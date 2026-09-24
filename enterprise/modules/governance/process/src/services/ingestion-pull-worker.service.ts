@@ -557,10 +557,10 @@ export class IngestionPullWorkerService {
       const through = Math.max(...droppedPeriodsMs);
       const widened = {
         since: Temporal.Instant.fromEpochMilliseconds(
-          window.since ? Math.min(toEpochMs(window.since), since) : since,
+          window.since ? Math.min(window.since.epochMilliseconds, since) : since,
         ),
         through: Temporal.Instant.fromEpochMilliseconds(
-          window.through ? Math.max(toEpochMs(window.through), through) : through,
+          window.through ? Math.max(window.through.epochMilliseconds, through) : through,
         ),
       };
       this.diagnostics.warn(
@@ -579,7 +579,7 @@ export class IngestionPullWorkerService {
 
     const gapStart = window.since;
     if (!gapStart || recordedPeriodsMs.length === 0) return;
-    if (Math.min(...recordedPeriodsMs) > toEpochMs(gapStart)) return;
+    if (Math.min(...recordedPeriodsMs) > gapStart.epochMilliseconds) return;
     if (completeness === "truncated") {
       this.diagnostics.info(
         "a re-read reached back across the unpriced window but stopped short of its end; the window is kept",

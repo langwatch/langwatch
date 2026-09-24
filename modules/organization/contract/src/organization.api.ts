@@ -320,6 +320,18 @@ export interface OrganizationApi {
   getAllMembers(input: Readonly<{ organizationId: string }>): Promise<User[]>;
   /** Every member row, disabled and deactivated included: governance's identity match reads it. */
   findMembersIncludingDeactivated(input: Readonly<{ organizationId: string }>): Promise<User[]>;
+  /** Every member's department column with their name (main `department.service.ts:112-119`). */
+  findMembersWithDepartments(input: {
+    organizationId: string;
+  }): Promise<
+    { userId: string; departmentId: string | null; user: { name: string | null; email: string | null } }[]
+  >;
+  /** Points one member at a department, or clears it; false when no such member (main `department.service.ts:241-244`). */
+  assignMemberDepartment(input: {
+    organizationId: string;
+    userId: string;
+    departmentId: string | null;
+  }): Promise<boolean>;
   /** Each named member's department column (main `directoryDepartmentSync.service.ts:207-210`). */
   findMemberDepartments(input: {
     organizationId: string;

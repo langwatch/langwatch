@@ -43,9 +43,9 @@ describe("given the memory-backed governance repositories", () => {
       });
 
       await expect(
-        repositories.departments.assignUser({
+        repositories.departments.assignTeam({
           organizationId: "org-2",
-          userId: "user-1",
+          teamId: "team-1",
           departmentId: mine.id,
         }),
       ).resolves.toBe(false);

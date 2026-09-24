@@ -375,6 +375,31 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       .map((row) => toUser(this.userRow(row.userId)));
   }
 
+  async findMembersWithDepartments({ organizationId }: { organizationId: string }): Promise<
+    { userId: string; departmentId: string | null; user: { name: string | null; email: string | null } }[]
+  > {
+    return this.memory.organizationUsers
+      .filter((row) => row.organizationId === organizationId)
+      .map((row) => {
+        const { name, email } = this.userRow(row.userId);
+        return { userId: row.userId, departmentId: row.departmentId ?? null, user: { name, email } };
+      });
+  }
+
+  async assignMemberDepartment(input: {
+    organizationId: string;
+    userId: string;
+    departmentId: string | null;
+  }): Promise<boolean> {
+    const row = this.memory.organizationUsers.find(
+      (candidate) =>
+        candidate.organizationId === input.organizationId && candidate.userId === input.userId,
+    );
+    if (!row) return false;
+    row.departmentId = input.departmentId;
+    return true;
+  }
+
   async findMemberDepartments({
     organizationId,
     userIds,
