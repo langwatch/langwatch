@@ -6,6 +6,7 @@
  */
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
@@ -13,7 +14,7 @@ import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 const REACHED_TRANSACTION = "REACHED_TRANSACTION";
 
 function mockPrisma(overrides: { team?: unknown; project?: unknown }): PrismaClient {
-  return {
+  return prismaDouble({
     organizationUser: { findFirst: vi.fn().mockResolvedValue(null) },
     team: { findFirst: vi.fn().mockResolvedValue(overrides.team ?? null) },
     project: {
@@ -28,7 +29,7 @@ function mockPrisma(overrides: { team?: unknown; project?: unknown }): PrismaCli
     groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
     // If control reaches here, the guard let the scope through.
     $transaction: vi.fn().mockRejectedValue(new Error(REACHED_TRANSACTION)),
-  } as unknown as PrismaClient;
+  });
 }
 
 /**

@@ -1,8 +1,8 @@
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { createApp } from "@langwatch/kernel";
 import { MetricApi } from "@langwatch/metric-contract";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it, vi } from "vitest";
 
 import { metricServer } from "../../metric.server.ts";
@@ -11,15 +11,8 @@ import { metricServer } from "../../metric.server.ts";
  * The one member `MetricApp` declares reading (`reads: ["clickhouse"]`). This
  * suite prepares only, so the pipeline's own append repository is never reached.
  */
-function unreachableClickHouse(): ClickHouseQueryClient {
-  return new Proxy(
-    {},
-    {
-      get(_target, property) {
-        throw new Error(`This test did not expect to reach ClickHouse.${String(property)}`);
-      },
-    },
-  ) as unknown as ClickHouseQueryClient;
+function unreachableClickHouse() {
+  return clickHouseQueryClientDouble();
 }
 
 const GAUGE_REQUEST = {

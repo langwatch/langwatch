@@ -1,5 +1,6 @@
-import type { ClickHouseQueryClient, QueryRequest } from "@langwatch/clickhouse-client";
+import type { QueryRequest } from "@langwatch/clickhouse-client";
 import { RetroactiveMutationInProgressError } from "@langwatch/data-retention-contract";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
 import { ClickHouseRetroactiveRetentionRepository } from "../clickhouse.retroactive-retention.repository.ts";
@@ -12,7 +13,7 @@ import { ClickHouseRetroactiveRetentionRepository } from "../clickhouse.retroact
 function createRepository(rows: unknown) {
   const commands: QueryRequest[] = [];
   const queries: QueryRequest[] = [];
-  const clickhouse = {
+  const clickhouse = clickHouseQueryClientDouble({
     async command(request: QueryRequest): Promise<void> {
       commands.push(request);
     },
@@ -20,7 +21,7 @@ function createRepository(rows: unknown) {
       queries.push(request);
       return { rows: rows as unknown[] };
     },
-  } as unknown as ClickHouseQueryClient;
+  });
 
   return {
     commands,

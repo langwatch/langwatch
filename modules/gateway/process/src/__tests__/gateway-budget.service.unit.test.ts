@@ -1,4 +1,5 @@
 import { type GatewayBudget, Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { Temporal, nowInstant, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -53,7 +54,7 @@ function stubBudget(overrides: Partial<GatewayBudget> = {}): GatewayBudget {
 }
 
 function mockPrismaWithBudgets(budgets: GatewayBudget[]): PrismaClient {
-  return {
+  return prismaDouble({
     gatewayBudget: {
       findMany: async () => budgets,
     },
@@ -66,7 +67,7 @@ function mockPrismaWithBudgets(budgets: GatewayBudget[]): PrismaClient {
     virtualKeyScope: {
       findMany: async () => [],
     },
-  } as unknown as PrismaClient;
+  });
 }
 
 /**
@@ -352,11 +353,6 @@ describe("GatewayService.check", () => {
  * shape and human-friendly name — all seven under one describe.
  */
 describe("GatewayService.findDetailById", () => {
-  type Findable = {
-    findFirst: unknown;
-    findUnique: unknown;
-    findMany: unknown;
-  };
   // Scope-target resolution goes through the shared batch resolver
   // (scopeTargets.ts), which reads one findMany per scope kind. The row
   // for the budget's own scope kind carries the budget's scopeId so the
@@ -367,7 +363,7 @@ describe("GatewayService.findDetailById", () => {
   ): PrismaClient {
     const targetRows = budget && scopeRow ? [{ id: budget.scopeId, ...scopeRow }] : [];
     const rowsFor = (kind: string) => (budget?.scopeType === kind ? targetRows : []);
-    return {
+    return prismaDouble({
       gatewayBudget: {
         findFirst: vi.fn(async () => budget),
       },
@@ -392,7 +388,7 @@ describe("GatewayService.findDetailById", () => {
         // name/prefix for the scope-target resolver. Ledger VK-name join
         // and scope-reach ask for neither, so they still see nothing.
         findMany: vi.fn(
-          async (args?: { select?: { scopes?: unknown; displayPrefix?: unknown } }) => {
+          async (args?: { select?: { scopes?: unknown; displayPrefix?: unknown } | null }) => {
             if (args?.select?.scopes) {
               return rowsFor("VIRTUAL_KEY").map((r) => ({
                 ...r,
@@ -413,7 +409,7 @@ describe("GatewayService.findDetailById", () => {
       group: {
         findMany: vi.fn(async () => rowsFor("GROUP")),
       },
-    } as unknown as PrismaClient & Record<string, Findable>;
+    });
   }
 
   describe("when the budget does not exist", () => {

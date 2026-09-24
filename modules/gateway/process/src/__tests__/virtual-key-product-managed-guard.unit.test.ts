@@ -4,7 +4,7 @@
  * them, but that was presentation only — the service let every mutation through.
  */
 
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -33,14 +33,14 @@ function vkRow(purpose: "USER" | "LANGY") {
 }
 
 function mockPrisma(row: unknown, findMany = vi.fn().mockResolvedValue([])) {
-  return {
+  return prismaDouble({
     virtualKey: {
       findFirst: vi.fn().mockResolvedValue(row),
       findMany,
     },
     // Reaching here means the guard let the mutation through.
     $transaction: vi.fn().mockRejectedValue(new Error(REACHED_TRANSACTION)),
-  } as unknown as PrismaClient;
+  });
 }
 
 const mutationInput = {

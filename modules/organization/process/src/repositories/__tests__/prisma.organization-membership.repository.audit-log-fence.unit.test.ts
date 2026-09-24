@@ -4,7 +4,7 @@
 
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PrismaOrganizationMembershipRepository } from "../prisma/prisma.organization-membership.repository.ts";
@@ -15,12 +15,12 @@ const auditLogFindMany = vi.fn();
 const auditLogCount = vi.fn();
 const userFindMany = vi.fn();
 
-const prisma = {
+const prisma = prismaDouble({
   organizationUser: { findMany: organizationUserFindMany },
   project: { findMany: projectFindMany },
   auditLog: { findMany: auditLogFindMany, count: auditLogCount },
   user: { findMany: userFindMany },
-} as unknown as PrismaClient;
+});
 
 const writer = createApiFixture<AuthzGrantsService>();
 

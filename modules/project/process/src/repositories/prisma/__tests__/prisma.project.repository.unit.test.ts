@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -21,7 +21,7 @@ function repositoryWithQueries(options: {
     count: vi.fn(async () => options.alternatives ?? 0),
     findMany: vi.fn(async () => options.paths ?? []),
   };
-  const database = { project, team: {} } as unknown as PrismaClient;
+  const database = prismaDouble({ project });
   return { repository: PrismaProjectRepository.create({ prisma: database }), project };
 }
 
@@ -103,7 +103,7 @@ describe("PrismaProjectRepository.tryGetTraceDestination", () => {
   it("follows an archived stored pointer", async () => {
     const archived = { ...destination, archivedAt: new Date("2026-01-01T00:00:00.000Z") };
     const project = { findUnique: vi.fn(async () => archived) };
-    const database = { project, team: {} } as unknown as PrismaClient;
+    const database = prismaDouble({ project });
 
     await expect(
       PrismaProjectRepository.create({ prisma: database }).findTraceDestination(archived.id),
@@ -116,7 +116,7 @@ describe("PrismaProjectRepository.listTraceDestinations", () => {
     const first = { ...destination, id: "project_first" };
     const second = { ...destination, id: "project_second" };
     const project = { findMany: vi.fn(async () => [second, first]) };
-    const database = { project, team: {} } as unknown as PrismaClient;
+    const database = prismaDouble({ project });
 
     await expect(
       PrismaProjectRepository.create({ prisma: database }).findTraceDestinations([
@@ -135,7 +135,7 @@ describe("PrismaProjectRepository coding-agent activity", () => {
   ] as const)("throttles the %s clock independently", async (_name, field, method) => {
     const updateMany = vi.fn().mockResolvedValue({ count: 1 });
     const repository = PrismaProjectRepository.create({
-      prisma: { project: { updateMany }, team: {} } as unknown as PrismaClient,
+      prisma: prismaDouble({ project: { updateMany } }),
     });
     const at = new Date("2026-08-25T12:00:00.000Z");
     const staleBefore = new Date("2026-08-25T11:00:00.000Z");
@@ -164,7 +164,7 @@ describe("PrismaProjectRepository.findOrganizationId", () => {
       .mockResolvedValueOnce({ team: { organizationId: "org_1" } })
       .mockResolvedValueOnce(null);
     const repository = PrismaProjectRepository.create({
-      prisma: { project: { findUnique }, team: {} } as unknown as PrismaClient,
+      prisma: prismaDouble({ project: { findUnique } }),
     });
 
     await expect(repository.findOrganizationId("project_archived")).resolves.toBe("org_1");

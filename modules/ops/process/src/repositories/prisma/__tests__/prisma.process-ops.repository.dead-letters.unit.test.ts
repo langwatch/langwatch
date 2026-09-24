@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import { ProcessOpsPrismaRepository } from "../prisma.process-ops.repository.ts";
@@ -35,7 +35,7 @@ const deadRow = {
 const repoAnswering = (results: unknown[]) => {
   const queryRaw = vi.fn();
   for (const result of results) queryRaw.mockResolvedValueOnce(result);
-  const prisma = { $queryRaw: queryRaw } as unknown as PrismaClient;
+  const prisma = prismaDouble({ $queryRaw: queryRaw });
   return { repo: ProcessOpsPrismaRepository.create({ prisma }), queryRaw };
 };
 

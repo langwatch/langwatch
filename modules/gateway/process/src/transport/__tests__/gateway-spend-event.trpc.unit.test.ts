@@ -12,6 +12,8 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -102,19 +104,19 @@ const clickHouseQuery = vi.fn();
 
 /** A fake ClickHouse client answering one row of the spend ledger. */
 function fakeClickHouse(): ClickHouseQueryClient {
-  return {
+  return clickHouseQueryClientDouble({
     query: clickHouseQuery,
     insert: async () => {},
-  } as unknown as ClickHouseQueryClient;
+  });
 }
 
 /** A fake Prisma client answering the one virtual-key display-name lookup. */
 function fakePrisma(): PrismaClient {
-  return {
+  return prismaDouble({
     virtualKey: {
       findMany: async () => [{ id: "vk_1", name: "Customer A key", displayPrefix: "..." }],
     },
-  } as unknown as PrismaClient;
+  });
 }
 
 /** No handle is ever resolved through it in these tests. */

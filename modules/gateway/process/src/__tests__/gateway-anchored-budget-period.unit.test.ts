@@ -6,6 +6,7 @@
 
 import { computeBudgetPeriodFloorMs, effectiveBudgetPeriod } from "@langwatch/gateway-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -184,7 +185,7 @@ describe("GatewayService.create with a cycle anchor", () => {
   const REACHED_TRANSACTION = "REACHED_TRANSACTION";
 
   function mockPrisma(): PrismaClient {
-    return {
+    return prismaDouble({
       organizationUser: { findFirst: vi.fn().mockResolvedValue(null) },
       team: { findFirst: vi.fn().mockResolvedValue(null) },
       project: {
@@ -199,7 +200,7 @@ describe("GatewayService.create with a cycle anchor", () => {
       groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
       // Reaching here means the anchor was accepted.
       $transaction: vi.fn().mockRejectedValue(new Error(REACHED_TRANSACTION)),
-    } as unknown as PrismaClient;
+    });
   }
 
   /**

@@ -2,6 +2,7 @@
  * @vitest-environment node
  */
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it } from "vitest";
 
 import { PrismaEvaluatorRepository } from "../prisma.evaluator.repository.ts";
@@ -38,7 +39,7 @@ function fakeDatabase(overrides: EvaluatorDelegate = {}): {
     },
     ...overrides,
   };
-  return { database: { evaluator } as unknown as PrismaClient, created };
+  return { database: prismaDouble({ evaluator }), created };
 }
 
 const persistInput = (overrides: { id?: string; projectId?: string; name: string }) => ({

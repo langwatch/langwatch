@@ -3,7 +3,7 @@
  * Tests correction row writes: dual-constraint upserts can race into duplicate inserts.
  */
 
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { Temporal } from "@langwatch/time";
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -38,9 +38,9 @@ describe("saving a correction", () => {
     it("retries the losing insert as an update", async () => {
       const upsert = vi.fn().mockRejectedValueOnce(uniqueViolation());
       const update = vi.fn().mockResolvedValue(row);
-      const repository = PrismaTraceEditOverlayRepository.create({
-        traceEditOverlay: { upsert, update },
-      } as unknown as PrismaClient);
+      const repository = PrismaTraceEditOverlayRepository.create(
+        prismaDouble({ traceEditOverlay: { upsert, update } }),
+      );
 
       const saved = await repository.upsert({
         projectId: "project-1",
@@ -70,9 +70,9 @@ describe("saving a correction", () => {
     it("surfaces the failure instead of retrying", async () => {
       const upsert = vi.fn().mockRejectedValue(new Error("connection lost"));
       const update = vi.fn();
-      const repository = PrismaTraceEditOverlayRepository.create({
-        traceEditOverlay: { upsert, update },
-      } as unknown as PrismaClient);
+      const repository = PrismaTraceEditOverlayRepository.create(
+        prismaDouble({ traceEditOverlay: { upsert, update } }),
+      );
 
       await expect(
         repository.upsert({

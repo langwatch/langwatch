@@ -2,7 +2,7 @@
 
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaOrganizationMembershipRepository } from "../prisma/prisma.organization-membership.repository.ts";
@@ -16,29 +16,27 @@ const expectedPurgeWhere = (model: string): Record<string, string> => {
 };
 
 function purgingPrisma() {
-  const deletions: { model: string; where: Record<string, unknown> }[] = [];
-  const deleteManyFor = (model: string) =>
-    vi.fn(({ where }: { where: Record<string, unknown> }) => {
-      deletions.push({ model, where });
+  const deletions: { model: string; where: unknown }[] = [];
+  const deleting = (model: string) => ({
+    deleteMany: vi.fn((args?: { where?: unknown }) => {
+      deletions.push({ model, where: args?.where });
       return { model };
-    });
-  const models = [
-    "roleBinding",
-    "grantUsage",
-    "grant",
-    "role",
-    "systemMigrationTenantState",
-    "systemMigrationEnrollment",
-    "apiKey",
-    "promptTag",
-    "team",
-    "organization",
-  ];
-  const transaction = vi.fn((operations: unknown[]) => Promise.resolve(operations));
-  const prisma = {
-    ...Object.fromEntries(models.map((model) => [model, { deleteMany: deleteManyFor(model) }])),
+    }),
+  });
+  const transaction = vi.fn((operations: unknown) => Promise.resolve(operations));
+  const prisma = prismaDouble({
+    roleBinding: deleting("roleBinding"),
+    grantUsage: deleting("grantUsage"),
+    grant: deleting("grant"),
+    role: deleting("role"),
+    systemMigrationTenantState: deleting("systemMigrationTenantState"),
+    systemMigrationEnrollment: deleting("systemMigrationEnrollment"),
+    apiKey: deleting("apiKey"),
+    promptTag: deleting("promptTag"),
+    team: deleting("team"),
+    organization: deleting("organization"),
     $transaction: transaction,
-  } as unknown as PrismaClient;
+  });
   return { prisma, deletions, transaction };
 }
 

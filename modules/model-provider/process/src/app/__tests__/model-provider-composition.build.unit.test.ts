@@ -10,6 +10,7 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
@@ -86,17 +87,13 @@ function createFullModelProviderTestOrganizations(): OrganizationApi {
   });
 }
 
-/**
- * The `redis` member, faked to the three calls this module's connection
- * counter makes — not a full `RedisConnection`, since nothing here reaches
- * `testConnection`. Same "narrow double" idiom as `modules/agent`'s.
- */
+/** The `redis` member, scripted to the three calls this module's connection counter makes. */
 function fakeRedis(): RedisConnection {
-  return {
+  return redisDouble({
     incr: async () => 1,
     expire: async () => 1,
     ttl: async () => 0,
-  } as unknown as RedisConnection;
+  });
 }
 
 /**

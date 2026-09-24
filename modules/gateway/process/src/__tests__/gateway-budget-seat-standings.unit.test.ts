@@ -6,6 +6,7 @@
 
 import { nanoUsdToDecimalString, usdToNanoUsd } from "@langwatch/gateway-contract";
 import { type GatewayBudget, Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import { type BucketSpend } from "../app/gateway.members.ts";
@@ -58,13 +59,13 @@ function bucketsOf(...spends: string[]): BucketSpend[] {
 }
 
 function mockPrisma(budgets: GatewayBudget[], boundaries: unknown[] = []) {
-  return {
+  return prismaDouble({
     gatewayBudget: { findMany: async () => budgets },
     project: { findMany: async () => [{ id: "project_01" }] },
     gatewayBudgetBucketBoundary: { findMany: async () => boundaries },
     // Scope reach rides along on the health-decorated list paths.
     virtualKey: { findMany: async () => [] },
-  } as unknown as PrismaClient;
+  });
 }
 
 /**

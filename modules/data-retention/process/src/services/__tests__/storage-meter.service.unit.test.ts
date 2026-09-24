@@ -1,12 +1,13 @@
-import type { ClickHouseQueryClient, QueryRequest } from "@langwatch/clickhouse-client";
+import type { QueryRequest } from "@langwatch/clickhouse-client";
 import { PRODUCTION_STORAGE_METER_TABLES } from "@langwatch/data-retention-contract/retention-tables";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it, vi } from "vitest";
 
 import { StorageMeterService } from "../storage-meter.service.ts";
 
 /** The process's one ClickHouse client, stood in for by its `query`. */
-function clientOf(query: unknown): ClickHouseQueryClient {
-  return { query } as unknown as ClickHouseQueryClient;
+function clientOf(query: (request: QueryRequest) => unknown) {
+  return clickHouseQueryClientDouble({ query });
 }
 
 describe("StorageMeterService memory guard", () => {

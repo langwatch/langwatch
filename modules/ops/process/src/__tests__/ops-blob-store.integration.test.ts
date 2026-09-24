@@ -8,8 +8,8 @@ import {
   LEGACY_HOLDER_LEASE_GUARD,
   redisBlobKey,
 } from "@langwatch/group-queue/operational";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import type { UserApi } from "@langwatch/user-contract";
 import Redis, { type Redis as RedisClient } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -166,10 +166,10 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
     if (!redisUrl) return;
     redis = new Redis(redisUrl);
     ops = OpsOperations.create({
-      database: {
+      database: prismaDouble({
         user: { findUnique: async () => null },
         session: { update: async () => ({}) },
-      } as unknown as PrismaClient,
+      }),
       adminEmails: [],
       audit: { record: async () => undefined },
       auditLog: createApiFixture<AuditLogApi>(),

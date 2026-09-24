@@ -2,11 +2,8 @@
 
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import {
-  OrganizationUserRole,
-  type Prisma,
-  type PrismaClient,
-} from "@langwatch/prisma-client/generated";
+import { OrganizationUserRole } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PrismaOrganizationMembershipRepository } from "../prisma/prisma.organization-membership.repository.ts";
@@ -22,7 +19,7 @@ const projectUpdateMany = vi.fn();
 const roleBindingFindMany = vi.fn();
 const queryRaw = vi.fn();
 
-const transactionClient = {
+const transactionScript = {
   organizationUser: {
     findUnique: memberFindUnique,
     count: memberCount,
@@ -34,13 +31,14 @@ const transactionClient = {
   project: { updateMany: projectUpdateMany },
   roleBinding: { findMany: roleBindingFindMany },
   $queryRaw: queryRaw,
-} as unknown as Prisma.TransactionClient;
+};
 
-const prisma = {
-  ...transactionClient,
-  $transaction: (run: (tx: Prisma.TransactionClient) => Promise<unknown>): Promise<unknown> =>
-    run(transactionClient),
-} as unknown as PrismaClient;
+const transactionClient = prismaDouble(transactionScript);
+
+const prisma = prismaDouble({
+  ...transactionScript,
+  $transaction: (run) => run(transactionClient),
+});
 
 const attachBindings = vi.fn();
 const changeBindingRole = vi.fn();

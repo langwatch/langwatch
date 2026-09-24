@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaOrganizationRepository } from "../prisma.organization.repository.ts";
@@ -6,9 +6,9 @@ import { PrismaOrganizationRepository } from "../prisma.organization.repository.
 describe("PrismaOrganizationRepository settings", () => {
   it("preserves partial-update semantics and persists columns as given", async () => {
     const update = vi.fn().mockResolvedValue(void 0);
-    const repository = PrismaOrganizationRepository.create({
-      organization: { update },
-    } as unknown as PrismaClient);
+    const repository = PrismaOrganizationRepository.create(
+      prismaDouble({ organization: { update } }),
+    );
 
     // The service encrypts before calling this: the repository stores
     // exactly the strings it is handed, never deciding what they mean.
@@ -50,9 +50,9 @@ describe("PrismaOrganizationRepository settings", () => {
       createdAt: new Date(1),
       updatedAt: new Date(2),
     });
-    const repository = PrismaOrganizationRepository.create({
-      organization: { findUnique },
-    } as unknown as PrismaClient);
+    const repository = PrismaOrganizationRepository.create(
+      prismaDouble({ organization: { findUnique } }),
+    );
 
     await expect(repository.findStoredSettings("organization")).resolves.toMatchObject({
       s3Endpoint: "encrypted:https://storage.example.com",

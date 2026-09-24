@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SystemMigration } from "@langwatch/system-migrations";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PrismaSystemMigrationEnrollmentRepository } from "../../repositories/prisma/prisma.system-migration-enrollment.repository.ts";
@@ -47,8 +48,8 @@ function stubDatabase({
   enrollments: { organizationId: string; migrationName: string }[];
   memberships: Record<string, string[]>;
 }) {
-  const findUnique = vi.fn(async (args: { where: { id: string } }) => {
-    const organizationIds = memberships[args.where.id];
+  const findUnique = vi.fn(async (args: { where: { id?: string } }) => {
+    const organizationIds = memberships[args.where.id ?? ""];
     return organizationIds
       ? { orgMemberships: organizationIds.map((organizationId) => ({ organizationId })) }
       : null;
@@ -61,7 +62,7 @@ function stubDatabase({
     findMany,
     projectFindMany,
     projectOrganization,
-    database: {
+    database: prismaDouble({
       systemMigrationEnrollment: { findMany: vi.fn().mockResolvedValue(enrollments) },
       // Both legs page their tenants before claiming any, through the walk
       // that skips tenants already terminal for every migration the pass
@@ -71,7 +72,7 @@ function stubDatabase({
       project: { findMany: projectFindMany, findUniqueOrThrow: projectOrganization },
       user: { findMany: vi.fn().mockResolvedValue([]), findUnique },
       organizationUser: { findMany },
-    } as unknown as PrismaClient,
+    }),
   };
 }
 
@@ -190,13 +191,13 @@ describe("OpsSystemMigrations", () => {
     /** @scenario Enrolling an organization takes effect on the next pass */
     it("reads enrollment fresh on each pass rather than caching the first answer", async () => {
       const enrollmentReads = vi.fn().mockResolvedValue([]);
-      const database = {
+      const database = prismaDouble({
         systemMigrationEnrollment: { findMany: enrollmentReads },
         $queryRaw: vi.fn().mockResolvedValue([]),
         organization: { findMany: vi.fn().mockResolvedValue([]) },
         user: { findMany: vi.fn().mockResolvedValue([]) },
         organizationUser: { findFirst: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
-      } as unknown as PrismaClient;
+      });
       const { adapter } = adapterOn(database);
 
       await adapter.runPass({});

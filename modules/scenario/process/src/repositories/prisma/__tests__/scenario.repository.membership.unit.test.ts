@@ -1,7 +1,7 @@
 /**
  * @see specs/suites/test-suite-membership-invariant.feature
  */
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaScenarioRepository } from "../scenario.repository.ts";
@@ -38,7 +38,7 @@ function transactionDouble(members: { id: string }[]) {
   const scenarioFindMany = vi.fn(async () => members);
   const suiteUpdate = vi.fn(async () => ({}));
   const executeRaw = vi.fn(async () => 0);
-  const transaction = {
+  const transaction = prismaDouble({
     $executeRaw: executeRaw,
     scenario: {
       create: vi.fn(async () => scenarioRow()),
@@ -55,12 +55,10 @@ function transactionDouble(members: { id: string }[]) {
       })),
       update: suiteUpdate,
     },
-  };
+  });
 
   return {
-    database: {
-      $transaction: async (work: (tx: unknown) => Promise<unknown>) => work(transaction),
-    } as unknown as PrismaClient,
+    database: prismaDouble({ $transaction: async (work) => work(transaction) }),
     scenarioFindMany,
     suiteUpdate,
     executeRaw,

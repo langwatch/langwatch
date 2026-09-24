@@ -1,4 +1,5 @@
-import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { OrganizationUserRole } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PrismaUsageMembershipRepository } from "../prisma.usage-membership.repository.ts";
@@ -47,7 +48,7 @@ describe("PrismaUsageMembershipRepository", () => {
 
   beforeEach(() => {
     mockPrisma = createMockPrisma();
-    repository = PrismaUsageMembershipRepository.create(mockPrisma as unknown as PrismaClient);
+    repository = PrismaUsageMembershipRepository.create(prismaDouble(mockPrisma));
   });
 
   describe("when getting the member count", () => {

@@ -1,5 +1,5 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaModelCostCatalogRepository } from "../../../model-provider.server.ts";
@@ -55,7 +55,7 @@ function catalogue(options: { project?: unknown } = {}) {
     findMany,
     projects,
     built: PrismaModelCostCatalogRepository.create({
-      database: { customLLMModelCost: { findMany } } as unknown as PrismaClient,
+      database: prismaDouble({ customLLMModelCost: { findMany } }),
       projects: projects as never,
     }).build(),
   };

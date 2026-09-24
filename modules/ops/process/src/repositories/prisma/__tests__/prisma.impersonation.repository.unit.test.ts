@@ -1,5 +1,5 @@
 import { guardOrganizationId } from "@langwatch/prisma-client";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaImpersonationRepository } from "../prisma.admin.repository.ts";
@@ -18,11 +18,11 @@ function stubDatabase({ row, session }: { row: unknown; session?: unknown }) {
   return {
     userFindUnique,
     organizationUserFindMany,
-    database: {
+    database: prismaDouble({
       user: { findUnique: userFindUnique },
       session: { findUnique: sessionFindUnique },
       organizationUser: { findMany: organizationUserFindMany },
-    } as unknown as PrismaClient,
+    }),
   };
 }
 

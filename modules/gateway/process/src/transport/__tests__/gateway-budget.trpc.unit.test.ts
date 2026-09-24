@@ -12,6 +12,8 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -117,19 +119,20 @@ const clickHouseQuery = vi.fn(async (input: { sql: string }) => {
 
 /** A fake ClickHouse client answering the budget spend + per-person bucket reads. */
 function fakeClickHouse(): ClickHouseQueryClient {
-  return {
+  return clickHouseQueryClientDouble({
     query: clickHouseQuery,
     insert: async () => {},
-  } as unknown as ClickHouseQueryClient;
+  });
 }
 
-const virtualKeyFindMany = vi.fn(async (args: { where: { id?: { in: string[] } } }) => {
+const virtualKeyFindMany = vi.fn(async (args?: { where?: { id?: unknown } }) => {
   // The attributed-user anchor lookup names the ids it wants; the scope-reach
   // candidate walk (below every `listWithHealth`) names none - no active keys
   // is a legitimate answer there, since no test needs a reach fact.
-  if (!args.where.id) return [];
+  const id = args?.where?.id;
+  if (!id) return [];
 
-  const requestedIds = args.where.id.in;
+  const requestedIds = typeof id === "object" && "in" in id && Array.isArray(id.in) ? id.in : [];
   return requestedIds.includes(ANCHOR_VK_ID)
     ? [{ id: ANCHOR_VK_ID, name: "prod-openai", displayPrefix: "lw_sk_ab" }]
     : [];
@@ -137,12 +140,12 @@ const virtualKeyFindMany = vi.fn(async (args: { where: { id?: { in: string[] } }
 
 /** A fake Prisma client answering the budget row, its bucket boundaries and its scope anchor. */
 function fakePrisma(budgets: Record<string, unknown>[]): PrismaClient {
-  return {
+  return prismaDouble({
     organization: { findUnique: async () => ({ id: ORG_ID }) },
     gatewayBudget: { findMany: async () => budgets },
     gatewayBudgetBucketBoundary: { findMany: async () => [] },
     virtualKey: { findMany: virtualKeyFindMany },
-  } as unknown as PrismaClient;
+  });
 }
 
 function projectsStub(overrides: Partial<ProjectApi>): ProjectApi {
