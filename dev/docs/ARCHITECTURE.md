@@ -147,8 +147,10 @@ is exactly the API's operations. The word "App" is retired inside modules.
 The internal grammar (enforced by the linter — the grammar file, not this
 document, is the authority on filenames):
 
-- `services/` — one class per entity over repository interfaces. A service
-  never opens a channel and never names a peer API.
+- `services/` — one class per entity over repository interfaces, channels and
+  narrow peer slices (`Pick<PeerApi, …>`) the module class hands it from its
+  `static dependencies` (Alex, 2026-09-25). A service never opens a channel or
+  a client itself, and never declares a peer — only the module class does.
 - `repositories/` — interfaces at the top; `prisma/` and `memory/` backends
   below; the registry offers both via `defineRepositories({ live, memory })`.
   Only `repositories/prisma/**` names Prisma, through
