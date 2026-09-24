@@ -94,7 +94,7 @@ describe("LangyTurnErrors.fromFrame", () => {
         expect(error).toBeInstanceOf(LangyModelNotConfiguredError);
         const serialized = JSON.parse(LangyTurnErrors.serialize(error)) as Record<string, unknown>;
         expect(serialized.kind).toBe("langy_model_not_configured");
-        // The chain persists losslessly: herr ⇄ HandledError, one model.
+        // The chain persists; a reason carries no trace id — the envelope holds the one pair.
         expect(serialized.reasons).toEqual([
           {
             code: "no_provider_configured",
@@ -102,7 +102,6 @@ describe("LangyTurnErrors.fromFrame", () => {
             kind: "no_provider_configured",
             fault: "customer",
             retryable: false,
-            traceId: "0af7651916cd43dd8448eb211c80319c",
             meta: {
               http_status: 400,
               message:

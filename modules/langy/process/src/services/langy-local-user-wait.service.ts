@@ -4,7 +4,9 @@
  * share one terminal.
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import {
+  LangyLocalRecordNotFoundError,
   LangyLocalRecordUnreadableError,
   type LangyPermissionAnswerSource,
   CALL_POLL_HOLD_MS,
@@ -291,10 +293,13 @@ export class UserWaitService {
     const ids = await this.store.zrangebyscore(turnWaitsKey(conversationId, turnId), 0);
     const pending: StoredUserWait[] = [];
     for (const id of ids) {
-      let wait: StoredUserWait | null;
+      let wait: StoredUserWait;
       try {
-        wait = await this.read(id);
+        wait = await this.getWait(id);
       } catch (error) {
+        if (HandledError.isHandled(error) && error.code === "langy_local_record_not_found") {
+          continue;
+        }
         if (!(error instanceof LangyLocalRecordUnreadableError)) {
           throw error;
         }
@@ -303,7 +308,7 @@ export class UserWaitService {
         continue;
       }
 
-      if (wait?.state === "pending") {
+      if (wait.state === "pending") {
         pending.push(wait);
       }
     }
@@ -312,14 +317,14 @@ export class UserWaitService {
   }
 
   /**
-   * The stored wait, or null once its key has expired. A blob we wrote that no
-   * longer decodes is corruption rather than absence, so it raises under a code
-   * that tells the person at the command line to ask for the change again.
+   * The stored wait; `langy_local_record_not_found` once its key has expired. A blob
+   * we wrote that no longer decodes is corruption rather than absence, so it raises
+   * under a code that tells the person at the command line to ask for the change again.
    */
-  async read(waitId: string): Promise<StoredUserWait | null> {
+  async getWait(waitId: string): Promise<StoredUserWait> {
     const raw = await this.store.tryGet(waitKey(waitId));
     if (!raw) {
-      return null;
+      throw new LangyLocalRecordNotFoundError();
     }
 
     try {
@@ -333,7 +338,12 @@ export class UserWaitService {
 
   /** The wait, with its budget applied: a card past its time reads expired. */
   private async readSettlingExpiry(waitId: string): Promise<StoredUserWait | null> {
-    const wait = await this.read(waitId);
+    const wait = await this.getWait(waitId).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "langy_local_record_not_found") {
+        return null;
+      }
+      throw error;
+    });
     if (!wait) {
       return null;
     }

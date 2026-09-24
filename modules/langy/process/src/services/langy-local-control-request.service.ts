@@ -4,6 +4,7 @@
  * 15-minute self-carried expiry.
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { Temporal, nowInstant } from "@langwatch/time";
@@ -18,6 +19,7 @@ import {
   CONTROL_REQUEST_TTL_MS,
   SHARE_CONTROL_COMMAND,
   type ControlRequest,
+  LangyLocalRecordNotFoundError,
   LangyLocalRecordUnreadableError,
   LangyLocalRequestExpiredError,
   LangyLocalRequestInvalidError,
@@ -211,19 +213,18 @@ export class ControlRequestService {
     const ids = await this.store.zrangebyscore(key, now);
     const requests: StoredControlRequest[] = [];
     for (const id of ids) {
-      let request: StoredControlRequest | null;
+      let request: StoredControlRequest;
       try {
-        request = await this.read(id);
+        request = await this.getRequest(id);
       } catch (error) {
+        if (HandledError.isHandled(error) && error.code === "langy_local_record_not_found") {
+          continue;
+        }
         if (!(error instanceof LangyLocalRecordUnreadableError)) {
           throw error;
         }
 
         logger.warn({ requestId: id }, "skipping unreadable control request");
-        continue;
-      }
-
-      if (!request) {
         continue;
       }
 
@@ -256,14 +257,14 @@ export class ControlRequestService {
   }
 
   /**
-   * The conversation one minted key controls, or nothing when it controls none.
-   * A binding we wrote that no longer decodes is corruption, so it raises under
-   * a code rather than reading back as a key that controls nothing.
+   * The conversation one minted key controls; `langy_local_record_not_found` when it
+   * controls none. A binding we wrote that no longer decodes is corruption, so it
+   * raises under a code rather than reading back as a key that controls nothing.
    */
-  async readKeyBinding(apiKeyId: string): Promise<SessionKeyBinding | null> {
+  async getKeyBinding(apiKeyId: string): Promise<SessionKeyBinding> {
     const raw = await this.store.tryGet(sessionKeyBindingKey(apiKeyId));
     if (!raw) {
-      return null;
+      throw new LangyLocalRecordNotFoundError();
     }
 
     try {
@@ -277,7 +278,12 @@ export class ControlRequestService {
 
   /** Drops the binding, so the key stops answering for the conversation. */
   async revokeKeyBinding(apiKeyId: string): Promise<void> {
-    const binding = await this.readKeyBinding(apiKeyId);
+    const binding = await this.getKeyBinding(apiKeyId).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "langy_local_record_not_found") {
+        return null;
+      }
+      throw error;
+    });
     await this.store.del(sessionKeyBindingKey(apiKeyId));
     if (binding) {
       await this.store.zrem(conversationKeyBindingsKey(binding.conversationId), apiKeyId);
@@ -301,14 +307,14 @@ export class ControlRequestService {
   }
 
   /**
-   * The stored request, or null once its key has expired. A blob we wrote that
-   * no longer decodes is corruption rather than absence, so it raises under a
-   * code that tells the person to ask for the code change again.
+   * The stored request; `langy_local_record_not_found` once its key has expired. A
+   * blob we wrote that no longer decodes is corruption rather than absence, so it
+   * raises under a code that tells the person to ask for the code change again.
    */
-  async read(requestId: string): Promise<StoredControlRequest | null> {
+  async getRequest(requestId: string): Promise<StoredControlRequest> {
     const raw = await this.store.tryGet(controlRequestKey(requestId));
     if (!raw) {
-      return null;
+      throw new LangyLocalRecordNotFoundError();
     }
 
     try {
@@ -417,14 +423,15 @@ export class ControlRequestService {
     userId: string;
     projectId?: string;
   }): Promise<StoredControlRequest> {
-    const request = await this.read(requestId);
+    const request = await this.getRequest(requestId).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "langy_local_record_not_found") {
+        throw new LangyLocalRequestInvalidError({ requestId });
+      }
+      throw error;
+    });
     // A request that belongs to somebody else answers exactly like one that
     // never existed, so the id cannot be used to probe another person's chat.
-    if (
-      !request ||
-      request.userId !== userId ||
-      (projectId !== undefined && request.projectId !== projectId)
-    ) {
+    if (request.userId !== userId || (projectId !== undefined && request.projectId !== projectId)) {
       throw new LangyLocalRequestInvalidError({ requestId });
     }
 

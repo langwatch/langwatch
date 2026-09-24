@@ -73,6 +73,20 @@ export class LangyLocalRecordUnreadableError extends HandledError {
   }
 }
 
+/** A record local control wrote — a call, a card, a request, a key binding — that has lapsed. */
+export class LangyLocalRecordNotFoundError extends HandledError {
+  declare readonly code: "langy_local_record_not_found";
+
+  constructor() {
+    super(
+      "langy_local_record_not_found",
+      "Langy has no record of this local request any more. Ask Langy for the code change again to start a new one.",
+      { httpStatus: 404, fault: "customer" },
+    );
+    this.name = "LangyLocalRecordNotFoundError";
+  }
+}
+
 /** The request was real, and its fifteen minutes are over. */
 export class LangyLocalRequestExpiredError extends HandledError {
   declare readonly code: "langy_local_request_expired";

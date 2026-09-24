@@ -44,6 +44,7 @@ describe("LangyTitleGeneratorService", () => {
       }).generator();
 
       await expect(generate(args)).resolves.toEqual({
+        outcome: "generated",
         title: "Instrument traces with LangWatch",
         model: "openai/gpt-5-mini",
       });
@@ -93,7 +94,7 @@ describe("LangyTitleGeneratorService", () => {
         }),
       }).generator();
 
-      await expect(generate(args)).resolves.toBeNull();
+      await expect(generate(args)).resolves.toEqual({ outcome: "unchanged" });
       expect(generateText).not.toHaveBeenCalled();
     });
   });
@@ -106,7 +107,7 @@ describe("LangyTitleGeneratorService", () => {
         models: resolver(() => ({ modelId: "openai/gpt-5-mini" })),
       }).generator();
 
-      await expect(generate(args)).resolves.toBeNull();
+      await expect(generate(args)).resolves.toEqual({ outcome: "unchanged" });
       expect(generateText).not.toHaveBeenCalled();
     });
   });
@@ -119,7 +120,7 @@ describe("LangyTitleGeneratorService", () => {
         models: resolver(() => ({ modelId: "openai/gpt-5-mini" })),
       }).generator();
 
-      await expect(generate(args)).resolves.toBeNull();
+      await expect(generate(args)).resolves.toEqual({ outcome: "unchanged" });
     });
   });
 });

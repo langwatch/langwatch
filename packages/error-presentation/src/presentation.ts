@@ -3721,6 +3721,10 @@ const presentations = {
     describe: () =>
       "Langy has no folder to work in. Run `npx langwatch@latest langy --share-control` in the folder you want it to change, then approve the request in the terminal.",
   },
+  langy_local_record_not_found: {
+    title: "Langy has no record of this request",
+    describe: () => "It has lapsed. Ask Langy for the code change again to start a new one.",
+  },
   langy_local_record_unreadable: {
     title: "Langy can't read this request any more",
     describe: () => "Ask Langy for the code change again to start a new one.",

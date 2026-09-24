@@ -462,7 +462,12 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   .handle(async ({ app, input, request, response, signal }, members) => {
     const auth = await resolveLocalCaller({ request, members });
     const runtime = members.runtime();
-    const wait = await runtime.waits.read(input.id);
+    const wait = await runtime.waits.getWait(input.id).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "langy_local_record_not_found") {
+        return null;
+      }
+      throw error;
+    });
     if (!wait || wait.projectId !== auth.projectId) return response.write(HONO_NOT_FOUND);
     await conversation({
       app,

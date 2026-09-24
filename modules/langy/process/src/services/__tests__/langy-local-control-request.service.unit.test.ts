@@ -87,7 +87,9 @@ describe("given a code access card that asked for a folder", () => {
 
       const open = await service.listOpen({ projectId, userId });
       expect(open.map((row) => row.id).toSorted()).toEqual([second.id, other.id].toSorted());
-      expect(await service.read(first.id)).toBeNull();
+      await expect(service.getRequest(first.id)).rejects.toMatchObject({
+        code: "langy_local_record_not_found",
+      });
       await expect(
         service.approve({ requestId: first.id, userId, projectId }),
       ).rejects.toMatchObject({ code: "langy_local_request_invalid" });
@@ -124,7 +126,7 @@ describe("given a code access card that asked for a folder", () => {
         projectId,
         organizationId: "org_1",
       });
-      const binding = await service.readKeyBinding(approved.apiKeyId);
+      const binding = await service.getKeyBinding(approved.apiKeyId);
       expect(binding).toMatchObject({ conversationId, projectId, userId });
       expect(approved.projectSlug).toBe("acme-shop");
 
@@ -150,7 +152,7 @@ describe("given a code access card that asked for a folder", () => {
         projectId,
         organizationId: "org_1",
       });
-      expect(await service.readKeyBinding(approved.apiKeyId)).toMatchObject({ projectId });
+      expect(await service.getKeyBinding(approved.apiKeyId)).toMatchObject({ projectId });
       expect(approved.projectSlug).toBe("acme-shop");
     });
 
@@ -212,7 +214,9 @@ describe("given a code access card that asked for a folder", () => {
 
       await service.revokeKeyBinding(approved.apiKeyId);
 
-      expect(await service.readKeyBinding(approved.apiKeyId)).toBeNull();
+      await expect(service.getKeyBinding(approved.apiKeyId)).rejects.toMatchObject({
+        code: "langy_local_record_not_found",
+      });
     });
 
     /** @scenario "Disconnecting revokes the key even when the command line cannot be reached" */
@@ -229,7 +233,9 @@ describe("given a code access card that asked for a folder", () => {
       const revoked = await service.revokeConversationBindings(conversationId);
 
       expect(revoked).toEqual([approved.apiKeyId]);
-      expect(await service.readKeyBinding(approved.apiKeyId)).toBeNull();
+      await expect(service.getKeyBinding(approved.apiKeyId)).rejects.toMatchObject({
+        code: "langy_local_record_not_found",
+      });
       expect(await service.revokeConversationBindings(conversationId)).toEqual([]);
     });
   });

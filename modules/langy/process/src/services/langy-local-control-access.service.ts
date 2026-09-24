@@ -1,4 +1,5 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { LangyLocalRequestInvalidError } from "@langwatch/langy-contract";
 
 import type {
@@ -16,14 +17,14 @@ export type ControlRequestPermission = "langy:view" | "langy:create";
  */
 export class ControlRequestAccessService {
   static create(deps: {
-    requests: Pick<ControlRequestService, "listOpen" | "read">;
+    requests: Pick<ControlRequestService, "listOpen" | "getRequest">;
     permissions: Pick<AuthzApi, "getDecision">;
   }): ControlRequestAccessService {
     return new ControlRequestAccessService(deps.requests, deps.permissions);
   }
 
   private constructor(
-    private readonly requests: Pick<ControlRequestService, "listOpen" | "read">,
+    private readonly requests: Pick<ControlRequestService, "listOpen" | "getRequest">,
     private readonly permissions: Pick<AuthzApi, "getDecision">,
   ) {}
 
@@ -63,8 +64,13 @@ export class ControlRequestAccessService {
     userId: string;
     permission: ControlRequestPermission;
   }): Promise<StoredControlRequest> {
-    const request = await this.requests.read(requestId);
-    if (!request || request.userId !== userId) {
+    const request = await this.requests.getRequest(requestId).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "langy_local_record_not_found") {
+        throw new LangyLocalRequestInvalidError({ requestId });
+      }
+      throw error;
+    });
+    if (request.userId !== userId) {
       throw new LangyLocalRequestInvalidError({ requestId });
     }
     const permitted = await this.permittedOn({

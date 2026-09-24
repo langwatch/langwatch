@@ -924,7 +924,7 @@ describe("given a folder shared with the conversation", () => {
       });
 
       await expect
-        .poll(() => podA.runtime.waits.read(waitId), { timeout: 5_000 })
+        .poll(() => podA.runtime.waits.getWait(waitId), { timeout: 5_000 })
         .toMatchObject({
           state: "answered",
           decision: "allow_pattern",
@@ -959,7 +959,7 @@ describe("given a folder shared with the conversation", () => {
       // Nothing to poll for on a frame that changes nothing, so the assertion
       // waits out the round trip the frame would have needed.
       await new Promise((resolve) => setTimeout(resolve, 500));
-      expect(await podA.runtime.waits.read(waitId)).toMatchObject({
+      expect(await podA.runtime.waits.getWait(waitId)).toMatchObject({
         state: "answered",
         decision: "allow_once",
         source: "panel",

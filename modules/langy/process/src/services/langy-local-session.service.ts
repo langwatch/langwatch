@@ -225,7 +225,12 @@ export class LocalControlSessionCoreService {
       };
     }
 
-    const binding = await this.requests.readKeyBinding(resolved.apiKeyId);
+    const binding = await this.requests.getKeyBinding(resolved.apiKeyId).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "langy_local_record_not_found") {
+        return null;
+      }
+      throw error;
+    });
     if (!binding || binding.projectId !== resolved.project.id) {
       return {
         ok: false,

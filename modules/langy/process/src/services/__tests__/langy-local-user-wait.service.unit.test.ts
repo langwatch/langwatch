@@ -193,7 +193,7 @@ describe("given a command that is not on the read-only list", () => {
         decision: "allow_once",
       });
 
-      expect((await service.read(wait.waitId))?.state).toBe("answered");
+      expect((await service.getWait(wait.waitId)).state).toBe("answered");
       expect(buffer.permissions.at(-1)).toMatchObject({
         status: "answered",
         decision: "allow_once",
@@ -235,7 +235,7 @@ describe("given a command that is not on the read-only list", () => {
         patterns: ["uv"],
       });
 
-      expect(await service.read(wait.waitId)).toMatchObject({
+      expect(await service.getWait(wait.waitId)).toMatchObject({
         state: "answered",
         decision: "allow_pattern",
         source: "terminal",
@@ -307,7 +307,7 @@ describe("given a command that is not on the read-only list", () => {
           source: "terminal",
         }),
       ).rejects.toMatchObject({ code: "langy_wait_expired" });
-      expect(await service.read(wait.waitId)).toMatchObject({
+      expect(await service.getWait(wait.waitId)).toMatchObject({
         decision: "allow_once",
         source: "panel",
       });
