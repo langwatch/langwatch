@@ -42,6 +42,12 @@ export type IngestionSourceClaim = {
   parserConfig: Record<string, unknown>;
 };
 
+/** ADR-088: the span a source's pulled spend was read without being priced; never on the wire. */
+export type UnpricedUsageWindow = {
+  since: Instant | null;
+  through: Instant | null;
+};
+
 export type CursorPinnedUpdate =
   | { outcome: "updated"; source: GovernanceIngestionSource }
   | { outcome: "cursor_moved" };
@@ -63,6 +69,8 @@ export abstract class IngestionSourceRepository {
     id: string,
     input: UpdateIngestionSourceRecord,
   ): Promise<GovernanceIngestionSource>;
+  abstract getUnpricedUsageWindow(id: string): Promise<UnpricedUsageWindow>;
+  abstract updateUnpricedUsageWindow(id: string, window: UnpricedUsageWindow): Promise<void>;
   abstract updateIfCursorUnchanged(input: {
     id: string;
     cursor: unknown;

@@ -54,6 +54,7 @@ export interface MemoryOrganizationUserRow {
   updatedAt: Instant;
   /** The grant intent an unfinished automatic admission is resumed from. */
   pendingSsoGrantId?: string | null;
+  departmentId?: string | null;
 }
 
 /** One person, the fields the membership repository joins against. */

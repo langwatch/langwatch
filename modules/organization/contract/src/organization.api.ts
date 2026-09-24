@@ -320,6 +320,11 @@ export interface OrganizationApi {
   getAllMembers(input: Readonly<{ organizationId: string }>): Promise<User[]>;
   /** Every member row, disabled and deactivated included: governance's identity match reads it. */
   findMembersIncludingDeactivated(input: Readonly<{ organizationId: string }>): Promise<User[]>;
+  /** Each named member's department column (main `directoryDepartmentSync.service.ts:207-210`). */
+  findMemberDepartments(input: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<{ userId: string; departmentId: string | null }[]>;
   /** Why each member is here, keyed by user id; explains, never grants. */
   getMemberProvenance(
     input: Readonly<{ organizationId: string }>,

@@ -9,6 +9,11 @@ export abstract class DepartmentRepository {
     userIds: readonly string[];
     dayUtc: string;
   }): Promise<Map<string, string>>;
+  /** Each named member's open membership-history row (`validTo` null). */
+  abstract findOpenMemberships(input: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<{ userId: string; departmentId: string }[]>;
   abstract create(input: { organizationId: string; name: string }): Promise<Department>;
   abstract resolveByNameOrCreate(input: {
     organizationId: string;

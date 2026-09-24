@@ -776,6 +776,19 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     return users.map(userFromRecord);
   }
 
+  async findMemberDepartments({
+    organizationId,
+    userIds,
+  }: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<{ userId: string; departmentId: string | null }[]> {
+    return this.prisma.organizationUser.findMany({
+      where: { organizationId, userId: { in: [...userIds] } },
+      select: { userId: true, departmentId: true },
+    });
+  }
+
   async getMembership(params: {
     organizationId: string;
     userId: string;

@@ -191,6 +191,11 @@ export function createWorkerService(doubles: WorkerTestDoubles): IngestionPullWo
     suppression: { loadForProvider: async () => NO_SUPPRESSION },
     discovery: { recordFromPulledEvents: async () => ({ discovered: 0 }) },
     identityMatch: { runFor: async () => undefined },
+    unpricedWindows: {
+      getUnpricedUsageWindow: async () => ({ since: null, through: null }),
+      updateUnpricedUsageWindow: async () => undefined,
+    },
+    departmentSync: { applyDirectoryEvents: async () => ({ assigned: 0 }) },
     diagnostics,
   });
 }

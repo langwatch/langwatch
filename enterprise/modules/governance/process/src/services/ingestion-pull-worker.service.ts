@@ -29,8 +29,10 @@ import { GENIE_ROUTING_PROFILE } from "../rules/genie-trace-mapper-service.rules
 import * as GenieTraceMapperService from "../rules/genie-trace-mapper-service.rules.ts";
 import { partitionSuppressedEvents } from "../rules/erasure-suppression.rules.ts";
 import { pullReadThrough } from "../rules/pull-read-through.rules.ts";
+import type { IngestionSourceRepository } from "../repositories/ingestion-source.repository.ts";
 import type { ErasureSuppressionService } from "./erasure-suppression.service.ts";
 import type { IngestionCredentialsService } from "./ingestion-credentials.service.ts";
+import type { DirectoryDepartmentSyncService } from "./directory-department-sync.service.ts";
 import type { PersonDiscoveryService } from "./person-discovery.service.ts";
 import type { PulledUsageRecordService } from "./pulled-usage-record.service.ts";
 import type { PullerRegistryService } from "./puller-registry.service.ts";
@@ -39,6 +41,13 @@ const OCSF_CLASS_API_ACTIVITY = 6003;
 const OCSF_CATEGORY_APPLICATION_ACTIVITY = 6;
 const OCSF_ACTIVITY_INVOKE = 6;
 const OCSF_SEVERITY_INFO = 1;
+
+type UnpricedWindowStore = Pick<
+  IngestionSourceRepository,
+  "getUnpricedUsageWindow" | "updateUnpricedUsageWindow"
+>;
+
+type DepartmentSync = Pick<DirectoryDepartmentSyncService, "applyDirectoryEvents">;
 
 type ConversationRouting = {
   profile: ConversationRoutingProfile;
@@ -89,6 +98,8 @@ export class IngestionPullWorkerService {
   private readonly suppression: Pick<ErasureSuppressionService, "loadForProvider">;
   private readonly discovery: Pick<PersonDiscoveryService, "recordFromPulledEvents">;
   private readonly identityMatch: DiscoveredPeopleMatcher;
+  private readonly unpricedWindows: UnpricedWindowStore;
+  private readonly departmentSync: DepartmentSync;
   private readonly diagnostics: IngestionPullDiagnosticsSink;
   private readonly traceIngestion: GovernanceTraceIngestionClient | undefined;
   private readonly configuration: IngestionPullWorkerConfiguration;
@@ -105,6 +116,8 @@ export class IngestionPullWorkerService {
     suppression,
     discovery,
     identityMatch,
+    unpricedWindows,
+    departmentSync,
     diagnostics,
     traceIngestion,
     configuration,
@@ -120,6 +133,8 @@ export class IngestionPullWorkerService {
     suppression: Pick<ErasureSuppressionService, "loadForProvider">;
     discovery: Pick<PersonDiscoveryService, "recordFromPulledEvents">;
     identityMatch: DiscoveredPeopleMatcher;
+    unpricedWindows: UnpricedWindowStore;
+    departmentSync: DepartmentSync;
     diagnostics: IngestionPullDiagnosticsSink;
     traceIngestion: GovernanceTraceIngestionClient | undefined;
     configuration: IngestionPullWorkerConfiguration;
@@ -135,6 +150,8 @@ export class IngestionPullWorkerService {
     this.suppression = suppression;
     this.discovery = discovery;
     this.identityMatch = identityMatch;
+    this.unpricedWindows = unpricedWindows;
+    this.departmentSync = departmentSync;
     this.diagnostics = diagnostics;
     this.traceIngestion = traceIngestion;
     this.configuration = configuration;
@@ -152,6 +169,8 @@ export class IngestionPullWorkerService {
     suppression: Pick<ErasureSuppressionService, "loadForProvider">;
     discovery: Pick<PersonDiscoveryService, "recordFromPulledEvents">;
     identityMatch: DiscoveredPeopleMatcher;
+    unpricedWindows: UnpricedWindowStore;
+    departmentSync: DepartmentSync;
     diagnostics: IngestionPullDiagnosticsSink;
     traceIngestion?: GovernanceTraceIngestionClient;
     configuration?: IngestionPullWorkerConfiguration;
@@ -168,6 +187,8 @@ export class IngestionPullWorkerService {
       suppression: options.suppression,
       discovery: options.discovery,
       identityMatch: options.identityMatch,
+      unpricedWindows: options.unpricedWindows,
+      departmentSync: options.departmentSync,
       diagnostics: options.diagnostics,
       traceIngestion: options.traceIngestion,
       configuration: options.configuration ?? IngestionPullWorkerConfiguration.create(),
@@ -266,6 +287,7 @@ export class IngestionPullWorkerService {
         events: result.events,
         source,
         pulledUsage: input.pulledUsage,
+        completeness: result.completeness ?? "complete",
       });
     }
 
@@ -285,6 +307,7 @@ export class IngestionPullWorkerService {
     events: NormalizedPullEvent[];
     source: GovernanceIngestionSource;
     pulledUsage?: PulledUsageDispatcher;
+    completeness: "complete" | "truncated";
   }): Promise<void> {
     const { source } = input;
     const suppression = await this.suppression.loadForProvider({
@@ -296,7 +319,8 @@ export class IngestionPullWorkerService {
       actorOf: (event) => event.actor,
       suppression,
     });
-    await this.writeEvents({ events: kept, source, pulledUsage: input.pulledUsage });
+    const periods = await this.writeEvents({ events: kept, source, pulledUsage: input.pulledUsage });
+    await this.recordUnpricedUsageWindow({ source, ...periods, completeness: input.completeness });
     if (suppressedCount > 0) {
       this.diagnostics.info("skipped pulled events naming an erased identifier", {
         ingestionSourceId: source.id,
@@ -317,7 +341,7 @@ export class IngestionPullWorkerService {
     }
   }
 
-  /** Main `pullerWorker.ts:740-776`; `events` is the post-partition list (ADR-128 §9 step 1). */
+  /** Main `pullerWorker.ts:740-775`; `events` is the post-partition list (ADR-128 §9 step 1). */
   private async syncPeopleFactsFromPull({
     source,
     events,
@@ -335,6 +359,18 @@ export class IngestionPullWorkerService {
     } catch (error) {
       this.diagnostics.error(
         "could not record discovered people; the pulled events are still delivered",
+        { ingestionSourceId: source.id, error: toErrorMessage(error) },
+      );
+    }
+    try {
+      await this.departmentSync.applyDirectoryEvents({
+        organizationId: source.organizationId,
+        provider: source.sourceType,
+        events,
+      });
+    } catch (error) {
+      this.diagnostics.error(
+        "could not apply directory departments; the pulled events are still delivered",
         { ingestionSourceId: source.id, error: toErrorMessage(error) },
       );
     }
@@ -428,7 +464,9 @@ export class IngestionPullWorkerService {
     events: NormalizedPullEvent[];
     source: GovernanceIngestionSource;
     pulledUsage?: PulledUsageDispatcher;
-  }): Promise<void> {
+  }): Promise<{ droppedPeriodsMs: number[]; recordedPeriodsMs: number[] }> {
+    const droppedPeriodsMs: number[] = [];
+    const recordedPeriodsMs: number[] = [];
     const project = await this.projects.ensureInternal({
       organizationId: input.source.organizationId,
       kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
@@ -444,7 +482,7 @@ export class IngestionPullWorkerService {
           sourceType: input.source.sourceType,
         }),
       );
-      if (!recordCost || !input.pulledUsage) {
+      if (!input.pulledUsage) {
         continue;
       }
 
@@ -481,13 +519,80 @@ export class IngestionPullWorkerService {
       if (!record) {
         continue;
       }
+      // The price existed either way; only storing it is gated (main `pullerWorker.ts:1082-1085`).
+      if (!recordCost) {
+        droppedPeriodsMs.push(record.occurredAtMs);
+        continue;
+      }
 
       await input.pulledUsage.recordPulledUsage({
         ...record,
         tenantId: project.id,
         occurredAt: record.occurredAtMs,
       });
+      recordedPeriodsMs.push(record.occurredAtMs);
     }
+    return { droppedPeriodsMs, recordedPeriodsMs };
+  }
+
+  /**
+   * Main `pullerWorker.ts:1145-1201` (ADR-088): a dropped price widens the source's unpriced
+   * window; a complete re-read reaching back across its start clears it. A truncated one never does.
+   */
+  private async recordUnpricedUsageWindow({
+    source,
+    droppedPeriodsMs,
+    recordedPeriodsMs,
+    completeness,
+  }: {
+    source: GovernanceIngestionSource;
+    droppedPeriodsMs: number[];
+    recordedPeriodsMs: number[];
+    completeness: "complete" | "truncated";
+  }): Promise<void> {
+    if (droppedPeriodsMs.length === 0 && recordedPeriodsMs.length === 0) return;
+    const window = await this.unpricedWindows.getUnpricedUsageWindow(source.id);
+    if (droppedPeriodsMs.length > 0) {
+      const since = Math.min(...droppedPeriodsMs);
+      const through = Math.max(...droppedPeriodsMs);
+      const widened = {
+        since: Temporal.Instant.fromEpochMilliseconds(
+          window.since ? Math.min(toEpochMs(window.since), since) : since,
+        ),
+        through: Temporal.Instant.fromEpochMilliseconds(
+          window.through ? Math.max(toEpochMs(window.through), through) : through,
+        ),
+      };
+      this.diagnostics.warn(
+        "pulled cost recording is off for this organization — audit rows landed but this run's spend was not priced",
+        {
+          ingestionSourceId: source.id,
+          organizationId: source.organizationId,
+          droppedCount: droppedPeriodsMs.length,
+          unpricedSince: widened.since.toString(),
+          unpricedThrough: widened.through.toString(),
+        },
+      );
+      await this.unpricedWindows.updateUnpricedUsageWindow(source.id, widened);
+      return;
+    }
+
+    const gapStart = window.since;
+    if (!gapStart || recordedPeriodsMs.length === 0) return;
+    if (Math.min(...recordedPeriodsMs) > toEpochMs(gapStart)) return;
+    if (completeness === "truncated") {
+      this.diagnostics.info(
+        "a re-read reached back across the unpriced window but stopped short of its end; the window is kept",
+        { ingestionSourceId: source.id },
+      );
+      return;
+    }
+
+    this.diagnostics.info(
+      "a re-read reached back across the unpriced window; its spend is priced again",
+      { ingestionSourceId: source.id },
+    );
+    await this.unpricedWindows.updateUnpricedUsageWindow(source.id, { since: null, through: null });
   }
 
   private toOcsfRow(input: {

@@ -98,6 +98,17 @@ export class PrismaDepartmentRepository extends DepartmentRepository {
     return new Map(rows.map((row) => [row.userId, row.departmentId]));
   }
 
+  async findOpenMemberships(input: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<{ userId: string; departmentId: string }[]> {
+    if (input.userIds.length === 0) return [];
+    return this.prisma.departmentMembershipHistory.findMany({
+      where: { organizationId: input.organizationId, userId: { in: [...input.userIds] }, validTo: null },
+      select: { userId: true, departmentId: true },
+    });
+  }
+
   async create(input: { organizationId: string; name: string }): Promise<Department> {
     return departmentSchema.parse(await this.prisma.department.create({ data: input }));
   }

@@ -77,6 +77,14 @@ export class MemoryDepartmentRepository extends DepartmentRepository {
     );
   }
 
+  async findOpenMemberships(input: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<{ userId: string; departmentId: string }[]> {
+    const onDay = await this.departmentsOnDay({ ...input, dayUtc: "" });
+    return [...onDay].map(([userId, departmentId]) => ({ userId, departmentId }));
+  }
+
   async create(input: { organizationId: string; name: string }): Promise<Department> {
     const now = toDate(nowInstant());
     const department: Department = {

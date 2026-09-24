@@ -4,13 +4,14 @@ import {
   type IngestionSource,
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
-import { toDate } from "@langwatch/time";
+import { fromDate, toDate } from "@langwatch/time";
 
 import {
   IngestionSourceRepository,
   type CreateIngestionSourceRecord,
   type CursorPinnedUpdate,
   type IngestionSourceClaim,
+  type UnpricedUsageWindow,
   type UpdateIngestionSourceRecord,
 } from "../ingestion-source.repository.ts";
 
@@ -151,6 +152,27 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
       data: updateDataOf(input),
     });
     return toIngestionSource(row);
+  }
+
+  async getUnpricedUsageWindow(id: string): Promise<UnpricedUsageWindow> {
+    const row = await this.database.ingestionSource.findUniqueOrThrow({
+      where: { id },
+      select: { unpricedUsageSince: true, unpricedUsageThrough: true },
+    });
+    return {
+      since: row.unpricedUsageSince ? fromDate(row.unpricedUsageSince) : null,
+      through: row.unpricedUsageThrough ? fromDate(row.unpricedUsageThrough) : null,
+    };
+  }
+
+  async updateUnpricedUsageWindow(id: string, window: UnpricedUsageWindow): Promise<void> {
+    await this.database.ingestionSource.update({
+      where: { id },
+      data: {
+        unpricedUsageSince: window.since ? toDate(window.since) : null,
+        unpricedUsageThrough: window.through ? toDate(window.through) : null,
+      },
+    });
   }
 
   async updateIfCursorUnchanged(input: {

@@ -8,6 +8,7 @@ import {
   type CreateIngestionSourceRecord,
   type CursorPinnedUpdate,
   type IngestionSourceClaim,
+  type UnpricedUsageWindow,
   type UpdateIngestionSourceRecord,
 } from "../ingestion-source.repository.ts";
 
@@ -16,6 +17,7 @@ type StoredSource = GovernanceIngestionSource & { providerAccountId: string | nu
 /** The ingestion-source twin: one array standing in for the `IngestionSource` table. */
 export class MemoryIngestionSourceRepository extends IngestionSourceRepository {
   private readonly rows: StoredSource[] = [];
+  private readonly unpricedWindows = new Map<string, UnpricedUsageWindow>();
 
   private constructor(private readonly now: () => number) {
     super();
@@ -115,6 +117,16 @@ export class MemoryIngestionSourceRepository extends IngestionSourceRepository {
     };
     this.rows[index] = next;
     return toSource(next);
+  }
+
+  async getUnpricedUsageWindow(id: string): Promise<UnpricedUsageWindow> {
+    if (!this.rows.some((row) => row.id === id)) throw new Error(`no ingestion source ${id}`);
+    return this.unpricedWindows.get(id) ?? { since: null, through: null };
+  }
+
+  async updateUnpricedUsageWindow(id: string, window: UnpricedUsageWindow): Promise<void> {
+    if (!this.rows.some((row) => row.id === id)) throw new Error(`no ingestion source ${id}`);
+    this.unpricedWindows.set(id, window);
   }
 
   async updateIfCursorUnchanged(input: {

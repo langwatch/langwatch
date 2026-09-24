@@ -115,6 +115,7 @@ import { ratePulledUsage } from "../rules/pulled-usage-rate.rules.ts";
 import { AgentDiscoveryService } from "../services/agent-discovery.service.ts";
 import { AnthropicAdminPullerAdapter } from "../services/anthropic-admin-puller.service.ts";
 import { DatabricksGeniePullerService } from "../services/databricks-genie-puller.service.ts";
+import { DirectoryDepartmentSyncService } from "../services/directory-department-sync.service.ts";
 import { DepartmentService } from "../services/department.service.ts";
 import { ErasureSuppressionService } from "../services/erasure-suppression.service.ts";
 import {
@@ -719,6 +720,15 @@ export class GovernanceApp implements GovernanceRestApi {
       ),
       suppression: this.erasureSuppression,
       discovery: PersonDiscoveryService.create({ people: this.repositories.discoveredPeople }),
+      unpricedWindows: this.repositories.ingestionSources,
+      departmentSync: DirectoryDepartmentSyncService.create({
+        departments: this.departments,
+        openMemberships: this.repositories.departments,
+        matcher: this.identityMatches,
+        discoveredPeople: this.repositories.discoveredPeople,
+        matches: this.repositories.identityMatches,
+        organizations: dependencies.organizations,
+      }),
       // Main `presets.ts:1566-1576`: proof before guesses, the order the engine spec fixes.
       identityMatch: {
         runFor: async ({ organizationId }) => {
