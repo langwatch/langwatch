@@ -5114,6 +5114,9 @@ importers:
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
+      '@langwatch/egress':
+        specifier: workspace:*
+        version: link:../../../packages/egress
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
@@ -5159,6 +5162,9 @@ importers:
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../packages/redis-client
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../packages/secrets
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../../packages/task

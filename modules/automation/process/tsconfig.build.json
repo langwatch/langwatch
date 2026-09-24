@@ -45,6 +45,9 @@
       "path": "../../dataset/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/egress/tsconfig.build.json"
+    },
+    {
       "path": "../../entitlement/contract/tsconfig.build.json"
     },
     {
@@ -88,6 +91,9 @@
     },
     {
       "path": "../../../packages/redis-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/secrets/tsconfig.build.json"
     },
     {
       "path": "../../../packages/task/tsconfig.build.json"
