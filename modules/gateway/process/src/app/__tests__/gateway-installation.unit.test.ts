@@ -1,6 +1,7 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import { BearerIdentity, RestHost, type RestCredentialBinding } from "@langwatch/api/rest";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { ProcessStore } from "@langwatch/eventing";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -8,6 +9,7 @@ import type { Encryption } from "@langwatch/process-stores";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
+import { gatewaySpendEventing } from "../../eventing/gateway-spend.pipeline.ts";
 import { gatewayServer } from "../../gateway.server.ts";
 import {
   buildGatewayCanonicalString,
@@ -171,6 +173,33 @@ describe("gateway app installation", () => {
         );
         expect(typeof installed.findVirtualKeyBySecret).toBe("function");
         expect(typeof installed.submitSpendCommands).toBe("function");
+      } finally {
+        await resources.close();
+      }
+    });
+
+    /** @scenario "The spend pipeline is registered in both roles" */
+    it("builds gateway_spend_processing for the api and for the worker", async () => {
+      const { state, resources } = await installGateway();
+
+      try {
+        const app = state.provided;
+        if (!(app instanceof GatewayApp)) {
+          throw new Error("Gateway installation did not provide GatewayApp");
+        }
+        const setup = {
+          repositories: undefined,
+          app,
+          processStore: createApiFixture<ProcessStore>(),
+        };
+
+        const produced = gatewaySpendEventing.build({ ...setup, participation: "produce" });
+        const consumed = gatewaySpendEventing.build({ ...setup, participation: "consume" });
+
+        expect(gatewayServer.eventing?.pipeline).toBe("gateway_spend_processing");
+        expect(produced.metadata.name).toBe("gateway_spend_processing");
+        expect(consumed.metadata.name).toBe("gateway_spend_processing");
+        expect([...consumed.foldProjections.keys()]).toHaveLength(1);
       } finally {
         await resources.close();
       }

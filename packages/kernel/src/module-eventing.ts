@@ -193,6 +193,14 @@ export interface EventingHost {
   /** Read at call time: a runtime opens its event store only once it initialises. */
   readonly eventStore?: AggregateEventLog;
   register(definition: unknown): unknown;
+  /** The runtime's own maintenance pipelines (blob, process-manager retention). */
+  maintenancePipelines?(): readonly unknown[];
+}
+
+/** Installs the framework's maintenance pipelines once, where the role drains (WP-6b ruling 2). */
+export function installEventingMaintenance(eventing: EventingHost | undefined): void {
+  if (eventing === void 0 || eventing.participation !== "consume") return;
+  for (const definition of eventing.maintenancePipelines?.() ?? []) eventing.register(definition);
 }
 
 /**
@@ -215,6 +223,9 @@ export function eventingHostFrom(pool: unknown, role: ServerRole): EventingHost 
       return host.eventStore;
     },
     register: registerPipelines(host.register.bind(candidate)),
+    ...(typeof host.maintenancePipelines === "function"
+      ? { maintenancePipelines: host.maintenancePipelines.bind(candidate) }
+      : {}),
   };
 }
 

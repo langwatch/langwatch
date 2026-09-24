@@ -9,6 +9,7 @@ import type {
   GatewayModelProviderCredentials,
   GatewaySpendConfirmation,
 } from "./app/gateway.members.ts";
+import { gatewaySpendEventing } from "./eventing/gateway-spend.pipeline.ts";
 import type { GatewayRealtimeSessionRepository } from "./repositories/gateway-realtime-session.repository.ts";
 import {
   PrismaGatewayElevenLabsCredentialRepository,
@@ -68,6 +69,7 @@ export const gatewayServer = defineServerModule("gateway")
     gatewayUsageTrpcTransport,
     virtualKeyTrpcTransport,
   )
+  .withEventing(gatewaySpendEventing)
   .withTransportFacts(({ app, dependencies }) => {
     if (!(app instanceof GatewayApp)) {
       throw new TypeError("Gateway transport requires its constructed application");

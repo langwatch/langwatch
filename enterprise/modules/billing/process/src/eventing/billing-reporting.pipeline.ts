@@ -11,6 +11,7 @@ import {
   type Projection,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+import type { EventingParticipation } from "@langwatch/kernel";
 
 import type { BillingApp } from "../app/billing.app.ts";
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
@@ -43,7 +44,13 @@ export class BillingReportingPipeline {
     private readonly deps: Omit<ReportUsageForMonthCommandDeps, "selfDispatch">,
   ) {}
 
-  buildProcessing(): BillingReportingDefinition {
+  /** The worker resolves the reporter now, so a keyless SaaS worker refuses at boot, as on main. */
+  buildProcessing({
+    participation,
+  }: {
+    participation: EventingParticipation;
+  }): BillingReportingDefinition {
+    if (participation === "consume") this.deps.getUsageReportingService();
     const reportUsageForMonthCommand = ReportUsageForMonthCommandHandler.create({
       ...this.deps,
       selfDispatch: (data) => {
@@ -88,6 +95,7 @@ export class BillingReportingPipeline {
 
 export const billingReportingEventing = defineEventingModule({
   pipeline: BILLING_REPORTING_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<BillingRepositories, BillingApp>) => app.reportingPipeline(),
+  build: ({ app, participation }: EventingSetup<BillingRepositories, BillingApp>) =>
+    app.reportingPipeline({ participation }),
   connect: ({ app, commands }) => app.connectReporting(commands.reportUsageForMonth),
 });

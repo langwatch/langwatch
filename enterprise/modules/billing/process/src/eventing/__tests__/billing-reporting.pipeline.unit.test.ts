@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { BillingApp, type ConnectedBillingPeers } from "../../app/billing.app.ts";
 import { billingServer } from "../../billing.server.ts";
 import { MemoryBillingRepositories } from "../../repositories/memory/memory.billing.repositories.ts";
+import { StripeUsageReportingUnavailable } from "../../services/usage-reporting.service.ts";
 import { billingReportingEventing } from "../billing-reporting.pipeline.ts";
 
 const peers: ConnectedBillingPeers = {
@@ -26,12 +27,33 @@ describe("the monthly billing roll-up's eventing declaration", () => {
         stripeSecretKey: undefined,
       });
 
-      const pipeline = app.reportingPipeline();
+      const pipeline = app.reportingPipeline({ participation: "consume" });
 
       expect(billingServer.eventing?.pipeline.split(", ")).toContain("billing_reporting");
       expect(billingReportingEventing.pipeline).toBe("billing_reporting");
       expect(pipeline.metadata.name).toBe("billing_reporting");
       expect(pipeline.foldProjections.size + pipeline.mapProjections.size).toBe(0);
+    });
+  });
+
+  describe("given a SaaS deployment with no Stripe secret", () => {
+    const composeSaas = () =>
+      BillingApp.assemble({
+        members: { isSaas: true, nodeEnvironment: "test" },
+        repositories: MemoryBillingRepositories.create(),
+        config: { bankDetails: undefined },
+        peers,
+        stripeSecretKey: undefined,
+      });
+
+    /** @scenario "A SaaS worker refuses to compose without the credential its reports are sent with" */
+    it("refuses the worker's build and lets the api's producer build", () => {
+      expect(() => composeSaas().reportingPipeline({ participation: "consume" })).toThrow(
+        StripeUsageReportingUnavailable,
+      );
+      expect(composeSaas().reportingPipeline({ participation: "produce" }).metadata.name).toBe(
+        "billing_reporting",
+      );
     });
   });
 });

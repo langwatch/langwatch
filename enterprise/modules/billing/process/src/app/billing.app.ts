@@ -24,7 +24,7 @@ import {
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
 import { GatewayApi } from "@langwatch/gateway-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { Temporal } from "@langwatch/time";
@@ -265,8 +265,12 @@ export class BillingApp implements BillingApi {
   }
 
   /** The command-only pipeline `billing_reporting` registers, composed once by {@link assemble}. */
-  reportingPipeline(): BillingReportingDefinition {
-    return this.#reporting.buildProcessing();
+  reportingPipeline({
+    participation,
+  }: {
+    participation: EventingParticipation;
+  }): BillingReportingDefinition {
+    return this.#reporting.buildProcessing({ participation });
   }
 
   /** Closes the roll-up's self re-dispatch over the registered sender. */

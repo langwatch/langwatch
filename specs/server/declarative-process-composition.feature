@@ -95,6 +95,13 @@ Feature: Composing a process declaratively
     And only the events the command's guard accepts come back
 
   @unit
+  Scenario: The draining role installs the framework's maintenance pipelines
+    Given an eventing runtime that offers its blob and process-manager maintenance pipelines
+    When a worker boots over it, and an api boots over it
+    Then the worker registers both maintenance pipelines after the modules' own
+    And the api registers neither
+
+  @unit
   Scenario: A module hosts several pipelines
     Given a module that calls withEventing once for each of three pipelines
     When the process boots with an eventing runtime on its pool

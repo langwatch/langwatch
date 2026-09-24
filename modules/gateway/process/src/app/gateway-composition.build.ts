@@ -171,6 +171,8 @@ export type GatewayControlPlane = GatewayAppDependencies &
     internalVirtualKeys: VirtualKeyService;
     internalChanges: PrismaGatewayChangeEventsRepository;
     internalScopeResolution: GatewayScopeResolutionService;
+    /** The spend ledger the gateway_spend fold writes, over the same routing client. */
+    spendLedger: GatewaySpendEventsRepository;
   }>;
 
 /**
@@ -209,9 +211,8 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
 
   const budgetSpend = GatewayBudgetClickHouseRepository.create(resolveClickHouse);
   const virtualKeySpend = GatewayVirtualKeySpendRepository.create(resolveClickHouse);
-  const spendEvents = GatewaySpendEventsService.create(
-    GatewaySpendEventsRepository.create(resolveClickHouse),
-  );
+  const spendLedger = GatewaySpendEventsRepository.create(resolveClickHouse);
+  const spendEvents = GatewaySpendEventsService.create(spendLedger);
 
   const budgetDecisions = PrismaGatewayAdapter.create({
     database: prisma,
@@ -257,6 +258,7 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
     internalVirtualKeys: virtualKeys,
     internalChanges: changes,
     internalScopeResolution: scopeResolution,
+    spendLedger,
 
     organizationIdForProject: async (projectId) => {
       const organizationId = await projects.findOrganizationId(projectId);

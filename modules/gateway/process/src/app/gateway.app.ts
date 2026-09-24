@@ -6,6 +6,12 @@ import type { RestIdentity } from "@langwatch/api/rest";
 import { type AuthzPermission, AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
+import type {
+  EventingCommandSender,
+  Projection,
+  RegisteredCommand,
+  StaticPipelineDefinition,
+} from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   type GatewayBudgetOverviewForUser,
@@ -59,7 +65,7 @@ import {
   type GatewayVirtualKeyRecord,
   GatewayBudgetNotFoundError,
 } from "@langwatch/gateway-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -78,8 +84,12 @@ import {
 } from "@langwatch/webhook-contract";
 import type { z } from "zod";
 
+import { GatewaySpendProducerAdapter } from "../eventing/gateway-spend-producer.ts";
 import { settlementGraceMs } from "../eventing/gateway-spend-settlement.intent.ts";
+import { EventingGatewaySpendAdapter } from "../eventing/gateway-spend.adapter.ts";
+import type { GatewaySpendProcessingEvent } from "../eventing/gateway-spend.intent.ts";
 import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
+import type { GatewaySpendEvents } from "../repositories/gateway-spend-events.repository.ts";
 import type { GatewayLicensedKey } from "../repositories/gateway-virtual-key.repository.ts";
 import { PrismaGatewayConnectUpstreamRepository } from "../repositories/prisma/prisma.gateway-connect-upstream.repository.ts";
 import { PrismaGatewayGuardrailRepository } from "../repositories/prisma/prisma.gateway-guardrail.repository.ts";
@@ -114,6 +124,7 @@ import { GatewayInternalProtocolService } from "../services/gateway-internal-pro
 import type {
   GatewayCodexRefresh,
   GatewayInternalSpendPipeline,
+  GatewaySpendCommandSender,
 } from "../services/gateway-internal-protocol.service.ts";
 import { GatewayJwtService } from "../services/gateway-jwt.service.ts";
 import type { GatewayRealtimeSessionCollaborators } from "../services/gateway-realtime-session.service.ts";
@@ -124,6 +135,7 @@ import type {
   VirtualKeySnakeDto,
 } from "../services/gateway-virtual-key-dto.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
+import { ModelCatalogGatewaySpendRatingService } from "../services/model-catalog-gateway-spend-rating.service.ts";
 import { buildGatewayControlPlane } from "./gateway-composition.build.ts";
 import { GatewayEndUserCapsAdapter } from "./gateway-end-user-caps.composition.ts";
 import {
@@ -530,6 +542,26 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
 
 export type GatewayInfrastructure = GatewayAppDependencies | GatewayRestInfrastructure;
 
+/** A grouped spend command record, as the queue takes it; anything else is a composition bug. */
+function spendCommandRecord(command: string, payload: unknown): Record<string, unknown> {
+  if (typeof payload === "object" && payload !== null && !Array.isArray(payload)) {
+    return Object.fromEntries(Object.entries(payload));
+  }
+  throw new TypeError(`gateway_spend ${command} was handed a payload that is not a record.`);
+}
+
+/** The ledger gateway_spend folds into and the senders registration hands back. */
+type GatewaySpendPipelineParts = Readonly<{
+  ledger: GatewaySpendEvents;
+  commands: Record<string, GatewaySpendCommandSender | undefined>;
+}>;
+
+type GatewaySpendDefinition = StaticPipelineDefinition<
+  GatewaySpendProcessingEvent,
+  Record<string, Projection>,
+  RegisteredCommand
+>;
+
 /**
  * What the billing reconciliation family reads that is neither the gateway's
  * own ledger nor a peer's application: the one guarded Postgres connection its
@@ -691,6 +723,7 @@ export class GatewayApp implements GatewayApi {
           runEvaluator: internalCollaborators.evaluatorRunner,
         })
       : void 0;
+    const spendCommands: Record<string, GatewaySpendCommandSender | undefined> = {};
     const internalProtocol = GatewayInternalProtocolService.create({
       virtualKeys: controlPlane.internalVirtualKeys,
       projects: setup.dependencies.projects,
@@ -701,7 +734,10 @@ export class GatewayApp implements GatewayApi {
       budgetSpend: controlPlane.budgetSpend,
       refreshCodex: internalCollaborators.refreshCodex,
       guardrails,
-      spend: internalCollaborators.spend,
+      spend: internalCollaborators.spend ?? {
+        commands: spendCommands,
+        rating: ModelCatalogGatewaySpendRatingService.create(),
+      },
       realtimeSessions:
         internalCollaborators.realtimeSessions ?? setup.members.elevenLabsWebhook?.sessions,
     });
@@ -715,6 +751,7 @@ export class GatewayApp implements GatewayApi {
       },
       internalProtocol,
       internalDoor: GatewayInternalIdentity.create(secrets.internalSecret),
+      spendPipeline: { ledger: controlPlane.spendLedger, commands: spendCommands },
       spend: {
         prisma: setup.members.prisma,
         webhooks: setup.dependencies.webhooks,
@@ -743,6 +780,7 @@ export class GatewayApp implements GatewayApi {
   #connectManagedKeys: ConnectManagedKeyService | undefined;
   #elevenLabsWebhook: GatewayElevenLabsWebhookService | undefined;
   #spend: GatewaySpendCollaborators | undefined;
+  #spendPipeline: GatewaySpendPipelineParts | undefined;
   #spendScope: PrismaGatewaySpendScopeRepository | undefined;
   #settlementPolicy: FixedGatewaySettlementPolicyService | undefined;
   #budgetOverviewDeps: GatewayBudgetOverviewDeps | undefined;
@@ -756,6 +794,7 @@ export class GatewayApp implements GatewayApi {
     members,
     internalProtocol,
     internalDoor,
+    spendPipeline,
     spend,
     budgetOverviewDeps,
     addresses = {
@@ -768,6 +807,7 @@ export class GatewayApp implements GatewayApi {
     members: GatewayInfrastructure;
     internalProtocol: GatewayInternalProtocolService;
     internalDoor: RestIdentity;
+    spendPipeline?: GatewaySpendPipelineParts;
     spend?: GatewaySpendCollaborators;
     budgetOverviewDeps?: GatewayBudgetOverviewDeps;
     addresses?: GatewayDeploymentAddresses;
@@ -776,6 +816,7 @@ export class GatewayApp implements GatewayApi {
     this.#addresses = addresses;
     this.#connectUpstream = connectUpstream;
     this.#spend = spend;
+    this.#spendPipeline = spendPipeline;
     this.#internalProtocol = internalProtocol;
     this.#internalDoor = internalDoor;
     this.#budgetOverviewDeps = budgetOverviewDeps;
@@ -789,6 +830,35 @@ export class GatewayApp implements GatewayApi {
     this.#elevenLabsWebhook = members.elevenLabsWebhook
       ? GatewayElevenLabsWebhookService.create(members.elevenLabsWebhook)
       : void 0;
+  }
+
+  /** gateway_spend as this role registers it: the worker folds the ledger, the api only sends. */
+  spendPipeline({
+    participation,
+  }: {
+    participation: EventingParticipation;
+  }): GatewaySpendDefinition {
+    if (participation === "produce") {
+      return GatewaySpendProducerAdapter.create().createGatewaySpendProducerPipeline({
+        processName: "langwatch-api",
+      });
+    }
+    const ledger = this.#spendPipeline?.ledger;
+    if (!ledger) throw this.spendStoreUnavailable();
+    return EventingGatewaySpendAdapter.create({ spendEvents: ledger }).buildProcessing();
+  }
+
+  /** The registered senders the data plane's /spend-commands and priced spend append through. */
+  connectSpend(commands: Readonly<Record<string, EventingCommandSender<unknown>>>): void {
+    const connected = this.#spendPipeline?.commands;
+    if (!connected) return;
+    for (const [name, sender] of Object.entries(commands)) {
+      connected[name] = {
+        send: (payload) => sender.send(spendCommandRecord(name, payload)),
+        sendBatch: (payloads) =>
+          sender.sendBatch(payloads.map((payload) => spendCommandRecord(name, payload))),
+      };
+    }
   }
 
   get internalDoor(): RestIdentity {
