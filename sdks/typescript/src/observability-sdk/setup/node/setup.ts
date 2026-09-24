@@ -22,7 +22,14 @@ import { ConsoleLogger, type Logger } from "../../../logger";
 import { initializeObservabilitySdkConfig } from "../../config";
 import { LangWatchLogsExporter, LangWatchTraceExporter } from "../../exporters";
 import { setLangWatchLoggerProvider } from "../../logger";
-import { createMergedResource, getConcreteProvider, isConcreteProvider } from "../utils";
+import {
+  callMember,
+  createMergedResource,
+  getConcreteProvider,
+  isConcreteProvider,
+  listProcessorRegistryCandidates,
+  readMember,
+} from "../utils";
 import { NodeSdk } from "./node-sdk";
 import { type SetupObservabilityOptions, type ObservabilityHandle } from "./types";
 
@@ -137,6 +144,35 @@ const refuseUnservedGrpc = (options: SetupObservabilityOptions) => {
 
 type TerminationSignal = "SIGINT" | "SIGTERM";
 
+const settleAfterSignalFlush = ({
+  signal,
+  logger,
+  exitProcessAfterShutdown,
+}: {
+  signal: TerminationSignal;
+  logger: Logger;
+  exitProcessAfterShutdown: boolean;
+}): void => {
+  if (exitProcessAfterShutdown) {
+    logger.debug(
+      `${signal}: flush complete, exiting because UNSAFE_exitProcessAfterAutoShutdown is set`,
+    );
+    process.exit(0);
+    return;
+  }
+
+  const otherListenerCount = process.listenerCount(signal);
+  if (otherListenerCount > 0) {
+    logger.debug(
+      `${signal}: flush complete, leaving the process to the ${otherListenerCount} other listener(s)`,
+    );
+    return;
+  }
+
+  logger.debug(`${signal}: flush complete and nothing else is listening, re-raising`);
+  process.kill(process.pid, signal);
+};
+
 /**
  * Registers flush-on-exit handlers backing `advanced.disableAutoShutdown`.
  * Never calls `process.exit()` directly -- Node runs every listener for a
@@ -201,26 +237,9 @@ const registerAutoShutdownHandlers = ({
     register(signal, () => {
       if (!beginShutdown()) return;
 
-      void flush(signal).then(() => {
-        if (exitProcessAfterShutdown) {
-          logger.debug(
-            `${signal}: flush complete, exiting because UNSAFE_exitProcessAfterAutoShutdown is set`,
-          );
-          process.exit(0);
-          return;
-        }
-
-        const otherListenerCount = process.listenerCount(signal);
-        if (otherListenerCount > 0) {
-          logger.debug(
-            `${signal}: flush complete, leaving the process to the ${otherListenerCount} other listener(s)`,
-          );
-          return;
-        }
-
-        logger.debug(`${signal}: flush complete and nothing else is listening, re-raising`);
-        process.kill(process.pid, signal);
-      });
+      void flush(signal).then(() =>
+        settleAfterSignalFlush({ signal, logger, exitProcessAfterShutdown }),
+      );
     });
   }
 };
@@ -249,14 +268,7 @@ export function setupObservability(options: SetupObservabilityOptions = {}): Obs
   }
 
   if (options.tracerProvider) {
-    try {
-      return setupDedicatedProvider(options.tracerProvider, options, logger);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      logger.error(`Failed to set up dedicated provider: ${errorMessage}`);
-      if (options.advanced?.throwOnSetupError) throw err;
-      return createNoOpHandle(logger);
-    }
+    return setupDedicatedProviderOrNoOp(options.tracerProvider, options, logger);
   }
 
   const earlyExit = checkForEarlyExit(options, logger);
@@ -267,15 +279,7 @@ export function setupObservability(options: SetupObservabilityOptions = {}): Obs
     const existingProvider = getConcreteProvider(globalProvider);
 
     if (options.advanced?.attachToExistingProvider && existingProvider) {
-      const handle = attachToExistingProvider(existingProvider, options, logger);
-      if (handle) return handle;
-
-      const errorMsg =
-        "attachToExistingProvider is enabled but the existing provider does not support adding span processors. " +
-        "This may be due to an incompatible OpenTelemetry version. No spans will be exported to LangWatch.";
-      if (options.advanced?.throwOnSetupError) throw new Error(errorMsg);
-      logger.error(errorMsg);
-      return createNoOpHandle(logger);
+      return attachToExistingProviderOrNoOp(existingProvider, options, logger);
     }
 
     const sdk = createAndStartNodeSdk(
@@ -306,6 +310,47 @@ export function setupObservability(options: SetupObservabilityOptions = {}): Obs
   }
 }
 
+function setupDedicatedProviderOrNoOp(
+  provider: apiModule.TracerProvider,
+  options: SetupObservabilityOptions,
+  logger: Logger,
+): ObservabilityHandle {
+  try {
+    return setupDedicatedProvider(provider, options, logger);
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    logger.error(`Failed to set up dedicated provider: ${errorMessage}`);
+    if (options.advanced?.throwOnSetupError) throw err;
+    return createNoOpHandle(logger);
+  }
+}
+
+function attachToExistingProviderOrNoOp(
+  provider: unknown,
+  options: SetupObservabilityOptions,
+  logger: Logger,
+): ObservabilityHandle {
+  const handle = attachToExistingProvider(provider, options, logger);
+  if (handle) return handle;
+
+  const errorMsg =
+    "attachToExistingProvider is enabled but the existing provider does not support adding span processors. " +
+    "This may be due to an incompatible OpenTelemetry version. No spans will be exported to LangWatch.";
+  if (options.advanced?.throwOnSetupError) throw new Error(errorMsg);
+  logger.error(errorMsg);
+  return createNoOpHandle(logger);
+}
+
+function detachProcessors(provider: unknown, addedProcessors: SpanProcessor[]): void {
+  for (const arr of listProcessorRegistryCandidates(provider)) {
+    if (!Array.isArray(arr)) continue;
+    for (const p of addedProcessors) {
+      const idx = arr.indexOf(p);
+      if (idx !== -1) arr.splice(idx, 1);
+    }
+  }
+}
+
 function setupDedicatedProvider(
   provider: apiModule.TracerProvider,
   options: SetupObservabilityOptions,
@@ -314,8 +359,8 @@ function setupDedicatedProvider(
   const langwatch = getLangWatchConfig(options);
   const addedProcessors: SpanProcessor[] = [];
 
-  const internalArray = (provider as any)?._activeSpanProcessor?._spanProcessors;
-  const hasPublicApi = typeof (provider as any)?.addSpanProcessor === "function";
+  const internalArray = readMember(readMember(provider, "_activeSpanProcessor"), "_spanProcessors");
+  const hasPublicApi = typeof readMember(provider, "addSpanProcessor") === "function";
 
   if (!Array.isArray(internalArray) && !hasPublicApi) {
     const msg = "Dedicated tracerProvider does not support adding span processors.";
@@ -326,8 +371,8 @@ function setupDedicatedProvider(
 
   const addProcessor = (processor: SpanProcessor) => {
     if (hasPublicApi) {
-      (provider as any).addSpanProcessor(processor);
-    } else {
+      callMember(provider, "addSpanProcessor", [processor]);
+    } else if (Array.isArray(internalArray)) {
       internalArray.push(processor);
     }
   };
@@ -382,18 +427,7 @@ function setupDedicatedProvider(
       try {
         await Promise.all(addedProcessors.map((p) => p.shutdown()));
       } finally {
-        const candidates = [
-          (provider as any)?._activeSpanProcessor?._spanProcessors,
-          (provider as any)?.activeSpanProcessor?._spanProcessors,
-          (provider as any)?._registeredSpanProcessors,
-        ];
-        for (const arr of candidates) {
-          if (!Array.isArray(arr)) continue;
-          for (const p of addedProcessors) {
-            const idx = arr.indexOf(p);
-            if (idx !== -1) arr.splice(idx, 1);
-          }
-        }
+        detachProcessors(provider, addedProcessors);
         unregisterInstrumentations?.();
       }
       logger.info("LangWatch processor shutdown complete");
@@ -406,8 +440,8 @@ function attachToExistingProvider(
   options: SetupObservabilityOptions,
   logger: Logger,
 ): ObservabilityHandle | null {
-  const internalArray = (provider as any)?._activeSpanProcessor?._spanProcessors;
-  const hasPublicApi = typeof (provider as any)?.addSpanProcessor === "function";
+  const internalArray = readMember(readMember(provider, "_activeSpanProcessor"), "_spanProcessors");
+  const hasPublicApi = typeof readMember(provider, "addSpanProcessor") === "function";
 
   if (!Array.isArray(internalArray) && !hasPublicApi) {
     return null;
@@ -415,8 +449,8 @@ function attachToExistingProvider(
 
   const addProcessor = (processor: SpanProcessor) => {
     if (hasPublicApi) {
-      (provider as any).addSpanProcessor(processor);
-    } else {
+      callMember(provider, "addSpanProcessor", [processor]);
+    } else if (Array.isArray(internalArray)) {
       internalArray.push(processor);
     }
   };
@@ -463,22 +497,44 @@ function attachToExistingProvider(
       try {
         await Promise.all(addedProcessors.map((p) => p.shutdown()));
       } finally {
-        const candidates = [
-          (provider as any)?._activeSpanProcessor?._spanProcessors,
-          (provider as any)?.activeSpanProcessor?._spanProcessors,
-          (provider as any)?._registeredSpanProcessors,
-        ];
-        for (const arr of candidates) {
-          if (!Array.isArray(arr)) continue;
-          for (const p of addedProcessors) {
-            const idx = arr.indexOf(p);
-            if (idx !== -1) arr.splice(idx, 1);
-          }
-        }
+        detachProcessors(provider, addedProcessors);
       }
       logger.info("LangWatch processor shutdown complete");
     },
   };
+}
+
+function applyNextJsProviderWorkaround(logger: Logger): void {
+  // Fix for Next.js 15: Explicitly verify and register provider if still proxy
+  // See: https://github.com/langwatch/langwatch/issues/753
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    // Wait a tick to ensure SDK initialization completes
+    setImmediate(() => {
+      const globalProvider = trace.getTracerProvider();
+
+      // Check if provider is still a proxy (Next.js 15 issue)
+      if (globalProvider.constructor.name === "ProxyTracerProvider") {
+        logger.warn(
+          "Global provider is still ProxyTracerProvider after SDK start - applying Next.js 15 workaround",
+        );
+
+        // Access the real provider from the delegate
+        const realProvider = (globalProvider as any)._delegate;
+
+        if (realProvider?.constructor.name === "NodeTracerProvider") {
+          // Explicitly register the real provider globally
+          trace.setGlobalTracerProvider(realProvider);
+          logger.info("Successfully registered NodeTracerProvider globally for Next.js 15");
+        } else {
+          logger.error(
+            "Could not find NodeTracerProvider in proxy delegate - spans may not be exported",
+          );
+        }
+      } else {
+        logger.debug(`Provider registered correctly: ${globalProvider.constructor.name}`);
+      }
+    });
+  }
 }
 
 export function createAndStartNodeSdk(
@@ -587,36 +643,7 @@ export function createAndStartNodeSdk(
   sdk.start();
   logger.info("NodeSDK started successfully");
 
-  // Fix for Next.js 15: Explicitly verify and register provider if still proxy
-  // See: https://github.com/langwatch/langwatch/issues/753
-  if (process.env.NEXT_RUNTIME === "nodejs") {
-    // Wait a tick to ensure SDK initialization completes
-    setImmediate(() => {
-      const globalProvider = trace.getTracerProvider();
-
-      // Check if provider is still a proxy (Next.js 15 issue)
-      if (globalProvider.constructor.name === "ProxyTracerProvider") {
-        logger.warn(
-          "Global provider is still ProxyTracerProvider after SDK start - applying Next.js 15 workaround",
-        );
-
-        // Access the real provider from the delegate
-        const realProvider = (globalProvider as any)._delegate;
-
-        if (realProvider?.constructor.name === "NodeTracerProvider") {
-          // Explicitly register the real provider globally
-          trace.setGlobalTracerProvider(realProvider);
-          logger.info("Successfully registered NodeTracerProvider globally for Next.js 15");
-        } else {
-          logger.error(
-            "Could not find NodeTracerProvider in proxy delegate - spans may not be exported",
-          );
-        }
-      } else {
-        logger.debug(`Provider registered correctly: ${globalProvider.constructor.name}`);
-      }
-    });
-  }
+  applyNextJsProviderWorkaround(logger);
 
   if (loggerProvider) {
     setLangWatchLoggerProvider(loggerProvider);

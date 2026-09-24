@@ -357,11 +357,9 @@ function VirtualKeyDetailPage() {
         </PageLayout.Header>
 
         <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
-          {detailQuery.isLoading ? (
-            <Spinner />
-          ) : !vk ? (
-            <Text color="fg.muted">Virtual key not found.</Text>
-          ) : (
+          {detailQuery.isLoading && <Spinner />}
+          {!detailQuery.isLoading && !vk && <Text color="fg.muted">Virtual key not found.</Text>}
+          {!detailQuery.isLoading && vk && (
             <VStack align="stretch" gap={6} maxWidth="900px">
               <Section title="Identity">
                 <DetailRow label="Prefix">
@@ -371,18 +369,7 @@ function VirtualKeyDetailPage() {
                   </HStack>
                 </DetailRow>
                 <DetailRow label="Status">
-                  <Badge
-                    colorPalette={
-                      vk.status === "revoked"
-                        ? "red"
-                        : vk.status === "disabled"
-                          ? "yellow"
-                          : isExpired(vk.expiresAt)
-                            ? "orange"
-                            : "green"
-                    }
-                    data-testid="vk-detail-status"
-                  >
+                  <Badge colorPalette={statusPalette(vk)} data-testid="vk-detail-status">
                     {vk.status === "active" && isExpired(vk.expiresAt) ? "expired" : vk.status}
                   </Badge>
                 </DetailRow>
@@ -469,30 +456,10 @@ function VirtualKeyDetailPage() {
                     <Text fontSize="sm" color="fg.muted">
                       Routing policy:
                     </Text>
-                    {vk.routingPolicyId ? (
-                      // The name when the reader may read policies, the
-                      // stored identifier when they may not: this page opens
-                      // on a weaker permission than the policy needs, and an
-                      // identifier is still better than an empty row.
-                      routingPolicyName ? (
-                        <Link
-                          href={`/gateway/routing-policies?drawer.open=routingPolicy&drawer.policyId=${vk.routingPolicyId}`}
-                          color="blue.600"
-                          fontSize="sm"
-                          data-testid="vk-routing-policy-link"
-                        >
-                          {routingPolicyName}
-                        </Link>
-                      ) : (
-                        <Code fontSize="xs" data-testid="vk-routing-policy-id">
-                          {vk.routingPolicyId}
-                        </Code>
-                      )
-                    ) : (
-                      <Text fontSize="sm" color="fg.muted">
-                        default cascade, all eligible providers in priority order
-                      </Text>
-                    )}
+                    <RoutingPolicyValue
+                      routingPolicyId={vk.routingPolicyId}
+                      routingPolicyName={routingPolicyName}
+                    />
                   </HStack>
                   <EligibleModelProvidersSummary
                     scopes={vk.scopes ?? []}
@@ -933,7 +900,7 @@ function ConfigurationSection({ config }: { config: VkConfig | null }) {
     (config.guardrails?.post?.length ?? 0) +
     (config.guardrails?.streamChunk?.length ?? 0);
 
-  const cacheTone = cacheMode === "force" ? "orange" : cacheMode === "disable" ? "red" : "green";
+  const cacheTone = cacheToneFor(cacheMode);
 
   return (
     <Section title="Configuration">
@@ -1031,3 +998,55 @@ function ConfigurationSection({ config }: { config: VkConfig | null }) {
 }
 
 export default VirtualKeyDetailPage;
+
+function statusPalette(vk: {
+  status: string;
+  expiresAt: Parameters<typeof isExpired>[0];
+}): "red" | "yellow" | "orange" | "green" {
+  if (vk.status === "revoked") return "red";
+  if (vk.status === "disabled") return "yellow";
+  if (isExpired(vk.expiresAt)) return "orange";
+  return "green";
+}
+
+// The name when the reader may read policies, the stored identifier when they
+// may not: this page opens on a weaker permission than the policy needs, and
+// an identifier is still better than an empty row.
+function RoutingPolicyValue({
+  routingPolicyId,
+  routingPolicyName,
+}: {
+  routingPolicyId: string | null;
+  routingPolicyName: string | null;
+}) {
+  if (!routingPolicyId) {
+    return (
+      <Text fontSize="sm" color="fg.muted">
+        default cascade, all eligible providers in priority order
+      </Text>
+    );
+  }
+  if (routingPolicyName) {
+    return (
+      <Link
+        href={`/gateway/routing-policies?drawer.open=routingPolicy&drawer.policyId=${routingPolicyId}`}
+        color="blue.600"
+        fontSize="sm"
+        data-testid="vk-routing-policy-link"
+      >
+        {routingPolicyName}
+      </Link>
+    );
+  }
+  return (
+    <Code fontSize="xs" data-testid="vk-routing-policy-id">
+      {routingPolicyId}
+    </Code>
+  );
+}
+
+function cacheToneFor(cacheMode: "respect" | "force" | "disable"): "orange" | "red" | "green" {
+  if (cacheMode === "force") return "orange";
+  if (cacheMode === "disable") return "red";
+  return "green";
+}
