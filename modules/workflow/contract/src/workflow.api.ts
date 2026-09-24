@@ -124,6 +124,15 @@ export type WorkflowPublicationFlags = Readonly<{
   isEvaluator: boolean;
 }>;
 
+/** A workflow's published version with its flags, or that nothing is published yet (ADR-146). */
+export type PublishedWorkflowAnswer =
+  | Readonly<{
+      published: true;
+      workflow: Readonly<Record<string, unknown>> &
+        Readonly<{ isComponent: boolean | undefined; isEvaluator: boolean | undefined }>;
+    }>
+  | Readonly<{ published: false }>;
+
 /** What one started evaluation run answers with. */
 export type WorkflowEvaluationStarted = Readonly<{
   runId: string;
@@ -322,6 +331,10 @@ export interface WorkflowApi {
     workflowId: string;
     projectId: string;
   }): Promise<WorkflowPublicationFlags | null>;
+  getPublishedWorkflow(input: {
+    workflowId: string;
+    projectId: string;
+  }): Promise<PublishedWorkflowAnswer>;
   /** One stored version by id, as the process's own read carries it. */
   findWorkflowVersionById(input: {
     versionId: string;

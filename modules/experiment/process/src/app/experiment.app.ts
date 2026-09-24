@@ -87,6 +87,7 @@ import {
   ExperimentWorkbenchRunService,
   type WorkbenchExecutionRequest,
 } from "../services/experiment-workbench-run.service.ts";
+import { ExperimentWorkbenchVersionService } from "../services/experiment-workbench-version.service.ts";
 import type { ExperimentService } from "../services/experiment.service.ts";
 import { buildExperimentInfrastructure } from "./experiment-composition.build.ts";
 
@@ -239,6 +240,7 @@ export class ExperimentApp implements ExperimentApi {
 
   #dependencies: ExperimentAppDependencies;
   #workbenchRuns: ExperimentWorkbenchRunService;
+  #workbenchVersions: ExperimentWorkbenchVersionService;
 
   private constructor(dependencies: ExperimentAppDependencies) {
     this.#dependencies = dependencies;
@@ -246,6 +248,9 @@ export class ExperimentApp implements ExperimentApi {
       experiments: dependencies.experiments,
       runLoop: dependencies.runLoop,
       observer: dependencies.workbenchObserver,
+    });
+    this.#workbenchVersions = ExperimentWorkbenchVersionService.create({
+      experiments: dependencies.experiments,
     });
   }
 
@@ -540,6 +545,14 @@ export class ExperimentApp implements ExperimentApi {
       ...input,
       actor: ExperimentApp.actorFor(by),
     });
+  }
+
+  /** Puts a past version back by the slug and path segment a REST door names. */
+  restoreWorkbenchVersionBySlug(
+    input: Readonly<{ projectId: string; slug: string; version: string }>,
+    by: ExperimentCaller,
+  ): Promise<WorkbenchSaveResult> {
+    return this.#workbenchVersions.restoreBySlug({ ...input, actor: ExperimentApp.actorFor(by) });
   }
 
   /** Records a run's cell results directly against the workbench state. */

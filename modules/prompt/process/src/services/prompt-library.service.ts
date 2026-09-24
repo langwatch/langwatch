@@ -2,23 +2,13 @@ import { createLogger } from "@langwatch/observability";
 import {
   PromptAddressInvalidError,
   PromptNotFoundError,
-  PromptTagConflictError,
-  PromptTagInvalidError,
-  PromptTagMissingError,
-  PromptTagNotFoundError,
-  PromptTagProtectedError,
-  PromptTagProtectedRefusalError,
-  PromptTagTakenError,
   PromptTagUnprocessableError,
-  PromptTagValidationError,
-  ShorthandParseError,
   apiResponsePromptWithVersionDataSchema,
   parsePromptShorthand,
   type ApiResponsePrompt,
   type CreatePromptCommand,
   type PromptRestSyncInput,
   type PromptSyncResult,
-  type PromptTag,
   type PromptTagAssignment,
   type UpdatePromptCommand,
   type VersionedPrompt,
@@ -29,45 +19,15 @@ import type { PromptService } from "./prompt.service.ts";
 const restLogger = createLogger("langwatch:api:prompts");
 
 /**
- * Re-raises the tag service's plain domain errors on the handled channel.
+ * A prompt as the `/api/prompts` REST family reads and writes it, tags included:
+ * its refusals keep the statuses that family has always answered with.
  */
-function asHandledTagError(error: unknown): never {
-  if (error instanceof PromptTagValidationError) throw new PromptTagInvalidError(error.message);
-  if (error instanceof PromptTagConflictError) throw new PromptTagTakenError(error.message);
-  if (error instanceof PromptTagProtectedError) {
-    throw new PromptTagProtectedRefusalError(error.message);
-  }
-  if (error instanceof PromptTagNotFoundError) throw new PromptTagMissingError(error.tagName);
-  throw error;
-}
-
-/** The statuses the `/api/prompts` REST family has always answered its refusals with. */
-function asRestRefusal(error: unknown): unknown {
-  if (
-    error instanceof PromptTagValidationError ||
-    error instanceof PromptTagInvalidError ||
-    error instanceof PromptTagProtectedError ||
-    error instanceof PromptTagProtectedRefusalError
-  ) {
-    return new PromptTagUnprocessableError(error);
-  }
-  if (error instanceof PromptTagConflictError) return new PromptTagTakenError(error.message);
-  if (error instanceof PromptTagNotFoundError) return new PromptTagMissingError(error.tagName);
-  if (error instanceof ShorthandParseError) return new PromptAddressInvalidError(error.message);
-
-  return error;
-}
-
-/**
- * A prompt as the `/api/prompts` REST family addresses it: its refusals keep
- * the statuses that family has always answered with.
- */
-export class PromptRestService {
+export class PromptLibraryService {
   static create(options: {
     prompts: PromptService;
     afterPromptCreated: (input: { projectId: string }) => void;
-  }): PromptRestService {
-    return new PromptRestService(options);
+  }): PromptLibraryService {
+    return new PromptLibraryService(options);
   }
 
   readonly #prompts: PromptService;
@@ -115,7 +75,7 @@ export class PromptRestService {
         ...(tag === undefined ? {} : { tag }),
       });
     } catch (error: unknown) {
-      throw asRestRefusal(error);
+      throw PromptTagUnprocessableError.fromRestRefusal(error);
     }
   }
 
@@ -152,7 +112,7 @@ export class PromptRestService {
       return answered;
     } catch (error: unknown) {
       restLogger.error({ projectId: data.projectId, error }, "Error creating prompt");
-      throw asRestRefusal(error);
+      throw PromptTagUnprocessableError.fromRestRefusal(error);
     }
   }
 
@@ -184,7 +144,7 @@ export class PromptRestService {
       return answered;
     } catch (error: unknown) {
       restLogger.error({ projectId, promptId: id, error }, "Error updating prompt");
-      throw asRestRefusal(error);
+      throw PromptTagUnprocessableError.fromRestRefusal(error);
     }
   }
 
@@ -206,89 +166,7 @@ export class PromptRestService {
       return syncResult;
     } catch (error: unknown) {
       restLogger.error({ projectId, promptId: id, error }, "Error syncing prompt");
-      throw asRestRefusal(error);
-    }
-  }
-
-  async assignTagByAddress(input: {
-    idOrHandle: string;
-    versionId: string;
-    tag: string;
-    projectId: string;
-    organizationId: string;
-  }): Promise<PromptTagAssignment> {
-    const { idOrHandle: id, tag, versionId, projectId, organizationId } = input;
-
-    restLogger.info({ projectId, promptId: id, tag, versionId }, "Assigning tag to prompt version");
-
-    try {
-      const config = await this.#getByIdOrHandle({ idOrHandle: id, projectId, organizationId });
-
-      // The lookup above also matches org-scoped prompts a SIBLING project
-      // owns, so the row's own projectId is not the one the credential was
-      // authorized on. The write goes to the authorized project.
-      const result = await this.#assignTag({
-        configId: config.id,
-        versionId,
-        tag,
-        projectId,
-        organizationId,
-      });
-
-      restLogger.info(
-        { projectId, configId: config.id, tag, versionId },
-        "Successfully assigned tag to prompt version",
-      );
-
-      return result;
-    } catch (error: unknown) {
-      throw asRestRefusal(error);
-    }
-  }
-
-  async createTagDefinition(input: { organizationId: string; name: string }): Promise<PromptTag> {
-    try {
-      const tag = await this.#prompts.createTag(input);
-
-      restLogger.info(
-        { organizationId: input.organizationId, name: input.name },
-        "Custom prompt tag created via REST",
-      );
-
-      return tag;
-    } catch (error) {
-      throw asRestRefusal(error);
-    }
-  }
-
-  async renameTagDefinition(input: {
-    organizationId: string;
-    oldName: string;
-    newName: string;
-  }): Promise<PromptTag> {
-    try {
-      const tag = await this.#prompts.renameTag(input);
-
-      restLogger.info(
-        { organizationId: input.organizationId, oldName: input.oldName, newName: input.newName },
-        "Custom prompt tag renamed via REST",
-      );
-
-      return tag;
-    } catch (error) {
-      throw asRestRefusal(error);
-    }
-  }
-
-  async deleteTagDefinition(input: { organizationId: string; name: string }): Promise<void> {
-    const { organizationId, name } = input;
-
-    try {
-      await this.#deleteTagByName({ organizationId, name });
-
-      restLogger.info({ organizationId, tagName: name }, "Custom prompt tag deleted via REST");
-    } catch (error) {
-      throw asRestRefusal(error);
+      throw PromptTagUnprocessableError.fromRestRefusal(error);
     }
   }
 
@@ -330,7 +208,7 @@ export class PromptRestService {
       return apiResponsePromptWithVersionDataSchema.parse(refetched);
     } catch (error) {
       if (error instanceof PromptNotFoundError) return prompt;
-      asHandledTagError(error);
+      throw PromptTagUnprocessableError.fromTagError(error);
     }
   }
 
@@ -340,7 +218,7 @@ export class PromptRestService {
     try {
       return await this.#prompts.getPromptByIdOrHandle(input);
     } catch (error) {
-      asHandledTagError(error);
+      throw PromptTagUnprocessableError.fromTagError(error);
     }
   }
 
@@ -348,15 +226,7 @@ export class PromptRestService {
     try {
       return await this.#prompts.assignTag(input);
     } catch (error) {
-      asHandledTagError(error);
-    }
-  }
-
-  async #deleteTagByName(input: { organizationId: string; name: string }): Promise<PromptTag> {
-    try {
-      return await this.#prompts.deleteTagByName(input);
-    } catch (error) {
-      asHandledTagError(error);
+      throw PromptTagUnprocessableError.fromTagError(error);
     }
   }
 }

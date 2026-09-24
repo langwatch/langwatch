@@ -33,19 +33,8 @@ export const workflowOptimizationTrpcTransport = defineTrpcRouter(
   .procedure("getPublishedWorkflow")
   .withPermission("workflows:view")
   .handle(async ({ app, input }) => {
-    const workflow = await app.findWorkflowFlags(input);
-    const publishedWorkflow = await app.findWorkflowVersionById({
-      versionId: workflow?.publishedId ?? "",
-      projectId: input.projectId,
-    });
-
-    if (!publishedWorkflow) return null;
-
-    return {
-      ...publishedWorkflow,
-      isComponent: workflow?.isComponent,
-      isEvaluator: workflow?.isEvaluator,
-    };
+    const answer = await app.getPublishedWorkflow(input);
+    return answer.published ? answer.workflow : null;
   })
 
   .procedure("disableAsComponent")

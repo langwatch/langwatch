@@ -49,6 +49,7 @@ import {
   type WorkflowLineageRow,
   type WorkflowListRow,
   type WorkflowMappingFields,
+  type PublishedWorkflowAnswer,
   type WorkflowPublicationFlags,
   type WorkflowReference,
   type WorkflowRelatedEntities,
@@ -78,6 +79,7 @@ import { WorkflowAgentMappingService } from "../services/workflow-agent-mapping.
 import { ContractWorkflowDslMigrationService } from "../services/workflow-dsl-migration.service.ts";
 import { WorkflowNlpExecutionService } from "../services/workflow-nlp-execution.service.ts";
 import { WorkflowProjectEnvironmentService } from "../services/workflow-project-environment.service.ts";
+import { WorkflowPublicationService } from "../services/workflow-publication.service.ts";
 import { WorkflowStudioCopyService } from "../services/workflow-studio-copy.service.ts";
 import type { WorkflowStudioDispatchService } from "../services/workflow-studio-dispatch.service.ts";
 import { ModelProviderWorkflowStudioDslService } from "../services/workflow-studio-dsl.service.ts";
@@ -437,6 +439,7 @@ export class WorkflowApp implements WorkflowApi {
   #members: WorkflowInfrastructure;
   #studioVersions: WorkflowStudioVersionService;
   #studioCopies: WorkflowStudioCopyService;
+  #publication: WorkflowPublicationService;
 
   private constructor(members: WorkflowInfrastructure) {
     this.#members = members;
@@ -448,6 +451,9 @@ export class WorkflowApp implements WorkflowApi {
     this.#studioCopies = WorkflowStudioCopyService.create({
       datasets: members.datasets,
       rows: members.workflowRows,
+    });
+    this.#publication = WorkflowPublicationService.create({
+      publications: members.publications,
     });
   }
 
@@ -950,6 +956,13 @@ export class WorkflowApp implements WorkflowApi {
     projectId: string;
   }): Promise<WorkflowPublicationFlags | null> {
     return this.#members.publications.findFlags(input);
+  }
+
+  getPublishedWorkflow(input: {
+    workflowId: string;
+    projectId: string;
+  }): Promise<PublishedWorkflowAnswer> {
+    return this.#publication.getPublished(input);
   }
 
   findWorkflowVersionById(input: {

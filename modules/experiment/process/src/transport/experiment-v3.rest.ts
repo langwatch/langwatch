@@ -11,7 +11,6 @@ import {
   type RestRawResult,
 } from "@langwatch/api/rest";
 import {
-  ExperimentVersionNotFoundError,
   listRunsQuerySchema,
   listRunsResponseSchema,
   listVersionsQuerySchema,
@@ -33,16 +32,14 @@ import {
   type WorkbenchRunAnswer,
 } from "@langwatch/experiment-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
-import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
 import type { ExperimentApp } from "#app/experiment.app";
 
+import { parseOptionalPositiveInt } from "../rules/experiment-version-number.rules.ts";
 import { workbenchStateAnswer } from "../rules/experiment-workbench-state-answer.rules.ts";
-
-const logger = createLogger("langwatch:experiments-v3");
 
 /** The 413 a body past its cap earns, in the plain sentence it has always been. */
 const payloadTooLarge = (): Error =>
@@ -65,6 +62,7 @@ export interface ExperimentV3RestApi {
   /** The application the workbench's four setup doors answer from. */
   experiments(): ExperimentApp;
   startSavedRun: ExperimentApp["startSavedRun"];
+  restoreWorkbenchVersionBySlug: ExperimentApp["restoreWorkbenchVersionBySlug"];
   executeWorkbenchRun: ExperimentApp["executeWorkbenchRun"];
   listRunsPage: ExperimentApp["listRunsPage"];
   pollRun: ExperimentApp["pollRun"];
@@ -94,17 +92,6 @@ export const experimentWorkbenchCredential = defineRestMiddleware(
     z.object({ kind: z.literal("legacyProjectKey") }).strict(),
   ]),
 );
-
-/**
- * Query parameters and path segments that are optional positive integers, or
- * nothing.
- */
-const parseOptionalPositiveInt = (value: string | undefined) => {
-  if (value === undefined) return undefined;
-  if (!/^\d+$/.test(value)) return undefined;
-  const parsed = Number(value);
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
-};
 
 export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .withNamespace("experiments")
@@ -359,30 +346,9 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   })
   .withMiddleware(projectRestFacts, experimentWorkbenchCredential)
   .handle(async ({ app, input, scope }, _project, credential) => {
-    const { slug, version } = input;
-
-    const experiments = app.experiments();
-    const workbench = await experiments.getWorkbenchState({ projectId: scope.id, slug });
-
-    // A path segment that is not a version number names a version this
-    // experiment never had, which is the same answer as a number it never
-    // had. `version: 0` because no experiment version is ever 0.
-    const parsedVersion = parseOptionalPositiveInt(version);
-    if (parsedVersion === undefined) {
-      throw new ExperimentVersionNotFoundError({
-        experimentId: workbench.experimentId,
-        version: 0,
-      });
-    }
-
-    const restored = await experiments.restoreWorkbenchVersion(
-      { projectId: scope.id, id: workbench.experimentId, version: parsedVersion },
+    const restored = await app.restoreWorkbenchVersionBySlug(
+      { projectId: scope.id, slug: input.slug, version: input.version },
       { kind: "credential", credential },
-    );
-
-    logger.info(
-      { projectId: scope.id, slug, version: parsedVersion },
-      "Experiment version restored over REST",
     );
 
     return { version: restored.version };

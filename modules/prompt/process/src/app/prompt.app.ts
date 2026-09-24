@@ -11,16 +11,9 @@ import {
   hoistSystemMessage,
   type ApiResponsePrompt,
   PromptNotFoundError,
-  PromptTagMissingError,
   PromptHasNoCopiesError,
   PromptNoCopiesSelectedError,
-  PromptTagInvalidError,
-  PromptTagProtectedRefusalError,
-  PromptTagTakenError,
-  PromptTagConflictError,
-  PromptTagNotFoundError,
-  PromptTagProtectedError,
-  PromptTagValidationError,
+  PromptTagUnprocessableError,
   PromptPlaygroundUnavailableError,
   type CreatePromptCommand,
   type PromptCopySource,
@@ -47,7 +40,8 @@ import type { PromptRepositories } from "../repositories/prompt.repositories.ts"
 import { promptsPlatformUrl } from "../rules/prompt-platform-url.rules.ts";
 import { PromptExecuteBoundsService } from "../services/prompt-execute-bounds.service.ts";
 import { PromptExecutionService } from "../services/prompt-execution.service.ts";
-import { PromptRestService } from "../services/prompt-rest.service.ts";
+import { PromptLibraryService } from "../services/prompt-library.service.ts";
+import { PromptTagCatalogueService } from "../services/prompt-tag-catalogue.service.ts";
 import { PromptTagService } from "../services/prompt-tag.service.ts";
 import { PromptVersionService } from "../services/prompt-version.service.ts";
 import { PromptService } from "../services/prompt.service.ts";
@@ -114,26 +108,14 @@ type PromptRepositorySetup = FeatureSetup<
   PromptRepositories
 >;
 
-/**
- * Re-raises the tag service's plain domain errors on the handled channel.
- */
-function asHandledTagError(error: unknown): never {
-  if (error instanceof PromptTagValidationError) throw new PromptTagInvalidError(error.message);
-  if (error instanceof PromptTagConflictError) throw new PromptTagTakenError(error.message);
-  if (error instanceof PromptTagProtectedError) {
-    throw new PromptTagProtectedRefusalError(error.message);
-  }
-  if (error instanceof PromptTagNotFoundError) throw new PromptTagMissingError(error.tagName);
-  throw error;
-}
-
 /** What every method below reads: the engine, the three peers and the members. */
 type PromptAppDependencies = Readonly<{
   prompts: PromptService;
   projects: ProjectApi;
   permissions: AuthzApi | null;
   members: PromptInfrastructure;
-  rest: PromptRestService;
+  library: PromptLibraryService;
+  tagCatalogue: PromptTagCatalogueService;
   /** Absent only on the read-only twin, which deliberately has no executor. */
   execution: PromptExecutionService | null;
   /**
@@ -195,7 +177,8 @@ export class PromptApp implements PromptApi {
         }),
       }),
       members: { prompts, afterPromptCreated },
-      rest: PromptRestService.create({ prompts, afterPromptCreated }),
+      library: PromptLibraryService.create({ prompts, afterPromptCreated }),
+      tagCatalogue: PromptTagCatalogueService.create({ prompts }),
       publicBaseUrl: members.publicBaseUrl,
     });
   }
@@ -212,10 +195,11 @@ export class PromptApp implements PromptApi {
       permissions: null,
       execution: null,
       members: { prompts: input.prompts, afterPromptCreated: () => undefined },
-      rest: PromptRestService.create({
+      library: PromptLibraryService.create({
         prompts: input.prompts,
         afterPromptCreated: () => undefined,
       }),
+      tagCatalogue: PromptTagCatalogueService.create({ prompts: input.prompts }),
       publicBaseUrl: undefined,
     });
   }
@@ -330,7 +314,7 @@ export class PromptApp implements PromptApi {
     try {
       return await this.#dependencies.prompts.deleteTagByName(input);
     } catch (error) {
-      asHandledTagError(error);
+      throw PromptTagUnprocessableError.fromTagError(error);
     }
   }
 
@@ -346,7 +330,7 @@ export class PromptApp implements PromptApi {
       return await this.#dependencies.prompts.getPromptByIdOrHandle(input);
     } catch (error) {
       if (error instanceof PromptNotFoundError) return null;
-      asHandledTagError(error);
+      throw PromptTagUnprocessableError.fromTagError(error);
     }
   }
 
@@ -359,7 +343,7 @@ export class PromptApp implements PromptApi {
     try {
       return await this.#dependencies.prompts.getPromptByIdOrHandle(input);
     } catch (error) {
-      asHandledTagError(error);
+      throw PromptTagUnprocessableError.fromTagError(error);
     }
   }
 
@@ -581,7 +565,7 @@ export class PromptApp implements PromptApi {
         createdById: by.id,
       });
     } catch (error) {
-      asHandledTagError(error);
+      throw PromptTagUnprocessableError.fromTagError(error);
     }
   }
 
@@ -848,7 +832,7 @@ export class PromptApp implements PromptApi {
         newName: input.newName,
       });
     } catch (error) {
-      asHandledTagError(error);
+      throw PromptTagUnprocessableError.fromTagError(error);
     }
   }
 
@@ -872,7 +856,7 @@ export class PromptApp implements PromptApi {
     try {
       return await this.#dependencies.prompts.assignTag({ ...input, userId: by?.id });
     } catch (error) {
-      asHandledTagError(error);
+      throw PromptTagUnprocessableError.fromTagError(error);
     }
   }
 
@@ -883,23 +867,23 @@ export class PromptApp implements PromptApi {
     projectId: string;
     organizationId: string;
   }): Promise<VersionedPrompt> {
-    return this.#dependencies.rest.getByAddress(input);
+    return this.#dependencies.library.getByAddress(input);
   }
 
   createWithTags(
     input: CreatePromptCommand & { organizationId: string; tags?: string[] },
   ): Promise<ApiResponsePrompt> {
-    return this.#dependencies.rest.createWithTags(input);
+    return this.#dependencies.library.createWithTags(input);
   }
 
   updateWithTags(
     input: UpdatePromptCommand & { organizationId: string; tags?: string[] },
   ): Promise<ApiResponsePrompt> {
-    return this.#dependencies.rest.updateWithTags(input);
+    return this.#dependencies.library.updateWithTags(input);
   }
 
   syncAndAnnounce(input: PromptRestSyncInput): Promise<PromptSyncResult> {
-    return this.#dependencies.rest.syncAndAnnounce(input);
+    return this.#dependencies.library.syncAndAnnounce(input);
   }
 
   assignTagByAddress(input: {
@@ -909,11 +893,11 @@ export class PromptApp implements PromptApi {
     projectId: string;
     organizationId: string;
   }): Promise<PromptTagAssignment> {
-    return this.#dependencies.rest.assignTagByAddress(input);
+    return this.#dependencies.tagCatalogue.assignTagByAddress(input);
   }
 
   createTagDefinition(input: { organizationId: string; name: string }): Promise<PromptTag> {
-    return this.#dependencies.rest.createTagDefinition(input);
+    return this.#dependencies.tagCatalogue.createTagDefinition(input);
   }
 
   async renameTagDefinition(input: {
@@ -925,7 +909,7 @@ export class PromptApp implements PromptApi {
   }): Promise<PromptTag> {
     const { projectId, by, ...rename } = input;
     await this.assertMayManageTagCatalog({ projectId, by });
-    return this.#dependencies.rest.renameTagDefinition(rename);
+    return this.#dependencies.tagCatalogue.renameTagDefinition(rename);
   }
 
   async deleteTagDefinition(input: {
@@ -936,7 +920,7 @@ export class PromptApp implements PromptApi {
   }): Promise<void> {
     const { projectId, by, ...deletion } = input;
     await this.assertMayManageTagCatalog({ projectId, by });
-    return this.#dependencies.rest.deleteTagDefinition(deletion);
+    return this.#dependencies.tagCatalogue.deleteTagDefinition(deletion);
   }
 
   async #organizationOf(projectId: string): Promise<string> {

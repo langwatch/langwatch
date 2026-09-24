@@ -1,6 +1,8 @@
 import { HandledError, NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { z } from "zod";
 
+import { ShorthandParseError } from "./prompt.shorthand.ts";
+
 export const promptProblemSchema = z
   .object({ code: z.string(), message: z.string(), details: z.unknown().optional() })
   .strict();
@@ -307,6 +309,33 @@ export class PromptTagUnprocessableError extends HandledError {
   constructor(refusal: { code: string; message: string }) {
     super(refusal.code, refusal.message, { httpStatus: 422, fault: "customer" });
     this.name = "PromptTagUnprocessableError";
+  }
+
+  /** The tag service's plain domain errors on the handled channel; anything else passes through. */
+  static fromTagError(error: unknown): unknown {
+    if (error instanceof PromptTagValidationError) return new PromptTagInvalidError(error.message);
+    if (error instanceof PromptTagConflictError) return new PromptTagTakenError(error.message);
+    if (error instanceof PromptTagProtectedError) {
+      return new PromptTagProtectedRefusalError(error.message);
+    }
+    if (error instanceof PromptTagNotFoundError) return new PromptTagMissingError(error.tagName);
+    return error;
+  }
+
+  /** A tag or address refusal at the status the `/api/prompts` REST family has always answered. */
+  static fromRestRefusal(error: unknown): unknown {
+    if (
+      error instanceof PromptTagValidationError ||
+      error instanceof PromptTagInvalidError ||
+      error instanceof PromptTagProtectedError ||
+      error instanceof PromptTagProtectedRefusalError
+    ) {
+      return new PromptTagUnprocessableError(error);
+    }
+    if (error instanceof PromptTagConflictError) return new PromptTagTakenError(error.message);
+    if (error instanceof PromptTagNotFoundError) return new PromptTagMissingError(error.tagName);
+    if (error instanceof ShorthandParseError) return new PromptAddressInvalidError(error.message);
+    return error;
   }
 }
 
