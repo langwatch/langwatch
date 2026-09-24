@@ -32,10 +32,12 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "catalog:",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/auth-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/aws-client": "workspace:*",
     "@langwatch/egress": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/enterprise-scim-contract": "workspace:*",

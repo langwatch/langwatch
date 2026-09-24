@@ -2415,6 +2415,9 @@ importers:
 
   enterprise/modules/governance/process:
     dependencies:
+      '@aws-sdk/client-s3':
+        specifier: 'catalog:'
+        version: 3.1108.0
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../../packages/api
@@ -2427,6 +2430,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../../../modules/authz/contract
+      '@langwatch/aws-client':
+        specifier: workspace:*
+        version: link:../../../../packages/aws-client
       '@langwatch/egress':
         specifier: workspace:*
         version: link:../../../../packages/egress
