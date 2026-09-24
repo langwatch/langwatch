@@ -50,6 +50,7 @@ function renderSubmit(
     useSubmitSearch({
       isLangyAvailable: true,
       isSamplePreview: false,
+      isInstantEvalAvailable: true,
       ...handlers,
       ...overrides,
     }),
@@ -392,6 +393,25 @@ describe("given the text is an eval chip typed by hand", () => {
       expect(useExplorerStore.getState().queryText).toBe(
         'eval:"the user is annoyed"',
       );
+    });
+  });
+
+  describe("given the Instant Evals flag is off for the project", () => {
+    /** @scenario "Instant Evals switched off open the contact-us popover and nothing is searched" */
+    it("hands the question to the Instant Eval handler and leaves the typed query unsearched", () => {
+      const { result } = renderSubmit({ isInstantEvalAvailable: false });
+      act(() =>
+        result.current.submitSearch('eval:"the user is annoyed"'),
+      );
+      expect(mutation.mutate).not.toHaveBeenCalled();
+      expect(handlers.onInstantEval).toHaveBeenCalledWith(
+        expect.objectContaining({
+          question: { instructions: "the user is annoyed" },
+        }),
+      );
+      // Nothing is searched: the popover the handler opens explains why,
+      // and the typed chip stays exactly where the reader left it.
+      expect(useExplorerStore.getState().queryText).toBe("");
     });
   });
 });

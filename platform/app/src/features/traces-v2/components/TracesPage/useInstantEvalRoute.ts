@@ -56,17 +56,25 @@ export interface InstantEvalRoutePayload {
  */
 export const INSTANT_EVAL_AUTO_RUN_USD = 0.5;
 
-/** The refusal codes that get a popover of their own, rather than the registry's copy. */
+/**
+ * The refusal codes that get a popover of their own, rather than the
+ * registry's copy.
+ *
+ * `instant_eval_not_enabled` is still mapped here even though the flag read
+ * in the search bar is meant to catch this first: that read can be stale or
+ * still loading, and the server's refusal is the authority, so a request
+ * that reaches it anyway still gets the right popover.
+ */
 function refusalOf({ error }: { error: unknown }): InstantEvalRefusal | null {
   const handled = readHandledError(error);
   if (!handled) return null;
   if (handled.code === "instant_eval_free_budget_exhausted") {
     return { kind: "budget" };
   }
-  if (
-    handled.code === "instant_eval_not_enabled" ||
-    handled.code === "instant_eval_classifier_unavailable"
-  ) {
+  if (handled.code === "instant_eval_not_enabled") {
+    return { kind: "unreleased" };
+  }
+  if (handled.code === "instant_eval_classifier_unavailable") {
     return { kind: "model" };
   }
   return null;
@@ -319,10 +327,18 @@ function useInstantEvalStarter({
  * budget or a missing judge is a popover, and every refusal ends in the
  * phrase search the router built.
  *
+ * A project the flag has not been turned on for never reaches the estimate:
+ * the popover shows straight away, and nothing is sent.
+ *
  * Spec: specs/traces-v2/instant-eval-search.feature ("A run starts under
- * the cost rule", "A refusal is a popover, never an error state").
+ * the cost rule", "A refusal is a popover, never an error state",
+ * "Instant Evals unreleased for this project").
  */
-export function useInstantEvalRoute(): InstantEvalRouteState {
+export function useInstantEvalRoute({
+  isInstantEvalAvailable,
+}: {
+  isInstantEvalAvailable: boolean;
+}): InstantEvalRouteState {
   const estimate = api.tracesV2.instantEval.estimate.useMutation();
   const outcome = useInstantEvalOutcome();
   const { pendingRef, setConfirmation, setRefusal, refuse } = outcome;
@@ -347,7 +363,18 @@ export function useInstantEvalRoute(): InstantEvalRouteState {
 
   const onInstantEvalRoute = useCallback(
     (payload: InstantEvalRoutePayload) => {
-      const seq = ++seqRef.current;
+      ++seqRef.current;
+      // The flag is checked before any estimate goes out: a project without
+      // Instant Evals gets the popover straight away, so nothing is sent
+      // over a run it can never start. Pending is left null, so dismissing
+      // this popover just closes it rather than applying a fallback query.
+      if (!isInstantEvalAvailable) {
+        pendingRef.current = null;
+        setConfirmation(null);
+        setRefusal({ kind: "unreleased" });
+        return;
+      }
+      const seq = seqRef.current;
       const { timeRange, evalRuns } = useExplorerStore.getState();
       const key = routeRunKey({ payload, presetId: timeRange.presetId });
       pendingRef.current = { payload, key };
@@ -380,6 +407,7 @@ export function useInstantEvalRoute(): InstantEvalRouteState {
     [
       applyChip,
       estimate,
+      isInstantEvalAvailable,
       pendingRef,
       refuse,
       setConfirmation,

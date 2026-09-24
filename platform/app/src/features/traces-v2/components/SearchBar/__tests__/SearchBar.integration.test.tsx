@@ -67,7 +67,7 @@ vi.mock("~/features/langy/stores/langyStore", () => {
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: undefined,
-    organization: undefined,
+    organization: { id: "org-1" },
     team: undefined,
     isFetching: false,
   }),
@@ -109,6 +109,13 @@ vi.mock("~/utils/api", () => ({
         start: {
           useMutation: () => ({ mutate: vi.fn(), isPending: false }),
         },
+      },
+    },
+    // The Instant Evals gate reads this flag; stub it enabled so these
+    // smoke tests exercise the flag-on path unless a test overrides it.
+    featureFlag: {
+      isEnabled: {
+        useQuery: () => ({ data: { enabled: true }, isLoading: false }),
       },
     },
   },

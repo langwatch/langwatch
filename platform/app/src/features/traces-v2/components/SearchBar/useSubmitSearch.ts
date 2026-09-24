@@ -23,6 +23,12 @@ import type { InstantEvalRoutePayload } from "../TracesPage/useInstantEvalRoute"
 interface UseSubmitSearchOptions {
   /** Whether the Langy route is open to this user. */
   isLangyAvailable: boolean;
+  /**
+   * Whether Instant Evals are open to this project. Off, a typed `eval` chip
+   * still shows up in the bar but starts no run — {@link onInstantEval} gets
+   * called with it purely so the refusal popover can be shown.
+   */
+  isInstantEvalAvailable: boolean;
   /** Sample data is client fixtures; a routed search has nothing to run on. */
   isSamplePreview: boolean;
   /** Hands the sentence to Langy as a question. */
@@ -277,6 +283,7 @@ function useRouteSubmit({
  */
 export function useSubmitSearch({
   isLangyAvailable,
+  isInstantEvalAvailable,
   isSamplePreview,
   onLangy,
   onInstantEval,
@@ -310,12 +317,17 @@ export function useSubmitSearch({
       queryText: string;
       projectId: string | null;
     }) => {
+      const run = projectId ? typedEvalRunOf({ queryText, projectId }) : null;
+      if (run && !isInstantEvalAvailable) {
+        // Nothing is searched: the typed chip stays in the bar under the
+        // popover that says why the run did not start.
+        onInstantEval(run);
+        return;
+      }
       applyQueryText(queryText);
-      if (!projectId) return;
-      const run = typedEvalRunOf({ queryText, projectId });
       if (run) onInstantEval(run);
     },
-    [applyQueryText, onInstantEval],
+    [applyQueryText, isInstantEvalAvailable, onInstantEval],
   );
 
   const submitSearch = useCallback(

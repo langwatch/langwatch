@@ -11,6 +11,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import type React from "react";
 import { describe, expect, it, vi } from "vitest";
 import {
+  CONTACT_US_HREF,
   InstantEvalRefusalPopover,
   instantEvalRefusalCopy,
   MODEL_PROVIDERS_HREF,
@@ -66,6 +67,53 @@ describe("given the deployment has no classifier", () => {
         label: "Configure a model",
         href: MODEL_PROVIDERS_HREF,
       });
+    });
+  });
+});
+
+describe("given the Instant Evals flag is off for the project", () => {
+  describe("when the popover opens", () => {
+    /** @scenario "Instant Evals switched off open the contact-us popover and nothing is searched" */
+    it("says Instant Evals aren't enabled yet, offers Contact us, and dismisses on Not now", () => {
+      const onClose = vi.fn();
+      render(
+        <InstantEvalRefusalPopover
+          refusal={{ kind: "unreleased" }}
+          onClose={onClose}
+        >
+          <span>anchor</span>
+        </InstantEvalRefusalPopover>,
+        { wrapper },
+      );
+      expect(
+        screen.getByText("Instant Evals aren't enabled for this project yet"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "An Instant Eval reads every result in this view and keeps the ones that answer your question, which no filter can do. Contact us and we'll switch them on for you.",
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: "Contact us" }),
+      ).toHaveAttribute("href", CONTACT_US_HREF);
+      fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "Instant Evals switched off open the contact-us popover and nothing is searched" */
+    it("pins the unreleased copy, including its dismiss label", () => {
+      const copy = instantEvalRefusalCopy({ kind: "unreleased" });
+      expect(copy.title).toBe(
+        "Instant Evals aren't enabled for this project yet",
+      );
+      expect(copy.body).toBe(
+        "An Instant Eval reads every result in this view and keeps the ones that answer your question, which no filter can do. Contact us and we'll switch them on for you.",
+      );
+      expect(copy.action).toEqual({
+        label: "Contact us",
+        href: CONTACT_US_HREF,
+      });
+      expect(copy.dismiss).toBe("Not now");
     });
   });
 });

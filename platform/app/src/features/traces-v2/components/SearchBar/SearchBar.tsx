@@ -17,6 +17,7 @@ import { Kbd } from "~/components/ops/shared/Kbd";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { explainAnyError } from "~/features/errors";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
@@ -168,7 +169,7 @@ export const SearchBar: React.FC = () => {
   // popover pointing the user at /settings/model-providers. Langy needs
   // none of this — the panel walks the user through model setup itself —
   // so when Langy owns the affordance the primer never blocks the way in.
-  const { project } = useOrganizationTeamProject();
+  const { project, organization } = useOrganizationTeamProject();
   const { hasEnabledProviders, isLoading: isLoadingProviders } =
     useModelProvidersSettings({ projectId: project?.id });
   const askAiNeedsProviderPrimer =
@@ -292,7 +293,17 @@ export const SearchBar: React.FC = () => {
   // attached. A search that ran without the model that shapes it says so in
   // the strip under the bar (`SearchFallbackNotice`), which is where the
   // model settings are offered.
-  const instantEval = useInstantEvalRoute();
+  // While the read is in flight the submit still goes to the server, which
+  // refuses with this same popover on `instant_eval_not_enabled` — so a slow
+  // flag read never hides a feature the project actually has.
+  const { enabled: instantEvalsReleased, isLoading: instantEvalsFlagLoading } =
+    useFeatureFlag("release_instant_evals", {
+      projectId: project?.id,
+      organizationId: organization?.id,
+      enabled: !!project?.id && !!organization?.id,
+    });
+  const isInstantEvalAvailable = instantEvalsReleased || instantEvalsFlagLoading;
+  const instantEval = useInstantEvalRoute({ isInstantEvalAvailable });
   const { onInstantEvalRoute } = instantEval;
   // The route's dialog and popover are anchored here, so a caller outside the
   // bar (a Langy action) reaches this same route rather than one of its own.
@@ -302,6 +313,7 @@ export const SearchBar: React.FC = () => {
   );
   const { submitSearch, isRouting } = useSubmitSearch({
     isLangyAvailable: langyRoutesAsk,
+    isInstantEvalAvailable,
     isSamplePreview,
     onLangy: askLangyFromSearch,
     onInstantEval: onInstantEvalRoute,

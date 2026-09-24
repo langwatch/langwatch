@@ -379,6 +379,14 @@ Feature: Instant Evals inside the Trace Explorer
       And closing it applies the phrase search
 
     @integration
+    Scenario: Instant Evals switched off open the contact-us popover and nothing is searched
+      Given the Instant Evals flag is off for the project
+      When the reader submits an eval chip
+      Then a closable popover anchored under the search bar says Instant Evals aren't enabled for this project and offers to contact us
+      And no estimate is requested and the typed query stays in the bar
+      And closing it, by Escape or a click outside, keeps the typed query and searches nothing
+
+    @integration
     Scenario: Any other refusal falls back to the phrase search
       Given the estimate fails for a reason the registry names
       When the Explorer receives an Instant Eval payload
