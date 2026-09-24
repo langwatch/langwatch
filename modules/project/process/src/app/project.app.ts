@@ -45,18 +45,8 @@ import type {
 } from "../transport/project.trpc.ts";
 
 export type ProjectInfrastructure = Readonly<{
-  topicClustering: {
-    requestClustering(input: {
-      tenantId: string;
-      occurredAt: number;
-      trigger: "manual";
-      requestedByUserId: string;
-    }): Promise<void>;
-  };
   now?: (() => number) | undefined;
 }>;
-
-export type TopicClusteringCommands = ProjectInfrastructure["topicClustering"];
 
 /**
  * The two process members this application reads, from the closed fourteen-name
@@ -116,7 +106,7 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     langy: LangyApi,
   };
   /** Both names are from the process's vocabulary; boot refuses by name. */
-  static readonly reads = ["encryption", "logger", "topicClustering"] as const;
+  static readonly reads = ["encryption", "logger"] as const;
 
   readonly #projectService: ProjectApplicationService;
   readonly #operations: ProjectOperationsService;
@@ -166,7 +156,6 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
       apiKeys: dependencies.apiKeys,
       share: dependencies.share,
       topics: dependencies.topics,
-      topicClustering: members.topicClustering,
       now: members.now ?? (() => nowInstant().epochMilliseconds),
       auditLog: dependencies.auditLog,
       logger: members.logger,

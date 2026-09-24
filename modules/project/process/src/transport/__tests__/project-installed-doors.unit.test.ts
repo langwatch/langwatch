@@ -62,7 +62,6 @@ function installed(peers: Peers) {
     .withConfig({ project: undefined })
     .withMembers({
       encryption: { encrypt: (plaintext: string) => `cipher(${plaintext})` },
-      topicClustering: { requestClustering: async () => undefined },
     })
     .withObservability((observability) => observability.withLogging({ error: () => undefined }))
     .provide({

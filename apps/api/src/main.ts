@@ -57,12 +57,6 @@ export async function startApi(options: ApiStartOptions = {}): Promise<ProcessSe
     .withMember("gatewayInternalProtocol", () => ({}))
     .withMember("connectJudge", () => null)
     .withMember("monitor", () => void 0)
-    // The api composes no clustering worker, so the claim is answered by
-    // something that refuses loudly rather than by `undefined`.
-    .withMember("topicClustering", () => ({
-      requestClustering: () =>
-        Promise.reject(new Error("langwatch-api composes no topic clustering worker")),
-    }))
     .exposeTransports((transports) =>
       transports
         .trpc()

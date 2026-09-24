@@ -52,12 +52,6 @@ export async function startWorker(options: WorkerStartOptions = {}): Promise<Pro
     .withMember("gatewayInternalProtocol", () => ({}))
     .withMember("connectJudge", () => null)
     .withMember("monitor", () => void 0)
-    // The worker hosts no topic-clustering caller of its own, so the claim is
-    // answered by something that refuses loudly rather than by `undefined`.
-    .withMember("topicClustering", () => ({
-      requestClustering: () =>
-        Promise.reject(new Error("langwatch-worker composes no topic clustering worker")),
-    }))
     .withPipelines((pipelines) => pipelines.consume())
     .boot();
 

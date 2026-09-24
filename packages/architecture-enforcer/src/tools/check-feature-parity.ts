@@ -847,7 +847,7 @@ const LEGACY_PARTIAL: string[] = [
   // testing harness, which this branch does not own.
   "specs/skills/skills-testing.feature",
   "specs/suites/suite-model-selection.feature",
-  "specs/topic-clustering/event-sourced-scheduling.feature",
+  "modules/topic/specs/event-sourced-scheduling.feature",
   // Reason: the first-trace poll scenario is the one the Trace Explorer
   // binds; the other scenarios describe the onboarding journey, which no
   // test on this branch is tagged against.

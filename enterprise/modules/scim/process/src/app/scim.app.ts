@@ -89,10 +89,8 @@ import type { ScimSyncLifecycle } from "./scim.members.ts";
  * it states facts on Identity's own `ScimSync` aggregate through guard and
  * ledger primitives Identity's public API does not expose to a peer module
  * today. A process composes one with `createScimSyncLifecycle`
- * (`scim.server.ts`) and supplies it here the same way
- * `ProjectInfrastructure.topicClustering` reaches `ProjectApp` in
- * `project.app.ts`: a member that is neither a process read nor a peer
- * capability, so it travels beside `reads()` rather than through it.
+ * (`scim.server.ts`) and supplies it beside `reads()`: it is neither a
+ * process read nor a peer capability.
  */
 export type ScimBespokeMembers = Readonly<{
   lifecycle: ScimSyncLifecycle;

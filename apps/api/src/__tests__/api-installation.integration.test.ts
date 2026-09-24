@@ -113,10 +113,6 @@ async function bootApi() {
           postgres: { configured: false },
           database: () => prisma,
         },
-        topicClustering: {
-          requestClustering: () =>
-            Promise.reject(new Error("langwatch-api composes no topic clustering worker")),
-        },
       }),
       close: async () => void 0,
     },

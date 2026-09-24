@@ -147,6 +147,7 @@ function application(
       share: createApiFixture<ShareApi>({}, "share"),
       topics: createApiFixture<TopicApi>({
         getClusteringStatus: async () => IDLE_CLUSTERING,
+        requestClustering: options.clustering ?? (async () => undefined),
       }),
       trace: createApiFixture<TraceApi>({}, "trace"),
       auditLog: createApiFixture<AuditLogApi>({}, "auditLog"),
@@ -154,9 +155,6 @@ function application(
     },
     repositories: { projects: MemoryProjectRepository.create({ memory: database }) },
     members: {
-      topicClustering: {
-        requestClustering: options.clustering ?? (async () => undefined),
-      },
       now: () => NOW.getTime(),
       // The deployment's cipher, named so the assertion can see it was the one
       // the procedure reached rather than any encryption at all.

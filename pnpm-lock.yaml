@@ -6476,9 +6476,6 @@ importers:
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
-      '@langwatch/workflow-process':
-        specifier: workspace:*
-        version: link:../../workflow/process
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -9057,9 +9054,6 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
-      '@langwatch/topic-contract':
-        specifier: workspace:*
-        version: link:../../topic/contract
       '@openrouter/sdk':
         specifier: ^0.3.12
         version: 0.3.16

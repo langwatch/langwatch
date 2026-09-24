@@ -111,10 +111,6 @@ async function bootWorker() {
           postgres: { configured: false },
           database: () => prisma,
         },
-        topicClustering: {
-          requestClustering: () =>
-            Promise.reject(new Error("langwatch-worker composes no topic clustering worker")),
-        },
       }),
       close: async () => void 0,
     },
@@ -137,6 +133,7 @@ describe("the worker process installation", () => {
       expect(pipelines).toContain("experiment_run_processing");
       expect(pipelines).toContain("coding_agent_processing");
       expect(pipelines).toContain("topic_clustering_processing");
+      expect(pipelines).toContain("automations");
       // Every process that is not producing resolves trace commands from this registration.
       expect(pipelines).toContain("trace_processing");
       const schedules = eventing.definitions.flatMap((definition) =>

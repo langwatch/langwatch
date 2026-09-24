@@ -141,7 +141,6 @@ function application(options: { apiKeys?: Partial<TestApiKeyService> } = {}): {
       projects: MemoryProjectRepository.create({ memory: database }),
     },
     members: {
-      topicClustering: { requestClustering: async () => undefined },
       now: () => NOW.getTime(),
       // Neither member is reached on this door: the management family writes no
       // stored-object credential and reports no best-effort failure.

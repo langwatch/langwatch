@@ -44,7 +44,6 @@
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/topic-contract": "workspace:*",
     "@openrouter/sdk": "^0.3.12",
     "@trpc/server": "catalog:",
     "ai": "catalog:",

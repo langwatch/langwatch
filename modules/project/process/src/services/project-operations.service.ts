@@ -21,15 +21,7 @@ type ProjectOperationsDependencies = Readonly<{
   readonly projects: ProjectOperationsDirectory;
   readonly apiKeys: ApiKeyApi;
   readonly share: ShareApi;
-  readonly topics: TopicApi;
-  readonly topicClustering: {
-    requestClustering(input: {
-      tenantId: string;
-      occurredAt: number;
-      trigger: "manual";
-      requestedByUserId: string;
-    }): Promise<void>;
-  };
+  readonly topics: Pick<TopicApi, "getClusteringStatus" | "requestClustering">;
   readonly now: () => number;
   readonly auditLog: AuditLogApi;
   /** Where a best-effort failure is reported when nothing can be done about it. */
@@ -158,8 +150,8 @@ export class ProjectOperationsService {
       return { started: false, reason: "already_running" };
     }
 
-    await this.dependencies.topicClustering.requestClustering({
-      tenantId: input.projectId,
+    await this.dependencies.topics.requestClustering({
+      projectId: input.projectId,
       occurredAt: this.dependencies.now(),
       trigger: "manual",
       requestedByUserId: by.id,

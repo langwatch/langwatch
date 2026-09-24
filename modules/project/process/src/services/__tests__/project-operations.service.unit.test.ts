@@ -135,7 +135,6 @@ function characterizationOperations(options: {
     apiKeys: refusingApiKeys(),
     share: new CharacterizationShareApi(options.revokeAllTraceShares),
     topics: refusingTopics(),
-    topicClustering: { requestClustering: async () => {} },
     now: () => 0,
     auditLog: createApiFixture<AuditLogApi>({}),
     logger: { error: () => undefined },
