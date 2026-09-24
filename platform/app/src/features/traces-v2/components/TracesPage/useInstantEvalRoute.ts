@@ -60,11 +60,11 @@ export const INSTANT_EVAL_AUTO_RUN_USD = 0.5;
  * The refusal codes that get a popover of their own, rather than the
  * registry's copy.
  *
- * The flag-off case never reaches here: {@link bailUnreleased} catches it
- * client-side before any request goes out. So a `not_enabled` refusal that
- * does arrive is from a released project the deployment cannot judge yet —
- * no classifier configured — the same case as `classifier_unavailable`, and
- * gets the same popover.
+ * The client-side bail in {@link bailUnreleased} catches the flag-off case
+ * only once the flag read has answered. A submit made while that read is
+ * still in flight goes to the server instead, and can come back as this same
+ * `not_enabled` code — so an arriving `not_enabled` is not always a released
+ * project the deployment cannot judge yet, and either case gets this popover.
  */
 function refusalOf({ error }: { error: unknown }): InstantEvalRefusal | null {
   const handled = readHandledError(error);
