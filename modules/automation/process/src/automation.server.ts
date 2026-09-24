@@ -83,9 +83,12 @@ import type { AutomationRunawaySignals } from "./services/automation-runaway-sig
 import { AutomationScheduledIntent } from "./services/automation-scheduled-intent.service.ts";
 import type { AutomationSettlementExecutor } from "./services/automation-settlement-executor.service.ts";
 import type { AutomationSettlementLedgerService } from "./services/automation-settlement-ledger.service.ts";
-import { AutomationSettlementMatchConfirmationService } from "./services/automation-settlement-match-confirmation.service.ts";
+import {
+  AutomationSettlementMatchConfirmationService,
+  type AutomationSettlementEvaluationFilters,
+  type AutomationSettlementTraceFilters,
+} from "./services/automation-settlement-match-confirmation.service.ts";
 import type { AutomationSettlementObservability } from "./services/automation-settlement-observability.service.ts";
-import type { AutomationSettlementFilterEvaluator } from "./services/automation-settlement-policy.service.ts";
 import {
   AutomationSlackSecretsService,
   type AutomationSecretCrypto,
@@ -385,7 +388,8 @@ export function createAutomationSettlement(input: {
   traces: AutomationSettlementTraceReader;
   evaluations: AutomationSettlementEvaluationReader;
   /** How a saved automation's own filters are re-checked against the trace it matched. */
-  filterEvaluator: AutomationSettlementFilterEvaluator;
+  traceFilters: AutomationSettlementTraceFilters;
+  evaluationFilters: AutomationSettlementEvaluationFilters;
   /** `ADD_TO_DATASET`'s row mapping, and the two persist writes. */
   mapper: AutomationDatasetMapper;
   writer: AutomationPersistActionWriter;
@@ -470,7 +474,8 @@ export function createAutomationSettlement(input: {
       confirmation: AutomationSettlementMatchConfirmationService.create({
         evaluations: input.evaluations,
         traces: input.traces,
-        filterEvaluator: input.filterEvaluator,
+        traceFilters: input.traceFilters,
+        evaluationFilters: input.evaluationFilters,
       }),
       persistActions: AutomationPersistActionService.create({
         automation: ledger,

@@ -151,10 +151,7 @@ export {
   AutomationNotificationDeliveryAdapter,
   injectFooterIntoBody,
 } from "./services/automation-notification-delivery.service.ts";
-export {
-  AutomationSettlementFilterEvaluator,
-  AutomationSettlementMatchConfirmation,
-} from "./services/automation-settlement-policy.service.ts";
+export { AutomationSettlementMatchConfirmation } from "./services/automation-settlement-policy.service.ts";
 export { AutomationSettlementExecutor } from "./services/automation-settlement-executor.service.ts";
 export {
   AutomationSettlementObservability,

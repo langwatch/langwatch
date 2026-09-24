@@ -115,8 +115,9 @@ export class GraphTriggerAlertDeliveryService {
     previousFireId: string | null;
     claimId: string;
   }): Promise<GraphTriggerEvaluationResult> {
+    let result: GraphAlertDispatchResult;
     try {
-      const result = await plan.request.deps.notifier.dispatch({
+      result = await plan.request.deps.notifier.dispatch({
         trigger: plan.trigger,
         project,
         context: this.context(plan, values, project),
@@ -129,13 +130,13 @@ export class GraphTriggerAlertDeliveryService {
           previousFireId,
         }),
       });
-
-      return await this.finish({ plan, value: values.currentValue, result, claimId });
     } catch (error) {
       await this.rollbackRetryableClaim(plan, claimId, error);
 
       throw error;
     }
+
+    return this.finish({ plan, value: values.currentValue, result, claimId });
   }
 
   private context(

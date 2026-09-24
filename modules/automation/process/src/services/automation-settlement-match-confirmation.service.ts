@@ -1,11 +1,11 @@
 import type { TriggerSummary } from "@langwatch/automation-contract";
-import type { TraceSummaryData } from "@langwatch/trace-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { TraceApi, TraceSummaryData } from "@langwatch/trace-contract";
 
 import type {
   AutomationSettlementEvaluationReader,
   AutomationSettlementTraceReader,
 } from "../repositories/automation-settlement-read.repository.ts";
-import type { AutomationSettlementFilterEvaluator } from "./automation-settlement-policy.service.ts";
 import { AutomationSettlementMatchConfirmation } from "./automation-settlement-policy.service.ts";
 
 const EVENT_FILTER_FIELDS = new Set([
@@ -37,14 +37,24 @@ function splitFilters(filters: Record<string, unknown>): {
   return { trace, evaluation };
 }
 
+/** The trace owner's in-memory query and legacy-filter matchers. */
+export type AutomationSettlementTraceFilters = Pick<
+  TraceApi,
+  "matchesFilterQuery" | "matchesTraceFilters"
+>;
+
+/** The evaluation owner's half of a trigger's legacy filters. */
+export type AutomationSettlementEvaluationFilters = Pick<EvaluationApi, "matchesEvaluationFilters">;
+
 /** Confirms a recorded match against its settled trace state before delivery.
- * The service owns conditional reads and fail-closed sequencing; the injected
- * trace evaluator owns only the host's query/filter implementation. */
+ * The service owns conditional reads and fail-closed sequencing; each data
+ * owner's Api owns the matching over its own data. */
 export class AutomationSettlementMatchConfirmationService extends AutomationSettlementMatchConfirmation {
   private constructor(
     private readonly evaluations: AutomationSettlementEvaluationReader,
     private readonly traces: AutomationSettlementTraceReader,
-    private readonly filterEvaluator: AutomationSettlementFilterEvaluator,
+    private readonly traceFilters: AutomationSettlementTraceFilters,
+    private readonly evaluationFilters: AutomationSettlementEvaluationFilters,
   ) {
     super();
   }
@@ -52,12 +62,14 @@ export class AutomationSettlementMatchConfirmationService extends AutomationSett
   static create(input: {
     evaluations: AutomationSettlementEvaluationReader;
     traces: AutomationSettlementTraceReader;
-    filterEvaluator: AutomationSettlementFilterEvaluator;
+    traceFilters: AutomationSettlementTraceFilters;
+    evaluationFilters: AutomationSettlementEvaluationFilters;
   }): AutomationSettlementMatchConfirmationService {
     return new AutomationSettlementMatchConfirmationService(
       input.evaluations,
       input.traces,
-      input.filterEvaluator,
+      input.traceFilters,
+      input.evaluationFilters,
     );
   }
 
@@ -94,7 +106,7 @@ export class AutomationSettlementMatchConfirmationService extends AutomationSett
       : null;
     const events = needs.events ? await this.deriveEvents(input) : null;
 
-    return this.filterEvaluator.matchesFilterQuery({
+    return this.traceFilters.matchesFilterQuery({
       query,
       foldState: input.foldState,
       evaluations,
@@ -113,7 +125,7 @@ export class AutomationSettlementMatchConfirmationService extends AutomationSett
 
     if (
       Object.keys(trace).length > 0 &&
-      !this.filterEvaluator.matchesTraceFilters({
+      !this.traceFilters.matchesTraceFilters({
         filters: trace,
         foldState: input.foldState,
         events,
@@ -131,7 +143,7 @@ export class AutomationSettlementMatchConfirmationService extends AutomationSett
       traceId: input.traceId,
     });
 
-    return this.filterEvaluator.matchesEvaluationFilters({
+    return this.evaluationFilters.matchesEvaluationFilters({
       filters: evaluation,
       evaluations,
     });

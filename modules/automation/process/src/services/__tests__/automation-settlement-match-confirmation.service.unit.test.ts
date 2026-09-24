@@ -1,11 +1,18 @@
 import type { TriggerSummary } from "@langwatch/automation-contract";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
-import type { DerivedTraceEvent, TraceSummaryData } from "@langwatch/trace-contract";
+import type {
+  DerivedTraceEvent,
+  TraceQueryEvaluationRun,
+  TraceSummaryData,
+} from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { AutomationSettlementTraceReader } from "../../repositories/automation-settlement-read.repository.ts";
-import { AutomationSettlementMatchConfirmationService } from "../automation-settlement-match-confirmation.service.ts";
-import { AutomationSettlementFilterEvaluator } from "../automation-settlement-policy.service.ts";
+import {
+  AutomationSettlementMatchConfirmationService,
+  type AutomationSettlementEvaluationFilters,
+  type AutomationSettlementTraceFilters,
+} from "../automation-settlement-match-confirmation.service.ts";
 
 function unavailable(): never {
   throw new Error("not used by this test");
@@ -117,14 +124,16 @@ class TestTraces extends AutomationSettlementTraceReader {
   }
 }
 
-class TestFilterEvaluator extends AutomationSettlementFilterEvaluator {
+class TestFilterEvaluator
+  implements AutomationSettlementTraceFilters, AutomationSettlementEvaluationFilters
+{
   filterQueryResult = true;
   traceFilterResult = true;
   evaluationFilterResult = true;
   filterQueryCalls: {
     query: string;
     foldState: TraceSummaryData;
-    evaluations: EvaluationRunData[] | null;
+    evaluations: TraceQueryEvaluationRun[] | null;
     events: DerivedTraceEvent[] | null;
   }[] = [];
   traceFilterCalls: {
@@ -140,7 +149,7 @@ class TestFilterEvaluator extends AutomationSettlementFilterEvaluator {
   matchesFilterQuery(input: {
     query: string;
     foldState: TraceSummaryData;
-    evaluations: EvaluationRunData[] | null;
+    evaluations: TraceQueryEvaluationRun[] | null;
     events: DerivedTraceEvent[] | null;
   }): boolean {
     this.filterQueryCalls.push(input);
@@ -243,7 +252,8 @@ function createService() {
   const service = AutomationSettlementMatchConfirmationService.create({
     evaluations,
     traces,
-    filterEvaluator,
+    traceFilters: filterEvaluator,
+    evaluationFilters: filterEvaluator,
   });
 
   return { service, evaluations, traces, filterEvaluator };
