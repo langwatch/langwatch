@@ -77,7 +77,7 @@ export class LocalControlLifecycleService {
     for (const call of await this.deps.dispatcher.listPendingForConversation(
       session.conversationId,
     )) {
-      await this.deps.dispatcher.tryCancel({
+      await this.deps.dispatcher.cancel({
         callId: call.callId,
         code: "cancelled",
         message: "The shared folder disconnected, so the command did not finish.",

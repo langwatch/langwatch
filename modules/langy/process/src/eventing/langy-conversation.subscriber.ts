@@ -3,6 +3,7 @@ import {
   type EventSubscriberDefinition,
   type ProjectionCursor,
 } from "@langwatch/eventing";
+import { HandledError } from "@langwatch/handled-error";
 import {
   cursorHasReachedEvent,
   LANGY_CONVERSATION_EVENT_TYPES,
@@ -37,10 +38,11 @@ export interface LangyConversationLivenessRecord {
   lastActivityAtMs: number | null;
 }
 export interface LangyConversationLivenessReader {
-  read(params: {
+  /** Throws `langy_conversation_not_found` until the conversation is folded. */
+  getById(params: {
     projectId: string;
     conversationId: string;
-  }): Promise<LangyConversationLivenessRecord | null>;
+  }): Promise<LangyConversationLivenessRecord>;
 }
 export interface LangyFailTurnCommand {
   failTurn(params: {
@@ -106,10 +108,11 @@ export interface LangyConversationFreshnessRecord {
   isShared: boolean;
 }
 export interface LangyConversationFreshnessReader {
-  read(params: {
+  /** Throws `langy_conversation_not_found` until the conversation is folded. */
+  getById(params: {
     projectId: string;
     conversationId: string;
-  }): Promise<LangyConversationFreshnessRecord | null>;
+  }): Promise<LangyConversationFreshnessRecord>;
 }
 /**
  * The tenant-wide broadcast channel this feature publishes on. `eventType` is the single literal
@@ -155,13 +158,12 @@ export function createAgentTurnLivenessSubscriber(
       const conversationId = String(event.aggregateId);
       const eventTurnId = extractTurnId(event);
       if (!eventTurnId) return;
-      const conversation = await deps.conversations.read({ projectId, conversationId });
-      if (!conversation || !cursorHasReachedEvent(conversation.cursor, event)) {
-        throw projectionNotReadyError({
-          projectionName: "langyConversation",
-          eventId: event.id,
-        });
-      }
+      const conversation = await getFoldedConversation({
+        reader: deps.conversations,
+        projectId,
+        conversationId,
+        event,
+      });
       if (
         conversation.status !== LANGY_CONVERSATION_STATUS.RUNNING ||
         conversation.currentTurnId === null ||
@@ -262,13 +264,12 @@ export function createLangyConversationUpdateBroadcastSubscriber(
     async handle(event): Promise<void> {
       const projectId = event.tenantId;
       const conversationId = String(event.aggregateId);
-      const record = await deps.conversations.read({ projectId, conversationId });
-      if (!record || !cursorHasReachedEvent(record.cursor, event)) {
-        throw projectionNotReadyError({
-          projectionName: "langyConversation",
-          eventId: event.id,
-        });
-      }
+      const record = await getFoldedConversation({
+        reader: deps.conversations,
+        projectId,
+        conversationId,
+        event,
+      });
       try {
         await deps.broadcast.broadcastToTenant(
           projectId,
@@ -336,4 +337,26 @@ function dispatchIntentOf({
 }): "create" | "revive" | "continue" {
   if (resumable) return "revive";
   return hasApiKey ? "create" : "continue";
+}
+
+/** The folded conversation once it has reached `event`; until then the delivery retries. */
+async function getFoldedConversation<TRecord extends { cursor: ProjectionCursor }>({
+  reader,
+  projectId,
+  conversationId,
+  event,
+}: {
+  reader: { getById(params: { projectId: string; conversationId: string }): Promise<TRecord> };
+  projectId: string;
+  conversationId: string;
+  event: LangyConversationProcessingEvent;
+}): Promise<TRecord> {
+  try {
+    const record = await reader.getById({ projectId, conversationId });
+    if (cursorHasReachedEvent(record.cursor, event)) return record;
+  } catch (error) {
+    if (!(HandledError.isHandled(error) && error.code === "langy_conversation_not_found"))
+      throw error;
+  }
+  throw projectionNotReadyError({ projectionName: "langyConversation", eventId: event.id });
 }

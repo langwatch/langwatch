@@ -239,13 +239,13 @@ describe("given a code access card that asked for a folder", () => {
       const mine = await create();
       await create({ conversationId: "conv_2" });
 
-      const found = await service.tryFindOpenForConversation({
+      const found = await service.findOpenForConversation({
         projectId,
         userId,
         conversationId,
       });
 
-      expect(found?.id).toBe(mine.id);
+      expect(found.map((request) => request.id)).toEqual([mine.id]);
     });
   });
 });

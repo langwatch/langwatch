@@ -218,7 +218,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
 
     const runtime = members.runtime();
     const connected = await runtime.presence.read(conversationId);
-    const pendingRequest = await runtime.requests.tryFindOpenForConversation({
+    const [pendingRequest] = await runtime.requests.findOpenForConversation({
       projectId: auth.projectId,
       userId: auth.userId,
       conversationId,
@@ -368,16 +368,16 @@ export const langyLocalRest = defineRestRouter(LangyApi)
       userId: auth.userId,
     });
 
-    const answer = await runtime.dispatcher.tryPoll({
+    const poll = await runtime.dispatcher.poll({
       callId: call.callId,
       holdMs: CALL_POLL_HOLD_MS,
       signal,
     });
-    if (!answer) return response.write(HONO_NOT_FOUND);
+    if (poll.outcome === "gone") return response.write(HONO_NOT_FOUND);
     return response.write({
       status: 200,
       mediaType: "application/json",
-      body: JSON.stringify(answer),
+      body: JSON.stringify(poll.answer),
     });
   })
 
@@ -399,7 +399,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
       userId: auth.userId,
     });
 
-    await runtime.dispatcher.tryCancel({ callId: call.callId });
+    await runtime.dispatcher.cancel({ callId: call.callId });
     await runtime.waits.cancelTurn({
       conversationId: call.conversationId,
       turnId: call.turnId,
@@ -463,16 +463,16 @@ export const langyLocalRest = defineRestRouter(LangyApi)
       userId: auth.userId,
     });
 
-    const answer = await runtime.waits.tryPoll({
+    const poll = await runtime.waits.poll({
       waitId: wait.waitId,
       holdMs: CALL_POLL_HOLD_MS,
       signal,
     });
-    if (!answer) return response.write(HONO_NOT_FOUND);
+    if (poll.outcome === "gone") return response.write(HONO_NOT_FOUND);
     return response.write({
       status: 200,
       mediaType: "application/json",
-      body: JSON.stringify(answer),
+      body: JSON.stringify(poll.answer),
     });
   })
 

@@ -88,7 +88,7 @@ function subscriberOver({
   const subscriber = createAgentTurnLivenessSubscriber({
     buffer,
     conversations: {
-      read: async () => ({
+      getById: async () => ({
         cursor: { acceptedAt, eventId: `evt_${turnId}` },
         status: LANGY_CONVERSATION_STATUS.RUNNING,
         currentTurnId: turnId,
@@ -118,7 +118,7 @@ async function pollFor({
 }): Promise<void> {
   const until = now + forMs;
   while (now < until) {
-    await dispatcher.tryPoll({ callId, holdMs: 0 });
+    await dispatcher.poll({ callId, holdMs: 0 });
     now += CALL_POLL_HOLD_MS;
   }
 }

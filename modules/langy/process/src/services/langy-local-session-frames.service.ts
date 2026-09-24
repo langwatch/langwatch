@@ -99,7 +99,7 @@ export class LocalControlFramesService {
       workspaceName: session.workspaceName,
       hostname: session.hostname,
     });
-    await this.deps.dispatcher.tryAwaitPermission({
+    await this.deps.dispatcher.awaitPermission({
       callId: call.callId,
       waitId: wait.waitId,
     });

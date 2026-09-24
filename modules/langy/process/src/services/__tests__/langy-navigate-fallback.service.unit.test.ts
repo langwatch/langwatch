@@ -2,10 +2,12 @@
  * The navigate fallback's page half, under the asking project's own slug.
  * @see specs/langy/langy-agent-driven-navigation.feature
  */
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
 import type {
   LangyNavigateProject,
+  LangyNavigateResourceLocation,
   LangyNavigateResourceLocator,
 } from "../../app/langy.members.ts";
 import type { LangyNavigateResourceKind } from "../../rules/langy-navigate-resources.rules.ts";
@@ -13,8 +15,11 @@ import { LangyNavigateFallbackService } from "../langy-navigate-fallback.service
 
 class FakeProjects implements LangyNavigateProject {
   constructor(private readonly slugs: Record<string, string>) {}
-  trySlugOf(projectId: string): Promise<string | null> {
-    return Promise.resolve(this.slugs[projectId] ?? null);
+  async getSlug(projectId: string): Promise<string> {
+    const slug = this.slugs[projectId];
+    if (slug === undefined)
+      throw new ProjectNotFoundError("Project not found", { meta: { projectId } });
+    return slug;
   }
 }
 
@@ -23,13 +28,14 @@ class FakeResources implements LangyNavigateResourceLocator {
 
   constructor(private readonly answer: (kind: LangyNavigateResourceKind) => string | null) {}
 
-  async tryLocate(input: {
+  async locate(input: {
     projectId: string;
     kind: LangyNavigateResourceKind;
     resourceId: string;
-  }): Promise<string | null> {
+  }): Promise<LangyNavigateResourceLocation> {
     this.lookups.push({ kind: input.kind, resourceId: input.resourceId });
-    return this.answer(input.kind);
+    const path = this.answer(input.kind);
+    return path === null ? { outcome: "unknown" } : { outcome: "located", path };
   }
 }
 
@@ -48,18 +54,18 @@ describe("LangyNavigateFallbackService", () => {
   describe("when the agent asks to open a page rather than one resource", () => {
     /** @scenario A page name navigates to the project's own page */
     it("resolves a page name to the project's own page address", async () => {
-      expect(await service().tryResolveUrl({ projectId: "project-1", resourceId: "prompts" })).toBe(
-        "https://app.langwatch.test/acme/prompts",
+      expect(await service().resolveUrl({ projectId: "project-1", resourceId: "prompts" })).toEqual(
+        { outcome: "resolved", url: "https://app.langwatch.test/acme/prompts" },
       );
 
       expect(
-        await service().tryResolveUrl({ projectId: "project-1", resourceId: "online-evaluations" }),
-      ).toBe("https://app.langwatch.test/acme/online-evaluations");
+        await service().resolveUrl({ projectId: "project-1", resourceId: "online-evaluations" }),
+      ).toEqual({ outcome: "resolved", url: "https://app.langwatch.test/acme/online-evaluations" });
     });
 
     it("reads a page name the agent typed in any case", async () => {
-      expect(await service().tryResolveUrl({ projectId: "project-1", resourceId: "Prompts" })).toBe(
-        "https://app.langwatch.test/acme/prompts",
+      expect(await service().resolveUrl({ projectId: "project-1", resourceId: "Prompts" })).toEqual(
+        { outcome: "resolved", url: "https://app.langwatch.test/acme/prompts" },
       );
     });
   });
@@ -68,11 +74,14 @@ describe("LangyNavigateFallbackService", () => {
     /** @scenario "An organization page opens at the top level, outside the project" */
     it("resolves the inventory page on its sources tab at the top level, with no project slug", async () => {
       expect(
-        await service({}).tryResolveUrl({
+        await service({}).resolveUrl({
           projectId: "project-1",
           resourceId: "governance-sources",
         }),
-      ).toBe("https://app.langwatch.test/governance/inventory?tab=sources");
+      ).toEqual({
+        outcome: "resolved",
+        url: "https://app.langwatch.test/governance/inventory?tab=sources",
+      });
     });
   });
 
@@ -81,11 +90,14 @@ describe("LangyNavigateFallbackService", () => {
       const resources = new FakeResources(() => "/prompts?promptId=prompt_abc");
 
       expect(
-        await service({ "project-1": "acme" }, resources).tryResolveUrl({
+        await service({ "project-1": "acme" }, resources).resolveUrl({
           projectId: "project-1",
           resourceId: "prompt_abc",
         }),
-      ).toBe("https://app.langwatch.test/acme/prompts?promptId=prompt_abc");
+      ).toEqual({
+        outcome: "resolved",
+        url: "https://app.langwatch.test/acme/prompts?promptId=prompt_abc",
+      });
       expect(resources.lookups).toEqual([{ kind: "prompt", resourceId: "prompt_abc" }]);
     });
 
@@ -96,11 +108,11 @@ describe("LangyNavigateFallbackService", () => {
       const resources = new FakeResources(() => editor);
 
       expect(
-        await service({ "project-1": "acme" }, resources).tryResolveUrl({
+        await service({ "project-1": "acme" }, resources).resolveUrl({
           projectId: "project-1",
           resourceId: "scenario_1",
         }),
-      ).toBe(`https://app.langwatch.test/acme${editor}`);
+      ).toEqual({ outcome: "resolved", url: `https://app.langwatch.test/acme${editor}` });
       expect(resources.lookups).toEqual([{ kind: "scenario", resourceId: "scenario_1" }]);
     });
 
@@ -108,11 +120,11 @@ describe("LangyNavigateFallbackService", () => {
       const resources = new FakeResources(() => null);
 
       expect(
-        await service({}, resources).tryResolveUrl({
+        await service({}, resources).resolveUrl({
           projectId: "project-1",
           resourceId: "dataset_gone",
         }),
-      ).toBeNull();
+      ).toEqual({ outcome: "dropped" });
       expect(resources.lookups).toEqual([{ kind: "dataset", resourceId: "dataset_gone" }]);
     });
 
@@ -120,11 +132,11 @@ describe("LangyNavigateFallbackService", () => {
       const resources = new FakeResources(() => "/anywhere");
 
       expect(
-        await service({ "project-1": "acme" }, resources).tryResolveUrl({
+        await service({ "project-1": "acme" }, resources).resolveUrl({
           projectId: "project-1",
           resourceId: "session_0002Gu9QAAAABBBB",
         }),
-      ).toBeNull();
+      ).toEqual({ outcome: "dropped" });
       expect(resources.lookups).toEqual([]);
     });
 
@@ -134,25 +146,37 @@ describe("LangyNavigateFallbackService", () => {
       });
 
       await expect(
-        service({ "project-1": "acme" }, resources).tryResolveUrl({
+        service({ "project-1": "acme" }, resources).resolveUrl({
           projectId: "project-1",
           resourceId: "scenariorun_1",
         }),
-      ).resolves.toBeNull();
+      ).resolves.toEqual({ outcome: "dropped" });
     });
   });
   describe("when the name is not a page this project can open", () => {
     /** @scenario A name outside the page set is not a destination */
-    it("returns null for a word that is neither a page nor a resolvable id", async () => {
+    it("drops a word that is neither a page nor a resolvable id", async () => {
       expect(
-        await service().tryResolveUrl({ projectId: "project-1", resourceId: "settings" }),
-      ).toBeNull();
+        await service().resolveUrl({ projectId: "project-1", resourceId: "settings" }),
+      ).toEqual({ outcome: "dropped" });
     });
 
-    it("returns null when the asking project has no readable slug", async () => {
+    it("drops the navigate when the asking project is missing", async () => {
       expect(
-        await service({}).tryResolveUrl({ projectId: "project-1", resourceId: "prompts" }),
-      ).toBeNull();
+        await service({}).resolveUrl({ projectId: "project-1", resourceId: "prompts" }),
+      ).toEqual({ outcome: "dropped" });
+    });
+
+    it("lets a project read failure other than a missing project through", async () => {
+      const failing = LangyNavigateFallbackService.create({
+        projects: { getSlug: () => Promise.reject(new Error("postgres down")) },
+        platformUrl: ({ projectSlug, path }) => `https://app.langwatch.test/${projectSlug}${path}`,
+        organizationUrl: ({ path }) => `https://app.langwatch.test${path}`,
+      });
+
+      await expect(
+        failing.resolveUrl({ projectId: "project-1", resourceId: "prompts" }),
+      ).rejects.toThrow("postgres down");
     });
   });
 });

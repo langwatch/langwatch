@@ -37,7 +37,7 @@ describe("createLocalConnectTurnSubscriber redelivery", () => {
     const subscriber = createLocalConnectTurnSubscriber({
       presence: () => presence,
       conversations: {
-        read: async () => ({ cursor: { acceptedAt: T0, eventId: "evt_2" }, status: "idle" }),
+        getById: async () => ({ cursor: { acceptedAt: T0, eventId: "evt_2" }, status: "idle" }),
       },
       turns: {
         async start({ idempotencyKey }) {

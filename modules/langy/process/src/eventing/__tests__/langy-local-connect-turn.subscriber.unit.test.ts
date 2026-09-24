@@ -46,7 +46,7 @@ const turnEnded = (id = "evt_2") => agentRespondedEvent({ id, occurredAt: T0, tu
 function subscriber() {
   return createLocalConnectTurnSubscriber({
     presence: () => presence,
-    conversations: { read: async () => ({ cursor: folded, status }) },
+    conversations: { getById: async () => ({ cursor: folded, status }) },
     turns: {
       async start({ userId, text, idempotencyKey }) {
         if (turnStartOutcome === "in_progress") throw new LangyTurnInProgressError();

@@ -36,6 +36,8 @@ import {
   type UserWaitServiceOptions,
 } from "../rules/langy-local-user-wait-record.rules.ts";
 
+/** One poll of a card, or `gone` once its record has expired. */
+export type UserWaitPoll = { outcome: "polled"; answer: PollWaitResponse } | { outcome: "gone" };
 export class UserWaitService {
   private readonly store: SessionStateStore;
   private readonly events: UserWaitEvents;
@@ -146,7 +148,7 @@ export class UserWaitService {
    * pass refreshes the live stream when the keepalive interval has gone by, so
    * a turn that waits ten minutes is still readable on a reload.
    */
-  async tryPoll({
+  async poll({
     waitId,
     holdMs = CALL_POLL_HOLD_MS,
     signal,
@@ -154,7 +156,7 @@ export class UserWaitService {
     waitId: string;
     holdMs?: number;
     signal?: AbortSignal;
-  }): Promise<PollWaitResponse | null> {
+  }): Promise<UserWaitPoll> {
     const until = this.now() + holdMs;
     const beat = this.beater();
     const look = async (): Promise<StoredUserWait | null> => {
@@ -170,7 +172,7 @@ export class UserWaitService {
       await sleep(this.pollIntervalMs, signal);
       wait = await look();
     }
-    return wait ? toPollResponse(wait) : null;
+    return wait ? { outcome: "polled", answer: toPollResponse(wait) } : { outcome: "gone" };
   }
 
   /**

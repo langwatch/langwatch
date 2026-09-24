@@ -35,7 +35,7 @@ function makeEvent(
 function makeDeps(params?: { cursor?: { acceptedAt: number; eventId: string } }) {
   return {
     conversations: {
-      read: vi.fn().mockResolvedValue({
+      getById: vi.fn().mockResolvedValue({
         cursor: params?.cursor ?? {
           acceptedAt: ACCEPTED_AT,
           eventId: "evt_b",
@@ -70,7 +70,7 @@ describe("Langy conversation update broadcast subscriber", () => {
 
     await subscriber.handle(makeEvent(), context);
 
-    expect(deps.conversations.read).toHaveBeenCalledWith({
+    expect(deps.conversations.getById).toHaveBeenCalledWith({
       projectId: "project_1",
       conversationId: "conv_1",
     });
@@ -102,7 +102,7 @@ describe("Langy conversation update broadcast subscriber", () => {
 
     await subscriber.handle(event, context);
 
-    expect(deps.conversations.read).toHaveBeenCalledWith({
+    expect(deps.conversations.getById).toHaveBeenCalledWith({
       projectId: "project_2",
       conversationId: "conv_2",
     });

@@ -207,7 +207,7 @@ export class RedisLangyEffectRepository {
             projectId,
             conversationId,
           });
-          if (!generated) return;
+          if (generated.outcome === "unchanged") return;
           await deps.saveTitle({
             projectId,
             conversationId,

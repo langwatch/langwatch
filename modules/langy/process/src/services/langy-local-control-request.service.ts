@@ -240,8 +240,8 @@ export class ControlRequestService {
     return requests.toSorted((left, right) => right.createdAt - left.createdAt);
   }
 
-  /** The open request of one conversation, for the card that is waiting on it. */
-  async tryFindOpenForConversation({
+  /** The open requests of one conversation, newest first, for the card waiting on them. */
+  async findOpenForConversation({
     projectId,
     userId,
     conversationId,
@@ -249,10 +249,10 @@ export class ControlRequestService {
     projectId: string;
     userId: string;
     conversationId: string;
-  }): Promise<StoredControlRequest | null> {
+  }): Promise<StoredControlRequest[]> {
     const open = await this.listOpen({ projectId, userId });
 
-    return open.find((row) => row.conversationId === conversationId) ?? null;
+    return open.filter((row) => row.conversationId === conversationId);
   }
 
   /**
