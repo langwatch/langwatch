@@ -149,6 +149,7 @@ export class OtlpSpanPiiRedactionService {
         span,
         resource,
         piiRedactionLevel,
+        projectId: tenantId,
       });
 
       return;
@@ -166,12 +167,13 @@ export class OtlpSpanPiiRedactionService {
             entities: lambda.entities,
             exceptPatterns: lambda.exceptPatterns,
           },
+          projectId: tenantId,
         });
         // Mark the span only when strict could not run because the analysis service is
         // genuinely unavailable (not configured in dev): the native floor redacted the
         // pattern-based identifiers but names/locations slip through, so the read path warns
         // instead of implying it is fully scrubbed.
-        if (!ran && !this.deps.isLangevalsConfigured) {
+        if (!ran && !(await this.deps.isLangevalsConfigured())) {
           this.markPiiAnalysisIncomplete(span);
         }
       } catch (error) {
@@ -217,20 +219,23 @@ export class OtlpSpanPiiRedactionService {
     resource,
     piiRedactionLevel,
     lambda,
+    projectId,
   }: {
     span: OtlpSpan;
     resource: OtlpResource | null;
     piiRedactionLevel: PIIRedactionLevel;
+    projectId?: string | undefined;
     lambda?: {
       entities?: readonly string[];
       exceptPatterns?: readonly string[];
     };
   }): Promise<boolean> {
-    const redaction = await this.policy.resolveRedactionOptions(
+    const redaction = await this.policy.resolveRedactionOptions({
       piiRedactionLevel,
-      lambda?.entities,
-      lambda?.exceptPatterns,
-    );
+      entities: lambda?.entities,
+      exceptPatterns: lambda?.exceptPatterns,
+      projectId: projectId,
+    });
     // No options means the analysis pass was skipped (disabled, or the service
     // is not configured outside production) — report that it did not run so the
     // caller can mark a requested strict pass as incomplete.

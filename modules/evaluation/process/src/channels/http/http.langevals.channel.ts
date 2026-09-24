@@ -62,7 +62,7 @@ export class HttpLangevalsChannel implements LangevalsChannel {
       throw new PayloadTooLargeError({ bytes, limitBytes: limit, kind });
     }
 
-    if (threshold === undefined || bytes <= threshold) {
+    if (threshold === undefined || bytes <= threshold || projectId === undefined) {
       logger.debug(
         { projectId, kind, bytes, thresholdBytes: threshold, url },
         threshold === undefined

@@ -42,7 +42,7 @@ export class LangevalsPiiDetectionService {
         },
         env: {},
       },
-      projectId: input.projectId,
+      ...(input.projectId ? { projectId: input.projectId } : {}),
       kind: "evaluation",
       signal: input.signal,
     });

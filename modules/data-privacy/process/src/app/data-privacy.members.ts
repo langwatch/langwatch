@@ -49,11 +49,13 @@ export interface PiiAnalysis {
     piiRedactionLevel: PIIRedactionLevel;
     exceptPatterns?: readonly string[];
   }): Promise<PiiClearing>;
-  clearPresidio(
-    texts: string[],
-    piiRedactionLevel: PIIRedactionLevel,
-    entities?: readonly string[],
-  ): Promise<(string | null)[]>;
+  clearPresidio(input: {
+    texts: string[];
+    piiRedactionLevel: PIIRedactionLevel;
+    entities?: readonly string[] | undefined;
+    /** The tenant the texts belong to, when the path has one. */
+    projectId?: string | undefined;
+  }): Promise<(string | null)[]>;
   close(): Promise<void>;
 }
 
@@ -72,4 +74,6 @@ export type PIICheckOptions = {
    * branch reads them; presidio ignores this field entirely.
    */
   exceptPatterns?: readonly string[];
+  /** The tenant the batch belongs to, when the path has one. */
+  projectId?: string;
 };

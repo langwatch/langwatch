@@ -1,5 +1,6 @@
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
+  DATA_PRIVACY_PRESIDIO_TIMEOUT_MS,
   DataPrivacyApi,
   type DataPrivacyCallerInput,
   type DataPrivacyConfig,
@@ -15,6 +16,7 @@ import {
   type ResolvedDataPrivacy,
   type SpanContentDropResult,
 } from "@langwatch/data-privacy-contract";
+import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { createTenantId } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
@@ -23,15 +25,19 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
 import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 
+import { googleDlpChannels } from "../channels/google-dlp-channels.registry.ts";
 import type { DataPrivacyRepositories } from "../repositories/data-privacy.repositories.ts";
 import { ContentDropPolicyService } from "../services/content-drop-policy.service.ts";
 import { DataPrivacyPermissionsService } from "../services/data-privacy-permissions.service.ts";
 import { DataPrivacyScopeAuthorizationService } from "../services/data-privacy-scope-authorization.service.ts";
 import { DataPrivacySnapshotService } from "../services/data-privacy-snapshot.service.ts";
 import { DataPrivacyService } from "../services/data-privacy.service.ts";
+import { GoogleDlpRedactionService } from "../services/google-dlp-redaction.service.ts";
+import { OtelPiiAnalysisMetricsAdapter } from "../services/otel-pii-analysis-metrics.service.ts";
 import { OtlpSpanContentDropService } from "../services/otlp-span-content-drop.service.ts";
 import { OtlpSpanPiiRedactionService } from "../services/otlp-span-pii-redaction.service.ts";
-import type { PiiAnalysis } from "./data-privacy.members.ts";
+import { PiiAnalysisService } from "../services/pii-analysis.service.ts";
+import { PresidioRedactionService } from "../services/presidio-redaction.service.ts";
 
 /** A project's place in the organization chain, plus the name it renders under. */
 export type DataPrivacyProjectLineage = Readonly<{
@@ -77,27 +83,14 @@ export type DataPrivacyInfrastructure = Readonly<{
   directory: DataPrivacyDirectoryReader;
   ttlMs?: number;
   now?: () => number;
-}> &
-  /**
-   * The record redaction path, or `null` where the process composed no PII
-   * analysis transport. Only the log and metric features call it, and they
-   * are installed beside a transport.
-   */
-  (
-    | Readonly<{ redaction: OtlpSpanPiiRedactionService | null }>
-    | Readonly<{
-        pii: Readonly<{
-          transport: PiiAnalysis;
-          isLangevalsConfigured: boolean;
-          isProduction: boolean;
-          piiRedactionMaxAttributeLength: number;
-        }>;
-      }>
-  );
+}>;
+
+/** Main's worker read 250_000 characters per attribute before skipping one (its own constant). */
+const PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 250_000;
 
 type DataPrivacySetup = FeatureSetup<
   typeof DataPrivacyApp.dependencies,
-  Readonly<{ dataPrivacy: DataPrivacyInfrastructure }>,
+  Readonly<{ dataPrivacy: DataPrivacyInfrastructure; nodeEnvironment: string | undefined }>,
   DataPrivacyServerConfig,
   DataPrivacyRepositories
 >;
@@ -113,8 +106,9 @@ export class DataPrivacyApp implements DataPrivacyApi {
     organizations: OrganizationApi,
     featureFlags: FeatureFlagApi,
     permissions: AuthzApi,
+    evaluation: EvaluationApi,
   };
-  static readonly reads = ["dataPrivacy"] as const;
+  static readonly reads = ["dataPrivacy", "nodeEnvironment"] as const;
   static readonly config = dataPrivacyConfig;
   /** The DLP service account's key; model-provider's Vertex dispatch borrows it. */
   static readonly secrets = {
@@ -122,7 +116,7 @@ export class DataPrivacyApp implements DataPrivacyApi {
   } as const;
 
   #privacy: DataPrivacyService;
-  #redaction: OtlpSpanPiiRedactionService | null;
+  #redaction: OtlpSpanPiiRedactionService;
   #snapshots: DataPrivacySnapshotService;
   #scopeAuthorization: DataPrivacyScopeAuthorizationService;
   #contentDrop: ContentDropPolicyService;
@@ -132,7 +126,7 @@ export class DataPrivacyApp implements DataPrivacyApi {
 
   private constructor(services: {
     privacy: DataPrivacyService;
-    redaction: OtlpSpanPiiRedactionService | null;
+    redaction: OtlpSpanPiiRedactionService;
     snapshots: DataPrivacySnapshotService;
     scopeAuthorization: DataPrivacyScopeAuthorizationService;
     contentDrop: ContentDropPolicyService;
@@ -164,6 +158,20 @@ export class DataPrivacyApp implements DataPrivacyApi {
           build(credential),
     );
     const members = supplied.dataPrivacy;
+    const metrics = OtelPiiAnalysisMetricsAdapter.create();
+    const presidio = PresidioRedactionService.create({
+      evaluation: dependencies.evaluation,
+      metrics,
+      timeoutMs: DATA_PRIVACY_PRESIDIO_TIMEOUT_MS,
+    });
+    const analysis = PiiAnalysisService.create({
+      presidio,
+      dlp: GoogleDlpRedactionService.create({
+        dlp: googleCredentials((credential) => googleDlpChannels.live.create({ credential })),
+        disabled: config.googleDlpDisabled === true || config.googleDlpDisabled === "true",
+        metrics,
+      }),
+    });
     const privacy = DataPrivacyService.create({
       repository: repositories.policies,
       projects: dependencies.projects,
@@ -175,15 +183,15 @@ export class DataPrivacyApp implements DataPrivacyApi {
 
     return new DataPrivacyApp({
       privacy,
-      redaction:
-        "pii" in members
-          ? OtlpSpanPiiRedactionService.create({
-              ...members.pii,
-              nativePolicyEnforced: config.enforcement !== "off",
-              dataPrivacy: privacy,
-              featureFlags: dependencies.featureFlags,
-            })
-          : members.redaction,
+      redaction: OtlpSpanPiiRedactionService.create({
+        transport: analysis,
+        isLangevalsConfigured: () => analysis.isPresidioConfigured(),
+        isProduction: supplied.nodeEnvironment === "production",
+        piiRedactionMaxAttributeLength: PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
+        nativePolicyEnforced: config.enforcement !== "off",
+        dataPrivacy: privacy,
+        featureFlags: dependencies.featureFlags,
+      }),
       snapshots: DataPrivacySnapshotService.create({
         policies: privacy,
         directory: members.directory,
@@ -268,7 +276,7 @@ export class DataPrivacyApp implements DataPrivacyApi {
     piiRedactionLevel: DataPrivacyPiiRedactionLevel,
     tenantId?: string,
   ): Promise<void> {
-    return this.#redactionPath().redactLog(
+    return this.#redaction.redactLog(
       input,
       piiRedactionLevel,
       tenantId ? createTenantId(tenantId) : undefined,
@@ -280,7 +288,7 @@ export class DataPrivacyApp implements DataPrivacyApi {
     piiRedactionLevel: DataPrivacyPiiRedactionLevel,
     tenantId?: string,
   ): Promise<void> {
-    return this.#redactionPath().redactMetricAttributes(
+    return this.#redaction.redactMetricAttributes(
       input,
       piiRedactionLevel,
       tenantId ? createTenantId(tenantId) : undefined,
@@ -293,7 +301,7 @@ export class DataPrivacyApp implements DataPrivacyApi {
     piiRedactionLevel: DataPrivacyPiiRedactionLevel;
     tenantId: string;
   }): Promise<void> {
-    await this.#redactionPath().redactSpan({
+    await this.#redaction.redactSpan({
       span: input.span,
       resource: input.resource,
       piiRedactionLevel: input.piiRedactionLevel,
@@ -303,17 +311,6 @@ export class DataPrivacyApp implements DataPrivacyApi {
 
   dropSpanContent(input: { span: OtlpSpan; projectId: string }): Promise<SpanContentDropResult> {
     return this.#spanContentDrop.dropSpanContent(input);
-  }
-
-  /** Refuses by name on a process that composed no PII analysis transport. */
-  #redactionPath(): OtlpSpanPiiRedactionService {
-    if (!this.#redaction) {
-      throw new Error(
-        "This process composed no PII analysis transport, so it cannot redact a record.",
-      );
-    }
-
-    return this.#redaction;
   }
 
   /**

@@ -35,7 +35,6 @@ export async function startWorker(options: WorkerStartOptions = {}): Promise<Pro
     .withModules(processModules)
     .withMember("dataPrivacy", (members) => ({
       directory: createDataPrivacyDirectoryReader(members.read("prisma")),
-      redaction: null,
     }))
     .withMember("langwatchQl", (members) =>
       langWatchQlSupply({

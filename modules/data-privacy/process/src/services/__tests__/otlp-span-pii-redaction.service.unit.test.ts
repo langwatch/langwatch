@@ -47,11 +47,15 @@ class FakePiiAnalysis implements PiiAnalysis {
     return { kind: "redacted", text: "[REDACTED]" };
   }
 
-  async clearPresidio(
-    texts: string[],
-    piiRedactionLevel: string,
-    entities?: readonly string[],
-  ): Promise<(string | null)[]> {
+  async clearPresidio({
+    texts,
+    piiRedactionLevel,
+    entities,
+  }: {
+    texts: string[];
+    piiRedactionLevel: string;
+    entities?: readonly string[] | undefined;
+  }): Promise<(string | null)[]> {
     this.presidioCalls.push({ texts, level: piiRedactionLevel, entities });
     if (this.behaviour.presidioThrows) throw this.behaviour.presidioThrows;
     return this.behaviour.presidio?.(texts) ?? texts.map(() => "[PERSON]");
@@ -113,7 +117,7 @@ function serviceWith(options: {
 }): OtlpSpanPiiRedactionService {
   return OtlpSpanPiiRedactionService.create({
     transport: options.transport,
-    isLangevalsConfigured: options.isLangevalsConfigured ?? true,
+    isLangevalsConfigured: async () => options.isLangevalsConfigured ?? true,
     isProduction: options.isProduction ?? false,
     nativePolicyEnforced: options.nativePolicyEnforced ?? true,
     piiRedactionMaxAttributeLength: options.maxAttributeLength ?? 250_000,
@@ -664,7 +668,7 @@ describe("given a service built without a feature-flag service", () => {
     const span = spanWith([{ key: "a", value: { stringValue: "Ana Silva" } }]);
     const service = OtlpSpanPiiRedactionService.create({
       transport,
-      isLangevalsConfigured: true,
+      isLangevalsConfigured: async () => true,
       isProduction: false,
       nativePolicyEnforced: false,
       piiRedactionMaxAttributeLength: 250_000,

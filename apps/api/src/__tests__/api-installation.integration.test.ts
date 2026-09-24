@@ -99,7 +99,7 @@ async function bootApi() {
         adminEmails: config.process.adminEmails,
         processName: "langwatch-api",
         producesPipelines: true,
-        dataPrivacy: { directory: unreachable<object>("dataPrivacy.directory"), redaction: null },
+        dataPrivacy: { directory: unreachable<object>("dataPrivacy.directory") },
         elevenLabsWebhook: void 0,
         storageResolver: void 0,
         storage: void 0,

@@ -10,7 +10,7 @@ import {
   type DataPrivacyOrganizationDirectory,
   type DataPrivacyProjectLineage,
 } from "../data-privacy.app.ts";
-import type { DataPrivacyResolution, PiiAnalysis, PiiClearing } from "../data-privacy.members.ts";
+import type { DataPrivacyResolution } from "../data-privacy.members.ts";
 
 /** The policy source the redaction cases drive their PII cases over. */
 export class DataPrivacyResolutionFake implements DataPrivacyResolution {
@@ -53,23 +53,6 @@ export class MemoryDataPrivacyDirectory implements DataPrivacyDirectoryReader {
     void input;
     return this.rows.scopeOrganizationId ?? null;
   }
-}
-
-/** An analysis transport that is composed but never reached by a test. */
-export class UnusedPiiAnalysis implements PiiAnalysis {
-  static create(): UnusedPiiAnalysis {
-    return new UnusedPiiAnalysis();
-  }
-
-  async clearGoogleDlp(): Promise<PiiClearing> {
-    throw new Error("the PII analysis transport is not configured for this test");
-  }
-
-  async clearPresidio(): Promise<(string | null)[]> {
-    throw new Error("the PII analysis transport is not configured for this test");
-  }
-
-  async close(): Promise<void> {}
 }
 
 /** The one project every privacy case in this package is opened from. */
@@ -140,12 +123,6 @@ export function createDataPrivacyTestProjects(): ProjectApi {
 export function dataPrivacyTestInfrastructure(directory = MemoryDataPrivacyDirectory.create()) {
   return {
     directory,
-    pii: {
-      transport: UnusedPiiAnalysis.create(),
-      isLangevalsConfigured: false,
-      isProduction: false,
-      piiRedactionMaxAttributeLength: 250_000,
-    },
   };
 }
 

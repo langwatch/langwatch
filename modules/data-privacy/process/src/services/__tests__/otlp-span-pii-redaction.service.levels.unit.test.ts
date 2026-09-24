@@ -75,7 +75,7 @@ function transportFor(batch: BatchClearPIIFunction) {
       const redacted = (await batch([text], {} as PIICheckOptions))[0];
       return redacted == null ? { kind: "unchanged" } : { kind: "redacted", text: redacted };
     },
-    clearPresidio: async (texts: string[]) => batch(texts, {} as PIICheckOptions),
+    clearPresidio: async ({ texts }: { texts: string[] }) => batch(texts, {} as PIICheckOptions),
     close: async () => undefined,
   };
 }
@@ -92,7 +92,7 @@ describe("OtlpSpanPiiRedactionService", () => {
     batchSpy = spy;
     service = OtlpSpanPiiRedactionService.create({
       transport: transportFor(mockBatchClearPII),
-      isLangevalsConfigured: true,
+      isLangevalsConfigured: async () => true,
       isProduction: false,
       nativePolicyEnforced: false,
       dataPrivacy: new DataPrivacyResolutionFake(PLATFORM_DEFAULT_DATA_PRIVACY),
@@ -506,7 +506,7 @@ describe("OtlpSpanPiiRedactionService", () => {
         const errorBatchClearPII = vi.fn().mockRejectedValue(new Error("PII service unavailable"));
         const errorService = OtlpSpanPiiRedactionService.create({
           transport: transportFor(errorBatchClearPII),
-          isLangevalsConfigured: true,
+          isLangevalsConfigured: async () => true,
           isProduction: false,
           nativePolicyEnforced: false,
           piiRedactionMaxAttributeLength: DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
@@ -535,7 +535,7 @@ describe("OtlpSpanPiiRedactionService", () => {
       maxLengthBatchSpy = spy;
       maxLengthService = OtlpSpanPiiRedactionService.create({
         transport: transportFor(mockBatchClearPII),
-        isLangevalsConfigured: true,
+        isLangevalsConfigured: async () => true,
         isProduction: false,
         nativePolicyEnforced: false,
         dataPrivacy: new DataPrivacyResolutionFake(PLATFORM_DEFAULT_DATA_PRIVACY),

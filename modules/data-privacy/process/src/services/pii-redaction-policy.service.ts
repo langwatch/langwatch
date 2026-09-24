@@ -52,7 +52,8 @@ export type RedactionOptions =
  */
 export interface OtlpSpanPiiRedactionServiceDependencies {
   transport: PiiAnalysis;
-  isLangevalsConfigured: boolean;
+  /** Asked, never assumed: evaluation answers whether this deployment reaches langevals. */
+  isLangevalsConfigured: () => Promise<boolean>;
   isProduction: boolean;
   nativePolicyEnforced: boolean;
   /** Maximum attribute value length for PII redaction; values exceeding this are skipped */
@@ -96,7 +97,7 @@ const batchClearPII = async (
   texts: string[],
   options: PIICheckOptions,
 ): Promise<(string | null)[]> => {
-  const { piiRedactionLevel, mainMethod, entities, exceptPatterns } = options;
+  const { piiRedactionLevel, mainMethod, entities, exceptPatterns, projectId } = options;
 
   if (mainMethod === "google_dlp") {
     return runGoogleDlpBatch({
@@ -108,7 +109,7 @@ const batchClearPII = async (
   }
 
   try {
-    return await transport.clearPresidio(texts, piiRedactionLevel, entities);
+    return await transport.clearPresidio({ texts, piiRedactionLevel, entities, projectId });
   } catch {
     // The DLP fallback redacts by level, not by the custom entity subset; the
     // native pass already handled the pattern-based selections, so this only
@@ -286,11 +287,17 @@ export class PiiRedactionPolicyService {
    * The options for the redaction call, or `skip_redaction` (disabled, no
    * langevals in dev, etc). Throws when langevals is required but unset in production.
    */
-  async resolveRedactionOptions(
-    piiRedactionLevel: PIIRedactionLevel,
-    entities?: readonly string[],
-    exceptPatterns?: readonly string[],
-  ): Promise<RedactionOptions> {
+  async resolveRedactionOptions({
+    piiRedactionLevel,
+    entities,
+    exceptPatterns,
+    projectId,
+  }: {
+    piiRedactionLevel: PIIRedactionLevel;
+    entities?: readonly string[] | undefined;
+    exceptPatterns?: readonly string[] | undefined;
+    projectId?: string | undefined;
+  }): Promise<RedactionOptions> {
     const disabled = this.deps.featureFlags
       ? await this.deps.featureFlags.isEnabled("ops_pii_strict_presidio_redaction_disabled", {
           kind: "system",
@@ -306,7 +313,7 @@ export class PiiRedactionPolicyService {
 
     const piiEnforced = this.deps.isProduction;
 
-    if (!this.deps.isLangevalsConfigured) {
+    if (!(await this.deps.isLangevalsConfigured())) {
       if (piiEnforced) {
         throw new Error("LANGEVALS_ENDPOINT is not set, PII check cannot be performed");
       }
@@ -322,6 +329,7 @@ export class PiiRedactionPolicyService {
         mainMethod: "presidio",
         ...(entities && entities.length > 0 ? { entities } : {}),
         ...(exceptPatterns && exceptPatterns.length > 0 ? { exceptPatterns } : {}),
+        ...(projectId ? { projectId } : {}),
       },
     };
   }

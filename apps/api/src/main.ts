@@ -40,7 +40,6 @@ export async function startApi(options: ApiStartOptions = {}): Promise<ProcessSe
     .withModules(processModules)
     .withMember("dataPrivacy", (members) => ({
       directory: createDataPrivacyDirectoryReader(members.read("prisma")),
-      redaction: null,
     }))
     .withMember("langwatchQl", (members) =>
       langWatchQlSupply({

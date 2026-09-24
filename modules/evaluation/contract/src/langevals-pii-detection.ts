@@ -2,7 +2,8 @@ import type { BatchEvaluationResult } from "@langwatch/evaluator-contract";
 
 /** One batch through langevals' Presidio analyzer; the signal bounds the whole exchange. */
 export type PiiDetectionRequest = Readonly<{
-  projectId: string;
+  /** The tenant the texts belong to; absent, the batch is never staged (main never staged it). */
+  projectId?: string | undefined;
   texts: readonly string[];
   /** Analyzer entity names, any case; each is sent lowercased and switched on. */
   entities: readonly string[];

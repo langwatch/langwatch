@@ -139,7 +139,7 @@ export class OtlpRecordPiiRedactionService {
   ): Promise<void> {
     const native = await this.policy.resolveNativeContext(tenantId, piiRedactionLevel);
     if (native.kind === "analysis") {
-      await this.lambdaRedactLog(log, piiRedactionLevel);
+      await this.lambdaRedactLog(log, piiRedactionLevel, { projectId: tenantId });
 
       return;
     }
@@ -150,6 +150,7 @@ export class OtlpRecordPiiRedactionService {
       await this.lambdaRedactLog(log, "STRICT", {
         entities: lambda.entities,
         exceptPatterns: lambda.exceptPatterns,
+        projectId: tenantId,
       });
     }
   }
@@ -165,13 +166,15 @@ export class OtlpRecordPiiRedactionService {
     lambda?: {
       entities?: readonly string[];
       exceptPatterns?: readonly string[];
+      projectId?: string | undefined;
     },
   ): Promise<void> {
-    const redaction = await this.policy.resolveRedactionOptions(
+    const redaction = await this.policy.resolveRedactionOptions({
       piiRedactionLevel,
-      lambda?.entities,
-      lambda?.exceptPatterns,
-    );
+      entities: lambda?.entities,
+      exceptPatterns: lambda?.exceptPatterns,
+      projectId: lambda?.projectId,
+    });
     if (redaction.kind === "skip_redaction") {
       return;
     }
@@ -207,7 +210,7 @@ export class OtlpRecordPiiRedactionService {
   ): Promise<void> {
     const native = await this.policy.resolveNativeContext(tenantId, piiRedactionLevel);
     if (native.kind === "analysis") {
-      await this.lambdaRedactMetricAttributes(metric, piiRedactionLevel);
+      await this.lambdaRedactMetricAttributes(metric, piiRedactionLevel, { projectId: tenantId });
 
       return;
     }
@@ -232,6 +235,7 @@ export class OtlpRecordPiiRedactionService {
       await this.lambdaRedactMetricAttributes(metric, "STRICT", {
         entities: lambda.entities,
         exceptPatterns: lambda.exceptPatterns,
+        projectId: tenantId,
       });
     }
   }
@@ -246,13 +250,15 @@ export class OtlpRecordPiiRedactionService {
     lambda?: {
       entities?: readonly string[];
       exceptPatterns?: readonly string[];
+      projectId?: string | undefined;
     },
   ): Promise<void> {
-    const redaction = await this.policy.resolveRedactionOptions(
+    const redaction = await this.policy.resolveRedactionOptions({
       piiRedactionLevel,
-      lambda?.entities,
-      lambda?.exceptPatterns,
-    );
+      entities: lambda?.entities,
+      exceptPatterns: lambda?.exceptPatterns,
+      projectId: lambda?.projectId,
+    });
     if (redaction.kind === "skip_redaction") {
       return;
     }

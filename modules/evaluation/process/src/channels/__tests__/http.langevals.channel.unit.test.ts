@@ -123,6 +123,21 @@ describe("given a deployment that parks payloads over a threshold", () => {
       expect(headersOf(0)[STAGED_PAYLOAD_HEADER.toLowerCase()]).toContain("signed=yes");
     });
 
+    /** @scenario "A tenantless PII batch over the staging threshold posts inline" */
+    it("posts a call that names no project inline, since there is no project to park it under", async () => {
+      const staging = new RecordingStaging();
+
+      await adapterWith(staging).post({
+        url: "https://langevals.test/presidio/pii_detection/evaluate",
+        body: { data: "x".repeat(2_000) },
+        kind: "evaluation",
+      });
+
+      expect(staging.staged).toHaveLength(0);
+      expect(fetchCalls).toHaveLength(1);
+      expect(headersOf(0)[STAGED_PAYLOAD_HEADER.toLowerCase()]).toBeUndefined();
+    });
+
     /** @scenario "Staged S3 object is deleted after the upstream responds" */
     it("discards exactly the object it parked once the upstream has answered", async () => {
       const staging = new RecordingStaging();

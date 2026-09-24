@@ -1,6 +1,7 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi, PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApp } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -21,12 +22,14 @@ function process(role: "api" | "worker", googleCredentials?: string) {
   return createApp({ role })
     .withModules([installableDataPrivacy(googleCredentials)])
     .withMember("dataPrivacy", dataPrivacyTestInfrastructure())
+    .withMember("nodeEnvironment", undefined)
     .withConfig({ "data-privacy": { googleDlpDisabled: undefined, enforcement: undefined } })
     .provide({
       project: createDataPrivacyTestProjects(),
       organization: createApiFixture<OrganizationApi>(),
       authz: createApiFixture<AuthzApi>(),
       "feature-flag": createApiFixture<FeatureFlagApi>(),
+      evaluation: createApiFixture<EvaluationApi>(),
     });
 }
 

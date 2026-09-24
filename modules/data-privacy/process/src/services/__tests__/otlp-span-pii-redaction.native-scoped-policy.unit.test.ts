@@ -75,11 +75,15 @@ function transportFor(batch: BatchClearPIIFunction) {
       const redacted = (await batch([text], {}))[0];
       return redacted == null ? { kind: "unchanged" } : { kind: "redacted", text: redacted };
     },
-    clearPresidio: async (
-      texts: string[],
-      piiRedactionLevel: "ESSENTIAL" | "STRICT" | "DISABLED",
-      entities?: readonly string[],
-    ) =>
+    clearPresidio: async ({
+      texts,
+      piiRedactionLevel,
+      entities,
+    }: {
+      texts: string[];
+      piiRedactionLevel: "ESSENTIAL" | "STRICT" | "DISABLED";
+      entities?: readonly string[] | undefined;
+    }) =>
       batch(texts, {
         piiRedactionLevel,
         mainMethod: "presidio",
@@ -119,7 +123,7 @@ function makeService(policy: ResolvedDataPrivacy) {
   const batchSpy = vi.fn<BatchClearPIIFunction>(async (texts) => texts.map(() => "[REDACTED]"));
   const service = OtlpSpanPiiRedactionService.create({
     transport: transportFor(batchSpy),
-    isLangevalsConfigured: true,
+    isLangevalsConfigured: async () => true,
     isProduction: false,
     nativePolicyEnforced: true,
     piiRedactionMaxAttributeLength: 250_000,
@@ -352,7 +356,7 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       // runs, and it must still scrub the pattern-based entities.
       const service = OtlpSpanPiiRedactionService.create({
         transport: transportFor(batchSpy),
-        isLangevalsConfigured: false,
+        isLangevalsConfigured: async () => false,
         isProduction: false,
         nativePolicyEnforced: true,
         piiRedactionMaxAttributeLength: 250_000,
@@ -493,7 +497,7 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
     }) {
       return OtlpSpanPiiRedactionService.create({
         transport: transportFor(batchClearPII),
-        isLangevalsConfigured,
+        isLangevalsConfigured: async () => isLangevalsConfigured,
         isProduction,
         nativePolicyEnforced: true,
         piiRedactionMaxAttributeLength: 250_000,
@@ -557,7 +561,7 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       switches.setFlag("ops_pii_strict_presidio_redaction_disabled", true);
       const batchSpy = vi.fn<BatchClearPIIFunction>(async (texts) => texts.map(() => "[REDACTED]"));
       const service = OtlpSpanPiiRedactionService.create({
-        isLangevalsConfigured: true,
+        isLangevalsConfigured: async () => true,
         isProduction: false,
         transport: transportFor(batchSpy),
         nativePolicyEnforced: true,
@@ -903,7 +907,7 @@ describe("OtlpSpanPiiRedactionService strict-only exception scoping", () => {
       texts.map((text) => (text.includes("reservation") ? null : "[ANONYMIZED]")),
     );
     return OtlpSpanPiiRedactionService.create({
-      isLangevalsConfigured: true,
+      isLangevalsConfigured: async () => true,
       isProduction: false,
       transport: transportFor(presidio),
       nativePolicyEnforced: true,

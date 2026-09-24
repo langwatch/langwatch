@@ -197,3 +197,9 @@ Feature: Evaluation service boundary
     Given langevals answers a PII batch of two texts with one result
     When data privacy asks evaluation to detect PII
     Then it is refused naming the expected and received result counts
+
+  @unit
+  Scenario: A tenantless PII batch over the staging threshold posts inline
+    Given a deployment that stages langevals payloads over a threshold
+    When a PII batch that names no project and is over the threshold is posted
+    Then it is posted inline and nothing is staged

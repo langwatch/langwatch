@@ -109,7 +109,7 @@ async function bootWorker() {
         adminEmails: config.process.adminEmails,
         processName: "langwatch-worker",
         producesPipelines: false,
-        dataPrivacy: { directory: unreachable<object>("dataPrivacy.directory"), redaction: null },
+        dataPrivacy: { directory: unreachable<object>("dataPrivacy.directory") },
         elevenLabsWebhook: void 0,
         storageResolver: void 0,
         storage: void 0,

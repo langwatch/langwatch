@@ -6,6 +6,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  */
 import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApp } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -48,12 +49,14 @@ async function bootWith(scopeOrganizationId: string | null): Promise<DataPrivacy
   const runtime = await createApp({ role: "api" })
     .withModules([installableDataPrivacy()])
     .withMember("dataPrivacy", dataPrivacyTestInfrastructure(directory))
+    .withMember("nodeEnvironment", undefined)
     .withConfig({ "data-privacy": { googleDlpDisabled: undefined, enforcement: undefined } })
     .provide({
       project: createDataPrivacyTestProjects(),
       organization: createApiFixture<OrganizationApi>(),
       authz: permittedAuthz,
       "feature-flag": createApiFixture<FeatureFlagApi>(),
+      evaluation: createApiFixture<EvaluationApi>(),
     })
     .boot();
 

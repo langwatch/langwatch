@@ -64,7 +64,8 @@ export interface LangevalsPayloadStaging {
 export type LangevalsPost = Readonly<{
   url: string;
   body: unknown;
-  projectId: string;
+  /** Absent for a tenantless call, always posted inline: no project to stage under. */
+  projectId?: string | undefined;
   kind: LangevalsCallKind;
   headers?: Readonly<Record<string, string>> | undefined;
   signal?: AbortSignal | undefined;

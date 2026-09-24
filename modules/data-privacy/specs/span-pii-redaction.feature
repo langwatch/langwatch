@@ -171,7 +171,7 @@ Feature: Redacting personal data out of a span at ingestion
   Scenario: The analysis request is the one the service expects
     Given a process that composed the analysis transport from its configuration
     When it sends a batch
-    Then the request names the evaluate path, the level's entity list and the threshold
+    Then evaluation is asked to detect the level's entity list for the batch's tenant
     And text past the scan ceiling is left unscanned and put back afterwards
     And the analyzer's angle-bracket markers are normalized to the platform's brackets
 
@@ -221,7 +221,8 @@ Feature: Redacting personal data out of a span at ingestion
     Then the address is redacted in place
 
   @unit
-  Scenario: A process without a PII analysis transport refuses a peer's span redaction
-    Given a process that composed no PII analysis transport
-    When a peer hands a span to the data-privacy API's span redaction
-    Then the call is refused rather than storing the span unredacted
+  Scenario: Whether the analysis service is reachable is asked of evaluation, once
+    Given a process whose evaluation module answers PII detection
+    When the redaction pass asks whether the analysis service is configured
+    Then it asks evaluation with an empty batch that sends nothing
+    And it asks again only after an answer failed
