@@ -14,7 +14,7 @@ import {
 } from "@langwatch/dataset-contract";
 import { describe, expect, it } from "vitest";
 
-import { TraceReadableSpanService } from "../trace-readable-span.service.ts";
+import { formatSpansDigest } from "../../rules/trace-readable-span.rules.ts";
 
 describe("SPAN_SUBFIELDS", () => {
   it("contains * (full span object) as first option", () => {
@@ -723,7 +723,7 @@ describe("THREAD_MAPPINGS", () => {
   });
 });
 
-describe("TraceReadableSpanService.formatSpansDigest", () => {
+describe("formatSpansDigest", () => {
   /** @scenario Formatted trace produces a span hierarchy digest */
   /** @scenario Formatted trace includes inputs and outputs */
   it("produces a string digest from spans", async () => {
@@ -763,7 +763,7 @@ describe("TraceReadableSpanService.formatSpansDigest", () => {
       },
     ];
 
-    const result = await TraceReadableSpanService.formatSpansDigest(spans);
+    const result = await formatSpansDigest(spans);
 
     expect(typeof result).toBe("string");
     expect(result).toContain("my-agent");
@@ -771,7 +771,7 @@ describe("TraceReadableSpanService.formatSpansDigest", () => {
   });
 
   it("returns empty digest for empty spans array", async () => {
-    const result = await TraceReadableSpanService.formatSpansDigest([]);
+    const result = await formatSpansDigest([]);
     expect(result).toBe("No spans recorded.");
   });
 
@@ -796,7 +796,7 @@ describe("TraceReadableSpanService.formatSpansDigest", () => {
       },
     ];
 
-    const result = await TraceReadableSpanService.formatSpansDigest(spans);
+    const result = await formatSpansDigest(spans);
 
     expect(typeof result).toBe("string");
     expect(result).toContain("failing-tool");
@@ -835,11 +835,7 @@ describe("TraceReadableSpanService.formatSpansDigest", () => {
     ];
 
     const result = (
-      await Promise.all(
-        [trace1Spans, trace2Spans].map((spans) =>
-          TraceReadableSpanService.formatSpansDigest(spans),
-        ),
-      )
+      await Promise.all([trace1Spans, trace2Spans].map((spans) => formatSpansDigest(spans)))
     ).join("\n\n---\n\n");
 
     expect(typeof result).toBe("string");

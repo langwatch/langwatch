@@ -18,7 +18,7 @@ import { enrichTracesWithEvaluations } from "../../../rules/trace-evaluation-enr
  * @integration
  * Integration coverage for the trace search projection DSL. Proves
  * specs/traces/trace-search-projection.feature against real infra. */
-import { TraceProjectionCompileService } from "../../../services/projection/trace-projection-compile.service.ts";
+import { compileProjection } from "../../../rules/trace-projection-compile.rules.ts";
 import { TraceCanonicalisationService } from "../../../services/trace-canonicalisation.service.ts";
 import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 import { openProtections } from "./open-protections.ts";
@@ -330,7 +330,7 @@ async function projectedSearch({
   protections?: Protections;
   dateField?: "occurred" | "updated";
 }) {
-  const compiled = TraceProjectionCompileService.compileProjection({ from, select, protections });
+  const compiled = compileProjection({ from, select, protections });
   const results = await service.listAllTracesForProject(makeQueryInput(), protections, {
     downloadMode: true,
     projection: compiled.plan,

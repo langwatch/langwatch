@@ -11,7 +11,7 @@ import {
   traceAttributeKeyForMetadata,
 } from "@langwatch/trace-contract";
 
-import { TraceAttributeRedactionService } from "./trace-attribute-redaction.service.ts";
+import { TraceAttributeRedactionService } from "../services/trace-attribute-redaction.service.ts";
 
 /**
  * The content category each editable span field belongs to. `params` rides
@@ -251,69 +251,61 @@ function redactTraceEdits({
   return { value, isChanged: true };
 }
 
-export class TraceEditOverlayRedactionService {
-  static create(): TraceEditOverlayRedactionService {
-    return new TraceEditOverlayRedactionService();
-  }
-
-  private constructor() {}
-
-  /**
-   * The correction as this viewer may read it: content edits drop out when the viewer may not read
-   * that category or the trace is past the visibility window, and surviving corrected `params`
-   * still go through restricted-attribute rules. Structural edits always stay.
-   */
-  static redactPatchForViewer({
-    patch,
+/**
+ * The correction as this viewer may read it: content edits drop out when the viewer may not read
+ * that category or the trace is past the visibility window, and surviving corrected `params`
+ * still go through restricted-attribute rules. Structural edits always stay.
+ */
+export function redactPatchForViewer({
+  patch,
+  protections,
+  isWindowRedacted,
+}: {
+  patch: TraceEditOverlayPatch;
+  protections: Protections;
+  isWindowRedacted?: boolean;
+}): TraceEditOverlayPatch {
+  const isDeniedByCategory = deniedCategoriesFor({
     protections,
     isWindowRedacted,
-  }: {
-    patch: TraceEditOverlayPatch;
-    protections: Protections;
-    isWindowRedacted?: boolean;
-  }): TraceEditOverlayPatch {
-    const isDeniedByCategory = deniedCategoriesFor({
-      protections,
-      isWindowRedacted,
-    });
-    const hiddenAttributes = isDeniedByCategory.input ? void 0 : protections.hiddenAttributes;
+  });
+  const hiddenAttributes = isDeniedByCategory.input ? void 0 : protections.hiddenAttributes;
 
-    const traceEdits = redactTraceEdits({
-      traceEdits: patch.trace,
+  const traceEdits = redactTraceEdits({
+    traceEdits: patch.trace,
+    isDeniedByCategory,
+    hiddenAttributes,
+  });
+  let isChanged = traceEdits.isChanged;
+
+  const spans: TraceEditSpanPatch[] = [];
+  for (const spanPatch of patch.spans) {
+    const redacted = deriveRedactedSpanPatch({
+      spanPatch,
       isDeniedByCategory,
       hiddenAttributes,
     });
-    let isChanged = traceEdits.isChanged;
-
-    const spans: TraceEditSpanPatch[] = [];
-    for (const spanPatch of patch.spans) {
-      const redacted = deriveRedactedSpanPatch({
-        spanPatch,
-        isDeniedByCategory,
-        hiddenAttributes,
-      });
-      if (redacted !== spanPatch) {
-        isChanged = true;
-      }
-
-      if (redacted) {
-        spans.push(redacted);
-      }
+    if (redacted !== spanPatch) {
+      isChanged = true;
     }
 
-    if (!isChanged) {
-      return patch;
+    if (redacted) {
+      spans.push(redacted);
     }
-
-    const next: TraceEditOverlayPatch = {
-      version: patch.version,
-      spans,
-      deletedSpanIds: patch.deletedSpanIds,
-    };
-    if (traceEdits.value) {
-      next.trace = traceEdits.value;
-    }
-
-    return next;
   }
+
+  if (!isChanged) {
+    return patch;
+  }
+
+  const next: TraceEditOverlayPatch = {
+    version: patch.version,
+    spans,
+    deletedSpanIds: patch.deletedSpanIds,
+  };
+  if (traceEdits.value) {
+    next.trace = traceEdits.value;
+  }
+
+  return next;
 }

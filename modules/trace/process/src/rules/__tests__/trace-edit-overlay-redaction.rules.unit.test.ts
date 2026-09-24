@@ -2,13 +2,13 @@ import type { Protections, Span, Trace, TraceEditOverlayPatch } from "@langwatch
 import { applyOverlayToTrace } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { TraceEditOverlayRedactionService } from "../../trace-edit-overlay-redaction.service.ts";
+import { redactPatchForViewer } from "../trace-edit-overlay-redaction.rules.ts";
 /**
  * @vitest-environment node
  * Redacts corrections by viewer permissions: hides on read, restores on save.
  * Guards viewer access to corrected content.
  */
-import { TraceEditOverlayRestoreService } from "../../trace-edit-overlay-restore.service.ts";
+import { restoreWithheldEdits } from "../trace-edit-overlay-restore.rules.ts";
 
 const openProtections: Protections = {
   canSeeCosts: true,
@@ -65,7 +65,7 @@ describe("redacting a correction for its reader", () => {
   describe("given a viewer the policy allows to read everything", () => {
     it("hands back the very same correction", () => {
       expect(
-        TraceEditOverlayRedactionService.redactPatchForViewer({
+        redactPatchForViewer({
           patch: contentAndStructurePatch,
           protections: openProtections,
         }),
@@ -86,7 +86,7 @@ describe("redacting a correction for its reader", () => {
           }),
           span({ span_id: "span-2" }),
         ]),
-        patch: TraceEditOverlayRedactionService.redactPatchForViewer({
+        patch: redactPatchForViewer({
           patch: contentAndStructurePatch,
           protections: {
             ...openProtections,
@@ -112,7 +112,7 @@ describe("redacting a correction for its reader", () => {
     });
 
     it("drops a span whose only edits were content", () => {
-      const redacted = TraceEditOverlayRedactionService.redactPatchForViewer({
+      const redacted = redactPatchForViewer({
         patch: patchOf({
           spans: [
             {
@@ -130,7 +130,7 @@ describe("redacting a correction for its reader", () => {
     });
 
     it("drops the trace edits entirely when neither category survives", () => {
-      const redacted = TraceEditOverlayRedactionService.redactPatchForViewer({
+      const redacted = redactPatchForViewer({
         patch: patchOf({
           trace: {
             input: { value: "corrected trace input" },
@@ -151,7 +151,7 @@ describe("redacting a correction for its reader", () => {
     /** @scenario "A viewer who may not read captured content is handed only
      * the structural edits" */
     it("hands over the structural edits and none of the corrected content", () => {
-      const redacted = TraceEditOverlayRedactionService.redactPatchForViewer({
+      const redacted = redactPatchForViewer({
         patch: contentAndStructurePatch,
         protections: {
           ...openProtections,
@@ -166,7 +166,7 @@ describe("redacting a correction for its reader", () => {
     });
 
     it("keeps the category the viewer may still read", () => {
-      const redacted = TraceEditOverlayRedactionService.redactPatchForViewer({
+      const redacted = redactPatchForViewer({
         patch: patchOf({
           trace: {
             input: { value: "corrected trace input" },
@@ -187,7 +187,7 @@ describe("redacting a correction for its reader", () => {
     it("replaces the hidden attribute and keeps the rest of the correction", () => {
       const corrected = applyOverlayToTrace({
         trace: trace([span({ span_id: "span-1", params: { model: "gpt-5" } })]),
-        patch: TraceEditOverlayRedactionService.redactPatchForViewer({
+        patch: redactPatchForViewer({
           patch: patchOf({
             spans: [
               {
@@ -213,7 +213,7 @@ describe("redacting a correction for its reader", () => {
     });
 
     it("drops the corrected attributes with the input category", () => {
-      const redacted = TraceEditOverlayRedactionService.redactPatchForViewer({
+      const redacted = redactPatchForViewer({
         patch: patchOf({
           spans: [
             {
@@ -237,7 +237,7 @@ describe("redacting a correction for its reader", () => {
   describe("given a trace beyond the plan's visibility window", () => {
     /** @scenario "Corrected content is withheld beyond the plan's visibility window" */
     it("withholds every corrected content field and keeps the structure", () => {
-      const redacted = TraceEditOverlayRedactionService.redactPatchForViewer({
+      const redacted = redactPatchForViewer({
         patch: contentAndStructurePatch,
         protections: openProtections,
         isWindowRedacted: true,
@@ -262,7 +262,7 @@ describe("redacting corrected trace metadata", () => {
   describe("given a viewer who may not read captured input", () => {
     /** @scenario "Corrected metadata is withheld from a viewer who may not read captured input" */
     it("drops the corrected metadata and keeps the structural edits", () => {
-      const readable = TraceEditOverlayRedactionService.redactPatchForViewer({
+      const readable = redactPatchForViewer({
         patch: metadataPatch,
         protections: { ...openProtections, canSeeCapturedInput: false },
       });
@@ -276,7 +276,7 @@ describe("redacting corrected trace metadata", () => {
   describe("given an attribute rule that hides one metadata key", () => {
     /** @scenario "A hidden attribute rule applies to corrected metadata" */
     it("replaces that key with the placeholder and keeps the others", () => {
-      const readable = TraceEditOverlayRedactionService.redactPatchForViewer({
+      const readable = redactPatchForViewer({
         patch: metadataPatch,
         protections: {
           ...openProtections,
@@ -293,7 +293,7 @@ describe("redacting corrected trace metadata", () => {
     /** @scenario "A hidden attribute rule applies to corrected metadata" */
     it("hands back the very same correction when no rule matches", () => {
       expect(
-        TraceEditOverlayRedactionService.redactPatchForViewer({
+        redactPatchForViewer({
           patch: metadataPatch,
           protections: {
             ...openProtections,
@@ -320,12 +320,12 @@ describe("saving over a correction whose metadata was read redacted", () => {
   describe("given a reviewer who was never shown one of the keys", () => {
     /** @scenario "A saved correction keeps the metadata edits the saver was never shown" */
     it("keeps their keys and puts the withheld one back as stored", () => {
-      const readable = TraceEditOverlayRedactionService.redactPatchForViewer({
+      const readable = redactPatchForViewer({
         patch: storedMetadataPatch,
         protections: hiddenTicket,
       });
 
-      const merged = TraceEditOverlayRestoreService.restoreWithheldEdits({
+      const merged = restoreWithheldEdits({
         incoming: patchOf({
           trace: {
             metadata: { ...readable.trace?.metadata, environment: "staging" },
@@ -343,7 +343,7 @@ describe("saving over a correction whose metadata was read redacted", () => {
 
     /** @scenario "A saved correction keeps the metadata edits the saver was never shown" */
     it("puts the whole map back when the category was withheld", () => {
-      const merged = TraceEditOverlayRestoreService.restoreWithheldEdits({
+      const merged = restoreWithheldEdits({
         incoming: patchOf({ spans: [{ spanId: "span-1", name: "mine" }] }),
         stored: storedMetadataPatch,
         protections: { ...openProtections, canSeeCapturedInput: false },
@@ -364,7 +364,7 @@ describe("saving over a correction whose metadata was read redacted", () => {
       });
 
       expect(
-        TraceEditOverlayRestoreService.restoreWithheldEdits({
+        restoreWithheldEdits({
           incoming,
           stored: storedMetadataPatch,
           protections: openProtections,
@@ -405,7 +405,7 @@ describe("saving over a correction that was read redacted", () => {
       const incoming = patchOf({ spans: [{ spanId: "span-1", name: "mine" }] });
 
       expect(
-        TraceEditOverlayRestoreService.restoreWithheldEdits({
+        restoreWithheldEdits({
           incoming,
           stored: storedPatch,
           protections: openProtections,
@@ -418,7 +418,7 @@ describe("saving over a correction that was read redacted", () => {
     /** @scenario "A saved correction keeps the edits the saver was never shown" */
     /** @scenario "A reviewer who cannot read a field cannot remove its correction" */
     it("keeps their edits and puts back everything that was withheld", () => {
-      const readable = TraceEditOverlayRedactionService.redactPatchForViewer({
+      const readable = redactPatchForViewer({
         patch: storedPatch,
         protections: restrictedProtections,
       });
@@ -430,7 +430,7 @@ describe("saving over a correction that was read redacted", () => {
         spans: [{ ...readable.spans[0]!, name: "renamed by me" }],
       });
 
-      const merged = TraceEditOverlayRestoreService.restoreWithheldEdits({
+      const merged = restoreWithheldEdits({
         incoming,
         stored: storedPatch,
         protections: restrictedProtections,
@@ -453,7 +453,7 @@ describe("saving over a correction that was read redacted", () => {
     });
 
     it("still lets them remove an edit they could read", () => {
-      const merged = TraceEditOverlayRestoreService.restoreWithheldEdits({
+      const merged = restoreWithheldEdits({
         incoming: patchOf({
           spans: [{ spanId: "span-1", name: "renamed by me" }],
         }),
@@ -467,7 +467,7 @@ describe("saving over a correction that was read redacted", () => {
     });
 
     it("takes the structural side of the save as given", () => {
-      const merged = TraceEditOverlayRestoreService.restoreWithheldEdits({
+      const merged = restoreWithheldEdits({
         incoming: patchOf({
           spans: [{ spanId: "span-1", name: "renamed by me" }],
           deletedSpanIds: ["span-9"],
@@ -485,7 +485,7 @@ describe("saving over a correction that was read redacted", () => {
       const incoming = patchOf({ spans: [{ spanId: "span-1", name: "mine" }] });
 
       expect(
-        TraceEditOverlayRestoreService.restoreWithheldEdits({
+        restoreWithheldEdits({
           incoming,
           stored: null,
           protections: restrictedProtections,

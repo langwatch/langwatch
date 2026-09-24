@@ -8,7 +8,7 @@ import type {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { TraceReadRedactionService } from "../../../services/trace-read-redaction.service.ts";
+import { applyDerivedTraceEventProtections } from "../../../rules/trace-read-redaction.rules.ts";
 import {
   gateEvaluations,
   gateHeaderCost,
@@ -268,10 +268,7 @@ describe("sharedTrace share-safe gates", () => {
 
     describe("when the viewer cannot read captured content", () => {
       it("blanks all event attributes", () => {
-        const out = TraceReadRedactionService.applyDerivedTraceEventProtections(
-          events,
-          anonProtections,
-        );
+        const out = applyDerivedTraceEventProtections(events, anonProtections);
         expect(out[0]?.attributes["exception.message"]).toBe("[REDACTED]");
         expect(out[0]?.attributes["exception.type"]).toBe("[REDACTED]");
         expect(out[0]?.name).toBe("exception");
@@ -280,7 +277,7 @@ describe("sharedTrace share-safe gates", () => {
 
     describe("when the event predates the visibility cutoff", () => {
       it("blanks the attributes even for a content-visible viewer", () => {
-        const out = TraceReadRedactionService.applyDerivedTraceEventProtections(events, {
+        const out = applyDerivedTraceEventProtections(events, {
           ...memberProtections,
           visibilityCutoffMs: 5000,
         });
@@ -290,7 +287,7 @@ describe("sharedTrace share-safe gates", () => {
 
     describe("when content is visible and within the window", () => {
       it("keeps attributes but applies restricted-attribute rules", () => {
-        const out = TraceReadRedactionService.applyDerivedTraceEventProtections(events, {
+        const out = applyDerivedTraceEventProtections(events, {
           ...memberProtections,
           hiddenAttributes: [{ pattern: "exception.message", visibleTo: "Admins" }],
         });

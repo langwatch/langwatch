@@ -14,7 +14,13 @@ import {
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,
 } from "../../../../rules/trace-log-content-derivation.rules.ts";
-import { TraceReadRedactionService } from "../../../../services/trace-read-redaction.service.ts";
+import {
+  applyDerivedTraceEventProtections,
+  applySpanProtections,
+  extractRedactionsFromAllSpanInputs,
+  extractRedactionsFromAllSpanOutputs,
+  redactObject,
+} from "../../../../rules/trace-read-redaction.rules.ts";
 import type { TracesReadMembers } from "../../../../services/trace-transcript-read.service.ts";
 
 /** One of the two stores the read is driven from. */
@@ -56,14 +62,11 @@ export function createTranscriptReadPorts(): TracesReadMembers {
     mappers: {
       spanDisplay: { buildDisplayInput, stringifySpanIO },
       spanProtection: {
-        applySpanProtections: TraceReadRedactionService.applySpanProtections,
-        extractRedactionsFromAllSpanInputs:
-          TraceReadRedactionService.extractRedactionsFromAllSpanInputs,
-        extractRedactionsFromAllSpanOutputs:
-          TraceReadRedactionService.extractRedactionsFromAllSpanOutputs,
-        redactObject: TraceReadRedactionService.redactObject,
-        applyDerivedTraceEventProtections:
-          TraceReadRedactionService.applyDerivedTraceEventProtections,
+        applySpanProtections: applySpanProtections,
+        extractRedactionsFromAllSpanInputs: extractRedactionsFromAllSpanInputs,
+        extractRedactionsFromAllSpanOutputs: extractRedactionsFromAllSpanOutputs,
+        redactObject: redactObject,
+        applyDerivedTraceEventProtections: applyDerivedTraceEventProtections,
       },
       contentPrivacy: {
         contentKeyCatalog: CONTENT_KEY_CATALOG,

@@ -22,7 +22,7 @@ import {
 import { ModelCatalogTraceModelCostAdapter } from "../../model-catalog.trace-model-cost.service.ts";
 import { SpanCostService } from "../../span-cost.service.ts";
 import { TraceCanonicalisationService } from "../../trace-canonicalisation.service.ts";
-import { TraceIoExtractionAdapter } from "../../trace-io-extraction-adapter.service.ts";
+import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
 import { TraceMediaReferenceAdapter } from "../../trace-media-reference.service.ts";
 import {
   TraceProjectionLeanService,
@@ -70,7 +70,7 @@ function createTestSpan(overrides: Partial<NormalizedSpan> = {}): NormalizedSpan
 }
 
 describe("given a span carrying semantic input and output attributes", () => {
-  const extraction = TraceIoExtractionAdapter.create(canonicalisation);
+  const extraction = TraceIOExtractionService.create(canonicalisation);
 
   describe("when the packaged extraction is asked for each side through its port", () => {
     /** @scenario "the packaged extraction reads the same semantic attributes" */

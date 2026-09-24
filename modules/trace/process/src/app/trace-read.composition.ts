@@ -42,8 +42,7 @@ import { TraceLegacyCredentialService } from "../services/trace-legacy-credentia
 import { TraceLegacyReadService } from "../services/trace-legacy-read.service.ts";
 import { TraceListService } from "../services/trace-list-read.service.ts";
 import { LogRecordStorageService } from "../services/trace-log-record-read.service.ts";
-import { TraceProcessingSpanIngestAdapter } from "../services/trace-processing-span-ingest.service.ts";
-import { TraceQueryClassificationAdapter } from "../services/trace-query-classification.service.ts";
+import { TraceQueryClassificationService } from "../services/trace-query-classification.service.ts";
 import { SessionGroupsService } from "../services/trace-session-groups.service.ts";
 import { SpanStorageService } from "../services/trace-span-storage-read.service.ts";
 import { TraceSummaryService } from "../services/trace-summary-read.service.ts";
@@ -161,7 +160,7 @@ export function composeTraceAppDependencies(
         resolveClient: resolve,
         modelProviders: options.modelProviders,
         queryFieldValues: TraceReadQueryFieldValues.create(list),
-        queryClassification: TraceQueryClassificationAdapter.create(),
+        queryClassification: TraceQueryClassificationService.create(),
         // A process that folds no trace projections has no fold to ask, so the
         // reader is left out rather than answering an empty summary.
         ...(summaryStore
@@ -224,7 +223,7 @@ export function composeTraceAppDependencies(
       editOverlay,
       changeTraceName: (data) => options.commands.changeTraceName(data),
     },
-    spanIngest: TraceProcessingSpanIngestAdapter.create(options.commands),
+    spanIngest: options.commands,
     // The receiver the two ingestion doors share. ONE dedup claim and ONE
     // command sender across both, so a span posted to `/api/collector` and the
     // same span exported over OTLP are one record, not two.

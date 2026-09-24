@@ -100,7 +100,7 @@ export type {
   TraceClickHouseWriteResolver,
 } from "./repositories/trace-clickhouse-client.repository.ts";
 export { TracePayloadReaderRepository } from "./repositories/trace-payload-reader.repository.ts";
-export { TraceQueryClassificationAdapter } from "./services/trace-query-classification.service.ts";
+export { TraceQueryClassificationService } from "./services/trace-query-classification.service.ts";
 export { TraceSpanStorageRepository } from "./repositories/span-storage-write.repository.ts";
 export {
   TraceSpanStorageClickHouseRepository,
@@ -137,10 +137,7 @@ export { TraceMediaReferenceAdapter } from "./services/trace-media-reference.ser
 export { ModelCatalogTraceModelCostAdapter } from "./services/model-catalog.trace-model-cost.service.ts";
 export { SpanNormalizationPipelineService } from "./services/span-normalization.service.ts";
 export { TraceSpoolService } from "./services/trace-spool.service.ts";
-export { TraceSpanSpoolAdapter } from "./services/trace-span-spool.service.ts";
-export { TraceSpanTokenEstimationAdapter } from "./services/trace-span-token-estimation-adapter.service.ts";
 export { OtelTraceEvaluationLoopMetricsAdapter } from "./services/otel.trace-evaluation-loop-metrics.service.ts";
-export { TraceSpanCostEnrichmentAdapter } from "./services/trace-span-cost-enrichment-adapter.service.ts";
 export { createEvaluationTriggerSubscriber } from "./eventing/evaluation-trigger.subscriber.ts";
 export type { TraceLegacyReadRepository } from "./repositories/trace-legacy-read.repository.ts";
 export { VisibilityWindowService } from "./services/trace-visibility-window.service.ts";

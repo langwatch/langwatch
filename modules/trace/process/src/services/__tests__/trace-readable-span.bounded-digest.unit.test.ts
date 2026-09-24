@@ -7,7 +7,7 @@ import { estimateTokensFromBytes, type Span } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { rankSpansForExpansion } from "../../rules/bounded-spans-digest.rules.ts";
-import { TraceReadableSpanService } from "../trace-readable-span.service.ts";
+import { formatSpansDigestBounded } from "../../rules/trace-readable-span.rules.ts";
 
 const span = ({
   spanId,
@@ -55,7 +55,7 @@ const trace = [
 ];
 
 const bounded = (spans: Span[], maxTokens: number) =>
-  TraceReadableSpanService.formatSpansDigestBounded({ spans, maxTokens });
+  formatSpansDigestBounded({ spans, maxTokens });
 
 describe("the token estimate behind the budget", () => {
   /** @scenario "The token estimate counts bytes, not characters" */

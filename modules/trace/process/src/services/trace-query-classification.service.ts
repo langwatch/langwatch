@@ -3,11 +3,11 @@ import type { TraceQueryClassification } from "@langwatch/trace-contract";
 import { type TraceQueryClassifier } from "../app/trace.members.ts";
 import { ClickhouseTraceQueryEvaluationRepository } from "../repositories/clickhouse/clickhouse.trace-query-evaluation.repository.ts";
 
-export class TraceQueryClassificationAdapter implements TraceQueryClassifier {
+export class TraceQueryClassificationService implements TraceQueryClassifier {
   private constructor() {}
 
-  static create(): TraceQueryClassificationAdapter {
-    return new TraceQueryClassificationAdapter();
+  static create(): TraceQueryClassificationService {
+    return new TraceQueryClassificationService();
   }
 
   classify(query: string): TraceQueryClassification {

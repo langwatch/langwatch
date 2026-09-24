@@ -50,7 +50,7 @@ import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.
  */
 import { formatTraceSummaryDigest, generateAsciiTree } from "#rules/trace-formatting.rules";
 import { tracePath } from "#rules/trace-platform-url.rules";
-import { TraceProjectionCompileService } from "#services/projection/trace-projection-compile.service";
+import { compileProjection } from "#rules/trace-projection-compile.rules";
 import { TraceFacetValuesService } from "#services/trace-facet-values.service";
 import { AmbiguousTraceIdPrefixError } from "#services/trace-legacy-read.service";
 
@@ -242,7 +242,7 @@ function compileRequestedProjection({
 
   try {
     return {
-      projection: TraceProjectionCompileService.compileProjection({
+      projection: compileProjection({
         from,
         select,
         protections,

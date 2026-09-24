@@ -10,6 +10,7 @@ import {
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
+import type { TraceIoExtraction } from "../app/trace.members.ts";
 import {
   type ExtractedIO,
   type FlattenMode,
@@ -26,7 +27,7 @@ import {
  * framework-specific heuristics. Priority for I/O extraction (highest to lowest): 1.
  * @example
  */
-export class TraceIOExtractionService {
+export class TraceIOExtractionService implements TraceIoExtraction {
   static create(traceCanonicalisation: TraceCanonicalisationService): TraceIOExtractionService {
     return new TraceIOExtractionService(traceCanonicalisation);
   }

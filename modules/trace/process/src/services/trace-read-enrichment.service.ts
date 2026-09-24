@@ -8,12 +8,12 @@ import { createLogger } from "@langwatch/observability";
 import type { Protections, Trace, TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { applyOverlayToTrace } from "@langwatch/trace-contract";
 
+import { redactPatchForViewer } from "../rules/trace-edit-overlay-redaction.rules.ts";
 import {
   ClaudeCodeLogEnrichmentService,
   CODING_AGENT_ORIGIN,
   type TraceLogRecordReader,
 } from "./claude-code-log-enrichment.service.ts";
-import { TraceEditOverlayRedactionService } from "./trace-edit-overlay-redaction.service.ts";
 import type { TraceEditOverlayService } from "./trace-edit-overlay.service.ts";
 
 export class TraceReadEnrichmentService {
@@ -108,7 +108,7 @@ export class TraceReadEnrichmentService {
 
       const next = applyOverlayToTrace({
         trace,
-        patch: TraceEditOverlayRedactionService.redactPatchForViewer({
+        patch: redactPatchForViewer({
           patch,
           protections,
           isWindowRedacted: trace.redacted_by_visibility_window === true,

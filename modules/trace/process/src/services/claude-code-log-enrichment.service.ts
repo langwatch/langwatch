@@ -6,6 +6,16 @@ import {
   type ClaudeContentLog,
   type ClaudeSpanRef,
 } from "../rules/claude-code-message-index.rules.ts";
+/**
+ * Read-time Claude Code log-to-span content enrichment. Real `llm_request` spans carry tokens but
+ * no message content, which lives only in OTLP log records, so every read path wanting whole spans
+ * joins the two server-side. Cost is not joined here: it is computed at ingest and stored once.
+ */
+import {
+  computeClaudeInteractionOutput,
+  computeClaudeSpanEnrichment,
+  computeClaudeToolSpanEnrichment,
+} from "../rules/claude-code-span-enrichment.rules.ts";
 import {
   CLAUDE_SPAN_NAME_PREFIX,
   isInteractionSpan,
@@ -24,12 +34,6 @@ import {
 } from "../rules/claude-code-tool-enrichment.rules.ts";
 import { DERIVED_ATTRS } from "../rules/trace-log-content-derivation.rules.ts";
 import { capPayloadString } from "../rules/trace-payload-cap.rules.ts";
-/**
- * Read-time Claude Code log-to-span content enrichment. Real `llm_request` spans carry tokens but
- * no message content, which lives only in OTLP log records, so every read path wanting whole spans
- * joins the two server-side. Cost is not joined here: it is computed at ingest and stored once.
- */
-import { ClaudeCodeSpanEnrichmentService } from "./claude-code-span-enrichment.service.ts";
 
 /**
  * The trace-log read this join issues for itself, and the row it answers with. Taken off the trace
@@ -266,12 +270,12 @@ export class ClaudeCodeLogEnrichmentService {
       codingAgents,
     );
     const refs = ClaudeCodeLogEnrichmentService.mapSpansToClaudeRefs(withInteractionInputs);
-    const enrichmentBySpanId = ClaudeCodeSpanEnrichmentService.computeClaudeSpanEnrichment({
+    const enrichmentBySpanId = computeClaudeSpanEnrichment({
       spans: refs,
       logs,
       traceCanonicalisation,
     });
-    const toolEnrichmentBySpanId = ClaudeCodeSpanEnrichmentService.computeClaudeToolSpanEnrichment({
+    const toolEnrichmentBySpanId = computeClaudeToolSpanEnrichment({
       spans: ClaudeCodeLogEnrichmentService.mapSpansToClaudeToolRefs(withInteractionInputs),
       toolLogs: ClaudeCodeLogEnrichmentService.mapLogRowsToClaudeToolLogs(logRows),
       contentLogs: logs,
@@ -283,7 +287,7 @@ export class ClaudeCodeLogEnrichmentService {
       const toolEnrichment = toolEnrichmentBySpanId.get(span.span_id);
       const interactionOutput =
         span.output == null && isInteractionSpan(span)
-          ? ClaudeCodeSpanEnrichmentService.computeClaudeInteractionOutput({
+          ? computeClaudeInteractionOutput({
               logs,
               windowStartMs: span.timestamps.started_at,
               windowEndMs: span.timestamps.finished_at,
@@ -432,7 +436,7 @@ export class ClaudeCodeLogEnrichmentService {
     traceCanonicalisation: TraceCanonicalisationService;
     codingAgents?: CodingAgentApi;
   }): Span {
-    const enrichment = ClaudeCodeSpanEnrichmentService.computeClaudeSpanEnrichment({
+    const enrichment = computeClaudeSpanEnrichment({
       spans: modelCallRefs,
       logs: ClaudeCodeLogEnrichmentService.mapLogRowsToClaudeContentLogs(logRows, codingAgents),
       traceCanonicalisation,

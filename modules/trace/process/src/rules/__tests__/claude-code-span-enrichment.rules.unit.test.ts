@@ -2,20 +2,17 @@ import { describe, expect, it } from "vitest";
 
 import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
-import {
-  type ClaudeContentLog,
-  type ClaudeSpanRef,
-} from "../../rules/claude-code-message-index.rules.ts";
+import { type ClaudeContentLog, type ClaudeSpanRef } from "../claude-code-message-index.rules.ts";
+import * as claudeCodeSpanEnrichment from "../claude-code-span-enrichment.rules.ts";
 import {
   type ClaudeToolLog,
   type ClaudeToolSpanRef,
-} from "../../rules/claude-code-tool-enrichment.rules.ts";
-import { ClaudeCodeSpanEnrichmentService } from "../claude-code-span-enrichment.service.ts";
+} from "../claude-code-tool-enrichment.rules.ts";
 
 const traceCanonicalisation = TraceCanonicalisationService.create();
 
 function computeClaudeSpanEnrichment(input: { spans: ClaudeSpanRef[]; logs: ClaudeContentLog[] }) {
-  return ClaudeCodeSpanEnrichmentService.computeClaudeSpanEnrichment({
+  return claudeCodeSpanEnrichment.computeClaudeSpanEnrichment({
     ...input,
     traceCanonicalisation,
   });
@@ -26,7 +23,7 @@ function computeClaudeToolSpanEnrichment(input: {
   toolLogs: ClaudeToolLog[];
   contentLogs: ClaudeContentLog[];
 }) {
-  return ClaudeCodeSpanEnrichmentService.computeClaudeToolSpanEnrichment({
+  return claudeCodeSpanEnrichment.computeClaudeToolSpanEnrichment({
     ...input,
     traceCanonicalisation,
   });
@@ -38,7 +35,7 @@ function tryComputeClaudeInteractionOutput(input: {
   windowEndMs: number;
   slackMs?: number;
 }) {
-  return ClaudeCodeSpanEnrichmentService.computeClaudeInteractionOutput({
+  return claudeCodeSpanEnrichment.computeClaudeInteractionOutput({
     ...input,
     traceCanonicalisation,
   });

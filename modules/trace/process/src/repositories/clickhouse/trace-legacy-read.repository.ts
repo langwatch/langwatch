@@ -54,13 +54,17 @@ import { type EventSpanRow } from "../../rules/trace-event-attribute-mapping.rul
 import { mapNormalizedSpansToSpans } from "../../rules/trace-legacy-span-mapping.rules.ts";
 import { mapTraceSummaryToTrace } from "../../rules/trace-legacy-summary-mapping.rules.ts";
 import { parseLLMSpanMessages } from "../../rules/trace-llm-span-messages.rules.ts";
+import {
+  applyEventProtections,
+  applyTraceProtections,
+  extractRedactionsForObject,
+} from "../../rules/trace-read-redaction.rules.ts";
 import type { BlobResolutionDeps } from "../../services/trace-legacy-read.service.ts";
 import { TraceOffloadResolutionBatchService } from "../../services/trace-offload-resolution-batch.service.ts";
 import {
   TraceOffloadResolutionService,
   type ResolvedTraceSpans,
 } from "../../services/trace-offload-resolution.service.ts";
-import { TraceReadRedactionService } from "../../services/trace-read-redaction.service.ts";
 import { TraceRetentionFloorService } from "../../services/trace-retention-floor.service.ts";
 import { TraceLegacyReadRepository } from "../trace-legacy-read.repository.ts";
 import { deserializeAttributes, ensureStringRecord } from "./stored-span-row.mapper.ts";
@@ -1822,7 +1826,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             projectId,
             traceCanonicalisation: this.traceCanonicalisation,
           });
-          return TraceReadRedactionService.applyTraceProtections(trace, protections);
+          return applyTraceProtections(trace, protections);
         });
 
         const lastTrace = traces.length > 0 ? (traces[traces.length - 1] ?? null) : null;
@@ -2109,21 +2113,19 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       );
     }
     // RBAC parity with the legacy read path: events attach AFTER
-    // TraceReadRedactionService.applyTraceProtections ran, so they must get the same treatment —
+    // applyTraceProtections ran, so they must get the same treatment —
     // event_details are blanked when captured input is not visible, and
     // otherwise scrubbed of any substring mirroring the trace's redacted io.
     for (const trace of traces) {
       const rawEvents = byTrace.get(trace.trace_id) ?? [];
       const redactions = new Set<string>([
-        ...(!protections.canSeeCapturedInput
-          ? TraceReadRedactionService.extractRedactionsForObject(trace.input?.value)
-          : []),
+        ...(!protections.canSeeCapturedInput ? extractRedactionsForObject(trace.input?.value) : []),
         ...(!protections.canSeeCapturedOutput
-          ? TraceReadRedactionService.extractRedactionsForObject(trace.output?.value)
+          ? extractRedactionsForObject(trace.output?.value)
           : []),
       ]);
       trace.events = rawEvents.map((event) =>
-        TraceReadRedactionService.applyEventProtections(event, protections, redactions),
+        applyEventProtections(event, protections, redactions),
       );
     }
   }
@@ -2484,7 +2486,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       };
     }
 
-    return TraceReadRedactionService.applyTraceProtections(trace, protections);
+    return applyTraceProtections(trace, protections);
   }
 
   /**

@@ -139,9 +139,10 @@ import {
   extractLlmMessagesForTrace,
 } from "../rules/trace-llm-messages.rules.ts";
 import { tracePlatformUrl } from "../rules/trace-platform-url.rules.ts";
+import { formatSpansDigest, formatSpansDigestBounded } from "../rules/trace-readable-span.rules.ts";
 import { traceToConversationTurn } from "../rules/trace-thread-conversation.rules.ts";
+import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
 import { ClaudeCodeLogEnrichmentService } from "../services/claude-code-log-enrichment.service.ts";
-import { TrackedEventSpanService } from "../services/ingestion-tracked-event-span.service.ts";
 import { TraceCollectorSpanService } from "../services/trace-collector-span.service.ts";
 import { TraceContentReadService as ConcreteTraceContentReadService } from "../services/trace-content-read.service.ts";
 import type { TraceEditRemoval } from "../services/trace-edit-overlay.service.ts";
@@ -156,7 +157,6 @@ import type { TraceIngestionService } from "../services/trace-ingestion.service.
 import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
 import type { TraceLegacyCredentialService } from "../services/trace-legacy-credential.service.ts";
 import { TraceReadBoundsService } from "../services/trace-read-bounds.service.ts";
-import { TraceReadableSpanService } from "../services/trace-readable-span.service.ts";
 import { TraceScenarioEventMediaService } from "../services/trace-scenario-event-media.service.ts";
 import type { TraceViewerProtectionService } from "../services/trace-viewer-protection.service.ts";
 import type { TraceService as TraceTreeService } from "../services/trace.service.ts";
@@ -734,11 +734,11 @@ export class TraceApp implements TraceApi, CollectorApp {
   }
 
   formatSpansDigest(input: { spans: Span[] }): Promise<string> {
-    return TraceReadableSpanService.formatSpansDigest(input.spans);
+    return formatSpansDigest(input.spans);
   }
 
   async renderReadableTrace(input: { trace: Trace; maxTokens: number }): Promise<string> {
-    return TraceReadableSpanService.formatSpansDigestBounded({
+    return formatSpansDigestBounded({
       spans: input.trace.spans,
       maxTokens: input.maxTokens,
     }).text;
@@ -1919,7 +1919,7 @@ export class TraceApp implements TraceApi, CollectorApp {
     const occurredAtMs = input.body.timestamp ?? nowInstant().epochMilliseconds;
     await ingest.recordSpan({
       tenantId: input.project.id,
-      span: TrackedEventSpanService.buildSpan({
+      span: buildTrackedEventSpan({
         body: input.body,
         eventId: input.eventId,
         occurredAtMs,

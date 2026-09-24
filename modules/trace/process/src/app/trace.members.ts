@@ -326,7 +326,7 @@ export interface TraceQueryClassifier {
 }
 
 export interface TraceSpanIngest {
-  recordSpan(data: RecordSpanCommandData): Promise<void>;
+  recordSpan(data: RecordSpanCommandData): Promise<unknown>;
 }
 
 export interface TraceSpanNormalization {

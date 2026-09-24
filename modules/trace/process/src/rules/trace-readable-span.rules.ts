@@ -14,7 +14,7 @@ import { SpanKind, SpanStatusCode, TraceFlags } from "@opentelemetry/api";
 import { emptyResource } from "@opentelemetry/resources";
 import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
 
-import { rankSpansForExpansion } from "../rules/bounded-spans-digest.rules.ts";
+import { rankSpansForExpansion } from "./bounded-spans-digest.rules.ts";
 
 function msToHrTime(ms: number): HrTime {
   const seconds = Math.trunc(ms / 1000);
@@ -198,103 +198,91 @@ function buildStatus(span: Span): SpanStatus {
   return { code: SpanStatusCode.OK };
 }
 
-export class TraceReadableSpanService {
-  static create(): TraceReadableSpanService {
-    return new TraceReadableSpanService();
+/**
+ * A whole trace's spans rendered as the one readable digest a judge reads. The formatter is the
+ * scenario judge's, because the digest a judge is shown and the digest an evaluator is shown
+ * have to be the same text — a second renderer would grade one thing and display another.
+ */
+export function formatSpansDigest(spans: Span[]): Promise<string> {
+  const readableSpans = spans.map((span) => langwatchSpanToReadableSpan(span));
+
+  return Promise.resolve(judgeSpanDigestFormatter.format(readableSpans));
+}
+
+/**
+ * The same digest under a token budget: the whole thing when it fits, else
+ * the structure-only skeleton plus as many expanded spans as fit in the
+ * order a reader wants them, else the skeleton cut to the budget.
+ * @see specs/traces/trace-extraction-modules.feature
+ */
+export function formatSpansDigestBounded({
+  spans,
+  maxTokens,
+}: {
+  spans: Span[];
+  /** Defaults to the scenario judge's own threshold. */
+  maxTokens?: number;
+}): BoundedSpansDigest {
+  const budget = maxTokens ?? DEFAULT_TOKEN_THRESHOLD;
+  const readableSpans = spans.map((span) => langwatchSpanToReadableSpan(span));
+
+  const full = judgeSpanDigestFormatter.format(readableSpans);
+  const fullTokens = estimateTokens(full);
+  if (fullTokens <= budget) {
+    return { text: full, isTruncated: false, estimatedTokens: fullTokens };
   }
 
-  private constructor() {}
-
-  /**
-   * A whole trace's spans rendered as the one readable digest a judge reads. The formatter is the
-   * scenario judge's, because the digest a judge is shown and the digest an evaluator is shown
-   * have to be the same text — a second renderer would grade one thing and display another.
-   */
-  static formatSpansDigest(spans: Span[]): Promise<string> {
-    const readableSpans = spans.map((span) =>
-      TraceReadableSpanService.langwatchSpanToReadableSpan(span),
-    );
-
-    return Promise.resolve(judgeSpanDigestFormatter.format(readableSpans));
+  const structure = judgeSpanDigestFormatter.formatStructureOnly(readableSpans);
+  if (estimateTokens(structure) > budget) {
+    // One span per line, so the cut lands on a line break: half a tree line
+    // names a span that does not exist.
+    const text = cutToEstimatedTokensAtLineBreak({ text: structure, maxTokens: budget });
+    return { text, isTruncated: true, estimatedTokens: estimateTokens(text) };
   }
 
-  /**
-   * The same digest under a token budget: the whole thing when it fits, else
-   * the structure-only skeleton plus as many expanded spans as fit in the
-   * order a reader wants them, else the skeleton cut to the budget.
-   * @see specs/traces/trace-extraction-modules.feature
-   */
-  static formatSpansDigestBounded({
-    spans,
-    maxTokens,
-  }: {
-    spans: Span[];
-    /** Defaults to the scenario judge's own threshold. */
-    maxTokens?: number;
-  }): BoundedSpansDigest {
-    const budget = maxTokens ?? DEFAULT_TOKEN_THRESHOLD;
-    const readableSpans = spans.map((span) =>
-      TraceReadableSpanService.langwatchSpanToReadableSpan(span),
-    );
+  return expandedWithinBudget({ spans, readableSpans, structure, budget });
+}
 
-    const full = judgeSpanDigestFormatter.format(readableSpans);
-    const fullTokens = estimateTokens(full);
-    if (fullTokens <= budget) {
-      return { text: full, isTruncated: false, estimatedTokens: fullTokens };
-    }
+export function langwatchSpanToReadableSpan(span: Span): ReadableSpan {
+  const startTime = msToHrTime(span.timestamps.started_at);
+  const endTime = msToHrTime(span.timestamps.finished_at);
+  const duration = hrTimeDuration(startTime, endTime);
 
-    const structure = judgeSpanDigestFormatter.formatStructureOnly(readableSpans);
-    if (estimateTokens(structure) > budget) {
-      // One span per line, so the cut lands on a line break: half a tree line
-      // names a span that does not exist.
-      const text = cutToEstimatedTokensAtLineBreak({ text: structure, maxTokens: budget });
-      return { text, isTruncated: true, estimatedTokens: estimateTokens(text) };
-    }
+  const spanCtx: SpanContext = {
+    traceId: span.trace_id,
+    spanId: span.span_id,
+    traceFlags: TraceFlags.SAMPLED,
+  };
 
-    return expandedWithinBudget({ spans, readableSpans, structure, budget });
-  }
+  const parentSpanCtx: SpanContext | undefined = span.parent_id
+    ? {
+        traceId: span.trace_id,
+        spanId: span.parent_id,
+        traceFlags: TraceFlags.SAMPLED,
+      }
+    : undefined;
 
-  static langwatchSpanToReadableSpan(span: Span): ReadableSpan {
-    const startTime = msToHrTime(span.timestamps.started_at);
-    const endTime = msToHrTime(span.timestamps.finished_at);
-    const duration = hrTimeDuration(startTime, endTime);
+  const resource = emptyResource();
 
-    const spanCtx: SpanContext = {
-      traceId: span.trace_id,
-      spanId: span.span_id,
-      traceFlags: TraceFlags.SAMPLED,
-    };
-
-    const parentSpanCtx: SpanContext | undefined = span.parent_id
-      ? {
-          traceId: span.trace_id,
-          spanId: span.parent_id,
-          traceFlags: TraceFlags.SAMPLED,
-        }
-      : undefined;
-
-    const resource = emptyResource();
-
-    return {
-      name: span.name ?? "",
-      kind: spanTypeToKind(span.type),
-      spanContext: () => spanCtx,
-      parentSpanContext: parentSpanCtx,
-      startTime,
-      endTime,
-      status: buildStatus(span),
-      attributes: buildAttributes(span),
-      links: [],
-      events: [],
-      duration,
-      ended: true,
-      resource,
-      instrumentationScope: { name: "langwatch" },
-      droppedAttributesCount: 0,
-      droppedEventsCount: 0,
-      droppedLinksCount: 0,
-    };
-  }
+  return {
+    name: span.name ?? "",
+    kind: spanTypeToKind(span.type),
+    spanContext: () => spanCtx,
+    parentSpanContext: parentSpanCtx,
+    startTime,
+    endTime,
+    status: buildStatus(span),
+    attributes: buildAttributes(span),
+    links: [],
+    events: [],
+    duration,
+    ended: true,
+    resource,
+    instrumentationScope: { name: "langwatch" },
+    droppedAttributesCount: 0,
+    droppedEventsCount: 0,
+    droppedLinksCount: 0,
+  };
 }
 
 /** A trace digest rendered for a model, with what it cost and what it lost. */

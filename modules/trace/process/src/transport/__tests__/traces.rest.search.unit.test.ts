@@ -27,9 +27,15 @@ import {
   andFilterConditions,
   findHiddenOriginConditions,
 } from "#rules/trace-filter-hidden-origins.rules";
-import { TraceProjectionCompileService } from "#services/projection/trace-projection-compile.service";
+import type * as projectionCompileRules from "#rules/trace-projection-compile.rules";
+import { compileProjection } from "#rules/trace-projection-compile.rules";
 
 import { tracesRestCredential, tracesRest } from "../traces.rest.ts";
+
+vi.mock("#rules/trace-projection-compile.rules", async (importOriginal) => {
+  const actual = await importOriginal<typeof projectionCompileRules>();
+  return { ...actual, compileProjection: vi.fn(actual.compileProjection) };
+});
 
 const traceQueryTranslator = ClickHouseTraceQueryRepository.create();
 
@@ -382,11 +388,10 @@ describe("POST /search", () => {
 
   describe("when no projection select is provided", () => {
     it("does not compile a projection", async () => {
-      const spy = vi.spyOn(TraceProjectionCompileService, "compileProjection");
+      const spy = vi.mocked(compileProjection).mockClear();
       const { send } = mount();
       await send({ startDate: 1000, endDate: 5000, format: "json" });
       expect(spy).not.toHaveBeenCalled();
-      spy.mockRestore();
     });
 
     it("omits the schema field from the response", async () => {
@@ -399,7 +404,7 @@ describe("POST /search", () => {
 
   describe("when a projection select is provided", () => {
     it("compiles the projection with from, select, and protections", async () => {
-      const spy = vi.spyOn(TraceProjectionCompileService, "compileProjection");
+      const spy = vi.mocked(compileProjection).mockClear();
       const { send } = mount();
       await send({ startDate: 1000, endDate: 5000, from: "traces", select: ["trace_id"] });
       expect(spy).toHaveBeenCalledWith({
@@ -407,11 +412,10 @@ describe("POST /search", () => {
         select: ["trace_id"],
         protections: PROTECTIONS,
       });
-      spy.mockRestore();
     });
 
     it("forwards the compiled plan to the trace service", async () => {
-      const spy = vi.spyOn(TraceProjectionCompileService, "compileProjection");
+      const spy = vi.mocked(compileProjection).mockClear();
       const { send, listTraces } = mount();
       await send({ startDate: 1000, endDate: 5000, from: "traces", select: ["trace_id"] });
       expect(listTraces).toHaveBeenCalledWith(
@@ -419,7 +423,6 @@ describe("POST /search", () => {
           options: expect.objectContaining({ projection: spy.mock.results[0]?.value.plan }),
         }),
       );
-      spy.mockRestore();
     });
 
     it("projects each trace through the compiled projector", async () => {
@@ -450,7 +453,7 @@ describe("POST /search", () => {
     });
 
     it("defaults from to traces when only select is provided", async () => {
-      const spy = vi.spyOn(TraceProjectionCompileService, "compileProjection");
+      const spy = vi.mocked(compileProjection).mockClear();
       const { send } = mount();
       await send({ startDate: 1000, endDate: 5000, select: ["trace_id"] });
       expect(spy).toHaveBeenCalledWith({
@@ -461,7 +464,6 @@ describe("POST /search", () => {
       const res = await send({ startDate: 1000, endDate: 5000, select: ["trace_id"] });
       const body = await bodyOf(res);
       expect(body).toHaveProperty("schema");
-      spy.mockRestore();
     });
   });
 
@@ -496,7 +498,7 @@ describe("POST /search", () => {
 
   describe("when the projection request fails schema validation", () => {
     it("rejects an unsupported from entity with 422", async () => {
-      const spy = vi.spyOn(TraceProjectionCompileService, "compileProjection");
+      const spy = vi.mocked(compileProjection).mockClear();
       const { send } = mount();
       const res = await send({
         startDate: 1000,
@@ -506,20 +508,18 @@ describe("POST /search", () => {
       });
       expect(res.status).toBe(422);
       expect(spy).not.toHaveBeenCalled();
-      spy.mockRestore();
     });
 
     it("rejects an empty select array with 422", async () => {
-      const spy = vi.spyOn(TraceProjectionCompileService, "compileProjection");
+      const spy = vi.mocked(compileProjection).mockClear();
       const { send } = mount();
       const res = await send({ startDate: 1000, endDate: 5000, select: [] });
       expect(res.status).toBe(422);
       expect(spy).not.toHaveBeenCalled();
-      spy.mockRestore();
     });
 
     it("rejects a select with more than 200 paths with 422", async () => {
-      const spy = vi.spyOn(TraceProjectionCompileService, "compileProjection");
+      const spy = vi.mocked(compileProjection).mockClear();
       const { send } = mount();
       const res = await send({
         startDate: 1000,
@@ -528,11 +528,10 @@ describe("POST /search", () => {
       });
       expect(res.status).toBe(422);
       expect(spy).not.toHaveBeenCalled();
-      spy.mockRestore();
     });
 
     it("rejects a select path longer than 256 characters with 422", async () => {
-      const spy = vi.spyOn(TraceProjectionCompileService, "compileProjection");
+      const spy = vi.mocked(compileProjection).mockClear();
       const { send } = mount();
       const res = await send({
         startDate: 1000,
@@ -541,7 +540,6 @@ describe("POST /search", () => {
       });
       expect(res.status).toBe(422);
       expect(spy).not.toHaveBeenCalled();
-      spy.mockRestore();
     });
   });
 

@@ -15,12 +15,13 @@ import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
+import type { TraceSpanNormalization } from "../app/trace.members.ts";
 import { OtlpTraceRequestService } from "./otlp-trace-request.service.ts";
 import { SpanRecordIdentityService } from "./span-record-identity.service.ts";
 
 const spanRecordIdentityService = SpanRecordIdentityService.create();
 
-export class SpanNormalizationPipelineService {
+export class SpanNormalizationPipelineService implements TraceSpanNormalization {
   static create(
     traceCanonicalisation: TraceCanonicalisationService,
   ): SpanNormalizationPipelineService {

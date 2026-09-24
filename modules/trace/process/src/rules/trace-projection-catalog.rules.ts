@@ -273,91 +273,83 @@ function mapAnnotationField({ path, rest }: { path: string; rest: string }): Res
   return null;
 }
 
-export class TraceProjectionCatalogService {
-  static create(): TraceProjectionCatalogService {
-    return new TraceProjectionCatalogService();
+/**
+ * Resolve a single dotted-path to its {@link ResolvedField}, or null when the
+ * path is not in the allowlist (the caller collects nulls into a 400).
+ */
+export function mapField(path: string): ResolvedField | null {
+  // Reject prototype-pollution segments anywhere in the path (defense in depth
+  // alongside the projector's setPath guard).
+  const hasForbiddenSegment = path.split(".").some((segment) => FORBIDDEN_SEGMENTS.has(segment));
+  if (hasForbiddenSegment) {
+    return null;
   }
 
-  private constructor() {}
+  const scalar = TRACE_SCALARS[path];
+  if (scalar) {
+    return field({ path, collection: null, ...scalar });
+  }
 
-  /**
-   * Resolve a single dotted-path to its {@link ResolvedField}, or null when the
-   * path is not in the allowlist (the caller collects nulls into a 400).
-   */
-  static mapField(path: string): ResolvedField | null {
-    // Reject prototype-pollution segments anywhere in the path (defense in depth
-    // alongside the projector's setPath guard).
-    const hasForbiddenSegment = path.split(".").some((segment) => FORBIDDEN_SEGMENTS.has(segment));
-    if (hasForbiddenSegment) {
+  if (path.startsWith(PREFIX.metrics)) {
+    const key = path.slice(PREFIX.metrics.length);
+    const type = TRACE_METRICS[key];
+    if (!type) {
       return null;
     }
 
-    const scalar = TRACE_SCALARS[path];
-    if (scalar) {
-      return field({ path, collection: null, ...scalar });
-    }
-
-    if (path.startsWith(PREFIX.metrics)) {
-      const key = path.slice(PREFIX.metrics.length);
-      const type = TRACE_METRICS[key];
-      if (!type) {
-        return null;
-      }
-
-      return field({
-        path,
-        type,
-        collection: null,
-        protection: key === "total_cost" ? "costs" : null,
-        outPath: ["metrics", key],
-        read: (t) => t.metrics?.[key] ?? null,
-      });
-    }
-
-    if (path.startsWith(PREFIX.metadata)) {
-      const key = path.slice(PREFIX.metadata.length);
-      if (!key) {
-        return null;
-      }
-
-      return field({
-        path,
-        type: "json",
-        collection: null,
-        protection: null,
-        outPath: ["metadata", key],
-        read: (t) => t.metadata?.[key] ?? null,
-      });
-    }
-
-    if (path.startsWith(PREFIX.evaluations)) {
-      const key = path.slice(PREFIX.evaluations.length);
-      const type = EVALUATION_FIELDS[key];
-      if (!type) {
-        return null;
-      }
-
-      return field({
-        path,
-        type,
-        collection: "evaluations",
-        protection: null,
-        outPath: [key],
-        read: (ev) => ev[key] ?? null,
-      });
-    }
-
-    if (path.startsWith(PREFIX.events)) {
-      return mapEventField({ path, rest: path.slice(PREFIX.events.length) });
-    }
-
-    if (path.startsWith(PREFIX.annotations)) {
-      return mapAnnotationField({
-        path,
-        rest: path.slice(PREFIX.annotations.length),
-      });
-    }
-
-    return null;
+    return field({
+      path,
+      type,
+      collection: null,
+      protection: key === "total_cost" ? "costs" : null,
+      outPath: ["metrics", key],
+      read: (t) => t.metrics?.[key] ?? null,
+    });
   }
+
+  if (path.startsWith(PREFIX.metadata)) {
+    const key = path.slice(PREFIX.metadata.length);
+    if (!key) {
+      return null;
+    }
+
+    return field({
+      path,
+      type: "json",
+      collection: null,
+      protection: null,
+      outPath: ["metadata", key],
+      read: (t) => t.metadata?.[key] ?? null,
+    });
+  }
+
+  if (path.startsWith(PREFIX.evaluations)) {
+    const key = path.slice(PREFIX.evaluations.length);
+    const type = EVALUATION_FIELDS[key];
+    if (!type) {
+      return null;
+    }
+
+    return field({
+      path,
+      type,
+      collection: "evaluations",
+      protection: null,
+      outPath: [key],
+      read: (ev) => ev[key] ?? null,
+    });
+  }
+
+  if (path.startsWith(PREFIX.events)) {
+    return mapEventField({ path, rest: path.slice(PREFIX.events.length) });
+  }
+
+  if (path.startsWith(PREFIX.annotations)) {
+    return mapAnnotationField({
+      path,
+      rest: path.slice(PREFIX.annotations.length),
+    });
+  }
+
+  return null;
 }

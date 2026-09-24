@@ -16,8 +16,8 @@ import {
  * and a per-trace `project` function. Pure and synchronous; execution lives in the trace service.
  */
 
-import { TraceProjectionCatalogService } from "./trace-projection-catalog.service.ts";
-import { type ProjectionSource, type ResolvedField } from "./trace-projection-catalog.service.ts";
+import { mapField } from "./trace-projection-catalog.rules.ts";
+import { type ProjectionSource, type ResolvedField } from "./trace-projection-catalog.rules.ts";
 
 const COLLECTIONS: ProjectionCollection[] = ["events", "annotations", "evaluations"];
 
@@ -41,7 +41,7 @@ function resolveSelectedFields(select: string[]): ResolvedField[] {
     }
 
     seen.add(path);
-    const resolved = TraceProjectionCatalogService.mapField(path);
+    const resolved = mapField(path);
     if (resolved) {
       fields.push(resolved);
     } else {
@@ -242,24 +242,16 @@ function setPath({
   cursor[last] = value;
 }
 
-export class TraceProjectionCompileService {
-  static create(): TraceProjectionCompileService {
-    return new TraceProjectionCompileService();
-  }
+export function compileProjection({
+  from = "traces",
+  select,
+  protections,
+}: CompileProjectionArgs): CompiledProjection {
+  const fields = resolveSelectedFields(select);
 
-  private constructor() {}
-
-  static compileProjection({
-    from = "traces",
-    select,
-    protections,
-  }: CompileProjectionArgs): CompiledProjection {
-    const fields = resolveSelectedFields(select);
-
-    return {
-      schema: buildSchema({ from, fields }),
-      plan: buildPlan({ from, fields, protections }),
-      project: buildProjector({ fields, protections }),
-    };
-  }
+  return {
+    schema: buildSchema({ from, fields }),
+    plan: buildPlan({ from, fields, protections }),
+    project: buildProjector({ fields, protections }),
+  };
 }

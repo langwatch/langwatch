@@ -6,8 +6,8 @@
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { TraceApi, traceEditOverlayTrpc } from "@langwatch/trace-contract";
 
-import { TraceEditOverlayRedactionService } from "../services/trace-edit-overlay-redaction.service.ts";
-import { TraceEditOverlayRestoreService } from "../services/trace-edit-overlay-restore.service.ts";
+import { redactPatchForViewer } from "../rules/trace-edit-overlay-redaction.rules.ts";
+import { restoreWithheldEdits } from "../rules/trace-edit-overlay-restore.rules.ts";
 
 export const traceEditOverlayTrpcTransport = defineTrpcRouter(TraceApi, traceEditOverlayTrpc)
   .procedure("getByTraceId")
@@ -31,7 +31,7 @@ export const traceEditOverlayTrpcTransport = defineTrpcRouter(TraceApi, traceEdi
 
     return {
       ...overlay,
-      patch: TraceEditOverlayRedactionService.redactPatchForViewer({
+      patch: redactPatchForViewer({
         patch: overlay.patch,
         protections,
         isWindowRedacted,
@@ -70,7 +70,7 @@ export const traceEditOverlayTrpcTransport = defineTrpcRouter(TraceApi, traceEdi
       {
         projectId: input.projectId,
         traceId: input.traceId,
-        patch: TraceEditOverlayRestoreService.restoreWithheldEdits({
+        patch: restoreWithheldEdits({
           incoming: input.patch,
           stored: stored.patch,
           protections,
@@ -82,7 +82,7 @@ export const traceEditOverlayTrpcTransport = defineTrpcRouter(TraceApi, traceEdi
 
     return {
       ...saved,
-      patch: TraceEditOverlayRedactionService.redactPatchForViewer({
+      patch: redactPatchForViewer({
         patch: saved.patch,
         protections,
         isWindowRedacted,
