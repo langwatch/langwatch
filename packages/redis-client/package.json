@@ -29,6 +29,7 @@
     "ioredis": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"

@@ -2230,6 +2230,9 @@ importers:
       '@langwatch/api-fixture':
         specifier: workspace:*
         version: link:../../../../packages/api-fixture
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../../packages/test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../../packages/vitest-config
@@ -3524,6 +3527,9 @@ importers:
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2)
@@ -5175,6 +5181,9 @@ importers:
       '@langwatch/api-fixture':
         specifier: workspace:*
         version: link:../../../packages/api-fixture
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -6184,6 +6193,9 @@ importers:
       '@langwatch/api-fixture':
         specifier: workspace:*
         version: link:../../../packages/api-fixture
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -8531,6 +8543,9 @@ importers:
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../packages/redis-client
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -9428,6 +9443,9 @@ importers:
         specifier: 'catalog:'
         version: 8.10.0
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -11213,6 +11231,9 @@ importers:
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -12290,6 +12311,9 @@ importers:
       '@langwatch/api-fixture':
         specifier: workspace:*
         version: link:../../../packages/api-fixture
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
       hono:
         specifier: 'catalog:'
         version: 4.13.1
@@ -12434,6 +12458,9 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -13263,6 +13290,9 @@ importers:
       '@langwatch/api-fixture':
         specifier: workspace:*
         version: link:../../../packages/api-fixture
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -14585,6 +14615,9 @@ importers:
         specifier: 'catalog:'
         version: 15.1.3
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
@@ -15326,6 +15359,9 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
@@ -15416,6 +15452,9 @@ importers:
         specifier: 'catalog:'
         version: 5.10.1
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config

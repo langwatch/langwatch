@@ -104,6 +104,7 @@
     "@langwatch/api-fixture": "workspace:*",
     "@langwatch/feature-flag-process": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@opentelemetry/sdk-trace-base": "catalog:",
     "@opentelemetry/sdk-trace-node": "catalog:",

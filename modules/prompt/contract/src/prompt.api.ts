@@ -10,6 +10,7 @@ import type {
 } from "./prompt.commands.ts";
 import type { PlaygroundStreamEvent, PromptExecuteRequest } from "./prompt.playground-execute.ts";
 import type {
+  ApiResponsePrompt,
   PromptCopyChoice,
   PromptCopySource,
   PromptCopySummary,
@@ -217,6 +218,44 @@ export interface PromptApi {
   seedTagsForOrganization(input: { organizationId: string }): Promise<void>;
   /** The usage report's figures (ADR-156, section 10). */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<PromptUsageCount>;
+  /** The `/api/prompts` REST family's operations: they refuse with the statuses that family has always answered. */
+  getByAddress(input: {
+    address: string;
+    version?: number;
+    tag?: string;
+    projectId: string;
+    organizationId: string;
+  }): Promise<VersionedPrompt>;
+  createWithTags(
+    input: CreatePromptCommand & { organizationId: string; tags?: string[] },
+  ): Promise<ApiResponsePrompt>;
+  updateWithTags(
+    input: UpdatePromptCommand & { organizationId: string; tags?: string[] },
+  ): Promise<ApiResponsePrompt>;
+  syncAndAnnounce(
+    input: Record<string, unknown> & { idOrHandle: string; projectId: string },
+  ): Promise<PromptSyncResult>;
+  assignTagByAddress(input: {
+    idOrHandle: string;
+    versionId: string;
+    tag: string;
+    projectId: string;
+    organizationId: string;
+  }): Promise<PromptTagAssignment>;
+  createTagDefinition(input: { organizationId: string; name: string }): Promise<PromptTag>;
+  renameTagDefinition(input: {
+    projectId: string;
+    organizationId: string;
+    oldName: string;
+    newName: string;
+    by: PromptTagCatalogPrincipal;
+  }): Promise<PromptTag>;
+  deleteTagDefinition(input: {
+    projectId: string;
+    organizationId: string;
+    name: string;
+    by: PromptTagCatalogPrincipal;
+  }): Promise<void>;
 }
 
 export const PromptApi = moduleApi<PromptApi>()("prompt");

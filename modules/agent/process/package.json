@@ -51,6 +51,7 @@
     "@langwatch/actor": "workspace:*",
     "@langwatch/api-fixture": "workspace:*",
     "@langwatch/secrets": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
     "@trpc/server": "catalog:",
     "@types/ws": "catalog:",
     "hono": "catalog:",

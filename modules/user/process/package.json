@@ -51,6 +51,7 @@
   },
   "devDependencies": {
     "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/bcrypt": "catalog:",
     "@types/node": "catalog:",

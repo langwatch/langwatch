@@ -38,6 +38,7 @@
     "prom-client": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
