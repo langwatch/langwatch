@@ -1076,6 +1076,8 @@ callers stay typed; it carries a disable comment naming why. A map projection de
 its pipeline's events it consumes, which types its key and map functions (Alex, 2026-09-24).
 A command declares the exact events it produces, and `withCommand` accepts it only when they belong to
 the pipeline. A queued payload is `unknown` until its schema parses it once at dispatch (Alex, 2026-09-24).
+The schema a queued event is parsed with is the one its pipeline already declared for that event type
+in `.withEvents` — the queue never needs a second schema or a cast (Alex, 2026-09-25).
 
 A module may host several pipelines: it calls `.withEventing(...)` once per
 pipeline, each a `defineEventingModule` declaration over the same app and
