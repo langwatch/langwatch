@@ -6339,6 +6339,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
+      '@langwatch/topic-contract':
+        specifier: workspace:*
+        version: link:../../topic/contract
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -6391,6 +6394,9 @@ importers:
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../experiment/contract
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -6418,6 +6424,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/topic-contract':
+        specifier: workspace:*
+        version: link:../../topic/contract
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract

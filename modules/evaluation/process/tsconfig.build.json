@@ -57,6 +57,9 @@
       "path": "../../experiment/contract/tsconfig.build.json"
     },
     {
+      "path": "../../feature-flag/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
@@ -82,6 +85,9 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../topic/contract/tsconfig.build.json"
     },
     {
       "path": "../../trace/contract/tsconfig.build.json"
