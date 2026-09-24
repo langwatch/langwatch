@@ -20,29 +20,24 @@ export type GovernanceMembershipStatus =
   | "user_deactivated"
   | "not_org_member";
 
-export abstract class GovernanceDirectory {
-  abstract membershipStatus(params: {
+export interface GovernanceDirectoryRepository {
+  membershipStatus(params: {
     userId: string;
     organizationId: string;
   }): Promise<GovernanceMembershipStatus>;
 
-  abstract findPersonProfile(
-    userId: string,
-  ): Promise<{ name: string | null; email: string | null } | null>;
+  findPersonProfile(userId: string): Promise<{ name: string | null; email: string | null } | null>;
 
-  abstract findOrganizationIdByProjectApiKey(apiKey: string): Promise<string | null>;
+  findOrganizationIdByProjectApiKey(apiKey: string): Promise<string | null>;
 
-  abstract findMemberIdByEmail(params: {
-    email: string;
-    organizationId: string;
-  }): Promise<string | null>;
+  findMemberIdByEmail(params: { email: string; organizationId: string }): Promise<string | null>;
 
-  abstract findLiveProjectBySlug(params: {
+  findLiveProjectBySlug(params: {
     slug: string;
     organizationId: string;
   }): Promise<(GovernanceDirectoryProject & { apiKey: string }) | null>;
 
-  abstract findLiveProjectByRef(params: {
+  findLiveProjectByRef(params: {
     projectRef: string;
     organizationId: string;
   }): Promise<GovernanceDirectoryProject | null>;

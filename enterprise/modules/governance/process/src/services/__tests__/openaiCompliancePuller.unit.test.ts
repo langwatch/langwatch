@@ -14,7 +14,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GovernanceObjectStore } from "../../app/governance.members.ts";
-import { OpenAiComplianceReferencePullerAdapter } from "../openai-compliance-puller.service.ts";
+import { OpenAiComplianceReferencePullerService } from "../openai-compliance-puller.service.ts";
 
 const stub = vi.hoisted(() => ({
   objects: [] as { key: string; body: string }[],
@@ -64,7 +64,7 @@ async function pullOneLine() {
       body: JSON.stringify(COMPLIANCE_LINE),
     },
   ];
-  const puller = OpenAiComplianceReferencePullerAdapter.create({ objects });
+  const puller = OpenAiComplianceReferencePullerService.create({ objects });
   const config = puller.validateConfig(ADMIN_INPUT);
   const result = await puller.runOnce({ cursor: null, credentials: {} }, config);
   // A precondition of every test below, not an assertion of any of them: a

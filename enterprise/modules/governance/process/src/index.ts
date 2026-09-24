@@ -56,7 +56,6 @@ export { OtelTraceAlertMetricsAdapter } from "./services/otel-trace-alert-metric
 
 export { SEAT_REPORT_ACTION } from "./rules/microsoft-graph-seats.rules.ts";
 export type { SpendSpikeAnomalyDatabase } from "./repositories/prisma/prisma.spend-spike-anomaly.repository.ts";
-export { PostgresIngestionPullSourceAdapter } from "./repositories/prisma/prisma.ingestion-pull-source.repository.ts";
 export type { IngestionSourceDatabase } from "./repositories/prisma/prisma.ingestion-source.repository.ts";
 export type { IngestionPullRunProjectionDatabase } from "./repositories/prisma/prisma.ingestion-pull-run-projection.repository.ts";
 
@@ -100,8 +99,8 @@ export {
   findAgentsListings,
   type IngestionPullWorkerSubstrates,
 } from "./governance.server.ts";
-export type { AgentsListingSummary } from "./services/agents-listing-outcome.service.ts";
-export { deriveAgentsListingOutcome } from "./services/agents-listing-outcome.service.ts";
+export type { AgentsListingSummary } from "./rules/agents-listing-outcome.rules.ts";
+export { deriveAgentsListingOutcome } from "./rules/agents-listing-outcome.rules.ts";
 export type {
   AgentsListingOutcome,
   AgentsListingRefusalCause,

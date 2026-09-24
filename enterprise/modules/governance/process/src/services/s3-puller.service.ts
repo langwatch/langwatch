@@ -8,7 +8,7 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import { nowInstant } from "@langwatch/time";
 /**
- * S3PollingPullerAdapter — universal S3-polling adapter for SaaS
+ * S3PollingPullerService — universal S3-polling adapter for SaaS
  * platforms that drop audit logs as files in a customer-owned bucket
  * (Anthropic compliance dump, OpenAI enterprise audit export,
  * customer-built S3-to-archive pipelines).
@@ -122,19 +122,23 @@ function asInt(value: unknown): number {
   return Math.trunc(asNumber(value));
 }
 
-export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
-  readonly id: string = "s3_polling";
-
-  protected constructor(
+export class S3PollingPullerService implements PullerAdapter<S3PollingConfig> {
+  private constructor(
+    readonly id: string,
     private readonly objects: GovernanceObjectStore,
     private readonly diagnostics: IngestionPullDiagnosticsSink = new NullIngestionPullDiagnosticsAdapter(),
   ) {}
 
   static create(options: {
+    id?: string;
     objects: GovernanceObjectStore;
     diagnostics?: IngestionPullDiagnosticsSink;
-  }): S3PollingPullerAdapter {
-    return new S3PollingPullerAdapter(options.objects, options.diagnostics);
+  }): S3PollingPullerService {
+    return new S3PollingPullerService(
+      options.id ?? "s3_polling",
+      options.objects,
+      options.diagnostics,
+    );
   }
 
   validateConfig(config: unknown): S3PollingConfig {

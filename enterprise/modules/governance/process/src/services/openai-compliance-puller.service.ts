@@ -2,7 +2,7 @@
 
 /**
  * OpenAI Enterprise Compliance reference puller — built on top of
- * the S3PollingPullerAdapter with the bucket-shape locked to
+ * the S3PollingPullerService with the bucket-shape locked to
  * OpenAI's documented compliance-export format. Customers enable
  * "OpenAI Compliance" with one click + provide AWS credentials for
  * the bucket they configured OpenAI to write to.
@@ -33,13 +33,17 @@
  *       (same lock-the-shape pattern; openai/claude follow as ⏳ rows)
  */
 
-import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
+import type {
+  GovernancePuller,
+  PullResult,
+  PullRunOptions,
+} from "@langwatch/enterprise-governance-contract";
 
 import type {
   GovernanceObjectStore,
   IngestionPullDiagnosticsSink,
 } from "../app/governance.members.ts";
-import { type S3PollingConfig, S3PollingPullerAdapter } from "./s3-puller.service.ts";
+import { type S3PollingConfig, S3PollingPullerService } from "./s3-puller.service.ts";
 
 /**
  * Locked reference config for OpenAI's enterprise compliance dump.
@@ -79,21 +83,18 @@ interface OpenAiAdminInput {
   region: string;
 }
 
-export class OpenAiComplianceReferencePullerAdapter extends S3PollingPullerAdapter {
-  override readonly id: string = "openai_compliance";
+export class OpenAiComplianceReferencePullerService implements GovernancePuller<S3PollingConfig> {
+  readonly id: string = "openai_compliance";
 
-  private constructor(options: {
+  private constructor(private readonly s3: S3PollingPullerService) {}
+
+  static create(options: {
     objects: GovernanceObjectStore;
     diagnostics?: IngestionPullDiagnosticsSink;
-  }) {
-    super(options.objects, options.diagnostics);
-  }
-
-  static override create(options: {
-    objects: GovernanceObjectStore;
-    diagnostics?: IngestionPullDiagnosticsSink;
-  }): OpenAiComplianceReferencePullerAdapter {
-    return new OpenAiComplianceReferencePullerAdapter(options);
+  }): OpenAiComplianceReferencePullerService {
+    return new OpenAiComplianceReferencePullerService(
+      S3PollingPullerService.create({ ...options, id: "openai_compliance" }),
+    );
   }
 
   /**
@@ -101,7 +102,7 @@ export class OpenAiComplianceReferencePullerAdapter extends S3PollingPullerAdapt
    * to the OpenAI-documented shape. We pull those fields off the
    * caller-supplied config and graft them onto the locked reference.
    */
-  override validateConfig(config: unknown): S3PollingConfig {
+  validateConfig(config: unknown): S3PollingConfig {
     const input = config as Partial<OpenAiAdminInput> | undefined;
     if (!input?.bucket) {
       throw new Error(
@@ -111,7 +112,7 @@ export class OpenAiComplianceReferencePullerAdapter extends S3PollingPullerAdapt
     if (!input.region) {
       throw new Error("openai_compliance: pullConfig.region is required");
     }
-    return super.validateConfig({
+    return this.s3.validateConfig({
       ...OPENAI_COMPLIANCE_PULL_CONFIG,
       bucket: input.bucket,
       prefix: input.prefix ?? "",
@@ -119,7 +120,7 @@ export class OpenAiComplianceReferencePullerAdapter extends S3PollingPullerAdapt
     });
   }
 
-  override async runOnce(options: PullRunOptions, config: S3PollingConfig): Promise<PullResult> {
-    return super.runOnce(options, config);
+  runOnce(options: PullRunOptions, config: S3PollingConfig): Promise<PullResult> {
+    return this.s3.runOnce(options, config);
   }
 }

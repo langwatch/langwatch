@@ -29,7 +29,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { FetchHttp } from "../../__tests__/support/puller-test-ports.ts";
 import {
   type DatabricksGeniePullConfig,
-  DatabricksGeniePullerAdapter,
+  DatabricksGeniePullerService,
 } from "../databricks-genie-puller.service.ts";
 import { DATABRICKS_GENIE_ADAPTER_ID } from "../pull-destination.service.ts";
 
@@ -385,7 +385,7 @@ function genieConfig(params: {
   startingAt: string;
   credentials?: Record<string, string>;
 }): DatabricksGeniePullConfig {
-  return DatabricksGeniePullerAdapter.create(new FetchHttp()).validateConfig({
+  return DatabricksGeniePullerService.create(new FetchHttp()).validateConfig({
     adapter: DATABRICKS_GENIE_ADAPTER_ID,
     workspaceUrl: params.baseUrl,
     spaceIds: params.spaceIds,
@@ -415,7 +415,7 @@ async function sweep(params: {
     ...params.fixtureOptions,
   });
   closers.push(fixture.close);
-  const adapter = DatabricksGeniePullerAdapter.create(new FetchHttp());
+  const adapter = DatabricksGeniePullerService.create(new FetchHttp());
   const config = genieConfig({
     baseUrl: fixture.baseUrl,
     spaceIds: params.spaceIds,
@@ -519,7 +519,7 @@ describe("given someone asks a question while a sweep is running", () => {
       },
     });
     closers.push(fixture.close);
-    const adapter = DatabricksGeniePullerAdapter.create(new FetchHttp());
+    const adapter = DatabricksGeniePullerService.create(new FetchHttp());
     const config = genieConfig({
       baseUrl: fixture.baseUrl,
       spaceIds: ["space-alpha", "space-beta"],
@@ -603,7 +603,7 @@ describe("given a list endpoint whose page token never advances", () => {
     const workspace = createFixtureWorkspace();
     const fixture = await startFixtureServer({ workspace });
     closers.push(fixture.close);
-    const adapter = DatabricksGeniePullerAdapter.create(new FetchHttp(), { maxRequests: 5 });
+    const adapter = DatabricksGeniePullerService.create(new FetchHttp(), { maxRequests: 5 });
     const config = genieConfig({
       baseUrl: fixture.baseUrl,
       spaceIds: ["space-loop"],
@@ -648,7 +648,7 @@ describe("given a sweep too large for one run's budget", () => {
     const workspace = createFixtureWorkspace();
     const fixture = await startFixtureServer({ workspace });
     closers.push(fixture.close);
-    const adapter = DatabricksGeniePullerAdapter.create(new FetchHttp());
+    const adapter = DatabricksGeniePullerService.create(new FetchHttp());
     const config = genieConfig({
       baseUrl: fixture.baseUrl,
       spaceIds: ["space-alpha", "space-beta"],
@@ -697,7 +697,7 @@ describe("given a sweep too large for one run's budget", () => {
     });
     closers.push(fixture.close);
 
-    const adapter = DatabricksGeniePullerAdapter.create(new FetchHttp());
+    const adapter = DatabricksGeniePullerService.create(new FetchHttp());
     const config = genieConfig({
       baseUrl: fixture.baseUrl,
       spaceIds: ["space-alpha", "space-beta"],
@@ -743,7 +743,7 @@ describe("given the directory fails while the sweep is running", () => {
     });
     closers.push(fixture.close);
 
-    const adapter = DatabricksGeniePullerAdapter.create(new FetchHttp());
+    const adapter = DatabricksGeniePullerService.create(new FetchHttp());
     const config = genieConfig({
       baseUrl: fixture.baseUrl,
       spaceIds: ["space-alpha"],
@@ -779,7 +779,7 @@ describe("given a source that signs in with a service principal", () => {
       oauth: { accessToken: "minted-token" },
     });
     closers.push(fixture.close);
-    const adapter = DatabricksGeniePullerAdapter.create(new FetchHttp());
+    const adapter = DatabricksGeniePullerService.create(new FetchHttp());
     const credentials = { clientId: "sp-client-id", clientSecret: "sp-client-secret" };
     const config = genieConfig({
       baseUrl: fixture.baseUrl,
@@ -808,14 +808,14 @@ describe("given a source that signs in with a service principal", () => {
 
 describe("given a source holding a pasted token", () => {
   let fixture: Awaited<ReturnType<typeof startFixtureServer>>;
-  let adapter: DatabricksGeniePullerAdapter;
+  let adapter: DatabricksGeniePullerService;
   let config: DatabricksGeniePullConfig;
 
   beforeEach(async () => {
     const workspace = createFixtureWorkspace();
     fixture = await startFixtureServer({ workspace });
     closers.push(fixture.close);
-    adapter = DatabricksGeniePullerAdapter.create(new FetchHttp());
+    adapter = DatabricksGeniePullerService.create(new FetchHttp());
     config = genieConfig({
       baseUrl: fixture.baseUrl,
       spaceIds: ["space-alpha"],
@@ -857,7 +857,7 @@ describe("given a source that cannot sign in", () => {
     const workspace = createFixtureWorkspace();
     const fixture = await startFixtureServer({ workspace, oauth: params.oauth });
     closers.push(fixture.close);
-    const adapter = DatabricksGeniePullerAdapter.create(new FetchHttp());
+    const adapter = DatabricksGeniePullerService.create(new FetchHttp());
     const config = genieConfig({
       baseUrl: fixture.baseUrl,
       spaceIds: ["space-alpha"],

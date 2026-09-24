@@ -16,7 +16,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GovernanceHttpClient } from "../../app/governance.members.ts";
-import { DatabricksGeniePullerAdapter } from "../databricks-genie-puller.service.ts";
+import { DatabricksGeniePullerService } from "../databricks-genie-puller.service.ts";
 import type { SsrfSafeResponse } from "../ssrf-safe-fetch.ts";
 
 vi.mock("../ssrf-safe-fetch.ts", () => ({ ssrfSafeFetch: vi.fn() }));
@@ -36,8 +36,8 @@ const testHttp: GovernanceHttpClient = {
   },
 };
 
-function makePuller(options?: { maxRequests?: number }): DatabricksGeniePullerAdapter {
-  return DatabricksGeniePullerAdapter.create(testHttp, options);
+function makePuller(options?: { maxRequests?: number }): DatabricksGeniePullerService {
+  return DatabricksGeniePullerService.create(testHttp, options);
 }
 
 const workspaceUrl = "https://adb-1.azuredatabricks.net";
@@ -66,7 +66,7 @@ beforeEach(() => {
   fetchMock.mockReset();
 });
 
-describe("DatabricksGeniePullerAdapter space enumeration", () => {
+describe("DatabricksGeniePullerService space enumeration", () => {
   describe("given the workspace answers the space list across two pages", () => {
     it("follows the continuation token and sweeps both spaces", async () => {
       fetchMock.mockImplementation(async (url: string) => {

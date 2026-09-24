@@ -17,7 +17,7 @@ import type {
 } from "./clickhouse/clickhouse.ocsf-events.repository.ts";
 import type { DepartmentRepository } from "./department.repository.ts";
 import type { GatewaySpendRepository } from "./gateway-spend.repository.ts";
-import type { GovernanceDirectory } from "./governance-directory.repository.ts";
+import type { GovernanceDirectoryRepository } from "./governance-directory.repository.ts";
 import type {
   GovernanceOcsfExportRepository,
   GovernanceSetupStateRepository,
@@ -44,7 +44,7 @@ export interface GovernanceRepositories {
   readonly adminWorkspaceViewAudit: AdminWorkspaceViewAuditRepository;
   readonly anomalyRules: AnomalyRuleRepository;
   readonly departments: DepartmentRepository;
-  readonly directory: GovernanceDirectory;
+  readonly directory: GovernanceDirectoryRepository;
   readonly ingestionTemplates: IngestionTemplateRepository;
   readonly ocsfExports: GovernanceOcsfExportRepository;
   readonly personalVirtualKeys: PersonalVirtualKeyRepository;

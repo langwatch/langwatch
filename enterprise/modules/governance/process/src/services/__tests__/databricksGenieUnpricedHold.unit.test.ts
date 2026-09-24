@@ -19,7 +19,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GovernanceHttpClient } from "../../app/governance.members.ts";
 import {
-  DatabricksGeniePullerAdapter,
+  DatabricksGeniePullerService,
   WAREHOUSE_COST_UNREADABLE,
 } from "../databricks-genie-puller.service.ts";
 import type { SsrfSafeResponse } from "../ssrf-safe-fetch.ts";
@@ -150,7 +150,7 @@ async function pull({
       return { ...response, statusText: "" };
     },
   };
-  return DatabricksGeniePullerAdapter.create(http).runOnce(
+  return DatabricksGeniePullerService.create(http).runOnce(
     { cursor, credentials: { token: "dapi-fixture" } },
     {
       adapter: "databricks_genie",

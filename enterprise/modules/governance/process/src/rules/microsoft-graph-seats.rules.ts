@@ -10,7 +10,7 @@
  * and a third sign-in, separate from Dataverse and from Resource Manager.
  *
  * Pure. No I/O, no clock of its own, no fetch — the caller does the talking
- * and hands the reply here, exactly as `azure-cost-management.service.ts` sits beside
+ * and hands the reply here, exactly as `azure-cost-management.rules.ts` sits beside
  * `copilotStudioDataverse.puller.ts`. That is what lets every rule below be
  * decided against a real captured reply in a unit test.
  *

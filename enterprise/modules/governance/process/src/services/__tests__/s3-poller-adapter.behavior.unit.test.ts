@@ -1,5 +1,5 @@
 /**
- * Unit coverage for S3PollingPullerAdapter on a stubbed S3 client (no testcontainers).
+ * Unit coverage for S3PollingPullerService on a stubbed S3 client (no testcontainers).
  * Spec: specs/ai-governance/puller-framework/s3-polling.feature
  * Spec: specs/governance/pulled-usage-cost-reporting.feature
  */
@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 
 import { TestObjectStorage } from "../../__tests__/support/puller-test-ports.ts";
-import { S3PollingPullerAdapter } from "../s3-puller.service.ts";
+import { S3PollingPullerService } from "../s3-puller.service.ts";
 
 const VALID_CONFIG = {
   adapter: "s3_polling" as const,
@@ -30,15 +30,15 @@ const VALID_CONFIG = {
 
 let storage: TestObjectStorage;
 
-function makeAdapter(): S3PollingPullerAdapter {
-  return S3PollingPullerAdapter.create({ objects: storage });
+function makeAdapter(): S3PollingPullerService {
+  return S3PollingPullerService.create({ objects: storage });
 }
 
 beforeEach(() => {
   storage = new TestObjectStorage();
 });
 
-describe("S3PollingPullerAdapter", () => {
+describe("S3PollingPullerService", () => {
   describe("when validateConfig is called", () => {
     it("accepts a valid config", () => {
       const adapter = makeAdapter();

@@ -21,7 +21,7 @@ import {
   type AzureDailyCost,
   azureCostEvents,
   nextAzureCostCursor,
-} from "../azure-cost-management.service.ts";
+} from "../azure-cost-management.rules.ts";
 
 const SUBSCRIPTION_ID = "00000000-0000-0000-0000-000000000000";
 const NOW_MS = Date.parse("2026-08-30T09:00:00.000Z");

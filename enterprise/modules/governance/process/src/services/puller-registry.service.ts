@@ -9,6 +9,8 @@ export interface RegisteredGovernancePuller {
 export class PullerRegistryService {
   private readonly adapters = new Map<string, RegisteredGovernancePuller>();
 
+  private constructor() {}
+
   static create(): PullerRegistryService {
     return new PullerRegistryService();
   }

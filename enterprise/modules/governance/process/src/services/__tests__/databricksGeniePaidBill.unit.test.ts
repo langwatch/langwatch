@@ -22,7 +22,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GovernanceHttpClient } from "../../app/governance.members.ts";
 import {
-  DatabricksGeniePullerAdapter,
+  DatabricksGeniePullerService,
   databricksGeniePullConfigSchema,
   PAID_GENIE_BILL_UNREADABLE,
 } from "../databricks-genie-puller.service.ts";
@@ -198,7 +198,7 @@ async function pull({
   warehouseId?: string;
   cursor?: string | null;
 }) {
-  return DatabricksGeniePullerAdapter.create(testHttp).runOnce(
+  return DatabricksGeniePullerService.create(testHttp).runOnce(
     { cursor, credentials: { token: "dapi-fixture" } },
     {
       adapter: "databricks_genie",

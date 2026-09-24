@@ -16,6 +16,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import capturedReply from "../../services/__tests__/fixtures/azureCostManagementDailyResponse.json";
 import {
   // Not yet implemented: the meter-category filter, the verdict a filtered
   // read that named nothing produces, and the span a given-up window leaves
@@ -33,8 +34,7 @@ import {
   azureCostRequestBody,
   nextAzureCostCursor,
   readAzureCostRows,
-} from "../azure-cost-management.service.ts";
-import capturedReply from "./fixtures/azureCostManagementDailyResponse.json";
+} from "../azure-cost-management.rules.ts";
 
 /** A reply built from named columns, so a test can vary one thing at a time. */
 function replyOf({

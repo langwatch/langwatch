@@ -3,7 +3,7 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import {
-  GovernanceDirectory,
+  type GovernanceDirectoryRepository,
   type GovernanceDirectoryProject,
   type GovernanceMembershipStatus,
 } from "../governance-directory.repository.ts";
@@ -18,10 +18,8 @@ const PROJECT_SELECT = {
   ownerUserId: true,
 } as const;
 
-export class PrismaGovernanceDirectoryRepository extends GovernanceDirectory {
-  private constructor(private readonly database: Database) {
-    super();
-  }
+export class PrismaGovernanceDirectoryRepository implements GovernanceDirectoryRepository {
+  private constructor(private readonly database: Database) {}
 
   static create(database: Database): PrismaGovernanceDirectoryRepository {
     return new PrismaGovernanceDirectoryRepository(database);

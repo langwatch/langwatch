@@ -8,7 +8,7 @@ import { generate } from "@langwatch/ksuid";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { IngestionPullRunStatusData } from "../../eventing/ingestion-pull-run-status-eventing.projection.ts";
-import type { AgentsListingSummary } from "../../services/agents-listing-outcome.service.ts";
+import type { AgentsListingSummary } from "../../rules/agents-listing-outcome.rules.ts";
 import { buildIngestionSourceMirror } from "./prisma.ingestion-source-mirror.mapper.ts";
 
 type Row = Prisma.IngestionPullRunProjectionGetPayload<object>;

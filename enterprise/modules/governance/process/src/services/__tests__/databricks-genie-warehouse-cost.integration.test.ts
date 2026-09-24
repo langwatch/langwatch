@@ -27,7 +27,7 @@ import {
   WAREHOUSE_COST_SETTLING_LAG_MS,
 } from "../../rules/warehouse-cost.rules.ts";
 import {
-  DatabricksGeniePullerAdapter,
+  DatabricksGeniePullerService,
   WAREHOUSE_COST_ROW_LIMIT,
   WAREHOUSE_COST_UNREADABLE,
 } from "../databricks-genie-puller.service.ts";
@@ -269,8 +269,8 @@ async function pull({ warehouseId, deadlineMs }: { warehouseId?: string; deadlin
   );
 }
 
-function makePuller(options?: { maxRequests?: number }): DatabricksGeniePullerAdapter {
-  return DatabricksGeniePullerAdapter.create(new FetchHttp(), options);
+function makePuller(options?: { maxRequests?: number }): DatabricksGeniePullerService {
+  return DatabricksGeniePullerService.create(new FetchHttp(), options);
 }
 
 /** The `pulled_usage` hint on the one message the fixture serves. */

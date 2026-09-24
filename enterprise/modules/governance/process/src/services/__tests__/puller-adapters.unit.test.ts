@@ -7,7 +7,7 @@ import type {
   GovernanceObjectStore,
 } from "../../app/governance.members.ts";
 import { HttpPollingPullerAdapter } from "../../channels/http/http.polling.channel.ts";
-import { S3PollingPullerAdapter } from "../s3-puller.service.ts";
+import { S3PollingPullerService } from "../s3-puller.service.ts";
 
 const httpConfig = {
   adapter: "http_polling",
@@ -107,8 +107,8 @@ function httpAdapter(http: FakeHttp): HttpPollingPullerAdapter {
   return HttpPollingPullerAdapter.create({ http });
 }
 
-function s3Adapter(objects: FakeObjects): S3PollingPullerAdapter {
-  return S3PollingPullerAdapter.create({ objects });
+function s3Adapter(objects: FakeObjects): S3PollingPullerService {
+  return S3PollingPullerService.create({ objects });
 }
 
 describe("HTTP polling puller", () => {

@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import type { GovernanceHttpClient, GovernanceHttpResponse } from "../../app/governance.members.ts";
 import {
-  DatabricksGeniePullerAdapter,
+  DatabricksGeniePullerService,
   WAREHOUSE_COST_ROW_LIMIT,
 } from "../databricks-genie-puller.service.ts";
 
@@ -144,7 +144,7 @@ function run(
   cursor: string | null = null,
   credentials: Record<string, string> = { token: "dapi-token" },
 ) {
-  const adapter = DatabricksGeniePullerAdapter.create(workspace);
+  const adapter = DatabricksGeniePullerService.create(workspace);
   return adapter.runOnce({ cursor, credentials }, adapter.validateConfig(config(overrides)));
 }
 

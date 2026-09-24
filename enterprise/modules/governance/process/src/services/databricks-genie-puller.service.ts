@@ -803,7 +803,7 @@ function readPaidGenieBill({
 
   const data = statement.result?.data_array ?? [];
   if (
-    DatabricksGeniePullerAdapter.warehouseAnswerCutShort({ statement, dataLength: data.length })
+    DatabricksGeniePullerService.warehouseAnswerCutShort({ statement, dataLength: data.length })
   ) {
     logger.error(
       {
@@ -1374,7 +1374,7 @@ class GenieHttpError extends Error {
   }
 }
 
-export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGeniePullConfig> {
+export class DatabricksGeniePullerService implements PullerAdapter<DatabricksGeniePullConfig> {
   readonly id: string = DATABRICKS_GENIE_ADAPTER_ID;
 
   /**
@@ -1401,8 +1401,8 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
     http: GovernanceHttpClient,
     options?: { maxRequests?: number },
     warehouseCosts: DatabricksWarehouseCostService = DatabricksWarehouseCostService.create(),
-  ): DatabricksGeniePullerAdapter {
-    return new DatabricksGeniePullerAdapter(http, warehouseCosts, options);
+  ): DatabricksGeniePullerService {
+    return new DatabricksGeniePullerService(http, warehouseCosts, options);
   }
 
   validateConfig(config: unknown): DatabricksGeniePullConfig {
@@ -1410,14 +1410,14 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
   }
 
   async runOnce(options: PullRunOptions, config: DatabricksGeniePullConfig): Promise<PullResult> {
-    const token = await DatabricksGeniePullerAdapter.resolveWorkspaceToken({
+    const token = await DatabricksGeniePullerService.resolveWorkspaceToken({
       credentials: options.credentials,
       workspaceUrl: config.workspaceUrl,
       signal: options.signal,
       http: this.http,
     });
 
-    const cursor = DatabricksGeniePullerAdapter.parseCursor(options.cursor, config);
+    const cursor = DatabricksGeniePullerService.parseCursor(options.cursor, config);
     const budget = new RunBudget(options.deadlineMs, this.maxRequests);
     // Stamped BEFORE the first request when a FRESH sweep begins, and carried
     // unchanged through every run that resumes it. The next watermark is
@@ -1476,7 +1476,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
 
     return {
       events: [
-        ...DatabricksGeniePullerAdapter.withWarehouseCost({
+        ...DatabricksGeniePullerService.withWarehouseCost({
           events: sweep.events,
           costByStatementId,
           costEnabled: config.warehouseId !== undefined,
@@ -1484,11 +1484,11 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
         }),
         ...paidBill.events,
       ],
-      cursor: DatabricksGeniePullerAdapter.encode(
+      cursor: DatabricksGeniePullerService.encode(
         // The cost read is part of what this run knows, so the watermark answers
         // to it as well as to the sweep. Without that, a window whose bill could
         // not be read is still recorded, still advanced past, and never revisited.
-        DatabricksGeniePullerAdapter.nextCursor({
+        DatabricksGeniePullerService.nextCursor({
           previous: cursor,
           sweep,
           sweepStartedAtMs,
@@ -1498,7 +1498,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
         }),
       ),
       errorCount: 0,
-      ...DatabricksGeniePullerAdapter.runNotices({
+      ...DatabricksGeniePullerService.runNotices({
         unreadable,
         paidBillUnreadable: paidBill.unreadable,
       }),
@@ -1549,13 +1549,13 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
     // Day-aligned both ends: the bill is per day and the statement filters on
     // the date. Through the end of TODAY, so today's partial row lands and is
     // re-read next run — the settling lag on the way in is what re-reads it.
-    const fromMs = DatabricksGeniePullerAdapter.startOfDayMs(
+    const fromMs = DatabricksGeniePullerService.startOfDayMs(
       cursor.paidBillReadThroughMs === null
-        ? DatabricksGeniePullerAdapter.configuredSinceMs(config)
+        ? DatabricksGeniePullerService.configuredSinceMs(config)
         : cursor.paidBillReadThroughMs - PAID_GENIE_BILL_SETTLING_LAG_MS,
     );
     const toMs =
-      DatabricksGeniePullerAdapter.startOfDayMs(nowInstant().epochMilliseconds) + ONE_DAY_MS;
+      DatabricksGeniePullerService.startOfDayMs(nowInstant().epochMilliseconds) + ONE_DAY_MS;
 
     const rows: PaidGenieBillRow[] = [];
     for (const chunk of this.warehouseCosts.chunks({ fromMs, toMs })) {
@@ -1837,7 +1837,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
     const spaces = await this.resolveSpaces({ config, token, options, budget });
     let complete = spaces.complete;
 
-    const spacePlan = DatabricksGeniePullerAdapter.spaceWalkPlan({
+    const spacePlan = DatabricksGeniePullerService.spaceWalkPlan({
       spaces,
       resumeSpaceId: cursor.spaceId,
       resumeFingerprint: cursor.spaceSetFingerprint,
@@ -1861,7 +1861,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
         // conversation position is handed back rather than dropped, so a run
         // that ends before it could touch this space does not undo the progress
         // an earlier run already made inside it.
-        return DatabricksGeniePullerAdapter.sweptUpTo({
+        return DatabricksGeniePullerService.sweptUpTo({
           events,
           space,
           at: resumeConversationId,
@@ -1899,7 +1899,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       // A gap inside the space, or this whole space unreadable. Either way the
       // sweep is about to move past something it never saw.
       hadGap = hadGap || read.hadGap;
-      oldestPendingMs = DatabricksGeniePullerAdapter.earliest(
+      oldestPendingMs = DatabricksGeniePullerService.earliest(
         oldestPendingMs,
         read.oldestPendingMs,
       );
@@ -1909,7 +1909,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       // that re-read to where it stopped, which is what lets a space bigger
       // than one run's whole budget finish across several runs.
       if (!read.complete && budget.exhausted()) {
-        return DatabricksGeniePullerAdapter.sweptUpTo({
+        return DatabricksGeniePullerService.sweptUpTo({
           events,
           space,
           at: read.resumeConversationId,
@@ -1992,7 +1992,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
         oldestPendingMs: null,
       };
 
-    const conversationPlan = DatabricksGeniePullerAdapter.conversationWalkPlan({
+    const conversationPlan = DatabricksGeniePullerService.conversationWalkPlan({
       conversations,
       resumeConversationId,
     });
@@ -2041,7 +2041,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
     space: GenieSpace;
     sinceMs: number;
     identities: Map<number, GenieIdentity>;
-    conversationPlan: ReturnType<typeof DatabricksGeniePullerAdapter.conversationWalkPlan>;
+    conversationPlan: ReturnType<typeof DatabricksGeniePullerService.conversationWalkPlan>;
   }): Promise<SpaceRead> {
     const events: NormalizedPullEvent[] = [];
     let complete = true;
@@ -2052,7 +2052,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
     for (let i = conversationPlan.startAt; i < conversationPlan.ordered.length; i += 1) {
       const conversation = conversationPlan.ordered[i]!;
       if (budget.exhausted()) {
-        return DatabricksGeniePullerAdapter.stoppedAt({
+        return DatabricksGeniePullerService.stoppedAt({
           items: events,
           conversation,
           hadGap,
@@ -2077,7 +2077,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       hadGap = hadGap || step.failed;
       // Not a gap: nothing was skipped. It only keeps the watermark behind this
       // message so the sweep comes back once the warehouse has answered.
-      oldestPendingMs = DatabricksGeniePullerAdapter.earliest(
+      oldestPendingMs = DatabricksGeniePullerService.earliest(
         oldestPendingMs,
         step.oldestPendingMs,
       );
@@ -2087,7 +2087,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       // through and keeps going, so one broken conversation cannot wedge the
       // space; `hadGap` is what stops the watermark for it instead.
       if (step.unfinished && budget.exhausted()) {
-        return DatabricksGeniePullerAdapter.stoppedAt({
+        return DatabricksGeniePullerService.stoppedAt({
           items: events,
           conversation,
           hadGap,
@@ -2331,7 +2331,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
         );
         continue;
       }
-      const createdMs = DatabricksGeniePullerAdapter.toEpochMs(raw);
+      const createdMs = DatabricksGeniePullerService.toEpochMs(raw);
       if (createdMs <= sinceMs) continue;
 
       // Emitted either way — a question asked is a governance fact the moment
@@ -2339,8 +2339,8 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       // version overwrites this one. What this buys is the guarantee that there
       // IS a next look: the watermark is kept behind the oldest message that
       // could still change, so the sweep comes back for it.
-      if (DatabricksGeniePullerAdapter.isSettling(message.status, createdMs)) {
-        oldestPendingMs = DatabricksGeniePullerAdapter.earliest(oldestPendingMs, createdMs);
+      if (DatabricksGeniePullerService.isSettling(message.status, createdMs)) {
+        oldestPendingMs = DatabricksGeniePullerService.earliest(oldestPendingMs, createdMs);
       }
 
       events.push(
@@ -2504,7 +2504,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
           path: `/api/2.0/preview/scim/v2/Users/${encodeURIComponent(String(userId))}`,
         }),
       );
-      const identity = DatabricksGeniePullerAdapter.genieIdentityFromScimUser(user, userId);
+      const identity = DatabricksGeniePullerService.genieIdentityFromScimUser(user, userId);
       identities.set(userId, identity);
       return identity;
     } catch (error) {
@@ -2760,7 +2760,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       );
       return {
         done: true,
-        pricedThroughMs: DatabricksGeniePullerAdapter.unpricedFloor(chunk),
+        pricedThroughMs: DatabricksGeniePullerService.unpricedFloor(chunk),
         unreadable: false,
       };
     }
@@ -2795,7 +2795,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       );
       return {
         done: true,
-        pricedThroughMs: DatabricksGeniePullerAdapter.unpricedFloor(chunk),
+        pricedThroughMs: DatabricksGeniePullerService.unpricedFloor(chunk),
         unreadable: true,
       };
     }
@@ -2820,7 +2820,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       if (read.owed) {
         return {
           done: true,
-          pricedThroughMs: DatabricksGeniePullerAdapter.unpricedFloor(chunk),
+          pricedThroughMs: DatabricksGeniePullerService.unpricedFloor(chunk),
           unreadable: false,
         };
       }
@@ -2919,7 +2919,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       );
       return {
         done: true,
-        pricedThroughMs: DatabricksGeniePullerAdapter.unpricedFloor(walked.heldAt),
+        pricedThroughMs: DatabricksGeniePullerService.unpricedFloor(walked.heldAt),
         unreadable: walked.unreadable,
       };
     }
@@ -3014,7 +3014,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
     chunk: { fromMs: number; toMs: number };
   }): Promise<WarehouseCostRead> {
     const askedAtMs = nowInstant().epochMilliseconds;
-    const observed = DatabricksGeniePullerAdapter.warehouseCostObserved({
+    const observed = DatabricksGeniePullerService.warehouseCostObserved({
       adapter: this.id,
       warehouseId,
       chunk,
@@ -3049,11 +3049,11 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
           on_wait_timeout: "CANCEL",
           format: "JSON_ARRAY",
           disposition: "INLINE",
-          parameters: DatabricksGeniePullerAdapter.warehouseCostParameters(chunk),
+          parameters: DatabricksGeniePullerService.warehouseCostParameters(chunk),
         },
       });
 
-      const read = DatabricksGeniePullerAdapter.readWarehouseCost({
+      const read = DatabricksGeniePullerService.readWarehouseCost({
         payload,
         adapter: this.id,
         warehouseId,
@@ -3283,7 +3283,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       {
         name: "from_ts",
         value: Temporal.Instant.fromEpochMilliseconds(
-          DatabricksGeniePullerAdapter.startOfHourMs(chunk.fromMs),
+          DatabricksGeniePullerService.startOfHourMs(chunk.fromMs),
         ).toString({ fractionalSecondDigits: 3 }),
         type: "TIMESTAMP",
       },
@@ -3294,7 +3294,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       {
         name: "scan_from_ts",
         value: Temporal.Instant.fromEpochMilliseconds(
-          DatabricksGeniePullerAdapter.startOfHourMs(chunk.fromMs) -
+          DatabricksGeniePullerService.startOfHourMs(chunk.fromMs) -
             WAREHOUSE_COST_STRADDLE_LOOKBACK_MS,
         ).toString({ fractionalSecondDigits: 3 }),
         type: "TIMESTAMP",
@@ -3302,7 +3302,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       {
         name: "to_ts",
         value: Temporal.Instant.fromEpochMilliseconds(
-          DatabricksGeniePullerAdapter.endOfHourMs(chunk.toMs),
+          DatabricksGeniePullerService.endOfHourMs(chunk.toMs),
         ).toString({ fractionalSecondDigits: 3 }),
         type: "TIMESTAMP",
       },
@@ -3355,14 +3355,14 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       adapter,
       warehouseId,
       askedFrom: Temporal.Instant.fromEpochMilliseconds(
-        DatabricksGeniePullerAdapter.startOfHourMs(chunk.fromMs),
+        DatabricksGeniePullerService.startOfHourMs(chunk.fromMs),
       ).toString({ fractionalSecondDigits: 3 }),
       askedTo: Temporal.Instant.fromEpochMilliseconds(
-        DatabricksGeniePullerAdapter.endOfHourMs(chunk.toMs),
+        DatabricksGeniePullerService.endOfHourMs(chunk.toMs),
       ).toString({ fractionalSecondDigits: 3 }),
       askedHours: Math.round(
-        (DatabricksGeniePullerAdapter.endOfHourMs(chunk.toMs) -
-          DatabricksGeniePullerAdapter.startOfHourMs(chunk.fromMs)) /
+        (DatabricksGeniePullerService.endOfHourMs(chunk.toMs) -
+          DatabricksGeniePullerService.startOfHourMs(chunk.fromMs)) /
           ONE_HOUR_MS,
       ),
     };
@@ -3449,7 +3449,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
     const log = { adapter, executorWarehouseId: warehouseId };
 
     if (statement.status.state !== "SUCCEEDED") {
-      return DatabricksGeniePullerAdapter.readUnsuccessfulWarehouseCost({ statement, log });
+      return DatabricksGeniePullerService.readUnsuccessfulWarehouseCost({ statement, log });
     }
 
     // No manifest is a refusal, not a pass. The rows are positional and every
@@ -3470,7 +3470,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
     const data = statement.result?.data_array ?? [];
 
     if (
-      DatabricksGeniePullerAdapter.warehouseAnswerCutShort({ statement, dataLength: data.length })
+      DatabricksGeniePullerService.warehouseAnswerCutShort({ statement, dataLength: data.length })
     ) {
       logger.error(
         {
@@ -3703,7 +3703,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
   ): GenieCursor {
     if (cursor) {
       try {
-        return DatabricksGeniePullerAdapter.withoutOrphanedResume(
+        return DatabricksGeniePullerService.withoutOrphanedResume(
           cursorSchema.parse(JSON.parse(cursor)),
         );
       } catch {
@@ -3714,7 +3714,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       }
     }
     return {
-      sinceMs: DatabricksGeniePullerAdapter.configuredSinceMs(config),
+      sinceMs: DatabricksGeniePullerService.configuredSinceMs(config),
       spaceId: null,
       conversationId: null,
       sweepHadGap: false,
@@ -3950,7 +3950,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
     if (!costEnabled) return events;
 
     return events.map((event) =>
-      DatabricksGeniePullerAdapter.withCost({ event, costByStatementId, watermarkMs }),
+      DatabricksGeniePullerService.withCost({ event, costByStatementId, watermarkMs }),
     );
   }
 
@@ -4059,7 +4059,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       // how tidily it finished. Holding the window costs a re-read of the same
       // period next sweep; advancing it would drop whatever was in the hole,
       // permanently.
-      sinceMs: DatabricksGeniePullerAdapter.nextWatermark({
+      sinceMs: DatabricksGeniePullerService.nextWatermark({
         previousMs: previous.sinceMs,
         sweepStartedAtMs,
         complete: sweep.complete && !sweep.hadGap,
@@ -4089,7 +4089,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       costHeldSinceMs: holdExpired ? null : costHeldSinceMs,
       // The bill read's own position and hold, folded here and nowhere near
       // `sinceMs` or the cost hold above.
-      ...DatabricksGeniePullerAdapter.nextPaidBillPosition({
+      ...DatabricksGeniePullerService.nextPaidBillPosition({
         previous,
         paidBillWindow,
         nowMs,
@@ -4112,8 +4112,8 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
   private static configuredSinceMs(config: DatabricksGeniePullConfig): number {
     const sinceMs = config.startingAt
       ? toEpochMs(config.startingAt)
-      : DatabricksGeniePullerAdapter.defaultSinceMs();
-    return Number.isFinite(sinceMs) ? sinceMs : DatabricksGeniePullerAdapter.defaultSinceMs();
+      : DatabricksGeniePullerService.defaultSinceMs();
+    return Number.isFinite(sinceMs) ? sinceMs : DatabricksGeniePullerService.defaultSinceMs();
   }
 
   /**

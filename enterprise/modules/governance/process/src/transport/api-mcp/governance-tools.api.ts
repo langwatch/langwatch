@@ -5,7 +5,7 @@ import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import { type ZodRawShape, z } from "zod";
 
-import type { GovernanceDirectory } from "../../repositories/governance-directory.repository.ts";
+import type { GovernanceDirectoryRepository } from "../../repositories/governance-directory.repository.ts";
 
 type ToolCallback = (
   // The MCP SDK passes parsed input as the first arg; we don't currently
@@ -41,7 +41,7 @@ const FORBIDDEN_PREFIX = "FORBIDDEN: ";
 const NEEDS_OAUTH_PREFIX = "AUTH_REQUIRED: ";
 
 export interface GovernanceMcpContext {
-  directory: GovernanceDirectory;
+  directory: GovernanceDirectoryRepository;
   governance: GovernanceApi;
   /** The organization permission decision this surface is judged by. */
   permissions: GovernanceMcpPermissionProbe;

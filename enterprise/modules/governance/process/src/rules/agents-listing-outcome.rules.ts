@@ -36,7 +36,7 @@ import type {
   AgentsListingRefusalCause,
 } from "@langwatch/enterprise-governance-contract";
 
-import type { ListingRefusalReason } from "../rules/provider-listing.rules.ts";
+import type { ListingRefusalReason } from "./provider-listing.rules.ts";
 
 /**
  * What a person has to DO about a refusal, which is the only reason a screen

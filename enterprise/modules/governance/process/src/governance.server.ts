@@ -68,17 +68,19 @@ import {
   PrismaIngestionPullRunProjectionRepository,
   type IngestionPullRunProjectionDatabase,
 } from "./repositories/prisma/prisma.ingestion-pull-run-projection.repository.ts";
-import { PostgresIngestionPullSourceAdapter } from "./repositories/prisma/prisma.ingestion-pull-source.repository.ts";
-import type { IngestionSourceDatabase } from "./repositories/prisma/prisma.ingestion-source.repository.ts";
+import {
+  PrismaIngestionSourceRepository,
+  type IngestionSourceDatabase,
+} from "./repositories/prisma/prisma.ingestion-source.repository.ts";
 import {
   PrismaSpendSpikeAnomalyRepository,
   type SpendSpikeAnomalyDatabase,
 } from "./repositories/prisma/prisma.spend-spike-anomaly.repository.ts";
-import type { AgentsListingSummary } from "./services/agents-listing-outcome.service.ts";
+import type { AgentsListingSummary } from "./rules/agents-listing-outcome.rules.ts";
 import { AnomalyAlertDispatcherService } from "./services/anomaly-alert-dispatcher.service.ts";
 import { AnthropicAdminPullerAdapter } from "./services/anthropic-admin-puller.service.ts";
 import { BuiltInPullerRegistryService } from "./services/built-in-puller-registry.service.ts";
-import { DatabricksGeniePullerAdapter } from "./services/databricks-genie-puller.service.ts";
+import { DatabricksGeniePullerService } from "./services/databricks-genie-puller.service.ts";
 import { DepartmentService } from "./services/department.service.ts";
 import {
   GovernanceEventsAdapter,
@@ -91,13 +93,13 @@ import { IngestionPullLifecycleService } from "./services/ingestion-pull-lifecyc
 import { IngestionPullWorkerService } from "./services/ingestion-pull-worker.service.ts";
 import { IngestionPullService } from "./services/ingestion-pull.service.ts";
 import { OpenAiAdminPullerAdapter } from "./services/openai-admin-puller.service.ts";
-import { OpenAiComplianceReferencePullerAdapter } from "./services/openai-compliance-puller.service.ts";
+import { OpenAiComplianceReferencePullerService } from "./services/openai-compliance-puller.service.ts";
 import { OtelTraceAlertMetricsAdapter } from "./services/otel-trace-alert-metrics.service.ts";
 import { PulledUsageEventingAdapter } from "./services/pulled-usage-eventing.service.ts";
 import { PulledUsagePricingService } from "./services/pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "./services/pulled-usage-record.service.ts";
 import { PullerRegistryService } from "./services/puller-registry.service.ts";
-import { S3PollingPullerAdapter } from "./services/s3-puller.service.ts";
+import { S3PollingPullerService } from "./services/s3-puller.service.ts";
 import { SpendSpikeAnomalyEvaluatorService } from "./services/spend-spike-anomaly-evaluator.service.ts";
 import {
   governanceRest,
@@ -163,14 +165,14 @@ function builtInPullers(
   const pullers = PullerRegistryService.create();
 
   pullers.register(HttpPollingPullerAdapter.create({ http, diagnostics }));
-  pullers.register(S3PollingPullerAdapter.create({ objects, diagnostics }));
+  pullers.register(S3PollingPullerService.create({ objects, diagnostics }));
   pullers.register(HttpCopilotStudioChannel.create({ http }));
   pullers.register(HttpCopilotStudioDataverseChannel.create(http));
-  pullers.register(OpenAiComplianceReferencePullerAdapter.create({ objects, diagnostics }));
+  pullers.register(OpenAiComplianceReferencePullerService.create({ objects, diagnostics }));
   pullers.register(OpenAiAdminPullerAdapter.create(http));
   pullers.register(ClaudeComplianceReferencePullerAdapter.create({ http, diagnostics }));
   pullers.register(AnthropicAdminPullerAdapter.create(http));
-  pullers.register(DatabricksGeniePullerAdapter.create(http));
+  pullers.register(DatabricksGeniePullerService.create(http));
 
   return BuiltInPullerRegistryService.create(pullers).build();
 }
@@ -334,5 +336,5 @@ export function createTraceAlertMetrics(): TraceAlertMetricsSink {
 export function createIngestionPullSources(
   database: IngestionSourceDatabase,
 ): IngestionPullSourceReader {
-  return PostgresIngestionPullSourceAdapter.create(database);
+  return PrismaIngestionSourceRepository.create(database);
 }

@@ -18,6 +18,8 @@ export const DATABRICKS_WORKSPACE_HOST_SUFFIXES = [
  * and the adapter still has to be pointable at a local fixture by its own tests.
  */
 export class PullDestinationService {
+  private constructor() {}
+
   static create(): PullDestinationService {
     return new PullDestinationService();
   }

@@ -1,17 +1,15 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
-  GovernanceDirectory,
+  type GovernanceDirectoryRepository,
   type GovernanceDirectoryProject,
   type GovernanceMembershipStatus,
 } from "../governance-directory.repository.ts";
 import type { MemoryGovernanceStore } from "./memory.governance.store.ts";
 
 /** The directory twin: identity, membership and project rows from one store. */
-export class MemoryGovernanceDirectoryRepository extends GovernanceDirectory {
-  private constructor(private readonly store: MemoryGovernanceStore) {
-    super();
-  }
+export class MemoryGovernanceDirectoryRepository implements GovernanceDirectoryRepository {
+  private constructor(private readonly store: MemoryGovernanceStore) {}
 
   static create(store: MemoryGovernanceStore): MemoryGovernanceDirectoryRepository {
     return new MemoryGovernanceDirectoryRepository(store);
