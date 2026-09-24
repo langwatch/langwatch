@@ -41,3 +41,8 @@ against the installed module class at `.withTransports(...)`, so a missing opera
   `@unimplemented`: `RedisGithubAppTokenCache.create` always builds `githubApiChannels.live`
   (redis-github-app-token-cache.ts:42), so a `memoryStores()` test cannot seed an installation — the channel choice
   should come from the registry's `{ live, memory }`.
+- stored-object: fixed (412b2663f0 — StoredObjectApp implements StoredObjectFileApi). Open vs main: (1) the transport's
+  `HTTPException(403|401|500)` refusals render as 500 through `canonicalErrorResponse` — ruled: throw HandledErrors (reuse
+  authz's denial), never hand-rolled; (2) project-API-key callers are refused — the process's browser door
+  (`process-server` api-surface `#browserDoor`) checks cookies only, main accepted a key or a session (framework fix);
+  (3) `GET/HEAD /api/files/:projectId/:id/:filename` (named download) is missing from the declaration.
