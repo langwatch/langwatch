@@ -2,7 +2,10 @@ import {
   redactSpanContent,
   redactTraceContent,
 } from "~/server/app-layer/traces/visibility-window.service";
-import { PRIVACY_DROPPED_MARKER_ATTR } from "~/server/data-privacy/dropKeyCatalog";
+import {
+  CONTENT_KEY_CATALOG,
+  PRIVACY_DROPPED_MARKER_ATTR,
+} from "~/server/data-privacy/dropKeyCatalog";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import type {
   Event,
@@ -58,9 +61,26 @@ export function collectDroppedCategories(spans: Span[] | undefined): string[] {
 }
 
 /**
+ * Keys whose values describe a message's shape ("user", "text",
+ * "image_url"), not what anyone wrote. They are left out of the redaction set,
+ * or every attribute that mentions a role would be blanked along with the
+ * content.
+ */
+const STRUCTURAL_KEYS: ReadonlySet<string> = new Set(["role", "type"]);
+
+/**
+ * Below this length a hidden string is only redacted where an attribute equals
+ * it outright. Matching it anywhere inside another value blanks unrelated
+ * attributes that merely contain a short word the content also used.
+ */
+const MIN_CONTAINED_REDACTION_LENGTH = 8;
+
+/**
  * Extracts string values from an object for redaction purposes.
  * When input/output is not visible, we need to collect all string values
- * so they can be redacted from any visible fields.
+ * so they can be redacted from any visible fields. Blank strings and the
+ * values of structural keys are skipped: they carry no content, and an empty
+ * string is contained in every value.
  *
  * @param object - The object to extract redaction strings from
  * @returns Array of strings that should be redacted
@@ -80,17 +100,36 @@ export function extractRedactionsForObject(object: unknown): string[] {
       } catch {
         // Not valid Python repr either
       }
-      return [object];
+      return object.trim() === "" ? [] : [object];
     }
   }
   if (Array.isArray(object)) {
     return object.flatMap(extractRedactionsForObject);
   }
   if (typeof object === "object" && object !== null) {
-    return Object.values(object).flatMap(extractRedactionsForObject);
+    return Object.entries(object)
+      .filter(([key]) => !STRUCTURAL_KEYS.has(key))
+      .flatMap(([, value]) => extractRedactionsForObject(value));
   }
 
   return [];
+}
+
+/**
+ * Whether a string leaf carries hidden content: it is one of the hidden
+ * strings, or it quotes one long enough to mean something on its own.
+ */
+function carriesRedaction(value: string, redactions: Set<string>): boolean {
+  if (redactions.has(value)) return true;
+  for (const redaction of redactions) {
+    if (
+      redaction.length >= MIN_CONTAINED_REDACTION_LENGTH &&
+      value.includes(redaction)
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -118,9 +157,7 @@ export function redactObject<T>(object: T, redactions: Set<string>): T {
       } catch {
         // Not valid Python repr either
       }
-      return Array.from(redactions).filter((redaction) =>
-        object.includes(redaction),
-      ).length > 0
+      return carriesRedaction(object, redactions)
         ? ("[REDACTED]" as T)
         : object;
     }
@@ -159,6 +196,28 @@ export function extractRedactionsFromAllSpanOutputs(spans: Span[]): string[] {
   return spans.flatMap((span) =>
     extractRedactionsForObject(span.output?.value),
   );
+}
+
+/**
+ * The attribute keys that carry input or output content the viewer cannot
+ * see, as hidden-attribute rules naming who can see them instead.
+ */
+function hiddenContentAttributes(
+  protections: Protections,
+): Array<{ pattern: string; visibleTo: string }> {
+  const hidden = (keys: readonly string[], visibleTo?: string | null) =>
+    keys.map((pattern) => ({
+      pattern,
+      visibleTo: visibleTo ?? "members of this project",
+    }));
+  return [
+    ...(protections.canSeeCapturedInput !== true
+      ? hidden(CONTENT_KEY_CATALOG.input, protections.capturedInputVisibleTo)
+      : []),
+    ...(protections.canSeeCapturedOutput !== true
+      ? hidden(CONTENT_KEY_CATALOG.output, protections.capturedOutputVisibleTo)
+      : []),
+  ];
 }
 
 /**
@@ -216,15 +275,19 @@ export function applySpanProtections(
     }
   }
 
-  // Custom attribute rules with a restrict disposition: replace matched span
-  // params (the mapper unflattens dotted keys into nested objects, so the
-  // matcher walks the nested paths) with the placeholder naming who can see
-  // them. Hidden input/output content riding along inside params (e.g. the
-  // raw gen_ai message attributes) is scrubbed by the redactions set.
+  // Custom attribute rules with a restrict disposition, plus the attributes
+  // that carry hidden input/output (`langwatch.input`, the gen_ai message
+  // keys): replace matched span params whole (the mapper unflattens dotted
+  // keys into nested objects, so the matcher walks the nested paths) with the
+  // placeholder naming who can see them. A copy of hidden content riding along
+  // in any other param is scrubbed by the redactions set.
   const transformedParams = redactObject(
     redactHiddenAttributes(
       span.params as Record<string, unknown> | null | undefined,
-      protections.hiddenAttributes,
+      [
+        ...(protections.hiddenAttributes ?? []),
+        ...hiddenContentAttributes(protections),
+      ],
     ),
     redactions,
   );

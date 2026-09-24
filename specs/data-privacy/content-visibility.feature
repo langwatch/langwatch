@@ -180,3 +180,60 @@ Feature: Restricting who can see trace content
     Given a rule on "web-app" that restricts trace input to admins
     When "dave" opens a trace for "web-app"
     Then "dave" still sees the trace's token counts, cost, and latency
+
+  # Access to a project can come from a role on the organization, on the team,
+  # or on the project itself. All three count as "a member of the project" for
+  # content visibility; a role held only on the organization must not turn every
+  # trace into a redaction placeholder.
+
+  @unit
+  Scenario: An organization admin with no team role sees captured content
+    Given no privacy rule restricts content on "web-app"
+    And "olga" is an organization admin with no role on the "platform" team
+    When "olga" opens a trace for "web-app"
+    Then the trace input is visible to "olga"
+
+  @unit
+  Scenario: An organization admin with no team role is in the Admins audience
+    Given a rule on "web-app" that restricts trace input to admins
+    And "olga" is an organization admin with no role on the "platform" team
+    When "olga" opens a trace for "web-app"
+    Then the trace input is visible to "olga"
+
+  @unit
+  Scenario: A project-level role counts as project membership
+    Given no privacy rule restricts content on "web-app"
+    And "pete" holds a member role on "web-app" only
+    When "pete" opens a trace for "web-app"
+    Then the trace input is visible to "pete"
+
+  @unit
+  Scenario: Someone the permission engine denies trace access is not a member
+    Given no privacy rule restricts content on "web-app"
+    And "xena" cannot view traces on "web-app"
+    When "xena" resolves the protections for "web-app"
+    Then the trace input is redacted for "xena"
+
+  # When the input or output is hidden, the attributes that carry it are
+  # replaced whole. Other span attributes are not blanked just because they
+  # happen to contain a short word ("user", "text") or an empty string that
+  # also appears somewhere in the hidden content.
+
+  @unit
+  Scenario: Hidden input is replaced whole in the attributes that carry it
+    Given "dave" cannot see the input of a span
+    When "dave" opens that span's attributes
+    Then "langwatch.input" is replaced by a redaction placeholder naming the audience
+
+  @unit
+  Scenario: Hiding input does not blank unrelated attributes
+    Given "dave" cannot see the input of a span whose messages have the role "user" and an empty text part
+    When "dave" opens that span's attributes
+    Then an unrelated attribute whose value contains "user" is still visible to "dave"
+
+  @unit
+  Scenario: Hidden input copied into another attribute is still scrubbed
+    Given "dave" cannot see the input of a span
+    And an unrelated attribute carries a copy of that input's message text
+    When "dave" opens that span's attributes
+    Then that attribute is redacted for "dave"

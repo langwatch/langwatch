@@ -325,28 +325,38 @@ export async function getUserProtectionsForProject(
   });
   const groupIds = memberships.map((membership) => membership.groupId);
   const groupIdSet = new Set(groupIds);
-  const teamGrants = await ctx.prisma.grant.findMany({
+  // A role reaches a project from its organization, its team or the project
+  // itself (the chain the permission engine walks), so the role groups an
+  // audience names are read from all three. Reading the team alone made an
+  // organization admin a non-member, and every trace a placeholder.
+  const scopeGrants = await ctx.prisma.grant.findMany({
     where: {
       organizationId,
-      scopeType: "TEAM",
-      scopeId: project.teamId,
+      OR: [
+        { scopeType: "ORGANIZATION", scopeId: organizationId },
+        { scopeType: "TEAM", scopeId: project.teamId },
+        { scopeType: "PROJECT", scopeId: projectId },
+      ],
       revokedAt: null,
       principalType: { in: ["USER", "GROUP"] },
     },
     select: { roleKey: true, principalType: true, principalId: true },
   });
-  const heldTeamGrants = teamGrants.filter(
+  const heldGrants = scopeGrants.filter(
     (grant) =>
       (grant.principalType === "USER" && grant.principalId === userId) ||
       (grant.principalType === "GROUP" &&
         grant.principalId !== null &&
         groupIdSet.has(grant.principalId)),
   );
-  const roleKeys = new Set(heldTeamGrants.map((grant) => grant.roleKey));
+  const roleKeys = new Set(heldGrants.map((grant) => grant.roleKey));
   const isAdmin = roleKeys.has("admin");
   const isMemberRole = roleKeys.has("member");
   const isViewer = roleKeys.has("viewer");
-  const isMember = heldTeamGrants.length > 0;
+  // Membership is the engine's own answer to "may this user read traces
+  // here", so a custom role or an external member's cap decides it exactly as
+  // it decides access to the trace itself.
+  const isMember = await probeProjectPermission(ctx, projectId, "traces:view");
   const isProjectOwner =
     project.ownerUserId != null && project.ownerUserId === userId;
 
