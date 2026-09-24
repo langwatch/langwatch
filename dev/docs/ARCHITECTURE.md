@@ -1076,8 +1076,12 @@ callers stay typed; it carries a disable comment naming why. A map projection de
 its pipeline's events it consumes, which types its key and map functions (Alex, 2026-09-24).
 A command declares the exact events it produces, and `withCommand` accepts it only when they belong to
 the pipeline. A queued payload is `unknown` until its schema parses it once at dispatch (Alex, 2026-09-24).
-The schema a queued event is parsed with is the one its pipeline already declared for that event type
-in `.withEvents` — the queue never needs a second schema or a cast (Alex, 2026-09-25).
+A pipeline declares its events with `.withEvents(schemas)` — the contract's zod event schemas, whole and
+versioned — and a queued event parses with the schema declared for its type; the queue never needs a
+second schema or a cast. Routing (group id, score) is computed from the typed value at send and handed to
+the group queue as send options; the queue never reads a payload. A process manager's intents keep their
+schema's type through a self-referencing generic and sealed closures, like projections and commands
+(Alex, 2026-09-25).
 
 A module may host several pipelines: it calls `.withEventing(...)` once per
 pipeline, each a `defineEventingModule` declaration over the same app and
@@ -1601,6 +1605,7 @@ chain. New code uses the left column only.
 | `traceProcessModule` / `processModules`       | `traceServer` / `serverModules`                                    |
 | `TraceModule` + `.withApi(...)`               | `TraceApp` + `.withApp(...)`                                       |
 | `<f>.module.ts` / `<f>.web.ts` file stems     | `<f>.server.ts` / `<f>.web.ts`                                     |
+| `definePipeline(...).withEvents(schemas)`     | `defineAggregate({ events: defineEvents([...type strings]) })`      |
 
 `createProcessApp` stays the target shape. Its previous implementation, the
 generated `createServerApp` and its `serverModuleChunk0..9`,
