@@ -1,5 +1,6 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { type AuthzApi, AuthzGrantNotConfirmedError } from "@langwatch/authz-contract";
+import { HandledError } from "@langwatch/handled-error";
 import {
   looksLikeSsoConnectionId,
   type SsoArrivalPolicy,
@@ -198,7 +199,12 @@ export class SsoArrivalService {
   }): Promise<{ policy: SsoArrivalPolicy; organizationId: string } | null> {
     // Cheap first: most accounts through this seam are not connections at all.
     if (!looksLikeSsoConnectionId(connectionId)) return null;
-    const connection = await this.deps.connections.tryFindConnection({ connectionId });
+    const connection = await this.deps.connections
+      .getConnection({ connectionId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "sso_connection_not_found") return null;
+        throw error;
+      });
     if (!connection) return null;
 
     const standing = ssoDomainStanding({ connection, domain });

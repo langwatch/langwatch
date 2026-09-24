@@ -6,7 +6,7 @@ export function normalizeIdentifierValue(raw: string): string {
 }
 
 /** The org-level routing fact; null for values that are not email-shaped. */
-export function identifierDomain(normalizedValue: string): string | null {
+export function extractIdentifierDomain(normalizedValue: string): string | null {
   const at = normalizedValue.lastIndexOf("@");
   if (at <= 0 || at === normalizedValue.length - 1) return null;
   return normalizedValue.slice(at + 1);

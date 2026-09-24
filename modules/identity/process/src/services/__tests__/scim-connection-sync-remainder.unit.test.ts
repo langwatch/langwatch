@@ -8,6 +8,7 @@ import {
   SCIM_TOKEN_ISSUED_EVENT_TYPE,
   SCIM_USER_PUSHED_EVENT_TYPE,
   type ScimSyncFactInput,
+  ScimSyncNotFoundError,
   type ScimSyncState,
 } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -49,16 +50,18 @@ class MemorySyncs implements ScimSyncReadRepository {
     return [...this.held.values()].filter((sync) => sync.connectionId === connectionId);
   }
 
-  async tryFindSync({
+  async getSync({
     scimSyncId,
     organizationId,
   }: {
     scimSyncId: string;
     organizationId: string;
-  }): Promise<ScimSyncState | null> {
+  }): Promise<ScimSyncState> {
     const sync = this.held.get(scimSyncId);
-
-    return sync && sync.organizationId === organizationId ? sync : null;
+    if (!sync || sync.organizationId !== organizationId) {
+      throw new ScimSyncNotFoundError(scimSyncId);
+    }
+    return sync;
   }
 }
 

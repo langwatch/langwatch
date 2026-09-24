@@ -121,7 +121,7 @@ const registerReplacement = async (connectionId = REPLACEMENT) =>
 async function liveReplacement(): Promise<void> {
   seedLegacy();
   await registerReplacement();
-  const held = await connections.tryFindConnection({ connectionId: REPLACEMENT });
+  const held = await connections.getConnection({ connectionId: REPLACEMENT });
   if (!held) throw new Error("the replacement was not registered");
   connections.seed({ ...held, state: "ACTIVE" });
 }
@@ -133,7 +133,7 @@ describe("given a grandfathered connection an organization is moving off", () =>
 
       await registerReplacement();
 
-      const state = await connections.tryFindConnection({ connectionId: REPLACEMENT });
+      const state = await connections.getConnection({ connectionId: REPLACEMENT });
       expect(state?.verifiedDomains).toEqual(["acme.com"]);
       expect(state?.state).toBe("VERIFIED");
       expect(state?.replacesConnectionId).toBe(LEGACY);
@@ -158,7 +158,7 @@ describe("given a grandfathered connection an organization is moving off", () =>
 
       await registerReplacement();
 
-      const state = await connections.tryFindConnection({ connectionId: REPLACEMENT });
+      const state = await connections.getConnection({ connectionId: REPLACEMENT });
       expect(state?.verifiedDomains).toEqual([]);
       expect(state?.state).toBe("DRAFT");
     });
@@ -214,12 +214,12 @@ describe("given a grandfathered connection an organization is moving off", () =>
         service.selectMigrationRoute({ ...command(REPLACEMENT), route: "direct" }),
       ).rejects.toBeInstanceOf(SsoConnectionInvalidTransitionError);
 
-      const held = await connections.tryFindConnection({ connectionId: REPLACEMENT });
+      const held = await connections.getConnection({ connectionId: REPLACEMENT });
       if (!held) throw new Error("the replacement was not registered");
       connections.seed({ ...held, state: "ACTIVE" });
       await service.selectMigrationRoute({ ...command(REPLACEMENT), route: "direct" });
 
-      const state = await connections.tryFindConnection({ connectionId: REPLACEMENT });
+      const state = await connections.getConnection({ connectionId: REPLACEMENT });
       expect(state?.migrationPhase).toBe("GRACE_DIRECT");
     });
 
@@ -228,7 +228,7 @@ describe("given a grandfathered connection an organization is moving off", () =>
 
       await service.selectMigrationRoute({ ...command(REPLACEMENT), route: "direct" });
 
-      const state = await connections.tryFindConnection({ connectionId: REPLACEMENT });
+      const state = await connections.getConnection({ connectionId: REPLACEMENT });
       expect(state?.migrationPhase).toBe("GRACE_DIRECT");
       expect(state?.graceStartedAtMs).toBe(T0);
       expect(state?.routeChangedAtMs).toBe(T0);
@@ -276,7 +276,7 @@ describe("given a grandfathered connection an organization is moving off", () =>
       await service.beginMigrationFinalization(command(REPLACEMENT));
       const again = await service.beginMigrationFinalization(command(REPLACEMENT));
 
-      const state = await connections.tryFindConnection({ connectionId: REPLACEMENT });
+      const state = await connections.getConnection({ connectionId: REPLACEMENT });
       expect(state?.migrationPhase).toBe("FINALIZING");
       expect(state?.finalizationRequestedAtMs).toBe(T0);
       expect(again).toEqual([]);
@@ -308,7 +308,7 @@ describe("given a grandfathered connection an organization is moving off", () =>
 
       await service.finalizeMigration(command(REPLACEMENT));
 
-      const state = await connections.tryFindConnection({ connectionId: REPLACEMENT });
+      const state = await connections.getConnection({ connectionId: REPLACEMENT });
       expect(state?.migrationPhase).toBe("FINALIZED");
       expect(state?.finalizedAtMs).toBe(T0);
     });
@@ -320,7 +320,7 @@ describe("given a grandfathered connection an organization is moving off", () =>
 
       await service.renameConnection({ ...command(REPLACEMENT), name: "  Okta  " });
 
-      const state = await connections.tryFindConnection({ connectionId: REPLACEMENT });
+      const state = await connections.getConnection({ connectionId: REPLACEMENT });
       expect(state?.idpMetadata.providerId).toBe("Okta");
       expect(state?.idpMetadata.issuer).toBe("https://acme.okta.com");
     });
@@ -358,9 +358,9 @@ describe("given a grandfathered connection an organization is still running", ()
       }),
     ).rejects.toMatchObject({ code: "sso_connection_already_registered" });
 
-    expect(
-      await connections.tryFindConnection({ connectionId: "local_ssoc_unlinked000000000000000" }),
-    ).toBeNull();
+    await expect(
+      connections.getConnection({ connectionId: "local_ssoc_unlinked000000000000000" }),
+    ).rejects.toMatchObject({ code: "sso_connection_not_found" });
   });
 
   it("serializes concurrent replacement attempts before either event is appended", async () => {
@@ -380,7 +380,7 @@ describe("given a grandfathered connection an organization is still running", ()
     await registerReplacement("local_ssoc_replacement_retry000000");
 
     expect(
-      await connections.tryFindConnection({ connectionId: "local_ssoc_replacement_retry000000" }),
+      await connections.getConnection({ connectionId: "local_ssoc_replacement_retry000000" }),
     ).toMatchObject({ migrationPhase: "SETUP", replacesConnectionId: LEGACY });
   });
 });

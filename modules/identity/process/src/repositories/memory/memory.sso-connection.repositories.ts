@@ -21,13 +21,17 @@ export class MemorySsoConnectionReadRepository implements SsoConnectionReadRepos
 
   private constructor(private readonly store: MemoryIdentityStore) {}
 
-  async tryFindConnection(args: { connectionId: string }): Promise<SsoConnectionState | null> {
-    return this.store.ssoConnections.get(args.connectionId) ?? null;
+  async getConnection(args: { connectionId: string }): Promise<SsoConnectionState> {
+    const connection = this.store.ssoConnections.get(args.connectionId);
+    if (!connection) {
+      throw new SsoConnectionNotFoundError(`connection ${args.connectionId} does not exist`);
+    }
+    return connection;
   }
 
-  async tryFindDomainOwner(args: {
+  async getDomainOwner(args: {
     domain: string;
-  }): Promise<{ connectionId: string; organizationId: string } | null> {
+  }): Promise<{ connectionId: string; organizationId: string }> {
     // The Postgres twin reads the ownership rows the projection keeps; the
     // same rule derives them here, predecessor first.
     const holders = [...this.store.ssoConnections.values()].filter((connection) =>
@@ -36,9 +40,10 @@ export class MemorySsoConnectionReadRepository implements SsoConnectionReadRepos
     const owner =
       holders.find((connection) => connection.replacesConnectionId === null) ?? holders[0];
 
-    return owner
-      ? { connectionId: owner.connectionId, organizationId: owner.organizationId }
-      : null;
+    if (!owner) {
+      throw new SsoConnectionNotFoundError(`no live connection holds domain ${args.domain}`);
+    }
+    return { connectionId: owner.connectionId, organizationId: owner.organizationId };
   }
 
   async findForOrganization({

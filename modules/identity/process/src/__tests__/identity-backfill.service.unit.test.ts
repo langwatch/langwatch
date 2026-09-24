@@ -9,6 +9,7 @@ import {
   normalizeIdentifierValue,
   type VerifyIdentifierCommandData,
 } from "@langwatch/identity-contract";
+import { UserNotFoundError } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
@@ -114,7 +115,10 @@ function harness(options?: {
   const carried: string[] = [];
   const service = IdentityBackfillService.create({
     reads: {
-      tryFindUser: async () => user,
+      getUser: async ({ userId }) => {
+        if (!user) throw new UserNotFoundError(userId);
+        return user;
+      },
       findAccountRows: async () => accounts,
       findIdentifierRows: async () => [...rows.values()],
     },
@@ -125,8 +129,8 @@ function harness(options?: {
       // The backfill never reads either of these - the plan takes the email
       // off the user row it already read, and the collision guard is the one
       // asking who holds an address - but the double is the whole port.
-      tryFindEmail: async () => user?.email ?? null,
-      tryFindUserIdByEmail: async () => null,
+      getUserEmail: async () => ({ email: user?.email ?? null }),
+      findUserIdsByEmail: async () => [],
       findAddressStanding: async () =>
         user ? { email: user.email ?? null, emailVerified: true, holders: 1 } : null,
     },

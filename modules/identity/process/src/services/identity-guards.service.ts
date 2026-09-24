@@ -17,7 +17,7 @@ import {
   IdentityPrimaryMustDemoteFirstError,
   IdentityPrimaryRequiresVerifiedError,
   type IdentityFactInput,
-  identifierDomain,
+  extractIdentifierDomain,
   LINK_PROPOSED_EVENT_TYPE,
   type MarkPrimaryCommandData,
   normalizeIdentifierValue,
@@ -176,8 +176,8 @@ export class IdentityGuardsService {
       return;
     }
 
-    const holder = await this.users.tryFindUserIdByEmail({ normalizedValue });
-    if (holder === null || holder === userId) {
+    const holders = await this.users.findUserIdsByEmail({ normalizedValue });
+    if (!holders.some((holder) => holder !== userId)) {
       return;
     }
 
@@ -217,7 +217,12 @@ export class IdentityGuardsService {
       return [];
     }
 
-    const userHashKey = await this.heads.tryFindUserHashKey({ userId });
+    const { userHashKey } = await this.heads.getUserHashKey({ userId }).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "user_not_found") {
+        return { userHashKey: null };
+      }
+      throw error;
+    });
     // Non-email providers arrive VERIFIED with no verify ceremony to re-check them, so the
     // attach itself is where a cross-user race resolves — and the address lock is what resolves
     // it, atomically. The loser arrives ATTACHED and dead-ends in the same emission, which is
@@ -245,7 +250,7 @@ export class IdentityGuardsService {
         value: normalizedValue,
         identifierHash:
           userHashKey === null ? null : computeIdentifierHash({ userHashKey, normalizedValue }),
-        domain: identifierDomain(normalizedValue),
+        domain: extractIdentifierDomain(normalizedValue),
         connectionId: null,
         state,
         actor,
@@ -426,7 +431,7 @@ export class IdentityGuardsService {
           provider,
           providerAccountId,
           value: normalizedValue,
-          domain: identifierDomain(normalizedValue),
+          domain: extractIdentifierDomain(normalizedValue),
           reason,
           actor,
         },

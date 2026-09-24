@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import {
   type IdentityActor,
   type SsoConnectionCommandType,
@@ -220,9 +221,9 @@ export class SsoConnectionGuardChecksService {
     );
   }
 
-  /** The connection as the fold currently holds it, or nothing. */
-  tryFindConnection(input: { connectionId: string }): Promise<SsoConnectionState | null> {
-    return this.connections.tryFindConnection(input);
+  /** The connection as the fold currently holds it; `SsoConnectionNotFoundError` when none. */
+  getConnection(input: { connectionId: string }): Promise<SsoConnectionState> {
+    return this.connections.getConnection(input);
   }
 
   /** Every connection the organization holds, newest first. */
@@ -249,14 +250,16 @@ export class SsoConnectionGuardChecksService {
     data: { connectionId: string },
     command: SsoConnectionCommandType,
   ): Promise<SsoConnectionState> {
-    const state = await this.connections.tryFindConnection({
-      connectionId: data.connectionId,
-    });
-    if (!state) {
-      throw new SsoConnectionInvalidTransitionError(
-        `connection ${data.connectionId} does not exist`,
-      );
-    }
+    const state = await this.connections
+      .getConnection({ connectionId: data.connectionId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "sso_connection_not_found") {
+          throw new SsoConnectionInvalidTransitionError(
+            `connection ${data.connectionId} does not exist`,
+          );
+        }
+        throw error;
+      });
 
     if (!ALLOWED_FROM[command].includes(state.state)) {
       throw new SsoConnectionInvalidTransitionError(
@@ -316,7 +319,10 @@ export class SsoConnectionGuardChecksService {
     domain: string;
     connectionId: string;
   }): Promise<void> {
-    const owner = await this.connections.tryFindDomainOwner({ domain });
+    const owner = await this.connections.getDomainOwner({ domain }).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "sso_connection_not_found") return null;
+      throw error;
+    });
     if (owner && owner.connectionId !== connectionId) {
       throw new SsoConnectionDomainTakenError(
         `domain ${domain} is already verified on connection ${owner.connectionId}`,

@@ -1951,6 +1951,10 @@ const presentations = {
     title: "That organization slug is already in use",
     describe: () => "Pick a different slug, or leave it out to generate one from the name.",
   },
+  scim_sync_not_found: {
+    title: "Directory sync not found",
+    describe: () => "This connection has not synced anyone yet. Reload to see where it stands.",
+  },
   scim_token_not_found: {
     title: "SCIM token not found",
     describe: () => "It may already be revoked. Reload to see the current tokens.",

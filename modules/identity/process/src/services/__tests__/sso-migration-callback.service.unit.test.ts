@@ -7,6 +7,7 @@ import {
   emptySsoConnection,
   type SsoConnectionState,
   type SsoDomainVerification,
+  SsoConnectionNotFoundError,
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
@@ -85,17 +86,16 @@ class Connections extends SsoConnectionReadRepository {
     super();
   }
 
-  async tryFindConnection(): Promise<SsoConnectionState | null> {
+  async getConnection(): Promise<SsoConnectionState> {
     throw new Error("the callback policy never reads one connection by id");
   }
 
-  async tryFindDomainOwner({ domain }: { domain: string }) {
+  async getDomainOwner({ domain }: { domain: string }) {
     const owner = this.rows.find(
       (row) => row.state === "ACTIVE" && row.verifiedDomains.includes(domain),
     );
-    return owner
-      ? { connectionId: owner.connectionId, organizationId: owner.organizationId }
-      : null;
+    if (!owner) throw new SsoConnectionNotFoundError(domain);
+    return { connectionId: owner.connectionId, organizationId: owner.organizationId };
   }
 
   async findForOrganization({ organizationId }: { organizationId: string }) {

@@ -9,7 +9,7 @@ import {
   type JoinRequestAggregateState,
   JoinRequestNotFoundError,
   type JoinSettingChange,
-  joinDomainOf,
+  extractJoinDomain,
   organizationAdmitsDomain,
   resolveJoinLookup,
 } from "@langwatch/identity-contract";
@@ -73,7 +73,7 @@ export class JoinRequestsService {
       return { outcome: "none" };
     }
 
-    const domain = joinDomainOf(verifiedEmail);
+    const domain = extractJoinDomain(verifiedEmail);
     if (!domain || isPublicEmailDomain(domain)) {
       return { outcome: "none" };
     }
@@ -120,7 +120,7 @@ export class JoinRequestsService {
     userId: string;
     verifiedEmail: string | null;
   }): Promise<JoinLookupDecision> {
-    const domain = verifiedEmail ? joinDomainOf(verifiedEmail) : null;
+    const domain = verifiedEmail ? extractJoinDomain(verifiedEmail) : null;
     if (!domain) {
       return { outcome: "none" };
     }
@@ -141,7 +141,7 @@ export class JoinRequestsService {
     userId: string;
     verifiedEmail: string | null;
   }): Promise<void> {
-    const domain = verifiedEmail ? joinDomainOf(verifiedEmail) : null;
+    const domain = verifiedEmail ? extractJoinDomain(verifiedEmail) : null;
     if (!domain) {
       return;
     }
@@ -249,7 +249,7 @@ export class JoinRequestsService {
       return { organization: null };
     }
 
-    const domain = joinDomainOf(verifiedEmail ?? "");
+    const domain = extractJoinDomain(verifiedEmail ?? "");
     if (!domain) {
       return { organization: null };
     }

@@ -6,9 +6,9 @@ import type { IdentifierFact, IdentityHeads } from "@langwatch/identity-contract
  * first and states only what they do not carry (PR #7429).
  */
 export abstract class IdentityHeadsRepository {
-  /** The per-user HMAC key (`User.userHashKey`); null when not yet minted —
-   *  the attach then records a null hash rather than failing the ceremony. */
-  abstract tryFindUserHashKey(args: { userId: string }): Promise<string | null>;
+  /** The user row's HMAC key (`User.userHashKey`), null inside until minted; the attach
+   *  then records a null hash. `UserNotFoundError` when no user carries this id. */
+  abstract getUserHashKey(args: { userId: string }): Promise<{ userHashKey: string | null }>;
   /** The user's current identifier heads, as the projection knows them. */
   abstract findHeads(args: { userId: string }): Promise<IdentityHeads>;
   /**

@@ -6,17 +6,17 @@ import type { SsoConnectionState } from "@langwatch/identity-contract";
  * queue's per-connection FIFO on the staged path. Either way a guard reads folded state first.
  */
 export abstract class SsoConnectionReadRepository {
-  /** One connection's folded state, or null when it has no history yet. */
-  abstract tryFindConnection(args: { connectionId: string }): Promise<SsoConnectionState | null>;
+  /** One connection's folded state; `SsoConnectionNotFoundError` when it has no history yet. */
+  abstract getConnection(args: { connectionId: string }): Promise<SsoConnectionState>;
 
   /**
-   * The connection that already holds a domain as VERIFIED on an ACTIVE
-   * connection — first verifier owns. The SCOPE of "already" (global on
-   * SaaS, instance-only on self-hosted) is a deployment fact, not this guard's.
+   * The connection holding a domain as VERIFIED on an ACTIVE connection (first verifier owns;
+   * `SsoConnectionNotFoundError` when none). The SCOPE of "already" (global on SaaS,
+   * instance-only on self-hosted) is a deployment fact, not this guard's.
    */
-  abstract tryFindDomainOwner(args: {
+  abstract getDomainOwner(args: {
     domain: string;
-  }): Promise<{ connectionId: string; organizationId: string } | null>;
+  }): Promise<{ connectionId: string; organizationId: string }>;
 
   /**
    * Every connection an organization holds, newest first. The read a peer

@@ -6,10 +6,8 @@ import type { ScimSyncState } from "@langwatch/identity-contract";
  * the calling path and the queue's staged re-run, and must reach one head.
  */
 export abstract class ScimSyncReadRepository {
-  abstract tryFindSync(args: {
-    scimSyncId: string;
-    organizationId: string;
-  }): Promise<ScimSyncState | null>;
+  /** `ScimSyncNotFoundError` when this organization holds no such sync. */
+  abstract getSync(args: { scimSyncId: string; organizationId: string }): Promise<ScimSyncState>;
 
   /**
    * Every sync this organization holds, newest first. The read a peer module

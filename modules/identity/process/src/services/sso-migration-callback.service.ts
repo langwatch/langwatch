@@ -1,4 +1,5 @@
 import { extractEmailDomain } from "@langwatch/auth-contract";
+import { HandledError } from "@langwatch/handled-error";
 import {
   normalizeDomain,
   type SsoConnectionState,
@@ -182,7 +183,10 @@ export class SsoMigrationCallbackService {
     const domain = address ? normalizeDomain(address) : null;
     if (!domain) return NOT_MIGRATING;
 
-    const owner = await this.deps.connections.tryFindDomainOwner({ domain });
+    const owner = await this.deps.connections.getDomainOwner({ domain }).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "sso_connection_not_found") return null;
+      throw error;
+    });
     if (!owner) return NOT_MIGRATING;
 
     const matching = findStandaloneLegacyConnections({

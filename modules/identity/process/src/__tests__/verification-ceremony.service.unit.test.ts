@@ -29,8 +29,10 @@ class InMemoryVerificationStore implements IdentityVerificationRepository {
     this.records.set(record.identifierId, record);
   }
 
-  async tryFindByIdentifierId({ identifierId }: { identifierId: string }) {
-    return this.records.get(identifierId) ?? null;
+  async getByIdentifierId({ identifierId }: { identifierId: string }) {
+    const record = this.records.get(identifierId);
+    if (!record) throw new IdentityVerificationInvalidError();
+    return record;
   }
 
   async consume({
@@ -97,7 +99,7 @@ function harness(options?: {
       },
       // The ceremony reads exactly one head; the rest of the port is
       // present so the double is the contract, not a slice of it.
-      tryFindUserHashKey: async () => null,
+      getUserHashKey: async () => ({ userHashKey: null }),
       hasFolded: async () => true,
       findHeads: async ({ userId }) => emptyIdentityHeads({ userId }),
       getActiveIdentifierByValue: async () => {

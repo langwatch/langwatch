@@ -2,7 +2,7 @@ import {
   IdentityEmailService as IdentityEmailCapability,
   type MatchableEmail,
   matchableEmailsOf,
-  primaryEmailOf,
+  pickPrimaryEmail,
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 
@@ -38,7 +38,7 @@ export class IdentityEmailService extends IdentityEmailCapability {
 
       const heads = await this.heads.findHeads({ userId });
 
-      return primaryEmailOf({ heads });
+      return pickPrimaryEmail({ heads });
     } catch (error) {
       // A read fork that can break sign-in is worse than a stale email.
       logger.warn(

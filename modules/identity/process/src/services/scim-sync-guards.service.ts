@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import {
   type IssueScimTokenCommandData,
   type RecordScimApplyFailureCommandData,
@@ -211,7 +212,10 @@ export class ScimSyncGuardsService {
     scimSyncId: string;
     organizationId: string;
   }): Promise<ScimSyncState | null> {
-    return this.deps.syncs.tryFindSync({ scimSyncId, organizationId });
+    return this.deps.syncs.getSync({ scimSyncId, organizationId }).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "scim_sync_not_found") return null;
+      throw error;
+    });
   }
 
   /** The recovery fact, when there is a standing failure for a push to end. */

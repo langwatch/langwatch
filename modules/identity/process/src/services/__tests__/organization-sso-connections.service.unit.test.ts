@@ -4,7 +4,11 @@
  * querying the rows identity owns.
  * Corresponds to specs/identity/sso-connection-lifecycle.feature.
  */
-import { emptySsoConnection, type SsoConnectionState } from "@langwatch/identity-contract";
+import {
+  emptySsoConnection,
+  SsoConnectionNotFoundError,
+  type SsoConnectionState,
+} from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
 import { SsoConnectionReadRepository } from "../../repositories/sso-connection.repository.ts";
@@ -46,15 +50,13 @@ function connection({
 
 function serviceOver(states: SsoConnectionState[]) {
   class StubReads extends SsoConnectionReadRepository {
-    async tryFindConnection({
-      connectionId,
-    }: {
-      connectionId: string;
-    }): Promise<SsoConnectionState | null> {
-      return states.find((state) => state.connectionId === connectionId) ?? null;
+    async getConnection({ connectionId }: { connectionId: string }): Promise<SsoConnectionState> {
+      const found = states.find((state) => state.connectionId === connectionId);
+      if (!found) throw new SsoConnectionNotFoundError(connectionId);
+      return found;
     }
-    async tryFindDomainOwner(): Promise<null> {
-      return null;
+    async getDomainOwner({ domain }: { domain: string }): Promise<never> {
+      throw new SsoConnectionNotFoundError(domain);
     }
     async findForOrganization({
       organizationId,

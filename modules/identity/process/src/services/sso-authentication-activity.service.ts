@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
 import type { SsoConnectionReadRepository } from "../repositories/sso-connection.repository.ts";
@@ -41,7 +42,13 @@ export class SsoAuthenticationActivityService {
     providerAccountId?: string | null;
   }): Promise<void> {
     try {
-      const connection = await this.deps.connections.tryFindConnection({ connectionId });
+      const connection = await this.deps.connections
+        .getConnection({ connectionId })
+        .catch((error: unknown) => {
+          if (HandledError.isHandled(error) && error.code === "sso_connection_not_found")
+            return null;
+          throw error;
+        });
       if (!connection) return;
 
       await this.deps.activity.recordAuthentication({

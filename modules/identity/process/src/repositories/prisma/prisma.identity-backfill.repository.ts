@@ -1,5 +1,6 @@
 import type { BackfillIdentifierRow } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { UserNotFoundError } from "@langwatch/user-contract";
 
 import type {
   BackfillAccountRow,
@@ -19,7 +20,7 @@ export class PrismaIdentityBackfillRepository implements IdentityBackfillReposit
 
   constructor(private readonly prisma: PrismaClient) {}
 
-  async tryFindUser({ userId }: { userId: string }): Promise<BackfillUserRow | null> {
+  async getUser({ userId }: { userId: string }): Promise<BackfillUserRow> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -30,7 +31,7 @@ export class PrismaIdentityBackfillRepository implements IdentityBackfillReposit
         userHashKey: true,
       },
     });
-    if (!user) return null;
+    if (!user) throw new UserNotFoundError(userId);
     return {
       id: user.id,
       email: user.email,

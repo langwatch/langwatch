@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { IdentifierFact, IdentityHeads } from "../facts.ts";
-import { primaryEmailOf } from "../primary-email.ts";
+import { pickPrimaryEmail } from "../primary-email.ts";
 
 const USER = "user_sam";
 const T0 = 1_690_000_000_000;
@@ -34,7 +34,7 @@ function headsOf(...facts: IdentifierFact[]): IdentityHeads {
   };
 }
 
-describe("primaryEmailOf", () => {
+describe("pickPrimaryEmail", () => {
   describe("given the user has a PRIMARY identifier", () => {
     /** @scenario "The legacy email field answers from the identifiers" */
     it("answers the primary, whatever else is verified", () => {
@@ -53,7 +53,7 @@ describe("primaryEmailOf", () => {
         }),
       );
 
-      expect(primaryEmailOf({ heads })).toBe("chosen@acme.com");
+      expect(pickPrimaryEmail({ heads })).toBe("chosen@acme.com");
     });
   });
 
@@ -72,7 +72,7 @@ describe("primaryEmailOf", () => {
         }),
       );
 
-      expect(primaryEmailOf({ heads })).toBe("new@acme.com");
+      expect(pickPrimaryEmail({ heads })).toBe("new@acme.com");
     });
 
     it("breaks a tie on identifier id, so every pod answers the same", () => {
@@ -81,7 +81,7 @@ describe("primaryEmailOf", () => {
         identifier({ identifierId: "idf_a", value: "a@acme.com" }),
       );
 
-      expect(primaryEmailOf({ heads })).toBe("a@acme.com");
+      expect(pickPrimaryEmail({ heads })).toBe("a@acme.com");
     });
   });
 
@@ -90,7 +90,7 @@ describe("primaryEmailOf", () => {
     it("answers nothing for ATTACHED, DETACHED or DEAD_END", () => {
       for (const state of ["ATTACHED", "DETACHED", "DEAD_END"] as const) {
         const heads = headsOf(identifier({ state }));
-        expect(primaryEmailOf({ heads })).toBeNull();
+        expect(pickPrimaryEmail({ heads })).toBeNull();
       }
     });
   });
@@ -99,7 +99,7 @@ describe("primaryEmailOf", () => {
     it("answers nothing: erasure wiped the value off the tombstone", () => {
       const heads = headsOf(identifier({ value: null, state: "PRIMARY" }));
 
-      expect(primaryEmailOf({ heads })).toBeNull();
+      expect(pickPrimaryEmail({ heads })).toBeNull();
     });
   });
 
@@ -107,13 +107,13 @@ describe("primaryEmailOf", () => {
     it("ignores it: the legacy column holds an email, not a subject", () => {
       const heads = headsOf(identifier({ identifierId: "idf_sso", provider: "saml" }));
 
-      expect(primaryEmailOf({ heads })).toBeNull();
+      expect(pickPrimaryEmail({ heads })).toBeNull();
     });
   });
 
   describe("given the user holds no identifiers at all", () => {
     it("answers nothing, so the caller keeps the legacy column", () => {
-      expect(primaryEmailOf({ heads: headsOf() })).toBeNull();
+      expect(pickPrimaryEmail({ heads: headsOf() })).toBeNull();
     });
   });
 });

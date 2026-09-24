@@ -31,12 +31,12 @@ function harness(options?: {
 
   const users: IdentityUsersRepository = {
     storeUserHashKeyIfMissing: vi.fn().mockResolvedValue(undefined),
-    tryFindEmail: vi
+    getUserEmail: vi
       .fn()
-      .mockResolvedValue(options?.email === undefined ? "sam@acme.com" : options.email),
+      .mockResolvedValue({ email: options?.email === undefined ? "sam@acme.com" : options.email }),
     // The ceremonies never ask it — the collision guard does, one layer
     // down — but the double is the whole port.
-    tryFindUserIdByEmail: vi.fn().mockResolvedValue(null),
+    findUserIdsByEmail: vi.fn().mockResolvedValue([]),
     findAddressStanding: vi.fn().mockResolvedValue(null),
   };
   const identity = {

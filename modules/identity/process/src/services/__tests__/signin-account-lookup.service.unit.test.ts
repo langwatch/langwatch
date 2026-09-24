@@ -39,8 +39,8 @@ class SeededHeads extends IdentityHeadsRepository {
     return heads;
   }
 
-  async tryFindUserHashKey() {
-    return null;
+  async getUserHashKey() {
+    return { userHashKey: null };
   }
 
   async hasFolded() {

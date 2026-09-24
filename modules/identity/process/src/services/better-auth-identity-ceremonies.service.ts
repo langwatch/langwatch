@@ -123,7 +123,10 @@ export class IdentityCeremoniesAdapter implements IdentityAccountCeremonies {
     if (typeof userId !== "string" || typeof providerId !== "string") return;
     if (!(await this.isLatched({ userId }))) return;
 
-    const value = await this.users.tryFindEmail({ userId });
+    const { email: value } = await this.users.getUserEmail({ userId }).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "user_not_found") return { email: null };
+      throw error;
+    });
     if (!value) {
       logger.warn(
         { userId, providerId },

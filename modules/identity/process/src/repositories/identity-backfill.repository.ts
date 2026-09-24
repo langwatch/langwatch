@@ -26,7 +26,8 @@ export interface BackfillAccountRow {
  * write the pass owns besides its facts is on IdentityUsersRepository.
  */
 export abstract class IdentityBackfillRepository {
-  abstract tryFindUser(args: { userId: string }): Promise<BackfillUserRow | null>;
+  /** `UserNotFoundError` when the user has vanished. */
+  abstract getUser(args: { userId: string }): Promise<BackfillUserRow>;
   abstract findAccountRows(args: { userId: string }): Promise<BackfillAccountRow[]>;
   abstract findIdentifierRows(args: { userId: string }): Promise<BackfillIdentifierRow[]>;
 }

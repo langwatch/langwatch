@@ -175,7 +175,7 @@ beforeEach(() => {
   seedProvedConnection("dns-txt");
 });
 
-const held = async () => connections.tryFindConnection({ connectionId: CONNECTION });
+const held = async () => connections.getConnection({ connectionId: CONNECTION });
 const proofOf = async () =>
   (await held())?.domainVerifications.find((entry) => entry.domain === "acme.com");
 const recorded = (): string[] =>
@@ -238,7 +238,7 @@ describe("re-reading the record that proves a domain", () => {
       const state = await held();
       expect(state?.state).toBe("ACTIVE");
       expect(state?.verifiedDomains).toEqual(["acme.com"]);
-      expect(await connections.tryFindDomainOwner({ domain: "acme.com" })).toMatchObject({
+      expect(await connections.getDomainOwner({ domain: "acme.com" })).toMatchObject({
         connectionId: CONNECTION,
       });
     });
@@ -364,7 +364,7 @@ describe("re-reading the record that proves a domain", () => {
         }),
       ).rejects.toMatchObject({ code: "sso_connection_invalid_transition" });
 
-      const attested = await connections.tryFindConnection({ connectionId: "ssoc_attested" });
+      const attested = await connections.getConnection({ connectionId: "ssoc_attested" });
       expect(attested?.domainVerifications[0]?.proofState).toBe("VERIFIED");
     });
   });

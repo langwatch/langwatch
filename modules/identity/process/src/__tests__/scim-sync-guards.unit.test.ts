@@ -8,6 +8,7 @@ import {
   SCIM_TOKEN_ISSUED_EVENT_TYPE,
   SCIM_TOKEN_REVOKED_EVENT_TYPE,
   SCIM_USER_PUSHED_EVENT_TYPE,
+  ScimSyncNotFoundError,
   type ScimSyncState,
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
@@ -35,7 +36,10 @@ const commandIdentity = {
 function guardsOver(state: ScimSyncState | null) {
   return ScimSyncGuardsService.create({
     syncs: {
-      tryFindSync: async () => state,
+      getSync: async ({ scimSyncId }) => {
+        if (!state) throw new ScimSyncNotFoundError(scimSyncId);
+        return state;
+      },
       findForOrganization: async () => [],
       findPageForOperator: async () => ({ syncs: [], total: 0 }),
       findByConnectionForOperator: async () => [],

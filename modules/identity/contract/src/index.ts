@@ -327,6 +327,7 @@ export {
   SsoSamlNotSelfServeError,
   SsoSetupAddressMismatchError,
   SsoSignInRefusedError,
+  ScimSyncNotFoundError,
   SsoTestArrivalCannotCreateOrganizationError,
 } from "./identity.errors.ts";
 export {
@@ -359,7 +360,7 @@ export {
   type JoinLookupDecision,
   type JoinLookupInput,
   type JoinOffer,
-  joinDomainOf,
+  extractJoinDomain,
   organizationAdmitsDomain,
   organizationAdmitsDomainAutomatically,
   PUBLIC_EMAIL_DOMAINS,
@@ -477,7 +478,11 @@ export {
   type VerifyIdentifierCommandData,
   verifyIdentifierCommandDataSchema,
 } from "./facts.ts";
-export { identifierDomain, normalizeDomain, normalizeIdentifierValue } from "./identifier.ts";
+export {
+  extractIdentifierDomain,
+  normalizeDomain,
+  normalizeIdentifierValue,
+} from "./identifier.ts";
 export {
   type IdentifierHead,
   type IdentityStream,
@@ -579,9 +584,9 @@ export {
   PASSWORD_MAXIMUM_BYTES,
   PASSWORD_MINIMUM_LENGTH,
   PASSWORD_REQUIREMENTS_HINT,
-  passwordProblem,
+  describePasswordProblem,
 } from "./password-policy.ts";
-export { primaryEmailOf } from "./primary-email.ts";
+export { pickPrimaryEmail } from "./primary-email.ts";
 export {
   LOCAL_METHOD_SET,
   PASSKEY_METHOD,

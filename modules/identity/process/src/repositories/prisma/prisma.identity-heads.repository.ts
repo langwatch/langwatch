@@ -1,6 +1,7 @@
 import type { IdentifierFact, IdentityHeads } from "@langwatch/identity-contract";
 import { IdentityIdentifierNotFoundError } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { UserNotFoundError } from "@langwatch/user-contract";
 
 import type { IdentityHeadsRepository } from "../identity-heads.repository.ts";
 import { identifierRowToFact } from "./prisma.identifier.mapper.ts";
@@ -27,12 +28,13 @@ export class PrismaIdentityHeadsRepository implements IdentityHeadsRepository {
 
   private constructor(private readonly database: PrismaIdentityHeadsDatabase) {}
 
-  async tryFindUserHashKey({ userId }: { userId: string }): Promise<string | null> {
+  async getUserHashKey({ userId }: { userId: string }): Promise<{ userHashKey: string | null }> {
     const user = await this.database.user.findUnique({
       where: { id: userId },
       select: { userHashKey: true },
     });
-    return user?.userHashKey ?? null;
+    if (!user) throw new UserNotFoundError(userId);
+    return { userHashKey: user.userHashKey };
   }
 
   async hasFolded({ userId }: { userId: string }): Promise<boolean> {

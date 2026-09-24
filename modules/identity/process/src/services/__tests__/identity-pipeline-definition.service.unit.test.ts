@@ -46,8 +46,8 @@ function fact(overrides: Partial<IdentifierFact>): IdentifierFact {
 class HeadsOf implements IdentityHeadsRepository {
   constructor(private readonly heads: IdentityHeads) {}
 
-  async tryFindUserHashKey() {
-    return "key_material";
+  async getUserHashKey() {
+    return { userHashKey: "key_material" };
   }
 
   /** Folded: these doubles hold no provisional newborn rows. */

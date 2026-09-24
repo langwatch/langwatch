@@ -124,7 +124,7 @@ describe("the published record decides the claim", () => {
         }),
       ).rejects.toMatchObject({ code: "sso_connection_invalid_transition" });
 
-      const state = await connections.tryFindConnection({ connectionId: CONNECTION });
+      const state = await connections.getConnection({ connectionId: CONNECTION });
       expect(state?.approvedDomains).toEqual([]);
     });
 
@@ -282,7 +282,7 @@ describe("the published record decides the claim", () => {
         }),
       ).rejects.toMatchObject({ code: "sso_connection_invalid_transition" });
 
-      const state = await connections.tryFindConnection({ connectionId: CONNECTION });
+      const state = await connections.getConnection({ connectionId: CONNECTION });
       expect(state?.pendingVerification ?? null).toBeNull();
     });
 

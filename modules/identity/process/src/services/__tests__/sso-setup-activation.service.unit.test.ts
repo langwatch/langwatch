@@ -4,7 +4,11 @@
  * account is evidence the journey holds, never a value a caller supplies.
  */
 import { createApiFixture } from "@langwatch/api-fixture";
-import { emptySsoConnection, type SsoConnectionState } from "@langwatch/identity-contract";
+import {
+  emptySsoConnection,
+  SsoConnectionNotFoundError,
+  type SsoConnectionState,
+} from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryIdentityRepositories } from "../../repositories/memory/memory.identity.repositories.ts";
@@ -32,12 +36,13 @@ class OneConnection extends SsoConnectionReadRepository {
     super();
   }
 
-  async tryFindConnection(): Promise<SsoConnectionState | null> {
+  async getConnection({ connectionId }: { connectionId: string }): Promise<SsoConnectionState> {
+    if (!this.row) throw new SsoConnectionNotFoundError(connectionId);
     return this.row;
   }
 
-  async tryFindDomainOwner(): Promise<null> {
-    return null;
+  async getDomainOwner({ domain }: { domain: string }): Promise<never> {
+    throw new SsoConnectionNotFoundError(domain);
   }
 
   async findForOrganization(): Promise<SsoConnectionState[]> {

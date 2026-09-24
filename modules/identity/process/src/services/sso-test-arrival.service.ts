@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import {
   isSsoConnectionInSetup,
   looksLikeSsoConnectionId,
@@ -65,7 +66,12 @@ export class SsoTestArrivalService {
   }: {
     connectionId: string;
   }): Promise<SsoTestArrivalStanding> {
-    const connection = await this.deps.connections.tryFindConnection({ connectionId });
+    const connection = await this.deps.connections
+      .getConnection({ connectionId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "sso_connection_not_found") return null;
+        throw error;
+      });
     if (!connection) return NOT_A_TEST_ARRIVAL;
 
     // STILL BEING SET UP, not merely "not live": an account through a

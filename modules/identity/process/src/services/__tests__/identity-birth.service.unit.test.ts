@@ -26,7 +26,7 @@ function harness(overrides?: {
 }) {
   const order: string[] = [];
   const heads = {
-    tryFindUserHashKey: async () => "key_material",
+    getUserHashKey: async () => ({ userHashKey: "key_material" }),
     hasFolded: async () => true,
     findHeads: async ({ userId }: { userId: string }) => ({
       userId,
@@ -59,8 +59,8 @@ function harness(overrides?: {
   };
 
   const rows = {
-    tryFindUserAtPinnedId: vi.fn<IdentityNewbornRepository["tryFindUserAtPinnedId"]>(async () =>
-      overrides?.occupiedBy === undefined ? null : { id: overrides.occupiedBy },
+    hasUserAtPinnedId: vi.fn<IdentityNewbornRepository["hasUserAtPinnedId"]>(
+      async () => overrides?.occupiedBy !== undefined,
     ),
     claim: vi.fn<IdentityNewbornRepository["claim"]>(async () => {
       order.push("claim");

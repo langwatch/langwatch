@@ -28,8 +28,8 @@ export class InMemoryHeads implements IdentityHeadsRepository {
    *  `fold` below produces. */
   newborns = new Set<string>();
 
-  async tryFindUserHashKey({ userId }: { userId: string }) {
-    return this.hashKeys.get(userId) ?? null;
+  async getUserHashKey({ userId }: { userId: string }) {
+    return { userHashKey: this.hashKeys.get(userId) ?? null };
   }
 
   async hasFolded({ userId }: { userId: string }): Promise<boolean> {

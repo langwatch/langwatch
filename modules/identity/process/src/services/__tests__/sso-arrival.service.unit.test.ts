@@ -11,6 +11,7 @@ import {
   emptySsoConnection,
   type SsoConnectionState,
   type SsoDomainVerification,
+  SsoConnectionNotFoundError,
 } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -22,11 +23,11 @@ import { SsoArrivalService } from "../sso-arrival.service.ts";
 
 /** Only the one read an arrival makes; the other two are never reached here. */
 class OneConnectionReads extends SsoConnectionReadRepository {
-  constructor(readonly tryFindConnection: SsoConnectionReadRepository["tryFindConnection"]) {
+  constructor(readonly getConnection: SsoConnectionReadRepository["getConnection"]) {
     super();
   }
 
-  tryFindDomainOwner(): never {
+  getDomainOwner(): never {
     throw new Error("an arrival never asks who owns a domain");
   }
 
@@ -107,7 +108,10 @@ function serviceOver({
     return { attached: ["rb_admission"], duplicates: [] };
   });
 
-  const tryFindConnection = vi.fn().mockResolvedValue(row);
+  const getConnection = vi.fn(async ({ connectionId }: { connectionId: string }) => {
+    if (!row) throw new SsoConnectionNotFoundError(connectionId);
+    return row;
+  });
   const requestFromSsoArrival = vi.fn().mockResolvedValue({ raised: true, joinRequestId: "jr_1" });
   const applyPendingInvite = vi
     .fn()
@@ -120,7 +124,7 @@ function serviceOver({
   const startNurturing = vi.fn();
   const adopt = vi.fn<() => Promise<void>>().mockResolvedValue();
 
-  const connections = new OneConnectionReads(tryFindConnection);
+  const connections = new OneConnectionReads(getConnection);
   const authz = createApiFixture<AuthzApi>({
     attachBindings,
     readPendingAdmission,
@@ -138,7 +142,7 @@ function serviceOver({
       adoption: { adopt },
     }),
     isMember,
-    tryFindConnection,
+    getConnection,
     requestFromSsoArrival,
     applyPendingInvite,
     attachBindings,
@@ -264,7 +268,7 @@ describe("given an account that is not a connection at all", () => {
 
     await parts.service.admit({ user: USER, connectionId: "google", domain: "acme.com" });
 
-    expect(parts.tryFindConnection).not.toHaveBeenCalled();
+    expect(parts.getConnection).not.toHaveBeenCalled();
   });
 });
 
@@ -548,12 +552,12 @@ describe("an unfinished admission", () => {
 
 describe("given a process that composed nowhere for a join request to be raised", () => {
   it("admits nobody through a connection that asks, and records that it could not", async () => {
-    const tryFindConnection = vi.fn().mockResolvedValue(connection());
+    const getConnection = vi.fn().mockResolvedValue(connection());
     const isMember = vi.fn().mockResolvedValue(false);
     const createMembership = vi.fn();
     const adopt = vi.fn<() => Promise<void>>().mockResolvedValue();
     const service = SsoArrivalService.create({
-      connections: new OneConnectionReads(tryFindConnection),
+      connections: new OneConnectionReads(getConnection),
       authz: createApiFixture<AuthzApi>({}),
       memberships: {
         isMember,

@@ -48,8 +48,8 @@ class InMemoryStateStore implements StateProjectionStore<IdentityFoldState> {
 class ProjectionHeads implements IdentityHeadsRepository {
   constructor(private readonly store: InMemoryStateStore) {}
 
-  async tryFindUserHashKey() {
-    return "key_material";
+  async getUserHashKey() {
+    return { userHashKey: "key_material" };
   }
 
   /** Folded: these doubles hold no provisional newborn rows. */

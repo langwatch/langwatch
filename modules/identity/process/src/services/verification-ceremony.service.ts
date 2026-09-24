@@ -9,7 +9,10 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 
 import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
-import type { IdentityVerificationRepository } from "../repositories/identity-verification.repository.ts";
+import type {
+  IdentityVerificationRecord,
+  IdentityVerificationRepository,
+} from "../repositories/identity-verification.repository.ts";
 import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
 import type { IdentityVerificationWrites } from "../rules/identity-writes.rules.ts";
 import { mintVerificationToken, s256Challenge, safeEqual, sha256Hex } from "../rules/pkce.rules.ts";
@@ -148,10 +151,7 @@ export class VerificationCeremonyService {
       refuse("user's identifier backfill is not finalized; no live events yet");
     }
 
-    const record = await this.store.tryFindByIdentifierId({ identifierId });
-    if (!record) {
-      refuse("no ceremony in flight for this identifier");
-    }
+    const record = await this.inFlightRecord({ identifierId, refuse });
 
     if (
       record.verificationId !== verificationId ||
@@ -231,6 +231,23 @@ export class VerificationCeremonyService {
         { userId, identifierId, verificationId },
         "verification record already consumed after the verify command landed",
       );
+    }
+  }
+
+  private async inFlightRecord({
+    identifierId,
+    refuse,
+  }: {
+    identifierId: string;
+    refuse: (reason: string) => never;
+  }): Promise<IdentityVerificationRecord> {
+    try {
+      return await this.store.getByIdentifierId({ identifierId });
+    } catch (error) {
+      if (HandledError.isHandled(error) && error.code === "identity_verification_invalid") {
+        refuse("no ceremony in flight for this identifier");
+      }
+      throw error;
     }
   }
 

@@ -1,4 +1,8 @@
-import { LIVE_IDENTIFIER_STATES, type SsoConnectionState } from "@langwatch/identity-contract";
+import {
+  LIVE_IDENTIFIER_STATES,
+  SsoConnectionNotFoundError,
+  type SsoConnectionState,
+} from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type {
@@ -28,32 +32,30 @@ export class PrismaSsoConnectionReadRepository implements SsoConnectionReadRepos
 
   constructor(private readonly prisma: PrismaSsoConnectionReadDatabase) {}
 
-  async tryFindConnection({
-    connectionId,
-  }: {
-    connectionId: string;
-  }): Promise<SsoConnectionState | null> {
+  async getConnection({ connectionId }: { connectionId: string }): Promise<SsoConnectionState> {
     const row = await this.prisma.ssoConnection.findUnique({
       where: { id: connectionId },
     });
-    return row === null ? null : PrismaSsoConnectionProjectionRepository.rowToConnection(row);
+    if (row === null)
+      throw new SsoConnectionNotFoundError(`connection ${connectionId} does not exist`);
+    return PrismaSsoConnectionProjectionRepository.rowToConnection(row);
   }
 
   /**
    * First verifier owns, and this is where the scope of "owns" is decided.
    */
-  async tryFindDomainOwner({
+  async getDomainOwner({
     domain,
   }: {
     domain: string;
-  }): Promise<{ connectionId: string; organizationId: string } | null> {
+  }): Promise<{ connectionId: string; organizationId: string }> {
     // The ownership row, not the head's array: the row is what the database
     // refuses a second organization on, so it is the only answer that cannot race.
     const ownership = await this.prisma.ssoVerifiedDomain.findUnique({
       where: { domain },
       select: { organizationId: true, holders: { select: { connectionId: true } } },
     });
-    if (ownership === null || ownership.holders.length === 0) return null;
+    if (ownership === null || ownership.holders.length === 0) throw unowned(domain);
     const holders = await this.prisma.ssoConnection.findMany({
       where: {
         id: { in: ownership.holders.map((holder) => holder.connectionId) },
@@ -62,9 +64,8 @@ export class PrismaSsoConnectionReadRepository implements SsoConnectionReadRepos
       select: { id: true, replacesConnectionId: true },
     });
     const owner = holders.find((holder) => holder.replacesConnectionId === null) ?? holders[0];
-    return owner === undefined
-      ? null
-      : { connectionId: owner.id, organizationId: ownership.organizationId };
+    if (owner === undefined) throw unowned(domain);
+    return { connectionId: owner.id, organizationId: ownership.organizationId };
   }
 
   async findForOrganization({
@@ -118,4 +119,8 @@ export class PrismaSsoConnectionStrandingRepository implements SsoConnectionStra
     const covered = new Set(elsewhere.map((row) => row.userId));
     return userIds.filter((userId) => !covered.has(userId));
   }
+}
+
+function unowned(domain: string): SsoConnectionNotFoundError {
+  return new SsoConnectionNotFoundError(`no live connection holds domain ${domain}`);
 }

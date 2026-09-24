@@ -39,9 +39,9 @@ function harness() {
 
   const users: IdentityUsersRepository = {
     async storeUserHashKeyIfMissing() {},
-    async tryFindEmail({ userId }) {
+    async getUserEmail({ userId }) {
       const row = db.user?.find((candidate) => candidate.id === userId);
-      return typeof row?.email === "string" ? row.email : null;
+      return { email: typeof row?.email === "string" ? row.email : null };
     },
     async findAddressStanding({ userId }) {
       const row = db.user?.find((candidate) => candidate.id === userId);
@@ -49,13 +49,14 @@ function harness() {
       const email = typeof row.email === "string" ? row.email : null;
       return { email, emailVerified: row.emailVerified === true, holders: email ? 1 : 0 };
     },
-    async tryFindUserIdByEmail({ normalizedValue }) {
-      const row = db.user?.find(
-        (candidate) =>
-          typeof candidate.email === "string" &&
-          candidate.email.toLowerCase() === normalizedValue.toLowerCase(),
+    async findUserIdsByEmail({ normalizedValue }) {
+      return (db.user ?? []).flatMap((candidate) =>
+        typeof candidate.email === "string" &&
+        typeof candidate.id === "string" &&
+        candidate.email.toLowerCase() === normalizedValue.toLowerCase()
+          ? [candidate.id]
+          : [],
       );
-      return typeof row?.id === "string" ? row.id : null;
     },
   };
 

@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { UserNotFoundError } from "@langwatch/user-contract";
 
 import type { IdentityUsersRepository } from "../identity-users.repository.ts";
 
@@ -36,12 +37,13 @@ export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
     `;
   }
 
-  async tryFindEmail({ userId }: { userId: string }): Promise<string | null> {
+  async getUserEmail({ userId }: { userId: string }): Promise<{ email: string | null }> {
     const user = await this.database.user.findUnique({
       where: { id: userId },
       select: { email: true },
     });
-    return user?.email ?? null;
+    if (!user) throw new UserNotFoundError(userId);
+    return { email: user.email };
   }
 
   async findAddressStanding({ userId }: { userId: string }): Promise<{
@@ -67,15 +69,11 @@ export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
    * case-insensitive match on what `User.email @unique` defends. Deactivated
    * users still count as holders, since the unique index still enforces it.
    */
-  async tryFindUserIdByEmail({
-    normalizedValue,
-  }: {
-    normalizedValue: string;
-  }): Promise<string | null> {
-    const user = await this.database.user.findFirst({
+  async findUserIdsByEmail({ normalizedValue }: { normalizedValue: string }): Promise<string[]> {
+    const users = await this.database.user.findMany({
       where: { email: { equals: normalizedValue, mode: "insensitive" } },
       select: { id: true },
     });
-    return user?.id ?? null;
+    return users.map((user) => user.id);
   }
 }

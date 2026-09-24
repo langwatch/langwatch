@@ -5,7 +5,7 @@ import {
   JoinNotAvailableError,
   JoinRequestNotFoundError,
   JoinRequestThrottledError,
-  joinDomainOf,
+  extractJoinDomain,
   isPublicEmailDomain,
   type JoinRequestAggregateState,
 } from "@langwatch/identity-contract";
@@ -61,7 +61,7 @@ export class JoinRequestAdmissionGuardsService {
 
   /** The domain the caller has PROVED, or the universal nothing. */
   provenDomainOrRefuse({ verifiedEmail }: { verifiedEmail: string | null }): string {
-    const domain = verifiedEmail ? joinDomainOf(verifiedEmail) : null;
+    const domain = verifiedEmail ? extractJoinDomain(verifiedEmail) : null;
     if (!domain || isPublicEmailDomain(domain)) {
       throw new JoinNotAvailableError("no verified company address is available for this request");
     }

@@ -48,7 +48,7 @@ function harness(options?: {
     claim: async () => {
       throw new Error("the sweep never claims");
     },
-    tryFindUserAtPinnedId: async () => {
+    hasUserAtPinnedId: async () => {
       throw new Error("the sweep never reads a pinned id");
     },
     commitNewborn: async () => {

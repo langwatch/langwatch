@@ -1,7 +1,7 @@
 import {
   isPublicEmailDomain,
   type JoinLookupDecision,
-  joinDomainOf,
+  extractJoinDomain,
 } from "@langwatch/identity-contract";
 
 /** Join-before-create interstitial: determines whether to offer workspace join. */
@@ -58,7 +58,7 @@ export function resolveJoinBeforeCreate({
   if (!verified) return { outcome: "create_workspace" };
   if (!lookup) return { outcome: "create_workspace" };
 
-  const domain = joinDomainOf(verifiedEmail);
+  const domain = extractJoinDomain(verifiedEmail);
   if (!domain || isPublicEmailDomain(domain)) {
     return { outcome: "create_workspace" };
   }

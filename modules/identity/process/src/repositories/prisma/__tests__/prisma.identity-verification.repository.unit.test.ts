@@ -104,7 +104,11 @@ describe("PrismaIdentityVerificationRepository", () => {
         expect(
           await repository.consume({ identifierId: "idf_1", verificationId: "verif_old" }),
         ).toBe(false);
-        expect(await repository.tryFindByIdentifierId({ identifierId: "idf_1" })).toBeNull();
+        await expect(repository.getByIdentifierId({ identifierId: "idf_1" })).rejects.toMatchObject(
+          {
+            code: "identity_verification_invalid",
+          },
+        );
       });
     });
   });
