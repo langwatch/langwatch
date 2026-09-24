@@ -3,7 +3,7 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { CodingAgentReadMetrics, CodingAgentClock } from "../../app/coding-agent.members.ts";
 import { SystemCodingAgentClockAdapter } from "../../services/coding-agent-clock.service.ts";
 import { NoopCodingAgentReadMetrics } from "../../services/coding-agent-read-metrics-noop.service.ts";
-import type { CodingAgentRepositories } from "../coding-agent.repositories.ts";
+import type { CodingAgentProjectionRepositories } from "../coding-agent.repositories.ts";
 import { CodingAgentSessionEventsClickHouseRepository } from "./clickhouse.coding-agent-session-event.repository.ts";
 import { CodingAgentSessionClickHouseRepository } from "./clickhouse.coding-agent-session.repository.ts";
 import { CodingAgentTraceSessionClickHouseRepository } from "./clickhouse.coding-agent-trace-session.repository.ts";
@@ -24,9 +24,7 @@ export type ClickHouseCodingAgentInfrastructure = Readonly<{
  * per-tenant client here — every statement names its own tenant.
  */
 export class ClickHouseCodingAgentRepositories {
-  static readonly requires = ["clickhouse"] as const;
-
-  static create(members: ClickHouseCodingAgentInfrastructure): CodingAgentRepositories {
+  static create(members: ClickHouseCodingAgentInfrastructure): CodingAgentProjectionRepositories {
     return ClickHouseCodingAgentRepositories.createWith(members);
   }
 
@@ -42,7 +40,7 @@ export class ClickHouseCodingAgentRepositories {
         metrics?: CodingAgentReadMetrics;
         clock?: CodingAgentClock;
       }>,
-  ): CodingAgentRepositories {
+  ): CodingAgentProjectionRepositories {
     const storage = {
       clickhouse: options.clickhouse,
       defaultTraceRetentionDays: options.defaultRetentionDays ?? DEFAULT_RETENTION_DAYS,

@@ -1,8 +1,10 @@
 import type { CodingAgentRepositories } from "../coding-agent.repositories.ts";
 import { MemoryCodingAgentSessionEventRepository } from "./memory.coding-agent-session-event.repository.ts";
+import { MemoryCodingAgentSessionFoldCacheRepository } from "./memory.coding-agent-session-fold-cache.repository.ts";
 import { MemoryCodingAgentSessionRepository } from "./memory.coding-agent-session.repository.ts";
 import { MemoryCodingAgentTraceSessionRepository } from "./memory.coding-agent-trace-session.repository.ts";
 import { MemoryCodingAgentDatabase } from "./memory.coding-agent.database.ts";
+import { MemorySessionContextMemoRepository } from "./memory.session-context-memo.repository.ts";
 import { MemorySessionMetricSeriesRepository } from "./memory.session-metric-series.repository.ts";
 
 /** The "memory" tier: every coding-agent row the app is tested without a store. */
@@ -20,6 +22,8 @@ export class MemoryCodingAgentRepositories {
       traceSessions: MemoryCodingAgentTraceSessionRepository.create(memory),
       metricSeries: MemorySessionMetricSeriesRepository.create(memory),
       sessionEvents: MemoryCodingAgentSessionEventRepository.create(memory),
+      sessionContextMemo: MemorySessionContextMemoRepository.create(),
+      sessionFoldCache: MemoryCodingAgentSessionFoldCacheRepository.create(),
     };
   }
 }

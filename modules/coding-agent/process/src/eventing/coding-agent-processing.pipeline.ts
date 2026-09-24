@@ -8,66 +8,58 @@ import {
 } from "@langwatch/coding-agent-contract";
 import {
   defineAggregate,
+  defineEventingModule,
   definePipeline,
-  RedisCachedFoldStore,
+  type EventingSetup,
   type Projection,
   type RegisteredCommand,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
-import type { Cluster, Redis } from "ioredis";
+import type { TraceApi } from "@langwatch/trace-contract";
 
+import type { CodingAgentApp } from "../app/coding-agent.app.ts";
 import type {
   CodingAgentClock,
   CodingAgentCostEstimator,
   CodingAgentCostMetrics,
   CodingAgentProjectActivity,
   CodingAgentPullRequestMapping,
-} from "../../app/coding-agent.members.ts";
-import { createCodingAgentCostDriftSubscriber } from "../../eventing/coding-agent-cost-drift.subscriber.ts";
-import { CodingAgentSessionEventsMapProjection } from "../../eventing/coding-agent-session-events.projection.ts";
-import {
-  CodingAgentSessionFoldProjection,
-  type CodingAgentSessionState,
-} from "../../eventing/coding-agent-session.projection.ts";
-import { CodingAgentTraceSessionsMapProjection } from "../../eventing/coding-agent-trace-sessions.projection.ts";
-import { createPullRequestMappingSubscriber } from "../../eventing/pull-request-mapping.subscriber.ts";
-import { SessionMetricSeriesMapProjection } from "../../eventing/session-metric-series.projection.ts";
+} from "../app/coding-agent.members.ts";
+import type { CodingAgentSessionFoldCacheRepository } from "../repositories/coding-agent-session-fold-cache.repository.ts";
+import type { CodingAgentRepositories } from "../repositories/coding-agent.repositories.ts";
+import type { CodingAgentSessionContextMemoRepository } from "../repositories/session-context-memo.repository.ts";
 import {
   EventingCodingAgentSessionEventsAppendAdapter,
   EventingCodingAgentTraceSessionAppendAdapter,
   EventingSessionMetricSeriesAppendAdapter,
-} from "../../services/coding-agent-projection-append.service.ts";
-import { CodingAgentSessionSeenService } from "../../services/coding-agent-session-seen.service.ts";
-import { EventingCodingAgentSessionStoreAdapter } from "../../services/coding-agent-session-store.service.ts";
-import { EventingContributeLogFactsAdapter } from "../../services/contribute-log-facts.service.ts";
-import { EventingContributeMetricFactsAdapter } from "../../services/contribute-metric-facts.service.ts";
-import { EventingContributeSpanFactsAdapter } from "../../services/contribute-span-facts.service.ts";
-import type { CodingAgentSessionContextMemoRepository } from "../session-context-memo.repository.ts";
-import { RedisSessionContextMemoRepository } from "./redis.session-context-memo.repository.ts";
+} from "../services/coding-agent-projection-append.service.ts";
+import { CodingAgentSessionSeenService } from "../services/coding-agent-session-seen.service.ts";
+import { EventingCodingAgentSessionStoreAdapter } from "../services/coding-agent-session-store.service.ts";
+import { EventingContributeLogFactsAdapter } from "../services/contribute-log-facts.service.ts";
+import { EventingContributeMetricFactsAdapter } from "../services/contribute-metric-facts.service.ts";
+import { EventingContributeSpanFactsAdapter } from "../services/contribute-span-facts.service.ts";
+import { createCodingAgentCostDriftSubscriber } from "./coding-agent-cost-drift.subscriber.ts";
+import { CodingAgentSessionEventsMapProjection } from "./coding-agent-session-events.projection.ts";
+import {
+  CodingAgentSessionFoldProjection,
+  type CodingAgentSessionState,
+} from "./coding-agent-session.projection.ts";
+import { CodingAgentTraceSessionsMapProjection } from "./coding-agent-trace-sessions.projection.ts";
+import { createPullRequestMappingSubscriber } from "./pull-request-mapping.subscriber.ts";
+import { SessionMetricSeriesMapProjection } from "./session-metric-series.projection.ts";
 
 export interface CodingAgentProcessingPipelineDeps {
-  traceCanonicalisation: TraceCanonicalisationService;
+  traceCanonicalisation: Pick<TraceApi, "classifyClaudeCall">;
   modelProviders: CodingAgentCostEstimator;
   costMetrics: CodingAgentCostMetrics;
   projections: CodingAgentProjectionPersistence;
   projects: CodingAgentProjectActivity;
   clock: CodingAgentClock;
-  redis: Redis | Cluster;
-  defaultRetentionDays: number;
-  /**
-   * The "context the session last declared" store the log-facts command stamps
-   * fact rows from. Defaults to the Redis memo over this pipeline's own Redis,
-   * which is the only shape a real process has; a test passes the in-memory one.
-   */
-  sessionContextMemo?: CodingAgentSessionContextMemoRepository;
-  /** Typed process configuration for the Redis fold-cache consistency TTL. */
-  foldCacheTtlSeconds?: number;
-  /**
-   * Asks the organization's GitHub connection which pull requests a folded
-   * session's branch has hosted. Absent where there is no GitHub connection to
-   * ask (the test app), in which case the pipeline mounts no subscriber at all.
-   */
+  /** The platform default a tenant with no retention override is stamped with, read per write. */
+  defaultRetentionDays: () => number;
+  sessionContextMemo: CodingAgentSessionContextMemoRepository;
+  sessionFoldCache: CodingAgentSessionFoldCacheRepository;
+  /** Absent where there is no GitHub connection to ask: no mapping subscriber is mounted. */
   github?: CodingAgentPullRequestMapping;
 }
 
@@ -93,22 +85,16 @@ export class EventingCodingAgentProcessingAdapter {
       projects: deps.projects,
       clock: deps.clock,
     });
-    const sessionStore = new RedisCachedFoldStore<CodingAgentSessionState>(
+    const sessionStore = deps.sessionFoldCache.cached<CodingAgentSessionState>(
       EventingCodingAgentSessionStoreAdapter.create({
         persistence: deps.projections,
         defaultRetentionDays: deps.defaultRetentionDays,
         onSessionsStored: (tenantIds) => sessionSeen.record(tenantIds),
       }),
-      deps.redis,
-      {
-        keyPrefix: "coding_agent_sessions",
-        ttlSeconds: deps.foldCacheTtlSeconds,
-      },
     );
 
     const github = deps.github;
-    const contextMemo =
-      deps.sessionContextMemo ?? RedisSessionContextMemoRepository.create(deps.redis);
+    const contextMemo = deps.sessionContextMemo;
     const builder = definePipeline({
       name: "coding_agent_processing",
       aggregate: defineAggregate({
@@ -160,10 +146,8 @@ export class EventingCodingAgentProcessingAdapter {
         }),
       )
       // ADR-066 pillar 2: coalesce contributions preserving order; sharding would break
-      // order-dependent model-call derivations. Instances rather than classes: both contributions
-      // carry the session-context memo. The log lane fills it from a declaration and stamps
-      // row-bearing records; the span lane only reads it, to stamp the spans that carry a model
-      // call.
+      // order-dependent model-call derivations. The log lane fills the session-context
+      // memo from a declaration; the span lane only reads it.
       .withCommandInstance(
         "contributeSpanFacts",
         EventingContributeSpanFactsAdapter,
@@ -191,10 +175,18 @@ export class EventingCodingAgentProcessingAdapter {
   }
 }
 
-/**
- * The definition this feature registers, named so a composition root can hold
- * one without restating its shape.
- */
+/** The definition this module registers, named so its eventing declaration can hold one. */
 export type CodingAgentProcessingPipeline = ReturnType<
   EventingCodingAgentProcessingAdapter["build"]
 >;
+
+/**
+ * The registration: the app builds the definition once, and the senders are
+ * bound back to it once the runtime has built them. The api only sends.
+ */
+export const codingAgentEventing = defineEventingModule({
+  pipeline: "coding_agent_processing",
+  build: ({ app }: EventingSetup<CodingAgentRepositories, CodingAgentApp>) =>
+    app.eventingPipeline(),
+  connect: ({ app, commands }) => app.connectCommands(commands),
+});

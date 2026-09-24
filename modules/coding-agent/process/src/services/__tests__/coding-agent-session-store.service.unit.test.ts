@@ -107,7 +107,7 @@ function storeWith(
 ): EventingCodingAgentSessionStoreAdapter {
   return EventingCodingAgentSessionStoreAdapter.create({
     persistence,
-    defaultRetentionDays: 30,
+    defaultRetentionDays: () => 30,
     onSessionsStored: hooks.onSessionsStored,
   });
 }

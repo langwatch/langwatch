@@ -6,7 +6,7 @@ import {
   type CodingAgentTraceSessionRecord,
 } from "@langwatch/coding-agent-contract";
 
-import type { CodingAgentRepositories } from "../repositories/coding-agent.repositories.ts";
+import type { CodingAgentProjectionRepositories } from "../repositories/coding-agent.repositories.ts";
 
 /**
  * What the fold commits one session through: the projection lifecycle boundary
@@ -14,11 +14,13 @@ import type { CodingAgentRepositories } from "../repositories/coding-agent.repos
  * second domain service - ordinary callers use CodingAgentSessionService.
  */
 export class CodingAgentProjectionPersistenceService extends CodingAgentProjectionPersistence {
-  static create(repositories: CodingAgentRepositories): CodingAgentProjectionPersistenceService {
+  static create(
+    repositories: CodingAgentProjectionRepositories,
+  ): CodingAgentProjectionPersistenceService {
     return new CodingAgentProjectionPersistenceService(repositories);
   }
 
-  private constructor(private readonly repositories: CodingAgentRepositories) {
+  private constructor(private readonly repositories: CodingAgentProjectionRepositories) {
     super();
   }
 

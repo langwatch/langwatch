@@ -5,7 +5,7 @@ import {
   detectCodingAgent,
   type SessionWorkingContext,
 } from "@langwatch/coding-agent-contract";
-import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
 
 import type { CodingAgentCostEstimator } from "../app/coding-agent.members.ts";
 import {
@@ -83,13 +83,13 @@ export interface CodingAgentSessionSpanProjectionInput {
 export class CodingAgentSessionSpanProjection {
   private constructor(
     private readonly stateProjection: CodingAgentSessionStateProjection,
-    private readonly traceCanonicalisation: TraceCanonicalisationService,
+    private readonly traceCanonicalisation: Pick<TraceApi, "classifyClaudeCall">,
     private readonly modelProviders: CodingAgentCostEstimator,
   ) {}
 
   static create(deps: {
     stateProjection: CodingAgentSessionStateProjection;
-    traceCanonicalisation: TraceCanonicalisationService;
+    traceCanonicalisation: Pick<TraceApi, "classifyClaudeCall">;
     modelProviders: CodingAgentCostEstimator;
   }): CodingAgentSessionSpanProjection {
     return new CodingAgentSessionSpanProjection(
@@ -224,7 +224,7 @@ export class CodingAgentSessionSpanProjection {
 
   private claudeCallTokenFacts(
     attrs: Record<string, unknown>,
-    traceCanonicalisation: TraceCanonicalisationService,
+    traceCanonicalisation: Pick<TraceApi, "classifyClaudeCall">,
   ): Record<string, unknown> {
     const cacheWriteTokens = this.stateProjection.number(attrs.cache_creation_tokens);
     const writesLongLived =

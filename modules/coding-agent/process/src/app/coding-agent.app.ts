@@ -31,13 +31,18 @@ import {
   type CodingAgentTracePullRequestLink,
   type CodingAgentTranscript,
 } from "@langwatch/coding-agent-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import type { EventingCommands } from "@langwatch/eventing";
 import { GithubApi, GithubPullRequestNotMappedError } from "@langwatch/github-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { ProjectApi } from "@langwatch/project-contract";
-/** The coding-agent application shared by all transports. */
-import type { SpanDetail } from "@langwatch/trace-contract";
+import { type SpanDetail, TraceApi } from "@langwatch/trace-contract";
 
+import {
+  type CodingAgentProcessingPipeline,
+  EventingCodingAgentProcessingAdapter,
+} from "../eventing/coding-agent-processing.pipeline.ts";
 import type { CodingAgentRepositories } from "../repositories/coding-agent.repositories.ts";
 import {
   gatePullRequestSessionTitles,
@@ -46,10 +51,14 @@ import {
 } from "../rules/coding-agent-gates.rules.ts";
 import { CodingAgentCallerScopeService } from "../services/coding-agent-caller-scope.service.ts";
 import { SystemCodingAgentClockAdapter } from "../services/coding-agent-clock.service.ts";
+import { CodingAgentCommandDispatcherService } from "../services/coding-agent-command-dispatcher.service.ts";
+import { OtelCodingAgentCostMetricsAdapter } from "../services/coding-agent-cost-metrics.service.ts";
+import { CodingAgentProjectionPersistenceService } from "../services/coding-agent-projection-persistence.service.ts";
 import {
   type CodingAgentSessionService,
   CodingAgentFeatureService,
 } from "../services/coding-agent.service.ts";
+import { ModelCatalogCostEstimatorAdapter } from "../services/model-catalog-cost-estimator.service.ts";
 import type {
   CodingAgentBillingPolicy,
   CodingAgentCallerScopeDirectory,
@@ -140,7 +149,12 @@ export type CodingAgentInfrastructure = Readonly<{
   service?: CodingAgentSessionService;
 }>;
 
-type CodingAgentDependencies = { projects: typeof ProjectApi; github: typeof GithubApi };
+type CodingAgentDependencies = {
+  projects: typeof ProjectApi;
+  github: typeof GithubApi;
+  traces: typeof TraceApi;
+  retention: typeof DataRetentionApi;
+};
 type CodingAgentSetup = FeatureSetup<
   CodingAgentDependencies,
   CodingAgentInfrastructure,
@@ -153,6 +167,10 @@ export class CodingAgentApp implements CodingAgentApi {
   static readonly dependencies: CodingAgentDependencies = {
     projects: ProjectApi,
     github: GithubApi,
+    /** Claude-call classification the session fold prices cache writes by. */
+    traces: TraceApi,
+    /** Owns the platform default retention a session's rows are stamped with, read lazily. */
+    retention: DataRetentionApi,
   };
 
   static create({ members, dependencies, repositories }: CodingAgentSetup): CodingAgentApp {
@@ -182,11 +200,26 @@ export class CodingAgentApp implements CodingAgentApi {
       },
       resolveCallerProjectScope: (input) => scopeService.resolve(input),
     };
+    const commands = CodingAgentCommandDispatcherService.create();
+    const processing = EventingCodingAgentProcessingAdapter.create({
+      traceCanonicalisation: dependencies.traces,
+      modelProviders: ModelCatalogCostEstimatorAdapter.create(),
+      costMetrics: OtelCodingAgentCostMetricsAdapter.create(),
+      projections: CodingAgentProjectionPersistenceService.create(repositories),
+      projects: dependencies.projects,
+      clock: SystemCodingAgentClockAdapter.create(),
+      defaultRetentionDays: () => dependencies.retention.getPlatformDefaultRetentionDays(),
+      sessionContextMemo: repositories.sessionContextMemo,
+      sessionFoldCache: repositories.sessionFoldCache,
+      github: dependencies.github,
+    }).build();
     return new CodingAgentApp({
       codingAgents: service,
       github: dependencies.github,
       scope,
       members,
+      processing,
+      commands,
     });
   }
 
@@ -207,23 +240,41 @@ export class CodingAgentApp implements CodingAgentApi {
   readonly #scope: CodingAgentScopeMembers;
   readonly #visibility: CodingAgentViewerVisibilityReader;
   readonly #audit: CodingAgentAuditSink;
+  readonly #processing: CodingAgentProcessingPipeline;
+  readonly #commands: CodingAgentCommandDispatcherService;
 
   private constructor({
     codingAgents,
     github,
     scope,
     members,
+    processing,
+    commands,
   }: {
     codingAgents: CodingAgentSessionService;
     github: GithubApi;
     scope: CodingAgentScopeMembers;
     members: CodingAgentInfrastructure;
+    processing: CodingAgentProcessingPipeline;
+    commands: CodingAgentCommandDispatcherService;
   }) {
     this.#codingAgents = codingAgents;
     this.#github = github;
     this.#scope = scope;
     this.#visibility = members.visibility;
     this.#audit = members.audit;
+    this.#processing = processing;
+    this.#commands = commands;
+  }
+
+  /** The session pipeline this module registers, built once by {@link create}. */
+  eventingPipeline(): CodingAgentProcessingPipeline {
+    return this.#processing;
+  }
+
+  /** Binds the registered pipeline's own senders. */
+  connectCommands(commands: EventingCommands<CodingAgentProcessingPipeline>): void {
+    this.#commands.connect(commands);
   }
 
   /** Pure derivation, no session store read: which log fields an event name captures. */

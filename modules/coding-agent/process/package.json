@@ -36,6 +36,7 @@
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
+    "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/github-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
@@ -54,6 +55,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/metric-process": "workspace:*",
     "@langwatch/secrets": "workspace:*",

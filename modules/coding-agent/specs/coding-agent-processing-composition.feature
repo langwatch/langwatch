@@ -42,11 +42,18 @@ Feature: Composing durable coding-agent session processing
     When a folded session is stored
     Then the cache entry is written under the keyspace the App also reads
 
-  @unit
+  # Pending: returns once eventing hands its pipelines the process's fold cache
+  # TTL (worker-pipelines manifest, WP-4 rulings on foldCacheTtlSeconds).
   Scenario: Producer and consumer honour one fold cache TTL
     Given a fold cache TTL named in the environment
     When the worker composes durable coding-agent session processing
     Then cache entries are written with that TTL
+
+  @unit
+  Scenario: The fold cache falls back to the replication-lag floor
+    Given durable coding-agent session processing composed with no fold cache TTL
+    When a folded session is stored
+    Then the cache entry expires after the replication-lag floor
 
   @unit
   Scenario: A model call is priced from the platform catalog alone

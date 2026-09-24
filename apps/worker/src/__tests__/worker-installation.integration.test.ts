@@ -135,6 +135,7 @@ describe("the worker process installation", () => {
       for (const token of moduleApis) expect(runtime.service(token)).toBeDefined();
       const pipelines = eventing.definitions.map((definition) => definition.metadata.name);
       expect(pipelines).toContain("experiment_run_processing");
+      expect(pipelines).toContain("coding_agent_processing");
       // Every process that is not producing resolves trace commands from this registration.
       expect(pipelines).toContain("trace_processing");
       const schedules = eventing.definitions.flatMap((definition) =>

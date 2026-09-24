@@ -6,12 +6,18 @@ import { describe, expect, it, vi } from "vitest";
 import type {
   CodingAgentProjectActivity,
   CodingAgentPullRequestMapping,
-} from "../../../app/coding-agent.members.ts";
-import { CodingAgentSessionStateProjection } from "../../../eventing/coding-agent-session-state.projection.ts";
-import { type CodingAgentSessionState } from "../../../eventing/coding-agent-session.projection.ts";
-import { ModelCatalogCostEstimatorAdapter } from "../../../services/model-catalog-cost-estimator.service.ts";
-import { RedisCodingAgentProcessingRepository } from "../redis.coding-agent-processing.repository.ts";
-import type { CodingAgentProcessingPipeline } from "../redis.coding-agent-session-pipeline.repository.ts";
+} from "../../app/coding-agent.members.ts";
+import { LiveCodingAgentRepositories } from "../../repositories/live/live.coding-agent.repositories.ts";
+import { SystemCodingAgentClockAdapter } from "../../services/coding-agent-clock.service.ts";
+import { OtelCodingAgentCostMetricsAdapter } from "../../services/coding-agent-cost-metrics.service.ts";
+import { CodingAgentProjectionPersistenceService } from "../../services/coding-agent-projection-persistence.service.ts";
+import { ModelCatalogCostEstimatorAdapter } from "../../services/model-catalog-cost-estimator.service.ts";
+import {
+  type CodingAgentProcessingPipeline,
+  EventingCodingAgentProcessingAdapter,
+} from "../coding-agent-processing.pipeline.ts";
+import { CodingAgentSessionStateProjection } from "../coding-agent-session-state.projection.ts";
+import { type CodingAgentSessionState } from "../coding-agent-session.projection.ts";
 
 /**
  * The replication-lag floor `RedisCachedFoldStore` clamps every TTL up to.
@@ -83,7 +89,6 @@ function foldedSession(): CodingAgentSessionState {
 
 function compose(
   options: {
-    foldCacheTtlSeconds?: number;
     pullRequestMapping?: CodingAgentPullRequestMapping | undefined;
   } = {},
 ) {
@@ -99,18 +104,24 @@ function compose(
   const redis = { get: vi.fn(async () => null), set };
   const projectActivity = new RecordingProjectActivity();
 
-  const pipeline: CodingAgentProcessingPipeline = RedisCodingAgentProcessingRepository.create({
+  const repositories = LiveCodingAgentRepositories.create({
     clickhouse: clickhouse as never,
-    defaultRetentionDays: 49,
     redis: redis as never,
+  });
+  const github =
+    "pullRequestMapping" in options ? options.pullRequestMapping : new MappingEverything();
+  const pipeline: CodingAgentProcessingPipeline = EventingCodingAgentProcessingAdapter.create({
     traceCanonicalisation: new TestTraceCanonicalisation(),
-    projectActivity,
-    pullRequestMapping:
-      "pullRequestMapping" in options ? options.pullRequestMapping : new MappingEverything(),
-    ...(options.foldCacheTtlSeconds === undefined
-      ? {}
-      : { foldCacheTtlSeconds: options.foldCacheTtlSeconds }),
-  }).buildProcessing();
+    modelProviders: ModelCatalogCostEstimatorAdapter.create(),
+    costMetrics: OtelCodingAgentCostMetricsAdapter.create(),
+    projections: CodingAgentProjectionPersistenceService.create(repositories),
+    projects: projectActivity,
+    clock: SystemCodingAgentClockAdapter.create(),
+    defaultRetentionDays: () => 49,
+    sessionContextMemo: repositories.sessionContextMemo,
+    sessionFoldCache: repositories.sessionFoldCache,
+    ...(github ? { github } : {}),
+  }).build();
 
   return { pipeline, insert, redis, set, projectActivity };
 }
@@ -131,7 +142,7 @@ async function storeThrough(pipeline: CodingAgentProcessingPipeline): Promise<vo
   });
 }
 
-describe("RedisCodingAgentProcessingRepository", () => {
+describe("coding_agent_processing over the live repositories", () => {
   describe("given a process holding a tenant-keyed client, its own Redis and a project seam", () => {
     /** @scenario "Durable processing composes from one client, one Redis and one database" */
     it("builds the session pipeline from those alone", () => {
@@ -235,18 +246,9 @@ describe("RedisCodingAgentProcessingRepository", () => {
     });
   });
 
-  describe("given a fold cache TTL named by the process", () => {
-    /** @scenario "Producer and consumer honour one fold cache TTL" */
-    it("writes cache entries with that TTL", async () => {
-      const { pipeline, set } = compose({ foldCacheTtlSeconds: 900 });
-
-      await storeThrough(pipeline);
-
-      expect(set.mock.calls[0]!.slice(2)).toEqual(["EX", 900]);
-    });
-
-    /** @scenario "Producer and consumer honour one fold cache TTL" */
-    it("falls back to the replication-lag floor when the process names none", async () => {
+  describe("given no fold cache TTL named by the process", () => {
+    /** @scenario "The fold cache falls back to the replication-lag floor" */
+    it("falls back to the replication-lag floor", async () => {
       const { pipeline, set } = compose();
 
       await storeThrough(pipeline);

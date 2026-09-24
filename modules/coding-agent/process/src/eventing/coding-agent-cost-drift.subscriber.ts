@@ -6,7 +6,7 @@ import {
   type CodingAgentProcessingEvent,
 } from "@langwatch/coding-agent-contract";
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
-import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
 
 import type {
   CodingAgentCostEstimator,
@@ -28,7 +28,7 @@ function labels(agent: string, facts: Record<string, unknown>): { agent: string;
 export function createCodingAgentCostDriftSubscriber(input: {
   metrics: CodingAgentCostMetrics;
   modelProviders: CodingAgentCostEstimator;
-  traceCanonicalisation: TraceCanonicalisationService;
+  traceCanonicalisation: Pick<TraceApi, "classifyClaudeCall">;
 }): EventSubscriberDefinition<CodingAgentProcessingEvent> {
   const stateProjection = CodingAgentSessionStateProjection.create();
   const spanProjection = CodingAgentSessionSpanProjection.create({

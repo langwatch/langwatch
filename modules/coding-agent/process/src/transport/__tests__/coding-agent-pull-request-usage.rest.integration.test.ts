@@ -3,10 +3,13 @@
  * The project-scoped pull-request usage door: who it answers for, who it
  * refuses by name, and what it writes down about the read.
  */
+import { createApiFixture } from "@langwatch/api-fixture";
 import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
 import type { CodingAgentPullRequestUsage } from "@langwatch/coding-agent-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import { ScopedSecrets } from "@langwatch/secrets";
+import type { TraceApi } from "@langwatch/trace-contract";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
@@ -180,7 +183,12 @@ function mount({
   }
 
   const app = CodingAgentApp.create({
-    dependencies: { github: new GithubForRest(), projects: new ProjectForRest() },
+    dependencies: {
+      github: new GithubForRest(),
+      projects: new ProjectForRest(),
+      traces: createApiFixture<TraceApi>({}),
+      retention: createApiFixture<DataRetentionApi>({}),
+    },
     members: {
       billing: new TestBillingPolicy(),
       scopeDirectory: new ScopeDirectory(),

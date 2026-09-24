@@ -6,8 +6,8 @@ import {
   type ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
 import { TraceCanonicalisationService } from "@langwatch/trace-contract";
-import Redis from "ioredis";
-import { EventingCodingAgentProcessingAdapter } from "../../repositories/redis/redis.coding-agent-session-pipeline.repository.ts";
+import { EventingCodingAgentProcessingAdapter } from "../../eventing/coding-agent-processing.pipeline.ts";
+import { MemoryCodingAgentSessionFoldCacheRepository } from "../../repositories/memory/memory.coding-agent-session-fold-cache.repository.ts";
 import { MemorySessionContextMemoRepository } from "../../repositories/memory/memory.session-context-memo.repository.ts";
 import type { CodingAgentCostMetrics } from "../../app/coding-agent.members.ts";
 import { TestClock, TestProjectService } from "./coding-agent.fixture.ts";
@@ -74,7 +74,6 @@ class TestTraceCanonicalisationService extends TraceCanonicalisationService {
   }
 }
 
-const redis = new Redis({ lazyConnect: true });
 
 export class TestModelProviderService implements ModelProviderApi {
   countUsage(): Promise<{ providers: string[] }> {
@@ -259,10 +258,7 @@ export class TestModelProviderService implements ModelProviderApi {
 }
 
 /** Builds the real pipeline definition without opening its runtime adapters. */
-export function buildTestCodingAgentProcessingPipeline(
-  github?: GithubApi,
-  foldCacheTtlSeconds?: number,
-) {
+export function buildTestCodingAgentProcessingPipeline(github?: GithubApi) {
   return EventingCodingAgentProcessingAdapter.create({
     traceCanonicalisation: new TestTraceCanonicalisationService(),
     modelProviders: new TestModelProviderService(),
@@ -270,10 +266,9 @@ export function buildTestCodingAgentProcessingPipeline(
     projections: new NoopCodingAgentProjectionPersistence(),
     projects: new TestProjectService(),
     clock: new TestClock(),
-    redis,
-    defaultRetentionDays: 365,
-    sessionContextMemo: new MemorySessionContextMemoRepository(),
-    foldCacheTtlSeconds,
+    defaultRetentionDays: () => 365,
+    sessionContextMemo: MemorySessionContextMemoRepository.create(),
+    sessionFoldCache: MemoryCodingAgentSessionFoldCacheRepository.create(),
     github,
   }).build();
 }

@@ -33,7 +33,7 @@ export class EventingCodingAgentSessionStoreAdapter implements FoldProjectionSto
   private constructor(
     private readonly persistence: CodingAgentProjectionPersistence,
     private readonly hooks: {
-      defaultRetentionDays: number;
+      defaultRetentionDays: () => number;
       /**
        * Called after a commit with the distinct tenants whose sessions were
        * stored — the seam `createCodingAgentSessionSeenTouch` rides. Fire-and-forget:
@@ -45,7 +45,7 @@ export class EventingCodingAgentSessionStoreAdapter implements FoldProjectionSto
 
   static create(input: {
     persistence: CodingAgentProjectionPersistence;
-    defaultRetentionDays: number;
+    defaultRetentionDays: () => number;
     onSessionsStored?: (tenantIds: string[]) => Promise<void>;
   }): EventingCodingAgentSessionStoreAdapter {
     return new EventingCodingAgentSessionStoreAdapter(input.persistence, {
@@ -100,7 +100,7 @@ export class EventingCodingAgentSessionStoreAdapter implements FoldProjectionSto
         sessionId: String(context.aggregateId),
         version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
       }),
-      retentionDays: context.retentionPolicy?.traces ?? this.hooks.defaultRetentionDays,
+      retentionDays: context.retentionPolicy?.traces ?? this.hooks.defaultRetentionDays(),
       // The executor's redelivery-dedup watermark, persisted next to the row so
       // a retry with a cold cache still recognises a batch it committed.
       appliedEventIds: context.appliedEventIds ? [...context.appliedEventIds] : [],

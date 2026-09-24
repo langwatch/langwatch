@@ -29,7 +29,7 @@ describe("coding-agent map coalescing", () => {
       const projection = CodingAgentTraceSessionsMapProjection.create({
         store: EventingCodingAgentTraceSessionAppendAdapter.create({
           persistence,
-          defaultRetentionDays: 365,
+          defaultRetentionDays: () => 365,
         }),
       });
       expect(projection.options?.coalesceMaxBatch).toBe(CODING_AGENT_MAP_COALESCE_MAX_BATCH);
@@ -38,7 +38,7 @@ describe("coding-agent map coalescing", () => {
     it("backs the ceiling with a bulkAppend-capable store", () => {
       const store = EventingCodingAgentTraceSessionAppendAdapter.create({
         persistence,
-        defaultRetentionDays: 365,
+        defaultRetentionDays: () => 365,
       });
       expect(typeof store.bulkAppend).toBe("function");
     });
@@ -49,7 +49,7 @@ describe("coding-agent map coalescing", () => {
       const projection = SessionMetricSeriesMapProjection.create({
         store: EventingSessionMetricSeriesAppendAdapter.create({
           persistence,
-          defaultRetentionDays: 365,
+          defaultRetentionDays: () => 365,
         }),
       });
       expect(projection.options?.coalesceMaxBatch).toBe(CODING_AGENT_MAP_COALESCE_MAX_BATCH);
