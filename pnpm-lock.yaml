@@ -2163,6 +2163,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../../packages/ksuid
+      '@langwatch/mail':
+        specifier: workspace:*
+        version: link:../../../../packages/mail
       '@langwatch/notification-contract':
         specifier: workspace:*
         version: link:../../../../modules/notification/contract
@@ -2184,6 +2187,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../../packages/prisma-client
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/project/contract
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../../../modules/scenario/contract

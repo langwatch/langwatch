@@ -72,6 +72,9 @@
       "path": "../../../../packages/ksuid/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/mail/tsconfig.declarations.json"
+    },
+    {
       "path": "../../../../modules/notification/contract/tsconfig.build.json"
     },
     {
@@ -91,6 +94,9 @@
     },
     {
       "path": "../../../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/project/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/scenario/contract/tsconfig.build.json"
