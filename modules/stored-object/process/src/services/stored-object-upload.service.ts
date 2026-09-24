@@ -5,11 +5,13 @@
  */
 import { createHash } from "node:crypto";
 
+import { HandledError } from "@langwatch/handled-error";
 import {
   DirectUploadUnavailableError,
   StorageUnavailableError,
   StoredObjectBytesMissingError,
   StoredObjectIntegrityConflictError,
+  StoredObjectNotFoundError,
   UploadChecksumMismatchError,
   UploadExpiredError,
   UploadIncompleteError,
@@ -58,7 +60,8 @@ export class StoredObjectUploadService {
     } catch (error) {
       if (
         error instanceof DirectUploadUnavailableError ||
-        error instanceof StoredObjectBytesMissingError
+        error instanceof StoredObjectBytesMissingError ||
+        error instanceof StoredObjectNotFoundError
       ) {
         throw error;
       }
@@ -182,7 +185,7 @@ export class StoredObjectUploadService {
     const now = this.now();
     const expiresAt = now.add({ milliseconds: this.options.uploadExpiryMs });
     const upload = await StoredObjectUploadService.storageCall(() =>
-      this.options.storage.tryCreateUpload({
+      this.options.storage.createUpload({
         projectId: input.projectId,
         objectId: id,
         byteLength: input.byteLength,
@@ -191,9 +194,6 @@ export class StoredObjectUploadService {
         expiresAt,
       }),
     );
-    if (!upload) {
-      throw new DirectUploadUnavailableError();
-    }
 
     const record = pendingUploadRecord({ input, id, upload, expiresAt, now, existing });
     try {
@@ -253,14 +253,16 @@ export class StoredObjectUploadService {
     }
 
     const stat = await StoredObjectUploadService.storageCall(() =>
-      this.options.storage.tryStat({
+      this.options.storage.getStat({
         projectId: claims.projectId,
         address: claims.address,
       }),
-    );
-    if (!stat) {
-      throw new UploadIncompleteError(claims.operationId);
-    }
+    ).catch((error: unknown) => {
+      if (error instanceof HandledError && error.code === "stored_object_not_found") {
+        throw new UploadIncompleteError(claims.operationId);
+      }
+      throw error;
+    });
 
     if (stat.byteLength !== value.byteLength || stat.sha256 !== value.sha256) {
       throw new UploadChecksumMismatchError(claims.operationId);

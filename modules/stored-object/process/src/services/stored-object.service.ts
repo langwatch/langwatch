@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import {
   StoredObjectBytesMissingError,
@@ -106,11 +107,13 @@ export class StoredObjectService {
     const value = await this.getAvailable(input);
     const address = this.getStorage(value);
     const bytes = await StoredObjectUploadService.storageCall(() =>
-      this.options.storage.tryRead({ projectId: input.projectId, address }),
-    );
-    if (!bytes) {
-      throw new StoredObjectBytesMissingError(input.projectId, input.id);
-    }
+      this.options.storage.getBytes({ projectId: input.projectId, address }),
+    ).catch((error: unknown) => {
+      if (error instanceof HandledError && error.code === "stored_object_not_found") {
+        throw new StoredObjectBytesMissingError(input.projectId, input.id);
+      }
+      throw error;
+    });
 
     return { metadata: storedObjectMetadataOf(value), bytes };
   }

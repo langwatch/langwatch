@@ -40,7 +40,7 @@ export function langWatchQLServiceFromEnvironment(
   overrides: Partial<LangWatchQLServiceDependencies> = {},
 ): LangWatchQLService {
   return createLangWatchQLService({
-    connection: executorService.tryConnectionFromEnvironment(environment),
+    connection: executorService.parseConnectionFromEnvironment(environment),
     ...overrides,
   });
 }

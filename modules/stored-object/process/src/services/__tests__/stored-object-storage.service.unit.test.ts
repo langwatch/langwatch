@@ -113,7 +113,7 @@ describe("StoredObjectStorageService", () => {
       destinationId: "bucket",
       relativeId: "project-1/object-1",
     });
-    await expect(adapter.tryStat({ projectId: "project-1", address })).resolves.toEqual({
+    await expect(adapter.getStat({ projectId: "project-1", address })).resolves.toEqual({
       byteLength: 5,
       sha256: "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
     });
@@ -131,7 +131,7 @@ describe("StoredObjectStorageService", () => {
     });
 
     await expect(
-      adapter.tryRead({
+      adapter.getBytes({
         projectId: "project-1",
         address: { provider: "s3", destinationId: "bucket", relativeId: "project-2/object-1" },
       }),
@@ -157,7 +157,7 @@ describe("StoredObjectStorageService", () => {
     });
 
     await expect(
-      adapter.tryRead({
+      adapter.getBytes({
         projectId: "project-1",
         address: { provider: "s3", destinationId: "bucket", relativeId },
       }),
@@ -185,12 +185,12 @@ describe("StoredObjectStorageService", () => {
       },
     ];
     for (const address of addresses) {
-      await expect(adapter.tryRead({ projectId: "project-1", address })).rejects.toThrow(Error);
+      await expect(adapter.getBytes({ projectId: "project-1", address })).rejects.toThrow(Error);
     }
   });
 
   describe("when a read races a delete", () => {
-    it("turns the missing-object failure into null", async () => {
+    it("turns the missing-object failure into the not-found error", async () => {
       const failure = new ObjectNotFoundError("s3://bucket/project-1/object-1");
       const driver = new ThrowingReadDriver(failure);
       driver.values.set("s3://bucket/project-1/object-1", Buffer.from("present"));
@@ -203,11 +203,11 @@ describe("StoredObjectStorageService", () => {
         runtime,
         aws: AwsClientProcessRuntime.create({ outboundProxy: new NoProxy() }),
       });
-      const read = adapter.tryRead({
+      const read = adapter.getBytes({
         projectId: "project-1",
         address: { provider: "s3", destinationId: "bucket", relativeId: "project-1/object-1" },
       });
-      await expect(read).resolves.toBeNull();
+      await expect(read).rejects.toMatchObject({ code: "stored_object_not_found" });
     });
 
     it("propagates any other read failure", async () => {
@@ -223,7 +223,7 @@ describe("StoredObjectStorageService", () => {
         runtime,
         aws: AwsClientProcessRuntime.create({ outboundProxy: new NoProxy() }),
       });
-      const read = adapter.tryRead({
+      const read = adapter.getBytes({
         projectId: "project-1",
         address: { provider: "s3", destinationId: "bucket", relativeId: "project-1/object-1" },
       });

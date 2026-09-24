@@ -44,7 +44,7 @@ export class TraceFacetDescriptorService {
     return new TraceFacetDescriptorService(repository, topicNaming);
   }
 
-  async materializeDescriptor({
+  async buildDescriptor({
     def,
     params,
     batch,

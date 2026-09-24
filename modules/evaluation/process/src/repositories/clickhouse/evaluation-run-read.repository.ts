@@ -1,5 +1,6 @@
 import {
   evaluationRunDataSchema,
+  EvaluationNotFoundError,
   evaluationSummarySchema,
   traceEvaluationDataSchema,
   type EvaluationRunData,
@@ -92,8 +93,9 @@ export class EvaluationRunClickHouseReadRepository {
     },
   ) {}
 
-  async tryFindByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null> {
-    validateTenant(input.tenantId, "EvaluationRunClickHouseReadRepository.tryFindByEvaluationId");
+  async getByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData> {
+    validateTenant(input.tenantId, "EvaluationRunClickHouseReadRepository.getByEvaluationId");
+    let row: ClickHouseEvaluationRunRecord | undefined;
     try {
       const { scheduledAtFrom, scheduledAtTo } = await this.resolveScheduledAtRange(input);
       const bounds = (column: string): string =>
@@ -142,8 +144,7 @@ export class EvaluationRunClickHouseReadRepository {
         },
         format: "JSONEachRow",
       });
-      const row = (await result.json<ClickHouseEvaluationRunRecord>())[0];
-      return row ? this.fromClickHouseRecord(row) : null;
+      row = (await result.json<ClickHouseEvaluationRunRecord>())[0];
     } catch (error) {
       logger.warn(
         { tenantId: input.tenantId, evaluationId: input.evaluationId, error },
@@ -151,6 +152,8 @@ export class EvaluationRunClickHouseReadRepository {
       );
       throw error;
     }
+    if (!row) throw new EvaluationNotFoundError(input.evaluationId);
+    return this.fromClickHouseRecord(row);
   }
 
   async findByTraceId(input: { tenantId: string; traceId: string }): Promise<EvaluationRunData[]> {

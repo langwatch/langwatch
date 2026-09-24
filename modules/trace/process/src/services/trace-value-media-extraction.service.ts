@@ -190,16 +190,21 @@ interface StoredSite extends CandidateSite {
   replacement: unknown;
 }
 
-async function processSite(
+/** A site whose media went to storage, or one left inline because nothing in it was stored. */
+type SiteOutcome =
+  | Readonly<{ status: "stored"; site: StoredSite }>
+  | Readonly<{ status: "unchanged" }>;
+
+async function storeSite(
   site: CandidateSite,
   params: WalkParams,
   refs: ExtractedRef[],
-): Promise<StoredSite | null> {
+): Promise<SiteOutcome> {
   if (site.kind === "bareDataUri") {
     const uri = site.node as string;
     const parsed = parseBase64DataUri(uri);
     if (!parsed) {
-      return null;
+      return { status: "unchanged" };
     }
 
     // Route the payload through the part vocabulary so audio gets the same
@@ -222,7 +227,7 @@ async function processSite(
       ...params,
     });
     if (ref === null) {
-      return null;
+      return { status: "unchanged" };
     }
 
     refs.push(ref);
@@ -231,8 +236,8 @@ async function processSite(
     // reference URL (the render-side collector surfaces bare reference
     // strings symmetrically).
     return {
-      ...site,
-      replacement: `/api/files/${params.projectId}/${ref.id}`,
+      status: "stored",
+      site: { ...site, replacement: `/api/files/${params.projectId}/${ref.id}` },
     };
   }
 
@@ -245,10 +250,10 @@ async function processSite(
   }
 
   if (part === site.node) {
-    return null;
+    return { status: "unchanged" };
   }
 
-  return { ...site, replacement: part };
+  return { status: "stored", site: { ...site, replacement: part } };
 }
 
 async function storeCandidates({
@@ -279,21 +284,21 @@ async function storeCandidates({
 
     const wave = takeable.slice(i, i + CONCURRENT_STORES);
     const results = await Promise.all(
-      wave.map(async (site) => {
+      wave.map(async (site): Promise<SiteOutcome> => {
         try {
-          return await processSite(site, params, refs);
+          return await storeSite(site, params, refs);
         } catch {
           // Per-part fail-open: this part stays inline; parts already stored
           // keep their references, so nothing orphans.
           budget.failedParts += 1;
 
-          return null;
+          return { status: "unchanged" };
         }
       }),
     );
     for (const result of results) {
-      if (result !== null) {
-        stored.push(result);
+      if (result.status === "stored") {
+        stored.push(result.site);
       }
     }
   }

@@ -85,17 +85,16 @@ export class EvaluationService {
   }
 
   async getRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData> {
-    const query = evaluationRunLookupSchema.parse(input);
-    const result = await this.options.repository.tryFindByEvaluationId(query);
-    if (!result) {
-      throw new EvaluationNotFoundError(input.evaluationId);
-    }
-
-    return result;
+    return this.options.repository.getByEvaluationId(evaluationRunLookupSchema.parse(input));
   }
 
-  findRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null> {
-    return this.options.repository.tryFindByEvaluationId(evaluationRunLookupSchema.parse(input));
+  async findRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null> {
+    try {
+      return await this.getRunByEvaluationId(input);
+    } catch (error) {
+      if (error instanceof EvaluationNotFoundError) return null;
+      throw error;
+    }
   }
 
   findRunsByTraceId(input: { tenantId: string; traceId: string }): Promise<EvaluationRunData[]> {

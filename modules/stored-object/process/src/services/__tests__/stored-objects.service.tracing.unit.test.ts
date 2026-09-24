@@ -102,9 +102,9 @@ describe("StoredObjectsService tracing", () => {
   describe("when the file surface reads an object back", () => {
     /** @scenario "OpenTelemetry spans wrap extraction during ingest and reads via /api/files/:id" */
     it("opens a span named for the read", async () => {
-      await makeService().tryGetById({ projectId: PROJECT_ID, id: "obj-1" });
+      await makeService().getById({ projectId: PROJECT_ID, id: "obj-1" });
 
-      expect(spanNames).toContain("StoredObjectsService.tryGetById");
+      expect(spanNames).toContain("StoredObjectsService.getById");
     });
   });
 });

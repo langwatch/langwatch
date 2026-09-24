@@ -56,9 +56,8 @@ export type StoredObjectFileStreamRead =
  */
 export interface StoredObjectFileReader {
   headById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectHead>;
-  tryGetById(
-    input: Readonly<{ projectId: string; id: string }>,
-  ): Promise<StoredObjectFileStreamRead | null>;
+  /** Throws `StoredObjectNotFoundError` when the project holds no such row. */
+  getById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectFileStreamRead>;
 }
 
 export type StoredObjectInfrastructure = Readonly<{
@@ -181,8 +180,8 @@ export class StoredObjectApp implements StoredObjectApi {
   /** One object's row and, when the bytes are there, a stream of them. */
   readById(
     input: Readonly<{ projectId: string; id: string }>,
-  ): Promise<StoredObjectFileStreamRead | null> {
-    return this.#files.tryGetById(input);
+  ): Promise<StoredObjectFileStreamRead> {
+    return this.#files.getById(input);
   }
 
   /**
@@ -190,8 +189,8 @@ export class StoredObjectApp implements StoredObjectApi {
    * outage on one instance raises rather than answering "no owner": a degraded
    * instance must not read as a deleted object.
    */
-  resolveOwner(input: { id: string }): Promise<{ projectId: string } | null> {
-    return this.#owners.tryResolve(input);
+  resolveOwner(input: { id: string }): Promise<{ projectId: string }> {
+    return this.#owners.getOwner(input);
   }
 
   storeFromBytes(

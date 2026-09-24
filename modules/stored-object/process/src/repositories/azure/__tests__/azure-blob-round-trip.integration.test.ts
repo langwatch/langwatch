@@ -174,7 +174,7 @@ describe("given a deployment whose object storage is Azure Blob and nothing else
           .digest("hex")}`,
       );
 
-      const read = await service.tryGetById({ projectId: PROJECT_ID, id: stored.id });
+      const read = await service.getById({ projectId: PROJECT_ID, id: stored.id });
       expect(read && "stream" in read).toBe(true);
       await expect(drain((read as { stream: Readable }).stream)).resolves.toBe(bytes.toString());
     });

@@ -96,7 +96,7 @@ export function toFiniteNumber(value: unknown): number | null {
  * present but unrepresentable, so OTLP partial-success reports it rather
  * than storing NaN/±Infinity as a silently-accepted NULL.
  */
-export function checkedOptionalDouble({
+export function parseOptionalDouble({
   value,
   label,
 }: {
@@ -110,7 +110,7 @@ export function checkedOptionalDouble({
 }
 
 export function checkedDouble({ value, label }: { value: unknown; label: string }): number {
-  const parsed = checkedOptionalDouble({ value, label });
+  const parsed = parseOptionalDouble({ value, label });
   if (parsed === null) throw new Error(`${label} must be a finite number`);
   return parsed;
 }

@@ -1,4 +1,5 @@
 import {
+  EvaluationNotFoundError,
   evaluationRunDataSchema,
   evaluationRunLookupSchema,
   upsertEvaluationRunCommandSchema,
@@ -43,7 +44,12 @@ export class EvaluationRunProjectionService extends EvaluationRunProjectionRepos
     );
   }
 
-  findRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null> {
-    return this.repository.tryFindByEvaluationId(evaluationRunLookupSchema.parse(input));
+  async findRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null> {
+    try {
+      return await this.repository.getByEvaluationId(evaluationRunLookupSchema.parse(input));
+    } catch (error) {
+      if (error instanceof EvaluationNotFoundError) return null;
+      throw error;
+    }
   }
 }

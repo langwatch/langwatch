@@ -76,16 +76,6 @@ export class CanonicalAttributeStore {
     return this.take(key);
   }
 
-  takeAny(keys: readonly string[]): { key: string; value: unknown } | null {
-    for (const k of keys) {
-      const v = this.take(k);
-      if (v !== void 0) {
-        return { key: k, value: v };
-      }
-    }
-    return null;
-  }
-
   takeByPrefix(prefix: string): { key: string; value: unknown }[] {
     const results: { key: string; value: unknown }[] = [];
     for (const [key, value] of this.map) {
@@ -131,19 +121,6 @@ export class CanonicalEventStore {
   /** Read without consuming */
   all(): readonly CanonicalEvent[] {
     return this.events;
-  }
-
-  /** Take first event with this name (and mark it consumed) */
-  takeFirst(name: string): CanonicalEvent | null {
-    for (let i = 0; i < this.events.length; i++) {
-      if (this.consumed.has(i)) continue;
-      const event = this.events[i];
-      if (event?.name === name) {
-        this.consumed.add(i);
-        return event;
-      }
-    }
-    return null;
   }
 
   /** Take all events with this name (and mark consumed) */

@@ -411,7 +411,7 @@ export async function runLwqlProvisioningTask({
 
   const connection = selfProvision.requested
     ? selfProvision.connection
-    : lwqlExecutors.tryConnectionFromEnvironment(source);
+    : lwqlExecutors.parseConnectionFromEnvironment(source);
   if (!connection) {
     logger.info("LWQL not configured, skipping");
     return;

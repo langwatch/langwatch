@@ -28,7 +28,7 @@ import {
 } from "../app/evaluation.members.ts";
 import {
   maxCausalityDepthOfSpans,
-  tryExtractParentTraceForNlpgo,
+  extractParentTraceForNlpgo,
 } from "../rules/evaluation-causality.rules.ts";
 import { executionResultOf } from "../rules/evaluation-execution-result.rules.ts";
 import { hasThreadMappings } from "../rules/evaluation-thread-mapping-service.rules.ts";
@@ -328,7 +328,7 @@ export class EvaluationExecutionService {
         data,
         traceId: trace?.trace_id,
         parentCausalityDepth,
-        parentTrace: tryExtractParentTraceForNlpgo(trace),
+        parentTrace: extractParentTraceForNlpgo(trace),
       });
     }
 
@@ -408,7 +408,7 @@ export class EvaluationExecutionService {
     // trace's root span so Studio's waterfall renders them as a child
     // sub-tree (not a separate orphan trace, which is the 2026-05-14
     // bug rchaves caught in prod).
-    const parentTrace = tryExtractParentTraceForNlpgo(trace);
+    const parentTrace = extractParentTraceForNlpgo(trace);
 
     const response = await this.deps.workflowExecutor.runEvaluationWorkflow(
       resolvedWorkflowId,

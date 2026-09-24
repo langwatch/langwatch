@@ -3,8 +3,10 @@ import { createHash } from "node:crypto";
 import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
 import { generate } from "@langwatch/ksuid";
 import {
+  DirectUploadUnavailableError,
   mintStoredObjectUri,
   ObjectNotFoundError,
+  StoredObjectNotFoundError,
   type StoredObjectStorageDestination,
   type StoredObjectByteStream,
 } from "@langwatch/stored-object-contract";
@@ -44,24 +46,15 @@ export class StoredObjectStorageService extends StoredObjectStorage {
     return address;
   }
 
-  async tryCreateUpload(): Promise<null> {
-    return null;
+  async createUpload(): Promise<never> {
+    throw new DirectUploadUnavailableError();
   }
 
-  async tryStat(input: {
+  async getStat(input: {
     projectId: string;
     address: StoredObjectStorageAddress;
-  }): Promise<{ byteLength: number; sha256: string } | null> {
-    assertProjectAddress(input.projectId, input.address);
-    const project = this.runtime.forProject(input.projectId, this.aws);
-    if (!(await project.objectStore.exists(uriFor(input.address)))) return null;
-    let stream;
-    try {
-      stream = await project.objectStore.get(uriFor(input.address));
-    } catch (error) {
-      if (error instanceof ObjectNotFoundError) return null;
-      throw error;
-    }
+  }): Promise<{ byteLength: number; sha256: string }> {
+    const stream = await this.getBytes(input);
     const hash = createHash("sha256");
     let byteLength = 0;
     for await (const chunk of stream) {
@@ -72,17 +65,19 @@ export class StoredObjectStorageService extends StoredObjectStorage {
     return { byteLength, sha256: hash.digest("hex") };
   }
 
-  async tryRead(input: {
+  async getBytes(input: {
     projectId: string;
     address: StoredObjectStorageAddress;
-  }): Promise<StoredObjectByteStream | null> {
+  }): Promise<StoredObjectByteStream> {
     assertProjectAddress(input.projectId, input.address);
     const project = this.runtime.forProject(input.projectId, this.aws);
-    if (!(await project.objectStore.exists(uriFor(input.address)))) return null;
+    if (!(await project.objectStore.exists(uriFor(input.address)))) {
+      throw new StoredObjectNotFoundError();
+    }
     try {
       return await project.objectStore.get(uriFor(input.address));
     } catch (error) {
-      if (error instanceof ObjectNotFoundError) return null;
+      if (error instanceof ObjectNotFoundError) throw new StoredObjectNotFoundError();
       throw error;
     }
   }

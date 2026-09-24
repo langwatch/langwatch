@@ -47,7 +47,8 @@ class FakeRepository extends EvaluationRunRepository {
     this.value = input.data;
   }
   async upsertBatch(): Promise<void> {}
-  async tryFindByEvaluationId(): Promise<EvaluationRunData | null> {
+  async getByEvaluationId(input: { evaluationId: string }): Promise<EvaluationRunData> {
+    if (!this.value) throw new EvaluationNotFoundError(input.evaluationId);
     return this.value;
   }
   async findByTraceId(): Promise<EvaluationRunData[]> {

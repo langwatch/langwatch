@@ -3,12 +3,13 @@
  * a token codec that remembers what it minted, a fixed delivery capability,
  * and the row-and-stream reads the byte surface performs.
  */
-import type {
-  StoredObjectDeliveryCapability,
-  StoredObjectDirectUploadTarget,
-  StoredObjectHead,
-  StoredObjectOwnerResolver,
-  StoredObjectStorageDestination,
+import {
+  StoredObjectNotFoundError,
+  type StoredObjectDeliveryCapability,
+  type StoredObjectDirectUploadTarget,
+  type StoredObjectHead,
+  type StoredObjectOwnerResolver,
+  type StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
 
 import { MemoryStoredObjectRepositories } from "../../repositories/memory/memory.stored-object.repositories.ts";
@@ -44,7 +45,7 @@ export class MemoryStoredObjectStorage extends StoredObjectStorage {
     return storedObjectTestAddress;
   }
 
-  async tryCreateUpload(): Promise<{
+  async createUpload(): Promise<{
     address: StoredObjectStorageAddress;
     target: StoredObjectDirectUploadTarget;
   }> {
@@ -59,11 +60,11 @@ export class MemoryStoredObjectStorage extends StoredObjectStorage {
     };
   }
 
-  async tryStat() {
+  async getStat() {
     return { byteLength: 3, sha256: STORED_OBJECT_TEST_SHA256 };
   }
 
-  async tryRead() {
+  async getBytes() {
     const bytes = this.bytes;
 
     return (async function* () {
@@ -127,7 +128,8 @@ export class MemoryStoredObjectFiles implements StoredObjectFileReader {
     return this.head;
   }
 
-  async tryGetById(): Promise<StoredObjectFileStreamRead | null> {
+  async getById(): Promise<StoredObjectFileStreamRead> {
+    if (!this.read) throw new StoredObjectNotFoundError();
     return this.read;
   }
 }
@@ -136,7 +138,10 @@ export function createStoredObjectTestOwners(
   projectId: string | null = null,
 ): StoredObjectOwnerResolver {
   return {
-    tryResolve: async () => (projectId ? { projectId } : null),
+    getOwner: async () => {
+      if (!projectId) throw new StoredObjectNotFoundError();
+      return { projectId };
+    },
   } as StoredObjectOwnerResolver;
 }
 

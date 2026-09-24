@@ -36,7 +36,12 @@ export class MemoryAnnotationScoreRepository implements AnnotationScoreRepositor
   }
 
   async upsertScore(input: UpsertAnnotationScoreInput): Promise<AnnotationScore> {
-    const previous = this.#database.score(input.projectId, input.id);
+    let previous: AnnotationScore | undefined;
+    try {
+      previous = this.#database.getScore(input.projectId, input.id);
+    } catch (error) {
+      if (!(error instanceof AnnotationScoreNotFoundError)) throw error;
+    }
 
     const score = annotationScoreSchema.parse({
       id: input.id,
@@ -76,9 +81,9 @@ export class MemoryAnnotationScoreRepository implements AnnotationScoreRepositor
   }
 
   async findScore(input: AnnotationScoreByIdInput): Promise<AnnotationScore> {
-    const score = this.#database.score(input.projectId, input.id);
+    const score = this.#database.getScore(input.projectId, input.id);
 
-    if (!score || score.projectId !== input.projectId || score.deletedAt !== null) {
+    if (score.projectId !== input.projectId || score.deletedAt !== null) {
       throw new AnnotationScoreNotFoundError(input.id);
     }
 
@@ -117,10 +122,8 @@ export class MemoryAnnotationScoreRepository implements AnnotationScoreRepositor
     projectId: string;
     scoreTypeIds: string[];
   }): Promise<number> {
-    return input.scoreTypeIds.filter((id) => {
-      const score = this.#database.score(input.projectId, id);
-
-      return score?.projectId === input.projectId;
-    }).length;
+    return this.#database
+      .findScores(input.projectId, input.scoreTypeIds)
+      .filter((score) => score.projectId === input.projectId).length;
   }
 }

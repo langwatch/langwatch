@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   checkedDouble,
   checkedInteger,
-  checkedOptionalDouble,
+  parseOptionalDouble,
   toFiniteNumber,
   finiteNumbers,
   MAX_INT32,
@@ -108,7 +108,7 @@ describe("toFiniteNumber", () => {
 
 describe("checkedDouble", () => {
   it("throws where the optional form would answer null", () => {
-    expect(checkedOptionalDouble({ value: undefined, label: "sum" })).toBeNull();
+    expect(parseOptionalDouble({ value: undefined, label: "sum" })).toBeNull();
     expect(() => checkedDouble({ value: undefined, label: "sum" })).toThrow(/sum/);
   });
 });

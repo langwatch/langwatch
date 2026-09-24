@@ -21,10 +21,10 @@ export type TraceLegacyRequestCredentials = Readonly<{
  * Preserves the credential precedence this deployment publishes across every
  * REST family: valid Basic, then non-empty Bearer, then `X-Auth-Token`.
  */
-export function readTraceLegacyRequestCredentials(
+export function extractTraceLegacyRequestCredentials(
   request: Request,
 ): TraceLegacyRequestCredentials | null {
-  return readTraceIngestCredentials({
+  return extractTraceIngestCredentials({
     authorization: request.headers.get("authorization"),
     xAuthToken: request.headers.get("x-auth-token"),
     xProjectId: request.headers.get("x-project-id"),
@@ -32,7 +32,7 @@ export function readTraceLegacyRequestCredentials(
 }
 
 /** The portable credential facts both the OTLP route and collector resolve. */
-export function readTraceIngestCredentials(
+export function extractTraceIngestCredentials(
   input: OtlpIngestCredentialInput,
 ): TraceLegacyRequestCredentials | null {
   const { authorization, xAuthToken, xProjectId } = input;
@@ -100,7 +100,7 @@ export class TraceLegacyCredentialService {
     request: Request;
     permission: "traces:view" | "traces:share";
   }): Promise<TraceLegacyCredential> {
-    const credentials = readTraceLegacyRequestCredentials(input.request);
+    const credentials = extractTraceLegacyRequestCredentials(input.request);
     if (!credentials) throw new ProjectMissingCredentialsError();
 
     const resolved = await this.#apiKeys.findResolvedToken(credentials);

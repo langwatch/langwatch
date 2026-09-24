@@ -111,7 +111,8 @@ export abstract class StoredObjectStorage {
     mediaType: string;
   }): Promise<StoredObjectStorageAddress>;
 
-  abstract tryCreateUpload(input: {
+  /** Throws `DirectUploadUnavailableError` where the backend has no direct upload. */
+  abstract createUpload(input: {
     projectId: StoredObjectProjectId;
     objectId: StoredObjectId;
     byteLength: number;
@@ -121,17 +122,19 @@ export abstract class StoredObjectStorage {
   }): Promise<{
     address: StoredObjectStorageAddress;
     target: StoredObjectDirectUploadTarget;
-  } | null>;
+  }>;
 
-  abstract tryStat(input: {
+  /** Throws `StoredObjectNotFoundError` when no bytes are at the address. */
+  abstract getStat(input: {
     projectId: StoredObjectProjectId;
     address: StoredObjectStorageAddress;
-  }): Promise<{ byteLength: number; sha256: string } | null>;
+  }): Promise<{ byteLength: number; sha256: string }>;
 
-  abstract tryRead(input: {
+  /** Throws `StoredObjectNotFoundError` when no bytes are at the address. */
+  abstract getBytes(input: {
     projectId: StoredObjectProjectId;
     address: StoredObjectStorageAddress;
-  }): Promise<StoredObjectByteStream | null>;
+  }): Promise<StoredObjectByteStream>;
 
   abstract delete(input: {
     projectId: StoredObjectProjectId;

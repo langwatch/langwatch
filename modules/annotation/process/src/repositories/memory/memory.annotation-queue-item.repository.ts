@@ -290,11 +290,9 @@ export class MemoryAnnotationQueueItemRepository implements AnnotationQueueItemR
         members: queue.userIds
           .filter((userId) => organizationMemberIds.includes(userId))
           .map((id) => ({ user: { id, name: null, image: null } })),
-        AnnotationQueueScores: queue.scoreTypeIds.flatMap((id) => {
-          const name = this.#database.scoreName(queue.projectId, id);
-
-          return name === undefined ? [] : [{ annotationScore: { id, name } }];
-        }),
+        AnnotationQueueScores: this.#database
+          .findScores(queue.projectId, queue.scoreTypeIds)
+          .map(({ id, name }) => ({ annotationScore: { id, name } })),
       },
     });
   }
@@ -311,11 +309,9 @@ export class MemoryAnnotationQueueItemRepository implements AnnotationQueueItemR
         members: queue.userIds
           .filter((id) => organizationMemberIds.includes(id))
           .map((id) => ({ user: { id, name: null, image: null } })),
-        AnnotationQueueScores: queue.scoreTypeIds.flatMap((id) => {
-          const name = this.#database.scoreName(queue.projectId, id);
-
-          return name === undefined ? [] : [{ annotationScore: { id, name } }];
-        }),
+        AnnotationQueueScores: this.#database
+          .findScores(queue.projectId, queue.scoreTypeIds)
+          .map(({ id, name }) => ({ annotationScore: { id, name } })),
         AnnotationQueueItems: this.#database
           .items()
           .filter((item) => item.annotationQueueId === queue.id)

@@ -2,7 +2,7 @@ import type { MetricKind } from "@langwatch/metric-contract";
 
 import {
   checkedInteger,
-  checkedOptionalDouble,
+  parseOptionalDouble,
   toFiniteNumber,
   MAX_INT32,
   MAX_INT64,
@@ -25,7 +25,7 @@ function validateOptionalDoubles({
   labels: Record<string, string>;
 }): void {
   for (const [field, label] of Object.entries(labels)) {
-    checkedOptionalDouble({ value: point[field], label });
+    parseOptionalDouble({ value: point[field], label });
   }
 }
 
@@ -167,7 +167,7 @@ function validateNumberPoint(point: UnknownRecord): void {
   }
   // NaN and ±Infinity normalize to NULL, which would report an accepted point
   // whose stored value is absent. Reject instead so the sender learns.
-  checkedOptionalDouble({ value: point.asDouble, label: "asDouble" });
+  parseOptionalDouble({ value: point.asDouble, label: "asDouble" });
 }
 
 function validateSummary(point: UnknownRecord): void {

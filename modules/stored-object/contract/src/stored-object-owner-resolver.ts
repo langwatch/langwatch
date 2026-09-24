@@ -3,7 +3,8 @@
  * It is deliberately separate from ordinary project-scoped Stored Object I/O.
  */
 export abstract class StoredObjectOwnerResolver {
-  abstract tryResolve(input: { id: string }): Promise<{ projectId: string } | null>;
+  /** Throws `StoredObjectNotFoundError` when no healthy instance holds the id. */
+  abstract getOwner(input: { id: string }): Promise<{ projectId: string }>;
 }
 
 /** The cross-tenant resolver could not rule out an owner during a partial outage. */

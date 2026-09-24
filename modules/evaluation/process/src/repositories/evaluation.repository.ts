@@ -19,7 +19,8 @@ export abstract class EvaluationRunRepository {
   abstract upsertBatch(
     input: { data: EvaluationRunData; tenantId: string; retentionDays?: number }[],
   ): Promise<void>;
-  abstract tryFindByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null>;
+  /** Throws `EvaluationNotFoundError` when the tenant holds no such run. */
+  abstract getByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData>;
   abstract findByTraceId(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[]>;
   abstract findSummariesByTraceIds(
     input: EvaluationSummariesByTraceIdsQuery,
