@@ -12512,6 +12512,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@langwatch/api-fixture':
+        specifier: workspace:*
+        version: link:../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
