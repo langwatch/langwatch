@@ -88,15 +88,15 @@ describe("given no classifier", () => {
         kind: "free_text",
         query: '"annoyed users"',
         decidedBy: "fallback",
-        isModelUnavailable: true,
         fellBackFrom: "routing",
+        modelTrouble: "no_model",
       });
     });
   });
 
   describe("when the model fails", () => {
     /** @scenario "A model failure is a phrase search, not an error" */
-    it("searches the phrase without flagging a missing model", async () => {
+    it("searches the phrase and names the model as the failure", async () => {
       const d = deps({
         routeWithModel: vi.fn(async () => {
           throw new Error("502 from the provider");
@@ -109,8 +109,8 @@ describe("given no classifier", () => {
         kind: "free_text",
         query: '"annoyed users"',
         decidedBy: "fallback",
-        isModelUnavailable: false,
         fellBackFrom: "routing",
+        modelTrouble: "model_failed",
       });
     });
   });

@@ -1,3 +1,4 @@
+import type { ScimSsoMigrationSubscriberService } from "@langwatch/enterprise-scim-contract";
 import type { EventSourcing } from "@langwatch/eventing";
 import { SSO_CONNECTION_PIPELINE_NAME } from "@langwatch/identity-contract";
 
@@ -77,6 +78,8 @@ export type PostgresSsoConnectionPipelineOptions = {
    * widens, "who may attest a customer's domain" must not widen with it silently.
    */
   operators: PlatformOperator;
+  /** How directory sync follows a finished migration onto the replacement connection. */
+  directorySync: ScimSsoMigrationSubscriberService;
   /** How a torn-down connection's directory tokens are retired, if at all. */
   directory?: SsoConnectionDirectoryRevocation;
   /**
@@ -136,6 +139,7 @@ export class PostgresSsoConnectionPipelineAdapter {
         directory: this.options.directory ?? UnrevokedSsoConnectionDirectory.create(),
       }),
       proofNotifications: this.proofNotifications(),
+      directorySync: this.options.directorySync,
     });
   }
 

@@ -25,6 +25,7 @@ function datasetOn({ projectId, at }: { projectId: string; at: number }): Datase
     status: "ready",
     statusError: null,
     stagingKey: null,
+    sourceStoredObjectId: null,
     uploadFilename: null,
     rowCount: null,
     sizeBytes: null,

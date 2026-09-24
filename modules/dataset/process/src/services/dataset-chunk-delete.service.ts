@@ -6,7 +6,7 @@
 
 import { createLogger } from "@langwatch/observability";
 
-import { type DatasetStorage } from "../app/dataset.app.ts";
+import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
 import {
   type DatasetMutationRecord,
@@ -21,7 +21,7 @@ const logger = createLogger("langwatch:datasets:mutations");
 
 /** The off-lock locate scan the owning service runs; a hint, never authoritative. */
 type LocateIds = (input: {
-  storage: DatasetStorage;
+  storage: DatasetChunkRepository;
   projectId: string;
   datasetId: string;
   ids: Set<string>;
@@ -58,7 +58,7 @@ export class DatasetChunkDeleteService {
     dataset: DatasetMutationRecord;
     projectId: string;
     recordIds: string[];
-    storage: DatasetStorage;
+    storage: DatasetChunkRepository;
   }): Promise<{ deleted: number }> {
     const datasetStorage = storage;
     const removeSet = new Set(recordIds);
@@ -141,7 +141,7 @@ export class DatasetChunkDeleteService {
     tx: DatasetContentRepository;
     dataset: DatasetMutationRecord;
     projectId: string;
-    storage: DatasetStorage;
+    storage: DatasetChunkRepository;
     removeSet: Set<string>;
     isTarget: (line: unknown) => boolean;
     hint: { affectedIndices: number[]; locatedIds: Set<string> };
@@ -215,7 +215,7 @@ export class DatasetChunkDeleteService {
   }: {
     dataset: DatasetMutationRecord;
     projectId: string;
-    storage: DatasetStorage;
+    storage: DatasetChunkRepository;
     removeSet: Set<string>;
     isTarget: (line: unknown) => boolean;
     hint: { affectedIndices: number[]; locatedIds: Set<string> };
@@ -286,7 +286,7 @@ export class DatasetChunkDeleteService {
     tx: DatasetContentRepository;
     dataset: DatasetMutationRecord;
     projectId: string;
-    storage: DatasetStorage;
+    storage: DatasetChunkRepository;
     removeSet: Set<string>;
     chunkCount: number;
   }): Promise<{ deleted: number }> {

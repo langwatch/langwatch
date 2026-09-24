@@ -18,15 +18,20 @@ describe("the files REST family", () => {
     });
 
     it("answers behind the browser's own door, which publishes no operation", () => {
-      expect(declaration.credential).toBe("session");
+      expect(declaration.credential).toBe("browser");
     });
 
     it("keeps every path, operation id and method", () => {
       expect(
         declaration.routes.map((route) => [route.path, route.operation, route.methods]),
       ).toEqual([
-        ["/api/files/:projectId/:id", "readProjectStoredObjectBytes", ["get", "head"]],
-        ["/api/files/:id", "readStoredObjectBytes", ["get", "head"]],
+        [
+          "/api/files/:projectId/:storedObjectId/:filename",
+          "readNamedProjectStoredObjectBytes",
+          ["get", "head"],
+        ],
+        ["/api/files/:projectId/:storedObjectId", "readProjectStoredObjectBytes", ["get", "head"]],
+        ["/api/files/:storedObjectId", "readStoredObjectBytes", ["get", "head"]],
       ]);
     });
 

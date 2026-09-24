@@ -131,3 +131,12 @@ describe("given a connection the organization has taken away", () => {
     expect(unknown.revokeTokensForConnection).toHaveBeenCalledOnce();
   });
 });
+
+describe("given a connection torn down by a finished move to a replacement", () => {
+  it("refuses the credential but keeps its tokens, which move to the replacement", async () => {
+    const finished = retirement([connection("TORN_DOWN"), replacementAt("FINALIZED")]);
+
+    await expect(finished.admits()).resolves.toBe(false);
+    expect(finished.revokeTokensForConnection).not.toHaveBeenCalled();
+  });
+});

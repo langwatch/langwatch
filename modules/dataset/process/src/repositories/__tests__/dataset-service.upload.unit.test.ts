@@ -1,7 +1,10 @@
-import { datasetSchema, type Dataset } from "@langwatch/dataset-contract";
+import { datasetSchema, type Dataset, type DatasetRecord } from "@langwatch/dataset-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
+import {
+  createDatasetTestAttachments,
+  createDatasetTestRequestBounds,
+} from "../../app/__tests__/dataset.fixture.ts";
 import type { DatasetUpload } from "../../app/dataset.app.ts";
 import { DatasetService } from "../../services/dataset.service.ts";
 import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
@@ -45,6 +48,10 @@ class Records implements DatasetRecordRepository {
   async count(): Promise<number> {
     return 0;
   }
+  async findByIds(): Promise<DatasetRecord[]> {
+    return [];
+  }
+
   async findPage() {
     return [];
   }
@@ -72,19 +79,14 @@ describe("DatasetService upload boundary", () => {
         updatedAt: new Date(),
         recordsCreated: 2,
       }));
-      createPendingUpload = vi.fn(async () => ({
+      createDatasetFromStoredObject = vi.fn(async () => ({
         datasetId: "d1",
         slug: "d",
-        uploadUrl: "https://example/upload",
-      }));
-      writeStagedUpload = vi.fn(async () => undefined);
-      abortPendingUpload = vi.fn(async () => ({
-        datasetId: "d1",
-        aborted: true as const,
-      }));
-      finalizeUpload = vi.fn(async () => ({
-        datasetId: "d1",
         status: "processing" as const,
+      }));
+      appendStoredObjectToDataset = vi.fn(async () => ({
+        datasetId: "d1",
+        recordsCreated: 2,
       }));
       retryNormalize = vi.fn(async () => ({
         datasetId: "d1",
@@ -96,10 +98,15 @@ describe("DatasetService upload boundary", () => {
       records: new Records(),
       uploads,
       requestBounds: createDatasetTestRequestBounds(),
+      attachments: createDatasetTestAttachments(),
     });
     await expect(
-      service.createPendingUpload({ projectId: "p1", name: "D", filename: "d.csv" }),
-    ).resolves.toMatchObject({ datasetId: "d1" });
-    expect(uploads.createPendingUpload).toHaveBeenCalledOnce();
+      service.appendStoredObjectToDataset({
+        projectId: "p1",
+        slugOrId: "d1",
+        storedObjectId: "so1",
+      }),
+    ).resolves.toMatchObject({ datasetId: "d1", recordsCreated: 2 });
+    expect(uploads.appendStoredObjectToDataset).toHaveBeenCalledOnce();
   });
 });

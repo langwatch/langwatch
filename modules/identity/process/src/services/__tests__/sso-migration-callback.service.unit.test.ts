@@ -200,16 +200,16 @@ describe("given a pair mid-cutover", () => {
     });
   });
 
-  it("refuses an address the identity provider has not verified", async () => {
+  /** @scenario "The new connection recognises members by address on a domain it proved, confirmed or not" */
+  it("matches an address nobody confirmed when it sits on a domain the replacement proved", async () => {
     const service = serviceOver({
       rows: [replacement("GRACE_LEGACY"), legacy()],
       unverified: [USER_ID],
     });
 
-    await expect(decide(service, { providerId: "auth0", accountId: "sub-old" })).resolves.toEqual({
-      kind: "reject",
-      code: "SSO_MIGRATION_LINK_UNVERIFIED",
-    });
+    await expect(
+      decide(service, { providerId: "auth0", accountId: "sub-old" }),
+    ).resolves.not.toMatchObject({ kind: "reject" });
   });
 
   it("refuses an address more than one person holds", async () => {

@@ -6,7 +6,6 @@ import { FlaskConical } from "lucide-react";
 import { useState } from "react";
 
 import { datasetApi } from "../../behavior/dataset-api.ts";
-import { retryDatasetNormalize } from "../../behavior/direct-upload.ts";
 import { useDatasetHost } from "../../model/dataset-host.ts";
 import { DatasetEditorTable } from "./dataset-editor-table.tsx";
 
@@ -25,6 +24,7 @@ export default function DatasetEditorScreen() {
   const project = host.project();
   const datasetId = host.route().params.id ?? "";
   const [isRetrying, setIsRetrying] = useState(false);
+  const retryNormalize = datasetApi.dataset.retryNormalize.useMutation();
 
   const datasetQuery = datasetApi.dataset.getById.useQuery(
     { projectId: project?.id ?? "", datasetId },
@@ -65,7 +65,7 @@ export default function DatasetEditorScreen() {
     if (!project) return;
     setIsRetrying(true);
     try {
-      await retryDatasetNormalize({ projectId: project.id, datasetId });
+      await retryNormalize.mutateAsync({ projectId: project.id, datasetId });
       await datasetQuery.refetch();
     } catch (error) {
       host.failed({ error, fallbackTitle: "Couldn't retry preparing this dataset" });

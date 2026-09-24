@@ -32,6 +32,7 @@ export const promptInputSchema = z
       "float",
       "bool",
       "image",
+      "file",
       "list",
       "list[str]",
       "list[float]",

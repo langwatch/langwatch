@@ -751,7 +751,9 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
         (c) =>
           typeof c.tenantId === "string" ||
           typeof c.migrationName_tenantId?.tenantId === "string" ||
-          (!bulkWrite && typeof c.migrationName === "string"),
+          // A finite list of migrations is as bounded as one: the periodic
+          // re-drive asks about every registered migration in a single read.
+          (!bulkWrite && isScopeIdValue(c.migrationName)),
       );
       return ok ? null : reason;
     },

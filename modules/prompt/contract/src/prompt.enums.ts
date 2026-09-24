@@ -26,4 +26,5 @@ export const datasetColumnTypeSchema = z.enum([
   "annotations",
   "evaluations",
   "image",
+  "file",
 ]);

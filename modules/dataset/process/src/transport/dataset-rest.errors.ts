@@ -20,13 +20,6 @@ const DOMAIN_ERROR_HTTP: Record<string, { status: ContentfulStatusCode; code: st
   // safety net so a propagated error (e.g. an upload racing an in-flight
   // normalize) returns 425, not a 500 that pages on-call for a normal race.
   DatasetNotReadyError: { status: 425, code: "DatasetNotReady" },
-  DirectUploadUnavailableError: {
-    status: 409,
-    code: "DirectUploadUnavailable",
-  },
-  UploadTooLargeError: { status: 400, code: "UploadTooLarge" },
-  StagedUploadNotFoundError: { status: 422, code: "UploadNotFound" },
-  StorageNotWritableError: { status: 500, code: "StorageNotWritable" },
   // A PATCH that changes columnTypes on an s3_jsonl dataset is a client request
   // error, not a server fault — 400, matching the tRPC layer's BAD_REQUEST.
   ColumnTypeChangeNotSupportedError: {
@@ -86,8 +79,7 @@ export function createDatasetErrorHandler(options: {
       `Dataset API Error [${status}]: ${error.message || String(error)}`,
     );
 
-    // Map known domain errors to their HTTP status + code (the direct-upload
-    // routes rely on this instead of catching each one inline).
+    // Map known domain errors to their HTTP status + code.
     if (domain) {
       return c.json(
         errorSchema.parse({ error: domain.code, message: error.message }),

@@ -20,6 +20,7 @@ const STORED_DEFAULTS = {
   statusError: null,
   stagingKey: null,
   uploadFilename: null,
+  sourceStoredObjectId: null,
   rowCount: null,
   sizeBytes: null,
   chunkCount: null,

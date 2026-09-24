@@ -7,6 +7,8 @@
  */
 import type { SsoConnectionLifecycleState, SsoConnectionType } from "@langwatch/identity-contract";
 
+import { updateChipFor, type SsoMigrationPhase } from "./migration-route.ts";
+
 export type ConnectionChipTone = "neutral" | "good" | "warning" | "bad";
 
 export interface ConnectionStatusChip {
@@ -144,3 +146,49 @@ const STEADY_STATES: Record<
     title: "This connection no longer carries anybody.",
   },
 };
+
+export interface PreviewCopy {
+  chip: ConnectionStatusChip;
+  action: string;
+  stepLabel: string;
+  step: string;
+}
+
+/**
+ * The preview card's words. An update in flight outranks the lifecycle state:
+ * a replacement sits in DRAFT while the whole company signs in through the
+ * connection it replaces, so the card says which step of the update it is on.
+ */
+export function previewCopyFor({
+  state,
+  goLiveBlockedBecause,
+  updatePhase,
+}: {
+  state: SsoConnectionLifecycleState | null;
+  goLiveBlockedBecause: string | null;
+  updatePhase: SsoMigrationPhase | null;
+}): PreviewCopy {
+  if (updatePhase) {
+    const chip = updateChipFor(updatePhase);
+    return { chip, action: "Where it stands", stepLabel: "Next step", step: chip.title };
+  }
+  if (state === null) {
+    return {
+      chip: {
+        label: "Not set up",
+        tone: "neutral",
+        title: "No identity provider is connected to this organization.",
+      },
+      action: "Set it up",
+      stepLabel: "First step",
+      step: "Telling us about your identity provider.",
+    };
+  }
+
+  return {
+    chip: connectionStatusChipFor({ state, goLiveBlockedBecause }),
+    action: "Carry on setting it up",
+    stepLabel: "Next step",
+    step: "Carry on where you left off.",
+  };
+}

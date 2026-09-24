@@ -1,10 +1,21 @@
 import { Readable } from "node:stream";
 
-import type { DatasetNormalizePayload } from "@langwatch/dataset-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
+import {
+  datasetNormalizePayloadSchema,
+  type DatasetNormalizePayload,
+} from "@langwatch/dataset-contract";
+import {
+  storedObjectMetadataSchema,
+  type StoredObjectApi,
+} from "@langwatch/stored-object-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { toJsonlChunks } from "../../rules/dataset-chunking.rules.ts";
-import { DatasetNormalizeAdapter, StagingKeyMismatchError } from "../dataset-normalize.service.ts";
+import {
+  DatasetNormalizeAdapter,
+  ImportSourceMismatchError,
+} from "../dataset-normalize.service.ts";
 import type { DatasetNormalizeDeps } from "../dataset-normalize.service.ts";
 
 /** The adapter's one operation, as the queue calls it. */
@@ -14,9 +25,8 @@ const normalizeHandler =
     DatasetNormalizeAdapter.create(deps).normalize(payload);
 
 /**
- * Unit test the normalize handler at its boundaries: a fake `DatasetStorage` (streamStaged →
- * Readable.from(...), writeChunks / deleteStaged / deleteChunksFrom spies) and a stub
- * `DatasetRepository`. The streaming parse + chunk-writer logic under test stays real.
+ * The normalize handler at its boundaries: chunk-repository spies, a stub repository and
+ * a stored-object fixture. Most cases drive the previous release's `stagingKey` payload.
  */
 
 const makeStorage = (overrides: Record<string, unknown> = {}) => {
@@ -24,24 +34,49 @@ const makeStorage = (overrides: Record<string, unknown> = {}) => {
     async ({ records, fromIndex = 0 }: { records: unknown[]; fromIndex?: number }) =>
       toJsonlChunks(records).map((c) => ({ ...c, index: c.index + fromIndex })),
   );
-  const deleteStaged = vi.fn().mockResolvedValue(undefined);
+  const removeStagedUpload = vi.fn().mockResolvedValue(undefined);
   const deleteChunksFrom = vi.fn().mockResolvedValue(undefined);
-  const headStagedObjectSize = vi.fn().mockResolvedValue(1024);
   return {
     storage: {
       writeChunks,
-      deleteStaged,
+      removeStagedUpload,
       deleteChunksFrom,
-      headStagedObjectSize,
-      streamStaged: vi.fn(),
+      readStagedUpload: vi.fn(),
       readChunks: vi.fn(),
-      createPresignedUpload: vi.fn(),
       ...overrides,
     },
     writeChunks,
-    deleteStaged,
+    removeStagedUpload,
     deleteChunksFrom,
-    headStagedObjectSize,
+  };
+};
+
+const noStoredObjects = createApiFixture<Pick<StoredObjectApi, "getById">>({}, "storedObjects");
+
+const importMetadata = (byteLength: number) =>
+  storedObjectMetadataSchema.parse({
+    projectId: "p1",
+    id: "so1",
+    sha256: "a".repeat(64),
+    byteLength,
+    mediaType: "application/x-ndjson",
+    filename: "data.jsonl",
+    mediaTypeVerified: true,
+    status: "available",
+    audiences: [],
+    generation: 1,
+    provenance: { purpose: "dataset_import", ownerKind: "project", ownerId: "p1" },
+    createdAt: "2026-09-24T00:00:00.000Z",
+  });
+
+const storedObjectsHolding = (text: string, byteLength = Buffer.byteLength(text)) => {
+  const getById = vi.fn(async () => ({
+    metadata: importMetadata(byteLength),
+    bytes: Readable.from([Buffer.from(text)]),
+  }));
+  return {
+    getById,
+    storedObjects: createApiFixture<Pick<StoredObjectApi, "getById">>({ getById }),
   };
 };
 
@@ -61,14 +96,59 @@ const basePayload = {
   filename: "data.jsonl",
 };
 
+const { stagingKey: _stagingKey, ...target } = basePayload;
+const storedObjectPayload = { ...target, sourceStoredObjectId: "so1" };
+
 beforeEach(() => vi.clearAllMocks());
 
+describe("datasetNormalizePayloadSchema", () => {
+  /** @scenario "A file queued for preparation before an upgrade is still prepared" */
+  it("accepts the previous release's stagingKey payload beside the stored-object one", () => {
+    expect(datasetNormalizePayloadSchema.parse(basePayload)).toEqual(basePayload);
+    expect(datasetNormalizePayloadSchema.parse(storedObjectPayload)).toEqual(storedObjectPayload);
+  });
+});
+
 describe("DatasetNormalizeAdapter", () => {
+  describe("when the payload names a confirmed stored object", () => {
+    /** @scenario "Datasets work on a minimal self-hosted install" */
+    /** @scenario "A large file uploads on a self-hosted install with no object storage" */
+    it("streams it from stored objects, prepares the rows and touches no staging key", async () => {
+      const { storage, writeChunks, removeStagedUpload } = makeStorage();
+      const { getById, storedObjects } = storedObjectsHolding('{"a":"1"}\n{"a":"2"}\n');
+      const repo = makeRepo({ id: "d1", status: "processing", sourceStoredObjectId: "so1" });
+
+      await normalizeHandler({ repository: repo as any, chunks: storage as any, storedObjects })(
+        storedObjectPayload,
+      );
+
+      expect(getById).toHaveBeenCalledWith({ projectId: "p1", id: "so1" });
+      expect(writeChunks).toHaveBeenCalledTimes(1);
+      expect(repo.update.mock.calls[0]![0].data).toMatchObject({ status: "ready", rowCount: 2 });
+      expect(storage.readStagedUpload).not.toHaveBeenCalled();
+      expect(removeStagedUpload).not.toHaveBeenCalled();
+    });
+
+    it("refuses a payload whose stored object is not the row's, before any read", async () => {
+      const { storage } = makeStorage();
+      const { getById, storedObjects } = storedObjectsHolding('{"a":"1"}\n');
+      const repo = makeRepo({ id: "d1", status: "processing", sourceStoredObjectId: "so2" });
+
+      await expect(
+        normalizeHandler({ repository: repo as any, chunks: storage as any, storedObjects })(
+          storedObjectPayload,
+        ),
+      ).rejects.toThrow(ImportSourceMismatchError);
+      expect(getById).not.toHaveBeenCalled();
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when a processing JSONL dataset normalizes successfully", () => {
     /** @scenario "Both CSV and JSONL files are accepted" */
     it("writes chunks and flips the dataset to ready with counters and columnTypes", async () => {
-      const { storage, writeChunks, deleteStaged } = makeStorage({
-        streamStaged: vi
+      const { storage, writeChunks, removeStagedUpload } = makeStorage({
+        readStagedUpload: vi
           .fn()
           .mockResolvedValue(Readable.from(['{"a":"1","b":"x"}\n{"a":"2","b":"y"}\n'])),
       });
@@ -76,7 +156,8 @@ describe("DatasetNormalizeAdapter", () => {
 
       const handler = normalizeHandler({
         repository: repo as any,
-        getStorage: async () => storage as any,
+        chunks: storage as any,
+        storedObjects: noStoredObjects,
       });
       await handler(basePayload);
 
@@ -90,9 +171,9 @@ describe("DatasetNormalizeAdapter", () => {
         { name: "b", type: "string" },
       ]);
       expect(typeof update.data.sizeBytes).toBe("bigint");
-      expect(deleteStaged).toHaveBeenCalledWith({
+      expect(removeStagedUpload).toHaveBeenCalledWith({
         projectId: "p1",
-        key: "staging/p1/u1",
+        stagingKey: "staging/p1/u1",
       });
     });
   });
@@ -101,13 +182,14 @@ describe("DatasetNormalizeAdapter", () => {
     /** @scenario "Both CSV and JSONL files are accepted" */
     it("derives headers from the CSV fields and writes the rows", async () => {
       const { storage, writeChunks } = makeStorage({
-        streamStaged: vi.fn().mockResolvedValue(Readable.from(["a,b\n1,x\n2,y\n"])),
+        readStagedUpload: vi.fn().mockResolvedValue(Readable.from(["a,b\n1,x\n2,y\n"])),
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
 
       const handler = normalizeHandler({
         repository: repo as any,
-        getStorage: async () => storage as any,
+        chunks: storage as any,
+        storedObjects: noStoredObjects,
       });
       await handler({ ...basePayload, filename: "data.csv" });
 
@@ -140,12 +222,13 @@ describe("DatasetNormalizeAdapter", () => {
       const pieces = csv.match(/[\s\S]{1,64}/g)!;
 
       const { storage, writeChunks } = makeStorage({
-        streamStaged: vi.fn().mockResolvedValue(Readable.from(pieces)),
+        readStagedUpload: vi.fn().mockResolvedValue(Readable.from(pieces)),
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
       const handler = normalizeHandler({
         repository: repo as any,
-        getStorage: async () => storage as any,
+        chunks: storage as any,
+        storedObjects: noStoredObjects,
       });
 
       await handler({ ...basePayload, filename: "data.csv" });
@@ -176,13 +259,14 @@ describe("DatasetNormalizeAdapter", () => {
     it("records the true rowCount and a positive sizeBytes once ready", async () => {
       const rows = Array.from({ length: 50 }, (_, i) => `{"a":"${i}"}`).join("\n");
       const { storage } = makeStorage({
-        streamStaged: vi.fn().mockResolvedValue(Readable.from([rows + "\n"])),
+        readStagedUpload: vi.fn().mockResolvedValue(Readable.from([rows + "\n"])),
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
 
       const handler = normalizeHandler({
         repository: repo as any,
-        getStorage: async () => storage as any,
+        chunks: storage as any,
+        storedObjects: noStoredObjects,
       });
       await handler(basePayload);
 
@@ -211,14 +295,15 @@ describe("DatasetNormalizeAdapter", () => {
         })),
       );
       const { storage } = makeStorage({
-        streamStaged: vi.fn().mockResolvedValue(Readable.from([rows + "\n"])),
+        readStagedUpload: vi.fn().mockResolvedValue(Readable.from([rows + "\n"])),
         writeChunks: splittingWriteChunks,
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
 
       const handler = normalizeHandler({
         repository: repo as any,
-        getStorage: async () => storage as any,
+        chunks: storage as any,
+        storedObjects: noStoredObjects,
       });
       await handler(basePayload);
 
@@ -241,7 +326,7 @@ describe("DatasetNormalizeAdapter", () => {
       );
       // Tiny per-flush cap so the single flush splits into several chunk objects.
       const { storage } = makeStorage({
-        streamStaged: vi.fn().mockResolvedValue(Readable.from([rows + "\n"])),
+        readStagedUpload: vi.fn().mockResolvedValue(Readable.from([rows + "\n"])),
         writeChunks: vi.fn(async ({ records, fromIndex = 0 }: any) =>
           toJsonlChunks(records, { maxBytes: 10 }).map((c) => ({
             ...c,
@@ -253,7 +338,8 @@ describe("DatasetNormalizeAdapter", () => {
 
       const handler = normalizeHandler({
         repository: repo as any,
-        getStorage: async () => storage as any,
+        chunks: storage as any,
+        storedObjects: noStoredObjects,
       });
       await handler(basePayload);
 
@@ -284,21 +370,22 @@ describe("DatasetNormalizeAdapter", () => {
 
   describe("when parsing fails", () => {
     it("flips the dataset to failed with a statusError, does NOT delete staging, and rethrows", async () => {
-      const { storage, deleteStaged } = makeStorage({
-        streamStaged: vi.fn().mockResolvedValue(Readable.from(["{not valid json\n"])),
+      const { storage, removeStagedUpload } = makeStorage({
+        readStagedUpload: vi.fn().mockResolvedValue(Readable.from(["{not valid json\n"])),
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
 
       const handler = normalizeHandler({
         repository: repo as any,
-        getStorage: async () => storage as any,
+        chunks: storage as any,
+        storedObjects: noStoredObjects,
       });
 
       await expect(handler(basePayload)).rejects.toThrow(SyntaxError);
       const update = repo.update.mock.calls[0]![0];
       expect(update.data.status).toBe("failed");
       expect(update.data.statusError).toBeTruthy();
-      expect(deleteStaged).not.toHaveBeenCalled();
+      expect(removeStagedUpload).not.toHaveBeenCalled();
     });
 
     // @regression — a parse error AFTER chunks have already flushed to S3 must
@@ -311,8 +398,8 @@ describe("DatasetNormalizeAdapter", () => {
         // forcing a real mid-stream flush (writeChunks → chunk objects in S3),
         // then a malformed line throws — the orphan scenario, made concrete.
         const big = (c: string) => `{"v":"${c.repeat(6 * 1024 * 1024)}"}\n`;
-        const { storage, writeChunks, deleteStaged, deleteChunksFrom } = makeStorage({
-          streamStaged: vi
+        const { storage, writeChunks, removeStagedUpload, deleteChunksFrom } = makeStorage({
+          readStagedUpload: vi
             .fn()
             .mockResolvedValue(Readable.from([big("a"), big("b"), big("c"), "{not valid json\n"])),
         });
@@ -320,7 +407,8 @@ describe("DatasetNormalizeAdapter", () => {
 
         const handler = normalizeHandler({
           repository: repo as any,
-          getStorage: async () => storage as any,
+          chunks: storage as any,
+          storedObjects: noStoredObjects,
         });
 
         await expect(handler(basePayload)).rejects.toThrow(SyntaxError);
@@ -335,31 +423,28 @@ describe("DatasetNormalizeAdapter", () => {
         const update = repo.update.mock.calls[0]![0];
         expect(update.data.status).toBe("failed");
         // Staging preserved for a manual retry; not deleted on failure.
-        expect(deleteStaged).not.toHaveBeenCalled();
+        expect(removeStagedUpload).not.toHaveBeenCalled();
       });
     });
   });
 
   describe("when the payload stagingKey matches the authoritative row", () => {
     it("reads storage with the payload key and normalizes as today", async () => {
-      const { storage, headStagedObjectSize, writeChunks } = makeStorage({
-        streamStaged: vi.fn().mockResolvedValue(Readable.from(['{"a":"1"}\n'])),
+      const { storage, writeChunks } = makeStorage({
+        readStagedUpload: vi.fn().mockResolvedValue(Readable.from(['{"a":"1"}\n'])),
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
 
       const handler = normalizeHandler({
         repository: repo as any,
-        getStorage: async () => storage as any,
+        chunks: storage as any,
+        storedObjects: noStoredObjects,
       });
       await handler(basePayload);
 
-      expect(headStagedObjectSize).toHaveBeenCalledWith({
+      expect(storage.readStagedUpload).toHaveBeenCalledWith({
         projectId: "p1",
-        key: "staging/p1/u1",
-      });
-      expect(storage.streamStaged).toHaveBeenCalledWith({
-        projectId: "p1",
-        key: "staging/p1/u1",
+        stagingKey: "staging/p1/u1",
       });
       const update = repo.update.mock.calls[0]![0];
       expect(update.data.status).toBe("ready");
@@ -373,8 +458,8 @@ describe("DatasetNormalizeAdapter", () => {
       // staged object): the row is authoritative — reading the payload's key
       // would fold a different upload's object into this dataset. The throw
       // precedes the storage boundary and the failure marking alike.
-      const { storage, headStagedObjectSize, writeChunks, deleteChunksFrom } = makeStorage({
-        streamStaged: vi.fn().mockResolvedValue(Readable.from(['{"a":"1"}\n'])),
+      const { storage, writeChunks, deleteChunksFrom } = makeStorage({
+        readStagedUpload: vi.fn().mockResolvedValue(Readable.from(['{"a":"1"}\n'])),
       });
       const repo = makeRepo({
         id: "d1",
@@ -384,12 +469,12 @@ describe("DatasetNormalizeAdapter", () => {
 
       const handler = normalizeHandler({
         repository: repo as any,
-        getStorage: async () => storage as any,
+        chunks: storage as any,
+        storedObjects: noStoredObjects,
       });
 
-      await expect(handler(basePayload)).rejects.toThrow(StagingKeyMismatchError);
-      expect(headStagedObjectSize).not.toHaveBeenCalled();
-      expect(storage.streamStaged).not.toHaveBeenCalled();
+      await expect(handler(basePayload)).rejects.toThrow(ImportSourceMismatchError);
+      expect(storage.readStagedUpload).not.toHaveBeenCalled();
       expect(writeChunks).not.toHaveBeenCalled();
       expect(deleteChunksFrom).not.toHaveBeenCalled();
       expect(repo.update).not.toHaveBeenCalled();
@@ -399,50 +484,52 @@ describe("DatasetNormalizeAdapter", () => {
   describe("when the dataset is not in processing", () => {
     it("no-ops without touching storage (idempotent re-drive guard)", async () => {
       const { storage } = makeStorage({
-        streamStaged: vi.fn(),
+        readStagedUpload: vi.fn(),
       });
       const repo = makeRepo({ id: "d1", status: "ready" });
 
       const handler = normalizeHandler({
         repository: repo as any,
-        getStorage: async () => storage as any,
+        chunks: storage as any,
+        storedObjects: noStoredObjects,
       });
       await handler(basePayload);
 
-      expect(storage.streamStaged).not.toHaveBeenCalled();
+      expect(storage.readStagedUpload).not.toHaveBeenCalled();
       expect(repo.update).not.toHaveBeenCalled();
     });
   });
 
   describe("when the dataset row no longer exists", () => {
     it("no-ops", async () => {
-      const { storage } = makeStorage({ streamStaged: vi.fn() });
+      const { storage } = makeStorage({ readStagedUpload: vi.fn() });
       const repo = makeRepo(null);
 
       const handler = normalizeHandler({
         repository: repo as any,
-        getStorage: async () => storage as any,
+        chunks: storage as any,
+        storedObjects: noStoredObjects,
       });
       await handler(basePayload);
 
-      expect(storage.streamStaged).not.toHaveBeenCalled();
+      expect(storage.readStagedUpload).not.toHaveBeenCalled();
     });
   });
 
   describe("when a .json file exceeds the large-json cap", () => {
     it("fails the dataset with a convert-to-JSONL statusError", async () => {
-      const { storage } = makeStorage({
-        headStagedObjectSize: vi.fn().mockResolvedValue(200 * 1024 * 1024),
-        streamStaged: vi.fn().mockResolvedValue(Readable.from(["[]"])),
-      });
-      const repo = makeRepo({ id: "d1", status: "processing" });
+      const { storage } = makeStorage();
+      const repo = makeRepo({ id: "d1", status: "processing", sourceStoredObjectId: "so1" });
 
       const handler = normalizeHandler({
         repository: repo as any,
-        getStorage: async () => storage as any,
+        chunks: storage as any,
+        storedObjects: storedObjectsHolding("[]", 200 * 1024 * 1024).storedObjects,
       });
 
-      await expect(handler({ ...basePayload, filename: "big.json" })).rejects.toThrow(/JSONL/i);
+      await expect(handler({ ...storedObjectPayload, filename: "big.json" })).rejects.toThrow(
+        /JSONL/i,
+      );
       const update = repo.update.mock.calls[0]![0];
       expect(update.data.status).toBe("failed");
     });
@@ -454,14 +541,15 @@ describe("DatasetNormalizeAdapter", () => {
       // (8 MB). papaparse would buffer the whole thing without the cursor guard;
       // the guard aborts and the handler fails the dataset.
       const giantField = "x".repeat(9 * 1024 * 1024);
-      const { storage, deleteStaged } = makeStorage({
-        streamStaged: vi.fn().mockResolvedValue(Readable.from([`a,b\n1,${giantField}\n`])),
+      const { storage, removeStagedUpload } = makeStorage({
+        readStagedUpload: vi.fn().mockResolvedValue(Readable.from([`a,b\n1,${giantField}\n`])),
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
 
       const handler = normalizeHandler({
         repository: repo as any,
-        getStorage: async () => storage as any,
+        chunks: storage as any,
+        storedObjects: noStoredObjects,
       });
 
       await expect(handler({ ...basePayload, filename: "malformed.csv" })).rejects.toThrow(
@@ -470,20 +558,21 @@ describe("DatasetNormalizeAdapter", () => {
       const update = repo.update.mock.calls[0]![0];
       expect(update.data.status).toBe("failed");
       // Staging preserved for a manual retry; not deleted on failure.
-      expect(deleteStaged).not.toHaveBeenCalled();
+      expect(removeStagedUpload).not.toHaveBeenCalled();
     });
   });
 
   describe("when a record carries a reserved column name", () => {
     it("renames the key in stored rows and columnTypes (id → id_)", async () => {
       const { storage, writeChunks } = makeStorage({
-        streamStaged: vi.fn().mockResolvedValue(Readable.from(['{"id":"x","b":"y"}\n'])),
+        readStagedUpload: vi.fn().mockResolvedValue(Readable.from(['{"id":"x","b":"y"}\n'])),
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
 
       const handler = normalizeHandler({
         repository: repo as any,
-        getStorage: async () => storage as any,
+        chunks: storage as any,
+        storedObjects: noStoredObjects,
       });
       await handler(basePayload);
 
@@ -513,7 +602,7 @@ describe("DatasetNormalizeAdapter", () => {
       /** @scenario The dataset is prepared with the columns I confirmed */
       it("renames keys to the confirmed names and converts values to the confirmed types", async () => {
         const { storage, writeChunks } = makeStorage({
-          streamStaged: vi
+          readStagedUpload: vi
             .fn()
             .mockResolvedValue(
               Readable.from(['{"qty":"5","name":"x"}\n{"qty":"12","name":"y"}\n']),
@@ -532,7 +621,8 @@ describe("DatasetNormalizeAdapter", () => {
 
         const handler = normalizeHandler({
           repository: repo as any,
-          getStorage: async () => storage as any,
+          chunks: storage as any,
+          storedObjects: noStoredObjects,
         });
         await handler(basePayload);
 
@@ -556,7 +646,7 @@ describe("DatasetNormalizeAdapter", () => {
     describe("given a CSV file and a confirmed number column", () => {
       it("converts the column's values to numbers as they stream", async () => {
         const { storage, writeChunks } = makeStorage({
-          streamStaged: vi.fn().mockResolvedValue(Readable.from(["a,b\n1,x\n2,y\n"])),
+          readStagedUpload: vi.fn().mockResolvedValue(Readable.from(["a,b\n1,x\n2,y\n"])),
         });
         const repo = makeRepo({
           id: "d1",
@@ -569,7 +659,8 @@ describe("DatasetNormalizeAdapter", () => {
 
         const handler = normalizeHandler({
           repository: repo as any,
-          getStorage: async () => storage as any,
+          chunks: storage as any,
+          storedObjects: noStoredObjects,
         });
         await handler({ ...basePayload, filename: "data.csv" });
 
@@ -586,7 +677,7 @@ describe("DatasetNormalizeAdapter", () => {
     describe("given a JSON-array file and a confirmed number + rename", () => {
       it("renames keys and converts values the same as the JSONL/CSV paths", async () => {
         const { storage, writeChunks } = makeStorage({
-          streamStaged: vi
+          readStagedUpload: vi
             .fn()
             .mockResolvedValue(Readable.from(['[{"qty":"5","name":"x"},{"qty":"12","name":"y"}]'])),
         });
@@ -601,7 +692,8 @@ describe("DatasetNormalizeAdapter", () => {
 
         const handler = normalizeHandler({
           repository: repo as any,
-          getStorage: async () => storage as any,
+          chunks: storage as any,
+          storedObjects: noStoredObjects,
         });
         await handler({ ...basePayload, filename: "data.json" });
 
@@ -628,7 +720,7 @@ describe("DatasetNormalizeAdapter", () => {
       describe("when columns are reordered", () => {
         it("binds each value by sourceHeader, not position, and persists the user's order", async () => {
           const { storage, writeChunks } = makeStorage({
-            streamStaged: vi
+            readStagedUpload: vi
               .fn()
               .mockResolvedValue(
                 Readable.from(['{"qty":"5","name":"x"}\n{"qty":"12","name":"y"}\n']),
@@ -647,7 +739,8 @@ describe("DatasetNormalizeAdapter", () => {
 
           const handler = normalizeHandler({
             repository: repo as any,
-            getStorage: async () => storage as any,
+            chunks: storage as any,
+            storedObjects: noStoredObjects,
           });
           await handler(basePayload);
 
@@ -672,7 +765,7 @@ describe("DatasetNormalizeAdapter", () => {
       describe("when columns are renamed and reordered", () => {
         it("handles a simultaneous rename + reorder without scrambling values", async () => {
           const { storage, writeChunks } = makeStorage({
-            streamStaged: vi
+            readStagedUpload: vi
               .fn()
               .mockResolvedValue(Readable.from(['{"first":"a","second":"b"}\n'])),
           });
@@ -688,7 +781,8 @@ describe("DatasetNormalizeAdapter", () => {
 
           const handler = normalizeHandler({
             repository: repo as any,
-            getStorage: async () => storage as any,
+            chunks: storage as any,
+            storedObjects: noStoredObjects,
           });
           await handler(basePayload);
 
@@ -710,7 +804,7 @@ describe("DatasetNormalizeAdapter", () => {
           // A confirmed column whose sourceHeader matches no file header (count
           // still matches) must not half-rename — fall back, same as a count miss.
           const { storage, writeChunks } = makeStorage({
-            streamStaged: vi.fn().mockResolvedValue(Readable.from(['{"a":"1","b":"x"}\n'])),
+            readStagedUpload: vi.fn().mockResolvedValue(Readable.from(['{"a":"1","b":"x"}\n'])),
           });
           const repo = makeRepo({
             id: "d1",
@@ -723,7 +817,8 @@ describe("DatasetNormalizeAdapter", () => {
 
           const handler = normalizeHandler({
             repository: repo as any,
-            getStorage: async () => storage as any,
+            chunks: storage as any,
+            storedObjects: noStoredObjects,
           });
           await handler(basePayload);
 
@@ -745,7 +840,9 @@ describe("DatasetNormalizeAdapter", () => {
           // silently dropping one and persisting a malformed two-entry columnTypes
           // against a one-key record. Degrade rather than corrupt.
           const { storage, writeChunks } = makeStorage({
-            streamStaged: vi.fn().mockResolvedValue(Readable.from(['{"a":"VAL_A","b":"VAL_B"}\n'])),
+            readStagedUpload: vi
+              .fn()
+              .mockResolvedValue(Readable.from(['{"a":"VAL_A","b":"VAL_B"}\n'])),
           });
           const repo = makeRepo({
             id: "d1",
@@ -758,7 +855,8 @@ describe("DatasetNormalizeAdapter", () => {
 
           const handler = normalizeHandler({
             repository: repo as any,
-            getStorage: async () => storage as any,
+            chunks: storage as any,
+            storedObjects: noStoredObjects,
           });
           await handler(basePayload);
 
@@ -778,7 +876,7 @@ describe("DatasetNormalizeAdapter", () => {
       describe("when a column was renamed to a blank name", () => {
         it("degrades to derive-all-string instead of writing an empty-keyed column", async () => {
           const { storage, writeChunks } = makeStorage({
-            streamStaged: vi.fn().mockResolvedValue(Readable.from(['{"a":"1","b":"x"}\n'])),
+            readStagedUpload: vi.fn().mockResolvedValue(Readable.from(['{"a":"1","b":"x"}\n'])),
           });
           const repo = makeRepo({
             id: "d1",
@@ -791,7 +889,8 @@ describe("DatasetNormalizeAdapter", () => {
 
           const handler = normalizeHandler({
             repository: repo as any,
-            getStorage: async () => storage as any,
+            chunks: storage as any,
+            storedObjects: noStoredObjects,
           });
           await handler(basePayload);
 
@@ -810,7 +909,7 @@ describe("DatasetNormalizeAdapter", () => {
       describe("when only some columns carry a sourceHeader (partial confirm payload)", () => {
         it("degrades to derive-all-string instead of positional-binding a client bug", async () => {
           const { storage, writeChunks } = makeStorage({
-            streamStaged: vi.fn().mockResolvedValue(Readable.from(['{"a":"1","b":"x"}\n'])),
+            readStagedUpload: vi.fn().mockResolvedValue(Readable.from(['{"a":"1","b":"x"}\n'])),
           });
           const repo = makeRepo({
             id: "d1",
@@ -825,7 +924,8 @@ describe("DatasetNormalizeAdapter", () => {
 
           const handler = normalizeHandler({
             repository: repo as any,
-            getStorage: async () => storage as any,
+            chunks: storage as any,
+            storedObjects: noStoredObjects,
           });
           await handler(basePayload);
 
@@ -848,7 +948,7 @@ describe("DatasetNormalizeAdapter", () => {
         // exactly like a coverage miss.
         it("degrades to derive-all-string rather than dropping the collision", async () => {
           const { storage, writeChunks } = makeStorage({
-            streamStaged: vi.fn().mockResolvedValue(Readable.from(['{"a":"1","b":"x"}\n'])),
+            readStagedUpload: vi.fn().mockResolvedValue(Readable.from(['{"a":"1","b":"x"}\n'])),
           });
           const repo = makeRepo({
             id: "d1",
@@ -861,7 +961,8 @@ describe("DatasetNormalizeAdapter", () => {
 
           const handler = normalizeHandler({
             repository: repo as any,
-            getStorage: async () => storage as any,
+            chunks: storage as any,
+            storedObjects: noStoredObjects,
           });
           await handler(basePayload);
 
@@ -884,7 +985,7 @@ describe("DatasetNormalizeAdapter", () => {
         // degrade-to-all-string (which would resurrect the excluded column).
         it("drops the excluded header's values and persists only the kept columns", async () => {
           const { storage, writeChunks } = makeStorage({
-            streamStaged: vi.fn().mockResolvedValue(Readable.from(["a,b,c\n1,2,3\n4,5,6\n"])),
+            readStagedUpload: vi.fn().mockResolvedValue(Readable.from(["a,b,c\n1,2,3\n4,5,6\n"])),
           });
           const repo = makeRepo({
             id: "d1",
@@ -898,7 +999,8 @@ describe("DatasetNormalizeAdapter", () => {
 
           const handler = normalizeHandler({
             repository: repo as any,
-            getStorage: async () => storage as any,
+            chunks: storage as any,
+            storedObjects: noStoredObjects,
           });
           await handler({ ...basePayload, filename: "data.csv" });
 
@@ -923,7 +1025,7 @@ describe("DatasetNormalizeAdapter", () => {
           // must drop `b` (a file header) yet keep `c` (a stray key) — the two
           // are distinguished by whether they're in the captured header set.
           const { storage, writeChunks } = makeStorage({
-            streamStaged: vi
+            readStagedUpload: vi
               .fn()
               .mockResolvedValue(Readable.from(['{"a":"1","b":"x"}\n{"a":"2","b":"y","c":"z"}\n'])),
           });
@@ -935,7 +1037,8 @@ describe("DatasetNormalizeAdapter", () => {
 
           const handler = normalizeHandler({
             repository: repo as any,
-            getStorage: async () => storage as any,
+            chunks: storage as any,
+            storedObjects: noStoredObjects,
           });
           await handler(basePayload);
 
@@ -953,7 +1056,7 @@ describe("DatasetNormalizeAdapter", () => {
         it("degrades to derive-all-string when the confirmed list is empty", async () => {
           // A 0-column dataset is invalid — an empty confirmed list binds nothing.
           const { storage, writeChunks } = makeStorage({
-            streamStaged: vi.fn().mockResolvedValue(Readable.from(['{"a":"1","b":"x"}\n'])),
+            readStagedUpload: vi.fn().mockResolvedValue(Readable.from(['{"a":"1","b":"x"}\n'])),
           });
           const repo = makeRepo({
             id: "d1",
@@ -963,7 +1066,8 @@ describe("DatasetNormalizeAdapter", () => {
 
           const handler = normalizeHandler({
             repository: repo as any,
-            getStorage: async () => storage as any,
+            chunks: storage as any,
+            storedObjects: noStoredObjects,
           });
           await handler(basePayload);
 
@@ -985,7 +1089,7 @@ describe("DatasetNormalizeAdapter", () => {
       // mismatch must never misalign — fall back to deriving all-`string`.
       it("ignores the confirmed columns and derives all-string from the headers", async () => {
         const { storage, writeChunks } = makeStorage({
-          streamStaged: vi.fn().mockResolvedValue(Readable.from(['{"a":"1","b":"x"}\n'])),
+          readStagedUpload: vi.fn().mockResolvedValue(Readable.from(['{"a":"1","b":"x"}\n'])),
         });
         const repo = makeRepo({
           id: "d1",
@@ -996,7 +1100,8 @@ describe("DatasetNormalizeAdapter", () => {
 
         const handler = normalizeHandler({
           repository: repo as any,
-          getStorage: async () => storage as any,
+          chunks: storage as any,
+          storedObjects: noStoredObjects,
         });
         await handler(basePayload);
 
@@ -1017,13 +1122,14 @@ describe("DatasetNormalizeAdapter", () => {
   describe("when the uploaded file has no rows", () => {
     it("fails the dataset with an empty-file statusError instead of flipping to ready", async () => {
       const { storage } = makeStorage({
-        streamStaged: vi.fn().mockResolvedValue(Readable.from(["\n  \n"])),
+        readStagedUpload: vi.fn().mockResolvedValue(Readable.from(["\n  \n"])),
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
 
       const handler = normalizeHandler({
         repository: repo as any,
-        getStorage: async () => storage as any,
+        chunks: storage as any,
+        storedObjects: noStoredObjects,
       });
 
       await expect(handler(basePayload)).rejects.toThrow(/empty/i);
@@ -1037,13 +1143,14 @@ describe("DatasetNormalizeAdapter", () => {
     it("fails the dataset rather than buffering an unbounded line", async () => {
       const giant = `{"a":"${"x".repeat(9 * 1024 * 1024)}"}\n`;
       const { storage } = makeStorage({
-        streamStaged: vi.fn().mockResolvedValue(Readable.from([giant])),
+        readStagedUpload: vi.fn().mockResolvedValue(Readable.from([giant])),
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
 
       const handler = normalizeHandler({
         repository: repo as any,
-        getStorage: async () => storage as any,
+        chunks: storage as any,
+        storedObjects: noStoredObjects,
       });
 
       await expect(handler(basePayload)).rejects.toThrow(/max size|malformed/i);
@@ -1066,7 +1173,7 @@ describe("DatasetNormalizeAdapter", () => {
             index: c.index + fromIndex,
           })),
         ),
-        streamStaged: vi
+        readStagedUpload: vi
           .fn()
           .mockResolvedValue(Readable.from(['{"v":"aaaaaaaa"}\n{"v":"bbbbbbbb"}\n'])),
       });
@@ -1074,7 +1181,8 @@ describe("DatasetNormalizeAdapter", () => {
 
       const handler = normalizeHandler({
         repository: repo as any,
-        getStorage: async () => storage as any,
+        chunks: storage as any,
+        storedObjects: noStoredObjects,
       });
       await handler(basePayload);
 

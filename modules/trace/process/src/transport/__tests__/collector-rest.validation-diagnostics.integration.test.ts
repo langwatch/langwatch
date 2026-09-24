@@ -40,6 +40,7 @@ const NOW = Date.now();
 const CUSTOMER_SECRET = "sk-live-CUSTOMER-PROMPT-DO-NOT-LOG";
 
 const reportedErrors: { message: string; context: unknown }[] = [];
+let ingestedSpanCount = 0;
 
 const runtime = createRestRuntime({
   identity: {
@@ -53,7 +54,10 @@ const collector = runtime.mount(collectorRest.router(), {
   app: () => ({
     collectorCredential: async () => ({ project, markUsed: () => undefined }),
     collectorUsageLimit: async () => undefined,
-    ingestSpan: async () => ({ status: "collected" }),
+    ingestSpan: async () => {
+      ingestedSpanCount++;
+      return { status: "collected" };
+    },
     reportEvaluation: async () => undefined,
     deriveEvaluatorId: (name: string) => name,
     collectorReportError: (error: Error, context: unknown) => {
@@ -95,6 +99,7 @@ function everythingLogged() {
 beforeEach(() => {
   logCalls.length = 0;
   reportedErrors.length = 0;
+  ingestedSpanCount = 0;
 });
 
 describe("given a span that fails schema validation", () => {
@@ -189,6 +194,54 @@ describe("given a spans field that is not an array", () => {
       const log = logCalls.find((call) => call.message.includes("expecting array"));
       expect((log?.fields as Record<string, unknown> | undefined)?.receivedType).toBe("string");
       expect(everythingLogged()).not.toContain(CUSTOMER_SECRET);
+    });
+  });
+});
+
+describe("given a span whose time cannot be stored", () => {
+  const span = (spanId: string, timestamps: { started_at: number; finished_at: number }) => ({
+    type: "span",
+    span_id: spanId,
+    trace_id: "trace-1",
+    timestamps,
+  });
+
+  describe("when its start time is zero and a valid sibling arrives with it", () => {
+    /** @scenario "A span whose start time cannot be stored is rejected at ingestion" */
+    it("drops only that span, names the field, and still dispatches the sibling", async () => {
+      const response = await postCollector({
+        trace_id: "trace-1",
+        spans: [
+          span("span-1", { started_at: 0, finished_at: NOW }),
+          span("span-2", { started_at: NOW, finished_at: NOW }),
+        ],
+      });
+
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as {
+        partialSuccess: { rejectedSpans: number; errorMessage: string };
+      };
+      expect(body.partialSuccess.rejectedSpans).toBe(1);
+      expect(body.partialSuccess.errorMessage).toContain("started_at");
+      expect(ingestedSpanCount).toBe(1);
+    });
+  });
+
+  describe("when its end time is zero", () => {
+    /** @scenario "A span whose start time cannot be stored is rejected at ingestion" */
+    it("drops it, since the end time is written to the same kind of column", async () => {
+      const response = await postCollector({
+        trace_id: "trace-1",
+        spans: [span("span-1", { started_at: NOW, finished_at: 0 })],
+      });
+
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as {
+        partialSuccess: { rejectedSpans: number; errorMessage: string };
+      };
+      expect(body.partialSuccess.rejectedSpans).toBe(1);
+      expect(body.partialSuccess.errorMessage).toContain("finished_at");
+      expect(ingestedSpanCount).toBe(0);
     });
   });
 });

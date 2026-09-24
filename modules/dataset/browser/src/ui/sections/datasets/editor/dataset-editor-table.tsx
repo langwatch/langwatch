@@ -22,6 +22,7 @@ import { api } from "@langwatch/browser-trpc/workflow-api";
 import { downloadCsv } from "@langwatch/csv/download";
 import {
   type AutosaveState,
+  type DatasetAttachmentSlot,
   type DatasetTableContextValue,
   DatasetTableProvider,
   type DatasetTableRowData,
@@ -62,6 +63,7 @@ import {
   plainRecordCount,
   searchFailedMessage,
 } from "../../../../model/dataset-editor-copy.ts";
+import { AttachmentCell } from "../../attachment-cell.tsx";
 import { AddOrEditDatasetDrawer } from "../add-or-edit-dataset-drawer.tsx";
 import { AddRowsFromCSVModal } from "../add-rows-from-csv-modal.tsx";
 
@@ -90,6 +92,8 @@ const MAX_ROWS_WITHOUT_VIRTUALIZATION = 100;
  *  page comfortably fits the virtualized viewport while keeping each read
  *  bounded — an s3_jsonl page touches only the chunks overlapping the window. */
 const DATASET_EDITOR_PAGE_SIZE = 50;
+
+const renderAttachment = (slot: DatasetAttachmentSlot): ReactNode => <AttachmentCell {...slot} />;
 
 const renderImage = (value: string): ReactNode | null => {
   const imageUrl = getImageUrl(value);
@@ -647,6 +651,7 @@ export function DatasetEditorTable({
       toggleCellExpanded,
       toggleRowSelection,
       renderImage,
+      renderAttachment,
       editorPortalRef,
     }),
     [

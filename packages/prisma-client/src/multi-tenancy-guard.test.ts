@@ -635,6 +635,53 @@ describe("guardProjectId — SCOPED_MODELS (SystemMigrationTenantState)", () => 
       ).rejects.toThrow(/migrationName and tenantId/);
     });
   });
+
+  describe("when the re-drive asks whether any named migration has a tenant left to move", () => {
+    /** @scenario The periodic re-drive reads across the migrations it names */
+    it("passes the guard - a finite list of migrations is as bounded as one", async () => {
+      await expect(
+        runGuard({
+          model: "SystemMigrationTenantState",
+          action: "findFirst",
+          args: {
+            where: {
+              migrationName: {
+                in: ["authz-team-user-backfill", "identity-account-linkage"],
+              },
+              status: { in: ["parked", "migrated"] },
+            },
+            select: { tenantId: true },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when findFirst names an empty list of migrations", () => {
+    it("refuses - an empty list bounds nothing", async () => {
+      await expect(
+        runGuard({
+          model: "SystemMigrationTenantState",
+          action: "findFirst",
+          args: { where: { migrationName: { in: [] } } },
+        }),
+      ).rejects.toThrow(/migrationName or tenantId/);
+    });
+  });
+
+  describe("when deleteMany names a list of migrations", () => {
+    it("refuses - a list of migrations is still a fleet-wide write", async () => {
+      await expect(
+        runGuard({
+          model: "SystemMigrationTenantState",
+          action: "deleteMany",
+          args: {
+            where: { migrationName: { in: ["authz-team-user-backfill"] } },
+          },
+        }),
+      ).rejects.toThrow(/bulk write/);
+    });
+  });
 });
 
 describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {

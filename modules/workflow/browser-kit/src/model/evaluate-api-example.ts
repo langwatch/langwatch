@@ -5,6 +5,9 @@
  */
 export const IMAGE_EXAMPLE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...";
 
+/** A placeholder file value for the snippet: truncated on purpose, not a usable file. */
+export const FILE_EXAMPLE = "data:application/pdf;base64,JVBERi0xLjQKJcfsj6IK...";
+
 /**
  * Example scalar value for an entry field type, or undefined when not a
  * scalar. The evaluate endpoint only accepts string/number/boolean params,
@@ -16,6 +19,8 @@ export function exampleParameterValue(type: string): string | number | boolean |
       return "example";
     case "image":
       return IMAGE_EXAMPLE;
+    case "file":
+      return FILE_EXAMPLE;
     case "float":
       return 0.5;
     case "int":

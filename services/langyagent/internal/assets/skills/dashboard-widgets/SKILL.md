@@ -19,7 +19,7 @@ Reach for this instead of `lwql-charts` when the visualization is not a plain Ve
 
 LangWatchQL analytics is switched per project. If any command answers with error code `lwql_not_enabled`, the feature is off for this project — tell the user, do not retry.
 
-Every `dashboard-widget` command runs against whatever project `LANGWATCH_PROJECT_ID` names in the environment. That variable is normally already set for you — do not invent a `langwatch project ...` command to look it up (there isn't one; `langwatch projects list` is the read command, plural). Only pass `--project <slug-or-id>` on a command yourself when you need to target a _different_ project than the one already in scope. If a command fails with "No project is in scope", set `LANGWATCH_PROJECT_ID` or pass `--project` — do not retry the same call unchanged.
+Every `dashboard-widget` command runs against whatever project `LANGWATCH_PROJECT_ID` names in the environment. That variable is normally already set for you — do not invent a `langwatch project ...` command to look it up (there isn't one; `langwatch projects list` is the read command, plural). Only pass `--project <slug-or-id>` on a command yourself when you need to target a *different* project than the one already in scope. If a command fails with "No project is in scope", set `LANGWATCH_PROJECT_ID` or pass `--project` — do not retry the same call unchanged.
 
 ## Step 1: Discover the schema before writing any SQL
 
@@ -83,8 +83,7 @@ export default function Widget() {
   const { data, isLoading, isError, error } = LW.useChartQuery("cost_by_model", {});
 
   if (isError) return <div style={{ fontSize: 11, color: "#b00" }}>{error.message}</div>;
-  if (isLoading || data === null)
-    return <div style={{ fontSize: 11, color: "#666" }}>Loading…</div>;
+  if (isLoading || data === null) return <div style={{ fontSize: 11, color: "#666" }}>Loading…</div>;
 
   return <LwqlChart data={data} />;
 }

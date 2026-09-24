@@ -3,7 +3,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { IdentityUsersRepository } from "../identity-users.repository.ts";
 
 /** The one model the identity guards touch on the legacy side of the fork. */
-export type PrismaIdentityUsersDatabase = Pick<PrismaClient, "user" | "$executeRaw">;
+export type PrismaIdentityUsersDatabase = Pick<PrismaClient, "user" | "$executeRaw" | "$queryRaw">;
 
 /**
  * The two `User` columns identity touches. `userHashKey` is written only
@@ -56,10 +56,17 @@ export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
     if (!user) return null;
     if (!user.email) return { email: null, emailVerified: !!user.emailVerified, holders: 0 };
 
-    const holders = await this.database.user.count({
-      where: { email: { equals: user.email, mode: "insensitive" } },
-    });
-    return { email: user.email, emailVerified: !!user.emailVerified, holders };
+    // Exact equality, not Prisma's insensitive `equals`: that compiles to ILIKE,
+    // where an `_` in the address matches any character and counts a stranger.
+    const [row] = await this.database.$queryRaw<{ holders: bigint }[]>`
+      -- @tenancy: an address names one account fleet-wide or it names nobody.
+      SELECT count(*) AS "holders" FROM "User" WHERE lower("email") = lower(${user.email})
+    `;
+    return {
+      email: user.email,
+      emailVerified: !!user.emailVerified,
+      holders: Number(row?.holders ?? 0),
+    };
   }
 
   /**

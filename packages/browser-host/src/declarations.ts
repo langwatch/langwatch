@@ -18,9 +18,13 @@ export type UiAuthenticationOverviewCardProps = {
   canReadMembership: boolean;
 };
 
-/** What a screen hands the join offer; the dashboard names its organization, onboarding not. */
+/**
+ * What a screen hands the join offer. `currentOrganizationId` is required: a
+ * string scopes to that organization, `null` means no organization context
+ * (onboarding), `undefined` means the caller's organization is still loading.
+ */
 export type UiJoinOfferProps = {
-  currentOrganizationId?: string | null;
+  currentOrganizationId: string | null | undefined;
   /** The way past, where "keep working on my own" is not what declining means. */
   dismissLabel?: string;
   onDismissed?: () => void;

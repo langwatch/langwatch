@@ -143,9 +143,11 @@ The non-negotiables, all lint-enforced:
   `transport/` (declarations only), `rules/` (pure functions). No `utils/`,
   `ports/`, `adapters/`, `lib/`, `helpers/`, `domain/`. Repository = owned
   state; channel = unowned messages; service = behaviour over both.
-- **No raw clients in module code.** Prisma, ClickHouse and Redis enter a
-  module only through a registry or channel factory and arrive as
-  repositories and channels. Only `repositories/prisma/**` names Prisma.
+- **No raw clients in module code.** Prisma, ClickHouse, Redis and object
+  storage enter a module only through a registry or channel factory and
+  arrive as repositories and channels. Only `repositories/prisma/**` names
+  Prisma. Uploads go to a signed URL and are attached by reference; no
+  module parses or buffers upload bytes (ADR-158).
 - **The four-way rule** — every dependency a module has is one of: derivable
   from supplied stores (build a repository/channel inside the module), another
   module's capability (a peer `*Api` token), a deployment fact (the module's
@@ -522,6 +524,7 @@ pipeline.
 | Inline `import(…)` | Top-level `import`/`import type` (lint-enforced). One exception: the SDK CLI startup path, where lazy import is load-bearing and pinned by a boot test |
 | Positional parameters | Named parameters via object destructuring: `fn({ a, b })` |
 | Repeating a docs page's frontmatter `title` as its first heading | The frontmatter renders as the H1 and lede — give the first section its own name |
+| `langwatch login`/`instrument` against a local instance with the machine's real config | They rewrite machine-global files and repoint every other session; export `LANGWATCH_CLI_CONFIG`, `CLAUDE_CONFIG_DIR` and `CODEX_HOME` under `<worktree>/.claude/tmp/dogfood/` first — `dev/docs/best_practices/dogfooding-isolation.md` |
 | Dogfooding agent-usage features with `claude -p` | Drive a real interactive session in a sub-tmux (`new-session -d`, `send-keys`, `capture-pane`); headless mode skips the lifecycle these features observe. Verify the data landed in the product |
 | Spawning a subagent without naming model, effort and context size | Every spawn states all three plus one clause why — routing table in `.claude/coordinator/COORDINATOR.md` §3 |
 

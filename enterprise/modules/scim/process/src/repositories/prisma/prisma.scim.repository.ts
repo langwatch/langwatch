@@ -587,6 +587,50 @@ export class PrismaScimRepository extends ScimRepository {
     const result = await this.prisma.scimToken.deleteMany({ where: input });
     return result.count;
   }
+  async findTokenIdsForConnection(input: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<string[]> {
+    const rows = await this.prisma.scimToken.findMany({ where: input, select: { id: true } });
+    return rows.map(({ id }) => id);
+  }
+
+  /** The target's own identities are re-read inside the transaction, so a
+   *  push landing mid-move cannot collide with a moved row. */
+  async moveDirectoryToConnection({
+    organizationId,
+    fromConnectionId,
+    toConnectionId,
+    tokenIds,
+  }: {
+    organizationId: string;
+    fromConnectionId: string;
+    toConnectionId: string;
+    tokenIds: readonly string[];
+  }): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const ownExternalIds = await tx.scimExternalId.findMany({
+        where: { organizationId, connectionId: toConnectionId },
+        select: { externalId: true },
+      });
+      await tx.scimToken.updateMany({
+        where: { organizationId, connectionId: fromConnectionId, id: { in: [...tokenIds] } },
+        data: { connectionId: toConnectionId },
+      });
+      await tx.scimExternalId.deleteMany({
+        where: {
+          organizationId,
+          connectionId: fromConnectionId,
+          externalId: { in: ownExternalIds.map(({ externalId }) => externalId) },
+        },
+      });
+      await tx.scimExternalId.updateMany({
+        where: { organizationId, connectionId: fromConnectionId },
+        data: { connectionId: toConnectionId },
+      });
+    });
+  }
+
   findTokenByHash(hashedToken: string): Promise<ScimTokenIdentity | null> {
     return this.prisma.scimToken.findFirst({
       where: { hashedToken },

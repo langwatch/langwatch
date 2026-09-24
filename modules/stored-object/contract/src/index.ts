@@ -14,3 +14,4 @@ export * from "./stored-object.trpc.ts";
 export * from "./storage-uri.ts";
 export * from "./uploads.ts";
 export * from "./stored-object.config.ts";
+export * from "./stored-object-purposes.ts";

@@ -1,4 +1,4 @@
-import type { InstantEvalSearchTarget } from "@langwatch/trace-contract";
+import type { InstantEvalSearchTarget, ModelTrouble } from "@langwatch/trace-contract";
 
 /**
  * What the router hands over when Enter on a sentence is a judgement each
@@ -24,4 +24,8 @@ export interface InstantEvalRoutePayload {
   /** The sentence quoted as one phrase, merged with `otherQuery`. */
   fallbackQuery: string;
   timeRange: { from: number; to: number };
+  /** Set when the question is the sentence as typed because no model rewrote it. */
+  modelTrouble?: ModelTrouble;
+  /** The handled code of that failure, when it carried one. */
+  modelErrorCode?: string;
 }

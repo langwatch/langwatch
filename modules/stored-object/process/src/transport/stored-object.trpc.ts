@@ -7,12 +7,21 @@ import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { StoredObjectApi, storedObjectTrpc } from "@langwatch/stored-object-contract";
 
 export const storedObjectTrpcTransport = defineTrpcRouter(StoredObjectApi, storedObjectTrpc)
-  /**
-   * Either permission suffices: one object is trace media for one viewer and
-   * scenario media for another. The primary surface's permission is named
-   * first, so a denial names `traces:view` — `/api/files/:id`'s own gate.
-   */
+  /** Main's two-step read check: any file-view permission here, the purpose's in the service. */
   .procedure("headById")
-  .withPermission({ kind: "permission-any", permissions: ["traces:view", "scenarios:view"] })
-  .handle(async ({ app, input }) => app.headById({ projectId: input.projectId, id: input.id }))
+  .withPermission({
+    kind: "permission-any",
+    permissions: ["traces:view", "scenarios:view", "datasets:view"],
+  })
+  .handle(async ({ app, input, actor }) =>
+    app.headById({ projectId: input.projectId, id: input.id }, actor),
+  )
+
+  .procedure("createUpload")
+  .withPermission("project:update")
+  .handle(async ({ app, input }) => app.createUpload(input))
+
+  .procedure("confirmUpload")
+  .withPermission("project:update")
+  .handle(async ({ app, input }) => app.confirmUpload(input))
   .build();

@@ -341,7 +341,7 @@ describe("given the Model Providers screen", () => {
 
         fireEvent.click(document.querySelector('[data-menu-item="test"]')!);
 
-        expect(await screen.findByText(/can't be tested automatically/)).toBeTruthy();
+        expect(await screen.findByText(/can't be tested from here/)).toBeTruthy();
         expect(screen.queryByText("Connection works")).toBeNull();
       });
 

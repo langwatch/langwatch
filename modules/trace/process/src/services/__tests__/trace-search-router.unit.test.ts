@@ -15,6 +15,7 @@ import {
   input,
   NoModel,
   ProviderDisabled,
+  ProviderError,
   RANGE,
 } from "./trace-search-router.harness.ts";
 
@@ -77,7 +78,6 @@ describe("given the classifier is configured", () => {
         kind: "free_text",
         query: '"annoyed users"',
         decidedBy: "fallback",
-        isModelUnavailable: false,
         fellBackFrom: "filter",
       });
     });
@@ -94,8 +94,8 @@ describe("given the classifier is configured", () => {
 
       expect(result).toMatchObject({
         kind: "free_text",
-        isModelUnavailable: true,
         fellBackFrom: "filter",
+        modelTrouble: "no_model",
       });
     });
   });
@@ -116,8 +116,8 @@ describe("given the classifier is configured", () => {
         kind: "free_text",
         query: '"failing calls"',
         decidedBy: "fallback",
-        isModelUnavailable: true,
         fellBackFrom: "filter",
+        modelTrouble: "no_model",
       });
     });
   });
@@ -158,6 +158,47 @@ describe("given the classifier is configured", () => {
       expect(result).toMatchObject({ kind: "instant_eval", target: "traces" });
     });
 
+    /** @scenario "A judge question no model could write is judged as typed" */
+    it("judges the sentence as typed when the question cannot be written", async () => {
+      const d = deps({
+        classifier: answering("instant_eval"),
+        buildQuestion: vi.fn(async () => {
+          throw new ProviderError();
+        }),
+      });
+      const result = await router(d).route(input({ text: "frustrated users status:error" }));
+      expect(result).toEqual({
+        kind: "instant_eval",
+        question: { instructions: "frustrated users" },
+        target: "traces",
+        otherQuery: "status:error",
+        fallbackQuery: 'status:error AND "frustrated users"',
+        decidedBy: "fallback",
+        modelTrouble: "model_failed",
+        modelErrorCode: "ai_query_provider_error",
+      });
+      expect(d.recordDecision).toHaveBeenCalledWith({
+        route: "instant_eval",
+        decidedBy: "fallback",
+      });
+    });
+
+    /** @scenario "A project with no model still judges the sentence" */
+    it("names the missing model when there is none to write the question", async () => {
+      const d = deps({
+        classifier: answering("instant_eval"),
+        buildQuestion: vi.fn(async () => {
+          throw new NoModel();
+        }),
+      });
+      const result = await router(d).route(input({ text: "frustrated users" }));
+      expect(result).toMatchObject({
+        kind: "instant_eval",
+        question: { instructions: "frustrated users" },
+        modelTrouble: "no_model",
+      });
+    });
+
     /** @scenario "An existing evaluator answers the judgement as a filter" */
     it("returns a filter with the reason when an existing evaluator answers it", async () => {
       const d = deps({
@@ -193,7 +234,6 @@ describe("given the classifier is configured", () => {
         kind: "free_text",
         query: 'service:api AND "cannot connect to database"',
         decidedBy: "classifier",
-        isModelUnavailable: false,
       });
       expect(d.buildFilter).not.toHaveBeenCalled();
       expect(d.routeWithModel).not.toHaveBeenCalled();
@@ -273,11 +313,14 @@ describe("given the classifier is configured", () => {
       expect(d.routeWithModel).toHaveBeenCalledWith(
         expect.objectContaining({ isInstantEvalAvailable: false }),
       );
+      // The phrase is what the model settles on once the closed route is off
+      // the table, so it is still the model's decision. Production never even
+      // reaches this guard: the decision reader downgrades a judgement answer
+      // to `free_text` before the router sees it.
       expect(result).toEqual({
         kind: "free_text",
         query: '"annoyed users"',
         decidedBy: "model",
-        isModelUnavailable: false,
       });
     });
 

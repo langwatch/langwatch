@@ -8,6 +8,7 @@ import type { EventSourcing } from "@langwatch/eventing";
 import type { Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
+import type { Instant } from "@langwatch/time";
 
 /** Now, read from one place, so a test moves time without touching a module. */
 export interface Clock {
@@ -28,12 +29,6 @@ export interface SecretResolver {
   find(key: string): string | undefined;
 }
 
-/** One stored object, as every module that keeps a blob reads and writes it. */
-export interface StoredObject {
-  readonly body: Uint8Array;
-  readonly contentType: string | undefined;
-}
-
 /**
  * Which project's object this is. Every call names one, since the member
  * resolves bucket, endpoint and credentials from it — no client can be held
@@ -42,13 +37,58 @@ export interface StoredObject {
 export interface StoredObjectAddress {
   readonly projectId: string;
   readonly key: string;
+  /** Where the object was recorded: read, digest and remove go there; writes ignore it. */
+  readonly location?: ObjectStorageDestination;
 }
 
-/** Blob storage, routed to the project's own account where it has one. */
+/** What a writer states about a body before sending it. */
+export interface ObjectBodyFacts {
+  readonly byteLength: number;
+  readonly contentType: string;
+}
+
+/** An object's size and lowercase-hex SHA-256, measured over its bytes as they streamed. */
+export interface ObjectDigest {
+  readonly byteLength: number;
+  readonly sha256: string;
+}
+
+/** What a writer states about an upload a client will PUT, and when its URL lapses. */
+export type UploadFacts = ObjectBodyFacts & Readonly<{ expiresAt: Instant }>;
+
+/** Where a client PUTs an upload: a URL the backend signed, or the process's own signed route. */
+export type SignedObjectUpload =
+  | Readonly<{ kind: "direct"; url: string; headers: Readonly<Record<string, string>> }>
+  | Readonly<{ kind: "through-process" }>;
+
+/** Where one project's objects live. */
+export type ObjectStorageDestination =
+  | Readonly<{ kind: "s3"; bucket: string }>
+  | Readonly<{ kind: "azure"; accountName: string; container: string }>
+  | Readonly<{ kind: "file"; root: string }>
+  | Readonly<{ kind: "memory" }>;
+
+/**
+ * Object storage over S3, Azure Blob or the filesystem, routed per project
+ * (ADR-158). Every body is a stream and every digest is taken over one.
+ */
 export interface ObjectStorage {
-  put(at: StoredObjectAddress, body: Uint8Array, contentType?: string): Promise<void>;
-  find(at: StoredObjectAddress): Promise<StoredObject | undefined>;
+  /** Counts and hashes while writing; refuses a body longer or shorter than declared. */
+  write(
+    at: StoredObjectAddress,
+    body: AsyncIterable<Uint8Array>,
+    facts: ObjectBodyFacts,
+  ): Promise<ObjectDigest>;
+  /** The object's bytes; an absent object refuses with StoredObjectNotFoundError. */
+  read(at: StoredObjectAddress): Promise<AsyncIterable<Uint8Array>>;
+  /** The backend's SHA-256 where it holds one, else the object streamed back through the hash. */
+  digest(at: StoredObjectAddress): Promise<ObjectDigest>;
+  /** Removes the object; an absent one is already removed. */
   remove(at: StoredObjectAddress): Promise<void>;
+  signUpload(at: StoredObjectAddress, facts: UploadFacts): Promise<SignedObjectUpload>;
+  destination(projectId: string): Promise<ObjectStorageDestination>;
+  /** Resolves when the project's destination answers with its credentials, and throws otherwise. */
+  probe(projectId: string): Promise<void>;
 }
 
 /** One message, already rendered, as the mail member sends it. */

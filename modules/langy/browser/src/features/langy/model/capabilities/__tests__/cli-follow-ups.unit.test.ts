@@ -104,6 +104,22 @@ describe("followUpsForResult", () => {
     });
   });
 
+  describe("given a scenario Langy just created", () => {
+    /** @scenario "A created scenario earns no bare simulations chip" */
+    it("offers no surface chip; the run is offered on the card itself", () => {
+      expect(
+        followUpsForResult({
+          name: "langwatch.scenario.create",
+          state: "output-available",
+          output: JSON.stringify({
+            id: "scenario_1",
+            name: "Customer support agent",
+          }),
+        }),
+      ).toEqual([]);
+    });
+  });
+
   describe("given an analytics query that returned metrics", () => {
     it("offers to pin them to a dashboard", () => {
       const suggestions = followUpsForResult({

@@ -1,4 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { AuthApi } from "@langwatch/auth-contract";
 import type { EnsuredPersonalWorkspace, OrganizationApi } from "@langwatch/organization-contract";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 import { USER_AVATAR_MAX_BYTES, type UserFullProfile } from "@langwatch/user-contract";
@@ -56,7 +57,6 @@ class StubRepository implements UserRepository {
   setPasskeyNudgeDismissedAt = vi.fn(async () => undefined);
   findJoinOfferDismissedDomains = vi.fn(async (): Promise<string[]> => ["acme.com"]);
   addJoinOfferDismissedDomain = vi.fn(async () => undefined);
-  findSsoStatus = vi.fn(async () => ({ pendingSsoSetup: false }));
   findTraceExplorerTourPreference = vi.fn(async () => ({
     dismissed: false,
     dismissedAt: null,
@@ -83,7 +83,7 @@ class StubAvatarStorage implements UserAvatarStorage {
 const PNG =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
-function createService() {
+function createService({ auth = createApiFixture<AuthApi>({}) }: { auth?: AuthApi } = {}) {
   const repository = new StubRepository();
   const avatarStorage = new StubAvatarStorage();
   const organizations = createApiFixture<OrganizationApi>({
@@ -93,6 +93,7 @@ function createService() {
     service: UserService.create({
       repository,
       organizations,
+      auth,
       avatarStorage,
       credentialIssuer: ISSUER,
       now: () => NOW,
@@ -341,6 +342,7 @@ describe("given a user whose photo came from their identity provider", () => {
       service: UserService.create({
         repository,
         organizations,
+        auth: createApiFixture<AuthApi>({}),
         avatarStorage: new StubAvatarStorage(),
         credentialIssuer: ISSUER,
         now: () => NOW,
@@ -450,6 +452,57 @@ describe("given a signed-in user on their profile settings", () => {
 
       expect(avatarStorage.store).not.toHaveBeenCalled();
       expect(repository.setAvatar).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("getSsoStatus()", () => {
+  const askedOf = () => {
+    const asked: { userId: string; email: string }[] = [];
+    const auth = createApiFixture<AuthApi>({
+      getSsoSetupStatus: async (input) => {
+        asked.push(input);
+        return { pendingSsoSetup: false };
+      },
+    });
+    return { auth, asked };
+  };
+
+  describe("given the flag is not set", () => {
+    it("reports not pending without asking auth", async () => {
+      const { auth, asked } = askedOf();
+      const { service } = createService({ auth });
+
+      await expect(service.getSsoStatus({ id: "user-1" })).resolves.toEqual({
+        pendingSsoSetup: false,
+      });
+      expect(asked).toEqual([]);
+    });
+  });
+
+  describe("given the flag is set", () => {
+    it("answers with auth's live reading of the accounts held now", async () => {
+      const { auth, asked } = askedOf();
+      const { service, repository } = createService({ auth });
+      repository.findById.mockResolvedValue({ ...user, pendingSsoSetup: true });
+
+      await expect(service.getSsoStatus({ id: "user-1" })).resolves.toEqual({
+        pendingSsoSetup: false,
+      });
+      expect(asked).toEqual([{ userId: "user-1", email: "ada@example.com" }]);
+    });
+  });
+
+  describe("given the flag is set on a user with no address", () => {
+    it("stays pending, since no organization can be found to satisfy", async () => {
+      const { auth, asked } = askedOf();
+      const { service, repository } = createService({ auth });
+      repository.findById.mockResolvedValue({ ...user, email: null, pendingSsoSetup: true });
+
+      await expect(service.getSsoStatus({ id: "user-1" })).resolves.toEqual({
+        pendingSsoSetup: true,
+      });
+      expect(asked).toEqual([]);
     });
   });
 });

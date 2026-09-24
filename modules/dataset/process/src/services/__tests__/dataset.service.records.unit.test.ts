@@ -4,7 +4,10 @@ import { InvalidColumnError } from "@langwatch/dataset-contract";
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
+import {
+  createDatasetTestAttachments,
+  createDatasetTestRequestBounds,
+} from "../../app/__tests__/dataset.fixture.ts";
 import type { DatasetRecordRepository } from "../../repositories/dataset-record.repository.ts";
 import type { DatasetRepository } from "../../repositories/dataset.repository.ts";
 import { DatasetService } from "../dataset.service.ts";
@@ -55,6 +58,7 @@ function service(overrides: { columnTypes?: { name: string; type: string }[] } =
       records,
       generateId: () => "generated-id",
       requestBounds: createDatasetTestRequestBounds(),
+      attachments: createDatasetTestAttachments(),
     }),
     update,
     createMany,

@@ -3678,6 +3678,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dataset/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @deprecated
+         * @description Upload a file for an image or file column and get the reference a cell holds. The project is named by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional `datasetId` field.
+         */
+        post: operations["postApiDatasetAttachments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4780,6 +4800,17 @@ export interface operations {
                                 id: string;
                                 url: string;
                                 parameterNotes: string[];
+                                scope: {
+                                    /** @constant */
+                                    kind: "shared";
+                                } | {
+                                    /** @constant */
+                                    kind: "owner";
+                                } | {
+                                    /** @constant */
+                                    kind: "host";
+                                    hostLabel: string;
+                                };
                             }[];
                             heartbeatIntervalMs: number;
                             instanceId: string;
@@ -9632,7 +9663,7 @@ export interface operations {
                             columnTypes: {
                                 name: string;
                                 /** @enum {string} */
-                                type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                             }[];
                             /** Format: date-time */
                             createdAt: string;
@@ -9682,7 +9713,7 @@ export interface operations {
                     columnTypes?: {
                         name: string;
                         /** @enum {string} */
-                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                     }[];
                 };
             };
@@ -9701,7 +9732,7 @@ export interface operations {
                         columnTypes: {
                             name: string;
                             /** @enum {string} */
-                            type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                            type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                         }[];
                         /** Format: date-time */
                         createdAt: string;
@@ -9895,7 +9926,7 @@ export interface operations {
                         columnTypes: {
                             name: string;
                             /** @enum {string} */
-                            type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                            type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                         }[];
                         /** Format: date-time */
                         createdAt: string;
@@ -9961,7 +9992,7 @@ export interface operations {
                     columnTypes?: {
                         name: string;
                         /** @enum {string} */
-                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                     }[];
                 };
             };
@@ -9980,7 +10011,7 @@ export interface operations {
                         columnTypes: {
                             name: string;
                             /** @enum {string} */
-                            type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                            type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                         }[];
                         /** Format: date-time */
                         createdAt: string;
@@ -19134,7 +19165,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -19160,7 +19191,7 @@ export interface operations {
                                     id?: string;
                                     name: string;
                                     /** @enum {string} */
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -19178,7 +19209,7 @@ export interface operations {
                                         id?: string;
                                         name: string;
                                         /** @enum {string} */
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -19286,7 +19317,7 @@ export interface operations {
                     inputs?: {
                         identifier: string;
                         /** @enum {string} */
-                        type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                        type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                     }[];
                     outputs?: {
                         identifier: string;
@@ -19342,7 +19373,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -19368,7 +19399,7 @@ export interface operations {
                                     id?: string;
                                     name: string;
                                     /** @enum {string} */
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -19386,7 +19417,7 @@ export interface operations {
                                         id?: string;
                                         name: string;
                                         /** @enum {string} */
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -19925,7 +19956,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -19951,7 +19982,7 @@ export interface operations {
                                     id?: string;
                                     name: string;
                                     /** @enum {string} */
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -19969,7 +20000,7 @@ export interface operations {
                                         id?: string;
                                         name: string;
                                         /** @enum {string} */
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -20104,7 +20135,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -20130,7 +20161,7 @@ export interface operations {
                                     id?: string;
                                     name: string;
                                     /** @enum {string} */
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -20148,7 +20179,7 @@ export interface operations {
                                         id?: string;
                                         name: string;
                                         /** @enum {string} */
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -20285,7 +20316,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -20311,7 +20342,7 @@ export interface operations {
                                     id?: string;
                                     name: string;
                                     /** @enum {string} */
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -20329,7 +20360,7 @@ export interface operations {
                                         id?: string;
                                         name: string;
                                         /** @enum {string} */
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -20445,7 +20476,7 @@ export interface operations {
                     inputs?: {
                         identifier: string;
                         /** @enum {string} */
-                        type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                        type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                     }[];
                     outputs?: {
                         identifier: string;
@@ -20504,7 +20535,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -20530,7 +20561,7 @@ export interface operations {
                                     id?: string;
                                     name: string;
                                     /** @enum {string} */
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -20548,7 +20579,7 @@ export interface operations {
                                         id?: string;
                                         name: string;
                                         /** @enum {string} */
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -20758,7 +20789,7 @@ export interface operations {
                         inputs?: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -20796,7 +20827,7 @@ export interface operations {
                                     id?: string;
                                     name: string;
                                     /** @enum {string} */
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -20814,7 +20845,7 @@ export interface operations {
                                         id?: string;
                                         name: string;
                                         /** @enum {string} */
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -20875,7 +20906,7 @@ export interface operations {
                             inputs: {
                                 identifier: string;
                                 /** @enum {string} */
-                                type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                                type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                             }[];
                             outputs: {
                                 identifier: string;
@@ -20901,7 +20932,7 @@ export interface operations {
                                         id?: string;
                                         name: string;
                                         /** @enum {string} */
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -20919,7 +20950,7 @@ export interface operations {
                                             id?: string;
                                             name: string;
                                             /** @enum {string} */
-                                            type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                            type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                         }[];
                                     };
                                 };
@@ -20960,7 +20991,7 @@ export interface operations {
                                 inputs: {
                                     identifier: string;
                                     /** @enum {string} */
-                                    type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                                    type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                                 }[];
                                 outputs: {
                                     identifier: string;
@@ -20998,7 +21029,7 @@ export interface operations {
                                             id?: string;
                                             name: string;
                                             /** @enum {string} */
-                                            type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                            type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                         }[];
                                     };
                                 };
@@ -21016,7 +21047,7 @@ export interface operations {
                                                 id?: string;
                                                 name: string;
                                                 /** @enum {string} */
-                                                type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                                type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                             }[];
                                         };
                                     };
@@ -26964,6 +26995,134 @@ export interface operations {
                             };
                         }[];
                         trace?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiDatasetAttachments: {
+        parameters: {
+            query: {
+                /** @description The project the file is stored for. */
+                projectId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description The file to store.
+                     */
+                    file: string;
+                    /** @description The dataset that owns the file. Omit it while the dataset is still a draft. */
+                    datasetId?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The reference the cell holds, and the file's metadata. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The value to write into the cell, and the address the file is served from. */
+                        url: string;
+                        /** @description The file name the reference carries. */
+                        name: string;
+                        /** @description The media type the file is stored under. */
+                        mediaType: string;
+                        /** @description The size of the stored file, in bytes. */
+                        sizeBytes: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description The file is larger than the upload limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description The media type is not accepted. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Too many uploads for this project in one minute. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
                     };
                 };
             };

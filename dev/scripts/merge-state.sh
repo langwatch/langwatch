@@ -9,12 +9,13 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
 
-if [ ! -f .git/MERGE_HEAD ]; then
+MERGE_HEAD_FILE=$(git rev-parse --git-path MERGE_HEAD)
+if [ ! -f "$MERGE_HEAD_FILE" ]; then
   printf 'no merge in progress.\n'
   exit 0
 fi
 
-THEIRS=$(cat .git/MERGE_HEAD)
+THEIRS=$(cat "$MERGE_HEAD_FILE")
 OURS=$(git rev-parse HEAD)
 BASE=$(git merge-base "$OURS" "$THEIRS")
 

@@ -254,7 +254,7 @@ async function ingestCollectorBody(input: {
     reportEvaluation: app.reportEvaluation,
   });
 
-  const { freshSpans, droppedOldSpans } = dispatch.partitionFreshSpans(spans, {
+  const { freshSpans, droppedOldSpans, droppedUnstorableSpans } = dispatch.partitionFreshSpans(spans, {
     projectId: project.id,
     traceId,
   });
@@ -263,6 +263,7 @@ async function ingestCollectorBody(input: {
     projectId: project.id,
     traceId,
     droppedOldSpans,
+    droppedUnstorableSpans,
     metadata,
     expectedOutput: params.expected_output,
   });

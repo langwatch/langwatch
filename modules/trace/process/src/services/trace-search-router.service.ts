@@ -15,6 +15,7 @@ import {
   type InstantEvalQuestionResult,
   type InstantEvalSearchTarget,
   type KnownProjectSignals,
+  type ModelFailure,
   type RouteSearchAvailability,
   type RouteSearchInput,
   type RouteSearchResult,
@@ -123,8 +124,27 @@ const MODEL_UNAVAILABLE_CODES: readonly string[] = [
   "model_provider_disabled",
 ];
 
-function isModelUnavailableError(error: unknown): boolean {
-  return error instanceof HandledError && MODEL_UNAVAILABLE_CODES.includes(error.code);
+/** Which of the two model problems this failure is, and the code it carried. */
+function modelFailureOf(error: unknown): ModelFailure {
+  if (!(error instanceof HandledError)) return { modelTrouble: "model_failed" };
+  if (MODEL_UNAVAILABLE_CODES.includes(error.code)) return { modelTrouble: "no_model" };
+  return { modelTrouble: "model_failed", modelErrorCode: error.code };
+}
+
+/** The cause inside the log message: the collector ships `msg` and drops `err`. */
+function describeCause(error: unknown): string {
+  if (error instanceof HandledError) {
+    const { meta } = error;
+    return [
+      error.code,
+      typeof meta.model === "string" ? meta.model : undefined,
+      typeof meta.provider === "string" ? meta.provider : undefined,
+      typeof meta.httpStatus === "number" ? `HTTP ${meta.httpStatus}` : undefined,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+  return error instanceof Error ? error.name : "unknown error";
 }
 
 /** A query the language parses, or not. */
@@ -250,17 +270,17 @@ export class TraceSearchRouterService {
         ...context.available,
       });
     } catch (error) {
-      const isModelUnavailable = isModelUnavailableError(error);
-      if (!isModelUnavailable) {
+      const failure = modelFailureOf(error);
+      if (failure.modelTrouble === "model_failed") {
         logger.warn(
           { projectId: input.projectId, err: error },
-          "Model could not route the search; searching the phrase instead",
+          `Model could not route the search; searching the phrase instead (${describeCause(error)})`,
         );
       }
       return this.freeText({
         context,
         decidedBy: "fallback",
-        isModelUnavailable,
+        failure,
         fellBackFrom: "routing",
       });
     }
@@ -286,12 +306,12 @@ export class TraceSearchRouterService {
   private freeText({
     context,
     decidedBy,
-    isModelUnavailable = false,
+    failure,
     fellBackFrom,
   }: {
     context: RouteContext;
     decidedBy: SearchRouteDecidedBy;
-    isModelUnavailable?: boolean;
+    failure?: ModelFailure;
     fellBackFrom?: SearchRouteKind | "routing";
   }): RouteSearchResult {
     this.deps.recordDecision({ route: "free_text", decidedBy });
@@ -299,8 +319,8 @@ export class TraceSearchRouterService {
       kind: "free_text",
       query: phraseSearch(context),
       decidedBy,
-      isModelUnavailable,
       ...(fellBackFrom ? { fellBackFrom } : {}),
+      ...failure,
     };
   }
 
@@ -329,10 +349,12 @@ export class TraceSearchRouterService {
     context,
     question,
     decidedBy,
+    failure,
   }: {
     context: RouteContext;
-    question: { instructions: string; criteria: [string, string] };
+    question: { instructions: string; criteria?: [string, string] };
     decidedBy: SearchRouteDecidedBy;
+    failure?: ModelFailure;
   }): RouteSearchResult {
     this.deps.recordDecision({ route: "instant_eval", decidedBy });
     return {
@@ -342,6 +364,7 @@ export class TraceSearchRouterService {
       otherQuery: context.explicitQuery,
       fallbackQuery: phraseSearch(context),
       decidedBy,
+      ...failure,
     };
   }
 
@@ -373,12 +396,12 @@ export class TraceSearchRouterService {
     } catch (error) {
       logger.warn(
         { projectId: context.input.projectId, err: error },
-        "Filter route could not be built; searching the phrase instead",
+        `Filter route could not be built; searching the phrase instead (${describeCause(error)})`,
       );
       return this.freeText({
         context,
         decidedBy: "fallback",
-        isModelUnavailable: isModelUnavailableError(error),
+        failure: modelFailureOf(error),
         fellBackFrom: "filter",
       });
     }
@@ -403,13 +426,14 @@ export class TraceSearchRouterService {
     } catch (error) {
       logger.warn(
         { projectId: context.input.projectId, err: error },
-        "Instant Eval question could not be written; searching the phrase instead",
+        `Instant Eval question could not be written; judging the sentence as typed (${describeCause(error)})`,
       );
-      return this.freeText({
+      // A judgement of the words as written, not a phrase match: what a hand-typed chip does.
+      return this.instantEval({
         context,
+        question: { instructions: context.sentence },
         decidedBy: "fallback",
-        isModelUnavailable: isModelUnavailableError(error),
-        fellBackFrom: "instant_eval",
+        failure: modelFailureOf(error),
       });
     }
     if (built.kind === "filter") {

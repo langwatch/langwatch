@@ -18,6 +18,8 @@ export type UiRedirectDescriptor = {
    * renders this.
    */
   readonly pinParams?: Readonly<Record<string, string>>;
+  /** Query params carried across under a new key. */
+  readonly renameParams?: Readonly<Record<string, string>>;
   /**
    * A rename table for the first sub-path segment: `/admin/user/u_1`
    * reaches `/ops/backoffice/users/u_1`. Case-insensitive; an unnamed
@@ -648,6 +650,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
                 "drawer.open": "traceV2Details",
                 "drawer.traceId": ":trace",
               },
+              renameParams: { t: "drawer.t" },
             },
           },
 

@@ -49,6 +49,22 @@ export type ConfirmStoredObjectUploadInput = StoredObjectsConfirmUploadInput;
 
 export type DeleteStoredObjectInput = StoredObjectsDeleteInput;
 
+/** A web stream's reader side, the shape the REST runtime hands a raw request body over in. */
+export interface StoredObjectUploadBody {
+  getReader(): {
+    read(): Promise<{ done: true; value?: Uint8Array } | { done: false; value: Uint8Array }>;
+    releaseLock(): void;
+  };
+}
+
+/** The hidden local route's body, streamed to storage once its seal checks out (ADR-158 §4). */
+export interface WriteStoredObjectUploadInput {
+  objectId: StoredObjectId;
+  signature: string;
+  contentLength: number | undefined;
+  body: StoredObjectUploadBody | null;
+}
+
 /**
  * The row the byte surface builds its response from. `purpose` and `owner_kind`
  * are gates rather than description: the file door picks its permission from
@@ -79,6 +95,8 @@ export interface StoredObjectApi {
   storeFromBytes(input: StoreStoredObjectFromBytesInput): Promise<StoreStoredObjectFromBytesResult>;
   createUpload(input: CreateStoredObjectUploadInput): Promise<StoredObjectsCreateUploadOutput>;
   confirmUpload(input: ConfirmStoredObjectUploadInput): Promise<StoredObjectReference>;
+  /** Internal: called only by the hidden local signed route. */
+  writeUpload(input: WriteStoredObjectUploadInput): Promise<void>;
   getMetadata(input: {
     projectId: StoredObjectProjectId;
     id: StoredObjectId;
@@ -96,7 +114,14 @@ export interface StoredObjectApi {
   deleteOwnedBy(input: {
     projectId: StoredObjectProjectId;
   }): Promise<DeleteProjectStoredObjectsResult>;
-  headById(input: { projectId: string; id: string }): Promise<StoredObjectHead>;
+  /**
+   * Holds `by` to the permission the object's purpose names; the transport
+   * admits any file viewer first.
+   */
+  headById(
+    input: { projectId: string; id: string },
+    by: Readonly<{ id: string }>,
+  ): Promise<StoredObjectHead>;
   readById(input: { projectId: string; id: string }): Promise<StoredObjectFileRead | null>;
   resolveOwner(input: { id: string }): Promise<{ projectId: string } | null>;
   /** Where this project's objects are written, for the checkup. */

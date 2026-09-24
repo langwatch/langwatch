@@ -3,6 +3,7 @@ import {
   normalizeDomain,
   type SsoConnectionState,
   type SsoMigrationAccountLinkDecision,
+  type SsoMigrationMemberMove,
   type SsoMigrationAuthenticationDecision,
 } from "@langwatch/identity-contract";
 
@@ -19,6 +20,13 @@ import {
   type MigrationCallbackAccount,
   type SsoMigrationCallbackPair,
 } from "../rules/sso-migration-callback.rules.ts";
+import { arrivalMatchOf } from "../rules/sso-migration.rules.ts";
+
+const LINK_REFUSALS = {
+  "no-address": "SSO_MIGRATION_LINK_UNVERIFIED",
+  "shared-address": "SSO_MIGRATION_LINK_AMBIGUOUS",
+  "unproved-domain": "SSO_MIGRATION_LINK_NOT_ALLOWED",
+} as const satisfies Record<Exclude<SsoMigrationMemberMove, "matched">, string>;
 
 /** Which organizations a person belongs to — the module that owns them. */
 export interface SsoMigrationMemberships {
@@ -139,29 +147,20 @@ export class SsoMigrationCallbackService {
         decision: await this.decideStandaloneLegacyConnection({ account, standing }),
       };
     }
-    if (!standing.email || !standing.emailVerified) {
-      return {
-        kind: "settled",
-        decision: { kind: "reject", code: "SSO_MIGRATION_LINK_UNVERIFIED" },
-      };
+    // The replacement is the authority for addresses on a domain it proved, so
+    // an address nobody confirmed (a directory-provisioned member) matches too.
+    const qualifiedFor = (domain: string) =>
+      pairs.filter((pair) => pairProvesDomain({ pair, domain }));
+    const match = arrivalMatchOf({
+      email: standing.email,
+      accountsHoldingAddress: standing.holders,
+      provesDomain: (domain) => qualifiedFor(domain).length > 0,
+    });
+    if (match !== "matched") {
+      return { kind: "settled", decision: { kind: "reject", code: LINK_REFUSALS[match] } };
     }
-    if (standing.holders !== 1) {
-      return {
-        kind: "settled",
-        decision: { kind: "reject", code: "SSO_MIGRATION_LINK_AMBIGUOUS" },
-      };
-    }
-
     const address = extractEmailDomain(standing.email);
-    const domain = address ? normalizeDomain(address) : null;
-    const qualified = domain ? pairs.filter((pair) => pairProvesDomain({ pair, domain })) : [];
-    if (qualified.length === 0) {
-      return {
-        kind: "settled",
-        decision: { kind: "reject", code: "SSO_MIGRATION_LINK_NOT_ALLOWED" },
-      };
-    }
-    return { kind: "ready", pairs: qualified };
+    return { kind: "ready", pairs: qualifiedFor(normalizeDomain(address ?? "")) };
   }
 
   /**

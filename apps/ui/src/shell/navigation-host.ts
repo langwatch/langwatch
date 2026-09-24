@@ -219,7 +219,7 @@ export class BrowserNavigationHost extends NavigationHost {
     return startupNotice();
   }
 
-  override joinOffer(input: { currentOrganizationId: string | undefined }): ReactNode {
+  override joinOffer(input: { currentOrganizationId: string | null | undefined }): ReactNode {
     return joinOffer(input);
   }
 

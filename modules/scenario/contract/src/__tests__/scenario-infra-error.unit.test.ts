@@ -479,6 +479,15 @@ describe("classifyScenarioInfraError", () => {
       const result = classifyScenarioInfraError("[JudgeAgent] Error: No response content from LLM");
       expect(result.code).toBe(ScenarioInfraErrorCode.ModelEmptyResponse);
       expect(result.message).toContain("The judge model");
+      expect(result.hint).not.toContain("asked it again");
+    });
+
+    /** @scenario "The empty-response error is raised only after the simulator retried" */
+    it("says the simulated user was asked again before the run gave up", () => {
+      const result = classifyScenarioInfraError(
+        "[UserSimulatorAgent] Error: No response content from LLM",
+      );
+      expect(result.hint).toContain("asked it again twice before giving up");
     });
 
     /** @scenario "A model that answered with no text becomes an empty-response error" */

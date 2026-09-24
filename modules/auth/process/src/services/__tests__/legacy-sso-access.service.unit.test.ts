@@ -53,7 +53,7 @@ function serviceOver(
   };
 }
 
-const query = { organizationId: ORG, connectionId: LEGACY };
+const query = { organizationId: ORG, connectionId: LEGACY, strandedUserIds: [] };
 
 describe("the federated accounts a retiring connection still holds", () => {
   it("retires only the subjects that provider answers for", async () => {
@@ -91,11 +91,20 @@ describe("the federated accounts a retiring connection still holds", () => {
     expect(held.has("acc_3")).toBe(true);
   });
 
+  it("keeps a stranded member's account, and does not count it as standing", async () => {
+    const { service, held } = serviceOver(ROWS);
+
+    const outcome = await service.retire({ ...query, strandedUserIds: ["user_1"] });
+
+    expect(outcome).toEqual({ retired: 0, remaining: 0 });
+    expect(held.has("acc_1")).toBe(true);
+  });
+
   it("sweeps nothing for a connection the organization does not hold", async () => {
     const { service, held } = serviceOver(ROWS);
 
     await expect(
-      service.retire({ organizationId: ORG, connectionId: "ssoc_other" }),
+      service.retire({ organizationId: ORG, connectionId: "ssoc_other", strandedUserIds: [] }),
     ).rejects.toThrow("sso_connection_not_found");
     expect(held.size).toBe(3);
   });

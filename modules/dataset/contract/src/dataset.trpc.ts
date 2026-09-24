@@ -18,7 +18,17 @@ import {
   datasetApiUpsertTargetInputSchema,
   datasetApiValidateNameInputSchema,
 } from "./dataset.schemas.ts";
-import { datasetNameResultSchema, datasetSchema, datasetSummarySchema } from "./dataset.ts";
+import {
+  appendStoredObjectToDatasetInputSchema,
+  createDatasetFromStoredObjectInputSchema,
+  datasetImportAppendedSchema,
+  datasetImportStartedSchema,
+  datasetNameResultSchema,
+  datasetSchema,
+  datasetSummarySchema,
+  retryNormalizeInputSchema,
+  uploadProcessingSchema,
+} from "./dataset.ts";
 
 /** What an archive or its undo answers. */
 export const datasetDeletedSchema = z.object({ success: z.literal(true) }).strict();
@@ -63,4 +73,19 @@ export const datasetTrpc = defineTrpcContract("dataset")
   .mutation("copy")
   .withInput(datasetApiCopyInputSchema)
   .withOutput(datasetSchema)
+
+  /** A new dataset from a confirmed `dataset_import` file, prepared in the background (ADR-158). */
+  .mutation("createFromStoredObject")
+  .withInput(createDatasetFromStoredObjectInputSchema)
+  .withOutput(datasetImportStartedSchema)
+
+  /** A confirmed `dataset_import` file's rows, added to an existing dataset. */
+  .mutation("appendStoredObject")
+  .withInput(appendStoredObjectToDatasetInputSchema)
+  .withOutput(datasetImportAppendedSchema)
+
+  /** A dataset whose preparation failed or stalled, prepared again from the same stored file. */
+  .mutation("retryNormalize")
+  .withInput(retryNormalizeInputSchema)
+  .withOutput(uploadProcessingSchema)
   .build();

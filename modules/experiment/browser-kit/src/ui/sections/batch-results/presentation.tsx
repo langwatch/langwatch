@@ -1,4 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { isImageAttachmentRef } from "@langwatch/dataset-contract";
 import { format, formatDistanceToNow, nowInstant } from "@langwatch/time";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -128,6 +129,19 @@ export const getImageUrl = (value: unknown): string | null => {
   } catch {
     return null;
   }
+};
+
+/**
+ * The address a result cell renders as a picture: a picture URL, or an uploaded
+ * dataset attachment whose name ends in a picture ending. Any other value,
+ * strings or not, answers null. @see specs/datasets/dataset-attachment-cells.feature
+ */
+export const cellPictureUrl = (value: unknown): string | null => {
+  const fromUrl = getImageUrl(value);
+  if (fromUrl) return fromUrl;
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return isImageAttachmentRef(trimmed) ? trimmed : null;
 };
 
 const COLOR_NAMES = [

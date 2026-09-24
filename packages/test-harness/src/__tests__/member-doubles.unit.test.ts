@@ -4,7 +4,6 @@ import {
   frozenAt,
   memoryCache,
   memoryIdempotency,
-  memoryObjectStorage,
   memoryRateLimiter,
   recordingMail,
   recordingTelemetry,
@@ -23,27 +22,6 @@ describe("given a frozen clock", () => {
 
       clock.set("2020-01-01T00:00:00.000Z");
       expect(clock.now().toISOString()).toBe("2020-01-01T00:00:00.000Z");
-    });
-  });
-});
-
-describe("given the memory object storage", () => {
-  describe("when two projects write the same key", () => {
-    /** @scenario "Object storage is addressed by project and key together" */
-    it("keeps them apart, as the routed member does", async () => {
-      const storage = memoryObjectStorage();
-
-      await storage.put({ projectId: "one", key: "report" }, new Uint8Array([1]));
-      await storage.put({ projectId: "two", key: "report" }, new Uint8Array([2]));
-
-      await expect(storage.find({ projectId: "one", key: "report" })).resolves.toMatchObject({
-        body: new Uint8Array([1]),
-      });
-      await storage.remove({ projectId: "one", key: "report" });
-      await expect(storage.find({ projectId: "one", key: "report" })).resolves.toBeUndefined();
-      await expect(storage.find({ projectId: "two", key: "report" })).resolves.toMatchObject({
-        body: new Uint8Array([2]),
-      });
     });
   });
 });

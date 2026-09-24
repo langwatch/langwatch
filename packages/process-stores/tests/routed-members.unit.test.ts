@@ -7,7 +7,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { MailConfig } from "../src/config.ts";
 import { buildMail } from "../src/mail-member.ts";
-import { buildObjectStorage, UnknownStorageProjectError } from "../src/object-storage-member.ts";
+import { UnknownStorageProjectError } from "../src/object-storage-backend.ts";
+import { buildObjectStorage } from "../src/object-storage-member.ts";
 import { cachedTenantDirectory } from "../src/tenant-directory.ts";
 
 describe("given the directory both routed members place a tenant with", () => {
@@ -56,33 +57,62 @@ describe("given the directory both routed members place a tenant with", () => {
 });
 
 describe("given object storage with an organization on its own account", () => {
+  const clock = { now: () => new Date("2026-09-24T12:00:00Z") };
   const config = {
-    bucket: "shared",
+    backend: "s3",
+    s3: { bucket: "shared" },
     privateAccounts: [{ organizationId: "organization-1", bucket: "private" }],
-  };
+  } as const;
 
   describe("when a project this deployment cannot place writes an object", () => {
     /** @scenario "An unplaceable project is refused rather than written to the shared bucket" */
     it("refuses rather than falling back to the shared bucket", async () => {
       const storage = buildObjectStorage({
         config,
+        clock,
         directory: { organizationForTenant: () => Promise.resolve(null) },
       });
 
       await expect(
-        storage.value.put({ projectId: "unknown", key: "k" }, new Uint8Array()),
+        storage.value.write({ projectId: "unknown", key: "k" }, (async function* () {})(), {
+          byteLength: 0,
+          contentType: "text/plain",
+        }),
       ).rejects.toBeInstanceOf(UnknownStorageProjectError);
     });
 
     it("refuses a call that names no project at all", async () => {
       const storage = buildObjectStorage({
         config,
+        clock,
         directory: { organizationForTenant: () => Promise.resolve("organization-1") },
       });
 
-      await expect(storage.value.find({ projectId: "", key: "k" })).rejects.toBeInstanceOf(
+      await expect(storage.value.read({ projectId: "", key: "k" })).rejects.toBeInstanceOf(
         UnknownStorageProjectError,
       );
+    });
+  });
+
+  describe("when a project of that organization asks where its objects live", () => {
+    it("answers the organization's own bucket, and the shared one for everyone else", async () => {
+      const storage = buildObjectStorage({
+        config,
+        clock,
+        directory: {
+          organizationForTenant: (projectId) =>
+            Promise.resolve(projectId === "own" ? "organization-1" : "organization-2"),
+        },
+      });
+
+      await expect(storage.value.destination("own")).resolves.toEqual({
+        kind: "s3",
+        bucket: "private",
+      });
+      await expect(storage.value.destination("other")).resolves.toEqual({
+        kind: "s3",
+        bucket: "shared",
+      });
     });
   });
 
@@ -91,12 +121,14 @@ describe("given object storage with an organization on its own account", () => {
       expect(() =>
         buildObjectStorage({
           config: {
-            bucket: "shared",
+            backend: "s3",
+            s3: { bucket: "shared" },
             privateAccounts: [
               { organizationId: "organization-1", bucket: "one" },
               { organizationId: "organization-1", bucket: "two" },
             ],
           },
+          clock,
           directory: { organizationForTenant: () => Promise.resolve(null) },
         }),
       ).toThrow("organization-1");
@@ -107,7 +139,8 @@ describe("given object storage with an organization on its own account", () => {
     it("refuses to build", () => {
       expect(() =>
         buildObjectStorage({
-          config: { bucket: "  " },
+          config: { backend: "s3", s3: { bucket: "  " } },
+          clock,
           directory: { organizationForTenant: () => Promise.resolve(null) },
         }),
       ).toThrow("without a bucket name");

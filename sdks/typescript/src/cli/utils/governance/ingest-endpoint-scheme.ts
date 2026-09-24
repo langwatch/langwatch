@@ -29,7 +29,7 @@ export function sendsIngestKeyInClear(endpoint: string | undefined): boolean {
  * `127.0.0.0/8` address, `[::1]`, `.localhost` (RFC 6761 loopback), and the
  * IPv4-mapped IPv6 spelling `new URL()` normalises `[::ffff:127.0.0.1]` into.
  */
-function isLoopbackHost(hostname: string): boolean {
+export function isLoopbackHost(hostname: string): boolean {
   const host = hostname
     .trim()
     .toLowerCase()

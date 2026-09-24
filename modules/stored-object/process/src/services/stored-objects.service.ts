@@ -285,8 +285,8 @@ export class StoredObjectsService {
     projectId: string;
     id: string;
   }): Promise<
-    | { status: "available"; mediaType: string }
-    | { status: "missing"; mediaType: string }
+    | { status: "available"; mediaType: string; purpose: string }
+    | { status: "missing"; mediaType: string; purpose: string }
     | { status: "not_found" }
   > {
     const row = await this.repository.tryFindById({ projectId, id });
@@ -296,9 +296,8 @@ export class StoredObjectsService {
 
     const bytesPresent = await this.registryFor(projectId).exists(row.storage_uri);
 
-    return bytesPresent
-      ? { status: "available", mediaType: row.media_type }
-      : { status: "missing", mediaType: row.media_type };
+    const facts = { mediaType: row.media_type, purpose: row.purpose };
+    return bytesPresent ? { status: "available", ...facts } : { status: "missing", ...facts };
   }
 
   /**

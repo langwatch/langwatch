@@ -1,8 +1,8 @@
 import type { WorkflowField } from "@langwatch/workflow-contract";
 
-import { IMAGE_EXAMPLE, exampleParameterValue } from "./evaluate-api-example.ts";
+import { FILE_EXAMPLE, IMAGE_EXAMPLE, exampleParameterValue } from "./evaluate-api-example.ts";
 
-export { IMAGE_EXAMPLE, exampleParameterValue };
+export { FILE_EXAMPLE, IMAGE_EXAMPLE, exampleParameterValue };
 
 /**
  * Build the example "parameters" object: entry fields the dataset doesn't

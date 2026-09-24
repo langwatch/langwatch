@@ -8,6 +8,12 @@ import type { Field } from "@langwatch/workflow-contract";
 /** The input field a connected agent column reads the turn from. */
 export const CONNECTED_INPUT_FIELD = "input";
 
+/**
+ * The input field a connected agent column reads an attachment from: optional and
+ * typed as a file, so it reaches the agent as a content part beside the turn.
+ */
+export const CONNECTED_ATTACHMENT_FIELD = "attachment";
+
 /** The output field a connected agent column writes the answer to. */
 export const CONNECTED_OUTPUT_FIELD = "output";
 
@@ -43,6 +49,7 @@ const fieldTypeOf = (definition: ScenarioParameterDefinition): Field["type"] => 
 export const connectedTargetFields = (source: unknown): { inputs: Field[]; outputs: Field[] } => ({
   inputs: [
     { identifier: CONNECTED_INPUT_FIELD, type: "str" },
+    { identifier: CONNECTED_ATTACHMENT_FIELD, type: "file", optional: true },
     ...connectedParameterDefinitions(source).map((definition): Field => ({
       identifier: definition.name,
       type: fieldTypeOf(definition),

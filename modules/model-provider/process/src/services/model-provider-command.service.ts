@@ -32,6 +32,7 @@ import type {
 } from "../app/model-provider.members.ts";
 import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
 import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
+import type { ModelProviderConnectionPingService } from "./model-provider-connection-ping.service.ts";
 import type { ModelProviderOnboardingDefaultsService } from "./model-provider-onboarding-defaults.service.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
 import type { ModelProviderWriteAuthorizationService } from "./model-provider-write-authorization.service.ts";
@@ -42,6 +43,7 @@ type ModelProviderCommandOptions = {
   credentialPolicy: ModelProviderCredentialPolicy;
   catalog: ModelProviderCatalog;
   connectionRateLimiter: ModelProviderConnectionRateLimiter;
+  connectionPing: ModelProviderConnectionPingService;
   writeAuthorization: ModelProviderWriteAuthorizationService;
   onboardingDefaults: ModelProviderOnboardingDefaultsService;
   ids: ModelProviderIdService;
@@ -168,7 +170,15 @@ export class ModelProviderCommandService {
 
     await this.options.connectionRateLimiter.assertAvailable({ organizationId });
 
-    return this.options.catalog.testConnection(provider.provider, provider.customKeys ?? {});
+    const credential = await this.options.catalog.testConnection(
+      provider.provider,
+      provider.customKeys ?? {},
+    );
+    return this.options.connectionPing.verify({
+      row: provider,
+      projectId: parsed.projectId,
+      credential,
+    });
   }
 
   private assertTenantAnchor(input: { projectId?: string; organizationId?: string }): void {

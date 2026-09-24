@@ -31,6 +31,8 @@ export function useTraceQueryArgs() {
   };
 
   const isReady = !!projectId && !!traceId && !isPreviewTraceId(traceId ?? "");
+  // The header read runs without the partition hint and backfills it; every other read waits.
+  const hintReady = occurredAtMs !== null;
 
   return {
     project,
@@ -39,6 +41,7 @@ export function useTraceQueryArgs() {
     occurredAtMs,
     isLive,
     isReady,
+    hintReady,
     queryArgs,
   };
 }

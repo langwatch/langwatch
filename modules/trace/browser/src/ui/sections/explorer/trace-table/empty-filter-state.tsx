@@ -4,8 +4,12 @@ import { type TimeRange, useExplorerStore } from "@langwatch/trace-browser-kit";
 import type React from "react";
 
 import { useSearchSubmitRequestStore } from "../../../../behavior/search-submit-request.store.ts";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { PIIRedactionAlert } from "../../../blocks/pii-redaction-notice.tsx";
 import { useExplorerCounts } from "../hooks/use-explorer-counts.ts";
 import { useInstantEvalRuns } from "../hooks/use-instant-eval-runs.ts";
+import { looksLikeEmail, redactsEmailAddresses } from "../utils/email-shaped-query.ts";
 import { QueryBreakdownChips } from "./query-breakdown-chips.tsx";
 
 const LangWatchMark: React.FC = () => (
@@ -131,6 +135,28 @@ interface ActionButton {
   onClick: () => void;
   primary?: boolean;
 }
+
+/**
+ * Why a search for an email address finds nothing. Shown only when the
+ * effective privacy policy redacts addresses; an unreadable policy shows nothing.
+ */
+const EmailRedactionNotice: React.FC = () => {
+  const { project } = useOrganizationTeamProject();
+  const snapshot = api.dataPrivacy.getSnapshot.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id, retry: false },
+  );
+  const pii = snapshot.data?.effective.pii;
+  if (!pii || !redactsEmailAddresses(pii)) return null;
+  return (
+    <Box width="full" textAlign="left">
+      <PIIRedactionAlert>
+        Email addresses are redacted before a trace is stored by this project's privacy settings, so
+        a search for one finds nothing. Search by a thread id, a trace id or a name instead.
+      </PIIRedactionAlert>
+    </Box>
+  );
+};
 
 function rangePreset(days: number, label: string): TimeRange {
   const now = nowInstant().epochMilliseconds;
@@ -263,6 +289,8 @@ export const EmptyFilterState: React.FC = () => {
             {content.description}
           </Text>
         </Stack>
+
+        {hasFilters && looksLikeEmail(queryText) && <EmailRedactionNotice />}
 
         {actions.length > 0 && (
           <HStack gap={2} flexWrap="wrap" justify="center">

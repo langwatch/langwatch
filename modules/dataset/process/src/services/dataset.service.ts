@@ -4,7 +4,11 @@ import {
   listDatasetsInputSchema,
   type CopyDatasetInput,
   type CreateDatasetRecordsInput,
+  type AppendStoredObjectToDatasetInput,
+  type CreateDatasetFromStoredObjectInput,
   type CreateDatasetFromUploadInput,
+  type DatasetImportAppended,
+  type DatasetImportStarted,
   type Dataset,
   type DatasetLookupInput,
   type DatasetNameInput,
@@ -20,11 +24,6 @@ import {
   type DatasetWithRecords,
   type DeleteDatasetRecordsInput,
   type ListDatasetsInput,
-  type PendingUploadInput,
-  type PendingUploadResult,
-  type StagedUploadInput,
-  type AbortPendingUploadInput,
-  type FinalizeUploadInput,
   type RetryNormalizeInput,
   type UpdateDatasetRecordInput,
   type UploadExistingDatasetInput,
@@ -38,16 +37,12 @@ import type * as datasetContractModule from "@langwatch/dataset-contract";
 import { generate } from "@langwatch/ksuid";
 import { nowInstant } from "@langwatch/time";
 
-import type {
-  DatasetNormalizeQueue,
-  DatasetUpload,
-  DatasetContent,
-  DatasetStorageResolver,
-} from "../app/dataset.app.ts";
+import type { DatasetNormalizeQueue, DatasetUpload, DatasetContent } from "../app/dataset.app.ts";
 import type { DatasetRecordRepository } from "../repositories/dataset-record.repository.ts";
 import type { DatasetRepository, DatasetUpdateInput } from "../repositories/dataset.repository.ts";
 import { assertKnownColumns } from "../rules/dataset-columns.rules.ts";
 import { datasetSlugOf } from "../rules/dataset-selection.rules.ts";
+import type { DatasetAttachmentReferenceService } from "./dataset-attachment-reference.service.ts";
 import { DatasetNamingService } from "./dataset-naming.service.ts";
 import { DatasetRecordService } from "./dataset-record.service.ts";
 import type { DatasetRequestBoundsService } from "./dataset-request-bounds.service.ts";
@@ -58,10 +53,11 @@ export type DatasetServiceOptions = {
   uploads?: DatasetUpload;
   queue?: DatasetNormalizeQueue;
   content?: DatasetContent;
-  storageResolver?: DatasetStorageResolver;
   generateId?: () => string;
   /** The tier-aware batch bound the record writes refuse above. */
   requestBounds: DatasetRequestBoundsService;
+  /** Checks the stored-file references a record write brings in (ADR-158 §6). */
+  attachments: DatasetAttachmentReferenceService;
 };
 
 /**
@@ -145,6 +141,14 @@ export class DatasetService {
     });
     if (conflict) {
       throw new DatasetConflictError();
+    }
+
+    if (parsed.datasetRecords && parsed.datasetRecords.length > 0) {
+      await this.options.attachments.assertAccepted({
+        projectId: parsed.projectId,
+        columnTypes: parsed.columnTypes,
+        entries: parsed.datasetRecords,
+      });
     }
 
     const created = await this.options.repository.create({
@@ -373,43 +377,27 @@ export class DatasetService {
     return this.options.uploads.createDatasetFromUpload(input);
   }
 
-  async createPendingUpload(input: PendingUploadInput): Promise<PendingUploadResult> {
+  async createDatasetFromStoredObject(
+    input: CreateDatasetFromStoredObjectInput,
+  ): Promise<DatasetImportStarted> {
     if (!this.options.uploads) {
       throw new Error("Dataset upload capability is not configured");
     }
 
-    return this.options.uploads.createPendingUpload(input);
+    const started = await this.options.uploads.createDatasetFromStoredObject(input);
+    await this.enqueueNormalize(input.projectId, started.datasetId);
+
+    return started;
   }
 
-  async writeStagedUpload(input: StagedUploadInput): Promise<void> {
+  async appendStoredObjectToDataset(
+    input: AppendStoredObjectToDatasetInput,
+  ): Promise<DatasetImportAppended> {
     if (!this.options.uploads) {
       throw new Error("Dataset upload capability is not configured");
     }
 
-    return this.options.uploads.writeStagedUpload(input);
-  }
-
-  async abortPendingUpload(
-    input: AbortPendingUploadInput,
-  ): Promise<{ datasetId: string; aborted: true }> {
-    if (!this.options.uploads) {
-      throw new Error("Dataset upload capability is not configured");
-    }
-
-    return this.options.uploads.abortPendingUpload(input);
-  }
-
-  async finalizeUpload(
-    input: FinalizeUploadInput,
-  ): Promise<{ datasetId: string; status: "processing" }> {
-    if (!this.options.uploads) {
-      throw new Error("Dataset upload capability is not configured");
-    }
-
-    const result = await this.options.uploads.finalizeUpload(input);
-    await this.enqueueNormalize(input.projectId, input.datasetId);
-
-    return result;
+    return this.options.uploads.appendStoredObjectToDataset(input);
   }
 
   async retryNormalize(

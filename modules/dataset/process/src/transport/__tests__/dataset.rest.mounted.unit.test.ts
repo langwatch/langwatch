@@ -1,6 +1,4 @@
-/** REST endpoints mounted with real requests, stubbed application. File-upload
- * doors absent (runtime can't declare multipart yet).
- */
+/** REST endpoints mounted with real requests, stubbed application. */
 
 import {
   bindRestMiddleware,
@@ -9,7 +7,7 @@ import {
   UnauthorizedError,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
-import type { DatasetApi } from "@langwatch/dataset-contract";
+import { MAX_FILE_SIZE_BYTES, type DatasetApi } from "@langwatch/dataset-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it, vi } from "vitest";
 
@@ -85,6 +83,7 @@ function mount(overrides: Partial<DatasetApi> = {}, options: { refuse?: boolean 
   });
 
   const runtime = createRestRuntime({
+    rateLimiter: { check: async () => ({ allowed: true }) },
     identity: {
       authenticate: () => {
         if (options.refuse) throw new UnauthorizedError();
@@ -93,6 +92,19 @@ function mount(overrides: Partial<DatasetApi> = {}, options: { refuse?: boolean 
           actor: { type: "user" as const, id: "user-1" },
           scope: { tier: "project" as const, id: "project-1" },
         };
+      },
+    },
+    doors: {
+      browser: {
+        authenticate: () => {
+          throw new UnauthorizedError();
+        },
+        identify: () => {
+          throw new UnauthorizedError();
+        },
+        authorize: () => {
+          throw new UnauthorizedError();
+        },
       },
     },
   });
@@ -118,7 +130,51 @@ function mount(overrides: Partial<DatasetApi> = {}, options: { refuse?: boolean 
         : { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
     });
 
-  return { send, stub };
+  const sendStream = (path: string, body: ReadableStream<Uint8Array>) =>
+    hono.request(path, {
+      method: "POST",
+      headers: { "content-type": `multipart/form-data; boundary=${BOUNDARY}` },
+      body,
+      duplex: "half",
+    });
+
+  return { send, sendStream, stub };
+}
+
+const BOUNDARY = "dataset-upload-boundary";
+const MIB = 1024 * 1024;
+
+/** A multipart file body streamed a MiB at a time, counting what the server pulled. */
+function streamedUpload(fileBytes: number) {
+  const encoder = new TextEncoder();
+  const head = encoder.encode(
+    `--${BOUNDARY}\r\nContent-Disposition: form-data; name="file"; filename="big.csv"\r\n` +
+      "Content-Type: text/csv\r\n\r\n",
+  );
+  const tail = encoder.encode(`\r\n--${BOUNDARY}--\r\n`);
+  const chunk = new Uint8Array(MIB).fill(97);
+  let sent = 0;
+  let pulled = 0;
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(head);
+      pulled += head.byteLength;
+    },
+    pull(controller) {
+      if (sent >= fileBytes) {
+        controller.enqueue(tail);
+        pulled += tail.byteLength;
+        controller.close();
+        return;
+      }
+      const part = chunk.subarray(0, Math.min(MIB, fileBytes - sent));
+      sent += part.byteLength;
+      pulled += part.byteLength;
+      controller.enqueue(part);
+    },
+  });
+
+  return { body, pulled: () => pulled };
 }
 
 describe("the mounted dataset REST family", () => {
@@ -602,6 +658,42 @@ describe("the mounted dataset REST family", () => {
 
       expect((await send("DELETE", "/api/dataset/my-dataset/records", {})).status).toBe(422);
       expect(stub.deleteRecords).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a file over the old size limit is posted to the deprecated upload pair", () => {
+    /** @scenario "A posted file over the old size limit is still refused" */
+    it("refuses it as too large before the multipart body is read to the end", async () => {
+      for (const path of ["/api/dataset/upload", "/api/dataset/my-dataset/upload"]) {
+        const createDatasetFromUpload = vi.fn();
+        const uploadToExistingDataset = vi.fn();
+        const { sendStream } = mount({ createDatasetFromUpload, uploadToExistingDataset });
+        const fileBytes = MAX_FILE_SIZE_BYTES + 8 * MIB;
+        const upload = streamedUpload(fileBytes);
+
+        const response = await sendStream(path, upload.body);
+
+        expect(response.status).toBe(400);
+        await expect(response.json()).resolves.toMatchObject({ error: "validation_error" });
+        expect(upload.pulled()).toBeLessThan(fileBytes);
+        expect(createDatasetFromUpload).not.toHaveBeenCalled();
+        expect(uploadToExistingDataset).not.toHaveBeenCalled();
+      }
+    });
+
+    it("still hands a file under the limit to the application", async () => {
+      const uploadToExistingDataset = vi.fn(async () => ({
+        datasetId: "dataset_1",
+        recordsCreated: 1,
+      }));
+      const { sendStream } = mount({ uploadToExistingDataset });
+
+      const response = await sendStream("/api/dataset/my-dataset/upload", streamedUpload(MIB).body);
+
+      expect(response.status).toBe(200);
+      expect(uploadToExistingDataset).toHaveBeenCalledWith(
+        expect.objectContaining({ slugOrId: "my-dataset", filename: "big.csv", fileSize: MIB }),
+      );
     });
   });
 

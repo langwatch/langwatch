@@ -7,6 +7,10 @@ import { lwTag } from "../utils/governance/brand";
 import { recordCliLocation } from "../utils/governance/cli-location";
 import { isLoggedIn, loadConfig, saveConfig } from "../utils/governance/config";
 import {
+  globalConfigIsolationWarning,
+  rewritesGlobalConfigForLocalInstance,
+} from "../utils/governance/global-config-isolation";
+import {
   cleartextIngestEndpointWarning,
   sendsIngestKeyInClear,
 } from "../utils/governance/ingest-endpoint-scheme";
@@ -146,6 +150,12 @@ export async function instrumentCommand(tool: string, options: InstrumentOptions
   // real deployment, and refusing would take its telemetry and protect nothing.
   if (sendsIngestKeyInClear(credential.endpoint)) {
     process.stderr.write(`${lwTag()} ${cleartextIngestEndpointWarning(credential.endpoint)}\n`);
+  }
+
+  // A local endpoint is not a key exposure, but the file written next is the
+  // tool's global one, so warn before the write (spec: login-unified.feature).
+  if (rewritesGlobalConfigForLocalInstance({ endpoint: credential.endpoint })) {
+    process.stderr.write(`${lwTag()} ${globalConfigIsolationWarning(credential.endpoint)}\n`);
   }
 
   const result = installTelemetryWiring({

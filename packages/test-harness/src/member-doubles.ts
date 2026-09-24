@@ -95,44 +95,6 @@ export function memoryRateLimiter(allowance = Number.MAX_SAFE_INTEGER): RateLimi
   };
 }
 
-/** One stored object, and the project whose object it is. */
-export interface StoredObject {
-  readonly body: Uint8Array;
-  readonly contentType: string | undefined;
-}
-
-export interface StoredObjectAddress {
-  readonly projectId: string;
-  readonly key: string;
-}
-
-export interface ObjectStorage {
-  put(at: StoredObjectAddress, body: Uint8Array, contentType?: string): Promise<void>;
-  find(at: StoredObjectAddress): Promise<StoredObject | undefined>;
-  remove(at: StoredObjectAddress): Promise<void>;
-}
-
-/**
- * Blobs in a Map, keyed by project and key together, so a test reading one
- * project's object under another project's id fails here exactly as it
- * would against the real member, which cannot be handed an unscoped client.
- */
-export function memoryObjectStorage(): ObjectStorage {
-  const stored = new Map<string, StoredObject>();
-  const at = (address: StoredObjectAddress) => `${address.projectId}/${address.key}`;
-  return {
-    put(address, body, contentType) {
-      stored.set(at(address), { body, contentType });
-      return Promise.resolve();
-    },
-    find: (address) => Promise.resolve(stored.get(at(address))),
-    remove(address) {
-      stored.delete(at(address));
-      return Promise.resolve();
-    },
-  };
-}
-
 /** One message, already rendered, as the mail member sends it. */
 export interface MailMessage {
   readonly to: string;

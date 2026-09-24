@@ -687,6 +687,42 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.DurationMs).toBeNull();
     });
 
+    /** @scenario "A finished event may name inconclusive criteria" */
+    it("keeps the criteria the judge could not decide apart, and still unmet", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createRunFinishedEvent({
+          results: {
+            verdict: "failure",
+            metCriteria: ["stays polite"],
+            unmetCriteria: ["names the refund window", "opens a ticket"],
+            inconclusiveCriteria: ["opens a ticket"],
+          },
+        }),
+      ]);
+
+      expect(state.UnmetCriteria).toEqual([
+        "names the refund window",
+        "opens a ticket",
+      ]);
+      expect(state.InconclusiveCriteria).toEqual(["opens a ticket"]);
+    });
+
+    it("stores no inconclusive criteria when the event names none", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createRunFinishedEvent({
+          results: {
+            verdict: "success",
+            metCriteria: ["a"],
+            unmetCriteria: [],
+          },
+        }),
+      ]);
+
+      expect(state.InconclusiveCriteria).toEqual([]);
+    });
+
     it("sets FAILURE status for failure verdict", () => {
       const state = foldEvents([
         createRunStartedEvent(),

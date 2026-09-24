@@ -58,7 +58,11 @@ class Connection {
   }
 
   /** Answers the register with one id per agent, `agent_<name>`. */
-  accept(register: RegisterFrame, instanceId = register.instance.id): void {
+  accept(
+    register: RegisterFrame,
+    instanceId = register.instance.id,
+    scope: Record<string, unknown> | undefined = { kind: "shared" },
+  ): void {
     this.send({
       type: "registered",
       agents: register.agents.map((agent) => ({
@@ -67,6 +71,7 @@ class Connection {
         id: `agent_${agent.name}`,
         url: `http://platform/agents/agent_${agent.name}`,
         parameterNotes: [],
+        ...(scope ? { scope } : {}),
       })),
       heartbeatIntervalMs: 10_000,
       instanceId,
@@ -368,6 +373,45 @@ describe("the agent client, given a fake platform", () => {
       expect(register.agents[0]?.environment).toBe("production");
       expect(register.agents[0]?.concurrency).toBe(10);
       expect(register.instance.label).toBe("green");
+    });
+  });
+
+  describe("when the registered frame carries a scope", () => {
+    const registeredWith = async (scope: Record<string, unknown> | undefined) => {
+      define(async () => "ok", { name: "support" });
+      const connection = await platform.nextConnection();
+      connection.accept(await connection.nextFrame<RegisterFrame>("register"), undefined, scope);
+      await until(() => sharedClientForTests()?.isRegistered === true);
+    };
+
+    /** @scenario "A personal agent prints who it belongs to and how to share it" */
+    it("prints that a personal agent belongs to the key's owner and names the environment variable", async () => {
+      await registeredWith({ kind: "owner" });
+
+      expect(logs.lines("info", /is online/)).toHaveLength(1);
+      const personal = logs.lines("info", /personal to the owner of this API key/);
+      expect(personal).toHaveLength(1);
+      expect(personal[0]).toContain("only their runs can target it");
+      expect(personal[0]).toContain("LANGWATCH_AGENT_ENVIRONMENT");
+    });
+
+    /** @scenario "The registered frame says whether the agent is personal, host-scoped or shared" */
+    it("prints the machine for a host-scoped agent and nothing extra for a shared one", async () => {
+      await registeredWith({ kind: "host", hostLabel: "build-box-1" });
+      expect(logs.lines("info", /scoped to this machine \(build-box-1\)/)).toHaveLength(1);
+      await resetSharedClient();
+
+      await registeredWith({ kind: "shared" });
+      expect(logs.lines("info", /is online/)).toHaveLength(2);
+      expect(logs.lines("info", /personal to|scoped to this machine/)).toHaveLength(1);
+    });
+
+    /** @scenario "The registered frame says whether the agent is personal, host-scoped or shared" */
+    it("reads a frame from a platform that sends no scope as shared", async () => {
+      await registeredWith(undefined);
+
+      expect(logs.lines("info", /is online/)).toHaveLength(1);
+      expect(logs.lines("info", /personal to|scoped to this machine/)).toHaveLength(0);
     });
   });
 

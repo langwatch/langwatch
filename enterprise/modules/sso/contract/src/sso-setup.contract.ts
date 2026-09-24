@@ -133,6 +133,8 @@ const ssoMigrationStragglerSchema = z
     name: z.string().nullable(),
     email: z.string().nullable(),
     lastLegacyAuthenticationAtMs: z.number().nullable(),
+    /** Whether the replacement recognises them by address, and if not, why. */
+    move: z.enum(["matched", "no-address", "shared-address", "unproved-domain"]),
   })
   .strict();
 
@@ -162,15 +164,22 @@ export const ssoSetupMigrationSchema = z
       .object({
         activeCount: z.number(),
         linkedCount: z.number(),
+        /** Members the replacement will match at their next sign-in. */
+        nextSignInCount: z.number(),
         stragglers: z.array(ssoMigrationStragglerSchema),
         nextCursor: z.string().nullable(),
       })
       .strict(),
     quietPeriod: z
-      .object({ lastLegacyAuthenticationAtMs: z.number().nullable(), complete: z.boolean() })
+      .object({
+        lastLegacyAuthenticationAtMs: z.number().nullable(),
+        /** When finishing opens, or null before sign-in is switched over. */
+        clearsAtMs: z.number().nullable(),
+        complete: z.boolean(),
+      })
       .strict(),
-    /** Whether directory provisioning still points at the connection being
-     *  retired. */
+    /** Whether directory provisioning is on the replacement, or still has
+     *  to be repointed before finishing. */
     scim: z.object({ status: z.enum(["not-applicable", "needs-repointing", "ready"]) }).strict(),
     /** One reason finalizing would be premature, in the words the reader acts on. */
     blockers: z.array(z.object({ code: z.string(), message: z.string() }).strict()),

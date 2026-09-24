@@ -294,6 +294,7 @@
                   "platform/members-and-teams",
                   "platform/rbac",
                   "platform/sso",
+                  "platform/sso-update",
                   "platform/api-keys",
                   "platform/audit-log",
                   "platform/data-privacy",
@@ -1080,22 +1081,18 @@
               "api-reference/datasets/overview",
               "api-reference/datasets/list-dataset",
               "api-reference/datasets/create-dataset",
-              "api-reference/datasets/create-direct-upload",
+              "api-reference/datasets/create-attachments",
               "api-reference/datasets/evaluate-a-dataset",
               "api-reference/datasets/create-upload",
               "api-reference/datasets/get-dataset",
               "api-reference/datasets/get-records",
               "api-reference/datasets/update-dataset",
               "api-reference/datasets/update-records",
-              "api-reference/datasets/update-staging",
               "api-reference/datasets/post-dataset-entries",
               "api-reference/datasets/action-records",
               "api-reference/datasets/action-upload",
-              "api-reference/datasets/action-finalize",
-              "api-reference/datasets/action-retry",
               "api-reference/datasets/delete-dataset",
-              "api-reference/datasets/delete-records",
-              "api-reference/datasets/delete-direct-upload"
+              "api-reference/datasets/delete-records"
             ]
           },
           {

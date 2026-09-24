@@ -189,8 +189,8 @@ export function convertValueToColumnType(
   if (type === "boolean") return convertBooleanValue(value);
   if (type === "date") return convertDateValue(value);
 
-  // Image is a URL string; string passes through unchanged.
-  if (type === "image" || type === "string" || type === undefined) {
+  // Attachment cells (image, file) hold a reference string; string passes through unchanged.
+  if (type === "image" || type === "file" || type === "string" || type === undefined) {
     return value;
   }
   // list / json / spans / chat_messages / annotations / evaluations — parse JSON,

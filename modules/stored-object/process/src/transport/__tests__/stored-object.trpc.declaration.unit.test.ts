@@ -38,14 +38,23 @@ describe("the storedObjects tRPC declaration", () => {
     it("keeps the probe's wire name and kind", () => {
       expect(
         Object.entries(storedObjectTrpc.members).map(([name, member]) => [name, member.kind]),
-      ).toEqual([["headById", "query"]]);
+      ).toEqual([
+        ["headById", "query"],
+        ["createUpload", "mutation"],
+        ["confirmUpload", "mutation"],
+      ]);
       expect(storedObjectTrpc.namespace).toBe("storedObjects");
     });
 
     /** @scenario "A viewer with trace access can probe trace media" */
-    it("admits a viewer holding either trace or scenario access, trace access first", () => {
+    it("admits any file viewer to the probe and leaves the purpose check to the service", () => {
       expect(accessOf(storedObjectTrpcTransport)).toEqual([
-        { kind: "permission-any", permissions: ["traces:view", "scenarios:view"] },
+        {
+          kind: "permission-any",
+          permissions: ["traces:view", "scenarios:view", "datasets:view"],
+        },
+        { kind: "permission", permission: "project:update" },
+        { kind: "permission", permission: "project:update" },
       ]);
     });
 

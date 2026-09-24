@@ -97,6 +97,24 @@ describe("queryAnalyticsCommand()", () => {
       );
     });
 
+    /** @scenario "Query with the traces.count alias" */
+    it("maps traces.count to the trace-count preset", async () => {
+      mockTimeseries.mockResolvedValue({ currentPeriod: [], previousPeriod: [] });
+
+      await queryAnalyticsCommand({ metric: "traces.count" });
+
+      expect(mockTimeseries).toHaveBeenCalledWith(
+        expect.objectContaining({
+          series: [
+            expect.objectContaining({
+              metric: "metadata.trace_id",
+              aggregation: "cardinality",
+            }),
+          ],
+        }),
+      );
+    });
+
     it("maps the natural-language latency alias to average completion time", async () => {
       mockTimeseries.mockResolvedValue({ currentPeriod: [], previousPeriod: [] });
 
@@ -134,6 +152,42 @@ describe("queryAnalyticsCommand()", () => {
         aggregation: "cardinality",
       });
       expect(console.log).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the metric is neither a preset nor a metric path", () => {
+    /** @scenario "An unknown metric is refused with the known list" */
+    it("exits with code 1 before any request, listing presets and metrics", async () => {
+      await expect(queryAnalyticsCommand({ metric: "spans.count" })).rejects.toThrow(
+        ProcessExitError,
+      );
+
+      expect(mockTimeseries).not.toHaveBeenCalled();
+      const printed = vi.mocked(console.error).mock.calls.flat().join("\n");
+      expect(printed).toContain("spans.count");
+      expect(printed).toContain("trace-count");
+      expect(printed).toContain("metadata.trace_id");
+      expect(printed).toContain("threads.average_duration_per_thread");
+    });
+
+    it("accepts a raw metric path the platform knows", async () => {
+      mockTimeseries.mockResolvedValue({ currentPeriod: [], previousPeriod: [] });
+
+      await queryAnalyticsCommand({
+        metric: "performance.total_tokens",
+        aggregation: "sum",
+      });
+
+      expect(mockTimeseries).toHaveBeenCalledWith(
+        expect.objectContaining({
+          series: [
+            expect.objectContaining({
+              metric: "performance.total_tokens",
+              aggregation: "sum",
+            }),
+          ],
+        }),
+      );
     });
   });
 

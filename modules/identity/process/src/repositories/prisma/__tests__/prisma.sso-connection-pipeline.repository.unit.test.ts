@@ -4,10 +4,16 @@
  * break-glass binding and ledger writer as a second composition.
  * @see ../prisma.sso-connection-pipeline.repository.ts
  */
+import { ScimSsoMigrationSubscriberService } from "@langwatch/enterprise-scim-contract";
 import type { EventSourcing } from "@langwatch/eventing";
+import {
+  MIGRATION_FINALIZED_EVENT_TYPE,
+  SSO_CONNECTION_AGGREGATE_TYPE,
+} from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { PlatformOperator } from "../../../app/identity.members.ts";
+import { migrationFinalizedEventSchema } from "../../../eventing/sso-connection-state.projection.ts";
 import {
   PostgresSsoConnectionPipelineAdapter,
   type SsoConnectionPipelineDatabase,
@@ -39,11 +45,42 @@ class TestOperators implements PlatformOperator {
   }
 }
 
-function testAdapter(): PostgresSsoConnectionPipelineAdapter {
+class TestDirectorySync extends ScimSsoMigrationSubscriberService {
+  readonly moved: { connectionId: string; tenantId: string }[] = [];
+
+  handleMigrationFinalized(
+    event: { data: { connectionId: string } },
+    context: { tenantId: string },
+  ): Promise<void> {
+    this.moved.push({ connectionId: event.data.connectionId, tenantId: context.tenantId });
+    return Promise.resolve();
+  }
+}
+
+const migrationFinalized = migrationFinalizedEventSchema.parse({
+  id: "evt_1",
+  aggregateId: "conn_new",
+  aggregateType: SSO_CONNECTION_AGGREGATE_TYPE,
+  tenantId: "org_1",
+  createdAt: 1,
+  occurredAt: 1,
+  type: MIGRATION_FINALIZED_EVENT_TYPE,
+  version: "2026-09-23",
+  data: {
+    connectionId: "conn_new",
+    actor: { type: "user", id: "user_1" },
+    source: "self-serve",
+  },
+});
+
+function testAdapter(
+  directorySync: TestDirectorySync = new TestDirectorySync(),
+): PostgresSsoConnectionPipelineAdapter {
   return PostgresSsoConnectionPipelineAdapter.create({
     database: testDatabase(),
     eventSourcing: testEventSourcing(),
     operators: new TestOperators(),
+    directorySync,
   });
 }
 
@@ -73,6 +110,25 @@ describe("PostgresSsoConnectionPipelineAdapter", () => {
       expect(connections.registerConnection).toBeTypeOf("function");
       expect(connections.claimDomain).toBeTypeOf("function");
       expect(connections.requestTeardown).toBeTypeOf("function");
+    });
+  });
+
+  describe("when a move to the organization's own identity provider finishes", () => {
+    it("declares directory sync as a subscriber to the finished migration only", () => {
+      const subscriber = testAdapter().build().eventSubscribers.get("scimDirectoryMove");
+
+      expect(subscriber?.eventTypes).toEqual([MIGRATION_FINALIZED_EVENT_TYPE]);
+    });
+
+    it("hands directory sync the replacement connection and the organization", async () => {
+      const directorySync = new TestDirectorySync();
+      const subscriber = testAdapter(directorySync)
+        .build()
+        .eventSubscribers.get("scimDirectoryMove");
+
+      await subscriber?.handle(migrationFinalized, { tenantId: "org_1", aggregateId: "conn_new" });
+
+      expect(directorySync.moved).toEqual([{ connectionId: "conn_new", tenantId: "org_1" }]);
     });
   });
 });

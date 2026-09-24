@@ -1,3 +1,4 @@
+import type { AuthApi } from "@langwatch/auth-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 import {
@@ -44,6 +45,7 @@ export class UserService {
   private readonly avatars = UserAvatarCodecService.create();
   private readonly repository: UserRepository;
   private readonly organizations: OrganizationApi;
+  private readonly auth: AuthApi;
   private readonly avatarStorage: UserAvatarStorage;
   /** The issuer every credential account row this service mints is stored under. */
   private readonly credentialIssuer: string;
@@ -52,18 +54,21 @@ export class UserService {
   private constructor({
     repository,
     organizations,
+    auth,
     avatarStorage,
     credentialIssuer,
     now,
   }: {
     repository: UserRepository;
     organizations: OrganizationApi;
+    auth: AuthApi;
     avatarStorage: UserAvatarStorage;
     credentialIssuer: string;
     now: () => Instant;
   }) {
     this.repository = repository;
     this.organizations = organizations;
+    this.auth = auth;
     this.avatarStorage = avatarStorage;
     this.credentialIssuer = credentialIssuer;
     this.now = now;
@@ -72,6 +77,7 @@ export class UserService {
   static create(options: {
     repository: UserRepository;
     organizations: OrganizationApi;
+    auth: AuthApi;
     avatarStorage: UserAvatarStorage;
     credentialIssuer: string;
     now?: () => Instant;
@@ -79,6 +85,7 @@ export class UserService {
     return new UserService({
       repository: options.repository,
       organizations: options.organizations,
+      auth: options.auth,
       avatarStorage: options.avatarStorage,
       credentialIssuer: options.credentialIssuer,
       now: options.now ?? nowInstant,
@@ -215,10 +222,15 @@ export class UserService {
     return account;
   }
 
-  getSsoStatus(input: UserIdInput): Promise<UserSsoStatus> {
+  /** The stored flag is only cleared by a later sign-in, so once it is set
+   *  auth re-asks the question against the accounts held now. */
+  async getSsoStatus(input: UserIdInput): Promise<UserSsoStatus> {
     const parsed = userIdInputSchema.parse(input);
+    const user = await this.repository.findById(parsed.id);
+    if (!user?.pendingSsoSetup) return { pendingSsoSetup: false };
+    if (!user.email) return { pendingSsoSetup: true };
 
-    return this.repository.findSsoStatus(parsed.id);
+    return this.auth.getSsoSetupStatus({ userId: parsed.id, email: user.email });
   }
 
   getTraceExplorerTourPreference(input: UserIdInput): Promise<UserTourPreference> {

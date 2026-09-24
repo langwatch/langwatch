@@ -3,6 +3,7 @@ export {
   useDatasetTable,
   type AutosaveState,
   type CellPosition,
+  type DatasetAttachmentSlot,
   type DatasetTableContextValue,
   type DatasetTableRowData,
   type RowHeightMode,

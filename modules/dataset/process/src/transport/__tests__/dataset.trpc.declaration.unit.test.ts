@@ -92,6 +92,9 @@ describe("the dataset tRPC declaration", () => {
         ["updateMapping", "mutation", "datasets:update"],
         ["findNextName", "query", "datasets:view"],
         ["copy", "mutation", "datasets:create"],
+        ["createFromStoredObject", "mutation", "datasets:create"],
+        ["appendStoredObject", "mutation", "datasets:update"],
+        ["retryNormalize", "mutation", "datasets:manage"],
       ]);
     });
 
@@ -356,6 +359,31 @@ describe("the dataset tRPC declaration", () => {
         sourceDatasetId: "dataset-1",
         sourceProjectId: "project-source",
         targetProjectId: "project-target",
+      });
+    });
+  });
+
+  describe("when a dataset whose preparation failed is retried", () => {
+    /** @scenario "Retrying a failed import still works" */
+    it("prepares it again through the application", async () => {
+      const retryNormalize = vi.fn(async () => ({
+        datasetId: "dataset-1",
+        status: "processing" as const,
+      }));
+      const handlers = callable(
+        datasetTrpcTransport,
+        completeDatasetApi({ retryNormalize: retryNormalize as never }),
+      );
+
+      await expect(
+        handlers.retryNormalize!({
+          ...invocation,
+          input: { projectId: "project-1", datasetId: "dataset-1" },
+        }),
+      ).resolves.toEqual({ datasetId: "dataset-1", status: "processing" });
+      expect(retryNormalize).toHaveBeenCalledWith({
+        projectId: "project-1",
+        datasetId: "dataset-1",
       });
     });
   });

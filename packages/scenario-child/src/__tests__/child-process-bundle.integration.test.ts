@@ -103,6 +103,8 @@ describe("Pre-compiled Scenario Child Process", () => {
       // SDK can consume what the run configuration produces.
       const content = fs.readFileSync(BUNDLE_PATH, "utf8");
       expect(content).toContain("wait_for_traces");
+      expect(content).toContain("traceQuietPeriodMs");
+      expect(content).toContain("inconclusiveCriteria");
     });
 
     /** @scenario 'Configuring log output does not stop a simulation starting' */

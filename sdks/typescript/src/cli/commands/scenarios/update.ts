@@ -11,6 +11,7 @@ import { parseScenarioFieldFlags } from "../../utils/suiteFieldFlags.ts";
 import { createCliTestSuitesService } from "../test-suites/cli-test-suites-service.ts";
 import { resolveSuiteReference, SuiteReferenceError } from "../test-suites/resolveSuite.ts";
 import { createCliScenariosService } from "./cli-scenarios-service.ts";
+import { resolveScenarioId } from "./resolveScenario.ts";
 
 /**
  * The field definitions of the suite a scenario is filed in, or none when
@@ -34,8 +35,9 @@ async function suiteFieldsOfScenario({
   }
 }
 
+/** Updates one scenario, named by its id or by its name. */
 export const updateScenarioCommand = async (
-  id: string,
+  reference: string,
   options: {
     name?: string;
     situation?: string;
@@ -69,6 +71,7 @@ export const updateScenarioCommand = async (
   }
 
   const service = createCliScenariosService();
+  const id = await resolveScenarioId({ reference, service });
 
   // A field value is read by the type the suite declares, so the suite the
   // scenario stays in is looked up when the command line names none.

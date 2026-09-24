@@ -2,8 +2,9 @@ import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type { BatchEvaluationRecord, BatchEvaluationSummary } from "./batch-record.trpc.ts";
 import type {
-  AbortPendingUploadInput,
+  AppendStoredObjectToDatasetInput,
   CopyDatasetInput,
+  CreateDatasetFromStoredObjectInput,
   CreateDatasetFromUploadInput,
   CreateDatasetFromUploadResult,
   CreateDatasetRecordsInput,
@@ -11,6 +12,8 @@ import type {
   DatasetColumns,
   DatasetEntrySelection,
   DatasetHead,
+  DatasetImportAppended,
+  DatasetImportStarted,
   DatasetListResult,
   DatasetLookupInput,
   DatasetNameInput,
@@ -22,12 +25,11 @@ import type {
   DatasetRecordPage,
   DatasetWithRecords,
   DeleteDatasetRecordsInput,
-  FinalizeUploadInput,
   ListDatasetsInput,
-  PendingUploadInput,
-  PendingUploadResult,
   RetryNormalizeInput,
-  StagedUploadInput,
+  StoreDatasetAttachmentUploadInput,
+  StoredDatasetAttachment,
+  UploadProcessing,
   UpdateDatasetRecordInput,
   UploadExistingDatasetInput,
   UpsertDatasetInput,
@@ -92,17 +94,23 @@ export interface DatasetApi {
     input: UpdateDatasetRecordInput & { recordId: string },
   ): Promise<DatasetRecordMutationResult>;
   deleteRecords: (input: DeleteDatasetRecordsInput) => Promise<{ count: number }>;
+  /** Deprecated with the multipart upload routes; retires in the next release (ADR-158 §8). */
   createDatasetFromUpload(
     input: CreateDatasetFromUploadInput,
   ): Promise<CreateDatasetFromUploadResult>;
+  /** Deprecated with the multipart upload routes; retires in the next release (ADR-158 §8). */
   uploadToExistingDataset(
     input: UploadExistingDatasetInput,
   ): Promise<{ datasetId: string; recordsCreated: number }>;
-  createPendingUpload(input: PendingUploadInput): Promise<PendingUploadResult>;
-  writeStagedUpload(input: StagedUploadInput): Promise<void>;
-  finalizeUpload(input: FinalizeUploadInput): Promise<{ datasetId: string; status: "processing" }>;
-  retryNormalize(input: RetryNormalizeInput): Promise<{ datasetId: string; status: "processing" }>;
-  abortPendingUpload(input: AbortPendingUploadInput): Promise<{ datasetId: string; aborted: true }>;
+  createDatasetFromStoredObject(
+    input: CreateDatasetFromStoredObjectInput,
+  ): Promise<DatasetImportStarted>;
+  /** Deprecated with `POST /api/dataset/attachments`; retires in the next release (ADR-158 §8). */
+  storeAttachmentUpload(input: StoreDatasetAttachmentUploadInput): Promise<StoredDatasetAttachment>;
+  appendStoredObjectToDataset(
+    input: AppendStoredObjectToDatasetInput,
+  ): Promise<DatasetImportAppended>;
+  retryNormalize(input: RetryNormalizeInput): Promise<UploadProcessing>;
   getByIds(input: { projectId: string; datasetIds: string[] }): Promise<Dataset[]>;
   renameDataset(input: { datasetId: string; projectId: string; name: string }): Promise<Dataset>;
   /** One row per experiment and dataset: how many ran, total cost, mean score. */

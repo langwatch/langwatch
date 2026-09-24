@@ -44,6 +44,18 @@ export class PrismaDatasetRecordRepository
     return rows.map(toDatasetRecord);
   }
 
+  async findByIds(input: {
+    datasetId: string;
+    projectId: string;
+    ids: readonly string[];
+  }): Promise<DatasetRecord[]> {
+    if (input.ids.length === 0) return [];
+    const rows = await this.database.datasetRecord.findMany({
+      where: { datasetId: input.datasetId, projectId: input.projectId, id: { in: [...input.ids] } },
+    });
+    return rows.map(toDatasetRecord);
+  }
+
   async findAll(input: {
     datasetId: string;
     projectId: string;

@@ -532,7 +532,11 @@ describe("headById", () => {
         id: "obj-1",
       });
 
-      expect(result).toEqual({ status: "available", mediaType: "audio/mp3" });
+      expect(result).toEqual({
+        status: "available",
+        mediaType: "audio/mp3",
+        purpose: row.purpose,
+      });
     });
   });
 
@@ -547,7 +551,11 @@ describe("headById", () => {
         id: "obj-1",
       });
 
-      expect(result).toEqual({ status: "missing", mediaType: "audio/mp3" });
+      expect(result).toEqual({
+        status: "missing",
+        mediaType: "audio/mp3",
+        purpose: row.purpose,
+      });
     });
   });
 
@@ -596,7 +604,11 @@ describe("the service surface a caller composes against", () => {
 
       expect(stored.isDuplicate).toBe(false);
       expect(read).toMatchObject({ row });
-      expect(head).toEqual({ status: "available", mediaType: row.media_type });
+      expect(head).toEqual({
+        status: "available",
+        mediaType: row.media_type,
+        purpose: row.purpose,
+      });
       expect(repo.deleteByIds).toHaveBeenCalledWith({
         projectId: PROJECT_ID,
         ids: [stored.id],

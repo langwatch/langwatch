@@ -10,6 +10,7 @@ export const LlmConfigInputTypes = [
   "float",
   "bool",
   "image",
+  "file",
   "list",
   "list[str]",
   "list[float]",

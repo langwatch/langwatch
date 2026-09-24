@@ -1,6 +1,7 @@
 import type { Agent, AgentApi } from "@langwatch/agent-contract";
 import { AgentEnvironmentUnresolvedError } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { RunActor } from "@langwatch/scenario-contract";
 import type { SuiteTarget } from "@langwatch/suite-contract";
 import { describe, expect, it } from "vitest";
 
@@ -11,7 +12,7 @@ import {
 
 const PROJECT_ID = "project_1";
 
-type Row = { id: string; environment: string; online: boolean };
+type Row = { id: string; environment: string; online: boolean; ownerUserId?: string };
 
 function agentsOver(rows: readonly Row[]): AgentApi {
   const asAgent = (row: Row): Agent =>
@@ -21,7 +22,7 @@ function agentsOver(rows: readonly Row[]): AgentApi {
       name: "support-agent",
       type: "connected",
       environment: row.environment,
-      ownerUserId: null,
+      ownerUserId: row.ownerUserId ?? null,
     }) as unknown as Agent;
   return createApiFixture<AgentApi>({
     getConnectedByName: async ({ name }: { name: string }) =>
@@ -44,15 +45,17 @@ function presenceOver(rows: readonly Row[]): ConnectedPresenceReader {
 async function resolve({
   rows,
   referenceId = "support-agent",
+  actor,
 }: {
   rows: readonly Row[];
   referenceId?: string;
+  actor?: RunActor;
 }): Promise<string> {
   const target: SuiteTarget = { type: "connected", referenceId } as SuiteTarget;
   const [resolved] = await ConnectedTargetService.resolveConnectedReferences({
     targets: [target],
     projectId: PROJECT_ID,
-    actor: undefined,
+    actor,
     agents: agentsOver(rows),
     presence: presenceOver(rows),
   });
@@ -124,6 +127,48 @@ describe("given a name registered in staging and in production", () => {
       expect(failure).toBeInstanceOf(AgentEnvironmentUnresolvedError);
       expect((failure as AgentEnvironmentUnresolvedError).meta).toMatchObject({
         onlineEnvironments: ["staging", "production"],
+      });
+    });
+  });
+});
+
+describe("given a name registered only as another person's personal development agent", () => {
+  const theirs: Row = {
+    id: "agent_theirs",
+    environment: "development",
+    online: true,
+    ownerUserId: "user_1",
+  };
+
+  describe("when its process is connected and the caller may run nothing else", () => {
+    /** @scenario "A name with no environment picks another person's personal agent only to refuse it as owner-only" */
+    it("picks it, for no actor and for a teammate", async () => {
+      const teammate: RunActor = { id: "user_2", label: "user" };
+
+      expect(await resolve({ rows: [theirs] })).toBe("agent_theirs");
+      expect(await resolve({ rows: [theirs], actor: teammate })).toBe("agent_theirs");
+    });
+  });
+
+  describe("when a shared agent of that name is online in another environment", () => {
+    /** @scenario "A name with no environment prefers a shared online agent over another person's personal one" */
+    it("prefers the shared agent", async () => {
+      const rows: Row[] = [theirs, { id: "agent_staging", environment: "staging", online: true }];
+
+      expect(await resolve({ rows })).toBe("agent_staging");
+    });
+  });
+
+  describe("when its process is not connected", () => {
+    /** @scenario "A name with no environment ignores another person's personal agent that is offline" */
+    it("still refuses with agent_environment_unresolved", async () => {
+      const failure = await resolve({ rows: [{ ...theirs, online: false }] }).catch(
+        (error: unknown) => error,
+      );
+
+      expect(failure).toBeInstanceOf(AgentEnvironmentUnresolvedError);
+      expect((failure as AgentEnvironmentUnresolvedError).meta).toMatchObject({
+        onlineEnvironments: [],
       });
     });
   });

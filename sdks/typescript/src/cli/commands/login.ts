@@ -6,6 +6,10 @@ import prompts from "prompts";
 
 import { recordCliLocation } from "@/cli/utils/governance/cli-location";
 import { isLoggedIn, loadConfig, saveConfig } from "@/cli/utils/governance/config";
+import {
+  globalConfigIsolationWarning,
+  rewritesGlobalConfigForLocalInstance,
+} from "@/cli/utils/governance/global-config-isolation";
 import { runDeviceFlowLogin, runUnifiedLoginFlow } from "@/cli/utils/governance/login-flow";
 import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpoint";
 import { fetchProjectKeyBySlug, SessionApiError } from "@/cli/utils/governance/session-api";
@@ -43,6 +47,15 @@ function printAgentHintBanner(): void {
   console.log(chalk.gray("  --endpoint <URL>           self-hosted instance URL"));
   console.log();
 }
+
+/**
+ * Warns once, on stderr, that a local control plane now owns the machine's
+ * one global config. Spec: specs/ai-governance/cli-onboarding/login-unified.feature
+ */
+const warnIfLocalEndpointTakesOverGlobalConfig = (endpoint: string): void => {
+  if (!rewritesGlobalConfigForLocalInstance({ endpoint })) return;
+  console.error(chalk.yellow(globalConfigIsolationWarning(endpoint)));
+};
 
 const updateEnvFile = (apiKey: string): { created: boolean; updated: boolean; path: string } => {
   const envPath = path.join(process.cwd(), ".env");
@@ -181,6 +194,7 @@ export const loginCommand = async (options?: {
       const cfg = loadConfig();
       cfg.control_plane_url = trimmed;
       saveConfig(cfg);
+      warnIfLocalEndpointTakesOverGlobalConfig(trimmed);
     }
 
     // --token: pre-minted device-session escape hatch (CI / agent contexts
@@ -364,6 +378,7 @@ export const loginCommand = async (options?: {
         cfg.control_plane_url = normalizeEndpoint(url.url as string);
         saveConfig(cfg);
       }
+      warnIfLocalEndpointTakesOverGlobalConfig(cfg.control_plane_url);
     }
 
     // Q2 — auth mode (AI tools = device-flow vs Project SDK = API key)

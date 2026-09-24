@@ -3,6 +3,7 @@ import { z } from "zod";
 export const FIELD_TYPES = [
   "str",
   "image",
+  "file",
   "float",
   "int",
   "bool",

@@ -26,6 +26,7 @@ type DatasetCellDisplayProps = {
   value: string;
   row: number;
   columnId: string;
+  datasetId: string;
   dataType?: DatasetColumnType;
   cellRef: RefObject<HTMLDivElement | null>;
   isEditing: boolean;
@@ -35,11 +36,20 @@ export function DatasetCellDisplay({
   value,
   row,
   columnId,
+  datasetId,
   dataType,
   cellRef,
   isEditing,
 }: DatasetCellDisplayProps) {
-  const { rowHeightMode, expandedCells, toggleCellExpanded, renderImage } = useDatasetTable();
+  const {
+    rowHeightMode,
+    expandedCells,
+    toggleCellExpanded,
+    renderImage,
+    renderAttachment,
+    setCellValue,
+    setEditingCell,
+  } = useDatasetTable();
   const contentRef = useRef<HTMLDivElement>(null);
   const currentHeightRef = useRef<number | null>(null);
   const draggingRef = useRef(false);
@@ -72,7 +82,20 @@ export function DatasetCellDisplay({
   const cellMaxHeight = isCompact ? `${COMPACT_MAX_HEIGHT}px` : expandedHeight;
   const expandedOverflow = isExpanded ? "auto" : void 0;
   const cellOverflow = isCompact ? "hidden" : expandedOverflow;
-  const image = dataType === "image" && value ? renderImage(value) : null;
+  const attachmentColumnType = dataType === "image" || dataType === "file" ? dataType : null;
+  const attachment =
+    attachmentColumnType && renderAttachment
+      ? renderAttachment({
+          value,
+          columnType: attachmentColumnType,
+          datasetId,
+          fallbackText: displayValue.text,
+          fallbackTruncated: displayValue.truncated,
+          onChange: (next) => setCellValue(datasetId, row, columnId, next),
+          onOpenEditor: () => setEditingCell({ row, columnId }),
+        })
+      : null;
+  const image = attachment ?? (dataType === "image" && value ? renderImage(value) : null);
 
   useEffect(() => {
     if (!isExpanded) {

@@ -6,6 +6,37 @@ import {
 import { DispatchError, toDispatchError } from "@langwatch/eventing";
 import type { TraceRecord } from "@langwatch/trace-contract";
 
+import { tracePath } from "../../rules/automation-platform-url.rules.ts";
+
+interface LinkedTrace {
+  traceId?: string;
+  graphId?: string;
+  occurredAtMs?: number | null;
+}
+
+/** The link a trigger row points at: the custom graph, else the trace with its partition hint. */
+function linkFor({
+  baseHost,
+  projectSlug,
+  trace,
+}: {
+  baseHost: string;
+  projectSlug: string;
+  trace: LinkedTrace;
+}): string {
+  if (trace.graphId) {
+    return `${baseHost}/${projectSlug}/analytics/custom/${trace.graphId}`;
+  }
+  if (trace.traceId) {
+    return `${baseHost}/${projectSlug}${tracePath({ traceId: trace.traceId, occurredAtMs: trace.occurredAtMs })}`;
+  }
+  return "#";
+}
+
+function displayTextFor(trace: LinkedTrace): string {
+  return trace.graphId ? "View Graph" : (trace.traceId ?? "View");
+}
+
 function assertSlackWebhookUrl(url: string, triggerName: string): void {
   if (isSlackWebhookUrl(url)) return;
   throw new DispatchError({
@@ -79,6 +110,7 @@ async function deliverSlackWebhook(
       return {
         traceId: data.traceId,
         graphId: data.graphId,
+        occurredAtMs: data.fullTrace?.timestamps?.started_at,
         input: data.input,
         output: data.output,
         events: data.fullTrace?.events ?? [],
@@ -86,30 +118,10 @@ async function deliverSlackWebhook(
     })
     .slice(0, 10);
 
-  const getLink = (data: { traceId?: string; graphId?: string }) => {
-    // Check if this is a custom graph trigger
-    if (data.graphId) {
-      return `${baseHost}/${projectSlug}/analytics/custom/${data.graphId}`;
-    }
-    // Regular trace link
-    if (data.traceId) {
-      return `${baseHost}/${projectSlug}/traces/${data.traceId}`;
-    }
-    return "#";
-  };
-
-  const getDisplayText = (data: { traceId?: string; graphId?: string }) => {
-    // For custom graphs, show a more user-friendly text
-    if (data.graphId) {
-      return "View Graph";
-    }
-    return data.traceId ?? "View";
-  };
-
   const traceLinks = traceIds.map((trace) => {
     const isCustomGraph = !!trace.graphId;
 
-    return `\n<${getLink(trace)}|${getDisplayText(trace)}>
+    return `\n<${linkFor({ baseHost, projectSlug, trace })}|${displayTextFor(trace)}>
     ${
       !triggerMessage && !isCustomGraph
         ? ` \n*Input:* ${escapeMrkdwn(trace.input)}

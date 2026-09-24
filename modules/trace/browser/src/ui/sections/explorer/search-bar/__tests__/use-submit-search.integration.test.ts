@@ -29,11 +29,13 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: project.current }),
 }));
 
+const toast = vi.hoisted(() => vi.fn());
+vi.mock("@langwatch/design-system/toaster", () => ({ toaster: { create: toast } }));
+
 const handlers = {
   onLangy: vi.fn(),
   onInstantEval: vi.fn(),
   onSupersede: vi.fn(),
-  onModelUnavailable: vi.fn(),
 };
 
 function renderSubmit(overrides: Partial<Parameters<typeof useSubmitSearch>[0]> = {}) {
@@ -59,9 +61,10 @@ beforeEach(() => {
   handlers.onLangy.mockClear();
   handlers.onInstantEval.mockClear();
   handlers.onSupersede.mockClear();
-  handlers.onModelUnavailable.mockClear();
+  toast.mockClear();
   project.current = { id: "project-1" };
   useFilterStore.getState().clearAll();
+  useFilterStore.setState({ searchNotice: null });
   useFilterStore.setState({ activeLensId: "all-traces" });
 });
 
@@ -146,15 +149,17 @@ describe("given the text has bare words", () => {
           kind: "free_text",
           query: '"cannot connect to database"',
           decidedBy: "classifier",
-          isModelUnavailable: false,
         }),
       );
-      expect(useFilterStore.getState().queryText).toBe('"cannot connect to database"');
-      expect(handlers.onModelUnavailable).not.toHaveBeenCalled();
+      expect(useFilterStore.getState().queryText).toBe(
+        '"cannot connect to database"',
+      );
+      // The classifier's own answer, so there is nothing to explain.
+      expect(useFilterStore.getState().searchNotice).toBeNull();
     });
 
     /** @scenario "Without a classifier or a model the words are searched as a phrase" */
-    it("applies the phrase and reports the missing model when flagged", () => {
+    it("applies the phrase and says why it is one", () => {
       const { result } = renderSubmit();
       act(() => result.current.submitSearch("annoyed users"));
       act(() =>
@@ -162,12 +167,17 @@ describe("given the text has bare words", () => {
           kind: "free_text",
           query: '"annoyed users"',
           decidedBy: "fallback",
-          isModelUnavailable: true,
           fellBackFrom: "routing",
+          modelTrouble: "no_model",
         }),
       );
       expect(useFilterStore.getState().queryText).toBe('"annoyed users"');
-      expect(handlers.onModelUnavailable).toHaveBeenCalledTimes(1);
+      expect(useFilterStore.getState().searchNotice).toEqual({
+        projectId: "project-1",
+        query: '"annoyed users"',
+        interpretedAs: "free_text",
+        modelTrouble: "no_model",
+      });
     });
   });
 
@@ -227,12 +237,23 @@ describe("given the text has bare words", () => {
 
   describe("when the router call fails", () => {
     /** @scenario "A model failure is a phrase search, not an error" */
-    it("searches the words as one phrase", () => {
+    /** @scenario "A router call that fails says the words were searched instead" */
+    it("searches the words as one phrase and says so", () => {
       const { result } = renderSubmit();
       act(() => result.current.submitSearch("annoyed users status:error"));
       act(() => lastCall().options.onError?.(new Error("network")));
-      expect(useFilterStore.getState().queryText).toBe('status:error AND "annoyed users"');
+      expect(useFilterStore.getState().queryText).toBe(
+        'status:error AND "annoyed users"',
+      );
       expect(useFilterStore.getState().parseError).toBeNull();
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "warning",
+          description: expect.stringContaining(
+            "The words were searched as a phrase instead.",
+          ),
+        }),
+      );
     });
   });
 
@@ -366,7 +387,6 @@ describe("given an Instant Eval estimate is still in flight", () => {
           kind: "free_text",
           query: '"annoyed users"',
           decidedBy: "classifier",
-          isModelUnavailable: false,
         }),
       );
       expect(handlers.onInstantEval).not.toHaveBeenCalled();

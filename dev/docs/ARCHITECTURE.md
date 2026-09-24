@@ -900,6 +900,10 @@ export const storesConfig = (modules) =>
       env: "REDIS_URL",
       developmentDefault: "redis://localhost:6379",
     }),
+    objectStorage: Config.group({
+      backend: Config.value(z.enum(["s3", "azure", "file"]).optional(), { env: "STORED_OBJECTS_BACKEND" }),
+      /* s3: S3_*; azure: AZURE_BLOB_*, AZURE_* identity; localRoot: LANGWATCH_LOCAL_STORAGE_PATH */
+    }),
   }).refine(
     /* rule 1: live + a required store unset → refuse naming modules and key
              rule 2: memory + NODE_ENV=production → refuse by name */
@@ -932,6 +936,28 @@ process holding DDL locks is how deploys die.
 
 **Clients appear in exactly one place: the chain.** From there only registry
 and channel factories touch them. There is no second path.
+
+**Object storage is a store, like the other three** (ruled 2026-09-24,
+ADR-158). The `objectStorage` member is one client over S3, Azure Blob and the
+local filesystem. It routes per project inside the client, as the ClickHouse
+client routes per tenant, so a module names a project and a key and never a
+bucket, account or root. Its settings belong to the stores owner:
+`STORED_OBJECTS_BACKEND`, `S3_BUCKET_NAME`, `S3_ENDPOINT`, `S3_REGION`,
+`AZURE_BLOB_*`, `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`,
+`AZURE_FEDERATED_TOKEN_FILE` and `LANGWATCH_LOCAL_STORAGE_PATH`, with
+`S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_SESSION_TOKEN` and
+`AZURE_BLOB_ACCOUNT_KEY` as secrets. `LANGWATCH_STORES=memory` answers it with
+a memory twin.
+
+Bodies travel as streams, and every digest is computed over a stream, once.
+Nothing holds a whole object in memory to hash it. Modules build repositories
+over the member, such as stored-object's files and dataset's chunk content,
+and no module composes a storage driver of its own. A client's upload never
+passes through a module: it PUTs to a signed URL the member answers, and it is
+confirmed afterwards. The filesystem has no URL of its own, so there the URL is
+stored-object's signed route, which streams into the member. A stored object's
+id is always a fresh KSUID, and its purpose is a field of its record. Neither
+is derived from content.
 
 **Resolving is invisible: callers just call the client** (ruled 2026-09-18,
 landing): a module holds the `clickhouse` member and queries it — every

@@ -1,16 +1,19 @@
 /** Bulk upload orchestration core: concurrent workers + single-file pipeline
- * (create/put/finalize). Injected deps for testability.
+ * (upload, then create the dataset from it). Injected deps for testability.
  */
 
 import type { DatasetConfirmColumns } from "@langwatch/dataset-contract";
+import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import { DATASET_IMPORT_PURPOSE } from "@langwatch/stored-object-contract";
 
-import {
-  abortPendingUpload,
-  DatasetNameConflictError,
-  finalizeDirectUpload,
-  putFileToPresignedUrl,
-  requestDirectUpload,
-} from "./direct-upload.ts";
+import type { DatasetImportTransport } from "./use-stored-object-upload.ts";
+
+export class DatasetNameConflictError extends Error {
+  constructor(message = "A dataset with this name already exists") {
+    super(message);
+    this.name = "DatasetNameConflictError";
+  }
+}
 
 /** Max times we re-attempt the CREATE under a bumped name on a slug conflict
  *  before giving up (a pathological run where every candidate is taken). */
@@ -37,19 +40,7 @@ export async function runWithConcurrency<T>(
   await Promise.all(lanes);
 }
 
-export type UploadSingleFileDeps = {
-  requestDirectUpload: typeof requestDirectUpload;
-  putFileToPresignedUrl: typeof putFileToPresignedUrl;
-  finalizeDirectUpload: typeof finalizeDirectUpload;
-  abortPendingUpload: typeof abortPendingUpload;
-};
-
-const defaultDeps: UploadSingleFileDeps = {
-  requestDirectUpload,
-  putFileToPresignedUrl,
-  finalizeDirectUpload,
-  abortPendingUpload,
-};
+export type UploadSingleFileDeps = DatasetImportTransport;
 
 export type UploadSingleFileResult = {
   datasetId: string;
@@ -59,9 +50,9 @@ export type UploadSingleFileResult = {
 };
 
 /**
- * Upload one file end to end. On a slug conflict it bumps the name via
- * `nextName` and retries — no row exists yet (the server rejects the name
- * before minting one). Once created, any failure or cancel reaps the row first.
+ * Upload one file end to end: the file goes to storage once, then the dataset
+ * is created from it. On a taken name it bumps the name via `nextName` and
+ * creates again; the uploaded file is reused, never sent twice.
  */
 export async function uploadSingleFile(
   params: {
@@ -73,49 +64,31 @@ export async function uploadSingleFile(
     /** Produce the next candidate name when the current one conflicts. */
     nextName: (current: string) => string;
   },
-  deps: UploadSingleFileDeps = defaultDeps,
+  deps: UploadSingleFileDeps,
 ): Promise<UploadSingleFileResult> {
   const { projectId, file, columnTypes, signal, nextName } = params;
-  let name = params.name;
+  const reference = await deps.uploadStoredObject({
+    projectId,
+    purpose: DATASET_IMPORT_PURPOSE,
+    file,
+    signal,
+  });
+  signal?.throwIfAborted();
 
+  let name = params.name;
   for (let attempt = 0; attempt < MAX_NAME_CONFLICT_RETRIES; attempt++) {
-    let datasetId: string;
-    let uploadUrl: string;
     try {
-      const handle = await deps.requestDirectUpload({
+      const { datasetId } = await deps.createFromStoredObject({
         projectId,
         name,
-        filename: file.name,
+        storedObjectId: reference.id,
         columnTypes,
       });
-      datasetId = handle.datasetId;
-      uploadUrl = handle.uploadUrl;
+      return { datasetId, finalName: name };
     } catch (error) {
-      // Conflict = the name (slug) is taken — no row was created, so just bump
-      // the name and retry the create cleanly.
-      if (error instanceof DatasetNameConflictError) {
-        name = nextName(name);
-        continue;
-      }
-      throw error;
+      if (readHandledError(error)?.code !== "dataset_name_taken") throw error;
+      name = nextName(name);
     }
-
-    // The row now exists. Reap ONLY on a PUT failure/cancel — at that point no
-    // bytes finalized, so the `uploading` row is genuinely orphaned.
-    try {
-      await deps.putFileToPresignedUrl(uploadUrl, file, signal);
-    } catch (error) {
-      await deps.abortPendingUpload({ projectId, datasetId }).catch(() => undefined);
-      throw error;
-    }
-
-    // PUT succeeded → committed to finalizing. A finalize failure must NOT reap:
-    // finalize may have already committed server-side (a transport blip on the
-    // response would otherwise delete a real dataset), and the reap is
-    // status-guarded to `uploading` anyway — a still-`uploading` row is left to
-    // the server's stale-upload TTL sweep, not blindly deleted here.
-    await deps.finalizeDirectUpload({ projectId, datasetId });
-    return { datasetId, finalName: name };
   }
 
   throw new DatasetNameConflictError(`Could not find an available name for "${file.name}"`);

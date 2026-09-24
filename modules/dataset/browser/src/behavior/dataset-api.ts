@@ -1,11 +1,12 @@
 /**
  * The procedures this package calls: dataset, datasetRecord and batchRecord
- * derive from the contract, the borrowed three belong to features not yet
- * split. Segment names are load-bearing (React Query cache key).
+ * derive from the contract, storedObjects from its owner's (ADR-158), the
+ * borrowed three belong to features not yet split. Segment names are the cache key.
  */
 
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { batchRecordTrpc, datasetRecordTrpc, datasetTrpc } from "@langwatch/dataset-contract";
+import type { storedObjectTrpc } from "@langwatch/stored-object-contract";
 
 /**
  * Procedures other features own. Each belongs in that feature's own contract;
@@ -68,6 +69,7 @@ type BorrowedProcedures = {
 export type DatasetApiMap = ContractApiMap<typeof datasetTrpc> &
   ContractApiMap<typeof datasetRecordTrpc> &
   ContractApiMap<typeof batchRecordTrpc> &
+  ContractApiMap<typeof storedObjectTrpc> &
   BorrowedProcedures;
 
 /**

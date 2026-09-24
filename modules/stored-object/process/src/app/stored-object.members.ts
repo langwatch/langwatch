@@ -1,15 +1,34 @@
+import type { Readable } from "node:stream";
+
+import type { ObjectDigest, SignedObjectUpload } from "@langwatch/process-stores/members";
 import type {
   StoredObjectByteStream,
   StoredObjectDeliveryAudience,
   StoredObjectDeliveryCapability,
-  StoredObjectDirectUploadTarget,
+  StoredObjectFileRow,
   StoredObjectId,
-  StoredObjectOperationId,
   StoredObjectProjectId,
-  StoredObjectReference,
   StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
 import type { Instant } from "@langwatch/time";
+
+/** A probe's answer before the purpose decides the gate and is dropped. */
+export type StoredObjectProbe =
+  | Readonly<{ status: "not_found" }>
+  | Readonly<{ status: "available" | "missing"; mediaType: string; purpose: string }>;
+
+/** The contract's byte read, narrowed to the Node stream this process's byte backends hand over. */
+export type StoredObjectFileStreamRead =
+  | { row: StoredObjectFileRow; stream: Readable }
+  | { row: StoredObjectFileRow; status: "missing" };
+
+/** The legacy index's reads the byte surface and the probe perform (ADR-158 §5). */
+export interface StoredObjectFileReader {
+  headById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectProbe>;
+  tryGetById(
+    input: Readonly<{ projectId: string; id: string }>,
+  ): Promise<StoredObjectFileStreamRead | null>;
+}
 
 export type StoredObjectOwnerLookupSpan = Readonly<{
   setAttribute(name: string, value: string | number | boolean): void;
@@ -93,40 +112,40 @@ export type StoredObjectStorageAddress = Readonly<{
   relativeId: string;
 }>;
 
-export type StoredObjectUploadTokenClaims = Readonly<{
-  projectId: StoredObjectProjectId;
-  objectId: StoredObjectId;
-  operationId: StoredObjectOperationId;
+/** Where a new object's bytes go, and the largest single PUT that backend takes. */
+export type StoredObjectPlacement = Readonly<{
   address: StoredObjectStorageAddress;
-  reference: StoredObjectReference;
-  expiresAt: string;
+  maxSinglePutBytes: number;
 }>;
 
-/** Existing application storage drivers are adapted to this narrow boundary. */
+/** The objectStorage member, spoken in the addresses a stored-object row records. */
 export abstract class StoredObjectStorage {
+  abstract place(input: {
+    projectId: StoredObjectProjectId;
+    objectId: StoredObjectId;
+  }): Promise<StoredObjectPlacement>;
+
+  /** Streams the body to `address`, counting and hashing; refuses past `byteLength`. */
   abstract write(input: {
     projectId: StoredObjectProjectId;
-    objectId: StoredObjectId;
-    bytes: Uint8Array;
-    mediaType: string;
-  }): Promise<StoredObjectStorageAddress>;
-
-  abstract tryCreateUpload(input: {
-    projectId: StoredObjectProjectId;
-    objectId: StoredObjectId;
+    address: StoredObjectStorageAddress;
+    body: StoredObjectByteStream;
     byteLength: number;
-    sha256: string;
+    mediaType: string;
+  }): Promise<ObjectDigest>;
+
+  abstract signUpload(input: {
+    projectId: StoredObjectProjectId;
+    address: StoredObjectStorageAddress;
+    byteLength: number;
     mediaType: string;
     expiresAt: Instant;
-  }): Promise<{
-    address: StoredObjectStorageAddress;
-    target: StoredObjectDirectUploadTarget;
-  } | null>;
+  }): Promise<SignedObjectUpload>;
 
   abstract tryStat(input: {
     projectId: StoredObjectProjectId;
     address: StoredObjectStorageAddress;
-  }): Promise<{ byteLength: number; sha256: string } | null>;
+  }): Promise<ObjectDigest | null>;
 
   abstract tryRead(input: {
     projectId: StoredObjectProjectId;
@@ -145,11 +164,6 @@ export abstract class StoredObjectStorage {
 
   /** Writes a small object where the project's bytes go, then removes it. */
   abstract probe(input: { projectId: StoredObjectProjectId }): Promise<void>;
-}
-
-export abstract class StoredObjectUploadTokenCodec {
-  abstract encode(claims: StoredObjectUploadTokenClaims): Promise<string>;
-  abstract decode(token: string): Promise<StoredObjectUploadTokenClaims>;
 }
 
 export abstract class StoredObjectDelivery {

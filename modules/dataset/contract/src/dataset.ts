@@ -14,6 +14,7 @@ export const datasetColumnTypeSchema = z.enum([
   "annotations",
   "evaluations",
   "image",
+  "file",
 ]);
 export type DatasetColumnType = z.infer<typeof datasetColumnTypeSchema>;
 
@@ -264,11 +265,16 @@ export const deleteDatasetRecordsInputSchema = datasetRecordLookupInputSchema.sa
 });
 export type DeleteDatasetRecordsInput = z.infer<typeof deleteDatasetRecordsInputSchema>;
 
+/** A posted file's body, read once as it arrives. */
+const uploadedBytesSchema = z.custom<AsyncIterable<Uint8Array>>(
+  (value) => typeof value === "object" && value !== null && Symbol.asyncIterator in value,
+);
+
 export const uploadExistingDatasetInputSchema = z.object({
   slugOrId: z.string().min(1),
   projectId: z.string().min(1),
   filename: z.string().min(1),
-  content: z.string(),
+  bytes: uploadedBytesSchema,
   fileSize: z.number().nonnegative(),
 });
 export type UploadExistingDatasetInput = z.infer<typeof uploadExistingDatasetInputSchema>;
@@ -277,10 +283,36 @@ export const createDatasetFromUploadInputSchema = z.object({
   projectId: z.string().min(1),
   name: z.string().min(1),
   filename: z.string().min(1),
-  content: z.string(),
+  bytes: uploadedBytesSchema,
   fileSize: z.number().nonnegative(),
 });
 export type CreateDatasetFromUploadInput = z.infer<typeof createDatasetFromUploadInputSchema>;
+
+/** Deprecated with `POST /api/dataset/attachments`; retires in the next release (ADR-158 §8). */
+export const storeDatasetAttachmentUploadInputSchema = z.object({
+  projectId: z.string().min(1),
+  datasetId: z.string().optional(),
+  filename: z.string(),
+  mediaType: z.string().optional(),
+  bytes: uploadedBytesSchema,
+  fileSize: z.number().nonnegative(),
+});
+export type StoreDatasetAttachmentUploadInput = z.infer<
+  typeof storeDatasetAttachmentUploadInputSchema
+>;
+
+/** A posted file stored as a dataset attachment: the reference a cell holds, and its metadata. */
+export const storedDatasetAttachmentSchema = z
+  .object({
+    url: z
+      .string()
+      .describe("The value to write into the cell, and the address the file is served from."),
+    name: z.string().describe("The file name the reference carries."),
+    mediaType: z.string().describe("The media type the file is stored under."),
+    sizeBytes: z.number().describe("The size of the stored file, in bytes."),
+  })
+  .meta({ id: "DatasetAttachment" });
+export type StoredDatasetAttachment = z.infer<typeof storedDatasetAttachmentSchema>;
 
 export type CreateDatasetFromUploadResult = Pick<Dataset, "createdAt" | "updatedAt"> & {
   id: string;
@@ -290,45 +322,52 @@ export type CreateDatasetFromUploadResult = Pick<Dataset, "createdAt" | "updated
   recordsCreated: number;
 };
 
-export const pendingUploadInputSchema = z.object({
+/** A dataset built in the background from a confirmed `dataset_import` file (ADR-158 §6). */
+export const createDatasetFromStoredObjectInputSchema = z.object({
   projectId: z.string().min(1),
   name: z.string().min(1),
-  filename: z.string().min(1),
-  columnTypes: z
-    .array(
-      z.object({
-        name: z.string(),
-        type: datasetColumnTypeSchema,
-        sourceHeader: z.string().optional(),
-      }),
-    )
-    .optional(),
+  storedObjectId: z.string().min(1),
+  columnTypes: datasetConfirmColumnsSchema.optional(),
 });
-export type PendingUploadInput = z.infer<typeof pendingUploadInputSchema>;
+export type CreateDatasetFromStoredObjectInput = z.infer<
+  typeof createDatasetFromStoredObjectInputSchema
+>;
 
-export type PendingUploadResult = {
-  datasetId: string;
-  slug: string;
-  uploadUrl: string;
-};
+export const datasetImportStartedSchema = z.object({
+  datasetId: z.string(),
+  slug: z.string(),
+  status: z.literal("processing"),
+});
+export type DatasetImportStarted = z.infer<typeof datasetImportStartedSchema>;
 
-export type StagedUploadInput = {
-  projectId: string;
-  uploadId: string;
-  body: unknown;
-};
+/** A confirmed `dataset_import` file's rows appended to an existing dataset. */
+export const appendStoredObjectToDatasetInputSchema = z.object({
+  projectId: z.string().min(1),
+  slugOrId: z.string().min(1),
+  storedObjectId: z.string().min(1),
+});
+export type AppendStoredObjectToDatasetInput = z.infer<
+  typeof appendStoredObjectToDatasetInputSchema
+>;
 
-export type AbortPendingUploadInput = {
-  projectId: string;
-  datasetId: string;
-};
+export const datasetImportAppendedSchema = z.object({
+  datasetId: z.string(),
+  recordsCreated: z.number().int().nonnegative(),
+});
+export type DatasetImportAppended = z.infer<typeof datasetImportAppendedSchema>;
 
-export type FinalizeUploadInput = {
-  projectId: string;
-  datasetId: string;
-};
+export const uploadProcessingSchema = z.object({
+  datasetId: z.string(),
+  status: z.literal("processing"),
+});
+export type UploadProcessing = z.infer<typeof uploadProcessingSchema>;
 
-export type RetryNormalizeInput = AbortPendingUploadInput;
+/** A dataset whose preparation failed or stalled, prepared again from the same stored file. */
+export const retryNormalizeInputSchema = z.object({
+  projectId: z.string().min(1),
+  datasetId: z.string().min(1),
+});
+export type RetryNormalizeInput = z.infer<typeof retryNormalizeInputSchema>;
 
 export const copyDatasetInputSchema = z
   .object({

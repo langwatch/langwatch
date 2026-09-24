@@ -1,7 +1,10 @@
-import { datasetSchema, type Dataset } from "@langwatch/dataset-contract";
+import { datasetSchema, type Dataset, type DatasetRecord } from "@langwatch/dataset-contract";
 import { describe, expect, it } from "vitest";
 
-import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
+import {
+  createDatasetTestAttachments,
+  createDatasetTestRequestBounds,
+} from "../../app/__tests__/dataset.fixture.ts";
 import { DatasetService } from "../../services/dataset.service.ts";
 import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
 import type { DatasetRepository } from "../dataset.repository.ts";
@@ -45,6 +48,10 @@ class Records implements DatasetRecordRepository {
   async count(): Promise<number> {
     return 0;
   }
+  async findByIds(): Promise<DatasetRecord[]> {
+    return [];
+  }
+
   async findPage() {
     return [];
   }
@@ -62,6 +69,7 @@ describe("DatasetService", () => {
       repository: new Repo(),
       records: new Records(),
       requestBounds: createDatasetTestRequestBounds(),
+      attachments: createDatasetTestAttachments(),
     });
     await expect(service.getBySlugOrId({ projectId: "p1", slugOrId: "d1" })).resolves.toMatchObject(
       { id: "d1" },

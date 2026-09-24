@@ -166,7 +166,7 @@ describe.skipIf(!existsSync(PLATFORM_PROTOCOL))(
           sorted(["protocol", ...keys]),
         );
         expect(sorted(sdkKeys({ source: sdk, name: "RegisteredAgent" }))).toEqual(
-          sorted(["name", "environment", "id", "url", "parameterNotes"]),
+          sorted(["name", "environment", "id", "url", "parameterNotes", "scope"]),
         );
       });
 

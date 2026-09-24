@@ -123,6 +123,7 @@ function scenario({
   bindings = [liveBinding],
   authentications = [],
   legacyAccounts = 0,
+  otherAccounts = [],
 }: {
   connections?: SsoConnectionState[];
   identifiers?: IdentifierFact[];
@@ -137,8 +138,24 @@ function scenario({
   }[];
   /** How many federated accounts the module that owns them still answers for. */
   legacyAccounts?: number;
+  /** Addresses held by accounts outside the organization. */
+  otherAccounts?: string[];
 } = {}) {
   const store = MemoryIdentityStore.create();
+  const accounts = [
+    ...members.map(({ userId, email }) => ({ userId, email })),
+    ...otherAccounts.map((email, index) => ({ userId: `user_other_${index}`, email })),
+  ];
+  for (const { userId, email } of accounts) {
+    store.users.set(userId, {
+      id: userId,
+      email,
+      emailVerified: false,
+      createdAtMs: NOW,
+      userHashKey: null,
+      payload: {},
+    });
+  }
   for (const connection of connections)
     store.ssoConnections.set(connection.connectionId, connection);
   for (const fact of identifiers) store.identifiers.set(fact.identifierId, fact);
@@ -214,8 +231,35 @@ describe("given a replacement registered beside the grandfathered connection", (
         name: "Ben",
         email: "ben@acme.com",
         lastLegacyAuthenticationAtMs: null,
+        move: "matched",
       },
     ]);
+  });
+
+  /** @scenario "The new connection recognises members by address on a domain it proved, confirmed or not" */
+  it("says whether the replacement will recognise each member, and counts who moves at their next sign-in", async () => {
+    const view = await progress(
+      scenario({
+        members: [
+          ANA,
+          BEN,
+          { userId: "user_cyd", name: "Cyd", email: null },
+          { userId: "user_dee", name: "Dee", email: "dee@acme.com" },
+          { userId: "user_eve", name: "Eve", email: "eve@elsewhere.org" },
+        ],
+        otherAccounts: ["DEE@acme.com"],
+      }),
+    );
+
+    expect(view?.members.nextSignInCount).toBe(1);
+    expect(
+      Object.fromEntries(view?.members.stragglers.map((row) => [row.userId, row.move]) ?? []),
+    ).toEqual({
+      user_ben: "matched",
+      user_cyd: "no-address",
+      user_dee: "shared-address",
+      user_eve: "unproved-domain",
+    });
   });
 
   it("says when each straggler last came in through the old connection", async () => {
@@ -331,15 +375,48 @@ describe("given a cutover that is nearly done", () => {
     expect(view?.blockers.map((blocker) => blocker.code)).toContain("recovery-path-missing");
   });
 
-  it("refuses while a member holds no identifier on the replacement", async () => {
+  it("does not hold the update for a member who holds no identifier on the replacement", async () => {
     const view = await progress(scenario({ members: [ANA, BEN] }));
 
-    expect(view?.blockers.map((blocker) => blocker.code)).toContain("members-not-linked");
+    expect(view?.blockers).toEqual([]);
+    expect(view?.canFinalize).toBe(true);
+  });
+
+  it("opens finishing two days after the switch-over when nobody used the old provider since", async () => {
+    const view = await progress(scenario());
+
+    expect(view?.quietPeriod.clearsAtMs).toBe(NOW - 8 * DAY_MS);
   });
 
   it("says nothing about directory provisioning this installation does not run", async () => {
     const view = await progress(scenario());
 
     expect(view?.scim.status).toBe("not-applicable");
+  });
+});
+
+describe("when finishing re-reads whether the previous provider still lets anybody in", () => {
+  const evidence = async (service: SsoMigrationProgressService) =>
+    service.getFinalizationEvidence({ organizationId: ORG });
+
+  it("does not wait on the identity of a member for whom it is the only way in", async () => {
+    const service = scenario({
+      identifiers: [
+        identifier({ identifierId: "idf_legacy", connectionId: LEGACY, state: "PRIMARY" }),
+      ],
+    });
+
+    expect((await evidence(service)).legacyAccessRetired).toBe(true);
+  });
+
+  it("still waits on the identity of a member who has another way in", async () => {
+    const service = scenario({
+      identifiers: [
+        identifier({ identifierId: "idf_legacy", connectionId: LEGACY, state: "PRIMARY" }),
+        identifier({ identifierId: "idf_email", provider: "email", connectionId: null }),
+      ],
+    });
+
+    expect((await evidence(service)).legacyAccessRetired).toBe(false);
   });
 });

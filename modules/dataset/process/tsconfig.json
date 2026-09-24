@@ -58,6 +58,9 @@
       "path": "../../project/contract/tsconfig.build.json"
     },
     {
+      "path": "../../stored-object/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/task/tsconfig.build.json"
     },
     {

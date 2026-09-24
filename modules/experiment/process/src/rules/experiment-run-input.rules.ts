@@ -22,6 +22,7 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { ResultMapperConfig } from "../eventing/experiment-result-mapping.process.ts";
 import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
+import type { ExperimentAttachmentInputService } from "../services/experiment-attachment-input.service.ts";
 import type { ExperimentStudioDispatch } from "../services/experiment-cell-execution.service.ts";
 import type { ExperimentConnectedDispatch } from "../services/experiment-connected-cell.service.ts";
 import type { LoadedWorkflow } from "../services/experiment-execution-data.service.ts";
@@ -52,6 +53,8 @@ export type ExperimentRunCollaborators = {
   connectedDispatch: ExperimentConnectedDispatch;
   /** Refuses a run against someone else's personal development agent. */
   connectedAgentOwnership: ExperimentConnectedAgentOwnership;
+  /** Reads the row's image and file values into what a target can open. */
+  attachments: ExperimentAttachmentInputService;
 };
 
 /**

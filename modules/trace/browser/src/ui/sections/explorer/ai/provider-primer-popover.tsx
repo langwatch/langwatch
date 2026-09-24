@@ -25,15 +25,6 @@ export const ASK_AI_PRIMER_COPY: ProviderPrimerCopy = {
   body: "Ask AI uses your own model provider keys to translate plain English into trace queries: “errors yesterday from service-x”, “slow checkout traces with eval scores under 0.5”. Add a provider to unlock it.",
 };
 
-/**
- * The search bar's words when Enter fell back to a phrase search: the search
- * still ran, and this says what a model would add to it.
- */
-export const SMARTER_SEARCH_PRIMER_COPY: ProviderPrimerCopy = {
-  title: "Connect a model for smarter search",
-  body: "Your words were searched as a phrase. With a model connected, a sentence typed here becomes a filter, a judgement over each trace, or a question for the assistant.",
-};
-
 type ProviderPrimerPopoverProps = {
   /** The element the popover opens from (trigger mode) or sits under (anchor mode). */
   children: React.ReactElement;

@@ -10,22 +10,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithDatasetHost } from "../../../testing.tsx";
 
-const requestDirectUpload = vi.fn();
-const putFileToPresignedUrl = vi.fn();
-const finalizeDirectUpload = vi.fn();
-const abortPendingUpload = vi.fn();
+const createFromStoredObject = vi.fn();
+const uploadStoredObject = vi.fn();
 const retryDatasetNormalize = vi.fn();
-vi.mock("../../../behavior/direct-upload.ts", async (orig) => {
-  const actual = await orig<typeof directUploadModule>();
-  return {
-    ...actual,
-    requestDirectUpload: (...a: unknown[]) => requestDirectUpload(...a),
-    putFileToPresignedUrl: (...a: unknown[]) => putFileToPresignedUrl(...a),
-    finalizeDirectUpload: (...a: unknown[]) => finalizeDirectUpload(...a),
-    abortPendingUpload: (...a: unknown[]) => abortPendingUpload(...a),
-    retryDatasetNormalize: (...a: unknown[]) => retryDatasetNormalize(...a),
-  };
-});
+
+const importTransport = {
+  uploadStoredObject: (...a: unknown[]) => uploadStoredObject(...a),
+  createFromStoredObject: (...a: unknown[]) => createFromStoredObject(...a),
+};
+vi.mock("../../../behavior/use-stored-object-upload.ts", () => ({
+  useDatasetImportTransport: () => importTransport,
+}));
 
 const parseHeaderColumns = vi.fn();
 vi.mock("../../../model/parse-header-columns.ts", async (orig) => {
@@ -44,12 +39,18 @@ const getByIdQuery = vi.fn(() => ({
 }));
 vi.mock("../../../behavior/dataset-api.ts", () => ({
   datasetApi: {
-    dataset: { getById: { useQuery: () => getByIdQuery() } },
+    dataset: {
+      getById: { useQuery: () => getByIdQuery() },
+      retryNormalize: {
+        useMutation: () => ({
+          mutateAsync: (...a: unknown[]) => retryDatasetNormalize(...a),
+        }),
+      },
+    },
     useUtils: () => ({}),
   },
 }));
 
-import type * as directUploadModule from "../../../behavior/direct-upload.ts";
 import type * as parseHeaderColumnsModule from "../../../model/parse-header-columns.ts";
 import { BulkUploadDrawer } from "../bulk-upload-drawer.tsx";
 
@@ -74,14 +75,12 @@ const fileInput = () => document.querySelector('input[type="file"]') as HTMLInpu
 const uploadButton = () => screen.getByRole("button", { name: /upload all/i });
 
 beforeEach(() => {
-  requestDirectUpload.mockReset().mockResolvedValue({
+  createFromStoredObject.mockReset().mockResolvedValue({
     datasetId: "dataset_1",
     slug: "data",
-    uploadUrl: "https://s3.example/put",
+    status: "processing",
   });
-  putFileToPresignedUrl.mockReset().mockResolvedValue(undefined);
-  finalizeDirectUpload.mockReset().mockResolvedValue({ status: "processing" });
-  abortPendingUpload.mockReset().mockResolvedValue(undefined);
+  uploadStoredObject.mockReset().mockResolvedValue({ id: "so_1" });
   retryDatasetNormalize.mockReset().mockResolvedValue(undefined);
   parseHeaderColumns.mockReset().mockResolvedValue(twoCols);
 });
@@ -172,12 +171,12 @@ describe("given the bulk upload drawer", () => {
       render_();
       await user.upload(fileInput(), [csv("data.csv")]);
       await waitFor(() =>
-        expect(screen.getByText(/2 columns — confirm types/i)).toBeInTheDocument(),
+        expect(screen.getByText(/2 columns, confirm types/i)).toBeInTheDocument(),
       );
 
       // Collapsed: the column inputs are not rendered until expanded.
       expect(screen.queryByLabelText("Column 1 name")).not.toBeInTheDocument();
-      await user.click(screen.getByText(/2 columns — confirm types/i));
+      await user.click(screen.getByText(/2 columns, confirm types/i));
 
       const nameInput = await screen.findByLabelText("Column 1 name");
       expect(nameInput).toHaveValue("a");
@@ -203,8 +202,8 @@ describe("given the bulk upload drawer", () => {
       await waitFor(() => expect(screen.getByText("renamed")).toBeInTheDocument());
 
       await user.click(uploadButton());
-      await waitFor(() => expect(requestDirectUpload).toHaveBeenCalled());
-      expect(requestDirectUpload.mock.calls[0]![0].name).toBe("renamed");
+      await waitFor(() => expect(createFromStoredObject).toHaveBeenCalled());
+      expect(createFromStoredObject.mock.calls[0]![0].name).toBe("renamed");
     });
   });
 
@@ -219,7 +218,7 @@ describe("given the bulk upload drawer", () => {
       await user.click(uploadButton());
 
       await waitFor(() => expect(screen.getAllByText(/ready/i).length).toBeGreaterThanOrEqual(2));
-      expect(requestDirectUpload).toHaveBeenCalledTimes(2);
+      expect(createFromStoredObject).toHaveBeenCalledTimes(2);
     });
 
     /** @scenario The types I confirmed are applied to that file's dataset */
@@ -234,10 +233,10 @@ describe("given the bulk upload drawer", () => {
       await user.click(await screen.findByRole("option", { name: /number/i }));
       await user.click(uploadButton());
 
-      await waitFor(() => expect(requestDirectUpload).toHaveBeenCalled());
+      await waitFor(() => expect(createFromStoredObject).toHaveBeenCalled());
       // Each column carries its immutable sourceHeader so normalize can bind by
       // header (the reorder-safe contract).
-      expect(requestDirectUpload.mock.calls[0]![0].columnTypes).toEqual([
+      expect(createFromStoredObject.mock.calls[0]![0].columnTypes).toEqual([
         { name: "a", type: "number", sourceHeader: "a" },
         { name: "b", type: "string", sourceHeader: "b" },
       ]);
@@ -270,8 +269,8 @@ describe("given the bulk upload drawer", () => {
       expect(screen.queryByLabelText("Column 1 name")).toHaveValue("b");
 
       await user.click(uploadButton());
-      await waitFor(() => expect(requestDirectUpload).toHaveBeenCalled());
-      expect(requestDirectUpload.mock.calls[0]![0].columnTypes).toEqual([
+      await waitFor(() => expect(createFromStoredObject).toHaveBeenCalled());
+      expect(createFromStoredObject.mock.calls[0]![0].columnTypes).toEqual([
         { name: "b", type: "string", sourceHeader: "b" },
       ]);
     });
@@ -322,8 +321,10 @@ describe("given the bulk upload drawer", () => {
       await waitFor(() => expect(screen.getByText("data (1)")).toBeInTheDocument());
 
       await user.click(uploadButton());
-      await waitFor(() => expect(requestDirectUpload).toHaveBeenCalledTimes(2));
-      const names = requestDirectUpload.mock.calls.map((c) => c[0].name).toSorted();
+      await waitFor(() => expect(createFromStoredObject).toHaveBeenCalledTimes(2));
+      const names = createFromStoredObject.mock.calls
+        .map((c) => String(c[0].name))
+        .toSorted((a, b) => a.localeCompare(b));
       expect(names).toEqual(["data", "data (1)"]);
     });
   });
@@ -331,11 +332,11 @@ describe("given the bulk upload drawer", () => {
   describe("when one file fails", () => {
     /** @scenario One file failing does not stop the others */
     it("fails that row but the others still become ready", async () => {
-      requestDirectUpload
+      createFromStoredObject
         .mockResolvedValueOnce({
           datasetId: "dataset_ok",
           slug: "ok",
-          uploadUrl: "https://s3.example/put",
+          status: "processing",
         })
         .mockRejectedValueOnce(new Error("boom"));
       const user = userEvent.setup();
@@ -351,17 +352,17 @@ describe("given the bulk upload drawer", () => {
 
     /** @scenario Retrying a failed file re-runs only that file and creates no duplicate */
     it("re-runs only the failed file on retry", async () => {
-      requestDirectUpload
+      createFromStoredObject
         .mockResolvedValueOnce({
           datasetId: "dataset_ok",
           slug: "ok",
-          uploadUrl: "https://s3.example/put",
+          status: "processing",
         })
         .mockRejectedValueOnce(new Error("boom"))
         .mockResolvedValueOnce({
           datasetId: "dataset_retry",
           slug: "bad",
-          uploadUrl: "https://s3.example/put",
+          status: "processing",
         });
       const user = userEvent.setup();
       render_();
@@ -370,21 +371,43 @@ describe("given the bulk upload drawer", () => {
       await user.click(uploadButton());
       await waitFor(() => expect(screen.getByText(/boom/i)).toBeInTheDocument());
 
-      const before = requestDirectUpload.mock.calls.length;
+      const before = createFromStoredObject.mock.calls.length;
       await user.click(screen.getByRole("button", { name: /retry/i }));
-      await waitFor(() => expect(requestDirectUpload.mock.calls.length).toBe(before + 1));
+      await waitFor(() => expect(createFromStoredObject.mock.calls.length).toBe(before + 1));
       // Only one more create — no duplicate for the already-succeeded file.
+    });
+  });
+
+  describe("when the dataset refuses the uploaded file", () => {
+    it("states the refusal in words, not its code", async () => {
+      createFromStoredObject.mockRejectedValueOnce(
+        Object.assign(new Error("dataset_import_source_refused"), {
+          data: {
+            error: { code: "dataset_import_source_refused", httpStatus: 422, meta: {} },
+          },
+        }),
+      );
+      const user = userEvent.setup();
+      render_();
+      await user.upload(fileInput(), [csv("data.csv")]);
+      await waitFor(() => expect(screen.getByText("data")).toBeInTheDocument());
+      await user.click(uploadButton());
+
+      await waitFor(() =>
+        expect(screen.getByText(/that file can't be imported/i)).toBeInTheDocument(),
+      );
+      expect(screen.queryByText("dataset_import_source_refused")).not.toBeInTheDocument();
     });
   });
 
   describe("when a batch exceeds the dataset allowance", () => {
     /** @scenario A batch larger than my remaining dataset allowance */
     it("fails the over-allowance files with a clear message, keeps the rest", async () => {
-      requestDirectUpload
+      createFromStoredObject
         .mockResolvedValueOnce({
           datasetId: "d1",
           slug: "a",
-          uploadUrl: "https://s3.example/put",
+          status: "processing",
         })
         .mockRejectedValueOnce(new Error("dataset limit reached"));
       const user = userEvent.setup();

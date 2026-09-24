@@ -5,9 +5,10 @@
  */
 import { Box, Button, HStack } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import { ExternalImage, getImageUrl } from "@langwatch/design-system/external-image";
+import { ExternalImage } from "@langwatch/design-system/external-image";
 import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
 import { formatMoney } from "@langwatch/design-system/format-money";
+import { cellPictureUrl } from "@langwatch/experiment-browser-kit";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import {
   ExpandedTextDialog,
@@ -102,8 +103,7 @@ export function BatchEvaluationV2EvaluationResult({
     // Dataset columns
     const firstEntry = Object.values(datasetByIndex)[0];
     for (const column of Array.from(datasetColumns)) {
-      const mightHaveImages =
-        typeof firstEntry?.entry?.[column] === "string" && getImageUrl(firstEntry.entry[column]!);
+      const mightHaveImages = cellPictureUrl(firstEntry?.entry?.[column]) !== null;
       cols.push({
         id: `dataset_${column}`,
         header: `Dataset Input (${column})`,
@@ -111,7 +111,7 @@ export function BatchEvaluationV2EvaluationResult({
         render: (row) => {
           const val = row.datasetEntry?.entry?.[column];
           if (mightHaveImages) {
-            const img = getImageUrl((val as string) ?? "");
+            const img = cellPictureUrl(val);
             if (img) {
               return (
                 <ExternalImage

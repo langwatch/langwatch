@@ -26,6 +26,7 @@ import {
   ModelProviderIdService,
   ModelTranslation,
 } from "../../app/model-provider.members.ts";
+import { MemoryModelProviderConnectionPingChannel } from "../../channels/memory/memory.model-provider-connection-ping.channel.ts";
 import type { ModelCostRepository } from "../../repositories/model-cost.repository.ts";
 import type {
   ModelDefaultConfigSaveInput,
@@ -808,6 +809,7 @@ function service(
     catalog,
     authorization: authorizationApi(authorization),
     translation: new Translator(),
+    connectionPing: MemoryModelProviderConnectionPingChannel.create(),
     ids: new Ids(),
   });
 }
@@ -1324,6 +1326,7 @@ describe("ModelProviderService", () => {
       catalog,
       authorization: authorizationApi(),
       translation,
+      connectionPing: MemoryModelProviderConnectionPingChannel.create(),
       ids: new Ids(),
     });
 
@@ -1355,6 +1358,7 @@ describe("ModelProviderService", () => {
       catalog: managed,
       authorization: authorizationApi(),
       translation: new Translator(),
+      connectionPing: MemoryModelProviderConnectionPingChannel.create(),
       ids: new Ids(),
     });
 
@@ -1753,6 +1757,7 @@ describe("ModelProviderService", () => {
       catalog: new Catalog(),
       authorization: authorizationApi(),
       translation: new Translator(),
+      connectionPing: MemoryModelProviderConnectionPingChannel.create(),
       ids: new Ids(),
     });
 
@@ -1800,6 +1805,7 @@ describe("ModelProviderService", () => {
       catalog: new Catalog(),
       authorization: authorizationApi(),
       translation: new Translator(),
+      connectionPing: MemoryModelProviderConnectionPingChannel.create(),
       ids: new Ids(),
     }).upsert({ projectId: "project_1", provider: "openai", enabled: true });
 

@@ -16,3 +16,18 @@ export function automationPlatformUrl({
 
   return `${base}/${projectSlug}${path}`;
 }
+
+const hasHint = (value: number | null | undefined): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value > 0;
+
+/** A trace's short-link path; a known start time rides along as `t`, the partition hint. */
+export function tracePath({
+  traceId,
+  occurredAtMs,
+}: {
+  traceId: string;
+  occurredAtMs?: number | null;
+}): string {
+  const path = `/traces/${traceId}`;
+  return hasHint(occurredAtMs) ? `${path}?t=${Math.floor(occurredAtMs)}` : path;
+}

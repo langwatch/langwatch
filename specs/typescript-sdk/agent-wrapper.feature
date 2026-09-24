@@ -63,6 +63,20 @@ Feature: connectAgent turns a function into a simulation target
       Then the register frame advertises ten calls at once, in every environment
       And a concurrency option replaces that number
 
+  Rule: The registered frame says who can target the agent
+
+    Scenario: The registered frame says whether the agent is personal, host-scoped or shared
+      When the platform answers the register with a scope per agent
+      Then a host-scoped agent prints the machine it is scoped to
+      And a shared agent prints nothing beyond the online line
+      And a frame from a platform that sends no scope is read as shared
+
+    Scenario: A personal agent prints who it belongs to and how to share it
+      When the platform answers the register with scope "owner"
+      Then the process prints that the agent is personal to the owner of this API key
+      And that only their runs can target it
+      And names LANGWATCH_AGENT_ENVIRONMENT as the way to share it
+
   Rule: The handler receives the turn fields and returns one of four shapes
 
     Scenario: A call frame reaches the handler as one object

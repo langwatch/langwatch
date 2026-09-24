@@ -6,6 +6,8 @@
  * a connection the organization no longer holds is refused, and every token
  * issued against that connection goes with it.
  */
+import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
+
 import type { ScimConnectionsService } from "./scim-connections.service.ts";
 
 /**
@@ -27,6 +29,18 @@ export interface ScimTokenRetirement {
     organizationId: string;
     connectionId: string;
   }): Promise<{ revoked: number }>;
+}
+
+function replacedByRetiringConnection(
+  connections: readonly OrganizationSsoConnection[],
+  connectionId: string,
+): boolean {
+  return connections.some(
+    (connection) =>
+      connection.replacesConnectionId === connectionId &&
+      connection.migrationPhase !== null &&
+      RETIRING_REPLACEMENT_PHASES.has(connection.migrationPhase),
+  );
 }
 
 export class ScimConnectionRetirementService {
@@ -62,13 +76,10 @@ export class ScimConnectionRetirementService {
 
     if (held && RETIRING_STATES.has(held.state)) return false;
     if (held && !RETIRED_STATES.has(held.state)) {
-      return !connections.some(
-        (connection) =>
-          connection.replacesConnectionId === connectionId &&
-          connection.migrationPhase !== null &&
-          RETIRING_REPLACEMENT_PHASES.has(connection.migrationPhase),
-      );
+      return !replacedByRetiringConnection(connections, connectionId);
     }
+    // Finished into a replacement: its tokens move there, so refusing keeps them.
+    if (replacedByRetiringConnection(connections, connectionId)) return false;
 
     await this.deps.tokens.revokeTokensForConnection({ organizationId, connectionId });
 

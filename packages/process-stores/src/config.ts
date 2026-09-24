@@ -101,11 +101,12 @@ export interface EventingConfig {
   readonly killSwitch?: KillSwitch;
 }
 
-/** Where one account's objects are written, and under whose credentials. */
+/** Where one S3 account's objects are written, and under whose credentials. */
 export interface ObjectStorageAccount {
   readonly bucket: string;
+  /** Absent leaves AWS endpoints on the SDK's own chain and names `auto` for any other. */
   readonly region?: string;
-  /** A non-AWS endpoint (MinIO, a dev container). Absent uses AWS itself. */
+  /** A non-AWS endpoint (MinIO, R2, a dev container). Absent uses AWS itself. */
   readonly endpoint?: string;
   /** Absent leaves the SDK on the deployment's own credential chain. */
   readonly credentials?: Readonly<{
@@ -113,19 +114,47 @@ export interface ObjectStorageAccount {
     secretAccessKey: string;
     sessionToken?: string;
   }>;
-  /** MinIO and most S3-compatible endpoints need the bucket in the path. */
+  /** Absent keeps the bucket in the path, which every S3-compatible endpoint accepts. */
   readonly forcePathStyle?: boolean;
 }
 
-/** One organization writing to its own S3 account rather than the shared one. */
+/** One organization writing to its own S3 account rather than the shared backend. */
 export interface ObjectStoragePrivateAccount extends ObjectStorageAccount {
   readonly organizationId: string;
 }
 
-/** Blob storage: the shared account, and the organizations that bring their own. */
-export interface ObjectStorageConfig extends ObjectStorageAccount {
-  readonly privateAccounts?: readonly ObjectStoragePrivateAccount[];
+/** The identity a Kubernetes workload-identity webhook injected, as the boot seam read it. */
+export interface ObjectStorageAzureIdentity {
+  readonly tenantId?: string;
+  readonly clientId?: string;
+  readonly federatedTokenFile?: string;
 }
+
+/** The `AZURE_BLOB_*` block as configured; the member validates it at build and refuses by name. */
+export interface ObjectStorageAzureConfig {
+  readonly authMode?: string;
+  readonly accountName?: string;
+  /** `AZURE_BLOB_ACCOUNT_KEY`, resolved through the secrets chain, never a config leaf. */
+  readonly accountKey?: string;
+  readonly container?: string;
+  readonly endpoint?: string;
+  readonly authorityHost?: string;
+  readonly tokenAudience?: string;
+  /** Plaintext token endpoints for emulator tests; the boot seam never sets it in production. */
+  readonly allowInsecureTokenEndpointForTests?: boolean;
+  readonly identity?: ObjectStorageAzureIdentity;
+}
+
+/**
+ * Object storage: the shared backend `STORED_OBJECTS_BACKEND` selects, and
+ * the organizations that bring their own S3 account.
+ */
+export type ObjectStorageConfig = (
+  | Readonly<{ backend: "s3"; s3: ObjectStorageAccount }>
+  | Readonly<{ backend: "azure"; azure: ObjectStorageAzureConfig }>
+  | Readonly<{ backend: "file"; root: string }>
+) &
+  Readonly<{ privateAccounts?: readonly ObjectStoragePrivateAccount[] }>;
 
 /** `HTTPS_PROXY` and friends, already parsed, for a gateway reached through one. */
 export interface OutboundProxyConfig {

@@ -165,6 +165,7 @@ function useInstantEvalStarter({
   const start = api.traces.instantEvalStart.useMutation();
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
   const registerEvalRun = useFilterStore((s) => s.registerEvalRun);
+  const recordSearchNotice = useFilterStore((s) => s.recordSearchNotice);
   const { pendingRef, setConfirmation, refuse } = outcome;
 
   const applyChip = useCallback(
@@ -181,8 +182,17 @@ function useInstantEvalStarter({
           }),
         }),
       );
+      if (!payload.modelTrouble) return;
+      // Against the text the store settled on: the strip shows while the bar holds it.
+      recordSearchNotice({
+        projectId: payload.projectId,
+        query: useFilterStore.getState().queryText,
+        interpretedAs: "instant_eval",
+        modelTrouble: payload.modelTrouble,
+        ...(payload.modelErrorCode ? { modelErrorCode: payload.modelErrorCode } : {}),
+      });
     },
-    [applyQueryText, registerEvalRun],
+    [applyQueryText, recordSearchNotice, registerEvalRun],
   );
 
   const startRun = useCallback(

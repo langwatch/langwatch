@@ -8,6 +8,11 @@ export interface DatasetRecordRepository {
     limit: number;
     cursorId?: string;
   }): Promise<DatasetRecord[]>;
+  findByIds(input: {
+    datasetId: string;
+    projectId: string;
+    ids: readonly string[];
+  }): Promise<DatasetRecord[]>;
   findAll(input: {
     datasetId: string;
     projectId: string;

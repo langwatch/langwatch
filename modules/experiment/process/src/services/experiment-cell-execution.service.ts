@@ -29,6 +29,7 @@ import {
   mapThrownErrorEvent,
   type ResultMapperConfig,
 } from "../eventing/experiment-result-mapping.process.ts";
+import { targetReadsExternalAttachments } from "../rules/experiment-attachment-input.rules.ts";
 import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
 import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service.ts";
 import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
@@ -273,6 +274,7 @@ export class ExperimentCellExecutionService {
   private async *dispatchTarget({
     cell,
     projectId,
+    datasetColumns,
     workflow,
     targetNodeId,
     loadedData,
@@ -283,6 +285,7 @@ export class ExperimentCellExecutionService {
   }: {
     cell: ExecutionCell;
     projectId: string;
+    datasetColumns: { id: string; name: string; type: string }[];
     workflow: StudioWorkflow;
     targetNodeId: string;
     loadedData: LoadedCellData;
@@ -294,14 +297,19 @@ export class ExperimentCellExecutionService {
     EvaluationV3Event,
     { targetOutput?: Record<string, unknown>; targetFailed: boolean }
   > {
-    const evaluatorInputSvc = ExperimentEvaluatorInputService.create({});
+    const inputs = await this.ports.attachments.buildDispatchInputs({
+      cell,
+      projectId,
+      datasetColumns,
+      shouldFetchExternal: targetReadsExternalAttachments(cell),
+    });
     const rawEvent = {
       type: "execute_component" as const,
       payload: {
         trace_id: traceId,
         workflow: { ...workflow, state: { execution: { status: "idle" as const } } },
         node_id: targetNodeId,
-        inputs: evaluatorInputSvc.buildTargetInputs({ cell }),
+        inputs,
         origin: "evaluation",
       },
     };
@@ -419,6 +427,7 @@ export class ExperimentCellExecutionService {
         const result = yield* this.dispatchTarget({
           cell,
           projectId,
+          datasetColumns,
           workflow,
           targetNodeId,
           loadedData,

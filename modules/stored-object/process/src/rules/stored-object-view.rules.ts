@@ -14,6 +14,7 @@ export function storedObjectMetadataOf(value: StoredObjectRecord): StoredObjectM
     sha256: value.sha256,
     byteLength: value.byteLength,
     mediaType: value.mediaType,
+    filename: value.filename,
     mediaTypeVerified: value.mediaTypeVerified,
     status: value.status,
     audiences: [...value.audiences],

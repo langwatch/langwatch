@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import type { ExperimentRunCollaborators } from "../../rules/experiment-run-input.rules.ts";
 import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service.ts";
+import { createNoAttachmentsFixture } from "./experiment-attachments.fixture.ts";
 
 const scripted: {
   flow: StudioServerEvent[];
@@ -22,6 +23,7 @@ const scripted: {
 } = { flow: [], component: [], componentThrows: undefined, dispatched: [] };
 
 const ports = {
+  attachments: createNoAttachmentsFixture(),
   studio: {
     postEvent: async ({
       event,

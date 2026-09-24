@@ -26,6 +26,7 @@ import {
   type RefusedFrame,
   type RegisterAgent,
   type RegisterInstance,
+  type RegisteredAgent,
   type RegisteredFrame,
 } from "./protocol";
 import {
@@ -534,6 +535,8 @@ export class AgentClient {
       this.logger.info(
         `agent "${entry.name}" (${entry.environment}) is online${entry.url ? `: ${entry.url}` : ""}`,
       );
+      const scopeNote = scopeBanner(entry);
+      if (scopeNote) this.logger.info(scopeNote);
       for (const note of entry.parameterNotes) this.logger.warn(`agent "${entry.name}": ${note}`);
     }
     this.armWatchdog();
@@ -836,3 +839,22 @@ export function sharedClientForTests(): AgentClient | null {
 
 /** The shutdown handlers as installed, so a test can drive a signal without raising it. */
 export const shutdownForTests = { onShutdownSignal, onBeforeExit };
+
+/**
+ * What the process prints under "is online" when the agent is not shared. A
+ * personal agent is invisible to every other key, which is the surprise this
+ * line prevents; a host-scoped one is reachable by the whole project.
+ */
+const scopeBanner = (entry: RegisteredAgent): string | null => {
+  switch (entry.scope.kind) {
+    case "shared":
+      return null;
+    case "owner":
+      return (
+        `agent "${entry.name}" is personal to the owner of this API key; only their runs can target it. ` +
+        `Set LANGWATCH_AGENT_ENVIRONMENT to a shared name such as dev-shared to share it with the project`
+      );
+    case "host":
+      return `agent "${entry.name}" is scoped to this machine (${entry.scope.hostLabel}); anyone in the project can target it`;
+  }
+};

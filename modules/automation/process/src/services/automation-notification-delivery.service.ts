@@ -53,6 +53,7 @@ function toDigestEntry(entry: SettlementDigestEntry): TriggerDigestEntry {
           occurredAt: Temporal.Instant.fromEpochMilliseconds(startedAt).toString({
             fractionalSecondDigits: 3,
           }),
+          occurredAtMs: startedAt,
         }
       : {}),
     ...(preview ? { preview: preview.slice(0, DIGEST_PREVIEW_MAX_CHARS) } : {}),

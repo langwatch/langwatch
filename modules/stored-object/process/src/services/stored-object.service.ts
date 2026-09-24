@@ -1,3 +1,6 @@
+import { Readable } from "node:stream";
+
+import { PermissionDeniedError, type AuthzApi } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 import {
   StoredObjectBytesMissingError,
@@ -12,8 +15,8 @@ import {
   type StoreStoredObjectFromBytesInput,
   type StoreStoredObjectFromBytesResult,
   type StoredObjectDeliveryAudience,
+  type StoredObjectHead,
   type StoredObjectId,
-  type StoredObjectIdDeriver,
   type StoredObjectMetadata,
   type StoredObjectReference,
   type StoredObjectStorageDestination,
@@ -21,37 +24,47 @@ import {
   type StoredObjectsCreateUploadOutput,
   type StoredObjectsDeleteOutput,
   type StoredObjectsGetOutput,
+  type WriteStoredObjectUploadInput,
 } from "@langwatch/stored-object-contract";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 import type {
   StoredObjectDelivery,
+  StoredObjectFileReader,
+  StoredObjectFileStreamRead,
+  StoredObjectProbe,
   StoredObjectStorage,
   StoredObjectStorageAddress,
-  StoredObjectUploadTokenCodec,
 } from "../app/stored-object.members.ts";
 import type {
   StoredObjectRecord,
   StoredObjectRecordRepository,
 } from "../repositories/stored-object-record.repository.ts";
+import { requiredPermissionForPurpose } from "../rules/stored-object-purpose-permission.rules.ts";
 import { storedObjectMetadataOf } from "../rules/stored-object-view.rules.ts";
+import type { StoredObjectUploadSignerService } from "./stored-object-upload-signer.service.ts";
 import { StoredObjectUploadService } from "./stored-object-upload.service.ts";
+
+/** The peer decision a probe asks once the row names its purpose. */
+export type StoredObjectPermissions = Pick<AuthzApi, "getDecision">;
 
 export type StoredObjectServiceOptions = Readonly<{
   records: StoredObjectRecordRepository;
+  permissions: StoredObjectPermissions;
   storage: StoredObjectStorage;
   delivery: StoredObjectDelivery;
-  uploadTokens: StoredObjectUploadTokenCodec;
-  idDeriver: StoredObjectIdDeriver;
+  signer: StoredObjectUploadSignerService;
+  /** The legacy ClickHouse index, read only where no Postgres row answers (ADR-158 §5). */
+  legacy: StoredObjectFileReader;
   maximumUploadBytes: number;
   uploadExpiryMs: number;
   cleanupBatchSize?: number;
   now?: () => Instant;
-  operationId?: () => string;
+  newId?: () => string;
 }>;
 
-/** The default upload-operation id, used only where a composition supplies none. */
-const UPLOAD_OPERATION_KSUID_RESOURCE = "upload";
+/** Every stored object's id is a fresh KSUID of this resource (ADR-158 §3). */
+const STORED_OBJECT_KSUID_RESOURCE = "so";
 
 /** The feature's only lifecycle/orchestration class. */
 export class StoredObjectService {
@@ -68,17 +81,18 @@ export class StoredObjectService {
   }
 
   private readonly now: () => Instant;
-  private readonly operationId: () => string;
   private readonly uploads: StoredObjectUploadService;
 
   private constructor(private readonly options: StoredObjectServiceOptions) {
     this.now = options.now ?? nowInstant;
-    this.operationId =
-      options.operationId ?? (() => generate(UPLOAD_OPERATION_KSUID_RESOURCE).toString());
     this.uploads = StoredObjectUploadService.create({
-      ...options,
+      records: options.records,
+      storage: options.storage,
+      signer: options.signer,
+      maximumUploadBytes: options.maximumUploadBytes,
+      uploadExpiryMs: options.uploadExpiryMs,
       now: this.now,
-      operationId: this.operationId,
+      newId: options.newId ?? (() => generate(STORED_OBJECT_KSUID_RESOURCE).toString()),
     });
   }
 
@@ -96,6 +110,84 @@ export class StoredObjectService {
 
   async confirmUpload(input: ConfirmStoredObjectUploadInput): Promise<StoredObjectReference> {
     return this.uploads.confirmUpload(input);
+  }
+
+  async writeUpload(input: WriteStoredObjectUploadInput): Promise<void> {
+    return this.uploads.writeUpload(input);
+  }
+
+  /**
+   * Main's post-read gate: the transport admitted any file viewer, and the
+   * row's purpose now names the one permission this probe needs.
+   */
+  async headById(
+    input: { projectId: string; id: string },
+    by: Readonly<{ id: string }>,
+  ): Promise<StoredObjectHead> {
+    const probe = await this.probe(input);
+    if (probe.status === "not_found") return probe;
+
+    const permission = requiredPermissionForPurpose(probe.purpose);
+    const decision = await this.options.permissions.getDecision({
+      userId: by.id,
+      permission,
+      scope: { tier: "project", id: input.projectId },
+    });
+    if (!decision.permitted) {
+      throw new PermissionDeniedError({
+        permission,
+        scope: { type: "project", id: input.projectId },
+        denialReason: decision.denialReason ?? "no-binding",
+      });
+    }
+
+    return { status: probe.status, mediaType: probe.mediaType };
+  }
+
+  /** Postgres first; the legacy index answers only for an object it never held. */
+  private async probe(input: { projectId: string; id: string }): Promise<StoredObjectProbe> {
+    const value = await this.options.records.findById({ tenantId: input.projectId, id: input.id });
+    if (!value) return this.options.legacy.headById(input);
+    if (value.status !== "available") return { status: "not_found" };
+
+    const bytes = value.storage
+      ? await StoredObjectUploadService.storageCall(() =>
+          this.options.storage.tryRead({
+            projectId: input.projectId,
+            address: this.getStorage(value),
+          }),
+        )
+      : null;
+    await bytes?.[Symbol.asyncIterator]().return?.();
+
+    return {
+      status: bytes ? "available" : "missing",
+      mediaType: value.mediaType,
+      purpose: value.purpose,
+    };
+  }
+
+  /** The row and its bytes for the file route: Postgres first, then the legacy index. */
+  async readById(input: {
+    projectId: string;
+    id: string;
+  }): Promise<StoredObjectFileStreamRead | null> {
+    const value = await this.options.records.findById({ tenantId: input.projectId, id: input.id });
+    if (!value) return this.options.legacy.tryGetById(input);
+    if (value.status !== "available") return null;
+
+    const row = {
+      id: value.id,
+      purpose: value.purpose,
+      owner_kind: value.ownerKind,
+      media_type: value.mediaType,
+      size_bytes: value.byteLength,
+    };
+    const bytes = value.storage
+      ? await this.options.storage.tryRead({ projectId: input.projectId, address: value.storage })
+      : null;
+
+    return bytes ? { row, stream: Readable.from(bytes) } : { row, status: "missing" };
   }
 
   async getMetadata(input: { projectId: string; id: string }): Promise<StoredObjectMetadata> {

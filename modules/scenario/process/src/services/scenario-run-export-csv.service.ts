@@ -53,9 +53,14 @@ const TAIL_COLUMNS = [
  * transcript. "Why did this fail" is only half-answered by the judge's prose `reasoning` — the
  * other half is which specific criteria went unmet, and counts alone cannot say which.
  */
-const CRITERIA_LIST_COLUMNS = ["met_criteria", "unmet_criteria"] as const;
+const CRITERIA_LIST_COLUMNS = ["met_criteria", "unmet_criteria", "inconclusive_criteria"] as const;
 
-const CRITERIA_COLUMNS = ["criterion", "met"] as const;
+/**
+ * An inconclusive criterion is one the judge could not decide, most often because the trace
+ * evidence never arrived. It is unmet (met is "false") and flagged, so a pivot can keep
+ * "the agent did not do it" apart from "no one could tell".
+ */
+const CRITERIA_COLUMNS = ["criterion", "met", "inconclusive"] as const;
 
 const MESSAGE_COLUMNS = [
   "message_index",
@@ -98,8 +103,15 @@ function serializeRunsToCriteriaCsv({
   for (const run of runs) {
     const core = buildCoreValues(run);
     const tail = buildTailValues(run);
+    const inconclusive = new Set(run.results?.inconclusiveCriteria ?? []);
     const push = (criterion: string, met: boolean) =>
-      rows.push([...core, text(criterion), String(met), ...tail]);
+      rows.push([
+        ...core,
+        text(criterion),
+        String(met),
+        String(!met && inconclusive.has(criterion)),
+        ...tail,
+      ]);
 
     for (const criterion of run.results?.metCriteria ?? []) {
       push(criterion, true);
@@ -183,7 +195,11 @@ function buildCoreValues(run: SimulationExportRun): string[] {
 }
 
 function buildCriteriaListValues(run: SimulationExportRun): string[] {
-  return [jsonArray(run.results?.metCriteria), jsonArray(run.results?.unmetCriteria)];
+  return [
+    jsonArray(run.results?.metCriteria),
+    jsonArray(run.results?.unmetCriteria),
+    jsonArray(run.results?.inconclusiveCriteria),
+  ];
 }
 
 /**

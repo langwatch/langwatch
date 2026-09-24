@@ -16,10 +16,15 @@ import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { api } from "@langwatch/browser-trpc/workflow-api";
-import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
+import type {
+  DatasetColumns,
+  DatasetConfirmColumns,
+  DatasetRecordEntry,
+} from "@langwatch/dataset-contract";
 import { MAX_FILE_SIZE_BYTES, MAX_ROWS_LIMIT } from "@langwatch/dataset-contract";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { createLogger } from "@langwatch/observability/browser";
+import { DATASET_IMPORT_PURPOSE } from "@langwatch/stored-object-contract";
 import { nowInstant } from "@langwatch/time";
 import { CheckCircle, FileText, Trash2, X, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -31,15 +36,9 @@ import {
   usePapaParse,
 } from "react-papaparse";
 
-import {
-  abortPendingUpload,
-  DirectUploadUnavailableError,
-  finalizeDirectUpload,
-  PresignedUploadFailedError,
-  putFileToPresignedUrl,
-  requestDirectUpload,
-  retryDatasetNormalize,
-} from "../../../behavior/direct-upload.ts";
+import { datasetApi } from "../../../behavior/dataset-api.ts";
+import { PresignedUploadFailedError } from "../../../behavior/stored-object-upload.ts";
+import { useDatasetImportTransport } from "../../../behavior/use-stored-object-upload.ts";
 import { parseHeaderColumns } from "../../../model/parse-header-columns.ts";
 import { readableDate } from "../../../model/readable-date.ts";
 import { getSafeColumnName } from "../../../model/reserved-columns.ts";
@@ -270,6 +269,7 @@ export function DatasetUploadProcessing({
   onViewDataset: () => void;
 }) {
   const [isRetrying, setIsRetrying] = useState(false);
+  const retryNormalize = datasetApi.dataset.retryNormalize.useMutation();
   const datasetQuery = api.dataset.getById.useQuery(
     { projectId, datasetId },
     {
@@ -308,7 +308,7 @@ export function DatasetUploadProcessing({
   const handleRetry = async () => {
     setIsRetrying(true);
     try {
-      await retryDatasetNormalize({ projectId, datasetId });
+      await retryNormalize.mutateAsync({ projectId, datasetId });
       await datasetQuery.refetch();
     } catch (error) {
       showErrorToast({
@@ -424,6 +424,7 @@ export function UploadCSVForm({
   const projectId = project?.id;
   const trpcUtils = api.useUtils();
   const router = useRouter();
+  const importTransport = useDatasetImportTransport();
 
   // The raw file from the dropzone. The direct-upload path streams this as-is
   // (no in-browser parse, so it never OOMs on big files and the columns are
@@ -436,7 +437,7 @@ export function UploadCSVForm({
   // without a confirm step) and the proposed dataset name. The host renders the
   // confirm drawer (see `requestColumnConfirm`); the user corrects names + types
   // before the upload starts.
-  const [parsedColumns, setParsedColumns] = useState<DatasetColumns | null>(null);
+  const [parsedColumns, setParsedColumns] = useState<DatasetConfirmColumns | null>(null);
   const [proposedName, setProposedName] = useState<string>("");
   // The header parse runs async on file pick; Upload must wait for it so a fast
   // click can't bypass the confirm step. A monotonic token discards a stale
@@ -449,16 +450,13 @@ export function UploadCSVForm({
   // the file's row (sizeError + overRowLimitForFallback below).
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [sizeError, setSizeError] = useState<string | null>(null);
-  // Abort handle for the in-flight PUT + the pending dataset it minted, so a
-  // user-initiated cancel can stop the stream and reap the orphaned row.
+  // Abort handle for the in-flight PUT; no dataset exists until it is confirmed.
   const abortControllerRef = useRef<AbortController | null>(null);
-  const pendingDatasetIdRef = useRef<string | null>(null);
 
   // Closing the drawer mid-upload unmounts this form — abort the in-flight PUT
-  // so it doesn't silently finalize a dataset behind the user's back. The refs
-  // are nulled the instant the PUT succeeds (before finalize), so this aborts
-  // only a genuinely in-flight stream; the AbortError catch then reaps the
-  // pending row. No-op (ref null) on a normal close or the processing handoff.
+  // so it doesn't silently create a dataset behind the user's back. The ref is
+  // nulled the instant the upload is confirmed, so this aborts only a genuinely
+  // in-flight stream. No-op (ref null) on a normal close or the processing handoff.
   useEffect(() => {
     return () => abortControllerRef.current?.abort();
   }, []);
@@ -494,9 +492,20 @@ export function UploadCSVForm({
     setUploadedDataset(buildDatasetFromRows(data, validName));
   };
 
+  /** The confirmed columns, bound to the file's headers by position, as the drawer lists them. */
+  const toConfirmColumns = (
+    columns: DatasetColumns | undefined,
+  ): DatasetConfirmColumns | undefined =>
+    columns?.map((column, index) => ({
+      name: column.name,
+      type: column.type,
+      sourceHeader: parsedColumns?.[index]?.sourceHeader ?? column.name,
+    }));
+
   /**
-   * Direct-to-storage path (ADR-032 D4): presigned PUT, finalize, navigate.
-   * `DirectUploadUnavailableError` is the only trigger for the fallback below.
+   * Upload by reference (ADR-158): the file goes to storage under the
+   * `dataset_import` purpose, then the dataset is created from it and prepared
+   * in the background. A rejected cross-origin PUT falls back to the in-browser parse.
    */
   const handleUpload = async (confirmed?: { name: string; columnTypes: DatasetColumns }) => {
     const canUploadDirectly = enableDirectUpload && rawFile && projectId && project;
@@ -507,38 +516,27 @@ export function UploadCSVForm({
 
     setIsUploading(true);
     setUploadError(null);
-    // Track the pending dataset so a presigned-PUT failure can clean up the
-    // orphaned `uploading` row before falling back. The refs mirror these so a
-    // user-initiated cancel can abort the stream and reap the same row.
     const controller = new AbortController();
     abortControllerRef.current = controller;
-    pendingDatasetIdRef.current = null;
-    let pendingDatasetId: string | undefined;
     try {
       const name =
         confirmed?.name ?? uploadedDataset?.name ?? (await proposeValidName(rawFile.name));
-      const { datasetId, uploadUrl } = await requestDirectUpload({
+      const reference = await importTransport.uploadStoredObject({
+        projectId,
+        purpose: DATASET_IMPORT_PURPOSE,
+        file: rawFile,
+        signal: controller.signal,
+      });
+      controller.signal.throwIfAborted();
+      abortControllerRef.current = null;
+      const { datasetId } = await importTransport.createFromStoredObject({
         projectId,
         name,
-        filename: rawFile.name,
-        // Confirmed columns (names + types) drive normalize's rename + type
-        // conversion. Absent when the header couldn't be parsed → normalize
-        // derives all-`string`.
-        columnTypes: confirmed?.columnTypes,
+        storedObjectId: reference.id,
+        columnTypes: toConfirmColumns(confirmed?.columnTypes),
       });
-      pendingDatasetId = datasetId;
-      pendingDatasetIdRef.current = datasetId;
-      await putFileToPresignedUrl(uploadUrl, rawFile, controller.signal);
-      // The PUT succeeded — we're now committed to finalizing, so a cancel must
-      // NOT reap the row. Clear the abort/reap handles BEFORE finalize (not
-      // after) to close the cancel-after-finalize double-reap race.
-      abortControllerRef.current = null;
-      pendingDatasetIdRef.current = null;
-      await finalizeDirectUpload({ projectId, datasetId });
 
       if (onDirectUploadComplete) {
-        // Hand off to the drawer host, which polls status and shows the
-        // processing → ready/failed flow in place (no navigation).
         setIsUploading(false);
         onDirectUploadComplete(datasetId);
       } else {
@@ -551,66 +549,23 @@ export function UploadCSVForm({
         void router.push(`/${project.slug}/datasets/${datasetId}`);
       }
     } catch (error) {
-      // A user cancel aborts the PUT (AbortError) or lands while the presign
-      // call is still pending and un-abortable, so it may reject AFTER the
-      // cancel. Either way (`controller.signal.aborted` covers both) reap any
-      // row the presign minted and bail — never run fallback/error handling
-      // for an upload the user already cancelled.
       if ((error instanceof Error && error.name === "AbortError") || controller.signal.aborted) {
-        const strandedId = pendingDatasetIdRef.current;
-        pendingDatasetIdRef.current = null;
-        if (strandedId && projectId) {
-          void abortPendingUpload({
-            projectId,
-            datasetId: strandedId,
-          }).catch((cleanupError) => {
-            logger.error({ error: cleanupError }, "Failed to clean up cancelled upload");
-          });
-        }
         return;
       }
-      // Any failure after requestDirectUpload minted the `uploading` row
-      // locks the slug, so reap it whether we fall back or surface the
-      // error. `DirectUploadUnavailableError` throws before the row exists
-      // (pendingDatasetId undefined → no-op).
-      if (pendingDatasetId) {
-        try {
-          await abortPendingUpload({ projectId, datasetId: pendingDatasetId });
-        } catch (cleanupError) {
-          logger.error({ error: cleanupError }, "Failed to clean up pending upload");
-        }
-      }
-      // No browser-reachable storage at all (DirectUploadUnavailable): the
-      // install simply has no S3 → fall back to the in-browser parse path. A
-      // large file there hits the size guard with the accurate "requires object
-      // storage" message.
-      if (error instanceof DirectUploadUnavailableError) {
-        // Parse the already-captured file NOW (the first and only in-browser
-        // parse on this path) and hand off to the existing parse-and-drawer flow.
-        await runFallbackParseAndDrawer(rawFile, "no-storage");
-        return;
-      }
-      // Storage IS configured but the presigned PUT was rejected (almost
-      // always a missing bucket CORS rule) — log it loudly for operators,
-      // since the UI can't explain CORS to an end user, then fall back.
+      // Storage is configured but the cross-origin PUT was rejected (almost
+      // always a missing bucket CORS rule): log it for operators, then fall back.
       if (error instanceof PresignedUploadFailedError) {
         logger.error(
           { error, fileSizeBytes: rawFile.size, projectId },
           "Direct-to-storage upload failed: presigned PUT rejected (likely a missing bucket CORS rule or storage connectivity). Falling back to in-browser parse.",
         );
-        await runFallbackParseAndDrawer(rawFile, "presign-failed");
+        await runFallbackParseAndDrawer(rawFile);
         return;
       }
-      // A same-origin local-FS failure (e.g. StorageNotWritable) is a real,
-      // actionable server error — report it to the user, no fallback parse.
       logger.error({ error }, "Direct dataset upload failed");
       // System error → top alert; clear any file-level error so the two never
       // render the shared `upload-error` testid at once.
       setSizeError(null);
-      // The upload goes through our API, so this is a server error like any
-      // other: since #5984 its message is the code slug, and `describeError`
-      // is the string-slot reader for exactly this case (`uploadError` is
-      // typed `string`, so an alert component can't be rendered here).
       setUploadError(
         describeError({
           error,
@@ -621,42 +576,24 @@ export function UploadCSVForm({
     }
   };
 
-  /**
-   * Cancel an in-flight direct upload: abort the streaming PUT and reap the
-   * pending `uploading` row so its slug isn't locked on retry.
-   */
+  /** Cancel an in-flight upload: abort the streaming PUT. */
   const handleCancelUpload = () => {
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
-    const pendingId = pendingDatasetIdRef.current;
-    pendingDatasetIdRef.current = null;
-    if (pendingId && projectId) {
-      void abortPendingUpload({ projectId, datasetId: pendingId }).catch((error) => {
-        logger.error({ error }, "Failed to clean up cancelled upload");
-      });
-    }
     setIsUploading(false);
   };
 
   /**
-   * 409-fallback only. Guarded on `MAX_FILE_SIZE_BYTES`: over the limit,
-   * abort with a message instead of parsing (no object storage to fall back on).
+   * Rejected-PUT fallback only. Guarded on `MAX_FILE_SIZE_BYTES`: over the
+   * limit, stop with a message instead of parsing; CORS detail stays in the log.
    */
-  const runFallbackParseAndDrawer = async (file: File, reason: "no-storage" | "presign-failed") => {
+  const runFallbackParseAndDrawer = async (file: File) => {
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      // Exhaustive map (not a ternary), so widening `reason` is a compile
-      // error here: presign-failed must never claim no object storage (the
-      // misleading message a real user hit) — CORS/connectivity detail
-      // stays in the log, per copywriting.md.
-      const oversizeMessage: Record<typeof reason, string> = {
-        "presign-failed":
-          "We couldn't upload your file to storage. Please try again, or contact your administrator if the problem persists.",
-        "no-storage":
-          "This file is too large to upload on this deployment. Large uploads require object storage.",
-      };
       // File-level error → inline row; clear any system error for exclusivity.
       setUploadError(null);
-      setSizeError(oversizeMessage[reason]);
+      setSizeError(
+        "We couldn't upload your file to storage. Please try again, or contact your administrator if the problem persists.",
+      );
       setIsUploading(false);
       return;
     }

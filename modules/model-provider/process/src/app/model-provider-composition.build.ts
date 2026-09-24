@@ -7,6 +7,7 @@ import type { RedisConnection } from "@langwatch/redis-client";
  */
 import { nanoid } from "nanoid";
 
+import { modelProviderConnectionPingChannels } from "../channels/model-provider-connection-ping-channels.registry.ts";
 import {
   CodexAccountService,
   CodexOAuthModelProviderTokenRefresherAdapter,
@@ -84,6 +85,9 @@ export function buildModelProviderInfrastructure(input: {
       projects: dependencies.projects,
       executionProxyBaseUrl: config.executionProxyBaseUrl,
       // No `codexHandles`: see the module docblock on `model-provider.members.ts`.
+    }),
+    connectionPing: modelProviderConnectionPingChannels.live.create({
+      executionProxyBaseUrl: config.executionProxyBaseUrl,
     }),
     ids: PrefixedModelProviderIdAdapter.create({ suffix: () => nanoid() }),
     codexTokenRefresher: CodexOAuthModelProviderTokenRefresherAdapter.create(),

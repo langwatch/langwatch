@@ -118,6 +118,22 @@ describe("mapClickHouseRowToScenarioRunData", () => {
     });
   });
 
+  describe("when the row names criteria the judge could not decide", () => {
+    it("lists them on the results beside the unmet ones", () => {
+      const run = mapClickHouseRowToScenarioRunData(
+        makeRow({
+          UnmetCriteria: ["opens a ticket"],
+          InconclusiveCriteria: ["opens a ticket"],
+        }),
+      );
+
+      expect(run.results).toMatchObject({
+        unmetCriteria: ["opens a ticket"],
+        inconclusiveCriteria: ["opens a ticket"],
+      });
+    });
+  });
+
   describe("when the row carries no evaluation columns", () => {
     it("maps to results without evaluations", () => {
       const run = mapClickHouseRowToScenarioRunData(makeRow());

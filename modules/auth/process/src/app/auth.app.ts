@@ -431,6 +431,13 @@ export class AuthApp implements AuthApiContract {
     return this.#federatedAccounts.findProvidersForUser(input);
   }
 
+  getSsoSetupStatus(input: {
+    userId: string;
+    email: string;
+  }): Promise<{ pendingSsoSetup: boolean }> {
+    return this.#federatedAccounts.getSsoSetupStatus(input);
+  }
+
   /** The deployment's ONE Better Auth instance, or the refusal that names why there is none. */
   betterAuth(): BetterAuthTransport {
     if (!this.#betterAuth) {

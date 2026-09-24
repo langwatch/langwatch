@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@langwatch/analytics-process": "workspace:*",
+    "@langwatch/auth-process": "workspace:*",
     "@langwatch/authz-process": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/clickhouse-migrations": "workspace:*",

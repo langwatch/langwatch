@@ -20,7 +20,7 @@ export const serverModuleMembers = {
   dashboard: ["publicBaseUrl"],
   "data-privacy": ["dataPrivacy"],
   "data-retention": ["clickhouse", "nodeEnvironment"],
-  dataset: ["content", "publicBaseUrl", "queue", "storage", "storageResolver"],
+  dataset: ["content", "objectStorage", "publicBaseUrl", "queue"],
   entitlement: ["logger"],
   evaluation: [],
   evaluator: ["prisma", "publicBaseUrl"],
@@ -48,7 +48,7 @@ export const serverModuleMembers = {
   scenario: ["clickhouse", "encryption", "publicBaseUrl", "rateLimiter"],
   secret: ["encryption"],
   share: ["redis"],
-  "stored-object": ["clickhouse", "logger", "nodeEnvironment", "prisma", "secrets"],
+  "stored-object": ["clickhouse", "encryption", "logger", "objectStorage", "publicBaseUrl"],
   suite: ["clickhouse", "publicBaseUrl", "redis"],
   topic: [],
   trace: [

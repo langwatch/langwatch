@@ -9,9 +9,11 @@ import type { SsoSetupPageView } from "@langwatch/enterprise-sso-contract";
 import { useEffect, useState } from "react";
 
 import { ssoApi } from "../../behavior/sso-api.ts";
+import { useArrivalPolicy } from "../../behavior/use-arrival-policy.ts";
 import { useMigrationMembers } from "../../behavior/use-migration-members.ts";
 import { useSettlingSetup } from "../../behavior/use-settling-setup.ts";
 import { arrivalAnswerLabel, SSO_ANSWER_BY_POLICY } from "../../model/arrivals.ts";
+import { providerDisplayName } from "../../model/provider-display-name.ts";
 import { setupProgressFor } from "../../model/setup-progress.ts";
 import {
   domainClaimsOf,
@@ -85,8 +87,100 @@ function SsoSetupPage({ organizationId }: { organizationId: string }) {
     );
   }
 
+  if (view.connection.source === "legacy-grandfathered") {
+    return (
+      <LegacyUpdateStart organizationId={organizationId} view={view} connection={view.connection} />
+    );
+  }
+
   return (
     <ConnectedJourney organizationId={organizationId} view={view} connection={view.connection} />
+  );
+}
+
+/**
+ * An organization signing in through the provider LangWatch set up, and the one
+ * thing it can do about that: connect its own, through the first-time form given
+ * the connection it replaces. What does not change is said before any field.
+ */
+function LegacyUpdateStart({
+  organizationId,
+  view,
+  connection,
+}: {
+  organizationId: string;
+  view: SsoSetupPageView;
+  connection: SetupConnection;
+}) {
+  const canManage = useSsoHost().canManage();
+  const utils = ssoApi.useUtils();
+  const name = providerDisplayName(connection.providerId);
+  const current = name ?? "your existing provider";
+  const arrivals = useArrivalPolicy({
+    organizationId,
+    connectionId: connection.connectionId,
+    onChanged: () => void utils.ssoSetup.getSetup.invalidate(),
+  });
+
+  return (
+    <VStack align="stretch" gap={6} width="full" data-testid="sso-setup">
+      <VStack align="stretch" gap={1}>
+        <Heading size="sm">Single sign-on is active</Heading>
+        <Text fontSize="sm">
+          {name
+            ? `Your people sign in through ${name} today. Connect your organization's own identity provider to take that over.`
+            : "Your people sign in through the provider set up for your organization today. Connect your organization's own identity provider to take that over."}
+        </Text>
+      </VStack>
+      <SetupSteps>
+        <SetupStep number={1} title="Update single sign-on" state="current" last>
+          {canManage ? (
+            <VStack align="stretch" gap={4}>
+              <UpdatePromises current={current} />
+              <RegisterConnectionSection
+                organizationId={organizationId}
+                serviceProvider={view.serviceProvider}
+                canManage={canManage}
+                replacesConnectionId={connection.connectionId}
+                onRegistered={() => utils.ssoSetup.getSetup.invalidate()}
+              />
+            </VStack>
+          ) : (
+            <Text color="fg.muted" fontSize="sm">
+              An organization administrator can connect your own identity provider here. Nothing
+              changes for anybody signing in until they do.
+            </Text>
+          )}
+        </SetupStep>
+      </SetupSteps>
+      <ArrivalsSection
+        title={`Who can join through ${current}`}
+        connectionState={connection.state}
+        canManage={canManage}
+        policy={connection.arrivalPolicy}
+        decided={view.goLive?.arrivalsDecided ?? false}
+        saving={arrivals.saving}
+        refusal={arrivals.refusal}
+        onSave={arrivals.save}
+      />
+    </VStack>
+  );
+}
+
+/** What connecting your own identity provider does, and what it does not. */
+function UpdatePromises({ current }: { current: string }) {
+  return (
+    <VStack align="stretch" gap={1.5}>
+      <Text fontSize="sm" color="fg.muted">
+        Everyone keeps signing in through {current} while you set the new connection up and test it.
+      </Text>
+      <Text fontSize="sm" color="fg.muted">
+        Nothing changes for your members until an administrator switches sign-in over.
+      </Text>
+      <Text fontSize="sm" color="fg.muted">
+        You can switch back to {current} at any point until you start finishing the update.
+      </Text>
+    </VStack>
   );
 }
 
@@ -286,7 +380,11 @@ function SetupJourneySteps({
   onChanged: () => void;
 }) {
   const host = useSsoHost();
-  const setArrivals = ssoApi.ssoSetup.setArrivals.useMutation();
+  const arrivals = useArrivalPolicy({
+    organizationId,
+    connectionId: connection.connectionId,
+    onChanged,
+  });
   const rename = ssoApi.ssoSetup.rename.useMutation();
   const activate = ssoApi.ssoSetup.activate.useMutation();
   // Set between an activation being accepted and the read saying ACTIVE.
@@ -301,12 +399,6 @@ function SetupJourneySteps({
   useSettlingSetup({ organizationId, waiting: activationAccepted });
 
   const progress = setupProgressFor(facts);
-
-  const saveArrivals = (policy: SetupConnection["arrivalPolicy"]) => {
-    // No toast: the refusal is rendered beside the control that caused it,
-    // where the reader is still mid-step.
-    setArrivals.mutate({ organizationId, connectionId, policy }, { onSuccess: onChanged });
-  };
 
   const goLive = () => {
     // No toast here either: the refusal names the precondition that is still
@@ -415,9 +507,9 @@ function SetupJourneySteps({
           canManage={canManage}
           policy={connection.arrivalPolicy}
           decided={facts.arrivalsDecided}
-          saving={setArrivals.isPending}
-          refusal={setArrivals.error}
-          onSave={saveArrivals}
+          saving={arrivals.saving}
+          refusal={arrivals.refusal}
+          onSave={arrivals.save}
         />
       </SetupStep>
 

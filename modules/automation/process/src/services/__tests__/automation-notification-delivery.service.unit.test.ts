@@ -248,6 +248,7 @@ describe("AutomationNotificationDeliveryAdapter", () => {
       const sent = mailer.sent[0]!;
       expect(sent.html).toContain("why did the refund fail");
       expect(sent.html).toContain(new Date(startedAt).toISOString().slice(0, 10));
+      expect(sent.html).toContain(`${BASE_HOST}/acme/traces/trace-1?t=${startedAt}`);
     });
 
     /** @scenario "The settlement digest renders and sends from this process" */

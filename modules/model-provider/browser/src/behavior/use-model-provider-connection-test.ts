@@ -38,13 +38,13 @@ const uncheckedMessage = (reason: ModelProviderUncheckedReason): string => {
     // already entered is the misdiagnosis this whole area exists to avoid.
     return "No credential could be read for this provider.";
   }
-  return "This provider can't be tested automatically — its settings are checked when you first use it.";
+  return "This provider can't be tested from here. Its settings are checked the first time you use it.";
 };
 
 /**
  * A pure function, kept outside the hook, so the compiler owns exhaustiveness: the `switch` has
  * no `default`, so a verdict added to the contract later fails to compile here instead of
- * silently falling through to "can't be tested automatically".
+ * silently falling through to "can't be tested from here".
  */
 function toState(result: ConnectionTestResult): ConnectionTestState {
   switch (result.outcome) {

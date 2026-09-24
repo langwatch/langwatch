@@ -5,6 +5,7 @@ import { bootNodeExecutable, configureLogger, createLogger } from "@langwatch/ob
 import { RedisConnectionService, RedisShutdownService } from "@langwatch/redis-client";
 import { secretLogRedactPaths, SecretsChain, SecretsResolver } from "@langwatch/secrets";
 
+import { clearStalePendingSsoSetup } from "./clear-stale-pending-sso-setup.ts";
 import { clickhouseMigrate } from "./clickhouse-migrate.ts";
 import {
   resolveTasksConfig,
@@ -24,6 +25,7 @@ const tasks = new Map<string, (input: TaskInput) => Promise<void>>([
   ["clickhouse-migrate", clickhouseMigrate],
   ["lwql-provision", lwqlProvision],
   ["system-migrations-pass", systemMigrationsPass],
+  ["clear-stale-pending-sso-setup", clearStalePendingSsoSetup],
 ]);
 
 export async function runTasks(argv: readonly string[], input: TaskInput): Promise<void> {

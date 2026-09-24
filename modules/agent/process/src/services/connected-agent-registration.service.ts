@@ -5,12 +5,14 @@
 
 import {
   AgentRegisterRefusedError,
+  type ConnectedAgentScope,
   DEFAULT_CALL_TIMEOUT_MS,
   DEFAULT_CONCURRENCY,
   MAX_CALL_TIMEOUT_MS,
   PROTOCOL_VERSION,
   type RegisterFrame,
   type RegisteredFrame,
+  type RegisteredScope,
   deriveScope,
   identityKeyOf,
   isValidEnvironment,
@@ -118,6 +120,7 @@ export class ConnectedAgentRegistrationService {
           id: agent.id,
           url: `${this.#publicBaseUrl}/${session.projectSlug}/agents?drawer.open=agentConnectedDetail&drawer.agentId=${encodeURIComponent(agent.id)}`,
           parameterNotes: agent.notes,
+          scope: wireScope(agent.scope),
         })),
         heartbeatIntervalMs,
         instanceId: session.instanceId,
@@ -134,13 +137,8 @@ export class ConnectedAgentRegistrationService {
     frame: RegisterFrame;
     projectId: string;
     userId: string | null;
-  }): Promise<{ id: string; name: string; environment: string; notes: string[] }[]> {
-    const registered: {
-      id: string;
-      name: string;
-      environment: string;
-      notes: string[];
-    }[] = [];
+  }): Promise<RegisteredAgentRow[]> {
+    const registered: RegisteredAgentRow[] = [];
     for (const agent of frame.agents) {
       const environment = sanitizeEnvironment(agent.environment);
       if (!isValidEnvironment(environment)) {
@@ -195,9 +193,30 @@ export class ConnectedAgentRegistrationService {
         name: row.name,
         environment,
         notes: normalized.notes,
+        scope,
       });
     }
 
     return registered;
+  }
+}
+
+interface RegisteredAgentRow {
+  id: string;
+  name: string;
+  environment: string;
+  notes: string[];
+  scope: ConnectedAgentScope;
+}
+
+/** The scope as the registered frame carries it: the owner's id stays here. */
+function wireScope(scope: ConnectedAgentScope): RegisteredScope {
+  switch (scope.kind) {
+    case "shared":
+      return { kind: "shared" };
+    case "owner":
+      return { kind: "owner" };
+    case "host":
+      return { kind: "host", hostLabel: scope.hostLabel };
   }
 }

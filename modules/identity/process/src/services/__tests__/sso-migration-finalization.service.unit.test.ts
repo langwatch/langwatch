@@ -158,12 +158,18 @@ describe("finishing a direct cutover", () => {
 
   it("refuses while any blocker stands, before the gate lands", async () => {
     const { service, calls } = ceremony({
-      blockers: [{ code: "members-not-linked", message: "Two members have not signed in." }],
+      blockers: [
+        {
+          code: "legacy-activity-not-quiet",
+          message:
+            "Wait two days after the switch-over, and seven after the last legacy sign-in since then.",
+        },
+      ],
     });
 
     await expect(service.finalize(request)).rejects.toMatchObject({
       code: "sso_migration_finalization_blocked",
-      meta: { blockerCodes: ["members-not-linked"] },
+      meta: { blockerCodes: ["legacy-activity-not-quiet"] },
     });
     expect(calls).toEqual([]);
   });

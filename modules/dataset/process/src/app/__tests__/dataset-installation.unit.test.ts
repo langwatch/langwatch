@@ -7,15 +7,12 @@ import { createApiFixture } from "@langwatch/api-fixture";
  */
 import { DatasetApi, DatasetNotFoundError } from "@langwatch/dataset-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import { memoryStores } from "@langwatch/process-stores";
+import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { describe, expect, it } from "vitest";
 
 import { datasetServer } from "../../dataset.server.ts";
-import type {
-  DatasetContent,
-  DatasetNormalizeQueue,
-  DatasetStorageResolver,
-  DatasetUpload,
-} from "../dataset.app.ts";
+import type { DatasetContent, DatasetNormalizeQueue } from "../dataset.app.ts";
 import {
   createDatasetTestAuthz,
   createDatasetTestEntitlement,
@@ -26,16 +23,16 @@ import {
 function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([withMemoryRepositories(datasetServer)])
+    .withStores(memoryStores())
     .withMember("publicBaseUrl", undefined)
     .withMember("content", createApiFixture<DatasetContent>())
     .withMember("queue", createApiFixture<DatasetNormalizeQueue>())
-    .withMember("storage", createApiFixture<DatasetUpload>())
-    .withMember("storageResolver", createApiFixture<DatasetStorageResolver>())
     .provide({
       experiment: createDatasetTestExperiments(),
       authz: createDatasetTestAuthz(),
       project: createDatasetTestProjects(),
       entitlement: createDatasetTestEntitlement(),
+      "stored-object": createApiFixture<StoredObjectApi>(),
     });
 }
 

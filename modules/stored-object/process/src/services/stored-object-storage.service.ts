@@ -1,112 +1,124 @@
-import { createHash } from "node:crypto";
-
-import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
 import { generate } from "@langwatch/ksuid";
-import {
-  mintStoredObjectUri,
-  ObjectNotFoundError,
-  type StoredObjectStorageDestination,
-  type StoredObjectByteStream,
+import type {
+  ObjectDigest,
+  ObjectStorage,
+  ObjectStorageDestination,
+  SignedObjectUpload,
+  StoredObjectAddress,
+} from "@langwatch/process-stores/members";
+import type {
+  StoredObjectByteStream,
+  StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
+import type { Instant } from "@langwatch/time";
 
 import {
   StoredObjectStorage,
+  type StoredObjectPlacement,
   type StoredObjectStorageAddress,
 } from "../app/stored-object.members.ts";
-import type { StoredObjectStorageRuntimeAdapter } from "./stored-object-storage-runtime.service.ts";
 
+/** Azure Put Blob's single-request ceiling; there are no block uploads (ADR-158 §3). */
+const AZURE_PUT_BLOB_MAX_BYTES = 5000 * 1024 * 1024;
+
+/** The recorded address of an object the process's `objectStorage` member holds. */
 export class StoredObjectStorageService extends StoredObjectStorage {
-  static create(input: {
-    runtime: StoredObjectStorageRuntimeAdapter;
-    aws: AwsClientProcessRuntime;
-  }): StoredObjectStorageService {
-    return new StoredObjectStorageService(input.runtime, input.aws);
+  static create(input: { objectStorage: ObjectStorage }): StoredObjectStorageService {
+    return new StoredObjectStorageService(input.objectStorage);
   }
 
-  private constructor(
-    private readonly runtime: StoredObjectStorageRuntimeAdapter,
-    private readonly aws: AwsClientProcessRuntime,
-  ) {
+  private constructor(private readonly objects: ObjectStorage) {
     super();
+  }
+
+  async place(input: { projectId: string; objectId: string }): Promise<StoredObjectPlacement> {
+    const destination = await this.objects.destination(input.projectId);
+    const address = addressFor(destination, `${input.projectId}/${input.objectId}`);
+    assertProjectAddress(input.projectId, address);
+    return {
+      address,
+      maxSinglePutBytes:
+        destination.kind === "azure" ? AZURE_PUT_BLOB_MAX_BYTES : Number.MAX_SAFE_INTEGER,
+    };
   }
 
   async write(input: {
     projectId: string;
-    objectId: string;
-    bytes: Uint8Array;
+    address: StoredObjectStorageAddress;
+    body: StoredObjectByteStream;
+    byteLength: number;
     mediaType: string;
-  }): Promise<StoredObjectStorageAddress> {
-    const project = this.runtime.forProject(input.projectId, this.aws);
-    const destination = await project.resolveDestination();
-    const address = addressFor(destination, `${input.projectId}/${input.objectId}`);
-    assertProjectAddress(input.projectId, address);
-    await project.objectStore.put(uriFor(address), Buffer.from(input.bytes), input.mediaType);
-    return address;
+  }): Promise<ObjectDigest> {
+    return this.objects.write(memberAddressOf(input.projectId, input.address), input.body, {
+      byteLength: input.byteLength,
+      contentType: input.mediaType,
+    });
   }
 
-  async tryCreateUpload(): Promise<null> {
-    return null;
+  async signUpload(input: {
+    projectId: string;
+    address: StoredObjectStorageAddress;
+    byteLength: number;
+    mediaType: string;
+    expiresAt: Instant;
+  }): Promise<SignedObjectUpload> {
+    return this.objects.signUpload(memberAddressOf(input.projectId, input.address), {
+      byteLength: input.byteLength,
+      contentType: input.mediaType,
+      expiresAt: input.expiresAt,
+    });
   }
 
   async tryStat(input: {
     projectId: string;
     address: StoredObjectStorageAddress;
-  }): Promise<{ byteLength: number; sha256: string } | null> {
-    assertProjectAddress(input.projectId, input.address);
-    const project = this.runtime.forProject(input.projectId, this.aws);
-    if (!(await project.objectStore.exists(uriFor(input.address)))) return null;
-    let stream;
+  }): Promise<ObjectDigest | null> {
     try {
-      stream = await project.objectStore.get(uriFor(input.address));
+      return await this.objects.digest(memberAddressOf(input.projectId, input.address));
     } catch (error) {
-      if (error instanceof ObjectNotFoundError) return null;
+      if (isAbsent(error)) return null;
       throw error;
     }
-    const hash = createHash("sha256");
-    let byteLength = 0;
-    for await (const chunk of stream) {
-      const bytes = Buffer.from(chunk);
-      byteLength += bytes.byteLength;
-      hash.update(bytes);
-    }
-    return { byteLength, sha256: hash.digest("hex") };
   }
 
   async tryRead(input: {
     projectId: string;
     address: StoredObjectStorageAddress;
   }): Promise<StoredObjectByteStream | null> {
-    assertProjectAddress(input.projectId, input.address);
-    const project = this.runtime.forProject(input.projectId, this.aws);
-    if (!(await project.objectStore.exists(uriFor(input.address)))) return null;
     try {
-      return await project.objectStore.get(uriFor(input.address));
+      return await this.objects.read(memberAddressOf(input.projectId, input.address));
     } catch (error) {
-      if (error instanceof ObjectNotFoundError) return null;
+      if (isAbsent(error)) return null;
       throw error;
     }
   }
 
   async delete(input: { projectId: string; address: StoredObjectStorageAddress }): Promise<void> {
-    assertProjectAddress(input.projectId, input.address);
-    const project = this.runtime.forProject(input.projectId, this.aws);
-    await project.objectStore.delete(uriFor(input.address));
+    await this.objects.remove(memberAddressOf(input.projectId, input.address));
   }
 
-  resolveDestination(input: { projectId: string }): Promise<StoredObjectStorageDestination> {
-    return this.runtime.forProject(input.projectId, this.aws).resolveDestination();
+  async resolveDestination(input: { projectId: string }): Promise<StoredObjectStorageDestination> {
+    const destination = await this.objects.destination(input.projectId);
+    if (destination.kind === "memory") {
+      throw new Error("In-memory object storage has no destination a checkup can name.");
+    }
+    return destination;
   }
 
   async probe(input: { projectId: string }): Promise<void> {
-    const project = this.runtime.forProject(input.projectId, this.aws);
-    const address = addressFor(
-      await project.resolveDestination(),
-      `${input.projectId}/checkup/${generate("stored-object").toString()}.txt`,
-    );
-    assertProjectAddress(input.projectId, address);
-    await project.objectStore.put(uriFor(address), Buffer.from("checkup"), "text/plain");
-    await project.objectStore.delete(uriFor(address));
+    const key = `${input.projectId}/checkup/${generate("stored-object").toString()}.txt`;
+    const body = new TextEncoder().encode("checkup");
+    await this.objects.write({ projectId: input.projectId, key }, bodyOf(body), {
+      byteLength: body.byteLength,
+      contentType: "text/plain",
+    });
+    await this.objects.remove({ projectId: input.projectId, key });
   }
+}
+
+/** The member refuses an absent object with its own `StoredObjectNotFoundError`. */
+function isAbsent(error: unknown): boolean {
+  return error instanceof Error && error.name === "StoredObjectNotFoundError";
 }
 
 function assertProjectAddress(projectId: string, address: StoredObjectStorageAddress): void {
@@ -132,8 +144,26 @@ function assertProjectAddress(projectId: string, address: StoredObjectStorageAdd
   }
 }
 
-function isProvider(value: string): value is "s3" | "file" | "azure-blob" {
-  return value === "s3" || value === "file" || value === "azure-blob";
+/** The member's address for a recorded one: read, digest and remove go where it was recorded. */
+function memberAddressOf(
+  projectId: string,
+  address: StoredObjectStorageAddress,
+): StoredObjectAddress {
+  assertProjectAddress(projectId, address);
+  return { projectId, key: address.relativeId, location: locationOf(address) };
+}
+
+function locationOf(address: StoredObjectStorageAddress): ObjectStorageDestination {
+  if (address.provider === "s3") return { kind: "s3", bucket: address.destinationId };
+  if (address.provider === "file") return { kind: "file", root: address.destinationId };
+  if (address.provider === "memory") return { kind: "memory" };
+  const [accountName = "", container = ""] = address.destinationId.split("/");
+
+  return { kind: "azure", accountName, container };
+}
+
+function isProvider(value: string): value is "s3" | "file" | "azure-blob" | "memory" {
+  return value === "s3" || value === "file" || value === "azure-blob" || value === "memory";
 }
 
 function isSafeSegment(value: string, provider: string): boolean {
@@ -146,21 +176,22 @@ function isSafeSegment(value: string, provider: string): boolean {
   if (hasUnsafeCharacters) {
     return false;
   }
-  if (provider === "s3") return !value.includes("/");
+  if (provider === "s3" || provider === "memory") return !value.includes("/");
   if (provider === "file") return !value.includes("//");
   const segments = value.split("/");
   return segments.length === 2 && segments.every((segment) => Boolean(segment));
 }
 
-function destinationIdFor(destination: StoredObjectStorageDestination): string {
+function destinationIdFor(destination: ObjectStorageDestination): string {
   if (destination.kind === "s3") return destination.bucket;
   if (destination.kind === "file") return destination.root;
+  if (destination.kind === "memory") return "memory";
 
   return `${destination.accountName}/${destination.container}`;
 }
 
 function addressFor(
-  destination: StoredObjectStorageDestination,
+  destination: ObjectStorageDestination,
   relativeId: string,
 ): StoredObjectStorageAddress {
   return {
@@ -170,25 +201,6 @@ function addressFor(
   };
 }
 
-function destinationFor(address: StoredObjectStorageAddress): StoredObjectStorageDestination {
-  if (address.provider === "s3") return { kind: "s3", bucket: address.destinationId };
-  if (address.provider === "file") return { kind: "file", root: address.destinationId };
-
-  const separator = address.destinationId.indexOf("/");
-
-  if (separator < 1 || separator === address.destinationId.length - 1) {
-    throw new Error("Invalid Azure stored-object destination address");
-  }
-
-  return {
-    kind: "azure",
-    accountName: address.destinationId.slice(0, separator),
-    container: address.destinationId.slice(separator + 1),
-  };
-}
-
-function uriFor(address: StoredObjectStorageAddress): string {
-  const destination = destinationFor(address);
-
-  return mintStoredObjectUri({ destination, objectPath: address.relativeId });
+async function* bodyOf(bytes: Uint8Array): AsyncGenerator<Uint8Array> {
+  yield bytes;
 }

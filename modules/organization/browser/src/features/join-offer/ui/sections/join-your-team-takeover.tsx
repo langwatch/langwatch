@@ -15,13 +15,14 @@ export function JoinYourTeamTakeover({
   dismissLabel = "Not now, keep working on my own",
   onDismissed,
   fallback = null,
-  currentOrganizationId = null,
+  currentOrganizationId,
 }: UiJoinOfferProps) {
   const host = useOrganizationHost();
   const { view, asking, dismissing, ask, dismiss, checkAgain } = useJoinOffer({
-    currentOrganizationId,
+    currentOrganizationId: currentOrganizationId ?? null,
   });
 
+  if (currentOrganizationId === undefined) return fallback;
   if (view === null) return null;
 
   if (view.kind === "waiting") {

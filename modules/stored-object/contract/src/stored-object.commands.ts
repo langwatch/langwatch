@@ -11,7 +11,6 @@ import {
 import { storedObjectMetadataSchema, storedObjectTimestampSchema } from "./metadata.ts";
 import { storedObjectDeliveryCapabilitySchema } from "./references.ts";
 import {
-  createStoredObjectsCreateUploadInputSchema,
   storedObjectsConfirmUploadInputSchema,
   storedObjectsConfirmUploadOutputSchema,
   storedObjectsCreateUploadInputSchema,
@@ -61,7 +60,7 @@ export interface StoredObjectsRpcProcedure<Input extends ZodTypeAny, Output exte
   readonly audienceProof?: true;
 }
 
-function publicRpcContract(createUploadInput: typeof storedObjectsCreateUploadInputSchema): {
+function publicRpcContract(): {
   readonly createUpload: {
     readonly method: "POST";
     readonly input: typeof storedObjectsCreateUploadInputSchema;
@@ -91,7 +90,7 @@ function publicRpcContract(createUploadInput: typeof storedObjectsCreateUploadIn
   return {
     createUpload: {
       method: "POST",
-      input: createUploadInput,
+      input: storedObjectsCreateUploadInputSchema,
       output: storedObjectsCreateUploadOutputSchema,
       permission: "project:update",
     },
@@ -118,11 +117,4 @@ function publicRpcContract(createUploadInput: typeof storedObjectsCreateUploadIn
 }
 
 /** Portable declarations consumed by the unified API registration adapter. */
-export const storedObjectsPublicRpc = publicRpcContract(storedObjectsCreateUploadInputSchema);
-
-/** Same declarations with the runtime's semantic maximum embedded in input validation. */
-export function createStoredObjectsPublicRpc(
-  maximumUploadBytes: number,
-): ReturnType<typeof publicRpcContract> {
-  return publicRpcContract(createStoredObjectsCreateUploadInputSchema(maximumUploadBytes));
-}
+export const storedObjectsPublicRpc = publicRpcContract();

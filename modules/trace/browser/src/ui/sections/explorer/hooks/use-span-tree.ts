@@ -23,7 +23,7 @@ import { useTraceQueryArgs } from "./use-trace-query-args.ts";
  */
 export function useSpanTreeCanonical() {
   const shared = useSharedTrace();
-  const { isLive, isReady, queryArgs } = useTraceQueryArgs();
+  const { isLive, isReady, hintReady, queryArgs } = useTraceQueryArgs();
   // SSE health decides the delta poll's CADENCE, not whether it runs at all.
   // While SSE is up, `useTraceFreshness` invalidates the delta on each
   // `span.stored` event and the merge happens push-style, so a timer would be
@@ -43,7 +43,7 @@ export function useSpanTreeCanonical() {
     // Disable the real fetch when the traceId is a preview-mode synthetic —
     // `useOpenTraceDrawer` has already seeded the cache with hand-crafted span data;
     // firing a real request would just return empty and clobber the seed.
-    enabled: isReady && !shared,
+    enabled: isReady && hintReady && !shared,
     staleTime: 300_000,
     gcTime: 1_800_000,
     placeholderData: keepPreviousData,

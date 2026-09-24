@@ -16,6 +16,7 @@ export const DATASET_COLUMN_TYPES = [
   "annotations",
   "evaluations",
   "image",
+  "file",
 ] as const;
 
 /**

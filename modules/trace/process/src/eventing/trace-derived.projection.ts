@@ -4,6 +4,7 @@ import {
   AbstractFoldProjection,
   type FoldEventHandlers,
 } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import {
   annotationAddedEventSchema,
@@ -35,6 +36,7 @@ import {
 } from "@langwatch/trace-contract";
 
 import { trimAttributesForAnalytics } from "../rules/analytics-attribute-trim.rules.ts";
+import { spanStorabilityOf, UNSTORABLE_SPAN_SKIPPED } from "../rules/storable-span-time.rules.ts";
 import { anchorStorageTime, firstUsableAnchor } from "../rules/trace-storage-anchor.rules.ts";
 import type { TraceProjectionRuntimeService } from "../services/projection/trace-projection-runtime.service.ts";
 import { OUTPUT_SOURCE } from "../services/trace-io-accumulation.service.ts";
@@ -45,6 +47,8 @@ import {
   RESERVED_REASONING_TOKENS,
   TraceSummaryFoldProjection,
 } from "./trace-summary.projection.ts";
+
+const logger = createLogger("langwatch:trace-processing:trace-analytics-fold");
 
 /**
  * Deterministic fold for the slim `trace_analytics` table: hoisted
@@ -394,6 +398,14 @@ export class TraceAnalyticsFoldProjection
     // boundary triggers in both folds at the same span.
     if (state.spanCount >= MAX_PROCESSED_SPANS) {
       return { ...state, spanCount: state.spanCount + 1 };
+    }
+
+    // A span whose own times cannot be stored throws inside normalization,
+    // permanently; leave the state untouched so the trace's other spans fold.
+    const storability = spanStorabilityOf({ event, consumer: "traceAnalyticsFold" });
+    if (!storability.storable) {
+      logger.warn(storability.skip, UNSTORABLE_SPAN_SKIPPED);
+      return state;
     }
 
     const normalizedSpan = this.runtime.spanNormalization.normalizeSpanReceived(

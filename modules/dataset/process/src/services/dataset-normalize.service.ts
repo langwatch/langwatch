@@ -3,7 +3,7 @@
  */
 
 import readline from "node:readline";
-import type { Readable } from "node:stream";
+import { Readable } from "node:stream";
 
 import {
   convertValueToColumnType,
@@ -15,11 +15,12 @@ import {
   type FileFormat,
   type DatasetNormalizePayload,
 } from "@langwatch/dataset-contract";
+import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import Papa from "papaparse";
 
-import type { DatasetNormalize, DatasetStorage } from "../app/dataset.app.ts";
+import type { DatasetNormalize } from "../app/dataset.app.ts";
+import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import type { DatasetContentRepository as DatasetRepository } from "../repositories/dataset-content.repository.ts";
-import { UPLOAD_MAX_BYTES } from "../rules/presigned-upload.rules.ts";
 import { StreamingChunkWriterService } from "./dataset-chunk-writer.service.ts";
 
 /**
@@ -50,7 +51,9 @@ export const CSV_IO_CHUNK_BYTES = 8 * 1024 * 1024;
 
 export type DatasetNormalizeDeps = {
   repository: DatasetRepository;
-  getStorage: (projectId: string) => Promise<DatasetStorage>;
+  chunks: DatasetChunkRepository;
+  /** The confirmed import file is read from here as a stream (ADR-158 §2). */
+  storedObjects: Pick<StoredObjectApi, "getById">;
 };
 
 /**
@@ -65,17 +68,16 @@ export class LargeJsonUnsupportedError extends Error {
 }
 
 /**
- * The payload's stagingKey disagrees with the authoritative dataset row
- * (server-minted at presign time). The payload is stale or forged; the row
- * and its staged object are left untouched for the current upload's own job.
+ * The payload names a different file than the dataset row: the payload is stale
+ * or forged, and the row is left untouched for its own job.
  */
-export class StagingKeyMismatchError extends Error {
-  constructor(datasetId: string, payloadStagingKey: string, rowStagingKey: string | null) {
+export class ImportSourceMismatchError extends Error {
+  constructor(datasetId: string, payloadSource: string, rowSource: string | null) {
     super(
-      `Dataset ${datasetId} staging key mismatch: payload names "${payloadStagingKey}" ` +
-        `but the authoritative row carries "${rowStagingKey ?? "none"}"; refusing to read storage`,
+      `Dataset ${datasetId} import source mismatch: payload names "${payloadSource}" ` +
+        `but the row carries "${rowSource ?? "none"}"; refusing to read storage`,
     );
-    this.name = "StagingKeyMismatchError";
+    this.name = "ImportSourceMismatchError";
   }
 }
 
@@ -105,11 +107,18 @@ const csvRowBytes = (data: Record<string, unknown>): number => {
   return bytes;
 };
 
-/** Read a whole stream into a single string (only the guarded small-json path). */
-const streamToString = async (stream: Readable): Promise<string> => {
+/** A whole stream as one string (only the guarded small-json path), refused past `maxBytes`. */
+const streamToString = async (
+  stream: AsyncIterable<Uint8Array | string>,
+  maxBytes: number,
+): Promise<string> => {
   const parts: string[] = [];
+  let seen = 0;
   for await (const chunk of stream) {
-    parts.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"));
+    const part = typeof chunk === "string" ? Buffer.from(chunk) : Buffer.from(chunk);
+    seen += part.byteLength;
+    if (seen > maxBytes) throw new LargeJsonUnsupportedError();
+    parts.push(part.toString("utf8"));
   }
   return parts.join("");
 };
@@ -154,7 +163,8 @@ const parseInto = async (params: {
   stream: Readable;
   format: FileFormat;
   writer: StreamingChunkWriterService;
-  sizeBytes: number;
+  /** Known up front for a stored object; a staged file is bounded while it streams. */
+  sizeBytes?: number;
   /**
    * User-confirmed columns from the upload step (ADR-032 v19). When the confirm
    */
@@ -345,10 +355,10 @@ const parseInto = async (params: {
   }
 
   // format === "json": a single array — guard the size, then buffer + parse.
-  if (sizeBytes > LARGE_JSON_MAX_BYTES) {
+  if (sizeBytes !== undefined && sizeBytes > LARGE_JSON_MAX_BYTES) {
     throw new LargeJsonUnsupportedError();
   }
-  const content = scrubNullBytes(await streamToString(stream)).trim();
+  const content = scrubNullBytes(await streamToString(stream, LARGE_JSON_MAX_BYTES)).trim();
   const parsed = JSON.parse(content);
   if (!Array.isArray(parsed)) {
     throw new Error("JSON content must be an array of objects");
@@ -386,36 +396,26 @@ export class DatasetNormalizeAdapter implements DatasetNormalize {
   private constructor(private readonly deps: DatasetNormalizeDeps) {}
 
   async normalize(payload: DatasetNormalizePayload): Promise<void> {
-    const { projectId, datasetId, stagingKey, filename } = payload;
+    const { projectId, datasetId, filename } = payload;
+    const staged = "stagingKey" in payload;
 
     const dataset = await this.deps.repository.findOne({ id: datasetId, projectId });
     // Idempotent re-drive guard (I-IDEM): only a `processing` dataset is
     // normalizable. A re-enqueue after success (ready) or a concurrent finalize
     // race is a no-op.
     if (dataset?.status !== "processing") return;
-    // The row is authoritative for the staged object (server-minted at
-    // presign): a payload whose stagingKey disagrees is stale or forged.
-    // Refuse before any storage call — and outside the failure catch, so a
-    // stale job never flips a healthy in-flight upload to failed.
-    if (dataset.stagingKey !== stagingKey) {
-      throw new StagingKeyMismatchError(datasetId, stagingKey, dataset.stagingKey);
+    const payloadSource = staged ? payload.stagingKey : payload.sourceStoredObjectId;
+    const rowSource = staged ? dataset.stagingKey : dataset.sourceStoredObjectId;
+    if (rowSource !== payloadSource) {
+      throw new ImportSourceMismatchError(datasetId, payloadSource, rowSource);
     }
 
-    const storage = await this.deps.getStorage(projectId);
+    const storage = this.deps.chunks;
 
     try {
-      // Defense-in-depth fast reject (I-MEM): finalize already capped this, but
-      // never start streaming an over-cap object.
-      const sizeBytes = await storage.headStagedObjectSize({
-        projectId,
-        key: stagingKey,
-      });
-      if (sizeBytes > UPLOAD_MAX_BYTES) {
-        throw new Error("Uploaded file is too large");
-      }
-
+      const { bytes, sizeBytes } = await this.openSource(payload);
       const format = detectFileFormat(filename);
-      const stream = await storage.streamStaged({ projectId, key: stagingKey });
+      const stream = Readable.from(bytes, { objectMode: false });
       const writer = StreamingChunkWriterService.create({
         storage,
         projectId,
@@ -469,17 +469,7 @@ export class DatasetNormalizeAdapter implements DatasetNormalize {
           columnTypes,
         },
       });
-
-      // Best-effort staging cleanup — non-fatal (the lifecycle rule reaps it
-      // otherwise; a failed delete must not fail a successful normalize).
-      try {
-        await storage.deleteStaged({ projectId, key: stagingKey });
-      } catch (cleanupError) {
-        if (!(cleanupError instanceof Error)) {
-          throw cleanupError;
-        }
-        // ignore
-      }
+      if (staged) await this.removeStaged({ projectId, stagingKey: payload.stagingKey });
     } catch (error: unknown) {
       // A failed dataset owns no valid chunks. parseInto flushes chunk objects to S3 as it
       // streams, so a mid-stream failure (e.g. a JSONL parse error at row N of M) leaves
@@ -494,8 +484,8 @@ export class DatasetNormalizeAdapter implements DatasetNormalize {
         }
         // non-fatal: a failed reap is preferable to masking the real error.
       }
-      // Mark failed and rethrow so the queue records the failure; the staging
-      // object is intentionally NOT deleted so a manual retry can re-run.
+      // Mark failed and rethrow so the queue records the failure; the source file
+      // stays, so a retry reads it again.
       const statusError = error instanceof Error ? error.message : "Normalize failed";
       await this.deps.repository.update({
         id: datasetId,
@@ -503,6 +493,32 @@ export class DatasetNormalizeAdapter implements DatasetNormalize {
         data: { status: "failed", statusError },
       });
       throw error;
+    }
+  }
+
+  private async openSource(
+    payload: DatasetNormalizePayload,
+  ): Promise<{ bytes: AsyncIterable<Uint8Array>; sizeBytes?: number }> {
+    if ("stagingKey" in payload) {
+      const bytes = await this.deps.chunks.readStagedUpload({
+        projectId: payload.projectId,
+        stagingKey: payload.stagingKey,
+      });
+      return { bytes };
+    }
+    const source = await this.deps.storedObjects.getById({
+      projectId: payload.projectId,
+      id: payload.sourceStoredObjectId,
+    });
+    return { bytes: source.bytes, sizeBytes: source.metadata.byteLength };
+  }
+
+  /** Best-effort, as the previous release's was: the bucket lifecycle reaps what is left. */
+  private async removeStaged(params: { projectId: string; stagingKey: string }): Promise<void> {
+    try {
+      await this.deps.chunks.removeStagedUpload(params);
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
     }
   }
 }

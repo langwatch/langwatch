@@ -9,6 +9,7 @@ import { failSpinner } from "../../utils/spinnerError";
 import { createCliRunPlansService } from "../run-plans/cli-run-plans-service";
 import { emitRunResult } from "../run-plans/reportRun";
 import { parseRepeat, parseTargets, parseWait } from "../run-plans/scopeFlags";
+import { resolveScenarioId } from "./resolveScenario";
 
 export interface RunScenarioOptions extends RawOutputFlags {
   target?: string[];
@@ -26,10 +27,12 @@ export interface RunScenarioOptions extends RawOutputFlags {
  * @see specs/features/scenario-cli.feature
  */
 export const runScenarioCommand = async (
-  id: string,
+  reference: string,
   options: RunScenarioOptions,
 ): Promise<void> => {
   await resolveCredentials();
+
+  const id = await resolveScenarioId({ reference });
 
   const parameters = parseRunParameterFlags({ pairs: options.param });
   const note = parseRunNoteFlag({ note: options.note });

@@ -53,15 +53,3 @@ export const storedObjectIdentitySchema = z
   })
   .strict();
 export type StoredObjectIdentity = z.infer<typeof storedObjectIdentitySchema>;
-
-/**
- * Runtime capability that preserves the existing authenticated-project +
- * SHA-256 derivation without pulling crypto or KSUID implementations into the
- * portable contract.
- */
-export interface StoredObjectIdDeriver {
-  fromDigest(input: {
-    projectId: StoredObjectProjectId;
-    sha256: string;
-  }): Promise<StoredObjectId> | StoredObjectId;
-}

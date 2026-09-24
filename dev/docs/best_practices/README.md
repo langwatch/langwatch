@@ -19,6 +19,7 @@ Project coding conventions. See also `../TESTING_PHILOSOPHY.md`.
 - **error-handling.md** - When to throw a HandledError, what to put on it, how the client renders it
 - **logging-and-tracing.md** - Logging infrastructure and context propagation
 - **local-observability.md** - Local LGTM stack (Grafana/Loki/Tempo/Prometheus); querying logs/traces as an agent with `gcx`
+- **dogfooding-isolation.md** - Dogfooding the CLI against a local instance without rewriting the machine's global agent wiring
 - **dependency-age-gates.md** - Dependency release-age gates and emergency security exceptions
 - **vitest-performance.md** - Vitest pool/isolation settings and the RAM guardrails they protect
 - **typescript.md** - TypeScript patterns

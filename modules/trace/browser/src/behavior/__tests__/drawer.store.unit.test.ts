@@ -5,6 +5,7 @@ import {
   DRAWER_DEFAULT_WIDTH_PX,
   DRAWER_MAXIMIZE_EDGE_PX,
   DRAWER_MIN_WIDTH_PX,
+  isOccurredAtParam,
   useDrawerStore,
 } from "../drawer.store.ts";
 
@@ -270,6 +271,20 @@ describe("drawerStore.closeDrawer", () => {
         expect(useDrawerStore.getState().traceId).toBeNull();
         expect(useDrawerStore.getState().isOpen).toBe(false);
       });
+    });
+  });
+});
+
+describe("isOccurredAtParam", () => {
+  describe("given the trace's start time from a short link", () => {
+    it("accepts it as the partition hint", () => {
+      expect(isOccurredAtParam("1714476000000")).toBe(true);
+    });
+  });
+
+  describe("given a value that is not a positive whole number", () => {
+    it.each(["yesterday", "0", "-5", "1.5", "", "017", null, undefined])("drops %s", (raw) => {
+      expect(isOccurredAtParam(raw)).toBe(false);
     });
   });
 });

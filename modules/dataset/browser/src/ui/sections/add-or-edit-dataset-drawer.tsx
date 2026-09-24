@@ -70,7 +70,8 @@ const COLUMN_TYPE_LABELS: readonly [DatasetColumnType, string][] = [
   ["date", "date"],
   ["list", "list"],
   ["json", "json"],
-  ["image", "image (URL)"],
+  ["image", "image"],
+  ["file", "file"],
   ["chat_messages", "json chat messages (OpenAI format)"],
   ["spans", "json spans"],
 ];

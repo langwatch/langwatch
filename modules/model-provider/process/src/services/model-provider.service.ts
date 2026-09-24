@@ -48,12 +48,14 @@ import type {
   ModelProviderIdService,
   ModelTranslation,
 } from "../app/model-provider.members.ts";
+import type { ModelProviderConnectionPing } from "../channels/model-provider-connection-ping.channel.ts";
 import type { ModelCostRepository } from "../repositories/model-cost.repository.ts";
 import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
 import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
 import { ModelProviderAuthorizationService } from "./model-provider-authorization.service.ts";
 import { ModelProviderCodexService } from "./model-provider-codex.service.ts";
 import { ModelProviderCommandService } from "./model-provider-command.service.ts";
+import { ModelProviderConnectionPingService } from "./model-provider-connection-ping.service.ts";
 import { ModelProviderCostsService } from "./model-provider-costs.service.ts";
 import { ModelProviderDefaultsWriteService } from "./model-provider-defaults-write.service.ts";
 import { ModelProviderDefaultsService } from "./model-provider-defaults.service.ts";
@@ -76,6 +78,7 @@ export interface ModelProviderServiceOptions {
   catalog: ModelProviderCatalog;
   authorization: AuthzApi;
   translation: ModelTranslation;
+  connectionPing: ModelProviderConnectionPing;
   ids: ModelProviderIdService;
 }
 
@@ -113,6 +116,10 @@ export class ModelProviderService {
       credentialPolicy: options.credentialPolicy,
       catalog: options.catalog,
       connectionRateLimiter: options.connectionRateLimiter,
+      connectionPing: ModelProviderConnectionPingService.create({
+        channel: options.connectionPing,
+        modelProviders: this,
+      }),
       writeAuthorization,
       onboardingDefaults: ModelProviderOnboardingDefaultsService.create({
         defaults: options.defaults,

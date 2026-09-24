@@ -36,10 +36,6 @@ import { explainAnyError } from "../../errors/index.ts";
 import { IsolatedErrorBoundary } from "../../isolated-error-boundary.tsx";
 import { useModelProvidersSettings } from "../../use-model-providers-settings.ts";
 import { AskAiButton } from "../ai/ask-ai-button.tsx";
-import {
-  ProviderPrimerPopover,
-  SMARTER_SEARCH_PRIMER_COPY,
-} from "../ai/provider-primer-popover.tsx";
 import { useInstantEvalRuns } from "../hooks/use-instant-eval-runs.ts";
 import { useTraceFacets } from "../hooks/use-trace-facets.ts";
 import { InstantEvalConfirmDialog } from "../instant-eval-confirm-dialog.tsx";
@@ -56,6 +52,7 @@ import {
   statusBorderColor,
 } from "./search-bar-indicators.tsx";
 import { searchSubmitProgress } from "./search-submit-progress.ts";
+import { SearchFallbackNotice } from "./search-fallback-notice.tsx";
 import { SearchedAsNotice } from "./searched-as-notice.tsx";
 import { SyntaxHelpDrawerHost } from "./syntax-help-drawer.tsx";
 import { TokenValuePicker, type TokenValuePickerAnchor } from "./token-value-picker.tsx";
@@ -65,13 +62,6 @@ import { useInstantEvalRoute } from "./use-instant-eval-route.ts";
 import { useSubmitSearch } from "./use-submit-search.ts";
 
 const MAX_DYNAMIC_ITEMS = 10;
-
-/**
- * The "connect a model for smarter search" primer shows once per page session:
- * the phrase search still ran, and a popover on every Enter would be a nag
- * rather than a pointer.
- */
-let smarterSearchPrimerShown = false;
 
 type RankedValue = { value: string; count: number; label?: string };
 
@@ -262,15 +252,8 @@ export const SearchBar: React.FC = () => {
   }, []);
 
   // Enter on a sentence. The router answers with what the sentence is; a
-  // `langy` answer takes the same door as the button, and a `free_text` answer
-  // with no model behind it opens the primer once so the reader knows what a
-  // model would add.
-  const [smarterSearchPrimerOpen, setSmarterSearchPrimerOpen] = useState(false);
-  const handleModelUnavailable = useCallback(() => {
-    if (smarterSearchPrimerShown) return;
-    smarterSearchPrimerShown = true;
-    setSmarterSearchPrimerOpen(true);
-  }, []);
+  // `langy` answer takes the same door as the button. A search that ran
+  // without the model that shapes it says so in the strip under the bar.
   // A judgement goes to the cost rule: reused run, auto-start under the
   // threshold, the dialog above it, and the phrase search behind every refusal.
   const instantEval = useInstantEvalRoute();
@@ -280,7 +263,6 @@ export const SearchBar: React.FC = () => {
     onLangy: askLangyFromSearch,
     onInstantEval: instantEval.onInstantEvalRoute,
     onSupersede: instantEval.abandonPendingRun,
-    onModelUnavailable: handleModelUnavailable,
   });
   // A text handed over by another part of the page is submitted the way a
   // typed one is.
@@ -389,8 +371,6 @@ export const SearchBar: React.FC = () => {
           submitQueryText={submitSearch}
           clearNonce={clearNonce}
           submitProgress={submitProgress}
-          smarterSearchPrimerOpen={smarterSearchPrimerOpen}
-          onSmarterSearchPrimerOpenChange={setSmarterSearchPrimerOpen}
           aiError={aiError}
           askAiNeedsProviderPrimer={askAiNeedsProviderPrimer}
           askAiSampleDisabledReason={askAiSampleDisabledReason}
@@ -687,8 +667,6 @@ function StructuredSearchBar({
   submitQueryText,
   clearNonce,
   submitProgress,
-  smarterSearchPrimerOpen,
-  onSmarterSearchPrimerOpenChange,
   askAiNeedsProviderPrimer,
   askAiSampleDisabledReason,
   askLabel,
@@ -723,8 +701,6 @@ function StructuredSearchBar({
   clearNonce: number;
   /** What the bar says between Enter and the result, or null. */
   submitProgress: string | null;
-  smarterSearchPrimerOpen: boolean;
-  onSmarterSearchPrimerOpenChange: (open: boolean) => void;
   askAiNeedsProviderPrimer: boolean;
   askAiSampleDisabledReason: string | undefined;
   askLabel: string;
@@ -756,12 +732,6 @@ function StructuredSearchBar({
 }) {
   return (
     <>
-      <ProviderPrimerPopover
-        mode="anchor"
-        open={smarterSearchPrimerOpen}
-        onOpenChange={onSmarterSearchPrimerOpenChange}
-        copy={SMARTER_SEARCH_PRIMER_COPY}
-      >
         <Flex
           align="center"
           width="full"
@@ -846,8 +816,8 @@ function StructuredSearchBar({
           {hasContent ? <ClearButton onClear={handleClear} /> : <Kbd>{"/"}</Kbd>}
           <TokenValuePicker anchor={tokenAnchor} onClose={() => setTokenAnchor(null)} />
         </Flex>
-      </ProviderPrimerPopover>
       <SearchedAsNotice />
+      <SearchFallbackNotice />
       {/* Unified error banner — handles both parse errors and AI errors.
           AI error takes priority when both are present (AI mode is the
           active flow). Rendered outside the Flex row so it spans the

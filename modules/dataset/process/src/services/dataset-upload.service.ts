@@ -1,47 +1,52 @@
-import type { Readable } from "node:stream";
+import readline from "node:readline";
+import { pipeline, Readable } from "node:stream";
 
 import {
   convertRowsToColumnTypes,
   datasetColumnsSchema,
+  dedupeHeaders,
   detectFileFormat,
   MAX_FILE_SIZE_BYTES,
   MAX_ROWS_LIMIT,
-  parseFileContent,
+  parseJSON,
   renameReservedColumns,
-  DatasetConflictError,
+  type FileFormat,
+  DatasetImportSourceRefusedError,
+  DatasetNameTakenError,
   DatasetNotFoundError,
-  DirectUploadUnavailableError,
-  StagedUploadNotFoundError,
   UploadNotPendingError,
-  UploadTooLargeError,
   UploadValidationError,
 } from "@langwatch/dataset-contract";
 import type {
+  AppendStoredObjectToDatasetInput,
+  CreateDatasetFromStoredObjectInput,
   CreateDatasetFromUploadInput,
   CreateDatasetFromUploadResult,
-  PendingUploadInput,
-  PendingUploadResult,
-  StagedUploadInput,
+  DatasetImportAppended,
+  DatasetImportStarted,
   UploadExistingDatasetInput,
-  AbortPendingUploadInput,
-  FinalizeUploadInput,
   RetryNormalizeInput,
   DatasetColumns,
 } from "@langwatch/dataset-contract";
 import { generate } from "@langwatch/ksuid";
+import {
+  DATASET_IMPORT_PURPOSE,
+  StoredObjectNotFoundError,
+  type StoredObjectApi,
+  type StoredObjectMetadata,
+} from "@langwatch/stored-object-contract";
 import { nowInstant } from "@langwatch/time";
+import Papa from "papaparse";
 
-import type { DatasetStorageResolver, DatasetUpload } from "../app/dataset.app.ts";
+import type { DatasetUpload } from "../app/dataset.app.ts";
+import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
 import type { DatasetRecordContentRepository } from "../repositories/dataset-record-content.repository.ts";
 import type { DatasetRow } from "../repositories/dataset.repository.ts";
 import { stripNullBytes } from "../rules/dataset-sanitize.rules.ts";
-import {
-  exceedsUploadCap,
-  stagingUploadKey,
-  UPLOAD_MAX_BYTES,
-} from "../rules/presigned-upload.rules.ts";
 import { DatasetChunkService } from "./dataset-chunk.service.ts";
+
+const IMPORTABLE_FILENAME = /\.(csv|json|jsonl)$/i;
 
 /**
  * The app's KSUID resource for a dataset row (`KSUID_RESOURCES.DATASET`).
@@ -55,29 +60,35 @@ export class DatasetUploadService implements DatasetUpload {
   static create(options: {
     datasets: DatasetContentRepository;
     records: DatasetRecordContentRepository;
-    storageResolver: DatasetStorageResolver;
+    chunks: DatasetChunkRepository;
+    storedObjects: StoredObjectApi;
   }): DatasetUploadService {
-    return new DatasetUploadService(options.datasets, options.records, options.storageResolver);
+    return new DatasetUploadService(options);
   }
   private readonly chunks: DatasetChunkService;
+  private readonly datasets: DatasetContentRepository;
+  private readonly records: DatasetRecordContentRepository;
+  private readonly storage: DatasetChunkRepository;
+  private readonly storedObjects: StoredObjectApi;
 
-  private constructor(
-    private readonly datasets: DatasetContentRepository,
-    private readonly records: DatasetRecordContentRepository,
-    private readonly storageResolver: DatasetStorageResolver,
-  ) {
-    this.chunks = DatasetChunkService.create({ datasets });
+  private constructor(options: {
+    datasets: DatasetContentRepository;
+    records: DatasetRecordContentRepository;
+    chunks: DatasetChunkRepository;
+    storedObjects: StoredObjectApi;
+  }) {
+    this.datasets = options.datasets;
+    this.records = options.records;
+    this.storage = options.chunks;
+    this.storedObjects = options.storedObjects;
+    this.chunks = DatasetChunkService.create({ datasets: options.datasets });
   }
 
   async uploadToExistingDataset(
     input: UploadExistingDatasetInput,
   ): Promise<{ datasetId: string; recordsCreated: number }> {
-    this.assertFile(input.filename, input.content);
+    const { headers, rows } = await this.readUpload(input);
     const dataset = await this.findDataset(input.slugOrId, input.projectId);
-    const { headers, rows } = parseFileContent({
-      content: input.content,
-      format: detectFileFormat(input.filename),
-    });
     const expected = new Set(
       (dataset.columnTypes as { name: string }[]).map((column) => column.name),
     );
@@ -97,13 +108,12 @@ export class DatasetUploadService implements DatasetUpload {
       ...entry,
     }));
     if (dataset.contentLayout === "s3_jsonl") {
-      const storage = await this.storageResolver.forProject(input.projectId);
       await this.chunks.append({
         dataset,
         projectId: input.projectId,
         entries: entries.map(({ id: _id, ...entry }) => entry),
         forcedIds: entries.map((entry) => entry.id),
-        storage,
+        storage: this.storage,
       });
     } else {
       await this.records.createMany({
@@ -121,11 +131,7 @@ export class DatasetUploadService implements DatasetUpload {
   async createDatasetFromUpload(
     input: CreateDatasetFromUploadInput,
   ): Promise<CreateDatasetFromUploadResult> {
-    this.assertFile(input.filename, input.content);
-    const { headers, rows } = parseFileContent({
-      content: input.content,
-      format: detectFileFormat(input.filename),
-    });
+    const { headers, rows } = await this.readUpload(input);
     const renamedHeaders = renameReservedColumns(headers);
     const rename = new Map(headers.map((header, index) => [header, renamedHeaders[index]!]));
     const entries = convertRowsToColumnTypes(
@@ -137,13 +143,12 @@ export class DatasetUploadService implements DatasetUpload {
       renamedHeaders.map((name) => ({ name, type: "string" as const })),
     );
     const datasetId = generate(DATASET_KSUID_RESOURCE).toString();
-    const storage = await this.storageResolver.forProject(input.projectId);
     const initial = await this.chunks.writeInitialChunks({
       projectId: input.projectId,
       datasetId,
       entries,
       forcedIds: entries.map(() => undefined),
-      storage,
+      storage: this.storage,
     });
     const dataset = await this.datasets.create({
       id: datasetId,
@@ -169,12 +174,13 @@ export class DatasetUploadService implements DatasetUpload {
     };
   }
 
-  async createPendingUpload(input: PendingUploadInput): Promise<PendingUploadResult> {
+  async createDatasetFromStoredObject(
+    input: CreateDatasetFromStoredObjectInput,
+  ): Promise<DatasetImportStarted> {
+    const source = await this.getImportSource(input);
     const slug = slugify(input.name);
     if (await this.datasets.findBySlug({ projectId: input.projectId, slug }))
-      throw new DatasetConflictError();
-    const storage = await this.storageResolver.forProject(input.projectId);
-    const upload = await storage.createPresignedUpload({ projectId: input.projectId });
+      throw new DatasetNameTakenError();
     const dataset = await this.datasets.create({
       id: generate(DATASET_KSUID_RESOURCE).toString(),
       projectId: input.projectId,
@@ -182,101 +188,44 @@ export class DatasetUploadService implements DatasetUpload {
       slug,
       columnTypes: input.columnTypes ?? [],
       contentLayout: "s3_jsonl",
-      status: "uploading",
-      stagingKey: upload.key,
-      uploadFilename: input.filename,
+      status: "processing",
+      uploadFilename: source.filename,
+      sourceStoredObjectId: input.storedObjectId,
     });
-    return { datasetId: dataset.id, slug: dataset.slug, uploadUrl: upload.url };
+    return { datasetId: dataset.id, slug: dataset.slug, status: "processing" };
   }
 
-  async writeStagedUpload(input: StagedUploadInput): Promise<void> {
-    const storage = await this.storageResolver.forProject(input.projectId);
-    if (!storage.putStaged) throw new DirectUploadUnavailableError();
-    const key = stagingUploadKey(input.projectId, input.uploadId);
-    if (
-      !(await this.datasets.findPendingUploadByStagingKey({
-        projectId: input.projectId,
-        stagingKey: key,
-      }))
-    )
-      throw new UploadNotPendingError();
-    await storage.putStaged({
+  /** Synchronous and capped at the multipart limit, as main's append was (ADR-158 §6). */
+  async appendStoredObjectToDataset(
+    input: AppendStoredObjectToDatasetInput,
+  ): Promise<DatasetImportAppended> {
+    const source = await this.getImportSource(input);
+    if (source.byteLength > MAX_FILE_SIZE_BYTES)
+      throw new UploadValidationError(
+        "File size exceeds the maximum limit of 25MB",
+        "file_too_large",
+      );
+    const { bytes } = await this.storedObjects.getById({
       projectId: input.projectId,
-      key,
-      body: input.body as Readable,
-      maxBytes: UPLOAD_MAX_BYTES,
+      id: input.storedObjectId,
     });
-  }
-
-  async abortPendingUpload(
-    input: AbortPendingUploadInput,
-  ): Promise<{ datasetId: string; aborted: true }> {
-    const dataset = await this.findDataset(input.datasetId, input.projectId);
-    if (dataset.status !== "uploading") throw new UploadNotPendingError();
-    if (dataset.stagingKey)
-      await this.storageResolver
-        .forProject(input.projectId)
-        .then((storage) =>
-          storage.deleteStaged({ projectId: input.projectId, key: dataset.stagingKey! }),
-        );
-    await this.datasets.deletePendingUpload({
-      id: input.datasetId,
+    return this.uploadToExistingDataset({
+      slugOrId: input.slugOrId,
       projectId: input.projectId,
+      filename: source.filename,
+      bytes,
+      fileSize: source.byteLength,
     });
-    return { datasetId: input.datasetId, aborted: true };
-  }
-
-  async finalizeUpload(
-    input: FinalizeUploadInput,
-  ): Promise<{ datasetId: string; status: "processing" }> {
-    const dataset = await this.findDataset(input.datasetId, input.projectId);
-    if (dataset.status !== "uploading" || !dataset.stagingKey) throw new UploadNotPendingError();
-    const storage = await this.storageResolver.forProject(input.projectId);
-    let size: number;
-    try {
-      size = await storage.headStagedObjectSize({
-        projectId: input.projectId,
-        key: dataset.stagingKey,
-      });
-    } catch (error) {
-      if (error instanceof StagedUploadNotFoundError)
-        await this.datasets.update({
-          id: dataset.id,
-          projectId: input.projectId,
-          data: { status: "failed", stagingKey: null },
-        });
-      throw error;
-    }
-    if (exceedsUploadCap(size)) {
-      await storage
-        .deleteStaged({ projectId: input.projectId, key: dataset.stagingKey })
-        .catch(() => undefined);
-      await this.datasets.update({
-        id: dataset.id,
-        projectId: input.projectId,
-        data: {
-          status: "failed",
-          stagingKey: null,
-          statusError: "Uploaded file is too large",
-        },
-      });
-      throw new UploadTooLargeError();
-    }
-    if (
-      (await this.datasets.claimForProcessing({
-        id: input.datasetId,
-        projectId: input.projectId,
-      })) === 0
-    )
-      throw new UploadNotPendingError();
-    return { datasetId: input.datasetId, status: "processing" };
   }
 
   async retryNormalize(
     input: RetryNormalizeInput,
   ): Promise<{ datasetId: string; status: "processing" }> {
     const dataset = await this.findDataset(input.datasetId, input.projectId);
-    if ((dataset.status !== "failed" && dataset.status !== "processing") || !dataset.stagingKey)
+    if (
+      (dataset.status !== "failed" && dataset.status !== "processing") ||
+      (!dataset.sourceStoredObjectId && !dataset.stagingKey)
+    )
       throw new UploadNotPendingError("Dataset is not retryable");
     await this.datasets.update({
       id: dataset.id,
@@ -284,6 +233,32 @@ export class DatasetUploadService implements DatasetUpload {
       data: { status: "processing", statusError: null },
     });
     return { datasetId: input.datasetId, status: "processing" };
+  }
+
+  /** The confirmed `dataset_import` file in this project, named as a readable format. */
+  private async getImportSource(input: {
+    projectId: string;
+    storedObjectId: string;
+  }): Promise<StoredObjectMetadata & { filename: string }> {
+    let metadata: StoredObjectMetadata;
+    try {
+      metadata = await this.storedObjects.getMetadata({
+        projectId: input.projectId,
+        id: input.storedObjectId,
+      });
+    } catch (error) {
+      if (error instanceof StoredObjectNotFoundError)
+        throw new DatasetImportSourceRefusedError("not_found");
+      throw error;
+    }
+    if (metadata.projectId !== input.projectId)
+      throw new DatasetImportSourceRefusedError("not_found");
+    if (metadata.status !== "available") throw new DatasetImportSourceRefusedError("not_confirmed");
+    if (metadata.provenance.purpose !== DATASET_IMPORT_PURPOSE)
+      throw new DatasetImportSourceRefusedError("wrong_purpose");
+    if (!IMPORTABLE_FILENAME.test(metadata.filename))
+      throw new DatasetImportSourceRefusedError("unsupported_format");
+    return metadata;
   }
 
   private async findDataset(slugOrId: string, projectId: string): Promise<DatasetRow> {
@@ -295,21 +270,25 @@ export class DatasetUploadService implements DatasetUpload {
   }
 
   /**
-   * The upload gate. The size bound is measured on the server — the bytes the
-   * content actually carries — never the client-stated `fileSize`, which an
-   * understated value must not widen. The row cap reads the parsed rows.
+   * The upload gate, row by row as the file streams in: the size bound counts the
+   * bytes that arrive, never the client-stated `fileSize`, and the row cap stops the read.
    */
-  private assertFile(filename: string, content: string): void {
-    const byteSize = Buffer.byteLength(content, "utf8");
-    if (byteSize > MAX_FILE_SIZE_BYTES)
-      throw new UploadValidationError(
-        "File size exceeds the maximum limit of 25MB",
-        "file_too_large",
-      );
-    const { rows } = parseFileContent({ content, format: detectFileFormat(filename) });
+  private async readUpload(input: {
+    filename: string;
+    bytes: AsyncIterable<Uint8Array>;
+  }): Promise<{ headers: string[]; rows: Record<string, unknown>[] }> {
+    const format = uploadFormatOf(input.filename);
+    let headers: string[] = [];
+    const rows: Record<string, unknown>[] = [];
+    for await (const row of readRows(boundedBytes(input.bytes), format)) {
+      if (rows.length === 0 && format !== "csv") headers = Object.keys(row.record);
+      if (row.headers) headers = row.headers;
+      else rows.push(row.record);
+      if (rows.length > MAX_ROWS_LIMIT)
+        throw new UploadValidationError(`File contains too many rows`, "row_limit_exceeded");
+    }
     if (!rows.length) throw new UploadValidationError("File contains no data rows", "empty_file");
-    if (rows.length > MAX_ROWS_LIMIT)
-      throw new UploadValidationError(`File contains too many rows`, "row_limit_exceeded");
+    return { headers, rows };
   }
 }
 
@@ -321,4 +300,88 @@ function slugify(value: string): string {
       .replaceAll(/^-+|-+$/g, "")
       .toLowerCase() || "dataset"
   );
+}
+
+function uploadFormatOf(filename: string): FileFormat {
+  if (!IMPORTABLE_FILENAME.test(filename)) {
+    const extension = filename.split(".").pop()?.toLowerCase() ?? "unknown";
+    throw new UploadValidationError(
+      `Unsupported file format: .${extension}. Supported formats: .csv, .json, .jsonl`,
+      "unsupported_format",
+    );
+  }
+  return detectFileFormat(filename);
+}
+
+/** The body as it arrives, refused once it passes the upload limit rather than read to the end. */
+async function* boundedBytes(body: AsyncIterable<Uint8Array>): AsyncGenerator<Uint8Array> {
+  let seen = 0;
+  for await (const part of body) {
+    seen += part.byteLength;
+    if (seen > MAX_FILE_SIZE_BYTES)
+      throw new UploadValidationError(
+        "File size exceeds the maximum limit of 25MB",
+        "file_too_large",
+      );
+    yield part;
+  }
+}
+
+type UploadedRow = { headers?: string[]; record: Record<string, unknown> };
+
+/** One record at a time; a `.json` array (or a `.jsonl` holding one) is read whole. */
+async function* readRows(
+  body: AsyncIterable<Uint8Array>,
+  format: FileFormat,
+): AsyncGenerator<UploadedRow> {
+  if (format === "csv") {
+    yield* readCsvRows(body);
+    return;
+  }
+  const lines = readline.createInterface({ input: Readable.from(body), crlfDelay: Infinity });
+  let first = true;
+  for await (const rawLine of lines) {
+    const line = withoutNullBytes(rawLine).trim();
+    if (line === "") continue;
+    if (format === "json" || (first && line.startsWith("["))) {
+      yield* readJsonArray(line, lines);
+      return;
+    }
+    first = false;
+    yield { record: JSON.parse(line) as Record<string, unknown> };
+  }
+}
+
+async function* readJsonArray(
+  firstLine: string,
+  rest: AsyncIterable<string>,
+): AsyncGenerator<UploadedRow> {
+  const parts = [firstLine];
+  for await (const line of rest) parts.push(withoutNullBytes(line));
+  for (const record of parseJSON(parts.join("\n"))) yield { record };
+}
+
+/** Rows as arrays mapped by index, the header row deduplicated once, as normalize does. */
+async function* readCsvRows(body: AsyncIterable<Uint8Array>): AsyncGenerator<UploadedRow> {
+  const parsed = pipeline(
+    Readable.from(body),
+    Papa.parse(Papa.NODE_STREAM_INPUT, { header: false, skipEmptyLines: true }),
+    () => undefined,
+  );
+  let headers: string[] | undefined;
+  for await (const values of parsed) {
+    const cells = (Array.isArray(values) ? values : []).map((value) =>
+      withoutNullBytes(value == null ? "" : String(value)),
+    );
+    if (headers) {
+      yield { record: Object.fromEntries(headers.map((header, i) => [header, cells[i]])) };
+    } else {
+      headers = dedupeHeaders(cells);
+      yield { headers, record: {} };
+    }
+  }
+}
+
+function withoutNullBytes(text: string): string {
+  return text.includes("\u0000") ? text.replaceAll("\u0000", "") : text;
 }

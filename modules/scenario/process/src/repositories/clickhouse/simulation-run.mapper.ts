@@ -35,6 +35,7 @@ export interface ClickHouseSimulationRunRow extends Partial<ClickHouseEvaluation
   Reasoning: string | null;
   MetCriteria: string[];
   UnmetCriteria: string[];
+  InconclusiveCriteria?: string[];
   Error: string | null;
   DurationMs: string | null;
   TotalCost: number | null;
@@ -127,6 +128,7 @@ export function mapClickHouseRowToScenarioRunData(
 
   const metCriteria = row.MetCriteria ?? [];
   const unmetCriteria = row.UnmetCriteria ?? [];
+  const inconclusiveCriteria = row.InconclusiveCriteria ?? [];
   const evaluations = columnsToEvaluations(row);
 
   const results =
@@ -136,6 +138,7 @@ export function mapClickHouseRowToScenarioRunData(
           reasoning: row.Reasoning ?? undefined,
           metCriteria,
           unmetCriteria,
+          ...(inconclusiveCriteria.length > 0 && { inconclusiveCriteria }),
           error: row.Error ?? undefined,
           ...(evaluations.length > 0 && { evaluations }),
         }

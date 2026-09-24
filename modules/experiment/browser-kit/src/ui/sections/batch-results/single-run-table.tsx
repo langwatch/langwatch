@@ -32,7 +32,7 @@ import { ComparisonWinnerCell } from "./comparison-winner-cell.tsx";
 import { ExpandableDatasetCell } from "./expandable-dataset-cell.tsx";
 import {
   type DescribeBatchCellFailure,
-  getImageUrl,
+  cellPictureUrl,
   type RenderBatchEvaluatorResult,
   type RenderDatasetImage,
   type RenderTracePeek,
@@ -167,12 +167,10 @@ const buildColumns = ({
         cell: ({ getValue }) => {
           const value = getValue();
 
-          // Check each cell for image URLs regardless of column type
-          if (typeof value === "string") {
-            const imageUrl = getImageUrl(value);
-            if (imageUrl) {
-              return renderDatasetImage?.({ src: imageUrl }) ?? <Text>{imageUrl}</Text>;
-            }
+          // Check each cell for a picture regardless of column type.
+          const imageUrl = cellPictureUrl(value);
+          if (imageUrl) {
+            return renderDatasetImage?.({ src: imageUrl }) ?? <Text>{imageUrl}</Text>;
           }
 
           // Use expandable cell for text content

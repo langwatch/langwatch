@@ -48,6 +48,16 @@ export class NoModel extends HandledError {
   }
 }
 
+/** A provider that answered with a failure, which carries its code. */
+export class ProviderError extends HandledError {
+  declare readonly code: "ai_query_provider_error";
+  constructor() {
+    super("ai_query_provider_error", "The model provider failed.", {
+      httpStatus: 502,
+    });
+  }
+}
+
 export function deps(
   overrides: Partial<Omit<TraceSearchRouterDeps, "recordDecision">> = {},
 ): TraceSearchRouterDeps & { recordDecision: Mock<TraceSearchRouterDeps["recordDecision"]> } {

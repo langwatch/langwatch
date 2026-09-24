@@ -111,6 +111,7 @@ export const storedObjectMetadataSchema = z
     sha256: storedObjectSha256Schema,
     byteLength: storedObjectByteLengthSchema,
     mediaType: storedObjectMediaTypeSchema,
+    filename: storedObjectFilenameSchema,
     mediaTypeVerified: z.boolean(),
     status: storedObjectLifecycleStatusSchema,
     audiences: z.array(storedObjectDeliveryAudienceSchema),

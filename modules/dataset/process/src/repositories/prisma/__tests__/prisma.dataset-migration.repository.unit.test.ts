@@ -1,26 +1,20 @@
-import { Readable } from "node:stream";
-
+import { memoryObjectStorage } from "@langwatch/process-stores";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  type DatasetStorageResolver,
-  type DatasetAzureConfigResolver,
-  type DatasetBlobDriver,
-  type DatasetStorage,
-  type PresignedUpload,
-} from "../../../app/dataset.app.ts";
-import {
+  chunkKey,
   toJsonlChunks,
   type ChunkOffset,
   type DatasetChunk,
 } from "../../../rules/dataset-chunking.rules.ts";
-import { AzureDatasetStorageAdapter } from "../../../services/azure.dataset-storage.service.ts";
+import type { DatasetChunkRepository } from "../../dataset-chunk.repository.ts";
+import { ObjectStorageDatasetChunkRepository } from "../../object-storage/object-storage.dataset-chunk.repository.ts";
 import { PrismaDatasetMigrationRepository } from "../prisma.dataset-migration.repository.ts";
 
 type DatasetLayout = { contentLayout: string; useS3: boolean };
 type Fingerprint = { count: number; maxUpdatedAt: Date | null };
 
-class FixtureStorage implements DatasetStorage {
+class FixtureStorage implements DatasetChunkRepository {
   readonly writeChunks = vi.fn(
     async (input: { records: unknown[]; fromIndex?: number }): Promise<DatasetChunk[]> =>
       toJsonlChunks(input.records).map((chunk) => ({
@@ -39,24 +33,12 @@ class FixtureStorage implements DatasetStorage {
   rewriteChunk(): Promise<ChunkOffset> {
     throw new Error("unused");
   }
-  createPresignedUpload(): Promise<PresignedUpload> {
+  readStagedUpload(): Promise<AsyncIterable<Uint8Array>> {
     throw new Error("unused");
   }
-  headStagedObjectSize(): Promise<number> {
+  removeStagedUpload(): Promise<void> {
     throw new Error("unused");
   }
-  streamStaged(): Promise<Readable> {
-    throw new Error("unused");
-  }
-  deleteStaged(): Promise<void> {
-    throw new Error("unused");
-  }
-}
-
-class FixtureStorageResolver implements DatasetStorageResolver {
-  readonly forProject = vi.fn(async () => this.storage);
-
-  constructor(private readonly storage: DatasetStorage) {}
 }
 
 function fingerprintRow(input: Fingerprint) {
@@ -70,7 +52,7 @@ function fixture(input: {
   current?: DatasetLayout | null;
   candidatePages?: string[][];
   recordPages?: { id: string; entry: unknown }[][];
-  storage?: DatasetStorage;
+  storage?: DatasetChunkRepository;
 }) {
   const current =
     input.current === undefined ? { contentLayout: "postgres", useS3: false } : input.current;
@@ -114,13 +96,12 @@ function fixture(input: {
     $transaction: runTransaction,
   };
   const storage = new FixtureStorage();
-  const storageResolver = new FixtureStorageResolver(input.storage ?? storage);
   // Prisma's delegates derive their return types from the arguments each call
   // was made with, so no hand-written stand-in can be declared to satisfy one.
   // The fake records what it was asked, which is what every claim below reads.
   const migration = PrismaDatasetMigrationRepository.create({
     database: database as never,
-    storage: storageResolver,
+    storage: input.storage ?? storage,
   });
 
   return {
@@ -133,35 +114,18 @@ function fixture(input: {
     recordAggregate,
     recordFindMany,
     storage,
-    storageResolver,
     update,
   };
 }
 
-describe("given a deployment whose dataset destination is Azure Blob", () => {
+describe("given a deployment whose dataset destination is its object storage", () => {
   describe("when the backfill migrates a postgres-layout dataset", () => {
     /** @scenario "The dataset-content backfill task migrates a postgres-layout dataset onto azure" */
-    it("writes the chunk objects into the Azure container rather than a bucket", async () => {
-      const put = vi.fn(async () => undefined);
-      const driver: DatasetBlobDriver = {
-        put,
-        get: async () => Readable.from([]),
-        head: async () => 0,
-        // False, deliberately: `deleteChunksFrom` walks upward until the first
-        // gap, so a driver that always answers true never terminates.
-        exists: async () => false,
-        delete: async () => undefined,
-      };
-      const azure = AzureDatasetStorageAdapter.create(
-        new (class implements DatasetAzureConfigResolver {
-          async resolve() {
-            return { driver, accountName: "lwacct", container: "datasets" };
-          }
-        })(),
-      );
+    it("writes the chunk objects through the object storage at the released chunk key", async () => {
+      const objectStorage = memoryObjectStorage();
       const subject = fixture({
         recordPages: [[{ id: "record_1", entry: { value: 1 } }], []],
-        storage: azure,
+        storage: ObjectStorageDatasetChunkRepository.create({ objectStorage }),
       });
       subject.recordAggregate.mockResolvedValue(
         fingerprintRow({ count: 1, maxUpdatedAt: new Date("2026-01-01T00:00:00.000Z") }),
@@ -171,11 +135,12 @@ describe("given a deployment whose dataset destination is Azure Blob", () => {
         subject.migration.migrateDataset({ datasetId: "dataset_1", projectId: "project_1" }),
       ).resolves.toBe("migrated");
 
-      expect(put).toHaveBeenCalledTimes(1);
-      const [uri, body, contentType] = put.mock.calls[0]! as unknown as [string, Buffer, string];
-      expect(uri).toMatch(/^azure-blob:\/\/lwacct\/datasets\//);
-      expect(body.toString("utf-8")).toContain('"record_1"');
-      expect(contentType).toBe("application/x-ndjson");
+      const stored = await objectStorage.read({
+        projectId: "project_1",
+        key: chunkKey("project_1", "dataset_1", 0),
+      });
+      const text = await new Response(ReadableStream.from(stored)).text();
+      expect(text).toContain('"record_1"');
     });
   });
 });
@@ -223,7 +188,9 @@ describe("PrismaDatasetMigrationRepository", () => {
       { id: "record_2", entry: { value: 2 } },
       { id: "record_3", entry: { value: 3 } },
     ]);
-    expect(subject.storageResolver.forProject).toHaveBeenCalledWith("project_1");
+    expect(subject.storage.writeChunks.mock.calls[0]?.[0]).toMatchObject({
+      projectId: "project_1",
+    });
     expect(subject.executeRaw).toHaveBeenCalledOnce();
     expect(subject.storage.deleteChunksFrom).toHaveBeenCalledWith({
       datasetId: "dataset_1",
@@ -284,7 +251,7 @@ describe("PrismaDatasetMigrationRepository", () => {
           projectId: "project_1",
         }),
       ).resolves.toBe("already-migrated");
-      expect(subject.storageResolver.forProject).not.toHaveBeenCalled();
+      expect(subject.storage.writeChunks).not.toHaveBeenCalled();
     }
   });
 
@@ -299,7 +266,7 @@ describe("PrismaDatasetMigrationRepository", () => {
     ).resolves.toBe("would-migrate");
     expect(subject.datasetFindFirst).not.toHaveBeenCalled();
     expect(subject.executeRaw).not.toHaveBeenCalled();
-    expect(subject.storageResolver.forProject).not.toHaveBeenCalled();
+    expect(subject.storage.writeChunks).not.toHaveBeenCalled();
   });
 
   it("tallies every durable outcome and continues after a failure", async () => {

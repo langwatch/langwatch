@@ -1,7 +1,10 @@
 import { datasetSchema, type Dataset, type DatasetRecord } from "@langwatch/dataset-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
+import {
+  createDatasetTestAttachments,
+  createDatasetTestRequestBounds,
+} from "../../app/__tests__/dataset.fixture.ts";
 import type { DatasetContent } from "../../app/dataset.app.ts";
 import { DatasetService } from "../../services/dataset.service.ts";
 import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
@@ -48,6 +51,10 @@ class Records implements DatasetRecordRepository {
   async count(): Promise<number> {
     return 0;
   }
+  async findByIds(): Promise<DatasetRecord[]> {
+    return [];
+  }
+
   async findPage() {
     return [];
   }
@@ -65,6 +72,10 @@ class Records implements DatasetRecordRepository {
 describe("DatasetService object-backed reads", () => {
   it("routes s3_jsonl reads through the content port", async () => {
     const content = new (class implements DatasetContent {
+      async findEntries(): Promise<Record<string, unknown>[]> {
+        return [];
+      }
+
       async searchRecords(): Promise<never> {
         throw new Error("not configured");
       }
@@ -101,6 +112,7 @@ describe("DatasetService object-backed reads", () => {
       records: new Records(),
       content,
       requestBounds: createDatasetTestRequestBounds(),
+      attachments: createDatasetTestAttachments(),
     });
     await service.getDatasetWithRecords({
       slugOrId: "dataset_1",

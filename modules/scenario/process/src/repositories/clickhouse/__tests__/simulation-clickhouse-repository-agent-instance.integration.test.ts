@@ -53,6 +53,7 @@ function finishedRunWithInstance(scenarioRunId: string): SimulationRunState["dat
     Reasoning: "All criteria met",
     MetCriteria: [],
     UnmetCriteria: [],
+    InconclusiveCriteria: [],
     Error: null,
     Evaluations: [],
     DurationMs: 1500,

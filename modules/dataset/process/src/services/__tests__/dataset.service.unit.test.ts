@@ -5,7 +5,10 @@
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 
-import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
+import {
+  createDatasetTestAttachments,
+  createDatasetTestRequestBounds,
+} from "../../app/__tests__/dataset.fixture.ts";
 import type { DatasetRecordRepository } from "../../repositories/dataset-record.repository.ts";
 import type { DatasetRepository } from "../../repositories/dataset.repository.ts";
 import { DatasetService } from "../dataset.service.ts";
@@ -51,6 +54,7 @@ function serviceHolding(records: ReturnType<typeof record>[]) {
     repository,
     records: recordsRepository,
     requestBounds: createDatasetTestRequestBounds(),
+    attachments: createDatasetTestAttachments(),
   });
 }
 

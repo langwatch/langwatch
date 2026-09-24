@@ -66,6 +66,15 @@ const makeScenario = (overrides: Partial<ScenarioResponse> = {}): ScenarioRespon
   ...overrides,
 });
 
+/** The platform's read by id: it answers for the fixture's id and nothing else. */
+const getById = () =>
+  vi.fn(async (id: string) => {
+    const found = makeScenario();
+    if (id !== found.id)
+      throw new ScenariosApiError(`Scenario "${id}" not found`, `fetch scenario with ID "${id}"`);
+    return found;
+  });
+
 describe("listScenariosCommand()", () => {
   let mockGetAll: ReturnType<typeof vi.fn>;
   let exitSpy: ReturnType<typeof mockProcessExit>;
@@ -76,7 +85,7 @@ describe("listScenariosCommand()", () => {
     vi.mocked(ScenariosApiService).mockImplementation(function () {
       return {
         getAll: mockGetAll,
-        get: vi.fn(),
+        get: getById(),
         create: vi.fn(),
         update: vi.fn(),
         delete: vi.fn(),
@@ -117,14 +126,16 @@ describe("listScenariosCommand()", () => {
 });
 
 describe("getScenarioCommand()", () => {
+  let mockGetAll: ReturnType<typeof vi.fn>;
   let mockGet: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGet = vi.fn();
+    mockGetAll = vi.fn();
+    mockGet = getById();
     vi.mocked(ScenariosApiService).mockImplementation(function () {
       return {
-        getAll: vi.fn(),
+        getAll: mockGetAll,
         get: mockGet,
         create: vi.fn(),
         update: vi.fn(),
@@ -136,21 +147,73 @@ describe("getScenarioCommand()", () => {
     mockProcessExit();
   });
 
-  describe("when scenario is found", () => {
-    it("calls get with the provided ID", async () => {
-      mockGet.mockResolvedValue(makeScenario());
+  describe("when the reference is an id", () => {
+    /** @scenario "Get scenario details by ID" */
+    it("returns the scenario that id names", async () => {
+      mockGetAll.mockResolvedValue([
+        makeScenario(),
+        makeScenario({ id: "scenario_other", name: "Other" }),
+      ]);
 
-      await getScenarioCommand("scenario_abc123");
+      const result = await getScenarioCommand("scenario_abc123");
 
-      expect(mockGet).toHaveBeenCalledWith("scenario_abc123");
+      expect(result?.data).toMatchObject({ id: "scenario_abc123", name: "Login Flow" });
+    });
+  });
+
+  describe("when the reference is a name", () => {
+    /** @scenario "Get a scenario by its name" */
+    it("returns the scenario that name names", async () => {
+      mockGetAll.mockResolvedValue([
+        makeScenario(),
+        makeScenario({ id: "scenario_other", name: "Other" }),
+      ]);
+
+      const result = await getScenarioCommand("Login Flow");
+
+      expect(result?.data).toMatchObject({ id: "scenario_abc123" });
+    });
+
+    /** @scenario "Get a scenario by its name ignoring case" */
+    it("matches the name without case when no exact name matches", async () => {
+      mockGetAll.mockResolvedValue([makeScenario()]);
+
+      const result = await getScenarioCommand("login flow");
+
+      expect(result?.data).toMatchObject({ id: "scenario_abc123" });
+    });
+  });
+
+  describe("when two scenarios share the name", () => {
+    /** @scenario "A name two scenarios share is refused with both ids" */
+    it("exits with code 1 and lists both ids", async () => {
+      mockGetAll.mockResolvedValue([
+        makeScenario({ id: "scenario_one" }),
+        makeScenario({ id: "scenario_two" }),
+      ]);
+
+      await expect(getScenarioCommand("Login Flow")).rejects.toThrow(ProcessExitError);
+      const printed = vi.mocked(console.error).mock.calls.flat().join("\n");
+      expect(printed).toContain("scenario_one");
+      expect(printed).toContain("scenario_two");
     });
   });
 
   describe("when scenario is not found", () => {
+    /** @scenario "Get scenario that does not exist" */
     it("exits with code 1", async () => {
-      mockGet.mockRejectedValue(new ScenariosApiError("Not found", "fetch scenario"));
+      mockGetAll.mockResolvedValue([makeScenario()]);
 
       await expect(getScenarioCommand("nonexistent")).rejects.toThrow(ProcessExitError);
+    });
+  });
+
+  describe("when the API call fails", () => {
+    it("exits with code 1", async () => {
+      mockGet.mockRejectedValue(new ScenariosApiError("Network error", "fetch scenario"));
+      mockGetAll.mockRejectedValue(new ScenariosApiError("Network error", "fetch all scenarios"));
+
+      await expect(getScenarioCommand("scenario_abc123")).rejects.toThrow(ProcessExitError);
     });
   });
 });
@@ -164,7 +227,7 @@ describe("createScenarioCommand()", () => {
     vi.mocked(ScenariosApiService).mockImplementation(function () {
       return {
         getAll: vi.fn(),
-        get: vi.fn(),
+        get: getById(),
         create: mockCreate,
         update: vi.fn(),
         delete: vi.fn(),
@@ -230,8 +293,8 @@ describe("updateScenarioCommand()", () => {
     mockUpdate = vi.fn();
     vi.mocked(ScenariosApiService).mockImplementation(function () {
       return {
-        getAll: vi.fn(),
-        get: vi.fn(),
+        getAll: vi.fn(async () => [makeScenario()]),
+        get: getById(),
         create: vi.fn(),
         update: mockUpdate,
         delete: vi.fn(),
@@ -268,11 +331,32 @@ describe("updateScenarioCommand()", () => {
     });
   });
 
+  describe("when the reference is a name", () => {
+    /** @scenario "Update a scenario by its name" */
+    it("updates the scenario that name names", async () => {
+      mockUpdate.mockResolvedValue(makeScenario({ name: "Updated Name" }));
+
+      await updateScenarioCommand("Login Flow", { name: "Updated Name" });
+
+      expect(mockUpdate).toHaveBeenCalledWith("scenario_abc123", { name: "Updated Name" });
+    });
+  });
+
+  describe("when the reference names no scenario", () => {
+    /** @scenario "A reference that names no scenario is not found" */
+    it("exits with code 1 without calling update", async () => {
+      await expect(updateScenarioCommand("nonexistent", { name: "Updated" })).rejects.toThrow(
+        ProcessExitError,
+      );
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when update fails", () => {
     it("exits with code 1", async () => {
-      mockUpdate.mockRejectedValue(new ScenariosApiError("Not found", "update scenario"));
+      mockUpdate.mockRejectedValue(new ScenariosApiError("Server error", "update scenario"));
 
-      await expect(updateScenarioCommand("nonexistent", { name: "Updated" })).rejects.toThrow(
+      await expect(updateScenarioCommand("scenario_abc123", { name: "Updated" })).rejects.toThrow(
         ProcessExitError,
       );
     });
@@ -280,17 +364,17 @@ describe("updateScenarioCommand()", () => {
 });
 
 describe("deleteScenarioCommand()", () => {
-  let mockGet: ReturnType<typeof vi.fn>;
+  let mockGetAll: ReturnType<typeof vi.fn>;
   let mockDelete: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGet = vi.fn();
+    mockGetAll = vi.fn();
     mockDelete = vi.fn();
     vi.mocked(ScenariosApiService).mockImplementation(function () {
       return {
-        getAll: vi.fn(),
-        get: mockGet,
+        getAll: mockGetAll,
+        get: getById(),
         create: vi.fn(),
         update: vi.fn(),
         delete: mockDelete,
@@ -302,20 +386,33 @@ describe("deleteScenarioCommand()", () => {
   });
 
   describe("when scenario exists and deletion succeeds", () => {
+    /** @scenario "Delete (archive) a scenario" */
     it("resolves the scenario then deletes it", async () => {
-      mockGet.mockResolvedValue(makeScenario());
+      mockGetAll.mockResolvedValue([makeScenario()]);
       mockDelete.mockResolvedValue({ id: "scenario_abc123", archived: true });
 
       await deleteScenarioCommand("scenario_abc123");
 
-      expect(mockGet).toHaveBeenCalledWith("scenario_abc123");
+      expect(mockDelete).toHaveBeenCalledWith("scenario_abc123");
+    });
+  });
+
+  describe("when the reference is a name", () => {
+    /** @scenario "Delete a scenario by its name" */
+    it("deletes the scenario that name names", async () => {
+      mockGetAll.mockResolvedValue([makeScenario()]);
+      mockDelete.mockResolvedValue({ id: "scenario_abc123", archived: true });
+
+      await deleteScenarioCommand("Login Flow");
+
       expect(mockDelete).toHaveBeenCalledWith("scenario_abc123");
     });
   });
 
   describe("when scenario is not found", () => {
+    /** @scenario "Delete a scenario that does not exist" */
     it("exits with code 1 without calling delete", async () => {
-      mockGet.mockRejectedValue(new ScenariosApiError("Not found", "fetch scenario"));
+      mockGetAll.mockResolvedValue([makeScenario()]);
 
       await expect(deleteScenarioCommand("nonexistent")).rejects.toThrow(ProcessExitError);
       expect(mockDelete).not.toHaveBeenCalled();
@@ -324,7 +421,7 @@ describe("deleteScenarioCommand()", () => {
 
   describe("when delete API call fails", () => {
     it("exits with code 1", async () => {
-      mockGet.mockResolvedValue(makeScenario());
+      mockGetAll.mockResolvedValue([makeScenario()]);
       mockDelete.mockRejectedValue(new ScenariosApiError("Server error", "delete scenario"));
 
       await expect(deleteScenarioCommand("scenario_abc123")).rejects.toThrow(ProcessExitError);

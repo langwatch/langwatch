@@ -4,11 +4,28 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+import { stdoutDocuments } from "../../../utils/__tests__/stdout-documents";
 import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
 
 const runSpy = vi.hoisted(() => vi.fn());
 vi.mock("../../run-plans/cli-run-plans-service", () => ({
   createCliRunPlansService: vi.fn(() => ({ run: runSpy })),
+}));
+
+const scenarios = vi.hoisted(() => [
+  { id: "scenario_1", name: "Login Flow" },
+  { id: "scenario_2", name: "Refund a paid order" },
+]);
+const getAllSpy = vi.hoisted(() => vi.fn(async () => scenarios));
+const getSpy = vi.hoisted(() =>
+  vi.fn(async (id: string) => {
+    const found = scenarios.find((scenario) => scenario.id === id);
+    if (!found) throw new Error(`no scenario ${id}`);
+    return found;
+  }),
+);
+vi.mock("../cli-scenarios-service", () => ({
+  createCliScenariosService: vi.fn(() => ({ getAll: getAllSpy, get: getSpy })),
 }));
 
 vi.mock("../../../utils/apiKey", () => ({
@@ -63,13 +80,6 @@ const makeRunResult = (overrides: Record<string, unknown> = {}) => ({
  */
 let savedAgentEnv: Record<string, string | undefined> = {};
 
-/** Every JSON document the command printed on stdout. */
-const printedDocuments = (): string[] =>
-  vi
-    .mocked(console.log)
-    .mock.calls.map((call) => call[0] as unknown)
-    .filter((line): line is string => typeof line === "string" && line.trimStart().startsWith("{"));
-
 describe("runScenarioCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -118,6 +128,19 @@ describe("runScenarioCommand()", () => {
       const printed = vi.mocked(console.log).mock.calls.flat().join("\n");
       expect(printed).toContain("Login Flow against Support Agent");
       expect(printed).toContain("batch_1");
+    });
+  });
+
+  describe("when the scenario is named by its name", () => {
+    /** @scenario "Run a scenario by its name" */
+    it("posts the run scoped to the scenario that name names", async () => {
+      await runScenarioCommand("Refund a paid order", { target: ["http:agent_abc123"] });
+
+      expect(runSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({ scenarioIds: ["scenario_2"] }),
+        }),
+      );
     });
   });
 
@@ -336,7 +359,7 @@ describe("runScenarioCommand()", () => {
         vi.useRealTimers();
       }
 
-      const documents = printedDocuments();
+      const documents = stdoutDocuments();
       expect(documents).toHaveLength(1);
       const document = JSON.parse(documents[0]!) as Record<string, unknown>;
       expect(document.outcome).toBe("failed");

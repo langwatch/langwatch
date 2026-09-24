@@ -18,6 +18,8 @@ export type DatasetRow = Pick<Dataset, "createdAt" | "updatedAt" | "archivedAt">
   statusError: string | null;
   stagingKey: string | null;
   uploadFilename: string | null;
+  /** The confirmed `dataset_import` stored object an import reads (ADR-158 §6). */
+  sourceStoredObjectId: string | null;
   rowCount: number | null;
   sizeBytes: bigint | null;
   chunkCount: number | null;

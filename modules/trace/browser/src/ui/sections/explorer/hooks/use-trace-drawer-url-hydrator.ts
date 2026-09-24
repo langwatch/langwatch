@@ -1,6 +1,11 @@
 import { useEffect, useRef } from "react";
 
-import { isViewMode, parseEditParam, useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import {
+  isOccurredAtParam,
+  isViewMode,
+  parseEditParam,
+  useDrawerStore,
+} from "../../../../behavior/drawer.store.ts";
 import {
   selectIsTraceEditDirty,
   useTraceEditStore,
@@ -37,9 +42,7 @@ export function useTraceDrawerUrlHydrator(): void {
 
 /** The `t` link parameter as a timestamp, or null when it names no usable one. */
 function timestampParam(raw: string | undefined): number | null {
-  const occurredAtMs = raw ? Number(raw) : null;
-  if (occurredAtMs === null || !Number.isFinite(occurredAtMs) || occurredAtMs <= 0) return null;
-  return occurredAtMs;
+  return isOccurredAtParam(raw) ? Number(raw) : null;
 }
 
 /** Brings the drawer store in line with what the link asks for. */

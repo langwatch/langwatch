@@ -19,7 +19,7 @@ import {
 } from "@langwatch/dataset-contract";
 import { generate } from "@langwatch/ksuid";
 
-import type { DatasetContent, DatasetStorageResolver } from "../app/dataset.app.ts";
+import type { DatasetContent } from "../app/dataset.app.ts";
 
 /**
  * The app's KSUID resource for a chunk-line row (`KSUID_RESOURCES.RECORD`).
@@ -27,6 +27,7 @@ import type { DatasetContent, DatasetStorageResolver } from "../app/dataset.app.
  * of the s3_jsonl layout already expects.
  */
 const RECORD_KSUID_RESOURCE = "record";
+import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
 import type { ChunkOffset } from "../rules/dataset-chunking.rules.ts";
 import { DatasetChunkService } from "../services/dataset-chunk.service.ts";
@@ -43,16 +44,16 @@ export class DatasetContentAdapter implements DatasetContent {
 
   private constructor(
     private readonly datasets: DatasetContentRepository,
-    private readonly storageResolver: DatasetStorageResolver,
+    private readonly storage: DatasetChunkRepository,
   ) {
     this.chunks = DatasetChunkService.create({ datasets });
   }
 
   static create(options: {
     datasets: DatasetContentRepository;
-    storageResolver: DatasetStorageResolver;
+    storage: DatasetChunkRepository;
   }): DatasetContentAdapter {
-    return new DatasetContentAdapter(options.datasets, options.storageResolver);
+    return new DatasetContentAdapter(options.datasets, options.storage);
   }
 
   async listRecords({
@@ -66,7 +67,7 @@ export class DatasetContentAdapter implements DatasetContent {
     const total = dataset.rowCount ?? 0;
     const limit = input.limit ?? 50;
     const page = input.page ?? 1;
-    const storage = await this.storageResolver.forProject(input.projectId);
+    const storage = this.storage;
     const offsets = readChunkOffsets(dataset.chunkOffsets);
     const start = (page - 1) * limit;
     const end = start + limit;
@@ -131,7 +132,7 @@ export class DatasetContentAdapter implements DatasetContent {
       });
     }
 
-    const storage = await this.storageResolver.forProject(input.projectId);
+    const storage = this.storage;
     const offsets = readSearchOffsets(dataset);
     const start = (input.page - 1) * input.limit;
     const end = start + input.limit;
@@ -206,7 +207,7 @@ export class DatasetContentAdapter implements DatasetContent {
     if (!dataset.chunkCount) {
       throw new DatasetChunkCountMissingError(dataset.id);
     }
-    const storage = await this.storageResolver.forProject(projectId);
+    const storage = this.storage;
     const lines = await storage.readChunks({
       projectId,
       datasetId: dataset.id,
@@ -242,6 +243,19 @@ export class DatasetContentAdapter implements DatasetContent {
     };
   }
 
+  findEntries(input: {
+    dataset: Dataset;
+    projectId: string;
+    recordIds: readonly string[];
+  }): Promise<Record<string, unknown>[]> {
+    return this.chunks.findEntries({
+      dataset: input.dataset,
+      projectId: input.projectId,
+      ids: input.recordIds,
+      storage: this.storage,
+    });
+  }
+
   async upsertRecord({
     dataset,
     input,
@@ -249,7 +263,7 @@ export class DatasetContentAdapter implements DatasetContent {
     dataset: Dataset;
     input: UpdateDatasetRecordInput & { recordId: string };
   }): Promise<DatasetRecordMutationResult> {
-    const storage = await this.storageResolver.forProject(input.projectId);
+    const storage = this.storage;
     const result = await this.chunks.editRecord({
       dataset,
       projectId: input.projectId,
@@ -271,7 +285,7 @@ export class DatasetContentAdapter implements DatasetContent {
     input: CreateDatasetRecordsInput;
   }): Promise<DatasetRecord[]> {
     const entries = input.entries.map((entry) => ({ ...entry }));
-    const storage = await this.storageResolver.forProject(input.projectId);
+    const storage = this.storage;
     await this.chunks.append({
       dataset,
       projectId: input.projectId,
@@ -293,7 +307,7 @@ export class DatasetContentAdapter implements DatasetContent {
       dataset,
       projectId: input.projectId,
       recordIds: input.recordIds,
-      storage: await this.storageResolver.forProject(input.projectId),
+      storage: this.storage,
     });
     return { count: result.deleted };
   }
@@ -313,8 +327,8 @@ export class DatasetContentAdapter implements DatasetContent {
     if (!source.chunkCount) {
       throw new DatasetChunkCountMissingError(source.id);
     }
-    const sourceStorage = await this.storageResolver.forProject(sourceProjectId);
-    const targetStorage = await this.storageResolver.forProject(targetProjectId);
+    const sourceStorage = this.storage;
+    const targetStorage = this.storage;
     const rows = await sourceStorage.readChunks({
       projectId: sourceProjectId,
       datasetId: source.id,
@@ -365,7 +379,7 @@ export class DatasetContentAdapter implements DatasetContent {
       newColumnTypes: columnTypes,
       name,
       slug,
-      storage: await this.storageResolver.forProject(projectId),
+      storage: this.storage,
     });
     return datasetSchema.parse(updated);
   }

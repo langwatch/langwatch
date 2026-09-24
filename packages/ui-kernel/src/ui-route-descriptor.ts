@@ -7,6 +7,7 @@ export type UiRedirectDescriptor = {
   readonly from: string;
   readonly to: string;
   readonly pinParams?: Readonly<Record<string, string>>;
+  readonly renameParams?: Readonly<Record<string, string>>;
   readonly mapSegment?: Readonly<Record<string, string>>;
 };
 

@@ -32,6 +32,8 @@ export const simulationEventResultsSchema = z.object({
   reasoning: z.string().optional(),
   metCriteria: z.array(z.string()).default([]),
   unmetCriteria: z.array(z.string()).default([]),
+  /** Criteria the judge could not decide; each is also in `unmetCriteria`. */
+  inconclusiveCriteria: z.array(z.string()).optional(),
   error: z.string().optional(),
   /** Code-triggered runs send their evaluations with the finished event. */
   evaluations: z.array(scenarioEvaluationResultSchema).optional(),

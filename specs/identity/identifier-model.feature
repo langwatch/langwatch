@@ -539,3 +539,11 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And the dashboard navigation is hidden and cannot receive focus
     And they can check access again, return home, or sign out
     And project content remains unavailable until they have team access
+
+  @integration @regression
+  Scenario: A member is never shown an access refusal before their access has been read
+    Given a signed-in member whose organization read has not answered yet
+    When they open a project page
+    Then the full-screen waiting-for-team-access page is not shown
+    And the page renders normally once the read answers and confirms team membership
+    And the waiting page is shown once the read answers and confirms no team membership

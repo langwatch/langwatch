@@ -83,20 +83,30 @@ function traceAnalyticsCost(extra: CallExtra): number | null {
 }
 
 /** The per-minute rollup the analytics graphs read by default. */
+/** Every span here has ordinary times, so a `null` map means a broken fixture. */
+function mapped<Row>(record: Row | null): Row {
+  if (record === null) throw new Error("expected the span to map to a record");
+  return record;
+}
+
 function analyticsRollupCost(extra: CallExtra): number {
-  return TraceAnalyticsRollupMapProjection.create({
-    store: noopAppendStore,
-    spanCostService: runtime.spanCost,
-    spanNormalization: runtime.spanNormalization,
-  }).mapTraceSpanReceived(claudeCallEvent(extra)).costSum;
+  return mapped(
+    TraceAnalyticsRollupMapProjection.create({
+      store: noopAppendStore,
+      spanCostService: runtime.spanCost,
+      spanNormalization: runtime.spanNormalization,
+    }).mapTraceSpanReceived(claudeCallEvent(extra)),
+  ).costSum;
 }
 
 function storedSpan(extra: CallExtra) {
-  return SpanStorageMapProjection.create({
-    store: noopAppendStore,
-    spanCostService: runtime.spanCost,
-    spanNormalization: runtime.spanNormalization,
-  }).mapTraceSpanReceived(claudeCallEvent(extra));
+  return mapped(
+    SpanStorageMapProjection.create({
+      store: noopAppendStore,
+      spanCostService: runtime.spanCost,
+      spanNormalization: runtime.spanNormalization,
+    }).mapTraceSpanReceived(claudeCallEvent(extra)),
+  );
 }
 
 /** `stored_spans.Cost`: the waterfall's per-span figure, and the export's. */

@@ -1,5 +1,5 @@
 import { nowInstant } from "@langwatch/time";
-import type { AiActionError } from "@langwatch/trace-contract";
+import type { AiActionError, ModelTrouble } from "@langwatch/trace-contract";
 import {
   excludedFacetQuery,
   isEmptyAST,
@@ -98,6 +98,13 @@ export interface QuerySlice {
     query: string;
   } | null;
 
+  /**
+   * What the strip under the bar says when a model was missing from the search
+   * that just ran. It shows while `query` is what the bar holds, so the next edit
+   * retires it; `projectId` guards a workspace switch, as `lastAiTranslation` does.
+   */
+  searchNotice: SearchNotice | null;
+
   /** Apply a query string from the search bar (parses → AST) */
   applyQueryText: (text: string) => void;
   /** Set query text and AST together */
@@ -174,6 +181,25 @@ export interface QuerySlice {
    * surface the original natural-language prompt instead of the produced
    * query string. */
   recordAiTranslation: (translation: { projectId: string; prompt: string; query: string }) => void;
+
+  /** Say what the search that just landed was read as, and what is missing. */
+  recordSearchNotice: (notice: SearchNotice) => void;
+}
+
+/**
+ * The strip's content: what the sentence was read as, and which of the two model
+ * problems is behind it. With no model, or one that does not answer, the search
+ * still runs (a judgement of the words as typed, or a phrase) and this says so.
+ */
+export interface SearchNotice {
+  projectId: string;
+  /** The query text this is about. The strip hides once the bar moves on. */
+  query: string;
+  /** What the sentence was read as. */
+  interpretedAs: "instant_eval" | "free_text";
+  modelTrouble: ModelTrouble;
+  /** The handled code of the failure, when it carried one. */
+  modelErrorCode?: string;
 }
 
 const EMPTY_AST: LiqeQuery = {
@@ -280,6 +306,7 @@ export const createQuerySlice: StateCreator<ExplorerStore, [], [], QuerySlice> =
   debouncedQueryText: "",
   debouncedTimeRange: INITIAL_TIME_RANGE,
   lastAiTranslation: null,
+  searchNotice: null,
   evalRuns: {},
 
   registerEvalRun: ({ key, runId }) =>
@@ -290,6 +317,8 @@ export const createQuerySlice: StateCreator<ExplorerStore, [], [], QuerySlice> =
   dismissParseError: () => set({ parseError: null }),
 
   recordAiTranslation: (translation) => set({ lastAiTranslation: translation }),
+
+  recordSearchNotice: (notice) => set({ searchNotice: notice }),
 
   applyQueryText: (text) => set((state) => appliedQueryText({ state, text })),
 
@@ -414,6 +443,7 @@ export const createQuerySlice: StateCreator<ExplorerStore, [], [], QuerySlice> =
       page: 1,
       pageCursors: { 1: null },
       lastAiTranslation: null,
+      searchNotice: null,
       evalRuns: {},
     }),
 

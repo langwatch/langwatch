@@ -8,8 +8,11 @@ import {
 } from "@langwatch/dataset-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
-import type { DatasetStorage, DatasetStorageResolver } from "../../app/dataset.app.ts";
+import {
+  createDatasetTestAttachments,
+  createDatasetTestRequestBounds,
+} from "../../app/__tests__/dataset.fixture.ts";
+import type { DatasetChunkRepository } from "../../repositories/dataset-chunk.repository.ts";
 import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
 import type { DatasetRecordRepository } from "../../repositories/dataset-record.repository.ts";
 import type { DatasetRepository } from "../../repositories/dataset.repository.ts";
@@ -22,7 +25,7 @@ import {
 import { DatasetService } from "../dataset.service.ts";
 
 let activeDataset: Dataset;
-let activeStorage: DatasetStorage;
+let activeStorage: DatasetChunkRepository;
 
 const makeService = (overrides: { recordRepository?: Partial<DatasetRecordRepository> }) => {
   const repository = createApiFixture<DatasetRepository>(
@@ -36,21 +39,23 @@ const makeService = (overrides: { recordRepository?: Partial<DatasetRecordReposi
     overrides.recordRepository,
     "record repository",
   );
-  const storageResolver = createApiFixture<DatasetStorageResolver>(
+  const storage = createApiFixture<DatasetChunkRepository>(
     {
-      forProject: async () => activeStorage,
+      readChunks: (params) => activeStorage.readChunks(params),
+      readChunk: (params) => activeStorage.readChunk(params),
     },
-    "storage resolver",
+    "dataset chunks",
   );
   const content = DatasetContentAdapter.create({
     datasets: createApiFixture<DatasetContentRepository>(),
-    storageResolver,
+    storage,
   });
   return DatasetService.create({
     repository,
     records,
     content,
     requestBounds: createDatasetTestRequestBounds(),
+    attachments: createDatasetTestAttachments(),
   });
 };
 
@@ -93,7 +98,7 @@ const record = (id: string, entry: Record<string, unknown>): DatasetRecord => ({
 const mockChunks = (byIndex: Record<number, unknown[]> = chunks) => {
   const readChunks = vi.fn();
   const readChunk = vi.fn(({ index }: { index: number }) => Promise.resolve(byIndex[index] ?? []));
-  activeStorage = createApiFixture<DatasetStorage>(
+  activeStorage = createApiFixture<DatasetChunkRepository>(
     {
       readChunks,
       readChunk,

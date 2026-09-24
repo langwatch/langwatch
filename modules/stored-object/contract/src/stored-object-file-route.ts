@@ -13,6 +13,15 @@ export type StoredObjectFileRouteScopedParams = z.infer<
   typeof storedObjectFileRouteScopedParamsSchema
 >;
 
+/** The named address a dataset attachment reference carries: the scoped one plus the file name. */
+export const storedObjectFileRouteNamedParamsSchema =
+  storedObjectFileRouteScopedParamsSchema.extend({
+    filename: z.string(),
+  });
+export type StoredObjectFileRouteNamedParams = z.infer<
+  typeof storedObjectFileRouteNamedParamsSchema
+>;
+
 export const storedObjectFileRouteIdParamsSchema = z.object({ storedObjectId: z.string() });
 export type StoredObjectFileRouteIdParams = z.infer<typeof storedObjectFileRouteIdParamsSchema>;
 

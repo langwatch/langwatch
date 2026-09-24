@@ -1,3 +1,5 @@
-/** Whether a timestamp is usable by trace timing and storage anchors. */
+import { isStorableSpanTimeMs } from "./storable-span-time.rules.ts";
+
+/** Usable timing and storable time are one rule: `occurredAt` mints the summary's KSUID. */
 export const isValidTimestamp = (value: number | null | undefined): value is number =>
-  typeof value === "number" && value > 0 && Number.isFinite(value);
+  isStorableSpanTimeMs(value);

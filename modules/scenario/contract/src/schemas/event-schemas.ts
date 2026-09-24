@@ -187,6 +187,11 @@ export const scenarioResultsSchema = z.object({
   reasoning: z.string().optional(),
   metCriteria: z.array(z.string()),
   unmetCriteria: z.array(z.string()),
+  /**
+   * Criteria the judge could not decide, each also listed in `unmetCriteria`:
+   * an undecided criterion never passes. Absent on results recorded before.
+   */
+  inconclusiveCriteria: z.array(z.string()).optional(),
   error: z.string().optional(),
   /**
    * One result per evaluator that ran on the scenario. Absent on a run with

@@ -36,8 +36,8 @@ import {
 } from "../eventing/experiment-connected-target.process.ts";
 import type { ResultMapperConfig } from "../eventing/experiment-result-mapping.process.ts";
 import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
+import type { ExperimentAttachmentInputService } from "./experiment-attachment-input.service.ts";
 import type { ExperimentCellExecutionService } from "./experiment-cell-execution.service.ts";
-import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service.ts";
 import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 
 /**
@@ -96,6 +96,7 @@ export class ExperimentConnectedCellService {
   }): ExperimentConnectedCellService {
     return new ExperimentConnectedCellService({
       cells,
+      attachments: ports.attachments,
       dispatch: dispatch ?? ((params) => ports.connectedDispatch.dispatch(params)),
       sleep: sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms))),
       now: now ?? (() => nowInstant().epochMilliseconds),
@@ -103,17 +104,20 @@ export class ExperimentConnectedCellService {
   }
 
   private readonly cells: ExperimentCellExecutionService;
+  private readonly attachments: ExperimentAttachmentInputService;
   private readonly dispatch: ConnectedDispatch;
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly now: () => number;
 
   private constructor(options: {
     cells: ExperimentCellExecutionService;
+    attachments: ExperimentAttachmentInputService;
     dispatch: ConnectedDispatch;
     sleep: (ms: number) => Promise<void>;
     now: () => number;
   }) {
     this.cells = options.cells;
+    this.attachments = options.attachments;
     this.dispatch = options.dispatch;
     this.sleep = options.sleep;
     this.now = options.now;
@@ -138,21 +142,28 @@ export class ExperimentConnectedCellService {
   }
 
   /** One turn per row: mapped message in isolated conversation and trace. */
-  private connectedTurnParams({
+  private async connectedTurnParams({
     cell,
     projectId,
     agent,
     dispatchAgent,
+    datasetColumns,
     traceId,
   }: {
     cell: ExecutionCell;
     projectId: string;
     agent: TypedAgent;
     dispatchAgent: DispatchAgent;
+    datasetColumns: { id: string; name: string; type: string }[];
     traceId: string;
-  }): Omit<Parameters<ConnectedDispatch>[0], "signal"> {
+  }): Promise<Omit<Parameters<ConnectedDispatch>[0], "signal">> {
     const { messages, params } = buildConnectedCall({
-      inputs: ExperimentEvaluatorInputService.create({}).buildTargetInputs({ cell }),
+      inputs: await this.attachments.buildDispatchInputs({
+        cell,
+        projectId,
+        datasetColumns,
+        shouldFetchExternal: true,
+      }),
       definitions: connectedParameterDefinitions(agent.config),
     });
 
@@ -303,14 +314,27 @@ export class ExperimentConnectedCellService {
     traceId: string;
     startedAt: number;
   }): Promise<{ ok: true; outcome: CallOutcome } | { ok: false; error: unknown }> {
-    const { cell, projectId, agent, isAborted } = input;
+    const { cell, projectId, agent, datasetColumns = [], isAborted } = input;
     const dispatchAgent = this.dispatchAgentOf(agent);
     try {
+      const params = await this.connectedTurnParams({
+        cell,
+        projectId,
+        agent,
+        dispatchAgent,
+        datasetColumns,
+        traceId,
+      });
+      // Reading the row's attachments can take a while; a run stopped meanwhile sends nothing.
+      if (isAborted && (await isAborted())) {
+        return { ok: false, error: new Error("Execution aborted") };
+      }
+
       const outcome = await this.dispatchWithBusyRetry({
         isAborted,
         budgetEndsAt: startedAt + CONNECTED_BUSY_RETRY_BUDGET_MS,
         callTimeoutMs: dispatchAgent.timeoutMs + CONNECTED_REQUEST_SLACK_MS,
-        params: this.connectedTurnParams({ cell, projectId, agent, dispatchAgent, traceId }),
+        params,
       });
 
       return { ok: true, outcome };

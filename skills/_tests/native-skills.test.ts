@@ -194,6 +194,28 @@ describe("native skill generation", () => {
     });
   });
 
+  // The rule is prose, and prose gets reworded. This gate is what keeps a
+  // rewording from dropping it out of the compiled copies Langy reads.
+  // Backs specs/langy/langy-scenario-grounding.feature.
+  describe("given the skills that reproduce a failing trace as a scenario", () => {
+    /** @scenario "A reproduced scenario invents its identifiers and seeds the lookup" */
+    it("tell the agent to invent the identifiers, name them in the situation and seed the lookup", () => {
+      for (const slug of ["agent-improve", "scenarios"]) {
+        const body = renderSkill(skills.find((s) => s.slug === slug)!);
+        expect(body, `${slug}: redaction rule`).toContain("[REDACTED]");
+        expect(body, `${slug}: redaction rule`).toContain("invent a stand-in");
+        expect(body, `${slug}: naming rule`).toContain(
+          "stops being reproducible",
+        );
+        expect(body, `${slug}: lookup rule`).toContain("fixtures or test data");
+        expect(
+          body,
+          `${slug}: the trace's own identifiers are not copied`,
+        ).not.toContain("verbatim into the situation");
+      }
+    });
+  });
+
   // AGENTS.md tells Langy which skill to invoke per user intent. A row naming
   // a skill that isn't in the shipped image teaches the model to hallucinate.
   // The image's skill set is the root-compiled native set Docker overlays into

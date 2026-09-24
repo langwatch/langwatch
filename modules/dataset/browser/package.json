@@ -62,6 +62,7 @@
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/langy-browser-kit": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
     "@langwatch/workflow-browser-kit": "workspace:*",

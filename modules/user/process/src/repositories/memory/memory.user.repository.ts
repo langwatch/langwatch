@@ -6,7 +6,6 @@ import {
   userFullProfileSchema,
   userPasskeyNudgeStatusSchema,
   userProfileSchema,
-  userSsoStatusSchema,
   userTourPreferenceSchema,
   UserNotFoundError,
   USER_ACCOUNT_KSUID_RESOURCE,
@@ -19,7 +18,6 @@ import {
   type UserFullProfile,
   type UserPasskeyNudgeStatus,
   type UserProfile,
-  type UserSsoStatus,
   type UserTourPreference,
   type UserUsageCount,
 } from "@langwatch/user-contract";
@@ -184,12 +182,6 @@ export class MemoryUserRepository implements UserRepository {
     const row = this.#database.user(id);
 
     return row ? userAccountInfoSchema.parse({ createdAt: toDate(row.createdAt) }) : null;
-  }
-
-  async findSsoStatus(id: string): Promise<UserSsoStatus> {
-    return userSsoStatusSchema.parse({
-      pendingSsoSetup: this.#database.user(id)?.pendingSsoSetup ?? false,
-    });
   }
 
   async findTraceExplorerTourPreference(id: string): Promise<UserTourPreference> {

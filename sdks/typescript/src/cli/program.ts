@@ -1835,12 +1835,16 @@ function registerAgentCommands(program: Command): void {
         "Read the list again every few seconds until the agent with this name or id reports online, then print it",
       )
       .option("--timeout <seconds>", "How long --wait-online waits before failing", "120")
+      .option(
+        "--all",
+        "List every row, including offline rows of a name and environment that a newer row replaced",
+      )
       // No positional argument here, so a stray word is a name with a space
       // passed bare after --wait-online: the refusal says to quote it.
       .configureOutput({
         outputError: (message, write) => write(withQuotedNameHint(message)),
       }),
-    async (options: { waitOnline?: string; timeout?: string }) => {
+    async (options: { waitOnline?: string; timeout?: string; all?: boolean }) => {
       const { listAgentsCommand: impl } = await import("./commands/agents/list.js");
       return impl(options);
     },
@@ -3398,8 +3402,8 @@ function registerScenarioCommands(program: Command): void {
 
   emitsResult(
     scenarioCmd
-      .command("get <id>")
-      .description("Get scenario details by ID")
+      .command("get <reference>")
+      .description("Get scenario details by ID or name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string) => {
       const { getScenarioCommand: impl } = await import("./commands/scenarios/get.js");
@@ -3433,8 +3437,8 @@ function registerScenarioCommands(program: Command): void {
   );
 
   const scenarioUpdateCmd = scenarioCmd
-    .command("update <id>")
-    .description("Update an existing scenario")
+    .command("update <reference>")
+    .description("Update an existing scenario, named by ID or name")
     .option("--name <name>", "New scenario name")
     .option("--situation <situation>", "New situation/context")
     .option("--criteria <criteria>", "New comma-separated list of criteria (replaces existing)")
@@ -3474,8 +3478,8 @@ function registerScenarioCommands(program: Command): void {
 
   rendersOwnResult(
     scenarioCmd
-      .command("run <id>")
-      .description("Run one scenario against one or more targets")
+      .command("run <reference>")
+      .description("Run one scenario, named by ID or name, against one or more targets")
       .option("--target <target>", TARGET_FLAG_HELP, collectParam)
       .option("--name <name>", RUN_NAME_FLAG_HELP)
       .option("--repeat <n>", REPEAT_FLAG_HELP)
@@ -3527,8 +3531,8 @@ function registerScenarioCommands(program: Command): void {
 
   emitsResult(
     scenarioCmd
-      .command("delete <id>")
-      .description("Archive (soft-delete) a scenario")
+      .command("delete <reference>")
+      .description("Archive (soft-delete) a scenario, named by ID or name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string) => {
       const { deleteScenarioCommand: impl } = await import("./commands/scenarios/delete.js");

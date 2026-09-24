@@ -11,7 +11,6 @@ import type {
   UserFullProfile,
   UserPasskeyNudgeStatus,
   UserProfile,
-  UserSsoStatus,
   UserTourPreference,
   UserUsageCount,
 } from "@langwatch/user-contract";
@@ -45,7 +44,6 @@ export interface UserRepository {
   addJoinOfferDismissedDomain(input: { id: string; domain: string }): Promise<void>;
   updateProfile(input: UpdateUserProfileInput): Promise<UserProfile>;
   findAccountInfo(id: string): Promise<UserAccountInfo | null>;
-  findSsoStatus(id: string): Promise<UserSsoStatus>;
   findTraceExplorerTourPreference(id: string): Promise<UserTourPreference>;
   setTraceExplorerTourDismissedAt(input: {
     id: string;

@@ -31,6 +31,9 @@
       "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/scim/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../entitlement/contract/tsconfig.build.json"
     },
     {

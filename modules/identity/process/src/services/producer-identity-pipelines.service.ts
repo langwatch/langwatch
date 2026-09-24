@@ -1,3 +1,4 @@
+import { ScimSsoMigrationSubscriberService } from "@langwatch/enterprise-scim-contract";
 import type { StateProjectionStore, StoredProjection } from "@langwatch/eventing";
 
 import type { ConnectionTeardown } from "../eventing/connection-teardown.process.ts";
@@ -158,6 +159,23 @@ class ProducerOnlyConnectionTeardown implements ConnectionTeardown {
   }
 }
 
+/** The directory move on a finished migration, refused: only the draining process moves it. */
+class ProducerOnlyScimSsoMigrationSubscriber extends ScimSsoMigrationSubscriberService {
+  constructor(private readonly processName: string) {
+    super();
+  }
+
+  handleMigrationFinalized(): Promise<void> {
+    return Promise.reject(
+      producerOnly({
+        processName: this.processName,
+        pipeline: "sso-connections",
+        capability: "move directory sync onto a replacement connection",
+      }),
+    );
+  }
+}
+
 /**
  * The four identity pipelines as a process that only SENDS commands on them sees them: every read,
  * projection and process-manager seam is a stand-in that refuses by name.
@@ -269,6 +287,7 @@ export class IdentityProducerPipelinesAdapter {
       }),
       teardown: new ProducerOnlyConnectionTeardown(this.processName),
       proofNotifications: new ProducerOnlySsoDomainProofNotifications(this.processName),
+      directorySync: new ProducerOnlyScimSsoMigrationSubscriber(this.processName),
     });
   }
 

@@ -4,13 +4,17 @@ import {
   type DatasetRecord,
   type DatasetSummary,
   type DatasetWithRecords,
-  type FinalizeUploadInput,
+  type CreateDatasetFromStoredObjectInput,
+  type DatasetImportStarted,
   type RetryNormalizeInput,
 } from "@langwatch/dataset-contract";
 import { type Instant, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
+import {
+  createDatasetTestAttachments,
+  createDatasetTestRequestBounds,
+} from "../../app/__tests__/dataset.fixture.ts";
 import type {
   DatasetContent,
   DatasetNormalizeQueue,
@@ -120,6 +124,10 @@ class MemoryRecordRepository implements DatasetRecordRepository {
   async count(): Promise<number> {
     return this.records.length;
   }
+  async findByIds(): Promise<DatasetRecord[]> {
+    return [];
+  }
+
   async findPage(): Promise<DatasetRecord[]> {
     return this.records;
   }
@@ -169,6 +177,7 @@ describe("DatasetService", () => {
       records,
       generateId: () => "record_1",
       requestBounds: createDatasetTestRequestBounds(),
+      attachments: createDatasetTestAttachments(),
     });
 
     const dataset = await service.upsertDataset({
@@ -189,6 +198,7 @@ describe("DatasetService", () => {
       repository,
       records: new MemoryRecordRepository(),
       requestBounds: createDatasetTestRequestBounds(),
+      attachments: createDatasetTestAttachments(),
     });
 
     await expect(
@@ -208,6 +218,7 @@ describe("DatasetService", () => {
       repository,
       records: new MemoryRecordRepository(),
       requestBounds: createDatasetTestRequestBounds(),
+      attachments: createDatasetTestAttachments(),
     });
 
     await expect(
@@ -230,6 +241,7 @@ describe("DatasetService", () => {
       repository,
       records: new MemoryRecordRepository(),
       requestBounds: createDatasetTestRequestBounds(),
+      attachments: createDatasetTestAttachments(),
     });
 
     await expect(
@@ -248,6 +260,10 @@ describe("DatasetService", () => {
     const records = new MemoryRecordRepository();
     const calls: string[] = [];
     class MemoryContent implements DatasetContent {
+      async findEntries(): Promise<Record<string, unknown>[]> {
+        return [];
+      }
+
       async searchRecords(): Promise<never> {
         throw new Error("not configured");
       }
@@ -292,6 +308,7 @@ describe("DatasetService", () => {
       records,
       content: new MemoryContent(),
       requestBounds: createDatasetTestRequestBounds(),
+      attachments: createDatasetTestAttachments(),
     });
 
     const result = await service.getDatasetWithRecords({
@@ -305,15 +322,15 @@ describe("DatasetService", () => {
     expect(calls).toEqual(["read:dataset_1"]);
   });
 
-  it("enqueues normalization after upload finalization through the queue port", async () => {
+  it("enqueues normalization after a stored-object import through the queue port", async () => {
     const repository = new MemoryDatasetRepository();
     const records = new MemoryRecordRepository();
     const queueCalls: { projectId: string; datasetId: string }[] = [];
     class Uploads implements DatasetUpload {
-      async finalizeUpload(
-        input: FinalizeUploadInput,
-      ): Promise<{ datasetId: string; status: "processing" }> {
-        return { datasetId: input.datasetId, status: "processing" };
+      async createDatasetFromStoredObject(
+        input: CreateDatasetFromStoredObjectInput,
+      ): Promise<DatasetImportStarted> {
+        return { datasetId: "dataset_1", slug: input.name, status: "processing" };
       }
       async retryNormalize(
         input: RetryNormalizeInput,
@@ -329,13 +346,7 @@ describe("DatasetService", () => {
       async createDatasetFromUpload(): Promise<never> {
         throw new Error("unused");
       }
-      async createPendingUpload(): Promise<never> {
-        throw new Error("unused");
-      }
-      async writeStagedUpload(): Promise<void> {
-        return;
-      }
-      async abortPendingUpload(): Promise<never> {
+      async appendStoredObjectToDataset(): Promise<never> {
         throw new Error("unused");
       }
     }
@@ -350,9 +361,14 @@ describe("DatasetService", () => {
       uploads: new Uploads(),
       queue: new Queue(),
       requestBounds: createDatasetTestRequestBounds(),
+      attachments: createDatasetTestAttachments(),
     });
 
-    await service.finalizeUpload({ projectId: "project_1", datasetId: "dataset_1" });
+    await service.createDatasetFromStoredObject({
+      projectId: "project_1",
+      name: "dataset_1",
+      storedObjectId: "stored_object_1",
+    });
     await service.retryNormalize({ projectId: "project_1", datasetId: "dataset_1" });
     expect(queueCalls).toEqual([
       { projectId: "project_1", datasetId: "dataset_1" },

@@ -31,6 +31,7 @@ const RECOMMENDED: ArrivalAnswer = "open";
 const CONFIGURABLE: readonly SsoConnectionLifecycleState[] = ["VERIFIED", "ACTIVE", "SUSPENDED"];
 
 export function ArrivalsSection({
+  title = "Who gets in",
   connectionState,
   canManage,
   policy,
@@ -39,6 +40,7 @@ export function ArrivalsSection({
   refusal,
   onSave,
 }: {
+  title?: string;
   connectionState: SsoConnectionLifecycleState;
   canManage: boolean;
   /** What the connection admits today. */
@@ -56,7 +58,7 @@ export function ArrivalsSection({
 
   return (
     <SettingsCard
-      title="Who gets in"
+      title={title}
       hint="What happens when somebody we have never seen signs in through your identity provider."
       testId="connection-arrivals"
     >

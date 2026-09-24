@@ -473,7 +473,6 @@ const LEGACY_INERT: string[] = [
   "specs/experiments-v3/table-display.feature",
   "specs/experiments-v3/undo-redo.feature",
   "specs/features/agent-cli.feature",
-  "specs/features/analytics-cli.feature",
   "specs/features/annotation-cli.feature",
   "specs/features/dashboard-cli.feature",
   "specs/features/dataset-python-sdk.feature",
@@ -664,7 +663,6 @@ const LEGACY_INERT: string[] = [
   "specs/traces-v2/span-view.feature",
   "specs/traces-v2/tour-visibility-and-persistence.feature",
   "specs/traces-v2/trace-drawer-panes.feature",
-  "specs/traces-v2/trace-drawer-shell.feature",
   "specs/traces-v2/trace-header-full-content-resolution.feature",
   "specs/traces-v2/trace-peek.feature",
   "specs/traces-v2/trace-view.feature",
@@ -695,6 +693,14 @@ const LEGACY_INERT: string[] = [
 
 /** Feature files with mixed tagged/untagged scenarios (legacy tolerance; new files fail) */
 const LEGACY_PARTIAL: string[] = [
+  // Reason: left LEGACY_INERT when the CLI gained the traces.count alias
+  // and the unknown-metric refusal, which its three new scenarios enforce.
+  // The six older scenarios describe the query presets and stay untagged.
+  "specs/features/analytics-cli.feature",
+  // Reason: left LEGACY_INERT when deep links started carrying the partition
+  // hint; the "Deep links carry the partition hint" rule is enforced. The
+  // rest of the drawer shell is described here and tested elsewhere, untagged.
+  "specs/traces-v2/trace-drawer-shell.feature",
   "sdks/typescript/specs/cli/daemon.feature",
   // Reason: the gateway half of this file is still unwritten and stays
   // @unimplemented. It left LEGACY_INERT because the trail now enforces one

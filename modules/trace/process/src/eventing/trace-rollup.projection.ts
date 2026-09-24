@@ -3,6 +3,7 @@ import {
   AbstractMapProjection,
   type MapEventHandlers,
 } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
 import { Temporal, type Instant } from "@langwatch/time";
 import {
   ATTR_KEYS,
@@ -12,6 +13,7 @@ import {
 } from "@langwatch/trace-contract";
 
 import { type TraceSpanNormalization } from "../app/trace.members.ts";
+import { spanStorabilityOf, UNSTORABLE_SPAN_SKIPPED } from "../rules/storable-span-time.rules.ts";
 import type { SpanCostService } from "../services/span-cost.service.ts";
 
 /**
@@ -51,6 +53,8 @@ export interface TraceAnalyticsRollupRow {
   cacheWriteTokensSum: number;
   reasoningTokensSum: number;
 }
+
+const logger = createLogger("langwatch:trace-processing:trace-analytics-rollup-map");
 
 const spanEvents = [spanReceivedEventSchema] as const;
 
@@ -97,7 +101,17 @@ export class TraceAnalyticsRollupMapProjection
     return new TraceAnalyticsRollupMapProjection(deps);
   }
 
-  mapTraceSpanReceived(event: SpanReceivedEvent): TraceAnalyticsRollupRow {
+  mapTraceSpanReceived(event: SpanReceivedEvent): TraceAnalyticsRollupRow | null {
+    // Same gate as the spanStorage projection, for the same reason: normalization
+    // mints a KSUID over the span's start SECONDS and throws on a value the
+    // 48-bit field cannot hold. It would also file the row's minute bucket
+    // outside anything a read opens.
+    const storability = spanStorabilityOf({ event, consumer: this.name });
+    if (!storability.storable) {
+      logger.warn(storability.skip, UNSTORABLE_SPAN_SKIPPED);
+      return null;
+    }
+
     // Normalize the same way the trace-summary fold + spanStorage projection do,
     // so the rollup contribution matches the trace total to the cent. Reusing
     // the pipeline service guarantees we never drift from the canonical

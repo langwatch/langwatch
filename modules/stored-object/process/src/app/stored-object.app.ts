@@ -3,83 +3,70 @@
  * and they are not one operation: the portable capability answers metadata and
  * an async iterable, the byte surface needs the ROW. Each has its own name.
  */
-import type { Readable } from "node:stream";
-
+import { AuthzApi } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
-import { StoredObjectApi, storedObjectConfig } from "@langwatch/stored-object-contract";
-import type {
-  DeleteProjectStoredObjectsResult,
-  ReadStoredObjectResult,
-  StoreStoredObjectFromBytesInput,
-  StoreStoredObjectFromBytesResult,
-  StoredObjectFileRow,
-  StoredObjectHead,
-  StoredObjectIdDeriver,
-  StoredObjectMetadata,
-  StoredObjectOwnerResolver,
-  StoredObjectReference,
-  StoredObjectServerConfig,
-  StoredObjectsConfirmUploadInput,
-  StoredObjectsCreateUploadInput,
-  StoredObjectsCreateUploadOutput,
-  StoredObjectsDeleteInput,
-  StoredObjectsDeleteOutput,
-  StoredObjectsGetInput,
-  StoredObjectsGetOutput,
-  StoredObjectStorageDestination,
-  StoredObjectStorageUsage,
+import {
+  StoredObjectApi,
+  storedObjectConfig,
+  type WriteStoredObjectUploadInput,
+  type DeleteProjectStoredObjectsResult,
+  type ReadStoredObjectResult,
+  type StoreStoredObjectFromBytesInput,
+  type StoreStoredObjectFromBytesResult,
+  type StoredObjectHead,
+  type StoredObjectMetadata,
+  type StoredObjectOwnerResolver,
+  type StoredObjectReference,
+  type StoredObjectServerConfig,
+  type StoredObjectsConfirmUploadInput,
+  type StoredObjectsCreateUploadInput,
+  type StoredObjectsCreateUploadOutput,
+  type StoredObjectsDeleteInput,
+  type StoredObjectsDeleteOutput,
+  type StoredObjectsGetInput,
+  type StoredObjectsGetOutput,
+  type StoredObjectStorageDestination,
+  type StoredObjectStorageUsage,
 } from "@langwatch/stored-object-contract";
 
 import type { StoredObjectRepositories } from "../repositories/stored-object.repositories.ts";
-import { StoredObjectService } from "../services/stored-object.service.ts";
+import type { StoredObjectUploadSignerService } from "../services/stored-object-upload-signer.service.ts";
+import {
+  StoredObjectService,
+  type StoredObjectPermissions,
+} from "../services/stored-object.service.ts";
 import { buildStoredObjectInfrastructure } from "./stored-object-composition.build.ts";
 import type {
   StoredObjectDelivery,
+  StoredObjectFileReader,
+  StoredObjectFileStreamRead,
   StoredObjectStorage,
-  StoredObjectUploadTokenCodec,
 } from "./stored-object.members.ts";
-
-/**
- * The contract's byte read, narrowed to the Node stream this process's byte
- * backends hand over: `Readable` is an `AsyncIterable<Uint8Array>`, so the
- * narrower answer still satisfies the contract's `readById`.
- */
-export type StoredObjectFileStreamRead =
-  | { row: StoredObjectFileRow; stream: Readable }
-  | { row: StoredObjectFileRow; status: "missing" };
-
-/**
- * The stored-object reads the byte surface and the probe perform, as the
- * process supplies them. Separate from the portable capability because it is
- * shaped differently rather than merely narrower.
- */
-export interface StoredObjectFileReader {
-  headById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectHead>;
-  tryGetById(
-    input: Readonly<{ projectId: string; id: string }>,
-  ): Promise<StoredObjectFileStreamRead | null>;
-}
 
 export type StoredObjectInfrastructure = Readonly<{
   storage: StoredObjectStorage;
   delivery: StoredObjectDelivery;
-  uploadTokens: StoredObjectUploadTokenCodec;
-  idDeriver: StoredObjectIdDeriver;
+  /** Seals the local backend's upload URL (ADR-158 §4). */
+  signer: StoredObjectUploadSignerService;
   maximumUploadBytes: number;
   uploadExpiryMs: number;
-  /** The row-and-stream reads the byte surface and the probe perform. */
+  /** The legacy ClickHouse index, read when no Postgres row answers (ADR-158 §5). */
   files: StoredObjectFileReader;
   /** Which project owns an object, when the URL does not say. */
   owners: StoredObjectOwnerResolver;
 }>;
 
-/** {@link StoredObjectSetup}'s members, once built into what the app composes over. */
-type StoredObjectDependencies = Record<never, never>;
+type StoredObjectDependencies = Readonly<{
+  /** Holds a probe to the permission the object's purpose names, once the row is read. */
+  authz: typeof AuthzApi;
+}>;
 
-/** `nodeEnvironment` is the process's own fact (§6), for the Azure insecure-token-endpoint gate. */
-type StoredObjectMembers = Pick<ProcessMembers, "prisma" | "clickhouse" | "logger" | "secrets"> &
-  Readonly<{ nodeEnvironment: string | undefined }>;
+type StoredObjectMembers = Pick<
+  ProcessMembers,
+  "clickhouse" | "logger" | "objectStorage" | "encryption"
+> &
+  Readonly<{ publicBaseUrl: string | undefined }>;
 
 type StoredObjectSetup = FeatureSetup<
   StoredObjectDependencies,
@@ -90,10 +77,15 @@ type StoredObjectSetup = FeatureSetup<
 
 export class StoredObjectApp implements StoredObjectApi {
   static readonly contract = StoredObjectApi;
-  static readonly dependencies = {};
+  static readonly dependencies: StoredObjectDependencies = { authz: AuthzApi };
   static readonly config = storedObjectConfig;
-  /** Both names are from the process's vocabulary; boot refuses by name. */
-  static readonly reads = ["prisma", "clickhouse", "logger", "secrets", "nodeEnvironment"] as const;
+  static readonly reads = [
+    "clickhouse",
+    "logger",
+    "objectStorage",
+    "encryption",
+    "publicBaseUrl",
+  ] as const;
 
   /**
    * Builds this process's own {@link StoredObjectInfrastructure} from the
@@ -101,15 +93,12 @@ export class StoredObjectApp implements StoredObjectApi {
    * {@link StoredObjectApp.fromInfrastructure} does.
    */
   static create(setup: StoredObjectSetup): StoredObjectApp {
-    const infrastructure = buildStoredObjectInfrastructure({
-      members: setup.members,
-      config: setup.config,
-      resources: setup.resources,
-    });
+    const infrastructure = buildStoredObjectInfrastructure({ members: setup.members });
 
     return StoredObjectApp.fromInfrastructure({
       infrastructure,
       repositories: setup.repositories,
+      permissions: setup.dependencies.authz,
     });
   }
 
@@ -121,6 +110,7 @@ export class StoredObjectApp implements StoredObjectApi {
   static fromInfrastructure(setup: {
     infrastructure: StoredObjectInfrastructure;
     repositories: StoredObjectRepositories;
+    permissions: StoredObjectPermissions;
   }): StoredObjectApp {
     const { infrastructure: members, repositories } = setup;
 
@@ -129,27 +119,21 @@ export class StoredObjectApp implements StoredObjectApi {
         records: repositories.records,
         storage: members.storage,
         delivery: members.delivery,
-        uploadTokens: members.uploadTokens,
-        idDeriver: members.idDeriver,
+        signer: members.signer,
+        legacy: members.files,
+        permissions: setup.permissions,
         maximumUploadBytes: members.maximumUploadBytes,
         uploadExpiryMs: members.uploadExpiryMs,
       }),
-      members.files,
       members.owners,
     );
   }
 
   #storage: StoredObjectService;
-  #files: StoredObjectFileReader;
   #owners: StoredObjectOwnerResolver;
 
-  private constructor(
-    storedObjects: StoredObjectService,
-    files: StoredObjectFileReader,
-    owners: StoredObjectOwnerResolver,
-  ) {
+  private constructor(storedObjects: StoredObjectService, owners: StoredObjectOwnerResolver) {
     this.#storage = storedObjects;
-    this.#files = files;
     this.#owners = owners;
   }
 
@@ -173,16 +157,24 @@ export class StoredObjectApp implements StoredObjectApi {
     return this.#storage.delete(input);
   }
 
-  /** Whether an object's row AND its bytes exist. */
-  headById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectHead> {
-    return this.#files.headById(input);
+  /** Streams a local upload to disk once its seal checks out. */
+  writeUpload(input: WriteStoredObjectUploadInput): Promise<void> {
+    return this.#storage.writeUpload(input);
+  }
+
+  /** Whether an object's row AND its bytes exist, held to the permission its purpose names. */
+  headById(
+    input: Readonly<{ projectId: string; id: string }>,
+    by: Readonly<{ id: string }>,
+  ): Promise<StoredObjectHead> {
+    return this.#storage.headById(input, by);
   }
 
   /** One object's row and, when the bytes are there, a stream of them. */
   readById(
     input: Readonly<{ projectId: string; id: string }>,
   ): Promise<StoredObjectFileStreamRead | null> {
-    return this.#files.tryGetById(input);
+    return this.#storage.readById(input);
   }
 
   /**

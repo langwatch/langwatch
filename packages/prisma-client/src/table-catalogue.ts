@@ -924,6 +924,7 @@ export const prismaModelFieldCatalogue = {
     "status",
     "statusError",
     "stagingKey",
+    "sourceStoredObjectId",
     "uploadFilename",
     "rowCount",
     "sizeBytes",

@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ExperimentRunCollaborators } from "../../rules/experiment-run-input.rules.ts";
 import type { ConnectedDispatch } from "../experiment-connected-cell.service.ts";
 import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service.ts";
+import { createNoAttachmentsFixture } from "./experiment-attachments.fixture.ts";
 
 const createTestDataset = (rowCount = 3) =>
   Array.from({ length: rowCount }, (_, i) => ({
@@ -141,6 +142,7 @@ describe("given a run whose target is a connected agent", () => {
       datasetEntry: {},
     } as any;
     const ports = {
+      attachments: createNoAttachmentsFixture(),
       studio: { postEvent: async () => {} },
     } as unknown as ExperimentRunCollaborators;
     const workflows = {

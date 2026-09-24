@@ -331,6 +331,41 @@ describe("addressing a connected agent by name and environment", () => {
   });
 });
 
+describe("addressing another person's personal agent by name and environment", () => {
+  describe("when it is the only agent of that name in that environment", () => {
+    /** @scenario "A name and environment naming only another person's personal agent is refused as owner-only" */
+    it("refuses the run as owner-only, naming the owner, for a teammate and for no actor", async () => {
+      const agents = connectedAgentApi([
+        {
+          id: "agent_theirs",
+          name: "support-agent",
+          environment: "development",
+          ownerUserId: owner.id,
+        },
+      ]);
+      const { service, execute } = buildService(agents);
+
+      const asTeammate = await runAgainst({
+        service,
+        referenceId: "support-agent@development",
+        actor: teammate,
+      }).catch((error: unknown) => error);
+      const withoutActor = await runAgainst({
+        service,
+        referenceId: "support-agent@development",
+      }).catch((error: unknown) => error);
+
+      for (const failure of [asTeammate, withoutActor]) {
+        expect(failure).toMatchObject({
+          code: "agent_owner_only",
+          meta: { agentId: "agent_theirs", ownerUserId: owner.id, ownerName: "Owner Person" },
+        });
+      }
+      expect(execute).not.toHaveBeenCalled();
+    });
+  });
+});
+
 describe("given a connected target unseen for thirty one days", () => {
   describe("when the suite run is triggered", () => {
     /** @scenario "A connected agent unseen for thirty days is refused as a run target" */

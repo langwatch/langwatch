@@ -292,7 +292,7 @@ describe("registering an identity provider", () => {
       expect(host.acknowledgements).toEqual([
         {
           title: "Replacement registered",
-          description: "Your current sign-in keeps working until you switch traffic over.",
+          description: "Your current sign-in keeps working until you switch everyone over.",
         },
       ]);
     });

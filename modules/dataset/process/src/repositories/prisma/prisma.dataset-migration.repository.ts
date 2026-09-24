@@ -2,8 +2,8 @@ import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
 
-import type { DatasetStorageResolver } from "../../app/dataset.app.ts";
 import { StreamingChunkWriterService } from "../../services/dataset-chunk-writer.service.ts";
+import type { DatasetChunkRepository } from "../dataset-chunk.repository.ts";
 import {
   DATASET_MUTATION_TXN_MAX_WAIT_MS,
   DATASET_MUTATION_TXN_TIMEOUT_MS,
@@ -39,7 +39,7 @@ export type DatasetMigrationRunResult =
 export class PrismaDatasetMigrationRepository {
   static create(options: {
     database: PrismaClient;
-    storage: DatasetStorageResolver;
+    storage: DatasetChunkRepository;
   }): PrismaDatasetMigrationRepository {
     return new PrismaDatasetMigrationRepository(options);
   }
@@ -47,7 +47,7 @@ export class PrismaDatasetMigrationRepository {
   private constructor(
     private readonly options: {
       database: PrismaClient;
-      storage: DatasetStorageResolver;
+      storage: DatasetChunkRepository;
     },
   ) {}
 
@@ -83,7 +83,7 @@ export class PrismaDatasetMigrationRepository {
     }
 
     const baseline = await this.readFingerprint(this.options.database.datasetRecord, input);
-    const storage = await this.options.storage.forProject(input.projectId);
+    const storage = this.options.storage;
     const writer = StreamingChunkWriterService.create({
       storage,
       projectId: input.projectId,

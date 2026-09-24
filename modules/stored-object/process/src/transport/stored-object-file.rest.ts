@@ -20,33 +20,23 @@ import type { AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import {
+  FILE_VIEW_PERMISSIONS,
   isReadbackSafe,
+  type StoredObjectFileViewPermission,
   storedObjectFileRouteFilenameQuerySchema,
   storedObjectFileRouteIdParamsSchema,
+  storedObjectFileRouteNamedParamsSchema,
   storedObjectFileRouteScopedParamsSchema,
   StoredObjectOwnerLookupUnavailableError,
 } from "@langwatch/stored-object-contract";
 import { HTTPException } from "hono/http-exception";
 
-import type { StoredObjectFileStreamRead } from "#app/stored-object.app";
+import type { StoredObjectFileStreamRead } from "#app/stored-object.members";
+import { requiredPermissionForPurpose } from "#rules/stored-object-purpose-permission.rules";
 
 /** Per-caller rate limit on the read routes. */
 const FILES_RATE_LIMIT_WINDOW_SECONDS = 60;
 const FILES_RATE_LIMIT_MAX = 120;
-
-/**
- * Stored objects are shared by several features, and which permission guards a
- * read depends on what the object IS: trace media requires `traces:view`,
- * scenario media `scenarios:view`, and a custom role can hold either alone.
- */
-export const FILE_VIEW_PERMISSIONS = ["traces:view", "scenarios:view"] as const;
-
-/** The permission an object of one purpose is read behind. */
-export type StoredObjectFileViewPermission = (typeof FILE_VIEW_PERMISSIONS)[number];
-
-export function requiredPermissionForPurpose(purpose: string): StoredObjectFileViewPermission {
-  return purpose === "trace_content" ? "traces:view" : "scenarios:view";
-}
 
 /** The codes the permission check raises when it refuses the caller. */
 const DENIAL_CODES: ReadonlySet<string> = new Set([
@@ -146,6 +136,23 @@ export const storedObjectFileRest = defineRestRouter(StoredObjectFileApi)
   // publishes no operation. A project API key opens the SAME door.
   .withCredential("browser")
   .withAddressing("literal", { v1Twin: true })
+
+  // The last segment of a dataset attachment reference names the file, so the
+  // browser downloads it under its own name; the bytes are the scoped route's.
+  .get("/api/files/:projectId/:storedObjectId/:filename", "readNamedProjectStoredObjectBytes")
+  .withParams(storedObjectFileRouteNamedParamsSchema)
+  .withAccess(deferredScope({ reason: OWNER_RESOLVED_IN_HANDLER }))
+  .withRawResponse({ produces: SERVED_MEDIA_TYPES })
+  .methods(["GET", "HEAD"])
+  .handle(async ({ app, input, request }) =>
+    serveStoredObjectBytes({
+      app,
+      request,
+      id: input.storedObjectId,
+      claimedProjectId: input.projectId,
+      requestedFilename: input.filename,
+    }),
+  )
 
   .get("/api/files/:projectId/:storedObjectId", "readProjectStoredObjectBytes")
   .withParams(storedObjectFileRouteScopedParamsSchema)

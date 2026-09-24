@@ -11,7 +11,6 @@ import {
   StoredObjectNotFoundError,
   UploadTooLargeError,
   audienceForLegacyStoredObjectPurpose,
-  createStoredObjectsCreateUploadInputSchema,
   storedObjectIdentitySchema,
   storedObjectProblemSchema,
   storedObjectReferenceSchema,
@@ -45,14 +44,14 @@ describe("Stored Objects validation contract", () => {
         filename: "report.pdf",
         mediaType: "application/pdf",
         byteLength: 12,
-        sha256: SHA256,
+        purpose: "dataset_attachment",
       }),
     ).toEqual({
       projectId: "project_1",
       filename: "report.pdf",
       mediaType: "application/pdf",
       byteLength: 12,
-      sha256: SHA256,
+      purpose: "dataset_attachment",
     });
 
     expect(() =>
@@ -60,14 +59,13 @@ describe("Stored Objects validation contract", () => {
         filename: "report.pdf",
         mediaType: "application/pdf",
         byteLength: 12,
-        sha256: SHA256,
+        purpose: "dataset_attachment",
       }),
     ).toThrow(ZodError);
   });
 
   it.each([
-    ["uppercase digest", { sha256: "A".repeat(64) }],
-    ["short digest", { sha256: "a".repeat(63) }],
+    ["empty purpose", { purpose: "" }],
     ["negative byte length", { byteLength: -1 }],
     ["fractional byte length", { byteLength: 1.5 }],
     ["filename controls", { filename: "report\n.pdf" }],
@@ -80,7 +78,7 @@ describe("Stored Objects validation contract", () => {
         filename: "report.pdf",
         mediaType: "application/pdf",
         byteLength: 12,
-        sha256: SHA256,
+        purpose: "dataset_attachment",
         ...overrides,
       }),
     ).toThrow(ZodError);
@@ -93,7 +91,7 @@ describe("Stored Objects validation contract", () => {
         filename: "Cafe\u0301.pdf",
         mediaType: "application/pdf",
         byteLength: 12,
-        sha256: SHA256,
+        purpose: "dataset_attachment",
       }).filename,
     ).toBe("Café.pdf");
 
@@ -103,22 +101,9 @@ describe("Stored Objects validation contract", () => {
         filename: "é".repeat(128),
         mediaType: "application/pdf",
         byteLength: 12,
-        sha256: SHA256,
+        purpose: "dataset_attachment",
       }),
     ).toThrow(ZodError);
-  });
-
-  it("applies the runtime maximum through the contract schema factory", () => {
-    const schema = createStoredObjectsCreateUploadInputSchema(10);
-    expect(() =>
-      schema.parse({
-        projectId: "project_1",
-        filename: "report.pdf",
-        mediaType: "application/pdf",
-        byteLength: 11,
-        sha256: SHA256,
-      }),
-    ).toThrow(/must not exceed 10/u);
   });
 });
 

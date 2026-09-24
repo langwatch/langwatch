@@ -4,9 +4,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   FixedStoredObjectDelivery,
+  GrantedStoredObjectPermissions,
+  MemoryStoredObjectFiles,
   MemoryStoredObjectStorage,
-  MemoryStoredObjectTokens,
-  STORED_OBJECT_TEST_SHA256 as sha256,
+  createStoredObjectTestSigner,
 } from "../../app/__tests__/stored-object.fixture.ts";
 import { MemoryStoredObjectRecordRepository } from "../../repositories/memory/memory.stored-object-record.repository.ts";
 import { StoredObjectService } from "../stored-object.service.ts";
@@ -16,45 +17,21 @@ function fixture() {
   const storage = new MemoryStoredObjectStorage();
   const service = StoredObjectService.create({
     records,
+    permissions: new GrantedStoredObjectPermissions(),
     storage,
-    uploadTokens: new MemoryStoredObjectTokens(),
+    signer: createStoredObjectTestSigner(),
+    legacy: new MemoryStoredObjectFiles(),
     delivery: new FixedStoredObjectDelivery(),
-    idDeriver: {
-      fromDigest: ({ sha256: digest }) => `so_${digest.slice(0, 8)}`,
-    },
     maximumUploadBytes: 1024,
     uploadExpiryMs: 300_000,
     now: () => Temporal.Instant.from("2026-08-22T00:00:00.000Z"),
-    operationId: () => "upload_1",
+    newId: () => "so_aaaaaaaa",
   });
 
   return { service, storage, records };
 }
 
 describe("StoredObjectService", () => {
-  it("stores internal bytes once in the single row store", async () => {
-    const { service, records } = fixture();
-    const input = {
-      projectId: "project_1",
-      filename: "input.bin",
-      mediaType: "application/octet-stream",
-      audience: "project:view" as const,
-      purpose: "test",
-      ownerKind: "test",
-      ownerId: "test_1",
-      bytes: new Uint8Array([1, 2, 3]),
-    };
-
-    const first = await service.storeFromBytes(input);
-    const second = await service.storeFromBytes(input);
-
-    expect(first.isDuplicate).toBe(false);
-    expect(second.isDuplicate).toBe(true);
-    await expect(
-      records.findById({ tenantId: "project_1", id: first.reference.id }),
-    ).resolves.toMatchObject({ status: "available", generation: 1 });
-  });
-
   it("persists a pending upload and confirms it in the same row", async () => {
     const { service, records } = fixture();
     const created = await service.createUpload({
@@ -62,9 +39,9 @@ describe("StoredObjectService", () => {
       filename: "input.bin",
       mediaType: "application/octet-stream",
       byteLength: 3,
-      sha256,
+      purpose: "dataset_attachment",
     });
-    expect(created.status).toBe("pending");
+    expect(created).toMatchObject({ objectId: "so_aaaaaaaa", method: "PUT" });
     await expect(
       records.findById({ tenantId: "project_1", id: "so_aaaaaaaa" }),
     ).resolves.toMatchObject({
@@ -74,7 +51,7 @@ describe("StoredObjectService", () => {
 
     const confirmed = await service.confirmUpload({
       projectId: "project_1",
-      uploadToken: "token",
+      objectId: created.objectId,
     });
     expect(confirmed.id).toBe("so_aaaaaaaa");
     await expect(

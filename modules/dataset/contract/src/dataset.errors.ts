@@ -3,25 +3,26 @@
  * These are framework-agnostic and can be mapped to tRPC/HTTP errors in the router layer.
  */
 import { HandledError } from "@langwatch/handled-error";
+import { REFUSED_ATTACHMENT_MEDIA_TYPES } from "@langwatch/stored-object-contract";
 
-export class UploadValidationError extends Error {
-  readonly kind:
-    | "column_mismatch"
-    | "file_too_large"
-    | "row_limit_exceeded"
-    | "empty_file"
-    | "unsupported_format";
+export type UploadRefusal =
+  | "column_mismatch"
+  | "file_too_large"
+  | "row_limit_exceeded"
+  | "empty_file"
+  | "unsupported_format";
 
-  constructor(
-    message: string,
-    kind:
-      | "column_mismatch"
-      | "file_too_large"
-      | "row_limit_exceeded"
-      | "empty_file"
-      | "unsupported_format",
-  ) {
-    super(message);
+/** A posted or imported file the dataset cannot take; too large or too long is a 400. */
+export class UploadValidationError extends HandledError {
+  declare readonly code: "validation_error";
+  readonly kind: UploadRefusal;
+
+  constructor(message: string, kind: UploadRefusal) {
+    super("validation_error", message, {
+      httpStatus: kind === "file_too_large" || kind === "row_limit_exceeded" ? 400 : 422,
+      fault: "customer",
+      meta: { fieldErrors: { file: [message] } },
+    });
     this.name = "UploadValidationError";
     this.kind = kind;
   }
@@ -186,47 +187,13 @@ export class InvalidColumnError extends Error {
   }
 }
 
-/**
- * Thrown when direct browser→S3 upload isn't available because object storage
- * isn't configured (e.g. single-node self-hosted). The caller should fall back
- * to the backend multipart upload path.
- */
-export class DirectUploadUnavailableError extends Error {
-  constructor(message = "Direct upload is unavailable; use the backend upload path") {
-    super(message);
-    this.name = "DirectUploadUnavailableError";
-  }
-}
+/** Thrown when a retry names a dataset that has no failed or stuck import to run again. */
+export class UploadNotPendingError extends HandledError {
+  declare readonly code: "dataset_upload_not_pending";
 
-/** Thrown when a finalized direct upload exceeds the hard size cap. */
-export class UploadTooLargeError extends Error {
-  constructor(message = "Uploaded file exceeds the maximum allowed size") {
-    super(message);
-    this.name = "UploadTooLargeError";
-  }
-}
-
-/**
- * Thrown when finalize is called on a dataset that is not in the `uploading`
- * state (e.g. re-finalizing a `processing`/`ready` dataset). Blocks finalize
- * replay; the route maps it to 409 Conflict.
- */
-export class UploadNotPendingError extends Error {
   constructor(message = "Upload is not pending finalization") {
-    super(message);
+    super("dataset_upload_not_pending", message, { httpStatus: 409, fault: "customer" });
     this.name = "UploadNotPendingError";
-  }
-}
-
-/**
- * Thrown when the staged object a finalize references is missing or incomplete (never uploaded,
- * NoSuchKey/NotFound, or a HEAD with no ContentLength). The route maps it to 422; the dataset
- * is flipped to `failed` so a never-completed upload doesn't sit stuck in `uploading`.
- */
-export class StagedUploadNotFoundError extends Error {
-  constructor(message = "Uploaded object not found") {
-    super(message);
-    this.name = "StagedUploadNotFoundError";
   }
 }
 
@@ -383,26 +350,85 @@ export class DatasetChunkCountMissingError extends Error {
   }
 }
 
-/**
- * The local-FS storage root is not writable (EACCES/EROFS/EPERM) — born-on- storage made a
- * writable backend mandatory, so this is a deployment-config error, not a transient failure.
- * fix, so per ADR-045 it crosses the boundary as a handled error under
- */
-export class StorageNotWritableError extends HandledError {
-  declare readonly code: "storage_not_writable";
-
-  constructor() {
-    super("storage_not_writable", "Dataset storage is not writable, so nothing was saved", {
-      httpStatus: 500,
-      fault: "platform",
-    });
-    this.name = "StorageNotWritableError";
-  }
-}
-
 export class DatasetRecordNotFoundError extends Error {
   constructor(message = "Dataset record not found") {
     super(message);
     this.name = "DatasetRecordNotFoundError";
+  }
+}
+
+/** The file is over the ceiling; `meta.maxBytes` is the number the copy shows. */
+export class DatasetAttachmentTooLargeError extends HandledError {
+  declare readonly code: "dataset_attachment_too_large";
+
+  constructor(maxBytes: number) {
+    super("dataset_attachment_too_large", "Dataset attachment is over the size ceiling", {
+      meta: { maxBytes },
+      httpStatus: 413,
+      fault: "customer",
+    });
+    this.name = "DatasetAttachmentTooLargeError";
+  }
+}
+
+/** The file is of a type a browser can run; `meta.refused` is our own list, not customer input. */
+export class DatasetAttachmentTypeRefusedError extends HandledError {
+  declare readonly code: "dataset_attachment_type_refused";
+
+  constructor(mediaType: string) {
+    super("dataset_attachment_type_refused", "Dataset attachment media type is not accepted", {
+      meta: { mediaType, refused: [...REFUSED_ATTACHMENT_MEDIA_TYPES] },
+      httpStatus: 415,
+      fault: "customer",
+    });
+    this.name = "DatasetAttachmentTypeRefusedError";
+  }
+}
+
+/** A file the row names that the run cannot read; `meta.fileName` tells the reader which cell. */
+export class DatasetAttachmentUnavailableError extends HandledError {
+  declare readonly code: "dataset_attachment_unavailable";
+
+  constructor(fileName: string) {
+    super("dataset_attachment_unavailable", `The attachment "${fileName}" could not be read.`, {
+      httpStatus: 400,
+      fault: "customer",
+      meta: { fileName },
+    });
+    this.name = "DatasetAttachmentUnavailableError";
+  }
+}
+
+export type DatasetStoredObjectRefusal =
+  | "not_found"
+  | "not_confirmed"
+  | "wrong_purpose"
+  | "unsupported_format";
+
+/** A cell names a stored file this dataset cannot hold (ADR-158 §6). */
+export class DatasetAttachmentReferenceRefusedError extends HandledError {
+  declare readonly code: "dataset_attachment_reference_refused";
+
+  constructor(input: { reason: DatasetStoredObjectRefusal; column: string }) {
+    super("dataset_attachment_reference_refused", "A cell holds a file that is not available", {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { reason: input.reason, column: input.column },
+    });
+    this.name = "DatasetAttachmentReferenceRefusedError";
+  }
+}
+
+/** The file a dataset is built from is missing, unconfirmed or not a dataset import. */
+export class DatasetImportSourceRefusedError extends HandledError {
+  declare readonly code: "dataset_import_source_refused";
+
+  constructor(reason: DatasetStoredObjectRefusal) {
+    super("dataset_import_source_refused", "The file is not available as a dataset import", {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { reason },
+    });
+    this.name = "DatasetImportSourceRefusedError";
   }
 }

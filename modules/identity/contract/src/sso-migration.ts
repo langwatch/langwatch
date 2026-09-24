@@ -55,12 +55,24 @@ export type SsoMigrationAuthenticationDecision =
   | { action: "continue" }
   | { action: "reject"; code: SsoMigrationAuthenticationRefusalCode };
 
+/**
+ * Whether the replacement recognises a member by address. `matched` members
+ * move across at their next sign-in; every other value names why the
+ * replacement will not recognise them. None of them holds the update.
+ */
+export type SsoMigrationMemberMove =
+  | "matched"
+  | "no-address"
+  | "shared-address"
+  | "unproved-domain";
+
 /** A member who still holds no identifier on the replacement. */
 export interface SsoMigrationStragglerView {
   userId: string;
   name: string | null;
   email: string | null;
   lastLegacyAuthenticationAtMs: number | null;
+  move: SsoMigrationMemberMove;
 }
 
 /** One reason finalizing would be premature, in the words the reader acts on. */
@@ -69,7 +81,7 @@ export interface SsoMigrationBlockerView {
   message: string;
 }
 
-/** Whether directory provisioning still points at the connection being retired. */
+/** Whether directory provisioning is on the replacement, or still has to be repointed. */
 export type SsoMigrationScimStatus = "not-applicable" | "needs-repointing" | "ready";
 
 /**
@@ -96,11 +108,15 @@ export interface SsoMigrationView {
   members: {
     activeCount: number;
     linkedCount: number;
+    /** Members the replacement will match at their next sign-in. */
+    nextSignInCount: number;
     stragglers: SsoMigrationStragglerView[];
     nextCursor: string | null;
   };
   quietPeriod: {
     lastLegacyAuthenticationAtMs: number | null;
+    /** When finishing opens, or null before sign-in is switched over. */
+    clearsAtMs: number | null;
     complete: boolean;
   };
   scim: { status: SsoMigrationScimStatus };

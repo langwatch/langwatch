@@ -2,7 +2,7 @@
  * The derived-block dispatcher — one stamped `langy-card` part in, the card it
  * validates as out (ADR-060 §3).
  */
-import { Box, Button, Grid, Table, Text } from "@chakra-ui/react";
+import { Box, Grid, Table, Text } from "@chakra-ui/react";
 import { MeterBar } from "@langwatch/design-system/meter-bar";
 import type {
   LangyCardHint,
@@ -17,6 +17,7 @@ import { ArrowUpRight, BadgeCheck } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { formatStatFigure, isComparableSeries } from "../../../model/langy-stat-figure.ts";
+import { LangyCardActionChip } from "../../elements/langy-card-action-chip.tsx";
 import { StreamingStatCard } from "../streaming-stat-card.tsx";
 import { LangyChoicesCard, type ChoicesRefRow } from "./langy-choices-card.tsx";
 import { LangyDerivedCardFrame } from "./langy-derived-card-frame.tsx";
@@ -328,9 +329,12 @@ function bindHints({
     // can actually route the request (live conversation, not time travel).
     if (onVerify) {
       chips.push(
-        <Button key="verify" size="xs" variant="outline" onClick={() => onVerify({ card })}>
-          <BadgeCheck size={12} /> Verify with a real query
-        </Button>,
+        <LangyCardActionChip
+          key="verify"
+          label="Verify with a real query"
+          icon={<BadgeCheck size={12} />}
+          onClick={() => onVerify({ card })}
+        />,
       );
     }
   }

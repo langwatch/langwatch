@@ -4,11 +4,15 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { Experiment, ExperimentApi } from "@langwatch/experiment-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
+import { memoryObjectStorage } from "@langwatch/process-stores";
+import type { ObjectStorage } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { vi } from "vitest";
 
 import type { DatasetRepositories } from "../../repositories/dataset.repositories.ts";
 import { MemoryDatasetRepositories } from "../../repositories/memory/memory.dataset.repositories.ts";
+import { DatasetAttachmentReferenceService } from "../../services/dataset-attachment-reference.service.ts";
 import { DatasetRequestBoundsService } from "../../services/dataset-request-bounds.service.ts";
 import type { DatasetInfrastructure } from "../dataset.app.ts";
 import { DatasetApp } from "../dataset.app.ts";
@@ -88,16 +92,25 @@ export function createDatasetTestRequestBounds(
   });
 }
 
+/** The reference check a `DatasetService` test constructs with; unscripted reads throw by name. */
+export function createDatasetTestAttachments(
+  storedObjects: StoredObjectApi = createApiFixture<StoredObjectApi>({}, "storedObjects"),
+): DatasetAttachmentReferenceService {
+  return DatasetAttachmentReferenceService.create({ storedObjects });
+}
+
 export function createDatasetTestApp(
   input: Readonly<{
     repositories?: DatasetRepositories;
     members?: DatasetInfrastructure;
+    objectStorage?: ObjectStorage;
     publicBaseUrl?: string;
     dependencies?: Partial<{
       experiments: ExperimentApi;
       permissions: AuthzApi;
       projects: ProjectApi;
       entitlement: EntitlementApi;
+      storedObjects: StoredObjectApi;
     }>;
   }> = {},
 ): DatasetApp {
@@ -108,8 +121,14 @@ export function createDatasetTestApp(
       permissions: input.dependencies?.permissions ?? createDatasetTestAuthz(),
       projects: input.dependencies?.projects ?? createDatasetTestProjects(),
       entitlement: input.dependencies?.entitlement ?? createDatasetTestEntitlement(),
+      storedObjects:
+        input.dependencies?.storedObjects ?? createApiFixture<StoredObjectApi>({}, "storedObjects"),
     },
-    members: { ...input.members, publicBaseUrl: input.publicBaseUrl },
+    members: {
+      ...input.members,
+      objectStorage: input.objectStorage ?? memoryObjectStorage(),
+      publicBaseUrl: input.publicBaseUrl,
+    },
     config: undefined,
     resources: new ResourceScope(),
     secrets: {} as never,

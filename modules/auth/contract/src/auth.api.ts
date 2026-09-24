@@ -167,6 +167,14 @@ export interface AuthApi {
    * them asks rather than reading them (ADR-129).
    */
   findFederatedAccountProviders(input: { userId: string }): Promise<string[]>;
+  /**
+   * Whether this person still owes the single sign-on their address's
+   * organization pins, asked of the accounts they hold now: live, never stored.
+   */
+  getSsoSetupStatus(input: {
+    userId: string;
+    email: string;
+  }): Promise<{ pendingSsoSetup: boolean }>;
   /** The organization's two sign-in security rules, all zero when unset. */
   getSignInSecuritySettings(input: { organizationId: string }): Promise<SignInSecuritySettings>;
   /**
@@ -190,6 +198,9 @@ export interface AuthApi {
 export interface LegacySsoAccessQuery {
   organizationId: string;
   connectionId: string;
+  /** Members whose legacy account is still their only way in: theirs is kept
+   *  and not counted, and the replacement matches them at their next sign-in. */
+  strandedUserIds: readonly string[];
 }
 
 /**

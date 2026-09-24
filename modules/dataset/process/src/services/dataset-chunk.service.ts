@@ -4,10 +4,10 @@
  * advisory lock (Decision 9 / I-COUNT); this class keeps append, edit and locate.
  */
 
-import { type DatasetColumns } from "@langwatch/dataset-contract";
+import { type Dataset, type DatasetColumns } from "@langwatch/dataset-contract";
 import { createLogger } from "@langwatch/observability";
 
-import { type DatasetStorage } from "../app/dataset.app.ts";
+import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
 import {
   type ChunkLine,
@@ -40,7 +40,7 @@ type EditTarget = {
   projectId: string;
   recordId: string;
   entry: unknown;
-  storage: DatasetStorage;
+  storage: DatasetChunkRepository;
 };
 
 /**
@@ -81,12 +81,12 @@ export class DatasetChunkService {
     datasetId: string;
     entries: unknown[];
     forcedIds?: (string | undefined)[];
-    storage: DatasetStorage;
+    storage: DatasetChunkRepository;
   }): Promise<ChunkedDatasetMeta> {
     const datasetStorage = storage;
 
     const lines = toChunkLines(entries, { forcedIds });
-    let written: Awaited<ReturnType<DatasetStorage["writeChunks"]>>;
+    let written: Awaited<ReturnType<DatasetChunkRepository["writeChunks"]>>;
     try {
       written = await datasetStorage.writeChunks({
         projectId,
@@ -128,7 +128,7 @@ export class DatasetChunkService {
   }: {
     projectId: string;
     datasetId: string;
-    storage: DatasetStorage;
+    storage: DatasetChunkRepository;
   }): Promise<void> {
     const datasetStorage = storage;
     await datasetStorage.deleteChunksFrom({ projectId, datasetId, fromIndex: 0 });
@@ -150,7 +150,7 @@ export class DatasetChunkService {
     projectId: string;
     entries: unknown[];
     forcedIds?: (string | undefined)[];
-    storage: DatasetStorage;
+    storage: DatasetChunkRepository;
   }): Promise<{ appended: number }> {
     const datasetStorage = storage;
 
@@ -185,7 +185,7 @@ export class DatasetChunkService {
     projectId: string;
     recordId: string;
     entry: unknown;
-    storage: DatasetStorage;
+    storage: DatasetChunkRepository;
   }): Promise<{ updated: boolean }> {
     const datasetStorage = storage;
 
@@ -341,7 +341,7 @@ export class DatasetChunkService {
     dataset: DatasetMutationRecord;
     projectId: string;
     recordIds: string[];
-    storage: DatasetStorage;
+    storage: DatasetChunkRepository;
   }): Promise<{ deleted: number }> {
     return this.deletes.deleteRecords(input);
   }
@@ -354,7 +354,7 @@ export class DatasetChunkService {
   recomputeCounts(input: {
     datasetId: string;
     projectId: string;
-    storage: DatasetStorage;
+    storage: DatasetChunkRepository;
   }): Promise<RecomputedDatasetCounts> {
     return this.maintenance.recomputeCounts(input);
   }
@@ -371,7 +371,7 @@ export class DatasetChunkService {
     newColumnTypes: DatasetColumns;
     name: string;
     slug: string;
-    storage: DatasetStorage;
+    storage: DatasetChunkRepository;
   }): Promise<DatasetMutationRecord> {
     return this.maintenance.migrateColumns(input);
   }
@@ -393,7 +393,7 @@ export class DatasetChunkService {
     current: DatasetMutationRecord;
     projectId: string;
     entries: unknown[];
-    storage: DatasetStorage;
+    storage: DatasetChunkRepository;
     forcedIds?: (string | undefined)[];
   }): Promise<{ appended: number }> {
     const lines = toChunkLines(entries, { forcedIds });
@@ -430,6 +430,35 @@ export class DatasetChunkService {
     return { appended: lines.length };
   }
 
+  /** The entries of the named rows, read chunk by chunk until every id is found. */
+  async findEntries({
+    dataset,
+    projectId,
+    ids,
+    storage,
+  }: {
+    dataset: Pick<Dataset, "id" | "chunkCount">;
+    projectId: string;
+    ids: readonly string[];
+    storage: DatasetChunkRepository;
+  }): Promise<Record<string, unknown>[]> {
+    const remaining = new Set(ids);
+    const entries: Record<string, unknown>[] = [];
+    const chunkCount = dataset.chunkCount ?? 0;
+    for (let index = 0; index < chunkCount && remaining.size > 0; index++) {
+      const rows = await storage.readChunk({ projectId, datasetId: dataset.id, index });
+      for (const line of rows) {
+        if (!isChunkLine(line) || !remaining.has(line.id)) continue;
+        remaining.delete(line.id);
+        if (typeof line.entry === "object" && line.entry !== null) {
+          entries.push({ ...line.entry });
+        }
+      }
+    }
+
+    return entries;
+  }
+
   /**
    * Pre-lock locate scan (no lock held): finds which chunk holds each of `ids`.
    * A HINT, never authoritative — the caller re-validates under the lock and
@@ -442,7 +471,7 @@ export class DatasetChunkService {
     ids,
     chunkCount,
   }: {
-    storage: DatasetStorage;
+    storage: DatasetChunkRepository;
     projectId: string;
     datasetId: string;
     ids: Set<string>;

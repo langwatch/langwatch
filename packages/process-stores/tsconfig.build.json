@@ -24,6 +24,9 @@
       "path": "../group-queue/tsconfig.build.json"
     },
     {
+      "path": "../handled-error/tsconfig.build.json"
+    },
+    {
       "path": "../kernel/tsconfig.build.json"
     },
     {
@@ -40,6 +43,9 @@
     },
     {
       "path": "../secrets/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
     }
   ]
 }

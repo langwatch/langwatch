@@ -1,3 +1,4 @@
+import type { ScimSsoMigrationSubscriberService } from "@langwatch/enterprise-scim-contract";
 import {
   defineAggregate,
   defineEvents,
@@ -14,6 +15,7 @@ import {
   CONNECTION_TORN_DOWN_EVENT_TYPE,
   DOMAIN_PROOF_LAPSED_EVENT_TYPE,
   DOMAIN_PROOF_WAVERED_EVENT_TYPE,
+  MIGRATION_FINALIZED_EVENT_TYPE,
   SSO_CONNECTION_EVENT_TYPES,
   TEARDOWN_REQUESTED_EVENT_TYPE,
   SSO_CONNECTION_AGGREGATE_TYPE,
@@ -123,6 +125,8 @@ export interface SsoConnectionPipelineDeps {
   teardown: ConnectionTeardown;
   /** Who is told when a verified domain's evidence goes missing (ADR-123). */
   proofNotifications: SsoDomainProofNotifications;
+  /** Moves directory sync onto the replacement once a migration finishes. */
+  directorySync: ScimSsoMigrationSubscriberService;
 }
 
 /**
@@ -166,6 +170,16 @@ export class SsoConnectionPipelineDefinitionAdapter {
       .withProcessManager(SSO_DOMAIN_PROOF_NOTIFICATION_PROCESS_NAME, (pm) =>
         mountDomainProofNotification(pm, deps.proofNotifications),
       )
+      .withEventSubscriber("scimDirectoryMove", {
+        events: [MIGRATION_FINALIZED_EVENT_TYPE],
+        handler: async (event, context) => {
+          if (event.type !== MIGRATION_FINALIZED_EVENT_TYPE) return;
+          await deps.directorySync.handleMigrationFinalized(
+            { data: { connectionId: event.data.connectionId } },
+            { tenantId: context.tenantId },
+          );
+        },
+      })
       .build();
   }
 }

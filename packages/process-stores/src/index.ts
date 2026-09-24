@@ -14,14 +14,18 @@ export {
   type MailMessage,
   type MemberName,
   type MembersRead,
+  type ObjectBodyFacts,
+  type ObjectDigest,
   type ObjectStorage,
+  type ObjectStorageDestination,
   type ProcessMembers,
   type RateLimitDecision,
   type RateLimiter,
   type SecretResolver,
-  type StoredObject,
+  type SignedObjectUpload,
   type StoredObjectAddress,
   type Telemetry,
+  type UploadFacts,
 } from "./members.ts";
 export {
   createProcessMembers,
@@ -40,6 +44,8 @@ export type {
   MailConfig,
   MailProvider,
   ObjectStorageAccount,
+  ObjectStorageAzureConfig,
+  ObjectStorageAzureIdentity,
   ObjectStorageConfig,
   ObjectStoragePrivateAccount,
   OutboundProxyConfig,
@@ -56,7 +62,16 @@ export {
   prismaTenantDirectory,
   type TenantDirectory,
 } from "./tenant-directory.ts";
-export { UnknownStorageProjectError } from "./object-storage-member.ts";
+export {
+  ObjectBodyShortError,
+  ObjectBodyTooLargeError,
+  StoredObjectNotFoundError,
+  UnknownStorageProjectError,
+} from "./object-storage-backend.ts";
+export {
+  AzureBackendMisconfiguredError,
+  AzureTokenExchangeError,
+} from "./object-storage-azure-credentials.ts";
 
 export { hostedMembers } from "./hosted-members.ts";
 
@@ -67,3 +82,4 @@ export {
   ConsumerPipelines,
 } from "./pipeline-selection.ts";
 export { openProcessStores } from "./open-stores.ts";
+export { memoryObjectStorage } from "./object-storage-memory.ts";

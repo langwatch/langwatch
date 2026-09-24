@@ -1,11 +1,12 @@
+import type { StoredObjectReference } from "@langwatch/stored-object-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  DatasetNameConflictError,
   runWithConcurrency,
   type UploadSingleFileDeps,
   uploadSingleFile,
 } from "../bulk-upload-orchestrator.ts";
-import { DatasetNameConflictError } from "../direct-upload.ts";
 
 const deferred = () => {
   let resolve!: () => void;
@@ -62,18 +63,28 @@ describe("runWithConcurrency", () => {
 
 const file = (name = "data.csv") => new File(["a,b\n1,2\n"], name);
 
-const makeDeps = (overrides: Partial<UploadSingleFileDeps> = {}): UploadSingleFileDeps => ({
-  requestDirectUpload: vi.fn().mockResolvedValue({
-    datasetId: "dataset_1",
-    slug: "data",
-    uploadUrl: "https://s3.example/put",
-  }),
-  putFileToPresignedUrl: vi.fn().mockResolvedValue(undefined),
-  finalizeDirectUpload: vi.fn().mockResolvedValue({
-    datasetId: "dataset_1",
-    status: "processing",
-  }),
-  abortPendingUpload: vi.fn().mockResolvedValue(undefined),
+const reference: StoredObjectReference = {
+  projectId: "p1",
+  id: "so_1",
+  sha256: "a".repeat(64),
+  byteLength: 8,
+  filename: "data.csv",
+  mediaType: "text/csv",
+  audience: "datasets:view",
+};
+
+const nameTaken = () =>
+  Object.assign(new Error("dataset_name_taken"), {
+    data: { error: { code: "dataset_name_taken", httpStatus: 409, meta: {} } },
+  });
+
+const makeDeps = (overrides: Partial<UploadSingleFileDeps> = {}) => ({
+  uploadStoredObject: vi
+    .fn<UploadSingleFileDeps["uploadStoredObject"]>()
+    .mockResolvedValue(reference),
+  createFromStoredObject: vi
+    .fn<UploadSingleFileDeps["createFromStoredObject"]>()
+    .mockResolvedValue({ datasetId: "dataset_1", slug: "data", status: "processing" }),
   ...overrides,
 });
 
@@ -82,7 +93,7 @@ describe("uploadSingleFile", () => {
 
   describe("given the happy path", () => {
     /** @scenario Large files do not freeze the app while uploading */
-    it("creates, uploads, and finalizes, streaming the raw File (never read into memory)", async () => {
+    it("uploads the raw File once, then creates the dataset from it", async () => {
       const deps = makeDeps();
       const theFile = file();
       const result = await uploadSingleFile(
@@ -90,78 +101,79 @@ describe("uploadSingleFile", () => {
         deps,
       );
       expect(result).toEqual({ datasetId: "dataset_1", finalName: "data" });
-      // The raw File is handed to the PUT as-is — never read into an ArrayBuffer
-      // first — so a multi-GB file streams without freezing the tab.
-      expect(deps.putFileToPresignedUrl).toHaveBeenCalledTimes(1);
-      const putCall = (deps.putFileToPresignedUrl as ReturnType<typeof vi.fn>).mock.calls[0]!;
-      expect(putCall[0]).toBe("https://s3.example/put");
-      expect(putCall[1]).toBe(theFile);
-      expect(deps.finalizeDirectUpload).toHaveBeenCalledWith({
+      // The raw File goes to the upload as-is, never read into memory first.
+      expect(deps.uploadStoredObject).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: "p1", purpose: "dataset_import", file: theFile }),
+      );
+      expect(deps.createFromStoredObject).toHaveBeenCalledWith({
         projectId: "p1",
-        datasetId: "dataset_1",
+        name: "data",
+        storedObjectId: "so_1",
+        columnTypes: undefined,
       });
-      expect(deps.abortPendingUpload).not.toHaveBeenCalled();
     });
   });
 
-  describe("when the name conflicts (the batch-name race)", () => {
-    it("bumps the name and retries the create without reaping anything", async () => {
-      const requestDirectUpload = vi
-        .fn()
-        .mockRejectedValueOnce(new DatasetNameConflictError())
-        .mockResolvedValueOnce({
-          datasetId: "dataset_2",
-          slug: "data-1",
-          uploadUrl: "https://s3.example/put",
-        });
-      const deps = makeDeps({ requestDirectUpload });
+  describe("when the name is taken (the batch-name race)", () => {
+    it("bumps the name and creates again from the same upload", async () => {
+      const createFromStoredObject = vi
+        .fn<UploadSingleFileDeps["createFromStoredObject"]>()
+        .mockRejectedValueOnce(nameTaken())
+        .mockResolvedValueOnce({ datasetId: "dataset_2", slug: "data-1", status: "processing" });
+      const deps = makeDeps({ createFromStoredObject });
 
       const result = await uploadSingleFile(
         { projectId: "p1", name: "data", file: file(), nextName: bump },
         deps,
       );
 
-      expect(result.finalName).toBe("data (1)");
-      expect(requestDirectUpload).toHaveBeenCalledTimes(2);
-      expect(requestDirectUpload.mock.calls[1]![0]).toMatchObject({
-        name: "data (1)",
-      });
-      // A conflict means no row was created, so nothing to reap.
-      expect(deps.abortPendingUpload).not.toHaveBeenCalled();
+      expect(result).toEqual({ datasetId: "dataset_2", finalName: "data (1)" });
+      expect(createFromStoredObject.mock.calls[1]![0]).toMatchObject({ name: "data (1)" });
+      expect(deps.uploadStoredObject).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe("when the upload fails after the row was created", () => {
-    it("reaps the pending row and rethrows", async () => {
-      const putFileToPresignedUrl = vi.fn().mockRejectedValue(new Error("CORS"));
-      const deps = makeDeps({ putFileToPresignedUrl });
+  describe("when every candidate name is taken", () => {
+    it("gives up with DatasetNameConflictError", async () => {
+      const createFromStoredObject = vi
+        .fn<UploadSingleFileDeps["createFromStoredObject"]>()
+        .mockRejectedValue(nameTaken());
+      const deps = makeDeps({ createFromStoredObject });
+
+      await expect(
+        uploadSingleFile({ projectId: "p1", name: "data", file: file(), nextName: bump }, deps),
+      ).rejects.toBeInstanceOf(DatasetNameConflictError);
+    });
+  });
+
+  describe("when the upload fails", () => {
+    it("rethrows and creates no dataset", async () => {
+      const uploadStoredObject = vi
+        .fn<UploadSingleFileDeps["uploadStoredObject"]>()
+        .mockRejectedValue(new Error("CORS"));
+      const deps = makeDeps({ uploadStoredObject });
 
       await expect(
         uploadSingleFile({ projectId: "p1", name: "data", file: file(), nextName: bump }, deps),
       ).rejects.toThrow("CORS");
-
-      expect(deps.abortPendingUpload).toHaveBeenCalledWith({
-        projectId: "p1",
-        datasetId: "dataset_1",
-      });
-      expect(deps.finalizeDirectUpload).not.toHaveBeenCalled();
+      expect(deps.createFromStoredObject).not.toHaveBeenCalled();
     });
   });
 
-  describe("when the upload is cancelled mid-flight", () => {
-    it("reaps the pending row and rethrows the abort", async () => {
-      const abortError = new Error("aborted");
-      abortError.name = "AbortError";
-      const putFileToPresignedUrl = vi.fn().mockRejectedValue(abortError);
-      const deps = makeDeps({ putFileToPresignedUrl });
+  describe("when the dataset refuses the source file", () => {
+    it("rethrows the refusal without retrying under another name", async () => {
+      const refused = Object.assign(new Error("dataset_import_source_refused"), {
+        data: { error: { code: "dataset_import_source_refused", httpStatus: 422, meta: {} } },
+      });
+      const createFromStoredObject = vi
+        .fn<UploadSingleFileDeps["createFromStoredObject"]>()
+        .mockRejectedValue(refused);
+      const deps = makeDeps({ createFromStoredObject });
 
       await expect(
         uploadSingleFile({ projectId: "p1", name: "data", file: file(), nextName: bump }, deps),
-      ).rejects.toThrow("aborted");
-      expect(deps.abortPendingUpload).toHaveBeenCalledWith({
-        projectId: "p1",
-        datasetId: "dataset_1",
-      });
+      ).rejects.toBe(refused);
+      expect(createFromStoredObject).toHaveBeenCalledTimes(1);
     });
   });
 });

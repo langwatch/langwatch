@@ -5,10 +5,16 @@
 
 // The relay's wire shapes (ADR-128), which the Agent feature package owns.
 import type { CallOutput, ProtocolMessage } from "@langwatch/agent-contract";
-import { CONNECTED_INPUT_FIELD, UNNAMED_FAILURE } from "@langwatch/experiment-contract";
+import {
+  CONNECTED_ATTACHMENT_FIELD,
+  CONNECTED_INPUT_FIELD,
+  UNNAMED_FAILURE,
+} from "@langwatch/experiment-contract";
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { HandledError } from "@langwatch/handled-error";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
+
+import { toAttachmentContentPart } from "#rules/attachment-parts.rules";
 
 /**
  * How long a row keeps waiting for a busy agent before it fails — the same
@@ -27,11 +33,17 @@ export type ConnectedTargetCall = {
 };
 
 /**
- * The conversation for one row. A string input becomes one user message; a
- * dataset column of chat messages is already a conversation and travels as
- * it is, so a multi-turn dataset can be replayed against the agent.
+ * The conversation for one row: the input as one user message, with a mapped
+ * attachment as a content part beside it. A column of chat messages is already
+ * a conversation and travels as it is, so a multi-turn dataset replays.
  */
-const messagesOf = (value: unknown): ProtocolMessage[] => {
+const messagesOf = ({
+  value,
+  attachment,
+}: {
+  value: unknown;
+  attachment: unknown;
+}): ProtocolMessage[] => {
   if (Array.isArray(value)) {
     const messages = value.filter(
       (entry): entry is ProtocolMessage =>
@@ -41,8 +53,24 @@ const messagesOf = (value: unknown): ProtocolMessage[] => {
     );
     if (messages.length > 0) return messages;
   }
-  const content = typeof value === "string" ? value : (JSON.stringify(value) ?? "");
-  return [{ role: "user", content }];
+  const text = typeof value === "string" ? value : (JSON.stringify(value) ?? "");
+
+  const part =
+    typeof attachment === "string" && attachment !== ""
+      ? toAttachmentContentPart(attachment)
+      : null;
+  if (!part) return [{ role: "user", content: text }];
+
+  // A turn with a picture or a document is a list of parts, which is how an
+  // OpenAI style message carries both. The text part is left out when the row
+  // maps no text, so the agent reads the attachment alone rather than an empty
+  // question in front of it.
+  return [
+    {
+      role: "user",
+      content: text ? [{ type: "text", text }, part] : [part],
+    },
+  ];
 };
 
 /** A mapped cell that holds a number, or nothing when it holds no number. */
@@ -100,7 +128,13 @@ export const buildConnectedCall = ({
     // nothing is sent for it.
     if (value !== undefined) params[definition.name] = value;
   }
-  return { messages: messagesOf(inputs[CONNECTED_INPUT_FIELD]), params };
+  return {
+    messages: messagesOf({
+      value: inputs[CONNECTED_INPUT_FIELD],
+      attachment: inputs[CONNECTED_ATTACHMENT_FIELD],
+    }),
+    params,
+  };
 };
 
 /** The text of one message, whatever shape its content has. */

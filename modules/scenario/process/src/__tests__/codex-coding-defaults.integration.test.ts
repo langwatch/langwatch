@@ -20,6 +20,7 @@ import {
   UnavailableModelProviderCredentialProbeAdapter,
   UnmanagedModelProviderGatewayAdapter,
   VercelAiModelTranslationAdapter,
+  modelProviderConnectionPingChannels,
 } from "@langwatch/model-provider-process";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -158,6 +159,7 @@ function realModelProviders(prisma: PrismaClient): ModelProviderApi {
       projects: createApiFixture<ProjectApi>({}),
       executionProxyBaseUrl: "http://langwatch_nlp:5561/go/proxy/v1",
     }),
+    connectionPing: modelProviderConnectionPingChannels.memory.create(),
     ids: PrefixedModelProviderIdAdapter.create({
       suffix: () => randomBytes(6).toString("hex"),
     }),

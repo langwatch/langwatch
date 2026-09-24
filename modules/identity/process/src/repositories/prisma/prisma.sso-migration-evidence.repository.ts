@@ -10,7 +10,7 @@ import type {
 /** The two models the pair's evidence is read through. */
 export type PrismaSsoMigrationEvidenceDatabase = Pick<
   PrismaClient,
-  "identifier" | "ssoAuthenticationActivity"
+  "identifier" | "ssoAuthenticationActivity" | "$queryRaw"
 >;
 
 export class PrismaSsoMigrationEvidenceRepository implements SsoMigrationEvidenceRepository {
@@ -52,6 +52,7 @@ export class PrismaSsoMigrationEvidenceRepository implements SsoMigrationEvidenc
         id: true,
         userId: true,
         state: true,
+        provider: true,
         connectionId: true,
         providerId: true,
         providerAccountId: true,
@@ -130,5 +131,19 @@ export class PrismaSsoMigrationEvidenceRepository implements SsoMigrationEvidenc
     }
 
     return latest;
+  }
+
+  async countAddressHolders({ addresses }: { addresses: string[] }): Promise<Map<string, number>> {
+    const lowered = [...new Set(addresses.map((address) => address.toLowerCase()))];
+    if (lowered.length === 0) return new Map();
+
+    const rows = await this.database.$queryRaw<{ address: string; holders: bigint }[]>`
+      -- @tenancy: an address names one account fleet-wide or it names nobody; only a migrating organization's members' addresses are counted.
+      SELECT lower("email") AS "address", count(*) AS "holders"
+        FROM "User"
+       WHERE lower("email") = ANY(${lowered}::text[])
+       GROUP BY 1
+    `;
+    return new Map(rows.map((row) => [row.address, Number(row.holders)]));
   }
 }

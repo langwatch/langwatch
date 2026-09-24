@@ -19,6 +19,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/error-presentation": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",

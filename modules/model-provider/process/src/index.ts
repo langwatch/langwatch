@@ -36,6 +36,7 @@ export {
   RegistryModelProviderCatalogAdapter,
   type RegistryModelProviderCatalogOptions,
 } from "./services/registry.model-provider-catalog.service.ts";
+export { modelProviderConnectionPingChannels } from "./channels/model-provider-connection-ping-channels.registry.ts";
 export { UnmanagedModelProviderGatewayAdapter } from "./services/unmanaged.model-provider-gateway.service.ts";
 export { HttpModelProviderCredentialProbeAdapter } from "./services/http.model-provider-credential-probe.service.ts";
 export { UnavailableModelProviderCredentialProbeAdapter } from "./services/unavailable.model-provider-credential-probe.service.ts";

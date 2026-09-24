@@ -49,6 +49,7 @@ import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.
  * literal /facets, before the bare :traceId.
  */
 import { formatTraceSummaryDigest, generateAsciiTree } from "#rules/trace-formatting.rules";
+import { tracePath } from "#rules/trace-platform-url.rules";
 import { TraceProjectionCompileService } from "#services/projection/trace-projection-compile.service";
 import { TraceFacetValuesService } from "#services/trace-facet-values.service";
 import { AmbiguousTraceIdPrefixError } from "#services/trace-legacy-read.service";
@@ -170,7 +171,7 @@ function formatTraceRow(
 ): unknown {
   const platformUrl = input.app.platformUrl({
     projectSlug: input.projectSlug,
-    path: `/traces/${trace.trace_id}`,
+    path: tracePath({ traceId: trace.trace_id, occurredAtMs: trace.timestamps?.started_at }),
   });
   if (input.format === "digest") {
     return {
@@ -562,7 +563,10 @@ export function createTracesRest(options: TracesRestOptions = {}): Readonly<{
       const evaluations = evaluationsMap[resolvedTraceId] ?? [];
       const url = app.platformUrl({
         projectSlug: project.projectSlug,
-        path: `/traces/${resolvedTraceId}`,
+        path: tracePath({
+          traceId: resolvedTraceId,
+          occurredAtMs: trace.timestamps?.started_at,
+        }),
       });
 
       if (format === "digest") {

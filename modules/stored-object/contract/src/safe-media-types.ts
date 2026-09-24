@@ -25,3 +25,21 @@ export function isReadbackSafe(mediaType: string): boolean {
   if (hasSafePrefix) return true;
   return false;
 }
+
+/**
+ * Media types a browser can execute. Files are served from our own origin, so
+ * an upload of one is refused at create for every uploadable purpose.
+ */
+export const REFUSED_ATTACHMENT_MEDIA_TYPES = [
+  "text/html",
+  "application/xhtml+xml",
+  "image/svg+xml",
+  "application/javascript",
+  "text/javascript",
+] as const;
+
+/** True for a media type a browser can run, compared without parameters or case. */
+export function isRefusedUploadMediaType(mediaType: string): boolean {
+  const base = mediaType.split(";")[0]?.trim().toLowerCase() ?? "";
+  return (REFUSED_ATTACHMENT_MEDIA_TYPES as readonly string[]).includes(base);
+}

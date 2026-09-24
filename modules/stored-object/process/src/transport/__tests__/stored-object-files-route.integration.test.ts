@@ -12,7 +12,7 @@ import { StoredObjectOwnerLookupUnavailableError } from "@langwatch/stored-objec
 import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import type { StoredObjectFileStreamRead } from "#app/stored-object.app";
+import type { StoredObjectFileStreamRead } from "#app/stored-object.members";
 
 import {
   storedObjectFileRest,
@@ -179,6 +179,7 @@ describe("given the /api/files family", () => {
       // The gate was applied to the project the ROW says owns the object, not
       // to anything the caller supplied.
       expect(permissionCheck.mock.calls.map(([args]) => args.projectId)).toEqual([
+        OWNER_PROJECT,
         OWNER_PROJECT,
         OWNER_PROJECT,
       ]);

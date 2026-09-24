@@ -159,6 +159,7 @@ export {
   type SsoMigrationBlockerView,
   type SsoMigrationConnectionRef,
   type SsoMigrationLinkRefusalCode,
+  type SsoMigrationMemberMove,
   type SsoMigrationScimStatus,
   type SsoMigrationStragglerView,
   type SsoMigrationView,

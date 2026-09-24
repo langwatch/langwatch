@@ -46,11 +46,8 @@ export async function startApi(options: ApiStartOptions = {}): Promise<ProcessSe
       redaction: null,
     }))
     .withMember("elevenLabsWebhook", () => void 0)
-    // Dataset's four optional seams. This process composes none, so each is
-    // answered "none" and the module's own absent-behaviour applies: normalize
-    // runs in-process and uploads resolve through the storage resolver it builds.
-    .withMember("storageResolver", () => void 0)
-    .withMember("storage", () => void 0)
+    // Dataset's two optional seams. This process composes neither, so the
+    // module's own absent-behaviour applies: normalize runs in-process.
     .withMember("queue", () => void 0)
     .withMember("content", () => void 0)
     .withMember("gatewayInternalProtocol", () => ({}))

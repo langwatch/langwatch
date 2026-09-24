@@ -6,6 +6,13 @@
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
+import {
+  storedObjectsConfirmUploadInputSchema,
+  storedObjectsConfirmUploadOutputSchema,
+  storedObjectsCreateUploadInputSchema,
+  storedObjectsCreateUploadOutputSchema,
+} from "./uploads.ts";
+
 export const storedObjectHeadInputSchema = z.object({
   projectId: z.string(),
   id: z.string(),
@@ -31,4 +38,10 @@ export const storedObjectTrpc = defineTrpcContract("storedObjects")
   .query("headById")
   .withInput(storedObjectHeadInputSchema)
   .withOutput(storedObjectHeadSchema)
+  .mutation("createUpload")
+  .withInput(storedObjectsCreateUploadInputSchema)
+  .withOutput(storedObjectsCreateUploadOutputSchema)
+  .mutation("confirmUpload")
+  .withInput(storedObjectsConfirmUploadInputSchema)
+  .withOutput(storedObjectsConfirmUploadOutputSchema)
   .build();

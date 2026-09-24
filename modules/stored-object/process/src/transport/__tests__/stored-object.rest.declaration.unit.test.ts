@@ -26,20 +26,17 @@ describe("the stored-objects REST family", () => {
           route.permission,
         ]),
       ).toEqual([
-        ["post", "/:uploadToken/confirmation", "confirmStoredObjectUpload", "project:update"],
-        ["get", "/:id", "getStoredObject", "project:view"],
-        ["delete", "/:id", "deleteStoredObject", "project:manage"],
+        ["post", "/uploads", "createStoredObjectUpload", "project:update"],
+        [
+          "post",
+          "/uploads/:storedObjectId/confirmation",
+          "confirmStoredObjectUpload",
+          "project:update",
+        ],
+        ["put", "/uploads/:storedObjectId/content", "putStoredObjectUploadContent", undefined],
+        ["get", "/:storedObjectId", "getStoredObject", "project:view"],
+        ["delete", "/:storedObjectId", "deleteStoredObject", "project:manage"],
       ]);
-    });
-
-    // `createUpload` answers `existing` or `pending`, and a route declares its
-    // answer as an object, an array or nothing. Publishing it as either arm
-    // alone would be a different contract, so it waits for a runtime that can
-    // state a union.
-    it("does not yet declare the create-upload route", () => {
-      expect(declaration.routes.map((route) => route.operation)).not.toContain(
-        "createStoredObjectUpload",
-      );
     });
 
     it("declares an input and an answer for every route", () => {

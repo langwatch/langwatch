@@ -23,6 +23,8 @@ import type {
   ModelProviderRateLimit,
   ModelTranslation,
 } from "./app/model-provider.members.ts";
+import { modelProviderConnectionPingChannels } from "./channels/model-provider-connection-ping-channels.registry.ts";
+import { type ModelProviderConnectionPing } from "./channels/model-provider-connection-ping.channel.ts";
 import { modelProviderRepositories } from "./repositories/model-provider-repositories.registry.ts";
 import { PrismaModelCostRepository } from "./repositories/prisma/prisma.model-cost.repository.ts";
 import { PrismaModelDefaultRepository } from "./repositories/prisma/prisma.model-default.repository.ts";
@@ -100,6 +102,7 @@ export interface PostgresModelProviderAdapterOptions {
   organizations: OrganizationApi;
   catalog: ModelProviderCatalog;
   translation: ModelTranslation;
+  connectionPing: ModelProviderConnectionPing;
   ids: ModelProviderIdService;
   authorization: AuthzApi;
   credentials: ModelProviderCredentialCodec;
@@ -131,6 +134,7 @@ export class PostgresModelProviderAdapter {
       catalog: this.options.catalog,
       authorization: this.options.authorization,
       translation: this.options.translation,
+      connectionPing: this.options.connectionPing,
       ids: this.options.ids,
     });
   }
@@ -186,6 +190,8 @@ export type ModelProviderRuntimeInput = Readonly<{
   /** Whether this is the hosted deployment, which decides the managed rows and TLS posture. */
   isSaas: boolean;
   translation: ModelProviderTranslationSurface;
+  /** The execution proxy Test Connection sends its one real generation through. */
+  executionProxyBaseUrl: string;
   /**
    * The fence an outbound credential probe goes through. A process that names none composes no
    * probe: a credential test with no fence is one this deployment has not decided it may make.
@@ -235,6 +241,9 @@ export function createModelProviderRuntime(input: ModelProviderRuntimeInput): Mo
             executionProxyBaseUrl: input.translation.executionProxyBaseUrl,
           })
         : input.translation,
+    connectionPing: modelProviderConnectionPingChannels.live.create({
+      executionProxyBaseUrl: input.executionProxyBaseUrl,
+    }),
     ids,
   };
 

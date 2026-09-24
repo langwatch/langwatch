@@ -18,6 +18,7 @@ import type { WireOf } from "@langwatch/api/web";
 import { downloadCsv } from "@langwatch/csv/download";
 import {
   type AutosaveState,
+  type DatasetAttachmentSlot,
   type DatasetTableContextValue,
   DatasetTableProvider,
   type DatasetTableRowData,
@@ -54,6 +55,7 @@ import { DatasetCellImage } from "../elements/dataset-cell-image.tsx";
 import { SelectionActionBar } from "../elements/selection-action-bar.tsx";
 import { AddOrEditDatasetDrawer } from "./add-or-edit-dataset-drawer.tsx";
 import { AddRowsFromCSVModal } from "./add-rows-from-csv-modal.tsx";
+import { AttachmentCell } from "./attachment-cell.tsx";
 
 const CHECKBOX_WIDTH_PX = 36;
 const MAX_ROWS_WITHOUT_VIRTUALIZATION = 100;
@@ -61,6 +63,8 @@ const MAX_ROWS_WITHOUT_VIRTUALIZATION = 100;
  *  keeping each read bounded — an s3_jsonl page touches only the chunks
  *  overlapping the window. */
 const DATASET_EDITOR_PAGE_SIZE = 50;
+
+const renderAttachment = (slot: DatasetAttachmentSlot): ReactNode => <AttachmentCell {...slot} />;
 
 const renderImage = (value: string): ReactNode | null => {
   const imageUrl = datasetImageUrl(value);
@@ -410,6 +414,7 @@ export function DatasetEditorTable({
       toggleCellExpanded,
       toggleRowSelection,
       renderImage,
+      renderAttachment,
     }),
     [
       rowHeightMode,

@@ -32,6 +32,7 @@ export class MemorySsoMigrationEvidenceRepository implements SsoMigrationEvidenc
         identifierId: fact.identifierId,
         userId: fact.userId,
         state: fact.state,
+        provider: fact.provider,
         connectionId: fact.connectionId,
         providerId: fact.providerId,
         providerAccountId: fact.providerAccountId,
@@ -90,5 +91,16 @@ export class MemorySsoMigrationEvidenceRepository implements SsoMigrationEvidenc
     }
 
     return latest;
+  }
+
+  async countAddressHolders({ addresses }: { addresses: string[] }): Promise<Map<string, number>> {
+    const wanted = new Set(addresses.map((address) => address.toLowerCase()));
+    const holders = new Map<string, number>();
+    for (const { email } of this.store.users.values()) {
+      const key = email?.toLowerCase();
+      if (key === undefined || !wanted.has(key)) continue;
+      holders.set(key, (holders.get(key) ?? 0) + 1);
+    }
+    return holders;
   }
 }

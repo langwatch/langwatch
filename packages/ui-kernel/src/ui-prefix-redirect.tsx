@@ -22,6 +22,7 @@ export function UiPrefixRedirect({
   from,
   to,
   pinParams,
+  renameParams,
   mapSegment,
 }: {
   from: string;
@@ -31,6 +32,8 @@ export function UiPrefixRedirect({
    * carried under those keys.
    */
   pinParams?: Record<string, string>;
+  /** Query params carried across under a new key: `{ t: "drawer.t" }`. */
+  renameParams?: Record<string, string>;
   /**
    * A rename table for the FIRST segment of the sub-path, applied before it is appended
    * to the destination.
@@ -51,12 +54,17 @@ export function UiPrefixRedirect({
     pathname = renamed === void 0 ? target : [target, renamed, ...deeper].join("/");
   }
 
-  // Only the pinParams path re-serializes the query; without it the
+  // Only a pinned or renamed param re-serializes the query; without one the
   // original search travels byte-for-byte, as it always has.
   let search = location.search;
-  if (pinParams) {
+  if (pinParams || renameParams) {
     const query = new URLSearchParams(location.search);
-    for (const [key, value] of Object.entries(pinParams)) {
+    for (const [from, to] of Object.entries(renameParams ?? {})) {
+      const value = query.get(from);
+      query.delete(from);
+      if (value !== null) query.set(to, value);
+    }
+    for (const [key, value] of Object.entries(pinParams ?? {})) {
       query.set(key, fillParams(value, params));
     }
     search = query.toString();

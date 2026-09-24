@@ -58,12 +58,16 @@ export class LegacySsoAccessService {
   private async matching({
     organizationId,
     connectionId,
+    strandedUserIds,
   }: LegacySsoAccessQuery): Promise<FederatedAccountRow[]> {
     const { providerId } = await this.deps.connections.getProvider({
       organizationId,
       connectionId,
     });
-    const userIds = await this.deps.memberships.listMemberIds({ organizationId });
+    const kept = new Set(strandedUserIds);
+    const userIds = (await this.deps.memberships.listMemberIds({ organizationId })).filter(
+      (userId) => !kept.has(userId),
+    );
     if (userIds.length === 0) return [];
 
     const accounts = await this.deps.accounts.findFederatedAccountsForUsers({ userIds });

@@ -1,6 +1,3 @@
-import type { Readable } from "node:stream";
-
-import type { S3Client } from "@aws-sdk/client-s3";
 /** Application: completes incomplete upserts and checks cross-project copy
  * reach. Wire mapping and read ceiling live in the doors.
  */
@@ -9,17 +6,22 @@ import {
   DatasetApi,
   DatasetNotFoundError,
   type DatasetNormalizePayload,
-  type AbortPendingUploadInput,
+  type AppendStoredObjectToDatasetInput,
   type BatchEvaluationRecord,
   type BatchEvaluationSummary,
   type CopyDatasetInput,
+  type CreateDatasetFromStoredObjectInput,
   type CreateDatasetFromUploadInput,
   type CreateDatasetFromUploadResult,
+  type StoreDatasetAttachmentUploadInput,
+  type StoredDatasetAttachment,
   type CreateDatasetRecordsInput,
   type Dataset,
   type DatasetColumns,
   type DatasetEntrySelection,
   type DatasetHead,
+  type DatasetImportAppended,
+  type DatasetImportStarted,
   type DatasetListResult,
   type DatasetLookupInput,
   type DatasetNameInput,
@@ -32,12 +34,8 @@ import {
   type DatasetUsageCount,
   type DatasetWithRecords,
   type DeleteDatasetRecordsInput,
-  type FinalizeUploadInput,
   type ListDatasetsInput,
-  type PendingUploadInput,
-  type PendingUploadResult,
   type RetryNormalizeInput,
-  type StagedUploadInput,
   type UpdateDatasetRecordInput,
   type UploadExistingDatasetInput,
   type UpsertDatasetInput,
@@ -46,11 +44,15 @@ import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ExperimentApi, ExperimentNotFoundError } from "@langwatch/experiment-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
+import { StoredObjectApi } from "@langwatch/stored-object-contract";
 
 import type { DatasetRepositories } from "../repositories/dataset.repositories.ts";
-import type { DatasetChunk, ChunkOffset } from "../rules/dataset-chunking.rules.ts";
+import { ObjectStorageDatasetChunkRepository } from "../repositories/object-storage/object-storage.dataset-chunk.repository.ts";
 import { datasetPlatformUrl } from "../rules/dataset-platform-url.rules.ts";
+import { DatasetAttachmentReferenceService } from "../services/dataset-attachment-reference.service.ts";
+import { DatasetAttachmentUploadService } from "../services/dataset-attachment-upload.service.ts";
 import { DatasetContentAdapter } from "../services/dataset-content.service.ts";
 import { DatasetNormalizationService } from "../services/dataset-normalization.service.ts";
 import { DatasetNormalizeAdapter } from "../services/dataset-normalize.service.ts";
@@ -65,10 +67,6 @@ const DATASET_RECORD_KSUID_RESOURCE = "datasetrecord";
  * code refuses BY NAME when an operation needs one.
  */
 export interface DatasetInfrastructure {
-  /** Where a project's dataset content is stored, when the deployment has any. */
-  readonly storageResolver?: DatasetStorageResolver;
-  /** A process-supplied upload seam, in place of the resolver-built one. */
-  readonly storage?: DatasetUpload;
   /** Where normalize work is queued; the in-process service when absent. */
   readonly queue?: DatasetNormalizeQueue;
   /** A process-supplied content seam, in place of the resolver-built one. */
@@ -80,7 +78,9 @@ export interface DatasetInfrastructure {
  * `publicBaseUrl` is the process's own fact, drilled in — absent where the
  * deployment named no `BASE_HOST`. `platformUrl` refuses by name when it is.
  */
-type DatasetMembers = Readonly<{ publicBaseUrl: string | undefined }> & DatasetInfrastructure;
+type DatasetMembers = Pick<ProcessMembers, "objectStorage"> &
+  Readonly<{ publicBaseUrl: string | undefined }> &
+  DatasetInfrastructure;
 
 type DatasetSetup = FeatureSetup<
   typeof DatasetApp.dependencies,
@@ -119,22 +119,19 @@ export class DatasetApp implements DatasetApi {
     projects: ProjectApi,
     /** The tier-effective bounds the record writes refuse above. */
     entitlement: EntitlementApi,
+    /** Reads the confirmed files a dataset is imported from (ADR-158 §6). */
+    storedObjects: StoredObjectApi,
   };
   /**
    * `publicBaseUrl` is the process's own fact; the rest are the optional,
    * process-specific collaborators in {@link DatasetInfrastructure} — every
    * name a composition may `withMember` must be declared here too.
    */
-  static readonly reads = [
-    "publicBaseUrl",
-    "storageResolver",
-    "storage",
-    "queue",
-    "content",
-  ] as const;
+  static readonly reads = ["publicBaseUrl", "objectStorage", "queue", "content"] as const;
 
   #datasets: DatasetService;
-  #normalization: DatasetNormalizationService | null;
+  #attachmentUploads: DatasetAttachmentUploadService;
+  #normalization: DatasetNormalizationService;
   #batchEvaluations: DatasetRepositories["batchEvaluations"];
   #usage: DatasetRepositories["usage"];
   #experiments: ExperimentApi;
@@ -146,40 +143,32 @@ export class DatasetApp implements DatasetApi {
     dependencies: DatasetSetup["dependencies"],
     members: DatasetMembers,
   ) {
-    const resolver = members.storageResolver;
+    const chunks = ObjectStorageDatasetChunkRepository.create({
+      objectStorage: members.objectStorage,
+    });
 
-    this.#normalization = resolver
-      ? DatasetNormalizationService.create({
-          datasets: repositories.content,
-          normalize: DatasetNormalizeAdapter.create({
-            repository: repositories.content,
-            getStorage: (projectId) => resolver.forProject(projectId),
-          }),
-        })
-      : null;
+    this.#normalization = DatasetNormalizationService.create({
+      datasets: repositories.content,
+      normalize: DatasetNormalizeAdapter.create({
+        repository: repositories.content,
+        chunks,
+        storedObjects: dependencies.storedObjects,
+      }),
+    });
 
     this.#datasets = DatasetService.create({
       repository: repositories.datasets,
       records: repositories.records,
-      uploads:
-        members.storage ??
-        (resolver
-          ? DatasetUploadService.create({
-              datasets: repositories.content,
-              records: repositories.recordContent,
-              storageResolver: resolver,
-            })
-          : undefined),
-      queue: members.queue ?? this.#normalization ?? undefined,
+      uploads: DatasetUploadService.create({
+        datasets: repositories.content,
+        records: repositories.recordContent,
+        chunks,
+        storedObjects: dependencies.storedObjects,
+      }),
+      queue: members.queue ?? this.#normalization,
       content:
         members.content ??
-        (resolver
-          ? DatasetContentAdapter.create({
-              datasets: repositories.content,
-              storageResolver: resolver,
-            })
-          : undefined),
-      storageResolver: resolver,
+        DatasetContentAdapter.create({ datasets: repositories.content, storage: chunks }),
       // The identifier format a new entry is written under is this module's
       // own business, not something a composing process supplies: every real
       // composition that ever wired this feature left it unset, and the
@@ -190,8 +179,14 @@ export class DatasetApp implements DatasetApi {
         entitlement: dependencies.entitlement,
         projects: dependencies.projects,
       }),
+      attachments: DatasetAttachmentReferenceService.create({
+        storedObjects: dependencies.storedObjects,
+      }),
     });
 
+    this.#attachmentUploads = DatasetAttachmentUploadService.create({
+      storedObjects: dependencies.storedObjects,
+    });
     this.#batchEvaluations = repositories.batchEvaluations;
     this.#usage = repositories.usage;
     this.#experiments = dependencies.experiments;
@@ -419,31 +414,30 @@ export class DatasetApp implements DatasetApi {
     return this.#datasets.uploadToExistingDataset(input);
   }
 
-  /** Starts a direct browser-to-storage upload. */
-  createPendingUpload(input: PendingUploadInput): Promise<PendingUploadResult> {
-    return this.#datasets.createPendingUpload(input);
+  /** Deprecated with `POST /api/dataset/attachments`: a posted file stored as an attachment. */
+  storeAttachmentUpload(
+    input: StoreDatasetAttachmentUploadInput,
+  ): Promise<StoredDatasetAttachment> {
+    return this.#attachmentUploads.store(input);
   }
 
-  /** Streams a heavy upload into staging where storage is not browser-reachable. */
-  writeStagedUpload(input: StagedUploadInput): Promise<void> {
-    return this.#datasets.writeStagedUpload(input);
+  /** A dataset built in the background from a confirmed `dataset_import` file. */
+  createDatasetFromStoredObject(
+    input: CreateDatasetFromStoredObjectInput,
+  ): Promise<DatasetImportStarted> {
+    return this.#datasets.createDatasetFromStoredObject(input);
   }
 
-  /** Size-checks a direct upload and starts processing it. */
-  finalizeUpload(input: FinalizeUploadInput): Promise<{ datasetId: string; status: "processing" }> {
-    return this.#datasets.finalizeUpload(input);
+  /** A confirmed `dataset_import` file's rows appended to an existing dataset. */
+  appendStoredObjectToDataset(
+    input: AppendStoredObjectToDatasetInput,
+  ): Promise<DatasetImportAppended> {
+    return this.#datasets.appendStoredObjectToDataset(input);
   }
 
   /** Re-runs normalization for a failed or stuck dataset. */
   retryNormalize(input: RetryNormalizeInput): Promise<{ datasetId: string; status: "processing" }> {
     return this.#datasets.retryNormalize(input);
-  }
-
-  /** Cleans up a still-pending upload whose transfer never landed. */
-  abortPendingUpload(
-    input: AbortPendingUploadInput,
-  ): Promise<{ datasetId: string; aborted: true }> {
-    return this.#datasets.abortPendingUpload(input);
   }
 
   // ── Batch evaluations ────────────────────────────────────────────────────
@@ -505,139 +499,6 @@ export interface DatasetNormalize {
   normalize(payload: DatasetNormalizePayload): Promise<void>;
 }
 
-/** A freshly-minted presigned upload target (server-owned staging key). */
-export type PresignedUpload = { uploadId: string; key: string; url: string };
-
-export type DatasetS3Client = { s3Client: S3Client; s3Bucket: string };
-
-/** A per-operation S3 client lease. Callers release it once their I/O has settled. */
-export type DatasetS3ClientLease = DatasetS3Client & { release(): void };
-
-export interface DatasetS3ClientResolver {
-  /**
-   * Resolves the current tenant target and acquires its process-owned client
-   * for one storage operation. The release makes a target change safe while
-   * an earlier operation is still using the superseded client.
-   */
-  acquire(projectId: string): Promise<DatasetS3ClientLease>;
-}
-
-export interface DatasetBlobDriver {
-  put: (uri: string, body: Buffer, contentType?: string) => Promise<void>;
-  get(uri: string): Promise<Readable>;
-  head(uri: string): Promise<number>;
-  exists(uri: string): Promise<boolean>;
-  delete(uri: string): Promise<void>;
-}
-
-export type DatasetAzureConfig = {
-  driver: DatasetBlobDriver;
-  accountName: string;
-  container: string;
-};
-
-export interface DatasetAzureConfigResolver {
-  resolve(projectId: string): Promise<DatasetAzureConfig>;
-}
-
-/**
- * Provider-pluggable I/O surface for dataset content. Implementations own only the boundary (S3
- * / filesystem); chunk boundaries, counts and the key scheme are shared pure helpers. Named
- * object params throughout (repo convention).
- */
-export interface DatasetStorage {
-  /**
-   * Write a record set as chunked JSONL starting at `fromIndex` (0 for a
-   * fresh dataset, `chunkCount` to append) and return the metadata for the
-   * chunks just written. Append never rewrites existing chunk objects.
-   */
-  writeChunks(params: {
-    projectId: string;
-    datasetId: string;
-    records: unknown[];
-    fromIndex?: number;
-    maxBytes?: number;
-  }): Promise<DatasetChunk[]>;
-
-  /**
-   * Read all rows of a dataset back from its chunk objects, in order. Driven by the
-   * PG-authoritative `chunkCount` (not S3 LIST).
-   */
-  readChunks(params: {
-    projectId: string;
-    datasetId: string;
-    chunkCount: number;
-  }): Promise<unknown[]>;
-
-  /**
-   * Read a single chunk object's rows (ADR-032 Decision 3 — edit/delete locate
-   */
-  readChunk(params: { projectId: string; datasetId: string; index: number }): Promise<unknown[]>;
-
-  /**
-   * Overwrite `chunk-{index}.jsonl` with exactly these records as a single
-   * object (ADR-032 Decision 3 — edit/delete rewrite one chunk in place under
-   */
-  rewriteChunk(params: {
-    projectId: string;
-    datasetId: string;
-    index: number;
-    records: unknown[];
-  }): Promise<ChunkOffset>;
-
-  /**
-   * Mint a presigned upload for a heavy browser→storage direct upload. The key is
-   * server-generated and tenant-scoped. Backends without a browser-reachable presign (local FS)
-   * throw `DirectUploadUnavailableError` so the caller falls back to the backend upload path.
-   */
-  createPresignedUpload(params: { projectId: string }): Promise<PresignedUpload>;
-
-  /**
-   * Deposit a staged upload from a byte stream, server-side. Present ONLY on backends whose
-   * direct upload routes the  THROUGH the app (local FS): the same-origin
-   * `/direct-upload/staging/:uploadId` route calls this.
-   */
-  putStaged?(params: {
-    projectId: string;
-    key: string;
-    body: Readable;
-    maxBytes?: number;
-  }): Promise<void>;
-
-  /** HEAD a staged upload to read its size — finalize size-cap enforcement. */
-  headStagedObjectSize(params: { projectId: string; key: string }): Promise<number>;
-
-  /**
-   * Open a backpressured read stream over a staged upload — the normalize job's source (stream
-   * → record transform → chunk-writer, never an in-memory array). Throws
-   * `StagedUploadNotFoundError` when the staged object is missing.
-   */
-  streamStaged(params: { projectId: string; key: string }): Promise<Readable>;
-
-  /** Best-effort delete of a staged upload (e.g. after a finalize rejection). */
-  deleteStaged(params: { projectId: string; key: string }): Promise<void>;
-
-  /**
-   * Delete orphan chunk objects left by a longer prior run (I-IDEM). Chunks are contiguous from
-   * index 0, so a re-drive that wrote fewer chunks than a crashed run leaves
-   * `chunk-{finalCount}`…`chunk-{prevCount-1}` orphaned.
-   */
-  deleteChunksFrom(params: {
-    projectId: string;
-    datasetId: string;
-    fromIndex: number;
-  }): Promise<void>;
-}
-
-/**
- * Runtime-selected storage, supplied once during composition. See
- * {@link DatasetInfrastructure}'s doc for why this is an `abstract class`
- * rather than an `interface` — a resolver `implements`, never `extends`, it.
- */
-export abstract class DatasetStorageResolver {
-  abstract forProject(projectId: string): Promise<DatasetStorage>;
-}
-
 /** {@link DatasetInfrastructure}'s process-supplied upload seam. */
 export abstract class DatasetUpload {
   abstract uploadToExistingDataset(
@@ -646,14 +507,12 @@ export abstract class DatasetUpload {
   abstract createDatasetFromUpload(
     input: CreateDatasetFromUploadInput,
   ): Promise<CreateDatasetFromUploadResult>;
-  abstract createPendingUpload(input: PendingUploadInput): Promise<PendingUploadResult>;
-  abstract writeStagedUpload(input: StagedUploadInput): Promise<void>;
-  abstract abortPendingUpload(
-    input: AbortPendingUploadInput,
-  ): Promise<{ datasetId: string; aborted: true }>;
-  abstract finalizeUpload(
-    input: FinalizeUploadInput,
-  ): Promise<{ datasetId: string; status: "processing" }>;
+  abstract createDatasetFromStoredObject(
+    input: CreateDatasetFromStoredObjectInput,
+  ): Promise<DatasetImportStarted>;
+  abstract appendStoredObjectToDataset(
+    input: AppendStoredObjectToDatasetInput,
+  ): Promise<DatasetImportAppended>;
   abstract retryNormalize(
     input: RetryNormalizeInput,
   ): Promise<{ datasetId: string; status: "processing" }>;
@@ -690,6 +549,11 @@ export abstract class DatasetContent {
     limitMb: number | null;
   }): Promise<DatasetWithRecords>;
   abstract getDatasetHead(input: { dataset: Dataset }): Promise<DatasetHead>;
+  abstract findEntries(input: {
+    dataset: Dataset;
+    projectId: string;
+    recordIds: readonly string[];
+  }): Promise<Record<string, unknown>[]>;
   abstract upsertRecord(input: {
     dataset: Dataset;
     input: UpdateDatasetRecordInput & { recordId: string };

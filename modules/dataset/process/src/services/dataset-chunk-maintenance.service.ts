@@ -12,7 +12,7 @@ import {
   type DatasetRecordEntry,
 } from "@langwatch/dataset-contract";
 
-import { type DatasetStorage } from "../app/dataset.app.ts";
+import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
 import {
   MAX_INMEMORY_COLUMN_EDIT_BYTES,
@@ -45,7 +45,7 @@ export class DatasetChunkMaintenanceService {
   }: {
     datasetId: string;
     projectId: string;
-    storage: DatasetStorage;
+    storage: DatasetChunkRepository;
   }): Promise<RecomputedDatasetCounts> {
     const datasetStorage = storage;
 
@@ -122,7 +122,7 @@ export class DatasetChunkMaintenanceService {
     newColumnTypes: DatasetColumns;
     name: string;
     slug: string;
-    storage: DatasetStorage;
+    storage: DatasetChunkRepository;
   }): Promise<DatasetMutationRecord> {
     const datasetStorage = storage;
 
@@ -190,7 +190,7 @@ export class DatasetChunkMaintenanceService {
     dataset: DatasetMutationRecord;
     projectId: string;
     chunkCount: number;
-    storage: DatasetStorage;
+    storage: DatasetChunkRepository;
   }): Promise<{ ids: string[]; entries: DatasetRecordEntry[] }> {
     const ids: string[] = [];
     const entries: DatasetRecordEntry[] = [];

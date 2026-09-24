@@ -8,6 +8,8 @@ export interface MigrationIdentifierHolding extends MigrationIdentifierBinding {
   userId: string;
   /** VERIFIED and PRIMARY are the two that count as proved. */
   state: string;
+  /** The kind of way in: `email`, `passkey`, or a provider's name. */
+  provider: string;
   /** When it was last proved; null for one nothing proved. */
   verifiedAtMs: number | null;
 }
@@ -57,4 +59,8 @@ export abstract class SsoMigrationEvidenceRepository {
     connectionId: string;
     userIds: string[];
   }): Promise<Map<string, number>>;
+
+  /** How many accounts hold each address, keyed by the address lowercased. An
+   *  address nobody holds is absent. */
+  abstract countAddressHolders(args: { addresses: string[] }): Promise<Map<string, number>>;
 }

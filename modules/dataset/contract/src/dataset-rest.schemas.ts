@@ -7,6 +7,8 @@ import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
 
 import {
+  appendStoredObjectToDatasetInputSchema,
+  createDatasetFromStoredObjectInputSchema,
   datasetColumnsSchema,
   datasetColumnTypeSchema,
   datasetPaginationSchema,
@@ -67,6 +69,39 @@ export const datasetRestLegacyEntriesSchema = z
 
 export const datasetRestSlugOrIdParamsSchema = z.object({ slugOrId: z.string() });
 export const datasetRestSlugParamsSchema = z.object({ datasetSlug: z.string() });
+
+/** `POST /api/dataset/imports`: the dataset to build, and the confirmed file it reads. */
+export const datasetRestImportSchema = createDatasetFromStoredObjectInputSchema
+  .omit({ projectId: true })
+  .meta({ id: "DatasetImport" });
+
+/** `POST /api/dataset/:slugOrId/imports`: the confirmed file whose rows are appended. */
+export const datasetRestAppendImportSchema = appendStoredObjectToDatasetInputSchema
+  .pick({ storedObjectId: true })
+  .meta({ id: "DatasetAppendImport" });
+
+/** The deprecated multipart `/upload` routes' text field; the file is the `file` part. */
+export const datasetRestUploadFieldsSchema = z.object({ name: z.string().trim().min(1) });
+export const datasetRestNoUploadFieldsSchema = z.object({});
+
+/** The deprecated multipart `/attachments` text field: the owning dataset, absent for a draft. */
+export const datasetRestAttachmentFieldsSchema = z.object({
+  datasetId: z
+    .string()
+    .optional()
+    .describe("The dataset that owns the file. Omit it while the dataset is still a draft."),
+});
+
+/** `POST /api/dataset/upload`: the dataset the posted file became. */
+export const datasetRestUploadCreatedSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  slug: z.string(),
+  columnTypes: datasetColumnsSchema,
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  recordsCreated: z.number().int().nonnegative(),
+});
 
 /** The dataset as this family answers it: the stored row plus its platform URL. */
 export const datasetRestSummarySchema = z.object({

@@ -30,6 +30,7 @@ export type DatasetWriteFields = {
   statusError?: string | null;
   stagingKey?: string | null;
   uploadFilename?: string | null;
+  sourceStoredObjectId?: string | null;
   rowCount?: number | null;
   sizeBytes?: bigint | number | null;
   chunkCount?: number | null;

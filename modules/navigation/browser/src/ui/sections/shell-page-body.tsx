@@ -14,7 +14,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { KeyRound } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
@@ -114,6 +113,7 @@ export const ShellPageBody = ({
   const project = host.project();
   const organizationRole = host.organizationRole();
   const deployment = host.deployment();
+  const isOrganizationLoading = host.isLoading();
 
   const usage = navigationApi.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
@@ -254,7 +254,9 @@ export const ShellPageBody = ({
 
       {host.startupNotice()}
 
-      {host.joinOffer({ currentOrganizationId: organization?.id })}
+      {host.joinOffer({
+        currentOrganizationId: isOrganizationLoading ? void 0 : (organization?.id ?? null),
+      })}
 
       {adminViewingAs && <AdminViewingAsBanner workspaceLabel={adminViewingAs.label} />}
 
@@ -273,17 +275,22 @@ export const ShellPageBody = ({
           <Alert.Content>
             <HStack width="full" gap={4}>
               <VStack align="start" gap={0} flex={1}>
-                <Alert.Title fontWeight="bold">Action Required: Link your SSO account</Alert.Title>
+                <Alert.Title fontWeight="bold">
+                  Sign in with your organization's single sign-on
+                </Alert.Title>
                 <Text fontSize="sm">
-                  Your organization requires SSO login. Please link your account by logging in via
-                  the email input box on the sign-in page.
+                  Your organization requires single sign-on. Sign out, then sign in again by
+                  entering your work email address.
                 </Text>
               </VStack>
-              <Button size="sm" colorPalette="red" flexShrink={0} color="white" asChild>
-                <NavigationLink href="/settings/authentication">
-                  <KeyRound size={14} />
-                  Link SSO Account
-                </NavigationLink>
+              <Button
+                size="sm"
+                colorPalette="red"
+                flexShrink={0}
+                color="white"
+                onClick={() => host.signOut()}
+              >
+                Sign out
               </Button>
             </HStack>
           </Alert.Content>
@@ -303,11 +310,10 @@ export const ShellPageBody = ({
         </HStack>
       )}
 
-      {userIsPartOfTeam ? (
-        // The page body absorbs the leftover vertical space inside the
-        // scrolling stack. Without `flex: 1` + `minHeight: 0`, a page using
-        // `height="full"` reads it as the whole stack — banners included — so
-        // showing one pushed the bottom of the page off the viewport.
+      {userIsPartOfTeam || isOrganizationLoading ? (
+        // A refusal is drawn only from an answered organization read, so the
+        // body renders while it is out. `flex: 1` + `minHeight: 0` keep a
+        // `height="full"` page from reading the whole stack, banners included.
         <Box flex="1" minHeight={0} width="full" display="flex" flexDirection="column">
           <ErrorBoundary FallbackComponent={PageErrorFallback} resetKeys={[pathname]}>
             <PageMeasure pathname={pathname}>{children}</PageMeasure>

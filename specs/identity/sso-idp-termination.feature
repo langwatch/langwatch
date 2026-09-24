@@ -448,6 +448,83 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     And finalization can be retried when its checks pass
     And after finalization no migration action is offered
 
+  @unit @regression
+  Scenario: Finishing is refused by the tenancy guard when a member's memberships are read across organizations
+    Given a member of the organization also belongs to another organization
+    When finishing asks whether that member's legacy identity is shared with another organization's provider
+    Then the other organizations are found through the member, not by reading memberships outside the tenant
+    And a membership read bounded only by "not this organization" is refused before it reaches the database
+
+  @unimplemented
+  Scenario: Finishing moves the previous connection's directory sync across
+    Given the previous connection's directory sync was set up by LangWatch, so the customer never held its token
+    When the update finishes
+    Then the tokens the identity provider already presents belong to the new connection, and whatever pushes today keeps pushing
+    And the people and external ids the previous connection provisioned are the new connection's, without duplicating anyone it provisioned itself
+    And the new connection's sync history starts, and the previous connection's ends
+    And before finishing, the update says the directory sync moves across when it finishes rather than asking anyone to repoint it
+
+  @unit @integration
+  Scenario: Finishing waits for directory sync on the new connection while nothing moves it across
+    Given the previous connection's directory sync is pushing and the new connection has none
+    When the administrator opens the update
+    Then directory sync reads as needing to be set up on the new connection, and finishing is refused until it is
+    And the update never says the sync moves across when it finishes
+
+  @integration @regression
+  Scenario: A person the previous connection's sync provisioned can sign in through the replacement before the update finishes
+    Given the previous connection's directory sync provisioned a member who has never signed in, so their address was never verified
+    And the update has switched sign-in over to the replacement
+    When they sign in through the replacement
+    Then they are recognised as the person the directory means, on the previous connection's word
+    And the update's link policy lets them through although their address was never verified
+
+  # Finishing never waits for members. An organization with hundreds of people
+  # will not get everyone to sign in again, and does not need to: the
+  # replacement recognises them by address at their next sign-in, before or
+  # after the update finishes. The update lists the few it will not recognise,
+  # so an administrator knows who will need a hand.
+
+  @unit @integration
+  Scenario: The new connection recognises members by address on a domain it proved, confirmed or not
+    Given the update has switched sign-in over to the replacement
+    And a member's address is on a domain the replacement proved, and no other account holds it
+    When they sign in through the replacement
+    Then they are linked to their existing account, whether or not their address was ever confirmed
+    But an address on a domain the replacement has not proved, or one another account also holds, is refused
+
+  @integration
+  Scenario: Members never hold the update
+    Given members have not signed in through the replacement
+    When the administrator opens the update
+    Then each is listed as moving across at their next sign-in, or with the reason the new connection will not recognise them
+    And none of them stops the update from finishing
+
+  @integration @regression
+  Scenario: Finishing leaves a member whose only way in is the previous provider on it rather than stopping
+    Given a member, active or deactivated, holds no verified way in other than the previous provider
+    When the update finishes
+    Then their previous identity is left in place, and stops working when the previous connection is torn down
+    And every other member's previous identity is taken away
+    And the update still counts access through the previous provider as retired
+
+
+  @unit @integration
+  Scenario: The quiet period counts from the switch-over and the last sign-in through the previous provider
+    Given the update has switched sign-in over to the replacement
+    When nobody signs in through the previous provider afterwards
+    Then the update can finish two days after the switch-over
+    But a sign-in through the previous provider after the switch-over moves that to seven days after the sign-in
+    And sign-ins through the previous provider before the switch-over do not count
+    And the update shows the time finishing opens
+
+  @integration @regression
+  Scenario: A revoked legacy directory sync is not one left to repoint
+    Given tearing the previous connection down has revoked its directory sync
+    When finishing re-reads what is outstanding
+    Then directory sync is not among the conditions, since a revoked sync pushes nobody
+    And finishing completes instead of asking for a repoint it has just made impossible
+
   @integration
   Scenario: Reading migration progress does not grant permission to change it
     Given a reader may see single sign-on but may not manage it
@@ -513,6 +590,83 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     Then the existing single sign-on remains active
     And no generic migration action is offered
 
+  # ---------------------------------------------------------------------
+  # Taking over a single sign-on LangWatch set up
+  # ---------------------------------------------------------------------
+  #
+  # The command that registers an organization's own identity provider beside
+  # the one it signs in through today has existed since the cutover was
+  # designed, and no customer screen ever called it: the only way an
+  # organization could take its sign-in over was to ask us to do it for them.
+  # These scenarios are the door, and what the administrator is promised
+  # before they touch it.
+  #
+  # The words matter as much as the door. What the organization is doing is
+  # replacing the sign-in it has with one it owns, and every line it reads
+  # says that; nothing a customer sees calls it a migration.
+
+  @integration
+  Scenario: An organization is offered its own identity provider on the Authentication overview
+    Given an organization signs in through single sign-on LangWatch set up for it
+    When its administrator opens Authentication
+    Then they are told they can connect their own identity provider
+    And one action takes them to the step that does it
+
+  @integration
+  Scenario: Connecting your own identity provider keeps today's sign-in working
+    Given an organization signs in through single sign-on LangWatch set up for it
+    When its administrator opens single sign-on setup
+    Then they are offered the same form the first-time journey asks
+    And they are told everyone keeps signing in as they do today, that nothing
+    changes for members until an administrator switches over, and that they
+    can switch back
+    And submitting it registers their identity provider beside the one in use
+
+  @integration
+  Scenario: A reader who may not manage single sign-on is told who can update it
+    Given an organization signs in through single sign-on LangWatch set up for it
+    And the reader may see single sign-on but not change it
+    When they open single sign-on setup
+    Then they read the status of their sign-in
+    And no form and no disabled action is offered
+
+  @integration
+  Scenario: Once it is under way, the overview says where the update got to
+    Given an organization has registered its own identity provider beside the
+    one in use
+    When its administrator opens Authentication
+    Then the overview says where the update stands, in the same words the
+    single sign-on page uses
+    And it links to that page
+
+  @integration
+  Scenario: The update reports where it stands and what is outstanding
+    Given an organization has registered its own identity provider beside the
+    one in use
+    When its administrator opens single sign-on setup
+    Then they read who is signing people in right now
+    And every outstanding check says what to do about it
+    And the full list of what has to be true before the update can finish is
+    available without leaving the page
+
+  @unit
+  Scenario: An organization not on an Enterprise plan is told the plan is what refuses
+    Given the organization is not on an Enterprise plan
+    When its administrator connects their own identity provider
+    Then the request is refused with "enterprise_plan_required"
+    And the words the administrator reads are the plan's, not a generic failure
+
+  # Starting twice is refused by the one-replacement rule already stated under
+  # "What stops registration being an enumeration rail", so it is not restated
+  # here.
+
+  @integration
+  Scenario: Identity provider details that do not work are reported on the form
+    Given an administrator connecting their own identity provider
+    When the details they give are refused
+    Then the reason is shown with the fields they filled in, not as a
+    notification that disappears
+
   @integration
   Scenario: Registering is acknowledged rather than left to be inferred
     Given an administrator who has filled the registration form in
@@ -552,10 +706,10 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     But a similarly named sibling provider does not count
 
   @integration @regression
-  Scenario: Native legacy retirement requires a usable replacement in the same organization
+  Scenario: Native legacy retirement leaves every member a way in
     Given a legacy identifier was adopted without a connection annotation
     When its legacy access is retired
-    Then retirement requires a verified replacement identifier for that user
+    Then it is taken away from a user who keeps a verified replacement identifier or another verified way in, which becomes primary where the legacy one was
     And accounts belonging only to another organization remain untouched
 
   @unit @regression

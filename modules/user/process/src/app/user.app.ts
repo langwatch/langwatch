@@ -221,6 +221,7 @@ export class UserApp implements UserApi {
       users: UserService.create({
         repository: repositories.users,
         organizations: dependencies.organizations,
+        auth: dependencies.auth,
         avatarStorage: members.avatarStorage,
         credentialIssuer: CREDENTIAL_ISSUER,
         ...(now ? { now } : {}),

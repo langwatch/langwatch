@@ -15,10 +15,8 @@ const getByIdResult: {
   isFetched: boolean;
 } = { data: undefined, isFetched: false };
 const retryDatasetNormalize = vi.fn();
-const requestDirectUpload = vi.fn();
-const putFileToPresignedUrl = vi.fn();
-const finalizeDirectUpload = vi.fn();
-const abortPendingUpload = vi.fn();
+const uploadStoredObject = vi.fn();
+const createFromStoredObject = vi.fn();
 
 vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
@@ -39,13 +37,24 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   },
 }));
 
-vi.mock("../../../../behavior/direct-upload.ts", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  retryDatasetNormalize: (...args: unknown[]) => retryDatasetNormalize(...args),
-  requestDirectUpload: (...args: unknown[]) => requestDirectUpload(...args),
-  putFileToPresignedUrl: (...args: unknown[]) => putFileToPresignedUrl(...args),
-  finalizeDirectUpload: (...args: unknown[]) => finalizeDirectUpload(...args),
-  abortPendingUpload: (...args: unknown[]) => abortPendingUpload(...args),
+vi.mock("../../../../behavior/dataset-api.ts", () => ({
+  datasetApi: {
+    dataset: {
+      retryNormalize: {
+        useMutation: () => ({
+          mutateAsync: (...args: unknown[]) => retryDatasetNormalize(...args),
+        }),
+      },
+    },
+  },
+}));
+
+const importTransport = {
+  uploadStoredObject: (...args: unknown[]) => uploadStoredObject(...args),
+  createFromStoredObject: (...args: unknown[]) => createFromStoredObject(...args),
+};
+vi.mock("../../../../behavior/use-stored-object-upload.ts", () => ({
+  useDatasetImportTransport: () => importTransport,
 }));
 
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
@@ -71,9 +80,6 @@ import {
   DatasetUploadProcessing,
   UploadCSVForm,
 } from "../upload-csv-drawer.tsx";
-
-/** Error shaped like an aborted fetch. */
-const abortError = () => Object.assign(new Error("aborted"), { name: "AbortError" });
 
 const wrap = (ui: React.ReactElement) =>
   render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
@@ -339,25 +345,15 @@ describe("DatasetUploadProcessing", () => {
 });
 
 describe("UploadCSVForm cancel", () => {
-  describe("when cancel lands before requestDirectUpload resolves", () => {
-    it("reaps the just-minted dataset row instead of stranding it", async () => {
+  describe("when cancel lands while the file is still uploading", () => {
+    it("creates no dataset from the file", async () => {
       const user = userEvent.setup();
-      // requestDirectUpload is held open so we can cancel mid-flight, then
-      // resolve it AFTER the cancel — the server has minted the row by then.
-      let resolveRequest!: (value: { datasetId: string; uploadUrl: string; slug: string }) => void;
-      requestDirectUpload.mockReturnValue(
+      let resolveUpload!: (value: { id: string }) => void;
+      uploadStoredObject.mockReturnValue(
         new Promise((resolve) => {
-          resolveRequest = resolve;
+          resolveUpload = resolve;
         }),
       );
-      // The PUT fails immediately because the cancel already aborted the signal.
-      putFileToPresignedUrl.mockImplementation(
-        (_url: string, _file: File, signal?: AbortSignal) => {
-          if (signal?.aborted) return Promise.reject(abortError());
-          return Promise.resolve();
-        },
-      );
-      abortPendingUpload.mockResolvedValue(undefined);
 
       render(
         <ChakraProvider value={defaultSystem}>
@@ -373,28 +369,13 @@ describe("UploadCSVForm cancel", () => {
 
       await user.upload(fileInput(), new File(["x"], "racey.csv", { type: "text/csv" }));
       await user.click(screen.getByRole("button", { name: /^upload$/i }));
-
-      // Mid-flight: the cancel control is shown; click it before the presign
-      // resolves (so handleCancelUpload sees no id yet → reaps nothing).
       await user.click(await screen.findByRole("button", { name: /cancel upload/i }));
-      expect(abortPendingUpload).not.toHaveBeenCalled();
 
-      // Now the presign resolves: the row exists, the aborted PUT throws, and
-      // the catch must reap the now-known id.
-      resolveRequest({
-        datasetId: "dataset_racey",
-        uploadUrl: "https://s3.example/put",
-        slug: "s",
-      });
+      resolveUpload({ id: "so_racey" });
 
-      await waitFor(() => {
-        expect(abortPendingUpload).toHaveBeenCalledWith({
-          projectId: "proj_1",
-          datasetId: "dataset_racey",
-        });
-      });
-      // Reaped exactly once.
-      expect(abortPendingUpload).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(uploadStoredObject).toHaveBeenCalledTimes(1));
+      await Promise.resolve();
+      expect(createFromStoredObject).not.toHaveBeenCalled();
     });
   });
 });

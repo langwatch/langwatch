@@ -1,56 +1,61 @@
 /**
- * The write half of the stored-object lifecycle: bytes arriving in-process, and the
- * presigned direct-upload handshake. The read, delete and cleanup halves stay on
- * `StoredObjectService`, which composes this one.
+ * The write half of the stored-object lifecycle (ADR-158 §4): bytes arriving
+ * in-process, and create, PUT to a signed URL, confirm. Every id is a fresh
+ * KSUID and every digest is taken as the bytes stream.
  */
-import { createHash } from "node:crypto";
-
+import { ValidationError } from "@langwatch/handled-error";
 import {
   DirectUploadUnavailableError,
   StorageUnavailableError,
   StoredObjectBytesMissingError,
+  StoredObjectDeletedError,
   StoredObjectIntegrityConflictError,
-  UploadChecksumMismatchError,
+  StoredObjectNotFoundError,
   UploadExpiredError,
   UploadIncompleteError,
   UploadTokenInvalidError,
   UploadTooLargeError,
+  isRefusedUploadMediaType,
+  purposePolicyOf,
   type ConfirmStoredObjectUploadInput,
   type CreateStoredObjectUploadInput,
   type StoreStoredObjectFromBytesInput,
   type StoreStoredObjectFromBytesResult,
+  type StoredObjectByteStream,
   type StoredObjectReference,
+  type StoredObjectUploadBody,
   type StoredObjectsCreateUploadOutput,
+  type WriteStoredObjectUploadInput,
 } from "@langwatch/stored-object-contract";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 
-import type { StoredObjectUploadTokenClaims } from "../app/stored-object.members.ts";
-import type { StoredObjectRecord } from "../repositories/stored-object-record.repository.ts";
+import type {
+  StoredObjectStorage,
+  StoredObjectStorageAddress,
+} from "../app/stored-object.members.ts";
+import type {
+  StoredObjectRecord,
+  StoredObjectRecordRepository,
+} from "../repositories/stored-object-record.repository.ts";
 import { storedObjectReferenceOf } from "../rules/stored-object-view.rules.ts";
-import type { StoredObjectServiceOptions } from "./stored-object.service.ts";
+import type { StoredObjectUploadSignerService } from "./stored-object-upload-signer.service.ts";
+
+export type StoredObjectUploadServiceOptions = Readonly<{
+  records: StoredObjectRecordRepository;
+  storage: StoredObjectStorage;
+  signer: StoredObjectUploadSignerService;
+  maximumUploadBytes: number;
+  uploadExpiryMs: number;
+  now: () => Instant;
+  newId: () => string;
+}>;
 
 export class StoredObjectUploadService {
-  static create(
-    options: StoredObjectServiceOptions & {
-      now: () => Instant;
-      operationId: () => string;
-    },
-  ): StoredObjectUploadService {
+  static create(options: StoredObjectUploadServiceOptions): StoredObjectUploadService {
     return new StoredObjectUploadService(options);
   }
 
-  private readonly now: () => Instant;
-  private readonly operationId: () => string;
-
-  private constructor(
-    private readonly options: StoredObjectServiceOptions & {
-      now: () => Instant;
-      operationId: () => string;
-    },
-  ) {
-    this.now = options.now;
-    this.operationId = options.operationId;
-  }
+  private constructor(private readonly options: StoredObjectUploadServiceOptions) {}
 
   static async storageCall<T>(operation: () => Promise<T>): Promise<T> {
     try {
@@ -89,38 +94,21 @@ export class StoredObjectUploadService {
   async storeFromBytes(
     input: StoreStoredObjectFromBytesInput,
   ): Promise<StoreStoredObjectFromBytesResult> {
-    const bytes = await this.readBounded(input.bytes);
-    const sha256 = createHash("sha256").update(bytes).digest("hex");
-    const id = await this.options.idDeriver.fromDigest({
-      projectId: input.projectId,
-      sha256,
-    });
-    const existing = await this.options.records.findById({
-      tenantId: input.projectId,
-      id,
-    });
-    if (existing?.status === "available") {
-      StoredObjectUploadService.assertByteFacts(existing, bytes.byteLength);
-      if (!existing.audiences.includes(input.audience)) {
-        await this.options.records.upsert({
-          ...existing,
-          audiences: [...existing.audiences, input.audience],
-          updatedAt: this.now(),
-        });
-      }
-
-      return { reference: storedObjectReferenceOf(existing), isDuplicate: true };
-    }
-
-    const address = await StoredObjectUploadService.storageCall(() =>
+    const { chunks, byteLength } = await this.measured(input.bytes);
+    const id = this.options.newId();
+    const { address } = await StoredObjectUploadService.storageCall(() =>
+      this.options.storage.place({ projectId: input.projectId, objectId: id }),
+    );
+    const digest = await StoredObjectUploadService.storageCall(() =>
       this.options.storage.write({
         projectId: input.projectId,
-        objectId: id,
-        bytes,
+        address,
+        body: streamOf(chunks),
+        byteLength,
         mediaType: input.mediaType,
       }),
     );
-    const now = this.now();
+    const now = this.options.now();
     const record: StoredObjectRecord = {
       tenantId: input.projectId,
       id,
@@ -129,30 +117,22 @@ export class StoredObjectUploadService {
       ownerKind: input.ownerKind,
       ownerId: input.ownerId,
       filename: input.filename,
-      sha256,
-      byteLength: bytes.byteLength,
+      sha256: digest.sha256,
+      byteLength: digest.byteLength,
       mediaType: input.mediaType,
       mediaTypeVerified: true,
       storage: address,
-      generation: (existing?.generation ?? 0) + 1,
+      generation: 1,
       audiences: [input.audience],
       expiresAt: null,
       availableAt: now,
       deletedAt: null,
       source: "canonical",
       legacyFingerprint: null,
-      createdAt: existing?.createdAt ?? now,
+      createdAt: now,
       updatedAt: now,
     };
-    try {
-      await this.options.records.upsert(record);
-    } catch (error) {
-      await StoredObjectUploadService.ignoreStorageFailure(() =>
-        this.options.storage.delete({ projectId: input.projectId, address }),
-      );
-
-      throw error;
-    }
+    await this.recordOrDiscard(record, address);
 
     return { reference: storedObjectReferenceOf(record), isDuplicate: false };
   }
@@ -160,118 +140,117 @@ export class StoredObjectUploadService {
   async createUpload(
     input: CreateStoredObjectUploadInput,
   ): Promise<StoredObjectsCreateUploadOutput> {
-    if (input.byteLength > this.options.maximumUploadBytes) {
-      throw new UploadTooLargeError(input.byteLength, this.options.maximumUploadBytes);
+    const policy = purposePolicyOf(input.purpose);
+    if (!policy.uploadable) {
+      throw refusedField("purpose", "Files with this purpose cannot be uploaded.");
+    }
+    if (isRefusedUploadMediaType(input.mediaType)) {
+      throw refusedField("mediaType", "Files of this type cannot be uploaded.");
     }
 
-    const id = await this.options.idDeriver.fromDigest({
-      projectId: input.projectId,
-      sha256: input.sha256,
-    });
-    const existing = await this.options.records.findById({
-      tenantId: input.projectId,
-      id,
-    });
-    if (existing?.status === "available") {
-      StoredObjectUploadService.assertByteFacts(existing, input.byteLength);
+    const id = this.options.newId();
+    const placement = await StoredObjectUploadService.storageCall(() =>
+      this.options.storage.place({ projectId: input.projectId, objectId: id }),
+    );
+    const limit = Math.min(policy.maxBytes, placement.maxSinglePutBytes);
+    if (input.byteLength > limit) throw new UploadTooLargeError(input.byteLength, limit);
 
-      return { status: "existing", reference: storedObjectReferenceOf(existing) };
-    }
-
-    const operationId = this.operationId();
-    const now = this.now();
+    const now = this.options.now();
     const expiresAt = now.add({ milliseconds: this.options.uploadExpiryMs });
-    const upload = await StoredObjectUploadService.storageCall(() =>
-      this.options.storage.tryCreateUpload({
+    const signed = await StoredObjectUploadService.storageCall(() =>
+      this.options.storage.signUpload({
         projectId: input.projectId,
-        objectId: id,
+        address: placement.address,
         byteLength: input.byteLength,
-        sha256: input.sha256,
         mediaType: input.mediaType,
         expiresAt,
       }),
     );
-    if (!upload) {
-      throw new DirectUploadUnavailableError();
-    }
-
-    const record = pendingUploadRecord({ input, id, upload, expiresAt, now, existing });
-    try {
-      await this.options.records.upsert(record);
-    } catch (error) {
-      await StoredObjectUploadService.ignoreStorageFailure(() =>
-        this.options.storage.delete({
-          projectId: input.projectId,
-          address: upload.address,
-        }),
-      );
-
-      throw error;
-    }
-
-    const reference = storedObjectReferenceOf(record);
-    const uploadToken = await this.options.uploadTokens.encode({
-      projectId: input.projectId,
-      objectId: id,
-      operationId,
-      address: upload.address,
-      reference,
-      expiresAt: toDate(expiresAt).toISOString(),
-    });
+    await this.options.records.upsert(
+      pendingUploadRecord({ input, id, address: placement.address, expiresAt, now }),
+    );
+    const target =
+      signed.kind === "direct"
+        ? { uploadUrl: signed.url, headers: { ...signed.headers } }
+        : {
+            uploadUrl: this.options.signer.urlFor({
+              projectId: input.projectId,
+              objectId: id,
+              byteLength: input.byteLength,
+              mediaType: input.mediaType,
+              expiresAt,
+            }),
+          };
 
     return {
-      status: "pending",
       objectId: id,
-      operationId,
-      uploadToken,
-      upload: upload.target,
+      method: "PUT",
+      expiresAt: toDate(expiresAt).toISOString(),
+      ...target,
     };
   }
 
-  async confirmUpload(input: ConfirmStoredObjectUploadInput): Promise<StoredObjectReference> {
-    const claims = await this.decodeUploadToken(input.uploadToken);
-    if (claims.projectId !== input.projectId) {
-      throw new UploadTokenInvalidError();
+  async writeUpload(input: WriteStoredObjectUploadInput): Promise<void> {
+    const seal = this.options.signer.open({
+      objectId: input.objectId,
+      signature: input.signature,
+      now: this.options.now(),
+    });
+    if (input.contentLength !== undefined && input.contentLength > seal.byteLength) {
+      throw new UploadTooLargeError(input.contentLength, seal.byteLength);
     }
 
     const value = await this.options.records.findById({
-      tenantId: claims.projectId,
-      id: claims.objectId,
+      tenantId: seal.projectId,
+      id: input.objectId,
     });
-    if (!value || value.status !== "pending") {
-      if (value?.status === "available") {
-        return storedObjectReferenceOf(value);
-      }
+    if (value?.status !== "pending" || !value.storage) throw new UploadTokenInvalidError();
 
-      throw new UploadIncompleteError(claims.operationId);
+    if (!input.body) throw new UploadIncompleteError();
+
+    const address = value.storage;
+    try {
+      await this.options.storage.write({
+        projectId: seal.projectId,
+        address,
+        body: chunksOf(input.body),
+        byteLength: seal.byteLength,
+        mediaType: seal.mediaType,
+      });
+    } catch (error) {
+      throw writeRefusalOf(error, seal.byteLength);
     }
+  }
+
+  async confirmUpload(input: ConfirmStoredObjectUploadInput): Promise<StoredObjectReference> {
+    const value = await this.options.records.findById({
+      tenantId: input.projectId,
+      id: input.objectId,
+    });
+    if (!value) throw new StoredObjectNotFoundError();
+    if (value.status === "available") return storedObjectReferenceOf(value);
+    if (value.status === "deleted")
+      throw new StoredObjectDeletedError(input.projectId, input.objectId);
+    if (value.status !== "pending" || !value.storage) throw new UploadIncompleteError();
 
     const isExpired =
-      value.expiresAt === null || Temporal.Instant.compare(value.expiresAt, this.now()) <= 0;
-    if (isExpired) {
-      throw new UploadExpiredError(claims.operationId);
-    }
+      value.expiresAt === null ||
+      Temporal.Instant.compare(value.expiresAt, this.options.now()) <= 0;
+    if (isExpired) throw new UploadExpiredError();
 
-    const stat = await StoredObjectUploadService.storageCall(() =>
-      this.options.storage.tryStat({
-        projectId: claims.projectId,
-        address: claims.address,
-      }),
+    const address = value.storage;
+    const digest = await StoredObjectUploadService.storageCall(() =>
+      this.options.storage.tryStat({ projectId: input.projectId, address }),
     );
-    if (!stat) {
-      throw new UploadIncompleteError(claims.operationId);
-    }
+    if (!digest) throw new UploadIncompleteError();
 
-    if (stat.byteLength !== value.byteLength || stat.sha256 !== value.sha256) {
-      throw new UploadChecksumMismatchError(claims.operationId);
-    }
-
-    const now = this.now();
+    StoredObjectUploadService.assertByteFacts(value, digest.byteLength);
+    const now = this.options.now();
     const available: StoredObjectRecord = {
       ...value,
       status: "available",
+      sha256: digest.sha256,
       mediaTypeVerified: true,
-      storage: claims.address,
       generation: value.generation + 1,
       expiresAt: null,
       availableAt: now,
@@ -282,75 +261,111 @@ export class StoredObjectUploadService {
     return storedObjectReferenceOf(available);
   }
 
-  private async readBounded(source: StoreStoredObjectFromBytesInput["bytes"]): Promise<Uint8Array> {
+  /** In-process bytes: a buffer is written as it is; a stream is counted within the ceiling. */
+  private async measured(
+    source: StoreStoredObjectFromBytesInput["bytes"],
+  ): Promise<{ chunks: readonly Uint8Array[]; byteLength: number }> {
+    if (source instanceof Uint8Array) {
+      this.assertWithinCeiling(source.byteLength);
+
+      return { chunks: [source], byteLength: source.byteLength };
+    }
+
     const chunks: Uint8Array[] = [];
     let byteLength = 0;
-    const values = source instanceof Uint8Array ? [source] : source;
-    for await (const chunk of values) {
+    for await (const chunk of source) {
       byteLength += chunk.byteLength;
-      if (byteLength > this.options.maximumUploadBytes) {
-        throw new UploadTooLargeError(byteLength, this.options.maximumUploadBytes);
-      }
-
+      this.assertWithinCeiling(byteLength);
       chunks.push(chunk);
     }
 
-    const result = new Uint8Array(byteLength);
-    let offset = 0;
-    for (const chunk of chunks) {
-      result.set(chunk, offset);
-      offset += chunk.byteLength;
-    }
-
-    return result;
+    return { chunks, byteLength };
   }
 
-  private async decodeUploadToken(token: string): Promise<StoredObjectUploadTokenClaims> {
+  private assertWithinCeiling(byteLength: number): void {
+    if (byteLength > this.options.maximumUploadBytes) {
+      throw new UploadTooLargeError(byteLength, this.options.maximumUploadBytes);
+    }
+  }
+
+  private async recordOrDiscard(
+    record: StoredObjectRecord,
+    address: StoredObjectStorageAddress,
+  ): Promise<void> {
     try {
-      return await this.options.uploadTokens.decode(token);
-    } catch {
-      throw new UploadTokenInvalidError();
+      await this.options.records.upsert(record);
+    } catch (error) {
+      await StoredObjectUploadService.ignoreStorageFailure(() =>
+        this.options.storage.delete({ projectId: record.tenantId, address }),
+      );
+
+      throw error;
     }
   }
 }
 
-/** The row a presigned upload leaves behind while its bytes are still in flight. */
+function refusedField(field: "purpose" | "mediaType", message: string): ValidationError {
+  return new ValidationError(message, { meta: { fieldErrors: { [field]: [message] } } });
+}
+
+/** The member refuses a body past or short of its declared length, and keeps nothing. */
+function writeRefusalOf(error: unknown, byteLength: number): Error {
+  const name = error instanceof Error ? error.name : "";
+  if (name === "ObjectBodyTooLargeError")
+    return new UploadTooLargeError(byteLength + 1, byteLength);
+  if (name === "ObjectBodyShortError") return new UploadIncompleteError();
+
+  return new StorageUnavailableError();
+}
+
+async function* chunksOf(body: StoredObjectUploadBody): StoredObjectByteStream {
+  const reader = body.getReader();
+  try {
+    for (let next = await reader.read(); !next.done; next = await reader.read()) yield next.value;
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+async function* streamOf(chunks: readonly Uint8Array[]): StoredObjectByteStream {
+  yield* chunks;
+}
+
+/** The row a signed upload leaves behind while its bytes are still in flight. */
 function pendingUploadRecord({
   input,
   id,
-  upload,
+  address,
   expiresAt,
   now,
-  existing,
 }: {
   input: CreateStoredObjectUploadInput;
   id: StoredObjectRecord["id"];
-  upload: { address: StoredObjectRecord["storage"] };
+  address: StoredObjectStorageAddress;
   expiresAt: Instant;
   now: Instant;
-  existing: StoredObjectRecord | null;
 }): StoredObjectRecord {
   return {
     tenantId: input.projectId,
     id,
     status: "pending",
-    purpose: "public_upload",
+    purpose: input.purpose,
     ownerKind: "project",
     ownerId: input.projectId,
     filename: input.filename,
-    sha256: input.sha256,
+    sha256: "",
     byteLength: input.byteLength,
     mediaType: input.mediaType,
     mediaTypeVerified: false,
-    storage: upload.address,
-    generation: existing?.generation ?? 0,
+    storage: address,
+    generation: 0,
     audiences: ["project:view"],
     expiresAt,
     availableAt: null,
     deletedAt: null,
     source: "canonical",
     legacyFingerprint: null,
-    createdAt: existing?.createdAt ?? now,
+    createdAt: now,
     updatedAt: now,
   };
 }

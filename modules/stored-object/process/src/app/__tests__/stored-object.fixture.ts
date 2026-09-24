@@ -3,28 +3,26 @@
  * a token codec that remembers what it minted, a fixed delivery capability,
  * and the row-and-stream reads the byte surface performs.
  */
+import type { AuthzDenialReason, PermissionDecision } from "@langwatch/authz-contract";
 import type {
   StoredObjectDeliveryCapability,
-  StoredObjectDirectUploadTarget,
-  StoredObjectHead,
   StoredObjectOwnerResolver,
   StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
 
 import { MemoryStoredObjectRepositories } from "../../repositories/memory/memory.stored-object.repositories.ts";
 import type { StoredObjectRepositories } from "../../repositories/stored-object.repositories.ts";
-import {
-  StoredObjectApp,
-  type StoredObjectFileReader,
-  type StoredObjectFileStreamRead,
-  type StoredObjectInfrastructure,
-} from "../stored-object.app.ts";
+import { StoredObjectUploadSignerService } from "../../services/stored-object-upload-signer.service.ts";
+import type { StoredObjectPermissions } from "../../services/stored-object.service.ts";
+import { StoredObjectApp, type StoredObjectInfrastructure } from "../stored-object.app.ts";
 import {
   StoredObjectDelivery,
   StoredObjectStorage,
-  StoredObjectUploadTokenCodec,
+  type StoredObjectFileReader,
+  type StoredObjectFileStreamRead,
+  type StoredObjectPlacement,
+  type StoredObjectProbe,
   type StoredObjectStorageAddress,
-  type StoredObjectUploadTokenClaims,
 } from "../stored-object.members.ts";
 
 export const STORED_OBJECT_TEST_SHA256 = "a".repeat(64);
@@ -40,23 +38,22 @@ export class MemoryStoredObjectStorage extends StoredObjectStorage {
   deleted = false;
   deleteFailuresRemaining = 0;
 
-  async write(): Promise<StoredObjectStorageAddress> {
-    return storedObjectTestAddress;
+  signed: "direct" | "through-process" = "direct";
+  written: Uint8Array[] = [];
+
+  async place(): Promise<StoredObjectPlacement> {
+    return { address: storedObjectTestAddress, maxSinglePutBytes: Number.MAX_SAFE_INTEGER };
   }
 
-  async tryCreateUpload(): Promise<{
-    address: StoredObjectStorageAddress;
-    target: StoredObjectDirectUploadTarget;
-  }> {
-    return {
-      address: storedObjectTestAddress,
-      target: {
-        method: "PUT",
-        url: "https://storage.example/upload",
-        headers: {},
-        expiresAt: "2026-08-22T00:05:00.000Z",
-      },
-    };
+  async write(input: { body: AsyncIterable<Uint8Array> }) {
+    for await (const chunk of input.body) this.written.push(chunk);
+    return { byteLength: 3, sha256: STORED_OBJECT_TEST_SHA256 };
+  }
+
+  async signUpload() {
+    return this.signed === "direct"
+      ? { kind: "direct" as const, url: "https://storage.example/upload", headers: {} }
+      : { kind: "through-process" as const };
   }
 
   async tryStat() {
@@ -90,19 +87,27 @@ export class MemoryStoredObjectStorage extends StoredObjectStorage {
   }
 }
 
-export class MemoryStoredObjectTokens extends StoredObjectUploadTokenCodec {
-  claims: StoredObjectUploadTokenClaims | null = null;
+/** Seals with the identity cipher: the tests read what a URL carries, not the crypto. */
+export function createStoredObjectTestSigner(): StoredObjectUploadSignerService {
+  return StoredObjectUploadSignerService.create({
+    encryption: { encrypt: (value) => value, decrypt: (value) => value },
+    publicBaseUrl: "https://app.example",
+  });
+}
 
-  async encode(claims: StoredObjectUploadTokenClaims): Promise<string> {
-    this.claims = claims;
+/** Grants exactly the project permissions a test names, denying the rest with the given reason. */
+export class GrantedStoredObjectPermissions implements StoredObjectPermissions {
+  constructor(
+    readonly granted: readonly string[] = ["traces:view", "scenarios:view", "datasets:view"],
+    readonly denialReason: AuthzDenialReason = "no-binding",
+  ) {}
 
-    return "token";
-  }
+  async getDecision(input: { permission: string }): Promise<PermissionDecision> {
+    if (this.granted.includes(input.permission)) {
+      return { permitted: true, organizationRole: "MEMBER" };
+    }
 
-  async decode(): Promise<StoredObjectUploadTokenClaims> {
-    if (!this.claims) throw new Error("missing token");
-
-    return this.claims;
+    return { permitted: false, organizationRole: "MEMBER", denialReason: this.denialReason };
   }
 }
 
@@ -120,10 +125,10 @@ export class FixedStoredObjectDelivery extends StoredObjectDelivery {
 
 /** The byte surface's reads, answering "no such row" until a test says otherwise. */
 export class MemoryStoredObjectFiles implements StoredObjectFileReader {
-  head: StoredObjectHead = { status: "not_found" };
+  head: StoredObjectProbe = { status: "not_found" };
   read: StoredObjectFileStreamRead | null = null;
 
-  async headById(): Promise<StoredObjectHead> {
+  async headById(): Promise<StoredObjectProbe> {
     return this.head;
   }
 
@@ -146,8 +151,7 @@ export function createStoredObjectTestInfrastructure(
   return {
     storage: new MemoryStoredObjectStorage(),
     delivery: new FixedStoredObjectDelivery(),
-    uploadTokens: new MemoryStoredObjectTokens(),
-    idDeriver: { fromDigest: ({ sha256 }) => `so_${sha256.slice(0, 8)}` },
+    signer: createStoredObjectTestSigner(),
     maximumUploadBytes: 1024,
     uploadExpiryMs: 300_000,
     files: new MemoryStoredObjectFiles(),
@@ -160,9 +164,11 @@ export function createStoredObjectTestApp(
   input: Readonly<{
     repositories?: StoredObjectRepositories;
     members?: Partial<StoredObjectInfrastructure>;
+    permissions?: StoredObjectPermissions;
   }> = {},
 ): StoredObjectApp {
   return StoredObjectApp.fromInfrastructure({
+    permissions: input.permissions ?? new GrantedStoredObjectPermissions(),
     repositories: input.repositories ?? MemoryStoredObjectRepositories.create(),
     infrastructure: createStoredObjectTestInfrastructure(input.members ?? {}),
   });

@@ -127,6 +127,32 @@ describe("visitContentPart", () => {
     });
   });
 
+  describe("given a data URL that carries a file name parameter", () => {
+    describe("when the part is decoded", () => {
+      /**
+       * A dataset attachment travels as `data:<type>;name=<file>;base64,<bytes>`
+       * (specs/experiments-v3/attachment-inputs.feature); the parameter before
+       * `;base64` must not hide the payload the span pipeline moves back out.
+       */
+      it("reads the bare media type and the payload", () => {
+        expect(
+          decode({
+            type: "file",
+            file: {
+              filename: "quarter.pdf",
+              file_data: `data:application/pdf;name=quarter%20one.pdf;base64,${PNG_B64}`,
+            },
+          }),
+        ).toMatchObject({
+          branch: "binary",
+          mimeType: "application/pdf",
+          data: PNG_B64,
+          filename: "quarter.pdf",
+        });
+      });
+    });
+  });
+
   describe("given a media part whose source shape is not one we speak", () => {
     it("passes it through rather than inventing an empty payload", () => {
       expect(decode({ type: "image", source: { type: "container", id: "abc" } })).toEqual({

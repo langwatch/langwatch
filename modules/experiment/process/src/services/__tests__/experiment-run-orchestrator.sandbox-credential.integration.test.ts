@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import type { ExperimentRunCollaborators } from "../../rules/experiment-run-input.rules.ts";
 import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service.ts";
+import { createNoAttachmentsFixture } from "./experiment-attachments.fixture.ts";
 
 const datasetColumns = [{ id: "input", name: "input", type: "string" }];
 
@@ -20,6 +21,7 @@ const resetBoundary = () => {
 };
 
 const ports = {
+  attachments: createNoAttachmentsFixture(),
   studio: {
     postEvent: async ({
       event,

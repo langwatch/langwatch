@@ -63,6 +63,7 @@ function makeStartedState(scenarioRunId: string): SimulationRunState["data"] {
     Reasoning: null,
     MetCriteria: [],
     UnmetCriteria: [],
+    InconclusiveCriteria: [],
     Error: null,
     Evaluations: [],
     DurationMs: null,
@@ -110,6 +111,45 @@ describe.skipIf(databaseUrl === null)(
         expect(projection!.data.ScenarioId).toBe(data.ScenarioId);
         expect(projection!.data.BatchRunId).toBe(data.BatchRunId);
         expect(projection!.data.ScenarioSetId).toBe(data.ScenarioSetId);
+      });
+    });
+
+    describe("when a finished run names a criterion the judge could not decide", () => {
+      /** @scenario "Inconclusive criteria survive the run row" */
+      it("reads it back apart from the failed ones, and a run without any reads none", async () => {
+        const store = async (data: SimulationRunState["data"]) =>
+          repo.storeProjection(
+            {
+              id: `proj-${nanoid()}`,
+              aggregateId: data.ScenarioRunId,
+              tenantId: createTenantId(tenantId),
+              version: new Date(now).toISOString().slice(0, 10),
+              data,
+            },
+            context,
+          );
+        const scenarioRunId = `run-inconclusive-${nanoid()}`;
+        const plainRunId = `run-plain-criteria-${nanoid()}`;
+        await store({
+          ...makeStartedState(scenarioRunId),
+          Status: "FAILURE",
+          Verdict: "failure",
+          FinishedAt: now,
+          MetCriteria: ["stays polite"],
+          UnmetCriteria: ["names the refund window", "opens a ticket"],
+          InconclusiveCriteria: ["opens a ticket"],
+        });
+        await store(makeStartedState(plainRunId));
+
+        const projection = await repo.findProjection(scenarioRunId, context);
+        const plain = await repo.findProjection(plainRunId, context);
+
+        expect(projection!.data.UnmetCriteria).toEqual([
+          "names the refund window",
+          "opens a ticket",
+        ]);
+        expect(projection!.data.InconclusiveCriteria).toEqual(["opens a ticket"]);
+        expect(plain!.data.InconclusiveCriteria).toEqual([]);
       });
     });
   },

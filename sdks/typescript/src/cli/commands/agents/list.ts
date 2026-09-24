@@ -10,6 +10,7 @@ import { formatTable, formatRelativeTime } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
+import { collapseStaleSiblings } from "./collapseAgents";
 
 /**
  * Who a personal or host-scoped agent belongs to, empty for a shared one.
@@ -26,6 +27,17 @@ export const agentOwnerLabel = (agent: AgentResponse): string => {
 
 /** The status column: online or offline for a connected agent, empty for the other types. */
 export const agentStatusLabel = (agent: AgentResponse): string => agent.status ?? "";
+
+/**
+ * The last seen column: "now" while a connected agent is online, otherwise
+ * how long ago its last process was seen, and empty for the other types,
+ * which have no process to see.
+ */
+export const agentLastSeenLabel = (agent: AgentResponse): string => {
+  if (agent.type !== "connected") return "";
+  if (agent.status === "online") return "now";
+  return agent.lastSeenAt ? formatRelativeTime(agent.lastSeenAt) : "";
+};
 
 /**
  * Colours one status cell. The table pads the cell to the width of the widest
@@ -48,7 +60,42 @@ export interface ListAgentsOptions {
   waitOnline?: string;
   /** How long `--wait-online` waits, in seconds. */
   timeout?: string | number;
+  /** List every row, including the stale siblings the list leaves out by default. */
+  all?: boolean;
 }
+
+/**
+ * The rows this command ships, not the rows the project has: stale siblings are
+ * collapsed unless `--all` asks for every row, and the total counts what ships.
+ */
+const shownAgents = ({
+  agents,
+  total,
+  all,
+}: {
+  agents: AgentResponse[];
+  total: number;
+  all?: boolean;
+}): { agents: AgentResponse[]; hidden: number; total: number } => {
+  const shown = all ? agents : collapseStaleSiblings({ agents });
+  const hidden = agents.length - shown.length;
+  return { agents: shown, hidden, total: total - hidden };
+};
+
+const foundAgentsLine = ({ total, hidden }: { total: number; hidden: number }): string => {
+  const found = `Found ${total} agent${total !== 1 ? "s" : ""}`;
+  if (hidden === 0) return found;
+  return `${found} (${hidden} stale row${hidden !== 1 ? "s" : ""} hidden, --all lists them)`;
+};
+
+const printHiddenRowsNote = (hidden: number): void => {
+  if (hidden === 0) return;
+  console.log(
+    chalk.gray(
+      `${hidden} stale row${hidden !== 1 ? "s" : ""} of a name and environment with a newer row hidden; ${chalk.cyan("langwatch agent list --all")} lists every row`,
+    ),
+  );
+};
 
 /** How often the list is read again while waiting. */
 const WAIT_POLL_MS = 3000;
@@ -129,14 +176,21 @@ export const listAgentsCommand = async (
         result = await service.list({ limit: 100 });
       }
     }
-    const agents = result.data;
+    const { agents, hidden, total } = shownAgents({
+      agents: result.data,
+      total: result.pagination.total,
+      all: options.all,
+    });
 
-    spinner.succeed(
-      `Found ${result.pagination.total} agent${result.pagination.total !== 1 ? "s" : ""}`,
-    );
+    spinner.succeed(foundAgentsLine({ total, hidden }));
 
     return {
-      data: result,
+      data: {
+        ...result,
+        data: agents,
+        pagination: { ...result.pagination, total },
+        hiddenStaleRows: hidden,
+      },
       table: () => {
         if (agents.length === 0) {
           console.log();
@@ -160,6 +214,7 @@ export const listAgentsCommand = async (
           Name: agent.name,
           Environment: agent.environment ?? "",
           Status: agentStatusLabel(agent),
+          "Last seen": agentLastSeenLabel(agent),
           Type: agent.type,
           ID: agent.id,
           Owner: agentOwnerLabel(agent),
@@ -168,7 +223,7 @@ export const listAgentsCommand = async (
 
         formatTable({
           data: tableData,
-          headers: ["Name", "Environment", "Status", "Type", "ID", "Owner", "Updated"],
+          headers: ["Name", "Environment", "Status", "Last seen", "Type", "ID", "Owner", "Updated"],
           colorMap: {
             Name: chalk.cyan,
             ID: chalk.green,
@@ -181,6 +236,7 @@ export const listAgentsCommand = async (
         console.log(
           chalk.gray(`Use ${chalk.cyan("langwatch agent get <id>")} to view agent details`),
         );
+        printHiddenRowsNote(hidden);
       },
     };
   } catch (error) {

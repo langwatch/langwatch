@@ -27,7 +27,6 @@ import {
 } from "../eventing/experiment-result-mapping.process.ts";
 import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
 import type { ExperimentCellExecutionService } from "./experiment-cell-execution.service.ts";
-import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service.ts";
 import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 import { ExperimentRunSandboxKeyService } from "./experiment-run-sandbox-key.service.ts";
 
@@ -310,7 +309,12 @@ export class ExperimentWorkflowCellService {
 
     try {
       const traceId = cell.traceId ?? generateOtelTraceId();
-      const inputs = ExperimentEvaluatorInputService.create({}).buildTargetInputs({ cell });
+      const inputs = await this.ports.attachments.buildDispatchInputs({
+        cell,
+        projectId,
+        datasetColumns,
+        shouldFetchExternal: true,
+      });
 
       // The workflow's own evaluator nodes carry the scores we surface per row.
       // Keep each node's display name so results show it (e.g. "Exact Match")

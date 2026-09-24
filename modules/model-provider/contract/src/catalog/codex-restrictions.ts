@@ -6,12 +6,19 @@ import { featuresByRole, type ModelRole } from "./model-feature-registry.ts";
 export const LANGY_CHAT_FEATURE_KEY = "langy.chat";
 
 /**
+ * The one-token generation Test Connection sends. Not in the feature registry:
+ * it names no surface, it asks one row whether it can answer at all.
+ */
+export const CONNECTION_TEST_FEATURE_KEY = "model_provider.connection_test";
+
+/**
  * The rule, not a hand-kept list: Langy plus every FAST-role assist — the
  * fast tier IS the "light AI assists" the codex terms cover, so a new fast
  * feature is codex-allowed by construction. A test pins the expansion.
  */
 export const CODEX_ALLOWED_FEATURE_KEYS: readonly string[] = [
   LANGY_CHAT_FEATURE_KEY,
+  CONNECTION_TEST_FEATURE_KEY,
   ...featuresByRole("FAST").map((f) => f.key),
 ];
 

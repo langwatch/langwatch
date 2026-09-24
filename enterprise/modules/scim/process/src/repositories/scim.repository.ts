@@ -227,6 +227,21 @@ export abstract class ScimRepository extends ScimGrantRepository {
     connectionId: string;
   }): Promise<number>;
   abstract findTokenByHash(hashedToken: string): Promise<ScimTokenIdentity | null>;
+  abstract findTokenIdsForConnection(input: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<string[]>;
+  /**
+   * Re-homes these tokens and the connection's directory identities onto
+   * another connection at once. An identity the target already holds stays
+   * the target's own, and the source's claim on it is dropped.
+   */
+  abstract moveDirectoryToConnection(input: {
+    organizationId: string;
+    fromConnectionId: string;
+    toConnectionId: string;
+    tokenIds: readonly string[];
+  }): Promise<void>;
   abstract recordTokenUse: (input: { tokenId: string; usedAt: Instant }) => Promise<void>;
   abstract scimConnectionExists(input: {
     organizationId: string;

@@ -118,7 +118,7 @@ describe("listAgentsCommand()", () => {
 
       // The command no longer decides the format — it hands the payload to
       // the output port, which renders json/yaml/agents/--jq from this value.
-      expect(result?.data).toEqual(listing);
+      expect(result?.data).toEqual({ ...listing, hiddenStaleRows: 0 });
       expect(console.log).not.toHaveBeenCalled();
     });
   });
@@ -162,7 +162,7 @@ describe("listAgentsCommand()", () => {
       const result = await pending;
 
       expect(mockList).toHaveBeenCalledTimes(3);
-      expect(result?.data).toEqual(online());
+      expect(result?.data).toEqual({ ...online(), hiddenStaleRows: 0 });
     });
 
     /** @scenario "The list can wait for an agent to come online" */

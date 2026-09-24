@@ -15,6 +15,20 @@ export const SEARCH_ROUTE_DECIDERS = ["classifier", "model", "fallback"] as cons
 
 export type SearchRouteDecidedBy = (typeof SEARCH_ROUTE_DECIDERS)[number];
 
+/**
+ * The model a route needed was missing (`no_model`: none configured) or did
+ * not answer (`model_failed`). Both are fixed from the model provider settings.
+ */
+export const MODEL_TROUBLES = ["no_model", "model_failed"] as const;
+
+export type ModelTrouble = (typeof MODEL_TROUBLES)[number];
+
+/** Which model problem this was, and the handled code it carried, if any. */
+export interface ModelFailure {
+  modelTrouble: ModelTrouble;
+  modelErrorCode?: string;
+}
+
 /** Which unit a judgement judges, decided from the lens the search ran in. */
 export type InstantEvalSearchTarget = "traces" | "threads" | "llm_spans";
 
@@ -59,6 +73,8 @@ export interface RouteSearchAvailability {
 
 const decidedBySchema = z.enum(SEARCH_ROUTE_DECIDERS);
 
+const modelTroubleSchema = z.enum(MODEL_TROUBLES);
+
 export const routeSearchResultSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("filter"),
@@ -72,8 +88,8 @@ export const routeSearchResultSchema = z.discriminatedUnion("kind", [
     kind: z.literal("instant_eval"),
     question: z.object({
       instructions: z.string(),
-      /** What counts as yes, and what counts as no, in that order. */
-      criteria: z.tuple([z.string(), z.string()]),
+      /** Yes then no. Absent when no model wrote the question. */
+      criteria: z.tuple([z.string(), z.string()]).optional(),
     }),
     target: z.enum(["traces", "threads", "llm_spans"]),
     /** The explicit terms typed alongside the sentence, applied as-is. */
@@ -81,16 +97,20 @@ export const routeSearchResultSchema = z.discriminatedUnion("kind", [
     /** The phrase search to run instead when the eval does not start. */
     fallbackQuery: z.string(),
     decidedBy: decidedBySchema,
+    /** Set when the question is the sentence as typed, because no model rewrote it. */
+    modelTrouble: modelTroubleSchema.optional(),
+    modelErrorCode: z.string().optional(),
   }),
   z.object({
     kind: z.literal("free_text"),
     /** The sentence as one phrase, merged with the explicit terms. */
     query: z.string(),
     decidedBy: decidedBySchema,
-    /** No classifier and no model: the client offers to configure one. */
-    isModelUnavailable: z.boolean(),
     /** Set when another route was chosen first and could not be built. */
     fellBackFrom: z.enum([...SEARCH_ROUTE_KINDS, "routing"]).optional(),
+    /** Set only when a model is what was missing, so the strip offers model settings. */
+    modelTrouble: modelTroubleSchema.optional(),
+    modelErrorCode: z.string().optional(),
   }),
   z.object({
     kind: z.literal("langy"),

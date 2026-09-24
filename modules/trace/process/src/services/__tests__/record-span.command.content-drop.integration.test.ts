@@ -131,8 +131,10 @@ function command({
       spanId: "span-1",
       name: "test-span",
       kind: 1,
-      startTimeUnixNano: "0",
-      endTimeUnixNano: "1000000",
+      // A real instant, two seconds long: a span starting at time zero is not
+      // a storable span time, so the fold would pass it over.
+      startTimeUnixNano: "1700000000500000000",
+      endTimeUnixNano: "1700000002500000000",
       attributes: kv(attributes),
       events: [],
       links: [],

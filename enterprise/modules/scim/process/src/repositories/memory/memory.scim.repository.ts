@@ -475,6 +475,51 @@ export class MemoryScimRepository extends ScimRepository {
     return dropped;
   }
 
+  async findTokenIdsForConnection(input: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<string[]> {
+    return this.tokens
+      .filter(
+        (row) =>
+          row.organizationId === input.organizationId && row.connectionId === input.connectionId,
+      )
+      .map(({ id }) => id);
+  }
+
+  async moveDirectoryToConnection({
+    organizationId,
+    fromConnectionId,
+    toConnectionId,
+    tokenIds,
+  }: {
+    organizationId: string;
+    fromConnectionId: string;
+    toConnectionId: string;
+    tokenIds: readonly string[];
+  }): Promise<void> {
+    for (const token of this.tokens) {
+      if (
+        token.organizationId === organizationId &&
+        token.connectionId === fromConnectionId &&
+        tokenIds.includes(token.id)
+      ) {
+        token.connectionId = toConnectionId;
+      }
+    }
+    const own = new Set(
+      this.directoryIdentities
+        .filter((row) => row.connectionId === toConnectionId)
+        .map((row) => row.externalId),
+    );
+    const moved = this.directoryIdentities.flatMap((row) => {
+      if (row.connectionId !== fromConnectionId) return [row];
+      if (own.has(row.externalId)) return [];
+      return [{ ...row, connectionId: toConnectionId }];
+    });
+    this.directoryIdentities.splice(0, this.directoryIdentities.length, ...moved);
+  }
+
   async findTokenByHash(hashedToken: string): Promise<ScimTokenIdentity | null> {
     const row = this.tokens.find((token) => token.hashedToken === hashedToken);
     return row ? identityOf(row) : null;

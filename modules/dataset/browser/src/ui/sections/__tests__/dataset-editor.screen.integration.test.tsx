@@ -24,7 +24,10 @@ const { datasetQuery } = vi.hoisted(() => ({
 
 vi.mock("../../../behavior/dataset-api.ts", () => ({
   datasetApi: {
-    dataset: { getById: { useQuery: () => datasetQuery.current } },
+    dataset: {
+      getById: { useQuery: () => datasetQuery.current },
+      retryNormalize: { useMutation: () => ({ mutateAsync: vi.fn() }) },
+    },
   },
 }));
 

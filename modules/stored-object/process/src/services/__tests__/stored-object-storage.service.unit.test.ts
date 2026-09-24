@@ -1,233 +1,159 @@
-import { Readable } from "node:stream";
-
-import { AwsClientProcessRuntime } from "@langwatch/aws-client";
-import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
+/**
+ * @vitest-environment node
+ * The recorded address is caller data: every member call is held to the
+ * project the caller asked about before the member is reached.
+ */
+import { memoryObjectStorage, type ObjectStorage } from "@langwatch/process-stores";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
-
 import type { StoredObjectStorageAddress } from "../../app/stored-object.members.ts";
-import {
-  StoredObjectStorageRuntimeAdapter,
-  StoredObjectProjectDestinationResolver,
-} from "../stored-object-storage-runtime.service.ts";
 import { StoredObjectStorageService } from "../stored-object-storage.service.ts";
 
-class NoProxy {
-  tryResolveForHost() {
-    return undefined;
-  }
+/** The memory twin, counting every call that reached it. */
+function recordingStorage() {
+  const inner = memoryObjectStorage();
+  const reached: string[] = [];
+  const objectStorage: ObjectStorage = {
+    write: (at, body, facts) => {
+      reached.push("write");
+      return inner.write(at, body, facts);
+    },
+    read: (at) => {
+      reached.push("read");
+      return inner.read(at);
+    },
+    digest: (at) => {
+      reached.push("digest");
+      return inner.digest(at);
+    },
+    remove: (at) => {
+      reached.push("remove");
+      return inner.remove(at);
+    },
+    signUpload: (at, facts) => {
+      reached.push("signUpload");
+      return inner.signUpload(at, facts);
+    },
+    destination: (projectId) => inner.destination(projectId),
+    probe: (projectId) => inner.probe(projectId),
+  };
+
+  return { reached, storage: StoredObjectStorageService.create({ objectStorage }) };
 }
 
-class Destination extends StoredObjectProjectDestinationResolver {
-  async resolve() {
-    return { kind: "s3" as const, bucket: "bucket" };
-  }
+async function* bytes(text: string): AsyncGenerator<Uint8Array> {
+  yield new TextEncoder().encode(text);
 }
 
-class MemoryDriver implements StoredObjectStorageDriver {
-  readonly values = new Map<string, Buffer>();
-
-  async get(uri: string) {
-    return Readable.from([this.values.get(uri) ?? Buffer.alloc(0)]);
-  }
-
-  async put(uri: string, bytes: Buffer) {
-    this.values.set(uri, Buffer.from(bytes));
-  }
-
-  async delete(uri: string) {
-    this.values.delete(uri);
-  }
-
-  async exists(uri: string) {
-    return this.values.has(uri);
-  }
+async function textOf(stream: AsyncIterable<Uint8Array> | null): Promise<string | null> {
+  if (!stream) return null;
+  let text = "";
+  for await (const chunk of stream) text += new TextDecoder().decode(chunk);
+  return text;
 }
 
-class ThrowingReadDriver extends MemoryDriver {
-  constructor(private readonly failure: Error) {
-    super();
-  }
-
-  override async get(): Promise<Readable> {
-    throw this.failure;
-  }
-}
-
-class RecordingDriver extends MemoryDriver {
-  readonly written: string[] = [];
-
-  override async put(uri: string, bytes: Buffer) {
-    this.written.push(uri);
-    await super.put(uri, bytes);
-  }
-}
+const otherProjects: readonly StoredObjectStorageAddress[] = [
+  { provider: "memory", destinationId: "memory", relativeId: "project-2/object-1" },
+  { provider: "memory", destinationId: "memory", relativeId: "object-1" },
+];
 
 describe("StoredObjectStorageService", () => {
-  describe("when the checkup probes a project's destination", () => {
-    it("writes an object under the project and removes it again", async () => {
-      const driver = new RecordingDriver();
-      const adapter = StoredObjectStorageService.create({
-        runtime: StoredObjectStorageRuntimeAdapter.create({
-          destination: new Destination(),
-          s3ForProject: () => driver,
-          fileForProject: () => driver,
-        }),
-        aws: AwsClientProcessRuntime.create({ outboundProxy: new NoProxy() }),
-      });
-
-      await expect(adapter.resolveDestination({ projectId: "project-1" })).resolves.toEqual({
-        kind: "s3",
-        bucket: "bucket",
-      });
-      await adapter.probe({ projectId: "project-1" });
-
-      expect(driver.written).toHaveLength(1);
-      expect(driver.written[0]).toMatch(/^s3:\/\/bucket\/project-1\/checkup\//);
-      expect(driver.values.size).toBe(0);
-    });
-  });
-
-  it("preserves canonical addresses and hashes existing bytes", async () => {
-    const driver = new MemoryDriver();
-    const runtime = StoredObjectStorageRuntimeAdapter.create({
-      destination: new Destination(),
-      s3ForProject: () => driver,
-      fileForProject: () => driver,
-    });
-    const adapter = StoredObjectStorageService.create({
-      runtime,
-      aws: AwsClientProcessRuntime.create({ outboundProxy: new NoProxy() }),
-    });
-
-    const address = await adapter.write({
-      projectId: "project-1",
-      objectId: "object-1",
-      bytes: new TextEncoder().encode("hello"),
-      mediaType: "text/plain",
-    });
-
-    expect(address).toEqual({
-      provider: "s3",
-      destinationId: "bucket",
-      relativeId: "project-1/object-1",
-    });
-    await expect(adapter.tryStat({ projectId: "project-1", address })).resolves.toEqual({
-      byteLength: 5,
-      sha256: "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
-    });
-  });
-
-  it("does not read another project through a caller-supplied project address", async () => {
-    const runtime = StoredObjectStorageRuntimeAdapter.create({
-      destination: new Destination(),
-      s3ForProject: () => new MemoryDriver(),
-      fileForProject: () => new MemoryDriver(),
-    });
-    const adapter = StoredObjectStorageService.create({
-      runtime,
-      aws: AwsClientProcessRuntime.create({ outboundProxy: new NoProxy() }),
-    });
-
-    await expect(
-      adapter.tryRead({
+  describe("given an object held for the requesting project", () => {
+    it("reads it back at its recorded address", async () => {
+      const { storage } = recordingStorage();
+      const { address } = await storage.place({ projectId: "project-1", objectId: "object-1" });
+      await storage.write({
         projectId: "project-1",
-        address: { provider: "s3", destinationId: "bucket", relativeId: "project-2/object-1" },
-      }),
-    ).rejects.toThrow("outside the requested project");
+        address,
+        body: bytes("hello"),
+        byteLength: 5,
+        mediaType: "text/plain",
+      });
+
+      await expect(
+        textOf(await storage.tryRead({ projectId: "project-1", address })),
+      ).resolves.toBe("hello");
+    });
   });
 
-  it.each([
+  describe.each(otherProjects)("given an address outside the project ($relativeId)", (address) => {
+    it("does not read another project through a caller-supplied project address", async () => {
+      const { storage, reached } = recordingStorage();
+
+      await expect(storage.tryRead({ projectId: "project-1", address })).rejects.toThrow(
+        "outside the requested project",
+      );
+      await expect(storage.tryStat({ projectId: "project-1", address })).rejects.toThrow(
+        "outside the requested project",
+      );
+      await expect(storage.delete({ projectId: "project-1", address })).rejects.toThrow(
+        "outside the requested project",
+      );
+      await expect(
+        storage.write({
+          projectId: "project-1",
+          address,
+          body: bytes("hello"),
+          byteLength: 5,
+          mediaType: "text/plain",
+        }),
+      ).rejects.toThrow("outside the requested project");
+      expect(reached).toEqual([]);
+    });
+  });
+
+  describe.each([
     "project-1/../project-2/object-1",
     "project-1/%2e%2e/project-2/object-1",
     "project-1/%252e%252e/project-2/object-1",
     "project-1\\..\\project-2\\object-1",
     "project-1/\t../project-2/object-1",
     "project-1/../project-2/object?x=1",
-  ])("rejects traversal address %s before URI construction", async (relativeId) => {
-    const runtime = StoredObjectStorageRuntimeAdapter.create({
-      destination: new Destination(),
-      s3ForProject: () => new MemoryDriver(),
-      fileForProject: () => new MemoryDriver(),
-    });
-    const adapter = StoredObjectStorageService.create({
-      runtime,
-      aws: AwsClientProcessRuntime.create({ outboundProxy: new NoProxy() }),
-    });
+    "project-1//object-1",
+  ])("given the traversal address %s", (relativeId) => {
+    it("refuses it before the member is reached", async () => {
+      const { storage, reached } = recordingStorage();
+      const address = { provider: "memory", destinationId: "memory", relativeId };
 
-    await expect(
-      adapter.tryRead({
-        projectId: "project-1",
-        address: { provider: "s3", destinationId: "bucket", relativeId },
-      }),
-    ).rejects.toThrow(Error);
+      await expect(storage.tryRead({ projectId: "project-1", address })).rejects.toThrow(
+        "outside the requested project",
+      );
+      expect(reached).toEqual([]);
+    });
   });
 
-  it("rejects unknown providers and destination injection", async () => {
-    const runtime = StoredObjectStorageRuntimeAdapter.create({
-      destination: new Destination(),
-      s3ForProject: () => new MemoryDriver(),
-      fileForProject: () => new MemoryDriver(),
-    });
-    const adapter = StoredObjectStorageService.create({
-      runtime,
-      aws: AwsClientProcessRuntime.create({ outboundProxy: new NoProxy() }),
-    });
+  describe("given an address naming a provider or destination nothing recorded", () => {
+    it("rejects unknown providers and destination injection", async () => {
+      const { storage, reached } = recordingStorage();
+      const addresses: readonly StoredObjectStorageAddress[] = [
+        { provider: "gcs", destinationId: "bucket", relativeId: "project-1/object-1" },
+        { provider: "s3", destinationId: "bucket/other", relativeId: "project-1/object-1" },
+        { provider: "s3", destinationId: "bucket?x=1", relativeId: "project-1/object-1" },
+        { provider: "file", destinationId: "/objects//other", relativeId: "project-1/object-1" },
+        {
+          provider: "azure-blob",
+          destinationId: "account/container/extra",
+          relativeId: "project-1/object-1",
+        },
+        { provider: "azure-blob", destinationId: "account", relativeId: "project-1/object-1" },
+      ];
 
-    const addresses: readonly StoredObjectStorageAddress[] = [
-      { provider: "gcs", destinationId: "bucket", relativeId: "project-1/object-1" },
-      { provider: "s3", destinationId: "bucket/other", relativeId: "project-1/object-1" },
-      {
-        provider: "azure-blob",
-        destinationId: "account/container/extra",
-        relativeId: "project-1/object-1",
-      },
-    ];
-    for (const address of addresses) {
-      await expect(adapter.tryRead({ projectId: "project-1", address })).rejects.toThrow(Error);
-    }
-  });
-
-  describe("when a read races a delete", () => {
-    it("turns the missing-object failure into null", async () => {
-      const failure = new ObjectNotFoundError("s3://bucket/project-1/object-1");
-      const driver = new ThrowingReadDriver(failure);
-      driver.values.set("s3://bucket/project-1/object-1", Buffer.from("present"));
-      const runtime = StoredObjectStorageRuntimeAdapter.create({
-        destination: new Destination(),
-        s3ForProject: () => driver,
-        fileForProject: () => driver,
-      });
-      const adapter = StoredObjectStorageService.create({
-        runtime,
-        aws: AwsClientProcessRuntime.create({ outboundProxy: new NoProxy() }),
-      });
-      const read = adapter.tryRead({
-        projectId: "project-1",
-        address: { provider: "s3", destinationId: "bucket", relativeId: "project-1/object-1" },
-      });
-      await expect(read).resolves.toBeNull();
-    });
-
-    it("propagates any other read failure", async () => {
-      const failure = new Error("network");
-      const driver = new ThrowingReadDriver(failure);
-      driver.values.set("s3://bucket/project-1/object-1", Buffer.from("present"));
-      const runtime = StoredObjectStorageRuntimeAdapter.create({
-        destination: new Destination(),
-        s3ForProject: () => driver,
-        fileForProject: () => driver,
-      });
-      const adapter = StoredObjectStorageService.create({
-        runtime,
-        aws: AwsClientProcessRuntime.create({ outboundProxy: new NoProxy() }),
-      });
-      const read = adapter.tryRead({
-        projectId: "project-1",
-        address: { provider: "s3", destinationId: "bucket", relativeId: "project-1/object-1" },
-      });
-      await expect(read).rejects.toThrow("network");
+      for (const address of addresses) {
+        await expect(storage.tryRead({ projectId: "project-1", address })).rejects.toThrow(
+          "invalid provider destination",
+        );
+        await expect(
+          storage.signUpload({
+            projectId: "project-1",
+            address,
+            byteLength: 5,
+            mediaType: "text/plain",
+            expiresAt: Temporal.Instant.from("2026-09-24T12:15:00Z"),
+          }),
+        ).rejects.toThrow("invalid provider destination");
+      }
+      expect(reached).toEqual([]);
     });
   });
 });

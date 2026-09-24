@@ -1,3 +1,4 @@
+import type { LegacySsoAccessQuery } from "@langwatch/auth-contract";
 import {
   breakGlassIsLive,
   SsoConnectionInvalidTransitionError,
@@ -17,10 +18,12 @@ import type { SsoMigrationEvidenceRepository } from "../repositories/sso-migrati
 import {
   connectionRefOf,
   identifierBelongsToMigrationConnection,
+  legacyStandingOf,
   inheritedDomainsOf,
+  memberMovesOf,
   membersViewOf,
-  MIGRATION_QUIET_PERIOD_MS,
   migrationBlockers,
+  quietPeriodOf,
   scimStatusOf,
 } from "../rules/sso-migration.rules.ts";
 
@@ -59,7 +62,7 @@ export interface SsoMigrationDirectoryReads {
  * legacy access is gone is somebody else's answer.
  */
 export interface SsoLegacyAccessReads {
-  count(args: { organizationId: string; connectionId: string }): Promise<number>;
+  count(args: LegacySsoAccessQuery): Promise<number>;
 }
 
 /** The facts finalization must re-read before and after every durable step. */
@@ -149,8 +152,9 @@ export class SsoMigrationProgressService {
       .filter((userId) => cursor === null || userId > cursor);
     const pageIds = stragglerIds.slice(0, limit);
     const byId = new Map(members.map((member) => [member.userId, member]));
+    const notYetMoved = members.filter((member) => !linkedUserIds.has(member.userId));
 
-    const [replacementLast, legacyLast, legacyActivityByUser, bindings, scimStatus] =
+    const [replacementLast, legacyLast, legacyActivityByUser, bindings, scimStatus, holders] =
       await Promise.all([
         this.deps.evidence.findLastAuthenticationAtMs({
           organizationId,
@@ -167,19 +171,24 @@ export class SsoMigrationProgressService {
         }),
         this.deps.breakGlass.findAllForOrganization({ organizationId }),
         this.readScimStatus(pair),
+        this.deps.evidence.countAddressHolders({
+          addresses: notYetMoved.flatMap((member) => (member.email ? [member.email] : [])),
+        }),
       ]);
 
     const nowMs = this.now();
     const linkedCount = members.filter((member) => linkedUserIds.has(member.userId)).length;
     const selectedRoute = ssoMigrationRouteOf(phase);
-    // The quiet period starts at the later of the route decision and the last
-    // legacy sign-in: choosing the direct route does not make the week
-    // already served, and neither does a sign-in during it.
-    const quietStartMs = Math.max(
-      replacement.routeChangedAtMs ?? replacement.graceStartedAtMs ?? replacement.createdAtMs,
-      legacyLast ?? 0,
-    );
-    const quietComplete = nowMs - quietStartMs >= MIGRATION_QUIET_PERIOD_MS;
+    const quiet = quietPeriodOf({
+      switchedOverAtMs:
+        selectedRoute === "direct"
+          ? (replacement.routeChangedAtMs ??
+            replacement.graceStartedAtMs ??
+            replacement.createdAtMs)
+          : null,
+      lastLegacyAuthenticationAtMs: legacyLast,
+      nowMs,
+    });
     const testSignIn = {
       done: replacementLast !== null || replacement.testLoginAccountId !== null,
       atMs: replacementLast,
@@ -188,9 +197,7 @@ export class SsoMigrationProgressService {
       selectedRoute,
       testSignInDone: testSignIn.done,
       liveRecoveryCount: bindings.filter((binding) => breakGlassIsLive({ binding, nowMs })).length,
-      linkedCount,
-      activeCount: members.length,
-      quietComplete,
+      quietComplete: quiet.complete,
       scimStatus,
       sharedLegacyIdentifiers: false,
     });
@@ -213,10 +220,11 @@ export class SsoMigrationProgressService {
             email: byId.get(userId)?.email ?? null,
           })),
           legacyActivityByUser,
+          moves: memberMovesOf({ members: notYetMoved, holders, replacement }),
         },
         limit,
       }),
-      quietPeriod: { lastLegacyAuthenticationAtMs: legacyLast, complete: quietComplete },
+      quietPeriod: { lastLegacyAuthenticationAtMs: legacyLast, ...quiet },
       scim: { status: scimStatus },
       blockers,
       canFinalize: blockers.length === 0 && (phase === "GRACE_DIRECT" || phase === "FINALIZING"),
@@ -269,14 +277,17 @@ export class SsoMigrationProgressService {
     });
     const userIds = members.map((member) => member.userId);
     const holdings = await this.deps.evidence.findLiveIdentifierHoldings({ userIds });
-    const held = holdings.some((holding) =>
-      identifierBelongsToMigrationConnection({ identifier: holding, connection: legacy }),
+    const { legacyIdentifierIds, strandedUserIds } = legacyStandingOf({ holdings, legacy });
+    const held = holdings.some(
+      (holding) =>
+        legacyIdentifierIds.has(holding.identifierId) && !strandedUserIds.has(holding.userId),
     );
     if (held) return false;
 
     const accounts = await this.deps.legacyAccess.count({
       organizationId: legacy.organizationId,
       connectionId: legacy.connectionId,
+      strandedUserIds: [...strandedUserIds],
     });
 
     return accounts === 0;

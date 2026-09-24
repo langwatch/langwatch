@@ -6,7 +6,7 @@ import type { DatasetColumns } from "@langwatch/dataset-contract";
  */
 import { describe, expect, it } from "vitest";
 
-import type { DatasetStorage } from "../../app/dataset.app.ts";
+import type { DatasetChunkRepository } from "../../repositories/dataset-chunk.repository.ts";
 import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
 import { type DatasetMutationRecord } from "../../rules/dataset-chunk-lines.rules.ts";
 import { DatasetChunkService } from "../dataset-chunk.service.ts";
@@ -58,7 +58,7 @@ function fakeStorage(chunks: unknown[][] = []) {
     deleteChunksFrom: async ({ fromIndex }: { fromIndex: number }) => {
       chunks.length = Math.min(chunks.length, fromIndex);
     },
-  } as unknown as DatasetStorage;
+  } as unknown as DatasetChunkRepository;
   return { storage, chunks };
 }
 

@@ -5,7 +5,6 @@ import {
   userAccountInfoSchema,
   userFullProfileSchema,
   userProfileSchema,
-  userSsoStatusSchema,
   userTourPreferenceSchema,
   userTourPreferenceRowSchema,
   userHomePathSchema,
@@ -19,7 +18,6 @@ import {
   type UserFullProfile,
   type UserPasskeyNudgeStatus,
   type UserProfile,
-  type UserSsoStatus,
   type UserTourPreference,
   type CreatedUser,
   type SetFirstUserPasswordResult,
@@ -264,18 +262,6 @@ export class PrismaUserRepository
     const row = await this.prisma.user.findUnique({ where: { id }, select: { createdAt: true } });
 
     return row ? userAccountInfoSchema.parse(row) : null;
-  }
-
-  async findSsoStatus(id: string): Promise<UserSsoStatus> {
-    const row = await this.prisma.user.findUnique({
-      where: { id },
-      select: { pendingSsoSetup: true },
-    });
-    const parsed = row ? userSsoStatusSchema.safeParse(row) : null;
-
-    return userSsoStatusSchema.parse({
-      pendingSsoSetup: parsed?.success ? parsed.data.pendingSsoSetup : false,
-    });
   }
 
   async findTraceExplorerTourPreference(id: string): Promise<UserTourPreference> {

@@ -80,4 +80,13 @@ export const datasetTrpcTransport = defineTrpcRouter(DatasetApi, datasetTrpc)
       targetProjectId: input.projectId,
     }),
   )
+  .procedure("createFromStoredObject")
+  .withPermission("datasets:create")
+  .handle(({ app, input }) => app.createDatasetFromStoredObject(input))
+  .procedure("appendStoredObject")
+  .withPermission("datasets:update")
+  .handle(({ app, input }) => app.appendStoredObjectToDataset(input))
+  .procedure("retryNormalize")
+  .withPermission("datasets:manage")
+  .handle(({ app, input }) => app.retryNormalize(input))
   .build();

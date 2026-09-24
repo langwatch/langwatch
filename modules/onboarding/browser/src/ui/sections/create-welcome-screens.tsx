@@ -69,7 +69,10 @@ const OrganizationScreen: React.FC<OnboardingScreenProps> = ({ surface }) => {
           way past lands back on this form with nothing lost. */}
       {joinOffers.map(({ key, JoinOffer }) => (
         <Suspense key={key} fallback={null}>
-          <JoinOffer dismissLabel="Create a new organization instead" />
+          <JoinOffer
+            dismissLabel="Create a new organization instead"
+            currentOrganizationId={null}
+          />
         </Suspense>
       ))}
       {/* For somebody who already declined for this domain: the sentence, not the screen. */}

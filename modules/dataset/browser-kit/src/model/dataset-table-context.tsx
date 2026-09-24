@@ -26,6 +26,19 @@ export type DatasetTableRowData = {
   isEmpty: boolean;
 };
 
+/** What the cell of an `image` or `file` column hands a table that lets people upload into it. */
+export type DatasetAttachmentSlot = {
+  value: string;
+  columnType: "image" | "file";
+  datasetId: string;
+  /** Text to render for a value that is neither an address nor a reference. */
+  fallbackText: string;
+  fallbackTruncated: boolean;
+  onChange: (value: string) => void;
+  /** Opens the text editor, the same one a double click opens. */
+  onOpenEditor: () => void;
+};
+
 export type DatasetTableContextValue = {
   rowHeightMode: RowHeightMode;
   expandedCells: Set<string>;
@@ -37,6 +50,8 @@ export type DatasetTableContextValue = {
   toggleCellExpanded: (row: number, columnId: string) => void;
   toggleRowSelection: (row: number) => void;
   renderImage: (value: string) => ReactNode | null;
+  /** Absent on a table nobody uploads into; its image cells use `renderImage`. */
+  renderAttachment?: (slot: DatasetAttachmentSlot) => ReactNode;
   /** Where the floating cell editor portals to. Required when the table is
    *  hosted inside a modal dialog: portaling to document.body would land
    *  outside the dialog's pointer-events scope and the editor would be

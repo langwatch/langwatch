@@ -197,13 +197,13 @@ export function FieldsDefinition({
     name: "fields",
   });
 
-  // The type vocabulary a field row can pick. Image is only meaningful on
-  // inputs (e.g. dataset columns fed into a node), matching the prior
-  // selector. Labels come from the shared TYPE_LABELS so Text/Number/...
+  // The type vocabulary a field row can pick. Image and file are only
+  // meaningful on inputs (e.g. dataset columns fed into a node), matching the
+  // prior selector. Labels come from the shared TYPE_LABELS so Text/Number/...
   // read the same everywhere.
   const fieldTypes: FieldType["type"][] =
     field === "inputs"
-      ? ["str", "image", "float", "bool", "dict", "list"]
+      ? ["str", "image", "file", "float", "bool", "dict", "list"]
       : ["str", "float", "bool", "dict", "list"];
   const typeOptions: WorkflowFieldTypeOption[] = fieldTypes.map((value) => ({
     value,

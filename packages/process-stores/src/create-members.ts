@@ -140,11 +140,15 @@ export function createProcessMembers(options: {
     },
     objectStorage: () => {
       if (!config.objectStorage) {
-        throw new MemberNotConfiguredError("objectStorage", "name a bucket");
+        throw new MemberNotConfiguredError(
+          "objectStorage",
+          "set STORED_OBJECTS_BACKEND and its bucket, container or root",
+        );
       }
       return buildObjectStorage({
         config: config.objectStorage,
         directory: tenantDirectory(),
+        clock: read("clock"),
       });
     },
     redis: () => {

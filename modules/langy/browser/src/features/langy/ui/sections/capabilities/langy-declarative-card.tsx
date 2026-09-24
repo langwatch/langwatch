@@ -10,8 +10,10 @@ import {
   extractPlatformUrl,
   isAppPath,
 } from "@langwatch/langy-contract";
+import { Play } from "lucide-react";
 
 import { collectionOf, totalOf } from "../../../../../model/langy-cli-result-document.ts";
+import { LangyCardActionChip } from "../../../../../ui/elements/langy-card-action-chip.tsx";
 import { StreamingStatCard } from "../../../../../ui/sections/streaming-stat-card.tsx";
 import { type CapabilityData, useCapabilityData } from "../../../behavior/use-capability-data.ts";
 import {
@@ -25,6 +27,7 @@ import {
   SURFACE_LABEL,
   summaryLines,
 } from "../../../model/capabilities/capability-registry.ts";
+import { type LangySend, useLangySend } from "../langy-send-context.tsx";
 import {
   CapabilityRow,
   CapabilityRowSkeletons,
@@ -416,6 +419,36 @@ function DiffBody({
   );
 }
 
+/**
+ * A freshly created scenario offers its first run, worded rather than scheduled: the message goes
+ * through the composer so Langy resolves the target and asks what it must. Nothing is offered
+ * where no request can be routed (a replayed turn) or when the card has no name for the sentence.
+ */
+function createdScenarioRunOffer({
+  descriptor,
+  name,
+  send,
+}: {
+  descriptor: CapabilityDescriptor;
+  name: string | null;
+  send: LangySend | null;
+}) {
+  const createdScenario =
+    descriptor.tone === "created" &&
+    descriptor.command.resource === "scenario" &&
+    descriptor.command.verb === "create";
+  if (!createdScenario || !send || !name) return undefined;
+  return (
+    <LangyCardActionChip
+      label="Run against my agent"
+      icon={<Play size={12} />}
+      disabled={send.isTurnInFlight}
+      onClick={() => send.send(`Run scenario "${name}" against my connected agent`)}
+      testId="langy-card-run-scenario"
+    />
+  );
+}
+
 /** The settled-write sentence, by tone. */
 function writeSentence(tone: CapabilityDescriptor["tone"]): string {
   switch (tone) {
@@ -437,6 +470,7 @@ export function LangyDeclarativeCard({
 }: CapabilityCardInput) {
   const projectSlug = rawProjectSlug ?? null;
   const { tone, body, noun } = descriptor;
+  const send = useLangySend();
 
   // Hydration is for COLLECTION reads: fresh names and links for the entities
   // the result referenced. Facts/stats/diff keep the stored structure (the
@@ -483,6 +517,7 @@ export function LangyDeclarativeCard({
         resourceId={removed ? null : id}
         platformUrl={removed ? null : extractPlatformUrl(output)}
         icon={descriptor.icon}
+        actions={createdScenarioRunOffer({ descriptor, name, send })}
       >
         <BodyLine>{writeSentence(tone)}</BodyLine>
       </LangyCapabilityCard>

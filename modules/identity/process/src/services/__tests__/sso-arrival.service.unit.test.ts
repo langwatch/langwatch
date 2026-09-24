@@ -268,6 +268,75 @@ describe("given an account that is not a connection at all", () => {
   });
 });
 
+describe("given an arrival this connection was never going to admit", () => {
+  const REASON_MESSAGE = "a single sign-on arrival was not considered for admission";
+
+  describe("when the account id is not connection-shaped at all", () => {
+    it("logs once at debug with reason not_a_connection_id and admits nobody", async () => {
+      const parts = serviceOver({ row: null });
+
+      await parts.service.admit({ user: USER, connectionId: "google", domain: "acme.com" });
+
+      expect(log.info).not.toHaveBeenCalled();
+      expect(log.debug).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: "not_a_connection_id", connectionId: "google" }),
+        REASON_MESSAGE,
+      );
+      expect(parts.createMembership).not.toHaveBeenCalled();
+      expect(parts.requestFromSsoArrival).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the connection id looks right but does not resolve", () => {
+    it("logs once with reason connection_not_found", async () => {
+      const parts = serviceOver({ row: null });
+
+      await admit(parts);
+
+      expect(log.info).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: "connection_not_found", connectionId: CONNECTION_ID }),
+        REASON_MESSAGE,
+      );
+      expect(parts.createMembership).not.toHaveBeenCalled();
+    });
+  });
+
+  describe.each([
+    {
+      when: "the connection is not live yet",
+      reason: "domain_not_live",
+      over: { state: "VERIFIED" as const },
+      domain: "acme.com",
+    },
+    {
+      when: "the address is on a domain the connection never proved",
+      reason: "domain_not_proved",
+      over: {},
+      domain: "elsewhere.com",
+    },
+    {
+      when: "the domain's published record has lapsed",
+      reason: "domain_proof_lapsed",
+      over: {
+        domainVerifications: [DOMAIN_PROOF, { ...DOMAIN_PROOF, proofState: "LAPSED" as const }],
+      },
+      domain: "acme.com",
+    },
+  ])("when $when", ({ reason, over, domain }) => {
+    it(`logs once with reason ${reason}`, async () => {
+      const parts = serviceOver({ row: connection(over) });
+
+      await admit(parts, domain);
+
+      expect(log.info).toHaveBeenCalledWith(
+        expect.objectContaining({ reason, connectionId: CONNECTION_ID, organizationId: ORG.id }),
+        REASON_MESSAGE,
+      );
+      expect(parts.createMembership).not.toHaveBeenCalled();
+    });
+  });
+});
+
 describe("given a domain-matched organization to join", () => {
   it("applies a waiting invitation and writes no default membership", async () => {
     const parts = serviceOver({ row: connection(), pendingInvite: { inviteId: "inv_1" } });

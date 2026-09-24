@@ -266,6 +266,78 @@ describe("TraceIngestionService.handleOtlpTraceRequest", () => {
     });
   });
 
+  describe("given a span whose start time cannot be stored", () => {
+    /** @scenario "A span whose start time cannot be stored is rejected at ingestion" */
+    it("drops it with a named reason and never dispatches it", async () => {
+      const { commands, service } = fixture();
+      const nowMs = BigInt(Date.now());
+      // A millisecond value scaled into nanoseconds twice over.
+      const doubleScaled = String(nowMs * 1_000_000n * 1_000_000n);
+
+      const result = await handle(service, [
+        span({ startTimeUnixNano: doubleScaled, endTimeUnixNano: doubleScaled }),
+      ]);
+
+      expect(result.rejectedSpans).toBe(1);
+      expect(result.errorMessage).toBe("span start time is not a valid timestamp");
+      expect(commands.record).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A span whose start time cannot be stored is rejected at ingestion" */
+    it("names the end time when only the end is past what storage can hold", async () => {
+      const { commands, service } = fixture();
+      const nowMs = BigInt(Date.now());
+
+      const result = await handle(service, [
+        span({
+          startTimeUnixNano: String(nowMs * 1_000_000n),
+          endTimeUnixNano: String(nowMs * 1_000_000n * 1_000_000n),
+        }),
+      ]);
+
+      expect(result.rejectedSpans).toBe(1);
+      expect(result.errorMessage).toBe("span end time is not a valid timestamp");
+      expect(commands.record).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A span whose start time cannot be stored is rejected at ingestion" */
+    it("drops only that span and still dispatches a valid sibling", async () => {
+      const { commands, service } = fixture();
+      const nowMs = BigInt(Date.now());
+
+      const result = await handle(service, [
+        span({
+          spanId: "span_bad",
+          startTimeUnixNano: String(nowMs * 1_000_000n),
+          endTimeUnixNano: "not-a-number",
+        }),
+        span({ spanId: "span_good" }),
+      ]);
+
+      expect(result.rejectedSpans).toBe(1);
+      expect(result.errorMessage).toBe("span end time is not a valid timestamp");
+      expect(commands.record).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("given a span starting far in the future but within what storage holds", () => {
+    /** @scenario "A span starting far in the future is still accepted when storage can hold it" */
+    it("accepts it, because the rule refuses only what cannot be stored", async () => {
+      const { commands, service } = fixture();
+      const year2100Ms = BigInt(Date.UTC(2100, 0, 1));
+
+      const result = await handle(service, [
+        span({
+          startTimeUnixNano: String(year2100Ms * 1_000_000n),
+          endTimeUnixNano: String((year2100Ms + 2000n) * 1_000_000n),
+        }),
+      ]);
+
+      expect(result.rejectedSpans).toBe(0);
+      expect(commands.record).toHaveBeenCalledOnce();
+    });
+  });
+
   describe("given the coding-agent filter is on and matches", () => {
     it("does not dispatch the span", async () => {
       const { commands, service } = fixture({

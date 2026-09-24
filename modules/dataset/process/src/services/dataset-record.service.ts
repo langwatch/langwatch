@@ -318,6 +318,12 @@ export class DatasetRecordService {
       projectId: parsed.projectId,
     });
     this.assertReady(dataset);
+    await this.options.attachments.assertAccepted({
+      projectId: parsed.projectId,
+      columnTypes: dataset.columnTypes,
+      entries: [parsed.updatedRecord],
+      findHeld: () => this.findHeldEntries(dataset, parsed.projectId, parsed.recordId),
+    });
     if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
       return this.options.content.upsertRecord({ dataset, input: parsed });
     }
@@ -350,6 +356,23 @@ export class DatasetRecordService {
     return { record, created: true };
   }
 
+  private async findHeldEntries(
+    dataset: Dataset,
+    projectId: string,
+    recordId: string,
+  ): Promise<Record<string, unknown>[]> {
+    if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
+      return this.options.content.findEntries({ dataset, projectId, recordIds: [recordId] });
+    }
+    const records = await this.options.records.findByIds({
+      datasetId: dataset.id,
+      projectId,
+      ids: [recordId],
+    });
+
+    return records.map((record) => record.entry);
+  }
+
   async batchCreateRecords(input: CreateDatasetRecordsInput): Promise<DatasetRecord[]> {
     const parsed = createDatasetRecordsInputSchema.parse(input);
     await this.deps.requestBounds.assertBatchSize(parsed.projectId, parsed.entries.length);
@@ -362,6 +385,11 @@ export class DatasetRecordService {
     this.deps.assertKnownColumns({
       datasetName: dataset.name,
       columns,
+      entries: parsed.entries,
+    });
+    await this.options.attachments.assertAccepted({
+      projectId: parsed.projectId,
+      columnTypes: dataset.columnTypes,
       entries: parsed.entries,
     });
     if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
@@ -391,6 +419,12 @@ export class DatasetRecordService {
       projectId: parsed.projectId,
     });
     this.assertReady(dataset);
+    await this.options.attachments.assertAccepted({
+      projectId: parsed.projectId,
+      columnTypes: dataset.columnTypes,
+      entries: [parsed.updatedRecord],
+      findHeld: () => this.findHeldEntries(dataset, parsed.projectId, parsed.recordId),
+    });
     if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
       const result = await this.options.content.upsertRecord({
         dataset,

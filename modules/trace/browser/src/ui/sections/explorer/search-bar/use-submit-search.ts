@@ -1,5 +1,7 @@
-import { useFilterStore } from "@langwatch/trace-browser-kit";
+import { toaster } from "@langwatch/design-system/toaster";
+import { useFilterStore, type SearchNotice } from "@langwatch/trace-browser-kit";
 import {
+  type ModelTrouble,
   queryWithoutInstantEvalChip,
   requoteBareTerms,
   resolveInstantEvalChips,
@@ -11,6 +13,7 @@ import { type RefObject, useCallback, useRef } from "react";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import type { InstantEvalRoutePayload } from "../../../../model/instant-eval-route.ts";
+import { explainAnyError } from "../../errors/index.ts";
 
 interface UseSubmitSearchOptions {
   /** Whether the Langy route is open to this user. */
@@ -26,9 +29,10 @@ interface UseSubmitSearchOptions {
    * free to come back and charge for a run nobody is looking at.
    */
   onSupersede: () => void;
-  /** Enter fell back to a phrase because no model could route it. */
-  onModelUnavailable: () => void;
 }
+
+/** What the toast adds when the router itself could not be reached. */
+const PHRASE_INSTEAD_NOTE = "The words were searched as a phrase instead.";
 
 interface RoutedSubmit {
   result: RouteSearchResult;
@@ -37,16 +41,50 @@ interface RoutedSubmit {
   timeRange: { from: number; to: number };
 }
 
+/**
+ * The model problem a route reported, in the shape its reader keeps it. Both
+ * fields are absent on a route that had no model trouble, so they travel together.
+ */
+function modelFailureOf(result: { modelTrouble?: ModelTrouble; modelErrorCode?: string }): {
+  modelTrouble?: ModelTrouble;
+  modelErrorCode?: string;
+} {
+  return {
+    ...(result.modelTrouble ? { modelTrouble: result.modelTrouble } : {}),
+    ...(result.modelErrorCode ? { modelErrorCode: result.modelErrorCode } : {}),
+  };
+}
+
+/**
+ * The strip a phrase search gets, or null. A phrase the classifier picked says
+ * nothing further; one left over from another route gets the strip, so the
+ * quotes around the words are explained rather than just appearing.
+ */
+function phraseNotice({
+  result,
+  projectId,
+}: {
+  result: Extract<RouteSearchResult, { kind: "free_text" }>;
+  projectId: string;
+}): SearchNotice | null {
+  if (!result.fellBackFrom || !result.modelTrouble) return null;
+  return {
+    projectId,
+    query: useFilterStore.getState().queryText,
+    interpretedAs: "free_text",
+    modelTrouble: result.modelTrouble,
+    ...(result.modelErrorCode ? { modelErrorCode: result.modelErrorCode } : {}),
+  };
+}
+
 /** Puts one router answer on screen: chips, a phrase, a question, or a run. */
 function useApplyRoute({
   onLangy,
   onInstantEval,
-  onModelUnavailable,
-}: Pick<UseSubmitSearchOptions, "onLangy" | "onInstantEval" | "onModelUnavailable">): (
-  submit: RoutedSubmit,
-) => void {
+}: Pick<UseSubmitSearchOptions, "onLangy" | "onInstantEval">): (submit: RoutedSubmit) => void {
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
   const recordAiTranslation = useFilterStore((s) => s.recordAiTranslation);
+  const recordSearchNotice = useFilterStore((s) => s.recordSearchNotice);
   return useCallback(
     ({ result, text, projectId, timeRange }: RoutedSubmit) => {
       switch (result.kind) {
@@ -57,10 +95,14 @@ function useApplyRoute({
           // to offer the sentence back as a phrase.
           recordAiTranslation({ projectId, prompt: text, query: result.query });
           return;
-        case "free_text":
+        case "free_text": {
           applyQueryText(result.query);
-          if (result.isModelUnavailable) onModelUnavailable();
+          // After the apply, against the text the store settled on: the strip
+          // shows while the bar still holds the query it is about.
+          const notice = phraseNotice({ result, projectId });
+          if (notice) recordSearchNotice(notice);
           return;
+        }
         case "langy":
           onLangy(result.question);
           return;
@@ -73,11 +115,12 @@ function useApplyRoute({
             otherQuery: result.otherQuery,
             fallbackQuery: result.fallbackQuery,
             timeRange,
+            ...modelFailureOf(result),
           });
           return;
       }
     },
-    [applyQueryText, recordAiTranslation, onInstantEval, onLangy, onModelUnavailable],
+    [applyQueryText, recordAiTranslation, recordSearchNotice, onInstantEval, onLangy],
   );
 }
 
@@ -128,12 +171,8 @@ function useRouteSubmit({
   isLangyAvailable,
   onLangy,
   onInstantEval,
-  onModelUnavailable,
   submitSeqRef,
-}: Pick<
-  UseSubmitSearchOptions,
-  "isLangyAvailable" | "onLangy" | "onInstantEval" | "onModelUnavailable"
-> & {
+}: Pick<UseSubmitSearchOptions, "isLangyAvailable" | "onLangy" | "onInstantEval"> & {
   submitSeqRef: RefObject<number>;
 }): {
   route: (args: { text: string; seq: number; projectId: string }) => void;
@@ -141,7 +180,7 @@ function useRouteSubmit({
 } {
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
   const routeSearch = api.traces.routeSearch.useMutation();
-  const applyRoute = useApplyRoute({ onLangy, onInstantEval, onModelUnavailable });
+  const applyRoute = useApplyRoute({ onLangy, onInstantEval });
 
   const route = useCallback(
     ({ text, seq, projectId }: { text: string; seq: number; projectId: string }) => {
@@ -163,9 +202,18 @@ function useRouteSubmit({
             if (seq !== submitSeqRef.current) return;
             applyRoute({ result, text, projectId, timeRange: range });
           },
-          onError: () => {
+          onError: (error) => {
             if (seq !== submitSeqRef.current) return;
+            // The words still get searched, and the reader is told that is
+            // what happened. A sentence coming back as a quoted phrase with
+            // nothing said about it reads as the search having worked.
             applyQueryText(requoteBareTerms(text));
+            const { title, description } = explainAnyError(error);
+            toaster.create({
+              title,
+              description: [description, PHRASE_INSTEAD_NOTE].filter(Boolean).join(" "),
+              type: "warning",
+            });
           },
         },
       );
@@ -187,7 +235,6 @@ export function useSubmitSearch({
   onLangy,
   onInstantEval,
   onSupersede,
-  onModelUnavailable,
 }: UseSubmitSearchOptions): {
   submitSearch: (text: string) => void;
   isRouting: boolean;
@@ -201,7 +248,6 @@ export function useSubmitSearch({
     isLangyAvailable,
     onLangy,
     onInstantEval,
-    onModelUnavailable,
     submitSeqRef,
   });
 

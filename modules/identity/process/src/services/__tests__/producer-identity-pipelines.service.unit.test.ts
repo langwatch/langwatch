@@ -1,7 +1,9 @@
 import {
   IDENTITY_PIPELINE_NAME,
   JOIN_REQUEST_PIPELINE_NAME,
+  MIGRATION_FINALIZED_EVENT_TYPE,
   SCIM_SYNC_PIPELINE_NAME,
+  SSO_CONNECTION_AGGREGATE_TYPE,
   SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
 /**
@@ -11,6 +13,7 @@ import {
  */
 import { describe, expect, it } from "vitest";
 
+import { migrationFinalizedEventSchema } from "../../eventing/sso-connection-state.projection.ts";
 import { PostgresIdentityPipelineAdapter } from "../../repositories/prisma/prisma.identity-pipeline.repository.ts";
 import { PostgresScimSyncPipelineAdapter } from "../../repositories/prisma/prisma.scim-sync-pipeline.repository.ts";
 import { IdentityProducerPipelinesAdapter } from "../producer-identity-pipelines.service.ts";
@@ -157,6 +160,31 @@ describe("given a process that produces identity commands without consuming them
       await expect(projection.store.tryLoad()).rejects.toThrow(
         /langwatch-api registered the scim-sync pipeline as a producer only/,
       );
+    });
+
+    it("refuses the directory move on a finished migration rather than dropping it", async () => {
+      const subscriber = IdentityProducerPipelinesAdapter.create({ processName: PROCESS_NAME })
+        .ssoConnectionPipeline()
+        .eventSubscribers.get("scimDirectoryMove");
+      const finalized = migrationFinalizedEventSchema.parse({
+        id: "evt_1",
+        aggregateId: "conn_new",
+        aggregateType: SSO_CONNECTION_AGGREGATE_TYPE,
+        tenantId: "org_1",
+        createdAt: 1,
+        occurredAt: 1,
+        type: MIGRATION_FINALIZED_EVENT_TYPE,
+        version: "2026-09-23",
+        data: {
+          connectionId: "conn_new",
+          actor: { type: "user", id: "user_1" },
+          source: "self-serve",
+        },
+      });
+
+      await expect(
+        subscriber?.handle(finalized, { tenantId: "org_1", aggregateId: "conn_new" }),
+      ).rejects.toThrow(/langwatch-api registered the sso-connections pipeline as a producer only/);
     });
   });
 });

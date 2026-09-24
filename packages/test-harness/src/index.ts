@@ -54,7 +54,6 @@ export {
   frozenAt,
   memoryCache,
   memoryIdempotency,
-  memoryObjectStorage,
   memoryRateLimiter,
   recordingMail,
   recordingTelemetry,
@@ -64,13 +63,10 @@ export {
   type IdempotencyStore,
   type Mail,
   type MailMessage,
-  type ObjectStorage,
   type RateLimiter,
   type RecordedMetric,
   type RecordingMail,
   type RecordingTelemetry,
-  type StoredObject,
-  type StoredObjectAddress,
   type Telemetry,
 } from "./member-doubles.ts";
 export { createTestAuditSink, type TestAuditRow, type TestAuditSink } from "./test-audit-sink.ts";

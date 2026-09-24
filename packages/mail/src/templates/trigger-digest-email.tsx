@@ -33,6 +33,8 @@ export const triggerDigestEntry = z.object({
   value: z.string().min(1).optional(),
   /** What that value is measured in. */
   unit: z.string().min(1).optional(),
+  /** The trace's start, carried on the link as the partition hint `t`. */
+  occurredAtMs: z.number().optional(),
 });
 
 export type TriggerDigestEntry = z.infer<typeof triggerDigestEntry>;
@@ -68,7 +70,13 @@ const linkFor = (
   { projectSlug, baseHost }: { projectSlug: string; baseHost: string },
 ): string => {
   if (entry.graphId) return `${baseHost}/${projectSlug}/analytics/custom/${entry.graphId}`;
-  if (entry.traceId) return `${baseHost}/${projectSlug}/traces/${entry.traceId}`;
+  if (entry.traceId) {
+    const trace = `${baseHost}/${projectSlug}/traces/${entry.traceId}`;
+    const hint = entry.occurredAtMs;
+    return hint !== undefined && Number.isFinite(hint) && hint > 0
+      ? `${trace}?t=${Math.floor(hint)}`
+      : trace;
+  }
   return "#";
 };
 

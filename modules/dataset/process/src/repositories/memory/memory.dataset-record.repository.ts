@@ -45,6 +45,17 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
       .map((record) => structuredClone(record));
   }
 
+  async findByIds(input: {
+    datasetId: string;
+    projectId: string;
+    ids: readonly string[];
+  }): Promise<DatasetRecord[]> {
+    const ids = new Set(input.ids);
+    return this.#of(input)
+      .filter((record) => ids.has(record.id))
+      .map((record) => structuredClone(record));
+  }
+
   async findAll(input: {
     datasetId: string;
     projectId: string;

@@ -610,10 +610,10 @@ const presentations = {
     },
   },
   agent_owner_only: {
-    title: "This development agent belongs to someone else",
+    title: "This development agent belongs to one person",
     describe: (error) => {
       const owner = str(error, "ownerName", "its owner");
-      return `Only ${owner} can run simulations against it. Connect your own copy of the agent, or ask them to run it.`;
+      return `Only ${owner}'s own key can run simulations against it, so a project or service key is refused even when it belongs to the same person. Run it with the key that connected the agent, connect your own copy, or give the agent a shared environment name.`;
     },
   },
   agent_call_timeout: {
@@ -1283,6 +1283,22 @@ const presentations = {
         ? "This key can't call the Agent Platform service. If it is an AI Studio key, clear the Google Cloud Project and Location fields and save again; otherwise allow the Agent Platform API in the Google Cloud console."
         : "This key belongs to a different Google service. If it is a Gemini Enterprise Agent Platform key, fill in the Google Cloud Project and Location fields and save again; otherwise allow the Generative Language API in the Google Cloud console.";
     },
+  },
+  provider_out_of_credit: {
+    // fault: customer, and the only refusal on this screen that a key will
+    // never fix. It is also the one a models listing cannot see, which is why
+    // the check sends a real generation.
+    title: "That account is out of credit",
+    describe: () =>
+      "The provider took the key and refused to generate: the account behind it has no credit or quota left. Top it up with the provider, then try again.",
+  },
+  provider_usage_limit_reached: {
+    // fault: customer, but nothing to buy and nothing to fix — a plan-billed
+    // lane (a ChatGPT plan behind Codex, for one) refuses until its window
+    // rolls over. The copy says wait, not "check your key".
+    title: "That plan is over its usage limit",
+    describe: () =>
+      "The provider took the key and refused to generate until the plan's allowance resets. Wait for the window to roll over, or use a provider billed per request.",
   },
   provider_refused: {
     // fault: provider. It answered and said no, but not in terms we can map —
@@ -3144,6 +3160,50 @@ const presentations = {
   },
 
   // ---- datasets ----
+  dataset_attachment_too_large: {
+    title: "That file is too large",
+    describe: (error) => {
+      const maxBytes = error.meta.maxBytes;
+      return typeof maxBytes === "number"
+        ? `Pick a file under ${Math.round(maxBytes / 1024 / 1024)} MB.`
+        : "Pick a smaller file.";
+    },
+  },
+  dataset_attachment_type_refused: {
+    // `meta.refused` is our own list of media types, not customer input. The
+    // copy names the kinds of file someone recognises rather than the list,
+    // which is long and reads as jargon next to a cell.
+    title: "That kind of file isn't accepted",
+    describe: () =>
+      "Web pages, scripts and scalable vector images cannot be attached. Pick a picture, a document, an audio file or a video.",
+  },
+  dataset_attachment_unavailable: {
+    // The reference in the cell no longer reads back: the object was removed,
+    // or the bytes never landed. Uploading again is a real action, so this is
+    // not the "we've been notified" shape.
+    title: "That attachment could not be read",
+    describe: (error) => {
+      const name = str(error, "fileName", "");
+      return name
+        ? `"${name}" is no longer available. Upload it again, then run the row.`
+        : "It is no longer available. Upload it again, then run the row.";
+    },
+  },
+  dataset_attachment_reference_refused: {
+    title: "That file can't be attached here",
+    describe: () =>
+      "Attach a file uploaded to this project for dataset cells, of a type the column accepts, then save again.",
+  },
+  dataset_import_source_refused: {
+    title: "That file can't be imported",
+    describe: () =>
+      "Upload a CSV, JSON or JSONL file to this project for dataset import, then try again.",
+  },
+  dataset_upload_not_pending: {
+    title: "There is nothing to retry",
+    describe: () =>
+      "This dataset has no failed or stuck import. Upload the file again to add its rows.",
+  },
   dataset_name_taken: {
     title: "That name is taken",
     describe: () => "Pick a different name for this dataset.",

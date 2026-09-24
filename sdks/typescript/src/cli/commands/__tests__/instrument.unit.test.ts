@@ -150,6 +150,60 @@ describe("instrumentCommand", () => {
     });
   });
 
+  describe("given a local instance behind the wiring this command writes", () => {
+    let prevCliConfig: string | undefined;
+
+    beforeEach(() => {
+      prevCliConfig = process.env.LANGWATCH_CLI_CONFIG;
+      delete process.env.LANGWATCH_CLI_CONFIG;
+      asMock(telemetryRefreshMod.resolveIngestionCredential).mockResolvedValue({
+        ...personalCredential,
+        endpoint: "http://localhost:5610/api/otel",
+      });
+    });
+
+    afterEach(() => {
+      if (prevCliConfig === undefined) delete process.env.LANGWATCH_CLI_CONFIG;
+      else process.env.LANGWATCH_CLI_CONFIG = prevCliConfig;
+    });
+
+    /** @scenario "Instrumenting against a local instance names the isolation env vars" */
+    it("names the global config it rewrites and the env vars that isolate a QA shell", async () => {
+      await instrumentCommand("claude", {});
+
+      const err = writtenTo(stderrSpy);
+      expect(err).toContain("local instance");
+      expect(err).toContain("LANGWATCH_CLI_CONFIG");
+      expect(err).toContain("CLAUDE_CONFIG_DIR");
+      expect(err).toContain("CODEX_HOME");
+      // A warning, never a refusal: the wiring still lands.
+      expect(installTelemetryWiring).toHaveBeenCalledTimes(1);
+      expect(writtenTo(stdoutSpy)).toContain("runs now send telemetry to");
+    });
+
+    /** @scenario "A shell that already relocated the CLI config hears nothing" */
+    it("says nothing when LANGWATCH_CLI_CONFIG already points elsewhere", async () => {
+      process.env.LANGWATCH_CLI_CONFIG = "/tmp/dogfood/langwatch-config.json";
+
+      await instrumentCommand("claude", {});
+
+      expect(writtenTo(stderrSpy)).not.toContain("LANGWATCH_CLI_CONFIG");
+      expect(installTelemetryWiring).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A remote endpoint is not a local instance" */
+    it("says nothing for an endpoint on another host", async () => {
+      asMock(telemetryRefreshMod.resolveIngestionCredential).mockResolvedValue({
+        ...personalCredential,
+        endpoint: "https://lw.acme.dev/api/otel",
+      });
+
+      await instrumentCommand("codex", {});
+
+      expect(writtenTo(stderrSpy)).not.toContain("local instance");
+    });
+  });
+
   describe("given a companion write the wiring depends on failed", () => {
     it("fails instead of reporting a wired tool", async () => {
       asMock(installTelemetryWiring).mockReturnValue({

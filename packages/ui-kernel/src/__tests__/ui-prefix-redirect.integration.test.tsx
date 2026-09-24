@@ -59,6 +59,39 @@ describe("given a prefix that moved", () => {
       expect(params.get("keep")).toBe("1");
     });
   });
+
+  describe("when the destination reads a query param under a new key", () => {
+    it("carries the value across and drops the old key", () => {
+      const { router, view } = renderAt(
+        "/old?t=1758000000000&keep=1",
+        <UiPrefixRedirect from="/old" to="/new" renameParams={{ t: "drawer.t" }} />,
+      );
+      dispose = () => {
+        view.unmount();
+        router.dispose();
+      };
+
+      const params = new URLSearchParams(router.state.location.search);
+      expect(params.get("drawer.t")).toBe("1758000000000");
+      expect(params.has("t")).toBe(false);
+      expect(params.get("keep")).toBe("1");
+    });
+
+    it("adds nothing when the old key is absent", () => {
+      const { router, view } = renderAt(
+        "/old?keep=1",
+        <UiPrefixRedirect from="/old" to="/new" renameParams={{ t: "drawer.t" }} />,
+      );
+      dispose = () => {
+        view.unmount();
+        router.dispose();
+      };
+
+      const params = new URLSearchParams(router.state.location.search);
+      expect(params.has("drawer.t")).toBe(false);
+      expect(params.get("keep")).toBe("1");
+    });
+  });
 });
 
 describe("given a retired address inside a parameterised family", () => {

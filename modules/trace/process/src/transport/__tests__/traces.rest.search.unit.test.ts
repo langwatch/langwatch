@@ -221,6 +221,7 @@ describe("POST /search", () => {
       );
     });
 
+    /** @scenario "The REST trace endpoints link with the timestamp" */
     it("includes trace metadata in each digest entry", async () => {
       const { send } = mount();
       const res = await send({ startDate: 1000, endDate: 5000, format: "digest" });
@@ -231,6 +232,7 @@ describe("POST /search", () => {
       expect(first).toHaveProperty("output");
       expect(first).toHaveProperty("timestamps");
       expect(first).toHaveProperty("metadata");
+      expect(first?.platformUrl).toContain("/traces/trace-1?t=1000");
     });
   });
 

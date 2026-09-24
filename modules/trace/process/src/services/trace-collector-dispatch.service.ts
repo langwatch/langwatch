@@ -14,6 +14,8 @@ import {
 import type { CollectorMetadata } from "#rules/trace-collector-body.rules";
 import { TraceCollectorSpanService } from "#services/trace-collector-span.service";
 
+import { isStorableSpanTimeMs } from "../rules/storable-span-time.rules.ts";
+
 const logger = createLogger("langwatch.collector");
 
 /** One already-normalized span, handed to the ingestion pipeline. */
@@ -55,13 +57,22 @@ export const EVALUATION_INGESTION_FAILED = "evaluation ingestion failed, please 
 function partitionFreshSpans(
   spans: Span[],
   input: Readonly<{ projectId: string; traceId: string }>,
-): Readonly<{ freshSpans: Span[]; droppedOldSpans: number }> {
+): Readonly<{ freshSpans: Span[]; droppedOldSpans: number; droppedUnstorableSpans: number }> {
   const startedAtCutoff = nowInstant().epochMilliseconds - SPAN_MAX_PAST_MS;
   const freshSpans: Span[] = [];
   let droppedOldSpans = 0;
+  let droppedUnstorableSpans = 0;
   for (const span of spans) {
     if (span.timestamps.started_at && span.timestamps.started_at < startedAtCutoff) {
       droppedOldSpans++;
+      continue;
+    }
+    // The OTLP door's predicate: the check above passes a zero `started_at` through.
+    if (
+      !isStorableSpanTimeMs(span.timestamps.started_at) ||
+      !isStorableSpanTimeMs(span.timestamps.finished_at)
+    ) {
+      droppedUnstorableSpans++;
       continue;
     }
     freshSpans.push(span);
@@ -73,7 +84,14 @@ function partitionFreshSpans(
     );
   }
 
-  return { freshSpans, droppedOldSpans };
+  if (droppedUnstorableSpans > 0) {
+    logger.warn(
+      { projectId: input.projectId, traceId: input.traceId, droppedUnstorableSpans },
+      "dropped spans whose start or end time is not a valid timestamp",
+    );
+  }
+
+  return { freshSpans, droppedOldSpans, droppedUnstorableSpans };
 }
 
 /**
@@ -145,16 +163,25 @@ async function dispatchSpans(
     projectId: string;
     traceId: string;
     droppedOldSpans: number;
+    droppedUnstorableSpans: number;
     metadata: CollectorMetadata;
     expectedOutput: string | null | undefined;
     ingestSpan: CollectorSpanIngest;
   }>,
 ): Promise<SpanDispatchOutcome> {
-  const { projectId, traceId, droppedOldSpans } = input;
-  const droppedErrors =
-    droppedOldSpans > 0
-      ? [`${droppedOldSpans} span(s) dropped: start time is more than 31 days in the past`]
-      : [];
+  const { projectId, traceId, droppedOldSpans, droppedUnstorableSpans } = input;
+  const droppedErrors: string[] = [];
+  if (droppedOldSpans > 0) {
+    droppedErrors.push(
+      `${droppedOldSpans} span(s) dropped: start time is more than 31 days in the past`,
+    );
+  }
+  if (droppedUnstorableSpans > 0) {
+    droppedErrors.push(
+      `${droppedUnstorableSpans} span(s) dropped: started_at or finished_at is not a valid timestamp`,
+    );
+  }
+  const droppedSpans = droppedOldSpans + droppedUnstorableSpans;
 
   try {
     const failureDetails = await fanOutSpans(freshSpans, input);
@@ -172,7 +199,7 @@ async function dispatchSpans(
     }
 
     return {
-      rejectedSpans: droppedOldSpans + failureErrors.length,
+      rejectedSpans: droppedSpans + failureErrors.length,
       dispatchFailures: failureErrors.length,
       rejectionErrors: [...droppedErrors, ...failureErrors],
     };
@@ -181,7 +208,7 @@ async function dispatchSpans(
     logger.error({ error, projectId, traceId }, "Error initializing event sourcing dispatch");
 
     return {
-      rejectedSpans: droppedOldSpans + freshSpans.length,
+      rejectedSpans: droppedSpans + freshSpans.length,
       dispatchFailures: freshSpans.length,
       rejectionErrors: [...droppedErrors, SPAN_INGESTION_FAILED],
     };
@@ -323,7 +350,7 @@ export class TraceCollectorDispatchService {
   partitionFreshSpans(
     spans: Span[],
     input: Readonly<{ projectId: string; traceId: string }>,
-  ): Readonly<{ freshSpans: Span[]; droppedOldSpans: number }> {
+  ): Readonly<{ freshSpans: Span[]; droppedOldSpans: number; droppedUnstorableSpans: number }> {
     return partitionFreshSpans(spans, input);
   }
 
@@ -334,6 +361,7 @@ export class TraceCollectorDispatchService {
       projectId: string;
       traceId: string;
       droppedOldSpans: number;
+      droppedUnstorableSpans: number;
       metadata: CollectorMetadata;
       expectedOutput: string | null | undefined;
     }>,

@@ -55,6 +55,7 @@ const door: AuthApi = {
   retireLegacySsoAccess: () => unreached("retireLegacySsoAccess"),
   countLegacySsoAccess: () => unreached("countLegacySsoAccess"),
   findFederatedAccountProviders: () => unreached("findFederatedAccountProviders"),
+  getSsoSetupStatus: () => unreached("getSsoSetupStatus"),
   issuesOwnPasswords: () => unreached("issuesOwnPasswords"),
   getSignInSecuritySettings: () => unreached("getSignInSecuritySettings"),
   saveSignInSecuritySettings: () => unreached("saveSignInSecuritySettings"),

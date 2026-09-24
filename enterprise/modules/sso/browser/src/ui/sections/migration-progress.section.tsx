@@ -1,17 +1,25 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * A cutover in progress: who is serving sign-in now, how far the members have
- * come, what is still in the way, and the two levers that move it — swap the
- * route, or finalize. Props-driven; the screen owns the reads and the writes.
+ * An update to the organization's own identity provider: who signs people in
+ * now, what is left before finishing, and the two levers that move it. The
+ * copy is the customer's, never the ledger's. Props-driven; the screen owns I/O.
  */
-import { Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Badge, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { HelpCircle } from "lucide-react";
 
 import {
+  checkCopyFor,
+  MEMBER_MOVE,
+  movedAcrossLine,
+  directoryStatusLine,
   inheritedDomainLine,
   migrationLevers,
   migrationTitle,
-  previousProviderName,
   servingSignInNow,
+  UPDATE_FINISH_CONDITIONS,
+  updateChipFor,
+  updateStatusLine,
   type MigrationMembersView,
   type MigrationView,
   type SsoMigrationRoute,
@@ -57,19 +65,24 @@ export function MigrationProgressSection({
   onPreviousMembers?: () => void;
   onRetryMembers?: () => void;
 }) {
-  const previous = previousProviderName(migration.legacy.providerId);
   const levers = migrationLevers({ migration, connectionActive, pending });
   const routeLever = levers.route;
 
   return (
     <SettingsCard title={migrationTitle(migration.legacy.providerId)} testId="sso-migration">
+      <HStack gap={2} justify="space-between" align="start">
+        <Text fontSize="sm" data-testid="sso-update-status">
+          {updateStatusLine(migration)}
+        </Text>
+        <UpdatePhaseChip migration={migration} />
+      </HStack>
       <VStack align="stretch" gap={1}>
-        <MigrationRow label="Normal sign-in">{servingSignInNow(migration)}</MigrationRow>
-        <MigrationRow label="Members linked">
-          {`${migration.members.linkedCount} of ${migration.members.activeCount}`}
+        <MigrationRow label="Signing people in">{servingSignInNow(migration)}</MigrationRow>
+        <MigrationRow label="Members moved across">
+          {movedAcrossLine(migration.members)}
         </MigrationRow>
-        <MigrationRow label="Directory provisioning">
-          {migration.scim.status.replaceAll("-", " ")}
+        <MigrationRow label="Directory sync">
+          {directoryStatusLine(migration.scim.status)}
         </MigrationRow>
       </VStack>
       {migration.inheritedDomains.length > 0 && (
@@ -77,9 +90,8 @@ export function MigrationProgressSection({
           {migration.inheritedDomains.map(inheritedDomainLine).join(", ")}
         </Text>
       )}
-      <InlineRefusal error={refusal} what="This cutover" />
+      <InlineRefusal error={refusal} what="This update" />
       <MigrationStragglers
-        previous={previous}
         members={members ?? migration.members}
         unavailable={membersUnavailable}
         loading={membersLoading}
@@ -89,11 +101,27 @@ export function MigrationProgressSection({
         onPreviousMembers={onPreviousMembers}
         onRetryMembers={onRetryMembers}
       />
-      {migration.blockers.map((blocker) => (
-        <Text key={blocker.code} fontSize="xs" color="fg.muted">
-          {blocker.message}
-        </Text>
-      ))}
+      {migration.phase !== "FINALIZED" && (
+        <VStack align="stretch" gap={1}>
+          <HStack gap={1}>
+            <Text fontSize="xs" fontWeight="semibold">
+              Before you can finish
+            </Text>
+            <FinishConditionsHelp />
+          </HStack>
+          {migration.blockers.length === 0 ? (
+            <Text fontSize="xs" color="fg.muted">
+              Every check has passed.
+            </Text>
+          ) : (
+            migration.blockers.map((blocker) => (
+              <Text key={blocker.code} fontSize="xs" color="fg.muted">
+                {checkCopyFor({ blocker, migration })}
+              </Text>
+            ))
+          )}
+        </VStack>
+      )}
       {canManage && migration.phase !== "FINALIZED" && (
         <HStack gap={2} flexWrap="wrap">
           {routeLever && (
@@ -122,6 +150,51 @@ export function MigrationProgressSection({
   );
 }
 
+function UpdatePhaseChip({ migration }: { migration: MigrationView }) {
+  const chip = updateChipFor(migration.phase);
+
+  return (
+    <Badge
+      size="sm"
+      colorPalette={chip.tone === "good" ? "green" : "yellow"}
+      title={chip.title}
+      data-testid="sso-update-chip"
+    >
+      {chip.label}
+    </Badge>
+  );
+}
+
+/** Every condition finishing needs, on the help beside the heading (copywriting.md). */
+function FinishConditionsHelp() {
+  return (
+    <Tooltip
+      content={
+        <VStack align="stretch" gap={0.5}>
+          {UPDATE_FINISH_CONDITIONS.map((condition) => (
+            <Text key={condition} fontSize="xs">
+              {condition}
+            </Text>
+          ))}
+        </VStack>
+      }
+    >
+      <IconButton
+        size="2xs"
+        variant="plain"
+        color="fg.subtle"
+        minWidth="auto"
+        height="auto"
+        cursor="help"
+        aria-label="Everything that has to be true before you can finish"
+        data-testid="sso-update-conditions-help"
+      >
+        <HelpCircle size={12} />
+      </IconButton>
+    </Tooltip>
+  );
+}
+
 function MigrationRow({ label, children }: { label: string; children: string }) {
   return (
     <HStack gap={2} justify="space-between">
@@ -139,7 +212,6 @@ function MigrationRow({ label, children }: { label: string; children: string }) 
  * left reads as a step somebody has to take.
  */
 function MigrationStragglers({
-  previous,
   members,
   unavailable,
   loading,
@@ -149,7 +221,6 @@ function MigrationStragglers({
   onPreviousMembers,
   onRetryMembers,
 }: {
-  previous: string;
   members: MigrationMembersView;
   unavailable: boolean;
   loading: boolean;
@@ -168,10 +239,9 @@ function MigrationStragglers({
   return (
     <VStack align="stretch" gap={1} data-testid="sso-migration-stragglers">
       <Text fontSize="sm" fontWeight="semibold">
-        Still using {previous}
+        Not moved across yet
       </Text>
       <MigrationMemberRows
-        previous={previous}
         members={members}
         unavailable={unavailable}
         loading={loading}
@@ -204,13 +274,11 @@ function MigrationStragglers({
 }
 
 function MigrationMemberRows({
-  previous,
   members,
   unavailable,
   loading,
   failed,
 }: {
-  previous: string;
   members: MigrationMembersView;
   unavailable: boolean;
   loading: boolean;
@@ -219,7 +287,7 @@ function MigrationMemberRows({
   if (failed) {
     return (
       <Text fontSize="sm" color="fg.muted">
-        We could not read who is still using {previous}.
+        We could not load the members not moved across yet.
       </Text>
     );
   }
@@ -233,7 +301,7 @@ function MigrationMemberRows({
   if (unavailable) {
     return (
       <Text fontSize="sm" color="fg.muted">
-        Migration progress is no longer available.
+        This list is no longer available.
       </Text>
     );
   }
@@ -248,8 +316,11 @@ function MigrationMemberRows({
   return (
     <>
       {members.stragglers.map((person) => (
-        <Text key={person.userId} fontSize="xs" color="fg.muted">
-          {person.name ?? person.email ?? person.userId}
+        <Text key={person.userId} fontSize="xs" color="fg.muted" data-testid="sso-update-member">
+          <Text as="span" color="fg">
+            {person.name ?? person.email ?? person.userId}
+          </Text>
+          {` · ${MEMBER_MOVE[person.move]}`}
         </Text>
       ))}
     </>

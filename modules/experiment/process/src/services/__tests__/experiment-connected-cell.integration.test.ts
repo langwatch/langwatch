@@ -14,6 +14,8 @@ import type { StudioServerEvent, WorkflowApi } from "@langwatch/workflow-contrac
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { createNoAttachmentsFixture } from "./experiment-attachments.fixture.ts";
+
 const scripted = vi.hoisted(() => ({
   component: [] as StudioServerEvent[],
   dispatched: [] as { type: string; payload: Record<string, any> }[],
@@ -33,6 +35,7 @@ import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator
  * dialled.
  */
 const ports = {
+  attachments: createNoAttachmentsFixture(),
   studio: {
     postEvent: async ({
       event,

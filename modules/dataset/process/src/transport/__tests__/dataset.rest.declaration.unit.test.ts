@@ -17,12 +17,17 @@ const declaration = createDatasetRest().router();
 const scope: AuthzDeclaredScopeId = { tier: "project", id: "project-1" };
 const project = { projectSlug: "my-project", viewerUserId: null, actorId: "user-1" };
 
-function answer(operation: string, app: DatasetApi, input: unknown): Promise<unknown> {
+function answer(
+  operation: string,
+  app: DatasetApi,
+  input: unknown,
+  files?: Record<string, File>,
+): Promise<unknown> {
   const route = declaration.routes.find((candidate) => candidate.operation === operation);
   if (!route) throw new Error(`no route declares the operation "${operation}"`);
 
   return Promise.resolve(
-    route.handler({ app, input, scope, actor: null, signal: undefined } as never, project),
+    route.handler({ app, input, files, scope, actor: null, signal: undefined } as never, project),
   );
 }
 
@@ -47,9 +52,39 @@ describe("the dataset REST declaration", () => {
         },
         {
           method: "post",
-          path: "/:slug/entries",
+          path: "/:datasetSlug/entries",
           operation: "postApiDatasetBySlugEntries",
           permission: "datasets:update",
+        },
+        {
+          method: "post",
+          path: "/imports",
+          operation: "postApiDatasetImports",
+          permission: "datasets:create",
+        },
+        {
+          method: "post",
+          path: "/:slugOrId/imports",
+          operation: "postApiDatasetBySlugOrIdImports",
+          permission: "datasets:update",
+        },
+        {
+          method: "post",
+          path: "/upload",
+          operation: "postApiDatasetUpload",
+          permission: "datasets:create",
+        },
+        {
+          method: "post",
+          path: "/:slugOrId/upload",
+          operation: "postApiDatasetBySlugOrIdUpload",
+          permission: "datasets:update",
+        },
+        {
+          method: "post",
+          path: "/attachments",
+          operation: "postApiDatasetAttachments",
+          permission: "datasets:manage",
         },
         {
           method: "get",
@@ -96,7 +131,33 @@ describe("the dataset REST declaration", () => {
         .filter((route) => route.status === 201)
         .map((route) => route.operation);
 
-      expect(created).toEqual(["postApiDataset", "postApiDatasetBySlugOrIdRecords"]);
+      expect(created).toEqual([
+        "postApiDataset",
+        "postApiDatasetBySlugOrIdRecords",
+        "postApiDatasetImports",
+        "postApiDatasetUpload",
+      ]);
+    });
+
+    it("marks the multipart upload pair deprecated, naming the imports successor", () => {
+      const pair = declaration.routes.filter((route) => route.path.endsWith("/upload"));
+
+      expect(pair.map((route) => route.operation)).toEqual([
+        "postApiDatasetUpload",
+        "postApiDatasetBySlugOrIdUpload",
+      ]);
+      for (const route of pair) {
+        expect(route.deprecated?.successor).toBeTruthy();
+      }
+    });
+  });
+
+  describe("given the web-only direct-upload addresses main served", () => {
+    /** @scenario "The web-only direct-upload addresses are gone" */
+    it("declares none of them", () => {
+      expect(declaration.routes.filter((route) => route.path.startsWith("/direct-upload"))).toEqual(
+        [],
+      );
     });
   });
 
@@ -152,6 +213,43 @@ describe("the dataset REST declaration", () => {
 
       await expect(answer("getApiDatasetBySlugOrId", app, { slugOrId: "one" })).rejects.toThrow(
         BadRequestError,
+      );
+    });
+  });
+
+  describe("when a file is posted to the deprecated attachments address", () => {
+    /** @scenario "Posting a file to the dataset attachments address still works and is marked deprecated" */
+    it("stores the file for the key's project and names file upload as the successor", async () => {
+      const stored = {
+        url: "/api/files/project-1/object-1/receipt.png",
+        name: "receipt.png",
+        mediaType: "image/png",
+        sizeBytes: 3,
+      };
+      const storeAttachmentUpload = vi.fn(async () => stored);
+      const route = declaration.routes.find(
+        (candidate) => candidate.operation === "postApiDatasetAttachments",
+      );
+      const file = new File(["png"], "receipt.png", { type: "image/png" });
+
+      expect(route?.deprecated?.successor).toBe("/api/v1/stored-objects");
+      expect(route?.rateLimit).toEqual({ requests: 30, seconds: 60 });
+      await expect(
+        answer(
+          "postApiDatasetAttachments",
+          completeDatasetApi({ storeAttachmentUpload }),
+          { datasetId: "dataset-1" },
+          { file },
+        ),
+      ).resolves.toEqual(stored);
+      expect(storeAttachmentUpload).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: "project-1",
+          datasetId: "dataset-1",
+          filename: "receipt.png",
+          mediaType: "image/png",
+          fileSize: 3,
+        }),
       );
     });
   });

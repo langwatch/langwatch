@@ -63,12 +63,13 @@ describe("ReportTraceRowService.toReportTraceRow", () => {
     });
   });
 
-  it("deep-links the trace", () => {
+  /** @scenario "Notification links carry the timestamp" */
+  it("deep-links the trace with its start time as the partition hint", () => {
     const row = ReportTraceRowService.toReportTraceRow({
-      item: makeItem({ traceId: "trace-abc" }),
+      item: makeItem({ traceId: "trace-abc", timestamp: 1714476000000 }),
       projectUrl: PROJECT_URL,
     });
-    expect(row.url).toBe(`${PROJECT_URL}/traces/trace-abc`);
+    expect(row.url).toBe(`${PROJECT_URL}/traces/trace-abc?t=1714476000000`);
   });
 });
 

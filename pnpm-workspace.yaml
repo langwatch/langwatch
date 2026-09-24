@@ -36,7 +36,7 @@ catalog:
   '@emotion/react': ^11.14.0
   '@hono/node-server': ^2.0.6
   '@hookform/resolvers': ^5.4.0
-  '@langwatch/scenario': 1.7.0-dev.voice6
+  '@langwatch/scenario': 1.7.0-dev.voice10
   '@modelcontextprotocol/sdk': ^1.29.0
   '@monaco-editor/react': ^4.7.0
   '@nx/oxlint': 23.2.1
@@ -241,8 +241,8 @@ overrides:
   '@hono/node-server@>=2.0.0 <2.0.10': '>=2.0.10'
   '@langchain/community>fast-xml-parser': ^5.7.0
   '@langchain/core@<0.3.80': '>=0.3.80'
-  '@langwatch/scenario': file:./vendor/langwatch-scenario-1.7.0-dev.voice9.tgz
-  '@langwatch/scenario@1.7.0-dev.voice9>langwatch': workspace:*
+  '@langwatch/scenario': file:./vendor/langwatch-scenario-1.7.0-dev.voice10.tgz
+  '@langwatch/scenario@1.7.0-dev.voice10>langwatch': workspace:*
   '@modelcontextprotocol/sdk>@hono/node-server': '>=2.0.10'
   '@modelcontextprotocol/sdk@>=1.10.0 <=1.25.3': '>=1.26.0'
   '@opensearch-project/opensearch': '-'

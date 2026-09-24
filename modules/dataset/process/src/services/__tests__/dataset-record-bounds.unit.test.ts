@@ -6,7 +6,10 @@ import { DatasetBatchTooLargeError } from "@langwatch/dataset-contract";
  */
 import { describe, expect, it } from "vitest";
 
-import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
+import {
+  createDatasetTestAttachments,
+  createDatasetTestRequestBounds,
+} from "../../app/__tests__/dataset.fixture.ts";
 import { MemoryDatasetRepositories } from "../../repositories/memory/memory.dataset.repositories.ts";
 import { DatasetService } from "../dataset.service.ts";
 
@@ -22,6 +25,7 @@ function service(tier: "free" | "paid" | "enterprise" = "free") {
       return () => `record_${++sequence}`;
     })(),
     requestBounds: createDatasetTestRequestBounds(tier),
+    attachments: createDatasetTestAttachments(),
   });
   return { datasets };
 }

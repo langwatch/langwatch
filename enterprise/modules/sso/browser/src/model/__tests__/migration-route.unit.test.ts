@@ -23,7 +23,14 @@ function migrationOf(overrides: Partial<MigrationView> = {}): MigrationView {
     selectedRoute: "legacy",
     inheritedDomains: [],
     testSignIn: { done: false },
-    members: { activeCount: 10, linkedCount: 4, stragglers: [], nextCursor: null },
+    members: {
+      activeCount: 10,
+      linkedCount: 4,
+      nextSignInCount: 0,
+      stragglers: [],
+      nextCursor: null,
+    },
+    quietPeriod: { clearsAtMs: null },
     scim: { status: "not-applicable" },
     blockers: [],
     canFinalize: false,
@@ -43,20 +50,20 @@ describe("an inherited domain's line", () => {
 
   it("falls back to the configuration it was inherited from", () => {
     expect(inheritedDomainLine({ domain: "acme.test", method: "legacy" })).toBe(
-      "acme.test (existing legacy configuration)",
+      "acme.test (your existing setup)",
     );
   });
 });
 
 describe("what a migration is called", () => {
   it("spells the vendor when it knows it", () => {
-    expect(migrationTitle("auth0")).toBe("Auth0 migration");
+    expect(migrationTitle("auth0")).toBe("Replacing Auth0");
     expect(previousProviderName("auth0")).toBe("Auth0");
   });
 
   it("never shows an identifier it cannot spell", () => {
-    expect(migrationTitle("acme-internal")).toBe("Single sign-on migration");
-    expect(previousProviderName("acme-internal")).toBe("the previous provider");
+    expect(migrationTitle("acme-internal")).toBe("Replacing your current sign-in");
+    expect(previousProviderName("acme-internal")).toBe("your previous provider");
   });
 });
 
@@ -69,20 +76,20 @@ describe("who is serving sign-in now", () => {
   });
 
   it("is the replacement once the route points at it", () => {
-    expect(servingSignInNow(migrationOf({ selectedRoute: "direct" }))).toBe("okta-primary");
+    expect(servingSignInNow(migrationOf({ selectedRoute: "direct" }))).toBe("Your new connection");
   });
 });
 
 describe("the levers a cutover offers", () => {
   it("offers the switch, refused until somebody has signed in through the replacement", () => {
     const blocked = migrationLevers({ migration: migrationOf(), connectionActive: true });
-    expect(blocked.route).toEqual({ to: "direct", label: "Switch to new SSO", disabled: true });
+    expect(blocked.route).toEqual({ to: "direct", label: "Switch sign-in over", disabled: true });
 
     const ready = migrationLevers({
       migration: migrationOf({ testSignIn: { done: true } }),
       connectionActive: true,
     });
-    expect(ready.route).toEqual({ to: "direct", label: "Switch to new SSO", disabled: false });
+    expect(ready.route).toEqual({ to: "direct", label: "Switch sign-in over", disabled: false });
   });
 
   it("refuses the switch while the replacement is not on", () => {
@@ -100,7 +107,7 @@ describe("the levers a cutover offers", () => {
       connectionActive: true,
     });
 
-    expect(levers.route).toEqual({ to: "legacy", label: "Roll back to Auth0", disabled: false });
+    expect(levers.route).toEqual({ to: "legacy", label: "Switch back to Auth0", disabled: false });
   });
 
   it("takes the route away once finalization has started", () => {
@@ -115,7 +122,7 @@ describe("the levers a cutover offers", () => {
     expect(
       migrationLevers({ migration: migrationOf({ phase: "FINALIZING" }), connectionActive: true })
         .finalize.label,
-    ).toBe("Retry finalization");
+    ).toBe("Try finishing again");
   });
 
   it("holds finalization until its own checks pass", () => {

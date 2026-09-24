@@ -155,6 +155,20 @@ describe("given the legacy Traces addresses", () => {
         );
       }, LAZY_CHROME);
     });
+
+    /** @scenario "The short link forwards the timestamp to the drawer" */
+    it("forwards the trace's start time to the drawer as the partition hint", async () => {
+      const router = open("/acme/traces/trace-1?t=1714476000000");
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/acme/traces");
+      }, LAZY_CHROME);
+      const params = new URLSearchParams(router.state.location.search);
+      expect(params.get("drawer.open")).toBe("traceV2Details");
+      expect(params.get("drawer.traceId")).toBe("trace-1");
+      expect(params.get("drawer.t")).toBe("1714476000000");
+      expect(params.has("t")).toBe(false);
+    });
   });
 
   describe("when the link is missing the ids it needs", () => {

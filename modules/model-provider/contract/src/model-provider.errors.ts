@@ -489,6 +489,32 @@ export class ProviderRefusedError extends HandledError {
   }
 }
 
+/** The account behind the credential cannot pay for a call. */
+export class ProviderOutOfCreditError extends HandledError {
+  constructor({ provider }: { provider: string }) {
+    super("provider_out_of_credit", `${provider} reports no credit left on the account`, {
+      fault: "customer",
+      httpStatus: 402,
+      meta: { provider },
+    });
+  }
+}
+
+/** The plan behind the credential is over its allowance for now. */
+export class ProviderUsageLimitError extends HandledError {
+  constructor({ provider }: { provider: string }) {
+    super(
+      "provider_usage_limit_reached",
+      `${provider} reports the plan's usage limit was reached`,
+      {
+        fault: "customer",
+        httpStatus: 429,
+        meta: { provider },
+      },
+    );
+  }
+}
+
 /** There was no credential to check — nothing stored, nothing in the env. */
 export class ProviderKeyMissingError extends HandledError {
   constructor({ provider }: { provider: string }) {

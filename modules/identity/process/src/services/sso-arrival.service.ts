@@ -196,17 +196,52 @@ export class SsoArrivalService {
     connectionId: string;
     domain: string;
   }): Promise<{ policy: SsoArrivalPolicy; organizationId: string } | null> {
-    // Cheap first: most accounts through this seam are not connections at all.
-    if (!looksLikeSsoConnectionId(connectionId)) return null;
+    // Most accounts through this seam are not connections at all: the expected
+    // path, so it reads at debug rather than one line per ordinary sign-in.
+    if (!looksLikeSsoConnectionId(connectionId)) {
+      logger.debug(
+        { reason: "not_a_connection_id", connectionId },
+        "a single sign-on arrival was not considered for admission",
+      );
+      return null;
+    }
     const connection = await this.deps.connections.tryFindConnection({ connectionId });
-    if (!connection) return null;
+    if (!connection) {
+      logger.info(
+        { reason: "connection_not_found", connectionId },
+        "a single sign-on arrival was not considered for admission",
+      );
+      return null;
+    }
 
-    const standing = ssoDomainStanding({ connection, domain });
-    if (!standing.live || !standing.proved || standing.lapsed) return null;
+    const refusal = this.standingRefusal(ssoDomainStanding({ connection, domain }));
+    if (refusal) {
+      logger.info(
+        { reason: refusal, connectionId, organizationId: connection.organizationId },
+        "a single sign-on arrival was not considered for admission",
+      );
+      return null;
+    }
 
     // Read off the connection rather than re-derived here: there is one field
     // and one answer, and this is the last reader that should keep a copy.
     return { policy: connection.arrivalPolicy, organizationId: connection.organizationId };
+  }
+
+  /** Why a domain's standing admits nobody, in the order the checks run. */
+  private standingRefusal({
+    live,
+    proved,
+    lapsed,
+  }: ReturnType<typeof ssoDomainStanding>):
+    | "domain_not_live"
+    | "domain_not_proved"
+    | "domain_proof_lapsed"
+    | undefined {
+    if (!live) return "domain_not_live";
+    if (!proved) return "domain_not_proved";
+    if (lapsed) return "domain_proof_lapsed";
+    return undefined;
   }
 
   /** An admission retry re-emits the same fact, including its idempotency key. */

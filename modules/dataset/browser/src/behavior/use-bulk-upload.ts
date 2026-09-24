@@ -1,8 +1,14 @@
-import type { DatasetConfirmColumns } from "@langwatch/dataset-contract";
-import { detectFileFormat } from "@langwatch/dataset-contract";
 /** Fire-and-forget orchestrator (not a React effect): closing drawer doesn't
  * abort in-flight files.
  */
+import { describeError } from "@langwatch/browser-host/errors";
+import type {
+  DatasetConfirmColumns,
+  RetryNormalizeInput,
+  UploadProcessing,
+} from "@langwatch/dataset-contract";
+import { detectFileFormat } from "@langwatch/dataset-contract";
+import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 import { generate } from "@langwatch/ksuid";
 import { useCallback, useRef, useState } from "react";
 
@@ -13,13 +19,6 @@ import {
   uploadSingleFile,
   type UploadSingleFileDeps,
 } from "./bulk-upload-orchestrator.ts";
-import {
-  abortPendingUpload,
-  finalizeDirectUpload,
-  putFileToPresignedUrl,
-  requestDirectUpload,
-  retryDatasetNormalize,
-} from "./direct-upload.ts";
 
 /** Files prepared at once; the rest queue (the "queues the rest" behaviour). */
 export const BULK_UPLOAD_CONCURRENCY = 3;
@@ -37,8 +36,8 @@ export type BulkFileStatus =
   | "pending" // accepted, ready to upload
   | "rejected" // unsupported type / too large — never uploaded
   | "queued" // accepted, waiting for an upload slot
-  | "uploading" // requestDirectUpload → PUT → finalize in flight
-  | "processing" // finalized; server is normalizing (poll for ready/failed)
+  | "uploading" // upload → confirm → create in flight
+  | "processing" // created; server is normalizing (poll for ready/failed)
   | "ready"
   | "failed"
   | "cancelled";
@@ -98,25 +97,16 @@ const parseHeaders = async (files: File[]): Promise<(DatasetConfirmColumns | nul
   return results;
 };
 
-const errorMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : "Something went wrong preparing this file.";
+const errorMessage = (error: unknown): string => {
+  if (readHandledError(error)) return describeError({ error });
+  return error instanceof Error ? error.message : "Something went wrong preparing this file.";
+};
 
 export type BulkUploadTransport = UploadSingleFileDeps & {
-  retryDatasetNormalize: typeof retryDatasetNormalize;
+  retryDatasetNormalize: (input: RetryNormalizeInput) => Promise<UploadProcessing>;
 };
 
-const defaultTransport: BulkUploadTransport = {
-  requestDirectUpload,
-  putFileToPresignedUrl,
-  finalizeDirectUpload,
-  abortPendingUpload,
-  retryDatasetNormalize,
-};
-
-export function useBulkUpload(
-  projectId: string | undefined,
-  transport: BulkUploadTransport = defaultTransport,
-) {
+export function useBulkUpload(projectId: string | undefined, transport: BulkUploadTransport) {
   const [files, setFiles] = useState<BulkFile[]>([]);
   // Mirror state for the detached orchestrator + actions to read without stale
   // closures (the fire-and-forget loop must see the latest rows).
@@ -241,7 +231,7 @@ export function useBulkUpload(
     (id: string) => {
       const controller = controllersRef.current.get(id);
       if (controller) {
-        controller.abort(); // uploading → abort the PUT; runOne reaps the row
+        controller.abort(); // uploading → abort the PUT; no dataset exists yet
         return;
       }
       // No in-flight PUT: only a not-yet-started row can be cancelled. A

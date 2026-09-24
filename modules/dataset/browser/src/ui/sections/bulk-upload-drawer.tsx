@@ -48,17 +48,11 @@ import { createPortal } from "react-dom";
 
 import { datasetApi } from "../../behavior/dataset-api.ts";
 import {
-  abortPendingUpload,
-  finalizeDirectUpload,
-  putFileToPresignedUrl,
-  requestDirectUpload,
-  retryDatasetNormalize,
-} from "../../behavior/direct-upload.ts";
-import {
   type BulkFile,
   type BulkUploadTransport,
   useBulkUpload,
 } from "../../behavior/use-bulk-upload.ts";
+import { useDatasetImportTransport } from "../../behavior/use-stored-object-upload.ts";
 import { reorderColumnsBySourceHeader } from "../../model/column-reorder.ts";
 import { invalidColumnNameKeys } from "../../model/column-validation.ts";
 import { useDatasetHost } from "../../model/dataset-host.ts";
@@ -642,15 +636,11 @@ export function BulkUploadDrawer({
   onCreateFromScratch?: () => void;
 }) {
   const projectId = useDatasetHost().project()?.id;
+  const importTransport = useDatasetImportTransport();
+  const retryNormalize = datasetApi.dataset.retryNormalize.useMutation();
   const bulkTransport: BulkUploadTransport = useMemo(
-    () => ({
-      requestDirectUpload,
-      putFileToPresignedUrl,
-      finalizeDirectUpload,
-      abortPendingUpload,
-      retryDatasetNormalize,
-    }),
-    [],
+    () => ({ ...importTransport, retryDatasetNormalize: retryNormalize.mutateAsync }),
+    [importTransport, retryNormalize.mutateAsync],
   );
   const bulk = useBulkUpload(projectId, bulkTransport);
   const [zoneHover, setZoneHover] = useState(false);

@@ -1,5 +1,6 @@
 import { Alert, Link } from "@chakra-ui/react";
 import { hasRedactionMarker } from "@langwatch/redaction";
+import type React from "react";
 
 import NextLink from "../elements/next-link.tsx";
 
@@ -13,8 +14,9 @@ export function PIIRedactionNotice({ content }: { content: string | null | undef
 
 /**
  * The banner itself, for callers that decide on their own that content was redacted.
+ * `children` replaces the sentence; the settings link stays either way.
  */
-export function PIIRedactionAlert() {
+export function PIIRedactionAlert({ children }: { children?: React.ReactNode }) {
   const settingsHref = "/settings/data-privacy";
 
   return (
@@ -22,8 +24,9 @@ export function PIIRedactionAlert() {
       <Alert.Indicator />
       <Alert.Content>
         <Alert.Description fontSize="sm">
-          Some content was redacted by this project's privacy settings (PII or secrets redaction).
-          Review them under{" "}
+          {children ??
+            "Some content was redacted by this project's privacy settings (PII or secrets redaction)."}{" "}
+          Review your privacy settings under{" "}
           <Link asChild color="blue.600" textDecoration="underline">
             <NextLink href={settingsHref}>Settings</NextLink>
           </Link>

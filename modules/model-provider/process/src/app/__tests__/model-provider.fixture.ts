@@ -9,6 +9,7 @@ import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
 
+import { modelProviderConnectionPingChannels } from "../../channels/model-provider-connection-ping-channels.registry.ts";
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
 import {
@@ -112,6 +113,7 @@ export function createModelProviderTestInfrastructure(
       projects,
       executionProxyBaseUrl: UNREACHABLE_EXECUTION_PROXY,
     }),
+    connectionPing: modelProviderConnectionPingChannels.memory.create(),
     ids: PrefixedModelProviderIdAdapter.create({ suffix: () => "test" }),
     codexTokenRefresher: CodexOAuthModelProviderTokenRefresherAdapter.create(),
     connectionRateLimiter: WindowedModelProviderConnectionRateLimiterAdapter.create({

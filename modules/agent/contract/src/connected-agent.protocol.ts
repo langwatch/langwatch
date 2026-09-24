@@ -61,6 +61,17 @@ export const registerFrameSchema = z.object({
 });
 export type RegisterFrame = z.infer<typeof registerFrameSchema>;
 
+/**
+ * Who can target the agent, as the SDK prints it at startup. The owner's user
+ * id stays off the wire: the process that registered already holds the key.
+ */
+export const registeredScopeSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("shared") }),
+  z.object({ kind: z.literal("owner") }),
+  z.object({ kind: z.literal("host"), hostLabel: z.string() }),
+]);
+export type RegisteredScope = z.infer<typeof registeredScopeSchema>;
+
 export const registeredFrameSchema = z.object({
   ...versioned.shape,
   type: z.literal("registered"),
@@ -71,6 +82,7 @@ export const registeredFrameSchema = z.object({
       id: z.string(),
       url: z.string(),
       parameterNotes: z.array(z.string()),
+      scope: registeredScopeSchema,
     }),
   ),
   heartbeatIntervalMs: z.number().int().positive(),

@@ -114,7 +114,13 @@ export class ProcessServer implements ProcessBoot {
     const secrets = this.resolver.scopeTo(storesOwner.name, Object.values(storesOwner.secrets));
     let members: ProcessMemberSource | undefined;
     try {
-      const opened = await openProcessStores(this.server.name, config, secrets, pipelines);
+      const opened = await openProcessStores({
+        name: this.server.name,
+        config,
+        secrets,
+        pipelines,
+        production: this.production,
+      });
       members = opened;
       let surface: ((peers: TransportPeers) => ExposedSurface<unknown, unknown>) | undefined;
       if (role === "api" && transports) {

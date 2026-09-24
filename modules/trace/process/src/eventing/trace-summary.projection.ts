@@ -3,6 +3,7 @@ import {
   AbstractFoldProjection,
   type FoldEventHandlers,
 } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
 import {
   ATTR_KEYS,
   type AnnotationAddedEvent,
@@ -34,6 +35,7 @@ import {
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
 } from "@langwatch/trace-contract";
 
+import { spanStorabilityOf, UNSTORABLE_SPAN_SKIPPED } from "../rules/storable-span-time.rules.ts";
 import { anchorStorageTime } from "../rules/trace-storage-anchor.rules.ts";
 import type { TraceProjectionRuntimeService } from "../services/projection/trace-projection-runtime.service.ts";
 import {
@@ -41,6 +43,8 @@ import {
   TraceIOAccumulationService,
 } from "../services/trace-io-accumulation.service.ts";
 import { TraceLogRecordIOService } from "../services/trace-log-record-io.service.ts";
+
+const logger = createLogger("langwatch:trace-processing:trace-summary-fold");
 
 export type { TraceSummaryData };
 
@@ -236,6 +240,14 @@ export class TraceSummaryFoldProjection
     // fold cost. Derived fields stay frozen at the first MAX_PROCESSED_SPANS.
     if (state.spanCount >= MAX_PROCESSED_SPANS) {
       return { ...state, spanCount: state.spanCount + 1 };
+    }
+
+    // A span whose own times cannot be stored throws inside normalization,
+    // permanently; leave the state untouched so the trace's other spans fold.
+    const storability = spanStorabilityOf({ event, consumer: "traceSummaryFold" });
+    if (!storability.storable) {
+      logger.warn(storability.skip, UNSTORABLE_SPAN_SKIPPED);
+      return state;
     }
 
     const normalizedSpan = this.runtime.spanNormalization.normalizeSpanReceived(

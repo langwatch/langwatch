@@ -3,7 +3,7 @@
  */
 import { generate } from "@langwatch/ksuid";
 
-import type { DatasetStorage } from "../app/dataset.app.ts";
+import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import {
   CHUNK_MAX_BYTES,
   type ChunkedDatasetMeta,
@@ -26,7 +26,7 @@ const RECORD_KSUID_RESOURCE = "record";
  */
 export class StreamingChunkWriterService {
   static create(deps: {
-    storage: DatasetStorage;
+    storage: DatasetChunkRepository;
     projectId: string;
     datasetId: string;
   }): StreamingChunkWriterService {
@@ -47,7 +47,7 @@ export class StreamingChunkWriterService {
 
   private constructor(
     private readonly deps: {
-      storage: DatasetStorage;
+      storage: DatasetChunkRepository;
       projectId: string;
       datasetId: string;
     },

@@ -22,6 +22,31 @@ const PROGRESS_CHUNK = 5;
 const BOOLEAN_OPERATORS = /(^|\s)(AND|OR|NOT)(\s|$)/;
 
 /**
+ * A query carrying an email address. PII redaction (on by default) strips
+ * them before a trace is stored, so such a search always finds nothing.
+ */
+const EMAIL_ADDRESS = /[^\s@<>"']+@[^\s@<>"']+\.[A-Za-z]{2,}/;
+
+const EMAIL_HINT =
+  "Email addresses are redacted before a trace is stored when the project redacts PII (the default), so a search for one finds nothing. Search by a thread id, a trace id or a name instead, or check the project's data privacy settings.";
+
+/** What an empty result should say about the query, or nothing. */
+export function emptySearchHint({
+  query,
+  found,
+}: {
+  query: string | undefined;
+  found: number;
+}): string | undefined {
+  if (found > 0 || !query) return undefined;
+  if (BOOLEAN_OPERATORS.test(query)) {
+    return "The query is matched as plain text, so AND, OR and NOT are searched for as words. Try one phrase.";
+  }
+  if (EMAIL_ADDRESS.test(query)) return EMAIL_HINT;
+  return undefined;
+}
+
+/**
  * The window flags take an ISO-8601 instant or epoch milliseconds, which is
  * what the Trace Explorer's page context and its links carry. `new Date()`
  * reads an integer string as a calendar date and answers NaN.
@@ -129,11 +154,14 @@ export const searchTracesCommand = async (
   if (resolveOutputOptions(options).format !== "table") {
     reportProgress({ events, total: traces.length, matched });
   }
-  await printResult(result, {
+  // The hint rides on the document too, so a machine caller reading zero
+  // traces is told the cause the same way a person is.
+  const hint = emptySearchHint({ query: options.query, found: traces.length });
+  await printResult(withHint({ document: result, hint }), {
     ...options,
     table: () => {
       if (traces.length === 0) {
-        printEmptySearch(options.query);
+        printEmptySearch({ hint, filter: options.filter });
       } else {
         printTable({ events, traces, matched });
       }
@@ -244,13 +272,33 @@ function truncate(str: string, maxLen: number): string {
   return cleaned.substring(0, maxLen - 1) + "…";
 }
 
-function printEmptySearch(query: string | undefined): void {
+function withHint<T extends object>({
+  document,
+  hint,
+}: {
+  document: T;
+  hint: string | undefined;
+}): T | (T & { hint: string }) {
+  return hint ? { ...document, hint } : document;
+}
+
+function printEmptySearch({
+  hint,
+  filter,
+}: {
+  hint: string | undefined;
+  filter: string | undefined;
+}): void {
   console.log();
   console.log(chalk.gray("No traces found matching your criteria."));
-  if (query && BOOLEAN_OPERATORS.test(query)) {
+  if (hint) console.log(chalk.gray(hint));
+  if (filter) {
+    // A filter that parses and matches nothing is almost always a value
+    // spelled the way a person would spell it rather than the way the
+    // project records it, which is the one question facets answers.
     console.log(
       chalk.gray(
-        "The query is matched as plain text, so AND, OR and NOT are searched for as words. Try one phrase.",
+        `The filter parsed, so a value may be spelled differently here. Check with ${chalk.cyan("langwatch trace facets <field>")}.`,
       ),
     );
   }

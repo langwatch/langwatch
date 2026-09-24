@@ -4,21 +4,21 @@
  * read, or what a connection would do before there is one. Declared through
  * `withCapabilities`. Spec: specs/identity/organization-authentication-settings.feature
  */
-import { Button, HStack, Skeleton, Text } from "@chakra-ui/react";
-import {
-  OverviewCard,
-  OverviewDetail,
-  StatusChip,
-  type OverviewChip,
-} from "@langwatch/design-system/settings-card";
+import { Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { OverviewCard, OverviewDetail, StatusChip } from "@langwatch/design-system/settings-card";
 import type { SsoSetupPageView } from "@langwatch/enterprise-sso-contract";
 import { ArrowRight, ExternalLink, RefreshCw, Settings2 } from "lucide-react";
 
 import { ssoApi } from "../../behavior/sso-api.ts";
 import { useTestSignIn } from "../../behavior/use-test-sign-in.ts";
 import { arrivalAnswerLabel, SSO_ANSWER_BY_POLICY } from "../../model/arrivals.ts";
-import { connectionProtocolName, connectionStatusChipFor } from "../../model/connection-status.ts";
+import {
+  connectionProtocolName,
+  connectionStatusChipFor,
+  previewCopyFor,
+} from "../../model/connection-status.ts";
 import { domainProofChipFor } from "../../model/domain-proof-chip.ts";
+import { updateChipFor } from "../../model/migration-route.ts";
 import { setupProgressFor } from "../../model/setup-progress.ts";
 import { domainClaimsOf, goLiveFactsOf } from "../../model/setup-view.ts";
 import { useSsoHost } from "../../model/sso-host.ts";
@@ -47,6 +47,7 @@ export function SsoOverviewCard({ organizationId }: { organizationId: string }) 
     <SingleSignOnPreviewCard
       state={connection?.state ?? null}
       canManage={canManage}
+      updatePhase={view?.migration?.phase ?? null}
       goLiveBlockedBecause={
         setupProgressFor(goLiveFactsOf(view?.goLive ?? null)).goLiveBlockedBecause
       }
@@ -159,39 +160,96 @@ export function SingleSignOnCard({
           </HStack>
         )}
       </OverviewDetail>
+
+      <UpdateNotice view={view} connection={connection} canManage={canManage} />
     </OverviewCard>
+  );
+}
+
+/**
+ * The invitation to connect the organization's own identity provider, or,
+ * once that is under way, where it got to in the provider page's own words.
+ * A reader who may not manage gets the status and never the action.
+ */
+function UpdateNotice({
+  view,
+  connection,
+  canManage,
+}: {
+  view: SsoSetupPageView;
+  connection: SetupConnection;
+  canManage: boolean;
+}) {
+  if (view.migration) {
+    const chip = updateChipFor(view.migration.phase);
+    return (
+      <OverviewDetail label="Update">
+        <HStack gap={2}>
+          <StatusChip
+            label={chip.label}
+            tone={chip.tone}
+            title={chip.title}
+            data-testid="sso-update-chip"
+          />
+          <a href={PROVIDER_PAGE}>Where it stands</a>
+        </HStack>
+      </OverviewDetail>
+    );
+  }
+  if (connection.source !== "legacy-grandfathered") return null;
+
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="border.emphasized"
+      borderRadius="md"
+      padding={3}
+      data-testid="sso-update-notice"
+    >
+      <VStack align="stretch" gap={2}>
+        <Text fontSize="13px" color="fg.muted">
+          {canManage
+            ? "LangWatch set this single sign-on up for your organization. Connect your own identity provider to run it yourself."
+            : "LangWatch set this single sign-on up for your organization. An organization administrator can connect your own identity provider to run it yourselves."}
+        </Text>
+        {canManage && (
+          <Button asChild size="sm" variant="solid" colorPalette="orange">
+            <a href={PROVIDER_PAGE}>
+              Update single sign-on
+              <ArrowRight size={14} />
+            </a>
+          </Button>
+        )}
+      </VStack>
+    </Box>
   );
 }
 
 /** What single sign-on would give this organization, before there is one to read. */
 export function SingleSignOnPreviewCard({
-  state,
-  canManage,
-  goLiveBlockedBecause,
+  state = null,
+  canManage = false,
+  goLiveBlockedBecause = null,
+  updatePhase = null,
 }: {
-  state: SetupConnection["state"] | null;
-  canManage: boolean;
-  goLiveBlockedBecause: string | null;
+  state?: SetupConnection["state"] | null;
+  canManage?: boolean;
+  goLiveBlockedBecause?: string | null;
+  /** Where an update to the organization's own identity provider got to. */
+  updatePhase?: NonNullable<SsoSetupPageView["migration"]>["phase"] | null;
 }) {
-  const chip: OverviewChip =
-    state === null
-      ? {
-          label: "Not set up",
-          tone: "neutral",
-          title: "No identity provider is connected to this organization.",
-        }
-      : connectionStatusChipFor({ state, goLiveBlockedBecause });
+  const copy = previewCopyFor({ state, goLiveBlockedBecause, updatePhase });
 
   return (
     <OverviewCard
       title="Single sign-on"
-      chip={chip}
+      chip={copy.chip}
       data-testid="single-sign-on-preview-card"
       actions={
         canManage ? (
           <Button asChild size="sm" variant="solid" colorPalette="orange">
-            <a href={PROVIDER_PAGE}>
-              {state === null ? "Set it up" : "Carry on setting it up"}
+            <a href={PROVIDER_PAGE} data-testid="single-sign-on-preview-action">
+              {copy.action}
               <ArrowRight size={14} />
             </a>
           </Button>
@@ -211,12 +269,8 @@ export function SingleSignOnPreviewCard({
         <Text>Anyone with an address at a domain you prove is yours.</Text>
       </OverviewDetail>
 
-      <OverviewDetail label={state === null ? "First step" : "Next step"}>
-        <Text color="fg.muted">
-          {state === null
-            ? "Telling us about your identity provider."
-            : "Carry on where you left off."}
-        </Text>
+      <OverviewDetail label={copy.stepLabel}>
+        <Text color="fg.muted">{copy.step}</Text>
       </OverviewDetail>
     </OverviewCard>
   );

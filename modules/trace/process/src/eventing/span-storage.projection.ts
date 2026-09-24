@@ -3,6 +3,7 @@ import {
   AbstractMapProjection,
   type MapEventHandlers,
 } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
 import {
   type SpanReceivedEvent,
   spanReceivedEventSchema,
@@ -10,11 +11,14 @@ import {
 } from "@langwatch/trace-contract";
 
 import { type TraceSpanNormalization } from "../app/trace.members.ts";
+import { spanStorabilityOf, UNSTORABLE_SPAN_SKIPPED } from "../rules/storable-span-time.rules.ts";
 import {
   spanStorageMapGroupKey,
   TRACE_SPAN_MAP_COALESCE_MAX_BATCH,
 } from "../rules/trace-span-storage-group.rules.ts";
 import type { SpanCostService } from "../services/span-cost.service.ts";
+
+const logger = createLogger("langwatch:trace-processing:span-storage-map");
 
 const spanEvents = [spanReceivedEventSchema] as const;
 
@@ -61,7 +65,15 @@ export class SpanStorageMapProjection
     return new SpanStorageMapProjection(deps);
   }
 
-  mapTraceSpanReceived(event: SpanReceivedEvent): NormalizedSpan {
+  mapTraceSpanReceived(event: SpanReceivedEvent): NormalizedSpan | null {
+    // Before normalization, where an unstorable time throws (the record id is a
+    // KSUID over its start seconds); skipping keeps one span from blocking the lane.
+    const storability = spanStorabilityOf({ event, consumer: this.name });
+    if (!storability.storable) {
+      logger.warn(storability.skip, UNSTORABLE_SPAN_SKIPPED);
+      return null;
+    }
+
     const span = this.spanNormalization.normalizeSpanReceived(
       event.tenantId,
       event.data.span,

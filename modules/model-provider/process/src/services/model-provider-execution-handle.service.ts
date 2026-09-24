@@ -1,4 +1,3 @@
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import {
   expandLatestAlias,
   isCodexModel,
@@ -10,6 +9,7 @@ import {
 import type { LanguageModel } from "ai";
 
 import type { ModelCostProject, ModelProviderCodexHandle } from "../app/model-provider.members.ts";
+import { handleForParameters } from "../rules/execution-handle.rules.ts";
 import {
   getProjectModelProviders,
   type LegacyModelProviderExecution,
@@ -308,23 +308,13 @@ export class ModelProviderExecutionHandleService {
       modelProvider,
       projectId,
     });
-    const headers = Object.fromEntries(
-      Object.entries(litellmParams).map(([key, value]) => [`x-litellm-${key}`, value]),
-    );
 
-    // Go playground proxy: nlpgo's /go/proxy/v1/* (in-process AI Gateway,
-    // no LiteLLM). Wire shape is x-litellm-* headers + OpenAI body; the Go
-    // side reads x-litellm-* via the gatewayproxy package and dispatches
-    // in-process.
-    const baseURL = input.executionProxyBaseUrl;
-    const vercelProvider = createOpenAICompatible({
-      name: `${providerKey}`,
-      apiKey: litellmParams.api_key,
-      baseURL,
-      headers,
+    return handleForParameters({
+      providerKey,
+      model: model_,
+      parameters: litellmParams,
+      executionProxyBaseUrl: input.executionProxyBaseUrl,
     });
-
-    return vercelProvider(model_);
   }
 
   resolve(input: ModelProviderExecutionHandleInput): Promise<LanguageModel> {

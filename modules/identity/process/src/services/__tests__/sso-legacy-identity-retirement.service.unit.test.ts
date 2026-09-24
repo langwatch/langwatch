@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  * What retiring a grandfathered connection does to the identifiers it minted:
- * everybody keeps a proved way in, a provider another organization still runs
+ * nobody loses their only way in, a provider another organization still runs
  * is left alone, and the accounts go through the module that owns them.
  * @see specs/identity/sso-connection-lifecycle.feature
  */
@@ -145,9 +145,14 @@ describe("retiring the identities a grandfathered connection minted", () => {
     expect(detachIdentifier).toHaveBeenCalledWith(
       expect.objectContaining({ userId: ANA, identifierId: "idf_legacy" }),
     );
-    expect(retire).toHaveBeenCalledWith({ organizationId: ORG, connectionId: LEGACY });
+    expect(retire).toHaveBeenCalledWith({
+      organizationId: ORG,
+      connectionId: LEGACY,
+      strandedUserIds: [],
+    });
   });
 
+  /** @scenario "Native legacy retirement leaves every member a way in" */
   it("hands primary to the replacement before the legacy one goes", async () => {
     const { service, markPrimary } = scenario();
 
@@ -158,12 +163,52 @@ describe("retiring the identities a grandfathered connection minted", () => {
     );
   });
 
-  it("refuses when somebody holds no proved identifier on the replacement", async () => {
-    const { service, detachIdentifier } = scenario({ identifiers: [legacyHolding] });
-
-    await expect(service.retire(request)).rejects.toMatchObject({
-      code: "sso_migration_finalization_blocked",
+  it("leaves a stranded member's old identity and account in place and still finishes", async () => {
+    const { service, detachIdentifier, markPrimary, retire } = scenario({
+      identifiers: [legacyHolding],
     });
+
+    await service.retire(request);
+
+    expect(detachIdentifier).not.toHaveBeenCalled();
+    expect(markPrimary).not.toHaveBeenCalled();
+    expect(retire).toHaveBeenCalledWith({
+      organizationId: ORG,
+      connectionId: LEGACY,
+      strandedUserIds: [ANA],
+    });
+  });
+
+  /** @scenario "Native legacy retirement leaves every member a way in" */
+  it("hands primary to the member's address when the replacement has not seen them yet", async () => {
+    const { service, detachIdentifier, markPrimary } = scenario({
+      identifiers: [
+        legacyHolding,
+        identifier({ identifierId: "idf_email", provider: "email", connectionId: null }),
+      ],
+    });
+
+    await service.retire(request);
+
+    expect(markPrimary).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: ANA, identifierId: "idf_email" }),
+    );
+    expect(detachIdentifier).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: ANA, identifierId: "idf_legacy" }),
+    );
+  });
+
+  /** @scenario "Native legacy retirement leaves every member a way in" */
+  it("does not count a passkey as another way in", async () => {
+    const { service, detachIdentifier } = scenario({
+      identifiers: [
+        legacyHolding,
+        identifier({ identifierId: "idf_passkey", provider: "passkey", connectionId: null }),
+      ],
+    });
+
+    await service.retire(request);
+
     expect(detachIdentifier).not.toHaveBeenCalled();
   });
 

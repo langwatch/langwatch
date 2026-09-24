@@ -166,7 +166,9 @@ const resolvingCredentials: ConnectedAgentCredentials = {
   }),
 };
 
-function registerFrame(overrides: { name?: string; instanceId?: string } = {}) {
+function registerFrame(
+  overrides: { name?: string; instanceId?: string; environment?: string } = {},
+) {
   return {
     protocol: PROTOCOL_VERSION,
     type: "register" as const,
@@ -180,7 +182,11 @@ function registerFrame(overrides: { name?: string; instanceId?: string } = {}) {
       inFlightCallIds: [],
     },
     agents: [
-      { name: overrides.name ?? "support-agent", environment: "production", parameters: {} },
+      {
+        name: overrides.name ?? "support-agent",
+        environment: overrides.environment ?? "production",
+        parameters: {},
+      },
     ],
   };
 }
@@ -189,7 +195,12 @@ function registerFrame(overrides: { name?: string; instanceId?: string } = {}) {
 async function startPod({
   pingIntervalMs = 10_000,
   pongWaitMs = 200,
-}: { pingIntervalMs?: number; pongWaitMs?: number } = {}) {
+  credentials = resolvingCredentials,
+}: {
+  pingIntervalMs?: number;
+  pongWaitMs?: number;
+  credentials?: ConnectedAgentCredentials;
+} = {}) {
   const runtime = ConnectedAgentRuntimeService.create({
     podId: `pod_${Math.random().toString(36).slice(2)}`,
     store: SessionStateStoreFactory.memory(),
@@ -201,7 +212,7 @@ async function startPod({
   const gateway = ConnectGatewayFixture.create({
     runtime,
     agents: registeringAgentService(),
-    credentials: resolvingCredentials,
+    credentials,
     publicBaseUrl: "https://example.test",
     replicaCount: 1,
     pingIntervalMs,
@@ -234,6 +245,48 @@ function connectAndRegister(
   });
   return { socket, registered };
 }
+
+describe("ConnectGateway registered frame", () => {
+  describe("when a project key registers a production agent", () => {
+    it("reports the agent as shared", async () => {
+      const pod = await startPod();
+      const { socket, registered } = connectAndRegister(pod.url, registerFrame());
+
+      await expect(registered).resolves.toMatchObject({
+        type: "registered",
+        agents: [expect.objectContaining({ parameterNotes: [], scope: { kind: "shared" } })],
+      });
+      socket.close();
+      await stopPod(pod);
+    });
+  });
+
+  describe("when the key is personal and the agent is a development one", () => {
+    /** @scenario "The registered frame reports the scope" */
+    it("says in the registered frame that the agent is scoped to its owner", async () => {
+      const pod = await startPod({
+        credentials: {
+          resolve: async () => ({
+            project: { id: "proj_1", slug: "proj-one" },
+            principalId: "user:user_1",
+            userId: "user_1",
+          }),
+        },
+      });
+      const { socket, registered } = connectAndRegister(
+        pod.url,
+        registerFrame({ environment: "development" }),
+      );
+
+      await expect(registered).resolves.toMatchObject({
+        type: "registered",
+        agents: [expect.objectContaining({ scope: { kind: "owner" } })],
+      });
+      socket.close();
+      await stopPod(pod);
+    });
+  });
+});
 
 describe("ConnectGateway socket lifecycle", () => {
   let pod: Awaited<ReturnType<typeof startPod>>;

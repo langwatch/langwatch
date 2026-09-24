@@ -15,14 +15,14 @@ import { useTraceQueryArgs } from "./use-trace-query-args.ts";
  */
 export function useSpanLangwatchSignals() {
   const shared = useSharedTrace();
-  const { isLive, isReady, queryArgs } = useTraceQueryArgs();
+  const { isLive, isReady, hintReady, queryArgs } = useTraceQueryArgs();
   // SSE-aware polling (see `useSpanTree` for the rationale): poll only
   // when `useTraceFreshness`'s SSE subscription isn't keeping the cache
   // fresh via invalidations.
   const sseConnected = useSseStatusStore((s) => s.sseConnectionState === "connected");
 
   const query = api.traces.spanLangwatchSignals.useQuery(queryArgs, {
-    enabled: isReady && !shared,
+    enabled: isReady && hintReady && !shared,
     staleTime: 300_000,
     gcTime: 1_800_000,
     placeholderData: keepPreviousData,

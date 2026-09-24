@@ -23,11 +23,11 @@ export function startupNotice(): ReactNode {
 export function joinOffer({
   currentOrganizationId,
 }: {
-  currentOrganizationId: string | undefined;
+  currentOrganizationId: string | null | undefined;
 }): ReactNode {
   return (
     <Suspense fallback={null}>
-      <JoinYourTeamTakeover currentOrganizationId={currentOrganizationId ?? null} />
+      <JoinYourTeamTakeover currentOrganizationId={currentOrganizationId} />
     </Suspense>
   );
 }

@@ -1,13 +1,11 @@
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
 /**
  * @vitest-environment node
  * @see modules/stored-object/specs/stored-objects.feature
  */
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
-import { resolvedSecrets } from "@langwatch/process-stores";
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import { createApp } from "@langwatch/kernel";
+import { memoryStores } from "@langwatch/process-stores";
 import { StoredObjectApi, StoredObjectNotFoundError } from "@langwatch/stored-object-contract";
 import { describe, expect, it } from "vitest";
 
@@ -25,32 +23,17 @@ function unavailable(name: string): never {
 }
 
 function installation(role: "api" | "worker" | "tasks") {
-  const localFilesystemRoot = mkdtempSync(join(tmpdir(), "stored-object-installation-"));
-
   return createApp({ role })
-    .withModules([withMemoryRepositories(storedObjectServer)])
-    .withConfig({
-      "stored-object": {
-        backend: undefined,
-        localFilesystemRoot,
-        s3: { bucket: undefined, endpoint: undefined, region: undefined },
-        azure: {
-          authMode: undefined,
-          accountName: undefined,
-          container: undefined,
-          endpoint: undefined,
-          authorityHost: undefined,
-          tokenAudience: undefined,
-          allowInsecureTokenEndpointForTests: undefined,
-          identity: { tenantId: undefined, clientId: undefined, federatedTokenFile: undefined },
-        },
-        azureSpoolRetentionConfirmed: false,
-      },
+    .withModules([storedObjectServer])
+    .withConfig({ "stored-object": { azureSpoolRetentionConfirmed: false } })
+    .withStores(memoryStores())
+    .withMember("encryption", {
+      encrypt: (value: string) => value,
+      decrypt: (value: string) => value,
     })
-    .withMember("nodeEnvironment", undefined)
-    .withRelational(unavailable("relational store"))
+    .withMember("publicBaseUrl", "https://app.example")
+    .provide({ authz: createApiFixture<AuthzApi>() })
     .withAnalytical(unavailable("analytical store"))
-    .withSecrets(resolvedSecrets({}))
     .withObservability((observability) => observability.withLogging(unavailable("logger")));
 }
 

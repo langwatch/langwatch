@@ -45,18 +45,25 @@ export class DatasetNormalizationService
       id: input.datasetId,
       projectId: input.projectId,
     });
-    if (!dataset.stagingKey || !dataset.uploadFilename) {
-      throw new UploadNotPendingError("Dataset normalization requires a staged upload");
+    if (!dataset.uploadFilename) {
+      throw new UploadNotPendingError("Dataset normalization requires an imported file");
     }
-
-    const payload: DatasetNormalizePayload = {
+    const target = {
       id: dataset.id,
       tenantId: input.projectId,
       projectId: input.projectId,
       datasetId: dataset.id,
-      stagingKey: dataset.stagingKey,
       filename: dataset.uploadFilename,
     };
+    // A row the previous release staged keeps its staging key until it is prepared (ADR-155).
+    let payload: DatasetNormalizePayload;
+    if (dataset.sourceStoredObjectId) {
+      payload = { ...target, sourceStoredObjectId: dataset.sourceStoredObjectId };
+    } else if (dataset.stagingKey) {
+      payload = { ...target, stagingKey: dataset.stagingKey };
+    } else {
+      throw new UploadNotPendingError("Dataset normalization requires an imported file");
+    }
 
     if (this.sender) {
       await this.sender(payload);

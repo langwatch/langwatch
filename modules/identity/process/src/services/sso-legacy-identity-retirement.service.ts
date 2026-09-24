@@ -1,3 +1,4 @@
+import type { LegacySsoAccessQuery } from "@langwatch/auth-contract";
 import {
   SsoMigrationFinalizationBlockedError,
   type SsoConnectionState,
@@ -10,7 +11,7 @@ import type {
   SsoMigrationEvidenceRepository,
 } from "../repositories/sso-migration-evidence.repository.ts";
 import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
-import { identifierBelongsToMigrationConnection } from "../rules/sso-migration.rules.ts";
+import { legacyStandingOf, successorsOf } from "../rules/sso-migration.rules.ts";
 import type { IdentityService } from "./identity.service.ts";
 import type {
   SsoLegacyAccessReads,
@@ -20,16 +21,10 @@ import type {
 /** A connection nobody can act on any further no longer holds a provider. */
 const CLOSED_STATES = new Set(["DISCARDED", "TORN_DOWN"]);
 
-/** The two states an identifier counts as a way in from. */
-const PROVED_STATES = new Set(["VERIFIED", "PRIMARY"]);
-
 /** Retiring the accounts as well as counting them, both answered by the
  *  module that owns the rows (ADR-129). */
 export interface SsoLegacyAccessRetirement extends SsoLegacyAccessReads {
-  retire(args: {
-    organizationId: string;
-    connectionId: string;
-  }): Promise<{ retired: number; remaining: number }>;
+  retire(args: LegacySsoAccessQuery): Promise<{ retired: number; remaining: number }>;
 }
 
 /** Membership, plus the one cross-organization question retirement asks:
@@ -70,6 +65,11 @@ export class SsoLegacyIdentityRetirementService {
     this.now = deps.now ?? (() => nowInstant().epochMilliseconds);
   }
 
+  /**
+   * Retires every member's identity on the previous provider except where it
+   * is their only way in: that one stays, stops working at teardown, and the
+   * replacement matches them by address at their next sign-in.
+   */
   async retire(request: RetirementRequest): Promise<void> {
     const legacy = await this.requireLegacyConnection(request);
     const replacement = await this.requireConnection({
@@ -81,94 +81,55 @@ export class SsoLegacyIdentityRetirementService {
     });
     const userIds = members.map((member) => member.userId);
     const holdings = await this.deps.evidence.findLiveIdentifierHoldings({ userIds });
+    const { legacyIdentifierIds, strandedUserIds } = legacyStandingOf({ holdings, legacy });
     const retiring = holdings
-      .filter((holding) =>
-        identifierBelongsToMigrationConnection({ identifier: holding, connection: legacy }),
+      .filter(
+        (holding) =>
+          legacyIdentifierIds.has(holding.identifierId) && !strandedUserIds.has(holding.userId),
       )
       .toSorted((left, right) => left.identifierId.localeCompare(right.identifierId));
 
     for (const holding of retiring) {
-      await this.retireIdentifier({ request, legacy, replacement, holdings, holding });
+      const [successor] = successorsOf({
+        holdings: holdings.filter(({ userId }) => userId === holding.userId),
+        legacyIdentifierIds,
+        replacement,
+      });
+      await this.retireIdentifier({ request, legacy, holding, successor });
     }
 
     await this.deps.legacyAccess.retire({
       organizationId: request.organizationId,
       connectionId: legacy.connectionId,
+      strandedUserIds: [...strandedUserIds],
     });
   }
 
   private async retireIdentifier({
     request,
     legacy,
-    replacement,
-    holdings,
     holding,
+    successor,
   }: {
     request: RetirementRequest;
     legacy: SsoConnectionState;
-    replacement: SsoConnectionState;
-    holdings: MigrationIdentifierHolding[];
     holding: MigrationIdentifierHolding;
+    successor: MigrationIdentifierHolding | undefined;
   }): Promise<void> {
     await this.requireProviderExclusive({
       organizationId: request.organizationId,
       userId: holding.userId,
       providerId: legacy.idpMetadata.providerId,
     });
-    await this.requireReplacementIsWayIn({
-      userId: holding.userId,
-      replacement,
-      holdings,
-      legacyIsPrimary: holding.state === "PRIMARY",
-      actorUserId: request.actorUserId,
-    });
+    if (holding.state === "PRIMARY" && successor?.state === "VERIFIED") {
+      await this.deps.identity.markPrimary({
+        ...this.command({ userId: holding.userId, actorUserId: request.actorUserId }),
+        identifierId: successor.identifierId,
+      });
+    }
     await this.deps.identity.detachIdentifier({
       ...this.command({ userId: holding.userId, actorUserId: request.actorUserId }),
       identifierId: holding.identifierId,
-    });
-  }
-
-  /**
-   * The person must still have a way in through the replacement, and it takes
-   * over as primary when the legacy identifier was theirs.
-   */
-  private async requireReplacementIsWayIn({
-    userId,
-    replacement,
-    holdings,
-    legacyIsPrimary,
-    actorUserId,
-  }: {
-    userId: string;
-    replacement: SsoConnectionState;
-    holdings: MigrationIdentifierHolding[];
-    legacyIsPrimary: boolean;
-    actorUserId: string;
-  }): Promise<void> {
-    const proved = holdings
-      .filter(
-        (holding) =>
-          holding.userId === userId &&
-          PROVED_STATES.has(holding.state) &&
-          identifierBelongsToMigrationConnection({ identifier: holding, connection: replacement }),
-      )
-      .toSorted(
-        (left, right) =>
-          (right.verifiedAtMs ?? 0) - (left.verifiedAtMs ?? 0) ||
-          left.identifierId.localeCompare(right.identifierId),
-      );
-    const [wayIn] = proved;
-    if (!wayIn) {
-      throw blocked(
-        "members-not-verified-on-replacement",
-        `User ${userId} has no verified replacement identifier.`,
-      );
-    }
-    if (!legacyIsPrimary || wayIn.state === "PRIMARY") return;
-
-    await this.deps.identity.markPrimary({
-      ...this.command({ userId, actorUserId }),
-      identifierId: wayIn.identifierId,
     });
   }
 

@@ -68,6 +68,7 @@ export const simulationFinishRunSchema = z.object({
       reasoning: z.string().optional(),
       metCriteria: z.array(z.string()).default([]),
       unmetCriteria: z.array(z.string()).default([]),
+      inconclusiveCriteria: z.array(z.string()).optional(),
       error: z.string().optional(),
     })
     .optional(),

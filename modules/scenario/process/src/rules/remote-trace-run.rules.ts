@@ -12,10 +12,17 @@ import type { TargetConfig } from "@langwatch/scenario-contract";
  */
 export const TRACE_WAIT_CAP_MS = 30_000;
 
+/**
+ * Quiet period a trace's span set must hold, once every parent resolved, before the
+ * judge reads it: a tool span ending after its parent exported lands a second later.
+ */
+export const TRACE_QUIET_PERIOD_MS = 2_000;
+
 export interface RemoteTraceRunConfig {
   fetchRemoteTraces: true;
   traceWaitTimeoutMs?: number;
   traceWaitExtensionMs: number;
+  traceQuietPeriodMs: number;
   langwatch: {
     endpoint: string;
     apiKey: string;
@@ -40,6 +47,7 @@ export function buildRemoteTraceRunConfig({
     fetchRemoteTraces: true,
     ...(traceWaitTimeoutMs !== undefined ? { traceWaitTimeoutMs } : {}),
     traceWaitExtensionMs: TRACE_WAIT_CAP_MS,
+    traceQuietPeriodMs: TRACE_QUIET_PERIOD_MS,
     langwatch: {
       endpoint: langwatchEndpoint,
       apiKey: langwatchApiKey,

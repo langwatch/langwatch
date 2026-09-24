@@ -1,4 +1,6 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import { MAX_FILE_SIZE_BYTES, MAX_ROWS_LIMIT } from "@langwatch/dataset-contract";
+import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 /**
  * @vitest-environment node
  * What an uploaded file BECOMES: rows parsed from CSV/JSONL/JSON array,
@@ -6,7 +8,7 @@ import { MAX_FILE_SIZE_BYTES, MAX_ROWS_LIMIT } from "@langwatch/dataset-contract
  */
 import { describe, expect, it } from "vitest";
 
-import type { DatasetStorage, DatasetStorageResolver } from "../../app/dataset.app.ts";
+import type { DatasetChunkRepository } from "../../repositories/dataset-chunk.repository.ts";
 import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
 import type { DatasetRecordContentRepository } from "../../repositories/dataset-record-content.repository.ts";
 import type { DatasetRow } from "../../repositories/dataset.repository.ts";
@@ -37,6 +39,7 @@ function datasetRow(overrides: Partial<DatasetRow> = {}): DatasetRow {
     status: "ready",
     statusError: null,
     stagingKey: null,
+    sourceStoredObjectId: null,
     uploadFilename: null,
     rowCount: null,
     sizeBytes: null,
@@ -89,14 +92,15 @@ function harness({
       return [{ index: 0, rowCount: lines.length, byteSize: lines.length * 10 }];
     },
     deleteChunksFrom: async () => undefined,
-  } as unknown as DatasetStorage;
-
-  const storageResolver = {
-    forProject: async () => storage,
-  } as unknown as DatasetStorageResolver;
+  } as unknown as DatasetChunkRepository;
 
   return {
-    adapter: DatasetUploadService.create({ datasets, records, storageResolver }),
+    adapter: DatasetUploadService.create({
+      datasets,
+      records,
+      chunks: storage,
+      storedObjects: createApiFixture<StoredObjectApi>({}, "storedObjects"),
+    }),
     created,
     updated,
     inlineRecords,
@@ -108,6 +112,12 @@ function harness({
   };
 }
 
+/** The file as a multipart body arrives: in pieces, never one string. */
+async function* bytesOf(content: string): AsyncGenerator<Uint8Array> {
+  const whole = Buffer.from(content, "utf8");
+  for (let at = 0; at < whole.byteLength; at += 64 * 1024) yield whole.subarray(at, at + 64 * 1024);
+}
+
 const upload = (
   adapter: DatasetUploadService,
   { slugOrId, filename, content }: { slugOrId: string; filename: string; content: string },
@@ -116,7 +126,7 @@ const upload = (
     slugOrId,
     projectId: PROJECT_ID,
     filename,
-    content,
+    bytes: bytesOf(content),
     fileSize: Buffer.byteLength(content, "utf8"),
   });
 
@@ -128,7 +138,7 @@ const create = (
     projectId: PROJECT_ID,
     name: input.name,
     filename: input.filename,
-    content: input.content,
+    bytes: bytesOf(input.content),
     fileSize: Buffer.byteLength(input.content, "utf8"),
   });
 
@@ -305,7 +315,7 @@ describe("DatasetUploadService", () => {
             slugOrId: "user-feedback",
             projectId: PROJECT_ID,
             filename: "feedback.csv",
-            content: "x".repeat(MAX_FILE_SIZE_BYTES + 1),
+            bytes: bytesOf("x".repeat(MAX_FILE_SIZE_BYTES + 1)),
             fileSize: 0,
           }),
         ).rejects.toMatchObject({ name: "UploadValidationError", kind: "file_too_large" });
@@ -321,7 +331,7 @@ describe("DatasetUploadService", () => {
             slugOrId: "user-feedback",
             projectId: PROJECT_ID,
             filename: "feedback.csv",
-            content: "input,output\nhello,world\n",
+            bytes: bytesOf("input,output\nhello,world\n"),
             fileSize: MAX_FILE_SIZE_BYTES + 1,
           }),
         ).resolves.toMatchObject({ recordsCreated: 1 });
@@ -340,7 +350,7 @@ describe("DatasetUploadService", () => {
             slugOrId: "user-feedback",
             projectId: PROJECT_ID,
             filename: "feedback.csv",
-            content: `input,output\n${rows}\n`,
+            bytes: bytesOf(`input,output\n${rows}\n`),
             fileSize: 0,
           }),
         ).rejects.toMatchObject({ name: "UploadValidationError", kind: "row_limit_exceeded" });

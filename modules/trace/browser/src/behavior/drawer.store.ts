@@ -302,8 +302,7 @@ function readInitialFromURL(): InitialFromURL {
     const traceId = params.get("drawer.traceId");
     const projectId = params.get("drawer.projectId");
     const tRaw = params.get("drawer.t");
-    const t = tRaw ? Number(tRaw) : NaN;
-    const occurredAtMs = Number.isFinite(t) && t > 0 ? t : null;
+    const occurredAtMs = isOccurredAtParam(tRaw) ? Number(tRaw) : null;
     const selectedSpanId = params.get("drawer.span");
     const mode = params.get("drawer.mode");
     const vizRaw = params.get("drawer.viz");
@@ -361,6 +360,11 @@ export function viewModeForEditState({
   isEditing: boolean;
 }): DrawerViewMode {
   return isEditing && isUneditableViewMode(viewMode) ? "trace" : viewMode;
+}
+
+/** Whether a `drawer.t` link value is a usable timestamp: a positive whole number. */
+export function isOccurredAtParam(raw: string | null | undefined): raw is string {
+  return typeof raw === "string" && /^[1-9]\d*$/.test(raw);
 }
 
 /**

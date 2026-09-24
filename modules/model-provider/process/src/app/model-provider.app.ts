@@ -67,6 +67,7 @@ import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
 
+import type { ModelProviderConnectionPing } from "../channels/model-provider-connection-ping.channel.ts";
 import type { ModelProviderRepositories } from "../repositories/model-provider.repositories.ts";
 import { AiCallFailureService } from "../services/ai-call-failure.service.ts";
 import {
@@ -114,6 +115,8 @@ export interface ModelProviderInfrastructure {
   catalog: ModelProviderCatalog;
   /** How a resolved model is executed, for the translation call. */
   translation: ModelTranslation;
+  /** The one real generation Test Connection sends to the provider. */
+  connectionPing: ModelProviderConnectionPing;
   /** The identifier format every row this module writes is minted in. */
   ids: ModelProviderIdFactory;
   /** The OAuth exchange a stored Codex token is refreshed through. */
@@ -353,6 +356,7 @@ export class ModelProviderApp implements ModelProviderApi {
       credentialPolicy: ModelProviderKeysService.create(),
       catalog: members.catalog,
       translation: members.translation,
+      connectionPing: members.connectionPing,
       ids: members.ids,
       codexTokenRefresher: members.codexTokenRefresher,
       connectionRateLimiter: members.connectionRateLimiter,

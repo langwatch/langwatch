@@ -16,6 +16,7 @@ import { SpanKind as ApiSpanKind, type Span as OtelSpan } from "@opentelemetry/a
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
 
+import { storableSpanTimesOf, type UnstorableSpanTime } from "../rules/storable-span-time.rules.ts";
 import { OtlpTraceRequestService } from "./otlp-trace-request.service.ts";
 
 export type SpanIngestionStatus = "collected" | "dropped" | "deduped" | "failed" | "filtered";
@@ -107,6 +108,13 @@ class SpanIngestionTally {
  * store, no session lookup.
  */
 export type CodingAgentIngestFilter = Pick<CodingAgentApi, "shouldFilterSpan">;
+
+/** What the producer is told, naming the field it has to fix. */
+function unstorableSpanTimeMessage({ field }: UnstorableSpanTime): string {
+  return field === "startTimeUnixMs"
+    ? "span start time is not a valid timestamp"
+    : "span end time is not a valid timestamp";
+}
 
 /**
  * Process-wide Trace receiver. Transport keeps auth and HTTP response mapping;
@@ -246,14 +254,13 @@ export class TraceIngestionService {
       };
     }
 
-    let startTimeUnixMs: number;
-    try {
-      startTimeUnixMs = OtlpTraceRequestService.convertUnixNanoToUnixMs(
-        OtlpTraceRequestService.normalizeOtlpUnixNano(spanParseResult.data.startTimeUnixNano),
-      );
-    } catch {
-      return { status: "dropped", error: "span start time is invalid" };
+    // A time storage cannot hold is refused at the door: minted into a record id
+    // after the append it throws permanently on a retrying lane. One span's problem.
+    const decoded = storableSpanTimesOf(spanParseResult.data);
+    if ("unstorable" in decoded) {
+      return { status: "dropped", error: unstorableSpanTimeMessage(decoded.unstorable) };
     }
+    const { startTimeUnixMs } = decoded.times;
 
     if (startTimeUnixMs < nowInstant().epochMilliseconds - SPAN_MAX_PAST_MS) {
       return { status: "dropped", error: "span start time is more than 31 days in the past" };

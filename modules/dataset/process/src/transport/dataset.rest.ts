@@ -1,6 +1,4 @@
-/** Datasets REST API. Eight doors unimplemented (multipart/streaming/dual-status
- * routes need runtime support).
- */
+/** Datasets REST API. */
 import {
   BadRequestError,
   defineRestRouter,
@@ -11,12 +9,24 @@ import {
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import {
+  DATASET_ATTACHMENT_MAX_BYTES,
+  DATASET_ATTACHMENT_MULTIPART_SLACK_BYTES,
+  DATASET_ATTACHMENT_REQUEST_MAX_BYTES,
   DatasetApi,
+  DatasetAttachmentTooLargeError,
   datasetRestArchivedSchema,
+  datasetRestAttachmentFieldsSchema,
   datasetRestBatchCreateRecordsSchema,
   datasetRestCreateSchema,
   datasetRestDeleteRecordsSchema,
   datasetRestDetailResponseSchema,
+  datasetRestImportSchema,
+  datasetRestAppendImportSchema,
+  datasetRestNoUploadFieldsSchema,
+  datasetRestUploadCreatedSchema,
+  datasetRestUploadFieldsSchema,
+  datasetImportAppendedSchema,
+  datasetImportStartedSchema,
   datasetRestEntriesAddedSchema,
   datasetRestLegacyEntriesSchema,
   datasetRestListResponseSchema,
@@ -28,6 +38,9 @@ import {
   datasetRestSlugParamsSchema,
   datasetRestSummarySchema,
   datasetRestUpdateSchema,
+  MAX_FILE_SIZE_BYTES,
+  storedDatasetAttachmentSchema,
+  UploadValidationError,
   type DatasetColumns,
 } from "@langwatch/dataset-contract";
 
@@ -57,6 +70,27 @@ function rethrowColumnRefusal(error: unknown): never {
 function datasetUrl(app: DatasetApi, projectSlug: string, datasetId: string): string {
   return app.platformUrl({ projectSlug, path: `/datasets/${datasetId}` });
 }
+
+/** Main's pace for the attachment route: well above a person filling cells. */
+const ATTACHMENT_UPLOADS_PER_MINUTE = 30;
+
+/** Where a dataset attachment's file is uploaded now. */
+const STORED_OBJECTS_SUCCESSOR = "/api/v1/stored-objects";
+
+/** Where a dataset is built from an uploaded file now (ADR-158 §8). */
+const IMPORTS_SUCCESSOR = "/api/v1/dataset/imports";
+
+/** The deprecated /upload pair's whole-request cap: main's 25 MB file plus multipart framing. */
+const UPLOAD_REQUEST_MAX_BYTES = MAX_FILE_SIZE_BYTES + DATASET_ATTACHMENT_MULTIPART_SLACK_BYTES;
+
+const uploadBodyLimit = {
+  maxBytes: UPLOAD_REQUEST_MAX_BYTES,
+  onExceeded: () =>
+    new UploadValidationError("File size exceeds the maximum limit of 25MB", "file_too_large"),
+};
+
+const UPLOAD_THEN_IMPORT =
+  "upload the file as a stored object with the purpose dataset_import, then create the dataset from it";
 
 /** The inert declaration the process mounts on its own project-key door. */
 export type DatasetRestDeclaration = Readonly<{
@@ -163,6 +197,102 @@ export function createDatasetRest(): DatasetRestDeclaration {
 
         return { success: true as const };
       })
+
+      // A dataset is built from a confirmed `dataset_import` file; the bytes never
+      // pass through here (ADR-158 §6). Preparation runs in the background.
+      .post("/imports", "postApiDatasetImports")
+      .withInput(datasetRestImportSchema)
+      .withPermission("datasets:create")
+      .withStatus(201)
+      .withOutput(datasetImportStartedSchema)
+      .withDocs({ description: "Create a dataset from an uploaded and confirmed file" })
+      .handle(({ app, input, scope }) =>
+        app.createDatasetFromStoredObject({ ...input, projectId: scope.id }),
+      )
+
+      .post("/:slugOrId/imports", "postApiDatasetBySlugOrIdImports")
+      .withParams(datasetRestSlugOrIdParamsSchema)
+      .withInput(datasetRestAppendImportSchema)
+      .withPermission("datasets:update")
+      .withOutput(datasetImportAppendedSchema)
+      .withDocs({ description: "Add an uploaded and confirmed file's rows to a dataset" })
+      .handle(({ app, input, scope }) =>
+        app.appendStoredObjectToDataset({ ...input, projectId: scope.id }),
+      )
+
+      // Deprecated, time-boxed exception to "no bytes": the Python SDK still posts
+      // files here. Both retire in the next release (ADR-158 §8).
+      .post("/upload", "postApiDatasetUpload")
+      .withMultipart({ fields: datasetRestUploadFieldsSchema, files: { file: { required: true } } })
+      .withBodyLimit(uploadBodyLimit)
+      .withPermission("datasets:create")
+      .withStatus(201)
+      .withOutput(datasetRestUploadCreatedSchema)
+      .withDeprecated({ successor: IMPORTS_SUCCESSOR, notice: UPLOAD_THEN_IMPORT })
+      .withDocs({ description: "Create a new dataset from an uploaded file (CSV, JSON, JSONL)" })
+      .handle(({ app, input, files, scope }) =>
+        app.createDatasetFromUpload({
+          projectId: scope.id,
+          name: input.name,
+          filename: files.file.name,
+          bytes: files.file.stream(),
+          fileSize: files.file.size,
+        }),
+      )
+
+      .post("/:slugOrId/upload", "postApiDatasetBySlugOrIdUpload")
+      .withParams(datasetRestSlugOrIdParamsSchema)
+      .withMultipart({
+        fields: datasetRestNoUploadFieldsSchema,
+        files: { file: { required: true } },
+      })
+      .withBodyLimit(uploadBodyLimit)
+      .withPermission("datasets:update")
+      .withOutput(datasetImportAppendedSchema)
+      .withDeprecated({ successor: IMPORTS_SUCCESSOR, notice: UPLOAD_THEN_IMPORT })
+      .withDocs({ description: "Upload a file (CSV, JSON, JSONL) to an existing dataset" })
+      .handle(({ app, input, files, scope }) =>
+        app.uploadToExistingDataset({
+          slugOrId: input.slugOrId,
+          projectId: scope.id,
+          filename: files.file.name,
+          bytes: files.file.stream(),
+          fileSize: files.file.size,
+        }),
+      )
+
+      // Deprecated, the same time-boxed exception as the /upload pair: the posted
+      // file is stored as a dataset attachment. Retires in the next release (ADR-158 §8).
+      .post("/attachments", "postApiDatasetAttachments")
+      .withMultipart({
+        fields: datasetRestAttachmentFieldsSchema,
+        files: { file: { required: true } },
+      })
+      .withBodyLimit({
+        maxBytes: DATASET_ATTACHMENT_REQUEST_MAX_BYTES,
+        onExceeded: () => new DatasetAttachmentTooLargeError(DATASET_ATTACHMENT_MAX_BYTES),
+      })
+      .withRateLimit({ requests: ATTACHMENT_UPLOADS_PER_MINUTE, seconds: 60 })
+      .withPermission("datasets:manage")
+      .withOutput(storedDatasetAttachmentSchema)
+      .withDeprecated({
+        successor: STORED_OBJECTS_SUCCESSOR,
+        notice: "upload the file as a stored object, then put its reference in the cell",
+      })
+      .withDocs({
+        description:
+          "Upload a file for an image or file column and get the reference a cell holds. The file goes in the `file` multipart field, with an optional `datasetId` field.",
+      })
+      .handle(({ app, input, files, scope }) =>
+        app.storeAttachmentUpload({
+          projectId: scope.id,
+          datasetId: input.datasetId,
+          filename: files.file.name,
+          mediaType: files.file.type,
+          bytes: files.file.stream(),
+          fileSize: files.file.size,
+        }),
+      )
 
       .get("/:slugOrId", "getApiDatasetBySlugOrId")
       .withParams(datasetRestSlugOrIdParamsSchema)

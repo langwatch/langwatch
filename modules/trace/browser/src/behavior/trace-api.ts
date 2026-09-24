@@ -12,6 +12,7 @@ import type {
 import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 import type { CodingAgentSessionDisplay } from "@langwatch/coding-agent-browser-kit";
 import type { CodingAgentTranscript } from "@langwatch/coding-agent-contract";
+import type { DataPrivacySnapshot } from "@langwatch/data-privacy-contract";
 import type {
   Dataset,
   DatasetRecord,
@@ -594,6 +595,11 @@ export type TraceApiMap = {
         output: { id: string; token: string; name: string };
       };
     };
+  };
+
+  /** The project's privacy settings, read to explain a filter that redaction empties. */
+  dataPrivacy: {
+    getSnapshot: { query: { input: ProjectScope; output: DataPrivacySnapshot } };
   };
 
   /**

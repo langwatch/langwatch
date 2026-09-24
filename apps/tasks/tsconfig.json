@@ -15,6 +15,9 @@
       "path": "../../modules/analytics/process/tsconfig.build.json"
     },
     {
+      "path": "../../modules/auth/process/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/authz/process/tsconfig.build.json"
     },
     {

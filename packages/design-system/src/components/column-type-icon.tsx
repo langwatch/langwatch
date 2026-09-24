@@ -8,6 +8,7 @@ import {
   Layers,
   List,
   MessageSquare,
+  Paperclip,
   PenLine,
   ToggleLeft,
   Type,
@@ -34,6 +35,8 @@ export const ColumnTypeIcon = ({ type, size = 12 }: ColumnTypeIconProps) => {
       return <MessageSquare {...iconProps} color="var(--chakra-colors-orange-500)" />;
     case "image":
       return <ImageIcon {...iconProps} color="var(--chakra-colors-gray-400)" />;
+    case "file":
+      return <Paperclip {...iconProps} color="var(--chakra-colors-gray-400)" />;
     case "date":
       return <Calendar {...iconProps} color="var(--chakra-colors-yellow-600)" />;
     case "list":

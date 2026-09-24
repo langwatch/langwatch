@@ -103,11 +103,17 @@ function materializeRoutes({
 }: MaterializeRoutesOptions): RouteObject[] {
   const routes = table.map((descriptor) => {
     if ("redirect" in descriptor) {
-      const { from, to, pinParams, mapSegment } = descriptor.redirect;
+      const { from, to, pinParams, renameParams, mapSegment } = descriptor.redirect;
       return {
         path: descriptor.path,
         element: (
-          <UiPrefixRedirect from={from} to={to} pinParams={pinParams} mapSegment={mapSegment} />
+          <UiPrefixRedirect
+            from={from}
+            to={to}
+            pinParams={pinParams}
+            renameParams={renameParams}
+            mapSegment={mapSegment}
+          />
         ),
       };
     }
