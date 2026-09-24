@@ -1944,6 +1944,11 @@ const presentations = {
     describe: () =>
       "We could not record the change just now. Nothing was applied — try again in a moment.",
   },
+  authz_scope_not_found: {
+    title: "Not found",
+    describe: () =>
+      "The project, team or organization this refers to no longer exists. Reload and try again.",
+  },
   role_binding_already_exists: {
     title: "That role is already bound",
     describe: () => "An identical binding already exists, so there's nothing to add.",
