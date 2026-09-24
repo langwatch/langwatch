@@ -59,7 +59,7 @@ beforeAll(() => {
   repository = RunConfigurationsClickHouseRepository.create(async () => ch!);
   stateRepository = SimulationRunStateRepositoryClickHouse.create({
     resolveClient: async () => ch!,
-    defaultRetentionDays: 30,
+    defaultRetentionDays: () => 30,
   });
 });
 

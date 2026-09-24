@@ -1,21 +1,12 @@
 import {
   SimulationService as SimulationServiceContract,
-  simulationBatchHistorySchema,
-  simulationBatchRunDataSchema,
-  simulationBatchSummarySchema,
   simulationCancelRunSchema,
   simulationDeleteRunSchema,
   simulationRecordAgentInstanceSchema,
-  simulationExportRunSchema,
   simulationFinishRunSchema,
   recordEvaluationsCommandDataSchema,
   simulationMessageSnapshotSchema,
   simulationQueueRunSchema,
-  simulationAllSuitesRunDataSchema,
-  simulationExternalSetSummarySchema,
-  simulationLastResultSummarySchema,
-  simulationRunDataSchema,
-  simulationSetDataSchema,
   simulationStartRunSchema,
   simulationTextMessageEndSchema,
   simulationTextMessageStartSchema,
@@ -75,89 +66,62 @@ export class SimulationService extends SimulationServiceContract {
     super();
   }
 
-  async getScenarioSetsData(input: SimulationProjectDateRangeInput): Promise<SimulationSetData[]> {
-    return simulationSetDataSchema.array().parse(await this.repository.findScenarioSetsData(input));
+  getScenarioSetsData(input: SimulationProjectDateRangeInput): Promise<SimulationSetData[]> {
+    return this.repository.findScenarioSetsData(input);
   }
 
-  async findScenarioRunData(input: SimulationScenarioRunInput): Promise<SimulationRunData | null> {
-    const run = await this.repository.findScenarioRunData(input);
-
-    return run === null ? null : simulationRunDataSchema.parse(run);
+  findScenarioRunData(input: SimulationScenarioRunInput): Promise<SimulationRunData | null> {
+    return this.repository.findScenarioRunData(input);
   }
 
-  async getBatchHistoryForScenarioSet(
+  getBatchHistoryForScenarioSet(
     input: SimulationBatchHistoryInput,
   ): Promise<SimulationBatchHistory> {
-    return simulationBatchHistorySchema.parse(
-      await this.repository.findBatchHistoryForScenarioSet(input),
-    );
+    return this.repository.findBatchHistoryForScenarioSet(input);
   }
 
-  async findBatchSummary(
-    input: SimulationBatchSummaryInput,
-  ): Promise<SimulationBatchSummary | null> {
-    const summary = await this.repository.findBatchSummary(input);
-
-    return summary === null ? null : simulationBatchSummarySchema.parse(summary);
+  findBatchSummary(input: SimulationBatchSummaryInput): Promise<SimulationBatchSummary | null> {
+    return this.repository.findBatchSummary(input);
   }
 
-  async getRunDataForBatchRun(input: SimulationBatchRunInput): Promise<SimulationBatchRunData> {
-    return simulationBatchRunDataSchema.parse(await this.repository.findRunDataForBatchRun(input));
+  getRunDataForBatchRun(input: SimulationBatchRunInput): Promise<SimulationBatchRunData> {
+    return this.repository.findRunDataForBatchRun(input);
   }
 
-  async getRunDataForScenarioSet(
+  getRunDataForScenarioSet(
     input: SimulationScenarioSetRunsInput,
   ): Promise<{ runs: SimulationRunData[]; nextCursor?: string; hasMore: boolean }> {
-    const result = await this.repository.findRunDataForScenarioSet(input);
-
-    return {
-      ...result,
-      runs: simulationRunDataSchema.array().parse(result.runs),
-    };
+    return this.repository.findRunDataForScenarioSet(input);
   }
 
-  async getAllRunDataForScenarioSet(
-    input: SimulationScenarioSetInput,
-  ): Promise<SimulationRunData[]> {
-    return simulationRunDataSchema
-      .array()
-      .parse(await this.repository.findAllRunDataForScenarioSet(input));
+  getAllRunDataForScenarioSet(input: SimulationScenarioSetInput): Promise<SimulationRunData[]> {
+    return this.repository.findAllRunDataForScenarioSet(input);
   }
 
   getBatchRunCountForScenarioSet(input: SimulationExternalSetCountInput): Promise<number> {
     return this.repository.findBatchRunCountForScenarioSet(input);
   }
 
-  async getExternalSetSummaries(
+  getExternalSetSummaries(
     input: SimulationProjectDateRangeInput,
   ): Promise<SimulationExternalSetSummary[]> {
-    return simulationExternalSetSummarySchema
-      .array()
-      .parse(await this.repository.findExternalSetSummaries(input));
+    return this.repository.findExternalSetSummaries(input);
   }
 
-  async getInternalSuiteSummaries(
+  getInternalSuiteSummaries(
     input: SimulationProjectDateRangeInput,
   ): Promise<SimulationExternalSetSummary[]> {
-    return simulationExternalSetSummarySchema
-      .array()
-      .parse(await this.repository.findInternalSuiteSummaries(input));
+    return this.repository.findInternalSuiteSummaries(input);
   }
 
-  async getLastResultSummaries(
+  getLastResultSummaries(
     input: SimulationLastResultSummariesInput,
   ): Promise<SimulationLastResultSummary[]> {
-    return simulationLastResultSummarySchema
-      .array()
-      .parse(await this.repository.findLastResultSummaries(input));
+    return this.repository.findLastResultSummaries(input);
   }
 
-  async getRunDataForAllSuites(
-    input: SimulationAllSuitesInput,
-  ): Promise<SimulationAllSuitesRunData> {
-    return simulationAllSuitesRunDataSchema.parse(
-      await this.repository.findRunDataForAllSuites(input),
-    );
+  getRunDataForAllSuites(input: SimulationAllSuitesInput): Promise<SimulationAllSuitesRunData> {
+    return this.repository.findRunDataForAllSuites(input);
   }
 
   getLastUpdatedAt(input: SimulationLastUpdatedInput): Promise<number> {
@@ -182,15 +146,10 @@ export class SimulationService extends SimulationServiceContract {
     return this.repository.countUsage(input);
   }
 
-  async findRunsForExport(
+  findRunsForExport(
     input: SimulationExportRunsInput,
   ): Promise<{ runs: SimulationExportRun[]; nextCursor?: string; hasMore: boolean }> {
-    const result = await this.repository.findRunsForExport(input);
-
-    return {
-      ...result,
-      runs: simulationExportRunSchema.array().parse(result.runs),
-    };
+    return this.repository.findRunsForExport(input);
   }
 
   queueRun(input: SimulationQueueRun): Promise<void> {

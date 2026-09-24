@@ -59,8 +59,8 @@ describe("callerVoiceConfigSchema voiceModel shape", () => {
   describe("when the value is not a provider slash voice string", () => {
     /** @scenario The caller voice value validates the provider slash voice shape */
     it("rejects a bare name and a value with no voice segment", () => {
-      expect(callerVoiceConfigSchema.safeParse({ voiceModel: "nova" }).success).toBe(false);
-      expect(callerVoiceConfigSchema.safeParse({ voiceModel: "openai/" }).success).toBe(false);
+      expect(callerVoiceConfigSchema.validate({ voiceModel: "nova" })).toBe(false);
+      expect(callerVoiceConfigSchema.validate({ voiceModel: "openai/" })).toBe(false);
     });
   });
 

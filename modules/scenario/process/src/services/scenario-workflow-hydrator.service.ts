@@ -23,6 +23,8 @@ const workflowNodeSchema = z.looseObject({
 });
 const workflowNodesSchema = z.array(z.unknown());
 const specVersionSchema = z.union([z.string(), z.number()]);
+const litellmParamsSchema = z.looseObject({});
+const workflowLooseNodesSchema = z.array(z.looseObject({}));
 
 interface WorkflowField {
   identifier: string;
@@ -129,7 +131,7 @@ export class ScenarioWorkflowHydratorService {
         return { success: false, reason: result.reason, message: result.message };
       }
 
-      litellmParamsByModel.set(model, z.looseObject({}).parse(result.params));
+      litellmParamsByModel.set(model, litellmParamsSchema.parse(result.params));
     }
 
     const hydratedNodes = this.hydrateNodes({
@@ -189,7 +191,7 @@ export class ScenarioWorkflowHydratorService {
     inputs: WorkflowField[];
     outputs: WorkflowField[];
   } {
-    const rawNodes = z.array(z.looseObject({})).safeParse(dsl.nodes);
+    const rawNodes = workflowLooseNodesSchema.safeParse(dsl.nodes);
     const nodes = rawNodes.success
       ? rawNodes.data.map((node) => ({
           ...node,

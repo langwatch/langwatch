@@ -2,14 +2,13 @@
 // (previously separate members of ScenarioApp)
 import { generate } from "@langwatch/ksuid";
 import type { Encryption } from "@langwatch/process-stores/members";
-import {
-  ScenarioSecretsUnavailableError,
-  ScenarioSimulationWritesUnavailableError,
-} from "@langwatch/scenario-contract";
+import { ScenarioSecretsUnavailableError } from "@langwatch/scenario-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
+import type { SnapshotUpdateBroadcastSubscriberDeps } from "../eventing/snapshot-update-broadcast.subscriber.ts";
+import type { SuiteRunSyncSubscriberDeps } from "../eventing/suite-run-sync.subscriber.ts";
 import { SimulationClickHouseRepository } from "../repositories/clickhouse/simulation-clickhouse.repository.ts";
-import { SimulationExecutionRepository } from "../repositories/simulation-execution.repository.ts";
+import type { SimulationExecutionRepository } from "../repositories/simulation-execution.repository.ts";
 import { SimulationService } from "../services/simulation.service.ts";
 import type {
   ScenarioClock,
@@ -77,48 +76,6 @@ class UnavailableScenarioSecretCipher implements ScenarioSecretCipher {
 }
 
 /**
- * The write half of the simulation pipeline, for a process that composed only
- * the reads. Every dispatch refuses by name: the worker that drains the
- * pipeline owns these, and a silent no-op would lose the run.
- */
-class ReadOnlySimulationExecution extends SimulationExecutionRepository {
-  queueRun(): Promise<never> {
-    return this.refuse("queue a simulation run");
-  }
-  startRun(): Promise<never> {
-    return this.refuse("start a simulation run");
-  }
-  messageSnapshot(): Promise<never> {
-    return this.refuse("record a simulation message");
-  }
-  textMessageStart(): Promise<never> {
-    return this.refuse("record a message start");
-  }
-  textMessageEnd(): Promise<never> {
-    return this.refuse("record a message end");
-  }
-  finishRun(): Promise<never> {
-    return this.refuse("finish a simulation run");
-  }
-  recordEvaluations(): Promise<never> {
-    return this.refuse("record a simulation run's evaluator results");
-  }
-  cancelRun(): Promise<never> {
-    return this.refuse("cancel a simulation run");
-  }
-  deleteRun(): Promise<never> {
-    return this.refuse("delete a simulation run");
-  }
-  recordAgentInstance(): Promise<never> {
-    return this.refuse("record the agent instance that served a simulation run");
-  }
-
-  private refuse(capability: string): Promise<never> {
-    return Promise.reject(new ScenarioSimulationWritesUnavailableError(capability));
-  }
-}
-
-/**
  * Adapts the process's ONE routing `clickhouse` member to the per-tenant
  * session the simulation repository was written against.
  */
@@ -151,6 +108,8 @@ class ScenarioClickHouseSession {
 export function buildScenarioComposition(input: {
   encryption: Encryption | undefined;
   clickhouse: ScenarioReadOnlyClickHouse | undefined;
+  /** The simulation writes, sent through simulation_processing's own commands. */
+  execution: SimulationExecutionRepository;
 }): {
   ids: ScenarioId;
   testSuiteIds: ScenarioTestSuiteId;
@@ -172,8 +131,26 @@ export function buildScenarioComposition(input: {
           SimulationClickHouseRepository.create((tenantId) =>
             Promise.resolve(new ScenarioClickHouseSession(clickhouse, tenantId)),
           ),
-          new ReadOnlySimulationExecution(),
+          input.execution,
         )
       : void 0,
   };
+}
+
+/** Suite run items wait on SuiteApi's run-item operations; until then each refuses by name. */
+export function pendingSuiteRunSync(): SuiteRunSyncSubscriberDeps {
+  const refuse = (operation: string) => () =>
+    Promise.reject(
+      new Error(`SuiteApi.${operation} is not available yet; the suite run item is not updated.`),
+    );
+  return {
+    recordSuiteRunItemStarted: refuse("recordSuiteRunItemStarted"),
+    completeSuiteRunItem: refuse("completeSuiteRunItem"),
+    regradeSuiteRunItem: refuse("regradeSuiteRunItem"),
+  };
+}
+
+/** No module offers scenario a tenant broadcast yet; main without Redis skipped it too. */
+export function undeliveredSnapshotUpdates(): SnapshotUpdateBroadcastSubscriberDeps {
+  return { broadcastUpdate: () => Promise.resolve() };
 }

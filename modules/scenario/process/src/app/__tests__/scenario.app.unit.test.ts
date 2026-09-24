@@ -1,6 +1,7 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { ResourceOwnership } from "@langwatch/kernel";
@@ -25,6 +26,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
+import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 import type { ScenarioRepository } from "../../repositories/scenario.repository.ts";
 import type { AgentTestService } from "../../services/agent-test.service.ts";
 import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
@@ -42,7 +44,7 @@ function harness() {
   };
 
   const app = ScenarioApp.create({
-    repositories: { scenarios: {} as ScenarioRepository },
+    repositories: { ...MemoryScenarioRepositories.create(), scenarios: {} as ScenarioRepository },
     dependencies: {
       agents: createApiFixture<AgentApi>(),
       users: {} as UserApi,
@@ -53,6 +55,7 @@ function harness() {
       auditLog: createApiFixture<AuditLogApi>(),
       traces: createApiFixture<TraceApi>(),
       billing: createApiFixture<BillingApi>(),
+      retention: createApiFixture<DataRetentionApi>(),
     },
     config: undefined,
     resources: {} as ResourceOwnership,
@@ -339,7 +342,10 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
       // Neither the member nor the ClickHouse the module would derive it
       // from: the only shape that still owes the caller a refusal.
       const app = ScenarioApp.create({
-        repositories: { scenarios: {} as ScenarioRepository },
+        repositories: {
+          ...MemoryScenarioRepositories.create(),
+          scenarios: {} as ScenarioRepository,
+        },
         dependencies: {
           agents: createApiFixture<AgentApi>(),
           users: createApiFixture<UserApi>(),
@@ -350,6 +356,7 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
           auditLog: createApiFixture<AuditLogApi>(),
           traces: createApiFixture<TraceApi>(),
           billing: createApiFixture<BillingApi>(),
+          retention: createApiFixture<DataRetentionApi>(),
         },
         config: undefined,
         resources: {} as ResourceOwnership,
@@ -390,7 +397,7 @@ describe("given a process that supplies no simulations member but does read Clic
   it("serves the read from ClickHouse instead of refusing", async () => {
     const asked: { tenantId: string }[] = [];
     const app = ScenarioApp.create({
-      repositories: { scenarios: {} as ScenarioRepository },
+      repositories: { ...MemoryScenarioRepositories.create(), scenarios: {} as ScenarioRepository },
       dependencies: {
         agents: createApiFixture<AgentApi>(),
         users: createApiFixture<UserApi>(),
@@ -401,6 +408,7 @@ describe("given a process that supplies no simulations member but does read Clic
         auditLog: createApiFixture<AuditLogApi>(),
         traces: createApiFixture<TraceApi>(),
         billing: createApiFixture<BillingApi>(),
+        retention: createApiFixture<DataRetentionApi>(),
       },
       config: undefined,
       resources: {} as ResourceOwnership,

@@ -29,6 +29,10 @@ import {
 /** A run is stalled only after twice the isolated child hard timeout. */
 export const STALL_THRESHOLD_MS = 30 * 60 * 1000;
 
+const unknownRecordSchema = z.record(z.string(), z.unknown());
+const pendingEvaluatorsSchema = z.array(pendingEvaluatorSchema);
+const secretParameterNamesSchema = z.array(z.string());
+
 /**
  * Simulation run execution process (ADR-052): pure state logic per run.
  * Replaces fire-and-forget subscriber; outbox owns retry, wake owns backstops.
@@ -462,16 +466,16 @@ export class SimulationRunExecutionEvolution {
    * job share a schema, so what the process can't watch isn't queued for it.
    */
   static pendingEvaluatorsOf(data: Record<string, unknown>): PendingEvaluator[] | null {
-    const parsedEvaluators = z.record(z.string(), z.unknown()).safeParse(data.evaluators);
+    const parsedEvaluators = unknownRecordSchema.safeParse(data.evaluators);
     if (!parsedEvaluators.success) return null;
-    const parsed = z.array(pendingEvaluatorSchema).safeParse(parsedEvaluators.data.attachments);
+    const parsed = pendingEvaluatorsSchema.safeParse(parsedEvaluators.data.attachments);
     return parsed.success ? parsed.data : null;
   }
 
   static buildSimulationRunEventView(
     event: SimulationRunPayloadEvent,
   ): SimulationRunProcessEventView {
-    const parsedData = z.record(z.string(), z.unknown()).safeParse(event.data);
+    const parsedData = unknownRecordSchema.safeParse(event.data);
     const data = parsedData.success ? parsedData.data : {};
     const str = (value: unknown): string | null => (typeof value === "string" ? value : null);
     // Validated rather than cast. A cast lets any non-null object through as a
@@ -485,7 +489,7 @@ export class SimulationRunExecutionEvolution {
     // cross into execution: an unreadable shape is dropped rather than failing
     // the run, since a run without parameters is the behaviour every run had
     // before them.
-    const parsedMetadata = z.record(z.string(), z.unknown()).safeParse(data.metadata);
+    const parsedMetadata = unknownRecordSchema.safeParse(data.metadata);
     const metadata = parsedMetadata.success ? parsedMetadata.data : {};
     const parsedParameters = runParameterValuesSchema.safeParse(metadata.parameters);
     const parameters =
@@ -503,7 +507,7 @@ export class SimulationRunExecutionEvolution {
     // The names ride the metadata in clear. They say what the ciphertext beside
     // them has to cover, so a queued event whose secret values were lost or
     // written by another CREDENTIALS_SECRET is caught before the run starts.
-    const parsedSecretNames = z.array(z.string()).safeParse(metadata.secretParameterNames);
+    const parsedSecretNames = secretParameterNamesSchema.safeParse(metadata.secretParameterNames);
     const secretParameterNames =
       parsedSecretNames.success && parsedSecretNames.data.length > 0
         ? parsedSecretNames.data
@@ -521,8 +525,7 @@ export class SimulationRunExecutionEvolution {
       secretParameters,
       secretParameterNames,
       evaluators: SimulationRunExecutionEvolution.pendingEvaluatorsOf(data),
-      hasOwnEvaluations:
-        z.record(z.string(), z.unknown()).safeParse(data.results).data?.evaluations != null,
+      hasOwnEvaluations: unknownRecordSchema.safeParse(data.results).data?.evaluations != null,
     };
   }
 }

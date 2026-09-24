@@ -57,6 +57,11 @@ import { ScenarioRunSecretsService } from "./scenario-run-secrets.service.ts";
 
 const logger = createLogger("langwatch:scenarios");
 
+const scenarioProjectIdInputSchema = scenarioIdInputSchema.pick({ projectId: true });
+const scenarioBatchArchiveInputSchema = scenarioProjectIdInputSchema.safeExtend({
+  ids: scenarioIdInputSchema.shape.id.array().min(1),
+});
+
 const defaultVersionPageSize = 20;
 
 function actorFor(lastUpdatedById: string | null | undefined): ScenarioActor {
@@ -147,7 +152,7 @@ export class ScenarioService {
   }
 
   getById(input: ScenarioIdInput): Promise<Scenario> {
-    return this.options.repository.findById(scenarioIdInputSchema.parse(input));
+    return this.options.repository.findById(input);
   }
 
   tryGetById(input: ScenarioIdInput): Promise<Scenario | null> {
@@ -159,15 +164,11 @@ export class ScenarioService {
   }
 
   list(input: { projectId: string }): Promise<Scenario[]> {
-    return this.options.repository.findAll(
-      scenarioIdInputSchema.pick({ projectId: true }).parse(input),
-    );
+    return this.options.repository.findAll(scenarioProjectIdInputSchema.parse(input));
   }
 
   count(input: { projectId: string }): Promise<number> {
-    return this.options.repository.count(
-      scenarioIdInputSchema.pick({ projectId: true }).parse(input),
-    );
+    return this.options.repository.count(scenarioProjectIdInputSchema.parse(input));
   }
 
   async update(input: ScenarioUpdateInput): Promise<Scenario> {
@@ -312,10 +313,7 @@ export class ScenarioService {
     ids: string[];
     projectId: string;
   }): Promise<{ archived: string[]; failed: { id: string; error: string }[] }> {
-    const parsed = scenarioIdInputSchema
-      .pick({ projectId: true })
-      .safeExtend({ ids: scenarioIdInputSchema.shape.id.array().min(1) })
-      .parse(input);
+    const parsed = scenarioBatchArchiveInputSchema.parse(input);
     const result = await this.options.repository.archiveMany({
       ids: parsed.ids,
       projectId: parsed.projectId,
@@ -346,9 +344,7 @@ export class ScenarioService {
     projectId: string;
     includeArchived?: boolean;
   }): Promise<ScenarioTestSuite[]> {
-    const { projectId } = scenarioIdInputSchema
-      .pick({ projectId: true })
-      .parse({ projectId: input.projectId });
+    const { projectId } = scenarioProjectIdInputSchema.parse({ projectId: input.projectId });
 
     return this.options.repository.findTestSuites({
       projectId,

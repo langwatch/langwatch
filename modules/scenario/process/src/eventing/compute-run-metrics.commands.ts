@@ -44,7 +44,7 @@ export const scenarioDeferredComputeRunMetricsJob = {
 };
 
 export interface ComputeRunMetricsDeps {
-  traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
+  traceSummaryStore: Pick<FoldProjectionStore<TraceSummaryData>, "get">;
   scheduleRetry: (payload: ComputeRunMetricsCommandData) => Promise<void>;
   /**
    * Derives per-role cost/latency for a trace from stored_spans, replacing

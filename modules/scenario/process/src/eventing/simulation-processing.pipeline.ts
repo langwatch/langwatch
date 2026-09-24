@@ -1,7 +1,9 @@
 import {
   defineAggregate,
+  defineEventingModule,
   definePipeline,
   type AppendStore,
+  type EventingSetup,
   type FoldProjectionStore,
   type ProcessManagerApplier,
   type Projection,
@@ -24,6 +26,7 @@ import {
   SimulationSetArchivedEventSchema,
 } from "@langwatch/scenario-contract";
 
+import type { ScenarioApp } from "../app/scenario.app.ts";
 import { ComputeRunMetricsCommand } from "./compute-run-metrics.commands.ts";
 import { FinishRunCommand } from "./finish-run.commands.ts";
 import { RecordEvaluationsCommand } from "./record-evaluations.commands.ts";
@@ -155,3 +158,11 @@ export class SimulationProcessingPipelineAdapter {
 
   private constructor() {}
 }
+
+/** simulation_processing, built by the app in both roles; its senders carry every run write. */
+export const simulationProcessingEventing = defineEventingModule({
+  pipeline: "simulation_processing",
+  build: ({ app, participation, priorEvents }: EventingSetup<never, ScenarioApp>) =>
+    app.simulationPipeline({ participation, ...(priorEvents ? { priorEvents } : {}) }),
+  connect: ({ app, commands }) => app.connectSimulationCommands(commands),
+});

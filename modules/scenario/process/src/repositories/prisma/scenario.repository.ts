@@ -341,35 +341,30 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     ids: string[];
     projectId: string;
   }): Promise<ScenarioReferenceState[]> {
-    const rows = await this.database.scenario.findMany({
+    return this.database.scenario.findMany({
       where: { id: { in: input.ids }, projectId: input.projectId },
       select: { id: true, archivedAt: true },
     });
-    return rows.map((row) => scenarioSchema.pick({ id: true, archivedAt: true }).parse(row));
   }
 
   async findNamesByIds(input: {
     ids: string[];
     projectId: string;
   }): Promise<{ id: string; name: string }[]> {
-    const rows = await this.database.scenario.findMany({
+    return this.database.scenario.findMany({
       where: { id: { in: input.ids }, projectId: input.projectId },
       select: { id: true, name: true },
     });
-    return rows.map((row) => scenarioSchema.pick({ id: true, name: true }).parse(row));
   }
 
   async findModelChoices(input: {
     ids: string[];
     projectId: string;
   }): Promise<{ id: string; simulatorModel: string | null; judgeModel: string | null }[]> {
-    const rows = await this.database.scenario.findMany({
+    return this.database.scenario.findMany({
       where: { id: { in: input.ids }, projectId: input.projectId },
       select: { id: true, simulatorModel: true, judgeModel: true },
     });
-    return rows.map((row) =>
-      scenarioSchema.pick({ id: true, simulatorModel: true, judgeModel: true }).parse(row),
-    );
   }
 
   async findIdsByLabelsOrTestSuites(input: {
@@ -395,13 +390,10 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     ids: string[];
     projectId: string;
   }): Promise<{ id: string; name: string; labels: string[] }[]> {
-    const rows = await this.database.scenario.findMany({
+    return this.database.scenario.findMany({
       where: { id: { in: input.ids }, projectId: input.projectId },
       select: { id: true, name: true, labels: true },
     });
-    return rows.map((row) =>
-      scenarioSchema.pick({ id: true, name: true, labels: true }).parse(row),
-    );
   }
 
   async findPlans(input: { projectId: string }): Promise<ScenarioPlanRecord[]> {

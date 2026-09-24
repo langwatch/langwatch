@@ -8,6 +8,7 @@ import { EventEmitter } from "node:events";
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { ResourceOwnership } from "@langwatch/kernel";
@@ -43,6 +44,7 @@ function buildProductionApp(publicBaseUrl: string | undefined, emitter = new Eve
       auditLog: createApiFixture<AuditLogApi>(),
       traces: createApiFixture<TraceApi>(),
       billing: createApiFixture<BillingApi>(),
+      retention: createApiFixture<DataRetentionApi>(),
     },
     config: undefined,
     resources: createApiFixture<ResourceOwnership>(),

@@ -11,7 +11,7 @@ import { PrismaScenarioRepository } from "./scenario.repository.ts";
 export class PostgresScenarioRepositories {
   static readonly requires = ["prisma"] as const;
 
-  static create({ prisma }: { prisma: PrismaClient }): ScenarioRepositories {
+  static create({ prisma }: { prisma: PrismaClient }): Pick<ScenarioRepositories, "scenarios"> {
     return { scenarios: PrismaScenarioRepository.create(prisma) };
   }
 }

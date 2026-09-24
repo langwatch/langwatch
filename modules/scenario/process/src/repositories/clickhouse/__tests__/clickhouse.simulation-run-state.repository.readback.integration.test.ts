@@ -32,7 +32,7 @@ beforeAll(() => {
   });
   repo = ClickHouseSimulationRunStateRepository.create<SimulationRunState>({
     resolveClient: async () => ch!,
-    defaultRetentionDays: 30,
+    defaultRetentionDays: () => 30,
   });
 });
 

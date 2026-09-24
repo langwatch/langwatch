@@ -93,7 +93,7 @@ describe("scenario run parameters", () => {
 
       /** @scenario "A parameter name outside the identifier grammar is rejected at save time" */
       it("rejects a run value supplied under that name", () => {
-        expect(runParameterValuesSchema.safeParse({ "account tier": "gold" }).success).toBe(false);
+        expect(runParameterValuesSchema.validate({ "account tier": "gold" })).toBe(false);
       });
     });
 
@@ -126,8 +126,8 @@ describe("scenario run parameters", () => {
         definition(`p${index}`),
       );
 
-      expect(scenarioParameterDefinitionsSchema.safeParse(tooMany).success).toBe(false);
-      expect(scenarioParameterDefinitionsSchema.safeParse(tooMany.slice(0, -1)).success).toBe(true);
+      expect(scenarioParameterDefinitionsSchema.validate(tooMany)).toBe(false);
+      expect(scenarioParameterDefinitionsSchema.validate(tooMany.slice(0, -1))).toBe(true);
     });
   });
 
@@ -138,7 +138,7 @@ describe("scenario run parameters", () => {
         Array.from({ length: MAX_RUN_PARAMETER_KEYS + 1 }, (_, index) => [`p${index}`, "x"]),
       );
 
-      expect(runParameterValuesSchema.safeParse(tooManyKeys).success).toBe(false);
+      expect(runParameterValuesSchema.validate(tooManyKeys)).toBe(false);
     });
 
     /** @scenario "A run-time payload over the size limits is rejected before scheduling" */
@@ -151,21 +151,21 @@ describe("scenario run parameters", () => {
       expect(new TextEncoder().encode(JSON.stringify(tooManyBytes)).length).toBeGreaterThan(
         MAX_RUN_PARAMETER_BYTES,
       );
-      expect(runParameterValuesSchema.safeParse(tooManyBytes).success).toBe(false);
+      expect(runParameterValuesSchema.validate(tooManyBytes)).toBe(false);
     });
 
     /** @scenario "A run-time payload over the size limits is rejected before scheduling" */
     it("rejects a single value longer than one value may be", () => {
-      expect(runParameterValuesSchema.safeParse({ note: "x".repeat(4097) }).success).toBe(false);
+      expect(runParameterValuesSchema.validate({ note: "x".repeat(4097) })).toBe(false);
     });
 
     it("accepts a payload inside every limit", () => {
       expect(
-        runParameterValuesSchema.safeParse({
+        runParameterValuesSchema.validate({
           region: "eu-central",
           retries: 3,
           verbose: true,
-        }).success,
+        }),
       ).toBe(true);
     });
   });
@@ -214,7 +214,7 @@ describe("scenario run parameters", () => {
         // see an empty record and answer success, and the caller would get a
         // 2xx for a value the run then ignored.
         for (const name of ["__proto__", "constructor", "prototype"]) {
-          expect(runParameterValuesSchema.safeParse(fromJson(name)).success).toBe(false);
+          expect(runParameterValuesSchema.validate(fromJson(name))).toBe(false);
         }
       });
     });

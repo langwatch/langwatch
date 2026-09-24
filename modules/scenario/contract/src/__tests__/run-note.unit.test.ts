@@ -62,7 +62,7 @@ describe("runNoteSchema", () => {
     it("rejects it", () => {
       const note = "a".repeat(MAX_RUN_NOTE_LENGTH + 1);
 
-      expect(runNoteSchema.safeParse(note).success).toBe(false);
+      expect(runNoteSchema.validate(note)).toBe(false);
     });
   });
 

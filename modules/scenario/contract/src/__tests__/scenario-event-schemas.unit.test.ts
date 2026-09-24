@@ -67,7 +67,7 @@ describe("scenarioMessageSnapshotSchema — input_audio wire acceptance (#5149)"
       { type: "input_audio", input_audio: { data: WAV_BASE64, format: "wav" } },
     ]);
 
-    expect(scenarioEventSchema.safeParse(event).success).toBe(true);
+    expect(scenarioEventSchema.validate(event)).toBe(true);
   });
 
   it("ACCEPTS the post-extraction rewrite shape: input_audio:{url, mimeType} with no data", () => {
@@ -79,26 +79,26 @@ describe("scenarioMessageSnapshotSchema — input_audio wire acceptance (#5149)"
       },
     ]);
 
-    expect(scenarioEventSchema.safeParse(event).success).toBe(true);
+    expect(scenarioEventSchema.validate(event)).toBe(true);
   });
 });
 
 describe("scenarioMessageSnapshotSchema — regression: previously-valid shapes still validate (#5149 AC4)", () => {
   it("ACCEPTS plain string content", () => {
     const event = makeSnapshotEvent("just text");
-    expect(scenarioEventSchema.safeParse(event).success).toBe(true);
+    expect(scenarioEventSchema.validate(event)).toBe(true);
   });
 
   it("ACCEPTS a text content part", () => {
     const event = makeSnapshotEvent([{ type: "text", text: "hello" }]);
-    expect(scenarioEventSchema.safeParse(event).success).toBe(true);
+    expect(scenarioEventSchema.validate(event)).toBe(true);
   });
 
   it("ACCEPTS an image_url content part (existing tracer chatMessageSchema member)", () => {
     const event = makeSnapshotEvent([
       { type: "image_url", image_url: { url: "https://example.com/cat.png" } },
     ]);
-    expect(scenarioEventSchema.safeParse(event).success).toBe(true);
+    expect(scenarioEventSchema.validate(event)).toBe(true);
   });
 });
 
@@ -332,13 +332,13 @@ describe("given a MESSAGE_SNAPSHOT wire event carrying attachment content", () =
         { type: "image", image: WEBP_DATA_URI },
       ]);
 
-      expect(scenarioEventSchema.safeParse(event).success).toBe(true);
+      expect(scenarioEventSchema.validate(event)).toBe(true);
     });
 
     it("ACCEPTS an image-only turn with no text part", () => {
       const event = makeSnapshotEvent([{ type: "image", image: WEBP_DATA_URI }]);
 
-      expect(scenarioEventSchema.safeParse(event).success).toBe(true);
+      expect(scenarioEventSchema.validate(event)).toBe(true);
     });
 
     /**
@@ -365,7 +365,7 @@ describe("given a MESSAGE_SNAPSHOT wire event carrying attachment content", () =
     it("ACCEPTS an external http URL image", () => {
       const event = makeSnapshotEvent([{ type: "image", image: "https://example.com/cat.png" }]);
 
-      expect(scenarioEventSchema.safeParse(event).success).toBe(true);
+      expect(scenarioEventSchema.validate(event)).toBe(true);
     });
   });
 
@@ -380,7 +380,7 @@ describe("given a MESSAGE_SNAPSHOT wire event carrying attachment content", () =
         },
       ]);
 
-      expect(scenarioEventSchema.safeParse(event).success).toBe(true);
+      expect(scenarioEventSchema.validate(event)).toBe(true);
     });
 
     /**
@@ -415,7 +415,7 @@ describe("given a MESSAGE_SNAPSHOT wire event carrying attachment content", () =
     it("ACCEPTS a part carrying only a provider file_id", () => {
       const event = makeSnapshotEvent([{ type: "file", file: { file_id: "file-abc123" } }]);
 
-      expect(scenarioEventSchema.safeParse(event).success).toBe(true);
+      expect(scenarioEventSchema.validate(event)).toBe(true);
     });
   });
 
@@ -457,7 +457,7 @@ describe("given a MESSAGE_SNAPSHOT wire event carrying attachment content", () =
         },
       ]);
 
-      expect(scenarioEventSchema.safeParse(event).success).toBe(true);
+      expect(scenarioEventSchema.validate(event)).toBe(true);
     });
   });
 });

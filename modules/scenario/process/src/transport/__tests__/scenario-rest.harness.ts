@@ -9,6 +9,7 @@ import {
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -74,6 +75,7 @@ export function createScenarioRestTestApp(
       auditLog: createApiFixture<AuditLogApi>(),
       traces: createApiFixture<TraceApi>(options.traces, "Trace API"),
       billing: createApiFixture<BillingApi>(options.billing ?? {}, "Billing API"),
+      retention: createApiFixture<DataRetentionApi>(),
     },
     members: {
       clickhouse: createApiFixture<ScenarioReadOnlyClickHouse>(),

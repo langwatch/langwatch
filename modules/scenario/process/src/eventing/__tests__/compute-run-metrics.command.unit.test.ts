@@ -11,7 +11,6 @@ function makeDeps(overrides: Partial<ComputeRunMetricsDeps> = {}): ComputeRunMet
   return {
     traceSummaryStore: {
       get: vi.fn().mockResolvedValue({ kind: "empty" }),
-      store: vi.fn().mockResolvedValue(undefined),
     },
     scheduleRetry: vi.fn().mockResolvedValue(undefined),
     deriveScenarioRoleMetrics: vi
@@ -95,7 +94,6 @@ describe("ComputeRunMetricsCommand", () => {
           get: vi
             .fn()
             .mockResolvedValue({ kind: "folded", state: makeTraceSummary({ totalCost: null }) }),
-          store: vi.fn(),
         },
         // No role cost derivable yet (spans not settled) and totalCost null.
         deriveScenarioRoleMetrics: vi.fn().mockResolvedValue({
@@ -125,7 +123,6 @@ describe("ComputeRunMetricsCommand", () => {
           get: vi
             .fn()
             .mockResolvedValue({ kind: "folded", state: makeTraceSummary({ totalCost: null }) }),
-          store: vi.fn(),
         },
       });
 
@@ -147,7 +144,6 @@ describe("ComputeRunMetricsCommand", () => {
           get: vi
             .fn()
             .mockResolvedValue({ kind: "folded", state: makeTraceSummary({ totalCost: 0.003 }) }),
-          store: vi.fn(),
         },
         deriveScenarioRoleMetrics: vi.fn().mockResolvedValue({
           scenarioRoleCosts: { Agent: 0.003 },
@@ -183,7 +179,6 @@ describe("ComputeRunMetricsCommand", () => {
           get: vi
             .fn()
             .mockResolvedValue({ kind: "folded", state: makeTraceSummary({ totalCost: null }) }),
-          store: vi.fn(),
         },
         deriveScenarioRoleMetrics: vi.fn().mockResolvedValue({
           scenarioRoleCosts: {},
@@ -212,7 +207,6 @@ describe("ComputeRunMetricsCommand", () => {
           get: vi
             .fn()
             .mockResolvedValue({ kind: "folded", state: makeTraceSummary({ totalCost: 0.01 }) }),
-          store: vi.fn(),
         },
         deriveScenarioRoleMetrics: vi.fn().mockResolvedValue({
           scenarioRoleCosts: {},

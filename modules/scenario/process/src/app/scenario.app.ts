@@ -6,6 +6,7 @@ import {
   type AgentTestTurnResult,
 } from "@langwatch/agent-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommands } from "@langwatch/eventing";
@@ -115,6 +116,7 @@ import {
   buildScenarioLifecyclePipeline,
   type ScenarioLifecyclePipeline,
 } from "../eventing/scenario-lifecycle.pipeline.ts";
+import type { SimulationProcessingPipelineDefinition } from "../eventing/simulation-processing.pipeline.ts";
 import type { ScenarioRepositories } from "../repositories/scenario.repositories.ts";
 import { scenarioPlatformUrl } from "../rules/scenario-platform-url.rules.ts";
 import type { AgentTestService } from "../services/agent-test.service.ts";
@@ -128,7 +130,16 @@ import { ScenarioGenerationService } from "../services/scenario-generation.servi
 import { ScenarioRunExportDownloadService } from "../services/scenario-run-export-download.service.ts";
 import { ScenarioRunExportService } from "../services/scenario-run-export.service.ts";
 import { ScenarioService } from "../services/scenario.service.ts";
-import { buildScenarioComposition } from "./scenario-composition.build.ts";
+import { SimulationCommandDispatcherService } from "../services/simulation-command-dispatcher.service.ts";
+import {
+  SimulationProcessingService,
+  type SimulationPipelineSetup,
+} from "../services/simulation-processing.service.ts";
+import {
+  buildScenarioComposition,
+  pendingSuiteRunSync,
+  undeliveredSnapshotUpdates,
+} from "./scenario-composition.build.ts";
 
 const lifecycleLogger = createLogger("langwatch:scenario:lifecycle");
 
@@ -195,6 +206,8 @@ export const scenarioAppDependencyTokens = {
   traces: TraceApi,
   /** Where a created scenario is announced, for product analytics and nurturing. */
   billing: BillingApi,
+  /** The platform default a simulation run row is stamped with, read per write. */
+  retention: DataRetentionApi,
 };
 
 /**
@@ -251,9 +264,11 @@ export class ScenarioApp implements ScenarioApi {
       ScenarioRepositories
     >,
   ): ScenarioApp {
+    const simulationCommands = SimulationCommandDispatcherService.create();
     const composed = buildScenarioComposition({
       encryption: setup.members.encryption,
       clickhouse: setup.members.clickhouse,
+      execution: simulationCommands,
     });
     const { ids, testSuiteIds, clock, secretCipher } = composed;
     // A process that composes its own whole simulation service still wins;
@@ -306,6 +321,17 @@ export class ScenarioApp implements ScenarioApi {
         announce: (signal) => setup.dependencies.billing.recordScenarioCreated(signal),
         claim: (key, ttlSeconds) => setup.members.idempotency.claim(key, ttlSeconds),
       }),
+      simulationCommands,
+      simulationProcessing: SimulationProcessingService.create({
+        runs: setup.repositories.simulationRunProcessing,
+        cancellations: setup.repositories.cancellations,
+        traces: setup.dependencies.traces,
+        retention: setup.dependencies.retention,
+        commands: simulationCommands,
+        simulations,
+        suiteRuns: pendingSuiteRunSync(),
+        snapshotUpdates: undeliveredSnapshotUpdates(),
+      }),
     });
   }
 
@@ -313,16 +339,23 @@ export class ScenarioApp implements ScenarioApi {
   readonly #publicBaseUrl: string | undefined;
   readonly #lifecycle: ScenarioLifecyclePipeline;
   #lifecycleCommands: EventingCommands<ScenarioLifecyclePipeline> | undefined;
+  readonly #simulationCommands: SimulationCommandDispatcherService;
+  readonly #simulationProcessing: SimulationProcessingService;
 
   private constructor(
     dependencies: ScenarioAppDependencies & {
       publicBaseUrl: string | undefined;
       lifecycle: ScenarioLifecyclePipeline;
+      simulationCommands: SimulationCommandDispatcherService;
+      simulationProcessing: SimulationProcessingService;
     },
   ) {
-    const { publicBaseUrl, lifecycle, ...rest } = dependencies;
+    const { publicBaseUrl, lifecycle, simulationCommands, simulationProcessing, ...rest } =
+      dependencies;
     this.#publicBaseUrl = publicBaseUrl;
     this.#lifecycle = lifecycle;
+    this.#simulationCommands = simulationCommands;
+    this.#simulationProcessing = simulationProcessing;
     this.#dependencies = rest;
   }
 
@@ -531,6 +564,18 @@ export class ScenarioApp implements ScenarioApi {
   /** Binds the built lifecycle pipeline's own senders. */
   connectLifecycleCommands(commands: EventingCommands<ScenarioLifecyclePipeline>): void {
     this.#lifecycleCommands = commands;
+  }
+
+  /** simulation_processing, built per role: the execution pool exists only where it drains. */
+  simulationPipeline(setup: SimulationPipelineSetup): SimulationProcessingPipelineDefinition {
+    return this.#simulationProcessing.buildPipeline(setup);
+  }
+
+  /** Binds simulation_processing's own senders; every simulation write goes through them. */
+  connectSimulationCommands(
+    commands: EventingCommands<SimulationProcessingPipelineDefinition>,
+  ): void {
+    this.#simulationCommands.connect(commands);
   }
 
   /**

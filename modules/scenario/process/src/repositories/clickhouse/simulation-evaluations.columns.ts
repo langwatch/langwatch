@@ -3,27 +3,29 @@ import {
   type ScenarioEvaluationResult,
   type ScenarioEvaluationStatus,
 } from "@langwatch/scenario-contract";
+import { z } from "zod";
 
 /**
  * The `Evaluations.*` parallel arrays of a `simulation_runs` row, one entry
  * per evaluator. Booleans travel as 0/1 and absent values as NULL or '',
  * which is how ClickHouse stores them.
  */
-export interface ClickHouseEvaluationColumns {
-  "Evaluations.EvaluatorId": string[];
-  "Evaluations.Name": string[];
-  "Evaluations.Status": string[];
-  "Evaluations.Required": number[];
-  "Evaluations.Passed": (number | null)[];
-  "Evaluations.Score": (number | null)[];
-  "Evaluations.Label": string[];
-  "Evaluations.Details": string[];
-  "Evaluations.CostAmount": (number | null)[];
-  "Evaluations.CostCurrency": string[];
-  "Evaluations.InputsJson": string[];
-}
+export const clickHouseEvaluationColumnsSchema = z.object({
+  "Evaluations.EvaluatorId": z.array(z.string()),
+  "Evaluations.Name": z.array(z.string()),
+  "Evaluations.Status": z.array(z.string()),
+  "Evaluations.Required": z.array(z.number()),
+  "Evaluations.Passed": z.array(z.number().nullable()),
+  "Evaluations.Score": z.array(z.number().nullable()),
+  "Evaluations.Label": z.array(z.string()),
+  "Evaluations.Details": z.array(z.string()),
+  "Evaluations.CostAmount": z.array(z.number().nullable()),
+  "Evaluations.CostCurrency": z.array(z.string()),
+  "Evaluations.InputsJson": z.array(z.string()),
+});
+export type ClickHouseEvaluationColumns = z.infer<typeof clickHouseEvaluationColumnsSchema>;
 
-/** The columns as a SELECT fragment, in the order the record interface lists them. */
+/** The columns as a SELECT fragment, in the order the schema lists them. */
 export const EVALUATION_COLUMNS_SQL = `
   \`Evaluations.EvaluatorId\`, \`Evaluations.Name\`, \`Evaluations.Status\`,
   \`Evaluations.Required\`, \`Evaluations.Passed\`, \`Evaluations.Score\`,

@@ -3,6 +3,7 @@ import { defineServerModule } from "@langwatch/kernel";
 
 import { ScenarioApp } from "./app/scenario.app.ts";
 import { scenarioLifecycleEventing } from "./eventing/scenario-lifecycle.pipeline.ts";
+import { simulationProcessingEventing } from "./eventing/simulation-processing.pipeline.ts";
 import { scenarioRepositories } from "./repositories/scenario-repositories.registry.ts";
 import { scenarioGenerateRest } from "./transport/scenario-generate.rest.ts";
 import { scenarioRunExportRest } from "./transport/scenario-run-export.rest.ts";
@@ -28,4 +29,5 @@ export const scenarioServer = defineServerModule("scenario")
   // Which surface a write declares itself through, off the caller's own
   // `X-LangWatch-Surface` header - nothing a process collaborator answers.
   .withTransportFacts(() => [bindRestHeader(scenarioRestSurface, "x-langwatch-surface")])
-  .withEventing(scenarioLifecycleEventing);
+  .withEventing(scenarioLifecycleEventing)
+  .withEventing(simulationProcessingEventing);

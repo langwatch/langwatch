@@ -1,9 +1,9 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import { classifyClickHouseError, StoreError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 
 import type { SimulationRunMetricsProjectionRecord } from "../../eventing/simulation-run-metrics.projection.ts";
 import type { SimulationRunMetricsRepository } from "../simulation-run-metrics.repository.ts";
+import type { SimulationEventingClickHouseResolver } from "./clickhouse.simulation-session.store.ts";
 
 const TABLE_NAME = "simulation_run_metrics" as const;
 const ROLLUP_TABLE_NAME = "simulation_run_metrics_rollup" as const;
@@ -14,9 +14,7 @@ type WithDateWrites<RecordType, DateKeys extends keyof RecordType> = Omit<Record
   [Key in DateKeys]: Date | null;
 };
 
-export type SimulationMetricsClickHouseClientResolver = (
-  projectId: string,
-) => Promise<ClickHouseClient>;
+export type SimulationMetricsClickHouseClientResolver = SimulationEventingClickHouseResolver;
 
 type ClickHouseSimulationRunMetricsWriteRecord = WithDateWrites<
   SimulationRunMetricsProjectionRecord,

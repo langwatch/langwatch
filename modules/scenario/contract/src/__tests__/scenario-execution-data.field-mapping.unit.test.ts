@@ -70,24 +70,20 @@ describe("TargetConfigSchema", () => {
     /** @scenario Suite target schema accepts all valid target types */
     it("accepts every valid target type", () => {
       for (const type of ["prompt", "http", "code", "workflow"] as const) {
-        expect(TargetConfigSchema.safeParse({ type, referenceId: `${type}_ref` }).success).toBe(
-          true,
-        );
+        expect(TargetConfigSchema.validate({ type, referenceId: `${type}_ref` })).toBe(true);
       }
     });
 
     it("accepts prompt type", () => {
-      expect(TargetConfigSchema.safeParse({ type: "prompt", referenceId: "p1" }).success).toBe(
-        true,
-      );
+      expect(TargetConfigSchema.validate({ type: "prompt", referenceId: "p1" })).toBe(true);
     });
 
     it("accepts http type", () => {
-      expect(TargetConfigSchema.safeParse({ type: "http", referenceId: "h1" }).success).toBe(true);
+      expect(TargetConfigSchema.validate({ type: "http", referenceId: "h1" })).toBe(true);
     });
 
     it("accepts code type", () => {
-      expect(TargetConfigSchema.safeParse({ type: "code", referenceId: "c1" }).success).toBe(true);
+      expect(TargetConfigSchema.validate({ type: "code", referenceId: "c1" })).toBe(true);
     });
   });
 });

@@ -1,4 +1,3 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import type {
   Projection,
   ProjectionStoreReadContext,
@@ -19,6 +18,7 @@ import type {
   SimulationRunStateData,
 } from "../../eventing/simulation-run-state.projection.ts";
 import type { SimulationRunStateRepository } from "../simulation-run-state.repository.ts";
+import type { SimulationEventingClickHouseResolver } from "./clickhouse.simulation-session.store.ts";
 import {
   type ClickHouseEvaluationColumns,
   columnsToEvaluations,
@@ -75,7 +75,7 @@ type WithDateWrites<RecordType, DateKeys extends keyof RecordType> = Omit<Record
   [Key in DateKeys]: Date | null;
 };
 
-export type SimulationClickHouseClientResolver = (projectId: string) => Promise<ClickHouseClient>;
+export type SimulationClickHouseClientResolver = SimulationEventingClickHouseResolver;
 
 type ClickHouseSimulationRunWriteRecord = WithDateWrites<
   ClickHouseSimulationRunRecord,
@@ -95,7 +95,7 @@ export class ClickHouseSimulationRunStateRepository<
 > implements SimulationRunStateRepository<ProjectionType> {
   static create<ProjectionType extends Projection = Projection>(options: {
     resolveClient: SimulationClickHouseClientResolver;
-    defaultRetentionDays: number;
+    defaultRetentionDays: () => number;
   }): ClickHouseSimulationRunStateRepository<ProjectionType> {
     return new ClickHouseSimulationRunStateRepository(options);
   }
@@ -103,7 +103,7 @@ export class ClickHouseSimulationRunStateRepository<
   constructor(
     private readonly options: {
       resolveClient: SimulationClickHouseClientResolver;
-      defaultRetentionDays: number;
+      defaultRetentionDays: () => number;
     },
   ) {}
 
@@ -216,7 +216,7 @@ export class ClickHouseSimulationRunStateRepository<
         : new Date(0),
       // Placeholder; storeProjection / storeProjectionBatch overwrite this with
       // the resolved retention (platform default when the tenant has none).
-      _retention_days: this.options.defaultRetentionDays,
+      _retention_days: this.options.defaultRetentionDays(),
     };
   }
 
@@ -346,7 +346,7 @@ export class ClickHouseSimulationRunStateRepository<
         | { scenarios?: number | null }
         | undefined;
       projectionRecord._retention_days =
-        retentionPolicy?.scenarios ?? this.options.defaultRetentionDays;
+        retentionPolicy?.scenarios ?? this.options.defaultRetentionDays();
 
       const client = await this.options.resolveClient(context.tenantId);
       await client.insert({
@@ -413,7 +413,7 @@ export class ClickHouseSimulationRunStateRepository<
       const retentionPolicy = context.metadata?.retentionPolicy as
         | { scenarios?: number | null }
         | undefined;
-      const retentionDays = retentionPolicy?.scenarios ?? this.options.defaultRetentionDays;
+      const retentionDays = retentionPolicy?.scenarios ?? this.options.defaultRetentionDays();
       const records = projections.map((projection) => {
         const scenarioRunId = String(projection.aggregateId);
         const record = this.mapProjectionDataToClickHouseRecord({

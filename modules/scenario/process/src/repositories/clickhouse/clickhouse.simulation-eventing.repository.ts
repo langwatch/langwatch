@@ -27,6 +27,7 @@ import {
 } from "../stalled-simulation-run.repository.ts";
 import { ClickHouseSimulationRunMetricsRepository } from "./clickhouse.simulation-run-metrics.repository.ts";
 import { ClickHouseSimulationRunStateRepository } from "./clickhouse.simulation-run-state.repository.ts";
+import type { SimulationEventingClickHouseResolver } from "./clickhouse.simulation-session.store.ts";
 import { ClickHouseStalledSimulationRunRepository } from "./clickhouse.stalled-simulation-run.repository.ts";
 
 const logger = createLogger("scenario:simulation-run-state-fold-store");
@@ -98,8 +99,8 @@ export class SimulationRunStateStoreAdapter implements ProjectionStore {
     options:
       | {
           type: "clickhouse";
-          resolveClient: (projectId: string) => Promise<ClickHouseClient>;
-          defaultRetentionDays: number;
+          resolveClient: SimulationEventingClickHouseResolver;
+          defaultRetentionDays: () => number;
         }
       | { type: "memory" },
   ): SimulationRunStateStoreAdapter {
@@ -153,7 +154,7 @@ export class SimulationRunMetricsStoreAdapter implements AppendStore<SimulationR
     options:
       | {
           type: "clickhouse";
-          resolveClient: (projectId: string) => Promise<ClickHouseClient>;
+          resolveClient: SimulationEventingClickHouseResolver;
         }
       | { type: "null" },
   ): SimulationRunMetricsStoreAdapter {
