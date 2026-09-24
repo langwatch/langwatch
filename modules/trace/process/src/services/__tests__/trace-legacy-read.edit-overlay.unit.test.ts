@@ -73,7 +73,7 @@ function makeService(): TraceLegacyReadService {
       findTracesWithSpans: mockGetTracesWithSpans,
       findTracesWithSpansByThreadIds: mockGetTracesWithSpansByThreadIds,
       resolveTraceIdByPrefix: vi.fn().mockResolvedValue([]),
-      findAllTracesForProject: vi.fn(),
+      listAllTracesForProject: vi.fn(),
       findTracesByThreadId: vi.fn(),
       findCustomersAndLabels: vi.fn(),
       findDistinctFieldNames: vi.fn(),

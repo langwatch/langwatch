@@ -17,7 +17,7 @@ export abstract class SsoConnectionBackofficeRepository {
    * operator would have to hand: a connection id from a log line, an
    * organization id from a support thread, or the customer's domain.
    */
-  abstract findPage(args: {
+  abstract listPage(args: {
     page: number;
     pageSize: number;
     search?: string;

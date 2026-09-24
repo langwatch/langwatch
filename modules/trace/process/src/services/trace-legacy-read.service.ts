@@ -269,7 +269,7 @@ export class TraceLegacyReadService {
       "TraceService.getAllTracesForProject",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
-        const result = await this.clickHouseService.findAllTracesForProject(
+        const result = await this.clickHouseService.listAllTracesForProject(
           input,
           protections,
           options,

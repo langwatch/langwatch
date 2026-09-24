@@ -35,7 +35,7 @@ export class BlobStoreService {
     projectId?: string | null;
     sort?: OpsBlobSort;
   }): Promise<OpsBlobPage> {
-    return this.repo.findAll({
+    return this.repo.listAll({
       queueName: params.queueName,
       cursor: params.cursor ?? null,
       limit: params.limit ?? DEFAULT_PAGE_SIZE,

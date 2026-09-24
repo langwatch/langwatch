@@ -89,7 +89,7 @@ export class MemorySsoConnectionBackofficeRepository implements SsoConnectionBac
 
   private constructor(private readonly store: MemoryIdentityStore) {}
 
-  async findPage(args: {
+  async listPage(args: {
     page: number;
     pageSize: number;
     search?: string;

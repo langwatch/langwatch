@@ -121,7 +121,7 @@ async function fetchUpdatedAxisPage(
   pageSize: number,
   scrollId?: string | null,
 ): Promise<TracesForProjectResult> {
-  const results = await service.findAllTracesForProject(
+  const results = await service.listAllTracesForProject(
     makeQueryInput({ pageSize }),
     openProtections,
     {
@@ -247,7 +247,7 @@ describe.skipIf(!clickHouseConfigured)("updated date-axis pagination (integratio
   // version matching the search would wrongly include the trace.
   describe("given a trace whose latest version no longer matches a search term", () => {
     const fetchDrift = (query: string) =>
-      service.findAllTracesForProject(
+      service.listAllTracesForProject(
         makeQueryInput({ projectId: filterTenant, query }),
         openProtections,
         {

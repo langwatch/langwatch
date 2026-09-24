@@ -93,7 +93,7 @@ export class OrganizationGroupService {
   async listGroups(input: ListOrganizationGroupsInput): Promise<OrganizationGroupPage> {
     const parsed = listOrganizationGroupsInputSchema.parse(input);
     const [page, bindings] = await Promise.all([
-      this.groups.findAll(parsed),
+      this.groups.listAll(parsed),
       this.authz.listOrganizationBindings({
         organizationId: parsed.organizationId,
       }),

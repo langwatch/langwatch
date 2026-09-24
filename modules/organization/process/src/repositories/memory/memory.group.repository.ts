@@ -42,7 +42,7 @@ export class MemoryGroupRepository extends GroupRepository {
     return toGroup(group);
   }
 
-  async findAll(input: { organizationId: string; page: number; limit: number }): Promise<{
+  async listAll(input: { organizationId: string; page: number; limit: number }): Promise<{
     data: OrganizationGroupWithMemberCount[];
     pagination: { page: number; limit: number; total: number };
   }> {

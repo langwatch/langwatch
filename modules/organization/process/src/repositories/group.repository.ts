@@ -6,7 +6,7 @@ export type OrganizationGroupWithMemberCount = OrganizationGroup & {
 
 export abstract class GroupRepository {
   abstract get(input: { groupId: string; organizationId: string }): Promise<OrganizationGroup>;
-  abstract findAll(input: { organizationId: string; page: number; limit: number }): Promise<{
+  abstract listAll(input: { organizationId: string; page: number; limit: number }): Promise<{
     data: OrganizationGroupWithMemberCount[];
     pagination: { page: number; limit: number; total: number };
   }>;

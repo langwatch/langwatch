@@ -52,7 +52,7 @@ function buildService(options?: {
   const storedGroup = options?.storedGroup ?? group;
   const groupRepository = {
     get: vi.fn().mockResolvedValue(storedGroup),
-    findAll: vi.fn().mockResolvedValue({
+    listAll: vi.fn().mockResolvedValue({
       data: [{ ...group, memberCount: 0 }],
       pagination: { page: 1, limit: 50, total: 1 },
     }),

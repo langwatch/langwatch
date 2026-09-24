@@ -70,7 +70,7 @@ describe.skipIf(!DB_URL)("PrismaGroupRepository member counts", () => {
 
   describe("when the organization's groups are listed", () => {
     it("counts only members who still belong to the organization, and zero for an empty group", async () => {
-      const listed = await repository.findAll({ organizationId, page: 1, limit: 10 });
+      const listed = await repository.listAll({ organizationId, page: 1, limit: 10 });
 
       expect(listed.data.map(({ id, memberCount }) => ({ id, memberCount }))).toEqual([
         { id: busyGroupId, memberCount: 2 },

@@ -76,7 +76,7 @@ export class BlobStoreRedisRepository extends BlobStoreRepository {
   }
 
   /** Cursor pagination with per-node SCAN cursors in cluster mode for safe browser exposure. */
-  async findAll({
+  async listAll({
     queueName,
     cursor,
     limit,

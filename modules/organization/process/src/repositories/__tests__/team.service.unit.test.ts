@@ -132,7 +132,7 @@ class MemoryGroups extends GroupRepository {
   get(): never {
     throw new Error("not used");
   }
-  findAll(): never {
+  listAll(): never {
     throw new Error("not used");
   }
   findForMember(): never {

@@ -27,7 +27,7 @@ export interface TraceOccurredAtRange {
  * service that orchestrates a read never names one.
  */
 export abstract class TraceLegacyReadRepository {
-  abstract findAllTracesForProject(
+  abstract listAllTracesForProject(
     input: GetAllTracesForProjectInput,
     protections: Protections,
     options?: GetAllTracesForProjectOptions,

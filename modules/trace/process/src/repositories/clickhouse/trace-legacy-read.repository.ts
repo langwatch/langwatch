@@ -744,7 +744,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     );
   }
 
-  async findAllTracesForProject(
+  async listAllTracesForProject(
     input: GetAllTracesForProjectInput,
     protections: Protections,
     options: GetAllTracesForProjectOptions = {},

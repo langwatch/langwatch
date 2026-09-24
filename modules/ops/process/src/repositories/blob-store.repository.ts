@@ -18,7 +18,7 @@ export interface BlobDeleteResult {
 
 export abstract class BlobStoreRepository {
   abstract findAllQueueNames(): Promise<string[]>;
-  abstract findAll(params: {
+  abstract listAll(params: {
     queueName: string;
     cursor?: string | null;
     limit: number;
@@ -48,7 +48,7 @@ export class NullBlobStoreRepository implements BlobStoreRepository {
   async findAllQueueNames(): Promise<string[]> {
     return [];
   }
-  async findAll(): Promise<OpsBlobPage> {
+  async listAll(): Promise<OpsBlobPage> {
     return {
       blobs: [],
       nextCursor: null,

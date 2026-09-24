@@ -150,7 +150,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const result = await service.findAllTracesForProject(baseInput, protections);
+        const result = await service.listAllTracesForProject(baseInput, protections);
 
         expect(result).not.toBeNull();
         const traces = result!.groups.flat();
@@ -173,7 +173,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceIds: ["trace-A", "trace-B"],
         } as GetAllTracesForProjectInput;
 
-        const result = await service.findAllTracesForProject(inputWithTraceIds, protections);
+        const result = await service.listAllTracesForProject(inputWithTraceIds, protections);
 
         expect(result).not.toBeNull();
 
@@ -201,7 +201,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceIds: ["trace-A"],
         } as GetAllTracesForProjectInput;
 
-        const result = await service.findAllTracesForProject(inputWithTraceIds, protections);
+        const result = await service.listAllTracesForProject(inputWithTraceIds, protections);
 
         expect(result).not.toBeNull();
         const traces = result!.groups.flat();
@@ -219,7 +219,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const result = await service.findAllTracesForProject(baseInput, protections);
+        const result = await service.listAllTracesForProject(baseInput, protections);
 
         expect(result).not.toBeNull();
 
@@ -262,7 +262,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
             traceCanonicalisation,
           });
 
-          const result = await service.findAllTracesForProject(baseInput, protections, {
+          const result = await service.listAllTracesForProject(baseInput, protections, {
             scrollId,
           });
 
@@ -293,7 +293,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
             scrollId,
           } as GetAllTracesForProjectInput;
 
-          const result = await service.findAllTracesForProject(inputWithScrollId, protections);
+          const result = await service.listAllTracesForProject(inputWithScrollId, protections);
 
           expect(result).not.toBeNull();
 
@@ -317,7 +317,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
             traceCanonicalisation,
           });
 
-          const result = await service.findAllTracesForProject(baseInput, protections);
+          const result = await service.listAllTracesForProject(baseInput, protections);
 
           expect(result).not.toBeNull();
 
@@ -341,7 +341,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
             traceCanonicalisation,
           });
 
-          const result = await service.findAllTracesForProject(baseInput, protections, {
+          const result = await service.listAllTracesForProject(baseInput, protections, {
             scrollId: "not-valid-base64!!!",
           });
 
@@ -370,7 +370,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
             traceCanonicalisation,
           });
 
-          const result = await service.findAllTracesForProject(baseInput, protections, {
+          const result = await service.listAllTracesForProject(baseInput, protections, {
             scrollId,
           });
 
@@ -397,7 +397,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
             traceCanonicalisation,
           });
 
-          const result = await service.findAllTracesForProject(baseInput, protections, {
+          const result = await service.listAllTracesForProject(baseInput, protections, {
             scrollId,
           });
 
@@ -427,7 +427,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.findAllTracesForProject(
+        await service.listAllTracesForProject(
           { ...baseInput, query: "Hello World" } as GetAllTracesForProjectInput,
           protections,
         );
@@ -449,7 +449,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.findAllTracesForProject(
+        await service.listAllTracesForProject(
           { ...baseInput, query: "Hello World" } as GetAllTracesForProjectInput,
           protections,
         );
@@ -471,7 +471,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.findAllTracesForProject(
+        await service.listAllTracesForProject(
           { ...baseInput, query: "Hello World" } as GetAllTracesForProjectInput,
           protections,
         );
@@ -488,7 +488,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.findAllTracesForProject(
+        await service.listAllTracesForProject(
           {
             ...baseInput,
             query: "100% success_rate",
@@ -514,7 +514,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.findAllTracesForProject(
+        await service.listAllTracesForProject(
           { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
           protections,
         );
@@ -536,7 +536,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.findAllTracesForProject(
+        await service.listAllTracesForProject(
           { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
           protections,
         );
@@ -558,7 +558,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.findAllTracesForProject(
+        await service.listAllTracesForProject(
           { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
           protections,
         );
@@ -594,7 +594,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.findAllTracesForProject(
+        await service.listAllTracesForProject(
           { ...baseInput, query: "co" } as GetAllTracesForProjectInput,
           protections,
         );
@@ -616,7 +616,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.findAllTracesForProject(
+        await service.listAllTracesForProject(
           { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
           { ...protections, canSeeCapturedOutput: false },
         );
@@ -636,7 +636,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const result = await service.findAllTracesForProject(
+        const result = await service.listAllTracesForProject(
           { ...baseInput, query: "hello" } as GetAllTracesForProjectInput,
           {
             canSeeCapturedInput: false,
@@ -657,7 +657,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.findAllTracesForProject(
+        await service.listAllTracesForProject(
           { ...baseInput, query: "hello" } as GetAllTracesForProjectInput,
           {
             canSeeCapturedInput: false,
@@ -678,7 +678,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.findAllTracesForProject(
+        await service.listAllTracesForProject(
           { ...baseInput, query: "hello" } as GetAllTracesForProjectInput,
           {
             canSeeCapturedInput: true,
@@ -701,7 +701,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.findAllTracesForProject(
+        await service.listAllTracesForProject(
           { ...baseInput, query: "ab" } as GetAllTracesForProjectInput,
           protections,
         );
@@ -721,7 +721,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const result = await service.findAllTracesForProject(baseInput, protections);
+        const result = await service.listAllTracesForProject(baseInput, protections);
 
         expect(result).not.toBeNull();
 
@@ -775,7 +775,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const result = await service.findAllTracesForProject(
+        const result = await service.listAllTracesForProject(
           { ...baseInput, pageSize: 4 } as GetAllTracesForProjectInput,
           protections,
         );
@@ -822,7 +822,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const result = await service.findAllTracesForProject(
+        const result = await service.listAllTracesForProject(
           { ...baseInput, pageSize: 30 } as GetAllTracesForProjectInput,
           protections,
         );
@@ -855,7 +855,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await expect(service.findAllTracesForProject(baseInput, protections)).rejects.toThrow(
+        await expect(service.listAllTracesForProject(baseInput, protections)).rejects.toThrow(
           "SYNTAX_ERROR",
         );
       });
@@ -893,7 +893,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const result = await service.findAllTracesForProject(baseInput, protections);
+        const result = await service.listAllTracesForProject(baseInput, protections);
 
         expect(result).not.toBeNull();
         expect(result!.groups.flat()).toHaveLength(1);
@@ -936,7 +936,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const result = await service.findAllTracesForProject(baseInput, protections, {
+        const result = await service.listAllTracesForProject(baseInput, protections, {
           includeSpans: true,
         });
 

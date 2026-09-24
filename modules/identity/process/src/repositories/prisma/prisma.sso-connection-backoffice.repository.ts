@@ -42,7 +42,7 @@ export class PrismaSsoConnectionBackofficeRepository implements SsoConnectionBac
 
   private constructor(private readonly prisma: PrismaSsoConnectionBackofficeDatabase) {}
 
-  async findPage({
+  async listPage({
     page,
     pageSize,
     search,

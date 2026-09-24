@@ -95,7 +95,7 @@ export class SsoConnectionBackofficeService {
     pageSize: number;
     search?: string;
   }): Promise<BackofficeSsoConnectionList> {
-    const { states, total } = await this.deps.reads.findPage({ page, pageSize, search });
+    const { states, total } = await this.deps.reads.listPage({ page, pageSize, search });
     const names = await this.organizationNames(states.map((state) => state.organizationId));
 
     return {

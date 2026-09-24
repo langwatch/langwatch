@@ -25,7 +25,7 @@ function backofficeOver(state: SsoConnectionState | null) {
     findHistory = findHistory;
   }
   class StubReads extends SsoConnectionBackofficeRepository {
-    findPage = vi.fn().mockResolvedValue({ states: [], total: 0 });
+    listPage = vi.fn().mockResolvedValue({ states: [], total: 0 });
     getById = vi.fn(async () => {
       if (!state) throw new SsoConnectionNotFoundError("no connection");
       return state;
