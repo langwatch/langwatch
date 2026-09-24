@@ -15,6 +15,7 @@ import type { ExecutionCell } from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   DATASET_ATTACHMENT_PURPOSE,
+  StoredObjectNotFoundError,
   type StoredObjectApi,
   type StoredObjectByteStream,
 } from "@langwatch/stored-object-contract";
@@ -142,7 +143,12 @@ export class ExperimentAttachmentInputService {
     projectId: string;
     objectId: string;
   }): Promise<AttachmentBytes | null> {
-    const found = await this.storedObjects.readById({ projectId, id: objectId });
+    const found = await this.storedObjects
+      .readById({ projectId, id: objectId })
+      .catch((error: unknown) => {
+        if (error instanceof StoredObjectNotFoundError) return null;
+        throw error;
+      });
     if (!found || "status" in found) return null;
     if (found.row.purpose !== DATASET_ATTACHMENT_PURPOSE) {
       await found.stream[Symbol.asyncIterator]().return?.();

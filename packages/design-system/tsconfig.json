@@ -5,6 +5,7 @@
     "lib": ["es2023", "dom", "dom.iterable"],
     "jsx": "react-jsx",
     "noUncheckedIndexedAccess": true,
+    "types": ["vite/client"],
     "verbatimModuleSyntax": true,
 
     "rootDir": ".",

@@ -28,7 +28,7 @@ const renderHandled: RestErrorHandler = (error, c) => {
   return c.json({ error: "internal_server_error" }, 500);
 };
 
-type Credential = { organizationId: string; userId: string | null } | null;
+type Credential = { organizationId: string; userId: string | null };
 
 function mount(options: { credential?: Credential; onboarding?: Partial<OnboardingApi> } = {}) {
   const credential =
@@ -39,7 +39,7 @@ function mount(options: { credential?: Credential; onboarding?: Partial<Onboardi
   const hono = createRestRuntime({
     identity: {
       authenticate: () => ({
-        actor: credential?.userId ? { type: "user", id: credential.userId } : null,
+        actor: credential.userId ? { type: "user", id: credential.userId } : null,
         scope: { tier: "project", id: PROJECT },
       }),
     },

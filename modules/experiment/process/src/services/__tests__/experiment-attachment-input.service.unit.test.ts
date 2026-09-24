@@ -1,7 +1,11 @@
 /** @see specs/experiments-v3/attachment-inputs.feature */
 import { createApiFixture } from "@langwatch/api-fixture";
 import { HandledError } from "@langwatch/handled-error";
-import type { StoredObjectApi, StoredObjectFileRead } from "@langwatch/stored-object-contract";
+import {
+  StoredObjectNotFoundError,
+  type StoredObjectApi,
+  type StoredObjectFileRead,
+} from "@langwatch/stored-object-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryExperimentAttachmentLinkChannel } from "../../channels/memory/memory.experiment-attachment-link.channel.ts";
@@ -24,9 +28,9 @@ function setup(stored: StoredFile | null = null) {
   const closed: boolean[] = [];
   const storedObjects = createApiFixture<StoredObjectApi>(
     {
-      readById: async (input): Promise<StoredObjectFileRead | null> => {
+      readById: async (input): Promise<StoredObjectFileRead> => {
         reads.push(input);
-        if (!stored) return null;
+        if (!stored) throw new StoredObjectNotFoundError();
         const file = stored;
         const bytes = (): AsyncIterable<Uint8Array> => ({
           [Symbol.asyncIterator]: () => {

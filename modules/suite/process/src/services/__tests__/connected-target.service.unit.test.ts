@@ -15,7 +15,6 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import type { SuiteExecution } from "../../app/suite.app.ts";
-import type { SuiteRunReadRepository } from "../../repositories/suite-run.repository.ts";
 import type { SuiteRepository } from "../../repositories/suite.repository.ts";
 import { ConnectedTargetService } from "../connected-target.service.ts";
 import { SuiteService } from "../suite.service.ts";
@@ -163,7 +162,6 @@ function buildService(agents: AgentApi) {
     agents,
     prompts: {} as PromptApi,
     execution,
-    runRepository: {} as SuiteRunReadRepository,
     generateId: () => "suite_generated",
   });
   return { service, execute };

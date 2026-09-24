@@ -1,6 +1,6 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import type { BrowserSessionApi } from "@langwatch/auth-contract";
+import type { AuthApi } from "@langwatch/auth-contract";
 import { createTenantId } from "@langwatch/eventing";
 import {
   blobHolderSetKey,
@@ -44,101 +44,6 @@ class NoopQueuePayloadDecoder implements QueuePayloadDecoder {
   }
 }
 
-class NoopAuthService implements BrowserSessionApi {
-  requestNewAccountVerification(): never {
-    throw new Error("unused");
-  }
-  sendMyAddressConfirmation(): never {
-    throw new Error("unused");
-  }
-  findDialableIdentityProviderOrigins(): never {
-    throw new Error("unused");
-  }
-  countUsage(): never {
-    throw new Error("unused");
-  }
-  issuesOwnPasswords(): boolean {
-    return false;
-  }
-  offersTwoStepVerification(): never {
-    throw new Error("unused");
-  }
-  getSignedInWith(): never {
-    throw new Error("unused");
-  }
-  getSignInSecuritySettings(): never {
-    throw new Error("unused");
-  }
-  saveSignInSecuritySettings(): never {
-    throw new Error("unused");
-  }
-  releaseHeldAccount(): never {
-    throw new Error("unused");
-  }
-  /** Auth's cutover half, which nothing here exercises. */
-  async retireLegacySsoAccess(): Promise<{ retired: number; remaining: number }> {
-    return { retired: 0, remaining: 0 };
-  }
-
-  async countLegacySsoAccess(): Promise<number> {
-    return 0;
-  }
-
-  async findFederatedAccountProviders(): Promise<string[]> {
-    return [];
-  }
-
-  async listBrowserSessions(): Promise<never[]> {
-    return [];
-  }
-  async endBrowserSession(): Promise<{ ended: number }> {
-    return { ended: 0 };
-  }
-  async isWithinBudget(): Promise<Readonly<{ allowed: boolean }>> {
-    return { allowed: false };
-  }
-  async route(): Promise<never> {
-    throw new Error("not configured");
-  }
-  async addressIsRegistered(): Promise<boolean> {
-    return false;
-  }
-  async requestSignUpVerification(): Promise<void> {}
-  async completeSignUpVerification(): Promise<never> {
-    throw new Error("not configured");
-  }
-  async readInviteLanding(): Promise<never> {
-    throw new Error("not configured");
-  }
-  async requestFreshInvite(): Promise<void> {}
-  async resolveAuthProvider(): Promise<string> {
-    return "email";
-  }
-  async tryVerifyBrowserSession(): Promise<null> {
-    return null;
-  }
-
-  async tryResolveBrowserSession() {
-    return null;
-  }
-
-  async revokeAllBrowserSessions(): Promise<void> {}
-
-  async revokeBrowserSession(): Promise<void> {}
-
-  async revokeOtherBrowserSessions(): Promise<void> {}
-
-  offersPasskeys(): boolean {
-    return false;
-  }
-
-  async findCliAccessSession(): Promise<null> {
-    return null;
-  }
-
-  async revokeCliAccessToken(): Promise<void> {}
-}
-
 /**
  * The operator delete path against a live Redis.
  */
@@ -174,7 +79,7 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
       audit: { record: async () => undefined },
       auditLog: createApiFixture<AuditLogApi>(),
       users: {} as UserApi,
-      auth: new NoopAuthService(),
+      auth: createApiFixture<AuthApi>(),
       redis,
       queuePayloads: new NoopQueuePayloadDecoder(),
       scheduler: {

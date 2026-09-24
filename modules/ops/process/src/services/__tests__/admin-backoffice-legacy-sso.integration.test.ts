@@ -5,12 +5,13 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * the presentation registry. Spec: specs/identity/sso-onboarding-tiers.feature
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuthApi } from "@langwatch/auth-contract";
 import { explainHandledError } from "@langwatch/error-presentation/presentation";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 import { describe, expect, it } from "vitest";
 
 import { OpsOperations } from "../../app/ops-operations.ts";
-import { AuditStub, AuthStub, organizationEdit } from "./support/backoffice-doubles.ts";
+import { AuditStub, organizationEdit } from "./support/backoffice-doubles.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
 /** Reached only if the refusal fails to happen; every call here is a failure. */
@@ -38,7 +39,7 @@ function backoffice(connectionDecides = true) {
     auditLog: createApiFixture<AuditLogApi>(),
     adminEmails: ["olive@example.com"],
     users: new TestUserApi(),
-    auth: new AuthStub(),
+    auth: createApiFixture<AuthApi>(),
     ssoRouting: { connectionDecides: async () => connectionDecides },
     scheduler: {
       repository: {} as never,

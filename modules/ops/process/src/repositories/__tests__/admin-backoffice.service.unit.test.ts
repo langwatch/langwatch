@@ -1,4 +1,5 @@
-import type { BrowserSessionApi } from "@langwatch/auth-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { AuthApi } from "@langwatch/auth-contract";
 import type { AdminOperationInput } from "@langwatch/ops-contract";
 import type { UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -25,91 +26,12 @@ const user: UserProfile = {
 const updateProfileFake = (email = user.email) =>
   vi.fn(async (): Promise<UserProfile> => ({ ...user, email }));
 
-class AuthFake implements BrowserSessionApi {
-  requestNewAccountVerification(): never {
-    throw new Error("unused");
-  }
-  sendMyAddressConfirmation(): never {
-    throw new Error("unused");
-  }
-  findDialableIdentityProviderOrigins(): never {
-    throw new Error("unused");
-  }
-  countUsage(): never {
-    throw new Error("unused");
-  }
-  issuesOwnPasswords(): boolean {
-    return false;
-  }
-  offersTwoStepVerification(): never {
-    throw new Error("unused");
-  }
-  getSignedInWith(): never {
-    throw new Error("unused");
-  }
-  getSignInSecuritySettings(): never {
-    throw new Error("unused");
-  }
-  saveSignInSecuritySettings(): never {
-    throw new Error("unused");
-  }
-  releaseHeldAccount(): never {
-    throw new Error("unused");
-  }
-  /** Auth's cutover half, which nothing here exercises. */
-  async retireLegacySsoAccess(): Promise<{ retired: number; remaining: number }> {
-    return { retired: 0, remaining: 0 };
-  }
-
-  async countLegacySsoAccess(): Promise<number> {
-    return 0;
-  }
-
-  async findFederatedAccountProviders(): Promise<string[]> {
-    return [];
-  }
-
-  async listBrowserSessions(): Promise<never[]> {
-    return [];
-  }
-  async endBrowserSession(): Promise<{ ended: number }> {
-    return { ended: 0 };
-  }
-  async isWithinBudget(): Promise<Readonly<{ allowed: boolean }>> {
-    return { allowed: false };
-  }
-  async route(): Promise<never> {
-    throw new Error("not configured");
-  }
-  async addressIsRegistered(): Promise<boolean> {
-    return false;
-  }
-  async requestSignUpVerification(): Promise<void> {}
-  async completeSignUpVerification(): Promise<never> {
-    throw new Error("not configured");
-  }
-  async readInviteLanding(): Promise<never> {
-    throw new Error("not configured");
-  }
-  async requestFreshInvite(): Promise<void> {}
-  async resolveAuthProvider(): Promise<string> {
-    return "email";
-  }
-  tryVerifyBrowserSession = vi.fn(async () => null);
-  tryResolveBrowserSession = vi.fn(async () => null);
-  revokeAllBrowserSessions = vi.fn(async () => undefined);
-  revokeBrowserSession = vi.fn(async () => undefined);
-  revokeOtherBrowserSessions = vi.fn(async () => undefined);
-
-  offersPasskeys(): boolean {
-    return false;
-  }
-
-  async findCliAccessSession(): Promise<null> {
-    return null;
-  }
-
-  async revokeCliAccessToken(): Promise<void> {}
+function authFake() {
+  const revokeAllBrowserSessions = vi.fn(async () => undefined);
+  return {
+    revokeAllBrowserSessions,
+    auth: createApiFixture<AuthApi>({ revokeAllBrowserSessions }),
+  };
 }
 
 class RepositoryFake extends AdminBackofficeRepository {
@@ -141,8 +63,8 @@ describe("AdminBackofficeService user email updates", () => {
       return { ...user, email: "new@example.com" };
     });
     const users = new TestUserApi({ updateProfile, findById: async () => user });
-    const auth = new AuthFake();
-    auth.revokeAllBrowserSessions.mockImplementation(async () => {
+    const { auth, revokeAllBrowserSessions } = authFake();
+    revokeAllBrowserSessions.mockImplementation(async () => {
       order.push("sessions");
     });
     const service = AdminBackofficeService.create({
@@ -155,7 +77,7 @@ describe("AdminBackofficeService user email updates", () => {
     await service.execute(input(" NEW@example.com "));
 
     expect(updateProfile).toHaveBeenCalledWith({ id: user.id, email: "new@example.com" });
-    expect(auth.revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: user.id });
+    expect(revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: user.id });
     expect(order).toEqual(["profile", "sessions"]);
   });
 
@@ -163,7 +85,7 @@ describe("AdminBackofficeService user email updates", () => {
   it("does not revoke sessions for a normalized case-only change", async () => {
     const updateProfile = updateProfileFake();
     const users = new TestUserApi({ updateProfile, findById: async () => user });
-    const auth = new AuthFake();
+    const { auth, revokeAllBrowserSessions } = authFake();
     const service = AdminBackofficeService.create({
       repository: new RepositoryFake(),
       users,
@@ -173,15 +95,15 @@ describe("AdminBackofficeService user email updates", () => {
 
     await service.execute(input("ALICE@EXAMPLE.COM"));
 
-    expect(auth.revokeAllBrowserSessions).not.toHaveBeenCalled();
+    expect(revokeAllBrowserSessions).not.toHaveBeenCalled();
   });
 
   /** @scenario "A failed revocation still leaves the new backoffice email in place" */
   it("retains the profile update when browser-session revocation fails", async () => {
     const updateProfile = updateProfileFake("new@example.com");
     const users = new TestUserApi({ updateProfile, findById: async () => user });
-    const auth = new AuthFake();
-    auth.revokeAllBrowserSessions.mockRejectedValue(new Error("redis unavailable"));
+    const { auth, revokeAllBrowserSessions } = authFake();
+    revokeAllBrowserSessions.mockRejectedValue(new Error("redis unavailable"));
     const service = AdminBackofficeService.create({
       repository: new RepositoryFake(),
       users,
