@@ -1021,6 +1021,8 @@ never thinks about resolution at all. The per-module resolver adapters
   declares (`withResponse("protocol", { refusal })`). A body that does not parse is the handled 400
   `malformed_request` in every family, never a 500. A JSON route never borrows the protocol kind to reach the request: the caller
   arrives as `actor`/`scope` from the runtime's credential authentication (2026-09-23).
+- A key-authenticated door's actor carries the key's owner, set by the runtime's credential
+  authentication, so no handler or module looks the owner up itself (Alex, 2026-09-25).
 - `publicRoute`/raw results only for genuinely non-JSON protocols (SCIM,
   OAuth device flow, MCP streams, webhook raw bodies) and the documented
   `*-legacy.rest.ts` family, each carrying a one-line reason.
