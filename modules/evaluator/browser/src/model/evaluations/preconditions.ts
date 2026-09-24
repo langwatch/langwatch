@@ -196,8 +196,9 @@ export function checkEvaluatorRequiredFields({
 }): boolean {
   const evaluator = getEvaluatorDefinitions(evaluatorType);
 
+  const requiresContexts = evaluator?.requiredFields.includes("contexts");
   if (
-    evaluator?.requiredFields.includes("contexts") &&
+    requiresContexts &&
     !spans.some(
       (span) =>
         span.type === "rag" && extractRAGTextualContext((span as RAGSpan).contexts).length > 0,

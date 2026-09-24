@@ -184,6 +184,8 @@ export function GroupDetailDialog({
     ...pendingAdditions.map((a) => a.userId),
   ]);
 
+  const isLoadingDetail = detail.isLoading;
+
   return (
     <Dialog.Root
       open={open}
@@ -201,9 +203,8 @@ export function GroupDetailDialog({
         </Dialog.Header>
         <Dialog.CloseTrigger />
         <Dialog.Body pb={6}>
-          {detail.isLoading ? (
-            <Spinner />
-          ) : !d ? null : (
+          {isLoadingDetail && <Spinner />}
+          {!isLoadingDetail && d && (
             <VStack gap={5} align="stretch">
               {canManage && !d.scimSource && (
                 <Input

@@ -6,6 +6,7 @@ import { X } from "react-feather";
 import { useFormContext } from "react-hook-form";
 
 import type {
+  CheckPrecondition,
   CheckPreconditionFields,
   CheckPreconditionRule,
 } from "../../../model/evaluations/types.ts";
@@ -27,7 +28,7 @@ export const PreconditionsField = ({
   helper = "Conditions that must be met for this check to run",
 }: {
   runOn: React.ReactNode | null;
-  append: (value: any) => void;
+  append: (value: CheckPrecondition) => void;
   remove: (index: number) => void;
   fields: Record<"id", string>[];
   label?: string | React.ReactNode;

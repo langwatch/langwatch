@@ -29,6 +29,21 @@ function getEvaluatorDisplayName(evaluatorType: string): string {
   return evaluatorDisplayName(evaluatorDefinition.name);
 }
 
+function evaluatorKindDisplayName(
+  kind: EvaluatorListItemProps["evaluator"]["type"],
+  evaluatorType: string,
+): string {
+  if (kind === "workflow") return "Workflow";
+  if (kind === "code") return "Code";
+  return getEvaluatorDisplayName(evaluatorType);
+}
+
+function EvaluatorKindIcon({ kind }: { kind: EvaluatorListItemProps["evaluator"]["type"] }) {
+  if (kind === "workflow") return <Workflow size={16} />;
+  if (kind === "code") return <Code size={16} />;
+  return <CheckCircle size={16} />;
+}
+
 function stopPropagation(callback: () => void) {
   return (event: MouseEvent) => {
     event.stopPropagation();
@@ -46,12 +61,7 @@ export function EvaluatorListItem({
 }: EvaluatorListItemProps) {
   const config = evaluator.config as { evaluatorType?: string } | null;
   const evaluatorType = config?.evaluatorType ?? "";
-  const displayName =
-    evaluator.type === "workflow"
-      ? "Workflow"
-      : evaluator.type === "code"
-        ? "Code"
-        : getEvaluatorDisplayName(evaluatorType);
+  const displayName = evaluatorKindDisplayName(evaluator.type, evaluatorType);
 
   return (
     <Box
@@ -80,13 +90,7 @@ export function EvaluatorListItem({
     >
       <HStack gap={3} align="start">
         <Box color="green.fg" paddingTop={1}>
-          {evaluator.type === "workflow" ? (
-            <Workflow size={16} />
-          ) : evaluator.type === "code" ? (
-            <Code size={16} />
-          ) : (
-            <CheckCircle size={16} />
-          )}
+          <EvaluatorKindIcon kind={evaluator.type} />
         </Box>
         <VStack align="start" gap={0} flex={1}>
           <Text fontWeight="medium" fontSize="13px">

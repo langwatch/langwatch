@@ -123,6 +123,18 @@ ${buildGoResponseHandling(isGuardrail)}
 }`;
 }
 
+function nextStepInstruction({
+  isGuardrail,
+  isOutputMandatory,
+}: {
+  isGuardrail: boolean;
+  isOutputMandatory: boolean;
+}): string {
+  if (!isGuardrail) return "Then, pass in the message data to get the result of the evaluator:";
+  if (isOutputMandatory) return "Then, after calling your LLM, check for the guardrail:";
+  return "Then, either before or after calling your LLM, check for the guardrail:";
+}
+
 export function EvaluationManualIntegration({
   slug,
   evaluatorDefinition,
@@ -218,13 +230,7 @@ export function EvaluationManualIntegration({
         </Box>
         {(!isOutputMandatory || !isGuardrail) && (
           <>
-            <Text fontSize="14px">
-              {isGuardrail
-                ? isOutputMandatory
-                  ? "Then, after calling your LLM, check for the guardrail:"
-                  : "Then, either before or after calling your LLM, check for the guardrail:"
-                : "Then, pass in the message data to get the result of the evaluator:"}
-            </Text>
+            <Text fontSize="14px">{nextStepInstruction({ isGuardrail, isOutputMandatory })}</Text>
             <Box className="markdown" width="full">
               <RenderCode
                 code={`def llm_step():
@@ -315,13 +321,7 @@ ${
         </Text>
         {(!isOutputMandatory || !isGuardrail) && (
           <>
-            <Text fontSize="14px">
-              {isGuardrail
-                ? isOutputMandatory
-                  ? "Then, after calling your LLM, check for the guardrail:"
-                  : "Then, either before or after calling your LLM, check for the guardrail:"
-                : "Then, pass in the message data to get the result of the evaluator:"}
-            </Text>
+            <Text fontSize="14px">{nextStepInstruction({ isGuardrail, isOutputMandatory })}</Text>
             <Box className="markdown" width="full">
               <RenderCode
                 code={`import { LangWatch } from "langwatch";
@@ -370,13 +370,7 @@ ${
       </Text>
       {(!isOutputMandatory || !isGuardrail) && (
         <>
-          <Text fontSize="14px">
-            {isGuardrail
-              ? isOutputMandatory
-                ? "Then, after calling your LLM, check for the guardrail:"
-                : "Then, either before or after calling your LLM, check for the guardrail:"
-              : "Then, pass in the message data to get the result of the evaluator:"}
-          </Text>
+          <Text fontSize="14px">{nextStepInstruction({ isGuardrail, isOutputMandatory })}</Text>
           <Box className="markdown" width="full">
             <RenderCode
               code={buildGoEvaluationSnippet({
