@@ -9757,7 +9757,7 @@ importers:
         version: 5.48.1(rxjs@7.8.2)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
