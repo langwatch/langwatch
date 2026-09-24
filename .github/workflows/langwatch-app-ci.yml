@@ -500,6 +500,14 @@ jobs:
             # merge commit its two parents (branch head and main tip), which is
             # all the three-dot diff needs.
             git fetch --no-tags --deepen=1 origin "$GITHUB_REF"
+            # The 4-minute floor in test-unit-global-setup.ts is sized for one
+            # sharded slice (~315 files, ~3 min). This branch is unsharded and
+            # --changed selects every file whose module graph reaches the diff,
+            # which for a widely imported module is well over a slice: a run
+            # that selected 589 files was cut at 310 started with every result
+            # green. 12 minutes matches test-component's floor below and still
+            # cuts a finalize wedge long before the 25-minute job cap.
+            LANGWATCH_UNIT_HARD_FLOOR_MS=720000 \
             pnpm test:unit --run --changed origin/main --passWithNoTests \
               --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
               --dangerouslyIgnoreUnhandledErrors
