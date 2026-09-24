@@ -10,6 +10,7 @@ import {
   type StoredProjection,
 } from "@langwatch/eventing";
 import { EventingClickHouseReplayEventSource } from "@langwatch/eventing/server";
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
 
 import { TraceProjectionLeanEventingAdapter } from "../eventing.trace-projection-lean.service.ts";
@@ -79,30 +80,23 @@ function registered(store: StateProjectionStore<CounterState>): RegisteredStateP
 
 function replayRedis() {
   const calls: string[] = [];
-  const redis = {
-    sadd: vi.fn(async (_key: string, pauseKey: string) => {
-      calls.push(`pause:${pauseKey}`);
+  const redis = redisDouble({
+    sadd: vi.fn(async (_key: unknown, pauseKey: unknown) => {
+      calls.push(`pause:${String(pauseKey)}`);
       return 1;
     }),
     scan: vi.fn(async () => ["0", []] as [string, string[]]),
-    srem: vi.fn(async (_key: string, pauseKey: string) => {
-      calls.push(`unpause:${pauseKey}`);
+    srem: vi.fn(async (_key: unknown, pauseKey: unknown) => {
+      calls.push(`unpause:${String(pauseKey)}`);
       return 1;
     }),
     lpush: vi.fn(async () => 1),
-  } as unknown as ReplayContext["redis"];
+  });
   return { redis, calls };
 }
 
 /** Dry-run/guard sentinel: those paths must not touch the pause seam. */
-const forbiddenRedis = new Proxy(
-  {},
-  {
-    get() {
-      throw new Error("this replay path must not touch redis");
-    },
-  },
-) as unknown as ReplayContext["redis"];
+const forbiddenRedis = redisDouble();
 
 describe("replayStateProjection", () => {
   it("reads canonical events, groups by tenant + key, and rebuilds each store row from init", async () => {
@@ -304,7 +298,7 @@ describe("replayStateProjection", () => {
 describe("the fold/map engine with state projections", () => {
   it("rejects a config carrying state projections rather than silently skipping them", async () => {
     const { store } = spyStore();
-    const ctx = {
+    const ctx: ReplayContext = {
       redis: forbiddenRedis,
       eventSource: new EventingClickHouseReplayEventSource({
         resolveClient: async () => {
@@ -313,7 +307,7 @@ describe("the fold/map engine with state projections", () => {
         lean: TraceProjectionLeanEventingAdapter.leanReplayEvent,
       }),
       accumulatorOpts: {},
-    } as unknown as ReplayContext;
+    };
 
     await expect(
       runFoldMapReplay({

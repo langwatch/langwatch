@@ -9,8 +9,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
+import { blobStoreResolving } from "../../../services/__tests__/support/trace-blob-store.support.ts";
 import type { TraceBlobStoreService } from "../../../services/trace-blob-store.service.ts";
-import { BlobNotFoundError } from "../../../services/trace-blob-store.service.ts";
 import { TraceIOExtractionService } from "../../../services/trace-io-extraction.service.ts";
 import { TraceOffloadResolutionService } from "../../../services/trace-offload-resolution.service.ts";
 import type * as traceLegacyReadRepositoryModule from "../trace-legacy-read.repository.ts";
@@ -130,31 +130,6 @@ function makeSpanRowWithEventRef(traceId: string, spanId: string) {
 }
 
 /**
- * Builds a fake TraceBlobStoreService whose getFromEventLog resolves from a static map.
- */
-function makeEventRefBlobStore(contents: Record<string, string>): TraceBlobStoreService {
-  return {
-    getFromEventLog: vi.fn(
-      async ({
-        field,
-      }: {
-        eventId: string;
-        field: string;
-        tenantId: string;
-        aggregateType: string;
-        aggregateId: string;
-      }) => {
-        if (field in contents) return contents[field]!;
-        throw new BlobNotFoundError("evt-test", field, "proj-1");
-      },
-    ),
-    putSpool: vi.fn(),
-    getSpool: vi.fn(),
-    deleteSpool: vi.fn(),
-  } as unknown as TraceBlobStoreService;
-}
-
-/**
  * Set up the CH queries fetchTracesWithSpansJoined fires: a light resolve
  * (min/max OccurredAt) for the hint-less path, then the summary and span reads.
  */
@@ -190,7 +165,7 @@ describe("TraceLegacyReadClickHouseRepository — eventref resolution seam (ADR-
     const mod = await import("../trace-legacy-read.repository.ts");
     TraceLegacyReadClickHouseRepository = mod.TraceLegacyReadClickHouseRepository;
 
-    blobStore = makeEventRefBlobStore({ "langwatch.output": fullOutput });
+    blobStore = blobStoreResolving({ "langwatch.output": fullOutput });
     traceCanonicalisation = TraceCanonicalisationService.create();
     const ioExtractionService = TraceIOExtractionService.create(traceCanonicalisation);
     const logger = createLogger("test");

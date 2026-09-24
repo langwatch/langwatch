@@ -8,6 +8,8 @@ import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-con
 import { createRestRuntime } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
+import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
@@ -17,7 +19,7 @@ import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { TraceLegacyCredentialService } from "../../services/trace-legacy-credential.service.ts";
-import type { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
+import { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
 import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
 import { traceLegacyRest } from "../../transport/trace-legacy.rest.ts";
 import {
@@ -58,6 +60,15 @@ function bootTraceApp(options: {
   const authz = createApiFixture<AuthzApi>({
     hasApiKeyPermission: vi.fn(async () => true),
   });
+  const protections = TraceViewerProtectionService.create({
+    authz,
+    projects: createApiFixture<ProjectApi>({}, "projects"),
+    plans: createApiFixture<PlanProvider>({}, "plans"),
+    dataPrivacy: createApiFixture<DataPrivacyApi>({}, "data privacy"),
+    fallbackVisibilityDays: 30,
+    processName: "test",
+  });
+  vi.spyOn(protections, "resolveForApiKey").mockResolvedValue({ canSeeCosts: true });
   const unread = () => Promise.reject(new Error("this suite reads a trace only by id"));
   const read: TraceLegacyRead = {
     findById,
@@ -106,9 +117,7 @@ function bootTraceApp(options: {
     } as ProjectApi,
     requestBounds: createTraceTestRequestBounds(),
     exportBounds: null,
-    protections: {
-      resolveForApiKey: async () => ({ canSeeCosts: true }),
-    } as unknown as TraceViewerProtectionService,
+    protections,
     legacyCredential: TraceLegacyCredentialService.create({ apiKeys, authz }),
   });
 

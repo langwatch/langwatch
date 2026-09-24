@@ -28,8 +28,8 @@ import {
   NormalizedStatusCode,
 } from "@langwatch/trace-contract";
 
+import { blobStoreResolving } from "../../__tests__/support/trace-blob-store.support.ts";
 import type { TraceBlobStoreService } from "../../trace-blob-store.service.ts";
-import { BlobNotFoundError } from "../../trace-blob-store.service.ts";
 import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
 
 // ---------------------------------------------------------------------------
@@ -80,34 +80,6 @@ function createMockLogger() {
   };
 }
 
-/**
- * Creates a fake TraceBlobStoreService whose getFromEventLog returns a pre-configured map
- * of field → fullValue for the given eventId / aggregateId combination.
- */
-function fakeBlobStore(resolvedValues: Record<string, string>): TraceBlobStoreService {
-  return {
-    getFromEventLog: vi.fn(
-      async ({
-        field,
-      }: {
-        eventId: string;
-        field: string;
-        tenantId: string;
-        aggregateType: string;
-        aggregateId: string;
-      }) => {
-        if (field in resolvedValues) {
-          return resolvedValues[field]!;
-        }
-        throw new BlobNotFoundError("evt-test", field, "proj-1");
-      },
-    ),
-    putSpool: vi.fn(),
-    getSpool: vi.fn(),
-    deleteSpool: vi.fn(),
-  } as unknown as TraceBlobStoreService;
-}
-
 const realIOService = TraceIOExtractionService.create(TraceCanonicalisationService.create());
 
 // ---------------------------------------------------------------------------
@@ -134,7 +106,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces()", () => {
       let result: Awaited<ReturnType<typeof TraceOffloadResolutionService.resolveOffloadedTraces>>;
 
       beforeEach(async () => {
-        const blobSvc = fakeBlobStore({ "langwatch.output": fullOutput });
+        const blobSvc = blobStoreResolving({ "langwatch.output": fullOutput });
         const logger = createMockLogger();
 
         result = await TraceOffloadResolutionService.resolveOffloadedTraces({
@@ -181,7 +153,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces()", () => {
         const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [span],
-          blobStore: fakeBlobStore({ "langwatch.output": "full output" }),
+          blobStore: blobStoreResolving({ "langwatch.output": "full output" }),
           ioExtractionService: realIOService,
           logger: createMockLogger(),
         });
@@ -205,7 +177,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces()", () => {
 
     describe("when resolved", () => {
       it("returns spans unchanged", async () => {
-        const blobSvc = fakeBlobStore({});
+        const blobSvc = blobStoreResolving({});
         const logger = createMockLogger();
 
         const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
@@ -220,8 +192,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces()", () => {
       });
 
       it("calls TraceBlobStoreService.getFromEventLog zero times", async () => {
-        const blobSvc = fakeBlobStore({});
-        const getFromEventLogSpy = blobSvc.getFromEventLog as ReturnType<typeof vi.fn>;
+        const blobSvc = blobStoreResolving({});
         const logger = createMockLogger();
 
         await TraceOffloadResolutionService.resolveOffloadedTraces({
@@ -232,11 +203,11 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces()", () => {
           logger,
         });
 
-        expect(getFromEventLogSpy).not.toHaveBeenCalled();
+        expect(blobSvc.getFromEventLog).not.toHaveBeenCalled();
       });
 
       it("anyResolved is false", async () => {
-        const blobSvc = fakeBlobStore({});
+        const blobSvc = blobStoreResolving({});
         const logger = createMockLogger();
 
         const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
@@ -266,14 +237,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces()", () => {
     });
 
     function failingBlobStore(): TraceBlobStoreService {
-      return {
-        getFromEventLog: vi.fn(async () => {
-          throw new BlobNotFoundError("evt-test", "langwatch.output", "proj-1");
-        }),
-        putSpool: vi.fn(),
-        getSpool: vi.fn(),
-        deleteSpool: vi.fn(),
-      } as unknown as TraceBlobStoreService;
+      return blobStoreResolving({});
     }
 
     describe("when resolved", () => {
@@ -349,7 +313,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces()", () => {
 
     describe("when resolved", () => {
       it("strips the reserved eventref key from returned span attributes", async () => {
-        const blobSvc = fakeBlobStore({});
+        const blobSvc = blobStoreResolving({});
         const logger = createMockLogger();
 
         const result = await TraceOffloadResolutionService.resolveOffloadedTraces({

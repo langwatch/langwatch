@@ -6,10 +6,11 @@ import type {
 } from "@langwatch/trace-contract";
 /** AC1 export wiring: proves TraceService is used and both modes resolve
  * blobs to prevent truncation data loss. */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { TraceExportService } from "../../trace-export.service.ts";
 import type { TraceLegacyReadService } from "../../trace-legacy-read.service.ts";
+import { legacyReadAnswering } from "./support/trace-legacy-read.support.ts";
 
 const protections: Protections = {
   canSeeCapturedInput: true,
@@ -37,38 +38,36 @@ function buildOptionsCapturingTraceService(): {
   optionsSeen: GetAllTracesForProjectOptions[];
 } {
   const optionsSeen: GetAllTracesForProjectOptions[] = [];
-  const traceService = {
-    getAllTracesForProject: vi.fn(
-      async (
-        _input: unknown,
-        _protections: unknown,
-        options: GetAllTracesForProjectOptions,
-      ): Promise<TracesForProjectResult> => {
-        optionsSeen.push(options);
-        // A complete-enough Trace so the real CSV/JSON serializers run.
-        const trace = {
-          trace_id: "t1",
-          project_id: "proj-1",
-          metadata: {},
-          timestamps: {
-            started_at: 1_700_000_000_000,
-            inserted_at: 1_700_000_001_000,
-            updated_at: 1_700_000_002_000,
-          },
-          input: { value: "hello" },
-          output: { value: "world" },
-          spans: [],
-          evaluations: [],
-        };
-        return {
-          groups: [[trace as never]],
-          totalHits: 1,
-          traceChecks: {},
-          scrollId: undefined,
-        } as TracesForProjectResult;
-      },
-    ),
-  } as unknown as TraceLegacyReadService;
+  const traceService = legacyReadAnswering(
+    async (
+      _input: unknown,
+      _protections: unknown,
+      options?: GetAllTracesForProjectOptions,
+    ): Promise<TracesForProjectResult> => {
+      optionsSeen.push(options ?? {});
+      // A complete-enough Trace so the real CSV/JSON serializers run.
+      const trace = {
+        trace_id: "t1",
+        project_id: "proj-1",
+        metadata: {},
+        timestamps: {
+          started_at: 1_700_000_000_000,
+          inserted_at: 1_700_000_001_000,
+          updated_at: 1_700_000_002_000,
+        },
+        input: { value: "hello" },
+        output: { value: "world" },
+        spans: [],
+        evaluations: [],
+      };
+      return {
+        groups: [[trace as never]],
+        totalHits: 1,
+        traceChecks: {},
+        scrollId: undefined,
+      } as TracesForProjectResult;
+    },
+  );
   return { traceService, optionsSeen };
 }
 

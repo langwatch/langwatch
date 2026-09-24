@@ -6,7 +6,6 @@ import type {
 } from "@langwatch/annotation-contract";
 import type {
   Protections,
-  ProjectableTrace,
   ProjectionFrom,
   GetAllTracesForProjectInput,
 } from "@langwatch/trace-contract";
@@ -341,7 +340,7 @@ async function projectedSearch({
     traces: results!.groups.flat(),
     traceChecks: results!.traceChecks,
   });
-  return enriched.map((t) => compiled.project(t as unknown as ProjectableTrace));
+  return enriched.map((t) => compiled.project(t));
 }
 
 describe.skipIf(!clickHouseConfigured)("trace search projection (integration)", () => {

@@ -1,4 +1,5 @@
 import type { EventingClickHouseReplayClient } from "@langwatch/eventing/server";
+import { clickHouseClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 
 /** One `event_log` row, as the replay reads it back. */
 export interface FakeEventLogRow {
@@ -161,7 +162,7 @@ export function makeFakeClickHouse(rows: FakeEventLogRow[]): {
   queries: string[];
 } {
   const queries: string[] = [];
-  const client = {
+  const client = clickHouseClientDouble({
     query: async ({
       query,
       query_params,
@@ -183,7 +184,7 @@ export function makeFakeClickHouse(rows: FakeEventLogRow[]): {
 
       throw new Error(`unexpected query: ${query.slice(0, 80)}`);
     },
-  };
+  });
 
-  return { client: client as unknown as EventingClickHouseReplayClient, queries };
+  return { client, queries };
 }

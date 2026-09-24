@@ -1,15 +1,20 @@
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { LogApi } from "@langwatch/log-contract";
 import type { Span } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
-import type { StoredLogRecordRow } from "../../repositories/log-record-storage.repository.ts";
+import {
+  NullLogRecordStorageRepository,
+  type StoredLogRecordRow,
+} from "../../repositories/log-record-storage.repository.ts";
 /**
  * Tests Claude Code log enrichment: joins llm_request spans (tokens + request_id) with
  * message content from OTLP log records. Tests gate, join, and best-effort degradation.
  */
 import { ClaudeCodeLogEnrichmentService } from "../claude-code-log-enrichment.service.ts";
-import type { LogRecordStorageService } from "../trace-log-record-read.service.ts";
+import { LogRecordStorageService } from "../trace-log-record-read.service.ts";
 
 const PROJECT_ID = "project_test";
 const TRACE_ID = "a3c6656cf433e97549f654034be02955";
@@ -75,7 +80,12 @@ const LIGHT_LOGS: StoredLogRecordRow[] = [
 function logStore(
   getLogsByTraceId: LogRecordStorageService["getLogsByTraceId"],
 ): LogRecordStorageService {
-  return { getLogsByTraceId } as unknown as LogRecordStorageService;
+  const store = LogRecordStorageService.create({
+    repository: new NullLogRecordStorageRepository(),
+    canonical: createApiFixture<LogApi>(),
+  });
+  vi.spyOn(store, "getLogsByTraceId").mockImplementation(getLogsByTraceId);
+  return store;
 }
 
 function enrich({ spans, logRecords }: { spans: Span[]; logRecords: LogRecordStorageService }) {

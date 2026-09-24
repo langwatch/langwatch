@@ -24,7 +24,8 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-import type { TraceEditOverlayService } from "../trace-edit-overlay.service.ts";
+import { MemoryTraceEditOverlayRepository } from "../../repositories/memory/memory.trace-edit-overlay.repository.ts";
+import { TraceEditOverlayService } from "../trace-edit-overlay.service.ts";
 import { TraceLegacyReadService } from "../trace-legacy-read.service.ts";
 
 const PROJECT_ID = "project_test";
@@ -67,6 +68,8 @@ function traceOutputPatch(value: string) {
 }
 
 function makeService(): TraceLegacyReadService {
+  const editOverlay = TraceEditOverlayService.create(MemoryTraceEditOverlayRepository.create());
+  vi.spyOn(editOverlay, "getPatchesByTraceIds").mockImplementation(mockGetPatchesByTraceIds);
   return TraceLegacyReadService.create({
     traceCanonicalisation: {} as TraceCanonicalisationService,
     traceRead: {
@@ -80,9 +83,7 @@ function makeService(): TraceLegacyReadService {
       findTopicCounts: vi.fn(),
       findSpanForPromptStudio: vi.fn(),
     },
-    editOverlay: {
-      getPatchesByTraceIds: mockGetPatchesByTraceIds,
-    } as unknown as TraceEditOverlayService,
+    editOverlay,
     evaluationService: refusingEvaluations(),
   });
 }

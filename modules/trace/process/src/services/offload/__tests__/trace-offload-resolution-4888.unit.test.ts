@@ -32,6 +32,11 @@ import {
   NormalizedStatusCode,
 } from "@langwatch/trace-contract";
 
+import {
+  blobStoreReading,
+  blobStoreResolving,
+  blobStoreWithoutClickHouse,
+} from "../../__tests__/support/trace-blob-store.support.ts";
 import type { TraceBlobStoreService } from "../../trace-blob-store.service.ts";
 import { BlobFieldNotFoundError, BlobNotFoundError } from "../../trace-blob-store.service.ts";
 import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
@@ -82,43 +87,6 @@ function createMockLogger() {
     info: vi.fn(),
     debug: vi.fn(),
   };
-}
-
-function fakeBlobStore(resolvedValues: Record<string, string>): TraceBlobStoreService {
-  return {
-    getFromEventLog: vi.fn(
-      async ({
-        field,
-      }: {
-        eventId: string;
-        field: string;
-        tenantId: string;
-        aggregateType: string;
-        aggregateId: string;
-      }) => {
-        if (field in resolvedValues) return resolvedValues[field]!;
-        throw new BlobNotFoundError("evt-test", field, "proj-1");
-      },
-    ),
-    putSpool: vi.fn(),
-    getSpool: vi.fn(),
-    deleteSpool: vi.fn(),
-  } as unknown as TraceBlobStoreService;
-}
-
-/**
- * Builds a TraceBlobStoreService whose getFromEventLog throws "ClickHouseClient not
- * configured" — simulates a CH-unconfigured deployment (AC5 third arm).
- */
-function unconfiguredBlobStore(): TraceBlobStoreService {
-  return {
-    getFromEventLog: vi.fn(async () => {
-      throw new Error("ClickHouseClient not configured — cannot read from event_log (ADR-022)");
-    }),
-    putSpool: vi.fn(),
-    getSpool: vi.fn(),
-    deleteSpool: vi.fn(),
-  } as unknown as TraceBlobStoreService;
 }
 
 const realIOService = TraceIOExtractionService.create(TraceCanonicalisationService.create());
@@ -182,7 +150,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC1: >64 KB
         >;
 
         beforeEach(async () => {
-          const blobSvc = fakeBlobStore({ [attrKey]: fullValue });
+          const blobSvc = blobStoreResolving({ [attrKey]: fullValue });
           const logger = createMockLogger();
 
           result = await TraceOffloadResolutionService.resolveOffloadedTraces({
@@ -244,7 +212,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC1: >64 KB
       let result: Awaited<ReturnType<typeof TraceOffloadResolutionService.resolveOffloadedTraces>>;
 
       beforeEach(async () => {
-        const blobSvc = fakeBlobStore({ [attrKey]: fullValue });
+        const blobSvc = blobStoreResolving({ [attrKey]: fullValue });
         const logger = createMockLogger();
 
         result = await TraceOffloadResolutionService.resolveOffloadedTraces({
@@ -290,7 +258,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC3: eventr
 
     describe("when resolved", () => {
       it("getFromEventLog is called exactly once (resolution attempted)", async () => {
-        const blobSvc = fakeBlobStore({ [attrKey]: fullValue });
+        const blobSvc = blobStoreResolving({ [attrKey]: fullValue });
         const logger = createMockLogger();
 
         await TraceOffloadResolutionService.resolveOffloadedTraces({
@@ -305,7 +273,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC3: eventr
       });
 
       it("no key with prefix 'langwatch.reserved.' remains in returned span attributes", async () => {
-        const blobSvc = fakeBlobStore({ [attrKey]: fullValue });
+        const blobSvc = blobStoreResolving({ [attrKey]: fullValue });
         const logger = createMockLogger();
 
         const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
@@ -322,7 +290,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC3: eventr
       });
 
       it("the resolved span attribute carries the full value from event_log", async () => {
-        const blobSvc = fakeBlobStore({ [attrKey]: fullValue });
+        const blobSvc = blobStoreResolving({ [attrKey]: fullValue });
         const logger = createMockLogger();
 
         const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
@@ -353,7 +321,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC4: no-eve
 
     describe("when resolved with any caller opts", () => {
       it("getFromEventLog is called 0 times", async () => {
-        const blobSvc = fakeBlobStore({});
+        const blobSvc = blobStoreResolving({});
         const logger = createMockLogger();
 
         await TraceOffloadResolutionService.resolveOffloadedTraces({
@@ -368,7 +336,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC4: no-eve
       });
 
       it("returns spans unchanged (same object reference)", async () => {
-        const blobSvc = fakeBlobStore({});
+        const blobSvc = blobStoreResolving({});
         const logger = createMockLogger();
 
         const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
@@ -383,7 +351,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC4: no-eve
       });
 
       it("anyResolved is false", async () => {
-        const blobSvc = fakeBlobStore({});
+        const blobSvc = blobStoreResolving({});
         const logger = createMockLogger();
 
         const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
@@ -398,7 +366,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC4: no-eve
       });
 
       it("span attribute value is unchanged (preview equals original)", async () => {
-        const blobSvc = fakeBlobStore({});
+        const blobSvc = blobStoreResolving({});
         const logger = createMockLogger();
 
         const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
@@ -438,14 +406,9 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC5: resolu
   // --- BlobNotFoundError ---
   describe("given getFromEventLog throws BlobNotFoundError", () => {
     function blobNotFoundStore(): TraceBlobStoreService {
-      return {
-        getFromEventLog: vi.fn(async () => {
-          throw new BlobNotFoundError("evt-fail", attrKey, "proj-1");
-        }),
-        putSpool: vi.fn(),
-        getSpool: vi.fn(),
-        deleteSpool: vi.fn(),
-      } as unknown as TraceBlobStoreService;
+      return blobStoreReading(async () => {
+        throw new BlobNotFoundError("evt-fail", attrKey, "proj-1");
+      });
     }
 
     describe("when resolved", () => {
@@ -505,14 +468,9 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC5: resolu
   // --- BlobFieldNotFoundError ---
   describe("given getFromEventLog throws BlobFieldNotFoundError", () => {
     function blobFieldNotFoundStore(): TraceBlobStoreService {
-      return {
-        getFromEventLog: vi.fn(async () => {
-          throw new BlobFieldNotFoundError("evt-fail", attrKey);
-        }),
-        putSpool: vi.fn(),
-        getSpool: vi.fn(),
-        deleteSpool: vi.fn(),
-      } as unknown as TraceBlobStoreService;
+      return blobStoreReading(async () => {
+        throw new BlobFieldNotFoundError("evt-fail", attrKey);
+      });
     }
 
     describe("when resolved", () => {
@@ -564,7 +522,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC5: resolu
           TraceOffloadResolutionService.resolveOffloadedTraces({
             projectId: "proj-1",
             normalizedSpans: [spanWithRef],
-            blobStore: unconfiguredBlobStore(),
+            blobStore: blobStoreWithoutClickHouse(),
             ioExtractionService: realIOService,
             logger,
           }),
@@ -576,7 +534,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC5: resolu
         const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
-          blobStore: unconfiguredBlobStore(),
+          blobStore: blobStoreWithoutClickHouse(),
           ioExtractionService: realIOService,
           logger,
         });
@@ -588,7 +546,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC5: resolu
         await TraceOffloadResolutionService.resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
-          blobStore: unconfiguredBlobStore(),
+          blobStore: blobStoreWithoutClickHouse(),
           ioExtractionService: realIOService,
           logger,
         });
@@ -625,7 +583,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC6: partia
       let result: Awaited<ReturnType<typeof TraceOffloadResolutionService.resolveOffloadedTraces>>;
 
       beforeEach(async () => {
-        const blobSvc = fakeBlobStore({ [largeAttr]: fullValue });
+        const blobSvc = blobStoreResolving({ [largeAttr]: fullValue });
         const logger = createMockLogger();
 
         result = await TraceOffloadResolutionService.resolveOffloadedTraces({
@@ -671,25 +629,20 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC6: partia
     });
 
     function partialBlobStore(): TraceBlobStoreService {
-      return {
-        getFromEventLog: vi.fn(
-          async ({
-            field,
-          }: {
-            eventId: string;
-            field: string;
-            tenantId: string;
-            aggregateType: string;
-            aggregateId: string;
-          }) => {
-            if (field === attrA) return fullValue;
-            throw new BlobNotFoundError("evt-b", field, "proj-1");
-          },
-        ),
-        putSpool: vi.fn(),
-        getSpool: vi.fn(),
-        deleteSpool: vi.fn(),
-      } as unknown as TraceBlobStoreService;
+      return blobStoreReading(
+        async ({
+          field,
+        }: {
+          eventId: string;
+          field: string;
+          tenantId: string;
+          aggregateType: string;
+          aggregateId: string;
+        }) => {
+          if (field === attrA) return fullValue;
+          throw new BlobNotFoundError("evt-b", field, "proj-1");
+        },
+      );
     }
 
     describe("when resolved", () => {

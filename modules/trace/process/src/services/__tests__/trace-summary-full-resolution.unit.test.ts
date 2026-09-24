@@ -29,10 +29,9 @@ import {
   NullSpanStorageRepository,
   type SpanStorageRepository,
 } from "../../repositories/span-storage.repository.ts";
-import type { TraceBlobStoreService } from "../trace-blob-store.service.ts";
-import { BlobNotFoundError } from "../trace-blob-store.service.ts";
 import { TraceIOExtractionService } from "../trace-io-extraction.service.ts";
 import { TraceSummaryService } from "../trace-summary-read.service.ts";
+import { blobStoreResolving } from "./support/trace-blob-store.support.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers — mirrors resolve-offloaded-traces.unit.test.ts's fixtures.
@@ -71,18 +70,6 @@ function makeSpan(
     nonBilledCost: null,
     ...overrides,
   } as NormalizedSpan;
-}
-
-function fakeBlobStore(resolvedValues: Record<string, string>): TraceBlobStoreService {
-  return {
-    getFromEventLog: vi.fn(async ({ field }: { field: string }) => {
-      if (field in resolvedValues) return resolvedValues[field]!;
-      throw new BlobNotFoundError("evt-test", field, "proj-1");
-    }),
-    putSpool: vi.fn(),
-    getSpool: vi.fn(),
-    deleteSpool: vi.fn(),
-  } as unknown as TraceBlobStoreService;
 }
 
 const realIOService = TraceIOExtractionService.create(TraceCanonicalisationService.create());
@@ -148,7 +135,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
           } as never,
           fullResolutionDeps: {
             spanStorageRepository: makeSpanRepo([spanWithRef]),
-            blobStore: fakeBlobStore({ "langwatch.input": fullInput }),
+            blobStore: blobStoreResolving({ "langwatch.input": fullInput }),
             ioExtractionService: realIOService,
           },
         });
@@ -171,7 +158,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
           } as never,
           fullResolutionDeps: {
             spanStorageRepository: spanRepo,
-            blobStore: fakeBlobStore({ "langwatch.input": fullInput }),
+            blobStore: blobStoreResolving({ "langwatch.input": fullInput }),
             ioExtractionService: realIOService,
           },
         });
@@ -189,7 +176,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
       const plainSpan = makeSpan({
         spanAttributes: { "langwatch.input": "small input, never offloaded" },
       });
-      const blobStore = fakeBlobStore({});
+      const blobStore = blobStoreResolving({});
       const service = TraceSummaryService.create({
         repository: {
           findByTraceId: vi.fn().mockResolvedValue(makeSummary()),
@@ -229,7 +216,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
         } as never,
         fullResolutionDeps: {
           spanStorageRepository: makeSpanRepo([spanWithBadRef]),
-          blobStore: fakeBlobStore({}), // nothing resolves — always throws BlobNotFoundError
+          blobStore: blobStoreResolving({}), // nothing resolves — always throws BlobNotFoundError
           ioExtractionService: realIOService,
         },
       });
@@ -255,7 +242,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
               .fn()
               .mockRejectedValue(new Error("ClickHouse unavailable")),
           }),
-          blobStore: fakeBlobStore({}),
+          blobStore: blobStoreResolving({}),
           ioExtractionService: realIOService,
         },
       });

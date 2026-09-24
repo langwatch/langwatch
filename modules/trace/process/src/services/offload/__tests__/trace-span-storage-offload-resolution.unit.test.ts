@@ -35,8 +35,7 @@ import {
 
 import type { SpanStorageRepository } from "../../../repositories/span-storage.repository.ts";
 import { NullSpanStorageRepository } from "../../../repositories/span-storage.repository.ts";
-import type { TraceBlobStoreService } from "../../trace-blob-store.service.ts";
-import { BlobNotFoundError } from "../../trace-blob-store.service.ts";
+import { blobStoreResolving } from "../../__tests__/support/trace-blob-store.support.ts";
 import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
 import { SpanStorageService } from "../../trace-span-storage-read.service.ts";
 
@@ -93,18 +92,6 @@ function makeStubRepository(normalizedSpans: NormalizedSpan[]): SpanStorageRepos
   });
 }
 
-function makeBlobStore(resolvedValues: Record<string, string>): TraceBlobStoreService {
-  return {
-    getFromEventLog: vi.fn(async ({ field }: { field: string }) => {
-      if (field in resolvedValues) return resolvedValues[field]!;
-      throw new BlobNotFoundError("evt-test", field, "proj-1");
-    }),
-    putSpool: vi.fn(),
-    getSpool: vi.fn(),
-    deleteSpool: vi.fn(),
-  } as unknown as TraceBlobStoreService;
-}
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -128,7 +115,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
 
       beforeEach(() => {
         const repo = makeStubRepository([spanWithRef]);
-        const blobStore = makeBlobStore({ "langwatch.output": FULL_OUTPUT });
+        const blobStore = blobStoreResolving({ "langwatch.output": FULL_OUTPUT });
         service = SpanStorageService.create({
           repository: repo,
           blobResolutionDeps: {
@@ -177,7 +164,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
 
       beforeEach(() => {
         const repo = makeStubRepository([spanWithRef]);
-        const blobStore = makeBlobStore({ "langwatch.output": FULL_OUTPUT });
+        const blobStore = blobStoreResolving({ "langwatch.output": FULL_OUTPUT });
         service = SpanStorageService.create({
           repository: repo,
           blobResolutionDeps: {
@@ -229,13 +216,8 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
     describe("when getSpansByTraceId is called with BlobResolutionDeps wired", () => {
       it("returns the span with the output value unchanged", async () => {
         const repo = makeStubRepository([cleanSpan]);
-        const getFromEventLogSpy = vi.fn();
-        const blobStore = {
-          getFromEventLog: getFromEventLogSpy,
-          putSpool: vi.fn(),
-          getSpool: vi.fn(),
-          deleteSpool: vi.fn(),
-        } as unknown as TraceBlobStoreService;
+        const blobStore = blobStoreResolving({});
+        const getFromEventLogSpy = blobStore.getFromEventLog;
         const service = SpanStorageService.create({
           repository: repo,
           blobResolutionDeps: {
@@ -312,7 +294,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
     describe("when getSpansByTraceId is called with BlobResolutionDeps wired", () => {
       it("returns the preview value without throwing", async () => {
         const repo = makeStubRepository([spanWithRef]);
-        const blobStore = makeBlobStore({}); // empty — will throw BlobNotFoundError
+        const blobStore = blobStoreResolving({}); // empty — will throw BlobNotFoundError
         const service = SpanStorageService.create({
           repository: repo,
           blobResolutionDeps: {

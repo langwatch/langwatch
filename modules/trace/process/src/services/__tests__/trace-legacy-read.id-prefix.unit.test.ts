@@ -22,7 +22,8 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-import type { TraceEditOverlayService } from "../trace-edit-overlay.service.ts";
+import { MemoryTraceEditOverlayRepository } from "../../repositories/memory/memory.trace-edit-overlay.repository.ts";
+import { TraceEditOverlayService } from "../trace-edit-overlay.service.ts";
 import {
   AmbiguousTraceIdPrefixError,
   TraceLegacyReadService,
@@ -77,7 +78,7 @@ function makeService(): TraceLegacyReadService {
       findTopicCounts: vi.fn(),
       findSpanForPromptStudio: vi.fn(),
     },
-    editOverlay: { getPatchesByTraceIds: vi.fn() } as unknown as TraceEditOverlayService,
+    editOverlay: TraceEditOverlayService.create(MemoryTraceEditOverlayRepository.create()),
     evaluationService: refusingEvaluations(),
   });
 }

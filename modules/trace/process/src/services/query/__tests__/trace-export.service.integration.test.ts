@@ -11,10 +11,11 @@ import type {
  * Integration tests for TraceExportService: mocks TraceService (external
  * boundary) and verifies the async generator yields correct chunks with progress.
  */
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { TraceExportService } from "../../trace-export.service.ts";
 import type { TraceLegacyReadService } from "../../trace-legacy-read.service.ts";
+import { legacyReadAnswering } from "./support/trace-legacy-read.support.ts";
 
 const fullProtections: Protections = {
   canSeeCosts: true,
@@ -89,19 +90,17 @@ function buildMockTraceService(options: {
   evaluations?: Record<string, Evaluation[]>;
 }): TraceLegacyReadService {
   let callIndex = 0;
-  return {
-    getAllTracesForProject: vi.fn().mockImplementation(() => {
-      const batch = options.batches[callIndex] ?? [];
-      const result: TracesForProjectResult = {
-        groups: batch.map((t) => [t as any]),
-        totalHits: options.totalHits,
-        traceChecks: options.evaluations ?? {},
-        scrollId: callIndex < options.batches.length - 1 ? `scroll-${callIndex + 1}` : undefined,
-      };
-      callIndex++;
-      return Promise.resolve(result);
-    }),
-  } as unknown as TraceLegacyReadService;
+  return legacyReadAnswering(() => {
+    const batch = options.batches[callIndex] ?? [];
+    const result: TracesForProjectResult = {
+      groups: batch.map((t) => [t as any]),
+      totalHits: options.totalHits,
+      traceChecks: options.evaluations ?? {},
+      scrollId: callIndex < options.batches.length - 1 ? `scroll-${callIndex + 1}` : undefined,
+    };
+    callIndex++;
+    return Promise.resolve(result);
+  });
 }
 
 // ---------------------------------------------------------------------------

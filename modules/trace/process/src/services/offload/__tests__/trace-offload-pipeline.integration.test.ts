@@ -61,7 +61,8 @@ import {
 
 import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
-import { type TraceBlobStoreService, BlobNotFoundError } from "../../trace-blob-store.service.ts";
+import { blobStoreResolving } from "../../__tests__/support/trace-blob-store.support.ts";
+import { type TraceBlobStoreService } from "../../trace-blob-store.service.ts";
 import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
 
 // ---------------------------------------------------------------------------
@@ -85,31 +86,10 @@ function ioExtractionService(): TraceIOExtractionService {
  */
 function makeEventLogBlobStore(contents: Record<string, string>): {
   blobStore: TraceBlobStoreService;
-  getFromEventLogSpy: ReturnType<typeof vi.fn>;
+  getFromEventLogSpy: TraceBlobStoreService["getFromEventLog"];
 } {
-  const getFromEventLogSpy = vi.fn(
-    async ({
-      field,
-    }: {
-      eventId: string;
-      field: string;
-      tenantId: string;
-      aggregateType: string;
-      aggregateId: string;
-    }) => {
-      if (field in contents) return contents[field]!;
-      throw new BlobNotFoundError("evt-test", field, PROJECT_ID);
-    },
-  );
-
-  const blobStore = {
-    getFromEventLog: getFromEventLogSpy,
-    putSpool: vi.fn(),
-    getSpool: vi.fn(),
-    deleteSpool: vi.fn(),
-  } as unknown as TraceBlobStoreService;
-
-  return { blobStore, getFromEventLogSpy };
+  const blobStore = blobStoreResolving(contents);
+  return { blobStore, getFromEventLogSpy: blobStore.getFromEventLog };
 }
 
 /**
@@ -242,7 +222,7 @@ describe("given a span field value exceeds the offload threshold (IO_PREVIEW_BYT
     let resolvedResult: Awaited<
       ReturnType<typeof TraceOffloadResolutionService.resolveOffloadedTraces>
     >;
-    let getFromEventLogSpy: ReturnType<typeof vi.fn>;
+    let getFromEventLogSpy: TraceBlobStoreService["getFromEventLog"];
     let logger: WarnLogger;
 
     beforeEach(async () => {

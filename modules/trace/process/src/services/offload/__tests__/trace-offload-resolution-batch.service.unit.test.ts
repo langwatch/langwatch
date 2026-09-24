@@ -30,6 +30,7 @@ import {
   NormalizedStatusCode,
 } from "@langwatch/trace-contract";
 
+import { blobStoreReading } from "../../__tests__/support/trace-blob-store.support.ts";
 import { type TraceBlobStoreService, BlobNotFoundError } from "../../trace-blob-store.service.ts";
 import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
 
@@ -121,7 +122,7 @@ function makeConcurrencyTrackingBlobStore(fullValue: string): {
   let inFlight = 0;
   let peak = 0;
   let calls = 0;
-  const getFromEventLog = vi.fn(async () => {
+  const blobStore = blobStoreReading(async () => {
     calls++;
     inFlight++;
     peak = Math.max(peak, inFlight);
@@ -131,12 +132,7 @@ function makeConcurrencyTrackingBlobStore(fullValue: string): {
     return fullValue;
   });
   return {
-    blobStore: {
-      getFromEventLog,
-      putSpool: vi.fn(),
-      getSpool: vi.fn(),
-      deleteSpool: vi.fn(),
-    } as unknown as TraceBlobStoreService,
+    blobStore,
     getCalls: () => calls,
     peakConcurrency: () => peak,
   };
@@ -305,14 +301,9 @@ describe("TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch() — A
 describe("TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch() — AC7 graceful degradation", () => {
   describe("given one trace whose event_log row is missing", () => {
     function makeMissingRowBlobStore(): TraceBlobStoreService {
-      return {
-        getFromEventLog: vi.fn(async ({ field }: { field: string }) => {
-          throw new BlobNotFoundError("evt-missing", field, "proj-1");
-        }),
-        putSpool: vi.fn(),
-        getSpool: vi.fn(),
-        deleteSpool: vi.fn(),
-      } as unknown as TraceBlobStoreService;
+      return blobStoreReading(async ({ field }: { field: string }) => {
+        throw new BlobNotFoundError("evt-missing", field, "proj-1");
+      });
     }
 
     describe("when resolved as a batch", () => {
@@ -388,17 +379,12 @@ describe("TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch() — A
 
   describe("given a result set where one trace fails and others succeed", () => {
     function makeSelectiveBlobStore(goodValue: string): TraceBlobStoreService {
-      return {
-        getFromEventLog: vi.fn(async ({ eventId, field }: { eventId: string; field: string }) => {
-          if (eventId === "evt-bad") {
-            throw new BlobNotFoundError(eventId, field, "proj-1");
-          }
-          return goodValue;
-        }),
-        putSpool: vi.fn(),
-        getSpool: vi.fn(),
-        deleteSpool: vi.fn(),
-      } as unknown as TraceBlobStoreService;
+      return blobStoreReading(async ({ eventId, field }: { eventId: string; field: string }) => {
+        if (eventId === "evt-bad") {
+          throw new BlobNotFoundError(eventId, field, "proj-1");
+        }
+        return goodValue;
+      });
     }
 
     describe("when resolved as a batch", () => {
