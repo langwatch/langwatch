@@ -1,6 +1,7 @@
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import {
   GithubApi,
   type GithubApi as GithubApiContract,
@@ -222,6 +223,7 @@ export class GithubApp implements GithubApiContract {
     permissions: AuthzApi,
     auth: AuthApi,
     auditLog: AuditLogApi,
+    codingAgents: CodingAgentApi,
   };
   static readonly config = githubConfig;
   static readonly secrets = {
@@ -235,6 +237,7 @@ export class GithubApp implements GithubApiContract {
   readonly #permissions: AuthzApi;
   readonly #auth: AuthApi;
   readonly #auditLog: AuditLogApi;
+  readonly #codingAgents: CodingAgentApi;
 
   private constructor(parts: {
     service: GithubApiContract;
@@ -243,6 +246,7 @@ export class GithubApp implements GithubApiContract {
     permissions: AuthzApi;
     auth: AuthApi;
     auditLog: AuditLogApi;
+    codingAgents: CodingAgentApi;
   }) {
     this.#service = parts.service;
     this.#branchMaintenance = parts.branchMaintenance;
@@ -250,6 +254,7 @@ export class GithubApp implements GithubApiContract {
     this.#permissions = parts.permissions;
     this.#auth = parts.auth;
     this.#auditLog = parts.auditLog;
+    this.#codingAgents = parts.codingAgents;
   }
 
   /**
@@ -415,6 +420,7 @@ export class GithubApp implements GithubApiContract {
       permissions: dependencies.permissions,
       auth: dependencies.auth,
       auditLog: dependencies.auditLog,
+      codingAgents: dependencies.codingAgents,
     });
   }
 
@@ -438,6 +444,9 @@ export class GithubApp implements GithubApiContract {
   }
   recordAudit(entry: GithubConnectionAuditEntry): Promise<void> {
     return this.#auditLog.record(entry);
+  }
+  async backfillPullRequestMappings(input: { organizationId: string }): Promise<void> {
+    await this.#codingAgents.backfillPullRequestMappings(input);
   }
 
   /** The fleet-wide branch sweep `github_maintenance` schedules. */

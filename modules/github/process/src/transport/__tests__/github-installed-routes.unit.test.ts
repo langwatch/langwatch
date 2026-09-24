@@ -7,6 +7,7 @@ import { BearerIdentity, RestHost, UnauthorizedError } from "@langwatch/api/rest
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { GithubApi } from "@langwatch/github-contract";
 import { createApp } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -57,6 +58,7 @@ async function installedGithub(
             : null,
       }),
       "audit-log": createApiFixture<AuditLogApi>({}),
+      "coding-agent": createApiFixture<CodingAgentApi>({}),
     })
     .boot();
 }
