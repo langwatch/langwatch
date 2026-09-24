@@ -57,9 +57,6 @@ const suitesGetAllQuery = vi.fn();
 
 vi.mock("~/utils/api", () => ({
   api: {
-    checkup: {
-      startupNotice: { useQuery: () => ({ data: undefined }) },
-    },
     scenarios: {
       getSuiteRunData: {
         useQuery: (...args: unknown[]) => suiteRunDataQuery(...args),

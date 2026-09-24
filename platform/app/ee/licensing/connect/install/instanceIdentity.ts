@@ -107,7 +107,6 @@ export interface InstanceIdentityRow {
   readonly lastReportError: string | null;
   readonly optionalMetricsOptOut: boolean;
   readonly hostnameOptOut: boolean;
-  readonly startupNoticeAcknowledgedSchemaVersion: number;
 }
 
 /** The row as it stands, or null where this install has never minted one. */
@@ -123,35 +122,7 @@ export async function readInstanceIdentityRow(
       lastReportError: true,
       optionalMetricsOptOut: true,
       hostnameOptOut: true,
-      startupNoticeAcknowledgedSchemaVersion: true,
     },
-  });
-}
-
-/**
- * Records that an administrator read the startup notice for this schema
- * version (specs/self-hosting/checkup/startup-notice.feature).
- *
- * Mints the identity where there is none: an install whose administrator is
- * dismissing the notice about reporting is an install about to report, and
- * the dismissal needs a row to live on.
- */
-export async function acknowledgeStartupNotice({
-  prisma,
-  schemaVersion,
-}: {
-  prisma: PrismaClient;
-  schemaVersion: number;
-}): Promise<void> {
-  const instanceId = await installInstanceId(prisma);
-  await prisma.instanceIdentity.upsert({
-    where: { id: ROW_ID },
-    create: {
-      id: ROW_ID,
-      instanceId,
-      startupNoticeAcknowledgedSchemaVersion: schemaVersion,
-    },
-    update: { startupNoticeAcknowledgedSchemaVersion: schemaVersion },
   });
 }
 

@@ -21846,15 +21846,6 @@
 					"isList": false,
 					"isOptional": false,
 					"documentation": "Hostname, which names the customer's own network and so has a switch of\nits own rather than travelling with its category."
-				},
-				{
-					"name": "startupNoticeAcknowledgedSchemaVersion",
-					"columnName": "startupNoticeAcknowledgedSchemaVersion",
-					"type": "Int",
-					"kind": "scalar",
-					"isList": false,
-					"isOptional": false,
-					"documentation": "The report schema version an administrator last dismissed the startup\nnotice for. Zero on a fresh install, so the notice shows once when the\ninstall starts reporting and again whenever the dictionary changes shape."
 				}
 			]
 		},
