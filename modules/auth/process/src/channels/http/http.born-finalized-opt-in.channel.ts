@@ -34,7 +34,7 @@ export async function isBornFinalizedSignUp({
   const pathname = normalizedRequestPathname(request.url);
   if (!pathname.endsWith(SIGN_UP_PATH_SUFFIX)) return false;
 
-  const email = await signUpEmailOf(request);
+  const email = await extractSignUpEmail(request);
   if (email === null) return false;
 
   try {
@@ -61,7 +61,7 @@ export async function isBornFinalizedSignUp({
 }
 
 /** The address, read from a CLONE so better-auth still gets its body. */
-async function signUpEmailOf(request: Request): Promise<string | null> {
+async function extractSignUpEmail(request: Request): Promise<string | null> {
   try {
     const body: unknown = await request.clone().json();
     const email =

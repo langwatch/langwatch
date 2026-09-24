@@ -853,7 +853,7 @@ async function mintCliKey({
   // leave the old key alive on a hostname or formatting change and let
   // credentials accumulate.
   const deviceLabel =
-    sanitizeDeviceLabel(clientInfo?.device_label ?? clientInfo?.hostname) ??
+    normalizeDeviceLabel(clientInfo?.device_label ?? clientInfo?.hostname) ??
     CLI_LOGIN_UNKNOWN_DEVICE_LABEL;
   let minted: { token: string; apiKeyId: string; scope: CliKeyScopeSummary };
 
@@ -1016,7 +1016,7 @@ function verificationUriOf(app: AuthCliDeviceFlowApi): string {
  * null when nothing usable survives, so a caller falls back to a random suffix
  * rather than naming every machine the same.
  */
-function sanitizeDeviceLabel(raw: string | undefined | null): string | null {
+function normalizeDeviceLabel(raw: string | undefined | null): string | null {
   if (!raw) return null;
 
   const cleaned = raw

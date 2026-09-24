@@ -152,7 +152,7 @@ export const userTrpcTransport = defineTrpcRouter(UserApi, userTrpc)
     await app.setOwnFirstPassword({
       userId: actor.id,
       password: input.password,
-      keepSessionId: keptSessionOf({ actor, browserSession }),
+      keepSessionId: deriveKeptSession({ actor, browserSession }),
       caller: callerOf(actor),
     });
 
@@ -167,7 +167,7 @@ export const userTrpcTransport = defineTrpcRouter(UserApi, userTrpc)
       userId: actor.id,
       currentPassword: input.currentPassword,
       newPassword: input.newPassword,
-      keepSessionId: keptSessionOf({ actor, browserSession }),
+      keepSessionId: deriveKeptSession({ actor, browserSession }),
       caller: callerOf(actor),
     });
 
@@ -246,7 +246,7 @@ export const userTrpcTransport = defineTrpcRouter(UserApi, userTrpc)
  * impersonating: the row is the OPERATOR's, so keeping it would neither keep
  * the subject's tab nor mean anything about the subject's devices.
  */
-function keptSessionOf({
+function deriveKeptSession({
   actor,
   browserSession,
 }: {

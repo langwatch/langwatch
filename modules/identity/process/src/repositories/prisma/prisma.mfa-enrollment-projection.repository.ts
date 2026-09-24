@@ -55,10 +55,10 @@ export class PrismaMfaEnrollmentProjectionRepository implements StateProjectionS
       enrollmentId: state.enrollmentId,
       method: state.method,
       state: state.state,
-      enrolledAt: msToDate(state.enrolledAtMs),
-      confirmedAt: msToDate(state.confirmedAtMs),
-      expiredAt: msToDate(state.expiredAtMs),
-      disabledAt: msToDate(state.disabledAtMs),
+      enrolledAt: toDateFromMs(state.enrolledAtMs),
+      confirmedAt: toDateFromMs(state.confirmedAtMs),
+      expiredAt: toDateFromMs(state.expiredAtMs),
+      disabledAt: toDateFromMs(state.disabledAtMs),
       disabledVia: state.disabledVia,
       backupCodeCount: state.backupCodeCount,
       consumedBackupCodeIndexes: state.consumedBackupCodeIndexes,
@@ -81,6 +81,6 @@ export class PrismaMfaEnrollmentProjectionRepository implements StateProjectionS
   }
 }
 
-function msToDate(ms: number | null): Date | null {
+function toDateFromMs(ms: number | null): Date | null {
   return ms === null ? null : new Date(ms);
 }

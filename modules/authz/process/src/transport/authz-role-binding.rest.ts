@@ -62,10 +62,10 @@ const matchesFilters = (
 
 /**
  * The just-written binding as the list reports it, so a write's response is
- * byte-compatible with a later read — or null while the grants projection is
+ * byte-compatible with a later read — none while the grants projection is
  * still behind the append that created it.
  */
-const readBack = async ({
+const findWrittenBindings = async ({
   app,
   organizationId,
   bindingId,
@@ -73,11 +73,10 @@ const readBack = async ({
   app: AuthzApi;
   organizationId: string;
   bindingId: string;
-}): Promise<RoleBindingRest | null> => {
+}): Promise<RoleBindingRest[]> => {
   const rows = await app.listManagedBindingsForOrganization({ organizationId });
-  const row = rows.find((candidate) => candidate.id === bindingId);
 
-  return row ? wire(row) : null;
+  return rows.filter((candidate) => candidate.id === bindingId).map(wire);
 };
 
 export const authzRoleBindingRest: Readonly<{
@@ -140,8 +139,9 @@ export const authzRoleBindingRest: Readonly<{
     // written rather than failing a successful create over ordinary lag — the
     // id is what the caller needs, and a retry would append a second grant for
     // the same slot rather than being absorbed.
+    const [readBack] = await findWrittenBindings({ app, organizationId, bindingId: created.id });
     const binding =
-      (await readBack({ app, organizationId, bindingId: created.id })) ??
+      readBack ??
       optimisticBindingWire({
         id: created.id,
         principal: { userId: input.userId, groupId: input.groupId, apiKeyId: input.apiKeyId },
@@ -175,7 +175,7 @@ export const authzRoleBindingRest: Readonly<{
       ...(input.customRoleId !== undefined ? { customRoleId: input.customRoleId } : {}),
       actor: organization.actor,
     });
-    const binding = await readBack({ app, organizationId, bindingId: updated.id });
+    const [binding] = await findWrittenBindings({ app, organizationId, bindingId: updated.id });
 
     // A patch, unlike a create, changed a row the service had already read from
     // the projection, so lag cannot explain its absence: nothing the caller can

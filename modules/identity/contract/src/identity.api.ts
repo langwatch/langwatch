@@ -704,7 +704,6 @@ export interface IdentityApi {
   /** The USER-rooted migration registry (ADR-101 §6), in main's order. */
   userMigrations(): readonly SystemMigration[];
   joinRequestGuards(): JoinRequestGuardsApi;
-  joinRequestNotifications(): JoinRequestNotificationApi | null;
   ssoConnections(): SsoConnectionApi;
   ssoConnectionGuards(): SsoConnectionGuardsApi;
   ssoBackoffice(): SsoConnectionBackofficeApi;

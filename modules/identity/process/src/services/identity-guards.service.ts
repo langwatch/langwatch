@@ -33,24 +33,24 @@ import type { IdentityUsersRepository } from "../repositories/identity-users.rep
 import { computeIdentifierHash } from "../rules/identifier-hash.rules.ts";
 
 /**
- * Why removing this identifier would strand the person, or null. Pure and
+ * Refuses removing an identifier that would strand the person. Pure and
  * exported so the detach guard and the Remove control share ONE answer,
  * never a screen's own drifting rule. Reads only what would be LEFT.
  */
-export function detachStrandsUser({
+export function assertDetachKeepsWayBack({
   heads,
   identifierId,
 }: {
   heads: IdentityHeads;
   identifierId: string;
-}): IdentityDetachStrandsUserError | null {
+}): void {
   const remaining = Object.values(heads.identifiers).filter(
     (candidate) =>
       candidate.identifierId !== identifierId &&
       (candidate.state === "VERIFIED" || candidate.state === "PRIMARY"),
   );
   if (remaining.length === 0) {
-    return new IdentityDetachStrandsUserError(
+    throw new IdentityDetachStrandsUserError(
       `detach_identifier: ${identifierId} is the last verified identifier for this user`,
     );
   }
@@ -58,11 +58,10 @@ export function detachStrandsUser({
   // holding only passkeys has nowhere a recovery message could reach them.
   // The remedy the screen offers is a verified email.
   if (remaining.every((candidate) => candidate.provider === "passkey")) {
-    return new IdentityDetachStrandsUserError(
+    throw new IdentityDetachStrandsUserError(
       `detach_identifier: removing ${identifierId} would leave this user with passkeys only and no recovery address`,
     );
   }
-  return null;
 }
 
 /**
@@ -387,8 +386,7 @@ export class IdentityGuardsService {
     // are actually usable: detaching an unverified address strands nobody,
     // because nobody could have signed in with it.
     if (head.state === "VERIFIED") {
-      const strands = detachStrandsUser({ heads, identifierId });
-      if (strands) throw strands;
+      assertDetachKeepsWayBack({ heads, identifierId });
     }
 
     return [{ type: IDENTIFIER_DETACHED_EVENT_TYPE, data: { identifierId, actor } }];

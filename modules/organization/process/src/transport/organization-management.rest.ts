@@ -47,7 +47,7 @@ export const organizationManagementEnterpriseGate = defineRestMiddleware(
 /** A wire date field the way every app answer carries it: an `Instant`, converted here once. */
 
 /** The member the organizationKey door hands over as `actor`; null for a service key. */
-const callerOf = (actor: { type: string; id?: string } | null): OrganizationCaller | null =>
+const deriveCaller = (actor: { type: string; id?: string } | null): OrganizationCaller | null =>
   actor && actor.type === "user" && actor.id ? { id: actor.id } : null;
 
 const memberWire = (member: {
@@ -245,7 +245,7 @@ export const organizationManagementRest: Readonly<{
   })
   .withMiddleware(organizationManagementEnterpriseGate)
   .handle(async ({ app, input, scope, actor }) => {
-    const caller: OrganizationCaller | null = callerOf(actor);
+    const caller: OrganizationCaller | null = deriveCaller(actor);
 
     let teamsLeftWithoutAdmin: { id: string; name: string }[] | undefined;
     if (input.role !== undefined) {
@@ -287,7 +287,7 @@ export const organizationManagementRest: Readonly<{
   })
   .withMiddleware(organizationManagementEnterpriseGate)
   .handle(async ({ app, input, scope, actor }) => {
-    await app.deleteMember({ organizationId: scope.id, userId: input.userId }, callerOf(actor));
+    await app.deleteMember({ organizationId: scope.id, userId: input.userId }, deriveCaller(actor));
 
     return { success: true as const };
   })
@@ -319,7 +319,7 @@ export const organizationManagementRest: Readonly<{
   })
   .withMiddleware(organizationManagementEnterpriseGate)
   .handle(async ({ app, input, scope, actor }) => {
-    const caller: OrganizationCaller | null = callerOf(actor);
+    const caller: OrganizationCaller | null = deriveCaller(actor);
 
     const created = await app.createInvitations(
       {

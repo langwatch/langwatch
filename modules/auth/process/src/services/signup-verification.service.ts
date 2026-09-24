@@ -111,7 +111,7 @@ export class SignUpVerificationService {
     accountExists: boolean;
   }> {
     const claimed = await this.deps.tokens.findAndClaim({ token, now: this.now() });
-    const pending = claimed ? readPendingSignUp(claimed.identifier) : null;
+    const pending = claimed ? parsePendingSignUp(claimed.identifier) : null;
 
     if (!pending) {
       throw new IdentityVerificationExpiredError();
@@ -193,7 +193,7 @@ function writePendingSignUp(pending: PendingSignUp): string {
  * written by another feature, or by an older shape of this one, is not a
  * sign-up: answering null sends it down the same path as an expired link.
  */
-function readPendingSignUp(identifier: string): PendingSignUp | null {
+function parsePendingSignUp(identifier: string): PendingSignUp | null {
   if (!identifier.startsWith(SIGN_UP_TOKEN_NAMESPACE)) {
     return null;
   }

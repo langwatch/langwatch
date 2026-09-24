@@ -213,7 +213,7 @@ export class OrganizationInvitationDoorService {
     } catch (error) {
       if (error instanceof OrganizationNotFoundError) throw error;
 
-      const limit = seatLimitOf(error);
+      const limit = extractSeatLimit(error);
       if (!limit) throw error;
 
       // Told, not just refused: an organization that has run out of seats is
@@ -302,7 +302,7 @@ export class OrganizationInvitationDoorService {
 }
 
 /** The seat facts behind a refusal, whichever layer raised it. */
-function seatLimitOf(
+function extractSeatLimit(
   error: unknown,
 ): Readonly<{ limitType: string; current: number; max: number }> | null {
   if (!HandledError.isHandled(error)) return null;

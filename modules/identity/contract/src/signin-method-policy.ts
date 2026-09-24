@@ -78,13 +78,13 @@ export class SignInMethodPolicyService implements SignInMethodPolicyResolver {
     return authProvider !== "email";
   }
 
-  /** The federated method a deployment offers, or null for email mode. */
-  static async tryResolveFederatedMethod(
+  /** The federated methods a deployment offers: none in email mode, else its one provider. */
+  static async findFederatedMethods(
     resolveAuthProvider: () => Promise<string>,
-  ): Promise<SignInMethod | null> {
+  ): Promise<SignInMethod[]> {
     const provider = await resolveAuthProvider();
 
-    return provider === "email" ? null : { id: provider, kind: "federated", connectionId: null };
+    return provider === "email" ? [] : [{ id: provider, kind: "federated", connectionId: null }];
   }
 
   async resolvePolicy(): Promise<SignInMethodPolicy> {
@@ -98,8 +98,8 @@ export class SignInMethodPolicyService implements SignInMethodPolicyResolver {
     // gate read to reach the same answer. When the gate allows, the memo is
     // warm and the call costs nothing.
     const federated = federationLicensed
-      ? await SignInMethodPolicyService.tryResolveFederatedMethod(this.inputs.resolveAuthProvider)
-      : null;
+      ? await SignInMethodPolicyService.findFederatedMethods(this.inputs.resolveAuthProvider)
+      : [];
     // Offered alongside whatever else answers, never instead of it: somebody
     // without a passkey on THIS device must still find the way they used last
     // time. It is appended, so the order the screen renders does not move.
@@ -107,10 +107,11 @@ export class SignInMethodPolicyService implements SignInMethodPolicyResolver {
 
     // A deployment that federates AND issues its own passwords offers both:
     // the federated method leads, and the password stands behind it (D09).
-    const local = !federated || this.inputs.issuesOwnPasswords() ? LOCAL_METHOD_SET : [];
+    const local =
+      federated.length === 0 || this.inputs.issuesOwnPasswords() ? LOCAL_METHOD_SET : [];
 
     return {
-      defaultMethods: [...(federated ? [federated] : []), ...local, ...passkeys],
+      defaultMethods: [...federated, ...local, ...passkeys],
       // NOT the passkeys. Break-glass works from any machine, which a
       // credential bound to one device does not — this line has to agree
       // with `PASSKEY_METHOD`'s own definition.

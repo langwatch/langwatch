@@ -690,10 +690,6 @@ export class IdentityApp implements IdentityApi {
     return this.#parts.joinRequestGuards;
   }
 
-  joinRequestNotifications(): JoinRequestNotificationService | null {
-    return this.#parts.joinRequestNotifications;
-  }
-
   ssoConnections(): SsoConnectionService {
     if (!this.#parts.ssoConnections) {
       throw new IdentityCapabilityUnavailableError("SSO connection store");

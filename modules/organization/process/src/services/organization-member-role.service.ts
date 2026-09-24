@@ -29,11 +29,11 @@ import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 import { EffectiveTeamRoleUpdatesService } from "./compute-effective-team-role-updates.service.ts";
 
 /**
- * The union of permissions granted by the custom roles behind these team bindings, or
- * undefined when none apply. Feeds seat classification, which treats a member whose custom
+ * The union of permissions granted by the custom roles behind these team bindings, empty
+ * when none apply. Feeds seat classification, which treats a member whose custom
  * roles grant only view permissions as a Lite Member.
  */
-async function collectCustomRolePermissions({
+async function findCustomRolePermissionGrants({
   repository,
   organizationId,
   currentTeamBindings,
@@ -41,12 +41,12 @@ async function collectCustomRolePermissions({
   repository: OrganizationMembershipRepository;
   organizationId: string;
   currentTeamBindings: { customRoleId: string | null }[];
-}): Promise<string[] | undefined> {
+}): Promise<string[]> {
   const customRoleIds = currentTeamBindings
     .map((binding) => binding.customRoleId)
     .filter((id): id is string => !!id);
   if (customRoleIds.length === 0) {
-    return undefined;
+    return [];
   }
 
   const permissionsPerRole = await repository.findCustomRolePermissions({
@@ -64,7 +64,7 @@ async function collectCustomRolePermissions({
     }
   }
 
-  return allPermissions.length > 0 ? allPermissions : undefined;
+  return allPermissions;
 }
 
 type OrganizationMemberRoleDependencies = {
@@ -208,11 +208,12 @@ export class OrganizationMemberRoleService {
       role: binding.role,
     }));
 
-    const userPermissions = await collectCustomRolePermissions({
+    const grantedPermissions = await findCustomRolePermissionGrants({
       repository: this.repo,
       organizationId,
       currentTeamBindings,
     });
+    const userPermissions = grantedPermissions.length > 0 ? grantedPermissions : undefined;
 
     await this.dependencies.seats.assertRoleChangeAllowed({
       organizationId,

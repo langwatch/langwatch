@@ -57,7 +57,7 @@ const DID_NOT_RUN: ShadowRun = { ran: false };
  * `/sign-in/email` carries one — a social/OIDC initiation has none, which is
  * exactly the no-address case the router answers with the sole-connection rule.
  */
-function submittedIdentifier(body: unknown): string | null {
+function extractSubmittedIdentifier(body: unknown): string | null {
   if (typeof body !== "object" || body === null) return null;
   const email = (body as { email?: unknown }).email;
   return typeof email === "string" && email.length > 0 ? email : null;
@@ -93,7 +93,7 @@ export async function runSignInRouterShadow({
   try {
     const [decision, legacyProvider] = await Promise.all([
       shadow.route({
-        identifier: submittedIdentifier(body),
+        identifier: extractSubmittedIdentifier(body),
         breakGlass: breakGlassRequested(url),
       }),
       shadow.resolveAuthProvider(),

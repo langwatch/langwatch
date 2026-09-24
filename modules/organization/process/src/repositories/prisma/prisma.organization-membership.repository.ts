@@ -63,7 +63,8 @@ import type {
 
 /**
  * The team's name for a refusal or a report, both of which are read by somebody
- * who knows the team by its name and not by its id.
+ * who knows the team by its name and not by its id, falling back to the id when the
+ * row is gone.
  */
 async function teamNameFor({
   tx,
@@ -71,12 +72,12 @@ async function teamNameFor({
 }: {
   tx: Prisma.TransactionClient;
   teamId: string;
-}): Promise<string | null> {
+}): Promise<string> {
   const team = await tx.team.findUnique({
     where: { id: teamId },
     select: { name: true },
   });
-  return team?.name ?? null;
+  return team?.name ?? teamId;
 }
 
 /**
@@ -1306,7 +1307,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
             }
             teamsLeftWithoutAdmin.push({
               id: teamId,
-              name: (await teamNameFor({ tx, teamId })) ?? teamId,
+              name: await teamNameFor({ tx, teamId }),
             });
           }
         }
