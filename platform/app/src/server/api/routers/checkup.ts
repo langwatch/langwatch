@@ -1,7 +1,4 @@
-import {
-  readInstanceIdentityRow,
-  setUsageReportSwitches,
-} from "@ee/licensing/connect/install/instanceIdentity";
+import { setUsageReportSwitches } from "@ee/licensing/connect/install/instanceIdentity";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import {
