@@ -57,6 +57,7 @@ parse · extract · build · stringify · serialize · deserialize · format · 
 normalize · coerce · decode · encode · convert · derive · compute · translate
 project · visit · as* · to*            (already exempt)
 infer · classify · detect · pick · describe · map          (added by this ADR)
+fold · reduce          (Alex, 2026-09-24: event reducers; state is null before the first event)
 ```
 
 **`resolve*` and `read*` stay governed.** They are the two verbs that read both

@@ -313,6 +313,8 @@ describe("given a derivation that computes its answer from its argument", () => 
         "pickPrimary(items: Item[]): Item | undefined { return undefined; }",
         "describeAnchor(anchor: Anchor): string | undefined { return undefined; }",
         "mapSeverity(level: string): Severity | undefined { return undefined; }",
+        "foldIdentifier(state: State | null, event: Event): State | null { return state; }",
+        "reduceSession(state: State | null, event: Event): State | null { return state; }",
       ];
 
       for (const method of derivations) {
