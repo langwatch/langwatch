@@ -3,13 +3,11 @@ export {
   createUnavailableEvaluationInfrastructure,
   evaluationServer,
 } from "./evaluation.server.ts";
-export type { EvaluationAnalyticsAttributePolicy } from "./app/evaluation.members.ts";
 export { ExecuteEvaluationCommand } from "./eventing/evaluation-execution.intent.ts";
 export { EvaluationNameAutoslugService } from "./services/evaluation-name-autoslug.service.ts";
 
 // Restored: these names have consumers outside this module.
 export { ClickHouseEvaluationRepository } from "./repositories/clickhouse/evaluation.repository.ts";
-export { EvaluationEventingAdapter } from "./services/evaluation.eventing.service.ts";
 export { EvaluationRunProjectionService } from "./services/evaluation-run-projection.service.ts";
 export type {
   EvaluationExecution,

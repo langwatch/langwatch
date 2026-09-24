@@ -221,14 +221,6 @@ export interface EvaluationInputsResolution {
   }): Promise<Record<string, unknown> | null>;
 }
 
-/**
- * Applies the shared analytics attribute retention policy at the Evaluation
- * projection boundary. Trace owns the current policy implementation.
- */
-export interface EvaluationAnalyticsAttributePolicy {
-  trim(attributes: Record<string, string>): Record<string, string>;
-}
-
 /** Persists the billable cost of a completed Evaluation execution. */
 export interface EvaluationCostRecorder {
   recordCost(input: {

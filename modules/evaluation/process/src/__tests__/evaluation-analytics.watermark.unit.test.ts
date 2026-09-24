@@ -2,7 +2,6 @@ import { AnalyticsService } from "@langwatch/analytics-contract";
 import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
-import type { EvaluationAnalyticsAttributePolicy } from "../app/evaluation.members.ts";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   EvaluationAnalyticsFoldProjection,
@@ -20,12 +19,6 @@ import { EvaluationAnalyticsStore } from "../eventing/evaluation-attributes.stor
  */
 
 const TENANT = "proj-eval-watermark";
-
-class PassthroughAttributePolicy implements EvaluationAnalyticsAttributePolicy {
-  trim(attributes: Record<string, string>): Record<string, string> {
-    return attributes;
-  }
-}
 
 type Written = {
   row: EvaluationAnalyticsRow;
@@ -75,8 +68,7 @@ function makeStore() {
   const analytics = new RecordingAnalytics();
   const store = EvaluationAnalyticsStore.create({
     analytics,
-    attributePolicy: new PassthroughAttributePolicy(),
-    defaultRetentionDays: 30,
+    defaultRetentionDays: () => 30,
   });
   return { analytics, store };
 }

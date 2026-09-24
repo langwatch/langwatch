@@ -1,4 +1,4 @@
-import type { AnalyticsService } from "@langwatch/analytics-contract";
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import type { AppendStore, ProjectionStoreContext } from "@langwatch/eventing";
 
 import type { EvaluationAnalyticsRollupRow } from "./evaluation-analytics-rollup.projection.ts";
@@ -10,19 +10,19 @@ import type { EvaluationAnalyticsRollupRow } from "./evaluation-analytics-rollup
  */
 export class EvaluationAnalyticsRollupStore implements AppendStore<EvaluationAnalyticsRollupRow> {
   static create(input: {
-    analytics: AnalyticsService;
-    defaultRetentionDays: number;
+    analytics: Pick<AnalyticsApi, "appendEvaluationAnalyticsRollup">;
+    defaultRetentionDays: () => number;
   }): EvaluationAnalyticsRollupStore {
     return new EvaluationAnalyticsRollupStore(input.analytics, input.defaultRetentionDays);
   }
 
   private constructor(
-    private readonly analytics: AnalyticsService,
-    private readonly defaultRetentionDays: number,
+    private readonly analytics: Pick<AnalyticsApi, "appendEvaluationAnalyticsRollup">,
+    private readonly defaultRetentionDays: () => number,
   ) {}
 
   async append(row: EvaluationAnalyticsRollupRow, context: ProjectionStoreContext): Promise<void> {
-    const retentionDays = context.retentionPolicy?.traces ?? this.defaultRetentionDays;
+    const retentionDays = context.retentionPolicy?.traces ?? this.defaultRetentionDays();
     await this.analytics.appendEvaluationAnalyticsRollup({ row, retentionDays });
   }
 }

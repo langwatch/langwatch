@@ -1,6 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-
-import type { EvaluationAnalyticsAttributePolicy } from "../app/evaluation.members.ts";
+import { trimAttributesForAnalytics } from "@langwatch/trace-contract";
 
 const logger = createLogger(
   "langwatch:event-sourcing:evaluation-processing:evaluation-analytics-fold",
@@ -68,12 +67,10 @@ export class EvaluationAnalyticsRowProjection {
     state,
     tenantId,
     version,
-    attributePolicy,
   }: {
     state: EvaluationAnalyticsData;
     tenantId: string;
     version: string;
-    attributePolicy: EvaluationAnalyticsAttributePolicy;
   }): EvaluationAnalyticsRow {
     const durationMs =
       state.completedAt !== null && state.startedAt !== null
@@ -103,7 +100,7 @@ export class EvaluationAnalyticsRowProjection {
       durationMs,
       totalCost: null,
       nonBilledCost: null,
-      attributes: attributePolicy.trim(state.attributes ?? {}),
+      attributes: trimAttributesForAnalytics(state.attributes ?? {}),
       startedAtMs: state.startedAt,
       completedAtMs: state.completedAt,
     };

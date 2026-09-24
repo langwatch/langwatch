@@ -1,4 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 /**
  * @vitest-environment node
  * The feature boots as a whole: the installer, its repositories and the one app
@@ -21,6 +22,9 @@ function process(role: "api" | "worker") {
       trace: createApiFixture<TraceApi>(),
       "model-provider": createApiFixture<ModelProviderApi>({
         getExecutionProviders: async () => ({}),
+      }),
+      "data-retention": createApiFixture<DataRetentionApi>({
+        getPlatformDefaultRetentionDays: () => 30,
       }),
     });
 }

@@ -6,16 +6,21 @@ import { ClickHouseEvaluationRepository } from "../clickhouse/evaluation.reposit
 import { ClickHouseMonitorPerformanceRepository } from "../clickhouse/monitor-performance.repository.ts";
 import type { EvaluationRepositories } from "../evaluation.repositories.ts";
 import { PostgresEvaluationRepositories } from "../prisma/prisma.evaluation.repositories.ts";
+import { RedisEvaluationAnalyticsFoldCacheRepository } from "../redis/redis.evaluation-analytics-fold-cache.repository.ts";
 
-/** Evaluation's live stores: the cost ledger in Prisma, run history and the trend in ClickHouse. */
+/**
+ * Evaluation's live stores: the cost ledger in Prisma, run history and the
+ * trend in ClickHouse, the analytics fold's cache in Redis.
+ */
 export class LiveEvaluationRepositories {
-  static readonly requires = ["prisma", "clickhouse"] as const;
+  static readonly requires = ["prisma", "clickhouse", "redis"] as const;
   static readonly repositories = PostgresEvaluationRepositories.repositories;
 
   static create({
     prisma,
     clickhouse,
-  }: Pick<ProcessMembers, "prisma" | "clickhouse">): EvaluationRepositories {
+    redis,
+  }: Pick<ProcessMembers, "prisma" | "clickhouse" | "redis">): EvaluationRepositories {
     const resolveClient: EvaluationClickHouseResolver = (tenantId) =>
       Promise.resolve(new ClickHouseEvaluationSession(clickhouse, tenantId));
 
@@ -23,6 +28,7 @@ export class LiveEvaluationRepositories {
       ...PostgresEvaluationRepositories.create({ prisma }),
       runs: ClickHouseEvaluationRepository.create({ resolveClient }),
       monitorPerformance: ClickHouseMonitorPerformanceRepository.create({ resolveClient }),
+      analyticsFoldCache: RedisEvaluationAnalyticsFoldCacheRepository.create(redis),
     };
   }
 }

@@ -33,9 +33,9 @@ import {
   type TraceCanonicalisationService,
   type TraceSummaryData,
   METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE,
+  trimAttributesForAnalytics,
 } from "@langwatch/trace-contract";
 
-import { trimAttributesForAnalytics } from "../rules/analytics-attribute-trim.rules.ts";
 import { spanStorabilityOf, UNSTORABLE_SPAN_SKIPPED } from "../rules/storable-span-time.rules.ts";
 import { anchorStorageTime, firstUsableAnchor } from "../rules/trace-storage-anchor.rules.ts";
 import type { TraceProjectionRuntimeService } from "../services/projection/trace-projection-runtime.service.ts";

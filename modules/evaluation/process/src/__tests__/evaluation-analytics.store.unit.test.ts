@@ -4,7 +4,6 @@ import type { ProjectionStoreContext } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
-import type { EvaluationAnalyticsAttributePolicy } from "../app/evaluation.members.ts";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   EvaluationAnalyticsFoldProjection,
@@ -24,13 +23,6 @@ import { EvaluationAnalyticsStore } from "../eventing/evaluation-attributes.stor
 
 const TENANT = "proj-eval-rb";
 const BASE_MS = 1_760_000_000_000;
-class PassthroughAnalyticsAttributePolicy implements EvaluationAnalyticsAttributePolicy {
-  trim(attributes: Record<string, string>): Record<string, string> {
-    return attributes;
-  }
-}
-
-const attributePolicy = new PassthroughAnalyticsAttributePolicy();
 const rowProjection = EvaluationAnalyticsRowProjection.create();
 
 const fold = new EvaluationAnalyticsFoldProjection({
@@ -42,7 +34,6 @@ function project(state: EvaluationAnalyticsData): EvaluationAnalyticsRow {
     state,
     tenantId: TENANT,
     version: EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
-    attributePolicy,
   });
 }
 
@@ -221,8 +212,7 @@ describe("EvaluationAnalyticsStore read-back version gate", () => {
     const analytics = new ReadBackAnalytics(row);
     const store = EvaluationAnalyticsStore.create({
       analytics,
-      attributePolicy,
-      defaultRetentionDays: 30,
+      defaultRetentionDays: () => 30,
     });
     return { store };
   }

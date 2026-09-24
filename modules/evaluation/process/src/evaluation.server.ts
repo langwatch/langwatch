@@ -33,11 +33,6 @@ import {
   type EvaluationInputOffloadConfig,
 } from "./services/evaluation-inputs-offload.service.ts";
 import { EvaluationNameAutoslugService } from "./services/evaluation-name-autoslug.service.ts";
-import { EvaluationRunProjectionService } from "./services/evaluation-run-projection.service.ts";
-import {
-  EvaluationEventingAdapter,
-  type EvaluationEventingStores,
-} from "./services/evaluation.eventing.service.ts";
 import { evaluationTrpcTransport } from "./transport/evaluation.trpc.ts";
 import { evaluationsLegacyRest } from "./transport/evaluations-legacy.rest.ts";
 
@@ -91,31 +86,6 @@ export function createMonitorPerformanceReads(input: {
   return ClickhouseMonitorPerformanceRepository.create({
     resolveClickHouse: input.resolveClickHouse,
   });
-}
-
-type EvaluationEventingInput = Parameters<typeof EvaluationEventingAdapter.create>[0];
-
-/**
- * The fold stores Evaluation's durable pipeline projects into: the run
- * projection over ClickHouse, and the analytics folds beside it.
- */
-export function createEvaluationEventingStores(
-  input: EvaluationClickHouseAccess &
-    Readonly<{
-      analytics: EvaluationEventingInput["analytics"];
-      attributePolicy: EvaluationEventingInput["attributePolicy"];
-      retentionDays: number;
-    }>,
-): EvaluationEventingStores {
-  return EvaluationEventingAdapter.create({
-    evaluation: EvaluationRunProjectionService.create({
-      repository: createEvaluationRunReads(input),
-      retentionFloor: input.retentionFloor,
-    }),
-    analytics: input.analytics,
-    attributePolicy: input.attributePolicy,
-    retentionDays: input.retentionDays,
-  }).buildStores();
 }
 
 /** The ONLINE engine: a stored trace rendered through its mappings and evaluated. */

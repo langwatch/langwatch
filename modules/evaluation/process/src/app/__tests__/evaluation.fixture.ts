@@ -1,4 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type {
   CustomEvaluator,
   EvaluationRunOutcome,
@@ -178,6 +179,7 @@ export function createEvaluationTestApp(
       workflows: WorkflowApi;
       traces: TraceApi;
       modelProviders: ModelProviderApi;
+      retention: DataRetentionApi;
     }>;
   }> = {},
 ): EvaluationApp {
@@ -190,6 +192,7 @@ export function createEvaluationTestApp(
       modelProviders:
         input.dependencies?.modelProviders ??
         createApiFixture<ModelProviderApi>({ getExecutionProviders: async () => ({}) }),
+      retention: input.dependencies?.retention ?? createApiFixture<DataRetentionApi>(),
     },
   });
 }

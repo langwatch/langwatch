@@ -97,3 +97,27 @@ Feature: Evaluation service boundary
     Given the live evaluation repositories over the process's ClickHouse member
     When a run is looked up for a tenant
     Then every statement names that tenant and carries only settings the member accepts
+
+  @unit
+  Scenario: A run lookup without a scheduled time stops at the platform default retention
+    Given a process that installs the evaluation module over its repositories
+    When a run older than the platform default retention is looked up without its scheduled time
+    Then it is refused as not found
+
+  @unit
+  Scenario: An evaluation report travels on the pipeline's own sender
+    Given an installed evaluation module whose evaluation_processing senders are connected
+    When an evaluation is reported
+    Then the report is sent once through the reportEvaluation sender
+
+  @unit
+  Scenario: An evaluation report refuses by name before the pipeline is connected
+    Given an installed evaluation module whose evaluation_processing senders are not connected
+    When an evaluation is reported
+    Then the report is refused naming the missing reportEvaluation sender
+
+  @unit
+  Scenario: Evaluation's fold stores stamp the platform default retention read at write time
+    Given evaluation's fold stores built over the platform default retention
+    When a run and its analytics fold are written for a tenant with no override
+    Then each row carries the default read at that write, and building the stores reads nothing

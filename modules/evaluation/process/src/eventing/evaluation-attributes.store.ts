@@ -1,11 +1,10 @@
-import type { AnalyticsService } from "@langwatch/analytics-contract";
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import type {
   FoldProjectionStore,
   ProjectionStoreContext,
   FoldStateRead,
 } from "@langwatch/eventing";
 
-import type { EvaluationAnalyticsAttributePolicy } from "../app/evaluation.members.ts";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   type EvaluationAnalyticsData,
@@ -15,29 +14,29 @@ import {
   EvaluationAnalyticsRowProjection,
 } from "./evaluation-analytics-row.projection.ts";
 
+/** The analytics operations the evaluation fold writes and reads back through. */
+export type EvaluationAnalyticsFoldWrites = Pick<
+  AnalyticsApi,
+  "upsertEvaluationAnalytics" | "upsertEvaluationAnalyticsBatch" | "findEvaluationAnalytics"
+>;
+
 /**
  * FoldProjectionStore adapter for slim evaluation_analytics fold (ADR-066);
  * read-back via typed columns.
  */
 export class EvaluationAnalyticsStore implements FoldProjectionStore<EvaluationAnalyticsData> {
   static create(input: {
-    analytics: AnalyticsService;
-    attributePolicy: EvaluationAnalyticsAttributePolicy;
-    defaultRetentionDays: number;
+    analytics: EvaluationAnalyticsFoldWrites;
+    defaultRetentionDays: () => number;
   }): EvaluationAnalyticsStore {
-    return new EvaluationAnalyticsStore(
-      input.analytics,
-      input.attributePolicy,
-      input.defaultRetentionDays,
-    );
+    return new EvaluationAnalyticsStore(input.analytics, input.defaultRetentionDays);
   }
 
   private readonly rowProjection = EvaluationAnalyticsRowProjection.create();
 
   private constructor(
-    private readonly analytics: AnalyticsService,
-    private readonly attributePolicy: EvaluationAnalyticsAttributePolicy,
-    private readonly defaultRetentionDays: number,
+    private readonly analytics: EvaluationAnalyticsFoldWrites,
+    private readonly defaultRetentionDays: () => number,
   ) {}
 
   async store(state: EvaluationAnalyticsData, context: ProjectionStoreContext): Promise<void> {
@@ -88,9 +87,8 @@ export class EvaluationAnalyticsStore implements FoldProjectionStore<EvaluationA
         state: stateWithId,
         tenantId: String(context.tenantId),
         version: EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
-        attributePolicy: this.attributePolicy,
       }),
-      retentionDays: context.retentionPolicy?.traces ?? this.defaultRetentionDays,
+      retentionDays: context.retentionPolicy?.traces ?? this.defaultRetentionDays(),
       appliedEventIds: context.appliedEventIds ? [...context.appliedEventIds] : [],
     };
   }

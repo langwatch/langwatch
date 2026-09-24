@@ -14,21 +14,21 @@ export class EvaluationRunStore implements FoldProjectionStore<EvaluationRunData
     defaultRetentionDays,
   }: {
     service: EvaluationRunProjectionRepository;
-    defaultRetentionDays: number;
+    defaultRetentionDays: () => number;
   }): EvaluationRunStore {
     return new EvaluationRunStore(service, defaultRetentionDays);
   }
 
   private constructor(
     private readonly service: EvaluationRunProjectionRepository,
-    private readonly defaultRetentionDays: number,
+    private readonly defaultRetentionDays: () => number,
   ) {}
 
   async store(state: EvaluationRunData, context: ProjectionStoreContext): Promise<void> {
     const data = state.evaluationId
       ? state
       : { ...state, evaluationId: String(context.aggregateId) };
-    const retentionDays = context.retentionPolicy?.traces ?? this.defaultRetentionDays;
+    const retentionDays = context.retentionPolicy?.traces ?? this.defaultRetentionDays();
     await this.service.upsertRun({
       data,
       tenantId: String(context.tenantId),
@@ -48,7 +48,7 @@ export class EvaluationRunStore implements FoldProjectionStore<EvaluationRunData
       entries.map(({ state, context }) => ({
         data: state.evaluationId ? state : { ...state, evaluationId: String(context.aggregateId) },
         tenantId: String(context.tenantId),
-        retentionDays: context.retentionPolicy?.traces ?? this.defaultRetentionDays,
+        retentionDays: context.retentionPolicy?.traces ?? this.defaultRetentionDays(),
       })),
     );
   }

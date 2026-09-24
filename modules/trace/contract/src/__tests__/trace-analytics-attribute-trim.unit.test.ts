@@ -5,7 +5,7 @@ import {
   ANALYTICS_STANDARD_VALUE_CAP,
   ANALYTICS_TRUNCATION_ELLIPSIS,
   trimAttributesForAnalytics,
-} from "../../rules/analytics-attribute-trim.rules.ts";
+} from "../trace-analytics-attribute-trim.ts";
 
 describe("trimAttributesForAnalytics", () => {
   describe("given a metadata.* attribute", () => {

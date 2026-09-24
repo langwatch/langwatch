@@ -14,10 +14,8 @@ import {
   createEvaluationScheduledEvent,
   createEvaluationStartedEvent,
 } from "./eventing/fixtures/evaluation-events.fixtures.ts";
-import { PreserveEvaluationAnalyticsAttributes } from "./eventing/fixtures/preserve-attributes.policy.ts";
 
 const TENANT = "proj-eval";
-const attributePolicy = new PreserveEvaluationAnalyticsAttributes();
 const rowProjection = EvaluationAnalyticsRowProjection.create();
 
 function makeFold() {
@@ -31,7 +29,6 @@ function projectFromState(state: EvaluationAnalyticsData) {
     state,
     tenantId: TENANT,
     version: EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
-    attributePolicy,
   });
 }
 

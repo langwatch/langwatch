@@ -1,5 +1,6 @@
 import type { AutomationEvaluationSubscriberService } from "@langwatch/automation-contract";
 import {
+  type CompleteEvaluationCommandData,
   type EvaluationRunData,
   EVALUATION_COMPLETED_EVENT_TYPE,
   EVALUATION_REPORTED_EVENT_TYPE,
@@ -8,6 +9,9 @@ import {
   evaluationStartedEventSchema,
   evaluationCompletedEventSchema,
   evaluationReportedEventSchema,
+  type ExecuteEvaluationCommandData,
+  type ReportEvaluationCommandData,
+  type StartEvaluationCommandData,
 } from "@langwatch/evaluation-contract";
 import {
   type AppendStore,
@@ -15,7 +19,6 @@ import {
   definePipeline,
   type FoldProjectionStore,
   type Projection,
-  type RegisteredCommand,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
@@ -32,6 +35,16 @@ import { EvaluationRunFoldProjection } from "../eventing/evaluation-run.projecti
 import { EvaluationCommandAdapter } from "./evaluation-command.service.ts";
 
 const GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS = 5_000;
+
+/** evaluation_processing as registered, its four commands named so their senders are typed. */
+export type EvaluationProcessingPipeline = StaticPipelineDefinition<
+  EvaluationProcessingEvent,
+  Record<string, Projection>,
+  | { name: "executeEvaluation"; payload: ExecuteEvaluationCommandData }
+  | { name: "startEvaluation"; payload: StartEvaluationCommandData }
+  | { name: "completeEvaluation"; payload: CompleteEvaluationCommandData }
+  | { name: "reportEvaluation"; payload: ReportEvaluationCommandData }
+>;
 
 export interface EvaluationProcessingPipelineDeps {
   evalRunStore: FoldProjectionStore<EvaluationRunData>;
@@ -55,11 +68,7 @@ export class EvaluationProcessingAdapter {
 
   private constructor(private readonly deps: EvaluationProcessingPipelineDeps) {}
 
-  build(): StaticPipelineDefinition<
-    EvaluationProcessingEvent,
-    Record<string, Projection>,
-    RegisteredCommand
-  > {
+  build(): EvaluationProcessingPipeline {
     const commands = EvaluationCommandAdapter.create();
 
     return definePipeline({

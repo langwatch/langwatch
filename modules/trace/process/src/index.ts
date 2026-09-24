@@ -19,7 +19,6 @@ export type { TraceClickHouseClient } from "./repositories/trace-clickhouse-clie
 export { ClickHouseTraceQueryRepository } from "./repositories/clickhouse/clickhouse.trace-query.repository.ts";
 export { ClickhouseTraceQueryEvaluationRepository } from "./repositories/clickhouse/clickhouse.trace-query-evaluation.repository.ts";
 export { EventingRecordSpanAdapter } from "./services/eventing.record-span.service.ts";
-export { trimAttributesForAnalytics } from "./rules/analytics-attribute-trim.rules.ts";
 export { TraceListService } from "./services/trace-list-read.service.ts";
 export { TraceBlobStoreService } from "./services/trace-blob-store.service.ts";
 export { traceServer, type TraceInfrastructure } from "./trace.server.ts";

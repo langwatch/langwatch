@@ -11,6 +11,7 @@ export * from "./trace-ingress.events.ts";
 export * from "./trace-content-part.ts";
 export * from "./trace-content-part.visitor.ts";
 export * from "./trace-attributes.ts";
+export { trimAttributesForAnalytics } from "./trace-analytics-attribute-trim.ts";
 export * from "./trace-time-range-presets.ts";
 export * from "./trace-token-budget.ts";
 export * from "./trace-explorer-url-state.ts";

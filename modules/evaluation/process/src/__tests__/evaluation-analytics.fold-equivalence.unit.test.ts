@@ -14,7 +14,6 @@ import {
   createEvaluationScheduledEvent,
   createEvaluationStartedEvent,
 } from "./eventing/fixtures/evaluation-events.fixtures.ts";
-import { PreserveEvaluationAnalyticsAttributes } from "./eventing/fixtures/preserve-attributes.policy.ts";
 
 /**
  * FOLD-EQUIVALENCE (ADR-066): proves `fold(events, fromRow(project(s))) ===
@@ -25,7 +24,6 @@ import { PreserveEvaluationAnalyticsAttributes } from "./eventing/fixtures/prese
 const TENANT = "proj-eval-equiv";
 const EVALUATION_ID = "eval-equiv";
 const BASE_MS = 1_760_000_000_000;
-const attributePolicy = new PreserveEvaluationAnalyticsAttributes();
 const rowProjection = EvaluationAnalyticsRowProjection.create();
 
 const projection = new EvaluationAnalyticsFoldProjection({
@@ -37,7 +35,6 @@ function project(state: EvaluationAnalyticsData): EvaluationAnalyticsRow {
     state,
     tenantId: TENANT,
     version: EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
-    attributePolicy,
   });
 }
 

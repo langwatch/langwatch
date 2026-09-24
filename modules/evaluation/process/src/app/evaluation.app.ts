@@ -1,3 +1,4 @@
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import {
   AZURE_SAFETY_ENV_VARS,
   AZURE_SAFETY_PROVIDER_KEY,
@@ -23,6 +24,7 @@ import {
   type WarmupEvaluatorsInput,
 } from "@langwatch/evaluation-contract";
 import { AVAILABLE_EVALUATORS, type SingleEvaluationResult } from "@langwatch/evaluator-contract";
+import type { EventingCommands } from "@langwatch/eventing";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -47,7 +49,10 @@ import {
   type EvaluationExperimentDirectory,
   type EvaluationExperimentRunWriter,
 } from "../services/evaluation-batch-log.service.ts";
+import { EvaluationCommandDispatcherService } from "../services/evaluation-command-dispatcher.service.ts";
 import { EvaluationNameAutoslugService } from "../services/evaluation-name-autoslug.service.ts";
+import type { EvaluationProcessingPipeline } from "../services/evaluation-processing.service.ts";
+import { EvaluationRetentionFloorService } from "../services/evaluation-retention-floor.service.ts";
 import { EvaluationService } from "../services/evaluation.service.ts";
 import type {
   EvaluationExecution,
@@ -193,6 +198,8 @@ export class EvaluationApp implements EvaluationApiContract {
     workflows: WorkflowApi,
     traces: TraceApi,
     modelProviders: ModelProviderApi,
+    /** Owns the platform default retention the run reads are floored at, read per lookup. */
+    retention: DataRetentionApi,
   };
   static readonly reads = reads();
 
@@ -212,12 +219,19 @@ export class EvaluationApp implements EvaluationApiContract {
   readonly #models: EvaluationModelCascade;
   readonly #ledger: EvaluationLedger;
   readonly #runner: EvaluationRunner;
+  readonly #commands: EvaluationCommandDispatcherService | undefined;
 
-  private constructor(
-    service: EvaluationService,
-    dependencies: EvaluationSetup["dependencies"],
-    members: EvaluationInfrastructure,
-  ) {
+  private constructor({
+    service,
+    dependencies,
+    members,
+    commands,
+  }: {
+    service: EvaluationService;
+    dependencies: EvaluationSetup["dependencies"];
+    members: EvaluationInfrastructure;
+    commands: EvaluationCommandDispatcherService | undefined;
+  }) {
     this.#service = service;
     this.#modelProviders = dependencies.modelProviders;
     this.#environment = members.environment;
@@ -232,6 +246,7 @@ export class EvaluationApp implements EvaluationApiContract {
     this.#models = members.models;
     this.#ledger = members.ledger;
     this.#runner = members.runner;
+    this.#commands = commands;
     this.#autoslug = EvaluationNameAutoslugService.create();
     this.#batchLog = EvaluationBatchLogService.create({
       experiments: members.experiments,
@@ -241,15 +256,22 @@ export class EvaluationApp implements EvaluationApiContract {
   }
 
   /**
-   * Run history and the monitor trend read the installed repositories; every
-   * other capability is still the closed stub until its port lands
+   * Run history, the monitor trend, the retention floor and the report
+   * command are real; the rest is still the closed stub until its port lands
    * (`.claude/handoffs/port-evaluation-runtime.md`).
    */
   static create({ dependencies, repositories }: EvaluationSetup): EvaluationApp {
+    const commands = EvaluationCommandDispatcherService.create();
+
     return EvaluationApp.fromInfrastructure({
-      infrastructure: createUnavailableEvaluationInfrastructure(EVALUATION_PROCESS_NAME),
+      infrastructure: {
+        ...createUnavailableEvaluationInfrastructure(EVALUATION_PROCESS_NAME),
+        retentionFloor: EvaluationRetentionFloorService.create(dependencies.retention),
+        report: commands,
+      },
       dependencies,
       repositories,
+      commands,
     });
   }
 
@@ -257,11 +279,12 @@ export class EvaluationApp implements EvaluationApiContract {
     infrastructure: EvaluationInfrastructure;
     dependencies: EvaluationSetup["dependencies"];
     repositories: Pick<EvaluationRepositories, "runs" | "monitorPerformance">;
+    commands?: EvaluationCommandDispatcherService;
   }): EvaluationApp {
-    const { infrastructure: members, dependencies, repositories } = setup;
+    const { infrastructure: members, dependencies, repositories, commands } = setup;
 
-    return new EvaluationApp(
-      EvaluationService.create({
+    return new EvaluationApp({
+      service: EvaluationService.create({
         repository: repositories.runs,
         monitorPerformance: repositories.monitorPerformance,
         retentionFloor: members.retentionFloor,
@@ -271,7 +294,14 @@ export class EvaluationApp implements EvaluationApiContract {
       }),
       dependencies,
       members,
-    );
+      commands,
+    });
+  }
+
+  /** Binds evaluation_processing's own senders; `reportEvaluation` goes through them. */
+  connectCommands(commands: EventingCommands<EvaluationProcessingPipeline>): void {
+    if (!this.#commands) throw new Error("this evaluation app was composed with its own report");
+    this.#commands.connect(commands);
   }
 
   executeForTrace: EvaluationApiContract["executeForTrace"] = (input) =>
