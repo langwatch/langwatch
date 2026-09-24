@@ -6,6 +6,7 @@
 import { z } from "zod";
 
 import { Config } from "./config.ts";
+import { environmentOneOrTrueSchema } from "./env-schemas.ts";
 
 const positiveInteger = z.coerce.number().int().positive();
 
@@ -23,3 +24,32 @@ export const { langevalsStagingThresholdBytes, langevalsStagingTtlSeconds } = Co
     ),
   }),
 );
+
+/** The outbound address fence every egress-making owner judges a call by. */
+export const { blockLocalHttpCalls, allowedProxyHosts } = Config.define((c) => ({
+  blockLocalHttpCalls: c.env("BLOCK_LOCAL_HTTP_CALLS", environmentOneOrTrueSchema),
+  /** An unset allowlist is EMPTY, never a wildcard. */
+  allowedProxyHosts: c.env(
+    "ALLOWED_PROXY_HOSTS",
+    z
+      .string()
+      .optional()
+      .transform((value) =>
+        (value ?? "")
+          .split(",")
+          .map((host) => host.trim())
+          .filter((host) => host.length > 0),
+      ),
+  ),
+}));
+
+/** The terminal fallback for a target that names no model; blank is not a model. */
+export const { langwatchDefaultModel } = Config.define((c) => ({
+  langwatchDefaultModel: c.env(
+    "LANGWATCH_DEFAULT_MODEL",
+    z
+      .string()
+      .optional()
+      .transform((value) => value?.trim() || void 0),
+  ),
+}));
