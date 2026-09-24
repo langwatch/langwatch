@@ -108,6 +108,11 @@ async function bootApi() {
         gatewayInternalProtocol: {},
         connectJudge: null,
         monitor: void 0,
+        langwatchQl: {
+          admin: { configured: false },
+          postgres: { configured: false },
+          database: () => prisma,
+        },
         topicClustering: {
           requestClustering: () =>
             Promise.reject(new Error("langwatch-api composes no topic clustering worker")),

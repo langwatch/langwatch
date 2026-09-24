@@ -106,6 +106,11 @@ async function bootWorker() {
         gatewayInternalProtocol: {},
         connectJudge: null,
         monitor: void 0,
+        langwatchQl: {
+          admin: { configured: false },
+          postgres: { configured: false },
+          database: () => prisma,
+        },
         topicClustering: {
           requestClustering: () =>
             Promise.reject(new Error("langwatch-worker composes no topic clustering worker")),
@@ -129,6 +134,7 @@ describe("the worker process installation", () => {
     try {
       for (const token of moduleApis) expect(runtime.service(token)).toBeDefined();
       const pipelines = eventing.definitions.map((definition) => definition.metadata.name);
+      expect(pipelines).toContain("experiment_run_processing");
       // Every process that is not producing resolves trace commands from this registration.
       expect(pipelines).toContain("trace_processing");
       const schedules = eventing.definitions.flatMap((definition) =>
