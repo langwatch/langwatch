@@ -527,10 +527,11 @@ serving. Auth verifiers are constructed by their owner from declared config
 and secrets; the process entry point supplies neither credentials nor
 transport internals.
 
-**Deployment-choice modules are one line in the main.** The audit sink is
-the worked example: OSS composes `auditLogNullServer` (records nothing),
-an enterprise deployment swaps in its real module — one `.withModules`
-line, no conditional wiring.
+**Deployment-choice modules are one line in the main.** A module whose
+implementation is a deployment choice is composed by one `.withModules`
+line, no conditional wiring. The audit sink is **not** one (Alex,
+2026-09-24): every deployment records audit entries, as main did, so api
+and worker compose the real audit-log module; the null sink is for tests.
 
 **The worker** is the same file with `role: "worker"` and `server.run()`
 instead of `serve()`. The role decides what `boot()` hosts: jobs and
