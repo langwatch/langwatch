@@ -31,7 +31,7 @@ export class MemoryRoutingPolicyRepository extends RoutingPolicyRepository {
     return new MemoryRoutingPolicyRepository(store);
   }
 
-  async list(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]> {
+  async findAll(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]> {
     return this.store.routingPolicies.filter((policy) => {
       if (policy.organizationId !== input.organizationId) return false;
       const scope = input.selectableForScope;

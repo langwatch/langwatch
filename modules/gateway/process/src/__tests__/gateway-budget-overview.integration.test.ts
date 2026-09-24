@@ -1,4 +1,4 @@
-import type { OrganizationService } from "@langwatch/organization-contract";
+import { type OrganizationService, TeamNotFoundError } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 /**
@@ -87,13 +87,13 @@ class SuiteOrganizationService extends TestOrganizationService {
   }): Promise<boolean> =>
     (await prisma.organizationUser.count({ where: { organizationId, userId } })) > 0;
 
-  override tryFindPersonalWorkspace = async ({
+  override getPersonalWorkspace = async ({
     userId,
   }: {
     userId: string;
     organizationId: string;
-  }): ReturnType<OrganizationService["tryFindPersonalWorkspace"]> => {
-    if (userId !== USER_ID) return null;
+  }): ReturnType<OrganizationService["getPersonalWorkspace"]> => {
+    if (userId !== USER_ID) throw new TeamNotFoundError();
     const team = await prisma.team.findUniqueOrThrow({ where: { id: PERSONAL_TEAM_ID } });
     const project = await prisma.project.findUniqueOrThrow({ where: { id: PERSONAL_PROJECT_ID } });
     return {

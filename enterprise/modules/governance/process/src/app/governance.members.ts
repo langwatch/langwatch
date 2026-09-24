@@ -458,7 +458,7 @@ export type GovernanceHttpResponse = {
    * Response headers, when the transport carries them. Optional because test doubles
    * build responses by hand; the 429 path doesn't use them, so absence = no Retry-After.
    */
-  readonly headers?: { get(name: string): string | null };
+  readonly headers?: Pick<Headers, "get">;
   /**
    * The response body stream, when the transport carries it. Optional for the same
    * reason as `headers`; callers only drain it, so absence means nothing to drain.

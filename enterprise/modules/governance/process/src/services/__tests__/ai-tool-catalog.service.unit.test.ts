@@ -35,8 +35,8 @@ const tile: AiToolEntry = {
 };
 
 class MemoryCatalog extends AiToolCatalogRepository {
-  listVisible = vi.fn(async () => [tile]);
-  listAdmin = vi.fn(async () => [tile]);
+  findVisible = vi.fn(async () => [tile]);
+  findAdmin = vi.fn(async () => [tile]);
   findById = vi.fn(async () => tile);
   departmentsBelongToOrganization = vi.fn(async () => true);
   create = vi.fn(async () => tile);
@@ -47,9 +47,9 @@ class MemoryCatalog extends AiToolCatalogRepository {
     created: input.tiles.length,
   }));
   seedStarterPack = vi.fn(async () => ({ created: 1, updated: 0, skipped: 0 }));
-  listConfiguredProvidersForUser = vi.fn(async () => ["openai"]);
-  listConfiguredProvidersForOrganization = vi.fn(async () => ["openai"]);
-  listRoutingPolicyOptions = vi.fn(async () => []);
+  findConfiguredProvidersForUser = vi.fn(async () => ["openai"]);
+  findConfiguredProvidersForOrganization = vi.fn(async () => ["openai"]);
+  findRoutingPolicyOptions = vi.fn(async () => []);
   reorder = vi.fn(async () => undefined);
 }
 
@@ -58,7 +58,7 @@ class FixedSlug implements AiToolSlug {
 }
 
 class FixedProviders implements AiToolProviderCatalog {
-  list() {
+  findAll() {
     return [
       { providerKey: "openai", displayName: "OpenAI", type: "llm" },
       { providerKey: "embed", displayName: "Embed", type: "embedding" },

@@ -29,7 +29,7 @@ export class PrismaSpendSpikeAnomalyRepository extends SpendSpikeAnomalyReposito
     return new PrismaSpendSpikeAnomalyRepository(database);
   }
 
-  async listActiveRules(): Promise<AnomalyRule[]> {
+  async findActiveRules(): Promise<AnomalyRule[]> {
     const rows = await this.prisma.anomalyRule.findMany({
       where: {
         ruleType: "spend_spike",

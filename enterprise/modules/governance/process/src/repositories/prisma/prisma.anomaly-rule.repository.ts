@@ -22,7 +22,7 @@ export class PrismaAnomalyRuleRepository extends AnomalyRuleRepository {
     return new PrismaAnomalyRuleRepository(database);
   }
 
-  async list(organizationId: string): Promise<AnomalyRule[]> {
+  async findAll(organizationId: string): Promise<AnomalyRule[]> {
     const rows = await this.prisma.anomalyRule.findMany({
       where: { organizationId, archivedAt: null },
       orderBy: [{ severity: "asc" }, { name: "asc" }],

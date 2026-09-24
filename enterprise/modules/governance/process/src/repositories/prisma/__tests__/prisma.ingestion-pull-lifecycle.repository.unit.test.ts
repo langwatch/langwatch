@@ -16,7 +16,7 @@ describe("PrismaIngestionPullLifecycleRepository", () => {
       ingestionSource: { findMany: sourceFindMany },
     } satisfies IngestionPullLifecycleDatabase);
 
-    await repository.listForReconciliation();
+    await repository.findForReconciliation();
 
     expect(projectFindMany).toHaveBeenCalledWith({
       where: { kind: "internal_governance", archivedAt: null },
@@ -44,7 +44,7 @@ describe("PrismaIngestionPullLifecycleRepository", () => {
       ingestionSource: { findMany: vi.fn().mockResolvedValue([]) },
     } satisfies IngestionPullLifecycleDatabase);
 
-    await repository.listForReconciliation();
+    await repository.findForReconciliation();
 
     expect(processFindMany).not.toHaveBeenCalled();
   });

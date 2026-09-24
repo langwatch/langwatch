@@ -5,6 +5,8 @@ import type { OpsApi } from "@langwatch/ops-contract";
 import {
   type OrganizationApi,
   OrganizationNotFoundForTeamError,
+  type PersonalWorkspace,
+  TeamNotFoundError,
 } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { vi } from "vitest";
@@ -65,7 +67,9 @@ export function createUserTestOrganizations(projectId = "project-1") {
       project: { id: projectId },
       team: { id: "team-1" },
     })),
-    tryFindPersonalWorkspace: vi.fn(async () => null),
+    getPersonalWorkspace: vi.fn(async (): Promise<PersonalWorkspace> => {
+      throw new TeamNotFoundError();
+    }),
     getOrganizationIdByTeamId: vi.fn(async ({ teamId }: { teamId: string }) => {
       throw new OrganizationNotFoundForTeamError(teamId);
     }),

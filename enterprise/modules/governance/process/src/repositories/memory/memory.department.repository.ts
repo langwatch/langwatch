@@ -23,7 +23,7 @@ export class MemoryDepartmentRepository extends DepartmentRepository {
     return new MemoryDepartmentRepository(store);
   }
 
-  async getAll(organizationId: string): Promise<Department[]> {
+  async findAll(organizationId: string): Promise<Department[]> {
     return this.store.departments.filter(
       (department) => department.organizationId === organizationId,
     );

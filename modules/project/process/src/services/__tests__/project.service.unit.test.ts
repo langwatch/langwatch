@@ -202,7 +202,7 @@ class StubOrganizationService extends OrganizationServiceContract {
     throw new Error("not used by this test");
   }
 
-  tryFindPersonalWorkspace(): Promise<never> {
+  getPersonalWorkspace(): Promise<never> {
     throw new Error("not used by this test");
   }
 

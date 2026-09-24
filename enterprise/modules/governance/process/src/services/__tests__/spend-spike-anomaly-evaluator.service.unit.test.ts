@@ -66,7 +66,7 @@ class MemoryAnomalyRepository extends SpendSpikeAnomalyRepository {
     super();
   }
 
-  async listActiveRules(): Promise<AnomalyRule[]> {
+  async findActiveRules(): Promise<AnomalyRule[]> {
     return this.rules;
   }
 

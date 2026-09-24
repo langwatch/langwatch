@@ -7,7 +7,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ResourceScope } from "@langwatch/kernel";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import { type OrganizationApi, TeamNotFoundError } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -37,7 +37,7 @@ const OTHER_ORG_ID = "org_2";
 const USER_ID = "user_1";
 
 const isMember = vi.fn();
-const tryFindPersonalWorkspace = vi.fn();
+const getPersonalWorkspace = vi.fn();
 const isEnabled = vi.fn();
 const virtualKeyFindMany = vi.fn();
 const groupMembershipFindMany = vi.fn();
@@ -79,7 +79,7 @@ async function gatewayAppStub(): Promise<GatewayApp> {
       projects: projectsStub({}),
       evaluators: peer("evaluators"),
       monitors: peer("monitors"),
-      organizations: organizationsStub({ isMember, tryFindPersonalWorkspace }),
+      organizations: organizationsStub({ isMember, getPersonalWorkspace }),
       featureFlags: featureFlagsStub({ isEnabled }),
       modelProviders: peer("modelProviders"),
     },
@@ -109,7 +109,7 @@ async function gatewayAppStub(): Promise<GatewayApp> {
 describe("GatewayApp.budgetOverviewForUser", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    tryFindPersonalWorkspace.mockResolvedValue(null);
+    getPersonalWorkspace.mockRejectedValue(new TeamNotFoundError());
     isEnabled.mockResolvedValue(true);
     virtualKeyFindMany.mockResolvedValue([]);
     groupMembershipFindMany.mockResolvedValue([]);

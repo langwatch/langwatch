@@ -27,10 +27,10 @@ describe("given the memory-backed governance repositories", () => {
         name: "Platform",
       });
 
-      await expect(repositories.departments.getAll("org-1")).resolves.toMatchObject([
+      await expect(repositories.departments.findAll("org-1")).resolves.toMatchObject([
         { id: created.id, name: "Platform" },
       ]);
-      await expect(repositories.departments.getAll("org-2")).resolves.toEqual([]);
+      await expect(repositories.departments.findAll("org-2")).resolves.toEqual([]);
     });
   });
 

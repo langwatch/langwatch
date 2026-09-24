@@ -8,7 +8,11 @@ import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ResourceScope } from "@langwatch/kernel";
-import type { OrganizationApi, PersonalWorkspace } from "@langwatch/organization-contract";
+import {
+  type OrganizationApi,
+  type PersonalWorkspace,
+  TeamNotFoundError,
+} from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -47,7 +51,10 @@ function buildApp(options: {
   const isOrganizationMember = vi.fn(async () =>
     options.isMember ? { userId: "member-1" } : null,
   );
-  const tryFindPersonalWorkspace = vi.fn(async () => options.workspace ?? null);
+  const getPersonalWorkspace = vi.fn(async () => {
+    if (!options.workspace) throw new TeamNotFoundError();
+    return options.workspace;
+  });
 
   // The two Prisma reads `createGovernanceMemberInfrastructure` wraps: `findFirst`
   // is the only method either port calls, so the rest of each delegate is unreachable.
@@ -64,14 +71,14 @@ function buildApp(options: {
       projects: createApiFixture<ProjectApi>(),
       auth: createApiFixture<AuthApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
-      organizations: createApiFixture<OrganizationApi>({ tryFindPersonalWorkspace }),
+      organizations: createApiFixture<OrganizationApi>({ getPersonalWorkspace }),
       permissions: createApiFixture<AuthzApi>(),
     },
     members: { prisma },
     resources: new ResourceScope(),
   });
 
-  return { app, tryFindUser, isOrganizationMember, tryFindPersonalWorkspace };
+  return { app, tryFindUser, isOrganizationMember, getPersonalWorkspace };
 }
 
 describe("GovernanceApp.tryResolveActorWorkspace", () => {
@@ -127,7 +134,7 @@ describe("GovernanceApp.tryResolveActorWorkspace", () => {
 
   describe("given a token that names nobody", () => {
     it("answers null without asking about membership", async () => {
-      const { app, isOrganizationMember, tryFindPersonalWorkspace } = buildApp({
+      const { app, isOrganizationMember, getPersonalWorkspace } = buildApp({
         user: null,
       });
 
@@ -138,13 +145,13 @@ describe("GovernanceApp.tryResolveActorWorkspace", () => {
         }),
       ).resolves.toBeNull();
       expect(isOrganizationMember).not.toHaveBeenCalled();
-      expect(tryFindPersonalWorkspace).not.toHaveBeenCalled();
+      expect(getPersonalWorkspace).not.toHaveBeenCalled();
     });
   });
 
   describe("given a person who is not in this organization", () => {
     it("answers null without reading their workspace", async () => {
-      const { app, tryFindPersonalWorkspace } = buildApp({
+      const { app, getPersonalWorkspace } = buildApp({
         user: { id: "user-2", name: "Ben", email: "ben@other.com" },
         isMember: false,
         workspace,
@@ -156,7 +163,7 @@ describe("GovernanceApp.tryResolveActorWorkspace", () => {
           actor: "ben@other.com",
         }),
       ).resolves.toBeNull();
-      expect(tryFindPersonalWorkspace).not.toHaveBeenCalled();
+      expect(getPersonalWorkspace).not.toHaveBeenCalled();
     });
   });
 

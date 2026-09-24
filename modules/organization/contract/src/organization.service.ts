@@ -111,9 +111,7 @@ export abstract class OrganizationService {
   abstract ensurePersonalWorkspace(
     input: PersonalWorkspaceInput,
   ): Promise<EnsuredPersonalWorkspace>;
-  abstract tryFindPersonalWorkspace(
-    input: FindPersonalWorkspaceInput,
-  ): Promise<PersonalWorkspace | null>;
+  abstract getPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace>;
   abstract getPersonalWorkspaceFeatures(
     input: PersonalWorkspaceFeaturesInput,
   ): Promise<PersonalFeatures>;

@@ -1,4 +1,4 @@
-import type { OrganizationService } from "@langwatch/organization-contract";
+import { type OrganizationService, TeamNotFoundError } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { TestOrganizationService } from "../../__tests__/support/test-organization-service.ts";
@@ -26,21 +26,19 @@ class FakeIngestionKeyIssuer implements IngestionKeyIssuer {
 class FakeOrganizations extends TestOrganizationService {
   projectId: string | null = "project-personal";
 
-  tryFindPersonalWorkspace = async (): Promise<
-    Awaited<ReturnType<OrganizationService["tryFindPersonalWorkspace"]>>
-  > =>
-    this.projectId
-      ? {
-          team: { id: "team", name: "Mine", slug: "mine", createdAtMs: 1 },
-          project: {
-            id: this.projectId,
-            name: "Personal",
-            slug: "personal",
-            apiKey: "pkey",
-            createdAtMs: 1,
-          },
-        }
-      : null;
+  getPersonalWorkspace = async (): ReturnType<OrganizationService["getPersonalWorkspace"]> => {
+    if (!this.projectId) throw new TeamNotFoundError();
+    return {
+      team: { id: "team", name: "Mine", slug: "mine", createdAtMs: 1 },
+      project: {
+        id: this.projectId,
+        name: "Personal",
+        slug: "personal",
+        apiKey: "pkey",
+        createdAtMs: 1,
+      },
+    };
+  };
 }
 
 describe("IngestionKeyService", () => {

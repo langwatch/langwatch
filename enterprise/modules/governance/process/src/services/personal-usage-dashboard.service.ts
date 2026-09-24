@@ -8,7 +8,7 @@ import type {
   PersonalUsageSummary,
   PersonalUsageWindow,
 } from "@langwatch/enterprise-governance-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
+import { type OrganizationService, TeamNotFoundError } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 /** The three answers one /me usage screen renders, resolved together. */
@@ -31,7 +31,7 @@ export type PersonalUsageDashboardServiceOptions = {
     "personalUsageSummary" | "personalUsageDailyBuckets" | "personalUsageBreakdownByModel"
   >;
   /** The member's personal workspace, which is the tenant their traces land in. */
-  organizations: Pick<OrganizationService, "tryFindPersonalWorkspace">;
+  organizations: Pick<OrganizationService, "getPersonalWorkspace">;
   /** The organization's hidden governance project, which ingestion rows land in. */
   projects: Pick<ProjectApi, "findInternal">;
 };
@@ -63,10 +63,15 @@ export class PersonalUsageDashboardService {
    * governance tenant.
    */
   async read(input: PersonalUsageDashboardQuery): Promise<PersonalUsageRollup> {
-    const workspace = await this.options.organizations.tryFindPersonalWorkspace({
-      userId: input.userId,
-      organizationId: input.organizationId,
-    });
+    const workspace = await this.options.organizations
+      .getPersonalWorkspace({
+        userId: input.userId,
+        organizationId: input.organizationId,
+      })
+      .catch((error: unknown) => {
+        if (TeamNotFoundError.is(error)) return null;
+        throw error;
+      });
     if (!workspace) {
       return nothingSpentYet();
     }

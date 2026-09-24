@@ -1,11 +1,12 @@
-// Personal usage dashboard: resolves which tenants a member sees (personal
-// workspace, governance project), returns empty on signup.
 import type {
   PersonalUsageBreakdown,
   PersonalUsageBucket,
   PersonalUsageQueryInput,
   PersonalUsageSummary,
 } from "@langwatch/enterprise-governance-contract";
+// Personal usage dashboard: resolves which tenants a member sees (personal
+// workspace, governance project), returns empty on signup.
+import { TeamNotFoundError } from "@langwatch/organization-contract";
 import type { InternalProject } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -65,9 +66,11 @@ function build(
   const personalUsageSummary = vi.fn(async (_: PersonalUsageQueryInput) => summary);
   const personalUsageDailyBuckets = vi.fn(async (_: PersonalUsageQueryInput) => buckets);
   const personalUsageBreakdownByModel = vi.fn(async (_: PersonalUsageQueryInput) => breakdown);
-  const tryFindPersonalWorkspace = vi.fn(async () =>
-    options.workspace === undefined ? personalWorkspace : options.workspace,
-  );
+  const getPersonalWorkspace = vi.fn(async () => {
+    const workspace = options.workspace === undefined ? personalWorkspace : options.workspace;
+    if (!workspace) throw new TeamNotFoundError();
+    return workspace;
+  });
   const findInternal = vi.fn(async () =>
     options.internalProject === undefined ? governanceProject : options.internalProject,
   );
@@ -78,7 +81,7 @@ function build(
       personalUsageDailyBuckets,
       personalUsageBreakdownByModel,
     },
-    organizations: { tryFindPersonalWorkspace },
+    organizations: { getPersonalWorkspace },
     projects: { findInternal },
   };
 
@@ -86,7 +89,7 @@ function build(
     personalUsageSummary,
     personalUsageDailyBuckets,
     personalUsageBreakdownByModel,
-    tryFindPersonalWorkspace,
+    getPersonalWorkspace,
     findInternal,
     service: PersonalUsageDashboardService.create(dependencies),
   };
@@ -209,12 +212,12 @@ describe("PersonalUsageDashboardService", () => {
   describe("given a query whose tenants the caller already resolved", () => {
     describe("when it is rolled up", () => {
       it("issues the three reads without resolving anything again", async () => {
-        const { service, tryFindPersonalWorkspace, personalUsageSummary } = build();
+        const { service, getPersonalWorkspace, personalUsageSummary } = build();
         const query = { personalProjectId: PERSONAL_PROJECT_ID, userId: USER_ID };
 
         const rollup = await service.rollup(query);
 
-        expect(tryFindPersonalWorkspace).not.toHaveBeenCalled();
+        expect(getPersonalWorkspace).not.toHaveBeenCalled();
         expect(personalUsageSummary).toHaveBeenCalledWith(query);
         expect(rollup).toEqual({
           summary,

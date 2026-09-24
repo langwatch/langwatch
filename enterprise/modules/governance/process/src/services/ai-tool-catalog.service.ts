@@ -66,13 +66,13 @@ export class DefaultGovernanceAiToolCatalogService {
   }
 
   listForUser(input: AiToolMemberInput): Promise<AiToolEntry[]> {
-    return this.repository.listVisible(aiToolMemberInputSchema.parse(input));
+    return this.repository.findVisible(aiToolMemberInputSchema.parse(input));
   }
 
   listForAdmin(input: AiToolOrganizationInput): Promise<AiToolEntry[]> {
     const parsed = aiToolOrganizationInputSchema.parse(input);
 
-    return this.repository.listAdmin(parsed.organizationId);
+    return this.repository.findAdmin(parsed.organizationId);
   }
 
   async findById(input: FindAiToolEntryInput): Promise<AiToolEntry | null> {
@@ -149,7 +149,7 @@ export class DefaultGovernanceAiToolCatalogService {
   }
 
   listConfiguredProvidersForUser(input: AiToolMemberInput): Promise<string[]> {
-    return this.repository.listConfiguredProvidersForUser(aiToolMemberInputSchema.parse(input));
+    return this.repository.findConfiguredProvidersForUser(aiToolMemberInputSchema.parse(input));
   }
 
   async listProviderOptionsForAdmin(
@@ -157,11 +157,11 @@ export class DefaultGovernanceAiToolCatalogService {
   ): Promise<AiToolProviderOption[]> {
     const parsed = aiToolOrganizationInputSchema.parse(input);
     const configured = new Set(
-      await this.repository.listConfiguredProvidersForOrganization(parsed.organizationId),
+      await this.repository.findConfiguredProvidersForOrganization(parsed.organizationId),
     );
 
     return this.providers
-      .list()
+      .findAll()
       .filter(({ type }) => type === "llm")
       .map(({ providerKey, displayName }) => ({
         providerKey,
@@ -176,7 +176,7 @@ export class DefaultGovernanceAiToolCatalogService {
   ): Promise<{ id: string; name: string }[]> {
     const parsed = aiToolOrganizationInputSchema.parse(input);
 
-    return this.repository.listRoutingPolicyOptions(parsed.organizationId);
+    return this.repository.findRoutingPolicyOptions(parsed.organizationId);
   }
 
   reorder(input: ReorderAiToolEntriesInput): Promise<void> {
@@ -187,7 +187,7 @@ export class DefaultGovernanceAiToolCatalogService {
     input: AiToolMemberInput,
   ): Promise<Partial<Record<PlatformToolSlug, PlatformToolPolicy>>> {
     const parsed = aiToolMemberInputSchema.parse(input);
-    const tiles = await this.repository.listVisible({
+    const tiles = await this.repository.findVisible({
       ...parsed,
       type: "coding_assistant",
     });
@@ -250,12 +250,12 @@ export class DefaultGovernanceAiToolCatalogService {
   async resolveCliCatalogForUser(input: AiToolMemberInput): Promise<AiToolCliCatalog> {
     const parsed = aiToolMemberInputSchema.parse(input);
     const [assistantTiles, providerTiles, configuredProviderKeys] = await Promise.all([
-      this.repository.listVisible({
+      this.repository.findVisible({
         ...parsed,
         type: "coding_assistant",
       }),
-      this.repository.listVisible({ ...parsed, type: "model_provider" }),
-      this.repository.listConfiguredProvidersForUser(parsed),
+      this.repository.findVisible({ ...parsed, type: "model_provider" }),
+      this.repository.findConfiguredProvidersForUser(parsed),
     ]);
     const configured = new Set(configuredProviderKeys);
     const tools: AiToolCliCatalog["tools"] = [];

@@ -18,7 +18,7 @@ export class TestOrganizationService extends OrganizationService {
   getBillingProfile = unsupported<OrganizationService["getBillingProfile"]>();
   claimBillingCustomerId = unsupported<OrganizationService["claimBillingCustomerId"]>();
   ensurePersonalWorkspace = unsupported<OrganizationService["ensurePersonalWorkspace"]>();
-  tryFindPersonalWorkspace = unsupported<OrganizationService["tryFindPersonalWorkspace"]>();
+  getPersonalWorkspace = unsupported<OrganizationService["getPersonalWorkspace"]>();
   getPersonalWorkspaceFeatures = unsupported<OrganizationService["getPersonalWorkspaceFeatures"]>();
   enableAllPersonalWorkspaceFeatures =
     unsupported<OrganizationService["enableAllPersonalWorkspaceFeatures"]>();

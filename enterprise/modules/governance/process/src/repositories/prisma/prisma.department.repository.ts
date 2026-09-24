@@ -25,7 +25,7 @@ export class PrismaDepartmentRepository extends DepartmentRepository {
     return new PrismaDepartmentRepository(database);
   }
 
-  async getAll(organizationId: string): Promise<Department[]> {
+  async findAll(organizationId: string): Promise<Department[]> {
     const rows = await this.prisma.department.findMany({
       where: { organizationId, archivedAt: null },
       orderBy: { name: "asc" },

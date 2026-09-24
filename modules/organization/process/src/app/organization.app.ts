@@ -915,22 +915,22 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   }
 
   /**
-   * The caller's personal workspace in this organization, or `null` when they
-   * have none. The read half of `ensurePersonalWorkspace` above, for the
-   * callers that must not create one as a side effect of asking.
+   * The caller's personal workspace in this organization; `TeamNotFoundError`
+   * when they have none. The read half of `ensurePersonalWorkspace` above, for
+   * the callers that must not create one as a side effect of asking.
    */
-  tryFindPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null>;
-  tryFindPersonalWorkspace(
+  getPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace>;
+  getPersonalWorkspace(
     input: Omit<FindPersonalWorkspaceInput, "userId">,
     by: OrganizationCaller,
-  ): Promise<PersonalWorkspace | null>;
-  tryFindPersonalWorkspace(
+  ): Promise<PersonalWorkspace>;
+  getPersonalWorkspace(
     input: FindPersonalWorkspaceInput | Omit<FindPersonalWorkspaceInput, "userId">,
     by?: OrganizationCaller,
-  ): Promise<PersonalWorkspace | null> {
+  ): Promise<PersonalWorkspace> {
     const userId = by?.id ?? ("userId" in input ? input.userId : void 0);
     if (userId === void 0) throw new Error("A user is required to find a personal workspace");
-    return this.#dependencies.organizations.tryFindPersonalWorkspace({ ...input, userId });
+    return this.#dependencies.organizations.getPersonalWorkspace({ ...input, userId });
   }
 
   /** Changes one member's role inside one team. */

@@ -65,7 +65,7 @@ export class TestOrganizationService extends OrganizationService {
     return unsupported();
   }
 
-  tryFindPersonalWorkspace(): never {
+  getPersonalWorkspace(): never {
     return unsupported();
   }
 

@@ -35,7 +35,7 @@ export class MemoryPersonalVirtualKeyRepository extends PersonalVirtualKeyReposi
     );
   }
 
-  async list(input: { organizationId: string; userId?: string }): Promise<PersonalVirtualKey[]> {
+  async findAll(input: { organizationId: string; userId?: string }): Promise<PersonalVirtualKey[]> {
     return this.store.personalVirtualKeys.filter(
       (key) =>
         key.organizationId === input.organizationId &&
@@ -58,7 +58,7 @@ export class MemoryPersonalVirtualKeyRepository extends PersonalVirtualKeyReposi
     );
   }
 
-  async listActiveForUser(userId: string): Promise<PersonalVirtualKey[]> {
+  async findActiveForUser(userId: string): Promise<PersonalVirtualKey[]> {
     return this.store.personalVirtualKeys.filter(
       (key) => isActive(key) && key.principalUserId === userId,
     );

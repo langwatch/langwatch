@@ -446,7 +446,7 @@ class Organizations extends OrganizationService {
   ensurePersonalWorkspace() {
     return this.notUsed();
   }
-  tryFindPersonalWorkspace() {
+  getPersonalWorkspace() {
     return this.notUsed();
   }
   getPersonalWorkspaceFeatures() {

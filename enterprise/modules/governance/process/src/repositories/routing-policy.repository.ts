@@ -9,7 +9,7 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 
 export abstract class RoutingPolicyRepository {
-  abstract list(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]>;
+  abstract findAll(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]>;
   abstract findById(id: string): Promise<RoutingPolicy | null>;
   abstract countReachableModelProviders(input: {
     organizationId: string;

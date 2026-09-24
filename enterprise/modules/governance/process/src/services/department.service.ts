@@ -15,7 +15,7 @@ export class DepartmentService {
   }
 
   getAll(input: { organizationId: string }): Promise<Department[]> {
-    return this.repository.getAll(input.organizationId);
+    return this.repository.findAll(input.organizationId);
   }
 
   findById(input: { id: string; organizationId: string }): Promise<Department | null> {

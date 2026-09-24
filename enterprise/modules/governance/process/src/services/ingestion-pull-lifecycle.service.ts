@@ -83,7 +83,7 @@ export class IngestionPullLifecycleService {
   }
 
   async reconcile(): Promise<{ reconciled: number; failed: number }> {
-    const sources = await this.repository.listForReconciliation();
+    const sources = await this.repository.findForReconciliation();
     let reconciled = 0;
     let failed = 0;
 

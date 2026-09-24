@@ -49,7 +49,7 @@ class InMemoryAnomalyRules extends AnomalyRuleRepository {
     super();
   }
 
-  async list() {
+  async findAll() {
     return [this.row];
   }
 

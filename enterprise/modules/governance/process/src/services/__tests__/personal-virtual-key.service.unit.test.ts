@@ -2,6 +2,7 @@ import {
   NoEligibleProvidersError,
   type PersonalVirtualKey,
 } from "@langwatch/enterprise-governance-contract";
+import { TeamNotFoundError } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { TestOrganizationService } from "../../__tests__/support/test-organization-service.ts";
@@ -27,9 +28,9 @@ const key: PersonalVirtualKey = {
 class MemoryKeys extends PersonalVirtualKeyRepository {
   eligible = 1;
   findDefault = vi.fn(async () => null);
-  list = vi.fn(async () => [key]);
+  findAll = vi.fn(async () => [key]);
   findOwned = vi.fn(async () => key);
-  listActiveForUser = vi.fn(async () => [key]);
+  findActiveForUser = vi.fn(async () => [key]);
   countEligibleProviders = vi.fn(async () => this.eligible);
 }
 
@@ -50,11 +51,13 @@ class MemoryOrganizations extends TestOrganizationService {
     },
     created: false,
   }));
-  tryFindPersonalWorkspace = vi.fn(async () => null);
+  getPersonalWorkspace = vi.fn(async (): Promise<never> => {
+    throw new TeamNotFoundError();
+  });
 }
 
 class MemoryPolicies {
-  list = vi.fn(async () => []);
+  findAll = vi.fn(async () => []);
   findById = vi.fn(async () => null);
   create = vi.fn();
   update = vi.fn();

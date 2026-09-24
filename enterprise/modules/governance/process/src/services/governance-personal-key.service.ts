@@ -174,7 +174,7 @@ export class DefaultGovernancePersonalVirtualKeyService {
   }
 
   list(input: ListPersonalVirtualKeysInput): Promise<PersonalVirtualKey[]> {
-    return this.repository.list(listPersonalVirtualKeysInputSchema.parse(input));
+    return this.repository.findAll(listPersonalVirtualKeysInputSchema.parse(input));
   }
 
   async revoke(input: RevokePersonalVirtualKeyInput): Promise<PersonalVirtualKey> {
@@ -197,7 +197,7 @@ export class DefaultGovernancePersonalVirtualKeyService {
 
   async revokeAllForUser(input: RevokeAllPersonalVirtualKeysInput): Promise<number> {
     const parsed = revokeAllPersonalVirtualKeysInputSchema.parse(input);
-    const keys = await this.repository.listActiveForUser(parsed.userId);
+    const keys = await this.repository.findActiveForUser(parsed.userId);
     for (const key of keys) {
       await this.issuer.revoke({
         id: key.id,

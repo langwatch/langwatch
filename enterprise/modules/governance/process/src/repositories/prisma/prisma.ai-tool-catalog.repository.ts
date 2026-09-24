@@ -46,7 +46,7 @@ export class PrismaAiToolCatalogRepository extends AiToolCatalogRepository {
     return new PrismaAiToolCatalogRepository(database);
   }
 
-  async listVisible(input: {
+  async findVisible(input: {
     organizationId: string;
     userId: string;
     type?: AiToolType;
@@ -98,7 +98,7 @@ export class PrismaAiToolCatalogRepository extends AiToolCatalogRepository {
     return Array.from(bySlug.values(), mapEntry);
   }
 
-  async listAdmin(organizationId: string): Promise<AiToolEntry[]> {
+  async findAdmin(organizationId: string): Promise<AiToolEntry[]> {
     const rows = await this.database.aiToolEntry.findMany({
       where: { organizationId, archivedAt: null },
       orderBy: [{ order: "asc" }, { displayName: "asc" }],
@@ -297,7 +297,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${input
     return { created: create.length, updated: update.length, skipped };
   }
 
-  async listConfiguredProvidersForUser(input: AiToolMemberInput): Promise<string[]> {
+  async findConfiguredProvidersForUser(input: AiToolMemberInput): Promise<string[]> {
     const memberships = await this.database.teamUser.findMany({
       where: {
         userId: input.userId,
@@ -313,7 +313,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${input
     return this.configuredProviders(input.organizationId, teamIds, projectIds);
   }
 
-  async listConfiguredProvidersForOrganization(organizationId: string): Promise<string[]> {
+  async findConfiguredProvidersForOrganization(organizationId: string): Promise<string[]> {
     const teams = await this.database.team.findMany({
       where: { organizationId },
       select: { id: true, projects: { select: { id: true } } },
@@ -325,7 +325,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${input
     );
   }
 
-  async listRoutingPolicyOptions(organizationId: string): Promise<{ id: string; name: string }[]> {
+  async findRoutingPolicyOptions(organizationId: string): Promise<{ id: string; name: string }[]> {
     return this.database.routingPolicy.findMany({
       where: {
         organizationId,

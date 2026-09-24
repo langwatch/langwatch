@@ -28,7 +28,7 @@ export class MemorySpendSpikeAnomalyRepository extends SpendSpikeAnomalyReposito
     return new MemorySpendSpikeAnomalyRepository(store);
   }
 
-  async listActiveRules(): Promise<AnomalyRule[]> {
+  async findActiveRules(): Promise<AnomalyRule[]> {
     return this.store.anomalyRules.filter(
       (rule) => rule.archivedAt === null && rule.status === "active",
     );

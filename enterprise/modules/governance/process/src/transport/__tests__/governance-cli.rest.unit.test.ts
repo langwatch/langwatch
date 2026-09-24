@@ -1,9 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/**
- * `/api/auth/cli`: who each route admits, in which order, and the
- * `{ error, error_description }` bodies released `langwatch` builds parse.
- * Spec: specs/ai-gateway/cli-token-revoke-on-deactivation.feature
- */
 import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
@@ -12,6 +6,13 @@ import {
   type GovernanceRestApi,
 } from "@langwatch/enterprise-governance-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * `/api/auth/cli`: who each route admits, in which order, and the
+ * `{ error, error_description }` bodies released `langwatch` builds parse.
+ * Spec: specs/ai-gateway/cli-token-revoke-on-deactivation.feature
+ */
+import { TeamNotFoundError } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { TestGovernanceService } from "../../app/__tests__/support/test-governance-service.ts";
@@ -111,7 +112,10 @@ function mountCli(world: World = {}) {
         findSupportContact: vi.fn().mockResolvedValue(world.supportContact ?? null),
       }),
       ensurePersonalWorkspace: unreachable<() => Promise<never>>(),
-      tryFindPersonalWorkspace: vi.fn().mockResolvedValue(world.personalWorkspace ?? null),
+      getPersonalWorkspace: vi.fn(async () => {
+        if (!world.personalWorkspace) throw new TeamNotFoundError();
+        return world.personalWorkspace;
+      }),
       permittedOnProject,
       ...(world.budgets ? { budgets: world.budgets } : {}),
       publicBaseUrl: "https://app.test",

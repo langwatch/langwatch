@@ -6,6 +6,7 @@ import {
   type OrganizationApi,
   OrganizationNotFoundForTeamError,
   type PersonalWorkspace,
+  TeamNotFoundError,
   type PersonalWorkspaceInput,
 } from "@langwatch/organization-contract";
 import {
@@ -127,6 +128,9 @@ export class UserAccountService {
   }
 
   findPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null> {
-    return this.organizations.tryFindPersonalWorkspace(input);
+    return this.organizations.getPersonalWorkspace(input).catch((error: unknown) => {
+      if (TeamNotFoundError.is(error)) return null;
+      throw error;
+    });
   }
 }

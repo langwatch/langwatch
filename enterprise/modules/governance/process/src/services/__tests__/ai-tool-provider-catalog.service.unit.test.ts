@@ -7,7 +7,7 @@ import { ModelProviderAiToolCatalogService } from "../ai-tool-provider-catalog.s
 describe("ModelProviderAiToolCatalogService", () => {
   describe("when the catalogue is listed", () => {
     it("answers every registry provider with its key, name and type", () => {
-      const providers = ModelProviderAiToolCatalogService.create().list();
+      const providers = ModelProviderAiToolCatalogService.create().findAll();
 
       expect(providers.length).toBeGreaterThan(0);
       expect(providers).toContainEqual(

@@ -37,7 +37,7 @@ export class PrismaRoutingPolicyRepository extends RoutingPolicyRepository {
     return new PrismaRoutingPolicyRepository(database);
   }
 
-  async list(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]> {
+  async findAll(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]> {
     let scopePredicates: Prisma.RoutingPolicyScopeWhereInput[] | undefined;
     if (input.selectableForScope) {
       scopePredicates = await this.ancestorScopePredicates(

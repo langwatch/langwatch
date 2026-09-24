@@ -643,9 +643,7 @@ describe("API-key service", () => {
       hasPermission: vi.fn().mockResolvedValue(true),
       listUserCreatedRoles: vi.fn().mockResolvedValue([]),
     });
-    const organizations = createApiFixture<OrganizationApi>({
-      tryFindPersonalWorkspace: vi.fn().mockResolvedValue(null),
-    });
+    const organizations = createApiFixture<OrganizationApi>({});
     const projects = createApiFixture<ProjectApi>({
       getWithTeam: vi.fn().mockResolvedValue({
         archivedAt: null,

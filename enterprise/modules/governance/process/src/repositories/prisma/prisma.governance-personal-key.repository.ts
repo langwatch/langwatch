@@ -47,7 +47,7 @@ export class PrismaPersonalVirtualKeyRepository extends PersonalVirtualKeyReposi
     return row ? mapKey(row) : null;
   }
 
-  async list(input: { organizationId: string; userId?: string }): Promise<PersonalVirtualKey[]> {
+  async findAll(input: { organizationId: string; userId?: string }): Promise<PersonalVirtualKey[]> {
     const principalUserId: Prisma.StringNullableFilter<"VirtualKey"> =
       input.userId === undefined ? { not: null } : { equals: input.userId };
     const rows = await this.database.virtualKey.findMany({
@@ -78,7 +78,7 @@ export class PrismaPersonalVirtualKeyRepository extends PersonalVirtualKeyReposi
     return row ? mapKey(row) : null;
   }
 
-  async listActiveForUser(userId: string): Promise<PersonalVirtualKey[]> {
+  async findActiveForUser(userId: string): Promise<PersonalVirtualKey[]> {
     const rows = await this.database.virtualKey.findMany({
       where: { principalUserId: userId, revokedAt: null },
       include: includeScopes,

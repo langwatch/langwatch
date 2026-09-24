@@ -11,7 +11,7 @@ import {
   type PersonalIngestionKeyState,
 } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationService } from "@langwatch/organization-contract";
+import { type OrganizationService, TeamNotFoundError } from "@langwatch/organization-contract";
 import { Temporal } from "@langwatch/time";
 
 import type { IngestionKeyIssuer, IngestionKeyRepository } from "../app/governance.members.ts";
@@ -73,7 +73,12 @@ export class IngestionKeyService {
     ingestionTemplateId?: string | null;
     createdByDeviceLabel?: string | null;
   }): Promise<IssuedIngestionKey> {
-    const workspace = await this.organizations.tryFindPersonalWorkspace(input);
+    const workspace = await this.organizations
+      .getPersonalWorkspace(input)
+      .catch((error: unknown) => {
+        if (TeamNotFoundError.is(error)) return null;
+        throw error;
+      });
     if (!workspace) {
       throw new PersonalWorkspaceMissingError();
     }
@@ -102,7 +107,12 @@ export class IngestionKeyService {
       throw new PersonalSourceTypeNotAllowedError(input.sourceType);
     }
 
-    const workspace = await this.organizations.tryFindPersonalWorkspace(input);
+    const workspace = await this.organizations
+      .getPersonalWorkspace(input)
+      .catch((error: unknown) => {
+        if (TeamNotFoundError.is(error)) return null;
+        throw error;
+      });
     if (!workspace) {
       throw new PersonalWorkspaceMissingError();
     }
@@ -219,7 +229,12 @@ export class IngestionKeyService {
     userId: string;
     organizationId: string;
   }): Promise<PersonalIngestionKey[]> {
-    const workspace = await this.organizations.tryFindPersonalWorkspace(input);
+    const workspace = await this.organizations
+      .getPersonalWorkspace(input)
+      .catch((error: unknown) => {
+        if (TeamNotFoundError.is(error)) return null;
+        throw error;
+      });
     if (!workspace) {
       return [];
     }

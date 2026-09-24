@@ -33,7 +33,7 @@ export class AnomalyRuleService {
   }
 
   async list(organizationId: string): Promise<AnomalyRule[]> {
-    return this.repository.list(organizationId);
+    return this.repository.findAll(organizationId);
   }
 
   async findById({

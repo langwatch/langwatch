@@ -47,7 +47,7 @@ class MemoryAnomalyRuleRepository extends AnomalyRuleRepository {
     for (const item of initial) this.rows.set(item.id, item);
   }
 
-  async list(organizationId: string): Promise<AnomalyRule[]> {
+  async findAll(organizationId: string): Promise<AnomalyRule[]> {
     return [...this.rows.values()].filter(
       (item) => item.organizationId === organizationId && item.archivedAt === null,
     );

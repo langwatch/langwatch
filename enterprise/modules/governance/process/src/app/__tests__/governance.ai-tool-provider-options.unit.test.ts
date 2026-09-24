@@ -39,8 +39,8 @@ const entry: AiToolEntry = {
 
 /** One organization that has configured exactly one provider. */
 class OneConfiguredProviderCatalog extends AiToolCatalogRepository {
-  listVisible = vi.fn(async () => [entry]);
-  listAdmin = vi.fn(async () => [entry]);
+  findVisible = vi.fn(async () => [entry]);
+  findAdmin = vi.fn(async () => [entry]);
   findById = vi.fn(async () => entry);
   departmentsBelongToOrganization = vi.fn(async () => true);
   create = vi.fn(async () => entry);
@@ -48,9 +48,9 @@ class OneConfiguredProviderCatalog extends AiToolCatalogRepository {
   remove = vi.fn(async () => entry);
   ensureDefaultCatalog = vi.fn(async () => ({ hasSeeded: true, created: 0 }));
   seedStarterPack = vi.fn(async () => ({ created: 0, updated: 0, skipped: 0 }));
-  listConfiguredProvidersForUser = vi.fn(async () => ["openai"]);
-  listConfiguredProvidersForOrganization = vi.fn(async () => ["openai"]);
-  listRoutingPolicyOptions = vi.fn(async () => []);
+  findConfiguredProvidersForUser = vi.fn(async () => ["openai"]);
+  findConfiguredProvidersForOrganization = vi.fn(async () => ["openai"]);
+  findRoutingPolicyOptions = vi.fn(async () => []);
   reorder = vi.fn(async () => undefined);
 }
 

@@ -30,7 +30,7 @@ class MemoryRoutingPolicyRepository extends RoutingPolicyRepository {
   reachable = 1;
   create = vi.fn(async () => policy);
   update = vi.fn(async () => policy);
-  list = vi.fn(async () => [policy]);
+  findAll = vi.fn(async () => [policy]);
   findById = vi.fn(async () => policy);
   setDefault = vi.fn(async () => policy);
   delete = vi.fn(async () => undefined);

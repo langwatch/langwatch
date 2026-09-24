@@ -17,7 +17,7 @@ export class ModelProviderAiToolCatalogService implements AiToolProviderCatalog 
     return new ModelProviderAiToolCatalogService();
   }
 
-  list(): { providerKey: string; displayName: string; type: string }[] {
+  findAll(): { providerKey: string; displayName: string; type: string }[] {
     return Object.entries(modelProviders).map(([providerKey, definition]) => ({
       providerKey,
       displayName: definition.name,

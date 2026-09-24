@@ -337,11 +337,12 @@ export interface OrganizationApi {
     input: Omit<PersonalWorkspaceInput, "userId">,
     by: OrganizationCaller,
   ): Promise<EnsuredPersonalWorkspace>;
-  tryFindPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null>;
-  tryFindPersonalWorkspace(
+  /** Throws `TeamNotFoundError` when the caller has no personal workspace in this organization. */
+  getPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace>;
+  getPersonalWorkspace(
     input: Omit<FindPersonalWorkspaceInput, "userId">,
     by: OrganizationCaller,
-  ): Promise<PersonalWorkspace | null>;
+  ): Promise<PersonalWorkspace>;
   updateTeamMemberRole(
     input: Readonly<{ teamId: string; userId: string; role: string; customRoleId?: string }>,
     by: OrganizationCaller,

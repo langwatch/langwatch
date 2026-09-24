@@ -62,7 +62,7 @@ export class SpendSpikeAnomalyEvaluatorService {
 
   async evaluateAll(input: { now?: Instant } = {}): Promise<SpendSpikeEvaluationSummary> {
     const now = input.now ?? nowInstant();
-    const rules = await this.repository.listActiveRules();
+    const rules = await this.repository.findActiveRules();
     const skipped: Record<string, number> = {};
     let alertsFired = 0;
 

@@ -1,11 +1,5 @@
 import { randomBytes } from "node:crypto";
 
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/**
- * Every credential `/api/auth/cli` hands back or mints, and the pre-flight
- * budget probe that decides whether a wrapped tool may run at all. The
- * transport renders these outcomes; every branch between them is decided here.
- */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   NoEligibleProvidersError,
@@ -17,6 +11,13 @@ import {
   type GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * Every credential `/api/auth/cli` hands back or mints, and the pre-flight
+ * budget probe that decides whether a wrapped tool may run at all. The
+ * transport renders these outcomes; every branch between them is decided here.
+ */
+import { TeamNotFoundError } from "@langwatch/organization-contract";
 
 import type { GovernanceCliCaller } from "./governance-cli-access.service.ts";
 import type { OrganizationSupportContactService } from "./organization-support-contact.service.ts";
@@ -139,10 +140,11 @@ export type GovernanceCliCredentialMembers = Readonly<{
     displayName?: string | null;
     displayEmail?: string | null;
   }) => Promise<GovernanceCliPersonalWorkspace>;
-  tryFindPersonalWorkspace: (input: {
+  /** Throws `TeamNotFoundError` when the caller has no personal workspace here. */
+  getPersonalWorkspace: (input: {
     organizationId: string;
     userId: string;
-  }) => Promise<GovernanceCliPersonalWorkspace | null>;
+  }) => Promise<GovernanceCliPersonalWorkspace>;
   /**
    * Whether one person may do one thing to one project. PROJECT-tier, the
    * deployment's own AuthZ graph, which is why it arrives rather than being
@@ -210,10 +212,15 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
    * rather than blocking: nothing can be over a budget it never reached.
    */
   async budgetStatus(caller: GovernanceCliCaller): Promise<GovernanceCliBudgetStatus> {
-    const workspace = await this.members.tryFindPersonalWorkspace({
-      organizationId: caller.organization_id,
-      userId: caller.user_id,
-    });
+    const workspace = await this.members
+      .getPersonalWorkspace({
+        organizationId: caller.organization_id,
+        userId: caller.user_id,
+      })
+      .catch((error: unknown) => {
+        if (TeamNotFoundError.is(error)) return null;
+        throw error;
+      });
 
     if (!workspace) return { outcome: "clear" };
 

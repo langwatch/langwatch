@@ -30,7 +30,7 @@ class MemoryLifecycleRepository extends IngestionPullLifecycleRepository {
     super();
   }
 
-  async listForReconciliation(): Promise<IngestionPullLifecycleSource[]> {
+  async findForReconciliation(): Promise<IngestionPullLifecycleSource[]> {
     return this.sources;
   }
 }

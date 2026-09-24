@@ -18,7 +18,7 @@ export class PrismaIngestionPullLifecycleRepository extends IngestionPullLifecyc
     return new PrismaIngestionPullLifecycleRepository(database);
   }
 
-  async listForReconciliation(): Promise<IngestionPullLifecycleSource[]> {
+  async findForReconciliation(): Promise<IngestionPullLifecycleSource[]> {
     const projects = await this.database.project.findMany({
       where: { kind: INTERNAL_GOVERNANCE_PROJECT_KIND, archivedAt: null },
       select: { id: true },

@@ -9,7 +9,7 @@ function createService() {
   };
   const organizations = {
     ensurePersonalWorkspace: vi.fn(),
-    tryFindPersonalWorkspace: vi.fn(),
+    getPersonalWorkspace: vi.fn(),
   };
   const ops = { isAdmin: vi.fn(() => true) };
   const service = UserAccountService.create({

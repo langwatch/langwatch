@@ -7,7 +7,7 @@
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayBudget, GatewayBudgetScopeType } from "@langwatch/gateway-contract";
 import { scopeTargetKey, GatewayWindow } from "@langwatch/gateway-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import { type OrganizationApi, TeamNotFoundError } from "@langwatch/organization-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 
 import { budgetSpendTargetsFor, type GatewayBudgetSpend } from "../app/gateway.members.ts";
@@ -113,7 +113,7 @@ type PersonalUsageReader = {
 
 export class BudgetOverviewService {
   private readonly repository: GatewayBudgetOverviewRepository;
-  private readonly organizations: Pick<OrganizationApi, "isMember" | "tryFindPersonalWorkspace">;
+  private readonly organizations: Pick<OrganizationApi, "isMember" | "getPersonalWorkspace">;
   private readonly featureFlags: FeatureFlagApi;
   private readonly personalVirtualKeys: PersonalVirtualKeyReader;
   private readonly personalUsage: PersonalUsageReader | undefined;
@@ -132,7 +132,7 @@ export class BudgetOverviewService {
     chRepo,
   }: {
     repository: GatewayBudgetOverviewRepository;
-    organizations: Pick<OrganizationApi, "isMember" | "tryFindPersonalWorkspace">;
+    organizations: Pick<OrganizationApi, "isMember" | "getPersonalWorkspace">;
     featureFlags: FeatureFlagApi;
     personalVirtualKeys: PersonalVirtualKeyReader;
     personalUsage: PersonalUsageReader | undefined;
@@ -159,7 +159,7 @@ export class BudgetOverviewService {
 
   static create(options: {
     repository: GatewayBudgetOverviewRepository;
-    organizations: Pick<OrganizationApi, "isMember" | "tryFindPersonalWorkspace">;
+    organizations: Pick<OrganizationApi, "isMember" | "getPersonalWorkspace">;
     featureFlags: FeatureFlagApi;
     personalVirtualKeys: PersonalVirtualKeyReader;
     budgetDecisions: GatewayService;
@@ -214,10 +214,15 @@ export class BudgetOverviewService {
     // The gates above stay sequential so the service still fails closed
     // before it reads any data.
     const [workspace, personalVks] = await Promise.all([
-      this.organizations.tryFindPersonalWorkspace({
-        userId: input.userId,
-        organizationId: input.organizationId,
-      }),
+      this.organizations
+        .getPersonalWorkspace({
+          userId: input.userId,
+          organizationId: input.organizationId,
+        })
+        .catch((error: unknown) => {
+          if (TeamNotFoundError.is(error)) return null;
+          throw error;
+        }),
       this.personalVirtualKeys.listActiveForPrincipal({
         userId: input.userId,
         organizationId: input.organizationId,

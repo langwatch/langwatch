@@ -23,7 +23,7 @@ export class MemoryAnomalyRuleRepository extends AnomalyRuleRepository {
     return new MemoryAnomalyRuleRepository(store);
   }
 
-  async list(organizationId: string): Promise<AnomalyRule[]> {
+  async findAll(organizationId: string): Promise<AnomalyRule[]> {
     return this.store.anomalyRules.filter(
       (rule) => rule.organizationId === organizationId && rule.archivedAt === null,
     );

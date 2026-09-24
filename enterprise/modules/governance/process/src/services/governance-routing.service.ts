@@ -35,7 +35,7 @@ export class DefaultGovernanceRoutingPolicyService {
   }
 
   list(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]> {
-    return this.repository.list(listRoutingPoliciesInputSchema.parse(input));
+    return this.repository.findAll(listRoutingPoliciesInputSchema.parse(input));
   }
 
   async findById(input: FindRoutingPolicyInput): Promise<RoutingPolicy | null> {

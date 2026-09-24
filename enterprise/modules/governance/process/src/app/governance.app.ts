@@ -77,7 +77,11 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import { OrganizationApi, type OrganizationService } from "@langwatch/organization-contract";
+import {
+  OrganizationApi,
+  type OrganizationService,
+  TeamNotFoundError,
+} from "@langwatch/organization-contract";
 import { reads } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 
@@ -237,7 +241,7 @@ export interface GovernanceAppDependencies {
    * The member's personal workspace: created on demand when they mint their
    * first key, read as it stands when they open their own dashboard.
    */
-  organizations: Pick<OrganizationService, "ensurePersonalWorkspace" | "tryFindPersonalWorkspace">;
+  organizations: Pick<OrganizationService, "ensurePersonalWorkspace" | "getPersonalWorkspace">;
   /**
    * The process's permission engine. Read directly rather than through a port
    * because the one question this feature asks it — may the caller see somebody
@@ -377,8 +381,7 @@ export class GovernanceApp implements GovernanceRestApi {
         supportContacts: () => cli.supportContacts,
         ensurePersonalWorkspace: (input) =>
           dependencies.organizations.ensurePersonalWorkspace(input),
-        tryFindPersonalWorkspace: (input) =>
-          dependencies.organizations.tryFindPersonalWorkspace(input),
+        getPersonalWorkspace: (input) => dependencies.organizations.getPersonalWorkspace(input),
         permittedOnProject: (input) => this.permittedOn("project", input.projectId, input),
         budgets: cli.budgets,
         publicBaseUrl: cli.publicBaseUrl,
@@ -869,10 +872,15 @@ export class GovernanceApp implements GovernanceRestApi {
     });
     if (!member) return null;
 
-    const workspace = await this.dependencies.organizations.tryFindPersonalWorkspace({
-      userId: user.id,
-      organizationId: input.organizationId,
-    });
+    const workspace = await this.dependencies.organizations
+      .getPersonalWorkspace({
+        userId: user.id,
+        organizationId: input.organizationId,
+      })
+      .catch((error: unknown) => {
+        if (TeamNotFoundError.is(error)) return null;
+        throw error;
+      });
     if (!workspace) return null;
 
     return {

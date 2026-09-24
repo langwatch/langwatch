@@ -38,5 +38,5 @@ export type IngestionPullLifecycleDatabase = {
 };
 
 export abstract class IngestionPullLifecycleRepository {
-  abstract listForReconciliation(): Promise<IngestionPullLifecycleSource[]>;
+  abstract findForReconciliation(): Promise<IngestionPullLifecycleSource[]>;
 }

@@ -122,7 +122,7 @@ function serviceOver(ledger: KeyLedger) {
     repository: new LedgerRepository(ledger),
     issuer: new LedgerIssuer(ledger),
     organizations: createApiFixture<OrganizationService>({
-      tryFindPersonalWorkspace: async () => ({
+      getPersonalWorkspace: async () => ({
         team: { id: "team-personal", name: "Personal", slug: "personal", createdAtMs: 0 },
         project: {
           id: PROJECT_ID,

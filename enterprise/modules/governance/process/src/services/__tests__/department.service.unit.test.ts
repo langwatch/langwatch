@@ -31,7 +31,7 @@ class MemoryDepartmentRepository extends DepartmentRepository {
     super();
   }
 
-  async getAll(): Promise<Department[]> {
+  async findAll(): Promise<Department[]> {
     return this.row ? [this.row] : [];
   }
 

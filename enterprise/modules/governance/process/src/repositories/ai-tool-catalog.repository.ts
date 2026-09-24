@@ -10,12 +10,12 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 
 export abstract class AiToolCatalogRepository {
-  abstract listVisible(input: {
+  abstract findVisible(input: {
     organizationId: string;
     userId: string;
     type?: AiToolType;
   }): Promise<AiToolEntry[]>;
-  abstract listAdmin(organizationId: string): Promise<AiToolEntry[]>;
+  abstract findAdmin(organizationId: string): Promise<AiToolEntry[]>;
   abstract findById(id: string): Promise<AiToolEntry | null>;
   abstract departmentsBelongToOrganization(input: {
     organizationId: string;
@@ -32,9 +32,9 @@ export abstract class AiToolCatalogRepository {
     values: SeedAiToolStarterPackInput;
     tiles: readonly AiToolStarterTile[];
   }): Promise<{ created: number; updated: number; skipped: number }>;
-  abstract listConfiguredProvidersForUser(input: AiToolMemberInput): Promise<string[]>;
-  abstract listConfiguredProvidersForOrganization(organizationId: string): Promise<string[]>;
-  abstract listRoutingPolicyOptions(
+  abstract findConfiguredProvidersForUser(input: AiToolMemberInput): Promise<string[]>;
+  abstract findConfiguredProvidersForOrganization(organizationId: string): Promise<string[]>;
+  abstract findRoutingPolicyOptions(
     organizationId: string,
   ): Promise<{ id: string; name: string }[]>;
   abstract reorder(input: ReorderAiToolEntriesInput): Promise<void>;
@@ -47,7 +47,7 @@ export interface AiToolSlug {
 
 /** The model providers this deployment can offer a catalogue entry. */
 export interface AiToolProviderCatalog {
-  list(): {
+  findAll(): {
     providerKey: string;
     displayName: string;
     type: string;
