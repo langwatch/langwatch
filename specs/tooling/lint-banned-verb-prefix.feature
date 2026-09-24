@@ -11,6 +11,14 @@ Feature: The banned-verb-prefix lint rule
   or throws; one that answers nothing becomes `assert<Condition>`. A private
   method's name is no caller's contract and is left alone.
 
+  When the declared answer, null and undefined set aside, is one value rather
+  than an array, the `try*` messages drop the `find<Noun>` option: they name
+  a throwing `get<Noun>`, or an explicit result union when absence means
+  something other than not-found. A method or module-scope const whose name
+  a vendor's callback interface dictates — its class implements or extends
+  only vendor imports, or its declared type heads at one — is exempt
+  (ADR-146); the same name in our own interface is still reported.
+
   Background:
     Given a workspace whose agent module has a contract and a process half
 
@@ -22,7 +30,7 @@ Feature: The banned-verb-prefix lint rule
 
   @unit
   Scenario: The try message never claims a catch and never prescribes a nullable find
-    Given a try-prefixed function whose body has no catch at all
+    Given a try-prefixed function answering an array or null whose body has no catch at all
     When the banned-verb-prefix rule runs over it
     Then the message says to drop try and names get<Noun> and an array-returning find<Noun>
     And it never mentions a catch
@@ -53,3 +61,18 @@ Feature: The banned-verb-prefix lint rule
     Given a private try-prefixed method, an arrow nested in a method body, and a find method
     When the banned-verb-prefix rule runs over them
     Then it reports nothing
+
+  @unit
+  Scenario: A try-prefixed name answering one value is pointed at get or a result union, never find
+    Given a try-prefixed declaration whose declared answer is one value or null or undefined
+    When the banned-verb-prefix rule runs over it
+    Then it reports tryPrefixOneValue, or swallowingTryOneValue when its own catch swallows
+    And the message names get<Noun> and an explicit result union and says not to rename it find
+    But an answer declared through a local alias it cannot see through keeps tryPrefix
+
+  @unit
+  Scenario: A vendor callback is exempt, and our own interface of the same shape is not
+    Given a try-prefixed method of a class implementing only a vendor import, or a const typed by one
+    When the banned-verb-prefix rule runs over it
+    Then it reports nothing
+    But the same name implementing a @langwatch, relative or mixed heritage, or typed by a relative import, is reported

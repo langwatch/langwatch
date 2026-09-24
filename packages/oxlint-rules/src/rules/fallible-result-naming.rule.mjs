@@ -19,6 +19,16 @@ const GET_VOCABULARY = /^get([A-Z]|$)/;
 const DERIVATION_VOCABULARY =
   /^(parse|extract|build|stringify|serialize|serialise|deserialize|deserialise|format|render|normalize|normalise|coerce|decode|encode|convert|derive|compute|translate|project|visit|as|to|infer|classify|detect|pick|describe|map|fold|reduce)([A-Z]|$)/;
 
+// ADR-146: a vendor's callback interface dictates its implementer's name and shape.
+const INTERNAL_SPECIFIER = /^(?:\.|\/|#|@langwatch\/|langwatch(?:\/|$))/;
+const TYPE_WRAPPERS = new Set(["NonNullable", "Readonly", "Required"]);
+const OPAQUE_ANSWER = new Set([
+  "TSAnyKeyword",
+  "TSNeverKeyword",
+  "TSUnknownKeyword",
+  "TSVoidKeyword",
+]);
+
 /** Shared with `banned-verb-prefix`, which owns the `try*` naming defect. */
 export function isTryPrefixedName(name) {
   return TRY_PREFIX.test(name);
@@ -90,6 +100,79 @@ function containsArrayType(node) {
   return false;
 }
 
+/** Local names bound by an import from a vendor package: not `@langwatch/*`, not relative. */
+export function vendorImportedNames(program) {
+  const names = new Set();
+  for (const statement of program.body) {
+    if (statement.type !== "ImportDeclaration") continue;
+    if (INTERNAL_SPECIFIER.test(statement.source.value)) continue;
+    for (const specifier of statement.specifiers) names.add(specifier.local.name);
+  }
+  return names;
+}
+
+function rootIdentifierName(node) {
+  if (node?.type === "Identifier") return node.name;
+  if (node?.type === "TSQualifiedName") return rootIdentifierName(node.left);
+  if (node?.type === "MemberExpression") return rootIdentifierName(node.object);
+  return undefined;
+}
+
+/** `Vendor`, `Vendor.Hook`, `Vendor["hook"]` and `NonNullable<Vendor>` all head at `Vendor`. */
+function typeHeadName(node) {
+  if (node?.type === "TSParenthesizedType") return typeHeadName(node.typeAnnotation);
+  if (node?.type === "TSIndexedAccessType") return typeHeadName(node.objectType);
+  if (node?.type !== "TSTypeReference") return undefined;
+  const name = rootIdentifierName(node.typeName);
+  if (!TYPE_WRAPPERS.has(name)) return name;
+  return typeHeadName(node.typeArguments?.params?.[0]);
+}
+
+/** A method of a class whose every `implements`/`extends` names a vendor import. */
+export function isVendorShapedMethod(method, vendorNames) {
+  const owner = method.parent?.parent;
+  const heritage = (owner?.implements ?? []).map((clause) => rootIdentifierName(clause.expression));
+  if (owner?.superClass) heritage.push(rootIdentifierName(owner.superClass));
+  return heritage.length > 0 && heritage.every((name) => vendorNames.has(name));
+}
+
+/** A `const hook: Vendor["hook"] = …` whose declared type is a vendor import. */
+export function isVendorTypedDeclarator(declarator, vendorNames) {
+  return vendorNames.has(typeHeadName(declarator.id?.typeAnnotation?.typeAnnotation));
+}
+
+/** This file's type aliases that answer null or undefined, and those that answer an array. */
+export function aliasShapesOf(program) {
+  const plural = new Set();
+  for (const alias of typeAliasesOf(program)) {
+    if (containsArrayType(alias.typeAnnotation)) plural.add(alias.id.name);
+  }
+  return { nullable: nullableAliasesOf(program), plural };
+}
+
+function answerMembers(node) {
+  if (node?.type === "TSParenthesizedType") return answerMembers(node.typeAnnotation);
+  if (node?.type === "TSUnionType") return node.types.flatMap(answerMembers);
+  const promiseArgument = promiseTypeArgument(node);
+  return promiseArgument ? answerMembers(promiseArgument) : [node];
+}
+
+function isOneValue(node, { nullable, plural }) {
+  if (OPAQUE_ANSWER.has(node.type) || node.type === "TSTupleType" || containsArrayType(node))
+    return false;
+  const name = referencedName(node);
+  return !nullable.has(name) && !plural.has(name);
+}
+
+/** Whether the declared answer, null and undefined set aside, is one value and never an array. */
+export function answersOneValue(returnType, aliasShapes) {
+  if (!returnType) return false;
+  const present = answerMembers(returnType).filter(
+    (member) => member.type !== "TSNullKeyword" && member.type !== "TSUndefinedKeyword",
+  );
+  return present.length > 0 && present.every((member) => isOneValue(member, aliasShapes));
+}
+
 /** The one-or-throw shape, which is what `get` means and what a repository may keep. */
 function isOneOrThrowGet(name, returnType, nullableAliases) {
   if (!GET_VOCABULARY.test(name) || !returnType) return false;
@@ -113,6 +196,11 @@ export function repositoryVocabularyRest(name) {
   return name.startsWith("get") ? name.slice("get".length) : name.slice("list".length);
 }
 
+/** `getById` -> `ById`, so `get{{rest}}` names the one-or-throw read. */
+export function oneValueRest(name) {
+  return name.slice("get".length);
+}
+
 // A `try*` name's rename belongs to `banned-verb-prefix`, and a repository
 // get*/list* name's to `repositoryServiceVocabulary` — each prescribes it once.
 function shouldReportNullableWithoutFind(
@@ -131,19 +219,46 @@ function isModuleScopeDeclarator(node) {
   return owner?.type === "Program" || owner?.type === "ExportNamedDeclaration";
 }
 
-function reportResult(context, { key, nullableAliases, repositoryVocabulary, returnType }) {
+/** A named, non-computed method the naming rules govern: not a vendor callback. */
+export function isGovernedMethod(node, vendorNames) {
+  if (node.kind !== "method" || node.computed) return false;
+  return !isVendorShapedMethod(node, vendorNames);
+}
+
+/** The function a module-scope const holds, unless a vendor type dictates it. */
+export function governedDeclaratorFunction(node, vendorNames) {
+  const init = node.init;
+  if (init?.type !== "ArrowFunctionExpression" && init?.type !== "FunctionExpression") return;
+  if (!isModuleScopeDeclarator(node) || isVendorTypedDeclarator(node, vendorNames)) return;
+  return init;
+}
+
+// ADR-146 maps a repository's `list*` (a collection or a page) to `find*`; only a
+// one-value `get*` keeps its verb.
+function reportRepositoryVocabulary(context, { key, oneValue }) {
   const name = key.name;
+  if (oneValue && GET_VOCABULARY.test(name)) {
+    const data = { name, rest: oneValueRest(name) };
+    context.report({ node: key, messageId: "repositoryOneValue", data });
+    return;
+  }
+  const data = { name, rest: repositoryVocabularyRest(name) };
+  context.report({ node: key, messageId: "repositoryServiceVocabulary", data });
+}
+
+function reportResult(context, { aliasShapes, key, repositoryVocabulary, returnType }) {
+  const name = key.name;
+  const nullableAliases = aliasShapes.nullable;
+  const oneValue = answersOneValue(returnType, aliasShapes);
   const isRepositoryVocabularyName =
     repositoryVocabulary &&
     REPOSITORY_SERVICE_VOCABULARY.test(name) &&
     !isOneOrThrowGet(name, returnType, nullableAliases);
-  if (isRepositoryVocabularyName) {
-    const rest = repositoryVocabularyRest(name);
-    context.report({ node: key, messageId: "repositoryServiceVocabulary", data: { name, rest } });
-  }
+  if (isRepositoryVocabularyName) reportRepositoryVocabulary(context, { key, oneValue });
   const scope = { isRepositoryVocabularyName, nullableAliases };
   if (returnType && shouldReportNullableWithoutFind(name, returnType, scope)) {
-    context.report({ node: key, messageId: "nullableWithoutFind", data: { name } });
+    const messageId = oneValue ? "nullableOneValue" : "nullableWithoutFind";
+    context.report({ node: key, messageId, data: { name } });
   }
 }
 
@@ -166,27 +281,48 @@ export const fallibleResultNamingRule = defineRule({
         " `find` states cardinality, and the existing nullable ones are left as they" +
         " are rather than joined by new ones.",
     },
+    nullableOneValue: {
+      what: "`{{name}}` answers one value or null or undefined, which is not a shape new code writes.",
+      why: "`find` states cardinality: it answers an array, and this answers one value.",
+      fix:
+        "Make it one-or-throw: name it `get<Noun>` — or `getBy<Key>` when the key is what" +
+        " distinguishes it — throw the domain error when the value does not exist, and drop" +
+        " null and undefined from the return type. If absence means something other than" +
+        " not-found, return an explicit result union naming that outcome instead. Do not" +
+        " rename it `find*`: `find` answers an array.",
+    },
     repositoryServiceVocabulary: {
       what: "Repository method `{{name}}` uses service vocabulary; repositories answer `find*`, services answer `get*`.",
       fix: "Rename it `find{{rest}}` here and in the repository interface this class implements.",
     },
+    repositoryOneValue: {
+      what: "Repository method `{{name}}` answers one value, which a repository names `get*` and answers or throws.",
+      why: "`find` answers an array, so renaming a one-value read to `find*` misstates its cardinality.",
+      fix:
+        "Name it `get{{rest}}`, throw the module's not-found error when the value does not" +
+        " exist and drop null and undefined from the return type, here and in the repository" +
+        " interface this class implements. If absence means something other than not-found," +
+        " return an explicit result union naming that outcome instead. Do not rename it" +
+        " `find{{rest}}`.",
+    },
   },
   create(context, file) {
     const isRepositoryVocabularyFile = REPOSITORY_METHOD_FILE.test(file.workspacePath ?? "");
-    let nullableAliases = new Set();
+    let aliasShapes = { nullable: new Set(), plural: new Set() };
+    let vendorNames = new Set();
 
     const check = (key, returnType, { accessibility, allowRepositoryVocabulary = false } = {}) => {
       if (key?.type !== "Identifier" || accessibility === "private") return;
       reportResult(context, {
+        aliasShapes,
         key,
-        nullableAliases,
         repositoryVocabulary: allowRepositoryVocabulary && isRepositoryVocabularyFile,
         returnType,
       });
     };
 
     const checkMethod = (node) => {
-      if (node.kind !== "method" || node.computed) return;
+      if (!isGovernedMethod(node, vendorNames)) return;
       check(node.key, node.value?.returnType?.typeAnnotation, {
         accessibility: node.accessibility,
         allowRepositoryVocabulary: true,
@@ -195,7 +331,8 @@ export const fallibleResultNamingRule = defineRule({
 
     return {
       Program(node) {
-        nullableAliases = nullableAliasesOf(node);
+        aliasShapes = aliasShapesOf(node);
+        vendorNames = vendorImportedNames(node);
       },
       MethodDefinition: checkMethod,
       TSAbstractMethodDefinition: checkMethod,
@@ -207,9 +344,8 @@ export const fallibleResultNamingRule = defineRule({
         check(node.id, node.returnType?.typeAnnotation);
       },
       VariableDeclarator(node) {
-        const init = node.init;
-        if (init?.type !== "ArrowFunctionExpression" && init?.type !== "FunctionExpression") return;
-        if (isModuleScopeDeclarator(node)) check(node.id, init.returnType?.typeAnnotation);
+        const init = governedDeclaratorFunction(node, vendorNames);
+        if (init) check(node.id, init.returnType?.typeAnnotation);
       },
     };
   },

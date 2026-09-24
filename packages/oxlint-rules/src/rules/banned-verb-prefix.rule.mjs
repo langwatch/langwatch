@@ -1,8 +1,13 @@
 import { walk } from "../ast.mjs";
 import { defineRule } from "../define-rule.mjs";
 import {
+  aliasShapesOf,
+  answersOneValue,
+  governedDeclaratorFunction,
   isFallibleResultModule,
+  isGovernedMethod,
   isTryPrefixedName,
+  vendorImportedNames,
   withoutPrefix,
 } from "./fallible-result-naming.rule.mjs";
 
@@ -23,6 +28,12 @@ const RENAME =
   " returning an array, whose empty case is the absence. A derivation (`parse`, `extract`," +
   " `derive` and the other ADR-146 derivation verbs) may answer undefined when its input carried none." +
   " Never rename it to a `find*` that still answers null — `find` promises a list.";
+
+const RENAME_ONE_VALUE =
+  "It answers one value, so name it `get<Noun>` — or `getBy<Key>` when the key is what distinguishes it —" +
+  " and throw the domain error instead of answering null. If absence means something other than" +
+  " not-found, return an explicit result union naming that outcome instead. Do not rename it `find*`:" +
+  " `find` answers an array.";
 
 function isNullishExpression(node) {
   if (!node) return false;
@@ -116,16 +127,18 @@ function answersNothing({ body, returnType }) {
   return !scopedSearch(body, (node) => node.type === "ReturnStatement" && node.argument != null);
 }
 
-function isModuleScopeDeclarator(node) {
-  const owner = node.parent?.parent;
-  return owner?.type === "Program" || owner?.type === "ExportNamedDeclaration";
+function tryMessageId({ aliasShapes, body, returnType }) {
+  const messageId = bodyIsSwallow(body) ? "swallowingTry" : "tryPrefix";
+  return answersOneValue(returnType?.typeAnnotation, aliasShapes)
+    ? `${messageId}OneValue`
+    : messageId;
 }
 
-function reportBannedPrefix(context, { accessibility, body, key, returnType }) {
+function reportBannedPrefix(context, { accessibility, aliasShapes, body, key, returnType }) {
   if (key?.type !== "Identifier" || accessibility === "private") return;
   const name = key.name;
   if (isTryPrefixedName(name)) {
-    const messageId = bodyIsSwallow(body) ? "swallowingTry" : "tryPrefix";
+    const messageId = tryMessageId({ aliasShapes, body, returnType });
     context.report({ node: key, messageId, data: { name } });
     return;
   }
@@ -146,9 +159,18 @@ export const bannedVerbPrefixRule = defineRule({
       why: "A caller reading the call site cannot tell a lookup from a hedge, and the two need different handling.",
       fix: `Drop \`try\` and name it for what it answers. ${RENAME}`,
     },
+    tryPrefixOneValue: {
+      what: "`{{name}}` is named for how it behaves on failure, not for the one value it answers.",
+      why: "`find` states cardinality, and this answers one value, not an array.",
+      fix: `Drop \`try\` and name it for what it answers. ${RENAME_ONE_VALUE}`,
+    },
     swallowingTry: {
       what: "`{{name}}` hedges: its catch turns a failure into null or undefined, so the caller cannot tell absence from breakage.",
       fix: `Delete the catch that answers null or undefined so the failure reaches the caller, then drop \`try\` and name it for what it answers. ${RENAME}`,
+    },
+    swallowingTryOneValue: {
+      what: "`{{name}}` hedges: its catch turns a failure into null or undefined, so the caller cannot tell absence from breakage.",
+      fix: `Delete the catch that answers null or undefined so the failure reaches the caller, then drop \`try\` and name it for what it answers. ${RENAME_ONE_VALUE}`,
     },
     requirePrefix: {
       what: "`{{name}}` carries a `require` prefix, which says how it fails rather than what it answers.",
@@ -160,10 +182,12 @@ export const bannedVerbPrefixRule = defineRule({
     },
   },
   create(context) {
-    const check = (declaration) => reportBannedPrefix(context, declaration);
+    let aliasShapes = { nullable: new Set(), plural: new Set() };
+    let vendorNames = new Set();
+    const check = (declaration) => reportBannedPrefix(context, { ...declaration, aliasShapes });
 
     const checkMethod = (node) => {
-      if (node.kind !== "method" || node.computed) return;
+      if (!isGovernedMethod(node, vendorNames)) return;
       check({
         accessibility: node.accessibility,
         body: node.value?.body,
@@ -173,6 +197,10 @@ export const bannedVerbPrefixRule = defineRule({
     };
 
     return {
+      Program(node) {
+        aliasShapes = aliasShapesOf(node);
+        vendorNames = vendorImportedNames(node);
+      },
       MethodDefinition: checkMethod,
       TSAbstractMethodDefinition: checkMethod,
       TSMethodSignature(node) {
@@ -182,11 +210,8 @@ export const bannedVerbPrefixRule = defineRule({
         check({ body: node.body, key: node.id, returnType: node.returnType });
       },
       VariableDeclarator(node) {
-        const init = node.init;
-        if (init?.type !== "ArrowFunctionExpression" && init?.type !== "FunctionExpression") return;
-        if (isModuleScopeDeclarator(node)) {
-          check({ body: init.body, key: node.id, returnType: init.returnType });
-        }
+        const init = governedDeclaratorFunction(node, vendorNames);
+        if (init) check({ body: init.body, key: node.id, returnType: init.returnType });
       },
     };
   },

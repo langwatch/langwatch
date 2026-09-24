@@ -24,13 +24,13 @@ function report(code, filename = CONTRACT_SERVICE) {
 describe("given a module file declaring a nullable result", () => {
   describe("when a nullable result is not a find method", () => {
     /** @scenario "A nullable result is reported unless the name is find-prefixed" */
-    it("reports nullableWithoutFind on the getter's line", () => {
+    it("reports nullableOneValue on the getter's line", () => {
       const found = report(
         "export abstract class AgentService {\n  abstract getById(): Promise<string | undefined>;\n}",
       );
 
       expect(found.map((entry) => [entry.messageId, entry.line])).toEqual([
-        ["nullableWithoutFind", 2],
+        ["nullableOneValue", 2],
       ]);
     });
 
@@ -81,11 +81,11 @@ describe("given a module file declaring a nullable result", () => {
 
   describe("when a module-scope arrow const declares a nullable result", () => {
     /** @scenario "A nullable arrow const is reported like a function" */
-    it("reports nullableWithoutFind on the const's line", () => {
+    it("reports nullableOneValue on the const's line", () => {
       const found = report("\nexport const load = (id: string): string | null => null;", SERVICE);
 
       expect(found.map((entry) => [entry.messageId, entry.data.name, entry.line])).toEqual([
-        ["nullableWithoutFind", "load", 2],
+        ["nullableOneValue", "load", 2],
       ]);
     });
 
@@ -122,7 +122,7 @@ describe("given a module file declaring a nullable result", () => {
         runRule(bannedVerbPrefixRule, { code, cwd: workspace.cwd, filename: SERVICE }).map(
           (entry) => entry.messageId,
         ),
-      ).toEqual(["tryPrefix"]);
+      ).toEqual(["tryPrefixOneValue"]);
     });
   });
 });
@@ -165,9 +165,9 @@ describe("given a repository class or interface file", () => {
     });
 
     /** @scenario "A repository get method is reported" */
-    it("reports repositoryServiceVocabulary for a nullable getById on a memory repository class", () => {
+    it("reports repositoryServiceVocabulary with the find rename for a nullable array answer", () => {
       const found = report(
-        "export class MemoryAgentRepository { getById(): Promise<string | null> { return this.lookup(); } }",
+        "export class MemoryAgentRepository { getById(): Promise<string[] | null> { return this.lookup(); } }",
         REPOSITORY_MEMORY,
       );
 
@@ -179,14 +179,49 @@ describe("given a repository class or interface file", () => {
       );
     });
 
+    /** @scenario "A repository read answering one value is pointed at a throwing get, never find" */
+    it("reports repositoryOneValue for a nullable one-object getById, naming get and a result union", () => {
+      const found = report(
+        "export class MemoryAgentRepository { getOrganizationDirectory(): Promise<Directory | null> { return this.lookup(); } }",
+        REPOSITORY_MEMORY,
+      );
+
+      expect(found.map((entry) => entry.messageId)).toEqual(["repositoryOneValue"]);
+      expect(found[0].data).toEqual({
+        name: "getOrganizationDirectory",
+        rest: "OrganizationDirectory",
+      });
+      expect(found[0].message).toContain("Name it `getOrganizationDirectory`");
+      expect(found[0].message).toContain("explicit result union");
+      expect(found[0].message).not.toContain("Rename it `findOrganizationDirectory`");
+    });
+
+    /** @scenario "A repository read answering one value is pointed at a throwing get, never find" */
+    it("keeps a bare get as get, and leaves a list page to the find rename ADR-146 maps it to", () => {
+      const found = report(
+        [
+          "export interface AgentRepository {",
+          "  listPage(): Promise<AgentPage>;",
+          "  get(key: string): Promise<string | null>;",
+          "}",
+        ].join("\n"),
+        REPOSITORY_INTERFACE,
+      );
+
+      expect(found.map((entry) => [entry.messageId, entry.data.rest])).toEqual([
+        ["repositoryServiceVocabulary", "Page"],
+        ["repositoryOneValue", ""],
+      ]);
+    });
+
     /** @scenario "A repository get method is reported" */
-    it("reports repositoryServiceVocabulary only, not nullableWithoutFind, when the result is nullable", () => {
+    it("reports the repository finding only, not nullableWithoutFind, when the result is nullable", () => {
       const found = report(
         "export class MemoryAgentRepository { getById(): Promise<string | undefined> { return this.lookup(); } }",
         REPOSITORY_MEMORY,
       );
 
-      expect(found.map((entry) => entry.messageId)).toEqual(["repositoryServiceVocabulary"]);
+      expect(found.map((entry) => entry.messageId)).toEqual(["repositoryOneValue"]);
     });
 
     /** @scenario "A repository get method is reported" */
@@ -245,7 +280,7 @@ describe("given a file outside the repository path gate", () => {
       );
 
       expect(found.map((entry) => entry.messageId)).not.toContain("repositoryServiceVocabulary");
-      expect(found.map((entry) => entry.messageId)).toEqual(["nullableWithoutFind"]);
+      expect(found.map((entry) => entry.messageId)).toEqual(["nullableOneValue"]);
     });
   });
 });
@@ -267,7 +302,7 @@ describe("given a nullable function named for a conversion rather than a lookup"
           SERVICE,
         );
 
-        expect(found.map((entry) => entry.messageId)).not.toContain("nullableWithoutFind");
+        expect(found).toEqual([]);
       }
     });
 
@@ -278,7 +313,7 @@ describe("given a nullable function named for a conversion rather than a lookup"
         SERVICE,
       );
 
-      expect(found.map((entry) => entry.messageId)).toEqual(["nullableWithoutFind"]);
+      expect(found.map((entry) => entry.messageId)).toEqual(["nullableOneValue"]);
     });
   });
 });
@@ -288,7 +323,7 @@ describe("given the guidance the nullableWithoutFind message hands a reader", ()
     /** @scenario "A nullable result is reported unless the name is find-prefixed" */
     it("names get and throwing, and refuses a new nullable find, per the 2026-09-16 naming decision", () => {
       const found = report(
-        "export class AgentService { resolveOwner(): string | undefined { return undefined; } }",
+        "export class AgentService { resolveOwners(): string[] | undefined { return undefined; } }",
         SERVICE,
       );
 
@@ -334,8 +369,112 @@ describe("given a derivation that computes its answer from its argument", () => 
       for (const method of governed) {
         const found = report(`export class AgentService { ${method} }`, SERVICE);
 
-        expect(found.map((entry) => entry.messageId)).toEqual(["nullableWithoutFind"]);
+        expect(found.map((entry) => entry.messageId)).toEqual(["nullableOneValue"]);
       }
+    });
+  });
+});
+
+describe("given a nullable result that answers one value", () => {
+  describe("when the answer, set apart from null and undefined, is not an array", () => {
+    /** @scenario "A nullable one-value result is pointed at a throwing get or a result union, never find" */
+    it("names get, throwing and a result union, and tells the author not to rename it find", () => {
+      const [finding] = report(
+        "export class AgentService { loadOwner(): Promise<Owner | null> { return this.lookup(); } }",
+        SERVICE,
+      );
+
+      expect(finding.messageId).toBe("nullableOneValue");
+      expect(finding.message).toContain("`get<Noun>`");
+      expect(finding.message).toContain("throw the domain error");
+      expect(finding.message).toContain("explicit result union");
+      expect(finding.message).toContain("Do not rename it `find*`");
+      expect(finding.message).not.toContain("name it `find<Noun>`");
+    });
+
+    /** @scenario "A nullable one-value result is pointed at a throwing get or a result union, never find" */
+    it("keeps nullableWithoutFind when the answer is an array, a local array alias or unknown", () => {
+      const found = report(
+        [
+          "type Rows = string[];",
+          "export abstract class AgentService {",
+          "  abstract loadRows(): Promise<Rows | null>;",
+          "  abstract loadMany(): ReadonlyArray<string> | undefined;",
+          "  abstract loadAny(): unknown | undefined;",
+          "}",
+        ].join("\n"),
+        SERVICE,
+      );
+
+      expect(found.map((entry) => [entry.messageId, entry.data.name])).toEqual([
+        ["nullableWithoutFind", "loadRows"],
+        ["nullableWithoutFind", "loadMany"],
+        ["nullableWithoutFind", "loadAny"],
+      ]);
+    });
+  });
+});
+
+describe("given a declaration whose name and shape a vendor's callback interface dictates", () => {
+  describe("when it implements or is typed by something imported from a vendor package", () => {
+    /** @scenario "A vendor callback is exempt, and our own interface of the same shape is not" */
+    it("leaves methods of a vendor-implementing class and vendor-typed consts alone", () => {
+      const declarations = (vendor) =>
+        [
+          `import type { BetterAuthOptions } from "${vendor("better-auth")}";`,
+          `import * as Vendor from "${vendor("vendor-sdk")}";`,
+          `import { Transport } from "${vendor("winston-transport")}";`,
+          "export class Hooks implements Vendor.Hooks {",
+          "  beforeUserCreate(): Promise<boolean | undefined> { return this.check(); }",
+          "}",
+          "export class LogSink extends Transport { lookup(): string | null { return null; } }",
+          'export const beforeSessionCreate: NonNullable<BetterAuthOptions["databaseHooks"]>["session"] =',
+          "  async (): Promise<boolean | undefined> => undefined;",
+          "export const beforeAccountCreate: Vendor.AccountHook = async (): Promise<string | undefined> => undefined;",
+        ].join("\n");
+
+      expect(
+        report(
+          declarations((name) => name),
+          SERVICE,
+        ),
+      ).toEqual([]);
+      expect(
+        report(
+          declarations((name) => `./${name}.ts`),
+          SERVICE,
+        ).map((entry) => entry.data.name),
+      ).toEqual(["beforeUserCreate", "lookup", "beforeSessionCreate", "beforeAccountCreate"]);
+    });
+  });
+
+  describe("when the type it implements or carries is ours", () => {
+    /** @scenario "A vendor callback is exempt, and our own interface of the same shape is not" */
+    it("still reports a hook-named method or const typed by a @langwatch, relative or mixed heritage", () => {
+      const found = report(
+        [
+          'import type { AuthHookApi } from "@langwatch/auth-contract";',
+          'import type { LocalHooks } from "./local-hooks.ts";',
+          'import type { SdkHooks } from "langwatch/observability";',
+          'import type { BetterAuthOptions } from "better-auth";',
+          "export class OwnHooks implements AuthHookApi { beforeUserCreate(): Promise<boolean | undefined> { return this.check(); } }",
+          "export class Mixed implements BetterAuthOptions, LocalHooks { beforeUserCreate(): boolean | undefined { return undefined; } }",
+          "export class Sdk implements SdkHooks { beforeUserCreate(): boolean | undefined { return undefined; } }",
+          "export class Plain { beforeUserCreate(): boolean | undefined { return undefined; } }",
+          "export const beforeSessionCreate: LocalHooks = async (): Promise<boolean | undefined> => undefined;",
+          "export const beforeAccountCreate = async (): Promise<boolean | undefined> => undefined;",
+        ].join("\n"),
+        SERVICE,
+      );
+
+      expect(found.map((entry) => [entry.messageId, entry.data.name, entry.line])).toEqual([
+        ["nullableOneValue", "beforeUserCreate", 5],
+        ["nullableOneValue", "beforeUserCreate", 6],
+        ["nullableOneValue", "beforeUserCreate", 7],
+        ["nullableOneValue", "beforeUserCreate", 8],
+        ["nullableOneValue", "beforeSessionCreate", 9],
+        ["nullableOneValue", "beforeAccountCreate", 10],
+      ]);
     });
   });
 });

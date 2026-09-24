@@ -20,6 +20,18 @@ Feature: The fallible-result-naming lint rule
   nullable draws only this one message. A `get*` whose declared result can be
   neither null nor an array is the one-or-throw shape and is left alone.
 
+  A result whose declared answer, null and undefined set aside, is one value
+  rather than an array is never told to become `find*`: `find` answers an
+  array. It is pointed at a throwing `get*`, or at an explicit result union
+  when absence means something other than not-found.
+
+  A method or module-scope const whose name and shape a vendor's callback
+  interface dictates is exempt (ADR-146): a method of a class whose every
+  `implements`/`extends` names an import from a package that is neither
+  `@langwatch/*`, the `langwatch` SDK nor relative, or a const whose declared
+  type heads at such an import. The same name in our own interface is still
+  reported.
+
   Background:
     Given a workspace whose agent feature is at strict layout version 0
 
@@ -27,7 +39,7 @@ Feature: The fallible-result-naming lint rule
   Scenario: A nullable result is reported unless the name is find-prefixed
     Given a method whose result type is nullable and is not named try*
     When the fallible-result-naming rule runs over it
-    Then it reports nullableWithoutFind unless the method is named find*
+    Then it reports nullableWithoutFind, or nullableOneValue when the answer is one value, unless the method is named find*
     And a getter that always answers or throws is left alone
     And the fix it offers names get or getBy and throwing, never a new nullable find*
 
@@ -60,11 +72,11 @@ Feature: The fallible-result-naming lint rule
 
   @unit
   Scenario: A repository get method is reported
-    Given a repository class method named get or getSomething whose result is nullable or an array, in the interface file or a prisma or memory backend
+    Given a repository class method named get or getSomething whose result is an array, in the interface file or a prisma or memory backend
     When the fallible-result-naming rule runs over it
     Then it reports repositoryServiceVocabulary naming the find-prefixed rename
     And a bare get renames to findAll
-    And it does not also report nullableWithoutFind when the same method is nullable
+    And it does not also report a nullable-result finding when the same method is nullable
     But a find-prefixed method on the same file is left alone
 
   @unit
@@ -87,7 +99,7 @@ Feature: The fallible-result-naming lint rule
     Given a get-prefixed method declared outside a repository file
     When the fallible-result-naming rule runs over it
     Then it does not report repositoryServiceVocabulary
-    But nullableWithoutFind still applies to it as before
+    But the nullable-result finding still applies to it as before
 
   # A conversion is handed the thing it converts. When it answers with absence it
   # is saying "the input carried none", not "no such record exists", and the two
@@ -113,4 +125,28 @@ Feature: The fallible-result-naming lint rule
   Scenario: resolve and read stay governed
     Given a service method named resolve or read that answers undefined
     When the fallible-result-naming rule runs over it
-    Then it reports nullableWithoutFind
+    Then it reports nullableOneValue
+
+  @unit
+  Scenario: A nullable one-value result is pointed at a throwing get or a result union, never find
+    Given a method whose declared answer is one value or null or undefined
+    When the fallible-result-naming rule runs over it
+    Then it reports nullableOneValue
+    And the fix names get or getBy with throwing, or an explicit result union, and says not to rename it find
+    But an answer that is an array, a local array alias or unknown keeps nullableWithoutFind
+
+  @unit
+  Scenario: A repository read answering one value is pointed at a throwing get, never find
+    Given a repository method named get whose declared answer is one value or null or undefined
+    When the fallible-result-naming rule runs over it
+    Then it reports repositoryOneValue naming the get-prefixed name, throwing and an explicit result union
+    And its message never names the find-prefixed rename
+    But a list method answering a page keeps the find-prefixed rename ADR-146 maps a repository list to
+
+  @unit
+  Scenario: A vendor callback is exempt, and our own interface of the same shape is not
+    Given a method of a class implementing or extending only vendor imports, or a const typed by a vendor import
+    When the fallible-result-naming rule runs over it
+    Then it reports nothing
+    But the same declaration typed by a @langwatch, langwatch SDK, relative or mixed heritage is reported
+    And the same method on a class with no heritage is reported

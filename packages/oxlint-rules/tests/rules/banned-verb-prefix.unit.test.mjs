@@ -28,11 +28,11 @@ describe("given a try-prefixed name with no catch to swallow anything", () => {
       const found = report(
         [
           "export abstract class AgentService {",
-          "  abstract tryFindById(): string | null;",
-          "  tryGetById(): string | null { return this.cache.get(this.id) ?? null; }",
+          "  abstract tryFindById(): string[] | null;",
+          "  tryGetById(): string[] | null { return this.cache.get(this.id) ?? null; }",
           "}",
-          "export function tryParse(input: string): number | null { return Number(input); }",
-          "export const tryLoad = (): string | null => null;",
+          "export function tryParse(input: string): number[] | null { return [Number(input)]; }",
+          "export const tryLoad = (): string[] | null => null;",
         ].join("\n"),
       );
 
@@ -47,7 +47,7 @@ describe("given a try-prefixed name with no catch to swallow anything", () => {
     /** @scenario "A try-prefixed name is refused without claiming a catch" */
     it("reports tryPrefix on an API interface member", () => {
       const found = report(
-        "export interface AgentApi { tryGetQueue(input: { id: string }): Promise<string | null>; }",
+        "export interface AgentApi { tryGetQueue(input: { id: string }): Promise<string[] | null>; }",
         API,
       );
 
@@ -57,7 +57,7 @@ describe("given a try-prefixed name with no catch to swallow anything", () => {
     /** @scenario "A try-prefixed name is refused without claiming a catch" */
     it("does not accuse a catch that rethrows", () => {
       const found = report(
-        "export class AgentService { tryGetById(): string {" +
+        "export class AgentService { tryGetById(): string[] {" +
           " try { return this.compute(); } catch (error) { throw this.wrap(error); } } }",
       );
 
@@ -69,7 +69,7 @@ describe("given a try-prefixed name with no catch to swallow anything", () => {
     /** @scenario "The try message never claims a catch and never prescribes a nullable find" */
     it("names the ADR-146 renames without mentioning a catch", () => {
       const [finding] = report(
-        "export function tryParse(input: string): number | null { return null; }",
+        "export function tryParse(input: string): number[] | null { return null; }",
       );
 
       expect(finding.message).not.toMatch(/catch/i);
@@ -88,9 +88,9 @@ describe("given a try-prefixed name whose own body swallows a failure", () => {
       const found = report(
         [
           "export class AgentService {",
-          "  async tryFindById(): Promise<string | null> { try { return await this.find(); } catch { return null; } }",
-          "  tryGetById(): string { try { return this.compute(); } catch { return undefined; } }",
-          "  tryResolveUrl(): Promise<string | null> { return this.fetch().catch(() => null); }",
+          "  async tryFindById(): Promise<string[] | null> { try { return await this.find(); } catch { return null; } }",
+          "  tryGetById(): string[] { try { return this.compute(); } catch { return undefined; } }",
+          "  tryResolveUrl(): Promise<string[] | null> { return this.fetch().catch(() => null); }",
           "}",
           "export const tryLoad = () => load().catch(() => undefined);",
         ].join("\n"),
@@ -107,12 +107,98 @@ describe("given a try-prefixed name whose own body swallows a failure", () => {
     /** @scenario "A swallowing try is reported once, naming its catch" */
     it("tells the author to delete the catch and never to rename to a nullable find", () => {
       const [finding] = report(
-        "export class AgentService { tryGetById(): string { try { return this.compute(); } catch { return null; } } }",
+        "export class AgentService { tryGetById(): string[] { try { return this.compute(); } catch { return null; } } }",
       );
 
       expect(finding.message).toContain("Delete the catch that answers null or undefined");
       expect(finding.message).toContain("Never rename it to a `find*` that still answers null");
       expect(finding.message).not.toMatch(/Keep a nullable/);
+    });
+  });
+});
+
+describe("given a try-prefixed name that answers one value", () => {
+  describe("when its declared answer, set apart from null and undefined, is not an array", () => {
+    /** @scenario "A try-prefixed name answering one value is pointed at get or a result union, never find" */
+    it("reports the one-value variants, swallowing or not", () => {
+      const found = report(
+        [
+          "export class AgentService {",
+          "  tryGetById(): Promise<Agent | null> { return this.lookup(); }",
+          "  tryResolveUrl(): Promise<string | null> { return this.fetch().catch(() => null); }",
+          "}",
+        ].join("\n"),
+      );
+
+      expect(located(found)).toEqual([
+        ["tryPrefixOneValue", "tryGetById", 2],
+        ["swallowingTryOneValue", "tryResolveUrl", 3],
+      ]);
+    });
+
+    /** @scenario "A try-prefixed name answering one value is pointed at get or a result union, never find" */
+    it("names get and a result union, and tells the author not to rename it find", () => {
+      const [finding] = report(
+        "export function tryLoadOrganization(id: string): Promise<Organization | undefined> { return load(id); }",
+      );
+
+      expect(finding.messageId).toBe("tryPrefixOneValue");
+      expect(finding.message).toContain("`get<Noun>`");
+      expect(finding.message).toContain("explicit result union");
+      expect(finding.message).toContain("Do not rename it `find*`");
+      expect(finding.message).not.toContain("becomes `find<Noun>`");
+    });
+
+    /** @scenario "A try-prefixed name answering one value is pointed at get or a result union, never find" */
+    it("keeps the general message when the answer is a local alias it cannot see through", () => {
+      const found = report(
+        "type Rows = string[];\nexport function tryLoadRows(): Promise<Rows | null> { return load(); }",
+      );
+
+      expect(found.map((entry) => entry.messageId)).toEqual(["tryPrefix"]);
+    });
+  });
+});
+
+describe("given a method whose name and shape a vendor's callback interface dictates", () => {
+  describe("when its class implements only types imported from a vendor package", () => {
+    /** @scenario "A vendor callback is exempt, and our own interface of the same shape is not" */
+    it("leaves the vendor-shaped try method alone", () => {
+      const found = report(
+        [
+          'import type { AdapterHooks } from "better-auth";',
+          "export class AgentHooks implements AdapterHooks {",
+          "  tryBeforeAccountCreate(): Promise<{ data: { id: string } } | undefined> { return this.pin(); }",
+          "}",
+          'export const tryBeforeUserCreate: AdapterHooks["user"] = async () => undefined;',
+        ].join("\n"),
+      );
+
+      expect(found).toEqual([]);
+    });
+  });
+
+  describe("when the class or const names our own type instead", () => {
+    /** @scenario "A vendor callback is exempt, and our own interface of the same shape is not" */
+    it("still reports a hook-named method implementing a @langwatch or relative interface", () => {
+      const found = report(
+        [
+          'import type { AgentHookApi } from "@langwatch/agent-contract";',
+          'import type { LocalHooks } from "./local-hooks.ts";',
+          'import type { AdapterHooks } from "better-auth";',
+          "export class OwnHooks implements AgentHookApi { tryBeforeAccountCreate(): string[] | undefined { return undefined; } }",
+          "export class LocalOnly implements LocalHooks { tryBeforeAccountCreate(): string[] | undefined { return undefined; } }",
+          "export class Mixed implements AdapterHooks, LocalHooks { tryBeforeAccountCreate(): string[] | undefined { return undefined; } }",
+          'export const tryBeforeUserCreate: LocalHooks["before"] = async () => undefined;',
+        ].join("\n"),
+      );
+
+      expect(located(found)).toEqual([
+        ["tryPrefix", "tryBeforeAccountCreate", 4],
+        ["tryPrefix", "tryBeforeAccountCreate", 5],
+        ["tryPrefix", "tryBeforeAccountCreate", 6],
+        ["tryPrefix", "tryBeforeUserCreate", 7],
+      ]);
     });
   });
 });
