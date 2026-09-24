@@ -5,6 +5,7 @@ import type {
   GatewayBudgetBreachAction,
   GatewayBudgetHealth,
   GatewayBudgetListWithHealth,
+  GatewayBudgetPageWithHealth,
   GatewayBudgetPageInput,
   GatewayBudgetResolutionTarget,
   GatewayBudgetResource,
@@ -27,6 +28,7 @@ export type BudgetCheckResult = GatewayBudgetCheckResult;
 export type BudgetDetail = GatewayBudgetDetail;
 export type BudgetHealth = GatewayBudgetHealth;
 export type BudgetListWithHealth = GatewayBudgetListWithHealth;
+export type BudgetPageWithHealth = GatewayBudgetPageWithHealth;
 export type CreateBudgetInput = CreateGatewayBudgetInput;
 export type UpdateBudgetInput = UpdateGatewayBudgetInput;
 
@@ -129,7 +131,7 @@ export abstract class GatewayBudgetRepository {
   abstract findWithHealth(input: GatewayOrganizationBudgetReadInput): Promise<BudgetListWithHealth>;
   abstract listPageWithHealth(
     input: GatewayBudgetPageInput & GatewayOrganizationBudgetReadInput,
-  ): Promise<BudgetListWithHealth>;
+  ): Promise<BudgetPageWithHealth>;
   abstract findForProjectWithHealth(
     input: GatewayProjectBudgetReadInput,
   ): Promise<BudgetListWithHealth>;

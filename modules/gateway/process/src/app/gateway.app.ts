@@ -51,6 +51,7 @@ import {
   type GatewayBudgetScopeReachResult,
   type GatewayBudgetHealth,
   type GatewayBudgetListWithHealth,
+  type GatewayBudgetPageWithHealth,
   type GatewayPricedSpend,
   type GatewayPricedSpendResult,
   type GatewayInternalSpendCommandRecord,
@@ -1124,7 +1125,7 @@ export class GatewayApp implements GatewayApi {
     return this.#dependencies.budgetDecisions.listWithHealth(organizationId);
   }
 
-  listBudgetPageWithHealth(input: GatewayBudgetPageInput): Promise<GatewayBudgetListWithHealth> {
+  listBudgetPageWithHealth(input: GatewayBudgetPageInput): Promise<GatewayBudgetPageWithHealth> {
     return this.#dependencies.budgetDecisions.listPageWithHealth(input);
   }
 
@@ -1261,9 +1262,9 @@ export class GatewayApp implements GatewayApi {
     });
   }
 
-  async findSpendEventsPage(
-    input: Parameters<GatewayApi["findSpendEventsPage"]>[0],
-  ): ReturnType<GatewayApi["findSpendEventsPage"]> {
+  async listSpendEventsPage(
+    input: Parameters<GatewayApi["listSpendEventsPage"]>[0],
+  ): ReturnType<GatewayApi["listSpendEventsPage"]> {
     const service = this.#dependencies.spendEvents;
     if (!service) return null;
 

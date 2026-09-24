@@ -102,6 +102,8 @@ export type BudgetListWithHealth = {
   scopeReach: Map<string, GatewayBudgetScopeReach>;
 };
 
+export type BudgetPageWithHealth = BudgetListWithHealth & { total: number };
+
 export type GatewayProjectBudgetScopeInput = {
   organizationId: string;
   teamId: string;
@@ -617,33 +619,40 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
    */
   async listPageWithHealth(
     args: GatewayBudgetPageInput & GatewayOrganizationBudgetReadInput,
-  ): Promise<BudgetListWithHealth> {
-    const rows = await this.prisma.gatewayBudget.findMany({
-      where: {
-        organizationId: args.organizationId,
-        archivedAt: null,
-        ...(args.scopeTypes ? { scopeType: { in: args.scopeTypes } } : {}),
-        ...(args.externalId !== undefined ? { externalId: args.externalId } : {}),
-        ...(args.cursor
-          ? {
-              OR: keysetAfter([
-                {
-                  name: "createdAt",
-                  value: toDate(args.cursor.createdAt),
-                  direction: "desc",
-                },
-                { name: "id", value: args.cursor.id, direction: "desc" },
-              ]),
-            }
-          : {}),
-      },
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: args.limit,
-    });
-    return this.decorateWithHealth(
+  ): Promise<BudgetPageWithHealth> {
+    const filter = {
+      organizationId: args.organizationId,
+      archivedAt: null,
+      ...(args.scopeTypes ? { scopeType: { in: args.scopeTypes } } : {}),
+      ...(args.externalId !== undefined ? { externalId: args.externalId } : {}),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.gatewayBudget.findMany({
+        where: {
+          ...filter,
+          ...(args.cursor
+            ? {
+                OR: keysetAfter([
+                  {
+                    name: "createdAt",
+                    value: toDate(args.cursor.createdAt),
+                    direction: "desc",
+                  },
+                  { name: "id", value: args.cursor.id, direction: "desc" },
+                ]),
+              }
+            : {}),
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: args.limit,
+      }),
+      this.prisma.gatewayBudget.count({ where: filter }),
+    ]);
+    const list = await this.decorateWithHealth(
       rows.map((row) => PrismaGatewayBudgetRepository.toGatewayBudgetResource(row)),
       args,
     );
+    return { ...list, total };
   }
 
   /** As findWithHealth, for the budgets that apply to one project. */

@@ -3,7 +3,7 @@ import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc"
 /**
  * @vitest-environment node
  * The `gatewaySpendEvents.list` transport is a thin handler over
- * `GatewayApp.findSpendEventsPage`, pinning only the wiring and shape.
+ * `GatewayApp.listSpendEventsPage`, pinning only the wiring and shape.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";

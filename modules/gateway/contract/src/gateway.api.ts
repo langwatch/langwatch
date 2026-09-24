@@ -31,6 +31,7 @@ import type {
   CreateGatewayBudgetInput,
   GatewayBudgetDetail,
   GatewayBudgetListWithHealth,
+  GatewayBudgetPageWithHealth,
   GatewayBudgetResolutionTarget,
   GatewayBudgetResource,
   GatewayBudgetScopeTarget,
@@ -446,7 +447,7 @@ export interface GatewayApi extends GatewayInternalProtocol {
     cursor: { createdAt: Instant; id: string } | null;
     scopeTypes?: readonly string[] | undefined;
     externalId?: string | undefined;
-  }): Promise<GatewayBudgetListWithHealth>;
+  }): Promise<GatewayBudgetPageWithHealth>;
   /** One budget with live health; throws `gateway_budget_not_found` outside this organization. */
   getBudgetWithHealth(input: { id: string; organizationId: string }): Promise<GatewayBudgetHealth>;
   /** Whether any active key could produce traffic against this budget's own scope target. */
@@ -724,7 +725,7 @@ export interface GatewayApi extends GatewayInternalProtocol {
    * virtual-key names resolved. Answers null with no ClickHouse spend
    * source, so a door renders disabled rather than an empty page.
    */
-  findSpendEventsPage(input: {
+  listSpendEventsPage(input: {
     projectId: string;
     fromMs: number;
     toMs: number;

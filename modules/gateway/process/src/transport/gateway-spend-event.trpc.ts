@@ -1,6 +1,6 @@
 /**
  * The server half of `gatewaySpendEvents.*`: a thin handler over
- * {@link GatewayApi.findSpendEventsPage}, which does the whole assembly and
+ * {@link GatewayApi.listSpendEventsPage}, which does the whole assembly and
  * answers `null` when this deployment has no ClickHouse spend source.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
@@ -10,7 +10,7 @@ export const gatewaySpendEventTrpcTransport = defineTrpcRouter(GatewayApi, gatew
   .procedure("list")
   .withPermission("gatewayUsage:view")
   .handle(async ({ app, input }) => {
-    const page = await app.findSpendEventsPage(input);
+    const page = await app.listSpendEventsPage(input);
     return (
       page ?? {
         rows: [],

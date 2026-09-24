@@ -229,6 +229,8 @@ export type GatewayBudgetListWithHealth = {
   >;
 };
 
+export type GatewayBudgetPageWithHealth = GatewayBudgetListWithHealth & { total: number };
+
 export type GatewayBudgetDetail = {
   budget: GatewayBudgetWithSeats;
   scopeTarget: GatewayBudgetScopeTarget;

@@ -39,6 +39,7 @@ import {
   type BudgetCheckInput,
   type BudgetCheckResult,
   type BudgetListWithHealth,
+  type BudgetPageWithHealth,
   type CreateBudgetInput,
   type UpdateBudgetInput,
   type GatewayBudgetScope,
@@ -132,7 +133,7 @@ export class GatewayService {
     return this.withScopeReach(result, organizationId);
   }
 
-  async listPageWithHealth(input: GatewayBudgetPageInput): Promise<BudgetListWithHealth> {
+  async listPageWithHealth(input: GatewayBudgetPageInput): Promise<BudgetPageWithHealth> {
     const tenantIds = await this.listSpendTenantIds(input.organizationId);
     const result = await this.repository.listPageWithHealth({ ...input, tenantIds });
 
@@ -363,10 +364,10 @@ export class GatewayService {
     return { cacheRules, guardrails, attachments };
   }
 
-  private async withScopeReach(
-    result: BudgetListWithHealth,
+  private async withScopeReach<Result extends BudgetListWithHealth>(
+    result: Result,
     organizationId: string,
-  ): Promise<BudgetListWithHealth> {
+  ): Promise<Result> {
     const candidates = await this.repository.findScopeReachCandidates(organizationId);
     const projectIds = candidates.flatMap((candidate) =>
       candidate.traceProjectId ? [candidate.traceProjectId] : [],

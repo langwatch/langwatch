@@ -1,7 +1,7 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
- * `GatewayApp.findSpendEventsPage`: ledger read, filter/cursor passthrough,
+ * `GatewayApp.listSpendEventsPage`: ledger read, filter/cursor passthrough,
  * virtual-key display-name resolution — moved here so REST and tRPC agree.
  */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
@@ -125,7 +125,7 @@ const BASE_INPUT = {
   toMs: Date.parse("2026-07-29T00:00:00Z"),
 };
 
-describe("GatewayApp.findSpendEventsPage", () => {
+describe("GatewayApp.listSpendEventsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clickHouseQuery.mockResolvedValue({ rows: [SPEND_EVENT_ROW] });
@@ -139,7 +139,7 @@ describe("GatewayApp.findSpendEventsPage", () => {
     /** @scenario Ledger filters and cursor pass through to the repository page read */
     it("passes filters and cursor through to the repository page read", async () => {
       const app = await gatewayAppStub();
-      await app.findSpendEventsPage({
+      await app.listSpendEventsPage({
         ...BASE_INPUT,
         filters: {
           virtualKeyIds: ["vk_1"],
@@ -174,7 +174,7 @@ describe("GatewayApp.findSpendEventsPage", () => {
     /** @scenario Ledger rows resolve virtual key display names */
     it("resolves virtual-key display names alongside the rows", async () => {
       const app = await gatewayAppStub();
-      const result = await app.findSpendEventsPage(BASE_INPUT);
+      const result = await app.listSpendEventsPage(BASE_INPUT);
 
       expect(result?.rows).toHaveLength(1);
       expect(result?.virtualKeyNames).toEqual({ vk_1: "Customer A key" });
@@ -194,7 +194,7 @@ describe("GatewayApp.findSpendEventsPage", () => {
       findOrganizationId.mockResolvedValue(undefined);
       const app = await gatewayAppStub();
 
-      const result = await app.findSpendEventsPage(BASE_INPUT);
+      const result = await app.listSpendEventsPage(BASE_INPUT);
 
       expect(result?.virtualKeyNames).toEqual({});
       expect(virtualKeyFindMany).not.toHaveBeenCalled();
