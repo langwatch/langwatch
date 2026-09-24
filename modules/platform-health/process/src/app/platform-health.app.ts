@@ -11,6 +11,8 @@ import {
   type ProjectKeyedProbeRequest,
 } from "@langwatch/platform-health-contract";
 import { ProjectApi } from "@langwatch/project-contract";
+import { ScenarioApi } from "@langwatch/scenario-contract";
+import { SuiteApi } from "@langwatch/suite-contract";
 import { fromDate } from "@langwatch/time";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
@@ -18,6 +20,7 @@ import { HttpSubsystemProbeChannel } from "../channels/http/http.subsystem-probe
 import { PlatformHealthKeyService } from "../services/platform-health-key.service.ts";
 import { PlatformHealthService } from "../services/platform-health.service.ts";
 import { ProjectKeyedProbeService } from "../services/project-keyed-probe.service.ts";
+import { ScenarioCanaryService } from "../services/scenario-canary.service.ts";
 import { SubsystemProbeAdapter } from "../services/subsystem-probe-run.service.ts";
 import {
   SubsystemProbeService,
@@ -50,6 +53,10 @@ export class PlatformHealthApp implements PlatformHealthApiContract {
     workflow: WorkflowApi,
     projects: ProjectApi,
     apiKeys: ApiKeyApi,
+    /** The scenario canary launches and reads one run as main's shared launcher did. */
+    scenarios: ScenarioApi,
+    /** The run plan the scenario canary is pointed at, by id or slug. */
+    suites: SuiteApi,
   };
   /** Both names are from the process's vocabulary; boot refuses by name. */
   static readonly reads = ["secrets", "publicBaseUrl"] as const;
@@ -102,6 +109,9 @@ export class PlatformHealthApp implements PlatformHealthApiContract {
         probes,
         resolveProject: async (input) =>
           (await dependencies.apiKeys.findResolvedToken(input))?.project.id ?? null,
+        scenarioCanary: ScenarioCanaryService.create({
+          peers: { scenarios: dependencies.scenarios, suites: dependencies.suites },
+        }),
       }),
     );
   }

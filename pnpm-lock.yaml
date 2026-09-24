@@ -10447,6 +10447,12 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/scenario-contract':
+        specifier: workspace:*
+        version: link:../../scenario/contract
+      '@langwatch/suite-contract':
+        specifier: workspace:*
+        version: link:../../suite/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time

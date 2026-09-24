@@ -126,3 +126,69 @@ Feature: One platform health answer for an external monitor
     Scenario: A project-keyed probe reports a missing trigger as main did
       When an orchestrator asks /api/health/triggers for a trigger the project does not have
       Then it answers 404 with {"message":"Trigger not found."}
+
+  Rule: /api/health/scenarios launches one run of a named run plan and waits for its judge, as main did
+
+    @unit
+    Scenario: The scenario canary reports healthy when the judged run succeeds
+      Given a run plan naming exactly one scenario and one target
+      When the canary launches a run and it settles with a successful verdict
+      Then the canary reports healthy with the run id and its duration
+
+    @unit
+    Scenario: The scenario canary retries once after an unhealthy first run
+      Given the first canary run ends in an error
+      When the retry settles with a successful verdict
+      Then the canary reports healthy, having launched two runs
+
+    @unit
+    Scenario: The scenario canary reports judge_failed when a successful run carries no verdict
+      When both canary runs succeed without a judge verdict
+      Then the canary reports unhealthy with the reason judge_failed
+
+    @unit
+    Scenario: The scenario canary reports timeout when the run never settles
+      When no canary run reaches a terminal status within its budget
+      Then the canary reports unhealthy with the reason timeout
+
+    @unit
+    Scenario: A run plan that names more than one scenario launches nothing
+      Given a run plan naming two scenarios
+      When the canary is pointed at it
+      Then it reports unhealthy with the reason run_failed and no run is launched
+
+    @unit
+    Scenario: The scenario canary finds a run plan by its slug
+      When the canary is pointed at a run plan by its slug
+      Then it launches that plan's scenario
+
+    @unit
+    Scenario: A second probe of the same run plan while one is in flight is told busy
+      Given a canary run of a plan is in flight
+      When the same plan is probed again by its other name
+      Then the second probe is told busy and launches nothing
+
+    @unit
+    Scenario: The scenario canary answers main's bodies for a healthy run and a busy plan
+      Then a healthy canary answers 200 {"status":"ok","scenarioRunId","durationMs"}
+      And a busy plan answers 429 {"status":"busy"}
+
+    @integration
+    Scenario: The scenario canary refuses an unknown key without caching the answer
+      When an orchestrator asks /api/health/scenarios with a key that resolves to no project
+      Then it answers 401 with {"message":"Invalid auth token."} and Cache-Control no-store
+
+    @integration
+    Scenario: The scenario canary without a runPlanId is a bad request
+      When an orchestrator asks /api/health/scenarios with a blank runPlanId
+      Then it answers 400 with {"message":"runPlanId query parameter is required."}
+
+    @integration
+    Scenario: The scenario canary refuses an implausibly long runPlanId
+      When an orchestrator asks /api/health/scenarios with a runPlanId longer than 128 characters
+      Then it answers 400 with {"message":"runPlanId query parameter is invalid."}
+
+    @integration
+    Scenario: The scenario canary answers 503 with the named reason for a plan it cannot find
+      When an orchestrator asks /api/health/scenarios for a run plan the project does not have
+      Then it answers 503 with {"status":"unhealthy","reason":"run_failed","durationMs":0}, uncached

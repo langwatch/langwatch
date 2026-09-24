@@ -1,6 +1,6 @@
 /**
- * `/api/health/{collector,evaluations,processor,triggers,workflows}` - the project-keyed probes an
- * orchestrator points at, answering main's `{ status, body }` or `{ message }` at main's statuses.
+ * `/api/health/{collector,evaluations,processor,triggers,workflows,scenarios}` - the project-keyed
+ * probes an orchestrator points at, answering main's bodies at main's statuses.
  */
 import { publicRoute } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
@@ -8,6 +8,7 @@ import { moduleApi } from "@langwatch/kernel/module-api";
 import {
   healthProbeHeadersSchema,
   platformHealthQuerySchema,
+  scenarioCanaryQuerySchema,
   type ProjectKeyedProbeRequest,
 } from "@langwatch/platform-health-contract";
 
@@ -89,6 +90,18 @@ export const platformHealthProbeRest = defineRestRouter(PlatformHealthProbeApi)
         headers,
         workflowId: input.workflowId,
       }),
+    ),
+  )
+
+  .get("/api/health/scenarios", "probeScenariosHealth")
+  .withQuery(scenarioCanaryQuerySchema)
+  .withAccess(canary)
+  .withHeaders(healthProbeHeadersSchema)
+  .withResponse("forwarded", FORWARDED)
+  .withDocs({ hide: true })
+  .handle(async ({ app, input, response }, headers) =>
+    response.pass(
+      await app.probeWithProjectKey({ check: "scenarios", headers, runPlanId: input.runPlanId }),
     ),
   )
   .build();

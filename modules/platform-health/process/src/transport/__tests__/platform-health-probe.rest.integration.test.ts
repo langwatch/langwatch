@@ -2,11 +2,15 @@
  * @vitest-environment node
  * `/api/health/*` pinned to main's statuses and bodies, over the real probes.
  */
+import { createApiFixture } from "@langwatch/api-fixture";
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import type { ScenarioApi } from "@langwatch/scenario-contract";
+import type { SuiteApi } from "@langwatch/suite-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemorySubsystemProbeChannel } from "../../channels/memory/memory.subsystem-probe.channel.ts";
 import { ProjectKeyedProbeService } from "../../services/project-keyed-probe.service.ts";
+import { ScenarioCanaryService } from "../../services/scenario-canary.service.ts";
 import { SubsystemProbeService } from "../../services/subsystem-probe.service.ts";
 import { platformHealthProbeRest } from "../platform-health-probe.rest.ts";
 
@@ -26,6 +30,12 @@ function probe() {
   const service = ProjectKeyedProbeService.create({
     probes,
     resolveProject: async ({ token }) => (token === KEY ? "project-1" : null),
+    scenarioCanary: ScenarioCanaryService.create({
+      peers: {
+        scenarios: createApiFixture<ScenarioApi>(),
+        suites: createApiFixture<SuiteApi>({ listByIds: async () => [], list: async () => [] }),
+      },
+    }),
   });
   const runtime = createRestRuntime({
     identity: {
@@ -87,5 +97,45 @@ describe("GET /api/health/*", () => {
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ message: "Trigger not found." });
+  });
+
+  /** @scenario "The scenario canary refuses an unknown key without caching the answer" */
+  it("answers 401 with Cache-Control no-store for a key that resolves to nothing", async () => {
+    const response = await probe().get("/scenarios?runPlanId=plan-1", { "X-Auth-Token": "nope" });
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toEqual({ message: "Invalid auth token." });
+  });
+
+  /** @scenario "The scenario canary without a runPlanId is a bad request" */
+  it("answers 400 when runPlanId is missing or blank", async () => {
+    const response = await probe().get("/scenarios?runPlanId=%20", { "X-Auth-Token": KEY });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ message: "runPlanId query parameter is required." });
+  });
+
+  /** @scenario "The scenario canary refuses an implausibly long runPlanId" */
+  it("answers 400 invalid for a runPlanId past 128 characters", async () => {
+    const response = await probe().get(`/scenarios?runPlanId=${"x".repeat(129)}`, {
+      "X-Auth-Token": KEY,
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ message: "runPlanId query parameter is invalid." });
+  });
+
+  /** @scenario "The scenario canary answers 503 with the named reason for a plan it cannot find" */
+  it("answers 503 run_failed, uncached, when the run plan does not resolve", async () => {
+    const response = await probe().get("/scenarios?runPlanId=missing", { "X-Auth-Token": KEY });
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toEqual({
+      status: "unhealthy",
+      reason: "run_failed",
+      durationMs: 0,
+    });
   });
 });

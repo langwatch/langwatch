@@ -70,10 +70,15 @@ export const healthProbeHeadersSchema = z.object({
 
 export type HealthProbeHeaders = z.infer<typeof healthProbeHeadersSchema>;
 
-/** One project-keyed probe: which subsystem, and what the caller presented. */
-export type ProjectKeyedProbeRequest = Readonly<{
-  check: PlatformHealthCheckName;
-  headers: HealthProbeHeaders;
-  triggerId?: string | undefined;
-  workflowId?: string | undefined;
-}>;
+/** `/api/health/scenarios` names the run plan, by id or slug, it launches one run of. */
+export const scenarioCanaryQuerySchema = z.object({ runPlanId: z.string().optional() });
+
+/** One project-keyed probe: which subsystem or canary, and what the caller presented. */
+export type ProjectKeyedProbeRequest =
+  | Readonly<{
+      check: PlatformHealthCheckName;
+      headers: HealthProbeHeaders;
+      triggerId?: string | undefined;
+      workflowId?: string | undefined;
+    }>
+  | Readonly<{ check: "scenarios"; headers: HealthProbeHeaders; runPlanId: string | undefined }>;
