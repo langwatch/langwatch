@@ -1,6 +1,5 @@
 /** @see specs/langy/langy-local-permissions.feature */
-import type { RestResolvedProjectCredential } from "@langwatch/api/rest";
-import type { LangyConversationDetail } from "@langwatch/langy-contract";
+import type { LangyConversationDetail, LangyKeyCaller } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -12,23 +11,7 @@ const PROJECT_ID = "project-123";
 const USER_ID = "user-1";
 const CONVERSATION_ID = "conversation-1";
 
-const credential: RestResolvedProjectCredential = {
-  type: "apiKey",
-  apiKeyId: "key-1",
-  userId: USER_ID,
-  organizationId: "organization-1",
-  ingestSourceType: null,
-  ingestionTemplateId: null,
-  project: {
-    id: PROJECT_ID,
-    name: "Project",
-    slug: "project",
-    teamId: "team-1",
-    organizationId: "organization-1",
-    isPersonal: false,
-    ownerUserId: null,
-  },
-};
+const key: LangyKeyCaller = { actor: { type: "user", id: USER_ID }, projectId: PROJECT_ID };
 
 function buildWorker(options: { own: boolean }) {
   const repositories = MemoryLangyRepositories.create();
@@ -89,19 +72,17 @@ describe("given a teammate shared their conversation with the project", () => {
       const turn = { conversationId: CONVERSATION_ID, turnId: "turn-1" };
 
       const refusals = await Promise.all([
-        worker
-          .createControlRequest({ credential, conversationId: CONVERSATION_ID })
-          .catch((e) => e),
+        worker.createControlRequest({ ...key, conversationId: CONVERSATION_ID }).catch((e) => e),
         worker
           .startCall({
-            credential,
+            ...key,
             call: { ...turn, tool: "local_read", params: { path: "a.ts" } },
           })
           .catch((e) => e),
         worker
-          .startWait({ credential, wait: { ...turn, kind: "question", questions: [] } })
+          .startWait({ ...key, wait: { ...turn, kind: "question", questions: [] } })
           .catch((e) => e),
-        worker.getWorkspace({ credential, conversationId: CONVERSATION_ID }).catch((e) => e),
+        worker.getWorkspace({ ...key, conversationId: CONVERSATION_ID }).catch((e) => e),
       ]);
 
       expect(refusals.map((error: { code?: string }) => error.code)).toEqual([
@@ -128,7 +109,7 @@ describe("given my own conversation", () => {
       const { worker, recorded } = buildWorker({ own: true });
 
       const created = await worker.createControlRequest({
-        credential,
+        ...key,
         conversationId: CONVERSATION_ID,
       });
 
@@ -142,7 +123,7 @@ describe("given my own conversation", () => {
     it("answers not found, which the worker reads as still pending", async () => {
       const { worker } = buildWorker({ own: true });
 
-      const error = await worker.getCallAnswer({ credential, callId: "call-gone" }).catch((e) => e);
+      const error = await worker.getCallAnswer({ ...key, callId: "call-gone" }).catch((e) => e);
 
       expect(error.code).toBe("langy_local_record_not_found");
     });
@@ -152,7 +133,7 @@ describe("given my own conversation", () => {
     it("answers not found", async () => {
       const { worker } = buildWorker({ own: true });
 
-      const error = await worker.getWaitAnswer({ credential, waitId: "wait-gone" }).catch((e) => e);
+      const error = await worker.getWaitAnswer({ ...key, waitId: "wait-gone" }).catch((e) => e);
 
       expect(error.code).toBe("langy_local_record_not_found");
     });

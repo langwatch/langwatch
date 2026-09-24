@@ -5,12 +5,11 @@
  */
 
 import { PayloadTooLargeError } from "@langwatch/api";
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  projectCredentialOfRequest,
-} from "@langwatch/api/rest";
-import {
+  cancelCallResponseSchema,
+  controlActionBodySchema,
+  createControlRequestResponseSchema,
   LangyApi,
   LangyApiRequestInvalidError,
   langyLocalCallIdParamsSchema,
@@ -18,6 +17,11 @@ import {
   langyLocalStartCallRequestSchema,
   langyLocalStartWaitRequestSchema,
   langyLocalWorkspaceQuerySchema,
+  pollCallResponseSchema,
+  pollWaitResponseSchema,
+  startCallResponseSchema,
+  startWaitResponseSchema,
+  workspaceStatusSchema,
 } from "@langwatch/langy-contract";
 import type { z } from "zod";
 
@@ -30,17 +34,6 @@ const MAX_BODY_BYTES = 256 * 1024;
  * runs cannot drift into disagreeing about what a caller needs.
  */
 const LOCAL_PERMISSION = "langy:create" as const;
-
-/** The worker's own wire: the key's owner is read off the request's credential. */
-const LOCAL_ANSWER = {
-  produces: "application/json",
-  because: "The local worker's identity bridge reads the key's owner off the project credential.",
-} as const;
-
-/** The operation's answer as the worker reads it. */
-function localJson(body: unknown) {
-  return { status: 200, mediaType: "application/json", body: JSON.stringify(body) } as const;
-}
 
 /** Parses and validates a JSON body a composed schema can't declare via `.withInput()`. */
 function parseJsonBody<T extends z.ZodType>(raw: string, schema: T): z.infer<T> {
@@ -66,19 +59,16 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   .get("/api/langy/local/workspace", "langyLocalWorkspace")
   .withPermission(LOCAL_PERMISSION)
   .withQuery(langyLocalWorkspaceQuerySchema)
-  .withResponse("protocol", LOCAL_ANSWER)
+  .withOutput(workspaceStatusSchema)
   .withDocs({
     description: "The code access card's own status document, as the command line reads it.",
   })
-  .handle(async ({ app, input, request, response }) =>
-    response.write(
-      localJson(
-        await app.getLocalWorkspace({
-          credential: projectCredentialOfRequest(request),
-          conversationId: input.conversationId ?? "",
-        }),
-      ),
-    ),
+  .handle(({ app, input, actor, scope }) =>
+    app.getLocalWorkspace({
+      actor,
+      projectId: scope.id,
+      conversationId: input.conversationId ?? "",
+    }),
   )
 
   // ── the control request the card renders ──────────────────────────────────
@@ -87,17 +77,14 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   .withPermission(LOCAL_PERMISSION)
   .withInput(langyLocalCreateRequestBodySchema)
   .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
-  .withResponse("protocol", LOCAL_ANSWER)
+  .withOutput(createControlRequestResponseSchema)
   .withDocs({ description: "The recorded request and the command that approves it." })
-  .handle(async ({ app, input, request, response }) =>
-    response.write(
-      localJson(
-        await app.createLocalControlRequest({
-          credential: projectCredentialOfRequest(request),
-          conversationId: input.conversationId,
-        }),
-      ),
-    ),
+  .handle(({ app, input, actor, scope }) =>
+    app.createLocalControlRequest({
+      actor,
+      projectId: scope.id,
+      conversationId: input.conversationId,
+    }),
   )
 
   // ── one local tool call ───────────────────────────────────────────────────
@@ -109,50 +96,42 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   // exactly as this route always has.
   .withRawBody("text")
   .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
-  .withResponse("protocol", LOCAL_ANSWER)
+  .withOutput(startCallResponseSchema)
   .withDocs({ description: "The started call's own id." })
-  .handle(async ({ app, raw, request, response }) =>
-    response.write(
-      localJson(
-        await app.startLocalCall({
-          credential: projectCredentialOfRequest(request),
-          call: parseJsonBody(raw, langyLocalStartCallRequestSchema),
-        }),
-      ),
-    ),
+  .handle(({ app, raw, actor, scope }) =>
+    app.startLocalCall({
+      actor,
+      projectId: scope.id,
+      call: parseJsonBody(raw, langyLocalStartCallRequestSchema),
+    }),
   )
 
   .get("/api/langy/local/calls/:id", "langyLocalReadCall")
   .withPermission(LOCAL_PERMISSION)
   .withParams(langyLocalCallIdParamsSchema)
-  .withResponse("protocol", LOCAL_ANSWER)
+  .withOutput(pollCallResponseSchema)
   .withDocs({ description: "The call's answer, or not found while it is still running." })
-  .handle(async ({ app, input, request, response, signal }) =>
-    response.write(
-      localJson(
-        await app.getLocalCallAnswer({
-          credential: projectCredentialOfRequest(request),
-          callId: input.id,
-          ...(signal ? { signal } : {}),
-        }),
-      ),
-    ),
+  .handle(({ app, input, actor, scope, signal }) =>
+    app.getLocalCallAnswer({
+      actor,
+      projectId: scope.id,
+      callId: input.id,
+      ...(signal ? { signal } : {}),
+    }),
   )
 
   .post("/api/langy/local/calls/:id/cancel", "langyLocalCancelCall")
   .withPermission(LOCAL_PERMISSION)
   .withParams(langyLocalCallIdParamsSchema)
-  .withResponse("protocol", LOCAL_ANSWER)
+  .withInput(controlActionBodySchema)
+  .withOutput(cancelCallResponseSchema)
   .withDocs({ description: "The cancelled call's own id." })
-  .handle(async ({ app, input, request, response }) =>
-    response.write(
-      localJson(
-        await app.cancelLocalCall({
-          credential: projectCredentialOfRequest(request),
-          callId: input.id,
-        }),
-      ),
-    ),
+  .handle(({ app, input, actor, scope }) =>
+    app.cancelLocalCall({
+      actor,
+      projectId: scope.id,
+      callId: input.id,
+    }),
   )
 
   // ── the question the worker asks ──────────────────────────────────────────
@@ -162,34 +141,28 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   // Same composed-schema reason as `/local/calls` above.
   .withRawBody("text")
   .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
-  .withResponse("protocol", LOCAL_ANSWER)
+  .withOutput(startWaitResponseSchema)
   .withDocs({ description: "The started wait's own id." })
-  .handle(async ({ app, raw, request, response }) =>
-    response.write(
-      localJson(
-        await app.startLocalWait({
-          credential: projectCredentialOfRequest(request),
-          wait: parseJsonBody(raw, langyLocalStartWaitRequestSchema),
-        }),
-      ),
-    ),
+  .handle(({ app, raw, actor, scope }) =>
+    app.startLocalWait({
+      actor,
+      projectId: scope.id,
+      wait: parseJsonBody(raw, langyLocalStartWaitRequestSchema),
+    }),
   )
 
   .get("/api/langy/waits/:id", "langyLocalReadWait")
   .withPermission(LOCAL_PERMISSION)
   .withParams(langyLocalCallIdParamsSchema)
-  .withResponse("protocol", LOCAL_ANSWER)
+  .withOutput(pollWaitResponseSchema)
   .withDocs({ description: "The answered question, or not found while it is still waiting." })
-  .handle(async ({ app, input, request, response, signal }) =>
-    response.write(
-      localJson(
-        await app.getLocalWaitAnswer({
-          credential: projectCredentialOfRequest(request),
-          waitId: input.id,
-          ...(signal ? { signal } : {}),
-        }),
-      ),
-    ),
+  .handle(({ app, input, actor, scope, signal }) =>
+    app.getLocalWaitAnswer({
+      actor,
+      projectId: scope.id,
+      waitId: input.id,
+      ...(signal ? { signal } : {}),
+    }),
   )
 
   .build();

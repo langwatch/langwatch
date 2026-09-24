@@ -1,68 +1,91 @@
-/** The control family reads the terminal's user off the door's actor, never the credential (§8). */
+/** The control family hands the door's actor to one operation and answers its result (§8). */
 import { createApiFixture } from "@langwatch/api-fixture";
-import {
-  bindRestMiddleware,
-  canonicalErrorResponse,
-  createRestRuntime,
-  type RestCaller,
-} from "@langwatch/api/rest";
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import { type LangyApi, LangyLocalRequestInvalidError } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { LocalControlRuntime } from "#repositories/redis/redis.langy-local-control-runtime.repository";
+import { langyLocalControlRest } from "../langy-local-control.rest.ts";
 
-import type { LocalControlLongPoll } from "../langy-local-control-long-poll.rest.ts";
-import {
-  type LangyLocalControlRestMembers,
-  langyLocalControlRest,
-  langyLocalControlRestMembers,
-} from "../langy-local-control.rest.ts";
+const OWNER = { type: "user", id: "user-1" } as const;
+const APPROVED = {
+  sessionKey: "sk-lw-session",
+  endpoint: "https://app.test",
+  conversation: { id: "conversation-1", title: "A conversation", url: "https://app.test/c/1" },
+};
 
-function familyFor(actor: RestCaller["actor"]) {
-  const listOpen = vi.fn<LocalControlRuntime["requests"]["listOpen"]>(async () => []);
-  const members: LangyLocalControlRestMembers = {
-    runtime: () =>
-      createApiFixture<LocalControlRuntime>({
-        requests: createApiFixture<LocalControlRuntime["requests"]>({ listOpen }),
-      }),
-    longPoll: () => createApiFixture<LocalControlLongPoll>(),
-    baseHost: "https://app.test",
-    permissions: () => ({ getDecision: () => Promise.reject(new Error("no request to decide")) }),
+function family(actor: typeof OWNER | null) {
+  const ops = {
+    listLocalControlRequests: vi.fn<LangyApi["listLocalControlRequests"]>(async (input) => {
+      if (!input.actor) throw new LangyLocalRequestInvalidError();
+      return { requests: [] };
+    }),
+    approveLocalControlRequest: vi.fn<LangyApi["approveLocalControlRequest"]>(async () => APPROVED),
+    cancelLocalControlRequest: vi.fn<LangyApi["cancelLocalControlRequest"]>(async (input) => ({
+      id: input.requestId,
+      cancelled: true,
+    })),
   };
-  const runtime = createRestRuntime({
-    identity: {
-      authenticate: () => ({ actor, scope: { tier: "project", id: "project-1" } }),
-    },
-  });
-  const family = runtime.mount(langyLocalControlRest.router(), {
-    app: () => createApiFixture(),
+  const hono = createRestRuntime({
+    identity: { authenticate: () => ({ actor, scope: { tier: "project", id: "project-1" } }) },
+  }).mount(langyLocalControlRest.router(), {
+    app: () => createApiFixture<LangyApi>(ops),
     onError: (error, context) => canonicalErrorResponse(error, context),
-    facts: [bindRestMiddleware(langyLocalControlRestMembers, () => members)],
   });
-
-  return { listOpen, list: () => family.request("http://api.test/api/langy/control/requests") };
+  const post = (path: string, body?: unknown) =>
+    hono.request(`http://api.test${path}`, {
+      method: "POST",
+      ...(body === undefined
+        ? {}
+        : { body: JSON.stringify(body), headers: { "content-type": "application/json" } }),
+    });
+  return { ops, get: (path: string) => hono.request(`http://api.test${path}`), post };
 }
 
-describe("listing the terminal's open requests", () => {
-  describe("given a key a person owns", () => {
-    it("reads that person's requests", async () => {
-      const { listOpen, list } = familyFor({ type: "user", id: "user-1" });
+describe("the terminal's control requests", () => {
+  it("lists the key owner's open requests at the v1 path main published", async () => {
+    const api = family(OWNER);
 
-      const response = await list();
+    const response = await api.get("/api/v1/langy/control/requests");
 
-      expect(response.status).toBe(200);
-      expect(listOpen).toHaveBeenCalledWith({ userId: "user-1" });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ requests: [] });
+    expect(api.ops.listLocalControlRequests).toHaveBeenCalledWith({ actor: OWNER });
+  });
+
+  it("refuses a key no person owns as an invalid request", async () => {
+    const api = family(null);
+
+    const response = await api.get("/api/v1/langy/control/requests");
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ code: "langy_local_request_invalid" });
+  });
+
+  it("answers an approval's session key once, status 200", async () => {
+    const api = family(OWNER);
+
+    const response = await api.post("/api/v1/langy/control/requests/request-1/approve", {
+      workspace: { root: "/home/ada/repo", name: "repo", os: "darwin" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(APPROVED);
+    expect(api.ops.approveLocalControlRequest).toHaveBeenCalledWith({
+      actor: OWNER,
+      requestId: "request-1",
     });
   });
 
-  describe("given a key no person owns", () => {
-    it("refuses as an invalid request without reading any", async () => {
-      const { listOpen, list } = familyFor(null);
+  it("answers a cancelled request, status 200", async () => {
+    const api = family(OWNER);
 
-      const response = await list();
+    const response = await api.post("/api/v1/langy/control/requests/request-1/cancel");
 
-      expect(response.status).toBe(404);
-      expect(await response.json()).toMatchObject({ code: "langy_local_request_invalid" });
-      expect(listOpen).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ id: "request-1", cancelled: true });
+    expect(api.ops.cancelLocalControlRequest).toHaveBeenCalledWith({
+      actor: OWNER,
+      requestId: "request-1",
     });
   });
 });

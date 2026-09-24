@@ -6,7 +6,6 @@ import {
   defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  projectCredentialOfRequest,
   type RestAnswer,
   type RestProtocolProducer,
 } from "@langwatch/api/rest";
@@ -15,6 +14,7 @@ import {
   LangyApiRequestInvalidError,
   langyRestConversationParamsSchema,
   langyRestTurnBodySchema,
+  type LangyKeyCaller,
 } from "@langwatch/langy-contract";
 import { z } from "zod";
 
@@ -110,6 +110,7 @@ function parseTurnBody(
  */
 async function startTurn(input: {
   app: LangyApi;
+  key: LangyKeyCaller;
   members: LangyTurnsRestMembers;
   request: Request;
   response: RestProtocolProducer<typeof TURN_PRODUCES>;
@@ -119,10 +120,7 @@ async function startTurn(input: {
   const { app, members, request, response, conversationId } = input;
   // The door already resolved this key and enforced `langy:create` as its
   // ceiling; reading its answer back here asks the key store nothing twice.
-  const caller = await app.getRestCaller({
-    credential: projectCredentialOfRequest(request),
-    surface: "turns",
-  });
+  const caller = await app.getRestCaller({ ...input.key, surface: "turns" });
   if (caller.dark) return response.write(HONO_NOT_FOUND);
 
   const session = await app.getRestActor({ userId: caller.userId });
@@ -212,8 +210,16 @@ export const langyTurnsRest = defineRestRouter(LangyApi)
   .withBodyLimit({ maxBytes: MAX_TURN_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
   .withDocs({ description: `Start a Langy conversation with one turn. ${TURN_ANSWER}` })
   .withMiddleware(langyTurnsMembers)
-  .handle(async ({ app, raw, request, response }, members) =>
-    startTurn({ app, members, request, response, raw, conversationId: null }),
+  .handle(async ({ app, raw, request, response, actor, scope }, members) =>
+    startTurn({
+      app,
+      key: { actor, projectId: scope.id },
+      members,
+      request,
+      response,
+      raw,
+      conversationId: null,
+    }),
   )
 
   .post("/api/langy/conversations/:conversationId/messages", "continueLangyConversationTurn")
@@ -224,9 +230,10 @@ export const langyTurnsRest = defineRestRouter(LangyApi)
   .withBodyLimit({ maxBytes: MAX_TURN_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
   .withDocs({ description: `Continue one Langy conversation with a turn. ${TURN_ANSWER}` })
   .withMiddleware(langyTurnsMembers)
-  .handle(async ({ app, input, raw, request, response }, members) =>
+  .handle(async ({ app, input, raw, request, response, actor, scope }, members) =>
     startTurn({
       app,
+      key: { actor, projectId: scope.id },
       members,
       request,
       response,

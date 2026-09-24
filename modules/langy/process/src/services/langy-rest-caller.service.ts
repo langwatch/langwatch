@@ -3,15 +3,20 @@
  * project door resolves the credential. ORDER IS THE CONTRACT: per-project
  * rollout (a dark 404), then the identity bridge, then the filing user.
  */
-import type { RestResolvedProjectCredential } from "@langwatch/api/rest";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   LangyApiIdentityDeniedError,
   type LangyCredentialSession,
+  type LangyKeyCaller,
   type LangyLocalCaller,
   type LangyRestCaller,
-  type LangyRestSurface,
+  type LangyRestCallerInput,
 } from "@langwatch/langy-contract";
+import {
+  ProjectNotFoundError,
+  type ProjectApi,
+  type ProjectIdentity,
+} from "@langwatch/project-contract";
 
 import { LANGY_UI_ACTIONS_FLAG } from "../app/langy.members.ts";
 import { LANGY_API_KEY_TURNS_FLAG } from "../rules/langy-rest-flags.rules.ts";
@@ -27,6 +32,8 @@ export type LangyRestCallerMembers = Readonly<{
   featureFlags: FeatureFlagApi;
   /** The user directory a key's owner is read from. */
   actors: LangyActorUserReader;
+  /** The project's name, slug and organization, read once per call. */
+  projects: Pick<ProjectApi, "findIdentity">;
 }>;
 
 const SURFACE_FLAGS = {
@@ -42,15 +49,12 @@ export class LangyRestCallerService {
   private constructor(private readonly members: LangyRestCallerMembers) {}
 
   /**
-   * Opens the surface's rollout flag, then bridges the credential to its owner. A project the
+   * Opens the surface's rollout flag, then bridges the key to its owner. A project the
    * rollout has not reached answers `dark`, exactly as an unmounted path does; every other
    * refusal throws.
    */
-  async getCaller(input: {
-    credential: RestResolvedProjectCredential;
-    surface: LangyRestSurface;
-  }): Promise<LangyRestCaller> {
-    const { project } = input.credential;
+  async getCaller(input: LangyRestCallerInput): Promise<LangyRestCaller> {
+    const project = await this.#project(input.projectId);
     const surfaceOpen = await this.members.featureFlags.isEnabled(SURFACE_FLAGS[input.surface], {
       kind: "project",
       projectId: project.id,
@@ -58,16 +62,14 @@ export class LangyRestCallerService {
     });
     if (!surfaceOpen) return { dark: true };
 
-    const userId = await this.getOwner({ credential: input.credential });
+    const userId = await this.getOwner({ actor: input.actor, project });
     return { dark: false, projectId: project.id, userId };
   }
 
   /** The owner of a local worker's key, with the project facts its links name. */
-  async getLocalCaller(input: {
-    credential: RestResolvedProjectCredential;
-  }): Promise<LangyLocalCaller> {
-    const { project } = input.credential;
-    const userId = await this.getOwner({ credential: input.credential });
+  async getLocalCaller(input: LangyKeyCaller): Promise<LangyLocalCaller> {
+    const project = await this.#project(input.projectId);
+    const userId = await this.getOwner({ actor: input.actor, project });
     return {
       userId,
       projectId: project.id,
@@ -85,10 +87,20 @@ export class LangyRestCallerService {
     return actor.session;
   }
 
-  private async getOwner(input: { credential: RestResolvedProjectCredential }): Promise<string> {
+  /** A key no person owns (a legacy key too) arrives with no actor, and is refused as unowned. */
+  private async getOwner(input: {
+    actor: LangyKeyCaller["actor"];
+    project: ProjectIdentity;
+  }): Promise<string> {
     const identity = await LangyKeyIdentityService.create({
       featureFlags: this.members.featureFlags,
-    }).resolve({ resolved: input.credential });
+    }).resolve({
+      resolved: {
+        type: "apiKey",
+        userId: input.actor?.type === "user" ? input.actor.id : null,
+        project: input.project,
+      },
+    });
     if (!identity.ok) {
       throw new LangyApiIdentityDeniedError(
         identity.reason === "unowned" ? "langy_api_key_unowned" : "langy_api_key_no_langy_access",
@@ -96,5 +108,11 @@ export class LangyRestCallerService {
       );
     }
     return identity.userId;
+  }
+
+  async #project(projectId: string): Promise<ProjectIdentity> {
+    const project = await this.members.projects.findIdentity(projectId);
+    if (!project) throw new ProjectNotFoundError();
+    return project;
   }
 }

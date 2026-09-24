@@ -1,9 +1,5 @@
 import { ApiKeyApi } from "@langwatch/api-key-contract";
-import {
-  BearerIdentity,
-  type RestIdentity,
-  type RestResolvedProjectCredential,
-} from "@langwatch/api/rest";
+import { BearerIdentity, type RestIdentity } from "@langwatch/api/rest";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { Event, StaticPipelineDefinition } from "@langwatch/eventing";
@@ -54,6 +50,7 @@ import {
   type LocalControlRuntime,
 } from "../repositories/redis/redis.langy-local-control-runtime.repository.ts";
 import { LangyInternalService } from "../services/langy-internal.service.ts";
+import { LangyLocalControlTerminalService } from "../services/langy-local-control-terminal.service.ts";
 import { LangyLocalWorkerService } from "../services/langy-local-worker.service.ts";
 import { LangyLocalWorkspaceService } from "../services/langy-local-workspace.service.ts";
 import { EventingLangyMaintenanceAdapter } from "../services/langy-maintenance.service.ts";
@@ -108,6 +105,7 @@ type LangyAppDependencies = {
   /** What the local doors reach beyond `LangyApi` (ADR-129). */
   localControl: LangyLocalControl;
   localWorker: LangyLocalWorkerService;
+  localControlTerminal: LangyLocalControlTerminalService;
 };
 
 /** The local-control runtime, its durable commands, its peer reads and this origin. */
@@ -222,6 +220,7 @@ export class LangyApp implements LangyApiContract {
     const callers = LangyRestCallerService.create({
       featureFlags: setup.dependencies.featureFlags,
       actors: setup.members.prisma,
+      projects: setup.dependencies.projects,
     });
     const runtime = RedisLangyLocalControlRuntimeRepository.create({
       store: setup.repositories.sessionState,
@@ -258,6 +257,11 @@ export class LangyApp implements LangyApiContract {
         conversations: langy,
         baseHost: setup.members.publicBaseUrl,
       }),
+      localControlTerminal: LangyLocalControlTerminalService.create({
+        requests: runtime.requests,
+        permissions: setup.dependencies.authz,
+        baseHost: setup.members.publicBaseUrl,
+      }),
     });
   }
 
@@ -292,10 +296,9 @@ export class LangyApp implements LangyApiContract {
     );
   }
 
-  getRestCaller(input: {
-    credential: RestResolvedProjectCredential;
-    surface: langyContractModule.LangyRestSurface;
-  }): Promise<langyContractModule.LangyRestCaller> {
+  getRestCaller(
+    input: langyContractModule.LangyRestCallerInput,
+  ): Promise<langyContractModule.LangyRestCaller> {
     return this.dependencies.callers.getCaller(input);
   }
 
@@ -303,9 +306,9 @@ export class LangyApp implements LangyApiContract {
     return this.dependencies.callers.getActor(input);
   }
 
-  getLocalCaller(input: {
-    credential: RestResolvedProjectCredential;
-  }): Promise<langyContractModule.LangyLocalCaller> {
+  getLocalCaller(
+    input: langyContractModule.LangyKeyCaller,
+  ): Promise<langyContractModule.LangyLocalCaller> {
     return this.dependencies.callers.getLocalCaller(input);
   }
 
@@ -349,6 +352,23 @@ export class LangyApp implements LangyApiContract {
     input: langyContractModule.LangyLocalWaitInput,
   ): Promise<langyContractModule.PollWaitResponse> {
     return this.dependencies.localWorker.getWaitAnswer(input);
+  }
+  listLocalControlRequests(
+    input: langyContractModule.LangyControlOwnerInput,
+  ): Promise<langyContractModule.ListControlRequestsResponse> {
+    return this.dependencies.localControlTerminal.listRequests(input);
+  }
+
+  approveLocalControlRequest(
+    input: langyContractModule.LangyControlRequestInput,
+  ): Promise<langyContractModule.ApproveControlRequestResponse> {
+    return this.dependencies.localControlTerminal.approveRequest(input);
+  }
+
+  cancelLocalControlRequest(
+    input: langyContractModule.LangyControlRequestInput,
+  ): Promise<langyContractModule.LangyControlRequestCancelled> {
+    return this.dependencies.localControlTerminal.cancelRequest(input);
   }
 
   ingestInternalTurnResult(input: langyContractModule.LangyTurnResultInput): Promise<{

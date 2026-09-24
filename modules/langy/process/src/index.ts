@@ -265,11 +265,12 @@ export type {
   SkipPermissionsProviderRows,
 } from "./services/langy-skip-permissions.service.ts";
 export { langyLocalRest } from "./transport/langy-local.rest.ts";
+export { langyLocalControlRest } from "./transport/langy-local-control.rest.ts";
 export {
-  langyLocalControlRest,
-  langyLocalControlRestMembers,
-  type LangyLocalControlRestMembers,
-} from "./transport/langy-local-control.rest.ts";
+  langyLocalControlConnectMembers,
+  langyLocalControlConnectRest,
+  type LangyLocalControlConnectMembers,
+} from "./transport/langy-local-control-connect.rest.ts";
 export {
   LocalControlLongPoll,
   type LocalControlLongPollOptions,

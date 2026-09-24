@@ -1,4 +1,4 @@
-import type { RestResolvedProjectCredential } from "@langwatch/api/rest";
+import type { RequestActor } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import type { z } from "zod";
 
@@ -15,12 +15,16 @@ import type {
   LangyTurnResultInput,
 } from "./langy-conversation.ts";
 import type {
+  langyControlCancelResultSchema,
   langyLocalStartCallRequestSchema,
   langyLocalStartWaitRequestSchema,
   RelayTally,
 } from "./langy-rest.schemas.ts";
 import type {
+  ApproveControlRequestResponse,
   CreateControlRequestResponse,
+  ListControlRequestsResponse,
+  LangyLocalCallCancelled,
   PollCallResponse,
   PollWaitResponse,
   StartCallResponse,
@@ -56,31 +60,29 @@ export type LangyLocalCaller = Readonly<{
   projectSlug: string;
 }>;
 
+/** Who the project door put behind a key (its owner, or none), and the project it resolved. */
+export type LangyKeyCaller = Readonly<{
+  actor: RequestActor | null;
+  projectId: string;
+}>;
+
 /** A local worker's key, and the conversation it names. */
-export type LangyLocalConversationInput = Readonly<{
-  credential: RestResolvedProjectCredential;
-  conversationId: string;
-}>;
-export type LangyLocalStartCallInput = Readonly<{
-  credential: RestResolvedProjectCredential;
-  call: z.infer<typeof langyLocalStartCallRequestSchema>;
-}>;
-export type LangyLocalStartWaitInput = Readonly<{
-  credential: RestResolvedProjectCredential;
-  wait: z.infer<typeof langyLocalStartWaitRequestSchema>;
-}>;
+export type LangyLocalConversationInput = LangyKeyCaller & Readonly<{ conversationId: string }>;
+export type LangyLocalStartCallInput = LangyKeyCaller &
+  Readonly<{ call: z.infer<typeof langyLocalStartCallRequestSchema> }>;
+export type LangyLocalStartWaitInput = LangyKeyCaller &
+  Readonly<{ wait: z.infer<typeof langyLocalStartWaitRequestSchema> }>;
 /** A long-poll read holds until the record settles or the caller hangs up. */
-export type LangyLocalCallInput = Readonly<{
-  credential: RestResolvedProjectCredential;
-  callId: string;
-  signal?: AbortSignal;
-}>;
-export type LangyLocalWaitInput = Readonly<{
-  credential: RestResolvedProjectCredential;
-  waitId: string;
-  signal?: AbortSignal;
-}>;
-export type LangyLocalCallCancelled = Readonly<{ callId: string; cancelled: true }>;
+export type LangyLocalCallInput = LangyKeyCaller &
+  Readonly<{ callId: string; signal?: AbortSignal }>;
+export type LangyLocalWaitInput = LangyKeyCaller &
+  Readonly<{ waitId: string; signal?: AbortSignal }>;
+/** The terminal's key owner (none for a key no person owns), and the request it addresses. */
+export type LangyControlOwnerInput = Readonly<{ actor: RequestActor | null }>;
+export type LangyControlRequestInput = LangyControlOwnerInput & Readonly<{ requestId: string }>;
+export type LangyControlRequestCancelled = z.infer<typeof langyControlCancelResultSchema>;
+/** A public surface's caller: the key's owner and project, and which surface's rollout gates it. */
+export type LangyRestCallerInput = LangyKeyCaller & Readonly<{ surface: LangyRestSurface }>;
 
 /** The portable, callable Langy capability shared by process transports. */
 export interface LangyApi {
@@ -224,14 +226,11 @@ export interface LangyApi {
   /** The setup skill's prompt the empty states copy; an unknown skill throws `not_found`. */
   getSetupSkillPrompt(input: { projectId: string; skill: string }): Promise<{ body: string }>;
   /** Rollout gate, then the key's owner; an unowned or unentitled key throws. */
-  getRestCaller(input: {
-    credential: RestResolvedProjectCredential;
-    surface: LangyRestSurface;
-  }): Promise<LangyRestCaller>;
+  getRestCaller(input: LangyRestCallerInput): Promise<LangyRestCaller>;
   /** The person an owner's turns are filed under; a missing one throws. */
   getRestActor(input: { userId: string }): Promise<LangyCredentialSession>;
   /** The owner of a local worker's key, proved against Langy access. */
-  getLocalCaller(input: { credential: RestResolvedProjectCredential }): Promise<LangyLocalCaller>;
+  getLocalCaller(input: LangyKeyCaller): Promise<LangyLocalCaller>;
   /** The code access card's status for the key owner's own conversation. */
   getLocalWorkspace(input: LangyLocalConversationInput): Promise<WorkspaceStatus>;
   createLocalControlRequest(
@@ -244,6 +243,13 @@ export interface LangyApi {
   startLocalWait(input: LangyLocalStartWaitInput): Promise<StartWaitResponse>;
   /** Holds until the question is answered; a lapsed or foreign wait throws not found. */
   getLocalWaitAnswer(input: LangyLocalWaitInput): Promise<PollWaitResponse>;
+  /** The key owner's open requests on every project they can read; no owner refuses. */
+  listLocalControlRequests(input: LangyControlOwnerInput): Promise<ListControlRequestsResponse>;
+  /** Approves one addressed request, answering its session key once. */
+  approveLocalControlRequest(
+    input: LangyControlRequestInput,
+  ): Promise<ApproveControlRequestResponse>;
+  cancelLocalControlRequest(input: LangyControlRequestInput): Promise<LangyControlRequestCancelled>;
 }
 
 export const LangyApi = moduleApi<LangyApi>()("langy");

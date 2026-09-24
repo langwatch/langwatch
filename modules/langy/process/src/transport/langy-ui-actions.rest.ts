@@ -108,9 +108,13 @@ export const langyUiActionsRest = defineRestRouter(LangyApi)
       "rollout is dark for the project.",
   })
   .withMiddleware(langyUiActionsRestMembers)
-  .handle(async ({ app, raw, request, response }, members) => {
+  .handle(async ({ app, raw, request, response, actor }, members) => {
     const resolved = projectCredentialOfRequest(request);
-    const caller = await app.getRestCaller({ credential: resolved, surface: "ui_actions" });
+    const caller = await app.getRestCaller({
+      actor,
+      projectId: resolved.project.id,
+      surface: "ui_actions",
+    });
     if (caller.dark) return response.write(HONO_NOT_FOUND);
 
     let parsedRaw: unknown;
@@ -167,9 +171,10 @@ export const langyUiActionsRest = defineRestRouter(LangyApi)
       "reads as it stands.",
   })
   .withMiddleware(langyUiActionsRestMembers)
-  .handle(async ({ app, request, response }, members) => {
+  .handle(async ({ app, request, response, actor }, members) => {
     const caller = await app.getRestCaller({
-      credential: projectCredentialOfRequest(request),
+      actor,
+      projectId: projectCredentialOfRequest(request).project.id,
       surface: "ui_actions",
     });
     if (caller.dark) return response.write(HONO_NOT_FOUND);

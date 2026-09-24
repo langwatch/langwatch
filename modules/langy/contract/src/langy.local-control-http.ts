@@ -30,6 +30,11 @@ export const listControlRequestsResponseSchema = z.object({
   requests: z.array(controlRequestSchema),
 });
 
+/** A bodiless control action: an absent body reads as this empty object (§8). */
+export const controlActionBodySchema = z.object({});
+
+export type ListControlRequestsResponse = z.infer<typeof listControlRequestsResponseSchema>;
+
 export const approveControlRequestBodySchema = z.object({
   workspace: workspaceInfoSchema,
 });
@@ -75,6 +80,12 @@ export const startCallResponseSchema = z.object({
   callId: z.string(),
 });
 export type StartCallResponse = z.infer<typeof startCallResponseSchema>;
+
+export const cancelCallResponseSchema = z.object({
+  callId: z.string(),
+  cancelled: z.literal(true),
+});
+export type LangyLocalCallCancelled = z.infer<typeof cancelCallResponseSchema>;
 
 export const CALL_STATES = ["pending", "running", "awaiting_permission", "done"] as const;
 export type CallState = (typeof CALL_STATES)[number];

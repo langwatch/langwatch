@@ -1,4 +1,3 @@
-import type { RestResolvedProjectCredential } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import {
   BASH_DEFAULT_TIMEOUT_MS,
@@ -15,6 +14,7 @@ import {
   type LangyLocalCallCancelled,
   type LangyLocalCallInput,
   type LangyLocalCaller,
+  type LangyKeyCaller,
   type LangyLocalConversationInput,
   type LangyLocalStartCallInput,
   type LangyLocalStartWaitInput,
@@ -35,8 +35,6 @@ import { ControlRequestService } from "./langy-local-control-request.service.ts"
 import type { LangyLocalWorkspaceService } from "./langy-local-workspace.service.ts";
 import type { LangyRestCallerService } from "./langy-rest-caller.service.ts";
 import type { LangyService } from "./langy.service.ts";
-
-type Credential = RestResolvedProjectCredential;
 
 /**
  * What the local worker's door answers (ADR-129), each operation one handler's
@@ -126,7 +124,8 @@ export class LangyLocalWorkerService {
   async startCall(input: LangyLocalStartCallInput): Promise<StartCallResponse> {
     const { conversationId, turnId, toolCallId, ...call } = input.call;
     const { caller, conversation } = await this.#ownConversation({
-      credential: input.credential,
+      actor: input.actor,
+      projectId: input.projectId,
       conversationId,
     });
     await reconcileSkipPolicy({
@@ -184,7 +183,8 @@ export class LangyLocalWorkerService {
   async startWait(input: LangyLocalStartWaitInput): Promise<StartWaitResponse> {
     const { wait: body } = input;
     const { caller } = await this.#ownConversation({
-      credential: input.credential,
+      actor: input.actor,
+      projectId: input.projectId,
       conversationId: body.conversationId,
     });
     const wait = await this.#runtime.waits.startQuestion({
@@ -212,7 +212,7 @@ export class LangyLocalWorkerService {
     return poll.answer;
   }
 
-  async #ownCall(input: { credential: Credential; callId: string }) {
+  async #ownCall(input: LangyKeyCaller & { callId: string }) {
     const caller = await this.#callers.getLocalCaller(input);
     const call = await this.#runtime.dispatcher.read(input.callId);
     if (!call || call.projectId !== caller.projectId) throw new LangyLocalRecordNotFoundError();
@@ -220,7 +220,7 @@ export class LangyLocalWorkerService {
     return call;
   }
 
-  async #ownConversation(input: { credential: Credential; conversationId: string }): Promise<{
+  async #ownConversation(input: LangyKeyCaller & { conversationId: string }): Promise<{
     caller: LangyLocalCaller;
     conversation: LangyConversationDetail;
   }> {
