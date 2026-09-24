@@ -32,6 +32,9 @@
     },
     {
       "path": "../../../packages/redaction/tsconfig.build.json"
+    },
+    {
+      "path": "../../trace/contract/tsconfig.build.json"
     }
   ]
 }

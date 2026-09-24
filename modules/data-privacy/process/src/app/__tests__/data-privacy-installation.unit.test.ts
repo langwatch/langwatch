@@ -21,6 +21,7 @@ function process(role: "api" | "worker", googleCredentials?: string) {
   return createApp({ role })
     .withModules([installableDataPrivacy(googleCredentials)])
     .withMember("dataPrivacy", dataPrivacyTestInfrastructure())
+    .withConfig({ "data-privacy": { googleDlpDisabled: undefined, enforcement: undefined } })
     .provide({
       project: createDataPrivacyTestProjects(),
       organization: createApiFixture<OrganizationApi>(),

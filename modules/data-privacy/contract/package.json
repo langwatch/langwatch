@@ -26,6 +26,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/redaction": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -5656,6 +5656,9 @@ importers:
       '@langwatch/redaction':
         specifier: workspace:*
         version: link:../../../packages/redaction
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
       zod:
         specifier: 'catalog:'
         version: 4.6.5

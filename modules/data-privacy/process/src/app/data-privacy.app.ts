@@ -3,14 +3,17 @@ import {
   DataPrivacyApi,
   type DataPrivacyCallerInput,
   type DataPrivacyConfig,
+  dataPrivacyConfig,
   type DataPrivacyLogRecord,
   type DataPrivacyMetricAttributes,
   type DataPrivacyPiiRedactionLevel,
   type DataPrivacyPolicy,
   type DataPrivacyScope,
   type DataPrivacyScopeTarget,
+  type DataPrivacyServerConfig,
   type DataPrivacySnapshot,
   type ResolvedDataPrivacy,
+  type SpanContentDropResult,
 } from "@langwatch/data-privacy-contract";
 import { createTenantId } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -18,6 +21,7 @@ import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
+import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 
 import type { DataPrivacyRepositories } from "../repositories/data-privacy.repositories.ts";
 import { ContentDropPolicyService } from "../services/content-drop-policy.service.ts";
@@ -25,6 +29,7 @@ import { DataPrivacyPermissionsService } from "../services/data-privacy-permissi
 import { DataPrivacyScopeAuthorizationService } from "../services/data-privacy-scope-authorization.service.ts";
 import { DataPrivacySnapshotService } from "../services/data-privacy-snapshot.service.ts";
 import { DataPrivacyService } from "../services/data-privacy.service.ts";
+import { OtlpSpanContentDropService } from "../services/otlp-span-content-drop.service.ts";
 import { OtlpSpanPiiRedactionService } from "../services/otlp-span-pii-redaction.service.ts";
 import type { PiiAnalysis } from "./data-privacy.members.ts";
 
@@ -94,7 +99,7 @@ export type DataPrivacyInfrastructure = Readonly<{
 type DataPrivacySetup = FeatureSetup<
   typeof DataPrivacyApp.dependencies,
   Readonly<{ dataPrivacy: DataPrivacyInfrastructure }>,
-  undefined,
+  DataPrivacyServerConfig,
   DataPrivacyRepositories
 >;
 
@@ -111,6 +116,7 @@ export class DataPrivacyApp implements DataPrivacyApi {
     permissions: AuthzApi,
   };
   static readonly reads = ["dataPrivacy"] as const;
+  static readonly config = dataPrivacyConfig;
   /** The DLP service account's key; model-provider's Vertex dispatch borrows it. */
   static readonly secrets = {
     googleApplicationCredentials: Secret.load("GOOGLE_APPLICATION_CREDENTIALS", { optional: true }),
@@ -121,6 +127,7 @@ export class DataPrivacyApp implements DataPrivacyApi {
   #snapshots: DataPrivacySnapshotService;
   #scopeAuthorization: DataPrivacyScopeAuthorizationService;
   #contentDrop: ContentDropPolicyService;
+  #spanContentDrop: OtlpSpanContentDropService;
   #projects: ProjectApi;
   #googleCredentials: GoogleCredentialsUse;
 
@@ -130,6 +137,7 @@ export class DataPrivacyApp implements DataPrivacyApi {
     snapshots: DataPrivacySnapshotService;
     scopeAuthorization: DataPrivacyScopeAuthorizationService;
     contentDrop: ContentDropPolicyService;
+    spanContentDrop: OtlpSpanContentDropService;
     projects: ProjectApi;
     googleCredentials: GoogleCredentialsUse;
   }) {
@@ -138,6 +146,7 @@ export class DataPrivacyApp implements DataPrivacyApi {
     this.#snapshots = services.snapshots;
     this.#scopeAuthorization = services.scopeAuthorization;
     this.#contentDrop = services.contentDrop;
+    this.#spanContentDrop = services.spanContentDrop;
     this.#projects = services.projects;
     this.#googleCredentials = services.googleCredentials;
   }
@@ -146,6 +155,7 @@ export class DataPrivacyApp implements DataPrivacyApi {
     repositories,
     members: supplied,
     dependencies,
+    config,
     secrets,
   }: DataPrivacySetup): Promise<DataPrivacyApp> {
     const googleCredentials = await secrets.into(
@@ -184,6 +194,10 @@ export class DataPrivacyApp implements DataPrivacyApi {
         permissions,
       }),
       contentDrop: ContentDropPolicyService.create(),
+      spanContentDrop: OtlpSpanContentDropService.create({
+        dataPrivacy: privacy,
+        nativePolicyEnforced: config.enforcement !== "off",
+      }),
       projects: dependencies.projects,
       googleCredentials,
     });
@@ -271,6 +285,24 @@ export class DataPrivacyApp implements DataPrivacyApi {
       piiRedactionLevel,
       tenantId ? createTenantId(tenantId) : undefined,
     );
+  }
+
+  async redactSpan(input: {
+    span: OtlpSpan;
+    resource: OtlpResource | null;
+    piiRedactionLevel: DataPrivacyPiiRedactionLevel;
+    tenantId: string;
+  }): Promise<void> {
+    await this.#redactionPath().redactSpan({
+      span: input.span,
+      resource: input.resource,
+      piiRedactionLevel: input.piiRedactionLevel,
+      tenantId: createTenantId(input.tenantId),
+    });
+  }
+
+  dropSpanContent(input: { span: OtlpSpan; projectId: string }): Promise<SpanContentDropResult> {
+    return this.#spanContentDrop.dropSpanContent(input);
   }
 
   /** Refuses by name on a process that composed no PII analysis transport. */

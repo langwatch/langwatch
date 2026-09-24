@@ -213,3 +213,15 @@ Feature: Redacting personal data out of a span at ingestion
     When it builds the span redaction port
     Then a span carrying personal data comes back scrubbed
     And a deployment that named no analysis service still scrubs the native floor
+
+  @unit
+  Scenario: A peer redacts a span through the data-privacy API
+    Given a span whose input carries an email address
+    When a peer hands it to the data-privacy API's span redaction at the essential level
+    Then the address is redacted in place
+
+  @unit
+  Scenario: A process without a PII analysis transport refuses a peer's span redaction
+    Given a process that composed no PII analysis transport
+    When a peer hands a span to the data-privacy API's span redaction
+    Then the call is refused rather than storing the span unredacted

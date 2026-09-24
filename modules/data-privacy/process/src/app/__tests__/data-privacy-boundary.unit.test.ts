@@ -48,6 +48,7 @@ async function bootWith(scopeOrganizationId: string | null): Promise<DataPrivacy
   const runtime = await createApp({ role: "api" })
     .withModules([installableDataPrivacy()])
     .withMember("dataPrivacy", dataPrivacyTestInfrastructure(directory))
+    .withConfig({ "data-privacy": { googleDlpDisabled: undefined, enforcement: undefined } })
     .provide({
       project: createDataPrivacyTestProjects(),
       organization: createApiFixture<OrganizationApi>(),

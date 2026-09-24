@@ -130,3 +130,17 @@ Feature: Dropping span content a project asked never to store
     Given the composed drop graph
     When a span is dropped through the port
     Then the content is gone and the marker explains it
+
+  @unit
+  Scenario: A peer drops a span's content through the data-privacy API
+    Given the project's policy drops input content
+    When a peer hands a span to the data-privacy API's content drop
+    Then the dropped category is reported
+    And the span carries the dropped-category marker
+
+  @unit
+  Scenario: The enforcement switch set to off leaves a peer's span whole
+    Given the deployment sets data-privacy enforcement to "off"
+    And the project's policy drops input content
+    When a peer hands a span to the data-privacy API's content drop
+    Then nothing is dropped and the span is unchanged

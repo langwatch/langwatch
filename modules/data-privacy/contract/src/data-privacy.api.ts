@@ -1,4 +1,5 @@
 import { moduleApi } from "@langwatch/kernel/module-api";
+import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 
 import type { DataPrivacySnapshot } from "./data-privacy.snapshot.ts";
 import type {
@@ -36,6 +37,14 @@ export type DataPrivacyMetricAttributes = {
   resourceAttributes: Record<string, string>;
   attributeNames?: Record<string, string>;
 };
+
+/** What one span's content drop removed: the only record of it, as the span is stored stripped. */
+export interface SpanContentDropResult {
+  droppedCount: number;
+  droppedCategories: string[];
+  /** Attribute keys removed by custom attribute rules (names only, deduped). */
+  droppedAttributeKeys: string[];
+}
 
 /** Callable data-privacy operations shared by process peers after composition. */
 export interface DataPrivacyApi {
@@ -92,6 +101,16 @@ export interface DataPrivacyApi {
     piiRedactionLevel: DataPrivacyPiiRedactionLevel,
     tenantId?: string,
   ): Promise<void>;
+
+  /** Redacts the span and its resource in place, at the level the ingest resolved. */
+  redactSpan(input: {
+    span: OtlpSpan;
+    resource: OtlpResource | null;
+    piiRedactionLevel: DataPrivacyPiiRedactionLevel;
+    tenantId: string;
+  }): Promise<void>;
+  /** Strips the content the project's policy never stores; fail-open, never throws. */
+  dropSpanContent(input: { span: OtlpSpan; projectId: string }): Promise<SpanContentDropResult>;
 }
 
 export const DataPrivacyApi = moduleApi<DataPrivacyApi>()("data-privacy");

@@ -5,6 +5,7 @@ import {
   matchesAnyAttributePattern,
   type CompiledAttributeMatcher,
   type ResolvedDataPrivacy,
+  type SpanContentDropResult,
 } from "@langwatch/data-privacy-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OtlpSpan } from "@langwatch/trace-contract";
@@ -13,15 +14,6 @@ import type { DataPrivacyResolution } from "../app/data-privacy.members.ts";
 import { ContentDropPolicyService } from "./content-drop-policy.service.ts";
 
 const logger = createLogger("langwatch:data-privacy:content-drop");
-
-export interface SpanContentDropResult {
-  /** How many attribute entries were removed across the span and its events. */
-  droppedCount: number;
-  /** The content categories the policy dropped (for the marker / observability). */
-  droppedCategories: string[];
-  /** Attribute keys removed by custom attribute rules (names only, deduped). */
-  droppedAttributeKeys: string[];
-}
 
 /** What one strip removed so far, threaded through the two passes. */
 type DropTally = { droppedCount: number; droppedAttributeKeys: Set<string> };

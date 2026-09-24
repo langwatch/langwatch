@@ -40,7 +40,6 @@ export {
 export {
   OtlpSpanContentDropService,
   type OtlpSpanContentDropServiceOptions,
-  type SpanContentDropResult,
 } from "./services/otlp-span-content-drop.service.ts";
 export { OtlpSpanPiiRedactionService } from "./services/otlp-span-pii-redaction.service.ts";
 export type {
