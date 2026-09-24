@@ -2,6 +2,7 @@ import { defineServerModule } from "@langwatch/kernel";
 import type { WebhookEnvelope } from "@langwatch/webhook-contract";
 
 import { WebhookApp } from "./app/webhook.app.ts";
+import { webhookDeliveryEventing } from "./eventing/webhook-delivery.pipeline.ts";
 import { webhookRepositories } from "./repositories/webhook-repositories.registry.ts";
 import {
   WebhookEnvelopeService,
@@ -17,7 +18,8 @@ export type { WebhookLiveDatabase } from "./repositories/prisma/prisma.webhook.r
 export const webhookServer = defineServerModule("webhook")
   .withRepositories(webhookRepositories)
   .withApp(WebhookApp)
-  .withTransports(webhookEndpointTrpcTransport, webhookRest);
+  .withTransports(webhookEndpointTrpcTransport, webhookRest)
+  .withEventing(webhookDeliveryEventing);
 
 /**
  * How another package composes this feature: the envelope a spend row is

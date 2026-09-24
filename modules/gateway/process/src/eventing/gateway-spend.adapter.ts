@@ -7,6 +7,7 @@ import {
   type RegisteredCommand,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+import type { WebhookApi } from "@langwatch/webhook-contract";
 
 import type { GatewaySpendEvents } from "../repositories/gateway-spend-events.repository.ts";
 import { GatewaySpendStore } from "../stores/gateway-spend/gateway-spend.store.ts";
@@ -20,6 +21,10 @@ import {
   SPEND_SETTLEMENT_PROCESS_NAME,
   spendSettlementPM,
 } from "./gateway-spend-settlement.process.ts";
+import {
+  GATEWAY_SPEND_WEBHOOK_SUBSCRIBER_NAME,
+  gatewaySpendWebhookSubscriber,
+} from "./gateway-spend-webhook.subscriber.ts";
 import {
   AdmitSpendCommand,
   ConfirmSpendCommand,
@@ -58,6 +63,8 @@ export interface EventingGatewaySpendAdapterOptions {
   /** The ADR-073 delivery process manager; absent when webhooks are off
    *  (the pipeline still projects, delivery just has no consumer). */
   webhookDelivery?: GatewaySpendProcessManagerMount;
+  /** Webhook's own delivery op; each committed spend step is handed to it (WP-6c). */
+  webhookSpendDelivery?: Pick<WebhookApi, "requestSpendDelivery">;
   /** The gateway's budget debits; absent without the ClickHouse spend path
    *  (the ledger is the only spend store). */
   gatewayDebits?: GatewaySpendProcessManagerMount;
@@ -109,6 +116,12 @@ export class EventingGatewaySpendAdapter {
       .withCommand("confirmSpend", ConfirmSpendCommand)
       .withCommand("failSpend", FailSpendCommand)
       .withCommand("settleSpend", SettleSpendCommand);
+    if (this.options.webhookSpendDelivery) {
+      pipeline = pipeline.withEventSubscriber(
+        GATEWAY_SPEND_WEBHOOK_SUBSCRIBER_NAME,
+        gatewaySpendWebhookSubscriber(this.options.webhookSpendDelivery),
+      );
+    }
     if (this.options.webhookDelivery) {
       pipeline = pipeline.withProcessManager(
         this.options.webhookDelivery.name,

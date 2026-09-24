@@ -2,15 +2,19 @@
 
 import type {
   IntentContext,
-  JsonValue,
   ProcessManagerApplier,
   ProcessIntent,
   ProcessStore,
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
-import { eventMatches, type WebhookEndpointView } from "@langwatch/webhook-contract";
+import {
+  eventMatches,
+  WEBHOOK_SPEND_DELIVERY_REQUESTED_EVENT_TYPE,
+  type WebhookEndpointView,
+} from "@langwatch/webhook-contract";
 
+import type { WebhookSpendDeliveryRequestedEvent } from "../eventing/webhook-spend-delivery.intent.ts";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
@@ -21,12 +25,10 @@ import {
   deliverSchema,
   flushEndpointSchema,
   sendBatchSchema,
-  type AdmitSpendCommandData,
   type ConfirmSpendCommandData,
   type DeliverPayload,
   type FailSpendCommandData,
   type FlushEndpointPayload,
-  type GatewaySpendProcessingEvent,
   type IntentExecutor,
   type SendBatchPayload,
   type SettleSpendCommandData,
@@ -144,47 +146,43 @@ export class WebhookDeliveryService {
     return new WebhookDeliveryService(deps);
   }
 
-  processManager(): ProcessManagerApplier<GatewaySpendProcessingEvent> {
+  processManager(): ProcessManagerApplier<WebhookSpendDeliveryRequestedEvent> {
     return (process) =>
       process
         .state<WebhookDeliveryState>(INITIAL_WEBHOOK_DELIVERY_STATE)
         .intent("deliver", deliverSchema, this.runDeliver())
         .intent("flushEndpoint", flushEndpointSchema, this.runFlushEndpoint())
         .intent("sendBatch", sendBatchSchema, this.runWebhookSendBatch())
-        .on(GATEWAY_SPEND_ADMITTED_EVENT_TYPE, (state, data, context) =>
-          onAdmission({
-            state,
-            ctx: context,
-            admit: data as AdmitSpendCommandData,
-          }),
-        )
-        .on(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, (state, data, context) =>
-          onSpendOutcome<ProcessIntent, ConfirmSpendCommandData>({
-            state,
-            ctx: context,
-            status: "confirmed",
-            data: data as ConfirmSpendCommandData,
-            toPayload: confirmedDeliverPayload,
-          }),
-        )
-        .on(GATEWAY_SPEND_FAILED_EVENT_TYPE, (state, data, context) =>
-          onSpendOutcome<ProcessIntent, FailSpendCommandData>({
-            state,
-            ctx: context,
-            status: "failed",
-            data: data as FailSpendCommandData,
-            toPayload: failedDeliverPayload,
-          }),
-        )
-        .on(GATEWAY_SPEND_SETTLED_EVENT_TYPE, (state, data, context) =>
-          onSpendOutcome<ProcessIntent, SettleSpendCommandData>({
-            state,
-            ctx: context,
-            status: "settled",
-            data: data as SettleSpendCommandData,
-            toPayload: settledDeliverPayload,
-          }),
-        )
+        .on(WEBHOOK_SPEND_DELIVERY_REQUESTED_EVENT_TYPE, (state, { spend }, context) => {
+          switch (spend.type) {
+            case GATEWAY_SPEND_ADMITTED_EVENT_TYPE:
+              return onAdmission({ state, ctx: context, admit: spend.data });
+            case GATEWAY_SPEND_CONFIRMED_EVENT_TYPE:
+              return onSpendOutcome<ProcessIntent, ConfirmSpendCommandData>({
+                state,
+                ctx: context,
+                status: "confirmed",
+                data: spend.data,
+                toPayload: confirmedDeliverPayload,
+              });
+            case GATEWAY_SPEND_FAILED_EVENT_TYPE:
+              return onSpendOutcome<ProcessIntent, FailSpendCommandData>({
+                state,
+                ctx: context,
+                status: "failed",
+                data: spend.data,
+                toPayload: failedDeliverPayload,
+              });
+            case GATEWAY_SPEND_SETTLED_EVENT_TYPE:
+              return onSpendOutcome<ProcessIntent, SettleSpendCommandData>({
+                state,
+                ctx: context,
+                status: "settled",
+                data: spend.data,
+                toPayload: settledDeliverPayload,
+              });
+          }
+        })
         .onWake((state, context) => {
           const target = deriveEndpointFlushTarget(state, context.key);
           if (!target) {
@@ -201,7 +199,6 @@ export class WebhookDeliveryService {
             ],
           };
         })
-        .toPayload((event) => event.data as unknown as JsonValue)
         .transient()
         .outbox(WEBHOOK_DELIVERY_OUTBOX);
   }

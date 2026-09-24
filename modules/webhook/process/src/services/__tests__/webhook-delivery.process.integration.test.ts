@@ -34,6 +34,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
+import { WEBHOOK_SPEND_DELIVERY_REQUESTED_EVENT_TYPE } from "@langwatch/webhook-contract";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { WebhookId, WebhookSecret } from "../../app/webhook.app.ts";
@@ -121,14 +122,19 @@ function envelopeFor({
   inProject?: string;
 }): ProcessEventEnvelope {
   const tenant = inProject ?? projectId;
+  const sourceEventId = `${eventType}:${requestId}`;
   return {
-    eventId: `${eventType}:${requestId}`,
-    eventType,
+    eventId: sourceEventId,
+    eventType: WEBHOOK_SPEND_DELIVERY_REQUESTED_EVENT_TYPE,
     occurredAt,
     tenantId: tenant,
     projectId: tenant,
     processKey: requestId,
-    payload: data as ProcessEventEnvelope["payload"],
+    payload: {
+      sourceEventId,
+      tenantId: tenant,
+      spend: { type: eventType, data },
+    } as ProcessEventEnvelope["payload"],
   };
 }
 

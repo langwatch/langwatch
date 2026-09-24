@@ -1,5 +1,6 @@
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { EventingCommandSender } from "@langwatch/eventing";
+import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 /**
  * The webhook feature's application: what both doors (tRPC and REST) call.
  * Lifts only the shared decisions — one `assertEntitled` gate, one optional
@@ -11,12 +12,23 @@ import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { nowInstant, type Instant } from "@langwatch/time";
 import {
   WebhookApi,
+  webhookConfig,
   type WebhookDestinationKind,
+  type WebhookServerConfig,
   type WebhookApi as WebhookApiContract,
 } from "@langwatch/webhook-contract";
 
+import { EgressWebhookDispatchChannel } from "../channels/egress/egress.webhook-dispatch.channel.ts";
+import {
+  buildWebhookDeliveryPipeline,
+  type WebhookDeliveryDefinition,
+} from "../eventing/webhook-delivery.pipeline.ts";
 import type { WebhookEndpointRuntime } from "../repositories/webhook-endpoint.repository.ts";
 import type { WebhookRepositories } from "../repositories/webhook.repositories.ts";
+import {
+  WebhookDeliveryService,
+  type WebhookDeliveryProcessDeps,
+} from "../services/webhook-delivery.service.ts";
 import type { WebhookDestinationConfig } from "../services/webhook-destination.service.ts";
 import { WebhookEndpointStreamService } from "../services/webhook-endpoint-stream.service.ts";
 import { WebhookEnvelopeService } from "../services/webhook-envelope.service.ts";
@@ -111,12 +123,23 @@ export interface WebhookAppDependencies {
   endpointStream: WebhookEndpointStreamService;
 }
 
+const storeReads = reads("rateLimiter", "redis");
+
 type WebhookSetup = FeatureSetup<
   typeof WebhookApp.dependencies,
-  MembersRead<typeof WebhookApp.reads>,
-  undefined,
+  MembersRead<typeof storeReads> & Readonly<{ isSaas: boolean }>,
+  WebhookServerConfig,
   WebhookRepositories
 >;
+
+/** What the worker's delivery process manager is composed from; built only when consuming. */
+type WebhookDeliveryParts = Readonly<{
+  processStore: WebhookRepositories["processStore"];
+  endpoints: WebhookEndpointRuntime;
+  retention: WebhookRepositories["retention"];
+  getPlan: WebhookDeliveryProcessDeps["getPlan"];
+  dispatch: () => WebhookDeliveryProcessDeps["dispatch"];
+}>;
 
 export class WebhookApp implements WebhookApiContract {
   static readonly contract = WebhookApi;
@@ -124,14 +147,16 @@ export class WebhookApp implements WebhookApiContract {
    *  {@link buildWebhookComposition} (`WebhookAccessService`). */
   static readonly dependencies = { entitlement: EntitlementApi };
   /** The test-fire door's per-organization counter. */
-  static readonly reads = reads("rateLimiter");
+  static readonly reads = ["rateLimiter", "redis", "isSaas"] as const;
+  static readonly config = webhookConfig;
 
   static create(input: WebhookSetup): WebhookApp {
     const built = buildWebhookComposition({
       entitlement: input.dependencies.entitlement,
     });
+    const { entitlement } = input.dependencies;
 
-    return new WebhookApp({
+    const app = new WebhookApp({
       endpoints: input.repositories.endpoints,
       events: WebhookEventsService.create({
         tenants: input.repositories.tenants,
@@ -152,7 +177,53 @@ export class WebhookApp implements WebhookApiContract {
         processStore: input.repositories.processStore,
       }),
     });
+    app.#delivery = {
+      processStore: input.repositories.processStore,
+      endpoints: input.repositories.endpoints,
+      retention: input.repositories.retention,
+      getPlan: (organizationId) => entitlement.getActivePlan({ organizationId }),
+      dispatch: () =>
+        EgressWebhookDispatchChannel.create({
+          redis: input.members.redis,
+          rejectUnauthorized: input.members.isSaas,
+          allowInsecureLocal: input.config.allowInsecureLocalUrls,
+        }).dispatch,
+    };
+    return app;
   }
+
+  #delivery: WebhookDeliveryParts | undefined;
+  #requestSpendDelivery: EventingCommandSender<unknown> | undefined;
+
+  /** webhook_delivery for this role: the worker also hosts the delivery process manager. */
+  deliveryPipeline({
+    participation,
+  }: {
+    participation: EventingParticipation;
+  }): WebhookDeliveryDefinition {
+    const parts = this.#delivery;
+    if (participation === "produce" || !parts) return buildWebhookDeliveryPipeline({});
+    return buildWebhookDeliveryPipeline({
+      deliveryProcess: WebhookDeliveryService.create({
+        processStore: parts.processStore,
+        endpoints: parts.endpoints,
+        pruneExpiredIdempotencyReceipts: (now) =>
+          parts.retention.pruneExpiredIdempotencyReceipts({ now }),
+        dispatch: parts.dispatch(),
+        getPlan: parts.getPlan,
+      }).processManager(),
+    });
+  }
+
+  connectDelivery(commands: Readonly<Record<string, EventingCommandSender<unknown>>>): void {
+    this.#requestSpendDelivery = commands.requestSpendDelivery;
+  }
+
+  requestSpendDelivery: WebhookApiContract["requestSpendDelivery"] = async (input) => {
+    const sender = this.#requestSpendDelivery;
+    if (!sender) throw new Error("webhook_delivery is not registered in this process");
+    await sender.send({ ...input, tenantId: input.spend.data.tenantId });
+  };
 
   /** Compatibility construction used by process roots and tests not yet on
    *  FeatureSetup — kept off the `create` property itself, since the

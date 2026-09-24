@@ -7,6 +7,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
+import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { WebhookApi } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
@@ -27,21 +28,28 @@ const entitledPlan: Plan = {
   prices: { USD: 0, EUR: 0 },
 };
 
-/** The two members this feature reads, answered the way opened stores answer. */
+/** The stores this feature reads, answered the way opened stores answer. */
 function stores() {
   const prisma = new PrismaClient({ accelerateUrl: "prisma://localhost/test" });
   const rateLimiter = { check: async () => ({ allowed: true }) };
+  const members: Record<string, unknown> = {
+    prisma,
+    rateLimiter,
+    redis: memoryRedisDouble(),
+  };
 
   return {
-    order: ["prisma", "rateLimiter"],
-    read: (name: string) => (name === "prisma" ? prisma : rateLimiter),
+    order: ["prisma", "rateLimiter", "redis"],
+    read: (name: string) => members[name],
   };
 }
 
 function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([withMemoryRepositories(webhookServer)])
+    .withConfig({ webhook: { allowInsecureLocalUrls: false, allowAmbientAwsCredentials: false } })
     .withStores(stores())
+    .withMember("isSaas", false)
     .provide({
       entitlement: createApiFixture<EntitlementApi>({
         getActivePlan: async () => entitledPlan,

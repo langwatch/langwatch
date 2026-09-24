@@ -8,3 +8,10 @@ Feature: The gateway registers its own spend pipeline
     When its eventing is built for the api and for the worker
     Then both builds name gateway_spend_processing
     And the worker's build folds into the ClickHouse spend ledger
+
+  @unit
+  Scenario: Each committed spend step is handed to webhook delivery under its own event id
+    Given the worker's spend pipeline built with webhook's delivery operation
+    When a confirmed spend event reaches its webhook subscriber
+    Then webhook delivery is asked once, named by the event's idempotency key
+    And the request carries the spend step's type and data unchanged

@@ -554,6 +554,7 @@ function spendCommandRecord(command: string, payload: unknown): Record<string, u
 type GatewaySpendPipelineParts = Readonly<{
   ledger: GatewaySpendEvents;
   commands: Record<string, GatewaySpendCommandSender | undefined>;
+  webhooks: Pick<WebhookApi, "requestSpendDelivery">;
 }>;
 
 type GatewaySpendDefinition = StaticPipelineDefinition<
@@ -751,7 +752,11 @@ export class GatewayApp implements GatewayApi {
       },
       internalProtocol,
       internalDoor: GatewayInternalIdentity.create(secrets.internalSecret),
-      spendPipeline: { ledger: controlPlane.spendLedger, commands: spendCommands },
+      spendPipeline: {
+        ledger: controlPlane.spendLedger,
+        commands: spendCommands,
+        webhooks: setup.dependencies.webhooks,
+      },
       spend: {
         prisma: setup.members.prisma,
         webhooks: setup.dependencies.webhooks,
@@ -845,7 +850,10 @@ export class GatewayApp implements GatewayApi {
     }
     const ledger = this.#spendPipeline?.ledger;
     if (!ledger) throw this.spendStoreUnavailable();
-    return EventingGatewaySpendAdapter.create({ spendEvents: ledger }).buildProcessing();
+    return EventingGatewaySpendAdapter.create({
+      spendEvents: ledger,
+      webhookSpendDelivery: this.#spendPipeline?.webhooks,
+    }).buildProcessing();
   }
 
   /** The registered senders the data plane's /spend-commands and priced spend append through. */

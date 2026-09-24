@@ -1,5 +1,6 @@
 import { moduleApi } from "@langwatch/kernel/module-api";
 
+import type { WebhookSpendDeliveryRequest } from "./webhook-spend-delivery.ts";
 import type {
   CreateWebhookEndpointCommand,
   UpdateWebhookEndpointCommand,
@@ -56,6 +57,8 @@ export interface WebhookApi {
     envelope: WebhookEnvelope;
     replayId: string;
   }): Promise<void>;
+  /** Queues one committed gateway spend event for delivery; a repeat of it is dropped. */
+  requestSpendDelivery(input: WebhookSpendDeliveryRequest): Promise<void>;
 }
 
 export const WebhookApi = moduleApi<WebhookApi>()("webhook");

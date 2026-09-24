@@ -150,6 +150,7 @@ describe("the worker process installation", () => {
       expect(pipelines).toContain("simulation_processing");
       expect(pipelines).toContain("billing_reporting");
       expect(pipelines).toContain("gateway_spend_processing");
+      expect(pipelines).toContain("webhook_delivery");
       expect(pipelines).toContain("governance_events_processing");
       expect(pipelines).toContain("pulled_usage_processing");
       expect(pipelines).toContain("ingestion_pull_processing");
