@@ -197,6 +197,9 @@ of:
 (hooks, api bindings, stores) → `ui/elements|blocks|sections`. Elements and
 blocks cannot fetch. The tRPC client is derived from the contract's
 declarations (`browser-trpc`), never hand-written, never from a router type.
+Its inputs and outputs are typed from those declarations, never `any` (Alex, 2026-09-24). An
+interactive element is the native one (`button`, `a`, `input`) styled through the design system to
+look as before; a `div` given a role is not (Alex, 2026-09-24).
 A screen reads no session or router directly: it declares a `*HostApi` the
 shell implements from `browser-host` capabilities. The half is declared with
 `defineBrowserModule` — screens, drawers, publications, mounts, flags — and
@@ -920,7 +923,9 @@ export const storesConfig = (modules) =>
       developmentDefault: "redis://localhost:6379",
     }),
     objectStorage: Config.group({
-      backend: Config.value(z.enum(["s3", "azure", "file"]).optional(), { env: "STORED_OBJECTS_BACKEND" }),
+      backend: Config.value(z.enum(["s3", "azure", "file"]).optional(), {
+        env: "STORED_OBJECTS_BACKEND",
+      }),
       /* s3: S3_*; azure: AZURE_BLOB_*, AZURE_* identity; localRoot: LANGWATCH_LOCAL_STORAGE_PATH */
     }),
   }).refine(
@@ -1017,6 +1022,9 @@ never thinks about resolution at all. The per-module resolver adapters
 - `publicRoute`/raw results only for genuinely non-JSON protocols (SCIM,
   OAuth device flow, MCP streams, webhook raw bodies) and the documented
   `*-legacy.rest.ts` family, each carrying a one-line reason.
+- A branch living in a handler moves into the module as an `*Api` operation carrying that logic
+  unchanged; such a one-to-one move is approved in advance. An operation that adds behaviour or a new
+  shape is still asked for (Alex, 2026-09-24).
 - The **process** mounts declarations; `boot()` opens the hosts. A module
   never mounts anything.
 - **A route's documentation lives on the route, in its own `.withDocs()`
@@ -1054,6 +1062,9 @@ Background work is a scheduled process manager on the module's pipeline, install
 hosts it, it ticks once across the fleet, and `onWake` sends the module's own intent through the outbox.
 There is no `.withJobs` and no module-level timer loop. Work that must run in every role (ADR-090's
 lease-held writer) is not background work: it stays a service the module owns. `withWorkers` is retired.
+
+The framework's public types carry typed parameters or `unknown`, never `any`: an event, command or
+projection state keeps its type from declaration to handler (Alex, 2026-09-24).
 
 A module may host several pipelines: it calls `.withEventing(...)` once per
 pipeline, each a `defineEventingModule` declaration over the same app and
@@ -1477,6 +1488,10 @@ double (`memoryAnalytical` throws on unscripted SQL). Component tests are
 config and declares its own datastore needs. **Tests live beside what they
 test, in a colocated `__tests__/` folder — never in a root `tests/` directory
 next to `src/`.**
+
+A raw client (Prisma, ClickHouse, ioredis, Stripe) or a class with private members is never
+cast into a test: its typed double lives once in `@langwatch/test-harness`, throwing by name on
+anything unscripted, and every test uses that one (Alex, 2026-09-24).
 
 The installation test is the same chain as production:
 
