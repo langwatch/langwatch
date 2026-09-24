@@ -311,7 +311,7 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
         await virtualKeyAuthorization.loadMembershipSet({ organizationId, userId }),
         virtualKey.scopes,
       ),
-    requireVisibleVirtualKeyForUser: async ({ organizationId, id, userId }) =>
+    getVisibleVirtualKeyForUser: async ({ organizationId, id, userId }) =>
       virtualKeyAuthorization.getVisibleVk(
         virtualKeys,
         await virtualKeyAuthorization.loadMembershipSet({ organizationId, userId }),
@@ -324,12 +324,12 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
         virtualKeyAuthorization.isVisibleToMembership(membership, virtualKey.scopes),
       );
     },
-    requireVisibleVirtualKeyForProjectCredential: ({ project, id, organizationId }) =>
+    getVisibleVirtualKeyForProjectCredential: ({ project, id, organizationId }) =>
       virtualKeyAuthorization.getVisibleVk(virtualKeys, membershipForProjectCredential(project), {
         id,
         organizationId,
       }),
-    requireExistingVirtualKey: ({ organizationId, id }) =>
+    getExistingVirtualKey: ({ organizationId, id }) =>
       virtualKeyAuthorization.getExistingVk(virtualKeys, id, organizationId),
 
     assertCanManageAllScopes: ({ actor, scopes }) =>
@@ -420,7 +420,7 @@ function gatewayVirtualKeyActor(actor: unknown): VirtualKeyActor {
     return { kind: "session", session: null };
   }
   if (!("kind" in actor)) {
-    return { kind: "session", session: sessionActor(actor) };
+    return { kind: "session", session: extractSessionActor(actor) };
   }
   if (
     actor.kind === "apiKey" &&
@@ -453,7 +453,7 @@ function gatewayVirtualKeyActor(actor: unknown): VirtualKeyActor {
  * The one member the authorization vocabulary reads off a browser session: the
  * signed-in person's id.
  */
-function sessionActor(value: object): { user: { id: string } } | null {
+function extractSessionActor(value: object): { user: { id: string } } | null {
   if (!("user" in value)) return null;
   const user = value.user;
   if (typeof user !== "object" || user === null) return null;

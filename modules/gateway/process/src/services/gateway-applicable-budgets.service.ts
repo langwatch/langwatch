@@ -1,6 +1,6 @@
 import {
   type ScopeInput,
-  budgetPeriodFloorMs,
+  computeBudgetPeriodFloorMs,
   scopeTargetKey,
   type GatewayBudgetResolutionTarget,
   type GatewayResolvedBudget,
@@ -208,7 +208,7 @@ async function loadSpend({
     scopeId: r.bucketScopeId,
     window: r.budget.window,
     match: "exact",
-    periodFloorMs: budgetPeriodFloorMs(r.budget),
+    periodFloorMs: computeBudgetPeriodFloorMs(r.budget),
   }));
   try {
     const spends = await chRepo.getSpendForTargetsAcrossTenants(tenantIds, targets);

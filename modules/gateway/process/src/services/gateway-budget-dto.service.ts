@@ -1,7 +1,7 @@
 import {
   type GatewayBudgetWithSeats,
   effectiveBudgetPeriod,
-  decimalUsdToNanoUsd,
+  convertDecimalUsdToNanoUsd,
   nanoUsdToDecimalString,
   toWireEnum,
   usdDisplayString,
@@ -27,7 +27,7 @@ function spendFields(
   if (!spendAvailable || b.scopeType === "ATTRIBUTED_USER") {
     return { spent_usd: null, spent_nano_usd: null };
   }
-  const nano = b.spentNanoUsd ?? decimalUsdToNanoUsd(b.spentUsd);
+  const nano = b.spentNanoUsd ?? convertDecimalUsdToNanoUsd(b.spentUsd);
   return {
     spent_usd: nano === null ? usdDisplayString(b.spentUsd) : nanoUsdToDecimalString(nano),
     spent_nano_usd: nano,
@@ -111,7 +111,7 @@ export class GatewayBudgetDtoService {
       // same unit the spend events carry, so the two reconcile without parsing
       // decimals. Null nano means the amount is past the safe integer range.
       limit_usd: usdDisplayString(b.limitUsd),
-      limit_nano_usd: decimalUsdToNanoUsd(b.limitUsd),
+      limit_nano_usd: convertDecimalUsdToNanoUsd(b.limitUsd),
       ...spendFields(b, spendAvailable),
       timezone: b.timezone,
       provider_key: b.providerKey,

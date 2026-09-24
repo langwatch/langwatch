@@ -58,7 +58,7 @@ export function metadataFromRow(value: unknown): ResourceMetadata {
  * which is the value that does not participate in the unique index, the same reason the column
  * is nullable at all. Absent leaves it alone.
  */
-export function externalIdPatch(next: string | null | undefined): string | null | undefined {
+export function buildExternalIdPatch(next: string | null | undefined): string | null | undefined {
   return next === undefined ? undefined : (next ?? null);
 }
 
@@ -70,7 +70,9 @@ export function identityPatchData(patch: {
   metadata?: ResourceMetadata;
 }): { externalId?: string | null; metadata?: ResourceMetadata } {
   return {
-    ...(patch.externalId !== undefined ? { externalId: externalIdPatch(patch.externalId) } : {}),
+    ...(patch.externalId !== undefined
+      ? { externalId: buildExternalIdPatch(patch.externalId) }
+      : {}),
     // `metadata` REPLACES rather than merges. A merge cannot express deleting a key without
     // inventing a sentinel, and a caller that reads-modifies-writes the whole map — which is
     // what every client library does — gets the same result either way. Absent leaves the

@@ -46,7 +46,7 @@ import {
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
-import { decodePageCursor, nextPageCursor } from "../rules/gateway-wire-pagination.rules.ts";
+import { decodePageCursor, buildNextPageCursor } from "../rules/gateway-wire-pagination.rules.ts";
 import { GatewayBudgetDtoService } from "../services/gateway-budget-dto.service.ts";
 
 const budgetDtos = GatewayBudgetDtoService.create();
@@ -225,7 +225,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     });
     return {
       data: await app.toVirtualKeySnakeDtos({ virtualKeys: visible }),
-      next_cursor: nextPageCursor(rows, input.limit, (vk) => [
+      next_cursor: buildNextPageCursor(rows, input.limit, (vk) => [
         vk.createdAt.epochMilliseconds,
         vk.id,
       ]),
@@ -287,7 +287,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withDocs({ summary: "Get virtual key", responses: canonicalBaseResponses })
   .handle(async ({ app, input, scope }) => {
     const organizationId = await app.organizationIdForProject(scope.id);
-    const vk = await app.requireVisibleVirtualKeyForProjectCredential({
+    const vk = await app.getVisibleVirtualKeyForProjectCredential({
       project: { id: scope.id },
       id: input.id,
       organizationId,
@@ -317,7 +317,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     if (fromDate.epochMilliseconds >= toDate.epochMilliseconds) {
       throw new Error("`from` must be before `to`");
     }
-    const vk = await app.requireVisibleVirtualKeyForProjectCredential({
+    const vk = await app.getVisibleVirtualKeyForProjectCredential({
       project: { id: scope.id },
       id: input.id,
       organizationId,
@@ -525,7 +525,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       data: budgets.map((b) =>
         toBudgetDto({ budget: b, memberCount: memberCounts.get(b.scopeId) }),
       ),
-      next_cursor: nextPageCursor(budgets, input.limit, (b) => [
+      next_cursor: buildNextPageCursor(budgets, input.limit, (b) => [
         b.createdAt.epochMilliseconds,
         b.id,
       ]),
@@ -539,8 +539,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withDocs({ summary: "Get budget", responses: canonicalBaseResponses })
   .handle(async ({ app, input, scope }) => {
     const organizationId = await app.organizationIdForProject(scope.id);
-    const found = await app.tryGetBudgetWithHealth({ id: input.id, organizationId });
-    if (!found) throw new Error(`budget ${input.id} not found`);
+    const found = await app.getBudgetWithHealth({ id: input.id, organizationId });
     const memberCounts = await app.groupMemberCounts([found.budget]);
     return {
       spend_available: found.spendAvailable,
@@ -717,7 +716,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     const rows = await app.listCacheRulePage({ organizationId, limit: input.limit, cursor });
     return {
       data: rows.map(toCacheRuleDto),
-      next_cursor: nextPageCursor(rows, input.limit, (r) => [
+      next_cursor: buildNextPageCursor(rows, input.limit, (r) => [
         r.priority,
         r.createdAt.getTime(),
         r.id,

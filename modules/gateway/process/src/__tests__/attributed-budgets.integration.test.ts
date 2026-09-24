@@ -1,7 +1,7 @@
 import {
   attributedUserBucketScopeId,
-  bucketPeriodFloorMs,
-  budgetPeriodFloorMs,
+  computeBucketPeriodFloorMs,
+  computeBudgetPeriodFloorMs,
   GatewayWindow,
   type GatewayBudgetWindow,
 } from "@langwatch/gateway-contract";
@@ -339,7 +339,7 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
           scopeId: VK_ID,
           window: "MANUAL",
           match: "exact",
-          periodFloorMs: budgetPeriodFloorMs(manual),
+          periodFloorMs: computeBudgetPeriodFloorMs(manual),
         },
       ],
     );
@@ -363,7 +363,7 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
           scopeId: VK_ID,
           window: "MANUAL",
           match: "exact",
-          periodFloorMs: budgetPeriodFloorMs(reset),
+          periodFloorMs: computeBudgetPeriodFloorMs(reset),
         },
       ],
     );
@@ -434,7 +434,7 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
             scopeId: bucket,
             window: "MANUAL",
             match: "exact",
-            periodFloorMs: floorMs ?? budgetPeriodFloorMs(toBudgetPeriod(templateAfter!)),
+            periodFloorMs: floorMs ?? computeBudgetPeriodFloorMs(toBudgetPeriod(templateAfter!)),
           },
         ],
       );
@@ -476,7 +476,7 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
             scopeId: VK_ID,
             window: "MONTH",
             match: "exact",
-            periodFloorMs: budgetPeriodFloorMs(budget, now),
+            periodFloorMs: computeBudgetPeriodFloorMs(budget, now),
           },
         ],
         now,
@@ -531,14 +531,14 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
     // again: the reset's clamp expires exactly there rather than carrying a
     // private boundary forward forever.
     const afterRollover = reset.resetsAt.add({ milliseconds: 1000 });
-    expect(budgetPeriodFloorMs(reset, afterRollover)).toBe(
+    expect(computeBudgetPeriodFloorMs(reset, afterRollover)).toBe(
       GatewayWindow.anchoredPeriodStart({
         window: "MONTH",
         anchorAt: CYCLE_ANCHOR,
         now: afterRollover,
       }).epochMilliseconds,
     );
-    expect(budgetPeriodFloorMs(reset, afterRollover)).toBe(reset.resetsAt.epochMilliseconds);
+    expect(computeBudgetPeriodFloorMs(reset, afterRollover)).toBe(reset.resetsAt.epochMilliseconds);
   });
 
   it("floors an anchored per-seat template's bucket read at the anchored period start", async () => {
@@ -591,7 +591,7 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
           scopeId: bucket,
           window: "MONTH",
           match: "exact",
-          periodFloorMs: bucketPeriodFloorMs(template, null, now),
+          periodFloorMs: computeBucketPeriodFloorMs(template, null, now),
         },
       ],
       now,
@@ -599,6 +599,6 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
     // Only the debit inside the anchored period. The bucket floor is the
     // budget's own, since this seat has no boundary row of its own.
     expect(Number.parseFloat(spends[0]!.spentUsd)).toBeCloseTo(5, 3);
-    expect(bucketPeriodFloorMs(template, null, now)).toBe(periodStart.epochMilliseconds);
+    expect(computeBucketPeriodFloorMs(template, null, now)).toBe(periodStart.epochMilliseconds);
   });
 });

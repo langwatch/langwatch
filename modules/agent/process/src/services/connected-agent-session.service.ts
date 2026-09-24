@@ -28,7 +28,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import { resultCapViolation } from "../rules/connected-agent-caps.rules.ts";
+import { detectResultCapViolation } from "../rules/connected-agent-caps.rules.ts";
 import {
   callAckKey,
   callKey,
@@ -268,7 +268,7 @@ export class AgentSessionService {
       return;
     }
 
-    const violation = resultCapViolation({
+    const violation = detectResultCapViolation({
       output: frame.output,
       session: frame.session,
       caps: relayPayloadCaps(this.#relayMaxPayloadMb),

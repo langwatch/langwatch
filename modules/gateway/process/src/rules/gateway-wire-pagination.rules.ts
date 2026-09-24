@@ -60,7 +60,7 @@ export function keysetAfter(columns: KeysetColumn[]): Record<string, unknown>[] 
  * Next-page cursor, or null when this page exhausted the walk — a page
  * shorter than `limit` is the only honest end-of-walk signal without an extra count.
  */
-export function nextPageCursor<T>(
+export function buildNextPageCursor<T>(
   rows: T[],
   limit: number,
   keyOf: (row: T) => (string | number)[],

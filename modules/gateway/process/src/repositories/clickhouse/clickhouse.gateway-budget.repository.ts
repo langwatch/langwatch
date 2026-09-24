@@ -7,8 +7,8 @@ import {
   type GatewayBudgetResource,
   type GatewayBudgetScopeType,
   type GatewayBudgetWindow,
-  bucketPeriodFloorMs,
-  budgetPeriodFloorMs,
+  computeBucketPeriodFloorMs,
+  computeBudgetPeriodFloorMs,
   currentPeriodStart,
   PROVIDER_BUCKET_SEPARATOR,
   nanoUsdToDecimalString,
@@ -1019,12 +1019,13 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
     const movedBoundaryPredicates = boundaries.map((b, i) => {
       params[`fbucket${i}`] = b.bucketScopeId;
       params[`ffloor${i}`] =
-        bucketPeriodFloorMs(budget, b.periodStartedAt, now) ?? b.periodStartedAt.epochMilliseconds;
+        computeBucketPeriodFloorMs(budget, b.periodStartedAt, now) ??
+        b.periodStartedAt.epochMilliseconds;
       return `(ScopeId = {fbucket${i}:String} AND OccurredAt >= fromUnixTimestamp64Milli({ffloor${i}:Int64}))`;
     });
     params.flooredBuckets = boundaries.map((b) => b.bucketScopeId);
 
-    const budgetFloorMs = budgetPeriodFloorMs(budget, now);
+    const budgetFloorMs = computeBudgetPeriodFloorMs(budget, now);
     if (budgetFloorMs !== undefined) params.budgetFloor = budgetFloorMs;
 
     return {

@@ -24,10 +24,10 @@ const assembly = GatewayConfigAssemblyAdapter.create({
   platformProviders: noPlatformProviders,
 });
 
-describe("tryDeclaredModelsForProvider", () => {
+describe("findDeclaredModelsForProvider", () => {
   describe("when a custom provider declares models", () => {
     it("declares the customer's own model ids", () => {
-      const declared = assembly.tryDeclaredModelsForProvider({
+      const declared = assembly.findDeclaredModelsForProvider({
         provider: "custom",
         customModels: [{ modelId: "stealth/ox-alpha", displayName: "Ox", mode: "chat" }],
         customEmbeddingsModels: null,
@@ -37,7 +37,7 @@ describe("tryDeclaredModelsForProvider", () => {
     });
 
     it("keeps a model id that contains a slash whole", () => {
-      const declared = assembly.tryDeclaredModelsForProvider({
+      const declared = assembly.findDeclaredModelsForProvider({
         provider: "custom",
         customModels: ["meta-llama/Llama-3-70B"],
         customEmbeddingsModels: null,
@@ -47,7 +47,7 @@ describe("tryDeclaredModelsForProvider", () => {
     });
 
     it("declares chat and embeddings models together", () => {
-      const declared = assembly.tryDeclaredModelsForProvider({
+      const declared = assembly.findDeclaredModelsForProvider({
         provider: "custom",
         customModels: ["chat-one"],
         customEmbeddingsModels: ["embed-one"],
@@ -59,7 +59,7 @@ describe("tryDeclaredModelsForProvider", () => {
 
   describe("when the provider is a hosted family", () => {
     it("declares the shipped catalog with the family prefix removed", () => {
-      const declared = assembly.tryDeclaredModelsForProvider({
+      const declared = assembly.findDeclaredModelsForProvider({
         provider: "openai",
         customModels: null,
         customEmbeddingsModels: null,
@@ -70,7 +70,7 @@ describe("tryDeclaredModelsForProvider", () => {
     });
 
     it("declares the customer's own models alongside the shipped ones", () => {
-      const declared = assembly.tryDeclaredModelsForProvider({
+      const declared = assembly.findDeclaredModelsForProvider({
         provider: "openai",
         customModels: ["ft:gpt-5-mini:acme:1"],
         customEmbeddingsModels: null,
@@ -82,7 +82,7 @@ describe("tryDeclaredModelsForProvider", () => {
 
     it("reads Anthropic and Gemini from the same catalog", () => {
       expect(
-        assembly.tryDeclaredModelsForProvider({
+        assembly.findDeclaredModelsForProvider({
           provider: "anthropic",
           customModels: null,
           customEmbeddingsModels: null,
@@ -90,7 +90,7 @@ describe("tryDeclaredModelsForProvider", () => {
       ).toContain("claude-sonnet-5");
       expect(
         assembly
-          .tryDeclaredModelsForProvider({
+          .findDeclaredModelsForProvider({
             provider: "gemini",
             customModels: null,
             customEmbeddingsModels: null,
@@ -106,19 +106,19 @@ describe("tryDeclaredModelsForProvider", () => {
       // provider said nothing" and keeps it a candidate for a model no other
       // provider claims. An empty list would read as "serves no models".
       expect(
-        assembly.tryDeclaredModelsForProvider({
+        assembly.findDeclaredModelsForProvider({
           provider: "bedrock",
           customModels: null,
           customEmbeddingsModels: null,
         }),
-      ).toBeUndefined();
+      ).toEqual([]);
       expect(
-        assembly.tryDeclaredModelsForProvider({
+        assembly.findDeclaredModelsForProvider({
           provider: "groq",
           customModels: [],
           customEmbeddingsModels: [],
         }),
-      ).toBeUndefined();
+      ).toEqual([]);
     });
   });
 
@@ -126,7 +126,7 @@ describe("tryDeclaredModelsForProvider", () => {
     /** @scenario A stored custom model entry that fails the strict parse is dropped loudly */
     it("drops it from the declared list and logs it at warn by name", () => {
       warned.mockClear();
-      const declared = assembly.tryDeclaredModelsForProvider({
+      const declared = assembly.findDeclaredModelsForProvider({
         provider: "custom",
         customModels: [
           { modelId: "good-model", displayName: "Good", mode: "chat" },
@@ -144,7 +144,7 @@ describe("tryDeclaredModelsForProvider", () => {
 
   describe("when the same model is declared twice", () => {
     it("declares it once, sorted, so the payload does not move on its own", () => {
-      const declared = assembly.tryDeclaredModelsForProvider({
+      const declared = assembly.findDeclaredModelsForProvider({
         provider: "custom",
         customModels: ["b-model", "a-model"],
         customEmbeddingsModels: ["a-model"],

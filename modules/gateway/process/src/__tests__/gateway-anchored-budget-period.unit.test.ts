@@ -4,14 +4,14 @@
  * for it must honor (cycle arithmetic itself: anchoredBudgetCycles.unit.test.ts).
  */
 
-import { budgetPeriodFloorMs, effectiveBudgetPeriod } from "@langwatch/gateway-contract";
+import { computeBudgetPeriodFloorMs, effectiveBudgetPeriod } from "@langwatch/gateway-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 
-describe("budgetPeriodFloorMs on an anchored budget", () => {
+describe("computeBudgetPeriodFloorMs on an anchored budget", () => {
   const anchor = Temporal.Instant.from("2026-06-17T09:00:00.000Z");
   const createdAt = Temporal.Instant.from("2026-06-17T09:00:00.000Z");
 
@@ -20,7 +20,7 @@ describe("budgetPeriodFloorMs on an anchored budget", () => {
     // Unreset: the rollup buckets by calendar month and has no row for a
     // period that starts on the 17th, so the read must take the floor.
     expect(
-      budgetPeriodFloorMs(
+      computeBudgetPeriodFloorMs(
         {
           window: "MONTH",
           currentPeriodStartedAt: createdAt,
@@ -34,7 +34,7 @@ describe("budgetPeriodFloorMs on an anchored budget", () => {
     // After the anchored rollover the floor moves with it, so the spend that
     // was counted a moment ago now belongs to the closed period.
     expect(
-      budgetPeriodFloorMs(
+      computeBudgetPeriodFloorMs(
         {
           window: "MONTH",
           currentPeriodStartedAt: createdAt,
@@ -48,7 +48,7 @@ describe("budgetPeriodFloorMs on an anchored budget", () => {
     // A future anchor floors at the anchor: nothing has been spent in a
     // period that has not begun.
     expect(
-      budgetPeriodFloorMs(
+      computeBudgetPeriodFloorMs(
         {
           window: "MONTH",
           currentPeriodStartedAt: createdAt,
@@ -72,16 +72,16 @@ describe("budgetPeriodFloorMs on an anchored budget", () => {
 
     // Inside the period the reset opened, the reset instant outranks the
     // anchored start: the forgiven spend stays forgiven.
-    expect(budgetPeriodFloorMs(row, Temporal.Instant.from("2026-07-10T00:00:00.000Z"))).toBe(
+    expect(computeBudgetPeriodFloorMs(row, Temporal.Instant.from("2026-07-10T00:00:00.000Z"))).toBe(
       resetAt.epochMilliseconds,
     );
     // One millisecond before the anchored boundary it still holds...
-    expect(budgetPeriodFloorMs(row, Temporal.Instant.from("2026-07-17T08:59:59.999Z"))).toBe(
+    expect(computeBudgetPeriodFloorMs(row, Temporal.Instant.from("2026-07-17T08:59:59.999Z"))).toBe(
       resetAt.epochMilliseconds,
     );
     // ...and at the boundary the cycle takes over again, unmoved by the
     // reset. A reset forgives spend; it never re-phases the cycle.
-    expect(budgetPeriodFloorMs(row, Temporal.Instant.from("2026-07-17T09:00:00.000Z"))).toBe(
+    expect(computeBudgetPeriodFloorMs(row, Temporal.Instant.from("2026-07-17T09:00:00.000Z"))).toBe(
       Temporal.Instant.from("2026-07-17T09:00:00.000Z").epochMilliseconds,
     );
   });
@@ -89,7 +89,7 @@ describe("budgetPeriodFloorMs on an anchored budget", () => {
   it("leaves MANUAL on its stored boundary even if an anchor is on the row", () => {
     const boundary = Temporal.Instant.from("2026-07-10T09:30:00.000Z");
     expect(
-      budgetPeriodFloorMs(
+      computeBudgetPeriodFloorMs(
         {
           window: "MANUAL",
           currentPeriodStartedAt: boundary,

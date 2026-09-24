@@ -58,7 +58,7 @@ export const virtualKeyTrpcTransport = defineTrpcRouter(GatewayApi, virtualKeyTr
   .handle(async ({ app, input, actor }) => {
     // A key the caller cannot see is indistinguishable from one that does not
     // exist - same not-found answer, no existence leak.
-    const vk = await app.requireVisibleVirtualKeyForUser({
+    const vk = await app.getVisibleVirtualKeyForUser({
       organizationId: input.organizationId,
       id: input.id,
       userId: actor.id,
@@ -124,7 +124,7 @@ export const virtualKeyTrpcTransport = defineTrpcRouter(GatewayApi, virtualKeyTr
     // STORED ownership; caller-supplied scopes, destination and principal are
     // ignored, or an organization-wide key could leak a sibling's data.
     if (input.virtualKeyId) {
-      const vk = await app.requireVisibleVirtualKeyForUser({
+      const vk = await app.getVisibleVirtualKeyForUser({
         organizationId: input.organizationId,
         id: input.virtualKeyId,
         userId: actor.id,

@@ -92,7 +92,7 @@ export const gatewayBudgetTrpcTransport = defineTrpcRouter(GatewayApi, gatewayBu
         spendAvailable,
         unreachableByAnyKey: scopeReach.get(b.id)?.reachable === false,
         scopeTarget: scopeTargets.get(scopeTargetKey(b.scopeType, b.scopeId)) ?? null,
-        providerLabel: providerLabelAdapter.labelFor(providerLabels, b.providerKey),
+        providerLabel: providerLabelAdapter.formatProviderLabel(providerLabels, b.providerKey),
       })),
     };
   })
@@ -116,7 +116,7 @@ export const gatewayBudgetTrpcTransport = defineTrpcRouter(GatewayApi, gatewayBu
         spendAvailable,
         unreachableByAnyKey: scopeReach.get(b.id)?.reachable === false,
         scopeTarget: scopeTargets.get(scopeTargetKey(b.scopeType, b.scopeId)) ?? null,
-        providerLabel: providerLabelAdapter.labelFor(providerLabels, b.providerKey),
+        providerLabel: providerLabelAdapter.formatProviderLabel(providerLabels, b.providerKey),
       })),
     };
   })
@@ -138,7 +138,10 @@ export const gatewayBudgetTrpcTransport = defineTrpcRouter(GatewayApi, gatewayBu
       spendAvailable: detail.spendAvailable,
       unreachableByAnyKey: detail.unreachableByAnyKey,
       scopeTarget: detail.scopeTarget,
-      providerLabel: providerLabelAdapter.labelFor(providerLabels, detail.budget.providerKey),
+      providerLabel: providerLabelAdapter.formatProviderLabel(
+        providerLabels,
+        detail.budget.providerKey,
+      ),
       recentLedger: detail.recentLedger.map((l) => ({
         id: l.id,
         virtualKeyId: l.virtualKeyId,

@@ -4,7 +4,7 @@
  * @see specs/ai-gateway/public-rest-api.feature
  */
 
-import { decimalUsdToNanoUsd } from "@langwatch/gateway-contract";
+import { convertDecimalUsdToNanoUsd } from "@langwatch/gateway-contract";
 import { Prisma } from "@langwatch/prisma-client/generated";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
@@ -39,25 +39,25 @@ function budget(overrides: Partial<GatewayBudgetWithSeats> = {}): GatewayBudgetW
   } as GatewayBudgetWithSeats;
 }
 
-describe("decimalUsdToNanoUsd", () => {
+describe("convertDecimalUsdToNanoUsd", () => {
   /** @scenario A budget amount converts to nano-USD without float drift */
   it("scales the decimal string exactly", () => {
     // 0.1 + 0.2 arithmetic is why this scales the STRING: `toNumber() * 1e9`
     // on these lands fractions of a cent away from the true integer.
-    expect(decimalUsdToNanoUsd(new Prisma.Decimal("25.500000"))).toBe(25_500_000_000);
-    expect(decimalUsdToNanoUsd(new Prisma.Decimal("0.000001"))).toBe(1_000);
-    expect(decimalUsdToNanoUsd(new Prisma.Decimal("0.070000"))).toBe(70_000_000);
-    expect(decimalUsdToNanoUsd(new Prisma.Decimal("0"))).toBe(0);
+    expect(convertDecimalUsdToNanoUsd(new Prisma.Decimal("25.500000"))).toBe(25_500_000_000);
+    expect(convertDecimalUsdToNanoUsd(new Prisma.Decimal("0.000001"))).toBe(1_000);
+    expect(convertDecimalUsdToNanoUsd(new Prisma.Decimal("0.070000"))).toBe(70_000_000);
+    expect(convertDecimalUsdToNanoUsd(new Prisma.Decimal("0"))).toBe(0);
   });
 
   /** @scenario An amount past the safe integer range reports no nano figure */
   it("returns null rather than a silently rounded number", () => {
     // Past 2^53 nano-USD a JSON number has already lost the low digits, and a
     // wrong money figure is worse than an absent one.
-    expect(decimalUsdToNanoUsd(new Prisma.Decimal("9007199.254740991"))).toBe(
+    expect(convertDecimalUsdToNanoUsd(new Prisma.Decimal("9007199.254740991"))).toBe(
       9_007_199_254_740_991,
     );
-    expect(decimalUsdToNanoUsd(new Prisma.Decimal("10000000"))).toBeNull();
+    expect(convertDecimalUsdToNanoUsd(new Prisma.Decimal("10000000"))).toBeNull();
   });
 });
 

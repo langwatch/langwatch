@@ -1012,7 +1012,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
    * clients registered here have no secret, so the password half is expected to be empty and is
    * not checked; the header is only another place a client may put its `client_id`.
    */
-  function clientIdFromBasicAuth(req: IncomingMessage): string | null {
+  function extractClientIdFromBasicAuth(req: IncomingMessage): string | null {
     const header = req.headers.authorization;
     if (!header?.toLowerCase().startsWith("basic ")) return null;
     try {
@@ -1037,7 +1037,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     const raw = await readRawBody(req, res);
     if (raw === undefined) return;
     const params = parseFormBody(raw);
-    const clientId = params.client_id ?? clientIdFromBasicAuth(req);
+    const clientId = params.client_id ?? extractClientIdFromBasicAuth(req);
     if (clientId) noteLogFields(res, { clientId });
 
     const exchange = await oauthTokens.redeem({

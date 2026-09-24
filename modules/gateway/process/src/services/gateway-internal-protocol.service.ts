@@ -1,6 +1,6 @@
 import {
   attributedUserBucketScopeId,
-  bucketPeriodFloorMs,
+  computeBucketPeriodFloorMs,
   bucketScopeIdFor,
   GATEWAY_INTERNAL_SPEND_COMMANDS,
   type GatewayBudget,
@@ -254,7 +254,7 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
       budgetRepository: this.#members.budgetSpend,
       budget,
       bucketScopeId,
-      periodFloorMs: bucketPeriodFloorMs(budget, boundary?.periodStartedAt),
+      periodFloorMs: computeBucketPeriodFloorMs(budget, boundary?.periodStartedAt),
     });
     return { status: "available", spentMicroUsd, bucketScopeId } as const;
   }

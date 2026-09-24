@@ -198,16 +198,18 @@ describe("given the shared spend filter vocabulary", () => {
 
   describe("when a key is named directly and by external id", () => {
     it("intersects rather than widening", () => {
-      expect(spendFilters.intersectIds(["vk_1", "vk_2"], ["vk_2", "vk_3"])).toEqual(["vk_2"]);
+      expect(spendFilters.computeIdIntersection(["vk_1", "vk_2"], ["vk_2", "vk_3"])).toEqual([
+        "vk_2",
+      ]);
     });
 
     it("treats an absent list as no opinion", () => {
-      expect(spendFilters.intersectIds(undefined, ["vk_1"])).toEqual(["vk_1"]);
-      expect(spendFilters.intersectIds(["vk_1"], undefined)).toEqual(["vk_1"]);
+      expect(spendFilters.computeIdIntersection(undefined, ["vk_1"])).toEqual(["vk_1"]);
+      expect(spendFilters.computeIdIntersection(["vk_1"], undefined)).toEqual(["vk_1"]);
     });
 
     it("answers nothing when the two name different keys", () => {
-      expect(spendFilters.intersectIds(["vk_1"], ["vk_2"])).toEqual([]);
+      expect(spendFilters.computeIdIntersection(["vk_1"], ["vk_2"])).toEqual([]);
     });
   });
 });

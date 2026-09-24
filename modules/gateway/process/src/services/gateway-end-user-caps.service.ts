@@ -1,5 +1,5 @@
 import {
-  bucketPeriodFloorMs,
+  computeBucketPeriodFloorMs,
   effectiveBudgetPeriod,
   attributedUserBucketScopeId,
   bucketScopeIdFor,
@@ -76,7 +76,7 @@ export class GatewayEndUserCapsService {
         scopeId: bucketScopeId,
         window: template.window,
         match: "exact" as const,
-        periodFloorMs: bucketPeriodFloorMs(
+        periodFloorMs: computeBucketPeriodFloorMs(
           template,
           boundaryByKey.get(`${template.id}:${bucketScopeId}`)?.periodStartedAt,
           now,
@@ -88,7 +88,7 @@ export class GatewayEndUserCapsService {
 
     return templates.map((template) => {
       const boundary = boundaryByKey.get(`${template.id}:${bucketFor(template)}`);
-      const periodFloorMs = bucketPeriodFloorMs(template, boundary?.periodStartedAt, now);
+      const periodFloorMs = computeBucketPeriodFloorMs(template, boundary?.periodStartedAt, now);
 
       return {
         budget_id: template.id,

@@ -7,7 +7,7 @@ import {
   type GatewayConnectUpstream,
   type ModelProvider,
   type VirtualKeyWithScopes,
-  budgetPeriodFloorMs,
+  computeBudgetPeriodFloorMs,
   parseVirtualKeyConfig,
   type GatewayResolvedBudget,
 } from "@langwatch/gateway-contract";
@@ -23,7 +23,7 @@ import {
   budgetToWire,
   buildProviderSlot,
   cacheRuleToWire,
-  expiresAtWire,
+  toExpiresAtWire,
   guardrailAttachmentToWire,
   guardrailToWire,
   providerExclusions,
@@ -237,7 +237,7 @@ export class GatewayConfigMaterialiserService {
       cache_rules: bundle.cacheRules.map(cacheRuleToWire),
       metadata: config.metadata ?? {},
       vk_tags: config.metadata?.tags ?? [],
-      expires_at: expiresAtWire(vk.expiresAt),
+      expires_at: toExpiresAtWire(vk.expiresAt),
     };
   }
 
@@ -277,7 +277,7 @@ export class GatewayConfigMaterialiserService {
             scopeId: r.bucketScopeId,
             window: r.budget.window,
             match: "exact" as const,
-            periodFloorMs: budgetPeriodFloorMs(r.budget),
+            periodFloorMs: computeBudgetPeriodFloorMs(r.budget),
           })),
       );
       const out = new Map<string, string>();

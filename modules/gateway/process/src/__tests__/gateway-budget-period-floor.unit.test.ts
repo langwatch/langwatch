@@ -1,5 +1,5 @@
 import {
-  budgetPeriodFloorMs,
+  computeBudgetPeriodFloorMs,
   currentPeriodStart,
   GatewayWindow,
 } from "@langwatch/gateway-contract";
@@ -27,13 +27,13 @@ describe("MANUAL window math", () => {
   });
 });
 
-describe("budgetPeriodFloorMs", () => {
+describe("computeBudgetPeriodFloorMs", () => {
   const boundary = Temporal.Instant.from("2026-07-10T09:30:00.000Z");
 
   /** @scenario The period floor follows the stored boundary, not the calendar */
   it("floors MANUAL always, reset calendars until the edge passes, unreset TOTAL never", () => {
     expect(
-      budgetPeriodFloorMs(
+      computeBudgetPeriodFloorMs(
         {
           window: "MANUAL",
           currentPeriodStartedAt: boundary,
@@ -47,7 +47,7 @@ describe("budgetPeriodFloorMs", () => {
     // A MONTH budget reset on the 10th reads from the 10th for the rest
     // of July (the calendar period start, July 1st, is behind it)...
     expect(
-      budgetPeriodFloorMs(
+      computeBudgetPeriodFloorMs(
         {
           window: "MONTH",
           currentPeriodStartedAt: boundary,
@@ -59,7 +59,7 @@ describe("budgetPeriodFloorMs", () => {
     ).toBe(boundary.epochMilliseconds);
     // ...and back on the fast path once August starts.
     expect(
-      budgetPeriodFloorMs(
+      computeBudgetPeriodFloorMs(
         {
           window: "MONTH",
           currentPeriodStartedAt: boundary,
@@ -73,7 +73,7 @@ describe("budgetPeriodFloorMs", () => {
     // An unreset budget never floors: TOTAL keeps its lifetime bucket
     // semantics even though its stored boundary is its creation time.
     expect(
-      budgetPeriodFloorMs(
+      computeBudgetPeriodFloorMs(
         {
           window: "TOTAL",
           currentPeriodStartedAt: boundary,
@@ -84,7 +84,7 @@ describe("budgetPeriodFloorMs", () => {
       ),
     ).toBeUndefined();
     expect(
-      budgetPeriodFloorMs(
+      computeBudgetPeriodFloorMs(
         {
           window: "MONTH",
           currentPeriodStartedAt: boundary,
