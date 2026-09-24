@@ -19,7 +19,17 @@ import {
   type ScenarioHttpResponse,
 } from "@langwatch/scenario-process/child";
 
-const logger = createChildProcessLogger("langwatch:scenarios:child", process.env);
+import {
+  readScenarioChildEnvironment,
+  type ScenarioChildEnvironment,
+} from "./scenario-child.environment.ts";
+
+const source = process.env;
+const environment = readScenarioChildEnvironment({
+  source,
+  egressPolicyKey: SCENARIO_EGRESS_POLICY_ENV,
+});
+const logger = createChildProcessLogger("langwatch:scenarios:child", source);
 
 /**
  * The one egress the run makes on its own account. An HTTP target is a URL the customer typed,
@@ -27,11 +37,13 @@ const logger = createChildProcessLogger("langwatch:scenarios:child", process.env
  * other outbound request in the product does rather than through native `fetch`.
  */
 class WorkerScenarioChildHttp implements ScenarioHttp {
-  private readonly validate = createSsrfUrlValidator(
-    decodeScenarioEgressPolicy(process.env[SCENARIO_EGRESS_POLICY_ENV]),
-  );
+  private readonly validate: ReturnType<typeof createSsrfUrlValidator>;
+  private readonly rejectUnauthorized: boolean;
 
-  private readonly rejectUnauthorized = process.env.NODE_TLS_REJECT_UNAUTHORIZED !== "0";
+  constructor(environment: Pick<ScenarioChildEnvironment, "egressPolicy" | "rejectUnauthorized">) {
+    this.validate = createSsrfUrlValidator(decodeScenarioEgressPolicy(environment.egressPolicy));
+    this.rejectUnauthorized = environment.rejectUnauthorized;
+  }
 
   async fetch(input: {
     url: string;
@@ -68,8 +80,7 @@ function readJobDataFromStdin(): Promise<ChildProcessJobData> {
  * else's deployment.
  */
 function readTelemetryEnvironment(): { langwatchEndpoint: string; langwatchApiKey: string } {
-  const langwatchEndpoint = process.env.LANGWATCH_ENDPOINT;
-  const langwatchApiKey = process.env.LANGWATCH_API_KEY;
+  const { langwatchEndpoint, langwatchApiKey } = environment;
   if (!langwatchEndpoint || !langwatchApiKey) {
     throw new Error("LANGWATCH_ENDPOINT and LANGWATCH_API_KEY must be set in child process env");
   }
@@ -82,10 +93,10 @@ async function main(): Promise<void> {
     jobData,
     runtime: {
       ...readTelemetryEnvironment(),
-      verbose: process.env.SCENARIO_VERBOSE === "true",
-      httpPort: new WorkerScenarioChildHttp(),
+      verbose: environment.verbose,
+      httpPort: new WorkerScenarioChildHttp(environment),
       logger,
-      nlpTimeouts: NlpFetchAdapter.timeoutsFromEnvironment(process.env),
+      nlpTimeouts: NlpFetchAdapter.timeoutsFromEnvironment(source),
     },
   });
 

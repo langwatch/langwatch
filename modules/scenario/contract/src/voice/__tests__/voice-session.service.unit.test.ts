@@ -79,7 +79,7 @@ function fakePorts({
     signSessionToken: (payload) => JSON.stringify(payload),
     now: () => 1000,
     newSessionId: () => "sess_generated",
-    registry: { elevenlabs_convai: runner, phone: createPhoneTransport({ processEnv: {} }) },
+    registry: { elevenlabs_convai: runner, phone: createPhoneTransport({ environment: {} }) },
     ...over,
   };
 }
@@ -257,7 +257,7 @@ describe("mintVoiceSession", () => {
             getCredential,
             registry: {
               elevenlabs_convai: runner,
-              phone: createPhoneTransport({ processEnv: {} }),
+              phone: createPhoneTransport({ environment: {} }),
             },
           },
         });

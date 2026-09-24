@@ -4,7 +4,10 @@ import type { AgentAdapter } from "@langwatch/scenario";
 
 import type { CallRecord } from "./call-record.ts";
 import { elevenLabsConvaiTransport } from "./transports/elevenlabs-convai.transport.ts";
-import { createPhoneTransport } from "./transports/phone.transport.ts";
+import {
+  createPhoneTransport,
+  type PhoneTransportEnvironment,
+} from "./transports/phone.transport.ts";
 import type { VoiceTransport } from "./voice-transport.ts";
 
 // Credential for reading/dialing. Never reaches browser (stays with runner).
@@ -68,10 +71,10 @@ export interface VoiceTransportRunner {
 }
 
 export function createVoiceTransportRegistry(
-  processEnv: NodeJS.ProcessEnv,
+  environment: PhoneTransportEnvironment,
 ): Record<VoiceTransport, VoiceTransportRunner> {
   return {
     elevenlabs_convai: elevenLabsConvaiTransport,
-    phone: createPhoneTransport({ processEnv }),
+    phone: createPhoneTransport({ environment }),
   };
 }

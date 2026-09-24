@@ -6,7 +6,6 @@ import { AgentRole } from "@langwatch/scenario";
 import type * as scenarioModule from "@langwatch/scenario";
 import { describe, expect, it, vi } from "vitest";
 
-import { VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV } from "../../voice-public-url-env.ts";
 import type { VoiceTransportCredential } from "../../voice-transport.registry.ts";
 import {
   createPhoneTransport,
@@ -14,6 +13,7 @@ import {
   PHONE_NO_BROWSER_CALL_MESSAGE,
   PHONE_RESPONSE_TAIL_SILENCE_SECONDS,
   resolveHttpPort,
+  type PhoneTransportEnvironment,
   derivePublicBaseUrl,
   TWILIO_MAX_CALL_DURATION_CAP_SECONDS,
   type TwilioAdapterLike,
@@ -85,17 +85,17 @@ function fakeAdapter(
 
 function buildTransport({
   adapter = fakeAdapter(),
-  processEnv = { VOICE_PUBLIC_BASE_URL: "https://voice.example.com" },
+  environment = { voicePublicBaseUrl: "https://voice.example.com" },
 }: {
   adapter?: FakeAdapter;
-  processEnv?: NodeJS.ProcessEnv;
+  environment?: PhoneTransportEnvironment;
 } = {}) {
   const factoryOptions: Parameters<TwilioAgentFactory>[0][] = [];
   const twilioAgentFactory: TwilioAgentFactory = (options) => {
     factoryOptions.push(options);
     return adapter;
   };
-  const transport = createPhoneTransport({ twilioAgentFactory, processEnv });
+  const transport = createPhoneTransport({ twilioAgentFactory, environment });
   return { transport, adapter, factoryOptions };
 }
 
@@ -256,7 +256,7 @@ describe("phoneTransport", () => {
             message: PHONE_NO_BROWSER_CALL_MESSAGE,
           });
         };
-        const transport = createPhoneTransport({ processEnv: {} });
+        const transport = createPhoneTransport({ environment: {} });
         assertThrows(() => transport.assertAvailable?.());
         assertThrows(() =>
           transport.mintSession({
@@ -280,8 +280,8 @@ describe("phoneTransport", () => {
       it("uses it over the app's own base host", () => {
         expect(
           derivePublicBaseUrl({
-            VOICE_PUBLIC_BASE_URL: "https://voice.example.com",
-            BASE_HOST: "https://app.example.com",
+            voicePublicBaseUrl: "https://voice.example.com",
+            baseHost: "https://app.example.com",
           }),
         ).toBe("https://voice.example.com");
       });
@@ -293,7 +293,7 @@ describe("phoneTransport", () => {
       // "no public media URL" fail-fast block below. This asserts the helper's
       // reporting behavior, not that a real call is allowed to use it.
       it("still reports the app's own base host from the resolver helper", () => {
-        expect(derivePublicBaseUrl({ BASE_HOST: "https://app.example.com" })).toBe(
+        expect(derivePublicBaseUrl({ baseHost: "https://app.example.com" })).toBe(
           "https://app.example.com",
         );
       });
@@ -309,7 +309,7 @@ describe("phoneTransport", () => {
       it("passes through unchanged", () => {
         expect(
           derivePublicBaseUrl({
-            VOICE_PUBLIC_BASE_URL: "https://voice.example.com",
+            voicePublicBaseUrl: "https://voice.example.com",
           }),
         ).toBe("https://voice.example.com");
       });
@@ -319,7 +319,7 @@ describe("phoneTransport", () => {
       it("passes through unchanged", () => {
         expect(
           derivePublicBaseUrl({
-            VOICE_PUBLIC_BASE_URL: "http://voice.example.com",
+            voicePublicBaseUrl: "http://voice.example.com",
           }),
         ).toBe("http://voice.example.com");
       });
@@ -329,7 +329,7 @@ describe("phoneTransport", () => {
       it("behaves as it does today: passes through with the trailing slash intact", () => {
         expect(
           derivePublicBaseUrl({
-            VOICE_PUBLIC_BASE_URL: "https://voice.example.com/",
+            voicePublicBaseUrl: "https://voice.example.com/",
           }),
         ).toBe("https://voice.example.com/");
       });
@@ -337,7 +337,7 @@ describe("phoneTransport", () => {
 
     describe("when VOICE_PUBLIC_BASE_URL is a scheme-less localhost value", () => {
       it("is normalized to an http URL", () => {
-        expect(derivePublicBaseUrl({ VOICE_PUBLIC_BASE_URL: "localhost:3000" })).toBe(
+        expect(derivePublicBaseUrl({ voicePublicBaseUrl: "localhost:3000" })).toBe(
           "http://localhost:3000",
         );
       });
@@ -345,7 +345,7 @@ describe("phoneTransport", () => {
 
     describe("when VOICE_PUBLIC_BASE_URL is a scheme-less non-local host", () => {
       it("is normalized to an https URL", () => {
-        expect(derivePublicBaseUrl({ VOICE_PUBLIC_BASE_URL: "voice.example.com" })).toBe(
+        expect(derivePublicBaseUrl({ voicePublicBaseUrl: "voice.example.com" })).toBe(
           "https://voice.example.com",
         );
       });
@@ -353,7 +353,7 @@ describe("phoneTransport", () => {
 
     describe("when VOICE_PUBLIC_BASE_URL is garbage", () => {
       it("throws naming VOICE_PUBLIC_BASE_URL", () => {
-        expect(() => derivePublicBaseUrl({ VOICE_PUBLIC_BASE_URL: "not a url at all" })).toThrow(
+        expect(() => derivePublicBaseUrl({ voicePublicBaseUrl: "not a url at all" })).toThrow(
           /VOICE_PUBLIC_BASE_URL/,
         );
       });
@@ -361,7 +361,7 @@ describe("phoneTransport", () => {
 
     describe("when BASE_HOST is malformed and VOICE_PUBLIC_BASE_URL is unset", () => {
       it("throws naming BASE_HOST rather than VOICE_PUBLIC_BASE_URL", () => {
-        expect(() => derivePublicBaseUrl({ BASE_HOST: "not a valid url" })).toThrow(/BASE_HOST/);
+        expect(() => derivePublicBaseUrl({ baseHost: "not a valid url" })).toThrow(/BASE_HOST/);
       });
     });
   });
@@ -373,7 +373,7 @@ describe("phoneTransport", () => {
         const adapter = fakeAdapter();
         const { transport, factoryOptions } = buildTransport({
           adapter,
-          processEnv: { BASE_HOST: "https://app.langwatch.ai" },
+          environment: { baseHost: "https://app.langwatch.ai" },
         });
 
         let thrown: unknown;
@@ -403,7 +403,7 @@ describe("phoneTransport", () => {
         const adapter = fakeAdapter();
         const { transport, factoryOptions } = buildTransport({
           adapter,
-          processEnv: {},
+          environment: {},
         });
 
         expect(() =>
@@ -424,8 +424,8 @@ describe("phoneTransport", () => {
         const adapter = fakeAdapter();
         const { transport } = buildTransport({
           adapter,
-          processEnv: {
-            [VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV]:
+          environment: {
+            voicePublicBaseUrlUnavailableReason:
               "cloudflared tunnel binary unavailable: spawn cloudflared ENOENT",
           },
         });
@@ -453,36 +453,36 @@ describe("phoneTransport", () => {
   describe("given the http port is resolved", () => {
     describe("when VOICE_WS_PORT is a valid port", () => {
       it("uses it", () => {
-        expect(resolveHttpPort({ VOICE_WS_PORT: "5564" })).toBe(5564);
+        expect(resolveHttpPort({ voiceWsPort: "5564" })).toBe(5564);
       });
     });
 
     describe("when VOICE_WS_PORT is unset", () => {
       it("falls back to the OS-assigned port", () => {
-        expect(resolveHttpPort({ VOICE_WS_PORT: undefined })).toBe(0);
+        expect(resolveHttpPort({ voiceWsPort: undefined })).toBe(0);
       });
     });
 
     describe("when VOICE_WS_PORT is not a number", () => {
       it("falls back to the OS-assigned port", () => {
-        expect(resolveHttpPort({ VOICE_WS_PORT: "not-a-port" })).toBe(0);
+        expect(resolveHttpPort({ voiceWsPort: "not-a-port" })).toBe(0);
       });
     });
 
     describe("when VOICE_WS_PORT is out of range", () => {
       it("falls back to the OS-assigned port", () => {
-        expect(resolveHttpPort({ VOICE_WS_PORT: "0" })).toBe(0);
-        expect(resolveHttpPort({ VOICE_WS_PORT: "65536" })).toBe(0);
-        expect(resolveHttpPort({ VOICE_WS_PORT: "-1" })).toBe(0);
+        expect(resolveHttpPort({ voiceWsPort: "0" })).toBe(0);
+        expect(resolveHttpPort({ voiceWsPort: "65536" })).toBe(0);
+        expect(resolveHttpPort({ voiceWsPort: "-1" })).toBe(0);
       });
     });
 
     describe("when the phone transport builds the SDK adapter", () => {
       it("passes the resolved http port to the factory", () => {
         const { transport, factoryOptions } = buildTransport({
-          processEnv: {
-            VOICE_PUBLIC_BASE_URL: "https://voice.example.com",
-            VOICE_WS_PORT: "5564",
+          environment: {
+            voicePublicBaseUrl: "https://voice.example.com",
+            voiceWsPort: "5564",
           },
         });
         transport.createAgentAdapter({
@@ -508,7 +508,7 @@ describe("phoneTransport", () => {
         twilioAgentMock.mockReturnValue(sdkAdapter);
 
         const transport = createPhoneTransport({
-          processEnv: { VOICE_PUBLIC_BASE_URL: "https://voice.example.com" },
+          environment: { voicePublicBaseUrl: "https://voice.example.com" },
         });
         const built = transport.createAgentAdapter({
           agentId: TARGET,
@@ -530,7 +530,7 @@ describe("phoneTransport", () => {
         twilioAgentMock.mockReturnValue(sdkAdapter);
 
         const transport = createPhoneTransport({
-          processEnv: { VOICE_PUBLIC_BASE_URL: "https://voice.example.com" },
+          environment: { voicePublicBaseUrl: "https://voice.example.com" },
         });
         const built = transport.createAgentAdapter({
           agentId: TARGET,
@@ -555,7 +555,7 @@ describe("phoneTransport", () => {
         twilioAgentMock.mockReturnValue(sdkAdapter);
 
         const transport = createPhoneTransport({
-          processEnv: { VOICE_PUBLIC_BASE_URL: "https://voice.example.com" },
+          environment: { voicePublicBaseUrl: "https://voice.example.com" },
         });
         const built = transport.createAgentAdapter({
           agentId: TARGET,
@@ -590,7 +590,7 @@ describe("phoneTransport", () => {
         twilioAgentMock.mockReturnValue(sdkAdapter);
 
         const transport = createPhoneTransport({
-          processEnv: { VOICE_PUBLIC_BASE_URL: "https://voice.example.com" },
+          environment: { voicePublicBaseUrl: "https://voice.example.com" },
         });
         const built = transport.createAgentAdapter({
           agentId: TARGET,
@@ -623,7 +623,7 @@ describe("phoneTransport", () => {
         twilioAgentMock.mockReturnValue(sdkAdapter);
 
         const transport = createPhoneTransport({
-          processEnv: { VOICE_PUBLIC_BASE_URL: "https://voice.example.com" },
+          environment: { voicePublicBaseUrl: "https://voice.example.com" },
         });
         transport.createAgentAdapter({
           agentId: TARGET,

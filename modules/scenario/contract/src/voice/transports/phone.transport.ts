@@ -7,7 +7,6 @@ import { createLogger } from "@langwatch/observability";
 import type { AgentAdapter } from "@langwatch/scenario";
 import { AgentRole, voice as scenarioVoice } from "@langwatch/scenario";
 
-import { VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV } from "../voice-public-url-env.ts";
 import type {
   VoiceTransportCredential,
   VoiceTransportRunner,
@@ -185,17 +184,17 @@ function normalizeToHttpUrl(value: string): string | undefined {
 /** App's public base URL for Twilio media stream: VOICE_PUBLIC_BASE_URL or
  * BASE_HOST; normalized via normalizeToHttpUrl, throws if unparseable.
  */
-export function derivePublicBaseUrl(processEnv: NodeJS.ProcessEnv): string | undefined {
-  const resolved = derivePublicBaseUrlWithSource(processEnv);
+export function derivePublicBaseUrl(environment: PhoneTransportEnvironment): string | undefined {
+  const resolved = derivePublicBaseUrlWithSource(environment);
   return resolved?.value;
 }
 
 /** Same resolution as {@link derivePublicBaseUrl}, but also reports which env
  *  var the value came from, so a caller can log it alongside the value. */
 export function derivePublicBaseUrlWithSource(
-  processEnv: NodeJS.ProcessEnv,
+  environment: PhoneTransportEnvironment,
 ): { value: string; source: PublicBaseUrlSource } | undefined {
-  const fromWorker = processEnv.VOICE_PUBLIC_BASE_URL?.trim();
+  const fromWorker = environment.voicePublicBaseUrl?.trim();
   if (fromWorker) {
     const normalized = normalizeToHttpUrl(fromWorker);
     if (!normalized) {
@@ -204,7 +203,7 @@ export function derivePublicBaseUrlWithSource(
     return { value: normalized, source: "VOICE_PUBLIC_BASE_URL" };
   }
 
-  const fromApp = processEnv.BASE_HOST?.trim();
+  const fromApp = environment.baseHost?.trim();
   if (fromApp) {
     const normalized = normalizeToHttpUrl(fromApp);
     if (!normalized) {
@@ -221,19 +220,30 @@ export function derivePublicBaseUrlWithSource(
  * valid, else `0` (OS-assigned). Lets an operator route a public origin to
  * the child in a single-worker deployment; slice 3's handoff supersedes it.
  */
-export function resolveHttpPort(processEnv: NodeJS.ProcessEnv): number {
-  const raw = processEnv.VOICE_WS_PORT?.trim();
+export function resolveHttpPort(environment: PhoneTransportEnvironment): number {
+  const raw = environment.voiceWsPort?.trim();
   if (!raw) return 0;
   const port = Number(raw);
   if (!Number.isInteger(port) || port < 1 || port > 65535) return 0;
   return port;
 }
 
-/** The dependencies the phone runner is built from. Injected in tests so a fake
- *  Twilio adapter and a controlled env stand in for the real SDK and host. */
+/**
+ * What the phone runner reads off its own process. The child's entrypoint reads
+ * its environment once into this record; the parent filled it from scenario's config.
+ */
+export interface PhoneTransportEnvironment {
+  readonly voicePublicBaseUrl?: string;
+  readonly baseHost?: string;
+  /** Why the worker has no public media URL, threaded down for the refusal. */
+  readonly voicePublicBaseUrlUnavailableReason?: string;
+  readonly voiceWsPort?: string;
+}
+
+/** The dependencies the phone runner is built from; a fake Twilio adapter stands in, in tests. */
 export interface PhoneTransportDeps {
   twilioAgentFactory?: TwilioAgentFactory;
-  processEnv: NodeJS.ProcessEnv;
+  environment: PhoneTransportEnvironment;
 }
 
 /** The Twilio branch of the credential union, or a thrown error. A credential
@@ -324,7 +334,7 @@ export function createPhoneTransport(deps: PhoneTransportDeps): VoiceTransportRu
       // The SDK caps an a-leg call at 300s and throws above it; a project whose
       // VOICE_CALL_MAX_SECONDS is higher is clamped down to the cap.
       const maxCallDurationSeconds = Math.min(maxCallSeconds, TWILIO_MAX_CALL_DURATION_CAP_SECONDS);
-      const resolvedBaseUrl = derivePublicBaseUrlWithSource(deps.processEnv);
+      const resolvedBaseUrl = derivePublicBaseUrlWithSource(deps.environment);
       // A phone call must route Twilio's media stream to VOICE_PUBLIC_BASE_URL,
       // the worker's own listener; BASE_HOST is the app's origin, which runs
       // none, and dialling it hands Twilio a dead URL (prod 31920 failure).
@@ -334,7 +344,7 @@ export function createPhoneTransport(deps: PhoneTransportDeps): VoiceTransportRu
         // (set at boot, forwarded by the child's environment), read from the
         // same env the base URL was resolved from so a test's injected env is
         // honored.
-        const reason = deps.processEnv[VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV]?.trim();
+        const reason = deps.environment.voicePublicBaseUrlUnavailableReason?.trim();
         logger.error(
           { agentId, streamBaseUrlSource: source, reason },
           "no voice public base URL for outbound call; refusing to dial",
@@ -365,7 +375,7 @@ export function createPhoneTransport(deps: PhoneTransportDeps): VoiceTransportRu
         authToken: twilio.authToken,
         phoneNumber: twilio.fromNumber,
         publicBaseUrl: resolvedBaseUrl.value,
-        httpPort: resolveHttpPort(deps.processEnv),
+        httpPort: resolveHttpPort(deps.environment),
         // Only the dialled target is allowlisted, so the SDK's deny-by-default
         // a-leg guard passes for exactly this number and nothing else. There is
         // no user-facing allowlist; this guard is internal to the SDK.

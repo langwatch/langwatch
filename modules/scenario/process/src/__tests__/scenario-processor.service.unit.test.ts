@@ -60,9 +60,10 @@ class HoldingExecutionRunner implements ScenarioExecutionRunner {
     private readonly child: ChildProcess,
   ) {}
 
+  /** Holds like a live child: the real runner settles only after its child exits. */
   execute(jobData: ExecutionJobData): Promise<void> {
     this.pool.registerChild(jobData.scenarioRunId, this.child);
-    return Promise.resolve();
+    return new Promise<void>(() => {});
   }
 
   skipCancelled(): void {}
