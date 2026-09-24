@@ -200,6 +200,14 @@ export class LocalControlSessionCoreService {
       };
     }
 
+    return this.authenticateKey(credentials);
+  }
+
+  /** The key a door already read off the request, checked the same way. */
+  async authenticateKey(credentials: {
+    token: string;
+    projectId: string | null;
+  }): Promise<AuthenticateOutcome> {
     const resolved = await this.apiKeys.findResolvedToken({
       token: credentials.token,
       projectId: credentials.projectId,

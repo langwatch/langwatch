@@ -4,22 +4,29 @@
  * poll, per the ADR-128 ingress requirement.
  */
 
+import type { SessionKeyHolder, SessionKeyPresented } from "@langwatch/api/rest";
+import { generate } from "@langwatch/ksuid";
 import {
   CALL_POLL_HOLD_MS,
   POLL_INTERVAL_MS,
   type CliFrame,
+  LangyLocalRecordNotFoundError,
+  LangySessionKeyInvalidError,
+  LangySessionKeyUnboundError,
+  LangySessionKeyWrongTypeError,
+  type LangyControlRegistered,
   LOCAL_CONTROL_PROTOCOL_VERSION,
+  type LocalControlRefusedCode,
   type PlatformFrame,
   type RegisterFrame,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import type { Unsubscribe } from "@langwatch/redis-client/session-state";
 import { nowInstant } from "@langwatch/time";
-import { nanoid } from "nanoid";
 
 import type { ControlSession } from "../rules/langy-local-session-contract.rules.ts";
-import { DeliveredCallsService } from "../services/langy-local-delivered-calls.service.ts";
-import type { LocalControlSessionCoreService } from "../services/langy-local-session.service.ts";
+import { DeliveredCallsService } from "./langy-local-delivered-calls.service.ts";
+import type { LocalControlSessionCoreService } from "./langy-local-session.service.ts";
 
 const logger = createLogger("langwatch:langy:local-control:long-poll");
 
@@ -29,96 +36,91 @@ const HTTP_SESSION_TTL_SECONDS = 60;
 /** The most frames one poll answers with. */
 const MAX_FRAMES_PER_POLL = 50;
 
-interface LongPollRegisterOutcome {
-  ok: boolean;
-  /** The token every later poll and post carries. */
-  token?: string;
-  reply?: PlatformFrame;
-  code?: string;
-  message?: string;
-}
-
 export interface LocalControlLongPollOptions {
   core: LocalControlSessionCoreService;
   holdMs?: number;
   pollIntervalMs?: number;
 }
 
+type LongPollSession = {
+  session: ControlSession;
+  queue: PlatformFrame[];
+  unsubscribe: Unsubscribe;
+  lastSeenAt: number;
+  state: {
+    /**
+     * Set once the platform told this command line the folder is disconnected.
+     * A poll after that stops refreshing the record, which is meant to be gone.
+     */
+    released: boolean;
+    delivered: DeliveredCallsService;
+  };
+};
+
 /**
  * One process's long-poll sessions, keyed by a pod-local token. A poll that
  * lands on another pod finds nothing and re-registers, same as a dropped socket.
  */
-export class LocalControlLongPoll {
+export class LocalControlLongPollService {
   private readonly core: LocalControlSessionCoreService;
   private readonly holdMs: number;
   private readonly pollIntervalMs: number;
-  private readonly sessions = new Map<
-    string,
-    {
-      session: ControlSession;
-      queue: PlatformFrame[];
-      unsubscribe: Unsubscribe;
-      lastSeenAt: number;
-      /**
-       * Set once the platform told this command line the folder is
-       * disconnected. A poll after that stops refreshing the record, which is
-       * meant to be gone.
-       */
-      released: boolean;
-    }
-  >();
+  private readonly sessions = new Map<string, LongPollSession>();
 
-  constructor(options: LocalControlLongPollOptions) {
+  static create(options: LocalControlLongPollOptions): LocalControlLongPollService {
+    return new LocalControlLongPollService(options);
+  }
+
+  private constructor(options: LocalControlLongPollOptions) {
     this.core = options.core;
     this.holdMs = options.holdMs ?? CALL_POLL_HOLD_MS;
     this.pollIntervalMs = options.pollIntervalMs ?? POLL_INTERVAL_MS;
   }
 
-  /** Registers a folder over HTTP and hands back the token its polls carry. */
+  /** Who holds a minted session key, as the session-key door asks; any other key throws. */
+  async verifySessionKey({ token, projectId }: SessionKeyPresented): Promise<SessionKeyHolder> {
+    const authenticated = await this.core.authenticateKey({ token, projectId });
+    if (!authenticated.ok) throw sessionKeyRefusal(authenticated.code);
+    return {
+      actor: { type: "user", id: authenticated.credential.userId },
+      projectId: authenticated.credential.projectId,
+    };
+  }
+
+  /** Registers a folder over HTTP; a key or conversation the core refuses throws its refusal. */
   async register({
     authorization,
     projectId,
     frame,
   }: {
-    authorization?: string;
-    projectId?: string;
+    authorization: string;
+    projectId: string;
     frame: RegisterFrame;
-  }): Promise<LongPollRegisterOutcome> {
-    const authenticated = await this.core.authenticate({
-      ...(authorization ? { authorization } : {}),
-      ...(projectId ? { projectId } : {}),
-    });
-    if (!authenticated.ok) {
-      return {
-        ok: false,
-        code: authenticated.code,
-        message: authenticated.message,
-      };
-    }
+  }): Promise<LangyControlRegistered> {
+    const authenticated = await this.core.authenticate({ authorization, projectId });
+    if (!authenticated.ok) throw sessionKeyRefusal(authenticated.code);
     const registered = await this.core.register({
       credential: authenticated.credential,
       frame,
     });
-    if (!registered.ok) {
-      return { ok: false, code: registered.code, message: registered.message };
-    }
+    if (!registered.ok) throw new LangySessionKeyUnboundError({ reason: "conversation_gone" });
 
-    const token = `lcs_${nanoid(24)}`;
+    const token = `lcs_${generate("langy").toString()}`;
     const queue: PlatformFrame[] = [];
-    const entry = {
-      session: registered.session,
-      queue,
-      unsubscribe: (async () => undefined) as Unsubscribe,
-      lastSeenAt: nowInstant().epochMilliseconds,
-      released: false,
-      delivered: deliveredWith(registered.inFlightCallIds),
-    };
-    entry.unsubscribe = await this.core.subscribe(registered.session, (platformFrame) => {
-      if (platformFrame.type === "disconnect") entry.released = true;
-      if (!entry.delivered.admit(platformFrame)) return;
+    const state = { released: false, delivered: deliveredWith(registered.inFlightCallIds) };
+    const unsubscribe = await this.core.subscribe(registered.session, (platformFrame) => {
+      if (platformFrame.type === "disconnect") state.released = true;
+      if (!state.delivered.admit(platformFrame)) return;
       if (queue.length >= MAX_FRAMES_PER_POLL) queue.shift();
       queue.push(platformFrame);
     });
+    const entry: LongPollSession = {
+      session: registered.session,
+      queue,
+      unsubscribe,
+      lastSeenAt: nowInstant().epochMilliseconds,
+      state,
+    };
     this.sessions.set(token, entry);
 
     await this.core.afterRegister(registered.session);
@@ -128,9 +130,9 @@ export class LocalControlLongPoll {
         protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
         call: envelope,
       };
-      if (entry.delivered.admit(callFrame)) queue.push(callFrame);
+      if (state.delivered.admit(callFrame)) queue.push(callFrame);
     }
-    return { ok: true, token, reply: registered.reply };
+    return { frame: registered.reply, instanceToken: token };
   }
 
   /**
@@ -139,24 +141,24 @@ export class LocalControlLongPoll {
    * with a cancel when the platform no longer holds them.
    */
   async poll({
-    token,
+    instanceToken,
     inFlightCallIds = [],
     signal,
   }: {
-    token: string;
-    inFlightCallIds?: string[];
+    instanceToken: string;
+    inFlightCallIds?: readonly string[];
     signal?: AbortSignal;
-  }): Promise<{ ok: boolean; frames: PlatformFrame[] }> {
-    const entry = this.sessions.get(token);
-    if (!entry) return { ok: false, frames: [] };
+  }): Promise<{ frames: PlatformFrame[] }> {
+    const entry = this.sessions.get(instanceToken);
+    if (!entry) throw new LangyLocalRecordNotFoundError();
 
     const orphaned = await this.orphanedCalls(inFlightCallIds);
-    if (orphaned.length > 0) return { ok: true, frames: orphaned };
+    if (orphaned.length > 0) return { frames: orphaned };
 
     const until = nowInstant().epochMilliseconds + this.holdMs;
     const look = async (): Promise<PlatformFrame[]> => {
       entry.lastSeenAt = nowInstant().epochMilliseconds;
-      if (!entry.released) await this.core.heartbeat(entry.session);
+      if (!entry.state.released) await this.core.heartbeat(entry.session);
       return entry.queue.splice(0, entry.queue.length);
     };
     let frames = await look();
@@ -164,11 +166,11 @@ export class LocalControlLongPoll {
       await sleep(this.pollIntervalMs, signal);
       frames = await look();
     }
-    return { ok: true, frames };
+    return { frames };
   }
 
   /** A cancel frame for each call the command line holds and the platform does not. */
-  private async orphanedCalls(inFlightCallIds: string[]): Promise<PlatformFrame[]> {
+  private async orphanedCalls(inFlightCallIds: readonly string[]): Promise<PlatformFrame[]> {
     const frames: PlatformFrame[] = [];
     for (const callId of inFlightCallIds) {
       const call = await this.core.dispatcher.read(callId);
@@ -182,14 +184,20 @@ export class LocalControlLongPoll {
     return frames;
   }
 
-  /** The frames the command line has for the platform. */
-  async frames({ token, frames }: { token: string; frames: CliFrame[] }): Promise<{ ok: boolean }> {
-    const entry = this.sessions.get(token);
-    if (!entry) return { ok: false };
+  /** The frames the command line has for the platform; every one is taken. */
+  async frames({
+    instanceToken,
+    frames,
+  }: {
+    instanceToken: string;
+    frames: CliFrame[];
+  }): Promise<{ accepted: number }> {
+    const entry = this.sessions.get(instanceToken);
+    if (!entry) throw new LangyLocalRecordNotFoundError();
     entry.lastSeenAt = nowInstant().epochMilliseconds;
     // A command line that writes is as alive as one that polls, and a long
     // call means it writes far more often than it polls.
-    if (!entry.released) await this.core.heartbeat(entry.session);
+    if (!entry.state.released) await this.core.heartbeat(entry.session);
     for (const frame of frames) {
       switch (frame.type) {
         case "ack":
@@ -205,13 +213,13 @@ export class LocalControlLongPoll {
           await this.core.permissionAnswered(entry.session, frame);
           break;
         case "deregister":
-          await this.retire(token, "cli_exit");
-          return { ok: true };
+          await this.retire(instanceToken, "cli_exit");
+          return { accepted: frames.length };
         case "register":
           break;
       }
     }
-    return { ok: true };
+    return { accepted: frames.length };
   }
 
   /** Drops one session and everything it holds. */
@@ -282,4 +290,13 @@ function deliveredWith(inFlightCallIds: readonly string[]): DeliveredCallsServic
   const delivered = DeliveredCallsService.create();
   for (const callId of inFlightCallIds) delivered.reserve(callId);
   return delivered;
+}
+
+/** The handled refusal for a session key the core would not authenticate. */
+function sessionKeyRefusal(code: LocalControlRefusedCode): Error {
+  if (code === "key_type_not_allowed") return new LangySessionKeyWrongTypeError();
+  if (code === "conversation_mismatch") {
+    return new LangySessionKeyUnboundError({ reason: "binding_lapsed" });
+  }
+  return new LangySessionKeyInvalidError();
 }

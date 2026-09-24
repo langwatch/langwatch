@@ -461,6 +461,22 @@ const registry = {
       "A request is single use, so a second approval of the same one is refused",
     ],
   },
+  langy_session_key_invalid: {
+    tips: [
+      "Send the key that approving the request printed, as a bearer token, with the project it was made for",
+      "Run `npx langwatch@latest langy --share-control` again to get a new key",
+    ],
+  },
+  langy_session_key_wrong_type: {
+    tips: [
+      "Run `npx langwatch@latest langy --share-control` and approve the request; the key it prints is the only one that can share a folder",
+    ],
+  },
+  langy_session_key_unbound: {
+    tips: [
+      "Ask Langy for the code change again, then approve the new request to share your folder",
+    ],
+  },
   langy_local_request_expired: {
     tips: [
       "A request to share a folder lasts fifteen minutes; ask Langy for the code change again to get a new one",

@@ -1,4 +1,4 @@
-import type { RequestActor } from "@langwatch/api/rest";
+import type { RequestActor, SessionKeyHolder, SessionKeyPresented } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import type { z } from "zod";
 
@@ -31,6 +31,7 @@ import type {
   StartWaitResponse,
   WorkspaceStatus,
 } from "./langy.local-control-http.ts";
+import type { CliFrame, PlatformFrame, RegisterFrame } from "./langy.local-control-protocol.ts";
 import type { LangyCredentialSession, LangyEgressAllowlist, LangyStopTurnInput } from "./langy.ts";
 
 /**
@@ -82,6 +83,15 @@ export type LangyControlOwnerInput = Readonly<{ actor: RequestActor | null }>;
 export type LangyControlRequestInput = LangyControlOwnerInput & Readonly<{ requestId: string }>;
 export type LangyControlRequestCancelled = z.infer<typeof langyControlCancelResultSchema>;
 /** A public surface's caller: the key's owner and project, and which surface's rollout gates it. */
+export type LangyControlRegisterInput = LangyKeyCaller &
+  Readonly<{ authorization: string; frame: RegisterFrame }>;
+export type LangyControlRegistered = Readonly<{ frame: PlatformFrame; instanceToken: string }>;
+export type LangyControlPollInput = Readonly<{
+  instanceToken: string;
+  inFlightCallIds: readonly string[];
+  signal?: AbortSignal;
+}>;
+export type LangyControlFramesInput = Readonly<{ instanceToken: string; frames: CliFrame[] }>;
 export type LangyRestCallerInput = LangyKeyCaller & Readonly<{ surface: LangyRestSurface }>;
 
 /** The portable, callable Langy capability shared by process transports. */
@@ -250,6 +260,14 @@ export interface LangyApi {
     input: LangyControlRequestInput,
   ): Promise<ApproveControlRequestResponse>;
   cancelLocalControlRequest(input: LangyControlRequestInput): Promise<LangyControlRequestCancelled>;
+  /** The session-key door's check: who holds a minted key; any other key throws its refusal. */
+  verifyLocalControlSessionKey(presented: SessionKeyPresented): Promise<SessionKeyHolder>;
+  /** Shares a folder over long-poll: the registered frame and the token its polls carry. */
+  registerLocalControlSession(input: LangyControlRegisterInput): Promise<LangyControlRegistered>;
+  /** Holds until the folder has frames; an unknown instance token throws not found. */
+  pollLocalControlSession(input: LangyControlPollInput): Promise<{ frames: PlatformFrame[] }>;
+  /** Takes the folder's frames; an unknown instance token throws not found. */
+  postLocalControlFrames(input: LangyControlFramesInput): Promise<{ accepted: number }>;
 }
 
 export const LangyApi = moduleApi<LangyApi>()("langy");

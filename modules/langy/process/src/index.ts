@@ -266,15 +266,7 @@ export type {
 } from "./services/langy-skip-permissions.service.ts";
 export { langyLocalRest } from "./transport/langy-local.rest.ts";
 export { langyLocalControlRest } from "./transport/langy-local-control.rest.ts";
-export {
-  langyLocalControlConnectMembers,
-  langyLocalControlConnectRest,
-  type LangyLocalControlConnectMembers,
-} from "./transport/langy-local-control-connect.rest.ts";
-export {
-  LocalControlLongPoll,
-  type LocalControlLongPollOptions,
-} from "./transport/langy-local-control-long-poll.rest.ts";
+export { langyLocalControlConnectRest } from "./transport/langy-local-control-connect.rest.ts";
 export {
   CONTROL_CONNECT_PATH,
   LocalControlGateway,

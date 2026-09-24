@@ -155,7 +155,7 @@ export type LangyLocalConversationTurns = Readonly<{
     idempotencyKey: string;
     session: LangyCredentialSession;
     requestedConversationId: string;
-    messages: readonly { role: "user" | "assistant" | "system"; parts: LangyMessagePart[] }[];
+    messages: { role: "user" | "assistant" | "system"; parts: LangyMessagePart[] }[];
     isRetry: boolean;
     turnContext: Record<string, never>;
   }): Promise<{ conversationId: string; turnId: string }>;

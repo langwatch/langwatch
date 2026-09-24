@@ -24,6 +24,7 @@ import {
   type LangyTitleGeneratorDeps,
 } from "./services/langy-title-generator.service.ts";
 import { langyInternalRest } from "./transport/langy-internal.rest.ts";
+import { langyLocalControlConnectRest } from "./transport/langy-local-control-connect.rest.ts";
 import { langyLocalControlRest } from "./transport/langy-local-control.rest.ts";
 import { langyLocalRest } from "./transport/langy-local.rest.ts";
 import { langyTurnsMembers, langyTurnsRest } from "./transport/langy-turns.rest.ts";
@@ -80,8 +81,8 @@ export function createLangySessionKeyReap(options: {
 }
 
 // `langy.*` and `langyEgress.*` still name the deleted tRPC builder and are
-// not listed here yet; the UI-action family and local-control's connect routes
-// are unconverted too. See .claude/handoffs/port-langy-routes.md for state.
+// not listed here yet; the UI-action family is unconverted too.
+// See .claude/handoffs/port-langy-routes.md for state.
 export const langyServer = defineServerModule("langy")
   .withRepositories(langyRepositories)
   .withApp(LangyApp)
@@ -90,6 +91,7 @@ export const langyServer = defineServerModule("langy")
     langyInternalRest,
     langyLocalRest,
     langyLocalControlRest,
+    langyLocalControlConnectRest,
     setupSkillsTrpcTransport,
   )
   .withTransportFacts(({ app, members }) => {
@@ -97,6 +99,7 @@ export const langyServer = defineServerModule("langy")
       throw new TypeError("Langy transport requires its constructed application");
     return [
       bindRestCredential("internalSecret", () => app.internalDoor),
+      bindRestCredential("sessionKey", () => app.sessionKeyDoor),
       bindRestMiddleware(langyTurnsMembers, () => ({
         // One `Prefer: wait` hold borrows a dedicated connection for its
         // blocking read and gives it back on release, so a held request never

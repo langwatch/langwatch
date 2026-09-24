@@ -4,7 +4,7 @@
  * model as the tool result. Panel copy lives in the presentation registry.
  */
 
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation as registeredRemediation } from "@langwatch/handled-error";
 
 import { remediation } from "./langy.error-remediation.ts";
 
@@ -184,5 +184,57 @@ export class LangyWaitExpiredError extends HandledError {
       },
     );
     this.name = "LangyWaitExpiredError";
+  }
+}
+
+/** A bearer the session-key door could not resolve to a key of this project. */
+export class LangySessionKeyInvalidError extends HandledError {
+  declare readonly code: "langy_session_key_invalid";
+
+  constructor() {
+    super("langy_session_key_invalid", "That key is not valid for this project.", {
+      httpStatus: 401,
+      fault: "customer",
+      ...registeredRemediation("langy_session_key_invalid"),
+    });
+    this.name = "LangySessionKeyInvalidError";
+  }
+}
+
+/** A real key with no person behind it, or not the one approving a control request mints. */
+export class LangySessionKeyWrongTypeError extends HandledError {
+  declare readonly code: "langy_session_key_wrong_type";
+
+  constructor() {
+    super(
+      "langy_session_key_wrong_type",
+      "Only the key that approving a control request mints can share a folder. Run `langwatch langy --share-control` and approve the request.",
+      {
+        httpStatus: 403,
+        fault: "customer",
+        ...registeredRemediation("langy_session_key_wrong_type"),
+      },
+    );
+    this.name = "LangySessionKeyWrongTypeError";
+  }
+}
+
+/** A session key whose conversation is gone: its binding lapsed, or the conversation did. */
+export class LangySessionKeyUnboundError extends HandledError {
+  declare readonly code: "langy_session_key_unbound";
+
+  constructor({ reason }: { reason: "binding_lapsed" | "conversation_gone" }) {
+    super(
+      "langy_session_key_unbound",
+      reason === "conversation_gone"
+        ? "That conversation is no longer available."
+        : "That key does not control a conversation any more. Ask Langy for the code change again.",
+      {
+        httpStatus: 403,
+        fault: "customer",
+        ...registeredRemediation("langy_session_key_unbound"),
+      },
+    );
+    this.name = "LangySessionKeyUnboundError";
   }
 }

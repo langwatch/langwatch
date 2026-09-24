@@ -31,8 +31,8 @@ import {
   type LocalControlRuntime,
 } from "../../repositories/redis/redis.langy-local-control-runtime.repository.ts";
 import { presenceKey } from "../../rules/langy-local-control-keys.rules.ts";
+import { LocalControlLongPollService } from "../../services/langy-local-control-long-poll.service.ts";
 import { LocalControlSessionCoreService } from "../../services/langy-local-session.service.ts";
-import { LocalControlLongPoll } from "../langy-local-control-long-poll.rest.ts";
 import { CONTROL_CONNECT_PATH, LocalControlGateway } from "../langy-local-control.ws.ts";
 
 function frameText(raw: WebSocket.RawData): string {
@@ -86,7 +86,7 @@ type Pod = {
   runtime: LocalControlRuntime;
   core: LocalControlSessionCoreService;
   gateway: LocalControlGateway;
-  longPoll: LocalControlLongPoll;
+  longPoll: LocalControlLongPollService;
   server: Server;
   url: string;
 };
@@ -261,7 +261,7 @@ async function startPod(): Promise<Pod> {
     pongWaitMs: 150,
   });
   gateway.mount(router);
-  const longPoll = new LocalControlLongPoll({
+  const longPoll = LocalControlLongPollService.create({
     core,
     holdMs: 300,
     pollIntervalMs: 25,
@@ -1127,9 +1127,8 @@ describe("given a network that blocks WebSockets", () => {
       },
     });
 
-    expect(registered.ok).toBe(true);
-    expect(registered.reply?.type).toBe("registered");
-    const token = registered.token!;
+    expect(registered.frame.type).toBe("registered");
+    const token = registered.instanceToken;
 
     const call = await podB.runtime.dispatcher.start({
       projectId,
@@ -1138,14 +1137,14 @@ describe("given a network that blocks WebSockets", () => {
       call: { tool: "local_ls", params: { path: "." } },
       timeoutMs: 30_000,
     });
-    const polled = await podA.longPoll.poll({ token });
+    const polled = await podA.longPoll.poll({ instanceToken: token });
     expect(polled.frames[0]).toMatchObject({
       type: "call",
       call: { callId: call.callId },
     });
 
     await podA.longPoll.frames({
-      token,
+      instanceToken: token,
       frames: [
         {
           protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
@@ -1163,7 +1162,9 @@ describe("given a network that blocks WebSockets", () => {
     expect(answer).toMatchObject({ outcome: "polled", answer: { state: "done", ok: true } });
 
     await podA.longPoll.retire(token, "cli_exit");
-    expect(await podA.longPoll.poll({ token })).toMatchObject({ ok: false });
+    await expect(podA.longPoll.poll({ instanceToken: token })).rejects.toMatchObject({
+      code: "langy_local_record_not_found",
+    });
   });
 });
 

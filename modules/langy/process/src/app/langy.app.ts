@@ -1,5 +1,12 @@
+import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
-import { BearerIdentity, type RestIdentity } from "@langwatch/api/rest";
+import {
+  BearerIdentity,
+  type RestIdentity,
+  SessionKeyIdentity,
+  type SessionKeyHolder,
+  type SessionKeyPresented,
+} from "@langwatch/api/rest";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { Event, StaticPipelineDefinition } from "@langwatch/eventing";
@@ -17,6 +24,11 @@ import {
   type LangyConversationEventPage,
   type LangyConversationListCursor,
   type LangyConversationListPage,
+  type LangyControlFramesInput,
+  type LangyControlPollInput,
+  type LangyControlRegisterInput,
+  type LangyControlRegistered,
+  type PlatformFrame,
   type LangyCredentialSession,
   type LangyEgressAllowlist,
   type LangyEventCursor,
@@ -49,8 +61,11 @@ import {
   RedisLangyLocalControlRuntimeRepository,
   type LocalControlRuntime,
 } from "../repositories/redis/redis.langy-local-control-runtime.repository.ts";
+import { readSessionKeyCredential } from "../rules/langy-local-control-connect.rules.ts";
 import { LangyInternalService } from "../services/langy-internal.service.ts";
+import { LocalControlLongPollService } from "../services/langy-local-control-long-poll.service.ts";
 import { LangyLocalControlTerminalService } from "../services/langy-local-control-terminal.service.ts";
+import { LocalControlSessionCoreService } from "../services/langy-local-session.service.ts";
 import { LangyLocalWorkerService } from "../services/langy-local-worker.service.ts";
 import { LangyLocalWorkspaceService } from "../services/langy-local-workspace.service.ts";
 import { EventingLangyMaintenanceAdapter } from "../services/langy-maintenance.service.ts";
@@ -106,6 +121,9 @@ type LangyAppDependencies = {
   localControl: LangyLocalControl;
   localWorker: LangyLocalWorkerService;
   localControlTerminal: LangyLocalControlTerminalService;
+  /** This process's long-poll shares, over the one session core. */
+  longPoll: LocalControlLongPollService;
+  sessionKeyDoor: RestIdentity;
 };
 
 /** The local-control runtime, its durable commands, its peer reads and this origin. */
@@ -222,12 +240,38 @@ export class LangyApp implements LangyApiContract {
       actors: setup.members.prisma,
       projects: setup.dependencies.projects,
     });
+    const buffer = setup.repositories.tokenBuffer.open({ redis: setup.members.redis });
     const runtime = RedisLangyLocalControlRuntimeRepository.create({
       store: setup.repositories.sessionState,
       projects: workspace,
       mintSessionKey: (input) => sessionKeys.mintForUser(input),
       events: commands,
-      buffer: setup.repositories.tokenBuffer.open({ redis: setup.members.redis }),
+      buffer,
+    });
+    const longPoll = LocalControlLongPollService.create({
+      core: LocalControlSessionCoreService.create({
+        apiKeys: setup.dependencies.apiKeys,
+        readCredential: readSessionKeyCredential,
+        actors: setup.members.prisma,
+        baseHost: setup.members.publicBaseUrl,
+        store: runtime.store,
+        presence: runtime.presence,
+        dispatcher: runtime.dispatcher,
+        waits: runtime.waits,
+        requests: runtime.requests,
+        turns: LocalControlSessionCoreService.turnStarter({
+          actors: setup.members.prisma,
+          turns: langy,
+        }),
+        conversations: langy,
+        events: commands,
+        buffer,
+        skipGate: (gate) => workspace.canSkipPermissions(gate),
+      }),
+    });
+    const sessionKeyDoor = SessionKeyIdentity.create({
+      instanceTokenHeader: INSTANCE_TOKEN_HEADER,
+      verify: (presented) => longPoll.verifySessionKey(presented),
     });
     return new LangyApp({
       langy,
@@ -262,6 +306,8 @@ export class LangyApp implements LangyApiContract {
         permissions: setup.dependencies.authz,
         baseHost: setup.members.publicBaseUrl,
       }),
+      longPoll,
+      sessionKeyDoor,
     });
   }
 
@@ -283,6 +329,11 @@ export class LangyApp implements LangyApiContract {
 
   get internalDoor(): RestIdentity {
     return this.dependencies.internalDoor;
+  }
+
+  /** The door the long-poll register authenticates its minted session key at (§8). */
+  get sessionKeyDoor(): RestIdentity {
+    return this.dependencies.sessionKeyDoor;
   }
 
   readonly #internal: LangyInternalService;
@@ -388,6 +439,22 @@ export class LangyApp implements LangyApiContract {
   }
 
   /** What the local doors reach beyond `LangyApi`. */
+  verifyLocalControlSessionKey(presented: SessionKeyPresented): Promise<SessionKeyHolder> {
+    return this.dependencies.longPoll.verifySessionKey(presented);
+  }
+
+  registerLocalControlSession(input: LangyControlRegisterInput): Promise<LangyControlRegistered> {
+    return this.dependencies.longPoll.register(input);
+  }
+
+  pollLocalControlSession(input: LangyControlPollInput): Promise<{ frames: PlatformFrame[] }> {
+    return this.dependencies.longPoll.poll(input);
+  }
+
+  postLocalControlFrames(input: LangyControlFramesInput): Promise<{ accepted: number }> {
+    return this.dependencies.longPoll.frames(input);
+  }
+
   get localControl(): LangyLocalControl {
     return this.dependencies.localControl;
   }
