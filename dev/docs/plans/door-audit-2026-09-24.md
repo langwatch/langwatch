@@ -46,3 +46,8 @@ against the installed module class at `.withTransports(...)`, so a missing opera
   authz's denial), never hand-rolled; (2) project-API-key callers are refused — the process's browser door
   (`process-server` api-surface `#browserDoor`) checks cookies only, main accepted a key or a session (framework fix);
   (3) `GET/HEAD /api/files/:projectId/:id/:filename` (named download) is missing from the declaration.
+- project: create / regenerateApiKey / field protections being fixed (fix-project-doors-A/B). Gap found: nothing mints the
+  Langy virtual key on this branch — the installed langy composition rejects `virtualKeys.provision` with
+  `LangyNotEnabledError` (langy-composition.build.ts:156), so best-effort provisioning always logs and returns. Port main's mint.
+- project fixed (5e97e22eec). Separate finding while checking boot: `apps/worker` installation test asserts the job list
+  includes `trace_processing` and it does not (worker boots; the job is missing from the list).
