@@ -5,9 +5,8 @@
  */
 
 import { createServer, type Server } from "node:http";
-import type { AddressInfo } from "node:net";
 
-import type { UpgradeHandler } from "@langwatch/api";
+import { WebSocketHost } from "@langwatch/api";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -15,6 +14,7 @@ import {
   LangyTurnInProgressError,
   LOCAL_CONTROL_PROTOCOL_VERSION,
 } from "@langwatch/langy-contract";
+import type { LangyApi } from "@langwatch/langy-contract";
 import {
   type RedisConnection,
   RedisConnectionService,
@@ -31,9 +31,13 @@ import {
   type LocalControlRuntime,
 } from "../../repositories/redis/redis.langy-local-control-runtime.repository.ts";
 import { presenceKey } from "../../rules/langy-local-control-keys.rules.ts";
+import { LocalControlConnectionService } from "../../services/langy-local-control-connection.service.ts";
 import { LocalControlLongPollService } from "../../services/langy-local-control-long-poll.service.ts";
 import { LocalControlSessionCoreService } from "../../services/langy-local-session.service.ts";
-import { CONTROL_CONNECT_PATH, LocalControlGateway } from "../langy-local-control.ws.ts";
+import {
+  CONTROL_CONNECT_PATH,
+  createLangyLocalControlWebSocketProtocol,
+} from "../langy-local-control.ws.ts";
 
 function frameText(raw: WebSocket.RawData): string {
   if (Array.isArray(raw)) return Buffer.concat(raw).toString("utf8");
@@ -85,7 +89,8 @@ let skipAllowed = false;
 type Pod = {
   runtime: LocalControlRuntime;
   core: LocalControlSessionCoreService;
-  gateway: LocalControlGateway;
+  gateway: LocalControlConnectionService;
+  sockets: WebSocketHost;
   longPoll: LocalControlLongPollService;
   server: Server;
   url: string;
@@ -132,25 +137,6 @@ const apiKeys = createApiFixture<ApiKeyApi>({
     };
   },
 });
-
-/** One `upgrade` listener per pod, the same shape the process router has. */
-function upgradeRouterFor(server: Server) {
-  const handlers = new Map<string, UpgradeHandler>();
-  server.on("upgrade", (request, socket, head) => {
-    const pathname = new URL(request.url ?? "/", "http://local").pathname;
-    const handler = handlers.get(pathname);
-    if (!handler) {
-      socket.destroy();
-      return;
-    }
-    handler(request, socket as never, head);
-  });
-  return {
-    register(pathname: string, handler: UpgradeHandler) {
-      handlers.set(pathname, handler);
-    },
-  };
-}
 
 function testPorts(store: SessionStateStore) {
   const runtime = RedisLangyLocalControlRuntimeRepository.create({
@@ -254,24 +240,33 @@ async function startPod(): Promise<Pod> {
     response.statusCode = 404;
     response.end();
   });
-  const router = upgradeRouterFor(server);
-  const gateway = new LocalControlGateway({
+  const gateway = LocalControlConnectionService.create({
     core,
     pingIntervalMs: 200,
     pongWaitMs: 150,
   });
-  gateway.mount(router);
+  const sockets = WebSocketHost.create();
+  sockets.mount(createLangyLocalControlWebSocketProtocol(), () =>
+    createApiFixture<LangyApi>({
+      acceptLocalControlConnection: (connection, credentials) =>
+        gateway.accept(connection, credentials),
+    }),
+  );
+  server.on("upgrade", (request, socket, head) => sockets.upgrade(request, socket, head));
   const longPoll = LocalControlLongPollService.create({
     core,
     holdMs: 300,
     pollIntervalMs: 25,
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const { port } = server.address() as AddressInfo;
+  const address = server.address();
+  if (address === null || typeof address === "string") throw new Error("no port bound");
+  const { port } = address;
   return {
     runtime,
     core,
     gateway,
+    sockets,
     longPoll,
     server,
     url: `ws://127.0.0.1:${port}`,
@@ -280,6 +275,7 @@ async function startPod(): Promise<Pod> {
 
 async function stopPod(pod: Pod): Promise<void> {
   await pod.gateway.close();
+  await pod.sockets.close();
   await pod.longPoll.close();
   await pod.runtime.store.close();
   await new Promise<void>((resolve) => pod.server.close(() => resolve()));

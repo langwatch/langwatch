@@ -296,3 +296,66 @@ describe("given a feature whose server declares transports", () => {
     });
   });
 });
+
+function readsCatalogue(value: unknown): value is CatalogueApi {
+  return (
+    typeof value === "object" && value !== null && typeof Reflect.get(value, "read") === "function"
+  );
+}
+
+/** One declared socket, standing in for a `WebSocketProtocol`. */
+const catalogueSocket = {
+  protocol: "websocket",
+  router: () => ({ path: "/api/v1/dataset/connect" }),
+} as const;
+
+describe("given a feature whose server declares a socket", () => {
+  const server = defineServerModule("dataset")
+    .withApp(CatalogueApp)
+    .withTransports(catalogueRest, catalogueSocket);
+
+  describe("when the api process opened an upgrade router", () => {
+    /** @scenario "A declared socket mounts on the api process's upgrade router" */
+    it("mounts the socket on it, bound to the feature's own app", async () => {
+      const sockets: { declaration: object; app: unknown }[] = [];
+
+      await createApp({ role: "api", members: memberSourceOf({}) })
+        .withTransports({
+          rest: recordingRestHost(),
+          websocket: { mount: (declaration, app) => sockets.push({ declaration, app: app() }) },
+        })
+        .withModules([server])
+        .boot();
+
+      expect(sockets).toHaveLength(1);
+      expect(sockets[0]?.declaration).toEqual({ path: "/api/v1/dataset/connect" });
+      const app = sockets[0]?.app;
+      if (!readsCatalogue(app)) throw new Error("the socket was bound to no catalogue app");
+      expect(app.read()).toBe("one dataset");
+    });
+  });
+
+  describe("when the api process opened no upgrade router", () => {
+    /** @scenario "An api process without an upgrade router refuses a declared socket by name" */
+    it("refuses boot, naming the feature and the protocol", async () => {
+      const boot = createApp({ role: "api", members: memberSourceOf({}) })
+        .withTransports({ rest: recordingRestHost() })
+        .withModules([server])
+        .boot();
+
+      await expect(boot).rejects.toThrow(MissingTransportHostError);
+      await expect(boot).rejects.toThrow(/"dataset" declares a WebSocket transport/);
+    });
+  });
+
+  describe("when the worker boots the same feature", () => {
+    /** @scenario "The worker never mounts a declared socket" */
+    it("opens no door and mounts nothing, so the socket is never refused", async () => {
+      const runtime = await createApp({ role: "worker", members: memberSourceOf({}) })
+        .withModules([server])
+        .boot();
+
+      expect(runtime.transports.rest).toHaveLength(0);
+    });
+  });
+});

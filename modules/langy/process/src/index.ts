@@ -269,6 +269,5 @@ export { langyLocalControlRest } from "./transport/langy-local-control.rest.ts";
 export { langyLocalControlConnectRest } from "./transport/langy-local-control-connect.rest.ts";
 export {
   CONTROL_CONNECT_PATH,
-  LocalControlGateway,
-  type ControlGatewayOptions,
+  createLangyLocalControlWebSocketProtocol,
 } from "./transport/langy-local-control.ws.ts";

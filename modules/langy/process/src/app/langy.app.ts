@@ -1,4 +1,5 @@
 import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
+import type { ProtocolConnection } from "@langwatch/api";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   BearerIdentity,
@@ -44,6 +45,7 @@ import {
   type LangyServerConfig,
   type LangyUsageCount,
   type LangyRelayConnection,
+  type LocalControlConnectCredentials,
   type RelayTally,
 } from "@langwatch/langy-contract";
 import type * as langyContractModule from "@langwatch/langy-contract";
@@ -63,6 +65,7 @@ import {
 } from "../repositories/redis/redis.langy-local-control-runtime.repository.ts";
 import { readSessionKeyCredential } from "../rules/langy-local-control-connect.rules.ts";
 import { LangyInternalService } from "../services/langy-internal.service.ts";
+import { LocalControlConnectionService } from "../services/langy-local-control-connection.service.ts";
 import { LocalControlLongPollService } from "../services/langy-local-control-long-poll.service.ts";
 import { LangyLocalControlTerminalService } from "../services/langy-local-control-terminal.service.ts";
 import { LocalControlSessionCoreService } from "../services/langy-local-session.service.ts";
@@ -123,6 +126,7 @@ type LangyAppDependencies = {
   localControlTerminal: LangyLocalControlTerminalService;
   /** This process's long-poll shares, over the one session core. */
   longPoll: LocalControlLongPollService;
+  sockets: LocalControlConnectionService;
   sessionKeyDoor: RestIdentity;
 };
 
@@ -248,31 +252,32 @@ export class LangyApp implements LangyApiContract {
       events: commands,
       buffer,
     });
-    const longPoll = LocalControlLongPollService.create({
-      core: LocalControlSessionCoreService.create({
-        apiKeys: setup.dependencies.apiKeys,
-        readCredential: readSessionKeyCredential,
+    const core = LocalControlSessionCoreService.create({
+      apiKeys: setup.dependencies.apiKeys,
+      readCredential: readSessionKeyCredential,
+      actors: setup.members.prisma,
+      baseHost: setup.members.publicBaseUrl,
+      store: runtime.store,
+      presence: runtime.presence,
+      dispatcher: runtime.dispatcher,
+      waits: runtime.waits,
+      requests: runtime.requests,
+      turns: LocalControlSessionCoreService.turnStarter({
         actors: setup.members.prisma,
-        baseHost: setup.members.publicBaseUrl,
-        store: runtime.store,
-        presence: runtime.presence,
-        dispatcher: runtime.dispatcher,
-        waits: runtime.waits,
-        requests: runtime.requests,
-        turns: LocalControlSessionCoreService.turnStarter({
-          actors: setup.members.prisma,
-          turns: langy,
-        }),
-        conversations: langy,
-        events: commands,
-        buffer,
-        skipGate: (gate) => workspace.canSkipPermissions(gate),
+        turns: langy,
       }),
+      conversations: langy,
+      events: commands,
+      buffer,
+      skipGate: (gate) => workspace.canSkipPermissions(gate),
     });
+    const longPoll = LocalControlLongPollService.create({ core });
+    const sockets = LocalControlConnectionService.create({ core });
     setup.resources.own("Langy local-control session state", () =>
       setup.repositories.sessionState.close(),
     );
     setup.resources.own("Langy local-control long-poll sessions", () => longPoll.close());
+    setup.resources.own("Langy local-control sockets", () => sockets.close());
     const sessionKeyDoor = SessionKeyIdentity.create({
       instanceTokenHeader: INSTANCE_TOKEN_HEADER,
       verify: (presented) => longPoll.verifySessionKey(presented),
@@ -311,6 +316,7 @@ export class LangyApp implements LangyApiContract {
         baseHost: setup.members.publicBaseUrl,
       }),
       longPoll,
+      sockets,
       sessionKeyDoor,
     });
   }
@@ -457,6 +463,13 @@ export class LangyApp implements LangyApiContract {
 
   postLocalControlFrames(input: LangyControlFramesInput): Promise<{ accepted: number }> {
     return this.dependencies.longPoll.frames(input);
+  }
+
+  acceptLocalControlConnection(
+    connection: ProtocolConnection,
+    credentials: LocalControlConnectCredentials,
+  ): Promise<void> {
+    return this.dependencies.sockets.accept(connection, credentials);
   }
 
   get localControl(): LangyLocalControl {

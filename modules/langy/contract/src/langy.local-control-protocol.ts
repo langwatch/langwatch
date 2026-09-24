@@ -384,3 +384,10 @@ export const platformFrameSchema = z.discriminatedUnion("type", [
   disconnectFrameSchema,
 ]);
 export type PlatformFrame = z.infer<typeof platformFrameSchema>;
+
+/** What the local-control socket reads off its upgrade: the session key and its project. */
+export const localControlConnectCredentialsSchema = z.object({
+  authorization: z.string().optional(),
+  projectId: z.string().optional(),
+});
+export type LocalControlConnectCredentials = z.infer<typeof localControlConnectCredentialsSchema>;

@@ -4,6 +4,7 @@
  * `@langwatch/eventing` and the Prisma/ioredis/ClickHouse graph off this package.
  */
 import type { ServerRole } from "./feature-installer.ts";
+import type { ResourceOwnership } from "./resource-scope.ts";
 
 /**
  * Whether this process only sends on a pipeline, or also drains it. The api
@@ -33,6 +34,8 @@ export interface FeatureEventingSetup<Repositories, App, ProcessStore> {
   readonly processStore: ProcessStore;
   /** Earlier events of this pipeline's own aggregate; absent only in a hand-built test setup. */
   readonly priorEvents?: PriorEventsRead;
+  /** The module's resource owner: what a consumer builds, it drains on shutdown here. */
+  readonly resources?: Pick<ResourceOwnership, "own">;
 }
 
 /** One aggregate of the reading pipeline's own type; `accepts` keeps the events it declared. */

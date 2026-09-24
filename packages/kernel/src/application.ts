@@ -49,7 +49,7 @@ import {
   type AnyRepositoryRegistry,
   type RepositorySelection,
 } from "./repository-registry.ts";
-import { ResourceScope } from "./resource-scope.ts";
+import { type ResourceOwnership, ResourceScope } from "./resource-scope.ts";
 import { RuntimeLifecycle, cleanupAfterFailure, type RuntimeService } from "./runtime-lifecycle.ts";
 import { SupplyToken } from "./supply-token.ts";
 import type { Tier } from "./tiers.ts";
@@ -447,7 +447,7 @@ export class ApplicationBuilder<
           ? { ...state, provided: apis.reference(declaration.apiContract) }
           : state;
         installed.set(declaration.name, installedState);
-        installModuleEventing(declaration, state, eventing);
+        installModuleEventing({ declaration, state, eventing, resources });
         declared.push(...declaredTransportsOf(declaration, installedState));
       }
       installEventingMaintenance(eventing);
@@ -458,7 +458,7 @@ export class ApplicationBuilder<
       if (role === "api") {
         // Now: all Apps exist, nothing serves yet. Only moment doors can be built.
         const hosts = this.openDoors((token) => provided.get(token));
-        if (hosts.rest !== void 0 || hosts.trpc !== void 0) {
+        if (hosts.rest !== void 0 || hosts.trpc !== void 0 || hosts.websocket !== void 0) {
           transports = mountDeclaredTransports({ declared, hosts });
         }
         // A bundle-only API still serves even when neither protocol has declarations.
@@ -641,11 +641,17 @@ function claimedBy(declaration: DeclaredFeature): readonly string[] {
 }
 
 /** Install module's eventing pipeline if runtime exists. */
-function installModuleEventing(
-  declaration: DeclaredFeature,
-  state: InstalledFeatureState,
-  eventing: EventingHost | undefined,
-): void {
+function installModuleEventing({
+  declaration,
+  state,
+  eventing,
+  resources,
+}: {
+  declaration: DeclaredFeature;
+  state: InstalledFeatureState;
+  eventing: EventingHost | undefined;
+  resources: ResourceOwnership;
+}): void {
   const module = declaration.eventing;
   if (!module || !eventing) return;
   const definition = buildModuleEventing({
@@ -655,6 +661,7 @@ function installModuleEventing(
       repositories: state.repositories,
       app: state.provided,
       processStore: eventing.processStore,
+      resources,
     },
     log: () => eventing.eventStore,
   });

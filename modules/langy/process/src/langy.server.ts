@@ -26,6 +26,7 @@ import {
 import { langyInternalRest } from "./transport/langy-internal.rest.ts";
 import { langyLocalControlConnectRest } from "./transport/langy-local-control-connect.rest.ts";
 import { langyLocalControlRest } from "./transport/langy-local-control.rest.ts";
+import { createLangyLocalControlWebSocketProtocol } from "./transport/langy-local-control.ws.ts";
 import { langyLocalRest } from "./transport/langy-local.rest.ts";
 import { langyTurnsMembers, langyTurnsRest } from "./transport/langy-turns.rest.ts";
 import { setupSkillsTrpcTransport } from "./transport/setup-skills.trpc.ts";
@@ -92,6 +93,7 @@ export const langyServer = defineServerModule("langy")
     langyLocalRest,
     langyLocalControlRest,
     langyLocalControlConnectRest,
+    createLangyLocalControlWebSocketProtocol(),
     setupSkillsTrpcTransport,
   )
   .withTransportFacts(({ app, members }) => {

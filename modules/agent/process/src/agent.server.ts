@@ -4,6 +4,7 @@ import { defineServerModule } from "@langwatch/kernel";
 import { AgentApp } from "#app/agent.app";
 import { agentRepositories } from "#repositories/agent-repositories.registry";
 import { agentConnectHeaders, createAgentConnectRest } from "#transport/agent-connect.rest";
+import { createAgentWebSocketProtocol } from "#transport/agent-connect.ws";
 import { agentLegacyRest } from "#transport/agent-legacy.rest";
 import { agentTraceparent, createAgentRest } from "#transport/agent.rest";
 import { agentTrpcTransport } from "#transport/agent.trpc";
@@ -15,6 +16,7 @@ export const agentServer = defineServerModule("agent")
   .withTransports(
     createAgentRest(),
     createAgentConnectRest(),
+    createAgentWebSocketProtocol(),
     agentLegacyRest,
     agentTrpcTransport,
     httpProxyTrpcTransport,

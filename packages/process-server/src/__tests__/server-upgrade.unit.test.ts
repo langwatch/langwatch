@@ -45,6 +45,7 @@ function upgradeStatus(server: Server, path: string): Promise<number | undefined
 
 describe("Server upgrades", () => {
   describe("given no upgrade router was contributed", () => {
+    /** @scenario "An upgrade with no upgrade router is answered 404" */
     it("answers every upgrade 404", async () => {
       const server = startServer();
       await server.listen();
@@ -54,6 +55,7 @@ describe("Server upgrades", () => {
   });
 
   describe("given an upgrade router was contributed", () => {
+    /** @scenario "The upgrade router receives every upgrade and closes before the door" */
     it("hands it the upgrade, and closes it before the door at shutdown", async () => {
       const seen: string[] = [];
       const close = vi.fn(async () => {});
@@ -76,10 +78,45 @@ describe("Server upgrades", () => {
       expect(close).toHaveBeenCalledOnce();
     });
 
+    /** @scenario "A second upgrade router is refused" */
     it("refuses a second router", () => {
       const door = { upgrade: () => {}, close: async () => {} };
 
       expect(() => startServer().with(door).with(door)).toThrow(/already has an upgrade router/);
+    });
+  });
+
+  describe("given the server is draining", () => {
+    /** @scenario "A draining server answers an upgrade 503" */
+    it("refuses a new upgrade by status while the door still answers", async () => {
+      let release = () => {};
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let reached = () => {};
+      const draining = new Promise<void>((resolve) => {
+        reached = resolve;
+      });
+      const upgrade = vi.fn();
+      const server = startServer()
+        .with({ upgrade, close: async () => {} })
+        .with({
+          name: "held drain",
+          stop: () => {
+            reached();
+            return held;
+          },
+        });
+      await server.listen();
+
+      const closing = server.close();
+      await draining;
+      const status = await upgradeStatus(server, "/api/v1/agents/connect");
+      release();
+      await closing;
+
+      expect(status).toBe(503);
+      expect(upgrade).not.toHaveBeenCalled();
     });
   });
 });

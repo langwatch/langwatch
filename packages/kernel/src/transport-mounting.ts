@@ -45,10 +45,16 @@ export interface FeatureTrpcHost<Mounted> {
   ): Mounted;
 }
 
+/** A process's upgrade router, as the installer calls it. */
+export interface FeatureWebSocketHost {
+  mount(declaration: MountableTransport, app: () => unknown): void;
+}
+
 /** The doors one process opens, named by protocol. */
 export type FeatureTransportHosts<Rest, Trpc> = Readonly<{
   rest?: FeatureRestHost<Rest> | undefined;
   trpc?: FeatureTrpcHost<Trpc> | undefined;
+  websocket?: FeatureWebSocketHost | undefined;
 }>;
 
 /** Whatever the process's doors made of one feature's declared transports. */
@@ -115,6 +121,10 @@ export function mountDeclaredTransports<Rest, Trpc>({
 
   for (const entry of declared) {
     for (const descriptor of entry.transports) {
+      if (descriptor.protocol === "websocket") {
+        mountSocket(entry, descriptor, hosts.websocket);
+        continue;
+      }
       if (descriptor.protocol === "rest") {
         rest.push(mountRest(entry, descriptor, hosts.rest));
         continue;
@@ -133,6 +143,16 @@ export function mountDeclaredTransports<Rest, Trpc>({
   }
 
   return { rest, trpc };
+}
+
+/** One socket on the process's upgrade router, bound to the feature's app. */
+function mountSocket(
+  entry: DeclaredTransports,
+  descriptor: FeatureTransportDescriptor,
+  host: FeatureWebSocketHost | undefined,
+): void {
+  if (!host) throw new MissingTransportHostError(entry.feature, "WebSocket");
+  host.mount(descriptor.router(), entry.provided);
 }
 
 /** One REST family on the process's own door, with the family's own options. */

@@ -1,3 +1,4 @@
+import type { ProtocolConnection } from "@langwatch/api";
 import type { RequestActor, SessionKeyHolder, SessionKeyPresented } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import type { z } from "zod";
@@ -31,7 +32,12 @@ import type {
   StartWaitResponse,
   WorkspaceStatus,
 } from "./langy.local-control-http.ts";
-import type { CliFrame, PlatformFrame, RegisterFrame } from "./langy.local-control-protocol.ts";
+import type {
+  CliFrame,
+  LocalControlConnectCredentials,
+  PlatformFrame,
+  RegisterFrame,
+} from "./langy.local-control-protocol.ts";
 import type { LangyCredentialSession, LangyEgressAllowlist, LangyStopTurnInput } from "./langy.ts";
 
 /**
@@ -268,6 +274,11 @@ export interface LangyApi {
   pollLocalControlSession(input: LangyControlPollInput): Promise<{ frames: PlatformFrame[] }>;
   /** Takes the folder's frames; an unknown instance token throws not found. */
   postLocalControlFrames(input: LangyControlFramesInput): Promise<{ accepted: number }>;
+  /** Holds one folder's socket from its register frame until it closes; refusals are frames. */
+  acceptLocalControlConnection(
+    connection: ProtocolConnection,
+    credentials: LocalControlConnectCredentials,
+  ): Promise<void>;
 }
 
 export const LangyApi = moduleApi<LangyApi>()("langy");

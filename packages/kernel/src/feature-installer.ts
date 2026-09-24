@@ -128,7 +128,7 @@ export type ModuleTransportFacts<Dependencies extends TokenMap, Members, App> = 
 
 /** An inert API descriptor retained for the process root to mount later. */
 export type FeatureTransportDescriptor = Readonly<{
-  readonly protocol: "rest" | "trpc";
+  readonly protocol: "rest" | "trpc" | "websocket";
   /** The family's path segment, or the tRPC namespace the record keys it by. */
   readonly namespace?: string;
   readonly router: (...args: never[]) => object;

@@ -78,6 +78,7 @@ describe("WebSocketHost", () => {
   });
 
   describe("when an upgrade names a mounted protocol's path", () => {
+    /** @scenario "An upgrade to a mounted protocol's path reaches that protocol" */
     it("reaches that protocol with its own app and declared facts", async () => {
       await expect(firstMessage(`ws://127.0.0.1:${port}/api/v1/agents/connect`)).resolves.toEqual({
         app: "agent",
@@ -90,12 +91,14 @@ describe("WebSocketHost", () => {
   });
 
   describe("when an upgrade names a path no protocol mounted", () => {
+    /** @scenario "An upgrade to a path no protocol mounted is answered 404" */
     it("answers 404 instead of holding the socket open", async () => {
       await expect(upgradeStatus(port, "/api/v1/unknown/connect")).resolves.toBe(404);
     });
   });
 
   describe("when two protocols declare one path", () => {
+    /** @scenario "Two protocols on one path are refused" */
     it("refuses the second mount by path", () => {
       const other = WebSocketHost.create();
       other.mount(echoProtocol("/same"), () => ({ name: "first" }));

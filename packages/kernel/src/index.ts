@@ -14,6 +14,7 @@ export {
   type FeatureTransportHosts,
   type FeatureTrpcHost,
   type FeatureTrpcMountOptions,
+  type FeatureWebSocketHost,
   type MountableTransport,
   type MountedTransports,
   type TransportFactBinding,
