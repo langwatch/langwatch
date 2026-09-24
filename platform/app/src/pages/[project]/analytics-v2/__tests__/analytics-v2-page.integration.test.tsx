@@ -35,6 +35,7 @@ const state = vi.hoisted(() => ({
   lwqlEnabled: true,
   lwqlIsError: false,
   organization: { id: "org_1" } as { id: string } | undefined,
+  workspaceError: undefined as unknown,
   refetch: vi.fn(),
 }));
 
@@ -46,6 +47,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "acme" },
     organization: state.organization,
+    workspaceError: state.workspaceError,
   }),
 }));
 
@@ -100,6 +102,7 @@ describe("the Analytics v2 page", () => {
     state.lwqlEnabled = true;
     state.lwqlIsError = false;
     state.organization = { id: "org_1" };
+    state.workspaceError = undefined;
     state.refetch.mockClear();
   });
   afterEach(cleanup);
@@ -210,6 +213,28 @@ describe("the Analytics v2 page", () => {
 
       fireEvent.click(screen.getByText("Try again"));
       expect(state.refetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the workspace read is refused", () => {
+    /** @scenario "A refused workspace read shows an error with a retry, not a spinner" */
+    it("renders the workspace error with a Try again control and no spinner, message or widget card", async () => {
+      state.workspaceError = new Error("FORBIDDEN");
+      state.organization = undefined;
+      const { default: AnalyticsV2Page } = await import("../index");
+      render(<AnalyticsV2Page />, { wrapper: Wrapper });
+
+      expect(
+        screen.getByTestId("analytics-v2-workspace-error"),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("analytics-v2-loading"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("analytics-v2-lwql-disabled"),
+      ).not.toBeInTheDocument();
+      expect(screen.queryAllByTestId(/^analytics-v2-widget-/)).toHaveLength(0);
+      expect(screen.getByText("Try again")).toBeInTheDocument();
     });
   });
 });

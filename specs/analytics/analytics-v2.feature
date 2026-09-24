@@ -85,6 +85,13 @@ Feature: Analytics v2 page on dashboard widgets over LangWatchQL
     And a Try again control re-runs the flag check
     And the page never claims LangWatchQL is disabled
 
+  @integration
+  Scenario: A refused workspace read shows an error with a retry, not a spinner
+    Given a member opens /[project]/analytics-v2
+    When the workspace read is refused
+    Then the page shows the workspace error state with a Try again control
+    And neither the loading spinner, the disabled message nor any widget card is rendered
+
   @unit
   Scenario: Reverting the change needs no data migration
     Given the change is reverted
@@ -110,5 +117,6 @@ Feature: Analytics v2 page on dashboard widgets over LangWatchQL
   # AC9  (LangWatchQL-disabled project message)               -> A project without LangWatchQL sees one clear message
   # AC9  (supporting)                                         -> The page waits while the organization is still resolving
   # AC9  (supporting)                                         -> A failed LangWatchQL flag check offers a retry
+  # AC9  (supporting)                                         -> A refused workspace read shows an error with a retry, not a spinner
   # AC10 (rollback needs no data migration)                   -> Reverting the change needs no data migration
   # AC11 (query API only, no legacy analytics router reads)   -> Every chart reads its data through the LangWatchQL query API only
