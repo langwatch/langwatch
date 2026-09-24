@@ -12,6 +12,8 @@ import type {
   SsoMigrationAccountLinkDecision,
   SsoMigrationCallbackApi,
 } from "@langwatch/identity-contract";
+import { OrganizationNotFoundError } from "@langwatch/organization-contract";
+import { UserNotFoundError } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
@@ -40,8 +42,13 @@ const WORKER: BetterAuthHookUser = {
 
 function repoFor(user: Partial<BetterAuthHookUser> | null = {}): BetterAuthHooksRepository {
   return createApiFixture<BetterAuthHooksRepository>({
-    tryFindUserForHooks: async () => (user === null ? null : { ...WORKER, ...user }),
-    tryFindOrganizationBySsoDomain: async () => null,
+    getUserForHooks: async ({ userId }) => {
+      if (user === null) throw new UserNotFoundError(userId);
+      return { ...WORKER, ...user };
+    },
+    getOrganizationBySsoDomain: async () => {
+      throw new OrganizationNotFoundError();
+    },
     findFederatedAccountsForUser: async () => [],
   });
 }

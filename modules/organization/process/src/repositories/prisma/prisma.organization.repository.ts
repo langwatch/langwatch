@@ -9,6 +9,7 @@ import {
   OrganizationHasNoTeamError,
   OrganizationNotFoundError,
   PersonalProjectNotFoundError,
+  TeamNotFoundError,
   type OrganizationBillingProfile,
   type UpdateOrganizationSettingsInput,
   type PersonalFeatures,
@@ -243,11 +244,13 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     return updated > 0;
   }
 
-  tryFindPersonalWorkspace(input: {
+  async getPersonalWorkspace(input: {
     userId: string;
     organizationId: string;
-  }): Promise<PersonalWorkspace | null> {
-    return this.tryFindWorkspace(this.database, input);
+  }): Promise<PersonalWorkspace> {
+    const workspace = await this.tryFindWorkspace(this.database, input);
+    if (!workspace) throw new TeamNotFoundError();
+    return workspace;
   }
 
   async ensurePersonalWorkspace(input: {

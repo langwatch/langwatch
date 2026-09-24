@@ -14,12 +14,14 @@ import type {
   AuthzRevokeBindingsWhereOutput,
 } from "@langwatch/authz-contract";
 import type { PlanProvider, Plan } from "@langwatch/entitlement-contract";
-import type {
-  Organization,
-  OrganizationInvite,
-  OrganizationUser,
-  OrganizationUserRole,
-  RoleBindingScopeType,
+import {
+  InviteNotFoundError,
+  OrganizationNotFoundError,
+  type Organization,
+  type OrganizationInvite,
+  type OrganizationUser,
+  type OrganizationUserRole,
+  type RoleBindingScopeType,
 } from "@langwatch/organization-contract";
 import type { RoleApi } from "@langwatch/role-contract";
 
@@ -255,14 +257,11 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
     this.memberships.add(`${userId}:${organizationId}`);
   }
 
-  async tryFindInviteStatus({
-    inviteId,
-  }: {
-    inviteId: string;
-  }): Promise<{ status: string } | null> {
+  async getInviteStatus({ inviteId }: { inviteId: string }): Promise<{ status: string }> {
     const invite = this.invitesById.get(inviteId);
+    if (!invite) throw new InviteNotFoundError();
 
-    return invite ? { status: invite.status } : null;
+    return { status: invite.status };
   }
 
   async hasMembership({
@@ -275,12 +274,11 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
     return this.memberships.has(`${userId}:${organizationId}`);
   }
 
-  async tryFindOrganization({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<Organization | null> {
-    return this.organizations.get(organizationId) ?? null;
+  async getOrganization({ organizationId }: { organizationId: string }): Promise<Organization> {
+    const organization = this.organizations.get(organizationId);
+    if (!organization) throw new OrganizationNotFoundError();
+
+    return organization;
   }
 
   async createPendingInvite(input: WriteInviteInput): Promise<OrganizationInvite> {
@@ -370,38 +368,36 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
     return updated;
   }
 
-  async tryFindInviteByCodeWithOrganization({
+  async getInviteByCodeWithOrganization({
     inviteCode,
   }: {
     inviteCode: string;
-  }): Promise<InviteWithOrganization | null> {
+  }): Promise<InviteWithOrganization> {
     const invite = Array.from(this.invitesById.values()).find(
       (candidate) => candidate.inviteCode === inviteCode,
     );
+    if (!invite) throw new InviteNotFoundError("Invitation not found");
 
-    return invite
-      ? { ...invite, organization: this.organizations.get(invite.organizationId) ?? null }
-      : null;
+    return { ...invite, organization: this.organizations.get(invite.organizationId) ?? null };
   }
 
   async findAdminEmails({ organizationId }: { organizationId: string }): Promise<string[]> {
     return this.adminEmailsByOrganization.get(organizationId) ?? [];
   }
 
-  tryFindOpenInviteForEmail = unsupported<
-    OrganizationInviteRepository["tryFindOpenInviteForEmail"]
-  >("tryFindOpenInviteForEmail");
-  tryFindMemberEmail =
-    unsupported<OrganizationInviteRepository["tryFindMemberEmail"]>("tryFindMemberEmail");
+  hasOpenInviteForEmail =
+    unsupported<OrganizationInviteRepository["hasOpenInviteForEmail"]>("hasOpenInviteForEmail");
+  findMemberEmails =
+    unsupported<OrganizationInviteRepository["findMemberEmails"]>("findMemberEmails");
   findTeamIdsInOrganization = unsupported<
     OrganizationInviteRepository["findTeamIdsInOrganization"]
   >("findTeamIdsInOrganization");
   findCustomRolePermissions = unsupported<
     OrganizationInviteRepository["findCustomRolePermissions"]
   >("findCustomRolePermissions");
-  tryFindOrganizationWithMembers = unsupported<
-    OrganizationInviteRepository["tryFindOrganizationWithMembers"]
-  >("tryFindOrganizationWithMembers");
+  getOrganizationWithMembers = unsupported<
+    OrganizationInviteRepository["getOrganizationWithMembers"]
+  >("getOrganizationWithMembers");
   findPersonalTeamsInScopes = unsupported<
     OrganizationInviteRepository["findPersonalTeamsInScopes"]
   >("findPersonalTeamsInScopes");
@@ -409,15 +405,17 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
     unsupported<OrganizationInviteRepository["findListableInvites"]>("findListableInvites");
   revokeOpenInvite =
     unsupported<OrganizationInviteRepository["revokeOpenInvite"]>("revokeOpenInvite");
-  async tryFindInviteWithOrganization({
+  async getInviteWithOrganization({
     inviteId,
     organizationId,
   }: {
     inviteId: string;
     organizationId: string;
-  }): Promise<InviteWithOrganization | null> {
+  }): Promise<InviteWithOrganization> {
     const invite = this.invitesById.get(inviteId);
-    if (!invite || invite.organizationId !== organizationId) return null;
+    if (!invite || invite.organizationId !== organizationId) {
+      throw new InviteNotFoundError("Invitation not found");
+    }
 
     return { ...invite, organization: this.organizations.get(invite.organizationId) ?? null };
   }
@@ -442,28 +440,29 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
 
     return 1;
   }
-  tryFindProjectSlugForTeams = unsupported<
-    OrganizationInviteRepository["tryFindProjectSlugForTeams"]
-  >("tryFindProjectSlugForTeams");
-  tryFindProjectSlugInOrganization = unsupported<
-    OrganizationInviteRepository["tryFindProjectSlugInOrganization"]
-  >("tryFindProjectSlugInOrganization");
-  async tryFindPendingInviteForEmail({
+  findProjectSlugsForTeams = unsupported<OrganizationInviteRepository["findProjectSlugsForTeams"]>(
+    "findProjectSlugsForTeams",
+  );
+  findProjectSlugsInOrganization = unsupported<
+    OrganizationInviteRepository["findProjectSlugsInOrganization"]
+  >("findProjectSlugsInOrganization");
+  async getPendingInviteForEmail({
     organizationId,
     email,
   }: {
     organizationId: string;
     email: string;
-  }): Promise<OrganizationInvite | null> {
+  }): Promise<OrganizationInvite> {
     const address = email.trim().toLowerCase();
-    return (
-      Array.from(this.invitesById.values()).find(
-        (invite) =>
-          invite.organizationId === organizationId &&
-          invite.status === "PENDING" &&
-          invite.email.trim().toLowerCase() === address,
-      ) ?? null
+    const pending = Array.from(this.invitesById.values()).find(
+      (invite) =>
+        invite.organizationId === organizationId &&
+        invite.status === "PENDING" &&
+        invite.email.trim().toLowerCase() === address,
     );
+    if (!pending) throw new InviteNotFoundError();
+
+    return pending;
   }
 }
 

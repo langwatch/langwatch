@@ -11,9 +11,7 @@ import { InviteService } from "../invite.service.ts";
 function serviceSeeing(memberEmail: string | null): InviteService {
   const prisma = {
     organizationUser: {
-      findFirst: vi.fn(async () =>
-        memberEmail === null ? null : { user: { email: memberEmail } },
-      ),
+      findMany: vi.fn(async () => (memberEmail === null ? [] : [{ user: { email: memberEmail } }])),
     },
   };
 
@@ -60,7 +58,7 @@ describe("given a batch of addresses to invite", () => {
 
   describe("when there is nothing to check", () => {
     it("does not query at all", async () => {
-      const prisma = { organizationUser: { findFirst: vi.fn() } };
+      const prisma = { organizationUser: { findMany: vi.fn() } };
       const service = InviteService.create({
         invites: PrismaOrganizationInviteRepository.create({ database: prisma as never }),
         seats: { getMemberCount: vi.fn(), getMembersLiteCount: vi.fn() } as never,
@@ -73,7 +71,7 @@ describe("given a batch of addresses to invite", () => {
 
       await service.assertNotAlreadyMembers({ emails: [], organizationId: "org-1" });
 
-      expect(prisma.organizationUser.findFirst).not.toHaveBeenCalled();
+      expect(prisma.organizationUser.findMany).not.toHaveBeenCalled();
     });
   });
 });

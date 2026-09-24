@@ -102,7 +102,7 @@ describe("given a deployment that named no browser-session identity", () => {
     await expect(app.tryVerifyBrowserSession({ headers: new Headers() })).resolves.toBeNull();
     await expect(
       app.resolveSession(new Request("https://app.langwatch.test/api/auth/session")),
-    ).resolves.toBeNull();
+    ).resolves.toEqual({ kind: "anonymous" });
   });
 });
 

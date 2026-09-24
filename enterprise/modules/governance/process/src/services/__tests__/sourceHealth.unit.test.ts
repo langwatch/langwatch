@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { isDayCoveredByPull, noDataSinceNotice } from "@langwatch/enterprise-governance-contract";
+import {
+  isDayCoveredByPull,
+  deriveNoDataSinceNotice,
+} from "@langwatch/enterprise-governance-contract";
 import { Temporal } from "@langwatch/time";
 /**
  * Which days a pull actually reached, and what a source that has never
@@ -92,7 +95,7 @@ describe("given a source whose runs have all stopped before the end", () => {
       // completed a run has no successful run to date a gap from, so a rule
       // that reads only that date drops the one source most likely to be
       // wrong — and the reader is shown nothing at all about it.
-      const notice = noDataSinceNotice({
+      const notice = deriveNoDataSinceNotice({
         status: "active",
         errorCount: 0,
         lastSuccessAt: null,
@@ -111,7 +114,7 @@ describe("given a source whose runs have all stopped before the end", () => {
       // The same source read through the rule that decides whether there is
       // anything to say at all. Null here is what drops it off the screen.
       expect(
-        noDataSinceNotice({
+        deriveNoDataSinceNotice({
           status: "active",
           errorCount: 0,
           lastSuccessAt: null,

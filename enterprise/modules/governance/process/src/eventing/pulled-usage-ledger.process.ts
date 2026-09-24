@@ -15,7 +15,7 @@ import { PulledUsageLedgerIntent, writePulledUsageSchema } from "./pulled-usage-
  * say. An item billed in dollars needs no conversion; anything else can only
  * be stated in dollars by the biller — we never invent a rate it didn't publish.
  */
-function ledgerAmountNanoUsd(record: PulledUsageObservedEventData): number | null {
+function deriveLedgerAmountNanoUsd(record: PulledUsageObservedEventData): number | null {
   if (record.currencyCode === PULLED_USAGE_DEFAULT_CURRENCY_CODE) {
     return record.costNanoMinor;
   }
@@ -45,7 +45,7 @@ export class PulledUsageLedgerProcess {
           this.intent.execute(payload),
         )
         .on(PULLED_USAGE_EVENT_TYPES.OBSERVED, (state, record, context) => {
-          const costNanoUsd = ledgerAmountNanoUsd(record);
+          const costNanoUsd = deriveLedgerAmountNanoUsd(record);
           // The ledger column is nano-DOLLARS; an unconverted foreign-currency
           // item has no honest value for it, so it gets no ledger row — the
           // daily cost rollup is where that money is read instead (ADR-128 §3).

@@ -99,7 +99,7 @@ function accepted(
   app: PlatformHealthCapability,
   authorization: string | null,
 ): PlatformHealthCapability {
-  const accepts = app.acceptsKey(bearerToken(authorization));
+  const accepts = app.acceptsKey(extractBearerToken(authorization));
   if (!accepts) throw new PlatformHealthUnauthorizedError();
 
   return app;
@@ -115,7 +115,7 @@ function answer(report: PlatformHealthReport): PlatformHealthReport {
   return report;
 }
 
-function bearerToken(headerValue: string | null): string | null {
+function extractBearerToken(headerValue: string | null): string | null {
   if (!headerValue) return null;
   const match = /^Bearer\s+(.+)$/i.exec(headerValue.trim());
 

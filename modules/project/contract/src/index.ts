@@ -5,5 +5,4 @@ export * from "./project-rest.schemas.ts";
 export * from "./project.api.ts";
 export * from "./project-trpc.schemas.ts";
 export * from "./project.trpc.ts";
-export * from "./home.trpc.ts";
 export * from "./integrations-checks.trpc.ts";

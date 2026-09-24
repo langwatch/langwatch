@@ -1,3 +1,4 @@
+import { InviteNotFoundError, OrganizationNotFoundError } from "@langwatch/organization-contract";
 import type {
   Organization,
   OrganizationInvite,
@@ -51,36 +52,39 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     );
   }
 
-  tryFindOpenInviteForEmail({
+  async hasOpenInviteForEmail({
     email,
     organizationId,
   }: {
     email: string;
     organizationId: string;
-  }): Promise<OrganizationInvite | null> {
-    return this.prisma.organizationInvite.findFirst({
+  }): Promise<boolean> {
+    const invite = await this.prisma.organizationInvite.findFirst({
       where: {
         email: { equals: email.trim(), mode: "insensitive" },
         organizationId,
         status: { in: ["PENDING", "PAYMENT_PENDING"] },
         OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
       },
+      select: { id: true },
     });
+
+    return invite !== null;
   }
 
-  async tryFindMemberEmail({
+  async findMemberEmails({
     organizationId,
     emails,
   }: {
     organizationId: string;
     emails: string[];
-  }): Promise<string | null> {
-    const existing = await this.prisma.organizationUser.findFirst({
+  }): Promise<string[]> {
+    const members = await this.prisma.organizationUser.findMany({
       where: { organizationId, user: { email: { in: emails, mode: "insensitive" } } },
       select: { user: { select: { email: true } } },
     });
 
-    return existing ? (existing.user.email ?? "") : null;
+    return members.map((member) => member.user.email ?? "");
   }
 
   async findTeamIdsInOrganization({
@@ -109,23 +113,27 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     });
   }
 
-  tryFindOrganization({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<Organization | null> {
-    return this.prisma.organization.findFirst({ where: { id: organizationId } });
+  async getOrganization({ organizationId }: { organizationId: string }): Promise<Organization> {
+    const organization = await this.prisma.organization.findFirst({
+      where: { id: organizationId },
+    });
+    if (organization === null) throw new OrganizationNotFoundError();
+
+    return organization;
   }
 
-  tryFindOrganizationWithMembers({
+  async getOrganizationWithMembers({
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<(Organization & { members: OrganizationUser[] }) | null> {
-    return this.prisma.organization.findFirst({
+  }): Promise<Organization & { members: OrganizationUser[] }> {
+    const organization = await this.prisma.organization.findFirst({
       where: { id: organizationId },
       include: { members: true },
     });
+    if (organization === null) throw new OrganizationNotFoundError();
+
+    return organization;
   }
 
   findPersonalTeamsInScopes({
@@ -206,17 +214,20 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     `;
   }
 
-  tryFindInviteWithOrganization({
+  async getInviteWithOrganization({
     inviteId,
     organizationId,
   }: {
     inviteId: string;
     organizationId: string;
-  }): Promise<InviteWithOrganization | null> {
-    return this.prisma.organizationInvite.findFirst({
+  }): Promise<InviteWithOrganization> {
+    const invite = await this.prisma.organizationInvite.findFirst({
       where: { id: inviteId, organizationId },
       include: { organization: true },
     });
+    if (invite === null) throw new InviteNotFoundError("Invitation not found");
+
+    return invite;
   }
 
   async rotateInviteCode({
@@ -262,15 +273,18 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     return count;
   }
 
-  tryFindInviteByCodeWithOrganization({
+  async getInviteByCodeWithOrganization({
     inviteCode,
   }: {
     inviteCode: string;
-  }): Promise<InviteWithOrganization | null> {
-    return this.prisma.organizationInvite.findUnique({
+  }): Promise<InviteWithOrganization> {
+    const invite = await this.prisma.organizationInvite.findUnique({
       where: { inviteCode },
       include: { organization: true },
     });
+    if (invite === null) throw new InviteNotFoundError("Invitation not found");
+
+    return invite;
   }
 
   async findAdminEmails({ organizationId }: { organizationId: string }): Promise<string[]> {
@@ -284,36 +298,36 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
       .filter((email): email is string => Boolean(email));
   }
 
-  async tryFindProjectSlugForTeams({ teamIds }: { teamIds: string[] }): Promise<string | null> {
-    const project = await this.prisma.project.findFirst({
+  async findProjectSlugsForTeams({ teamIds }: { teamIds: string[] }): Promise<string[]> {
+    const projects = await this.prisma.project.findMany({
       where: { teamId: { in: teamIds }, archivedAt: null },
       select: { slug: true },
     });
 
-    return project?.slug ?? null;
+    return projects.map((project) => project.slug);
   }
 
-  async tryFindProjectSlugInOrganization({
+  async findProjectSlugsInOrganization({
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<string | null> {
-    const project = await this.prisma.project.findFirst({
+  }): Promise<string[]> {
+    const projects = await this.prisma.project.findMany({
       where: { team: { organizationId, archivedAt: null }, archivedAt: null },
       select: { slug: true },
     });
 
-    return project?.slug ?? null;
+    return projects.map((project) => project.slug);
   }
 
-  tryFindPendingInviteForEmail({
+  async getPendingInviteForEmail({
     organizationId,
     email,
   }: {
     organizationId: string;
     email: string;
-  }): Promise<OrganizationInvite | null> {
-    return this.prisma.organizationInvite.findFirst({
+  }): Promise<OrganizationInvite> {
+    const invite = await this.prisma.organizationInvite.findFirst({
       where: {
         organizationId,
         email: { equals: email, mode: "insensitive" },
@@ -321,6 +335,9 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
         OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
       },
     });
+    if (invite === null) throw new InviteNotFoundError();
+
+    return invite;
   }
 
   async claimInviteForAcceptance({
@@ -366,11 +383,14 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     });
   }
 
-  tryFindInviteStatus({ inviteId }: { inviteId: string }): Promise<{ status: string } | null> {
-    return this.prisma.organizationInvite.findUnique({
+  async getInviteStatus({ inviteId }: { inviteId: string }): Promise<{ status: string }> {
+    const invite = await this.prisma.organizationInvite.findUnique({
       where: { id: inviteId },
       select: { status: true },
     });
+    if (invite === null) throw new InviteNotFoundError();
+
+    return invite;
   }
 
   async hasMembership({

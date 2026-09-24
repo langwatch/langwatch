@@ -28,7 +28,6 @@ import {
   type ProjectKeyMap,
   type ProjectStoredObjects,
 } from "./services/project.service.ts";
-import { homeTrpcTransport } from "./transport/home.trpc.ts";
 import { integrationsChecksTrpcTransport } from "./transport/integrations-checks.trpc.ts";
 import { projectRest, projectRestCredential } from "./transport/project.rest.ts";
 import { projectTrpcTransport } from "./transport/project.trpc.ts";
@@ -36,12 +35,7 @@ import { projectTrpcTransport } from "./transport/project.trpc.ts";
 export const projectServer = defineServerModule("project")
   .withRepositories(projectRepositories)
   .withApp(ProjectApp)
-  .withTransports(
-    projectRest,
-    projectTrpcTransport,
-    homeTrpcTransport,
-    integrationsChecksTrpcTransport,
-  )
+  .withTransports(projectRest, projectTrpcTransport, integrationsChecksTrpcTransport)
   .withTransportFacts(() => [
     bindRestMiddleware(projectRestCredential, (context) => {
       const credential = organizationCredentialOfRequest(context.req.raw);

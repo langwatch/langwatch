@@ -4,7 +4,7 @@
  * @see specs/platform/process-installation.feature
  */
 import { createApiFixture } from "@langwatch/api-fixture";
-import { auditLogNullServer } from "@langwatch/audit-log-null";
+import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { parseProcessConfig } from "@langwatch/config";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { serverModules } from "@langwatch/installed-server-modules";
@@ -34,8 +34,6 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
 const ROLE = "api";
-const installed = [...serverModules, auditLogNullServer] as const;
-
 /** Every value is harmless and invented: nothing here is read from `.env`. */
 const SYNTHETIC_ENVIRONMENT: Readonly<Record<string, string>> = {
   NODE_ENV: "test",
@@ -51,7 +49,7 @@ function overMemory(module: InstallableServerFeature<never>): InstallableServerF
 }
 
 async function bootApi() {
-  const owners = processConfig(installed, ROLE);
+  const owners = processConfig(serverModules, ROLE);
   const config = parseProcessConfig({ owners, environment: SYNTHETIC_ENVIRONMENT });
   const resolver = SecretsResolver.over(
     SecretsChain.start({ environment: SYNTHETIC_ENVIRONMENT }).withEnv(),
@@ -85,7 +83,7 @@ async function bootApi() {
   };
   const runtime = await bootInstalledProcess({
     role: ROLE,
-    modules: installed.map(overMemory),
+    modules: serverModules.map(overMemory),
     config,
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
     members: {
@@ -121,7 +119,7 @@ async function bootApi() {
   return { runtime, eventing };
 }
 
-const moduleApis = installed.flatMap((module) =>
+const moduleApis = serverModules.flatMap((module) =>
   module.apiContract instanceof ModuleApiToken ? [module.apiContract] : [],
 );
 
@@ -136,7 +134,7 @@ describe("the api process installation", () => {
       expect(eventing.definitions.map((definition) => definition.metadata.name)).toContain(
         "trace_processing",
       );
-      expect(installed.flatMap((module) => module.transports ?? [])).not.toEqual([]);
+      expect(serverModules.flatMap((module) => module.transports ?? [])).not.toEqual([]);
     } finally {
       await runtime.stop();
     }
@@ -157,6 +155,33 @@ describe("the api process installation", () => {
       ).resolves.toEqual([]);
     } finally {
       await Promise.all([first.runtime.stop(), second.runtime.stop()]);
+    }
+  });
+
+  /** @scenario "the composed api process keeps its audit entries in the installed audit-log module" */
+  it("records into the installed audit-log module and reads the entry back", async () => {
+    const { runtime } = await bootApi();
+
+    try {
+      const audit = runtime.service(AuditLogApi);
+      await audit.record({
+        userId: "user-1",
+        projectId: "project-1",
+        action: "prompts.update",
+        args: { configId: "prompt-1" },
+      });
+
+      await expect(
+        audit.listEntityHistory({
+          projectId: "project-1",
+          actionPrefix: "prompts.",
+          entityId: "prompt-1",
+          argumentNames: ["configId"],
+          limit: 10,
+        }),
+      ).resolves.toHaveLength(1);
+    } finally {
+      await runtime.stop();
     }
   });
 });

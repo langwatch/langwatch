@@ -110,9 +110,9 @@ export class GovernanceIngestionOperationsService {
   readonly ingestionKeyListForPersonalProject: GovernanceApi["ingestionKeyListForPersonalProject"] =
     (...args) => this.ingestionKeys.listForPersonalProject(...args);
 
-  readonly tryDescribePersonalIngestionKey: GovernanceApi["tryDescribePersonalIngestionKey"] = (
+  readonly getPersonalIngestionKeyState: GovernanceApi["getPersonalIngestionKeyState"] = (
     ...args
-  ) => this.ingestionKeys.tryDescribePersonalKey(...args);
+  ) => this.ingestionKeys.getPersonalKeyState(...args);
 
   readonly ingestionSourceList: GovernanceApi["ingestionSourceList"] = (...args) =>
     this.ingestionSources.list(...args);

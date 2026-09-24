@@ -111,7 +111,7 @@ function toIso(at: Instant | string | null): string | null {
  * needed it, because the cost screen asks the same question about the same
  * sources (ADR-128 s4a) and must not import a module that pulls in icons.
  */
-export function noDataSinceNotice({
+export function deriveNoDataSinceNotice({
   status,
   errorCount,
   lastSuccessAt,

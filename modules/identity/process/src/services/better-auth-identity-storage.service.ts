@@ -548,7 +548,7 @@ function identityCustomAdapter({
      * (ADR-116 §3), or nothing at all.
      */
     const bearOnIdentityBranch = async (canonical: Row): Promise<Row | null> => {
-      if (BetterAuthIdentityBirthAdapter.currentIdentityBirth() === undefined) return null;
+      if (!BetterAuthIdentityBirthAdapter.isInsideIdentityBirth()) return null;
       const { email, createdAt } = canonical;
       if (typeof email !== "string" || email.length === 0) {
         logger.warn(

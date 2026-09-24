@@ -4,6 +4,7 @@
  */
 import { ledgerActorFor } from "@langwatch/actor";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -101,7 +102,12 @@ export class InviteAcceptanceService {
       // because THIS user's own concurrent accept won, the grant tail is a
       // repair, exactly as in the retry path above; anyone else sees the
       // stale-code refusal.
-      const current = await this.invites.tryFindInviteStatus({ inviteId: invite.id });
+      const current = await this.invites
+        .getInviteStatus({ inviteId: invite.id })
+        .catch((error: unknown) => {
+          if (HandledError.isHandled(error) && error.code === "invite_not_found") return undefined;
+          throw error;
+        });
       const isCallerRacingItself =
         current?.status === "ACCEPTED" &&
         (await this.callerHoldsMembership({

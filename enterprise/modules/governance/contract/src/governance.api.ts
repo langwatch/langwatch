@@ -227,11 +227,11 @@ export interface GovernanceApi {
     userId: string;
     organizationId: string;
   }): Promise<PersonalIngestionKey[]>;
-  tryDescribePersonalIngestionKey(input: {
+  getPersonalIngestionKeyState(input: {
     userId: string;
     organizationId: string;
     lookupId: string;
-  }): Promise<PersonalIngestionKeyState | null>;
+  }): Promise<PersonalIngestionKeyState>;
 
   ingestionSourceList(organizationId: string): Promise<GovernanceIngestionSource[]>;
   findIngestionSourceById(input: {

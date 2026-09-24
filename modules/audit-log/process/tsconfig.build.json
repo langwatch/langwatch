@@ -1,0 +1,66 @@
+{
+  "extends": ["./tsconfig.json", "../../../tsconfig.emit.json"],
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
+    "paths": {
+      "@langwatch/audit-log-process": ["./src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": [
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/tests/**",
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/*.stories.*",
+    "**/*.bench.*",
+    "**/__bench__/**"
+  ],
+  "references": [
+    {
+      "path": "../../annotation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../dataset/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/kernel/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/ksuid/tsconfig.build.json"
+    },
+    {
+      "path": "../../monitor/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../prompt/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/system-migrations/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../workflow/contract/tsconfig.build.json"
+    }
+  ]
+}

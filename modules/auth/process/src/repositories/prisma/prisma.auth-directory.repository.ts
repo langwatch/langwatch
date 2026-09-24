@@ -1,5 +1,6 @@
 import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { UserNotFoundError } from "@langwatch/user-contract";
 
 type Database = Pick<PrismaClient, "user" | "organization" | "organizationUser" | "project">;
@@ -64,7 +65,7 @@ export class PrismaAuthDirectoryRepository {
     return membership !== null;
   }
 
-  async tryFindLiveProject({
+  async getLiveProject({
     projectId,
     organizationId,
   }: {
@@ -77,8 +78,8 @@ export class PrismaAuthDirectoryRepository {
     apiKey: string;
     isPersonal: boolean;
     ownerUserId: string | null;
-  } | null> {
-    return this.database.project.findFirst({
+  }> {
+    const project = await this.database.project.findFirst({
       where: { id: projectId, archivedAt: null, team: { organizationId } },
       select: {
         id: true,
@@ -89,5 +90,7 @@ export class PrismaAuthDirectoryRepository {
         ownerUserId: true,
       },
     });
+    if (project === null) throw new ProjectNotFoundError();
+    return project;
   }
 }

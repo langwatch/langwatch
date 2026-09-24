@@ -88,6 +88,9 @@
       "path": "packages/audit-log-null/tsconfig.json"
     },
     {
+      "path": "modules/audit-log/process/tsconfig.json"
+    },
+    {
       "path": "modules/auth/browser/tsconfig.json"
     },
     {
@@ -197,9 +200,6 @@
     },
     {
       "path": "packages/egress/tsconfig.json"
-    },
-    {
-      "path": "enterprise/modules/audit-log/process/tsconfig.json"
     },
     {
       "path": "enterprise/modules/billing/browser/tsconfig.json"

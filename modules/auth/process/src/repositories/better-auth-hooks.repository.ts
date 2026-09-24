@@ -33,10 +33,12 @@ export type FederatedAccountRow = {
  * boundary since every hook reads/writes the same rows (User, Org, Account).
  */
 export abstract class BetterAuthHooksRepository {
-  abstract tryFindUserForHooks(input: { userId: string }): Promise<BetterAuthHookUser | null>;
-  abstract tryFindOrganizationBySsoDomain(input: {
+  /** Throws `UserNotFoundError`. */
+  abstract getUserForHooks(input: { userId: string }): Promise<BetterAuthHookUser>;
+  /** Throws `OrganizationNotFoundError` when no organization claims the domain. */
+  abstract getOrganizationBySsoDomain(input: {
     domain: string;
-  }): Promise<BetterAuthHookOrganization | null>;
+  }): Promise<BetterAuthHookOrganization>;
   abstract countAccountsForUser(input: { userId: string }): Promise<number>;
   /**
    * The federated accounts this person holds, credential rows excluded. Read

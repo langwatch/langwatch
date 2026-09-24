@@ -30,9 +30,9 @@ export function textOf(activity: Activity): string {
  * Never invented: a message with no GUID and a message that cannot be dated
  * are both rejected here rather than given a made-up identity or the clock.
  */
-export function tryReadableMessage(activity: Activity): ReadableMessage | null {
+export function extractReadableMessage(activity: Activity): ReadableMessage | null {
   const id = typeof activity.id === "string" ? activity.id : "";
-  const ms = CopilotTranscriptGroupingService.tryActivityMs(activity);
+  const ms = CopilotTranscriptGroupingService.extractActivityMs(activity);
   const text = CopilotTurnAssemblyService.textOf(activity);
   if (!GUID.test(id) || ms === null || !text) {
     return null;
@@ -44,7 +44,7 @@ export function tryReadableMessage(activity: Activity): ReadableMessage | null {
     id,
     ms,
     text,
-    role: CopilotTranscriptGroupingService.tryRoleOf(activity.from?.role),
+    role: CopilotTranscriptGroupingService.parseRole(activity.from?.role),
     // `from.id` is deliberately not consulted. It is GUID-shaped and looks
     // like an account, but it is per-conversation and naming a person by it
     // would invent one person per conversation.
@@ -109,7 +109,7 @@ export function applyMessage(params: { state: TurnAccumulator; message: Readable
   // Said something, cannot be attributed to either side. Counting it is the
   // whole point: the alternative is a conversation whose every message has
   // an unreadable role producing no turns at all, which reaches
-  // `tryAssembleTraceRequest` as an empty span list and disappears with no
+  // `buildTraceRequest` as an empty span list and disappears with no
   // log, no attribute and no error — indistinguishable from a pull that
   // found nothing.
   state.skipped += 1;
@@ -132,7 +132,7 @@ export function turnsOf(activities: Activity[]): {
       continue;
     }
 
-    const message = CopilotTurnAssemblyService.tryReadableMessage(activity);
+    const message = CopilotTurnAssemblyService.extractReadableMessage(activity);
     if (!message) {
       // A message with nothing said is not a skip worth counting — there is
       // no turn being lost. A message that said something but cannot be
@@ -176,7 +176,7 @@ export function callIdOf(params: { value: ToolCallValue; activityId: string }): 
  * One tool-call trace, or null when the activity is not one or cannot be
  * identified or dated.
  */
-export function tryToolCallTraceOf(activity: Activity): ToolCallTrace | null {
+export function extractToolCallTrace(activity: Activity): ToolCallTrace | null {
   if (activity.type !== "event") {
     return null;
   }
@@ -186,7 +186,7 @@ export function tryToolCallTraceOf(activity: Activity): ToolCallTrace | null {
   }
 
   const id = typeof activity.id === "string" ? activity.id : "";
-  const ms = CopilotTranscriptGroupingService.tryActivityMs(activity);
+  const ms = CopilotTranscriptGroupingService.extractActivityMs(activity);
   if (!GUID.test(id) || ms === null) {
     return null;
   }
@@ -206,7 +206,7 @@ export function tryToolCallTraceOf(activity: Activity): ToolCallTrace | null {
 export function toolCallsOf(activities: Activity[]): ToolCall[] {
   const byCallId = new Map<string, ToolCall>();
   for (const activity of activities) {
-    const trace = CopilotTurnAssemblyService.tryToolCallTraceOf(activity);
+    const trace = CopilotTurnAssemblyService.extractToolCallTrace(activity);
     if (!trace) {
       continue;
     }
@@ -242,12 +242,12 @@ export function toolCallsOf(activities: Activity[]): ToolCall[] {
 
 const CopilotTurnAssemblyService = {
   textOf,
-  tryReadableMessage,
+  extractReadableMessage,
   closeTurn,
   applyMessage,
   turnsOf,
   toolNameOf,
   callIdOf,
-  tryToolCallTraceOf,
+  extractToolCallTrace,
   toolCallsOf,
 };

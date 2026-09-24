@@ -431,10 +431,16 @@ async function projectKeyAnswer({
     throw refused("authorization_pending", "Approval received but project key not ready yet", 428);
   }
 
-  const project = await app.directory().tryFindLiveProject({
-    projectId: record.project_api_key.project_id,
-    organizationId: organization.id,
-  });
+  const project = await app
+    .directory()
+    .getLiveProject({
+      projectId: record.project_api_key.project_id,
+      organizationId: organization.id,
+    })
+    .catch((error: unknown) => {
+      if (isProjectGone(error)) return null;
+      throw error;
+    });
   const stillAdministers =
     project !== null && (await app.canManageProject({ userId: user.id, projectId: project.id }));
   const ownsItIfPersonal =
@@ -701,11 +707,13 @@ async function approveProjectKey({
   // spoofed `project_id` from leaking another org's key.
   const project = await app
     .directory()
-    .tryFindLiveProject({ projectId: project_id, organizationId });
-
-  if (!project) {
-    throw refused("forbidden", "Project not found or unavailable in this organization", 403);
-  }
+    .getLiveProject({ projectId: project_id, organizationId })
+    .catch((error: unknown) => {
+      if (isProjectGone(error)) {
+        throw refused("forbidden", "Project not found or unavailable in this organization", 403);
+      }
+      throw error;
+    });
 
   if (project.isPersonal && project.ownerUserId !== person.id) {
     throw refused(
@@ -1028,7 +1036,6 @@ function posted(raw: string): unknown {
   }
 }
 
-/** One OAuth refusal, in the two-field shape RFC 8628 clients parse. */
 /** Each directory read's own not-found code, and nothing else. */
 function isPersonOrOrganizationGone(error: unknown): boolean {
   return (
@@ -1037,6 +1044,11 @@ function isPersonOrOrganizationGone(error: unknown): boolean {
   );
 }
 
+function isProjectGone(error: unknown): boolean {
+  return HandledError.isHandled(error) && error.code === "project_not_found";
+}
+
+/** One OAuth refusal, in the two-field shape RFC 8628 clients parse. */
 function refused(error: string, description: string, status: number): CliDeviceFlowRefusedError {
   return new CliDeviceFlowRefusedError({
     refusal: { error, error_description: description },

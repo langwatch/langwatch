@@ -16,6 +16,7 @@ import {
   type GovernanceCliSourceRequest,
   type GovernanceCliSourcesRequest,
 } from "@langwatch/enterprise-governance-contract";
+import { HandledError } from "@langwatch/handled-error";
 
 import type {
   GovernanceCliAccessApi,
@@ -267,11 +268,16 @@ export class GovernanceCliService {
   async ingestionKeyState(input: GovernanceCliKeyLookupRequest): Promise<GovernanceCliAnswer> {
     const gate = await this.#admit(input);
     if ("refusal" in gate) return gate.refusal;
-    const key = await this.#governance.tryDescribePersonalIngestionKey({
-      userId: gate.caller.user_id,
-      organizationId: gate.caller.organization_id,
-      lookupId: input.lookupId,
-    });
+    const key = await this.#governance
+      .getPersonalIngestionKeyState({
+        userId: gate.caller.user_id,
+        organizationId: gate.caller.organization_id,
+        lookupId: input.lookupId,
+      })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "ingestion_key_not_found") return null;
+        throw error;
+      });
     if (!key) return answer({ lookup_id: input.lookupId, status: "unknown" });
     return answer({
       lookup_id: input.lookupId,

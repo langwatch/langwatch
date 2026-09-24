@@ -7,6 +7,7 @@ import { ApiKeyScopeViolationError } from "@langwatch/api-key-contract";
 import { createRestRuntime } from "@langwatch/api/rest";
 import { CliSessionRecordNotFoundError } from "@langwatch/auth-contract";
 import { OrganizationNotFoundError } from "@langwatch/organization-contract";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { UserNotFoundError } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
@@ -580,7 +581,10 @@ function deviceFlowWorld(
     getOrganization: () => Promise.resolve({ id: ORGANIZATION_ID, name: "Acme", slug: "acme" }),
     maxSessionDurationDays: () => Promise.resolve(0),
     hasActiveMembership: () => Promise.resolve(world.activeMembership),
-    tryFindLiveProject: () => Promise.resolve(world.project),
+    getLiveProject: () =>
+      world.project === null
+        ? Promise.reject(new ProjectNotFoundError())
+        : Promise.resolve(world.project),
   };
 
   const sessions = CliDeviceSessionService.create({ store });

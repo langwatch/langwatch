@@ -48,13 +48,6 @@ Feature: The project.* browser namespace is served by the application the compos
     When Langy is asked to provision the project's virtual key
     Then the failure is reported and the request answers normally
 
-  # Moves to the audit-log module, which owns the entries (Alex, 2026-09-24): the audit-log lane.
-  @unimplemented
-  Scenario: the home strip answers an empty trail with no items
-    Given the project module installed over memory repositories
-    When somebody with no recent activity reads the home strip
-    Then they are answered with no items
-
   # Moves to the onboarding module, its own lane (Alex, 2026-09-24).
   @unimplemented
   Scenario: the setup checklist answers for the project

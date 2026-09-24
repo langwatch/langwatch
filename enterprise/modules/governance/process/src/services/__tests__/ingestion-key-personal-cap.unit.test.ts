@@ -261,7 +261,7 @@ describe("given keys the person and the platform each revoked", () => {
       ledger.revoke({ id: byCap.apiKeyId, cause: "cap" });
 
       const describe_ = (lookupId: string) =>
-        service.tryDescribePersonalKey({
+        service.getPersonalKeyState({
           userId: USER_ID,
           organizationId: ORGANIZATION_ID,
           lookupId,
@@ -280,7 +280,9 @@ describe("given keys the person and the platform each revoked", () => {
         revocationCause: null,
       });
       expect(live.apiKeyId).toBe("key-3");
-      expect(await describe_("nosuchlookupid")).toBeNull();
+      await expect(describe_("nosuchlookupid")).rejects.toMatchObject({
+        code: "ingestion_key_not_found",
+      });
     });
   });
 });

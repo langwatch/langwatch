@@ -35,9 +35,6 @@
       "path": "../../modules/audit-log/contract/tsconfig.build.json"
     },
     {
-      "path": "../../packages/audit-log-null/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/auth/contract/tsconfig.build.json"
     },
     {

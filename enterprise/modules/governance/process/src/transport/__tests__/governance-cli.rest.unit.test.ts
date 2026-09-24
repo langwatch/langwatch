@@ -7,6 +7,7 @@
 import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
+  IngestionKeyNotFoundError,
   PersonalSourceTypeNotAllowedError,
   type GovernanceRestApi,
 } from "@langwatch/enterprise-governance-contract";
@@ -365,7 +366,7 @@ describe("the CLI governance plane", () => {
     it("answers with the cause for a revoked key and unknown for one it does not hold", async () => {
       const revoked = mountCli({
         governance: {
-          tryDescribePersonalIngestionKey: vi.fn().mockResolvedValue({
+          getPersonalIngestionKeyState: vi.fn().mockResolvedValue({
             live: false,
             sourceType: "internal_codex",
             revocationCause: "cap_retired",
@@ -373,7 +374,11 @@ describe("the CLI governance plane", () => {
         },
       });
       const absent = mountCli({
-        governance: { tryDescribePersonalIngestionKey: vi.fn().mockResolvedValue(null) },
+        governance: {
+          getPersonalIngestionKeyState: vi
+            .fn()
+            .mockRejectedValue(new IngestionKeyNotFoundError("lookup-2")),
+        },
       });
 
       const revokedResponse = await revoked.get("/api/auth/cli/governance/ingestion-keys/lookup-1");

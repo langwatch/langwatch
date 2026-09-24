@@ -35,9 +35,9 @@ export class DefaultGovernancePersonalUsageService {
       return this.emptySummary();
     }
 
-    const [summary, topModel] = await Promise.all([
+    const [summary, [topModel]] = await Promise.all([
       this.reader.findSummary({ tenantId: parsed.personalProjectId, window }),
-      this.reader.tryFindTopModel({ tenantId: parsed.personalProjectId, window }),
+      this.reader.findTopModels({ tenantId: parsed.personalProjectId, window, limit: 1 }),
     ]);
     const ingestion =
       parsed.userId && parsed.ingestionTenantId
@@ -156,7 +156,7 @@ export class DefaultGovernancePersonalUsageService {
     window: PersonalUsageWindow;
   }): Promise<IngestionPrincipalSummaryRow | null> {
     try {
-      return (await this.reader?.tryFindIngestionPrincipalSummary(input)) ?? null;
+      return (await this.reader?.getIngestionPrincipalSummary(input)) ?? null;
     } catch {
       return null;
     }

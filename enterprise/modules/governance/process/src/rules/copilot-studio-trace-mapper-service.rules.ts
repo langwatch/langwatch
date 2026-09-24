@@ -431,7 +431,7 @@ export function tryToTraceRequest({
     (group) => CopilotStudioTraceMapperService.conversationSpans({ origin, group }),
   );
 
-  return ConversationTraceAssemblyService.tryAssembleTraceRequest(spans, origin.profile);
+  return ConversationTraceAssemblyService.buildTraceRequest(spans, origin.profile);
 }
 
 const CopilotStudioTraceMapperService = {

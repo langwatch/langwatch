@@ -83,13 +83,16 @@ export class MemoryPersonalUsageRepository implements PersonalUsageReader {
     };
   }
 
-  async tryFindTopModel(input: {
+  async findTopModels(input: {
     tenantId: string;
     window: PersonalUsageWindow;
-  }): Promise<PersonalUsageTopModelRow | null> {
+    limit: number;
+  }): Promise<PersonalUsageTopModelRow[]> {
     const counts = this.modelCounts(this.traceRowsFor(input.tenantId, input.window));
-    const top = [...counts.entries()].toSorted((a, b) => b[1] - a[1])[0];
-    return top ? { model: top[0], requests: top[1] } : null;
+    return [...counts.entries()]
+      .toSorted((a, b) => b[1] - a[1])
+      .slice(0, input.limit)
+      .map(([model, requests]) => ({ model, requests }));
   }
 
   async findDailyBuckets(input: {
@@ -131,13 +134,21 @@ export class MemoryPersonalUsageRepository implements PersonalUsageReader {
       .map(([label, entry]) => ({ label, ...entry }));
   }
 
-  async tryFindIngestionPrincipalSummary(input: {
+  async getIngestionPrincipalSummary(input: {
     tenantId: string;
     userId: string;
     window: PersonalUsageWindow;
-  }): Promise<IngestionPrincipalSummaryRow | null> {
+  }): Promise<IngestionPrincipalSummaryRow> {
     const rows = this.principalRowsFor(input.tenantId, input.userId, input.window);
-    if (rows.length === 0) return null;
+    if (rows.length === 0) {
+      return {
+        totalCost: 0,
+        requestCount: 0,
+        promptTokens: 0,
+        completionTokens: 0,
+        topModel: null,
+      };
+    }
     const counts = new Map<string, number>();
     for (const row of rows) counts.set(row.model, (counts.get(row.model) ?? 0) + 1);
     const top = [...counts.entries()].toSorted((a, b) => b[1] - a[1])[0];

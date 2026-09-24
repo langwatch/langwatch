@@ -54,11 +54,6 @@ describe("ingestionCredentials", () => {
       const cfg = { ottlStatements: ["x"] };
       expect(credentials.encryptParserConfig(cfg)).toEqual(cfg);
     });
-
-    it("passes null/undefined through", () => {
-      expect(credentials.encryptParserConfig(null)).toBeNull();
-      expect(credentials.encryptParserConfig(undefined)).toBeUndefined();
-    });
   });
 
   describe("given the service reads a legacy plaintext object", () => {

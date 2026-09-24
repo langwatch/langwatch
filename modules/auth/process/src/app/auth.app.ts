@@ -81,7 +81,7 @@ import {
   type SignUpAccountFactory,
   type SignUpVerificationMailer,
 } from "../services/signup-verification.service.ts";
-import type { AuthRestFederatedLogout, AuthRestSession } from "../transport/auth.rest.ts";
+import type { AuthRestFederatedLogout, AuthRestSessionAnswer } from "../transport/auth.rest.ts";
 import { buildBetterAuth, type BetterAuthDeploymentIdentity } from "./auth-composition.build.ts";
 import type { AuthDirectory } from "./auth.members.ts";
 
@@ -318,7 +318,7 @@ export class AuthApp implements AuthApiContract {
       cliSessions: CliDeviceSessionService.create({
         store: repositories.cliSessions,
       }),
-      signUp: signUpVerification({ members, repositories, now, users: dependencies.users }),
+      signUp: buildSignUpVerification({ members, repositories, now, users: dependencies.users }),
       members,
       dependencies: { apiKeys: dependencies.apiKeys, featureFlags: dependencies.featureFlags },
       legacySsoAccess: LegacySsoAccessService.create({
@@ -468,10 +468,11 @@ export class AuthApp implements AuthApiContract {
   }
 
   /** The session the browser's own poll reads, verified and then resolved. */
-  async resolveSession(request: Request): Promise<AuthRestSession | null> {
+  async resolveSession(request: Request): Promise<AuthRestSessionAnswer> {
     const verified = await this.tryVerifyBrowserSession({ headers: request.headers });
+    const session = await this.tryResolveBrowserSession({ verified });
 
-    return this.tryResolveBrowserSession({ verified });
+    return session === null ? { kind: "anonymous" } : { kind: "signed_in", session };
   }
 
   /**
@@ -726,7 +727,7 @@ export class AuthApp implements AuthApiContract {
 }
 
 /** The ceremony this process can run, or nothing where a collaborator is missing. */
-function signUpVerification({
+function buildSignUpVerification({
   members,
   repositories,
   now,

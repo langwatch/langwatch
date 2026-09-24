@@ -15,7 +15,7 @@ vi.mock("@langwatch/observability", () => ({
 }));
 
 function repoAnswering(deactivatedAt: Instant | null, signupConfirmationPending = false) {
-  const tryFindUserForHooks = vi.fn(async () => ({
+  const getUserForHooks = vi.fn(async () => ({
     id: "user-1",
     email: "user@example.com",
     name: null,
@@ -28,10 +28,10 @@ function repoAnswering(deactivatedAt: Instant | null, signupConfirmationPending 
   ]);
   return {
     repo: createApiFixture<BetterAuthHooksRepository>({
-      tryFindUserForHooks,
+      getUserForHooks,
       findFederatedAccountsForUser,
     }),
-    tryFindUserForHooks,
+    getUserForHooks,
   };
 }
 
@@ -73,7 +73,7 @@ describe("beforeSessionCreate", () => {
     describe("when a session is about to be created for them", () => {
       /** @scenario "Active user is not blocked from signing in" */
       it("leaves the sign-in to continue", async () => {
-        const { repo, tryFindUserForHooks } = repoAnswering(null);
+        const { repo, getUserForHooks } = repoAnswering(null);
 
         await expect(
           beforeSessionCreate({
@@ -83,7 +83,7 @@ describe("beforeSessionCreate", () => {
             collaborators: CONTINUING,
           }),
         ).resolves.toBeUndefined();
-        expect(tryFindUserForHooks).toHaveBeenCalled();
+        expect(getUserForHooks).toHaveBeenCalled();
       });
     });
   });

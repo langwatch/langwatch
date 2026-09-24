@@ -27,6 +27,9 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../audit-log/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/browser-host/tsconfig.build.json"
     },
     {

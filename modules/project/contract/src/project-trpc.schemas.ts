@@ -61,10 +61,3 @@ export const projectArchiveByIdInputSchema = z.object({
   projectToArchiveId: z.string(),
 });
 export type ProjectArchiveByIdInput = z.infer<typeof projectArchiveByIdInputSchema>;
-
-/** The recent-items strip: one project, and how many rows it renders. */
-export const recentItemsInputSchema = z.object({
-  projectId: z.string(),
-  limit: z.number().min(1).max(50).default(12),
-});
-export type RecentItemsInput = z.infer<typeof recentItemsInputSchema>;

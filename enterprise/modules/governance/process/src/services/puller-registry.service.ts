@@ -21,8 +21,13 @@ export class PullerRegistryService {
     this.adapters.set(adapter.id, adapter);
   }
 
-  tryGet(adapterId: string): RegisteredGovernancePuller | undefined {
-    return this.adapters.get(adapterId);
+  getById(adapterId: string): RegisteredGovernancePuller {
+    const adapter = this.adapters.get(adapterId);
+    if (!adapter) {
+      throw new Error(`Unknown ingestion pull adapter: ${adapterId}`);
+    }
+
+    return adapter;
   }
 
   ids(): string[] {

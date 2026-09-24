@@ -326,8 +326,15 @@ export class OrganizationService extends OrganizationServiceContract {
     return this.personalWorkspaces.ensurePersonalWorkspace(input);
   }
 
-  tryFindPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null> {
-    return this.personalWorkspaces.tryFindPersonalWorkspace(input);
+  async tryFindPersonalWorkspace(
+    input: FindPersonalWorkspaceInput,
+  ): Promise<PersonalWorkspace | null> {
+    try {
+      return await this.personalWorkspaces.getPersonalWorkspace(input);
+    } catch (error) {
+      if (HandledError.isHandled(error) && error.code === "team_not_found") return null;
+      throw error;
+    }
   }
 
   getPersonalWorkspaceFeatures(input: PersonalWorkspaceFeaturesInput): Promise<PersonalFeatures> {

@@ -31,7 +31,7 @@ export function thoughtTypeOf(thought: GenieThought): string {
 }
 
 /** Databricks stamps some timestamps in seconds, some in ms — normalize. */
-export function tryToMs(value: number | null | undefined): number | null {
+export function normalizeTimestampMs(value: number | null | undefined): number | null {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
     return null;
   }
@@ -79,7 +79,7 @@ export function flattenThoughts(attachments: GenieAttachment[] | null | undefine
  * "ANSWER" is tolerated. A lone text attachment without a purpose still
  * counts — presence of an answer beats strictness on a label.
  */
-export function tryExtraString(event: NormalizedPullEvent, key: string): string | undefined {
+export function extractExtraString(event: NormalizedPullEvent, key: string): string | undefined {
   const value = event.extra?.[key];
 
   return typeof value === "string" && value.length > 0 ? value : undefined;
@@ -111,7 +111,7 @@ export function rootAttributesOf(
 ): OtlpJsonAttr[] {
   const attachments = frame.payload.attachments ?? [];
   const question =
-    frame.payload.content ?? GenieSpanAttributesService.tryExtraString(event, "question") ?? "";
+    frame.payload.content ?? GenieSpanAttributesService.extractExtraString(event, "question") ?? "";
   const assistantMessage: Record<string, string> = {
     role: "assistant",
     content: GenieSpanAttributesService.assistantContentOf(frame, attachments),
@@ -173,7 +173,7 @@ export function optionalRootAttributes(
   const rawUserId =
     frame.payload.user_id != null
       ? String(frame.payload.user_id)
-      : GenieSpanAttributesService.tryExtraString(event, "actorUserId");
+      : GenieSpanAttributesService.extractExtraString(event, "actorUserId");
   if (rawUserId) {
     attributes.push(
       ConversationTraceAssemblyService.stringAttr({ key: "langwatch.user.id", value: rawUserId }),
@@ -198,7 +198,7 @@ export function optionalRootAttributes(
     );
   }
 
-  const spaceId = GenieSpanAttributesService.tryExtraString(event, "spaceId");
+  const spaceId = GenieSpanAttributesService.extractExtraString(event, "spaceId");
   if (spaceId) {
     attributes.push(
       ConversationTraceAssemblyService.stringAttr({
@@ -302,9 +302,9 @@ export function queryStepSpan(
 
 const GenieSpanAttributesService = {
   thoughtTypeOf,
-  tryToMs,
+  normalizeTimestampMs,
   flattenThoughts,
-  tryExtraString,
+  extractExtraString,
   assistantContentOf,
   rootAttributesOf,
   optionalRootAttributes,

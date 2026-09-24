@@ -130,6 +130,7 @@ type ServerHalfOnDisk =
   | "analytics"
   | "annotation"
   | "api-key"
+  | "audit-log"
   | "auth"
   | "authz"
   | "automation"

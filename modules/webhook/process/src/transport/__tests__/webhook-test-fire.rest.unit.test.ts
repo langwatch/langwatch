@@ -55,7 +55,7 @@ function mountWithPlan(planType: "FREE" | "ENTERPRISE") {
 
   const { request } = mountWebhookRest({
     endpoints: {
-      getSigningSecrets: async () => [],
+      findSigningSecrets: async () => [],
       getDestinationConfig: async () => ({ kind: "http", url: "https://example.test/hook" }),
       recordDeliveryAttempt: async () => {},
     } as never,

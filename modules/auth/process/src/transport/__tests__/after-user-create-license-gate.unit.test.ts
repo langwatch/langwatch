@@ -9,6 +9,7 @@ import type {
  * federation, and it rides the same platform SSO license gate as every other provider — a
  * domain-matched organization must not gain a member off a licensing store answer of "no
  */
+import { InviteNotFoundError, OrganizationNotFoundError } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
@@ -36,8 +37,8 @@ class StubFederation implements BetterAuthFederation {
 }
 
 class StubInvites implements BetterAuthPendingInvite {
-  tryFindPendingByOrganizationAndEmail(): Promise<null> {
-    return Promise.resolve(null);
+  getPendingByOrganizationAndEmail(): Promise<never> {
+    return Promise.reject(new InviteNotFoundError());
   }
   applyInvite(): Promise<void> {
     return Promise.reject(new Error("unused"));
@@ -63,8 +64,8 @@ function hooksRepo(members: Partial<BetterAuthHooksRepository>): BetterAuthHooks
     throw new Error("this repository member is not used by this test");
   };
   return {
-    tryFindUserForHooks: unused,
-    tryFindOrganizationBySsoDomain: unused,
+    getUserForHooks: unused,
+    getOrganizationBySsoDomain: unused,
     countAccountsForUser: unused,
     findFederatedAccountsForUser: unused,
     findFederatedAccountsForUsers: unused,
@@ -80,9 +81,12 @@ function hooksRepo(members: Partial<BetterAuthHooksRepository>): BetterAuthHooks
 
 function organizationRepo(organization: BetterAuthHookOrganization | null) {
   const mocks = {
-    tryFindOrganizationBySsoDomain: vi
-      .fn<BetterAuthHooksRepository["tryFindOrganizationBySsoDomain"]>()
-      .mockResolvedValue(organization),
+    getOrganizationBySsoDomain: vi
+      .fn<BetterAuthHooksRepository["getOrganizationBySsoDomain"]>()
+      .mockImplementation(async () => {
+        if (organization === null) throw new OrganizationNotFoundError();
+        return organization;
+      }),
     createOrganizationMembership:
       vi.fn<BetterAuthHooksRepository["createOrganizationMembership"]>(),
   };
@@ -122,7 +126,7 @@ describe("the ssoDomain auto-join on an unlicensed deployment", () => {
       },
     });
 
-    expect(mocks.tryFindOrganizationBySsoDomain).not.toHaveBeenCalled();
+    expect(mocks.getOrganizationBySsoDomain).not.toHaveBeenCalled();
     expect(mocks.createOrganizationMembership).not.toHaveBeenCalled();
   });
 });

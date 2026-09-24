@@ -73,13 +73,6 @@ export class IngestionPullWorkerConfiguration {
 }
 
 export class IngestionPullWorkerService {
-  /** The routing profile a pulled source's conversations are assembled under. */
-  static tryConversationRoutingProfileFor(
-    sourceType: string,
-  ): ConversationRoutingProfile | undefined {
-    return CONVERSATION_ROUTING.get(sourceType)?.profile;
-  }
-
   private readonly sources: IngestionPullSourceReader;
   private readonly registry: PullerRegistryService;
   private readonly credentials: IngestionCredentialsService;
@@ -183,10 +176,7 @@ export class IngestionPullWorkerService {
       throw new Error("IngestionSource has no pullConfig.adapter");
     }
 
-    const adapter = this.registry.tryGet(adapterId);
-    if (!adapter) {
-      throw new Error(`Unknown ingestion pull adapter: ${adapterId}`);
-    }
+    const adapter = this.registry.getById(adapterId);
 
     const validatedConfig = adapter.validateConfig(pullConfig);
 

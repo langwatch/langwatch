@@ -11,14 +11,14 @@ class StubPersonalUsageReader implements PersonalUsageReader {
     promptTokens: 10,
     completionTokens: 20,
   }));
-  tryFindTopModel = vi.fn(async () => ({ model: "trace-model", requests: 3 }));
+  findTopModels = vi.fn(async () => [{ model: "trace-model", requests: 3 }]);
   findDailyBuckets = vi.fn(async () => [
     { day: "2026-08-01", spentUsd: 4, billedUsd: 3, requests: 4 },
   ]);
   findModelBreakdown = vi.fn(async () => [
     { label: "trace-model", spentUsd: 4, billedUsd: 3, requests: 4 },
   ]);
-  tryFindIngestionPrincipalSummary = vi.fn(async () => ({
+  getIngestionPrincipalSummary = vi.fn(async () => ({
     totalCost: 2,
     requestCount: 2,
     promptTokens: 5,
@@ -72,9 +72,7 @@ describe("DefaultGovernancePersonalUsageService", () => {
 
   it("keeps trace usage available when the best-effort ledger fails", async () => {
     const reader = new StubPersonalUsageReader();
-    reader.tryFindIngestionPrincipalSummary.mockRejectedValueOnce(
-      new Error("ClickHouse unavailable"),
-    );
+    reader.getIngestionPrincipalSummary.mockRejectedValueOnce(new Error("ClickHouse unavailable"));
 
     const result = await DefaultGovernancePersonalUsageService.create({
       reader,

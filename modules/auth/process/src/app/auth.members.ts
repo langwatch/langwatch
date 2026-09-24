@@ -24,10 +24,11 @@ export abstract class AuthDirectory {
     organizationId: string;
   }): Promise<boolean>;
 
-  abstract tryFindLiveProject(params: {
+  /** An unarchived project of the organization; throws `ProjectNotFoundError`. */
+  abstract getLiveProject(params: {
     projectId: string;
     organizationId: string;
-  }): Promise<AuthDirectoryProject | null>;
+  }): Promise<AuthDirectoryProject>;
 }
 
 /** The project fields a device grant mints or names a key from. */

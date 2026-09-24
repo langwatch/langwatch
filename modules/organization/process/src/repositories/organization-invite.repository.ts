@@ -42,15 +42,13 @@ export abstract class OrganizationInviteRepository {
     options?: { timeoutMs: number; maxWaitMs: number },
   ): Promise<T>;
 
-  abstract tryFindOpenInviteForEmail(input: {
+  /** Whether the address holds a pending or payment-pending invite that has not expired. */
+  abstract hasOpenInviteForEmail(input: {
     email: string;
     organizationId: string;
-  }): Promise<OrganizationInvite | null>;
-  /** The stored address of the first of these that is already a member. */
-  abstract tryFindMemberEmail(input: {
-    organizationId: string;
-    emails: string[];
-  }): Promise<string | null>;
+  }): Promise<boolean>;
+  /** The stored address of each of these that is already a member. */
+  abstract findMemberEmails(input: { organizationId: string; emails: string[] }): Promise<string[]>;
   abstract findTeamIdsInOrganization(input: {
     teamIds: string[];
     organizationId: string;
@@ -59,11 +57,12 @@ export abstract class OrganizationInviteRepository {
   abstract findCustomRolePermissions(input: {
     organizationId: string;
   }): Promise<{ id: string; permissions: unknown }[]>;
-  abstract tryFindOrganization(input: { organizationId: string }): Promise<Organization | null>;
-  /** The organization with its membership rows, as the batch path reports it back. */
-  abstract tryFindOrganizationWithMembers(input: {
+  /** Throws `OrganizationNotFoundError`. */
+  abstract getOrganization(input: { organizationId: string }): Promise<Organization>;
+  /** The organization with its membership rows; throws `OrganizationNotFoundError`. */
+  abstract getOrganizationWithMembers(input: {
     organizationId: string;
-  }): Promise<(Organization & { members: OrganizationUser[] }) | null>;
+  }): Promise<Organization & { members: OrganizationUser[] }>;
   /** The personal teams a set of role-binding scopes reaches, by each owner's name for it. */
   abstract findPersonalTeamsInScopes(input: {
     scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
@@ -76,10 +75,11 @@ export abstract class OrganizationInviteRepository {
   abstract findListableInvites(input: { organizationId: string }): Promise<InviteWithRequester[]>;
   /** Answers how many rows moved; zero means the invite was not open. */
   abstract revokeOpenInvite(input: { inviteId: string; organizationId: string }): Promise<number>;
-  abstract tryFindInviteWithOrganization(input: {
+  /** Throws `InviteNotFoundError`. */
+  abstract getInviteWithOrganization(input: {
     inviteId: string;
     organizationId: string;
-  }): Promise<InviteWithOrganization | null>;
+  }): Promise<InviteWithOrganization>;
   /**
    * Rotates a pending invite's code, conditional on the code the caller read.
    * Answers how many rows moved; zero means it rotated under them.
@@ -101,18 +101,20 @@ export abstract class OrganizationInviteRepository {
     organizationId: string;
     expiration: NonNullable<OrganizationInvite["expiration"]>;
   }): Promise<number>;
-  abstract tryFindInviteByCodeWithOrganization(input: {
+  /** Throws `InviteNotFoundError`. */
+  abstract getInviteByCodeWithOrganization(input: {
     inviteCode: string;
-  }): Promise<InviteWithOrganization | null>;
+  }): Promise<InviteWithOrganization>;
   abstract findAdminEmails(input: { organizationId: string }): Promise<string[]>;
-  abstract tryFindProjectSlugForTeams(input: { teamIds: string[] }): Promise<string | null>;
-  abstract tryFindProjectSlugInOrganization(input: {
-    organizationId: string;
-  }): Promise<string | null>;
-  abstract tryFindPendingInviteForEmail(input: {
+  /** The live projects' slugs in these teams. */
+  abstract findProjectSlugsForTeams(input: { teamIds: string[] }): Promise<string[]>;
+  /** The live projects' slugs in the organization's live teams. */
+  abstract findProjectSlugsInOrganization(input: { organizationId: string }): Promise<string[]>;
+  /** A pending, unexpired invite for the address; throws `InviteNotFoundError`. */
+  abstract getPendingInviteForEmail(input: {
     organizationId: string;
     email: string;
-  }): Promise<OrganizationInvite | null>;
+  }): Promise<OrganizationInvite>;
   /**
    * Claims a pending invite for one acceptor, conditional on the (status,
    * code, expiry) the caller read. Answers how many rows moved; zero means
@@ -130,7 +132,8 @@ export abstract class OrganizationInviteRepository {
     organizationId: string;
     role: OrganizationUserRole;
   }): Promise<void>;
-  abstract tryFindInviteStatus(input: { inviteId: string }): Promise<{ status: string } | null>;
+  /** Throws `InviteNotFoundError`. */
+  abstract getInviteStatus(input: { inviteId: string }): Promise<{ status: string }>;
   abstract hasMembership(input: { userId: string; organizationId: string }): Promise<boolean>;
   abstract findPaymentPendingInvites(input: {
     subscriptionId: string;

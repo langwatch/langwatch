@@ -192,7 +192,7 @@ describe("isAllowedAuthOrigin", () => {
 
     describe("and Origin is malformed", () => {
       it("falls through to Referer when Origin is garbage", () => {
-        // Origin header is present but malformed → originOf returns null →
+        // Origin header is present but malformed → parseOrigin returns null →
         // falls through to the Referer fallback path which matches BASE.
         expect(
           isAllowedAuthOrigin({

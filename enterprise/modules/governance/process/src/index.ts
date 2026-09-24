@@ -101,7 +101,7 @@ export {
   type IngestionPullWorkerSubstrates,
 } from "./governance.server.ts";
 export type { AgentsListingSummary } from "./services/agents-listing-outcome.service.ts";
-export { agentsListingOutcome } from "./services/agents-listing-outcome.service.ts";
+export { deriveAgentsListingOutcome } from "./services/agents-listing-outcome.service.ts";
 export type {
   AgentsListingOutcome,
   AgentsListingRefusalCause,

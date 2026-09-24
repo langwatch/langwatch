@@ -31,7 +31,7 @@ function authWorld(overrides: Partial<AuthDoorApi> = {}) {
   const door: AuthDoorApi = {
     betterAuth: () => ({ handler, api: { getSession } }),
     revokeBrowserSession,
-    resolveSession: async () => SIGNED_IN,
+    resolveSession: async () => ({ kind: "signed_in", session: SIGNED_IN }),
     findProjectSlugByToken: async () => null,
     featureFlags: () => ({ isEnabled: async () => false }) as never,
     directory: () => ({}) as never,
@@ -78,7 +78,7 @@ describe("given the /api/auth family mounted on a process's own doors", () => {
     });
 
     it("answers a bare null for a request carrying no session", async () => {
-      const world = authWorld({ resolveSession: async () => null });
+      const world = authWorld({ resolveSession: async () => ({ kind: "anonymous" }) });
 
       const response = await world.app.request("/api/auth/session");
 

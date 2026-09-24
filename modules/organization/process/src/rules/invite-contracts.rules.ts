@@ -82,6 +82,9 @@ export interface ResolvedInviteTeams {
   teamIdsString: string;
 }
 
+/** An invite's teams, or `dropped` when lenient validation leaves it nothing to join. */
+export type InviteTeamsResolution = ({ kind: "teams" } & ResolvedInviteTeams) | { kind: "dropped" };
+
 /**
  * Input for creating a PAYMENT_PENDING invite (checkout flow).
  */

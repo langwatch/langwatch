@@ -538,7 +538,6 @@ overrides:
 packageExtensionsChecksum: sha256-m/G/WH1yLdya4bNe65I9ulURa/FU76z3o30vd4qvq6M=
 
 importers:
-
   .:
     devDependencies:
       '@0xdeafcafe/tslsp-cli':
@@ -637,9 +636,6 @@ importers:
       '@langwatch/audit-log-contract':
         specifier: workspace:*
         version: link:../../modules/audit-log/contract
-      '@langwatch/audit-log-null':
-        specifier: workspace:*
-        version: link:../../packages/audit-log-null
       '@langwatch/auth-contract':
         specifier: workspace:*
         version: link:../../modules/auth/contract
@@ -1547,9 +1543,6 @@ importers:
       '@langwatch/audit-log-contract':
         specifier: workspace:*
         version: link:../../modules/audit-log/contract
-      '@langwatch/audit-log-null':
-        specifier: workspace:*
-        version: link:../../packages/audit-log-null
       '@langwatch/auth-contract':
         specifier: workspace:*
         version: link:../../modules/auth/contract
@@ -1996,49 +1989,6 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
-
-  enterprise/modules/audit-log/process:
-    dependencies:
-      '@langwatch/audit-log-contract':
-        specifier: workspace:*
-        version: link:../../../../modules/audit-log/contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../../packages/kernel
-      '@langwatch/ksuid':
-        specifier: workspace:*
-        version: link:../../../../packages/ksuid
-      '@langwatch/observability':
-        specifier: workspace:*
-        version: link:../../../../packages/observability
-      '@langwatch/prisma-client':
-        specifier: workspace:*
-        version: link:../../../../packages/prisma-client
-      '@langwatch/system-migrations':
-        specifier: workspace:*
-        version: link:../../../../packages/system-migrations
-      '@langwatch/time':
-        specifier: workspace:*
-        version: link:../../../../packages/time
-      zod:
-        specifier: 'catalog:'
-        version: 4.4.3
-    devDependencies:
-      '@langwatch/test-harness':
-        specifier: workspace:*
-        version: link:../../../../packages/test-harness
-      '@langwatch/vitest-config':
-        specifier: workspace:*
-        version: link:../../../../packages/vitest-config
-      '@types/node':
-        specifier: ^26.0.1
-        version: 26.2.0
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
-      vitest:
-        specifier: 'catalog:'
-        version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
   enterprise/modules/billing/browser:
     dependencies:
@@ -4396,6 +4346,9 @@ importers:
 
   modules/audit-log/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
@@ -4406,6 +4359,76 @@ importers:
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  modules/audit-log/process:
+    dependencies:
+      '@langwatch/annotation-contract':
+        specifier: workspace:*
+        version: link:../../annotation/contract
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
+      '@langwatch/audit-log-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@langwatch/dataset-contract':
+        specifier: workspace:*
+        version: link:../../dataset/contract
+      '@langwatch/kernel':
+        specifier: workspace:*
+        version: link:../../../packages/kernel
+      '@langwatch/ksuid':
+        specifier: workspace:*
+        version: link:../../../packages/ksuid
+      '@langwatch/monitor-contract':
+        specifier: workspace:*
+        version: link:../../monitor/contract
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../packages/observability
+      '@langwatch/prisma-client':
+        specifier: workspace:*
+        version: link:../../../packages/prisma-client
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
+      '@langwatch/prompt-contract':
+        specifier: workspace:*
+        version: link:../../prompt/contract
+      '@langwatch/system-migrations':
+        specifier: workspace:*
+        version: link:../../../packages/system-migrations
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../packages/time
+      '@langwatch/workflow-contract':
+        specifier: workspace:*
+        version: link:../../workflow/contract
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
+    devDependencies:
+      '@langwatch/api-fixture':
+        specifier: workspace:*
+        version: link:../../../packages/api-fixture
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../../../packages/vitest-config
+      '@trpc/server':
+        specifier: 'catalog:'
+        version: 11.18.0(typescript@7.0.2)
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -4621,6 +4644,9 @@ importers:
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../packages/redis-client
@@ -10502,6 +10528,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/audit-log-contract':
+        specifier: workspace:*
+        version: link:../../audit-log/contract
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
@@ -14592,6 +14621,9 @@ importers:
       '@langwatch/api-key-process':
         specifier: workspace:*
         version: link:../../modules/api-key/process
+      '@langwatch/audit-log-process':
+        specifier: workspace:*
+        version: link:../../modules/audit-log/process
       '@langwatch/auth-process':
         specifier: workspace:*
         version: link:../../modules/auth/process

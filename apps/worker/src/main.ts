@@ -1,5 +1,4 @@
 import "@langwatch/time/polyfill";
-import { auditLogNullServer } from "@langwatch/audit-log-null";
 import { createDataPrivacyDirectoryReader } from "@langwatch/data-privacy-process";
 import { serverModules as processModules } from "@langwatch/installed-server-modules";
 import { processMetrics, processTelemetry } from "@langwatch/observability/node";
@@ -33,9 +32,6 @@ export async function startWorker(options: WorkerStartOptions = {}): Promise<Pro
   const app = await server
     .composeProcess("worker")
     .withModules(processModules)
-    // Availability, not a module install: audit-log's implementation is
-    // enterprise, so core answers the subject with the null provider.
-    .withModules([auditLogNullServer])
     .withMember("dataPrivacy", (members) => ({
       directory: createDataPrivacyDirectoryReader(members.read("prisma")),
       redaction: null,

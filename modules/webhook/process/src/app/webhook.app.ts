@@ -86,7 +86,7 @@ export interface WebhookAppDependencies {
   health: Pick<WebhookHealthService, "health">;
   /**
    * The emitted-events log. Undefined on a deployment without ClickHouse —
-   * the log has no fallback store — which {@link WebhookApp.requireEvents}
+   * the log has no fallback store — which {@link WebhookApp.getEventsService}
    * reports as a plain "not configured" failure.
    */
   events: WebhookEventsService | undefined;
@@ -168,7 +168,7 @@ export class WebhookApp implements WebhookApiContract {
   }
 
   create: WebhookApiContract["create"] = (input) => this.#dependencies.endpoints.create(input);
-  getAll: WebhookApiContract["getAll"] = (input) => this.#dependencies.endpoints.getAll(input);
+  getAll: WebhookApiContract["getAll"] = (input) => this.#dependencies.endpoints.findAll(input);
   getById: WebhookApiContract["getById"] = (input) => this.#dependencies.endpoints.getById(input);
   update: WebhookApiContract["update"] = (input) => this.#dependencies.endpoints.update(input);
   rollSecret: WebhookApiContract["rollSecret"] = (input) =>
@@ -188,7 +188,7 @@ export class WebhookApp implements WebhookApiContract {
     await testFireBounds.assertTestFireWithinBounds({ organizationId });
 
     const [secrets, destination] = await Promise.all([
-      endpoints.getSigningSecrets({ organizationId, endpointId }),
+      endpoints.findSigningSecrets({ organizationId, endpointId }),
       endpoints.getDestinationConfig({ organizationId, endpointId }),
     ]);
     const dispatchId = generate(TEST_DISPATCH_KSUID_RESOURCE).toString();
@@ -249,9 +249,9 @@ export class WebhookApp implements WebhookApiContract {
   assertEndpointsEntitled: WebhookApiContract["assertEndpointsEntitled"] = (organizationId) =>
     this.#dependencies.assertEndpointsEntitled(organizationId);
   getEmittedEvents: WebhookApiContract["getEmittedEvents"] = (input) =>
-    this.requireEvents().getEmittedEvents(input);
+    this.getEventsService().getEmittedEvents(input);
   findEmittedEventById: WebhookApiContract["findEmittedEventById"] = (input) =>
-    this.requireEvents().findEmittedEventById(input);
+    this.getEventsService().findEmittedEventById(input);
   appendReplayToEndpointStream: WebhookApiContract["appendReplayToEndpointStream"] = async ({
     organizationId,
     endpoint,
@@ -310,7 +310,7 @@ export class WebhookApp implements WebhookApiContract {
 
   /**
    * The emitted-events log as composed, absent included, so recomposing over
-   * a different entitlement gate doesn't silently drop it. {@link requireEvents}
+   * a different entitlement gate doesn't silently drop it. {@link getEventsService}
    * is what a door reads.
    */
   get events(): WebhookEventsService | undefined {
@@ -322,7 +322,7 @@ export class WebhookApp implements WebhookApiContract {
    * in — not a `HandledError`, since a missing datastore has no caller
    * remedy and degrades to "unknown" at the boundary (ADR-045).
    */
-  requireEvents(): WebhookEventsService {
+  getEventsService(): WebhookEventsService {
     const service = this.#dependencies.events;
     if (!service) throw new Error("ClickHouse is not configured");
     return service;

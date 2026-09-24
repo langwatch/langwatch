@@ -45,6 +45,7 @@
     "@langwatch/plans": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",

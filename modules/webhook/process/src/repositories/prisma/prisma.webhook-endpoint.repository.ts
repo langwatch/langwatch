@@ -227,7 +227,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRuntime {
     return { endpoint: PrismaWebhookEndpointRepository.toView(endpoint), secret };
   }
 
-  async getAll(params: { organizationId: string }): Promise<WebhookEndpointView[]> {
+  async findAll(params: { organizationId: string }): Promise<WebhookEndpointView[]> {
     const endpoints = await this.prisma.webhookEndpoint.findMany({
       where: { organizationId: params.organizationId, archivedAt: null },
       orderBy: { createdAt: "asc" },
@@ -436,7 +436,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRuntime {
    * secret is dropped here rather than by a sweep, so the window closes on
    * the clock even if nothing else ran.
    */
-  async getSigningSecrets(params: {
+  async findSigningSecrets(params: {
     organizationId: string;
     endpointId: string;
     now?: Instant;
@@ -527,7 +527,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRuntime {
     };
   }
 
-  async getActiveByOrganization(params: {
+  async findActiveByOrganization(params: {
     organizationId: string;
   }): Promise<WebhookEndpointView[]> {
     const endpoints = await this.prisma.webhookEndpoint.findMany({
@@ -1048,7 +1048,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRuntime {
    * What one credential field becomes: nothing when the request chose the other
    * mode, otherwise what the request named, otherwise what the row already held.
    */
-  private static mergedCredentialField({
+  private static deriveMergedCredentialField({
     isCleared,
     sent,
     stored,
@@ -1092,22 +1092,22 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRuntime {
     }
     const merged: SqsDestinationInput = {
       queueUrl: sqs.queueUrl ?? endpoint.sqsQueueUrl ?? "",
-      roleArn: PrismaWebhookEndpointRepository.mergedCredentialField({
+      roleArn: PrismaWebhookEndpointRepository.deriveMergedCredentialField({
         isCleared: selectsStatic,
         sent: sqs.roleArn,
         stored: endpoint.sqsRoleArn,
       }),
-      externalId: PrismaWebhookEndpointRepository.mergedCredentialField({
+      externalId: PrismaWebhookEndpointRepository.deriveMergedCredentialField({
         isCleared: selectsStatic,
         sent: sqs.externalId,
         stored: endpoint.sqsExternalId,
       }),
-      accessKeyId: PrismaWebhookEndpointRepository.mergedCredentialField({
+      accessKeyId: PrismaWebhookEndpointRepository.deriveMergedCredentialField({
         isCleared: selectsRole,
         sent: sqs.accessKeyId,
         stored: endpoint.sqsAccessKeyId,
       }),
-      secretAccessKey: PrismaWebhookEndpointRepository.mergedCredentialField({
+      secretAccessKey: PrismaWebhookEndpointRepository.deriveMergedCredentialField({
         isCleared: selectsRole,
         sent: sqs.secretAccessKey,
         // The stored secret is only ever compared for presence here; its value

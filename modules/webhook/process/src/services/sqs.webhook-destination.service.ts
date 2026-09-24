@@ -253,7 +253,7 @@ function attributesFor(request: WebhookDispatchRequest): Record<string, MessageA
  * says what to change: the same bytes will never fit, and splitting is not on the table because
  * one batch is one message and the batch id is the replay-safety key.
  */
-function oversizeRefusal({
+function detectOversizeRefusal({
   bytes,
   batchId,
 }: {
@@ -384,7 +384,7 @@ export class SqsWebhookDestinationAdapter implements WebhookDestination {
     }
 
     const attributes = attributesFor(request);
-    const refusal = oversizeRefusal({
+    const refusal = detectOversizeRefusal({
       bytes: sqsMessageBytes({ body: request.body, attributes }),
       batchId: request.batchId,
     });

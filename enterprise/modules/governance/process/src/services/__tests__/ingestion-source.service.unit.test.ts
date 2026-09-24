@@ -15,6 +15,7 @@ import type {
 import {
   IngestionSourceRepository,
   type CreateIngestionSourceRecord,
+  type CursorPinnedUpdate,
   type UpdateIngestionSourceRecord,
 } from "../../repositories/ingestion-source.repository.ts";
 import { IngestionCredentialsService } from "../ingestion-credentials.service.ts";
@@ -65,7 +66,7 @@ class FakeSourceRepository extends IngestionSourceRepository {
   row: GovernanceIngestionSource = source();
   createInput: CreateIngestionSourceRecord | null = null;
   updateInput: UpdateIngestionSourceRecord | null = null;
-  list = vi.fn(async () => [this.row]);
+  findAll = vi.fn(async () => [this.row]);
   findById = vi.fn(async () => this.row);
   findByCurrentSecretHash = vi.fn(async () => null);
   findByPriorSecretHash = vi.fn(async () => []);
@@ -81,12 +82,10 @@ class FakeSourceRepository extends IngestionSourceRepository {
     return this.row;
   });
   updateIfCursorUnchanged = vi.fn(
-    async (input: {
-      update: UpdateIngestionSourceRecord;
-    }): Promise<GovernanceIngestionSource | null> => {
+    async (input: { update: UpdateIngestionSourceRecord }): Promise<CursorPinnedUpdate> => {
       this.updateInput = input.update;
       this.row = source({ ...this.row, ...rowPatchOf(input.update) });
-      return this.row;
+      return { outcome: "updated", source: this.row };
     },
   );
 }
@@ -359,7 +358,7 @@ describe("IngestionSourceService", () => {
       parserConfig: { adapter: "anthropic_admin", report: "usage" },
       pollerCursor: null,
     });
-    repository.updateIfCursorUnchanged.mockResolvedValueOnce(null);
+    repository.updateIfCursorUnchanged.mockResolvedValueOnce({ outcome: "cursor_moved" });
 
     await expect(
       service.updateSource({

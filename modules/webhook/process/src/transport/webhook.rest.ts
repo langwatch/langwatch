@@ -132,7 +132,7 @@ function destinationFromBody(body: {
 }
 
 /** The `firedAt~id` wire cursor, parsed into the position the service reads. */
-function deliveriesCursorOf(
+function parseDeliveriesCursor(
   cursor: string | undefined,
 ): { firedAt: Instant; id: string } | undefined {
   if (!cursor) return undefined;
@@ -346,7 +346,7 @@ export const webhookRest: Readonly<{
       organizationId: scope.id,
       endpointId: input.id,
       limit: input.limit,
-      cursor: deliveriesCursorOf(input.cursor),
+      cursor: parseDeliveriesCursor(input.cursor),
     });
 
     return {

@@ -16,6 +16,11 @@ import { isAllowedAuthOrigin } from "../rules/auth-origin.rules.ts";
 const logger = createLogger("langwatch:auth");
 
 /** The session `GET /api/auth/session` publishes, field for field. */
+/** The browser's own session poll: signed in, or an anonymous caller. */
+export type AuthRestSessionAnswer =
+  | { kind: "signed_in"; session: AuthRestSession }
+  | { kind: "anonymous" };
+
 export type AuthRestSession = Readonly<{
   expires: string;
   user: Readonly<{
@@ -53,7 +58,7 @@ export interface AuthDoorApi {
   /** Ends one browser session. */
   revokeBrowserSession: (input: { sessionId: string }) => Promise<void>;
   /** The session as this process resolves it, for the browser's own poll. */
-  resolveSession: (request: Request) => Promise<AuthRestSession | null>;
+  resolveSession: (request: Request) => Promise<AuthRestSessionAnswer>;
   /**
    * The project a legacy `X-Auth-Token` names, by slug. `callerKey` names the
    * probing address so the answer stays a token check and not a token oracle.
@@ -131,10 +136,11 @@ export const authRest = defineRestRouter(AuthDoorApi)
   .withAccess(AUTH_DOOR)
   .withRawResponse({ produces: JSON_MEDIA_TYPE })
   .handle(async ({ app, request }) => {
-    const session = await app.resolveSession(request);
+    const answered = await app.resolveSession(request);
     const headers = { "Cache-Control": "no-store, must-revalidate" };
 
-    if (!session) return answer(null, 200, headers);
+    if (answered.kind === "anonymous") return answer(null, 200, headers);
+    const { session } = answered;
 
     return answer(
       {
