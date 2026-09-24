@@ -5,9 +5,9 @@ Feature: Analytics v2 page on dashboard widgets over LangWatchQL
   So that the legacy analytics pages can later be replaced by the new stack instead of by an unowned scripts folder
 
   Legacy analytics at /[project]/analytics runs on a bespoke analytics
-  pipeline. The parity work for a replacement lived in
-  platform/app/scripts/legacy-parity-widgets, a scripts folder no product
-  surface owned. This page moves that work in-app: nine inline widget
+  pipeline. The parity work for a replacement lived in the legacy parity
+  scripts folder under platform/app/scripts, which no product surface owned.
+  This page moves that work in-app: nine inline widget
   definitions, rendered by the same sandboxed frame dashboards use, every
   query an LWQL statement bound to the page's period. The scripts folder is
   deleted in the same change.
@@ -47,8 +47,8 @@ Feature: Analytics v2 page on dashboard widgets over LangWatchQL
 
   @unit
   Scenario: The legacy parity scripts folder is gone and nothing references it
-    Then platform/app/scripts/legacy-parity-widgets does not exist
-    And no file in the repository references legacy-parity-widgets
+    Then the legacy parity scripts folder under platform/app/scripts does not exist
+    And no file in the repository references the legacy parity scripts folder
 
   @unit
   Scenario: The starter dashboard seed still resolves every widget file

@@ -19,7 +19,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -33,6 +33,9 @@ const state = vi.hoisted(() => ({
   throwForId: null as string | null,
   frameCalls: [] as { id: string; graph: unknown }[],
   lwqlEnabled: true,
+  lwqlIsError: false,
+  organization: { id: "org_1" } as { id: string } | undefined,
+  refetch: vi.fn(),
 }));
 
 vi.mock("~/components/GraphsLayout", () => ({
@@ -42,6 +45,7 @@ vi.mock("~/components/GraphsLayout", () => ({
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "acme" },
+    organization: state.organization,
   }),
 }));
 
@@ -53,14 +57,14 @@ vi.mock("~/components/PeriodSelector", () => ({
   }),
 }));
 
-// The page's own gate — grepped in the implementation contract as "the
-// client LangWatchQL feature-flag hook". `~/hooks/useFeatureFlag` is the
-// established pattern for a project-scoped gate elsewhere in the codebase
-// (see `src/server/analytics/lwql/access.ts`'s `LWQL_FLAG`), so this mocks
-// that module. If the landed page reads the flag through a different hook,
-// this mock target needs updating to match — see the write-up's report.
+// Page gate: LWQL_WORKBENCH_FRONTEND_FLAG via useFeatureFlag.
 vi.mock("~/hooks/useFeatureFlag", () => ({
-  useFeatureFlag: () => ({ enabled: state.lwqlEnabled, isLoading: false }),
+  useFeatureFlag: () => ({
+    enabled: state.lwqlEnabled,
+    isLoading: false,
+    isError: state.lwqlIsError,
+    refetch: state.refetch,
+  }),
 }));
 
 vi.mock("~/features/custom-chart-playground/DashboardWidgetFrame", async () => {
@@ -94,6 +98,9 @@ describe("the Analytics v2 page", () => {
     state.throwForId = null;
     state.frameCalls = [];
     state.lwqlEnabled = true;
+    state.lwqlIsError = false;
+    state.organization = { id: "org_1" };
+    state.refetch.mockClear();
   });
   afterEach(cleanup);
 
@@ -171,6 +178,37 @@ describe("the Analytics v2 page", () => {
         screen.getByTestId("analytics-v2-lwql-disabled"),
       ).toBeInTheDocument();
       expect(screen.queryAllByTestId(/^analytics-v2-widget-/)).toHaveLength(0);
+    });
+  });
+
+  describe("when the organization is still resolving", () => {
+    /** @scenario "A project without LangWatchQL sees one clear message" */
+    it("shows the spinner and neither the disabled message nor a widget card", async () => {
+      state.organization = undefined;
+      const { default: AnalyticsV2Page } = await import("../index");
+      render(<AnalyticsV2Page />, { wrapper: Wrapper });
+
+      expect(
+        screen.queryByTestId("analytics-v2-lwql-disabled"),
+      ).not.toBeInTheDocument();
+      expect(screen.queryAllByTestId(/^analytics-v2-widget-/)).toHaveLength(0);
+    });
+  });
+
+  describe("when the LangWatchQL flag check fails", () => {
+    /** @scenario "A project without LangWatchQL sees one clear message" */
+    it("shows a retryable error and clicking Try again refetches", async () => {
+      state.lwqlIsError = true;
+      const { default: AnalyticsV2Page } = await import("../index");
+      render(<AnalyticsV2Page />, { wrapper: Wrapper });
+
+      expect(screen.getByTestId("analytics-v2-flag-error")).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("analytics-v2-lwql-disabled"),
+      ).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByText("Try again"));
+      expect(state.refetch).toHaveBeenCalledTimes(1);
     });
   });
 });

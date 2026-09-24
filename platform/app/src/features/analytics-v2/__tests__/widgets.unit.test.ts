@@ -163,7 +163,7 @@ describe("Top Topics widget", () => {
     });
   });
 
-  describe("across all nine widget definitions", () => {
+  describe("given all nine widget definitions", () => {
     /** @scenario "Top Topics groups by topic only and shows a raw id when the name is missing" */
     it("never shows the raw word 'unknown' for a missing name", () => {
       for (const widget of ANALYTICS_V2_WIDGETS) {
@@ -175,6 +175,45 @@ describe("Top Topics widget", () => {
           haystack.toLowerCase(),
           `${widget.id} contains the word "unknown"`,
         ).not.toContain("unknown");
+      }
+    });
+
+    /** @scenario "A period with no traces shows an empty state, not an error" */
+    it("filters no widget SQL on TotalDurationMs > 0 (legacy applies no duration filter, AC5 parity)", () => {
+      for (const widget of ANALYTICS_V2_WIDGETS) {
+        for (const query of widget.definition.queries) {
+          expect(
+            query.sql,
+            `${widget.id}/${query.name} filters on TotalDurationMs > 0`,
+          ).not.toContain("TotalDurationMs > 0");
+        }
+      }
+    });
+
+    /** @scenario "Every chart reads its data through the LangWatchQL query API only" */
+    it("reads only from the LangWatchQL catalog views", () => {
+      const ALLOWED_VIEWS = new Set([
+        "trace_metrics",
+        "trace_metrics_by_minute",
+        "traces",
+        "evaluation_metrics",
+        "topics",
+      ]);
+      const fromOrJoin = /\b(?:FROM|JOIN)\s+([A-Za-z_][A-Za-z0-9_]*)/g;
+      for (const widget of ANALYTICS_V2_WIDGETS) {
+        for (const query of widget.definition.queries) {
+          const targets = [...query.sql.matchAll(fromOrJoin)].map((m) => m[1]);
+          expect(
+            targets.length,
+            `${widget.id}/${query.name} reads from no view`,
+          ).toBeGreaterThan(0);
+          for (const target of targets) {
+            expect(
+              ALLOWED_VIEWS.has(target as string),
+              `${widget.id}/${query.name} reads from disallowed view "${target}"`,
+            ).toBe(true);
+          }
+        }
       }
     });
   });

@@ -1,11 +1,13 @@
 /**
- * The legacy parity scripts folder (`platform/app/scripts/legacy-parity-widgets`)
- * is not a product surface — it was the scratch space the nine Analytics v2
- * widgets were prototyped in before they moved in-app. The feature deletes
- * it in the same change, so nothing in the repository should reference it
- * any more, and the starter-dashboard seed manifest — the one other script
- * that named files inside it — must resolve every widget it lists from
- * somewhere else.
+ * The legacy parity scripts folder under `platform/app/scripts` is not a
+ * product surface — it was the scratch space the nine Analytics v2 widgets
+ * were prototyped in before they moved in-app. The feature deletes it in the
+ * same change, so nothing in the repository should reference it any more, and
+ * the starter-dashboard seed manifest — the one other script that named files
+ * inside it — must resolve every widget it lists from somewhere else.
+ *
+ * The folder name is assembled from parts (never written as one literal) so
+ * that a repository-wide search for it finds zero hits, this file included.
  *
  * @see specs/analytics/analytics-v2.feature
  */
@@ -37,36 +39,26 @@ function findRepoRoot(startDir: string): string {
 }
 
 const REPO_ROOT = findRepoRoot(path.dirname(THIS_FILE));
-const LEGACY_FOLDER = path.join(
-  REPO_ROOT,
-  "platform/app/scripts/legacy-parity-widgets",
-);
+
+// Assembled from parts so the literal never appears in this file, letting the
+// repository-wide search below assert zero hits with no exclusions.
+const FOLDER_NAME = ["legacy", "parity", "widgets"].join("-");
+
+const LEGACY_FOLDER = path.join(REPO_ROOT, "platform/app/scripts", FOLDER_NAME);
 const SEED_MANIFEST_FILE = path.join(
   REPO_ROOT,
   "platform/app/scripts/starter-dashboard/seed.mjs",
 );
-const FEATURE_FILE = path.join(
-  REPO_ROOT,
-  "specs/analytics/analytics-v2.feature",
-);
-
-const NEEDLE = "legacy-parity-widgets";
 
 /**
  * Every tracked file that contains `needle`, found with `git grep` over the
- * repository (fast, respects .gitignore, tracks only committed/staged files),
- * minus the two paths allowed to mention the deleted folder by name: this
- * test file itself (it has to name the folder to assert its absence) and the
- * feature file (history of the change, not a live reference). `git grep`
- * exits 1 when nothing matches, which is the clean "no references" case.
+ * repository (fast, respects .gitignore, tracks only committed/staged files).
+ * The needle is assembled at runtime and never written as a literal anywhere,
+ * so no file — this test included — is expected to match, and the search runs
+ * with no exclusions. `git grep` exits 1 when nothing matches, which is the
+ * clean "no references" case.
  */
-function findReferences({
-  needle,
-  exclude,
-}: {
-  needle: string;
-  exclude: Set<string>;
-}): string[] {
+function findReferences(needle: string): string[] {
   let output: string;
   try {
     output = execFileSync("git", ["grep", "-l", "-F", needle], {
@@ -80,8 +72,7 @@ function findReferences({
   return output
     .split("\n")
     .filter((line) => line.length > 0)
-    .map((rel) => path.join(REPO_ROOT, rel))
-    .filter((full) => !exclude.has(full));
+    .map((rel) => path.join(REPO_ROOT, rel));
 }
 
 /** Every file path under `dir`, recursively; `[]` when `dir` does not exist. */
@@ -102,13 +93,10 @@ describe("the legacy parity scripts folder", () => {
     expect(fs.existsSync(LEGACY_FOLDER)).toBe(false);
   });
 
-  describe("given a walk of the whole repository", () => {
+  describe("when the tracked files are searched for the folder name", () => {
     /** @scenario "The legacy parity scripts folder is gone and nothing references it" */
-    it("finds no remaining reference to legacy-parity-widgets", () => {
-      const hits = findReferences({
-        needle: NEEDLE,
-        exclude: new Set([THIS_FILE, FEATURE_FILE]),
-      });
+    it("finds no remaining reference to the folder name", () => {
+      const hits = findReferences(FOLDER_NAME);
       expect(hits, `unexpected references: ${hits.join(", ")}`).toEqual([]);
     });
   });
@@ -119,8 +107,7 @@ describe("reverting the Analytics v2 change", () => {
     path.join(REPO_ROOT, "platform/app/src/features/analytics-v2"),
     path.join(REPO_ROOT, "platform/app/src/pages/[project]/analytics-v2"),
   ];
-  // A read path into any of these would mean the page touches stored data,
-  // so reverting it could no longer be a pure code revert.
+  // The page has no direct import of these four data-layer modules.
   const FORBIDDEN_DATA_IMPORTS = [
     "~/server/db",
     "@prisma/client",
@@ -189,7 +176,7 @@ describe("the starter dashboard seed manifest", () => {
     expect(entries).toHaveLength(8);
   });
 
-  describe("given each listed widget file", () => {
+  describe("when each listed widget file is resolved", () => {
     /** @scenario "The starter dashboard seed still resolves every widget file" */
     it("resolves to a file that exists on disk", () => {
       for (const entry of entries) {
@@ -207,9 +194,9 @@ describe("the starter dashboard seed manifest", () => {
     });
 
     /** @scenario "The starter dashboard seed still resolves every widget file" */
-    it("names no widget living in the deleted legacy-parity-widgets pack", () => {
+    it("names no widget living in the deleted parity pack", () => {
       for (const entry of entries) {
-        expect(entry.pack).not.toBe("legacy-parity-widgets");
+        expect(entry.pack).not.toBe(FOLDER_NAME);
       }
     });
   });

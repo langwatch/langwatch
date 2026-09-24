@@ -57,15 +57,6 @@
  * @see dev/docs/adr/005-feature-flags.md for architecture decisions
  * @see useFeatureFlag for frontend usage
  */
-/**
- * The LangWatchQL surface flag. Mirrors `LWQL_FLAG` in
- * `~/server/analytics/lwql/access.ts` — kept as a client-safe constant here
- * so the frontend can reference it without importing the server access
- * module (which would pull the flag service and Prisma into the client
- * bundle).
- */
-export const LWQL_WORKBENCH_FRONTEND_FLAG = "release_lwql_workbench" as const;
-
 export const FRONTEND_FEATURE_FLAGS = [
   "release_ui_ai_gateway_menu_enabled",
   // Voice agents: register an ElevenLabs agent, talk to it, call it from a
@@ -98,7 +89,7 @@ export const FRONTEND_FEATURE_FLAGS = [
   // workbench and the analytics.lwql endpoints. Read-only here — the REST
   // and tRPC boundaries still enforce it server-side, so listing it cannot
   // let the browser open the surface, only mirror whether it is open.
-  LWQL_WORKBENCH_FRONTEND_FLAG,
+  "release_lwql_workbench",
   // Gates the Optimize this prompt menu item alongside the UI-action channel
   // it hands off to; the server-side dispatch checks the same flag.
   "release_langy_ui_actions",
@@ -148,3 +139,12 @@ export const FRONTEND_FEATURE_FLAGS = [
  * Use this type for type-safe flag references.
  */
 export type FrontendFeatureFlag = (typeof FRONTEND_FEATURE_FLAGS)[number];
+
+/**
+ * The LangWatchQL surface flag. Mirrors `LWQL_FLAG` in
+ * `~/server/analytics/lwql/access.ts` — kept as a client-safe constant here
+ * so the frontend can reference it without importing the server access
+ * module (which would pull the flag service and Prisma into the client
+ * bundle). Listed in `FRONTEND_FEATURE_FLAGS` above.
+ */
+export const LWQL_WORKBENCH_FRONTEND_FLAG = "release_lwql_workbench" as const;
