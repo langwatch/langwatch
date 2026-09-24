@@ -698,6 +698,7 @@ export const APP_ERROR_CODES = [
   "virtual_key_expiry_in_past",
   "virtual_key_not_found",
   "voice_agents_disabled",
+  "voice_call_record_not_ready",
   "voice_conversation_mismatch",
   "voice_key_missing",
   "voice_mint_failed",

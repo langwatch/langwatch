@@ -92,7 +92,7 @@ export class AutomationSettlementLedgerService extends AutomationSettlementLedge
     this.breach = breach;
   }
 
-  getActiveTraceTriggersForProject(projectId: string): Promise<TriggerSummary[]> {
+  findActiveTraceTriggersForProject(projectId: string): Promise<TriggerSummary[]> {
     return this.active.getActiveTraceTriggersForProject(projectId);
   }
 

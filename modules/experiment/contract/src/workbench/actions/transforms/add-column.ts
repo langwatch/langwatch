@@ -1,6 +1,6 @@
 import type { DatasetColumn } from "../../../experiment-workbench.ts";
 import { type AddColumnPayload, addColumnPayloadSchema } from "../schemas.ts";
-import { inlineRowCount, replaceDataset, requireInlineDataset } from "./helpers.ts";
+import { inlineRowCount, replaceDataset, getInlineDataset } from "./helpers.ts";
 import { type Transform, TransformError } from "./types.ts";
 
 /**
@@ -11,7 +11,7 @@ export const addColumn: Transform<AddColumnPayload, { datasetId: string; columnI
   payload,
 }) => {
   const { datasetId, column } = addColumnPayloadSchema.parse(payload);
-  const dataset = requireInlineDataset({ state, datasetId });
+  const dataset = getInlineDataset({ state, datasetId });
 
   // Blank is not an id: an empty or whitespace-only one falls back to the name,
   // the same as sending none. A blank id reaching state would key the records

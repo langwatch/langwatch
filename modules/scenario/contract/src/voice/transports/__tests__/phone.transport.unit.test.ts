@@ -265,7 +265,7 @@ describe("phoneTransport", () => {
           }),
         );
         assertThrows(() =>
-          transport.fetchCallRecord({
+          transport.getCallRecord({
             conversationId: "c",
             credential: TWILIO_CREDENTIAL,
             audioProxyUrl: "/audio",

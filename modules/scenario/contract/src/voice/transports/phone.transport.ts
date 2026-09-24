@@ -308,7 +308,7 @@ export function createPhoneTransport(deps: PhoneTransportDeps): VoiceTransportRu
       throw new VoicePhoneTransportUnavailableError();
     },
 
-    fetchCallRecord(): Promise<never> {
+    getCallRecord(): Promise<never> {
       throw new VoicePhoneTransportUnavailableError();
     },
 

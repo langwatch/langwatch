@@ -1,6 +1,6 @@
 import type { TargetConfig } from "../../../experiment-workbench.ts";
 import { type UpdateTargetModelPayload, updateTargetModelPayloadSchema } from "../schemas.ts";
-import { requireTarget } from "./helpers.ts";
+import { getTarget } from "./helpers.ts";
 import { type Transform, TransformError } from "./types.ts";
 
 /**
@@ -11,7 +11,7 @@ export const updateTargetModel: Transform<
   { targetId: string; model: string }
 > = ({ state, payload }) => {
   const { targetId, model } = updateTargetModelPayloadSchema.parse(payload);
-  const target = requireTarget({ state, targetId });
+  const target = getTarget({ state, targetId });
 
   if (!target.localPromptConfig) {
     throw new TransformError({

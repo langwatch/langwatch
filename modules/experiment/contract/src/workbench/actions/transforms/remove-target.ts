@@ -1,6 +1,6 @@
 import type { FieldMapping } from "../../../experiment-workbench.ts";
 import { type RemoveTargetPayload, removeTargetPayloadSchema } from "../schemas.ts";
-import { requireTarget } from "./helpers.ts";
+import { getTarget } from "./helpers.ts";
 import type { Transform } from "./types.ts";
 
 /**
@@ -33,7 +33,7 @@ export const removeTarget: Transform<RemoveTargetPayload, { targetId: string }> 
   payload,
 }) => {
   const { targetId } = removeTargetPayloadSchema.parse(payload);
-  requireTarget({ state, targetId });
+  getTarget({ state, targetId });
 
   const evaluators = state.evaluators.map((evaluator) => {
     const mappings: typeof evaluator.mappings = {};

@@ -155,12 +155,6 @@ describe("resolveDispatchEvaluatorType", () => {
       expect(resolveDispatchEvaluatorType("langevals/llm_boolean")).toBe("langevals/llm_boolean");
     });
   });
-
-  describe("given undefined", () => {
-    it("returns undefined", () => {
-      expect(resolveDispatchEvaluatorType(undefined)).toBeUndefined();
-    });
-  });
 });
 
 describe("normalizeEvaluators", () => {

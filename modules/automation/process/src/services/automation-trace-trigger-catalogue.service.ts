@@ -24,7 +24,7 @@ export class AutomationTraceTriggerCatalogueService extends AutomationTraceTrigg
     super();
   }
 
-  getActiveTraceTriggersForProject(projectId: string): Promise<TriggerSummary[]> {
+  findActiveTraceTriggersForProject(projectId: string): Promise<TriggerSummary[]> {
     return this.active.getActiveTraceTriggersForProject(projectId);
   }
 }

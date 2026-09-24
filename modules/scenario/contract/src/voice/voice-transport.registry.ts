@@ -48,15 +48,15 @@ export interface VoiceTransportRunner {
     credential: VoiceTransportCredential;
   }) => Promise<VoiceSessionConnect>;
   /**
-   * Read the finished conversation back as a normalised `CallRecord`. Null
-   * means no record yet (falls back to the browser transcript); throws on a
-   * failed fetch, distinguishing "not ready" from "could not fetch" (AC15).
+   * Read the finished conversation back as a normalised `CallRecord`. No record
+   * yet throws `voice_call_record_not_ready` (the browser transcript is kept);
+   * any other throw is a failed fetch (AC15).
    */
-  fetchCallRecord(input: {
+  getCallRecord(input: {
     conversationId: string;
     credential: VoiceTransportCredential;
     audioProxyUrl: string;
-  }): Promise<CallRecord | null>;
+  }): Promise<CallRecord>;
   /**
    * End the live call now, when the whole-call limit elapses, so the
    * drained transcript is still judged (AC28). "Hang up" lives on the runner

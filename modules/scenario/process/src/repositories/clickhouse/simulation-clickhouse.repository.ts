@@ -174,7 +174,7 @@ function groupRunsByBatch(runs: SimulationRunData[]): Map<string, SimulationRunD
 }
 
 /** The actor a stored id and label name, or null when they name no person. */
-function readActor(params: {
+function deriveRunActor(params: {
   id: string | null | undefined;
   label: string | null | undefined;
 }): RunActor | null {
@@ -272,7 +272,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return Math.min(Math.max(1, limit), ceiling);
   }
 
-  static startedAtBoundsForPage(
+  static computeStartedAtBoundsForPage(
     rows: { MinStartedAt: string; MaxStartedAt: string }[],
   ): { minMs: number; maxMs: number } | null {
     let minMs = Number.POSITIVE_INFINITY;
@@ -522,7 +522,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     // runs windowed/hit; no usable range runs unbounded/unwindowed (the old
     // silent widening, now counted). fallback "none": step 1 already bounded
     // these batches, so an empty windowed read is a genuine empty page.
-    const startedAtBounds = SimulationClickHouseRepository.startedAtBoundsForPage(pageRows);
+    const startedAtBounds = SimulationClickHouseRepository.computeStartedAtBoundsForPage(pageRows);
 
     // Step 2: fetch slim item rows (preview columns only)
     const itemRows = await queryWindowed<PreviewItemRow[]>({
@@ -582,7 +582,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
       // way the note is, so the first run that names one answers for the
       // batch. It rides the preview rows already loaded, so it costs no query.
       const actorRow = (itemsByBatch.get(b.BatchRunId) ?? []).find((r) => r.ActorId !== "");
-      const startedBy = readActor({
+      const startedBy = deriveRunActor({
         id: actorRow?.ActorId,
         label: actorRow?.ActorLabel,
       });
@@ -644,7 +644,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
       ...SimulationClickHouseRepository.mapBatchAggregateRow(row),
       stalledCount: Number(row.StalledCount),
       note: row.Note === "" ? null : row.Note,
-      startedBy: readActor({ id: row.ActorId, label: row.ActorLabel }),
+      startedBy: deriveRunActor({ id: row.ActorId, label: row.ActorLabel }),
     };
   }
 

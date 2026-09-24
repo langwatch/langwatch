@@ -1,5 +1,5 @@
 import { type AddRowsPayload, addRowsPayloadSchema } from "../schemas.ts";
-import { inlineRowCount, replaceDataset, requireInlineDataset } from "./helpers.ts";
+import { inlineRowCount, replaceDataset, getInlineDataset } from "./helpers.ts";
 import type { Transform } from "./types.ts";
 
 const paddedTo = ({ values, length }: { values: string[]; length: number }): string[] => {
@@ -18,7 +18,7 @@ export const addRows: Transform<
   { datasetId: string; addedRows: number; rowCount: number }
 > = ({ state, payload }) => {
   const { datasetId, rows } = addRowsPayloadSchema.parse(payload);
-  const dataset = requireInlineDataset({ state, datasetId });
+  const dataset = getInlineDataset({ state, datasetId });
 
   const startRowCount = inlineRowCount(dataset.inline);
   const records: Record<string, string[]> = {};

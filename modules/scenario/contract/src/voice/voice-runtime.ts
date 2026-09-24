@@ -12,4 +12,8 @@ export type {
 } from "./voice-transport.registry.ts";
 export type { VoiceTransport } from "./voice-transport.ts";
 export { PHONE_NO_CREDENTIAL_MESSAGE } from "./transports/phone.transport.ts";
-export { VoiceAgentRowNotFoundError, VoiceKeyMissingError } from "./voice-session.service.ts";
+export {
+  VoiceAgentRowNotFoundError,
+  VoiceKeyMissingError,
+  VoiceSessionInvalidError,
+} from "./voice-session.service.ts";

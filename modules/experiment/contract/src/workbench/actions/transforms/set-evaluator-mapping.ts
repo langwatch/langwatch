@@ -1,5 +1,5 @@
 import { type SetEvaluatorMappingPayload, setEvaluatorMappingPayloadSchema } from "../schemas.ts";
-import { requireDataset, requireEvaluator, requireTarget } from "./helpers.ts";
+import { getDataset, getEvaluator, getTarget } from "./helpers.ts";
 import type { Transform } from "./types.ts";
 
 /**
@@ -11,9 +11,9 @@ export const setEvaluatorMapping: Transform<
 > = ({ state, payload }) => {
   const { evaluatorId, datasetId, targetId, inputField, mapping } =
     setEvaluatorMappingPayloadSchema.parse(payload);
-  requireEvaluator({ state, evaluatorId });
-  requireDataset({ state, datasetId });
-  requireTarget({ state, targetId });
+  getEvaluator({ state, evaluatorId });
+  getDataset({ state, datasetId });
+  getTarget({ state, targetId });
 
   return {
     state: {

@@ -9,6 +9,7 @@ import type { AgentAdapter } from "@langwatch/scenario";
 import * as ScenarioRunner from "@langwatch/scenario";
 import { nowInstant } from "@langwatch/time";
 
+import { VoiceCallRecordNotReadyError } from "../../scenario.errors.ts";
 import type { CallRecord, CallTurn } from "../call-record.ts";
 import { VOICE_HTTP_TIMEOUT_MS } from "../voice-limits.ts";
 import type {
@@ -240,17 +241,15 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
     return { signedUrl: body.signed_url };
   },
 
-  async fetchCallRecord({ conversationId, credential, audioProxyUrl }) {
+  async getCallRecord({ conversationId, credential, audioProxyUrl }) {
     const el = elevenLabsCredentialOf(credential);
     const url = `${el.baseUrl}${CONVERSATION_PATH}/${encodeURIComponent(conversationId)}`;
     const response = await fetch(url, {
       headers: authHeaders(el),
       signal: AbortSignal.timeout(VOICE_HTTP_TIMEOUT_MS),
     });
-    // Not ready yet: the record does not exist for this conversation. The
-    // caller falls back to the live transcript rather than treating it as a
-    // fetch failure.
-    if (response.status === 404) return null;
+    // Not ready yet: the caller keeps the live transcript, not a fetch failure.
+    if (response.status === 404) throw new VoiceCallRecordNotReadyError({ conversationId });
     if (!response.ok) {
       const bodyText = await response.text().catch(() => "");
       throw new Error(
@@ -269,7 +268,7 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
         { conversationId, status: body.status },
         "provider record not ready; browser transcript will be used",
       );
-      return null;
+      throw new VoiceCallRecordNotReadyError({ conversationId });
     }
     const startedAt = body.metadata?.start_time_unix_secs
       ? body.metadata.start_time_unix_secs * 1000

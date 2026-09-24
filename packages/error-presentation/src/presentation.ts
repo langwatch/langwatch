@@ -4428,6 +4428,10 @@ const presentations = {
   // drift. That import is impossible here: @langwatch/feature-flag-contract, which
   // owns the constant, already depends on @langwatch/handled-error, so importing it
   // back would be a workspace cycle. The literal is duplicated deliberately.
+  voice_call_record_not_ready: {
+    title: "The call record is not ready yet",
+    describe: () => "The provider is still finishing this call. Try again in a moment.",
+  },
   voice_agents_disabled: {
     // voiceAgents.message has zero imports of its own, so pulling it in here
     // never drags server-only Prisma code into this client-bundled registry.

@@ -173,7 +173,7 @@ class TestAutomationService implements AutomationTraceTriggerCatalogue, Automati
     throw new Error("not used by this subscriber");
   };
 
-  getActiveTraceTriggersForProject(_projectId: string): Promise<TriggerSummary[]> {
+  findActiveTraceTriggersForProject(_projectId: string): Promise<TriggerSummary[]> {
     return Promise.resolve([trigger()]);
   }
   getActiveGraphTriggersForProject(_projectId: string): Promise<TriggerSummary[]> {

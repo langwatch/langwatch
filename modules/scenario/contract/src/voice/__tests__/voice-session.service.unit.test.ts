@@ -5,6 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScenarioRunStatus } from "../../scenario-run.ts";
+import { VoiceCallRecordNotReadyError } from "../../scenario.errors.ts";
 import type { CallRecord } from "../call-record.ts";
 import {
   createPhoneTransport,
@@ -39,7 +40,9 @@ function fakeRunner(over: Partial<VoiceTransportRunner> = {}): VoiceTransportRun
     missingKeyMessage: "No ElevenLabs key in this project",
     createAgentAdapter: () => ({}) as never,
     mintSession: vi.fn(async () => ({ signedUrl: "wss://signed.example/abc" })),
-    fetchCallRecord: vi.fn(async () => null),
+    getCallRecord: vi.fn(async (): Promise<CallRecord> => {
+      throw new VoiceCallRecordNotReadyError({ conversationId: "conv" });
+    }),
     endCall: vi.fn(async () => {}),
     ...over,
   };
@@ -661,7 +664,7 @@ describe("finishVoiceSession", () => {
     describe("when the provider record names a different agent than the token", () => {
       it("refuses without writing the run", async () => {
         const runner = fakeRunner({
-          fetchCallRecord: vi.fn(async (): Promise<CallRecord> => ({
+          getCallRecord: vi.fn(async (): Promise<CallRecord> => ({
             conversationId: "conv_1",
             transport: "elevenlabs_convai",
             agentExternalId: "someone_elses_agent",
@@ -774,7 +777,7 @@ describe("finishVoiceSession", () => {
       /** @scenario "A finished provider record with turns is written as the provider transcript" */
       it("writes the provider turns and marks the source provider", async () => {
         const runner = fakeRunner({
-          fetchCallRecord: vi.fn(async (): Promise<CallRecord> => ({
+          getCallRecord: vi.fn(async (): Promise<CallRecord> => ({
             conversationId: "conv_1",
             transport: "elevenlabs_convai",
             agentExternalId: "agent_xyz",
@@ -804,7 +807,7 @@ describe("finishVoiceSession", () => {
       /** @scenario "A finished provider record with no turns keeps the live transcript" */
       it("writes the browser turns and marks the source browser", async () => {
         const runner = fakeRunner({
-          fetchCallRecord: vi.fn(async (): Promise<CallRecord> => ({
+          getCallRecord: vi.fn(async (): Promise<CallRecord> => ({
             conversationId: "conv_1",
             transport: "elevenlabs_convai",
             agentExternalId: "agent_xyz",
@@ -832,7 +835,7 @@ describe("finishVoiceSession", () => {
       /** @scenario "A finished provider record with no turns keeps the live transcript" */
       it("keeps the provider's recording even when the turns come from the browser", async () => {
         const runner = fakeRunner({
-          fetchCallRecord: vi.fn(async (): Promise<CallRecord> => ({
+          getCallRecord: vi.fn(async (): Promise<CallRecord> => ({
             conversationId: "conv_1",
             transport: "elevenlabs_convai",
             agentExternalId: "agent_xyz",
@@ -878,9 +881,13 @@ describe("finishVoiceSession", () => {
        * notice"
        */
       it("keeps the browser turns without flagging the fetch as failed", async () => {
-        // The transport maps a "failed" status to null (not ready), so the
-        // service sees no record and falls back to the live transcript.
-        const runner = fakeRunner({ fetchCallRecord: vi.fn(async () => null) });
+        // The transport maps a "failed" status to not-ready, so the service
+        // falls back to the live transcript.
+        const runner = fakeRunner({
+          getCallRecord: vi.fn(async (): Promise<CallRecord> => {
+            throw new VoiceCallRecordNotReadyError({ conversationId: "conv" });
+          }),
+        });
         const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         const ports = fakePorts({ runner, over: { writeCallRun } });
 
@@ -929,7 +936,7 @@ describe("finishVoiceSession", () => {
        */
       it("keeps the live transcript and flags the fetch as failed", async () => {
         const runner = fakeRunner({
-          fetchCallRecord: vi.fn(async () => {
+          getCallRecord: vi.fn(async () => {
             throw new Error("key rotated");
           }),
         });
@@ -1016,9 +1023,11 @@ describe("authorizeRecordingPlayback", () => {
   describe("given a recording-playback request", () => {
     describe("when a scenario run exists for the conversation", () => {
       it("authorizes with the credential and never calls the provider", async () => {
-        const fetchCallRecord = vi.fn(async () => null);
+        const getCallRecord = vi.fn(async (): Promise<CallRecord> => {
+          throw new VoiceCallRecordNotReadyError({ conversationId: "conv" });
+        });
         const ports = fakePorts({
-          runner: fakeRunner({ fetchCallRecord }),
+          runner: fakeRunner({ getCallRecord }),
           over: {
             findExistingRun: vi.fn(async () => ({
               agentId: "agent_row",
@@ -1038,7 +1047,7 @@ describe("authorizeRecordingPlayback", () => {
         });
 
         expect(credential).toEqual(CREDENTIAL);
-        expect(fetchCallRecord).not.toHaveBeenCalled();
+        expect(getCallRecord).not.toHaveBeenCalled();
       });
     });
 
@@ -1046,7 +1055,7 @@ describe("authorizeRecordingPlayback", () => {
       /** @scenario "A drawer call's recording still plays after hang-up" */
       it("authorizes with the credential", async () => {
         const hasVoiceAgentForExternalId = vi.fn(async () => true);
-        const fetchCallRecord = vi.fn(async (): Promise<CallRecord> => ({
+        const getCallRecord = vi.fn(async (): Promise<CallRecord> => ({
           conversationId: "conv_1",
           transport: "elevenlabs_convai",
           agentExternalId: "agent_xyz",
@@ -1058,7 +1067,7 @@ describe("authorizeRecordingPlayback", () => {
           source: "provider",
         }));
         const ports = fakePorts({
-          runner: fakeRunner({ fetchCallRecord }),
+          runner: fakeRunner({ getCallRecord }),
           over: { hasVoiceAgentForExternalId },
         });
 
@@ -1081,7 +1090,7 @@ describe("authorizeRecordingPlayback", () => {
       it("refuses and never returns the credential", async () => {
         const ports = fakePorts({
           runner: fakeRunner({
-            fetchCallRecord: vi.fn(async (): Promise<CallRecord> => ({
+            getCallRecord: vi.fn(async (): Promise<CallRecord> => ({
               conversationId: "conv_1",
               transport: "elevenlabs_convai",
               agentExternalId: "agent_other",
@@ -1111,7 +1120,7 @@ describe("authorizeRecordingPlayback", () => {
         const hasVoiceAgentForExternalId = vi.fn(async () => true);
         const ports = fakePorts({
           runner: fakeRunner({
-            fetchCallRecord: vi.fn(async () => {
+            getCallRecord: vi.fn(async () => {
               throw new Error("provider down");
             }),
           }),

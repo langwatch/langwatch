@@ -103,7 +103,7 @@ export class TriggerSettlementPersistenceService {
     triggerId: string;
     traceIds: string[];
   }): Promise<TriggerSummary | null> {
-    const triggers = await this.composition.automation.getActiveTraceTriggersForProject(
+    const triggers = await this.composition.automation.findActiveTraceTriggersForProject(
       input.projectId,
     );
     const trigger = triggers.find(({ id }) => id === input.triggerId) ?? null;

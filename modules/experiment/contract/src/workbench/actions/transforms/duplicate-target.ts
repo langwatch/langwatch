@@ -1,7 +1,7 @@
 import type { EvaluatorConfig, FieldMapping, TargetConfig } from "../../../experiment-workbench.ts";
 import { type DuplicateTargetPayload, duplicateTargetPayloadSchema } from "../schemas.ts";
 import { attachTarget, newTargetId } from "./add-target.ts";
-import { requireTarget } from "./helpers.ts";
+import { getTarget } from "./helpers.ts";
 import type { Transform } from "./types.ts";
 
 /**
@@ -46,7 +46,7 @@ export const duplicateTarget: Transform<
   { targetId: string; name?: string }
 > = ({ state, payload }) => {
   const { targetId, name } = duplicateTargetPayloadSchema.parse(payload);
-  const source = requireTarget({ state, targetId });
+  const source = getTarget({ state, targetId });
 
   const copyTargetId = newTargetId();
 

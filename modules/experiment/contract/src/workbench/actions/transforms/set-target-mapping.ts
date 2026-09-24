@@ -1,5 +1,5 @@
 import { type SetMappingPayload, setMappingPayloadSchema } from "../schemas.ts";
-import { requireDataset, requireTarget } from "./helpers.ts";
+import { getDataset, getTarget } from "./helpers.ts";
 import type { Transform } from "./types.ts";
 
 /**
@@ -10,8 +10,8 @@ export const setTargetMapping: Transform<SetMappingPayload, { targetId: string }
   payload,
 }) => {
   const { targetId, datasetId, inputField, mapping } = setMappingPayloadSchema.parse(payload);
-  requireTarget({ state, targetId });
-  requireDataset({ state, datasetId });
+  getTarget({ state, targetId });
+  getDataset({ state, datasetId });
 
   return {
     state: {

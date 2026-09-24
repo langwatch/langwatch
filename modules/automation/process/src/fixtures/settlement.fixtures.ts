@@ -159,7 +159,7 @@ class SettlementAutomationService implements AutomationSettlementLedger {
     this.activeTrigger = trigger;
   }
 
-  async getActiveTraceTriggersForProject(): Promise<TriggerSummary[]> {
+  async findActiveTraceTriggersForProject(): Promise<TriggerSummary[]> {
     this.activeTriggerReads += 1;
     return this.activeTrigger ? [this.activeTrigger] : [];
   }

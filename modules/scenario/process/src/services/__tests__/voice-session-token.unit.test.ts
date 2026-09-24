@@ -22,6 +22,8 @@ const PAYLOAD: VoiceSessionTokenPayload = {
 };
 
 describe("voice session token", () => {
+  const INVALID = expect.objectContaining({ code: "voice_session_invalid" });
+
   describe("given a signed token", () => {
     describe("when a token is signed and verified with the same secret", () => {
       it("round-trips the claims", () => {
@@ -34,17 +36,19 @@ describe("voice session token", () => {
     });
 
     describe("when the signature does not match the secret", () => {
-      it("verifies to null", () => {
+      it("refuses as an invalid session", () => {
         const token = signVoiceSessionToken({
           payload: PAYLOAD,
           secret: SECRET,
         });
-        expect(verifyVoiceSessionToken({ token, now: NOW, secret: "other-secret" })).toBeNull();
+        expect(() => verifyVoiceSessionToken({ token, now: NOW, secret: "other-secret" })).toThrow(
+          INVALID,
+        );
       });
     });
 
     describe("when the payload is edited after signing", () => {
-      it("verifies to null", () => {
+      it("refuses as an invalid session", () => {
         const token = signVoiceSessionToken({
           payload: PAYLOAD,
           secret: SECRET,
@@ -54,36 +58,40 @@ describe("voice session token", () => {
           JSON.stringify({ ...PAYLOAD, projectId: "p2" }),
           "utf8",
         ).toString("base64url");
-        expect(
+        expect(() =>
           verifyVoiceSessionToken({
             token: `${forged}.${signature}`,
             now: NOW,
             secret: SECRET,
           }),
-        ).toBeNull();
+        ).toThrow(INVALID);
       });
     });
 
     describe("when the token has expired", () => {
-      it("verifies to null", () => {
+      it("refuses as an invalid session", () => {
         const token = signVoiceSessionToken({
           payload: PAYLOAD,
           secret: SECRET,
         });
-        expect(verifyVoiceSessionToken({ token, now: PAYLOAD.exp, secret: SECRET })).toBeNull();
+        expect(() => verifyVoiceSessionToken({ token, now: PAYLOAD.exp, secret: SECRET })).toThrow(
+          INVALID,
+        );
       });
     });
 
     describe("when the token is malformed", () => {
-      it("verifies to null", () => {
-        expect(
+      it("refuses as an invalid session", () => {
+        expect(() =>
           verifyVoiceSessionToken({
             token: "garbage",
             now: NOW,
             secret: SECRET,
           }),
-        ).toBeNull();
-        expect(verifyVoiceSessionToken({ token: "a.b.c", now: NOW, secret: SECRET })).toBeNull();
+        ).toThrow(INVALID);
+        expect(() => verifyVoiceSessionToken({ token: "a.b.c", now: NOW, secret: SECRET })).toThrow(
+          INVALID,
+        );
       });
     });
   });

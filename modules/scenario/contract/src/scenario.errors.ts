@@ -254,6 +254,17 @@ export class VoiceAgentNotFoundError extends HandledError {
   }
 }
 
+/** The provider has no finished record for this conversation yet. */
+export class VoiceCallRecordNotReadyError extends NotFoundError {
+  declare readonly code: "voice_call_record_not_ready";
+  constructor({ conversationId }: { conversationId: string }) {
+    super("voice_call_record_not_ready", "Call record", conversationId, {
+      meta: { conversationId },
+    });
+    this.name = "VoiceCallRecordNotReadyError";
+  }
+}
+
 export class ScenarioGenerationFailedError extends HandledError {
   constructor(cause: unknown) {
     super("scenario_generation_failed", "Failed to generate scenario", {

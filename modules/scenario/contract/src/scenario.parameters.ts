@@ -213,8 +213,9 @@ export function withoutParameterNames({
 }: {
   values?: RunParameterValues;
   names: ReadonlySet<string>;
-}): RunParameterValues | undefined {
-  if (!values || names.size === 0) return values;
+}): RunParameterValues {
+  if (!values) return {};
+  if (names.size === 0) return values;
   return Object.fromEntries(Object.entries(values).filter(([name]) => !names.has(name)));
 }
 

@@ -363,13 +363,16 @@ async function fetchProviderRecord(
     throw error;
   }
   try {
-    const record = await runner.fetchCallRecord({
+    const record = await runner.getCallRecord({
       conversationId,
       credential,
       audioProxyUrl: ports.audioProxyUrl({ conversationId, projectId }),
     });
     return { record, hasFetchFailed: false };
-  } catch {
+  } catch (error) {
+    if (HandledError.isHandled(error) && error.code === "voice_call_record_not_ready") {
+      return { record: null, hasFetchFailed: false };
+    }
     return { record: null, hasFetchFailed: true };
   }
 }
@@ -759,9 +762,9 @@ async function drawerRecordingBelongsToProject(
     credential: VoiceTransportCredential;
   },
 ): Promise<boolean> {
-  let record: CallRecord | null;
+  let record: CallRecord;
   try {
-    record = await runnerFor(ports, transport).fetchCallRecord({
+    record = await runnerFor(ports, transport).getCallRecord({
       conversationId,
       credential,
       audioProxyUrl: ports.audioProxyUrl({ conversationId, projectId }),
@@ -769,7 +772,7 @@ async function drawerRecordingBelongsToProject(
   } catch {
     return false;
   }
-  const agentExternalId = record?.agentExternalId;
+  const agentExternalId = record.agentExternalId;
   if (!agentExternalId) return false;
   return ports.hasVoiceAgentForExternalId({
     projectId,

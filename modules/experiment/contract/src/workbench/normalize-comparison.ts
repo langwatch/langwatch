@@ -12,9 +12,7 @@ export { resolveExperimentVerdictLabel as resolveVerdictLabel };
 
 // Reroutes legacy pairwise_compare to select_best_compare. Co-located type
 // reroute and payload translation prevent #5528-style mismatches.
-export const resolveDispatchEvaluatorType = (
-  storedEvaluatorType: string | undefined,
-): string | undefined =>
+export const resolveDispatchEvaluatorType = (storedEvaluatorType: string): string =>
   storedEvaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE
     ? COMPARISON_EVALUATOR_TYPE
     : storedEvaluatorType;

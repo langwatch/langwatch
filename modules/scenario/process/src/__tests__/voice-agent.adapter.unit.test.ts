@@ -21,14 +21,14 @@ function fakeRegistry(
       missingKeyMessage: "No ElevenLabs key in this project",
       createAgentAdapter,
       mintSession: vi.fn(),
-      fetchCallRecord: vi.fn(),
+      getCallRecord: vi.fn(),
       endCall: vi.fn(),
     },
     phone: {
       missingKeyMessage: "No Twilio credentials in this project",
       createAgentAdapter: vi.fn(),
       mintSession: vi.fn(),
-      fetchCallRecord: vi.fn(),
+      getCallRecord: vi.fn(),
       endCall: vi.fn(),
       assertAvailable: vi.fn(() => {
         throw new Error("Phone targets have no browser call");

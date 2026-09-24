@@ -21,7 +21,7 @@ function harness(
   const seen = { summaries: [] as string[], confirmed: [] as string[], delivered: 0 };
   const composition = {
     automation: {
-      getActiveTraceTriggersForProject: async () => options.triggers ?? [TRIGGER],
+      findActiveTraceTriggersForProject: async () => options.triggers ?? [TRIGGER],
       isSendClaimed: async () => options.claimed ?? false,
       filterSendClaimed: async () => [],
       claimSend: async () => undefined,

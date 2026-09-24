@@ -10,7 +10,7 @@ import type { Instant } from "@langwatch/time";
 // AutomationService into three concerns: triggers + send claims, persist ceiling, webhook log.
 export abstract class AutomationSettlementLedger {
   /** The project's active trace automations, as the settled digest re-reads them. */
-  abstract getActiveTraceTriggersForProject(projectId: string): Promise<TriggerSummary[]>;
+  abstract findActiveTraceTriggersForProject(projectId: string): Promise<TriggerSummary[]>;
 
   /** Whether this (trigger, trace) has already been delivered for. */
   abstract isSendClaimed(input: {

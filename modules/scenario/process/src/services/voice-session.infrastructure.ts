@@ -82,7 +82,7 @@ export interface VoiceSessionServices {
 /** The terminal-retry fields a finished run persisted, narrowed from the loose
  *  run metadata to the shapes {@link VoiceSessionInfrastructure.findExistingRun}
  *  promises. The persisted audioUrl is already the same-origin proxy url the
- *  transport wrote (fetchCallRecord sets it from audioProxyUrl), so it is kept
+ *  transport wrote (getCallRecord sets it from audioProxyUrl), so it is kept
  *  as-is. */
 function narrowPersistedRunFields(rawMetadata: unknown): {
   agentId: string | null;

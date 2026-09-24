@@ -43,7 +43,7 @@ function runtime(
   const capture = vi.fn();
 
   const automation = {
-    getActiveTraceTriggersForProject: vi.fn().mockResolvedValue([trigger]),
+    findActiveTraceTriggersForProject: vi.fn().mockResolvedValue([trigger]),
     filterSendClaimed: vi.fn().mockResolvedValue(new Set<string>()),
     resolvePersistDailyCap: vi.fn().mockResolvedValue(100),
     consumePersistCapSlot,

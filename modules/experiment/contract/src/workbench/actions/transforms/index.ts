@@ -10,10 +10,10 @@ export { addTarget, attachTarget, newTargetId } from "./add-target.ts";
 export { duplicateTarget } from "./duplicate-target.ts";
 export {
   inlineRowCount,
-  requireDataset,
-  requireEvaluator,
-  requireInlineDataset,
-  requireTarget,
+  getDataset,
+  getEvaluator,
+  getInlineDataset,
+  getTarget,
 } from "./helpers.ts";
 export { removeTarget } from "./remove-target.ts";
 export { setCellValue } from "./set-cell-value.ts";

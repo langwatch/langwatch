@@ -6,7 +6,7 @@ import type {
 } from "../../../experiment-workbench.ts";
 import { TransformError, type WorkbenchState } from "./types.ts";
 
-export const requireTarget = ({
+export const getTarget = ({
   state,
   targetId,
 }: {
@@ -24,7 +24,7 @@ export const requireTarget = ({
   return target;
 };
 
-export const requireEvaluator = ({
+export const getEvaluator = ({
   state,
   evaluatorId,
 }: {
@@ -42,7 +42,7 @@ export const requireEvaluator = ({
   return evaluator;
 };
 
-export const requireDataset = ({
+export const getDataset = ({
   state,
   datasetId,
 }: {
@@ -63,14 +63,14 @@ export const requireDataset = ({
 /**
  * A dataset whose rows and columns this layer may edit.
  */
-export const requireInlineDataset = ({
+export const getInlineDataset = ({
   state,
   datasetId,
 }: {
   state: WorkbenchState;
   datasetId: string;
 }): DatasetReference & { inline: InlineDataset } => {
-  const dataset = requireDataset({ state, datasetId });
+  const dataset = getDataset({ state, datasetId });
   if (dataset.type !== "inline" || !dataset.inline) {
     throw new TransformError({
       code: "dataset_not_editable",

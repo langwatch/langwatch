@@ -2,7 +2,7 @@ import type { Field } from "@langwatch/workflow-contract";
 
 import type { TargetConfig } from "../../../experiment-workbench.ts";
 import { type SetTargetPromptPayload, setTargetPromptPayloadSchema } from "../schemas.ts";
-import { requireTarget } from "./helpers.ts";
+import { getTarget } from "./helpers.ts";
 import type { Transform } from "./types.ts";
 
 /**
@@ -14,7 +14,7 @@ export const setTargetPrompt: Transform<SetTargetPromptPayload, { targetId: stri
 }) => {
   const { targetId, localPromptConfig, inputs, outputs } =
     setTargetPromptPayloadSchema.parse(payload);
-  const target = requireTarget({ state, targetId });
+  const target = getTarget({ state, targetId });
 
   const updated: TargetConfig = {
     ...target,

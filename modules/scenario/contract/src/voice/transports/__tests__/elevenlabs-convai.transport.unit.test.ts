@@ -312,7 +312,7 @@ describe("elevenLabsConvaiTransport.mintSession", () => {
   });
 });
 
-describe("elevenLabsConvaiTransport.fetchCallRecord", () => {
+describe("elevenLabsConvaiTransport.getCallRecord", () => {
   describe("given a fetch call record request", () => {
     afterEach(() => vi.unstubAllGlobals());
 
@@ -333,15 +333,15 @@ describe("elevenLabsConvaiTransport.fetchCallRecord", () => {
           }),
         });
 
-        const record = await elevenLabsConvaiTransport.fetchCallRecord({
+        const record = await elevenLabsConvaiTransport.getCallRecord({
           conversationId: "conv_1",
           credential: CREDENTIAL,
           audioProxyUrl: "/api/voice/session/conv_1/audio",
         });
 
-        expect(record?.audioUrl).toBeUndefined();
-        expect(record?.source).toBe("provider");
-        expect(record?.turns).toEqual([
+        expect(record.audioUrl).toBeUndefined();
+        expect(record.source).toBe("provider");
+        expect(record.turns).toEqual([
           { role: "caller", text: "hello", startMs: 0 },
           { role: "agent", text: "hi", startMs: 1000 },
         ]);
@@ -358,26 +358,27 @@ describe("elevenLabsConvaiTransport.fetchCallRecord", () => {
           }),
         });
 
-        const record = await elevenLabsConvaiTransport.fetchCallRecord({
+        const record = await elevenLabsConvaiTransport.getCallRecord({
           conversationId: "conv_1",
           credential: CREDENTIAL,
           audioProxyUrl: "/api/voice/session/conv_1/audio",
         });
 
-        expect(record?.audioUrl).toBe("/api/voice/session/conv_1/audio");
+        expect(record.audioUrl).toBe("/api/voice/session/conv_1/audio");
       });
     });
 
     describe("when the record is not ready yet", () => {
       /** @scenario "The provider record is read only once the status is done" */
-      it("returns null so the caller falls back to the live transcript", async () => {
+      it("throws not-ready so the caller falls back to the live transcript", async () => {
         mockFetchOnce({ ok: false, status: 404 });
-        const record = await elevenLabsConvaiTransport.fetchCallRecord({
-          conversationId: "conv_1",
-          credential: CREDENTIAL,
-          audioProxyUrl: "/api/voice/session/conv_1/audio",
-        });
-        expect(record).toBeNull();
+        await expect(
+          elevenLabsConvaiTransport.getCallRecord({
+            conversationId: "conv_1",
+            credential: CREDENTIAL,
+            audioProxyUrl: "/api/voice/session/conv_1/audio",
+          }),
+        ).rejects.toMatchObject({ code: "voice_call_record_not_ready" });
       });
     });
 
@@ -393,19 +394,19 @@ describe("elevenLabsConvaiTransport.fetchCallRecord", () => {
           }),
         });
 
-        const record = await elevenLabsConvaiTransport.fetchCallRecord({
+        const record = await elevenLabsConvaiTransport.getCallRecord({
           conversationId: "conv_1",
           credential: CREDENTIAL,
           audioProxyUrl: "/api/voice/session/conv_1/audio",
         });
 
-        expect(record?.turns).toEqual([{ role: "caller", text: "hi", startMs: 0 }]);
+        expect(record.turns).toEqual([{ role: "caller", text: "hi", startMs: 0 }]);
       });
     });
 
     describe("when the conversation is still processing", () => {
       /** @scenario "An unfinished provider record keeps the live transcript" */
-      it("returns null so the caller keeps the live transcript", async () => {
+      it("throws not-ready so the caller keeps the live transcript", async () => {
         mockFetchOnce({
           json: async () => ({
             conversation_id: "conv_1",
@@ -414,19 +415,19 @@ describe("elevenLabsConvaiTransport.fetchCallRecord", () => {
           }),
         });
 
-        const record = await elevenLabsConvaiTransport.fetchCallRecord({
-          conversationId: "conv_1",
-          credential: CREDENTIAL,
-          audioProxyUrl: "/api/voice/session/conv_1/audio",
-        });
-
-        expect(record).toBeNull();
+        await expect(
+          elevenLabsConvaiTransport.getCallRecord({
+            conversationId: "conv_1",
+            credential: CREDENTIAL,
+            audioProxyUrl: "/api/voice/session/conv_1/audio",
+          }),
+        ).rejects.toMatchObject({ code: "voice_call_record_not_ready" });
       });
     });
 
     describe("when the conversation failed", () => {
       /** @scenario "The provider record is read only once the status is done" */
-      it("returns null so the caller keeps the live transcript", async () => {
+      it("throws not-ready so the caller keeps the live transcript", async () => {
         mockFetchOnce({
           json: async () => ({
             conversation_id: "conv_1",
@@ -435,13 +436,13 @@ describe("elevenLabsConvaiTransport.fetchCallRecord", () => {
           }),
         });
 
-        const record = await elevenLabsConvaiTransport.fetchCallRecord({
-          conversationId: "conv_1",
-          credential: CREDENTIAL,
-          audioProxyUrl: "/api/voice/session/conv_1/audio",
-        });
-
-        expect(record).toBeNull();
+        await expect(
+          elevenLabsConvaiTransport.getCallRecord({
+            conversationId: "conv_1",
+            credential: CREDENTIAL,
+            audioProxyUrl: "/api/voice/session/conv_1/audio",
+          }),
+        ).rejects.toMatchObject({ code: "voice_call_record_not_ready" });
       });
     });
   });

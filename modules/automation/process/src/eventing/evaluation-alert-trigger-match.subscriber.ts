@@ -19,7 +19,7 @@ type EvaluationState = {
 const logger = createLogger("langwatch:automation:evaluation-alert-trigger-match-subscriber");
 
 interface ActiveTraceTriggerReader {
-  getActiveTraceTriggersForProject(projectId: string): Promise<
+  findActiveTraceTriggersForProject(projectId: string): Promise<
     {
       id: string;
       action: TriggerMatchRecordedEventData["action"];
@@ -65,7 +65,7 @@ export async function handleEvaluationAlertTriggerMatch(
     );
     return;
   }
-  const triggers = await deps.automation.getActiveTraceTriggersForProject(context.tenantId);
+  const triggers = await deps.automation.findActiveTraceTriggersForProject(context.tenantId);
   for (const trigger of triggers.filter((candidate) =>
     deps.evaluationFilters.readsEvaluations(candidate),
   )) {

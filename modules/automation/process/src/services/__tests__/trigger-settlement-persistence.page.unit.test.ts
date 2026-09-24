@@ -62,7 +62,7 @@ function runtime(
   const allowed = options.capAllows ?? true;
 
   const automation = {
-    getActiveTraceTriggersForProject: vi.fn().mockResolvedValue([trigger]),
+    findActiveTraceTriggersForProject: vi.fn().mockResolvedValue([trigger]),
     filterSendClaimed: vi.fn().mockResolvedValue(new Set<string>()),
     resolvePersistDailyCap: vi.fn().mockResolvedValue(1),
     consumePersistCapSlot: vi

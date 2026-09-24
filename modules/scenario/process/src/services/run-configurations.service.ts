@@ -259,7 +259,7 @@ function runLevelParameters(row: RawRunConfigurationRow): RunParameterValues {
   const merged = parseRunParametersJson(row.Parameters);
   const overrides = parseRunParametersJson(row.FirstTargetParameters);
 
-  return withoutParameterNames({ values: merged, names: new Set(Object.keys(overrides)) }) ?? {};
+  return withoutParameterNames({ values: merged, names: new Set(Object.keys(overrides)) });
 }
 
 /** One folded row, plus the plan that owns it, as one dropdown entry. */

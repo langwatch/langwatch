@@ -1,5 +1,5 @@
 import { type SetCellValuePayload, setCellValuePayloadSchema } from "../schemas.ts";
-import { inlineRowCount, replaceDataset, requireInlineDataset } from "./helpers.ts";
+import { inlineRowCount, replaceDataset, getInlineDataset } from "./helpers.ts";
 import { type Transform, TransformError } from "./types.ts";
 
 /**
@@ -10,7 +10,7 @@ export const setCellValue: Transform<
   { datasetId: string; rowIndex: number }
 > = ({ state, payload }) => {
   const { datasetId, rowIndex, columnId, value } = setCellValuePayloadSchema.parse(payload);
-  const dataset = requireInlineDataset({ state, datasetId });
+  const dataset = getInlineDataset({ state, datasetId });
 
   if (!dataset.inline.columns.some((column) => column.id === columnId)) {
     throw new TransformError({
