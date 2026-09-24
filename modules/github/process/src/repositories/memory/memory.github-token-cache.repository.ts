@@ -4,6 +4,7 @@ import { nowInstant } from "@langwatch/time";
 
 import {
   GithubTokenCacheRepository,
+  type GithubInstallationKey,
   type GithubLockAcquisition,
 } from "../github-token-cache.repository.ts";
 import type { MemoryGithubDatabase } from "./memory.github.database.ts";
@@ -24,56 +25,52 @@ export class MemoryGithubTokenCacheRepository extends GithubTokenCacheRepository
     super();
   }
 
-  async findToken(input: { installationId: string; scopeKey: string }): Promise<string | null> {
+  async findToken(input: GithubInstallationKey & { scopeKey: string }): Promise<string | null> {
     return this.read(this.tokenKey(input));
   }
 
-  async storeToken(input: {
-    installationId: string;
-    scopeKey: string;
-    token: string;
-    ttlSec: number;
-  }): Promise<void> {
+  async storeToken(
+    input: GithubInstallationKey & { scopeKey: string; token: string; ttlSec: number },
+  ): Promise<void> {
     this.write(this.tokenKey(input), input.token, input.ttlSec);
   }
 
-  async hasLiveness(installationId: string): Promise<boolean> {
-    return this.read(`${installationId}:liveness`) !== null;
+  async hasLiveness(input: GithubInstallationKey): Promise<boolean> {
+    return this.read(this.livenessKey(input)) !== null;
   }
 
-  async markLiveness(input: {
-    installationId: string;
-    value: "alive" | "backoff";
-    ttlSec: number;
-  }): Promise<void> {
-    this.write(`${input.installationId}:liveness`, input.value, input.ttlSec);
+  async markLiveness(
+    input: GithubInstallationKey & { value: "alive" | "backoff"; ttlSec: number },
+  ): Promise<void> {
+    this.write(this.livenessKey(input), input.value, input.ttlSec);
   }
 
-  async acquireLivenessLock(installationId: string): Promise<GithubLockAcquisition> {
-    return this.acquire(`${installationId}:liveness:lock`);
+  async acquireLivenessLock(input: GithubInstallationKey): Promise<GithubLockAcquisition> {
+    return this.acquire(`${this.livenessKey(input)}:lock`);
   }
 
-  async acquireMintLock(input: {
-    installationId: string;
-    scopeKey: string;
-  }): Promise<GithubLockAcquisition> {
+  async acquireMintLock(
+    input: GithubInstallationKey & { scopeKey: string },
+  ): Promise<GithubLockAcquisition> {
     return this.acquire(`${this.tokenKey(input)}:lock`);
   }
 
-  async releaseLivenessLock(input: { installationId: string; token: string }): Promise<void> {
-    this.release(`${input.installationId}:liveness:lock`, input.token);
+  async releaseLivenessLock(input: GithubInstallationKey & { token: string }): Promise<void> {
+    this.release(`${this.livenessKey(input)}:lock`, input.token);
   }
 
-  async releaseMintLock(input: {
-    installationId: string;
-    scopeKey: string;
-    token: string;
-  }): Promise<void> {
+  async releaseMintLock(
+    input: GithubInstallationKey & { scopeKey: string; token: string },
+  ): Promise<void> {
     this.release(`${this.tokenKey(input)}:lock`, input.token);
   }
 
-  private tokenKey(input: { installationId: string; scopeKey: string }): string {
-    return `${input.installationId}:${input.scopeKey}`;
+  private tokenKey(input: GithubInstallationKey & { scopeKey: string }): string {
+    return `${input.host}:${input.installationId}:${input.scopeKey}`;
+  }
+
+  private livenessKey(input: GithubInstallationKey): string {
+    return `${input.host}:${input.installationId}:liveness`;
   }
 
   private read(key: string): string | null {

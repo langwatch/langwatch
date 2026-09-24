@@ -1,9 +1,9 @@
 import { defineRepositories } from "@langwatch/kernel";
 
+import { LiveGithubRepositories } from "./live/live.github.repositories.ts";
 import { MemoryGithubRepositories } from "./memory/memory.github.repositories.ts";
-import { PostgresGithubRepositories } from "./prisma/prisma.github.repositories.ts";
 
 export const githubRepositories = defineRepositories({
-  live: PostgresGithubRepositories,
+  live: LiveGithubRepositories,
   memory: MemoryGithubRepositories,
 });

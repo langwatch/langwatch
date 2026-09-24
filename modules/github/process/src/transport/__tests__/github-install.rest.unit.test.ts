@@ -16,7 +16,7 @@ import type { ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { GithubInstallNonceRedisRepository } from "../../repositories/redis/redis.github-install-nonce.repository.ts";
+import { unansweredRedisRepositories } from "../../__tests__/support/github-unanswered-redis.support.ts";
 import { GithubInstallStateService } from "../../services/github-install-state.service.ts";
 import { githubInstallRest, type GithubInstallApi } from "../github-install.rest.ts";
 
@@ -26,7 +26,7 @@ const INSTALL_URL = "https://github.com/apps/langwatch/installations/new";
 
 const state = GithubInstallStateService.create({
   signingKey: SIGNING_KEY,
-  nonces: GithubInstallNonceRedisRepository.create({ redis: null }),
+  nonces: unansweredRedisRepositories().installNonces,
 });
 
 const appConfig: GithubAppConfig = {

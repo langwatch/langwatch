@@ -12,7 +12,9 @@ import { PrismaGithubPullRequestsRepository } from "./prisma.github-pull-request
 export class PostgresGithubRepositories {
   static readonly requires = ["prisma"] as const;
 
-  static create(members: Readonly<{ prisma: PrismaClient }>): GithubRepositories {
+  static create(
+    members: Readonly<{ prisma: PrismaClient }>,
+  ): Pick<GithubRepositories, "installations" | "pullRequests"> {
     return {
       installations: PrismaGithubInstallationsRepository.create(members.prisma),
       pullRequests: PrismaGithubPullRequestsRepository.create(members.prisma),

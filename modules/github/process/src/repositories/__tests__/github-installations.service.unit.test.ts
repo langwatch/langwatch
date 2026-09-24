@@ -9,6 +9,7 @@ import { Temporal, nowInstant } from "@langwatch/time";
  */
 import { describe, expect, it, vi } from "vitest";
 
+import { unansweredRedisRepositories } from "../../__tests__/support/github-unanswered-redis.support.ts";
 import {
   type GithubInstallationDetails,
   type GithubInstallationToken,
@@ -94,7 +95,7 @@ function makeAppTokens(
   const tokens = RedisGithubAppTokenCache.create({
     appId: "app-1",
     privateKey: "test-private-key",
-    redis: null,
+    tokenCache: unansweredRedisRepositories().tokenCache,
   });
 
   vi.spyOn(tokens, "configured", "get").mockReturnValue(over.configured ?? true);

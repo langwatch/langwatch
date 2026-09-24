@@ -7,6 +7,7 @@ import { generateKeyPairSync } from "node:crypto";
 import type { Instant } from "@langwatch/time";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { unansweredRedisRepositories } from "../../__tests__/support/github-unanswered-redis.support.ts";
 import { GithubApp } from "../../app/github.app.ts";
 import { PrismaGithubInstallationsRepository } from "../../repositories/prisma/prisma.github-installations.repository.ts";
 import { PrismaGithubPullRequestsRepository } from "../../repositories/prisma/prisma.github-pull-requests.repository.ts";
@@ -106,6 +107,7 @@ function githubApi() {
 function demand(client: object, project: GithubProjectActivity) {
   return GithubApp.composeBranchDemand({
     repositories: {
+      ...unansweredRedisRepositories(),
       installations: PrismaGithubInstallationsRepository.create(
         client as unknown as Parameters<typeof PrismaGithubInstallationsRepository.create>[0],
       ),
@@ -114,7 +116,6 @@ function demand(client: object, project: GithubProjectActivity) {
       ),
     },
     config: { appId: "1234", privateKey },
-    redis: null,
     project,
   });
 }

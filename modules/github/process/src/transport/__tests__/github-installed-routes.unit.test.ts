@@ -33,7 +33,6 @@ async function installedGithub(
     .withConfig({ github: { appId: undefined, host: undefined, appSlug: undefined } })
     .withStores(memoryStores())
     .withMembers({
-      redis: null,
       secrets: resolvedSecrets({ CREDENTIALS_SECRET: "github-install-state-signing-key" }),
     })
     .provide({

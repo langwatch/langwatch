@@ -5,8 +5,6 @@ import type { GithubRepository } from "@langwatch/github-contract";
 import { githubApiChannels } from "../channels/github-api-channels.registry.ts";
 import { GithubInstallationNotFoundError } from "../channels/github-api.channel.ts";
 import type { GithubTokenCacheRepository } from "../repositories/github-token-cache.repository.ts";
-import type { GithubRedis } from "../repositories/redis/github-redis.connection.ts";
-import { GithubTokenCacheRedisRepository } from "../repositories/redis/redis.github-token-cache.repository.ts";
 import {
   GITHUB_READ_PULL_PERMISSIONS,
   GITHUB_WRITE_PERMISSIONS,
@@ -31,22 +29,22 @@ export class RedisGithubAppTokenCache implements GithubAppTokenCache {
   static create({
     appId,
     privateKey,
-    redis,
+    tokenCache,
     host = GithubHostService.create(),
   }: {
     appId: string;
     privateKey: string;
-    redis: GithubRedis | null;
+    tokenCache: GithubTokenCacheRepository;
     host?: GithubHost;
   }): RedisGithubAppTokenCache {
     const api = githubApiChannels.live.create(appId, privateKey, host);
-    const cache = GithubTokenCacheRedisRepository.create({ redis, host });
-    return new RedisGithubAppTokenCache(api, cache);
+    return new RedisGithubAppTokenCache(api, tokenCache, host);
   }
 
   private constructor(
     private readonly api: GithubAppClient,
     private readonly cache: GithubTokenCacheRepository,
+    private readonly host: GithubHost,
   ) {}
 
   get configured(): boolean {
@@ -90,6 +88,7 @@ export class RedisGithubAppTokenCache implements GithubAppTokenCache {
       permissions,
     });
     const cacheKey = {
+      host: this.host.getHost(),
       installationId: input.installationId,
       scopeKey,
     };
@@ -174,11 +173,12 @@ export class RedisGithubAppTokenCache implements GithubAppTokenCache {
   }
 
   private async assertInstallationStillExists(installationId: string): Promise<void> {
-    if (await this.cache.hasLiveness(installationId)) {
+    const key = { host: this.host.getHost(), installationId };
+    if (await this.cache.hasLiveness(key)) {
       return;
     }
 
-    const lock = await this.cache.acquireLivenessLock(installationId);
+    const lock = await this.cache.acquireLivenessLock(key);
     if (!lock.acquired) {
       return;
     }
@@ -186,7 +186,7 @@ export class RedisGithubAppTokenCache implements GithubAppTokenCache {
     try {
       await this.getInstallation(installationId);
       await this.cache.markLiveness({
-        installationId,
+        ...key,
         value: "alive",
         ttlSec: LIVENESS_RECHECK_TTL_SEC,
       });
@@ -196,12 +196,12 @@ export class RedisGithubAppTokenCache implements GithubAppTokenCache {
       }
 
       await this.cache.markLiveness({
-        installationId,
+        ...key,
         value: "backoff",
         ttlSec: LIVENESS_FAILURE_BACKOFF_SEC,
       });
     } finally {
-      await this.cache.releaseLivenessLock({ installationId, token: lock.token });
+      await this.cache.releaseLivenessLock({ ...key, token: lock.token });
     }
   }
 }

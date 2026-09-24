@@ -32,12 +32,6 @@ import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/pr
 import { Secret } from "@langwatch/secrets";
 
 import type { GithubRepositories } from "../repositories/github.repositories.ts";
-import {
-  RedisGithubAdapter,
-  type GithubRedisConnection,
-} from "../repositories/redis/github-redis.connection.ts";
-import { GithubInstallNonceRedisRepository } from "../repositories/redis/redis.github-install-nonce.repository.ts";
-import { GithubPullRequestStatusCacheRedisRepository } from "../repositories/redis/redis.github-pull-request-status-cache.repository.ts";
 import { GithubInstallResponseRules } from "../rules/github-install-response.rules.ts";
 import { GithubPullRequestEventRules } from "../rules/github-pull-request-event.rules.ts";
 import { GithubBranchDemandService } from "../services/github-branch-demand.service.ts";
@@ -142,7 +136,6 @@ export interface GithubAppTokenCache {
 }
 
 export type GithubInfrastructure = Readonly<{
-  redis: GithubRedisConnection | null;
   secrets: ProcessMembers["secrets"];
 }>;
 
@@ -156,7 +149,6 @@ type GithubSetup = FeatureSetup<
 /** What a graph needs beside its rows to answer for a GitHub App. */
 export type GithubComposition = Readonly<{
   repositories: GithubRepositories;
-  redis: GithubRedisConnection | null;
   organization: OrganizationApiContract;
   project: GithubProjectActivity;
   config: {
@@ -172,7 +164,6 @@ export type GithubComposition = Readonly<{
 /** What the fleet-wide branch sweep needs beside its rows. */
 export type GithubBranchMaintenanceComposition = Readonly<{
   repositories: GithubRepositories;
-  redis: GithubRedisConnection | null;
   config: { appId: string; privateKey: string };
   hostConfig?: { host?: string };
 }>;
@@ -180,7 +171,6 @@ export type GithubBranchMaintenanceComposition = Readonly<{
 /** What branch demand needs beside its rows: the project fact the demand call reads. */
 export type GithubBranchDemandComposition = Readonly<{
   repositories: GithubRepositories;
-  redis: GithubRedisConnection | null;
   config: { appId: string; privateKey: string };
   hostConfig?: { host?: string };
   project: GithubProjectActivity;
@@ -215,7 +205,7 @@ class ComposedGithubBranchDemand implements GithubBranchDemand {
 
 /** The process-owned GitHub capability; provider and persistence stay private. */
 export class GithubApp implements GithubApiContract {
-  static readonly reads = reads("redis", "secrets");
+  static readonly reads = reads("secrets");
   static readonly contract = GithubApi;
   static readonly dependencies = {
     organizations: OrganizationApi,
@@ -264,11 +254,10 @@ export class GithubApp implements GithubApiContract {
    */
   static composeApi(parts: GithubComposition): GithubFeatureService {
     const host = GithubHostService.create(parts.hostConfig);
-    const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
     const appTokens = RedisGithubAppTokenCache.create({
       appId: parts.config.appId,
       privateKey: parts.config.privateKey,
-      redis,
+      tokenCache: parts.repositories.tokenCache,
       host,
     });
     const { installations: installationsRepository, pullRequests: pullRequestsRepository } =
@@ -308,7 +297,7 @@ export class GithubApp implements GithubApiContract {
       repository: pullRequestsRepository,
       installations,
       appTokens,
-      cache: GithubPullRequestStatusCacheRedisRepository.create({ redis }),
+      cache: parts.repositories.pullRequestStatusCache,
     });
 
     return GithubFeatureService.create({
@@ -322,7 +311,7 @@ export class GithubApp implements GithubApiContract {
       host,
       installState: GithubInstallStateService.create({
         signingKey: parts.config.signingKey,
-        nonces: GithubInstallNonceRedisRepository.create({ redis }),
+        nonces: parts.repositories.installNonces,
       }),
       installResponse: GithubInstallResponseRules.create(),
       pullRequestEvents: GithubPullRequestEventRules.create(),
@@ -338,11 +327,10 @@ export class GithubApp implements GithubApiContract {
     parts: GithubBranchMaintenanceComposition,
   ): GithubBranchMaintenance {
     const host = GithubHostService.create(parts.hostConfig);
-    const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
     const appTokens = RedisGithubAppTokenCache.create({
       appId: parts.config.appId,
       privateKey: parts.config.privateKey,
-      redis,
+      tokenCache: parts.repositories.tokenCache,
       host,
     });
     const { installations, pullRequests } = parts.repositories;
@@ -364,11 +352,10 @@ export class GithubApp implements GithubApiContract {
    */
   static composeBranchDemand(parts: GithubBranchDemandComposition): GithubBranchDemand {
     const host = GithubHostService.create(parts.hostConfig);
-    const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
     const appTokens = RedisGithubAppTokenCache.create({
       appId: parts.config.appId,
       privateKey: parts.config.privateKey,
-      redis,
+      tokenCache: parts.repositories.tokenCache,
       host,
     });
     const { installations, pullRequests } = parts.repositories;
@@ -394,7 +381,6 @@ export class GithubApp implements GithubApiContract {
     return new GithubApp({
       service: GithubApp.composeApi({
         repositories,
-        redis: members.redis,
         organization: dependencies.organizations,
         project: dependencies.projects,
         config: {
@@ -412,7 +398,6 @@ export class GithubApp implements GithubApiContract {
       // sweep runs over this same graph's rows.
       branchMaintenance: GithubApp.composeBranchMaintenance({
         repositories,
-        redis: members.redis,
         config: branchConfig,
         ...hostConfig,
       }),

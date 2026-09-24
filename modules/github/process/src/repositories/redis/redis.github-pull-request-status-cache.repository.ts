@@ -1,24 +1,21 @@
+import type { ProcessMembers } from "@langwatch/process-stores/members";
+
 import type {
   GithubPullRequestRef,
   GithubPullRequestStatus,
 } from "../../services/github-pull-request-status.service.ts";
 import { GithubPullRequestStatusCacheRepository } from "../github-pull-request-status-cache.repository.ts";
-import type { GithubRedis } from "./github-redis.connection.ts";
 
 const STATUS_CACHE_TTL_SEC = 60;
 const STATUSES: readonly string[] = ["open", "draft", "merged", "closed"];
 
-/**
- * The Redis tier. The connection is nullable because this module's Redis is
- * optional members: a process that opened none misses every read, which
- * is what a cold cache does anyway.
- */
+/** The Redis tier. A Redis that cannot answer misses, which is what a cold cache does anyway. */
 export class GithubPullRequestStatusCacheRedisRepository extends GithubPullRequestStatusCacheRepository {
-  static create(parts: { redis: GithubRedis | null }): GithubPullRequestStatusCacheRedisRepository {
-    return new GithubPullRequestStatusCacheRedisRepository(parts.redis);
+  static create(redis: ProcessMembers["redis"]): GithubPullRequestStatusCacheRedisRepository {
+    return new GithubPullRequestStatusCacheRedisRepository(redis);
   }
 
-  private constructor(private readonly redis: GithubRedis | null) {
+  private constructor(private readonly redis: ProcessMembers["redis"]) {
     super();
   }
 
@@ -26,10 +23,6 @@ export class GithubPullRequestStatusCacheRedisRepository extends GithubPullReque
     organizationId: string;
     ref: GithubPullRequestRef;
   }): Promise<GithubPullRequestStatus | null> {
-    if (!this.redis) {
-      return null;
-    }
-
     try {
       const value = await this.redis.get(statusKey(input));
 
@@ -44,10 +37,6 @@ export class GithubPullRequestStatusCacheRedisRepository extends GithubPullReque
     ref: GithubPullRequestRef;
     status: GithubPullRequestStatus;
   }): Promise<void> {
-    if (!this.redis) {
-      return;
-    }
-
     try {
       await this.redis.set(statusKey(input), input.status, "EX", STATUS_CACHE_TTL_SEC);
     } catch {

@@ -6,6 +6,7 @@ import { generateKeyPairSync } from "node:crypto";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { unansweredRedisRepositories } from "../../__tests__/support/github-unanswered-redis.support.ts";
 import { GithubApp } from "../../app/github.app.ts";
 import { PrismaGithubInstallationsRepository } from "../../repositories/prisma/prisma.github-installations.repository.ts";
 import { PrismaGithubPullRequestsRepository } from "../../repositories/prisma/prisma.github-pull-requests.repository.ts";
@@ -103,6 +104,7 @@ function githubApi() {
 function sweep(client: object) {
   return GithubApp.composeBranchMaintenance({
     repositories: {
+      ...unansweredRedisRepositories(),
       installations: PrismaGithubInstallationsRepository.create(
         client as unknown as Parameters<typeof PrismaGithubInstallationsRepository.create>[0],
       ),
@@ -111,7 +113,6 @@ function sweep(client: object) {
       ),
     },
     config: { appId: "1234", privateKey },
-    redis: null,
   });
 }
 
@@ -162,6 +163,7 @@ describe("the GitHub branch sweep composed from Postgres alone", () => {
       const paths = githubApi();
       const uncredentialed = GithubApp.composeBranchMaintenance({
         repositories: {
+          ...unansweredRedisRepositories(),
           installations: PrismaGithubInstallationsRepository.create(
             client as unknown as Parameters<typeof PrismaGithubInstallationsRepository.create>[0],
           ),
@@ -170,7 +172,6 @@ describe("the GitHub branch sweep composed from Postgres alone", () => {
           ),
         },
         config: { appId: "", privateKey: "" },
-        redis: null,
       });
 
       await expect(uncredentialed.recheckDueBranches()).resolves.toBe(1);
@@ -184,6 +185,7 @@ describe("the GitHub branch sweep composed from Postgres alone", () => {
       const { client } = database();
       const uncredentialed = GithubApp.composeBranchMaintenance({
         repositories: {
+          ...unansweredRedisRepositories(),
           installations: PrismaGithubInstallationsRepository.create(
             client as unknown as Parameters<typeof PrismaGithubInstallationsRepository.create>[0],
           ),
@@ -192,7 +194,6 @@ describe("the GitHub branch sweep composed from Postgres alone", () => {
           ),
         },
         config: { appId: "", privateKey: "" },
-        redis: null,
       });
 
       await expect(uncredentialed.pruneStaleBranchLinkage()).resolves.toEqual({

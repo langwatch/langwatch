@@ -3,9 +3,11 @@
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { HandledError } from "@langwatch/handled-error";
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { Temporal, nowInstant, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
+import { unansweredRedisRepositories } from "../../__tests__/support/github-unanswered-redis.support.ts";
 import type {
   GithubAppTokenCache,
   GithubInstallationDetails,
@@ -15,12 +17,12 @@ import type {
 } from "../../app/github.app.ts";
 import { GithubRateLimitedError } from "../../channels/github-api.channel.ts";
 import { NullGithubInstallationsRepository } from "../../repositories/github-installations.repository.ts";
+import type { GithubPullRequestStatusCacheRepository } from "../../repositories/github-pull-request-status-cache.repository.ts";
 import {
   type GithubPullRequestRow,
   NullGithubPullRequestsRepository,
   type RefreshGithubPullRequestSnapshotInput,
 } from "../../repositories/github-pull-requests.repository.ts";
-import { GithubRedis } from "../../repositories/redis/github-redis.connection.ts";
 import { GithubPullRequestStatusCacheRedisRepository } from "../../repositories/redis/redis.github-pull-request-status-cache.repository.ts";
 import { GithubInstallationAccessService } from "../github-installation-access.service.ts";
 import { GithubInstallationsService } from "../github-installations.service.ts";
@@ -47,31 +49,16 @@ type GetPullRequestInput = {
   number: number;
 };
 
-class TestRedis extends GithubRedis {
-  readonly store = new Map<string, string>();
-
-  get(key: string): Promise<string | null> {
-    return Promise.resolve(this.store.get(key) ?? null);
-  }
-
-  set(key: string, value: string): Promise<string | null> {
-    this.store.set(key, value);
-    return Promise.resolve("OK");
-  }
-
-  delete(key: string): Promise<number> {
-    return Promise.resolve(this.store.delete(key) ? 1 : 0);
-  }
-
-  getDelete(key: string): Promise<string | null> {
-    const value = this.store.get(key) ?? null;
-    this.store.delete(key);
-    return Promise.resolve(value);
-  }
-
-  evaluate(): Promise<number | string | null> {
-    return Promise.resolve(null);
-  }
+function storingRedis(): { redis: ReturnType<typeof redisDouble>; store: Map<string, string> } {
+  const store = new Map<string, string>();
+  const redis = redisDouble({
+    get: (key: unknown) => Promise.resolve(store.get(String(key)) ?? null),
+    set: (key: unknown, value: unknown) => {
+      store.set(String(key), String(value));
+      return Promise.resolve("OK");
+    },
+  });
+  return { redis, store };
 }
 
 class TestPullRequestRepository extends NullGithubPullRequestsRepository {
@@ -181,12 +168,12 @@ function storedRow(over: Partial<GithubPullRequestRow> = {}) {
 function serviceWith({
   stored,
   getPullRequest,
-  redis = null,
+  cache = unansweredRedisRepositories().pullRequestStatusCache,
   find,
 }: {
   stored: GithubPullRequestRow | null;
   getPullRequest: (input: GetPullRequestInput) => Promise<GithubPullRequestSummary>;
-  redis?: GithubRedis | null;
+  cache?: GithubPullRequestStatusCacheRepository;
   find?: (input: { prNumber: number }) => Promise<GithubPullRequestRow | null>;
 }) {
   const repository = new TestPullRequestRepository(find ?? (() => Promise.resolve(stored)));
@@ -203,7 +190,7 @@ function serviceWith({
     repository,
     installations,
     appTokens,
-    cache: GithubPullRequestStatusCacheRedisRepository.create({ redis }),
+    cache,
   });
   return { service, refreshSnapshot: repository.refreshSnapshot };
 }
@@ -336,7 +323,7 @@ describe("GithubPullRequestStatusService", () => {
 
   describe("when a live status is cached", () => {
     it("caches each pull request under its own key", async () => {
-      const redis = new TestRedis();
+      const { redis, store } = storingRedis();
       const getPullRequest = vi
         .fn()
         .mockResolvedValueOnce({
@@ -367,7 +354,7 @@ describe("GithubPullRequestStatusService", () => {
         stored: null,
         find: ({ prNumber }) => Promise.resolve(storedRow({ prNumber })),
         getPullRequest,
-        redis,
+        cache: GithubPullRequestStatusCacheRedisRepository.create(redis),
       });
 
       const [merged] = await service.getLiveStatuses({
@@ -382,7 +369,7 @@ describe("GithubPullRequestStatusService", () => {
       expect(merged?.status).toBe("merged");
       // The second pull request must not be answered from the first one's entry.
       expect(open?.status).toBe("open");
-      expect([...redis.store.keys()].toSorted()).toEqual([
+      expect([...store.keys()].toSorted()).toEqual([
         "gh:prstatus:org-1:github.com:acme/widgets:7",
         "gh:prstatus:org-1:github.com:acme/widgets:8",
       ]);
@@ -390,7 +377,7 @@ describe("GithubPullRequestStatusService", () => {
 
     /** @scenario "Live status is cached briefly" */
     it("answers the second read of one pull request from the cache", async () => {
-      const redis = new TestRedis();
+      const { redis } = storingRedis();
       const getPullRequest = vi.fn().mockResolvedValue({
         number: 7,
         htmlUrl: "https://github.com/acme/widgets/pull/7",
@@ -406,7 +393,7 @@ describe("GithubPullRequestStatusService", () => {
       const { service } = serviceWith({
         stored: storedRow(),
         getPullRequest,
-        redis,
+        cache: GithubPullRequestStatusCacheRedisRepository.create(redis),
       });
 
       await service.getLiveStatuses({ organizationId: "org-1", refs: [REF] });

@@ -3,10 +3,10 @@ import { createHmac } from "node:crypto";
 import type { GithubInstallStatePayload } from "@langwatch/github-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { GithubInstallNonceRedisRepository } from "../../repositories/redis/redis.github-install-nonce.repository.ts";
+import { unansweredRedisRepositories } from "../../__tests__/support/github-unanswered-redis.support.ts";
 import { GithubInstallStateService } from "../github-install-state.service.ts";
 
-const noNonceStore = () => GithubInstallNonceRedisRepository.create({ redis: null });
+const noNonceStore = () => unansweredRedisRepositories().installNonces;
 
 const SIGNING_KEY = "test-secret-not-real";
 const NOW = 1_700_000_000_000;

@@ -1,6 +1,7 @@
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { unansweredRedisRepositories } from "../../__tests__/support/github-unanswered-redis.support.ts";
 import { RedisGithubAppTokenCache } from "../../app/redis-github-app-token-cache.ts";
 import { NullGithubInstallationsRepository } from "../../repositories/github-installations.repository.ts";
 import {
@@ -49,7 +50,7 @@ function service(repository: MaintenanceRepository) {
   const appTokens = RedisGithubAppTokenCache.create({
     appId: "app",
     privateKey: "test-key",
-    redis: null,
+    tokenCache: unansweredRedisRepositories().tokenCache,
   });
   const access = GithubInstallationAccessService.create(
     new NullGithubInstallationsRepository(),

@@ -24,6 +24,7 @@ import {
   TestProjectService,
 } from "../services/__tests__/fixtures/github-services.fixture.ts";
 import { GithubPullRequestStatusService } from "../services/github-pull-request-status.service.ts";
+import { unansweredRedisRepositories } from "./support/github-unanswered-redis.support.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(_context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -173,7 +174,10 @@ function harness(input: { host?: string } = {}) {
     http,
     projects,
     github: GithubApp.composeApi({
-      repositories: PostgresGithubRepositories.create({ prisma: database() }),
+      repositories: {
+        ...unansweredRedisRepositories(),
+        ...PostgresGithubRepositories.create({ prisma: database() }),
+      },
       config: {
         appId: "test-app",
         privateKey: testGithubPrivateKey,
@@ -181,7 +185,6 @@ function harness(input: { host?: string } = {}) {
         webhookSecret: "test-webhook-secret",
         signingKey: "test-signing-key",
       },
-      redis: null,
       organization: new TestOrganizationService().api,
       project: projects,
       ...(input.host ? { hostConfig: { host: input.host } } : {}),
