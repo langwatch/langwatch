@@ -1,4 +1,4 @@
-import type { AutomationEvaluationSubscriberService } from "@langwatch/automation-contract";
+import type { AutomationApi } from "@langwatch/automation-contract";
 import {
   type CompleteEvaluationCommandData,
   type EvaluationRunData,
@@ -51,8 +51,14 @@ export interface EvaluationProcessingPipelineDeps {
   evaluationAnalyticsStore: FoldProjectionStore<EvaluationAnalyticsData>;
   evaluationAnalyticsRollupAppendStore: AppendStore<EvaluationAnalyticsRollupRow>;
   executeEvaluationCommand: ExecuteEvaluationCommand;
-  automations: AutomationEvaluationSubscriberService;
+  automations: EvaluationAutomationReactions;
 }
+
+/** The two automation reactions a terminal evaluation wakes. */
+export type EvaluationAutomationReactions = Pick<
+  AutomationApi,
+  "handleEvaluationTriggerMatch" | "handleEvaluationGraphTriggerActivity"
+>;
 
 /** Tracks evaluation lifecycle (scheduled → completed) via evaluation-level aggregates. */
 export class EvaluationProcessingAdapter {
@@ -104,7 +110,7 @@ export class EvaluationProcessingAdapter {
         delay: 10_000,
         ttl: 30_000,
         handler: (event, context) =>
-          this.deps.automations.handleEvaluationTriggerMatch(event, context),
+          this.deps.automations.handleEvaluationTriggerMatch({ event, context }),
       })
       .withEventSubscriber("graphTriggerActivity", {
         events: [EVALUATION_COMPLETED_EVENT_TYPE, EVALUATION_REPORTED_EVENT_TYPE],
@@ -125,7 +131,7 @@ export class EvaluationProcessingAdapter {
           EvaluationProcessingAdapter,
         ),
         handler: (event, context) =>
-          this.deps.automations.handleEvaluationGraphTriggerActivity(event, context),
+          this.deps.automations.handleEvaluationGraphTriggerActivity({ event, context }),
       })
       .withCommandInstance(
         "executeEvaluation",

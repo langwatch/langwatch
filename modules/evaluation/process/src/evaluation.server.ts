@@ -12,6 +12,7 @@ import type {
   EvaluationSettingsRecovery,
   ExecuteEvaluationCommandDeps,
 } from "./app/evaluation.members.ts";
+import { evaluationProcessingEventing } from "./eventing/evaluation-processing.pipeline.ts";
 import { ClickhouseMonitorPerformanceRepository } from "./repositories/clickhouse/clickhouse.monitor-performance.repository.ts";
 import type { EvaluationClickHouseResolver } from "./repositories/clickhouse/evaluation-clickhouse-client.ts";
 import { ClickHouseEvaluationRepository } from "./repositories/clickhouse/evaluation.repository.ts";
@@ -43,7 +44,8 @@ export {
 export const evaluationServer = defineServerModule("evaluation")
   .withRepositories(evaluationRepositories)
   .withApp(EvaluationApp)
-  .withTransports(evaluationTrpcTransport, evaluationsLegacyRest);
+  .withTransports(evaluationTrpcTransport, evaluationsLegacyRest)
+  .withEventing(evaluationProcessingEventing);
 
 // Evaluation's composition seam: a process builds this feature's runtime through the factories
 // below and never names one of its repositories or services. What a composition root passes is

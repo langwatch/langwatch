@@ -1,3 +1,5 @@
+import { AnalyticsApi } from "@langwatch/analytics-contract";
+import { AutomationApi } from "@langwatch/automation-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import {
   AZURE_SAFETY_ENV_VARS,
@@ -52,6 +54,7 @@ import type {
 } from "../app/evaluation.members.ts";
 import { langevalsChannels } from "../channels/langevals-channels.registry.ts";
 import { ObjectStorageLangevalsPayloadStaging } from "../channels/object-storage.langevals-payload-staging.channel.ts";
+import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
 import type { EvaluationRepositories } from "../repositories/evaluation.repositories.ts";
 import { findUnavailability } from "../rules/evaluator-availability-service.rules.ts";
 import { AzureSafetyCredentialsService } from "../services/azure-safety-credentials.service.ts";
@@ -63,6 +66,7 @@ import {
 } from "../services/evaluation-batch-log.service.ts";
 import { EvaluationCommandDispatcherService } from "../services/evaluation-command-dispatcher.service.ts";
 import { EvaluationCostService } from "../services/evaluation-cost.service.ts";
+import { EvaluationEventingService } from "../services/evaluation-eventing.service.ts";
 import { EvaluationExecutionIntentService } from "../services/evaluation-execution-intent.service.ts";
 import { EvaluationExecutionService } from "../services/evaluation-execution.service.ts";
 import { EvaluationFilterMatchingService } from "../services/evaluation-filter-matching.service.ts";
@@ -74,8 +78,13 @@ import {
   EvaluationInputsOffloadService,
 } from "../services/evaluation-inputs-offload.service.ts";
 import { EvaluationNameAutoslugService } from "../services/evaluation-name-autoslug.service.ts";
-import type { EvaluationProcessingPipeline } from "../services/evaluation-processing.service.ts";
+import {
+  EvaluationProcessingAdapter,
+  type EvaluationAutomationReactions,
+  type EvaluationProcessingPipeline,
+} from "../services/evaluation-processing.service.ts";
 import { EvaluationRetentionFloorService } from "../services/evaluation-retention-floor.service.ts";
+import { EvaluationRunProjectionService } from "../services/evaluation-run-projection.service.ts";
 import { EvaluationSettingsRecoverySwitchService } from "../services/evaluation-settings-recovery-switch.service.ts";
 import { EvaluationSpanDigestService } from "../services/evaluation-span-digest.service.ts";
 import { EvaluationService } from "../services/evaluation.service.ts";
@@ -241,6 +250,10 @@ export class EvaluationApp implements EvaluationApiContract {
     evaluators: EvaluatorApi,
     /** Read when a queued evaluation runs, never in construction: MonitorApp depends on us. */
     monitors: MonitorApi,
+    /** Wakes trigger matching and graph alerts when an evaluation settles. */
+    automations: AutomationApi,
+    /** Where the analytics folds and rollup are written. */
+    analytics: AnalyticsApi,
   };
   static readonly reads = reads("objectStorage");
   static readonly secrets = {
@@ -268,6 +281,8 @@ export class EvaluationApp implements EvaluationApiContract {
   readonly #commands: EvaluationCommandDispatcherService | undefined;
   readonly #clustering: LangevalsClusteringService;
   readonly #executionIntent: EvaluationExecutionIntent;
+  readonly #eventing: EvaluationEventingService;
+  readonly #automations: EvaluationAutomationReactions;
 
   private constructor({
     service,
@@ -276,6 +291,7 @@ export class EvaluationApp implements EvaluationApiContract {
     commands,
     clustering,
     executionIntent,
+    eventing,
   }: {
     service: EvaluationService;
     dependencies: EvaluationSetup["dependencies"];
@@ -283,10 +299,13 @@ export class EvaluationApp implements EvaluationApiContract {
     commands: EvaluationCommandDispatcherService | undefined;
     clustering: LangevalsClusteringService;
     executionIntent: EvaluationExecutionIntent;
+    eventing: EvaluationEventingService;
   }) {
     this.#service = service;
     this.#clustering = clustering;
     this.#executionIntent = executionIntent;
+    this.#eventing = eventing;
+    this.#automations = dependencies.automations;
     this.#azureSafety = AzureSafetyCredentialsService.create(dependencies.modelProviders);
     this.#environment = members.environment;
     this.#customEvaluators = members.customEvaluators;
@@ -400,6 +419,15 @@ export class EvaluationApp implements EvaluationApiContract {
           costs: EvaluationCostService.create({ repository: repositories.costs }),
         }),
       }),
+      eventing: EvaluationEventingService.create({
+        runs: EvaluationRunProjectionService.create({
+          repository: repositories.runs,
+          retentionFloor: EvaluationRetentionFloorService.create(dependencies.retention),
+        }),
+        analytics: dependencies.analytics,
+        analyticsFoldCache: repositories.analyticsFoldCache,
+        defaultRetentionDays: () => dependencies.retention.getPlatformDefaultRetentionDays(),
+      }),
     });
   }
 
@@ -410,6 +438,7 @@ export class EvaluationApp implements EvaluationApiContract {
     commands?: EvaluationCommandDispatcherService;
     clustering: LangevalsClusteringService;
     executionIntent: EvaluationExecutionIntent;
+    eventing: EvaluationEventingService;
   }): EvaluationApp {
     const {
       infrastructure: members,
@@ -418,6 +447,7 @@ export class EvaluationApp implements EvaluationApiContract {
       commands,
       clustering,
       executionIntent,
+      eventing,
     } = setup;
 
     return new EvaluationApp({
@@ -434,12 +464,17 @@ export class EvaluationApp implements EvaluationApiContract {
       commands,
       clustering,
       executionIntent,
+      eventing,
     });
   }
 
-  /** What evaluation_processing's execute command runs through, once (c) registers the pipeline. */
-  executionIntent(): EvaluationExecutionIntent {
-    return this.#executionIntent;
+  /** evaluation_processing: run and analytics folds, execute intent, automation reactions. */
+  eventingPipeline(): EvaluationProcessingPipeline {
+    return EvaluationProcessingAdapter.createPipeline({
+      ...this.#eventing.buildStores(),
+      executeEvaluationCommand: ExecuteEvaluationCommand.create(this.#executionIntent),
+      automations: this.#automations,
+    });
   }
 
   /** Binds evaluation_processing's own senders; `reportEvaluation` goes through them. */

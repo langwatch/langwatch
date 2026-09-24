@@ -1,4 +1,3 @@
-import { AutomationEvaluationSubscriberService } from "@langwatch/automation-contract";
 import {
   EVALUATION_COMPLETED_EVENT_TYPE,
   EVALUATION_REPORTED_EVENT_TYPE,
@@ -9,7 +8,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { EvaluationAnalyticsData } from "../eventing/evaluation-analytics-row.projection.ts";
 import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
-import { createEvaluationProcessingPipeline } from "../services/evaluation-processing.service.ts";
+import {
+  createEvaluationProcessingPipeline,
+  type EvaluationAutomationReactions,
+} from "../services/evaluation-processing.service.ts";
 
 const GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS = 5_000;
 import type {
@@ -46,7 +48,7 @@ function completedEvent(): EvaluationCompletedEvent {
   };
 }
 
-class TestAutomationEvaluationSubscriberService extends AutomationEvaluationSubscriberService {
+class TestAutomationEvaluationSubscriberService implements EvaluationAutomationReactions {
   readonly triggerMatchCalls: {
     event: EvaluationProcessingEvent;
     context: TriggerContext<EvaluationRunData>;
@@ -56,17 +58,23 @@ class TestAutomationEvaluationSubscriberService extends AutomationEvaluationSubs
     context: { tenantId: string };
   }[] = [];
 
-  async handleEvaluationTriggerMatch(
-    event: EvaluationProcessingEvent,
-    context: TriggerContext<EvaluationRunData>,
-  ): Promise<void> {
+  async handleEvaluationTriggerMatch({
+    event,
+    context,
+  }: {
+    event: EvaluationProcessingEvent;
+    context: TriggerContext<EvaluationRunData>;
+  }): Promise<void> {
     this.triggerMatchCalls.push({ event, context });
   }
 
-  async handleEvaluationGraphTriggerActivity(
-    event: EvaluationProcessingEvent,
-    context: { tenantId: string },
-  ): Promise<void> {
+  async handleEvaluationGraphTriggerActivity({
+    event,
+    context,
+  }: {
+    event: EvaluationProcessingEvent;
+    context: { tenantId: string };
+  }): Promise<void> {
     this.graphActivityCalls.push({ event, context });
   }
 }

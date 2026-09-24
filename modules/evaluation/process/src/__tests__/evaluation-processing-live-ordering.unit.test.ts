@@ -1,4 +1,3 @@
-import { AutomationEvaluationSubscriberService } from "@langwatch/automation-contract";
 import type {
   EvaluationRunData,
   EvaluationCompletedEvent,
@@ -23,25 +22,17 @@ import type { EvaluationAnalyticsData } from "../eventing/evaluation-analytics-r
 import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
 import { EvaluationRunFoldProjection } from "../eventing/evaluation-run.projection.ts";
 import { EvaluationCommandAdapter } from "../services/evaluation-command.service.ts";
-import { createEvaluationProcessingPipeline } from "../services/evaluation-processing.service.ts";
+import {
+  createEvaluationProcessingPipeline,
+  type EvaluationAutomationReactions,
+} from "../services/evaluation-processing.service.ts";
 
 const tenantId = createTenantId("project-1");
 
-class TestAutomationEvaluationSubscriberService extends AutomationEvaluationSubscriberService {
-  handleEvaluationTriggerMatch(
-    _event: EvaluationProcessingEvent,
-    _context: { tenantId: string; aggregateId: string; state: EvaluationRunData },
-  ): Promise<void> {
-    return Promise.resolve();
-  }
-
-  handleEvaluationGraphTriggerActivity(
-    _event: EvaluationProcessingEvent,
-    _context: { tenantId: string },
-  ): Promise<void> {
-    return Promise.resolve();
-  }
-}
+const quietAutomations: EvaluationAutomationReactions = {
+  handleEvaluationTriggerMatch: () => Promise.resolve(),
+  handleEvaluationGraphTriggerActivity: () => Promise.resolve(),
+};
 
 function foldStore<State>(): FoldProjectionStore<State> {
   return {
@@ -250,7 +241,7 @@ describe("evaluation processing live FIFO", () => {
       executeEvaluationCommand: ExecuteEvaluationCommand.create({
         execute: async () => [],
       }),
-      automations: new TestAutomationEvaluationSubscriberService(),
+      automations: quietAutomations,
     });
 
     expect(

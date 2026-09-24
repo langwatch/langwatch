@@ -134,6 +134,7 @@ describe("the worker process installation", () => {
       expect(pipelines).toContain("coding_agent_processing");
       expect(pipelines).toContain("topic_clustering_processing");
       expect(pipelines).toContain("automations");
+      expect(pipelines).toContain("evaluation_processing");
       // Every process that is not producing resolves trace commands from this registration.
       expect(pipelines).toContain("trace_processing");
       const schedules = eventing.definitions.flatMap((definition) =>

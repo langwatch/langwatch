@@ -2,7 +2,6 @@
  * The `evaluation_processing` pipeline as a PRODUCER registers it. One definition, two
  * registrations.
  */
-import type { AutomationEvaluationSubscriberService } from "@langwatch/automation-contract";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import type { AppendStore, FoldProjectionStore } from "@langwatch/eventing";
 
@@ -10,7 +9,10 @@ import { type EvaluationExecutionIntent } from "../app/evaluation.members.ts";
 import type { EvaluationAnalyticsData } from "../eventing/evaluation-analytics-fold.projection.ts";
 import type { EvaluationAnalyticsRollupRow } from "../eventing/evaluation-analytics-rollup.projection.ts";
 import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
-import { EvaluationProcessingAdapter } from "./evaluation-processing.service.ts";
+import {
+  EvaluationProcessingAdapter,
+  type EvaluationAutomationReactions,
+} from "./evaluation-processing.service.ts";
 
 /** Why every stand-in below refuses, in the process's own words. */
 function producerOnly(processName: string, capability: string): Error {
@@ -57,7 +59,7 @@ class ProducerOnlyExecutionIntent implements EvaluationExecutionIntent {
 }
 
 /** The automation subscribers this process does not hold. */
-function producerOnlyAutomations(processName: string): AutomationEvaluationSubscriberService {
+function producerOnlyAutomations(processName: string): EvaluationAutomationReactions {
   return {
     handleEvaluationTriggerMatch: () =>
       Promise.reject(producerOnly(processName, "match an automation trigger")),

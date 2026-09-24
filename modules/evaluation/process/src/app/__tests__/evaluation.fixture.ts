@@ -1,4 +1,6 @@
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { AutomationApi } from "@langwatch/automation-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type {
   CustomEvaluator,
@@ -28,6 +30,8 @@ import { MemoryLangevalsChannel } from "../../channels/memory/memory.langevals.c
 import { evaluationServer } from "../../evaluation.server.ts";
 import type { EvaluationRepositories } from "../../repositories/evaluation.repositories.ts";
 import { MemoryEvaluationRepositories } from "../../repositories/memory/memory.evaluation.repositories.ts";
+import { EvaluationEventingService } from "../../services/evaluation-eventing.service.ts";
+import { EvaluationRunProjectionService } from "../../services/evaluation-run-projection.service.ts";
 import { LangevalsClusteringService } from "../../services/langevals-clustering.service.ts";
 import { EvaluationApp, type EvaluationInfrastructure } from "../evaluation.app.ts";
 import type {
@@ -192,13 +196,17 @@ export function createEvaluationTestApp(
       featureFlags: FeatureFlagApi;
       evaluators: EvaluatorApi;
       monitors: MonitorApi;
+      automations: AutomationApi;
+      analytics: AnalyticsApi;
     }>;
     clustering?: LangevalsClusteringService;
   }> = {},
 ): EvaluationApp {
+  const repositories = input.repositories ?? MemoryEvaluationRepositories.create();
+
   return EvaluationApp.fromInfrastructure({
     infrastructure: createEvaluationTestInfrastructure(input.members ?? {}),
-    repositories: input.repositories ?? MemoryEvaluationRepositories.create(),
+    repositories,
     dependencies: {
       workflows: input.dependencies?.workflows ?? createApiFixture<WorkflowApi>(),
       traces: input.dependencies?.traces ?? createApiFixture<TraceApi>(),
@@ -209,6 +217,8 @@ export function createEvaluationTestApp(
       featureFlags: input.dependencies?.featureFlags ?? createApiFixture<FeatureFlagApi>(),
       evaluators: input.dependencies?.evaluators ?? createApiFixture<EvaluatorApi>(),
       monitors: input.dependencies?.monitors ?? createApiFixture<MonitorApi>(),
+      automations: input.dependencies?.automations ?? createApiFixture<AutomationApi>(),
+      analytics: input.dependencies?.analytics ?? createApiFixture<AnalyticsApi>(),
     },
     clustering:
       input.clustering ??
@@ -219,6 +229,15 @@ export function createEvaluationTestApp(
     executionIntent: {
       execute: () => Promise.reject(new Error("this test composed no evaluation execution intent")),
     },
+    eventing: EvaluationEventingService.create({
+      runs: EvaluationRunProjectionService.create({
+        repository: repositories.runs,
+        retentionFloor: { getFloorMs: async () => 0 },
+      }),
+      analytics: createApiFixture<AnalyticsApi>(),
+      analyticsFoldCache: repositories.analyticsFoldCache,
+      defaultRetentionDays: () => 30,
+    }),
   });
 }
 

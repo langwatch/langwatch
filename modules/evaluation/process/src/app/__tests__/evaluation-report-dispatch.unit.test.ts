@@ -1,4 +1,6 @@
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { AutomationApi } from "@langwatch/automation-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EvaluationApi, type ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
@@ -39,6 +41,8 @@ async function installed() {
       "feature-flag": createApiFixture<FeatureFlagApi>(),
       evaluator: createApiFixture<EvaluatorApi>(),
       monitor: createApiFixture<MonitorApi>(),
+      automation: createApiFixture<AutomationApi>(),
+      analytics: createApiFixture<AnalyticsApi>(),
       "data-retention": createApiFixture<DataRetentionApi>(),
     })
     .boot();

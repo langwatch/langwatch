@@ -1,4 +1,6 @@
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { AutomationApi } from "@langwatch/automation-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 /**
  * @vitest-environment node
@@ -33,6 +35,8 @@ function process(role: "api" | "worker") {
       "feature-flag": createApiFixture<FeatureFlagApi>(),
       evaluator: createApiFixture<EvaluatorApi>(),
       monitor: createApiFixture<MonitorApi>(),
+      automation: createApiFixture<AutomationApi>(),
+      analytics: createApiFixture<AnalyticsApi>(),
       "data-retention": createApiFixture<DataRetentionApi>({
         getPlatformDefaultRetentionDays: () => 30,
       }),
