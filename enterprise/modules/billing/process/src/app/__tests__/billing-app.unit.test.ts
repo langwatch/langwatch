@@ -5,6 +5,7 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { MemoryBillingRepositories } from "../../repositories/memory/memory.billing.repositories.ts";
+import type { MeteredUsageWarningService } from "../../services/metered-usage-warning.service.ts";
 import { type ConnectedBillingPeers, BillingApp } from "../billing.app.ts";
 
 const ACME = "org-acme";
@@ -62,6 +63,7 @@ function billingApp({
   const registry = licensedAt(commitUsdCents);
   const repositories = MemoryBillingRepositories.create();
   const app = BillingApp.assemble({
+    usageWarnings: createApiFixture<MeteredUsageWarningService>({}),
     members: { isSaas, nodeEnvironment: "test" },
     repositories,
     config: { bankDetails: undefined },

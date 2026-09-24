@@ -1,34 +1,15 @@
 /**
  * The fixed quantities a usage warning is decided by: the thresholds it fires at, the month it
- * counts within, and the two deployment hooks that colour the mail.
+ * counts within, and what the warning is composed over.
  */
 import type {
-  BillingPricingModel,
   BillingUsageCounter,
   BillingUsageLimitOrganization,
 } from "@langwatch/enterprise-billing-contract";
 import type { NotificationService as NotificationRecordService } from "@langwatch/notification-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
-import type {
-  NotificationService,
-  UsageLimitEmailData,
-} from "../services/billing-usage-notice.service.ts";
-
-/** What an organization's usage is metered in, resolved by the deployment's own meter policy. */
-export type BillingUsageUnit = "traces" | "events";
-
-/**
- * Where organization can go next; structural type avoids cross-package
- * entitlement-server dependency.
- */
-export type BillingNextStepResolver = {
-  find(input: {
-    organizationId: string;
-    pricingModel: BillingPricingModel | null;
-    currency: "USD" | "EUR";
-  }): Promise<NonNullable<UsageLimitEmailData["nextStep"]> | undefined>;
-};
+import type { NotificationService } from "../services/billing-usage-notice.service.ts";
 
 /** Ascending, so the last one passed is the highest one crossed. */
 export const USAGE_WARNING_THRESHOLDS = [50, 70, 90, 95, 100] as const;
@@ -56,13 +37,9 @@ export function findCrossedUsageThreshold(
 }
 
 export type UsageWarningServiceOptions = {
-  records: NotificationRecordService;
+  records: Pick<NotificationRecordService, "listRecentByOrganization" | "create">;
   organizations: BillingUsageLimitOrganization;
   usageCounts: BillingUsageCounter;
-  emails: NotificationService;
+  emails: Pick<NotificationService, "sendUsageLimitEmail">;
   baseHost: string;
-  /** Resolves where the organization can go next. Absent skips the hook. */
-  nextStep?: BillingNextStepResolver;
-  /** What the organization is metered in, from the deployment's own meter policy. */
-  usageUnit?: (input: { organizationId: string }) => Promise<BillingUsageUnit | undefined>;
 };

@@ -79,6 +79,8 @@ export interface UsageVolumeCounter {
 export interface UsageWarning {
   /** Reports nothing sent when the reading crossed no threshold, or the window still holds. */
   sendWarning(input: SendUsageLimitWarningInput): Promise<UsageLimitWarning>;
+  /** Main's daily check of every organization; Cloud only. */
+  sweep(): Promise<void>;
 }
 
 /**

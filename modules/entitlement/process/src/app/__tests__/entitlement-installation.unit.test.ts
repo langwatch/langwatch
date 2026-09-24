@@ -91,6 +91,7 @@ describe("entitlement app installation", () => {
     "installs a working capability in the %s role, with no enterprise sources composed",
     async (role) => {
       const { logger } = createTestLogger();
+      const warned: Parameters<BillingApi["checkAndSendUsageWarning"]>[0][] = [];
       const runtime = await createApp({ role })
         .withModules([withMemoryRepositories(entitlementServer)])
         .withConfig({ entitlement: { requestBounds: undefined } })
@@ -103,6 +104,10 @@ describe("entitlement app installation", () => {
             getPricingModel: async () => ({ pricingModel: null }),
             countBillableEventsByProjects: async ({ projectIds }) =>
               projectIds.map((projectId) => ({ projectId, count: 11 })),
+            checkAndSendUsageWarning: async (input) => {
+              warned.push(input);
+              return { sent: true, notificationId: "notification-1" };
+            },
           }),
           trace: createApiFixture<TraceApi>({
             countTracesByProjects: async ({ projectIds }) =>
@@ -136,15 +141,22 @@ describe("entitlement app installation", () => {
           usageUnit: "events",
         });
 
-        // The approaching-limit mail needs the same Enterprise gateway, so it
-        // refuses by name rather than reporting that it sent something.
+        // Billing sends the approaching-limit mail, counted in the organization's own meter.
         await expect(
           app.sendUsageLimitWarning({
             organizationId: "organization-1",
             currentMonthMessagesCount: 900,
             maxMonthlyUsageLimit: 1_000,
           }),
-        ).rejects.toMatchObject({ code: "service_unavailable" });
+        ).resolves.toEqual({ sent: true, notificationId: "notification-1" });
+        expect(warned).toEqual([
+          {
+            organizationId: "organization-1",
+            currentMonthMessagesCount: 900,
+            maxMonthlyUsageLimit: 1_000,
+            meter: "events",
+          },
+        ]);
       } finally {
         await runtime.stop();
       }

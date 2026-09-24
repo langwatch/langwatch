@@ -127,48 +127,6 @@ Feature: The growth hooks the transactional messages carry
     Then no share of the limit appears
 
   @unit
-  Scenario: The usage warning names the plan that removes the limit
-    Given the usage limit email with a self-serve next step
-    When it is rendered
-    Then the plan name and its monthly price appear
-
-  @unit
-  Scenario: The usage warning puts the plan under the fix at a full crossing
-    Given the usage limit email at a full crossing with a self-serve next step
-    When it is rendered
-    Then the interruption is stated before the plan is named
-
-  @unit
-  Scenario: An organization on negotiated terms is never quoted a price
-    Given the usage limit email with an account-managed next step
-    When it is rendered
-    Then the account team is named and no price and no plan page appear
-
-  @unit
-  Scenario: An organization with nothing above it is offered nothing
-    Given the usage limit email with no next step
-    When it is rendered
-    Then neither a price nor an account team appears
-
-  @unit
-  Scenario: The usage warning counts in the unit the organization is metered in
-    Given the usage limit email metered in events
-    When it is rendered
-    Then the counts read in events rather than in messages
-
-  @unit
-  Scenario: The usage warning names the project carrying most of the month
-    Given the usage limit email where one project carries most of the volume
-    When it is rendered
-    Then that project is named as the place to look first
-
-  @unit
-  Scenario: An even spread across projects names none of them
-    Given the usage limit email where the volume is spread evenly
-    When it is rendered
-    Then no project is named as the place to look first
-
-  @unit
   Scenario: A reached ceiling names the tier that allows more
     Given the automation limit email for a reached ceiling with a self-serve next step
     When it is rendered

@@ -3,6 +3,7 @@ import { defineServerModule } from "@langwatch/kernel";
 
 import { EntitlementApp } from "./app/entitlement.app.ts";
 import type { PlanCatalogueReader } from "./app/entitlement.app.ts";
+import { entitlementUsageWarningEventing } from "./eventing/entitlement-usage-warning.pipeline.ts";
 import { entitlementRepositories } from "./repositories/entitlement-repositories.registry.ts";
 import {
   PrismaUsageMembershipRepository,
@@ -29,7 +30,8 @@ export { createAbsentRequestBound } from "./app/entitlement-composition.build.ts
 export const entitlementServer = defineServerModule("entitlement")
   .withRepositories(entitlementRepositories)
   .withApp(EntitlementApp)
-  .withTransports(planTrpcTransport, usageLimitsTrpcTransport, organizationSpendTrpcTransport);
+  .withTransports(planTrpcTransport, usageLimitsTrpcTransport, organizationSpendTrpcTransport)
+  .withEventing(entitlementUsageWarningEventing);
 
 /**
  * Runtime seams: thin factories over this feature's private classes, so a

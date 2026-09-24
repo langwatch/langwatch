@@ -63,6 +63,8 @@ export class TestUsageWarnings implements UsageWarning {
 
     return this.answer;
   }
+
+  async sweep(): Promise<void> {}
 }
 
 export function createEntitlementTestUsers(): UserApi {

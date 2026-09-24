@@ -39,13 +39,25 @@ Feature: Plan-limit and usage-warning notifications fire correctly
     Then the notification names projects and what to do about it
 
   @unit
-  Scenario: The usage warning carries the organization's own next step and meter
-    Given an organization above a warning threshold on the public ladder
+  Scenario: The usage warning carries main's severity and usage link
+    Given an organization at 80% of its monthly limit
     When the usage-limit warning is built
-    Then the mail carries the plan it can move to and the unit it is metered in
+    Then the mail is graded Medium, reads 80%, and links to the usage settings
 
   @unit
-  Scenario: A usage warning omits the next step it cannot resolve
-    Given an organization above a warning threshold whose catalogue read fails
-    When the usage-limit warning is built
-    Then the mail still sends without a next step
+  Scenario: A usage warning below every threshold sends nothing
+    Given an organization at 10% of its monthly limit
+    When the usage-limit warning is checked
+    Then no mail goes out and nothing is recorded
+  @unit
+  Scenario: The usage warning lists projects in the meter the caller resolved
+    Given an organization metered in events above a warning threshold
+    When the usage-limit warning is checked with the events meter
+    Then the mail lists each named project's billable events, not its traces
+
+  @unit
+  Scenario: A usage warning for an organization that no longer exists sends nothing
+    Given an organization that has been deleted
+    When the usage-limit warning is checked
+    Then nothing is sent and the check reports it was not sent
+

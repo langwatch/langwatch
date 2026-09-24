@@ -123,10 +123,6 @@ export type { BillingTenantOrganizationDatabase } from "./repositories/prisma/pr
 export type { BillingSubscription } from "./repositories/subscription.repository.ts";
 export type { BillingCooldownCache } from "./services/billing-alert-cooldown.service.ts";
 export type {
-  BillingNextStepResolver,
-  BillingUsageUnit,
-} from "./rules/usage-warning-thresholds.rules.ts";
-export type {
   GeneratedLicense,
   LicenseEmailDelivery,
   LicenseFeaturesResolver,

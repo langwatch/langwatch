@@ -26,6 +26,7 @@
     "@langwatch/enterprise-billing-contract": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/observability": "workspace:*",

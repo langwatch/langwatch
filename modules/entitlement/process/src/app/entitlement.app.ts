@@ -22,6 +22,7 @@ import {
   type UsageStats,
   type PricingModel,
 } from "@langwatch/entitlement-contract";
+import type { Event, StaticPipelineDefinition } from "@langwatch/eventing";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import {
@@ -35,6 +36,7 @@ import { nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 
+import { buildUsageWarningPipeline } from "../eventing/entitlement-usage-warning.pipeline.ts";
 import type { EntitlementRepositories } from "../repositories/entitlement.repositories.ts";
 import { EntitlementService } from "../services/entitlement.service.ts";
 import { PlanNextStepService } from "../services/plan-next-step.service.ts";
@@ -232,6 +234,16 @@ export class EntitlementApp implements EntitlementApiContract {
 
   sendUsageLimitWarning(input: SendUsageLimitWarningInput): Promise<UsageLimitWarning> {
     return this.#warnings.sendWarning(input);
+  }
+
+  /** The daily warning sweep this module's worker hosts, over the warning it composed. */
+  usageWarningEventingPipeline(deps: {
+    deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;
+  }): StaticPipelineDefinition<Event> {
+    return buildUsageWarningPipeline({
+      sweep: () => this.#warnings.sweep(),
+      deleteDispatchedBefore: deps.deleteDispatchedBefore,
+    });
   }
 
   /**

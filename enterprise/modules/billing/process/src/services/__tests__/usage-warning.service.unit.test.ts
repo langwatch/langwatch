@@ -1,14 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { UsageWarningServiceOptions } from "../../rules/usage-warning-thresholds.rules.ts";
 import { UsageWarningService } from "../usage-warning.service.ts";
 
 const ORG = {
   id: "org-1",
   name: "Acme Corp",
   sentPlanLimitAlert: null,
-  pricingModel: "TIERED" as const,
-  currency: "USD" as const,
   members: [{ user: { id: "user-1", name: "Priya", email: "priya@acme.example" } }],
 };
 
@@ -32,73 +29,46 @@ function baseOptions() {
 }
 
 describe("UsageWarningService", () => {
-  describe("when a next-step resolver and a usage-unit resolver are composed", () => {
-    /** @scenario "The usage warning carries the organization's own next step and meter" */
-    it("passes the resolved plan and unit through to the mail", async () => {
-      const nextStep = {
-        find: vi.fn().mockResolvedValue({
-          kind: "self_serve" as const,
-          name: "Accelerate",
-          url: "https://app.langwatch.ai/settings/subscription/checkout/accelerate",
-          price: 199,
-          currency: "USD",
-          billingPeriod: "monthly" as const,
-          pricedPerSeat: false,
-          raisesLimitTo: 5_000_000,
-        }),
-      };
-      const usageUnit = vi.fn().mockResolvedValue("events" as const);
+  describe("when usage crosses a warning threshold", () => {
+    /** @scenario "The usage warning carries main's severity and usage link" */
+    it("sends main's email data to every deliverable admin", async () => {
       const options = baseOptions();
-      const service = UsageWarningService.create({
-        ...options,
-        nextStep,
-        usageUnit,
-      } as unknown as UsageWarningServiceOptions);
+      const service = UsageWarningService.create(options);
 
-      await service.checkAndSendWarning({
+      const result = await service.checkAndSendWarning({
         organizationId: "org-1",
         currentMonthMessagesCount: 800,
         maxMonthlyUsageLimit: 1000,
       });
 
-      expect(nextStep.find).toHaveBeenCalledWith({
-        organizationId: "org-1",
-        pricingModel: "TIERED",
-        currency: "USD",
-      });
+      expect(result.outcome).toBe("sent");
       const sent = options.emails.sendUsageLimitEmail.mock.calls[0]?.[0];
-      expect(sent.usageData.nextStep).toEqual({
-        kind: "self_serve",
-        name: "Accelerate",
-        url: "https://app.langwatch.ai/settings/subscription/checkout/accelerate",
-        price: 199,
-        currency: "USD",
-        billingPeriod: "monthly",
-        pricedPerSeat: false,
-        raisesLimitTo: 5_000_000,
+      expect(sent.to).toBe("priya@acme.example");
+      expect(sent.usageData).toMatchObject({
+        severity: "Medium",
+        usagePercentageFormatted: "80",
+        crossedThreshold: 70,
+        actionUrl: "https://app.langwatch.ai/settings/usage",
+        projectUsageData: [{ id: "project-1", name: "Support", messageCount: 10 }],
       });
-      expect(sent.usageData.usageUnit).toBe("events");
     });
   });
 
-  describe("when the next-step resolver throws", () => {
-    /** @scenario "A usage warning omits the next step it cannot resolve" */
-    it("still sends the warning, without a next step", async () => {
-      const nextStep = { find: vi.fn().mockRejectedValue(new Error("catalogue unavailable")) };
+  describe("when usage is below every threshold", () => {
+    /** @scenario "A usage warning below every threshold sends nothing" */
+    it("skips without sending or recording", async () => {
       const options = baseOptions();
-      const service = UsageWarningService.create({
-        ...options,
-        nextStep,
-      } as unknown as UsageWarningServiceOptions);
+      const service = UsageWarningService.create(options);
 
-      await service.checkAndSendWarning({
+      const result = await service.checkAndSendWarning({
         organizationId: "org-1",
-        currentMonthMessagesCount: 800,
+        currentMonthMessagesCount: 100,
         maxMonthlyUsageLimit: 1000,
       });
 
-      const sent = options.emails.sendUsageLimitEmail.mock.calls[0]?.[0];
-      expect(sent.usageData.nextStep).toBeUndefined();
+      expect(result.outcome).toBe("skipped");
+      expect(options.emails.sendUsageLimitEmail).not.toHaveBeenCalled();
+      expect(options.records.create).not.toHaveBeenCalled();
     });
   });
 });

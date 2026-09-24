@@ -17,7 +17,6 @@ import { FIRST_STEPS_LINKS } from "../onboarding/first-steps.tsx";
 import { renderMailTemplate, type MailTemplate } from "../registry.ts";
 import { signUpVerificationEmailTemplate } from "../sign-up-verification-email.tsx";
 import { triggerDigestEmailTemplate } from "../trigger-digest-email.tsx";
-import { usageLimitEmailTemplate } from "../usage-limit-email.tsx";
 
 /**
  * Every hook is optional data behind a gate, so test both when the sender can and cannot
@@ -304,127 +303,6 @@ describe("given the budget increase request email", () => {
       });
 
       expect(rendered).not.toContain("Of the limit");
-    });
-  });
-});
-
-const usageBase = {
-  organizationName: "Acme Corp",
-  usagePercentage: 78.4,
-  usagePercentageFormatted: "78.4",
-  currentMonthMessagesCount: 784_120,
-  maxMonthlyUsageLimit: 1_000_000,
-  crossedThreshold: 70,
-  projectUsageData: [
-    { id: "project_1", name: "Support agent", messageCount: 512_403 },
-    { id: "project_2", name: "Sales copilot", messageCount: 271_717 },
-  ],
-  actionUrl: "https://app.langwatch.ai/settings/usage",
-};
-
-const selfServePlan = {
-  kind: "self_serve" as const,
-  name: "Accelerate",
-  price: 199,
-  currency: "USD",
-  billingPeriod: "monthly" as const,
-  url: PLAN_URL,
-  raisesLimitTo: 5_000_000,
-};
-
-describe("given the usage limit email", () => {
-  describe("when the organization buys from the public ladder", () => {
-    /** @scenario "The usage warning names the plan that removes the limit" */
-    it("names the plan and its monthly price", async () => {
-      const rendered = await html(usageLimitEmailTemplate, {
-        ...usageBase,
-        nextStep: selfServePlan,
-      });
-
-      expect(rendered).toContain("Upgrade to Accelerate");
-      expect(rendered).toContain("$199 a month");
-      expect(rendered).toContain("5,000,000");
-      expect(rendered).toContain(PLAN_URL);
-    });
-  });
-
-  describe("when the limit is fully crossed and the organization can buy more", () => {
-    /** @scenario "The usage warning puts the plan under the fix at a full crossing" */
-    it("states the interruption before it names the plan", async () => {
-      const rendered = await html(usageLimitEmailTemplate, {
-        ...usageBase,
-        usagePercentage: 100,
-        usagePercentageFormatted: "100.0",
-        crossedThreshold: 100,
-        nextStep: selfServePlan,
-      });
-
-      expect(rendered.indexOf("To carry on using LangWatch")).toBeLessThan(
-        rendered.indexOf("$199"),
-      );
-    });
-  });
-
-  describe("when the organization is on negotiated terms", () => {
-    /** @scenario "An organization on negotiated terms is never quoted a price" */
-    it("names the account team and quotes no price", async () => {
-      const rendered = await html(usageLimitEmailTemplate, {
-        ...usageBase,
-        nextStep: { kind: "account_team", contactUrl: ACCOUNT_TEAM_URL },
-      });
-
-      expect(rendered).toContain(ACCOUNT_TEAM_URL);
-      expect(rendered).not.toContain("$199");
-      expect(rendered).not.toContain(PLAN_URL);
-      expect(rendered).not.toContain("move to a larger plan");
-    });
-  });
-
-  describe("when nothing above this organization was resolved", () => {
-    /** @scenario "An organization with nothing above it is offered nothing" */
-    it("names neither a price nor an account team", async () => {
-      const rendered = await html(usageLimitEmailTemplate, usageBase);
-
-      expect(rendered).not.toContain("$199");
-      expect(rendered).not.toContain(ACCOUNT_TEAM_URL);
-    });
-  });
-
-  describe("when the organization is metered in events", () => {
-    /** @scenario "The usage warning counts in the unit the organization is metered in" */
-    it("counts in events rather than in messages", async () => {
-      const rendered = await html(usageLimitEmailTemplate, {
-        ...usageBase,
-        usageUnit: "events",
-      });
-
-      expect(rendered).toContain("784,120 of 1,000,000 events");
-      expect(rendered).not.toContain("of 1,000,000 messages");
-    });
-  });
-
-  describe("when one project carries most of the month", () => {
-    /** @scenario "The usage warning names the project carrying most of the month" */
-    it("names that project as the place to look first", async () => {
-      const rendered = await html(usageLimitEmailTemplate, usageBase);
-
-      expect(rendered).toContain("Most of the month is Support agent");
-    });
-  });
-
-  describe("when the volume is spread evenly across projects", () => {
-    /** @scenario "An even spread across projects names none of them" */
-    it("names no project as the place to look first", async () => {
-      const rendered = await html(usageLimitEmailTemplate, {
-        ...usageBase,
-        projectUsageData: [
-          { id: "project_1", name: "Support agent", messageCount: 261_373 },
-          { id: "project_2", name: "Sales copilot", messageCount: 261_373 },
-          { id: "project_3", name: "Internal tools", messageCount: 261_374 },
-        ],
-      });
-
-      expect(rendered).not.toContain("Most of the month is");
     });
   });
 });

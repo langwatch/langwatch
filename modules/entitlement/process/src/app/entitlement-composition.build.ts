@@ -12,7 +12,6 @@ import {
   type UsageLimitWarning,
   type EntitlementApi as EntitlementApiContract,
   type EntitlementSource,
-  EntitlementNotifierUnavailableError,
 } from "@langwatch/entitlement-contract";
 import type { Logger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -23,55 +22,65 @@ import {
   type Plan as CataloguePlan,
 } from "@langwatch/plans";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { toDate } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
 import { EntitlementService } from "../services/entitlement.service.ts";
 import { UsageService } from "../services/usage-enforcement.service.ts";
+import { UsageWarningSweepService } from "../services/usage-warning-sweep.service.ts";
 import type { EntitlementInfrastructure } from "./entitlement.app.ts";
 import { InProcessUsageCache, type UsageWarning } from "./entitlement.members.ts";
 
-/** Which plan source this deployment could not compose, said once at composition. */
-export abstract class EntitlementAbsenceReport {
-  abstract absent(source: "usage-mail"): void;
-}
-
-/** Writes each absent source to the process log, with what it costs. */
-export class LoggedEntitlementAbsence extends EntitlementAbsenceReport {
-  static create(logger: Pick<Logger, "warn">): LoggedEntitlementAbsence {
-    return new LoggedEntitlementAbsence(logger);
+/** The approaching-limit mail, in the organization's own meter, sent by billing. */
+class BillingUsageWarning implements UsageWarning {
+  static create(input: {
+    billing: Pick<BillingApi, "checkAndSendUsageWarning">;
+    counter: UsageService;
+    plans: EntitlementService;
+    peers: EntitlementUsagePeers;
+    isSaas: boolean;
+    logger: Logger;
+  }): BillingUsageWarning {
+    return new BillingUsageWarning(input.billing, input.counter, (send) =>
+      UsageWarningSweepService.create({
+        isSaas: input.isSaas,
+        logger: input.logger,
+        organizationIds: () => input.peers.organizations.findAllIds(),
+        projectIds: (organizationId) =>
+          input.peers.projects.listIdsByOrganization({ organizationId }),
+        currentMonthCount: (organizationId) =>
+          input.counter.getCurrentMonthCount({ organizationId }),
+        activePlan: (organizationId) => input.plans.getActivePlan({ organizationId }),
+        send,
+      }),
+    );
   }
 
-  private constructor(private readonly logger: Pick<Logger, "warn">) {
-    super();
+  readonly #sweep: UsageWarningSweepService;
+
+  private constructor(
+    private readonly billing: Pick<BillingApi, "checkAndSendUsageWarning">,
+    private readonly counter: UsageService,
+    sweep: (send: UsageWarning["sendWarning"]) => UsageWarningSweepService,
+  ) {
+    this.#sweep = sweep((input) => this.sendWarning(input));
   }
 
-  absent(source: "usage-mail"): void {
-    this.logger.warn({ source }, ENTITLEMENT_CONSEQUENCE[source]);
-  }
-}
-
-/** The `usage-mail` string is ported verbatim from the deleted `api-usage.composition.ts`. */
-const ENTITLEMENT_CONSEQUENCE = {
-  "usage-mail":
-    "API process composed no mail gateway because this deployment named no BASE_HOST: there is no sender address to derive and no host to build the usage link from, so the approaching-limit mail refuses by name rather than reporting that it sent something.",
-} as const;
-
-/**
- * The approaching-limit mail, on a deployment that composed no Enterprise
- * billing gateway. Refuses by name rather than reporting that it sent
- * something, exactly like the deleted composition's own `ApiComposedUsageWarnings`.
- */
-class AbsentUsageWarning implements UsageWarning {
-  static create(report: EntitlementAbsenceReport, processName: string): AbsentUsageWarning {
-    report.absent("usage-mail");
-
-    return new AbsentUsageWarning(processName);
+  async sendWarning(input: SendUsageLimitWarningInput): Promise<UsageLimitWarning> {
+    const meter = await this.counter.getResolvedUsageUnit({ organizationId: input.organizationId });
+    const { sent, notificationId, sentAt } = await this.billing.checkAndSendUsageWarning({
+      ...input,
+      meter,
+    });
+    return {
+      sent,
+      ...(notificationId === undefined ? {} : { notificationId }),
+      ...(sentAt === undefined ? {} : { sentAt: toDate(sentAt) }),
+    };
   }
 
-  private constructor(private readonly processName: string) {}
-
-  async sendWarning(_input: SendUsageLimitWarningInput): Promise<UsageLimitWarning> {
-    throw new EntitlementNotifierUnavailableError(this.processName);
+  sweep(): Promise<void> {
+    return this.#sweep.sweep();
   }
 }
 
@@ -159,8 +168,11 @@ function liveUsageCounter(input: {
 /** The peers the live usage count reads through. */
 export type EntitlementUsagePeers = Readonly<{
   traces: Pick<TraceApi, "countTracesByProjects">;
-  billing: Pick<BillingApi, "countBillableEventsByProjects" | "getPricingModel">;
-  organizations: Pick<OrganizationApi, "getOrganizationIdByTeamId">;
+  billing: Pick<
+    BillingApi,
+    "countBillableEventsByProjects" | "getPricingModel" | "checkAndSendUsageWarning"
+  >;
+  organizations: Pick<OrganizationApi, "getOrganizationIdByTeamId" | "findAllIds">;
   projects: Pick<ProjectApi, "listIdsByOrganization">;
 }>;
 
@@ -176,11 +188,7 @@ export function buildEntitlementInfrastructure(input: {
   billing: Pick<BillingApi, "getActiveSubscriptionPlan">;
   /** Where the month's usage is counted. */
   usage: EntitlementUsagePeers;
-  /** Overridable for tests; defaults to the process logger. */
-  report?: EntitlementAbsenceReport;
 }): EntitlementInfrastructure {
-  const report = input.report ?? LoggedEntitlementAbsence.create(input.logger);
-
   // Main composed the subscription provider on Cloud only; self-hosted resolves licences alone.
   const subscription = input.isSaas ? BillingSubscriptionPlans.create(input.billing) : undefined;
 
@@ -190,13 +198,19 @@ export function buildEntitlementInfrastructure(input: {
     subscription,
   };
 
+  const plans = EntitlementService.create(sources);
+  const counter = liveUsageCounter({ isSaas: input.isSaas, plans, peers: input.usage });
+
   return {
     ...sources,
-    counter: liveUsageCounter({
-      isSaas: input.isSaas,
-      plans: EntitlementService.create(sources),
+    counter,
+    warnings: BillingUsageWarning.create({
+      billing: input.usage.billing,
+      counter,
+      plans,
       peers: input.usage,
+      isSaas: input.isSaas,
+      logger: input.logger,
     }),
-    warnings: AbsentUsageWarning.create(report, input.processName),
   };
 }

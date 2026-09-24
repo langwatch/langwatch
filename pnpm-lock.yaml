@@ -6317,6 +6317,9 @@ importers:
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../packages/eventing
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error

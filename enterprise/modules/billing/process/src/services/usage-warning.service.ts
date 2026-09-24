@@ -34,22 +34,16 @@ import {
   USAGE_WARNING_THRESHOLDS,
   findCrossedUsageThreshold,
   getCurrentMonthStart,
-  type BillingNextStepResolver,
-  type BillingUsageUnit,
   type UsageWarningServiceOptions,
 } from "../rules/usage-warning-thresholds.rules.ts";
 import { UsageWarningDispatchService } from "./usage-warning-dispatch.service.ts";
 
 export class UsageWarningService {
-  private readonly records: NotificationRecordService;
+  private readonly records: UsageWarningServiceOptions["records"];
   private readonly organizations: BillingUsageLimitOrganization;
   private readonly usageCounts: BillingUsageCounter;
-  private readonly emails: NotificationService;
+  private readonly emails: UsageWarningServiceOptions["emails"];
   private readonly baseHost: string;
-  private readonly nextStep: BillingNextStepResolver | undefined;
-  private readonly resolveUsageUnit:
-    | ((input: { organizationId: string }) => Promise<BillingUsageUnit | undefined>)
-    | undefined;
 
   static create(options: UsageWarningServiceOptions): UsageWarningService {
     return new UsageWarningService(options);
@@ -61,14 +55,10 @@ export class UsageWarningService {
     this.usageCounts = options.usageCounts;
     this.emails = options.emails;
     this.baseHost = options.baseHost;
-    this.nextStep = options.nextStep;
-    this.resolveUsageUnit = options.usageUnit;
     this.dispatch = UsageWarningDispatchService.create({
       records: options.records,
       emails: options.emails,
       baseHost: options.baseHost,
-      nextStep: options.nextStep,
-      resolveUsageUnit: options.usageUnit,
     });
   }
 
@@ -136,11 +126,8 @@ export class UsageWarningService {
       organizationId,
       organizationName: organization.name,
       deliverableAdmins,
-      emailContext: await this.dispatch.buildEmailContext({
-        organizationId,
+      emailContext: this.dispatch.buildEmailContext({
         organizationName: organization.name,
-        pricingModel: organization.pricingModel,
-        currency: organization.currency,
         usagePercentage,
         currentMonthMessagesCount,
         maxMonthlyUsageLimit,

@@ -2,6 +2,7 @@
 
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
+import type { Instant } from "@langwatch/time";
 
 import type { BillingPricingModel, SubscriptionPlanInput, USAGE_UNKNOWN } from "./billing-types.ts";
 import type {
@@ -90,6 +91,16 @@ export interface BillingApi {
     organizationId: string;
     projectIds: string[];
   }): Promise<{ projectId: string; count: number }[] | typeof USAGE_UNKNOWN>;
+  /**
+   * Main's `usageLimits.checkAndSendWarning`: mails the organization's admins when usage crosses a
+   * warning threshold not yet warned about this month, counting projects in the caller's meter.
+   */
+  checkAndSendUsageWarning(input: {
+    organizationId: string;
+    currentMonthMessagesCount: number;
+    maxMonthlyUsageLimit: number;
+    meter: "traces" | "events";
+  }): Promise<{ sent: boolean; notificationId?: string; sentAt?: Instant }>;
   /** The organization's pricing model column, which is empty for organizations never migrated. */
   getPricingModel(input: {
     organizationId: string;

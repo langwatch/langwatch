@@ -177,10 +177,6 @@ export interface BillingUsageLimitOrganization {
     name: string;
     sentPlanLimitAlert: Instant | null;
     members: { user: { id: string; name: string | null; email: string | null } }[];
-    /** Which self-serve ladder this organization buys from, for the next-step hook. */
-    pricingModel: BillingPricingModel | null;
-    /** What the next-step plan is quoted in for this organization. */
-    currency: "USD" | "EUR";
   } | null>;
   updateSentPlanLimitAlert(organizationId: string, timestamp: Instant): Promise<void>;
   findProjectsWithName(organizationId: string): Promise<{ id: string; name: string }[]>;

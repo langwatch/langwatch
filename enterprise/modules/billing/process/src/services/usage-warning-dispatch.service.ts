@@ -1,36 +1,28 @@
-import {
-  NOTIFICATION_TYPES,
-  type BillingPricingModel,
-} from "@langwatch/enterprise-billing-contract";
+import { NOTIFICATION_TYPES } from "@langwatch/enterprise-billing-contract";
 import type {
   NotificationService as NotificationRecordService,
   Notification,
 } from "@langwatch/notification-contract";
 /**
  * The usage-limit warning as it reaches a person: the copy the mail is built from, the send to
- * every deliverable admin, and the record written once at least one send succeeded. A hook that
- * cannot be resolved truthfully is left out rather than guessed — the message still goes out.
+ * every deliverable admin, and the record written once at least one send succeeded.
  */
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, toDate } from "@langwatch/time";
 
-import type {
-  BillingNextStepResolver,
-  BillingUsageUnit,
-} from "../rules/usage-warning-thresholds.rules.ts";
 import type { NotificationService, UsageLimitEmailData } from "./billing-usage-notice.service.ts";
 
 const logger = createLogger("langwatch:notifications:usageWarning");
 
 type UsageWarningDispatchOptions = {
-  records: NotificationRecordService;
-  emails: NotificationService;
+  records: Pick<NotificationRecordService, "create">;
+  emails: Pick<NotificationService, "sendUsageLimitEmail">;
   baseHost: string;
-  nextStep: BillingNextStepResolver | undefined;
-  resolveUsageUnit:
-    | ((input: { organizationId: string }) => Promise<BillingUsageUnit | undefined>)
-    | undefined;
 };
+
+/** Main's header image, carried on the email data as main's service carried it. */
+const LOGO_URL =
+  "https://hs-143534269.f.hubspotstarter-eu1.net/hub/143534269/hubfs/header-3.png?width=1116&upscale=true&name=header-3.png";
 
 export class UsageWarningDispatchService {
   static create(deps: UsageWarningDispatchOptions): UsageWarningDispatchService {
@@ -42,105 +34,35 @@ export class UsageWarningDispatchService {
   /**
    * Builds the email data object with severity, formatting, and presentation constants.
    */
-  async buildEmailContext({
-    organizationId,
+  buildEmailContext({
     organizationName,
-    pricingModel,
-    currency,
     usagePercentage,
     currentMonthMessagesCount,
     maxMonthlyUsageLimit,
     crossedThreshold,
     projectUsageData,
   }: {
-    organizationId: string;
     organizationName: string;
-    pricingModel: BillingPricingModel | null;
-    currency: "USD" | "EUR";
     usagePercentage: number;
     currentMonthMessagesCount: number;
     maxMonthlyUsageLimit: number;
     crossedThreshold: number;
     projectUsageData: { id: string; name: string; messageCount: number }[];
-  }): Promise<UsageLimitEmailData> {
-    const actionUrl = `${this.deps.baseHost}/settings/usage`;
-
-    const [usageUnit, nextStep] = await Promise.all([
-      this.tryResolveUsageUnit({ organizationId }),
-      this.tryResolveNextStep({ organizationId, pricingModel, currency }),
-    ]);
-
-    const logoUrl =
-      "https://hs-143534269.f.hubspotstarter-eu1.net/hub/143534269/hubfs/header-3.png?width=1116&upscale=true&name=header-3.png";
-
+  }): UsageLimitEmailData {
     const cappedPercentage = Math.min(usagePercentage, 100);
-    const usagePercentageFormatted = Math.floor(cappedPercentage).toString();
-
-    let severity: string;
-    if (crossedThreshold >= 95) {
-      severity = "Critical";
-    } else if (crossedThreshold >= 90) {
-      severity = "High";
-    } else if (crossedThreshold >= 70) {
-      severity = "Medium";
-    } else {
-      severity = "Info";
-    }
 
     return {
       organizationName,
       usagePercentage,
-      usagePercentageFormatted,
+      usagePercentageFormatted: Math.floor(cappedPercentage).toString(),
       currentMonthMessagesCount,
       maxMonthlyUsageLimit,
       crossedThreshold,
       projectUsageData,
-      actionUrl,
-      logoUrl,
-      severity,
-      ...(usageUnit !== undefined && { usageUnit }),
-      ...(nextStep !== undefined && { nextStep }),
+      actionUrl: `${this.deps.baseHost}/settings/usage`,
+      logoUrl: LOGO_URL,
+      severity: severityOf(crossedThreshold),
     };
-  }
-
-  /** What this organization is metered in, or nothing when the deployment composed no meter. */
-  private async tryResolveUsageUnit(input: {
-    organizationId: string;
-  }): Promise<BillingUsageUnit | undefined> {
-    if (!this.deps.resolveUsageUnit) return undefined;
-    try {
-      return await this.deps.resolveUsageUnit(input);
-    } catch (error) {
-      logger.warn(
-        { organizationId: input.organizationId, error },
-        "Could not resolve the usage unit for a usage-limit email; the mail keeps its default word",
-      );
-
-      return undefined;
-    }
-  }
-
-  /**
-   * Where this organization can go next, or nothing when the deployment composed no
-   * catalogue, or the plan could not be read. A hook that cannot be resolved truthfully
-   * is omitted rather than guessed — the service message it rides on still goes out.
-   */
-  private async tryResolveNextStep(input: {
-    organizationId: string;
-    pricingModel: BillingPricingModel | null;
-    currency: "USD" | "EUR";
-  }): Promise<UsageLimitEmailData["nextStep"] | undefined> {
-    if (!this.deps.nextStep) return undefined;
-    try {
-      return await this.deps.nextStep.find(input);
-    } catch (error) {
-      logger.warn(
-        { organizationId: input.organizationId, error },
-        "Could not resolve the next-step plan for a usage-limit email; the mail omits it",
-      );
-
-      return undefined;
-    }
   }
 
   /**
@@ -253,4 +175,11 @@ export class UsageWarningDispatchService {
       },
     });
   }
+}
+
+function severityOf(crossedThreshold: number): string {
+  if (crossedThreshold >= 95) return "Critical";
+  if (crossedThreshold >= 90) return "High";
+  if (crossedThreshold >= 70) return "Medium";
+  return "Info";
 }

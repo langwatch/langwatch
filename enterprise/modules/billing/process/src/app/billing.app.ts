@@ -28,12 +28,17 @@ import { LicensingApi, type PlanInfo } from "@langwatch/enterprise-licensing-con
 import type { EventingCommandSender } from "@langwatch/eventing";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
+import type { EmailDelivery } from "@langwatch/mail";
+import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
 import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
-import { Temporal } from "@langwatch/time";
+import { ProjectApi } from "@langwatch/project-contract";
+import { Temporal, type Instant } from "@langwatch/time";
+import { TraceApi } from "@langwatch/trace-contract";
 
 import { connectedInvoicingChannels } from "../channels/connected-invoicing-channels.registry.ts";
 import type { ConnectedStatementMailChannel } from "../channels/connected-statement-mail.channel.ts";
+import { usageLimitEmailChannels } from "../channels/usage-limit-email-channels.registry.ts";
 import {
   type BillingReportingDefinition,
   BillingReportingPipeline,
@@ -42,6 +47,7 @@ import type { BillingRepositories } from "../repositories/billing.repositories.t
 import { fireScenarioCreated } from "../rules/nurturing-feature-adoption-service.rules.ts";
 import { BillableEventsQueryService } from "../services/billable-events-query.service.ts";
 import { BillingErrorReporterService } from "../services/billing-error-reporter.service.ts";
+import { NotificationService as BillingUsageNoticeService } from "../services/billing-usage-notice.service.ts";
 import { ConnectedBillingOverviewService } from "../services/connected-billing-overview.service.ts";
 import { ConnectedBillingTickService } from "../services/connected-billing-tick.service.ts";
 import { ConnectedBillingService } from "../services/connected-billing.service.ts";
@@ -53,12 +59,14 @@ import { ConnectedMonthlyStatementService } from "../services/connected-monthly-
 import { ConnectedSeatChangeService } from "../services/connected-seat-change.service.ts";
 import { ConnectedUsageCeilingService } from "../services/connected-usage-ceiling.service.ts";
 import { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
+import { MeteredUsageWarningService } from "../services/metered-usage-warning.service.ts";
 import { OrganizationPricingService } from "../services/organization-pricing.service.ts";
 import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
 import {
   ScenarioCreatedSignalService,
   type ScenarioSignalOrganizations,
 } from "../services/scenario-created-signal.service.ts";
+import { UsageLimitOrganizationService } from "../services/usage-limit-organization.service.ts";
 import {
   StripeUsageReportingBuilder,
   type UsageReportingService,
@@ -67,9 +75,12 @@ import {
 /** Both are the process's own facts: where it runs, and which price mode it bills in. */
 type BillingMembers = Readonly<{ isSaas: boolean; nodeEnvironment: string | undefined }>;
 
+/** Main's `env.BASE_HOST ?? "https://app.langwatch.ai"` for the usage link. */
+const DEFAULT_PUBLIC_BASE_URL = "https://app.langwatch.ai";
+
 type BillingSetup = FeatureSetup<
   typeof BillingApp.dependencies,
-  BillingMembers,
+  BillingMembers & Readonly<{ mail: EmailDelivery; publicBaseUrl: string | undefined }>,
   BillingServerConfig,
   BillingRepositories
 >;
@@ -113,10 +124,16 @@ export class BillingApp implements BillingApi {
     gateway: GatewayApi,
     /** Where every backoffice billing command is recorded, as main recorded it. */
     auditLog: AuditLogApi,
+    /** Where the usage-limit warning is written down, and read back so it goes once a month. */
+    notifications: NotificationApi,
+    /** The per-project trace counts a usage-limit warning lists. */
+    traces: TraceApi,
+    /** The named projects a usage-limit warning lists. */
+    projects: ProjectApi,
   };
   static readonly config = billingConfig;
   static readonly secrets = { stripeSecretKey: billingSecrets.stripeSecretKey } as const;
-  static readonly reads = ["isSaas", "nodeEnvironment"] as const;
+  static readonly reads = ["isSaas", "nodeEnvironment", "mail", "publicBaseUrl"] as const;
 
   static create(setup: BillingSetup): Promise<BillingApp> {
     return setup.secrets.into(BillingApp.secrets.stripeSecretKey, (stripeSecretKey) =>
@@ -126,8 +143,30 @@ export class BillingApp implements BillingApi {
         config: setup.config,
         peers: setup.dependencies,
         stripeSecretKey,
+        usageWarnings: BillingApp.#composeUsageWarnings(setup),
       }),
     );
+  }
+
+  /** Main's usage-limit warning, sent over the process's mail member. */
+  static #composeUsageWarnings(setup: BillingSetup): MeteredUsageWarningService {
+    const { notifications, traces, organizations, projects } = setup.dependencies;
+    const billableEvents = BillableEventsQueryService.create(setup.repositories.billableEvents);
+    return MeteredUsageWarningService.create({
+      records: notifications,
+      organizations: UsageLimitOrganizationService.create({ organizations, projects }),
+      emails: BillingUsageNoticeService.create({
+        config: {},
+        usageLimitEmail: usageLimitEmailChannels.ses.create(setup.members.mail),
+      }),
+      baseHost: setup.members.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL,
+      counters: {
+        traces: { getCountByProjects: (input) => traces.countTracesByProjects(input) },
+        events: {
+          getCountByProjects: (input) => billableEvents.countBillableEventsByProjects(input),
+        },
+      },
+    });
   }
 
   /** The construction once the payment provider's key has resolved, or not. */
@@ -138,6 +177,7 @@ export class BillingApp implements BillingApi {
     peers,
     stripeSecretKey,
     statementMail,
+    usageWarnings,
   }: {
     members: BillingMembers;
     repositories: Pick<
@@ -155,6 +195,7 @@ export class BillingApp implements BillingApi {
     stripeSecretKey: string | undefined;
     /** No process composes the statement mail yet; absent, statements wait. */
     statementMail?: ConnectedStatementMailChannel;
+    usageWarnings: MeteredUsageWarningService;
   }): BillingApp {
     const { isSaas, nodeEnvironment } = members;
     const repository = repositories.connectedBilling;
@@ -181,6 +222,7 @@ export class BillingApp implements BillingApi {
         isSaas,
       }),
       isSaas,
+      usageWarnings,
       billableEvents: BillableEventsQueryService.create(repositories.billableEvents),
       pricing: OrganizationPricingService.create(repositories.organizationPricing),
       reporting: BillingApp.#composeReporting({
@@ -253,6 +295,7 @@ export class BillingApp implements BillingApi {
   readonly #billableEvents: BillableEventsQueryService;
   readonly #pricing: OrganizationPricingService;
   readonly #reporting: BillingReportingPipeline;
+  readonly #usageWarnings: MeteredUsageWarningService;
 
   private constructor({
     connected,
@@ -265,6 +308,7 @@ export class BillingApp implements BillingApi {
     billableEvents,
     pricing,
     reporting,
+    usageWarnings,
   }: {
     connected: ConnectedBilling | undefined;
     operators: Pick<OpsApi, "isAdmin">;
@@ -276,6 +320,7 @@ export class BillingApp implements BillingApi {
     billableEvents: BillableEventsQueryService;
     pricing: OrganizationPricingService;
     reporting: BillingReportingPipeline;
+    usageWarnings: MeteredUsageWarningService;
   }) {
     this.#connected = connected;
     this.#operators = operators;
@@ -287,6 +332,16 @@ export class BillingApp implements BillingApi {
     this.#billableEvents = billableEvents;
     this.#pricing = pricing;
     this.#reporting = reporting;
+    this.#usageWarnings = usageWarnings;
+  }
+
+  checkAndSendUsageWarning(input: {
+    organizationId: string;
+    currentMonthMessagesCount: number;
+    maxMonthlyUsageLimit: number;
+    meter: "traces" | "events";
+  }): Promise<{ sent: boolean; notificationId?: string; sentAt?: Instant }> {
+    return this.#usageWarnings.checkAndSendWarning(input);
   }
 
   countBillableEventsByProjects(input: {
