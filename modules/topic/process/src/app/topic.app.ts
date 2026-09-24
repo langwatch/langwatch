@@ -1,3 +1,4 @@
+import { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import type { Instant } from "@langwatch/time";
 import type {
@@ -19,11 +20,13 @@ export interface TopicClusteringScheduleReader {
   findNextWakeAt(input: { projectId: string }): Promise<Instant | null>;
 }
 
-type TopicSetup = FeatureSetup<Record<never, never>, never, undefined, TopicRepositories>;
+type TopicSetup = FeatureSetup<typeof TopicApp.dependencies, never, undefined, TopicRepositories>;
 
 export class TopicApp implements TopicApi {
   static readonly contract = TopicApiToken;
-  static readonly dependencies = {};
+  static readonly dependencies = {
+    evaluations: EvaluationApi,
+  };
 
   readonly #topics: TopicService;
 

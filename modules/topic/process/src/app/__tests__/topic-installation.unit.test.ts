@@ -1,10 +1,14 @@
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { TopicApi } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
 
 import { topicServer } from "../../topic.server.ts";
 function process(role: "api" | "worker") {
-  return createApp({ role }).withModules([withMemoryRepositories(topicServer)]);
+  return createApp({ role })
+    .withModules([withMemoryRepositories(topicServer)])
+    .provide({ evaluation: createApiFixture<EvaluationApi>({}) });
 }
 
 describe("topic app installation", () => {
