@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  CONFIRMED_ADDRESS_TTL_MS,
   SIGN_UP_VERIFICATION_TTL_MS,
   SignUpVerificationService,
   SPENT_LINK_GRACE_MS,
@@ -392,6 +393,123 @@ describe("given a link that proved an address with no account yet", () => {
       });
       expect(again.addressProof).toBeNull();
       expect(again.addressProof).not.toBe(first.addressProof);
+    });
+  });
+});
+
+describe("given an installation that cannot send email", () => {
+  describe("when an unconfirmed proof is issued", () => {
+    it("mails nothing and binds a single-use proof to the normalized address", async () => {
+      const harness = makeService();
+
+      const proof = await harness.service.issueUnconfirmedAddressProof({
+        email: " Sam@Acme.com ",
+      });
+
+      expect(harness.sent).toEqual([]);
+      expect(harness.issued[0]?.expires).toEqual(
+        new Date(NOW.getTime() + CONFIRMED_ADDRESS_TTL_MS),
+      );
+      await expect(
+        harness.service.validateUnconfirmedAddressProof({
+          token: proof,
+          email: "sam@acme.com",
+        }),
+      ).resolves.toBe(true);
+      await expect(
+        harness.service.claimUnconfirmedAddressProof({
+          token: proof,
+          email: "other@acme.com",
+        }),
+      ).resolves.toBe(false);
+      await expect(
+        harness.service.claimUnconfirmedAddressProof({
+          token: proof,
+          email: "sam@acme.com",
+        }),
+      ).resolves.toBe(true);
+      await expect(
+        harness.service.claimUnconfirmedAddressProof({
+          token: proof,
+          email: "sam@acme.com",
+        }),
+      ).resolves.toBe(false);
+    });
+
+    it("stops working once its lifetime has passed", async () => {
+      const harness = makeService();
+      const proof = await harness.service.issueUnconfirmedAddressProof({
+        email: "sam@acme.com",
+      });
+
+      harness.advance(CONFIRMED_ADDRESS_TTL_MS + 1);
+
+      await expect(
+        harness.service.claimUnconfirmedAddressProof({
+          token: proof,
+          email: "sam@acme.com",
+        }),
+      ).resolves.toBe(false);
+    });
+  });
+
+  describe("when an unconfirmed proof is offered as a confirmed one", () => {
+    /** @scenario "A confirmed address proof and an unconfirmed one never stand in for each other" */
+    it("is refused by both confirmed-proof checks and stays unspent", async () => {
+      const harness = makeService();
+      const proof = await harness.service.issueUnconfirmedAddressProof({
+        email: "sam@acme.com",
+      });
+
+      await expect(
+        harness.service.validateAddressProof({
+          token: proof,
+          email: "sam@acme.com",
+        }),
+      ).resolves.toBe(false);
+      await expect(
+        harness.service.claimAddressProof({
+          token: proof,
+          email: "sam@acme.com",
+        }),
+      ).resolves.toBe(false);
+      await expect(
+        harness.service.validateUnconfirmedAddressProof({
+          token: proof,
+          email: "sam@acme.com",
+        }),
+      ).resolves.toBe(true);
+    });
+  });
+
+  describe("when a confirmed proof is offered as an unconfirmed one", () => {
+    /** @scenario "A confirmed address proof and an unconfirmed one never stand in for each other" */
+    it("is refused by both unconfirmed-proof checks", async () => {
+      const harness = makeService();
+      await harness.service.requestVerification({ email: "sam@acme.com" });
+      const { addressProof } = await harness.service.completeVerification({
+        token: "token-1",
+      });
+      if (!addressProof) throw new Error("the link minted no proof");
+
+      await expect(
+        harness.service.validateUnconfirmedAddressProof({
+          token: addressProof,
+          email: "sam@acme.com",
+        }),
+      ).resolves.toBe(false);
+      await expect(
+        harness.service.claimUnconfirmedAddressProof({
+          token: addressProof,
+          email: "sam@acme.com",
+        }),
+      ).resolves.toBe(false);
+      await expect(
+        harness.service.claimAddressProof({
+          token: addressProof,
+          email: "sam@acme.com",
+        }),
+      ).resolves.toBe(true);
     });
   });
 });

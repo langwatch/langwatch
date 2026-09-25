@@ -15,6 +15,7 @@ import {
 import {
   AuthRateLimitedError,
   DirectRegistrationUnavailableError,
+  EmailSendingUnavailableError,
   NoAddressToConfirmError,
 } from "~/server/auth/errors";
 import { getAuthRateLimitClientIp } from "~/server/auth/rate-limit-client-ip";
@@ -27,6 +28,7 @@ import {
   resolveInviteDisplayStatus,
 } from "~/server/invites/invite.service";
 import { buildMembersSettingsUrl } from "~/server/invites/invite-link";
+import { hasEmailProvider } from "~/server/mailer/providers";
 import { rateLimit } from "~/server/rateLimit";
 import { EmailAlreadyRegisteredError } from "~/server/users/errors";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
@@ -76,15 +78,29 @@ export const authRouter = createTRPCRouter({
         "returns enrollment methods only to a visitor holding this address's proof",
     })
     .mutation(async ({ input }) => {
-      const valid = await signUpVerification().validateAddressProof({
-        token: input.addressProof,
-        email: input.email,
-      });
-      if (!valid) {
-        throw new NoAddressToConfirmError();
+      const verification = signUpVerification();
+      const proof = { token: input.addressProof, email: input.email };
+      if (await verification.validateAddressProof(proof)) {
+        return localSignUpDecision(input.email);
       }
 
-      return localSignUpDecision(input.email);
+      // An unconfirmed proof counts only while the installation still cannot
+      // send email, and it never enrolls a passkey (passkey sign-up requires
+      // a confirmed proof).
+      if (
+        !hasEmailProvider() &&
+        (await verification.validateUnconfirmedAddressProof(proof))
+      ) {
+        const decision = await localSignUpDecision(input.email);
+        return {
+          ...decision,
+          methodSet: decision.methodSet.filter(
+            (method) => method.kind !== "passkey",
+          ),
+        };
+      }
+
+      throw new NoAddressToConfirmError();
     }),
 
   /**
@@ -224,10 +240,11 @@ export const authRouter = createTRPCRouter({
       }
 
       const verification = signUpVerification();
-      if (
-        (await verification.addressState({ email: input.email })) ===
-        "confirmed"
-      ) {
+      const canSendEmail = hasEmailProvider();
+      const state = await verification.addressState({ email: input.email });
+      // Without email there is no link to wait for, so an unconfirmed account
+      // is not mid-sign-up: it is an account, and the way on is to log in.
+      if (state === "confirmed" || (!canSendEmail && state !== "unknown")) {
         throw new EmailAlreadyRegisteredError();
       }
 
@@ -245,6 +262,18 @@ export const authRouter = createTRPCRouter({
         throw new AuthRateLimitedError({
           retryAfterSeconds: secondsUntil(perAddress.resetAt),
         });
+      }
+
+      // Nothing can prove the address on an installation that cannot send
+      // email, so the screen gets an unconfirmed proof and enrolls a password
+      // with the address left unconfirmed (ADR-117, revision 2026-09-25).
+      if (!canSendEmail) {
+        return {
+          sent: false as const,
+          addressProof: await verification.issueUnconfirmedAddressProof({
+            email: input.email,
+          }),
+        };
       }
 
       await verification.requestVerification({ email: input.email });
@@ -273,12 +302,14 @@ export const authRouter = createTRPCRouter({
       // about whether somebody has confirmed themselves. A session carrying
       // no address has nothing to confirm.
       const email = ctx.session.user.email ?? null;
-      if (!email) return { email: null, confirmed: false };
+      const canSendConfirmation = hasEmailProvider();
+      if (!email) return { email: null, confirmed: false, canSendConfirmation };
 
       return {
         email,
         confirmed:
           (await signUpVerification().addressState({ email })) === "confirmed",
+        canSendConfirmation,
       };
     }),
 
@@ -309,6 +340,9 @@ export const authRouter = createTRPCRouter({
       const email = ctx.session.user.email;
       if (!email) {
         throw new NoAddressToConfirmError();
+      }
+      if (!hasEmailProvider()) {
+        throw new EmailSendingUnavailableError();
       }
 
       const limit = await rateLimit({

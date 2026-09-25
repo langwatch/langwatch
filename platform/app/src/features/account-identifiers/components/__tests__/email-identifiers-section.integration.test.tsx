@@ -382,4 +382,42 @@ describe("the account's email addresses", () => {
       expect(screen.getByTestId("resend-address-link")).toBeTruthy();
     });
   });
+
+  describe("given an installation that cannot send email", () => {
+    /** @scenario "Without a way to send email, the address confirmation nudge stays silent" */
+    it("says the own address is unconfirmed and offers no resend", () => {
+      identifiersRef.current = [];
+      confirmationRef.current = {
+        email: "sam@acme.test",
+        confirmed: false,
+        canSendConfirmation: false,
+      };
+      renderSection();
+
+      expect(screen.getByTestId("address-unconfirmed")).toBeTruthy();
+      expect(screen.queryByTestId("resend-address-link")).toBeNull();
+    });
+
+    /** @scenario "Without a way to send email, the address confirmation nudge stays silent" */
+    it("offers no resend on the own identifier row either", () => {
+      confirmationRef.current = {
+        email: "sam@acme.test",
+        confirmed: false,
+        canSendConfirmation: false,
+      };
+      identifiersRef.current = [
+        address({
+          identifierId: "own-address",
+          value: "sam@acme.test",
+          isPrimary: true,
+          confirmed: false,
+          resendable: true,
+        }),
+      ];
+      renderSection();
+
+      expect(screen.queryByTestId("resend-address-link")).toBeNull();
+      expect(resendOwnMock).not.toHaveBeenCalled();
+    });
+  });
 });

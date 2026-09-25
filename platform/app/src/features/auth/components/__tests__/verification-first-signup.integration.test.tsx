@@ -276,6 +276,62 @@ describe("given the sign-up screen", () => {
     });
   });
 
+  describe("when the installation cannot send email", () => {
+    /** @scenario "An installation that cannot send email signs up with a password and leaves the address unconfirmed" */
+    it("asks for a password straight away and never says the address is confirmed", async () => {
+      requestVerificationMock.mockResolvedValue({
+        sent: false,
+        addressProof: "unconfirmed_proof",
+      });
+      enrollmentMock.mockResolvedValue({
+        outcome: "enroll",
+        methodSet: [
+          { id: "passkey", kind: "passkey", connectionId: null },
+          { id: "password", kind: "password", connectionId: null },
+        ],
+        reasonCode: "identifier_unknown",
+      });
+      registerMock.mockResolvedValue({ id: "user_1" });
+      signInMock.mockResolvedValue({ data: { user: { id: "user_1" } } });
+
+      const { container } = renderScreen();
+      await userEvent.type(
+        await screen.findByLabelText(/email/i),
+        "sam@acme.com",
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+      expect(
+        await screen.findByTestId("unconfirmed-address"),
+      ).toHaveTextContent(
+        "This installation does not send email, so sam@acme.com is not confirmed. Choose a password to finish.",
+      );
+      expect(enrollmentMock).toHaveBeenCalledWith({
+        email: "sam@acme.com",
+        addressProof: "unconfirmed_proof",
+      });
+      expect(screen.queryByTestId("verification-sent")).toBeNull();
+      expect(screen.queryByTestId("verified-address")).toBeNull();
+      expect(screen.queryByTestId("passkey-sign-up")).toBeNull();
+
+      await fillPasswordPair(container, "a-good-password");
+      await userEvent.click(
+        screen.getByRole("button", { name: "Create account" }),
+      );
+
+      await waitFor(() => {
+        expect(registerMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            email: "sam@acme.com",
+            password: "a-good-password",
+            addressProof: "unconfirmed_proof",
+          }),
+        );
+      });
+      await waitFor(() => expect(signInMock).toHaveBeenCalled());
+    });
+  });
+
   describe("when a confirmation link comes back for an account that exists", () => {
     /** Existing accounts are refused by the verification boundary. */
     it("goes straight into the app on the session the link opened", async () => {

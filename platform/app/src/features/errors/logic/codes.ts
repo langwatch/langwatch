@@ -65,6 +65,7 @@ export const APP_ERROR_CODES = [
   "api_key_reserved_name",
   "api_key_scope_violation",
   "auth_direct_registration_unavailable",
+  "auth_email_sending_unavailable",
   "auth_no_address_to_confirm",
   "auth_rate_limited",
   "authz_grant_not_confirmed",
