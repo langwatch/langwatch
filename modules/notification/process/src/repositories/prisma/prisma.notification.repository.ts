@@ -1,6 +1,4 @@
 import {
-  createNotificationCommandSchema,
-  notificationRecentQuerySchema,
   notificationSchema,
   type CreateNotificationCommand,
   type Notification,
@@ -17,9 +15,7 @@ export class PrismaNotificationRepository
 {
   static readonly create = this.factory((prisma) => new PrismaNotificationRepository(prisma));
 
-  async listRecentByOrganization(input: NotificationRecentQuery): Promise<Notification[]> {
-    const query = notificationRecentQuerySchema.parse(input);
-
+  async findRecentByOrganization(query: NotificationRecentQuery): Promise<Notification[]> {
     const rows = await this.prisma.notification.findMany({
       where: {
         organizationId: query.organizationId,
@@ -31,9 +27,7 @@ export class PrismaNotificationRepository
     return rows.map((row) => notificationSchema.parse(row));
   }
 
-  async create(input: CreateNotificationCommand): Promise<Notification> {
-    const command = createNotificationCommandSchema.parse(input);
-
+  async create(command: CreateNotificationCommand): Promise<Notification> {
     const row = await this.prisma.notification.create({
       data: {
         organizationId: command.organizationId,

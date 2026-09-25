@@ -27,7 +27,7 @@ describe("MemoryNotificationRepository", () => {
       });
 
       await expect(
-        repository.listRecentByOrganization({
+        repository.findRecentByOrganization({
           organizationId: "organization-1",
           since: new Date("2026-08-24T00:00:00.000Z"),
         }),
@@ -44,7 +44,7 @@ describe("MemoryNotificationRepository", () => {
       });
 
       await expect(
-        repository.listRecentByOrganization({
+        repository.findRecentByOrganization({
           organizationId: "organization-1",
           since: new Date("2026-08-24T00:00:00.000Z"),
         }),

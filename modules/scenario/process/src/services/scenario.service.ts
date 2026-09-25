@@ -152,11 +152,7 @@ export class ScenarioService {
   }
 
   getById(input: ScenarioIdInput): Promise<Scenario> {
-    return this.options.repository.findById(input);
-  }
-
-  tryGetById(input: ScenarioIdInput): Promise<Scenario | null> {
-    return this.options.repository.tryFindById(scenarioIdInputSchema.parse(input));
+    return this.options.repository.findById(scenarioIdInputSchema.parse(input));
   }
 
   tryGetByIdIncludingArchived(input: ScenarioIdInput): Promise<Scenario | null> {

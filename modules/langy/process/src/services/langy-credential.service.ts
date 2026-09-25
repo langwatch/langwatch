@@ -82,10 +82,7 @@ export class LangyCredentialService {
     mintSessionKey?: boolean;
     repositoryFullName?: string;
   }): Promise<LangyWorkerCredentials> {
-    const project = await this.deps.repository.tryFindProject(projectId);
-    if (!project) {
-      throw new LangyCredentialResolutionError(`Project ${projectId} not found.`);
-    }
+    const project = await this.deps.repository.getProject(projectId);
 
     const langwatchEndpoint = this.deps.runtime.workerCallbackUrl;
     const gatewayBaseUrl = this.deps.runtime.workerGatewayBaseUrl;
@@ -211,9 +208,12 @@ export class LangyCredentialService {
   }
 
   async findModelsAllowedForProject(projectId: string): Promise<string[] | null> {
-    const project = await this.deps.repository.tryFindProject(projectId);
-    if (!project) {
-      return null;
+    let project: { organizationId: string };
+    try {
+      project = await this.deps.repository.getProject(projectId);
+    } catch (error) {
+      if (LangyCredentialResolutionError.is(error)) return null;
+      throw error;
     }
 
     return this.findModelsAllowed({
@@ -233,7 +233,7 @@ export class LangyCredentialService {
     projectId: string;
     organizationId: string;
   }): Promise<string[] | null> {
-    const config = await this.deps.repository.tryFindVirtualKeyConfig(input);
+    const [config] = await this.deps.repository.findVirtualKeyConfigs(input);
     if (config == null) {
       return null;
     }
@@ -251,7 +251,7 @@ export class LangyCredentialService {
   }
 
   async findEgressAllowlist({ projectId }: { projectId: string }): Promise<string[] | null> {
-    const value = await this.deps.repository.tryFindEgressAllowlist(projectId);
+    const [value] = await this.deps.repository.findEgressAllowlists(projectId);
     if (value == null) {
       return null;
     }

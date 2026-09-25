@@ -167,7 +167,6 @@ describe("ScenarioService", () => {
   });
 
   /** @scenario "A required scenario read is tenant scoped" */
-  /** @scenario "Optional scenario discovery is explicit" */
   it("keeps reads project-scoped and only makes optional reads nullable", async () => {
     const repository = MemoryScenarioRepository.create();
     const service = ScenarioService.create(serviceOptions(repository, "scenario_1"));
@@ -179,7 +178,6 @@ describe("ScenarioService", () => {
       labels: [],
     });
 
-    expect(await service.tryGetById({ id: "scenario_1", projectId: "project-b" })).toBeNull();
     await expect(
       service.getById({ id: "scenario_1", projectId: "project-b" }),
     ).rejects.toMatchObject({

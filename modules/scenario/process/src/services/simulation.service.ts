@@ -77,7 +77,7 @@ export class SimulationService extends SimulationServiceContract {
   getBatchHistoryForScenarioSet(
     input: SimulationBatchHistoryInput,
   ): Promise<SimulationBatchHistory> {
-    return this.repository.findBatchHistoryForScenarioSet(input);
+    return this.repository.listBatchHistoryForScenarioSet(input);
   }
 
   findBatchSummary(input: SimulationBatchSummaryInput): Promise<SimulationBatchSummary | null> {
@@ -91,7 +91,7 @@ export class SimulationService extends SimulationServiceContract {
   getRunDataForScenarioSet(
     input: SimulationScenarioSetRunsInput,
   ): Promise<{ runs: SimulationRunData[]; nextCursor?: string; hasMore: boolean }> {
-    return this.repository.findRunDataForScenarioSet(input);
+    return this.repository.listRunDataForScenarioSet(input);
   }
 
   getAllRunDataForScenarioSet(input: SimulationScenarioSetInput): Promise<SimulationRunData[]> {
@@ -146,10 +146,10 @@ export class SimulationService extends SimulationServiceContract {
     return this.repository.countUsage(input);
   }
 
-  findRunsForExport(
+  listRunsForExport(
     input: SimulationExportRunsInput,
   ): Promise<{ runs: SimulationExportRun[]; nextCursor?: string; hasMore: boolean }> {
-    return this.repository.findRunsForExport(input);
+    return this.repository.listRunsForExport(input);
   }
 
   queueRun(input: SimulationQueueRun): Promise<void> {

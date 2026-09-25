@@ -147,13 +147,6 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     return scenarioSchema.parse(row);
   }
 
-  async tryFindById(input: ScenarioIdentity): Promise<Scenario | null> {
-    const row = await this.database.scenario.findFirst({
-      where: scenarioWhere(input, false),
-    });
-    return row ? scenarioSchema.parse(row) : null;
-  }
-
   async findByIdIncludingArchived(input: ScenarioIdentity): Promise<Scenario> {
     const row = await this.database.scenario.findFirst({
       where: scenarioWhere(input, true),

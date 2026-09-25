@@ -37,7 +37,7 @@ function contractCases(backend: { repository: () => ScenarioRepository }): void 
         actor: { userId: null, label: "api" },
       });
 
-      await expect(repository.tryFindById({ id, projectId: PROJECT_ID })).resolves.toMatchObject({
+      await expect(repository.findById({ id, projectId: PROJECT_ID })).resolves.toMatchObject({
         id,
         name: "Refund a duplicate charge",
       });
@@ -45,7 +45,9 @@ function contractCases(backend: { repository: () => ScenarioRepository }): void 
       const archivedAt = nowInstant();
       await repository.archive({ id, projectId: PROJECT_ID, archivedAt });
 
-      await expect(repository.tryFindById({ id, projectId: PROJECT_ID })).resolves.toBeNull();
+      await expect(repository.findById({ id, projectId: PROJECT_ID })).rejects.toMatchObject({
+        code: "scenario_not_found",
+      });
       await expect(
         repository.tryFindByIdIncludingArchived({ id, projectId: PROJECT_ID }),
       ).resolves.toMatchObject({ id, archivedAt: toDate(archivedAt) });
@@ -126,7 +128,7 @@ function contractCases(backend: { repository: () => ScenarioRepository }): void 
       });
 
       expect(created.fields).toEqual({ golden_sql: "SELECT 1" });
-      await expect(repository.tryFindById({ id, projectId: PROJECT_ID })).resolves.toMatchObject({
+      await expect(repository.findById({ id, projectId: PROJECT_ID })).resolves.toMatchObject({
         fields: { golden_sql: "SELECT 1" },
       });
 
@@ -138,7 +140,7 @@ function contractCases(backend: { repository: () => ScenarioRepository }): void 
       });
 
       expect(updated.fields).toEqual({ golden_sql: "SELECT 2" });
-      await expect(repository.tryFindById({ id, projectId: PROJECT_ID })).resolves.toMatchObject({
+      await expect(repository.findById({ id, projectId: PROJECT_ID })).resolves.toMatchObject({
         fields: { golden_sql: "SELECT 2" },
       });
     });

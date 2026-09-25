@@ -123,7 +123,7 @@ export class TestSimulationService extends SimulationService {
     return 0;
   }
 
-  async findRunsForExport(): Promise<{
+  async listRunsForExport(): Promise<{
     runs: SimulationExportRun[];
     nextCursor?: string;
     hasMore: boolean;

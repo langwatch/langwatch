@@ -61,13 +61,6 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     return row;
   }
 
-  tryFindById(input: { id: string; projectId: string }): Promise<Scenario | null> {
-    const row = this.rows.get(input.id);
-    return Promise.resolve(
-      row?.projectId === input.projectId && row.archivedAt === null ? row : null,
-    );
-  }
-
   async findById(input: { id: string; projectId: string }): Promise<Scenario> {
     const row = this.rows.get(input.id);
     if (row?.projectId !== input.projectId || row.archivedAt !== null) {

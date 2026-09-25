@@ -1,3 +1,4 @@
+import { LangyCredentialResolutionError } from "@langwatch/langy-contract";
 import { Prisma } from "@langwatch/prisma-client/generated";
 
 import { LangyCredentialRepository } from "../langy-credential.repository.ts";
@@ -12,37 +13,43 @@ export class PrismaLangyCredentialRepository extends LangyCredentialRepository {
     return new PrismaLangyCredentialRepository(database);
   }
 
-  async tryFindProject(projectId: string): Promise<{ organizationId: string } | null> {
+  async getProject(projectId: string): Promise<{ organizationId: string }> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       select: { team: { select: { organizationId: true } } },
     });
-    return project?.team ? { organizationId: project.team.organizationId } : null;
+    if (!project?.team) {
+      throw new LangyCredentialResolutionError(`Project ${projectId} not found.`);
+    }
+    return { organizationId: project.team.organizationId };
   }
 
-  tryFindVirtualKeyConfig(input: { projectId: string; organizationId: string }): Promise<unknown> {
-    return this.prisma.virtualKey
-      .findFirst({
-        where: {
-          organizationId: input.organizationId,
-          purpose: "LANGY",
-          status: "ACTIVE",
-          scopes: {
-            some: { scopeType: "PROJECT", scopeId: input.projectId },
-          },
+  async findVirtualKeyConfigs(input: {
+    projectId: string;
+    organizationId: string;
+  }): Promise<unknown[]> {
+    const rows = await this.prisma.virtualKey.findMany({
+      where: {
+        organizationId: input.organizationId,
+        purpose: "LANGY",
+        status: "ACTIVE",
+        scopes: {
+          some: { scopeType: "PROJECT", scopeId: input.projectId },
         },
-        orderBy: { updatedAt: "desc" },
-        select: { config: true },
-      })
-      .then((row) => row?.config ?? null);
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 1,
+      select: { config: true },
+    });
+    return rows.flatMap((row) => (row.config == null ? [] : [row.config]));
   }
 
-  async tryFindEgressAllowlist(projectId: string): Promise<unknown> {
+  async findEgressAllowlists(projectId: string): Promise<unknown[]> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       select: { langyEgressAllowlist: true },
     });
-    return project?.langyEgressAllowlist ?? null;
+    return project?.langyEgressAllowlist == null ? [] : [project.langyEgressAllowlist];
   }
 
   async saveEgressAllowlist(projectId: string, allowlist: string[] | null): Promise<void> {

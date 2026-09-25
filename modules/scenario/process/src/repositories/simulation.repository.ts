@@ -43,14 +43,14 @@ export abstract class SimulationRepository {
   abstract findScenarioRunData(
     input: SimulationScenarioRunInput,
   ): Promise<SimulationRunData | null>;
-  abstract findBatchHistoryForScenarioSet(
+  abstract listBatchHistoryForScenarioSet(
     input: SimulationBatchHistoryInput,
   ): Promise<SimulationBatchHistory>;
   abstract findBatchSummary(
     input: SimulationBatchSummaryInput,
   ): Promise<SimulationBatchSummary | null>;
   abstract findRunDataForBatchRun(input: SimulationBatchRunInput): Promise<SimulationBatchRunData>;
-  abstract findRunDataForScenarioSet(
+  abstract listRunDataForScenarioSet(
     input: SimulationScenarioSetRunsInput,
   ): Promise<{ runs: SimulationRunData[]; nextCursor?: string; hasMore: boolean }>;
   abstract findAllRunDataForScenarioSet(
@@ -76,7 +76,7 @@ export abstract class SimulationRepository {
   abstract findDistinctExternalSetIds(input: SimulationProjectIdsInput): Promise<Set<string>>;
   abstract countRunsForExport(input: SimulationExportFilterInput): Promise<number>;
   abstract countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<number>;
-  abstract findRunsForExport(
+  abstract listRunsForExport(
     input: SimulationExportRunsInput,
   ): Promise<{ runs: SimulationExportRun[]; nextCursor?: string; hasMore: boolean }>;
 }
@@ -89,7 +89,7 @@ export class NullSimulationRepository extends SimulationRepository {
   async findScenarioRunData(): Promise<SimulationRunData | null> {
     return null;
   }
-  async findBatchHistoryForScenarioSet(): Promise<SimulationBatchHistory> {
+  async listBatchHistoryForScenarioSet(): Promise<SimulationBatchHistory> {
     return { batches: [], hasMore: false, lastUpdatedAt: 0, totalCount: 0 };
   }
   async findBatchSummary(): Promise<SimulationBatchSummary | null> {
@@ -98,7 +98,7 @@ export class NullSimulationRepository extends SimulationRepository {
   async findRunDataForBatchRun(): Promise<SimulationBatchRunData> {
     return { changed: true, lastUpdatedAt: 0, runs: [] };
   }
-  async findRunDataForScenarioSet(): Promise<{
+  async listRunDataForScenarioSet(): Promise<{
     runs: SimulationRunData[];
     nextCursor?: string;
     hasMore: boolean;
@@ -144,7 +144,7 @@ export class NullSimulationRepository extends SimulationRepository {
   async countUsage(): Promise<number> {
     return 0;
   }
-  async findRunsForExport(): Promise<{
+  async listRunsForExport(): Promise<{
     runs: SimulationExportRun[];
     nextCursor?: string;
     hasMore: boolean;

@@ -8,7 +8,11 @@ import {
 } from "@langwatch/model-provider-contract";
 import { projectSchema, type ProjectApi } from "@langwatch/project-contract";
 import { versionedPromptSchema, type PromptApi } from "@langwatch/prompt-contract";
-import { type LiteLLMParams, scenarioSchema } from "@langwatch/scenario-contract";
+import {
+  type LiteLLMParams,
+  ScenarioNotFoundError,
+  scenarioSchema,
+} from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { suiteSchema, type SuiteApi } from "@langwatch/suite-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -161,9 +165,9 @@ function fakeService<T extends object>(methods: Partial<T>): T {
 
 function scenarioService(deps: ScenarioPrefetchFixture): ScenarioService {
   return fakeService<ScenarioService>({
-    tryGetById: async (input: { projectId: string; id: string }) => {
+    getById: async (input: { projectId: string; id: string }) => {
       const value = await deps.scenarioFetcher.getById(input);
-      if (!value) return null;
+      if (!value) throw new ScenarioNotFoundError(input.id);
       const now = new Date(0);
       return scenarioSchema.parse({
         projectId: input.projectId,

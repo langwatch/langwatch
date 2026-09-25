@@ -21,7 +21,7 @@ export class NotificationService {
   }
 
   listRecentByOrganization(input: NotificationRecentQuery): Promise<Notification[]> {
-    return this.#repository.listRecentByOrganization(notificationRecentQuerySchema.parse(input));
+    return this.#repository.findRecentByOrganization(notificationRecentQuerySchema.parse(input));
   }
 
   create(input: CreateNotificationCommand): Promise<Notification> {

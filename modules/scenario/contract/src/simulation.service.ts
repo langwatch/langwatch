@@ -154,7 +154,7 @@ export abstract class SimulationService {
   abstract countRunsForExport(input: SimulationExportFilterInput): Promise<number>;
   /** The usage report's figure: scenario runs started since `since` (epoch ms). */
   abstract countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<number>;
-  abstract findRunsForExport(
+  abstract listRunsForExport(
     input: SimulationExportRunsInput,
   ): Promise<{ runs: SimulationExportRun[]; nextCursor?: string; hasMore: boolean }>;
   abstract queueRun(input: SimulationQueueRun): Promise<void>;

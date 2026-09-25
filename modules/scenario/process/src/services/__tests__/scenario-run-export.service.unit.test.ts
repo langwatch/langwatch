@@ -47,7 +47,7 @@ function buildRun(overrides: Partial<SimulationExportRun> = {}): SimulationExpor
   };
 }
 
-type FindCall = Parameters<SimulationService["findRunsForExport"]>[0];
+type FindCall = Parameters<SimulationService["listRunsForExport"]>[0];
 
 const noop = async () => undefined;
 
@@ -83,7 +83,7 @@ function pagingService(pages: SimulationExportRun[][]): {
   const calls: FindCall[] = [];
   const simulations = createSimulationService();
   vi.spyOn(simulations, "countRunsForExport").mockResolvedValue(pages.flat().length);
-  vi.spyOn(simulations, "findRunsForExport").mockImplementation(async (params: FindCall) => {
+  vi.spyOn(simulations, "listRunsForExport").mockImplementation(async (params: FindCall) => {
     calls.push(params);
     const index = params.cursor ? Number(params.cursor) : 0;
     const runs = pages[index] ?? [];

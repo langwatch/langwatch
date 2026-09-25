@@ -41,7 +41,7 @@ describe("PrismaNotificationRepository", () => {
       const repository = PrismaNotificationRepository.create({ prisma });
 
       await expect(
-        repository.listRecentByOrganization({ organizationId: "organization-1", since }),
+        repository.findRecentByOrganization({ organizationId: "organization-1", since }),
       ).resolves.toEqual(rows);
 
       expect(findMany).toHaveBeenCalledWith({

@@ -14,10 +14,7 @@ import {
 import { PrismaCustomGraphRepository } from "../../repositories/prisma/prisma.custom-graph.repository.ts";
 import { PrismaEmailSuppressionRepository } from "../../repositories/prisma/prisma.email-suppression.repository.ts";
 import { PrismaGraphTriggerSentRepository } from "../../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
-import {
-  PrismaTriggerRepository,
-  type TriggerDatabase,
-} from "../../repositories/prisma/prisma.trigger.repository.ts";
+import { PrismaTriggerRepository } from "../../repositories/prisma/prisma.trigger.repository.ts";
 import { PrismaWebhookDeliveryRepository } from "../../repositories/prisma/prisma.webhook-delivery.repository.ts";
 import { AutomationEmailCapService } from "../../services/email-cap.service.ts";
 import { AutomationGraphActivityService } from "../automation-graph-activity.service.ts";
@@ -46,18 +43,15 @@ function compose(
   const clock = new FrozenClock();
   const delivery = over.delivery ?? new RecordingDelivery();
   const logger = new SilentLogger();
-  const triggers = PrismaTriggerRepository.create(
-    database.prisma as unknown as TriggerDatabase,
-    clock,
-  );
+  const triggers = PrismaTriggerRepository.create(database.prisma, clock);
   const service = AutomationGraphActivityService.create({
     triggers,
-    customGraphs: PrismaCustomGraphRepository.create(database.prisma as never),
-    graphTriggerSent: PrismaGraphTriggerSentRepository.create(database.prisma as never),
+    customGraphs: PrismaCustomGraphRepository.create(database.prisma),
+    graphTriggerSent: PrismaGraphTriggerSentRepository.create(database.prisma),
     persistence: AutomationGraphDeliveryService.create({
       triggers,
-      suppressions: PrismaEmailSuppressionRepository.create(database.prisma as never),
-      webhookDeliveries: PrismaWebhookDeliveryRepository.create(database.prisma as never),
+      suppressions: PrismaEmailSuppressionRepository.create(database.prisma),
+      webhookDeliveries: PrismaWebhookDeliveryRepository.create(database.prisma),
     }),
     clock,
     projects: new OneProject(),

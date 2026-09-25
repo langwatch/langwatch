@@ -7,12 +7,6 @@ Feature: Scenario service boundary
     Then ScenarioNotFoundError is thrown
 
   @unit
-  Scenario: Optional scenario discovery is explicit
-    Given a scenario does not exist in the requested project
-    When a caller uses tryGetById
-    Then the result is null
-
-  @unit
   Scenario: Scenario archive delivery is retry safe
     Given a scenario was archived
     When the archive command is delivered again

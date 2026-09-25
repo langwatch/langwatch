@@ -38,7 +38,6 @@ export abstract class ScenarioRepository {
     input: ScenarioCreateInput & { id: string; actor: ScenarioActor },
   ): Promise<Scenario>;
   abstract findById(input: { id: string; projectId: string }): Promise<Scenario>;
-  abstract tryFindById(input: { id: string; projectId: string }): Promise<Scenario | null>;
   abstract findByIdIncludingArchived(input: { id: string; projectId: string }): Promise<Scenario>;
   abstract tryFindByIdIncludingArchived(input: {
     id: string;

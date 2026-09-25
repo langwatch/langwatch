@@ -80,8 +80,10 @@ export class EvaluatorService {
     return this.code.execute(input);
   }
 
-  async tryGetById(input: { id: string; projectId: string }): Promise<Evaluator | null> {
-    return (await this.options.repository.findById(input)) ?? null;
+  async findById(input: { id: string; projectId: string }): Promise<Evaluator[]> {
+    const evaluator = await this.options.repository.findById(input);
+
+    return evaluator ? [evaluator] : [];
   }
 
   async getById(input: { id: string; projectId: string }): Promise<Evaluator> {
@@ -93,13 +95,13 @@ export class EvaluatorService {
     return evaluator;
   }
 
-  async tryGetByIdWithFields(input: {
+  async findByIdWithFields(input: {
     id: string;
     projectId: string;
-  }): Promise<EvaluatorWithFields | null> {
-    const evaluator = await this.tryGetById(input);
+  }): Promise<EvaluatorWithFields[]> {
+    const evaluators = await this.findById(input);
 
-    return evaluator ? this.enrichWithFields(evaluator) : null;
+    return Promise.all(evaluators.map((evaluator) => this.enrichWithFields(evaluator)));
   }
 
   async getByIdWithFields(input: { id: string; projectId: string }): Promise<EvaluatorWithFields> {
@@ -112,8 +114,10 @@ export class EvaluatorService {
     return this.execution.resolve(parsed);
   }
 
-  async tryGetBySlug(input: { slug: string; projectId: string }): Promise<Evaluator | null> {
-    return (await this.options.repository.findBySlug(input)) ?? null;
+  async findBySlug(input: { slug: string; projectId: string }): Promise<Evaluator[]> {
+    const evaluator = await this.options.repository.findBySlug(input);
+
+    return evaluator ? [evaluator] : [];
   }
 
   async getBySlug(input: { slug: string; projectId: string }): Promise<Evaluator> {
@@ -125,11 +129,10 @@ export class EvaluatorService {
     return evaluator;
   }
 
-  async tryGetByWorkflow(input: {
-    workflowId: string;
-    projectId: string;
-  }): Promise<Evaluator | null> {
-    return (await this.options.repository.findByWorkflow(input)) ?? null;
+  async findByWorkflow(input: { workflowId: string; projectId: string }): Promise<Evaluator[]> {
+    const evaluator = await this.options.repository.findByWorkflow(input);
+
+    return evaluator ? [evaluator] : [];
   }
 
   getAll(input: { projectId: string }): Promise<Evaluator[]> {
@@ -159,11 +162,11 @@ export class EvaluatorService {
         workflowId: input.workflowId,
         projectId: input.projectId,
       });
-      const existing = await this.tryGetByWorkflow({
+      const existing = await this.findByWorkflow({
         workflowId: input.workflowId,
         projectId: input.projectId,
       });
-      if (existing) {
+      if (existing.length > 0) {
         throw new EvaluatorWorkflowAlreadyAssignedError(input.workflowId);
       }
     }

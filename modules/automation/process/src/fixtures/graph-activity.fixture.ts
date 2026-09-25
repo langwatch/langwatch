@@ -1,4 +1,5 @@
 import type { AutomationClock,AutomationProjectDirectory } from "../app/automation.members.ts";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import {
   AutomationDispatchError,
   AutomationLogger,
@@ -195,7 +196,14 @@ function isSameTraceSent(row: Record<string, unknown>, entry: Record<string, unk
  * deliberately literal -- enumerated `where` shapes, not a generic
  * interpreter, so a drifted repository stops matching instead of reading everything.
  */
-export function createGraphActivityPrismaDouble(seed: PrismaDoubleSeed) {
+type GraphActivityPrismaDouble = {
+  prisma: ReturnType<typeof prismaDouble>;
+  reads: { triggerFindMany: number };
+  triggerSent: Record<string, unknown>[];
+  triggers: PrismaDoubleSeed["triggers"];
+};
+
+export function createGraphActivityPrismaDouble(seed: PrismaDoubleSeed): GraphActivityPrismaDouble {
   const triggers = seed.triggers.map((row) => ({ ...row }));
   const customGraphs = (seed.customGraphs ?? [customGraphRow]).map((row) => ({ ...row }));
   const suppressions = (seed.suppressions ?? []).map((row) => ({ ...row }));
@@ -205,17 +213,17 @@ export function createGraphActivityPrismaDouble(seed: PrismaDoubleSeed) {
 
   const prisma = {
     trigger: {
-      findMany: async ({ where }: { where: Record<string, unknown> }) => {
+      findMany: async ({ where = {} }: { where?: Record<string, unknown> } = {}) => {
         reads.triggerFindMany += 1;
         return triggers.filter((row) => matches(row, where));
       },
-      findFirst: async ({ where }: { where: Record<string, unknown> }) =>
+      findFirst: async ({ where = {} }: { where?: Record<string, unknown> } = {}) =>
         triggers.find((row) => matches(row, where)) ?? null,
       update: async ({
-        where,
+        where = {},
         data,
       }: {
-        where: Record<string, unknown>;
+        where?: Record<string, unknown>;
         data: Record<string, unknown>;
       }) => {
         const row = triggers.find((entry) => matches(entry, where));
@@ -225,28 +233,28 @@ export function createGraphActivityPrismaDouble(seed: PrismaDoubleSeed) {
       },
     },
     customGraph: {
-      findUnique: async ({ where }: { where: Record<string, unknown> }) =>
+      findUnique: async ({ where = {} }: { where?: Record<string, unknown> } = {}) =>
         customGraphs.find((row) => matches(row, where)) ?? null,
     },
     emailSuppression: {
-      findMany: async ({ where }: { where: Record<string, unknown> }) =>
+      findMany: async ({ where = {} }: { where?: Record<string, unknown> } = {}) =>
         suppressions
           .filter((row) => matches(row, where))
           .map((row) => ({ ...row, id: "suppression", reason: "unsubscribed", createdAt: FROZEN_ROW_AT })),
     },
     triggerSent: {
-      findFirst: async ({ where }: { where: Record<string, unknown> }) =>
+      findFirst: async ({ where = {} }: { where?: Record<string, unknown> } = {}) =>
         triggerSent.find((row) => matches(row, where)) ?? null,
-      findMany: async ({ where }: { where: Record<string, unknown> }) =>
+      findMany: async ({ where = {} }: { where?: Record<string, unknown> } = {}) =>
         triggerSent.filter((row) => matches(row, where)),
       create: async ({ data }: { data: Record<string, unknown> }) => {
         const row = { id: `sent-${nextId++}`, createdAt: FROZEN_ROW_AT, ...data };
         triggerSent.push(row);
         return row;
       },
-      createMany: async ({ data }: { data: Record<string, unknown>[] }) => {
+      createMany: async (args?: { data: Record<string, unknown> | Record<string, unknown>[] }) => {
         let count = 0;
-        for (const entry of data) {
+        for (const entry of [args?.data ?? []].flat()) {
           const duplicate = triggerSent.some((row) => isSameTraceSent(row, entry));
           if (duplicate) continue;
           triggerSent.push({ id: `sent-${nextId++}`, createdAt: FROZEN_ROW_AT, ...entry });
@@ -255,10 +263,10 @@ export function createGraphActivityPrismaDouble(seed: PrismaDoubleSeed) {
         return { count };
       },
       update: async ({
-        where,
+        where = {},
         data,
       }: {
-        where: Record<string, unknown>;
+        where?: Record<string, unknown>;
         data: Record<string, unknown>;
       }) => {
         const row = triggerSent.find((entry) => matches(entry, where));
@@ -266,7 +274,7 @@ export function createGraphActivityPrismaDouble(seed: PrismaDoubleSeed) {
         Object.assign(row, data);
         return row;
       },
-      delete: async ({ where }: { where: Record<string, unknown> }) => {
+      delete: async ({ where = {} }: { where?: Record<string, unknown> } = {}) => {
         const index = triggerSent.findIndex((entry) => matches(entry, where));
         if (index >= 0) triggerSent.splice(index, 1);
         return {};
@@ -274,8 +282,5 @@ export function createGraphActivityPrismaDouble(seed: PrismaDoubleSeed) {
     },
   };
 
-  // Returned untyped on purpose: naming `PrismaClient` outside a repository or
-  // a Postgres adapter is the leak `prisma-containment` exists to prevent, and
-  // a fixture is not either of those. The composing test casts once.
-  return { prisma: prisma as unknown, reads, triggerSent, triggers };
+  return { prisma: prismaDouble(prisma), reads, triggerSent, triggers };
 }

@@ -112,7 +112,7 @@ describe.skipIf(databaseUrl === null)("getRunDataForScenarioSet() message trunca
         }),
       );
 
-      const result = await repo.findRunDataForScenarioSet({
+      const result = await repo.listRunDataForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -136,7 +136,7 @@ describe.skipIf(databaseUrl === null)("getRunDataForScenarioSet() message trunca
         }),
       );
 
-      const result = await repo.findRunDataForScenarioSet({
+      const result = await repo.listRunDataForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -162,7 +162,7 @@ describe.skipIf(databaseUrl === null)("getRunDataForScenarioSet() message trunca
         }),
       );
 
-      const result = await repo.findRunDataForScenarioSet({
+      const result = await repo.listRunDataForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,

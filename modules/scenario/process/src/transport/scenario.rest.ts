@@ -14,7 +14,6 @@ import { createLogger } from "@langwatch/observability";
 import {
   parseScenarioParameterDefinitions,
   ScenarioApi,
-  ScenarioNotFoundError,
   type Scenario,
   type ScenarioParameterDefinition,
   scenarioLegacyErrorBodySchema,
@@ -145,8 +144,7 @@ export function createScenarioRest(): Readonly<{
       .withMiddleware(projectRestFacts)
       .handle(async ({ app, input, scope }, project) => {
         logger.info({ projectId: scope.id, scenarioId: input.scenarioId }, "Getting scenario");
-        const scenario = await app.tryGetById({ id: input.scenarioId, projectId: scope.id });
-        if (!scenario) throw new ScenarioNotFoundError(input.scenarioId);
+        const scenario = await app.getById({ id: input.scenarioId, projectId: scope.id });
         return withPlatformUrl(app, scenario, project.projectSlug);
       })
 
@@ -206,8 +204,7 @@ export function createScenarioRest(): Readonly<{
         const { scenarioId: id, ...body } = input;
         logger.info({ projectId: scope.id, scenarioId: id }, "Updating scenario");
 
-        const existing = await app.tryGetById({ id, projectId: scope.id });
-        if (!existing) throw new ScenarioNotFoundError(id);
+        await app.getById({ id, projectId: scope.id });
 
         const scenario = await app.update(
           { id, projectId: scope.id, ...scenarioUpdateData(body) },
@@ -227,8 +224,7 @@ export function createScenarioRest(): Readonly<{
         const { scenarioId: id, ...body } = input;
         logger.info({ projectId: scope.id, scenarioId: id }, "Updating scenario");
 
-        const existing = await app.tryGetById({ id, projectId: scope.id });
-        if (!existing) throw new ScenarioNotFoundError(id);
+        await app.getById({ id, projectId: scope.id });
 
         const scenario = await app.update(
           { id, projectId: scope.id, ...scenarioUpdateData(body) },

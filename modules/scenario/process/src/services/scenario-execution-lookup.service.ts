@@ -10,7 +10,6 @@ import {
   type ScenarioConfig,
   parseCallerVoiceConfig,
   type CallerVoiceConfig,
-  ScenarioNotFoundError,
 } from "@langwatch/scenario-contract";
 import { extractSuiteId, type Suite, type SuiteApi } from "@langwatch/suite-contract";
 
@@ -58,13 +57,10 @@ export class ScenarioExecutionLookupService {
     judgeModel: string | null;
     callerVoice: CallerVoiceConfig;
   }> {
-    const scenario = await this.options.scenarios.tryGetById({
+    const scenario = await this.options.scenarios.getById({
       projectId,
       id: scenarioId,
     });
-    if (!scenario) {
-      throw new ScenarioNotFoundError(scenarioId);
-    }
 
     const definitions = parseScenarioParameterDefinitions(scenario.parameters);
     // The secret declarations are taken out before the merge, so no secret value

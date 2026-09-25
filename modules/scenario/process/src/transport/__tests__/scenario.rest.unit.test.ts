@@ -52,8 +52,8 @@ describe("the scenarios REST declaration", () => {
 
       expect(response.status).toBe(201);
       const created = scenarioRestResponseWithPlatformUrlSchema.parse(await response.json());
-      const row = await family.app.tryGetById({ id: created.id, projectId: PROJECT_ID });
-      expect(row?.lastUpdatedById).toBeNull();
+      const row = await family.app.getById({ id: created.id, projectId: PROJECT_ID });
+      expect(row.lastUpdatedById).toBeNull();
     });
   });
 

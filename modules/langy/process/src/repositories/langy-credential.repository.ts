@@ -1,13 +1,16 @@
 /** Langy credential persistence. The database shape stays private to server. */
 export abstract class LangyCredentialRepository {
-  abstract tryFindProject(projectId: string): Promise<{ organizationId: string } | null>;
+  /** Throws `LangyCredentialResolutionError` when the project, or its team, does not exist. */
+  abstract getProject(projectId: string): Promise<{ organizationId: string }>;
 
-  abstract tryFindVirtualKeyConfig(input: {
+  /** The latest active Langy key's config, or none. */
+  abstract findVirtualKeyConfigs(input: {
     projectId: string;
     organizationId: string;
-  }): Promise<unknown>;
+  }): Promise<unknown[]>;
 
-  abstract tryFindEgressAllowlist(projectId: string): Promise<unknown>;
+  /** The project's stored allow-list, or none when it has never set one. */
+  abstract findEgressAllowlists(projectId: string): Promise<unknown[]>;
 
   abstract saveEgressAllowlist(projectId: string, allowlist: string[] | null): Promise<void>;
 }

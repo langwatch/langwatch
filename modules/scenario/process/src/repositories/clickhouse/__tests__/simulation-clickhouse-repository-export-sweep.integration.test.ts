@@ -72,11 +72,11 @@ async function insertRows(rows: ReturnType<typeof makeInsertRow>[]) {
 }
 
 /** Sweeps to exhaustion the way the service does, so cursor handling is exercised too. */
-async function sweep(params: Parameters<SimulationClickHouseRepository["findRunsForExport"]>[0]) {
+async function sweep(params: Parameters<SimulationClickHouseRepository["listRunsForExport"]>[0]) {
   const collected = [];
   let cursor: string | undefined;
   do {
-    const page = await repo.findRunsForExport({
+    const page = await repo.listRunsForExport({
       ...params,
       ...(cursor ? { cursor } : {}),
     });

@@ -115,7 +115,7 @@ describe.skipIf(databaseUrl === null)("the note of a batch", () => {
         }),
       ]);
 
-      const result = await repo.findBatchHistoryForScenarioSet({
+      const result = await repo.listBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -159,7 +159,7 @@ describe.skipIf(databaseUrl === null)("the note of a batch", () => {
         }),
       ]);
 
-      const result = await repo.findBatchHistoryForScenarioSet({
+      const result = await repo.listBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -197,7 +197,7 @@ describe.skipIf(databaseUrl === null)("the note of a batch", () => {
         }),
       ]);
 
-      const result = await repo.findBatchHistoryForScenarioSet({
+      const result = await repo.listBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -243,7 +243,7 @@ describe.skipIf(databaseUrl === null)("the note of a batch", () => {
         makeRunRow({ scenarioSetId, batchRunId: unnoted, metadata: null }),
       ]);
 
-      const result = await repo.findBatchHistoryForScenarioSet({
+      const result = await repo.listBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -271,7 +271,7 @@ describe.skipIf(databaseUrl === null)("a batch produced by an SDK or CI run", ()
         }),
       ]);
 
-      const result = await repo.findBatchHistoryForScenarioSet({
+      const result = await repo.listBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -334,7 +334,7 @@ describe.skipIf(databaseUrl === null)("the cost of reading the note", () => {
       });
       const recordingRepo = SimulationClickHouseRepository.create(async () => recordingClient);
 
-      const result = await recordingRepo.findBatchHistoryForScenarioSet({
+      const result = await recordingRepo.listBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,

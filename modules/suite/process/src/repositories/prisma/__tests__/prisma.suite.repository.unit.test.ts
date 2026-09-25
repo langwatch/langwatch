@@ -4,11 +4,13 @@
  * `resolveDynamicRunMembership`'s row lock.
  * Spec: specs/suites/run-plan-dynamic-scopes.feature
  */
+import type { Prisma } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
-import { PrismaSuiteRepository, type SuiteDatabase } from "../prisma.suite.repository.ts";
+import { PrismaSuiteRepository } from "../prisma.suite.repository.ts";
 
-type RawSql = (strings: readonly string[], ...values: unknown[]) => Promise<unknown>;
+type RawSql = (query: Prisma.Sql | TemplateStringsArray, ...values: unknown[]) => Promise<unknown>;
 
 function build(
   overrides: {
@@ -23,15 +25,15 @@ function build(
   const update = vi.fn().mockResolvedValue(undefined);
   const findMany = vi.fn().mockResolvedValue([{ id: "scenario_1" }, { id: "scenario_2" }]);
 
-  const transaction = {
+  const transaction = prismaDouble({
     $executeRaw: executeRaw,
     simulationSuite: { findFirst, update },
     scenario: { findMany },
-  };
+  });
 
-  const database = {
-    $transaction: (callback: (tx: typeof transaction) => unknown) => callback(transaction),
-  } as unknown as SuiteDatabase;
+  const database = prismaDouble({
+    $transaction: (callback: (tx: typeof transaction) => Promise<unknown>) => callback(transaction),
+  });
 
   return {
     repository: PrismaSuiteRepository.create(database),
@@ -44,7 +46,9 @@ function build(
 
 /** The tagged-template SQL, collapsed to one line for a stable assertion. */
 function rawSqlFrom(executeRaw: Mock<RawSql>): string {
-  const strings = executeRaw.mock.calls[0]?.[0] ?? [];
+  const query = executeRaw.mock.calls[0]?.[0];
+  if (query === undefined) return "";
+  const strings = "strings" in query ? query.strings : query;
   return strings.join("?").replace(/\s+/g, " ").trim();
 }
 
@@ -119,7 +123,7 @@ describe("PrismaSuiteRepository.resolveDynamicRunMembership", () => {
 describe("PrismaSuiteRepository.list", () => {
   function buildList() {
     const findMany = vi.fn().mockResolvedValue([]);
-    const database = { simulationSuite: { findMany } } as unknown as SuiteDatabase;
+    const database = prismaDouble({ simulationSuite: { findMany } });
     return { repository: PrismaSuiteRepository.create(database), findMany };
   }
 

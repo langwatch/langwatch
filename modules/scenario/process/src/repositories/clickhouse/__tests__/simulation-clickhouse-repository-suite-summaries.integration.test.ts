@@ -123,7 +123,7 @@ describe.skipIf(databaseUrl === null)("a test suite's runs in the results view",
         makeRunRow({ scenarioSetId: setId, batchRunId, metadata: null }),
       ]);
 
-      const history = await repo.findBatchHistoryForScenarioSet({
+      const history = await repo.listBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId: setId,
         limit: 10,

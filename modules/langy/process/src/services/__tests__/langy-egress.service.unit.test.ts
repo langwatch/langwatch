@@ -15,7 +15,7 @@ import { LangyService } from "../langy.service.ts";
 function credentialService(stored: string[] | null) {
   const saveEgressAllowlist = vi.fn(async () => undefined);
   const repository = {
-    tryFindEgressAllowlist: vi.fn(async () => stored),
+    findEgressAllowlists: vi.fn(async () => (stored == null ? [] : [stored])),
     saveEgressAllowlist,
   };
   const service = LangyCredentialService.create({

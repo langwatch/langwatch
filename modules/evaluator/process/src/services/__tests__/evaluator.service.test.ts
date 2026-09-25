@@ -175,7 +175,7 @@ describe("EvaluatorService", () => {
     });
     const evaluators = service({ repository: missing });
 
-    await expect(evaluators.tryGetById({ id: "missing", projectId: "p1" })).resolves.toBeNull();
+    await expect(evaluators.findById({ id: "missing", projectId: "p1" })).resolves.toEqual([]);
     await expect(evaluators.getById({ id: "missing", projectId: "p1" })).rejects.toBeInstanceOf(
       EvaluatorNotFoundError,
     );

@@ -262,8 +262,8 @@ export interface ScenarioApi {
   // -- the scenarios a project defines ---------------------------------------
   /** How many scenarios the project holds. */
   count(input: { projectId: string }): Promise<number>;
-  /** One scenario, or null when the project holds no such live scenario. */
-  tryGetById(input: ScenarioIdInput): Promise<Scenario | null>;
+  /** One live scenario. Throws `ScenarioNotFoundError` when the project holds none. */
+  getById(input: ScenarioIdInput): Promise<Scenario>;
   /** The same read, archived rows included. */
   tryGetByIdIncludingArchived(input: ScenarioIdInput): Promise<Scenario | null>;
   create(

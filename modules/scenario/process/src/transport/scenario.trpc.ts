@@ -5,7 +5,7 @@
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { NotFoundError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { ScenarioApi, ScenarioNotFoundError, scenarioTrpc } from "@langwatch/scenario-contract";
+import { ScenarioApi, scenarioTrpc } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 
 import { filterRunsByTimestamp } from "../rules/simulation-run-timestamp-filter.rules.ts";
@@ -38,12 +38,7 @@ export const scenarioTrpcTransport = defineTrpcRouter(ScenarioApi, scenarioTrpc)
 
   .procedure("getById")
   .withPermission("scenarios:view")
-  .handle(async ({ app, input }) => {
-    const scenario = await app.tryGetById(input);
-    if (!scenario) throw new ScenarioNotFoundError(input.id);
-
-    return scenario;
-  })
+  .handle(({ app, input }) => app.getById(input))
 
   .procedure("getByIdIncludingArchived")
   .withPermission("scenarios:view")

@@ -58,7 +58,7 @@ describe("ScenarioRunExportDownloadService", () => {
     const publish = vi.fn<PresenceApi["publishProjectEvent"]>().mockResolvedValue();
     const simulations = createApiFixture<SimulationService>({
       countRunsForExport: async () => 1,
-      findRunsForExport: async () => ({ runs: [run()], hasMore: false }),
+      listRunsForExport: async () => ({ runs: [run()], hasMore: false }),
     });
     const service = ScenarioRunExportDownloadService.create({
       auditLog: createApiFixture<AuditLogApi>({ record: audit }),
@@ -93,7 +93,7 @@ describe("ScenarioRunExportDownloadService", () => {
   /** @scenario "Cancelling an export prevents the CSV sweep from starting" */
   it("does not count or fetch runs when the request was already cancelled", async () => {
     const countRunsForExport = vi.fn<SimulationService["countRunsForExport"]>();
-    const findRunsForExport = vi.fn<SimulationService["findRunsForExport"]>();
+    const listRunsForExport = vi.fn<SimulationService["listRunsForExport"]>();
     const controller = new AbortController();
     controller.abort(new Error("client disconnected"));
     const service = ScenarioRunExportDownloadService.create({
@@ -101,7 +101,7 @@ describe("ScenarioRunExportDownloadService", () => {
         record: async () => ({ id: "audit", occurredAt: 0 }),
       }),
       exports: ScenarioRunExportService.create(
-        createApiFixture<SimulationService>({ countRunsForExport, findRunsForExport }),
+        createApiFixture<SimulationService>({ countRunsForExport, listRunsForExport }),
       ),
       presence: createApiFixture<PresenceApi>({ publishProjectEvent: async () => {} }),
     });
@@ -115,7 +115,7 @@ describe("ScenarioRunExportDownloadService", () => {
     ).rejects.toThrow("client disconnected");
 
     expect(countRunsForExport).not.toHaveBeenCalled();
-    expect(findRunsForExport).not.toHaveBeenCalled();
+    expect(listRunsForExport).not.toHaveBeenCalled();
   });
 
   /** @scenario "Cancelling an in-flight export stops additional CSV pages" */
@@ -124,8 +124,8 @@ describe("ScenarioRunExportDownloadService", () => {
     const firstPage = new Promise<{ runs: SimulationExportRun[]; hasMore: boolean }>((resolve) => {
       resolveFirstPage = resolve;
     });
-    const findRunsForExport = vi
-      .fn<SimulationService["findRunsForExport"]>()
+    const listRunsForExport = vi
+      .fn<SimulationService["listRunsForExport"]>()
       .mockReturnValue(firstPage);
     const service = ScenarioRunExportDownloadService.create({
       auditLog: createApiFixture<AuditLogApi>({
@@ -134,7 +134,7 @@ describe("ScenarioRunExportDownloadService", () => {
       exports: ScenarioRunExportService.create(
         createApiFixture<SimulationService>({
           countRunsForExport: async () => 2,
-          findRunsForExport,
+          listRunsForExport,
         }),
       ),
       presence: createApiFixture<PresenceApi>({ publishProjectEvent: async () => {} }),
@@ -144,12 +144,12 @@ describe("ScenarioRunExportDownloadService", () => {
       request: { projectId: "project_1", mode: "full" },
       userId: "user_1",
     });
-    await vi.waitFor(() => expect(findRunsForExport).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(listRunsForExport).toHaveBeenCalledTimes(1));
 
     await download.cancel(new Error("client disconnected"));
     resolveFirstPage!({ runs: [run()], hasMore: true });
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(findRunsForExport).toHaveBeenCalledTimes(1);
+    expect(listRunsForExport).toHaveBeenCalledTimes(1);
   });
 });

@@ -209,7 +209,8 @@ export class EvaluatorApp implements EvaluatorApi {
     id: string;
     projectId: string;
   }): Promise<EvaluatorWithFields | undefined> {
-    return (await this.#dependencies.evaluators.tryGetByIdWithFields(input)) ?? void 0;
+    const [evaluator] = await this.#dependencies.evaluators.findByIdWithFields(input);
+    return evaluator;
   }
 
   /** One evaluator with its computed fields. */
@@ -219,7 +220,8 @@ export class EvaluatorApp implements EvaluatorApi {
 
   /** One evaluator, or undefined. */
   async findById(input: { id: string; projectId: string }): Promise<Evaluator | undefined> {
-    return (await this.#dependencies.evaluators.tryGetById(input)) ?? void 0;
+    const [evaluator] = await this.#dependencies.evaluators.findById(input);
+    return evaluator;
   }
 
   /** One evaluator. */
@@ -229,7 +231,8 @@ export class EvaluatorApp implements EvaluatorApi {
 
   /** One evaluator by its project-unique slug, or undefined. */
   async findBySlug(input: { slug: string; projectId: string }): Promise<Evaluator | undefined> {
-    return (await this.#dependencies.evaluators.tryGetBySlug(input)) ?? void 0;
+    const [evaluator] = await this.#dependencies.evaluators.findBySlug(input);
+    return evaluator;
   }
 
   /** One evaluator by its project-unique slug. */
@@ -265,10 +268,8 @@ export class EvaluatorApp implements EvaluatorApi {
   }
 
   /** The evaluator already assigned to this workflow, if there is one. */
-  async listByWorkflow(input: { workflowId: string; projectId: string }): Promise<Evaluator[]> {
-    const evaluator = await this.#dependencies.evaluators.tryGetByWorkflow(input);
-
-    return evaluator ? [evaluator] : [];
+  listByWorkflow(input: { workflowId: string; projectId: string }): Promise<Evaluator[]> {
+    return this.#dependencies.evaluators.findByWorkflow(input);
   }
 
   /** The entry-node fields a workflow evaluator maps trace data onto. */

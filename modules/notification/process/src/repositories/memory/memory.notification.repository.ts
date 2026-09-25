@@ -20,7 +20,7 @@ export class MemoryNotificationRepository implements NotificationRepository {
     return new MemoryNotificationRepository();
   }
 
-  async listRecentByOrganization(input: NotificationRecentQuery): Promise<Notification[]> {
+  async findRecentByOrganization(input: NotificationRecentQuery): Promise<Notification[]> {
     const query = notificationRecentQuerySchema.parse(input);
 
     return this.#records

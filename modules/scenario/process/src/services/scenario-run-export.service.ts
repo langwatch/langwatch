@@ -100,7 +100,7 @@ export class ScenarioRunExportService {
         return;
       }
 
-      const page = await this.simulations.findRunsForExport({
+      const page = await this.simulations.listRunsForExport({
         projectId: request.projectId,
         scenarioSetId: request.scenarioSetId,
         scenarioId: request.scenarioId,

@@ -429,7 +429,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     };
   }
 
-  async findBatchHistoryForScenarioSet({
+  async listBatchHistoryForScenarioSet({
     projectId,
     scenarioSetId,
     limit = 8,
@@ -778,7 +778,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return rows.map((row) => mapClickHouseRowToScenarioRunData(row));
   }
 
-  async findRunDataForScenarioSet({
+  async listRunDataForScenarioSet({
     projectId,
     scenarioSetId,
     limit = 20,
@@ -1443,7 +1443,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
    * Forward-only CSV export via keyset pagination (not OFFSET) on (StartedAt, ScenarioRunId),
    * reading RUN_COLUMNS (not LIST_COLUMNS), unlike findRunDataForAllSuites which is capped.
    */
-  async findRunsForExport({
+  async listRunsForExport({
     projectId,
     scenarioSetId,
     scenarioId,

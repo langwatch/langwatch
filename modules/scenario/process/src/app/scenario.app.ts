@@ -545,9 +545,9 @@ export class ScenarioApp implements ScenarioApi {
     return this.#dependencies.scenarios.count(input);
   }
 
-  /** One scenario, or null when it does not exist or is archived. */
-  tryGetById(input: ScenarioIdInput): Promise<Scenario | null> {
-    return this.#dependencies.scenarios.tryGetById(input);
+  /** One live scenario; throws `ScenarioNotFoundError` when it does not exist or is archived. */
+  getById(input: ScenarioIdInput): Promise<Scenario> {
+    return this.#dependencies.scenarios.getById(input);
   }
 
   /** One scenario, archived ones included. */
