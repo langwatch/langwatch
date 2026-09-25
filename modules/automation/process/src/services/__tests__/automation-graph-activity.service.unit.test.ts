@@ -142,6 +142,33 @@ describe("AutomationGraphActivityService", () => {
       expect(delivery.emails).toHaveLength(1);
     });
 
+    /** @scenario "A stored Slack credential is read back with the deployment's own key" */
+    it("sends the Slack call with the plaintext token to the author's channel", async () => {
+      const slackTrigger = graphTriggerRow({
+        action: "SEND_SLACK_MESSAGE",
+        actionParams: {
+          slackDelivery: "bot",
+          slackBotToken: crypto.encrypt("xoxb-plain"),
+          slackChannelId: "C0CHANNEL",
+          threshold: 10,
+          operator: "gt",
+          timePeriod: 60,
+          seriesName: "0",
+        },
+      });
+      const { adapter, delivery } = compose({ triggers: [slackTrigger] });
+
+      await adapter.evaluateGraphTrigger({
+        triggerId: "trigger-1",
+        projectId: "project-1",
+        reason: "real-time",
+      });
+
+      expect(delivery.slackBots.map(({ token, channel }) => ({ token, channel }))).toEqual([
+        { token: "xoxb-plain", channel: "C0CHANNEL" },
+      ]);
+    });
+
     /** @scenario "A suppressed recipient is not written to" */
     it("sends nothing when the only recipient has unsubscribed", async () => {
       const { adapter, delivery } = compose({

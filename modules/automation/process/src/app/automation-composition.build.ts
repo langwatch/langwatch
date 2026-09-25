@@ -30,7 +30,7 @@ import {
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { PrismaScheduledJobStore, SchedulerService } from "@langwatch/eventing/server";
-import { ReactEmailMailRenderer } from "@langwatch/mail";
+import { type EmailContent, EmailDelivery, ReactEmailMailRenderer } from "@langwatch/mail";
 import type { Logger } from "@langwatch/observability";
 import type { Encryption, Mail, ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -764,6 +764,28 @@ export function createAutomationSettlement(input: {
       input.graphActivity,
     ),
   };
+}
+
+/** Mail's delivery seam over this process's `mail` member, for the limit notice. */
+export class MailMemberDelivery extends EmailDelivery {
+  constructor(private readonly mail: Mail) {
+    super();
+  }
+
+  defaultFrom(): string {
+    return this.mail.defaultFrom();
+  }
+
+  send(content: EmailContent): Promise<void> {
+    const bcc = typeof content.bcc === "string" ? [content.bcc] : content.bcc;
+    return this.mail.send({
+      to: typeof content.to === "string" ? content.to : content.to.join(", "),
+      subject: content.subject,
+      html: content.html,
+      ...(content.from === undefined ? {} : { from: content.from }),
+      ...(bcc === undefined ? {} : { bcc }),
+    });
+  }
 }
 
 /** The paid ceiling, stated rather than resolved. See the config leaf. */

@@ -6,6 +6,7 @@ import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import type { AnnotationApi } from "@langwatch/annotation-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   AutomationApi,
   type AutomationServerConfig,
@@ -70,6 +71,7 @@ type Installed = Readonly<{
   entitlement?: EntitlementApi;
   dataset?: DatasetApi;
   annotation?: AnnotationApi;
+  authz?: AuthzApi;
   mail?: Mail;
   logger?: ReturnType<typeof createTestLogger>["logger"];
 }>;
@@ -104,6 +106,7 @@ function process(role: "api" | "worker", eventing: EventSourcing, installed: Ins
       evaluation: createApiFixture<EvaluationApi>(),
       dataset: installed.dataset ?? createApiFixture<DatasetApi>(),
       annotation: installed.annotation ?? createApiFixture<AnnotationApi>(),
+      authz: installed.authz ?? createApiFixture<AuthzApi>(),
     });
 }
 
@@ -207,6 +210,7 @@ async function settlingWorker(installed: Installed) {
 function automation(
   action: CreateTriggerCommand["action"],
   actionParams: CreateTriggerCommand["actionParams"],
+  filters: CreateTriggerCommand["filters"] = {},
 ): CreateTriggerCommand {
   const lastRunAt = toDate(Temporal.Instant.fromEpochMilliseconds(0));
   return {
@@ -215,6 +219,7 @@ function automation(
     name: "Settles",
     action,
     actionParams,
+    filters,
     lastRunAt,
   };
 }
@@ -295,9 +300,7 @@ describe("given a memory-tier worker settling a match end to end", () => {
       });
 
       expect(appended).toEqual(["dataset-1"]);
-      expect(lines.filter((line) => line.triggerId === "trigger-1" && line.cap === 1)).toHaveLength(
-        1,
-      );
+      expect(lines).toContainEqual(expect.objectContaining({ triggerId: "trigger-1", cap: 1 }));
       await worker.runtime.stop();
     });
 
@@ -359,5 +362,99 @@ describe("given a memory-tier worker settling a match end to end", () => {
       expect(await worker.lastRunAt()).toBe(0);
       await worker.runtime.stop();
     });
+  });
+});
+
+function organizationOf(members: { email: string; role: "ADMIN" | "MEMBER" }[]): AuthzApi {
+  const createdAt = toDate(Temporal.Instant.fromEpochMilliseconds(0));
+  return createApiFixture<AuthzApi>({
+    listOrganizationBindings: async ({ organizationId }) =>
+      members.map(({ email, role }, index) => ({
+        id: `binding-${index}`,
+        organizationId,
+        userId: `user-${index}`,
+        groupId: null,
+        apiKeyId: null,
+        role,
+        customRoleId: null,
+        scopeType: "ORGANIZATION",
+        scopeId: organizationId,
+        createdAt,
+        user: { id: `user-${index}`, name: null, email, image: null },
+        group: null,
+        apiKey: null,
+        customRole: null,
+      })),
+  });
+}
+
+async function breachedWorker(input: {
+  filters: CreateTriggerCommand["filters"];
+  countTracesInLastDay: TraceApi["countTracesInLastDay"];
+}) {
+  const { mail, sent } = capturingMail();
+  const appended: string[] = [];
+  const worker = await settlingWorker({
+    mail,
+    entitlement: planWithCeiling(1),
+    authz: organizationOf([
+      { email: "admin@acme.test", role: "ADMIN" },
+      { email: "member@acme.test", role: "MEMBER" },
+    ]),
+    trace: createApiFixture<TraceApi>({
+      findSummary: async ({ traceId }) => settlementSummary(traceId),
+      getById: async ({ traceId }) => settlementTrace(traceId),
+      deriveEvents: async () => [],
+      matchesTraceFilters: () => true,
+      countTracesInLastDay: input.countTracesInLastDay,
+    }),
+    dataset: createApiFixture<DatasetApi>({
+      batchCreateRecords: async ({ slugOrId }) => {
+        appended.push(slugOrId);
+        return [];
+      },
+    }),
+  });
+  const datasetMapping = { mapping: { question: { source: "input" } }, expansions: [] };
+  await worker.automations.create(
+    automation("ADD_TO_DATASET", { datasetId: "dataset-1", datasetMapping }, input.filters),
+  );
+  await worker.run("persistMatch", { triggerId: "trigger-1", traceIds: ["trace-1", "trace-2"] });
+  const trigger = await worker.automations.getById({
+    triggerId: "trigger-1",
+    projectId: "project-1",
+  });
+  await worker.runtime.stop();
+  return { sent, appended, trigger };
+}
+
+describe("given a memory-tier worker whose automation passes its plan's ceiling", () => {
+  /** @scenario "A misconfigured automation is paused and its administrators are told" */
+  it("pauses a condition-less automation for runaway volume and mails only the administrators", async () => {
+    const { sent, appended, trigger } = await breachedWorker({
+      filters: {},
+      countTracesInLastDay: async () => 1_000_000,
+    });
+
+    expect(trigger.active).toBe(false);
+    expect(trigger.pausedReason).toBe("runaway_volume");
+    expect(sent.map(({ to }) => to)).toEqual(["admin@acme.test"]);
+    expect(appended).toEqual(["dataset-1"]);
+  });
+
+  /** @scenario "An automation that merely reached its ceiling is told, not paused" */
+  it("keeps a narrowed automation active, tells its administrators and reads the project's own traffic", async () => {
+    const counted: string[] = [];
+    const { sent, trigger } = await breachedWorker({
+      filters: { "metadata.labels": ["checkout"] },
+      countTracesInLastDay: async ({ projectId }) => {
+        counted.push(projectId);
+        return 1_000_000;
+      },
+    });
+
+    expect(trigger.active).toBe(true);
+    expect(sent.map(({ to }) => to)).toEqual(["admin@acme.test"]);
+    expect(counted).toEqual(["project-1"]);
   });
 });

@@ -1,6 +1,7 @@
 import { AnalyticsApi } from "@langwatch/analytics-contract";
 import { AnnotationApi } from "@langwatch/annotation-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
 /**
  * The automation feature's application: the one typed thing all five of its
  * doors are given, so one operation serves a browser, an API key and a job.
@@ -85,6 +86,8 @@ import {
   AutomationRulesService,
   type AutomationProjectIdentity,
 } from "../services/automation-rules.service.ts";
+import { AutomationRunawayMetricsOtelService } from "../services/automation-runaway-metrics-otel.service.ts";
+import { AutomationRunawayService } from "../services/automation-runaway.service.ts";
 import { AutomationSettlementObservabilityService } from "../services/automation-settlement-observability.service.ts";
 import type { AutomationSlackBotTokenDecryptor } from "../services/automation-slack-secrets.service.ts";
 import { AutomationTemplateService } from "../services/automation-template.service.ts";
@@ -104,6 +107,7 @@ import {
   createAutomationSettlement,
   DatasetTraceMapper,
   LoggedSettlementBreach,
+  MailMemberDelivery,
   PeerPersistActionWriter,
   type AutomationComposedInfrastructure,
   type AutomationProcessMembers,
@@ -247,10 +251,12 @@ type AutomationDependencies = Readonly<{
   evaluations: typeof EvaluationApi;
   datasets: typeof DatasetApi;
   annotations: typeof AnnotationApi;
+  /** Who a runaway automation's limit notice reaches: its organization's administrators. */
+  authorization: typeof AuthzApi;
 }>;
 
 /** Peers only settlement reads, which `create` composes and `fromInfrastructure` never sees. */
-type AutomationSettlementPeer = "evaluations" | "datasets" | "annotations";
+type AutomationSettlementPeer = "evaluations" | "datasets" | "annotations" | "authorization";
 
 /** {@link AutomationDependencies}, resolved to the peer Apps `fromInfrastructure` itself reads. */
 type AutomationRuntimeDependencies = Omit<
@@ -292,6 +298,7 @@ export class AutomationApp implements AutomationApi {
     evaluations: EvaluationApi,
     datasets: DatasetApi,
     annotations: AnnotationApi,
+    authorization: AuthzApi,
   };
   static readonly config = automationServerConfig;
   /** Unsubscribe links are signed with auth's session key, as main signed them (§6). */
@@ -379,6 +386,20 @@ export class AutomationApp implements AutomationApi {
       },
       emailHourlyCap: config.emailHourlyCap,
       tenantDailyCap: config.tenantDailyCap,
+      createRunaway: (suppression) =>
+        AutomationRunawayService.create({
+          redis: members.redis,
+          directories: {
+            projects: dependencies.projects,
+            authorization: dependencies.authorization,
+          },
+          suppression,
+          mailer: new MailMemberDelivery(members.mail),
+          traces: dependencies.traces,
+          metrics: AutomationRunawayMetricsOtelService.create(),
+          baseHost: members.publicBaseUrl ?? "",
+          logger: members.logger,
+        }),
     });
   }
 

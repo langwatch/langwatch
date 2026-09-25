@@ -47,7 +47,7 @@ export class TestDispatchErrors extends AutomationDispatchError {
 export class RecordingDelivery extends AutomationNotificationDelivery {
   readonly emails: { recipients: string[]; subject: string; triggerId: string }[] = [];
   readonly slackWebhooks: { webhook: string; triggerName: string }[] = [];
-  readonly slackBots: { channel: string; triggerName: string }[] = [];
+  readonly slackBots: { token: string; channel: string; triggerName: string }[] = [];
   readonly webhooks: string[] = [];
 
   async sendLegacyEmail(): Promise<void> {
@@ -82,8 +82,12 @@ export class RecordingDelivery extends AutomationNotificationDelivery {
     throw new Error("The graph path does not send legacy Slack digests.");
   }
 
-  async sendSlackBot(input: { channel: string; triggerName: string }): Promise<void> {
-    this.slackBots.push({ channel: input.channel, triggerName: input.triggerName });
+  async sendSlackBot(input: { token: string; channel: string; triggerName: string }): Promise<void> {
+    this.slackBots.push({
+      token: input.token,
+      channel: input.channel,
+      triggerName: input.triggerName,
+    });
   }
 
   async sendWebhook(input: {
