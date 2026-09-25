@@ -190,3 +190,10 @@ func TestNullableObjectKeepsItsRequiredList(t *testing.T) {
 		t.Errorf("a two-object anyOf made its properties required: %+v", either)
 	}
 }
+
+func TestAnOptionalObjectKeepsItsRequiredList(t *testing.T) {
+	optional := FlattenSchema(nil, decode(t, `{"type": "object", "properties": {"cost": {"anyOf": [{"anyOf": [{"not": {}}, {"type": "object", "required": ["amount"], "properties": {"amount": {"type": "number"}}}]}, {"type": "null"}]}}}`))
+	if field := optional["cost.amount"]; !field.Required {
+		t.Fatalf("cost.amount lost its required flag behind zod's {not: {}} alternative: %+v", field)
+	}
+}

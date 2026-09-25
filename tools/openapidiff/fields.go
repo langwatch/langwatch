@@ -145,17 +145,24 @@ func (walker schemaWalker) walkChildren(node schemaNode, object map[string]any) 
 	}
 }
 
-// onlyNullAlternative is anyOf/oneOf of one schema and {type: null}, the way
-// a generator writes a nullable object: that object keeps its required list.
+// onlyNullAlternative is anyOf/oneOf of one schema and {type: null} or zod's
+// {not: {}} (an absent value), the way a generator writes a nullable or
+// optional object: that object keeps its required list.
 func onlyNullAlternative(branches []any) bool {
 	others := 0
 	for _, branch := range branches {
 		object, _ := branch.(map[string]any)
-		if object["type"] != "null" {
+		if object["type"] != "null" && !matchesNothing(object) {
 			others++
 		}
 	}
 	return others == 1 && len(branches) > 1
+}
+
+// matchesNothing is {not: {}}: no value validates, so it only marks absence.
+func matchesNothing(object map[string]any) bool {
+	not, ok := object["not"].(map[string]any)
+	return ok && len(not) == 0 && len(object) == 1
 }
 
 // walkBranch folds a composition branch into the node it composes: allOf
