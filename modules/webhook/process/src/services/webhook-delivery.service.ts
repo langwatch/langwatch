@@ -50,7 +50,7 @@ import {
   failedDeliverPayload,
   settledDeliverPayload,
 } from "../rules/webhook-spend-payload.rules.ts";
-import { HttpWebhookDestinationAdapter } from "./http.webhook-destination.service.ts";
+import { HttpWebhookDestinationService } from "./http.webhook-destination.service.ts";
 import { WebhookBatchSendService } from "./webhook-batch-send.service.ts";
 import { WebhookDeliveryMaintenanceService } from "./webhook-delivery-maintenance.service.ts";
 import type { WebhookDestinationConfig } from "./webhook-destination.service.ts";
@@ -227,7 +227,7 @@ export class WebhookDeliveryService {
           error: "This process composes no AWS transport for queue webhook destinations.",
         });
       }
-      return HttpWebhookDestinationAdapter.create({
+      return HttpWebhookDestinationService.create({
         url: request.destination.url,
         egress: input.channel,
         allowInsecureLocal: input.allowInsecureLocal,

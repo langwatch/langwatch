@@ -122,10 +122,10 @@ export type {
   WebhookDispatchVerdict,
 } from "./app/webhook.app.ts";
 export {
-  WebhookDestinationAdapter,
+  WebhookDestinationDispatchService,
   type WebhookDestinationDeps,
 } from "./services/webhook-destination-dispatch.service.ts";
-export { HttpWebhookDestinationAdapter } from "./services/http.webhook-destination.service.ts";
+export { HttpWebhookDestinationService } from "./services/http.webhook-destination.service.ts";
 export type {
   AwsClientConfigResolver,
   SqsDestinationConfig,

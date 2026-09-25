@@ -6,10 +6,14 @@ import {
   LangyUiTurnInactiveError,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
+import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 
 import type { LangyUiActionCatalog, LangyUiActionDefinition } from "../app/langy.members.ts";
-import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
+import type {
+  LangyStreamRedis,
+  LangyTokenBuffer,
+} from "../repositories/langy-token-buffer.repository.ts";
 
 /**
  * The agent-to-page action channel (specs/langy/langy-ui-actions.feature).
@@ -84,20 +88,13 @@ export type UiActionBackendRunner = (args: {
 }) => Promise<unknown>;
 
 /** The minimal Redis surface the service needs (ioredis satisfies it). */
-export interface UiActionRedis {
-  set(key: string, value: string, mode: "EX", ttl: number, nx?: "NX"): Promise<unknown>;
-  get(key: string): Promise<string | null>;
-  del(...keys: string[]): Promise<number>;
-  lpush(key: string, value: string): Promise<number>;
-  expire(key: string, seconds: number): Promise<number>;
-  /** ioredis duplicate — a dedicated connection for the blocking wait. */
-  duplicate(): UiActionBlockingRedis;
-}
+export type UiActionRedis = LangyStreamRedis &
+  Pick<Redis, "del" | "lpush"> & {
+    /** ioredis duplicate — a dedicated connection for the blocking wait. */
+    duplicate(): UiActionBlockingRedis;
+  };
 
-export interface UiActionBlockingRedis {
-  blpop(key: string, timeoutSeconds: number): Promise<[string, string] | null>;
-  disconnect(): void;
-}
+export type UiActionBlockingRedis = Pick<Redis, "blpop" | "disconnect">;
 
 /** The one slice of the conversation service dispatch needs. */
 export interface UiActionConversations {

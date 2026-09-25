@@ -9,9 +9,9 @@ export const LANGY_DISPATCH_METRIC_NAME = "langwatch_langy_dispatch_total";
  * declared in the platform application's `server/metrics.ts`; it now
  * lives beside the port, and `apps/worker` composes it for the dispatcher.
  */
-export class OtelLangyWorkerMetricsAdapter extends LangyWorkerMetrics {
-  static create(): OtelLangyWorkerMetricsAdapter {
-    return new OtelLangyWorkerMetricsAdapter(
+export class LangyWorkerMetricsOtelService extends LangyWorkerMetrics {
+  static create(): LangyWorkerMetricsOtelService {
+    return new LangyWorkerMetricsOtelService(
       counter({
         name: LANGY_DISPATCH_METRIC_NAME,
         description: "Langy worker dispatch attempts by outcome",

@@ -2,6 +2,7 @@
  * The token buffer's hybrid flush policy.
  * @see specs/langy/langy-dual-stream.feature
  */
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LANGY_EMPTY_TURN_FALLBACK } from "../../../rules/langy-empty-turn.rules.ts";
@@ -23,9 +24,9 @@ function makeRedis(): { redis: LangyStreamRedis; entries: RecordedEntry[] } {
   const entries: RecordedEntry[] = [];
   const streams = new Map<string, [string, string[]][]>();
   let seq = 0;
-  const redis: LangyStreamRedis = {
-    xadd: async (key, ...args) => {
-      // Payload is the last arg (single `p` field).
+  const redis = redisDouble({
+    xadd: async (...args: unknown[]) => {
+      const key = String(args[0]);
       const payload = String(args[args.length - 1]);
       entries.push(JSON.parse(payload) as RecordedEntry);
       const id = `1-${++seq}`;
@@ -34,11 +35,11 @@ function makeRedis(): { redis: LangyStreamRedis; entries: RecordedEntry[] } {
       streams.set(key, rows);
       return id;
     },
-    xrange: async (key) => streams.get(key) ?? [],
+    xrange: async (...args: unknown[]) => streams.get(String(args[0])) ?? [],
     expire: async () => 1,
     set: async () => "OK",
     get: async () => null,
-  };
+  });
   return { redis, entries };
 }
 

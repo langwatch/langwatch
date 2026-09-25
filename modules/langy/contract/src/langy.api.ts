@@ -129,10 +129,6 @@ export interface LangyApi {
   receiveInternalFrames(body: ReadableStream<Uint8Array> | null): Promise<RelayTally>;
   stopTurn(input: LangyStopTurnInput & { userId: string }): Promise<void>;
   findEgressAllowlist(input: { projectId: string }): Promise<LangyEgressAllowlist | null>;
-  trySetEgressAllowlist(input: {
-    projectId: string;
-    allowlist: LangyEgressAllowlist;
-  }): Promise<LangyEgressAllowlist | null>;
   openRelayConnection(): LangyRelayConnection;
   getPage(input: {
     projectId: string;

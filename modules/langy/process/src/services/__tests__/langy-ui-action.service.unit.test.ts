@@ -6,6 +6,7 @@ import {
  * The UI-action dispatch/claim/complete protocol, against fakes (specs/langy/langy-ui-
  * actions.feature).
  */
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -58,14 +59,17 @@ function makeRedis(blpopBehavior: ("wait-empty" | (() => void))[] = []): {
   redis: UiActionRedis;
   store: FakeStore;
   blpopCalls: number[];
+  hooks: { beforeDel?: () => Promise<void> };
 } {
   const store: FakeStore = { kv: new Map(), lists: new Map() };
   const blpopCalls: number[] = [];
+  const hooks: { beforeDel?: () => Promise<void> } = {};
   let behaviorIndex = 0;
 
-  const blocking: UiActionBlockingRedis = {
-    blpop: async (key, timeoutSeconds) => {
-      blpopCalls.push(timeoutSeconds);
+  const blocking: UiActionBlockingRedis = redisDouble({
+    blpop: async (...args: unknown[]) => {
+      const key = String(args[0]);
+      blpopCalls.push(Number(args[1]));
       const behavior = blpopBehavior[behaviorIndex++] ?? "wait-empty";
       if (typeof behavior === "function") behavior();
       const list = store.lists.get(key) ?? [];
@@ -73,30 +77,33 @@ function makeRedis(blpopBehavior: ("wait-empty" | (() => void))[] = []): {
       return value === undefined ? null : [key, value];
     },
     disconnect: () => undefined,
-  };
+  });
 
-  const redis: UiActionRedis = {
-    set: async (key, value, _mode, _ttl, nx) => {
-      if (nx === "NX" && store.kv.has(key)) return null;
-      store.kv.set(key, value);
+  const redis: UiActionRedis = redisDouble({
+    set: async (...args: unknown[]) => {
+      const key = String(args[0]);
+      if (args[4] === "NX" && store.kv.has(key)) return null;
+      store.kv.set(key, String(args[1]));
       return "OK";
     },
-    get: async (key) => store.kv.get(key) ?? null,
-    del: async (...keys) => {
+    get: async (...args: unknown[]) => store.kv.get(String(args[0])) ?? null,
+    del: async (...keys: unknown[]) => {
+      await hooks.beforeDel?.();
       let count = 0;
-      for (const key of keys) if (store.kv.delete(key)) count++;
+      for (const key of keys) if (store.kv.delete(String(key))) count++;
       return count;
     },
-    lpush: async (key, value) => {
+    lpush: async (...args: unknown[]) => {
+      const key = String(args[0]);
       const list = store.lists.get(key) ?? [];
-      list.push(value);
+      list.push(String(args[1]));
       store.lists.set(key, list);
       return list.length;
     },
     expire: async () => 1,
     duplicate: () => blocking,
-  };
-  return { redis, store, blpopCalls };
+  });
+  return { redis, store, blpopCalls, hooks };
 }
 
 function makeService({
@@ -734,7 +741,7 @@ describe("LangyUiActionService", () => {
   describe("when a tab claims as the dispatch hands the action to the backend", () => {
     /** @scenario A tab claiming as the dispatch gives up never double-executes */
     it("refuses the late claim, so only the backend runs the action", async () => {
-      const { redis } = makeRedis(["wait-empty"]);
+      const { redis, hooks } = makeRedis(["wait-empty"]);
       const appended: {
         actionId: string;
         kind: string;
@@ -755,15 +762,13 @@ describe("LangyUiActionService", () => {
       // interleaving: the dispatch has decided to run on the backend, and the
       // record the tab validated is still there.
       let lateClaim: { isClaimed: boolean } | undefined;
-      const del = redis.del.bind(redis);
-      redis.del = async (...keys) => {
+      hooks.beforeDel = async () => {
         lateClaim ??= await service.claim({
           projectId: "project-1",
           userId: "user-1",
           conversationId: "conv-1",
           actionId: appended[0]!.actionId,
         });
-        return del(...keys);
       };
 
       const outcome = await service.dispatch({

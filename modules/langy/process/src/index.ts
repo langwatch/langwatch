@@ -15,7 +15,7 @@ export type { LangyDatabase } from "./repositories/prisma/langy-database.mapper.
 export type { LangyTurnTechnicalMembers } from "./services/langy-turn.service.ts";
 export { type LangySessionKeyMetrics } from "./app/langy.members.ts";
 export {
-  OtelLangySessionKeyMetricsAdapter,
+  LangySessionKeyMetricsOtelService,
   LANGY_SESSION_KEYS_METRIC_NAME,
 } from "./services/langy-session-key-metrics-otel.service.ts";
 export type { PrismaLangySessionKeyReapDatabase } from "./repositories/prisma/prisma.langy-session-key-reap.repository.ts";
@@ -84,8 +84,8 @@ export type {
   LangyWorkerAdapterConfig,
   LangyWorkerHttpConfig,
 } from "./channels/http/http.langy-worker.channel.ts";
-export { NullLangyWorkerMetricsAdapter } from "./services/langy-worker-metrics-null.service.ts";
-export { NullLangyBlockMetricsAdapter } from "./services/langy-block-metrics-null.service.ts";
+export { LangyWorkerMetricsNullService } from "./services/langy-worker-metrics-null.service.ts";
+export { LangyBlockMetricsNullService } from "./services/langy-block-metrics-null.service.ts";
 export { UnavailableLangyWorkerAdapter } from "./services/langy-worker-unavailable.service.ts";
 export {
   LANGY_UI_ACTIONS_FLAG,
@@ -223,11 +223,11 @@ export {
 export type { GithubPrLimitResult } from "./services/langy-github-pr-quota.service.ts";
 export {
   LANGY_DISPATCH_METRIC_NAME,
-  OtelLangyWorkerMetricsAdapter,
+  LangyWorkerMetricsOtelService,
 } from "./services/langy-worker-metrics-otel.service.ts";
 export {
   LANGY_BLOCKS_METRIC_NAME,
-  LangyBlockOtelMetricsAdapter,
+  LangyBlockMetricsOtelService,
 } from "./services/langy-block-metrics-otel.service.ts";
 
 // ADR-129 local control: the developer's own folder, and the cards that wait

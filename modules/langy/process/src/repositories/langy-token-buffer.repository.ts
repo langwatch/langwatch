@@ -1,4 +1,5 @@
 import type { LangyStreamEntry } from "@langwatch/langy-contract";
+import type { Redis } from "ioredis";
 
 /** An entry paired with the Redis stream id it was read at. */
 export interface LangyStreamRead {
@@ -6,24 +7,11 @@ export interface LangyStreamRead {
   entry: LangyStreamEntry;
 }
 
-/**
- * The minimal Redis surface the buffer uses. Injected so unit tests can drive a fake without a
- * live server; production adapts the shared ioredis connection. `blocking` is a duplicated
- * connection dedicated to `XREAD BLOCK` so a follow read never wedges the shared client.
- */
-export interface LangyStreamRedis {
-  xadd(key: string, ...args: (string | number)[]): Promise<string | null>;
-  xrange(key: string, start: string, end: string): Promise<[string, string[]][]>;
-  expire(key: string, seconds: number): Promise<number>;
-  set(key: string, value: string, mode: "EX", ttl: number): Promise<unknown>;
-  get(key: string): Promise<string | null>;
-  /** Dedicated connection for blocking reads. Falls back to `this` if absent. */
-  blocking?: {
-    xread(
-      ...args: (string | number)[]
-    ): Promise<[string, [string, string[]][]][]> | null | Promise<null>;
-  };
-}
+/** The Redis commands the buffer uses on the shared connection. */
+export type LangyStreamRedis = Pick<Redis, "xadd" | "xrange" | "expire" | "set" | "get" | "xread">;
+
+/** A duplicated connection for `XREAD BLOCK`, so a follow read never wedges the shared one. */
+export type LangyStreamBlockingRedis = Pick<Redis, "xread">;
 
 /**
  * The live edge of one turn: the ordered, TTL'd stream a worker writes tokens and ticks onto,
@@ -101,4 +89,7 @@ export abstract class LangyTokenBuffer {
 }
 
 /** The connection a stream's blocking tail borrows, handed to `open()` below. */
-export type LangyTokenBufferConnection = { redis: unknown; blockingRedis?: unknown };
+export type LangyTokenBufferConnection = {
+  redis: LangyStreamRedis;
+  blockingRedis?: LangyStreamBlockingRedis;
+};

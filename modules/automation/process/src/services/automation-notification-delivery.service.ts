@@ -23,6 +23,7 @@ import {
 } from "../channels/slack/slack.web-api-delivery.channel.ts";
 import { SlackWebhookClientAdapter } from "../channels/slack/slack.webhook-client.channel.ts";
 import { SlackWebhookDeliveryAdapter } from "../channels/slack/slack.webhook-delivery.channel.ts";
+import { injectFooterIntoBody } from "../rules/automation-notification-footer.rules.ts";
 import { TriggerNoReplyService, TriggerNoReplyWarning } from "./trigger-no-reply.service.ts";
 import { UnsubscribeTokenService } from "./unsubscribe-token.service.ts";
 
@@ -394,19 +395,6 @@ export class AutomationNotificationDeliveryAdapter extends AutomationNotificatio
       },
     };
   }
-}
-
-/**
- * `render()` returns a whole HTML document, so appending the footer would
- * land it after `</body></html>` and some clients drop content there. Insert
- * before the closing tag when present, else append (fragments, plain HTML).
- */
-export function injectFooterIntoBody(html: string, footerHtml: string): string {
-  const bodyClose = /<\/body>/i;
-
-  return bodyClose.test(html)
-    ? html.replace(bodyClose, `${footerHtml}</body>`)
-    : `${html}${footerHtml}`;
 }
 
 class LoggedNoReplyWarning extends TriggerNoReplyWarning {

@@ -9,13 +9,13 @@ export const LANGY_BLOCKS_METRIC_NAME = "langwatch_langy_blocks_total";
  * The block-salvage series, pushed over OTLP. `LangyFinalPartsService.build` takes a `countBlock`
  * and defaults it to a no-op, so a caller that passes nothing publishes nothing.
  */
-export class LangyBlockOtelMetricsAdapter extends LangyBlockMetrics {
+export class LangyBlockMetricsOtelService extends LangyBlockMetrics {
   private constructor() {
     super();
   }
 
-  static create(): LangyBlockOtelMetricsAdapter {
-    return new LangyBlockOtelMetricsAdapter();
+  static create(): LangyBlockMetricsOtelService {
+    return new LangyBlockMetricsOtelService();
   }
 
   blockCounter(): LangyBlockCounter {

@@ -13,7 +13,7 @@ import {
 /** How much of the receiver's response the delivery log keeps. */
 const RESPONSE_SNIPPET_CHARS = 1000;
 
-export interface HttpWebhookDestinationAdapterOptions {
+export interface HttpWebhookDestinationServiceOptions {
   url: string;
   /**
    * The process's ONE outbound webhook sender: the SSRF fence, the TLS policy
@@ -32,21 +32,21 @@ export interface HttpWebhookDestinationAdapterOptions {
 /**
  * The HTTPS destination: the transport every endpoint used before there was more than one.
  */
-export class HttpWebhookDestinationAdapter implements WebhookDestination {
+export class HttpWebhookDestinationService implements WebhookDestination {
   readonly kind = "http" as const;
 
   private readonly url: string;
   private readonly egress: Pick<WebhookEgressService, "send">;
   private readonly allowInsecureLocal: boolean;
 
-  private constructor(options: HttpWebhookDestinationAdapterOptions) {
+  private constructor(options: HttpWebhookDestinationServiceOptions) {
     this.url = options.url;
     this.egress = options.egress;
     this.allowInsecureLocal = options.allowInsecureLocal;
   }
 
-  static create(options: HttpWebhookDestinationAdapterOptions): HttpWebhookDestinationAdapter {
-    return new HttpWebhookDestinationAdapter(options);
+  static create(options: HttpWebhookDestinationServiceOptions): HttpWebhookDestinationService {
+    return new HttpWebhookDestinationService(options);
   }
 
   async send(request: WebhookDispatchRequest): Promise<WebhookDispatchResult> {

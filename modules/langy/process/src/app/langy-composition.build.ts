@@ -9,10 +9,11 @@ import {
   LangyNotEnabledError,
 } from "@langwatch/langy-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
+import type { Redis } from "ioredis";
 
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
 import { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
-import { LangyBlockOtelMetricsAdapter } from "../services/langy-block-metrics-otel.service.ts";
+import { LangyBlockMetricsOtelService } from "../services/langy-block-metrics-otel.service.ts";
 import {
   LangyGithubPrCounter,
   LangyGithubPrQuotaService,
@@ -26,14 +27,9 @@ import type { LangyTurnTechnicalMembers } from "../services/langy-turn-shared.se
 import { LangyGithubPermit, type LangyWorker } from "./langy.members.ts";
 
 /** The Redis surface this file needs: exactly what `LangyGithubPrCounter` names. */
-export type LangyGithubPrRedis = Readonly<{
-  get(key: string): Promise<string | null>;
-  incr(key: string): Promise<number>;
-  decr(key: string): Promise<number>;
-  incrby(key: string, amount: number): Promise<number>;
-  expire(key: string, seconds: number): Promise<unknown>;
-  eval(script: string, numKeys: number, ...args: string[]): Promise<unknown>;
-}>;
+export type LangyGithubPrRedis = Readonly<
+  Pick<Redis, "get" | "incr" | "decr" | "incrby" | "expire" | "eval">
+>;
 
 /**
  * The daily pull-request counter, on this process's own Redis. `eval` is
@@ -168,7 +164,7 @@ export function buildLangyInfrastructure(input: {
     turns,
     credentials,
     events: null,
-    blockMetrics: LangyBlockOtelMetricsAdapter.create(),
+    blockMetrics: LangyBlockMetricsOtelService.create(),
     ...(redis ? { feedbackPromptRedis: redis } : {}),
     // No relay: opening one needs this process's public origin, which is not
     // among the two members `LangyApp` reads. A process that serves the

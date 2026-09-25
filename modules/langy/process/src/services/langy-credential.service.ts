@@ -261,17 +261,19 @@ export class LangyCredentialService {
     return parsed.length > 0 ? parsed : null;
   }
 
-  async trySetEgressAllowlist({
+  async setEgressAllowlist({
     projectId,
     allowlist,
   }: {
     projectId: string;
     allowlist: string[];
-  }): Promise<string[] | null> {
+  }): Promise<string[]> {
     const normalized = allowlist.map((host) => host.trim().replace(/\.$/, "").toLowerCase());
-    const value = normalized.length > 0 ? normalized : null;
-    await this.deps.repository.saveEgressAllowlist(projectId, value);
+    await this.deps.repository.saveEgressAllowlist(
+      projectId,
+      normalized.length > 0 ? normalized : null,
+    );
 
-    return value;
+    return normalized;
   }
 }

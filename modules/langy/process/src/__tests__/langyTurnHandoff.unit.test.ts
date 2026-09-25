@@ -1,23 +1,11 @@
-import { LangyTurnHandoffRedisRepository, type LangyHandoffRedis } from "@langwatch/langy-process";
+import { LangyTurnHandoffRedisRepository } from "@langwatch/langy-process";
+import { memoryRedisDouble, memoryRedisStore } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
 
 import { LANGY_HANDOFF_TTL_SECONDS } from "../repositories/langy-live-turn.repository.ts";
 
-function fakeRedis(): LangyHandoffRedis & { values: Map<string, string> } {
-  const values = new Map<string, string>();
-  return {
-    values,
-    async set(key, value) {
-      values.set(key, value);
-      return "OK";
-    },
-    async get(key) {
-      return values.get(key) ?? null;
-    },
-    async expire(key, _ttl) {
-      return values.has(key) ? 1 : 0;
-    },
-  };
+function fakeRedis() {
+  return memoryRedisDouble();
 }
 
 const handoff = {
@@ -57,12 +45,12 @@ describe("LangyTurnHandoffRedisRepository", () => {
       store.read({ conversationId: handoff.conversationId, turnId: handoff.turnId }),
     ).resolves.toBeNull();
 
-    redis.values.set("langy:handoff:{conversation-1}:turn-1", "not-json");
+    await redis.set("langy:handoff:{conversation-1}:turn-1", "not-json");
     await expect(
       store.read({ conversationId: handoff.conversationId, turnId: handoff.turnId }),
     ).resolves.toBeNull();
 
-    redis.values.set(
+    await redis.set(
       "langy:handoff:{conversation-1}:turn-1",
       JSON.stringify({ ...handoff, credentials: {} }),
     );
@@ -72,18 +60,18 @@ describe("LangyTurnHandoffRedisRepository", () => {
   });
 
   it("refreshes a live handoff without rewriting it", async () => {
-    const redis = fakeRedis();
-    const expire = vi.spyOn(redis, "expire");
-    const set = vi.spyOn(redis, "set");
+    const keys = memoryRedisStore();
+    await LangyTurnHandoffRedisRepository.create({
+      redis: memoryRedisDouble({ store: keys }),
+    }).stash(handoff);
+    const set = vi.fn(async () => "OK");
+    const redis = memoryRedisDouble({ store: keys, script: { set } });
     const store = LangyTurnHandoffRedisRepository.create({ redis });
-    await store.stash(handoff);
-    set.mockClear();
 
     await expect(
       store.refresh({ conversationId: handoff.conversationId, turnId: handoff.turnId }),
     ).resolves.toBe(true);
-    expect(expire).toHaveBeenCalledWith(
-      "langy:handoff:{conversation-1}:turn-1",
+    expect(await redis.ttl("langy:handoff:{conversation-1}:turn-1")).toBe(
       LANGY_HANDOFF_TTL_SECONDS,
     );
     expect(set).not.toHaveBeenCalled();

@@ -7,9 +7,9 @@ import { type LangySessionKeyMetrics } from "../app/langy.members.ts";
 export const LANGY_SESSION_KEYS_METRIC_NAME = "langwatch_langy_session_keys_total";
 
 /** Langy session-key lifecycle counts, pushed over OTLP. */
-export class OtelLangySessionKeyMetricsAdapter implements LangySessionKeyMetrics {
-  static create(): OtelLangySessionKeyMetricsAdapter {
-    return new OtelLangySessionKeyMetricsAdapter(
+export class LangySessionKeyMetricsOtelService implements LangySessionKeyMetrics {
+  static create(): LangySessionKeyMetricsOtelService {
+    return new LangySessionKeyMetricsOtelService(
       counter({
         name: LANGY_SESSION_KEYS_METRIC_NAME,
         description: "Langy session API keys by lifecycle operation",

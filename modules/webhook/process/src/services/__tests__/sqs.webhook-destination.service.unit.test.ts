@@ -9,7 +9,7 @@ import type {
 import { inspectSqsQueueUrl, parseSqsQueueUrl } from "../../rules/sqs-queue-url.rules.ts";
 import {
   SQS_MAX_MESSAGE_BYTES,
-  SqsWebhookDestinationAdapter,
+  SqsWebhookDestinationService,
 } from "../sqs.webhook-destination.service.ts";
 
 // The queue channel and the rate limiter are the two boundaries; everything
@@ -64,7 +64,7 @@ function fakeQueue(behavior?: { rejectWith?: unknown }) {
   return { sent, channel };
 }
 
-describe("SqsWebhookDestinationAdapter", () => {
+describe("SqsWebhookDestinationService", () => {
   beforeEach(() => {
     limitMock.mockResolvedValue({
       allowed: true,
@@ -81,7 +81,7 @@ describe("SqsWebhookDestinationAdapter", () => {
     /** @scenario A queue message carries the same bytes as the HTTP body */
     it("puts the exact HTTP body on the queue with no wrapper around it", async () => {
       const { sent, channel } = fakeQueue();
-      const destination = SqsWebhookDestinationAdapter.create({
+      const destination = SqsWebhookDestinationService.create({
         config: {
           channel,
           rateLimiter,
@@ -106,7 +106,7 @@ describe("SqsWebhookDestinationAdapter", () => {
     /** @scenario Signature, delivery id and attempt ride as message attributes */
     it("carries the signature, delivery id and attempt under their header names", async () => {
       const { sent, channel } = fakeQueue();
-      const destination = SqsWebhookDestinationAdapter.create({
+      const destination = SqsWebhookDestinationService.create({
         config: {
           channel,
           rateLimiter,
@@ -131,7 +131,7 @@ describe("SqsWebhookDestinationAdapter", () => {
     /** @scenario Signature, delivery id and attempt ride as message attributes */
     it("marks a test fire under its own header name", async () => {
       const { sent, channel } = fakeQueue();
-      const destination = SqsWebhookDestinationAdapter.create({
+      const destination = SqsWebhookDestinationService.create({
         config: {
           channel,
           rateLimiter,
@@ -150,7 +150,7 @@ describe("SqsWebhookDestinationAdapter", () => {
     /** @scenario A queue delivery is recorded with no response status */
     it("answers success with a message id and no status", async () => {
       const { channel } = fakeQueue();
-      const destination = SqsWebhookDestinationAdapter.create({
+      const destination = SqsWebhookDestinationService.create({
         config: {
           channel,
           rateLimiter,
@@ -175,7 +175,7 @@ describe("SqsWebhookDestinationAdapter", () => {
     /** @scenario A batch too large for one queue message is refused terminally */
     it("refuses terminally and names the batch-size control", async () => {
       const { channel, sent } = fakeQueue();
-      const destination = SqsWebhookDestinationAdapter.create({
+      const destination = SqsWebhookDestinationService.create({
         config: {
           channel,
           rateLimiter,
@@ -197,13 +197,13 @@ describe("SqsWebhookDestinationAdapter", () => {
     });
 
     it("counts attribute names, types and values against the limit", () => {
-      const attributes = SqsWebhookDestinationAdapter.messageAttributes({
+      const attributes = SqsWebhookDestinationService.messageAttributes({
         batchId: "wh_1:abc",
         attempt: 1,
         signature: "t=1,v1=deadbeef",
       });
-      const bodyOnly = SqsWebhookDestinationAdapter.messageBytes({ body: "{}", attributes: {} });
-      const withAttributes = SqsWebhookDestinationAdapter.messageBytes({ body: "{}", attributes });
+      const bodyOnly = SqsWebhookDestinationService.messageBytes({ body: "{}", attributes: {} });
+      const withAttributes = SqsWebhookDestinationService.messageBytes({ body: "{}", attributes });
       expect(withAttributes).toBeGreaterThan(bodyOnly);
     });
   });
@@ -216,7 +216,7 @@ describe("SqsWebhookDestinationAdapter", () => {
         resetAt: Date.now() + 60_000,
       } as never);
       const { channel, sent } = fakeQueue();
-      const destination = SqsWebhookDestinationAdapter.create({
+      const destination = SqsWebhookDestinationService.create({
         config: {
           channel,
           rateLimiter,
@@ -259,48 +259,48 @@ describe("SqsWebhookDestinationAdapter", () => {
     /** @scenario A missing or forbidden queue is terminal, a throttled one retries */
     it("classifies a missing queue and a refused permission as terminal", () => {
       expect(
-        SqsWebhookDestinationAdapter.classifyFailure({
+        SqsWebhookDestinationService.classifyFailure({
           name: "AWS.SimpleQueueService.NonExistentQueue",
         }).verdict,
       ).toBe("terminal");
       expect(
-        SqsWebhookDestinationAdapter.classifyFailure({ name: "QueueDoesNotExist" }).verdict,
+        SqsWebhookDestinationService.classifyFailure({ name: "QueueDoesNotExist" }).verdict,
       ).toBe("terminal");
-      expect(SqsWebhookDestinationAdapter.classifyFailure({ name: "AccessDenied" }).verdict).toBe(
+      expect(SqsWebhookDestinationService.classifyFailure({ name: "AccessDenied" }).verdict).toBe(
         "terminal",
       );
       expect(
-        SqsWebhookDestinationAdapter.classifyFailure({ name: "AccessDeniedException" }).verdict,
+        SqsWebhookDestinationService.classifyFailure({ name: "AccessDeniedException" }).verdict,
       ).toBe("terminal");
     });
 
     /** @scenario A missing or forbidden queue is terminal, a throttled one retries */
     it("classifies throttling, server errors and network failures as retryable", () => {
       expect(
-        SqsWebhookDestinationAdapter.classifyFailure({ name: "ThrottlingException" }).verdict,
+        SqsWebhookDestinationService.classifyFailure({ name: "ThrottlingException" }).verdict,
       ).toBe("retryable");
       expect(
-        SqsWebhookDestinationAdapter.classifyFailure({ $metadata: { httpStatusCode: 503 } })
+        SqsWebhookDestinationService.classifyFailure({ $metadata: { httpStatusCode: 503 } })
           .verdict,
       ).toBe("retryable");
-      expect(SqsWebhookDestinationAdapter.classifyFailure({ code: "ECONNRESET" }).verdict).toBe(
+      expect(SqsWebhookDestinationService.classifyFailure({ code: "ECONNRESET" }).verdict).toBe(
         "retryable",
       );
     });
 
     /** @scenario A missing or forbidden queue is terminal, a throttled one retries */
     it("keeps an expired credential retryable, so an expiring session is not a dead queue", () => {
-      expect(SqsWebhookDestinationAdapter.classifyFailure({ name: "ExpiredToken" }).verdict).toBe(
+      expect(SqsWebhookDestinationService.classifyFailure({ name: "ExpiredToken" }).verdict).toBe(
         "retryable",
       );
       expect(
-        SqsWebhookDestinationAdapter.classifyFailure({ name: "ExpiredTokenException" }).verdict,
+        SqsWebhookDestinationService.classifyFailure({ name: "ExpiredTokenException" }).verdict,
       ).toBe("retryable");
     });
 
     it("treats a failure it has never seen as retryable, since the ladder gives up on its own", () => {
       expect(
-        SqsWebhookDestinationAdapter.classifyFailure({ name: "SomethingNewFromAws" }).verdict,
+        SqsWebhookDestinationService.classifyFailure({ name: "SomethingNewFromAws" }).verdict,
       ).toBe("retryable");
     });
 
@@ -310,7 +310,7 @@ describe("SqsWebhookDestinationAdapter", () => {
           name: "QueueDoesNotExist",
         }),
       });
-      const destination = SqsWebhookDestinationAdapter.create({
+      const destination = SqsWebhookDestinationService.create({
         config: {
           channel,
           rateLimiter,

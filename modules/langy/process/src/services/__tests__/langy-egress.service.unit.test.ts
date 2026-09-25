@@ -64,7 +64,7 @@ describe("LangyService egress allow-list, composed the way production composes i
       const { service, saveEgressAllowlist } = credentialService(null);
 
       await expect(
-        composed(service).trySetEgressAllowlist({
+        composed(service).setEgressAllowlist({
           projectId: "project-1",
           allowlist: ["API.Example.com.", " other.example.com "],
         }),
@@ -80,8 +80,8 @@ describe("LangyService egress allow-list, composed the way production composes i
       const { service, saveEgressAllowlist } = credentialService(["api.example.com"]);
 
       await expect(
-        composed(service).trySetEgressAllowlist({ projectId: "project-1", allowlist: [] }),
-      ).resolves.toBeNull();
+        composed(service).setEgressAllowlist({ projectId: "project-1", allowlist: [] }),
+      ).resolves.toEqual([]);
 
       expect(saveEgressAllowlist).toHaveBeenCalledWith("project-1", null);
     });

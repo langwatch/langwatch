@@ -123,13 +123,13 @@ export class LangyService {
     return this.credentials.findEgressAllowlist({ projectId });
   }
 
-  trySetEgressAllowlist(input: {
+  setEgressAllowlist(input: {
     projectId: string;
     allowlist: LangyEgressAllowlist;
-  }): Promise<LangyEgressAllowlist | null> {
+  }): Promise<LangyEgressAllowlist> {
     const { projectId, allowlist } = langySetEgressInputSchema.parse(input);
 
-    return this.credentials.trySetEgressAllowlist({ projectId, allowlist });
+    return this.credentials.setEgressAllowlist({ projectId, allowlist });
   }
 
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<LangyUsageCount> {

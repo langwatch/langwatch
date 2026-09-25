@@ -4,7 +4,7 @@ import { DispatchError } from "@langwatch/eventing";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { WebhookDispatchRequest } from "../../app/webhook.app.ts";
-import { HttpWebhookDestinationAdapter } from "../http.webhook-destination.service.ts";
+import { HttpWebhookDestinationService } from "../http.webhook-destination.service.ts";
 
 // The SSRF-fenced egress service (which also owns the hourly dispatch cap) is
 // the boundary; the classification under test is the real one.
@@ -14,7 +14,7 @@ const egress = createApiFixture<WebhookEgressService>({ send: mockedSend });
 const URL_UNDER_TEST = "https://receiver.example.com/webhooks/langwatch";
 
 const destination = () =>
-  HttpWebhookDestinationAdapter.create({ url: URL_UNDER_TEST, egress, allowInsecureLocal: false });
+  HttpWebhookDestinationService.create({ url: URL_UNDER_TEST, egress, allowInsecureLocal: false });
 
 function request(overrides: Partial<WebhookDispatchRequest> = {}): WebhookDispatchRequest {
   return {
@@ -38,7 +38,7 @@ function receiverAnswers(status: number, retryAfterMs?: number) {
   } as never);
 }
 
-describe("HttpWebhookDestinationAdapter", () => {
+describe("HttpWebhookDestinationService", () => {
   afterEach(() => {
     vi.clearAllMocks();
   });

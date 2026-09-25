@@ -1,27 +1,23 @@
-import { type LangyLinkRedis } from "@langwatch/langy-process";
 /**
  * The resource-link store is Langy's per-CONVERSATION memory of which platform address a lookup
  * surfaced for a resource — the only thing a later `langwatch navigate open <id>` may resolve
  * an address from.
  */
+import { memoryRedisDouble, memoryRedisStore } from "@langwatch/test-harness/client-doubles/redis";
+import type { RedisKey } from "ioredis";
 import { describe, expect, it, vi } from "vitest";
 
 import { LangyResourceLinksRedisRepository } from "../repositories/redis/redis.langy-resource-links.repository.ts";
 
 function fakeRedis() {
-  const hashes = new Map<string, Map<string, string>>();
-  const redis = {
-    hset: vi.fn(async (key: string, field: string, value: string) => {
-      const hash = hashes.get(key) ?? new Map<string, string>();
-      const added = hash.has(field) ? 0 : 1;
-      hash.set(field, value);
-      hashes.set(key, hash);
-      return added;
-    }),
-    hget: vi.fn(async (key: string, field: string) => hashes.get(key)?.get(field) ?? null),
-    expire: vi.fn(async () => 1),
-  } satisfies LangyLinkRedis;
-  return { redis, hashes };
+  const keys = memoryRedisStore();
+  const recorder = memoryRedisDouble({ store: keys });
+  const hset = vi.fn((key: RedisKey, ...fieldValues: (string | number | Buffer)[]) =>
+    recorder.hset(key, ...fieldValues),
+  );
+  const expire = vi.fn(async (..._args: unknown[]) => 1);
+  const redis = memoryRedisDouble({ store: keys, script: { hset, expire } });
+  return { redis, hset, expire };
 }
 
 describe("langyResourceLinkStore", () => {
@@ -39,15 +35,23 @@ describe("langyResourceLinkStore", () => {
         ],
       });
 
-      expect(await store.resolve({ conversationId: "conv-1", id: "batch_1" })).toEqual({ kind: "hit", href });
-      expect(await store.resolve({ conversationId: "conv-1", id: "run_1" })).toEqual({ kind: "hit", href });
+      expect(await store.resolve({ conversationId: "conv-1", id: "batch_1" })).toEqual({
+        kind: "hit",
+        href,
+      });
+      expect(await store.resolve({ conversationId: "conv-1", id: "run_1" })).toEqual({
+        kind: "hit",
+        href,
+      });
     });
 
     it("answers a miss for a resource this conversation never surfaced", async () => {
       const { redis } = fakeRedis();
       const store = LangyResourceLinksRedisRepository.create({ redis });
 
-      expect(await store.resolve({ conversationId: "conv-1", id: "unknown" })).toEqual({ kind: "miss" });
+      expect(await store.resolve({ conversationId: "conv-1", id: "unknown" })).toEqual({
+        kind: "miss",
+      });
     });
   });
 
@@ -60,13 +64,15 @@ describe("langyResourceLinkStore", () => {
         links: [{ id: "run_1", href: "https://app.langwatch.ai/a/x" }],
       });
 
-      expect(await store.resolve({ conversationId: "conv-2", id: "run_1" })).toEqual({ kind: "miss" });
+      expect(await store.resolve({ conversationId: "conv-2", id: "run_1" })).toEqual({
+        kind: "miss",
+      });
     });
   });
 
   describe("when links are written", () => {
     it("refreshes the conversation key's TTL on every write", async () => {
-      const { redis } = fakeRedis();
+      const { redis, expire } = fakeRedis();
       const store = LangyResourceLinksRedisRepository.create({ redis });
       await store.remember({
         conversationId: "conv-1",
@@ -77,17 +83,17 @@ describe("langyResourceLinkStore", () => {
         links: [{ id: "run_2", href: "https://app.langwatch.ai/a/y" }],
       });
 
-      expect(redis.expire).toHaveBeenCalledTimes(2);
-      expect(redis.expire).toHaveBeenCalledWith("langy:navlink:conv-1", expect.any(Number));
+      expect(expire).toHaveBeenCalledTimes(2);
+      expect(expire).toHaveBeenCalledWith("langy:navlink:conv-1", expect.any(Number));
     });
 
     it("writes nothing — and touches no TTL — for an empty link set", async () => {
-      const { redis } = fakeRedis();
+      const { redis, hset, expire } = fakeRedis();
       const store = LangyResourceLinksRedisRepository.create({ redis });
       await store.remember({ conversationId: "conv-1", links: [] });
 
-      expect(redis.hset).not.toHaveBeenCalled();
-      expect(redis.expire).not.toHaveBeenCalled();
+      expect(hset).not.toHaveBeenCalled();
+      expect(expire).not.toHaveBeenCalled();
     });
   });
 });

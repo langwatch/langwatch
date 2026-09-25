@@ -143,10 +143,7 @@ export {
   RunawayContainmentService,
 } from "./services/runaway-containment.service.ts";
 export { AutomationNotificationDelivery } from "./channels/automation-notification-delivery.channel.ts";
-export {
-  AutomationNotificationDeliveryAdapter,
-  injectFooterIntoBody,
-} from "./services/automation-notification-delivery.service.ts";
+export { AutomationNotificationDeliveryAdapter } from "./services/automation-notification-delivery.service.ts";
 export type { AutomationSettlementMatchConfirmation } from "./services/automation-settlement-match-confirmation.service.ts";
 export { AutomationSettlementExecutor } from "./services/automation-settlement-executor.service.ts";
 export {

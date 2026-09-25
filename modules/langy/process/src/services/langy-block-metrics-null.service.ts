@@ -2,13 +2,13 @@ import { LangyBlockMetrics } from "../app/langy.members.ts";
 import type { LangyBlockCounter } from "./langy-final-parts.service.ts";
 
 /** The default: a deployment composed no block-metrics collector publishes nothing. */
-export class NullLangyBlockMetricsAdapter extends LangyBlockMetrics {
+export class LangyBlockMetricsNullService extends LangyBlockMetrics {
   private constructor() {
     super();
   }
 
-  static create(): NullLangyBlockMetricsAdapter {
-    return new NullLangyBlockMetricsAdapter();
+  static create(): LangyBlockMetricsNullService {
+    return new LangyBlockMetricsNullService();
   }
 
   blockCounter(): LangyBlockCounter {

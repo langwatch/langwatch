@@ -1,14 +1,12 @@
+import type { Redis } from "ioredis";
+
 import type {
   LangyResourceLinkLookup,
   LangyResourceLinksRepository,
 } from "../langy-live-turn.repository.ts";
 
 /** Conversation-scoped Redis links used by Langy's navigate command. */
-export interface LangyLinkRedis {
-  hset(key: string, field: string, value: string): Promise<number>;
-  hget(key: string, field: string): Promise<string | null>;
-  expire(key: string, seconds: number): Promise<number | boolean>;
-}
+export type LangyLinkRedis = Pick<Redis, "hset" | "hget" | "expire">;
 
 export class LangyResourceLinksRedisRepository implements LangyResourceLinksRepository {
   private constructor(private readonly redis: LangyLinkRedis) {}

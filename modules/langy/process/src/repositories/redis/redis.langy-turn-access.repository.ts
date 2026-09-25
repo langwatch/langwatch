@@ -1,3 +1,5 @@
+import type { Redis } from "ioredis";
+
 import {
   LANGY_TURN_ACCESS_TTL_SECONDS,
   type LangyTurnAccess,
@@ -5,10 +7,7 @@ import {
   langyTurnAccessSchema,
 } from "../langy-live-turn.repository.ts";
 
-interface LangyAccessRedis {
-  get(key: string): Promise<string | null>;
-  set(key: string, value: string, mode: "EX", ttl: number): Promise<unknown>;
-}
+type LangyAccessRedis = Pick<Redis, "get" | "set">;
 
 /** Redis-backed turn access, keyed by conversation so a turn's slot hashes together. */
 export class LangyTurnAccessRedisRepository extends LangyTurnAccessRepository {

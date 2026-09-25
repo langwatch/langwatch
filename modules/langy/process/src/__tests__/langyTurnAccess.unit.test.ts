@@ -1,23 +1,13 @@
 /**
  * @vitest-environment node
  */
+import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { LangyTurnAccessRedisRepository } from "../repositories/redis/redis.langy-turn-access.repository.ts";
 
-/** An in-memory stand-in for the Redis surface the store needs. */
 function fakeRedis() {
-  const store = new Map<string, string>();
-  return {
-    store,
-    async get(key: string) {
-      return store.get(key) ?? null;
-    },
-    async set(key: string, value: string, _mode: "EX", _ttl: number) {
-      store.set(key, value);
-      return "OK";
-    },
-  };
+  return memoryRedisDouble();
 }
 
 const ACCESS = {
@@ -68,14 +58,14 @@ describe("LangyTurnAccessRedisRepository", () => {
   describe("given a corrupt record", () => {
     it("fails closed", async () => {
       const redis = fakeRedis();
-      redis.store.set("langy:turn-access:{conv-1}:turn-1", "not json");
+      await redis.set("langy:turn-access:{conv-1}:turn-1", "not json");
       const store = LangyTurnAccessRedisRepository.create({ redis });
       expect(await store.isTurnActor(ACCESS)).toBe(false);
     });
 
     it("fails closed when valid JSON has the wrong shape", async () => {
       const redis = fakeRedis();
-      redis.store.set(
+      await redis.set(
         "langy:turn-access:{conv-1}:turn-1",
         JSON.stringify({ ...ACCESS, userId: 123 }),
       );

@@ -17,7 +17,7 @@ import type {
   LangyEventingMembers,
   LangyTurnTechnicalMembers,
 } from "@langwatch/langy-process";
-import { LangyBlockOtelMetricsAdapter, PostgresLangyAdapter } from "@langwatch/langy-process";
+import { LangyBlockMetricsOtelService, PostgresLangyAdapter } from "@langwatch/langy-process";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import {
   createRecordingMeterProvider,
@@ -137,7 +137,7 @@ describe("PostgresLangyAdapter", () => {
           const instance = PostgresLangyAdapter.create({ database: undefined! });
           const service = instance.build({
             ...compositionOptions(),
-            blockMetrics: LangyBlockOtelMetricsAdapter.create(),
+            blockMetrics: LangyBlockMetricsOtelService.create(),
           });
 
           await service.ingestAgentTurnResult({

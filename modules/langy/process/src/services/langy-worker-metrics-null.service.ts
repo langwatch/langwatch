@@ -1,12 +1,12 @@
 import { LangyWorkerMetrics } from "../app/langy.members.ts";
 
-export class NullLangyWorkerMetricsAdapter extends LangyWorkerMetrics {
+export class LangyWorkerMetricsNullService extends LangyWorkerMetrics {
   private constructor() {
     super();
   }
 
-  static create(): NullLangyWorkerMetricsAdapter {
-    return new NullLangyWorkerMetricsAdapter();
+  static create(): LangyWorkerMetricsNullService {
+    return new LangyWorkerMetricsNullService();
   }
 
   recordDispatch(): void {

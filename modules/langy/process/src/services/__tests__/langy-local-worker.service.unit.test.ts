@@ -1,5 +1,6 @@
 /** @see specs/langy/langy-local-permissions.feature */
 import type { LangyConversationDetail, LangyKeyCaller } from "@langwatch/langy-contract";
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -24,7 +25,7 @@ function buildWorker(options: { own: boolean }) {
       startUserWait: async () => void recorded.push("user_wait_started"),
       endUserWait: async () => void recorded.push("user_wait_ended"),
     },
-    buffer: repositories.tokenBuffer.open({ redis: null }),
+    buffer: repositories.tokenBuffer.open({ redis: redisDouble() }),
   });
   const detail: LangyConversationDetail = {
     id: CONVERSATION_ID,

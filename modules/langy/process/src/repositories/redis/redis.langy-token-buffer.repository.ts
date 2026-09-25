@@ -15,8 +15,10 @@ import {
   LANGY_STREAMING,
 } from "../../rules/langy-streaming-constants.rules.ts";
 import {
+  type LangyStreamBlockingRedis,
   type LangyStreamRead,
   type LangyStreamRedis,
+  type LangyTokenBufferConnection,
   LangyTokenBuffer,
 } from "../langy-token-buffer.repository.ts";
 
@@ -43,6 +45,7 @@ function decodeFields(fields: string[]): LangyStreamEntry | null {
 
 export class LangyTokenBufferRedisRepository extends LangyTokenBuffer {
   private readonly redis: LangyStreamRedis;
+  private readonly blocking: LangyStreamBlockingRedis;
   /** Per-turn token accumulator, flushed on the hybrid size/time policy. */
   private readonly pending = new Map<string, string>();
   private readonly tokenCounts = new Map<string, number>();
@@ -60,20 +63,14 @@ export class LangyTokenBufferRedisRepository extends LangyTokenBuffer {
   private readonly pendingReasoning = new Map<string, string>();
   private readonly reasoningFlushTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-  private constructor(deps: { redis: LangyStreamRedis }) {
+  private constructor(deps: LangyTokenBufferConnection) {
     super();
     this.redis = deps.redis;
+    this.blocking = deps.blockingRedis ?? deps.redis;
   }
 
-  static create(deps: {
-    redis: unknown;
-    blockingRedis?: unknown;
-  }): LangyTokenBufferRedisRepository {
-    const redis = deps.redis as LangyStreamRedis;
-    if (deps.blockingRedis) {
-      redis.blocking = deps.blockingRedis as LangyStreamRedis["blocking"];
-    }
-    return new LangyTokenBufferRedisRepository({ redis });
+  static create(deps: LangyTokenBufferConnection): LangyTokenBufferRedisRepository {
+    return new LangyTokenBufferRedisRepository(deps);
   }
 
   private streamKey(conversationId: string, turnId: string): string {
@@ -581,16 +578,15 @@ export class LangyTokenBufferRedisRepository extends LangyTokenBuffer {
     signal?: AbortSignal;
   }): AsyncGenerator<LangyStreamRead, void, void> {
     const key = this.streamKey(conversationId, turnId);
-    const reader = this.redis.blocking ?? this.redis;
     let cursor = fromId;
     while (!signal?.aborted) {
-      const res = (await (
-        reader as {
-          xread(...args: (string | number)[]): Promise<[string, [string, string[]][]][]> | null;
-        }
-      ).xread("BLOCK", LANGY_STREAMING.FOLLOW_BLOCK_MS, "STREAMS", key, cursor)) as
-        | [string, [string, string[]][]][]
-        | null;
+      const res = await this.blocking.xread(
+        "BLOCK",
+        LANGY_STREAMING.FOLLOW_BLOCK_MS,
+        "STREAMS",
+        key,
+        cursor,
+      );
       if (!res) continue; // block timed out; loop re-checks the abort signal
       for (const [, rows] of res) {
         for (const [id, fields] of rows) {

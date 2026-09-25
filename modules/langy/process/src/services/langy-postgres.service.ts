@@ -27,7 +27,7 @@ import {
   RedisLangyTurnRelayRepository,
   type LangyRelayRedis,
 } from "../repositories/redis/redis.langy-turn-relay.repository.ts";
-import { NullLangyBlockMetricsAdapter } from "./langy-block-metrics-null.service.ts";
+import { LangyBlockMetricsNullService } from "./langy-block-metrics-null.service.ts";
 import { LangyConversationService } from "./langy-conversation.service.ts";
 import {
   LangyCredentialService,
@@ -110,7 +110,7 @@ export type LangyServiceCompositionOptions = {
   runtime?: LangyConversationRuntime;
   relay?: LangyRelayCompositionOptions;
   feedbackPromptRedis?: LangyFeedbackPromptRedis | null;
-  /** Block-salvage counter; absent composes NullLangyBlockMetricsAdapter (nothing published). */
+  /** Block-salvage counter; absent composes LangyBlockMetricsNullService (nothing published). */
   blockMetrics?: LangyBlockMetrics;
 };
 
@@ -198,7 +198,7 @@ export class PostgresLangyAdapter {
       messages: this.repositories.messages,
       events: options.events,
       finalParts: LangyFinalPartsService.create(
-        (options.blockMetrics ?? NullLangyBlockMetricsAdapter.create()).blockCounter(),
+        (options.blockMetrics ?? LangyBlockMetricsNullService.create()).blockCounter(),
       ),
       runtime: options.runtime,
     });

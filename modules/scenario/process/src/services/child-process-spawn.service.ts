@@ -19,9 +19,9 @@ export interface SpawnConfig {
  * Spawn command resolver: production uses bundle or tsx fallback, dev uses bundle if
  * current else tsx (edit child -> next spawn uses tsx, no rebuild needed).
  */
-export class ChildProcessSpawnAdapter {
-  static create(): ChildProcessSpawnAdapter {
-    return new ChildProcessSpawnAdapter();
+export class ChildProcessSpawnService {
+  static create(): ChildProcessSpawnService {
+    return new ChildProcessSpawnService();
   }
 
   private constructor() {}
@@ -53,10 +53,6 @@ export class ChildProcessSpawnAdapter {
     return resolveDevelopmentSpawn(sourcePath);
   }
 }
-
-export const resolveChildProcessSpawn = (
-  ...args: Parameters<typeof ChildProcessSpawnAdapter.resolve>
-): ReturnType<typeof ChildProcessSpawnAdapter.resolve> => ChildProcessSpawnAdapter.resolve(...args);
 
 function bundlePathFor(packageRoot: string): string {
   return path.join(packageRoot, "dist", "server", "scenario-child-process.mjs");

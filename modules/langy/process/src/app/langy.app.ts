@@ -56,10 +56,15 @@ import { PresenceApi, type PresenceTenantEmitter } from "@langwatch/presence-con
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { UserApi } from "@langwatch/user-contract";
+import type { Redis } from "ioredis";
 
 import { HttpLangyWorkerAdapter } from "../channels/http/http.langy-worker.channel.ts";
 import type { LangySessionKeyReapDeps } from "../eventing/langy-session-key-reap.intent.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
+import type {
+  LangyStreamBlockingRedis,
+  LangyStreamRedis,
+} from "../repositories/langy-token-buffer.repository.ts";
 import { PrismaLangySessionKeyReapRepository } from "../repositories/prisma/prisma.langy-session-key-reap.repository.ts";
 import {
   RedisLangyLocalControlRuntimeRepository,
@@ -76,13 +81,13 @@ import { LangyLocalWorkspaceService } from "../services/langy-local-workspace.se
 import { EventingLangyMaintenanceAdapter } from "../services/langy-maintenance.service.ts";
 import { PostgresLangyAdapter } from "../services/langy-postgres.service.ts";
 import { LangyRestCallerService } from "../services/langy-rest-caller.service.ts";
-import { OtelLangySessionKeyMetricsAdapter } from "../services/langy-session-key-metrics-otel.service.ts";
+import { LangySessionKeyMetricsOtelService } from "../services/langy-session-key-metrics-otel.service.ts";
 import { LangySessionKeyReapService } from "../services/langy-session-key-reap.service.ts";
 import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service.ts";
 import type { LangyChatMessageInput } from "../services/langy-turn-shared.service.ts";
 import { LangyTurnsBoundsService } from "../services/langy-turns-bounds.service.ts";
 import { LangyVirtualKeyProvisioningService } from "../services/langy-virtual-key-provisioning.service.ts";
-import { OtelLangyWorkerMetricsAdapter } from "../services/langy-worker-metrics-otel.service.ts";
+import { LangyWorkerMetricsOtelService } from "../services/langy-worker-metrics-otel.service.ts";
 import { UnavailableLangyWorkerAdapter } from "../services/langy-worker-unavailable.service.ts";
 import type { LangyService } from "../services/langy.service.ts";
 import { langyRestPrometheusMetrics } from "../services/prometheus.langy-rest-metrics.service.ts";
@@ -96,11 +101,9 @@ import type { LangyConversationCommands } from "./langy.members.ts";
  * just-started turn's actor is read from, and a dedicated connection for the
  * blocking tail. An ioredis standalone or cluster client satisfies it.
  */
-export type LangyRedis = Readonly<{
-  get(key: string): Promise<string | null>;
-  set(key: string, value: string, mode: "EX", ttl: number): Promise<unknown>;
-  duplicate(): { disconnect(): void };
-}>;
+export type LangyRedis = Readonly<
+  LangyStreamRedis & { duplicate(): LangyStreamBlockingRedis & Pick<Redis, "disconnect"> }
+>;
 
 /** What the process composes this feature's application from. */
 type LangyAppDependencies = {
@@ -204,7 +207,7 @@ export class LangyApp implements LangyApiContract {
   static async create(setup: LangySetup): Promise<LangyApp> {
     const { channel, door } = await setup.secrets.into(langySecrets.internal, (internalSecret) => {
       assertLangyServerConfig(setup.config, internalSecret);
-      const metrics = OtelLangyWorkerMetricsAdapter.create();
+      const metrics = LangyWorkerMetricsOtelService.create();
       const channel =
         setup.config.agentUrl && internalSecret
           ? HttpLangyWorkerAdapter.create({
@@ -240,7 +243,7 @@ export class LangyApp implements LangyApiContract {
     const sessionKeys = adapter.createSessionKeys({
       apiKeys: setup.dependencies.apiKeys,
       authz: setup.dependencies.authz,
-      metrics: OtelLangySessionKeyMetricsAdapter.create(),
+      metrics: LangySessionKeyMetricsOtelService.create(),
     });
     const callers = LangyRestCallerService.create({
       featureFlags: setup.dependencies.featureFlags,
@@ -301,7 +304,7 @@ export class LangyApp implements LangyApiContract {
       }),
       sessionKeyReap: LangySessionKeyReapService.create({
         repository: PrismaLangySessionKeyReapRepository.create(setup.members.prisma),
-        metrics: OtelLangySessionKeyMetricsAdapter.create(),
+        metrics: LangySessionKeyMetricsOtelService.create(),
       }),
       callers,
       localControl: { runtime, commands, workspace, baseHost: setup.members.publicBaseUrl },
@@ -494,13 +497,6 @@ export class LangyApp implements LangyApiContract {
 
   findEgressAllowlist(input: { projectId: string }): Promise<LangyEgressAllowlist | null> {
     return this.dependencies.langy.findEgressAllowlist(input);
-  }
-
-  trySetEgressAllowlist(input: {
-    projectId: string;
-    allowlist: LangyEgressAllowlist;
-  }): Promise<LangyEgressAllowlist | null> {
-    return this.dependencies.langy.trySetEgressAllowlist(input);
   }
 
   openRelayConnection(): LangyRelayConnection {
@@ -850,7 +846,9 @@ export class LangyApp implements LangyApiContract {
     projectId: string;
     allowlist: LangyEgressAllowlist;
   }): Promise<LangyEgressState> {
-    return toEgressState(await this.dependencies.langy.trySetEgressAllowlist(input));
+    const allowlist = await this.dependencies.langy.setEgressAllowlist(input);
+
+    return toEgressState(allowlist.length > 0 ? allowlist : null);
   }
 
   // -- the live edge ---------------------------------------------------------

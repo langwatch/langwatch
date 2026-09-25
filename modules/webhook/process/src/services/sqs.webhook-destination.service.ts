@@ -317,7 +317,7 @@ async function putOnQueue({
   }
 }
 
-export interface SqsWebhookDestinationAdapterOptions extends SqsDestinationConfig {
+export interface SqsWebhookDestinationServiceOptions extends SqsDestinationConfig {
   /** The process-owned SQS transport. */
   channel: SqsWebhookSender;
   /**
@@ -328,17 +328,17 @@ export interface SqsWebhookDestinationAdapterOptions extends SqsDestinationConfi
   rateLimiter?: WebhookDispatchRateLimiter | undefined;
 }
 
-export class SqsWebhookDestinationAdapter implements WebhookDestination {
+export class SqsWebhookDestinationService implements WebhookDestination {
   readonly kind = "sqs" as const;
 
-  private constructor(private readonly config: SqsWebhookDestinationAdapterOptions) {}
+  private constructor(private readonly config: SqsWebhookDestinationServiceOptions) {}
 
   static create({
     config,
   }: {
-    config: SqsWebhookDestinationAdapterOptions;
-  }): SqsWebhookDestinationAdapter {
-    return new SqsWebhookDestinationAdapter(config);
+    config: SqsWebhookDestinationServiceOptions;
+  }): SqsWebhookDestinationService {
+    return new SqsWebhookDestinationService(config);
   }
 
   /** How large one delivery is, body and attributes together. */

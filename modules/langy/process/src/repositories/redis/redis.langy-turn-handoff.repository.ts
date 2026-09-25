@@ -1,3 +1,5 @@
+import type { Redis } from "ioredis";
+
 import {
   LANGY_HANDOFF_TTL_SECONDS,
   type LangyTurnHandoff,
@@ -5,11 +7,7 @@ import {
   langyTurnHandoffSchema,
 } from "../langy-live-turn.repository.ts";
 
-export interface LangyHandoffRedis {
-  set(key: string, value: string, mode: "EX", ttl: number): Promise<unknown>;
-  get(key: string): Promise<string | null>;
-  expire(key: string, ttl: number): Promise<number>;
-}
+export type LangyHandoffRedis = Pick<Redis, "set" | "get" | "expire">;
 
 /** Redis-backed turn handoff, parked for `LANGY_HANDOFF_TTL_SECONDS`. */
 export class LangyTurnHandoffRedisRepository extends LangyTurnHandoffRepository {

@@ -5,6 +5,7 @@ import { instantiateRepositories } from "@langwatch/kernel";
  * against each backend the package can reach. The memory tier always runs;
  * Redis joins as a second row when this package declares that datastore.
  */
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
 import type { LangyTurnHandoff } from "../langy-live-turn.repository.ts";
@@ -154,7 +155,7 @@ describe.each(backends)("given the $name langy repositories", ({ create }) => {
   describe("when a status is put on the live edge", () => {
     it("replays it from the tail of the turn's stream", async () => {
       const repositories = create();
-      const buffer = repositories.tokenBuffer.open({ redis: undefined });
+      const buffer = repositories.tokenBuffer.open({ redis: redisDouble() });
 
       await buffer.appendStatus({ ...turn, status: "reading the trace" });
 
@@ -170,8 +171,8 @@ describe.each(backends)("given the $name langy repositories", ({ create }) => {
   describe("when the token buffer is opened twice for the same store", () => {
     it("both openings read back the same turn's entries", async () => {
       const repositories = create();
-      const first = repositories.tokenBuffer.open({ redis: undefined });
-      const second = repositories.tokenBuffer.open({ redis: undefined });
+      const first = repositories.tokenBuffer.open({ redis: redisDouble() });
+      const second = repositories.tokenBuffer.open({ redis: redisDouble() });
 
       await first.appendStatus({ ...turn, status: "reading the trace" });
 

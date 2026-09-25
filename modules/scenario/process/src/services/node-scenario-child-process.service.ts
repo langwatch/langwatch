@@ -24,7 +24,7 @@ import {
 } from "../rules/child-egress-policy.rules.ts";
 import { resolveChildTlsEnv } from "../rules/child-tls-env.rules.ts";
 import { encodeScenarioLogContext, SCENARIO_LOG_CONTEXT_ENV } from "./child-logger.service.ts";
-import { resolveChildProcessSpawn } from "./child-process-spawn.service.ts";
+import { ChildProcessSpawnService } from "./child-process-spawn.service.ts";
 import type {
   ExecutionJobData,
   ScenarioExecutionPoolService,
@@ -122,7 +122,7 @@ export class NodeScenarioChildProcessAdapter implements ScenarioChildBootstrap {
       labels: input.environment.labels,
       telemetry: input.environment.telemetry,
     });
-    const spawnConfig = resolveChildProcessSpawn({
+    const spawnConfig = ChildProcessSpawnService.resolve({
       packageRoot: this.options.config.packageRoot,
       nodeEnv: this.options.config.nodeEnv,
       sourcePath: this.options.config.sourcePath,
