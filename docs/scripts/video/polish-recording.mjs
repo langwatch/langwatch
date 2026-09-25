@@ -500,25 +500,20 @@ function drawRipple(dst, dw, dh, px, py, radius, fillA, strokeA, strokeW, color)
 
 // -------------------------------------------------------------------- tracks
 
-/**
- * Turns the beats into camera keyframes. Each zoomed beat contributes four:
- * leave 1x, reach the target zoom, hold, return to 1x. When two beats overlap
- * before the first returns, both 1x keyframes drop and the camera pans straight between them.
- */
-function buildCameraTrack(beats, cfg, duration, midX, midY) {
-  const groups = [];
-  for (const b of beats) {
-    if (b.x == null || b.y == null) continue;
-    const z = b.zoom == null ? cfg.default : b.zoom;
-    if (!(z > 1.0001)) continue;
-    const lead = b.lead == null ? cfg.lead : b.lead;
-    // Every zoom travels at the same rate: the ease lasts as long as the zoom
-    // is deep. A 1.4x and a 1.9x on the same video then read as one camera.
-    const rate = Math.log(z) / Math.log(Math.max(1.0001, cfg.default));
-    const rampIn = (b.in == null ? cfg.in : b.in) * rate;
-    const peak = b.t - lead;
-    const holdEnd = b.t + (b.hold == null ? cfg.hold : b.hold);
-    groups.push({
+/** The four-keyframe zoom one beat asks for, or none when it does not zoom. */
+function zoomGroupsFor(b, cfg) {
+  if (b.x == null || b.y == null) return [];
+  const z = b.zoom == null ? cfg.default : b.zoom;
+  if (!(z > 1.0001)) return [];
+  const lead = b.lead == null ? cfg.lead : b.lead;
+  // Every zoom travels at the same rate: the ease lasts as long as the zoom
+  // is deep. A 1.4x and a 1.9x on the same video then read as one camera.
+  const rate = Math.log(z) / Math.log(Math.max(1.0001, cfg.default));
+  const rampIn = (b.in == null ? cfg.in : b.in) * rate;
+  const peak = b.t - lead;
+  const holdEnd = b.t + (b.hold == null ? cfg.hold : b.hold);
+  return [
+    {
       rampIn: peak - rampIn,
       peak,
       holdEnd,
@@ -526,9 +521,12 @@ function buildCameraTrack(beats, cfg, duration, midX, midY) {
       z,
       cx: b.zoomAt ? b.zoomAt.x : b.x,
       cy: b.zoomAt ? b.zoomAt.y : b.y,
-    });
-  }
+    },
+  ];
+}
 
+/** When two zooms overlap before the first returns, both 1x keyframes drop. */
+function zoomKeyframes(groups, midX, midY) {
   const kf = [];
   for (let i = 0; i < groups.length; i++) {
     const g = groups[i];
@@ -536,15 +534,24 @@ function buildCameraTrack(beats, cfg, duration, midX, midY) {
     const next = groups[i + 1];
     const joinBefore = prev && prev.rampOut > g.rampIn;
     const joinAfter = next && g.rampOut > next.rampIn;
+    const holdEnd = joinAfter ? Math.min(g.holdEnd, next.peak - 0.08) : g.holdEnd;
 
     if (!joinBefore) kf.push({ t: g.rampIn, z: 1, cx: midX, cy: midY });
     kf.push({ t: g.peak, z: g.z, cx: g.cx, cy: g.cy });
-    let holdEnd = g.holdEnd;
-    if (joinAfter) holdEnd = Math.min(holdEnd, next.peak - 0.08);
     kf.push({ t: Math.max(holdEnd, g.peak + 0.02), z: g.z, cx: g.cx, cy: g.cy });
     if (!joinAfter) kf.push({ t: g.rampOut, z: 1, cx: midX, cy: midY });
   }
+  return kf;
+}
 
+/**
+ * Turns the beats into camera keyframes. Each zoomed beat contributes four:
+ * leave 1x, reach the target zoom, hold, return to 1x. When two beats overlap
+ * before the first returns, both 1x keyframes drop and the camera pans straight between them.
+ */
+function buildCameraTrack(beats, cfg, duration, midX, midY) {
+  const groups = beats.flatMap((b) => zoomGroupsFor(b, cfg));
+  const kf = zoomKeyframes(groups, midX, midY);
   if (kf.length === 0) return () => ({ z: 1, cx: midX, cy: midY });
 
   kf.sort((a, b) => a.t - b.t);
@@ -572,143 +579,198 @@ function buildCameraTrack(beats, cfg, duration, midX, midY) {
   };
 }
 
-/**
- * Turns the beats into the cursor's path, its arrow-or-hand state, the click
- * dip, the click ripples and its visibility.
- */
 /** Seconds the source is held before this beat's click, 0 for most beats. */
 const pauseBefore = (b) => (typeof b.pause === "number" ? b.pause : (b.pause?.before ?? 0));
 
-function buildCursorTrack(beats, cfg) {
+/**
+ * One cursor move to a beat. Travel time comes from the distance, so the
+ * cursor keeps one speed. A beat with a `pause` has the cursor on target for
+ * the whole pause; every other beat arrives `settle` early and no earlier.
+ */
+function cursorMoveTo({ b, at, freeFrom, cfg }) {
+  const dist = Math.hypot(b.x - at.x, b.y - at.y);
+  const travel =
+    b.travel != null ? b.travel : clamp(dist / cfg.speed, cfg.minTravel, cfg.maxTravel);
+  const latest = b.t - cfg.settle;
+  const wanted = latest - pauseBefore(b);
+  const arrive = clamp(wanted, Math.min(freeFrom + travel, latest), latest);
+  const depart = Math.min(Math.max(arrive - travel, freeFrom), arrive);
+  // The hand only appears where there is something to click.
+  const handAfter = b.click !== false;
+  const arc = b.arc == null ? cfg.arc : b.arc;
+  return { depart, arrive, from: at, to: { x: b.x, y: b.y }, handAfter, arc };
+}
+
+/** The cursor's moves, clicks and visibility keys, in beat order. */
+function planCursor(beats, cfg) {
   const moves = [];
   const clicks = [];
   const vis = [{ t: -1, a: cfg.start.hidden ? 0 : 1 }];
-
   let at = { x: cfg.start.x, y: cfg.start.y };
   let freeFrom = 0;
 
   for (const b of beats) {
-    if (b.hide) {
-      vis.push({ t: b.t, a: 0 });
-      continue;
-    }
-    if (b.show) {
-      vis.push({ t: b.t, a: 1 });
+    if (b.hide || b.show) {
+      vis.push({ t: b.t, a: b.hide ? 0 : 1 });
       continue;
     }
     if (b.x == null || b.y == null || b.cursor === false) continue;
-
-    // Travel time comes from the distance, so the cursor keeps one speed
-    // across the whole video instead of racing over a long move.
-    const dist = Math.hypot(b.x - at.x, b.y - at.y);
-    const travel =
-      b.travel != null ? b.travel : clamp(dist / cfg.speed, cfg.minTravel, cfg.maxTravel);
-    // A beat that asks for a `pause` before its click is asking the viewer to
-    // look at the target, so the cursor has to be on it for the whole pause.
-    // Every other beat arrives `settle` early and no earlier: waiting on a
-    // target nobody was told to look at just reads as lag.
-    const latest = b.t - cfg.settle;
-    const wanted = latest - pauseBefore(b);
-    const arrive = clamp(wanted, Math.min(freeFrom + travel, latest), latest);
-    let depart = arrive - travel;
-    if (depart < freeFrom) depart = freeFrom;
-    if (depart > arrive) depart = arrive;
-    // The hand only appears where there is something to click.
-    const handAfter = b.click !== false;
-    const arc = b.arc == null ? cfg.arc : b.arc;
-    moves.push({ depart, arrive, from: at, to: { x: b.x, y: b.y }, handAfter, arc });
-    if (handAfter) clicks.push({ t: b.t, x: b.x, y: b.y });
-    at = { x: b.x, y: b.y };
+    const move = cursorMoveTo({ b, at, freeFrom, cfg });
+    moves.push(move);
+    if (move.handAfter) clicks.push({ t: b.t, x: b.x, y: b.y });
+    at = move.to;
     // The hand stays down for the whole press. Leaving earlier turns it back
     // into an arrow while the ripple is still expanding under it.
-    freeFrom = b.t + (handAfter ? cfg.press.duration : 0);
+    freeFrom = b.t + (move.handAfter ? cfg.press.duration : 0);
   }
-
-  const posAt = (t) => {
-    for (let i = 0; i < moves.length; i++) {
-      const m = moves[i];
-      if (t < m.depart) {
-        const prev = moves[i - 1];
-        return { p: m.from, hand: prev ? prev.handAfter : false };
-      }
-      if (t <= m.arrive) {
-        const span = m.arrive - m.depart;
-        const u = span <= 0 ? 1 : easeInOutCubic((t - m.depart) / span);
-        const dx = m.to.x - m.from.x;
-        const dy = m.to.y - m.from.y;
-        const len = Math.hypot(dx, dy) || 1;
-        // A slight perpendicular bow keeps the path from looking mechanical.
-        // A beat sets `arc: 0` when it wants a ruled line, such as a sweep
-        // along a line of text.
-        const bow = m.arc * len;
-        const mx = (m.from.x + m.to.x) / 2 - (dy / len) * bow;
-        const my = (m.from.y + m.to.y) / 2 + (dx / len) * bow;
-        const iu = 1 - u;
-        return {
-          p: {
-            x: iu * iu * m.from.x + 2 * iu * u * mx + u * u * m.to.x,
-            y: iu * iu * m.from.y + 2 * iu * u * my + u * u * m.to.y,
-          },
-          hand: false,
-        };
-      }
-    }
-    const lastMove = moves[moves.length - 1];
-    return {
-      p: lastMove ? lastMove.to : cfg.start,
-      hand: lastMove ? lastMove.handAfter : false,
-    };
-  };
-
   vis.sort((a, b) => a.t - b.t);
-  const alphaAt = (t) => {
-    let a = vis[0].a;
-    for (let i = 1; i < vis.length; i++) {
-      const k = vis[i];
-      if (t >= k.t) {
-        a = k.a;
-        continue;
-      }
-      const from = vis[i - 1].a;
-      const u = clamp((t - (k.t - cfg.fade)) / cfg.fade, 0, 1);
-      return lerp(from, k.a, easeInOutCubic(u));
-    }
-    return a;
-  };
+  return { moves, clicks, vis };
+}
 
-  const scaleAt = (t) => {
-    for (const c of clicks) {
-      if (t >= c.t && t <= c.t + cfg.press.duration) {
-        const u = (t - c.t) / cfg.press.duration;
-        // Dip in fast, come back gently.
-        return 1 - (1 - cfg.press.scale) * Math.sin(Math.PI * easeOutCubic(u));
-      }
-    }
-    return 1;
+/**
+ * A point along a move. A slight perpendicular bow keeps the path from looking
+ * mechanical; a beat sets `arc: 0` when it wants a ruled line.
+ */
+function pointAlong(m, t) {
+  const span = m.arrive - m.depart;
+  const u = span <= 0 ? 1 : easeInOutCubic((t - m.depart) / span);
+  const dx = m.to.x - m.from.x;
+  const dy = m.to.y - m.from.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const bow = m.arc * len;
+  const mx = (m.from.x + m.to.x) / 2 - (dy / len) * bow;
+  const my = (m.from.y + m.to.y) / 2 + (dx / len) * bow;
+  const iu = 1 - u;
+  return {
+    x: iu * iu * m.from.x + 2 * iu * u * mx + u * u * m.to.x,
+    y: iu * iu * m.from.y + 2 * iu * u * my + u * u * m.to.y,
   };
+}
 
+function cursorPositionAt({ moves, start, t }) {
+  for (let i = 0; i < moves.length; i++) {
+    const m = moves[i];
+    if (t < m.depart) {
+      const prev = moves[i - 1];
+      return { p: m.from, hand: prev ? prev.handAfter : false };
+    }
+    if (t <= m.arrive) return { p: pointAlong(m, t), hand: false };
+  }
+  const lastMove = moves[moves.length - 1];
+  return { p: lastMove ? lastMove.to : start, hand: lastMove ? lastMove.handAfter : false };
+}
+
+function cursorAlphaAt({ vis, fade, t }) {
+  let a = vis[0].a;
+  for (let i = 1; i < vis.length; i++) {
+    const k = vis[i];
+    if (t >= k.t) {
+      a = k.a;
+      continue;
+    }
+    const u = clamp((t - (k.t - fade)) / fade, 0, 1);
+    return lerp(vis[i - 1].a, k.a, easeInOutCubic(u));
+  }
+  return a;
+}
+
+/** The click dip: in fast, back gently. */
+function pressScaleAt({ clicks, press, t }) {
+  const c = clicks.find((click) => t >= click.t && t <= click.t + press.duration);
+  if (!c) return 1;
+  const u = (t - c.t) / press.duration;
+  return 1 - (1 - press.scale) * Math.sin(Math.PI * easeOutCubic(u));
+}
+
+function ripplesAt({ clicks, t, cfg2 }) {
+  const out = [];
+  for (const c of clicks) {
+    const u = (t - c.t) / cfg2.duration;
+    if (u < 0 || u > 1) continue;
+    const e = easeOutCubic(u);
+    out.push({
+      x: c.x,
+      y: c.y,
+      radius: lerp(cfg2.radius[0], cfg2.radius[1], e),
+      fill: cfg2.fill * (1 - u),
+      stroke: cfg2.stroke * (1 - u),
+    });
+  }
+  return out;
+}
+
+/**
+ * Turns the beats into the cursor's path, its arrow-or-hand state, the click
+ * dip, the click ripples and its visibility.
+ */
+function buildCursorTrack(beats, cfg) {
+  const { moves, clicks, vis } = planCursor(beats, cfg);
   return {
     at: (t) => {
-      const { p, hand } = posAt(t);
-      return { x: p.x, y: p.y, hand, scale: scaleAt(t), alpha: alphaAt(t) };
+      const { p, hand } = cursorPositionAt({ moves, start: cfg.start, t });
+      const scale = pressScaleAt({ clicks, press: cfg.press, t });
+      return { x: p.x, y: p.y, hand, scale, alpha: cursorAlphaAt({ vis, fade: cfg.fade, t }) };
     },
-    ripples: (t, cfg2) => {
-      const out = [];
-      for (const c of clicks) {
-        const u = (t - c.t) / cfg2.duration;
-        if (u < 0 || u > 1) continue;
-        const e = easeOutCubic(u);
-        out.push({
-          x: c.x,
-          y: c.y,
-          radius: lerp(cfg2.radius[0], cfg2.radius[1], e),
-          fill: cfg2.fill * (1 - u),
-          stroke: cfg2.stroke * (1 - u),
-        });
-      }
-      return out;
-    },
+    ripples: (t, cfg2) => ripplesAt({ clicks, t, cfg2 }),
   };
+}
+
+const pauseOf = (b) => ({
+  before: pauseBefore(b),
+  after: typeof b.pause === "number" ? 0 : (b.pause?.after ?? 0),
+});
+
+/** Adds a freeze at source time `c`; negative is a skip, so the guard is on magnitude. */
+function insertFreeze(freezes, c, d) {
+  if (!(Math.abs(d) > 0.005)) return;
+  const hit = freezes.find((f) => Math.abs(f.c - c) < 1e-6);
+  if (hit) {
+    hit.d += d;
+    return;
+  }
+  freezes.push({ c, d });
+  freezes.sort((a, b) => a.c - b.c);
+}
+
+function outputTimeOf(freezes, c) {
+  let acc = 0;
+  for (const f of freezes) {
+    if (!(f.c < c - 1e-9)) break;
+    acc += f.d;
+  }
+  return c + acc;
+}
+
+function sourceTimeOf(freezes, o) {
+  let acc = 0;
+  for (const f of freezes) {
+    const start = f.c + acc;
+    if (o < start) return o - acc;
+    if (f.d > 0 && o < start + f.d) return f.c;
+    acc += f.d;
+  }
+  return o - acc;
+}
+
+/**
+ * The click lands at the end of its own `before` freeze, so the frame the
+ * viewer waits on is the one before anything happened.
+ */
+const beatOutputTime = (freezes, b) =>
+  outputTimeOf(freezes, b.t) + (b.x == null ? 0 : pauseOf(b).before);
+
+/** Freezes the source wherever the cursor would have to move faster than `pace.speed`. */
+function autoPace({ beats, pace, cursorCfg, freezes }) {
+  const path = beats.filter((b) => b.x != null && b.cursor !== false);
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1];
+    const b = path[i];
+    const press = a.click === false ? 0 : cursorCfg.press.duration;
+    const travel = Math.hypot(b.x - a.x, b.y - a.y) / pace.speed;
+    const need = travel + cursorCfg.settle + pauseBefore(b) + press + pace.dwell;
+    const short = need - (beatOutputTime(freezes, b) - beatOutputTime(freezes, a));
+    if (short > 0.005) insertFreeze(freezes, Math.min(a.t + pace.afterDelay, b.t - 0.05), short);
+  }
 }
 
 /**
@@ -718,71 +780,25 @@ function buildCursorTrack(beats, cfg) {
  */
 function buildPacing(beats, pace, cursorCfg) {
   const freezes = [];
-  const insert = (c, d) => {
-    // Negative is a skip, so the guard is on the magnitude, not the sign.
-    if (!(Math.abs(d) > 0.005)) return;
-    const hit = freezes.find((f) => Math.abs(f.c - c) < 1e-6);
-    if (hit) {
-      hit.d += d;
-      return;
-    }
-    freezes.push({ c, d });
-    freezes.sort((a, b) => a.c - b.c);
-  };
-  const outOf = (c) => {
-    let acc = 0;
-    for (const f of freezes) {
-      if (f.c < c - 1e-9) acc += f.d;
-      else break;
-    }
-    return c + acc;
-  };
-  const pauseOf = (b) => ({
-    before: pauseBefore(b),
-    after: typeof b.pause === "number" ? 0 : (b.pause?.after ?? 0),
-  });
-  // The click lands at the end of its own `before` freeze, so the frame the
-  // viewer waits on is the one before anything happened.
-  const timeOf = (b) => outOf(b.t) + (b.x == null ? 0 : pauseOf(b).before);
-
   for (const b of beats) {
     if (b.x == null) continue;
     const { before, after } = pauseOf(b);
     // A skip is a freeze of negative length: the source jumps forward instead
     // of standing still, and every clock below already handles the sign.
-    if (b.skip > 0) insert(b.t - b.skip, -b.skip);
-    insert(b.t, before);
-    insert(b.t + pace.afterDelay, after);
+    if (b.skip > 0) insertFreeze(freezes, b.t - b.skip, -b.skip);
+    insertFreeze(freezes, b.t, before);
+    insertFreeze(freezes, b.t + pace.afterDelay, after);
   }
-
-  if (pace.auto) {
-    const path = beats.filter((b) => b.x != null && b.cursor !== false);
-    for (let i = 1; i < path.length; i++) {
-      const a = path[i - 1];
-      const b = path[i];
-      const need =
-        Math.hypot(b.x - a.x, b.y - a.y) / pace.speed +
-        cursorCfg.settle +
-        pauseBefore(b) +
-        (a.click === false ? 0 : cursorCfg.press.duration) +
-        pace.dwell;
-      const short = need - (timeOf(b) - timeOf(a));
-      if (short > 0.005) insert(Math.min(a.t + pace.afterDelay, b.t - 0.05), short);
-    }
-  }
+  if (pace.auto) autoPace({ beats, pace, cursorCfg, freezes });
 
   const total = freezes.reduce((sum, f) => sum + f.d, 0);
-  const srcOf = (o) => {
-    let acc = 0;
-    for (const f of freezes) {
-      const start = f.c + acc;
-      if (o < start) return o - acc;
-      if (f.d > 0 && o < start + f.d) return f.c;
-      acc += f.d;
-    }
-    return o - acc;
+  return {
+    total,
+    freezes,
+    outOf: (c) => outputTimeOf(freezes, c),
+    srcOf: (o) => sourceTimeOf(freezes, o),
+    timeOf: (b) => beatOutputTime(freezes, b),
   };
-  return { total, freezes, outOf, srcOf, timeOf };
 }
 
 // ------------------------------------------------------------------ raw frames

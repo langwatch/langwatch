@@ -156,8 +156,7 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}": UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement":
     UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
-  "/api/v1/projects/{projectId}/analytics/dashboard-widgets":
-    UNDOCUMENTED_DASHBOARD_WIDGETS,
+  "/api/v1/projects/{projectId}/analytics/dashboard-widgets": UNDOCUMENTED_DASHBOARD_WIDGETS,
   "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}":
     UNDOCUMENTED_DASHBOARD_WIDGETS,
   "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard":
@@ -714,20 +713,16 @@ function sortScore(method: string, apiPath: string): number {
   return 6;
 }
 
-function main() {
-  const spec: OpenAPISpec = JSON.parse(fs.readFileSync(SPEC_PATH, "utf-8"));
-  const docsJson = JSON.parse(fs.readFileSync(DOCS_JSON_PATH, "utf-8"));
+type NavPage = string | { group: string; pages: string[] };
+type Tally = { created: number; existing: number };
+type GroupEndpoint = { method: string; path: string; op: OpenAPIOperation };
 
-  type NavPage = string | { group: string; pages: string[] };
-  const allNavGroups: { group: string; pages: NavPage[] }[] = [];
-  let totalCreated = 0;
-  let totalExisting = 0;
-
-  const owners = resolveOwners(Object.keys(spec.paths));
-
-  // A hand-written page is named as a string, so a rename or a typo would drop
-  // it out of the sidebar silently: the same failure this generator exists to
-  // prevent. Check every one of them against the filesystem up front.
+/**
+ * A hand-written page is named as a string, so a rename or a typo would drop it
+ * out of the sidebar silently: the same failure this generator exists to
+ * prevent. Check every one of them against the filesystem up front.
+ */
+function checkDeclaredExtras(): void {
   const declaredExtras = [
     ...INTRO_GROUP.pages,
     ...ENDPOINT_GROUPS.flatMap((group) => group.extraPages ?? []),
@@ -746,7 +741,15 @@ function main() {
     );
     process.exit(1);
   }
+}
 
+function checkEveryPathOwned({
+  spec,
+  owners,
+}: {
+  spec: OpenAPISpec;
+  owners: ReturnType<typeof resolveOwners>;
+}): void {
   const unowned = Object.keys(spec.paths).filter(
     (apiPath) => !isSkipped(apiPath) && !owners.has(apiPath),
   );
@@ -767,12 +770,21 @@ function main() {
     );
     process.exit(1);
   }
+}
 
-  // An `endpointOrder` key only sorts the group that declares it — a key
-  // naming an operation another group owns silently falls back to the
-  // default sort, with no diagnostic. A drifted param name, a casing slip,
-  // or a sibling group's path key all reshuffle the sidebar silently. The
-  // two failures get separate reports since their remedies differ.
+type OperationIndex = {
+  specOperations: Set<string>;
+  operationOwner: Map<string, EndpointGroup>;
+  groupOperations: Map<EndpointGroup, Set<string>>;
+};
+
+function indexSpecOperations({
+  spec,
+  owners,
+}: {
+  spec: OpenAPISpec;
+  owners: ReturnType<typeof resolveOwners>;
+}): OperationIndex {
   const specOperations = new Set<string>();
   const operationOwner = new Map<string, EndpointGroup>();
   const groupOperations = new Map<EndpointGroup, Set<string>>(
@@ -790,7 +802,14 @@ function main() {
       }
     }
   }
+  return { specOperations, operationOwner, groupOperations };
+}
 
+/** Sorts every endpointOrder key the declaring group does not own by why it sorts nothing. */
+function strayOrderKeys({ specOperations, operationOwner, groupOperations }: OperationIndex): {
+  unknownOrder: string[];
+  misownedOrder: string[];
+} {
   const unknownOrder: string[] = [];
   const misownedOrder: string[] = [];
   for (const group of ENDPOINT_GROUPS) {
@@ -806,7 +825,22 @@ function main() {
       );
     }
   }
+  return { unknownOrder, misownedOrder };
+}
 
+function checkEndpointOrder({
+  spec,
+  owners,
+}: {
+  spec: OpenAPISpec;
+  owners: ReturnType<typeof resolveOwners>;
+}): void {
+  // An `endpointOrder` key only sorts the group that declares it — a key
+  // naming an operation another group owns silently falls back to the
+  // default sort, with no diagnostic. A drifted param name, a casing slip,
+  // or a sibling group's path key all reshuffle the sidebar silently. The
+  // two failures get separate reports since their remedies differ.
+  const { unknownOrder, misownedOrder } = strayOrderKeys(indexSpecOperations({ spec, owners }));
   if (unknownOrder.length > 0) {
     const noun = unknownOrder.length === 1 ? "key matches" : "keys match";
     console.error(`ERROR: ${unknownOrder.length} endpointOrder ${noun} no operation in the spec:`);
@@ -828,102 +862,177 @@ function main() {
   if (unknownOrder.length > 0 || misownedOrder.length > 0) {
     process.exit(1);
   }
+}
+
+function sortGroupEndpoints({
+  group,
+  endpoints,
+}: {
+  group: EndpointGroup;
+  endpoints: GroupEndpoint[];
+}): void {
+  // A declared order wins; everything it does not name keeps the CRUD sort
+  // and follows behind, so adding a route never silently reshuffles the rest.
+  const declaredOrder = group.endpointOrder ?? [];
+  const declaredIndex = ({ method, apiPath }: { method: string; apiPath: string }): number => {
+    const at = declaredOrder.indexOf(`${method.toUpperCase()} ${apiPath}`);
+    return at === -1 ? Number.MAX_SAFE_INTEGER : at;
+  };
+
+  endpoints.sort((a, b) => {
+    const aDeclared = declaredIndex({ method: a.method, apiPath: a.path });
+    const bDeclared = declaredIndex({ method: b.method, apiPath: b.path });
+    if (aDeclared !== bDeclared) return aDeclared - bDeclared;
+    const aScore = sortScore(a.method, a.path);
+    const bScore = sortScore(b.method, b.path);
+    if (aScore !== bScore) return aScore - bScore;
+    return a.path.localeCompare(b.path);
+  });
+}
+
+function collectGroupEndpoints({
+  group,
+  spec,
+  owners,
+}: {
+  group: EndpointGroup;
+  spec: OpenAPISpec;
+  owners: ReturnType<typeof resolveOwners>;
+}): GroupEndpoint[] {
+  const endpoints: {
+    method: string;
+    path: string;
+    op: OpenAPIOperation;
+  }[] = [];
+
+  for (const [apiPath, methods] of Object.entries(spec.paths)) {
+    if (owners.get(apiPath) !== group) continue;
+
+    for (const [method, op] of Object.entries(methods)) {
+      if (!METHOD_ORDER.includes(method)) continue;
+      endpoints.push({ method, path: apiPath, op });
+    }
+  }
+  return endpoints;
+}
+
+function writeOverviewPage({
+  group,
+  dirPath,
+  tally,
+}: {
+  group: EndpointGroup;
+  dirPath: string;
+  tally: Tally;
+}): void {
+  // Write overview page
+  const overviewPath = path.join(dirPath, "overview.mdx");
+  if (!fs.existsSync(overviewPath)) {
+    fs.writeFileSync(
+      overviewPath,
+      `---\ntitle: "Overview"\ndescription: "${group.overviewDescription}"\n---\n\n## Intro\n\n${group.overviewDescription}\n`,
+    );
+    tally.created++;
+  } else {
+    tally.existing++;
+  }
+}
+
+/** The page name for one endpoint, reusing an MDX file that already points at it. */
+function endpointPage({
+  ep,
+  dirPath,
+  existingMdx,
+  usedNames,
+  tally,
+}: {
+  ep: GroupEndpoint;
+  dirPath: string;
+  existingMdx: ReturnType<typeof findExistingMdxFiles>;
+  usedNames: Set<string>;
+  tally: Tally;
+}): string {
+  const openapiRef = `${ep.method.toUpperCase()} ${ep.path}`;
+
+  // Reuse existing MDX file if one already points to this endpoint
+  const existingName = existingMdx.get(openapiRef);
+  if (existingName && !usedNames.has(existingName)) {
+    usedNames.add(existingName);
+    tally.existing++;
+    return existingName;
+  }
+
+  let fileName = generateFileName(ep.method, ep.path, ep.op);
+  if (usedNames.has(fileName)) {
+    fileName = `${ep.method}-${fileName}`;
+  }
+  if (usedNames.has(fileName)) {
+    const suffix = ep.path.split("/").pop()?.replace(/[{}]/g, "") ?? "ep";
+    fileName = `${fileName}-${suffix}`;
+  }
+  usedNames.add(fileName);
+
+  const title = generateTitle(ep.method, ep.path, ep.op);
+  const mdxPath = path.join(dirPath, `${fileName}.mdx`);
+
+  if (!fs.existsSync(mdxPath)) {
+    fs.writeFileSync(mdxPath, `---\ntitle: "${title}"\nopenapi: "${openapiRef}"\n---\n`);
+    tally.created++;
+  } else {
+    tally.existing++;
+  }
+
+  return fileName;
+}
+
+/** Writes one group's pages; answers its nav pages, or none when it owns no endpoint. */
+function writeGroupPages({
+  group,
+  spec,
+  owners,
+  tally,
+}: {
+  group: EndpointGroup;
+  spec: OpenAPISpec;
+  owners: ReturnType<typeof resolveOwners>;
+  tally: Tally;
+}): string[] {
+  const dirPath = path.join(API_REF_DIR, group.dirName);
+  fs.mkdirSync(dirPath, { recursive: true });
+  const existingMdx = findExistingMdxFiles(dirPath);
+  const endpoints = collectGroupEndpoints({ group, spec, owners });
+  if (endpoints.length === 0) return [];
+  sortGroupEndpoints({ group, endpoints });
+  writeOverviewPage({ group, dirPath, tally });
+
+  const pages: string[] = [`api-reference/${group.dirName}/overview`];
+  const usedNames = new Set<string>(["overview"]);
+  for (const ep of endpoints) {
+    const name = endpointPage({ ep, dirPath, existingMdx, usedNames, tally });
+    pages.push(`api-reference/${group.dirName}/${name}`);
+  }
+  pages.push(...(group.extraPages ?? []));
+  return pages;
+}
+
+function main() {
+  const spec: OpenAPISpec = JSON.parse(fs.readFileSync(SPEC_PATH, "utf-8"));
+  const docsJson = JSON.parse(fs.readFileSync(DOCS_JSON_PATH, "utf-8"));
+
+  const allNavGroups: { group: string; pages: NavPage[] }[] = [];
+  const tally: Tally = { created: 0, existing: 0 };
+
+  const owners = resolveOwners(Object.keys(spec.paths));
+
+  checkDeclaredExtras();
+  checkEveryPathOwned({ spec, owners });
+  checkEndpointOrder({ spec, owners });
 
   allNavGroups.push(INTRO_GROUP);
 
   for (const group of ENDPOINT_GROUPS) {
-    const dirPath = path.join(API_REF_DIR, group.dirName);
-    fs.mkdirSync(dirPath, { recursive: true });
-
-    const existingMdx = findExistingMdxFiles(dirPath);
-
-    const endpoints: {
-      method: string;
-      path: string;
-      op: OpenAPIOperation;
-    }[] = [];
-
-    for (const [apiPath, methods] of Object.entries(spec.paths)) {
-      if (owners.get(apiPath) !== group) continue;
-
-      for (const [method, op] of Object.entries(methods)) {
-        if (!METHOD_ORDER.includes(method)) continue;
-        endpoints.push({ method, path: apiPath, op });
-      }
-    }
-
-    if (endpoints.length === 0) continue;
-
-    // A declared order wins; everything it does not name keeps the CRUD sort
-    // and follows behind, so adding a route never silently reshuffles the rest.
-    const declaredOrder = group.endpointOrder ?? [];
-    const declaredIndex = ({ method, apiPath }: { method: string; apiPath: string }): number => {
-      const at = declaredOrder.indexOf(`${method.toUpperCase()} ${apiPath}`);
-      return at === -1 ? Number.MAX_SAFE_INTEGER : at;
-    };
-
-    endpoints.sort((a, b) => {
-      const aDeclared = declaredIndex({ method: a.method, apiPath: a.path });
-      const bDeclared = declaredIndex({ method: b.method, apiPath: b.path });
-      if (aDeclared !== bDeclared) return aDeclared - bDeclared;
-      const aScore = sortScore(a.method, a.path);
-      const bScore = sortScore(b.method, b.path);
-      if (aScore !== bScore) return aScore - bScore;
-      return a.path.localeCompare(b.path);
-    });
-
-    // Write overview page
-    const overviewPath = path.join(dirPath, "overview.mdx");
-    if (!fs.existsSync(overviewPath)) {
-      fs.writeFileSync(
-        overviewPath,
-        `---\ntitle: "Overview"\ndescription: "${group.overviewDescription}"\n---\n\n## Intro\n\n${group.overviewDescription}\n`,
-      );
-      totalCreated++;
-    } else {
-      totalExisting++;
-    }
-
-    const pages: string[] = [`api-reference/${group.dirName}/overview`];
-    const usedNames = new Set<string>(["overview"]);
-
-    for (const ep of endpoints) {
-      const openapiRef = `${ep.method.toUpperCase()} ${ep.path}`;
-
-      // Reuse existing MDX file if one already points to this endpoint
-      const existingName = existingMdx.get(openapiRef);
-      if (existingName && !usedNames.has(existingName)) {
-        pages.push(`api-reference/${group.dirName}/${existingName}`);
-        usedNames.add(existingName);
-        totalExisting++;
-        continue;
-      }
-
-      let fileName = generateFileName(ep.method, ep.path, ep.op);
-      if (usedNames.has(fileName)) {
-        fileName = `${ep.method}-${fileName}`;
-      }
-      if (usedNames.has(fileName)) {
-        const suffix = ep.path.split("/").pop()?.replace(/[{}]/g, "") ?? "ep";
-        fileName = `${fileName}-${suffix}`;
-      }
-      usedNames.add(fileName);
-
-      const title = generateTitle(ep.method, ep.path, ep.op);
-      const mdxPath = path.join(dirPath, `${fileName}.mdx`);
-
-      if (!fs.existsSync(mdxPath)) {
-        fs.writeFileSync(mdxPath, `---\ntitle: "${title}"\nopenapi: "${openapiRef}"\n---\n`);
-        totalCreated++;
-      } else {
-        totalExisting++;
-      }
-
-      pages.push(`api-reference/${group.dirName}/${fileName}`);
-    }
-
-    pages.push(...(group.extraPages ?? []));
-
+    const pages = writeGroupPages({ group, spec, owners, tally });
+    if (pages.length === 0) continue;
     allNavGroups.push({ group: group.name, pages });
 
     // Insert Built-in Evaluators (categorized) right after the Evaluators config group
@@ -934,7 +1043,6 @@ function main() {
       });
     }
   }
-
   // Update docs.json navigation
   const apiRefAnchor = docsJson.navigation.anchors.find(
     (a: { anchor: string }) => a.anchor === "API Reference",
@@ -945,8 +1053,8 @@ function main() {
 
   fs.writeFileSync(DOCS_JSON_PATH, JSON.stringify(docsJson, null, 2) + "\n");
 
-  console.log(`Created ${totalCreated} new MDX pages`);
-  console.log(`Skipped ${totalExisting} existing pages`);
+  console.log(`Created ${tally.created} new MDX pages`);
+  console.log(`Skipped ${tally.existing} existing pages`);
   console.log(`Updated docs.json with ${allNavGroups.length} API groups`);
 }
 

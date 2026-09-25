@@ -90,6 +90,205 @@ function jsonResponse(res: nodeHttpModule.ServerResponse, status: number, data: 
   res.end(JSON.stringify(data));
 }
 
+type GenerateRequest = {
+  apiKey: string;
+  clientId: string;
+  model: string;
+  messages: { role: string; content: string }[];
+};
+
+async function handleGenerate({
+  req,
+  res,
+  timestamp,
+  traceparent,
+}: {
+  req: nodeHttpModule.IncomingMessage;
+  res: nodeHttpModule.ServerResponse;
+  timestamp: string;
+  traceparent: string | string[] | undefined;
+}): Promise<void> {
+  const request = await readGenerateRequest({ req, res, timestamp });
+  if (request.length === 0) return;
+  const [{ apiKey, clientId, model, messages }] = request;
+
+  console.log(
+    `[${timestamp}] Generating: client=${clientId}, model=${model}, messages=${messages.length}`,
+  );
+
+  try {
+    // Extract incoming trace context so AI SDK spans are children of the caller's trace
+    const parentContext = propagation.extract(otelContext.active(), req.headers);
+    const extractedSpan = trace.getSpan(parentContext);
+    const extractedTraceId = extractedSpan?.spanContext().traceId;
+    const extractedSpanId = extractedSpan?.spanContext().spanId;
+    console.log(
+      `[${timestamp}] OTEL context extraction: traceparent=${String(traceparent ?? "none")}, ` +
+        `extractedTraceId=${extractedTraceId ?? "none"}, extractedSpanId=${extractedSpanId ?? "none"}`,
+    );
+
+    // Create OpenAI client with the provided API key
+    const openai = createOpenAI({ apiKey });
+
+    // Run generateText within the extracted trace context, wrapped in a
+    // labeled span so the trace is visible in LangWatch with proper labels.
+    const generate = async () => {
+      if (tracer) {
+        return tracer.withActiveSpan("weather-agent", async (span) => {
+          span.setAttribute("metadata", JSON.stringify({ labels: ["ai-server", "weather-agent"] }));
+          span.setAttribute("langwatch.user.id", clientId);
+          return generateText({
+            model: openai(model),
+            system: SYSTEM_PROMPT,
+            messages: messages as NonNullable<Parameters<typeof generateText>[0]["messages"]>,
+            tools: { get_weather: weatherTool },
+            stopWhen: stepCountIs(3),
+            experimental_telemetry: { isEnabled: true },
+          });
+        });
+      }
+      return generateText({
+        model: openai(model),
+        system: SYSTEM_PROMPT,
+        messages: messages as NonNullable<Parameters<typeof generateText>[0]["messages"]>,
+        tools: { get_weather: weatherTool },
+        stopWhen: stepCountIs(3),
+        experimental_telemetry: { isEnabled: true },
+      });
+    };
+
+    const { text, steps } = await otelContext.with(parentContext, generate);
+
+    const toolCalls = steps.flatMap((s) => s.toolCalls);
+    console.log(
+      `[${timestamp}] 200 Generation success (${steps.length} steps, ${toolCalls.length} tool calls)`,
+    );
+    if (toolCalls.length > 0) {
+      for (const tc of toolCalls) {
+        console.log(`[${timestamp}]   tool_call: ${tc.toolName}(${JSON.stringify(tc.input)})`);
+      }
+    }
+    // Log active span after generation to verify OTEL context
+    const activeSpan = trace.getActiveSpan();
+    console.log(
+      `[${timestamp}] Active span after generation: ${activeSpan ? `traceId=${activeSpan.spanContext().traceId}` : "none"}`,
+    );
+    jsonResponse(res, 200, {
+      choices: [
+        {
+          message: {
+            role: "assistant",
+            content: text,
+          },
+        },
+      ],
+      model,
+      usage: {
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        total_tokens: 0,
+      },
+    });
+  } catch (e) {
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    console.error(`[${timestamp}] 500 Generation error:`, errorMessage);
+    jsonResponse(res, ...generationFailure({ errorMessage, model }));
+  }
+}
+
+/** Common OpenAI failures named; anything else is a 500 carrying its message. */
+function generationFailure({
+  errorMessage,
+  model,
+}: {
+  errorMessage: string;
+  model: string;
+}): [number, { error: string; message: string }] {
+  // Check for common OpenAI errors
+  if (errorMessage.includes("401") || errorMessage.includes("invalid_api_key")) {
+    return [401, { error: "Unauthorized", message: "Invalid OpenAI API key" }];
+  }
+  if (errorMessage.includes("model")) {
+    return [400, { error: "Bad Request", message: `Invalid model: ${model}` }];
+  }
+  return [500, { error: "Internal Server Error", message: errorMessage }];
+}
+
+/** The validated request, or none once a refusal has been answered. */
+async function readGenerateRequest({
+  req,
+  res,
+  timestamp,
+}: {
+  req: nodeHttpModule.IncomingMessage;
+  res: nodeHttpModule.ServerResponse;
+  timestamp: string;
+}): Promise<GenerateRequest[]> {
+  // Validate API key header
+  const apiKey = req.headers[API_KEY_HEADER];
+  if (!apiKey || typeof apiKey !== "string") {
+    console.log(`[${timestamp}] 401 Missing X-API-Key header`);
+    jsonResponse(res, 401, {
+      error: "Unauthorized",
+      message: "Missing required header: X-API-Key",
+    });
+    return [];
+  }
+
+  // Validate Client ID header
+  const clientId = req.headers[CLIENT_ID_HEADER];
+  if (!clientId || typeof clientId !== "string") {
+    console.log(`[${timestamp}] 400 Missing X-Client-ID header`);
+    jsonResponse(res, 400, {
+      error: "Bad Request",
+      message: "Missing required header: X-Client-ID",
+    });
+    return [];
+  }
+
+  // Parse body
+  let body = "";
+  for await (const chunk of req) body += chunk;
+
+  let parsed: RequestBody;
+  try {
+    parsed = JSON.parse(body) as RequestBody;
+  } catch {
+    console.log(`[${timestamp}] 400 Invalid JSON body`);
+    jsonResponse(res, 400, {
+      error: "Bad Request",
+      message: "Invalid JSON in request body",
+    });
+    return [];
+  }
+
+  // Validate required fields
+  const { model, messages } = parsed;
+
+  if (!model || typeof model !== "string") {
+    console.log(`[${timestamp}] 400 Missing model field`);
+    jsonResponse(res, 400, {
+      error: "Bad Request",
+      message: "Missing required field: model",
+    });
+    return [];
+  }
+
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    console.log(`[${timestamp}] 400 Missing messages field`);
+    jsonResponse(res, 400, {
+      error: "Bad Request",
+      message: "Missing required field: messages (must be non-empty array)",
+    });
+    return [];
+  }
+
+  console.log(
+    `[${timestamp}] Generating: client=${clientId}, model=${model}, messages=${messages.length}`,
+  );
+  return [{ apiKey, clientId, model, messages }];
+}
+
 const server = createServer(async (req, res) => {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] ${req.method} ${req.url}`);
@@ -112,178 +311,7 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.method === "POST" && req.url === "/generate") {
-    // Validate API key header
-    const apiKey = req.headers[API_KEY_HEADER];
-    if (!apiKey || typeof apiKey !== "string") {
-      console.log(`[${timestamp}] 401 Missing X-API-Key header`);
-      jsonResponse(res, 401, {
-        error: "Unauthorized",
-        message: "Missing required header: X-API-Key",
-      });
-      return;
-    }
-
-    // Validate Client ID header
-    const clientId = req.headers[CLIENT_ID_HEADER];
-    if (!clientId || typeof clientId !== "string") {
-      console.log(`[${timestamp}] 400 Missing X-Client-ID header`);
-      jsonResponse(res, 400, {
-        error: "Bad Request",
-        message: "Missing required header: X-Client-ID",
-      });
-      return;
-    }
-
-    // Parse body
-    let body = "";
-    for await (const chunk of req) body += chunk;
-
-    let parsed: RequestBody;
-    try {
-      parsed = JSON.parse(body) as RequestBody;
-    } catch {
-      console.log(`[${timestamp}] 400 Invalid JSON body`);
-      jsonResponse(res, 400, {
-        error: "Bad Request",
-        message: "Invalid JSON in request body",
-      });
-      return;
-    }
-
-    // Validate required fields
-    const { model, messages } = parsed;
-
-    if (!model || typeof model !== "string") {
-      console.log(`[${timestamp}] 400 Missing model field`);
-      jsonResponse(res, 400, {
-        error: "Bad Request",
-        message: "Missing required field: model",
-      });
-      return;
-    }
-
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      console.log(`[${timestamp}] 400 Missing messages field`);
-      jsonResponse(res, 400, {
-        error: "Bad Request",
-        message: "Missing required field: messages (must be non-empty array)",
-      });
-      return;
-    }
-
-    console.log(
-      `[${timestamp}] Generating: client=${clientId}, model=${model}, messages=${messages.length}`,
-    );
-
-    try {
-      // Extract incoming trace context so AI SDK spans are children of the caller's trace
-      const parentContext = propagation.extract(otelContext.active(), req.headers);
-      const extractedSpan = trace.getSpan(parentContext);
-      const extractedTraceId = extractedSpan?.spanContext().traceId;
-      const extractedSpanId = extractedSpan?.spanContext().spanId;
-      console.log(
-        `[${timestamp}] OTEL context extraction: traceparent=${String(traceparent ?? "none")}, ` +
-          `extractedTraceId=${extractedTraceId ?? "none"}, extractedSpanId=${extractedSpanId ?? "none"}`,
-      );
-
-      // Create OpenAI client with the provided API key
-      const openai = createOpenAI({ apiKey });
-
-      // Run generateText within the extracted trace context, wrapped in a
-      // labeled span so the trace is visible in LangWatch with proper labels.
-      const generate = async () => {
-        if (tracer) {
-          return tracer.withActiveSpan("weather-agent", async (span) => {
-            span.setAttribute(
-              "metadata",
-              JSON.stringify({ labels: ["ai-server", "weather-agent"] }),
-            );
-            span.setAttribute("langwatch.user.id", clientId);
-            return generateText({
-              model: openai(model),
-              system: SYSTEM_PROMPT,
-              messages: messages as NonNullable<Parameters<typeof generateText>[0]["messages"]>,
-              tools: { get_weather: weatherTool },
-              stopWhen: stepCountIs(3),
-              experimental_telemetry: { isEnabled: true },
-            });
-          });
-        }
-        return generateText({
-          model: openai(model),
-          system: SYSTEM_PROMPT,
-          messages: messages as NonNullable<Parameters<typeof generateText>[0]["messages"]>,
-          tools: { get_weather: weatherTool },
-          stopWhen: stepCountIs(3),
-          experimental_telemetry: { isEnabled: true },
-        });
-      };
-
-      const { text, steps } = await otelContext.with(parentContext, generate);
-
-      const toolCalls = steps.flatMap((s) => s.toolCalls);
-      console.log(
-        `[${timestamp}] 200 Generation success (${steps.length} steps, ${toolCalls.length} tool calls)`,
-      );
-      if (toolCalls.length > 0) {
-        for (const tc of toolCalls) {
-          console.log(`[${timestamp}]   tool_call: ${tc.toolName}(${JSON.stringify(tc.input)})`);
-        }
-      }
-      // Log active span after generation to verify OTEL context
-      const activeSpan = trace.getActiveSpan();
-      console.log(
-        `[${timestamp}] Active span after generation: ${activeSpan ? `traceId=${activeSpan.spanContext().traceId}` : "none"}`,
-      );
-      jsonResponse(res, 200, {
-        choices: [
-          {
-            message: {
-              role: "assistant",
-              content: text,
-            },
-          },
-        ],
-        model,
-        usage: {
-          prompt_tokens: 0,
-          completion_tokens: 0,
-          total_tokens: 0,
-        },
-      });
-    } catch (e) {
-      const errorMessage = e instanceof Error ? e.message : String(e);
-      console.error(`[${timestamp}] 500 Generation error:`, errorMessage);
-
-      // Check for common OpenAI errors
-      if (errorMessage.includes("401")) {
-        jsonResponse(res, 401, {
-          error: "Unauthorized",
-          message: "Invalid OpenAI API key",
-        });
-        return;
-      }
-      if (errorMessage.includes("invalid_api_key")) {
-        jsonResponse(res, 401, {
-          error: "Unauthorized",
-          message: "Invalid OpenAI API key",
-        });
-        return;
-      }
-
-      if (errorMessage.includes("model")) {
-        jsonResponse(res, 400, {
-          error: "Bad Request",
-          message: `Invalid model: ${model}`,
-        });
-        return;
-      }
-
-      jsonResponse(res, 500, {
-        error: "Internal Server Error",
-        message: errorMessage,
-      });
-    }
+    await handleGenerate({ req, res, timestamp, traceparent });
     return;
   }
 

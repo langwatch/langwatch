@@ -13,7 +13,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { execViaDaemon, requestStatus, requestStop } from "../client";
 import { secureSocketFile, UntrustedSocketDirError } from "../identity";
-import { encodeFrame, FrameDecoder, PROTOCOL_VERSION, type ClientFrame } from "../protocol";
+import {
+  encodeFrame,
+  FrameDecoder,
+  PROTOCOL_VERSION,
+  type ClientFrame,
+  type ServerFrame,
+} from "../protocol";
 import type { CommandExecution, CommandExecutor } from "../runner";
 import {
   cleanStaleSocket,
@@ -41,6 +47,26 @@ const collector = (): { stream: Writable; text: () => string } => {
     }),
     text: () => Buffer.concat(chunks).toString(),
   };
+};
+
+/** A client that cancels as soon as the daemon admits it, then reads to the exit frame. */
+const cancelOnceAdmitted = ({
+  frame,
+  socket,
+  out,
+  resolve,
+}: {
+  frame: ServerFrame;
+  socket: net.Socket;
+  out: ReturnType<typeof collector>;
+  resolve: (code: number) => void;
+}): void => {
+  if (frame.t === "hello-ok") socket.write(encodeFrame({ t: "cancel" }));
+  if (frame.t === "out") out.stream.write(Buffer.from(frame.d, "base64"));
+  if (frame.t === "exit") {
+    socket.destroy();
+    resolve(frame.code);
+  }
 };
 
 /** An executor that just replays a scripted result. */
@@ -701,7 +727,7 @@ describe("daemon over a unix socket", () => {
 
         const out = collector();
         const socket = net.connect(socketPath);
-        const decoder = new FrameDecoder();
+        const decoder = new FrameDecoder<ServerFrame>();
 
         const exitCode = await new Promise<number>((resolve) => {
           socket.on("connect", () => {
@@ -726,16 +752,7 @@ describe("daemon over a unix socket", () => {
           });
           socket.on("data", (chunk: Buffer) => {
             for (const frame of decoder.push(chunk)) {
-              if (frame.t === "hello-ok") {
-                socket.write(encodeFrame({ t: "cancel" }));
-              }
-              if (frame.t === "out") {
-                out.stream.write(Buffer.from(frame.d, "base64"));
-              }
-              if (frame.t === "exit") {
-                socket.destroy();
-                resolve(frame.code);
-              }
+              cancelOnceAdmitted({ frame, socket, out, resolve });
             }
           });
         });

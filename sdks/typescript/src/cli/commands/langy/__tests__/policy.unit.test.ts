@@ -162,7 +162,9 @@ describe("given a folder shared with a Langy conversation", () => {
       }
     });
   });
+});
 
+describe("given a folder shared with a Langy conversation", () => {
   describe("when Langy does ordinary git work in the folder", () => {
     /**
      * The git a person expects an agent working in their repository to run.
@@ -350,7 +352,9 @@ describe("given a folder shared with a Langy conversation", () => {
       }
     });
   });
+});
 
+describe("given a folder shared with a Langy conversation", () => {
   describe("when Langy writes or edits a file inside the folder", () => {
     /** @scenario "Editing a file inside the folder runs at once" */
     it("applies the change with no card", () => {
@@ -546,7 +550,9 @@ describe("given a folder shared with a Langy conversation", () => {
       }
     });
   });
+});
 
+describe("given a folder shared with a Langy conversation", () => {
   describe("when a read-only command carries a write flag or a redirect", () => {
     /** @scenario "A read-only command with a write flag or a redirect asks" */
     it("asks", () => {
@@ -602,7 +608,9 @@ describe("given a folder shared with a Langy conversation", () => {
       expect(bash("FOO=1 ls").kind).toBe("ask");
     });
   });
+});
 
+describe("given a folder shared with a Langy conversation", () => {
   describe("when the user allowed a pattern for this session", () => {
     /** @scenario "A grant follows the command name and its first argument" */
     it("runs a command with the same name and first argument", () => {
@@ -712,7 +720,9 @@ describe("given a folder shared with a Langy conversation", () => {
       expect(grantsAllow({ tokens: ["go", "test"], grants: new Set(["python *"]) })).toBe(false);
     });
   });
+});
 
+describe("given a folder shared with a Langy conversation", () => {
   describe("when a path points outside the folder", () => {
     /** @scenario "A path outside the folder is refused" */
     it("refuses every escape shape and names the folder that is allowed", () => {
@@ -847,7 +857,9 @@ describe("given a folder shared with a Langy conversation", () => {
       expect(parsed.parts[0]?.redirectTarget).toEqual([false, false, true]);
     });
   });
+});
 
+describe("given a folder shared with a Langy conversation", () => {
   describe("when a git or GitHub CLI command writes its own words", () => {
     /** @scenario "A git or GitHub CLI word is not judged a path" */
     it("reads a subcommand, an option flag and a reference as words", () => {

@@ -504,100 +504,115 @@ async function runWatchSupervisor(rawArgv, env) {
     stderr(`${PREFIX} usage: dev-supervisor.mjs --watch -- <command> [args...]\n`);
     return 64;
   }
-  const { dirs, debounceMs } = resolveWatchConfig(env);
-  const graceMs = positiveInt(env.LANGWATCH_DEV_GRACE_MS, DEFAULT_GRACE_MS);
-  const bundle = resolveBundleConfig(env);
+  return new WatchSupervisor(argv, env).run();
+}
+
+/** One watched command: its current child, its restarts and its exit. */
+class WatchSupervisor {
+  child = null;
+  restarting = false;
+  settledCode = 0;
+  finished = false;
+  watchers = [];
+
+  constructor(argv, env) {
+    this.argv = argv;
+    this.env = env;
+    const { dirs, debounceMs } = resolveWatchConfig(env);
+    this.dirs = dirs;
+    this.graceMs = positiveInt(env.LANGWATCH_DEV_GRACE_MS, DEFAULT_GRACE_MS);
+    this.bundle = resolveBundleConfig(env);
+    this.crashOptions = { raw: rawCrashEnabled(env), crashLog: crashLogPath(env) };
+    this.exited = new Promise((resolve) => {
+      this.resolveExit = resolve;
+    });
+    this.debouncer = createDebouncer({ debounceMs, onFire: (files) => this.onChange(files) });
+  }
+
+  async run() {
+    this.watchers = watchDirs(this.dirs, this.debouncer);
+    const firstBuild = await this.rebuild();
+    if (!firstBuild.ok) {
+      for (const w of this.watchers) w.close();
+      return 1;
+    }
+    if (!this.spawnOne()) return 127;
+    for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+      process.on(signal, () => this.onSignal());
+    }
+    return await this.exited;
+  }
 
   /**
    * The import is deliberately dynamic: dev-supervisor.test.ts copies this
    * file to a scratch dir and runs it expecting nothing but node builtins
    * imported at load time. A static import here would break that copy.
    */
-  const rebuild = async () => {
-    if (bundle === null) return { ok: true };
+  async rebuild() {
+    if (this.bundle === null) return { ok: true };
     const { buildDevBundle } = await import("./lib/dev-bundle.mjs");
-    const result = await buildDevBundle({ appDir: process.cwd(), ...bundle });
+    const result = await buildDevBundle({ appDir: process.cwd(), ...this.bundle });
     if (!result.ok) {
       stderr(`${PREFIX} bundle failed, keeping the previous run:\n`);
       for (const line of result.errors) stderr(`${PREFIX}   ${line}\n`);
     }
     return result;
-  };
+  }
 
-  let child = null;
-  let restarting = false;
-  let settledCode = 0;
-
-  const crashOptions = { raw: rawCrashEnabled(env), crashLog: crashLogPath(env) };
-
-  const spawnOne = () => {
-    child = startChild(argv, env, false, { captureIO: true });
+  spawnOne() {
+    this.child = startChild(this.argv, this.env, false, { captureIO: true });
+    const { child } = this;
     if (child === null) return false;
-    if (child.stdout) wireStdout(child.stdout, crashOptions);
-    if (child.stderr) wireStderr(child.stderr, crashOptions);
+    if (child.stdout) wireStdout(child.stdout, this.crashOptions);
+    if (child.stderr) wireStderr(child.stderr, this.crashOptions);
     child.on("close", (code, signal) => {
-      if (restarting) return; // this exit was ours; the restart owns what happens next
-      settledCode = exitCodeFor({ code, signal });
-      finish();
+      if (this.restarting) return; // this exit was ours; the restart owns what happens next
+      this.settledCode = exitCodeFor({ code, signal });
+      this.finish();
     });
     return true;
-  };
-
-  let resolveExit;
-  const exited = new Promise((resolve) => {
-    resolveExit = resolve;
-  });
-  let finished = false;
-  const finish = () => {
-    if (finished) return;
-    finished = true;
-    debouncer.cancel();
-    for (const w of watchers) w.close();
-    resolveExit(settledCode);
-  };
-
-  const debouncer = createDebouncer({
-    debounceMs,
-    onFire: async (files) => {
-      if (finished || child === null) return;
-      // The rebuild IS the debounce boundary when one is configured: a
-      // restart only happens on a successful bundle, so a broken edit never
-      // takes down the process that was still working.
-      const built = await rebuild();
-      if (!built.ok) return;
-      if (finished || child === null) return;
-      const noun = files.length === 1 ? "file" : "files";
-      stderr(
-        `${PREFIX} restarting (${files.length} ${noun} changed): ${files.slice(0, 3).join(", ")}${files.length > 3 ? ", …" : ""}\n`,
-      );
-      restarting = true;
-      const stack = stackControls({ target: child.pid, graceMs });
-      if (!(await stack.takeDown())) {
-        stderr(`${PREFIX} some of the previous run outlived SIGKILL, restarting anyway\n`);
-      }
-      restarting = false;
-      if (finished) return;
-      if (!spawnOne()) finish();
-    },
-  });
-
-  const watchers = watchDirs(dirs, debouncer);
-  const firstBuild = await rebuild();
-  if (!firstBuild.ok) {
-    for (const w of watchers) w.close();
-    return 1;
-  }
-  if (!spawnOne()) return 127;
-
-  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
-    process.on(signal, () => {
-      if (finished || child === null) return;
-      restarting = true; // the close handler must not treat this as a real exit
-      void stackControls({ target: child.pid, graceMs }).takeDown().then(finish);
-    });
   }
 
-  return await exited;
+  finish() {
+    if (this.finished) return;
+    this.finished = true;
+    this.debouncer.cancel();
+    for (const w of this.watchers) w.close();
+    this.resolveExit(this.settledCode);
+  }
+
+  /**
+   * The rebuild IS the debounce boundary when one is configured: a restart
+   * only happens on a successful bundle, so a broken edit never takes down
+   * the process that was still working.
+   */
+  async onChange(files) {
+    if (this.finished || this.child === null) return;
+    const built = await this.rebuild();
+    if (!built.ok) return;
+    if (this.finished || this.child === null) return;
+    const noun = files.length === 1 ? "file" : "files";
+    const more = files.length > 3 ? ", …" : "";
+    stderr(
+      `${PREFIX} restarting (${files.length} ${noun} changed): ${files.slice(0, 3).join(", ")}${more}\n`,
+    );
+    this.restarting = true;
+    const stack = stackControls({ target: this.child.pid, graceMs: this.graceMs });
+    if (!(await stack.takeDown())) {
+      stderr(`${PREFIX} some of the previous run outlived SIGKILL, restarting anyway\n`);
+    }
+    this.restarting = false;
+    if (this.finished) return;
+    if (!this.spawnOne()) this.finish();
+  }
+
+  onSignal() {
+    if (this.finished || this.child === null) return;
+    this.restarting = true; // the close handler must not treat this as a real exit
+    void stackControls({ target: this.child.pid, graceMs: this.graceMs })
+      .takeDown()
+      .then(() => this.finish());
+  }
 }
 
 /**
