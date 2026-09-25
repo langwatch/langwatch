@@ -35519,12 +35519,11 @@ This page gets one voice test running from the platform, against an ElevenLabs a
   Voice agents are in private beta. On cloud, write to support@langwatch.ai to enable them for your organization. Self-hosted, set `FEATURE_FLAG_FORCE_ENABLE=release_voice_agents_enabled` on the app.
 </Note>
 
-Add two providers under **Settings > Model Providers**:
+Add the providers under **Settings > Model Providers**. See [Model Providers](/platform/model-providers).
 
-- **ElevenLabs**, with a key in the same ElevenLabs workspace as your agent. The key needs `convai_read`, `convai_write` and conversation read.
-- **OpenAI**. The simulated caller speaks with OpenAI text-to-speech, and the judge reads an OpenAI transcript of the call.
-
-To call a phone number instead, also add a **Twilio** provider. See [Model Providers](/platform/model-providers).
+- **OpenAI**, for every voice test. The simulated caller speaks with OpenAI text-to-speech, and the judge reads an OpenAI transcript of the call.
+- **ElevenLabs**, to test an ElevenLabs agent. The key must be in the same ElevenLabs workspace as the agent, with `convai_read`, `convai_write` and conversation read.
+- **Twilio**, to test a phone number. The call is placed from your Twilio number.
 
 ## Add your voice agent
 
@@ -58253,7 +58252,7 @@ Neither the AWS SDK nor Node's HTTP client reads `HTTPS_PROXY` on its own, so La
 
 ## Voice Agents
 
-These variables apply only when [voice agents](/agent-testing/voice-agents) are enabled with `FEATURE_FLAG_FORCE_ENABLE=release_voice_agents_enabled`.
+`VOICE_CALL_MAX_SECONDS` and `VOICE_RUNS_MAX_CONCURRENT` shape [voice agent](/agent-testing/voice-agents) runs, which need `FEATURE_FLAG_FORCE_ENABLE=release_voice_agents_enabled`. The other three act on every worker boot, with the flag on or off: each worker listens on `VOICE_WS_PORT` and, unless `VOICE_PUBLIC_BASE_URL` is set or `VOICE_TUNNEL=false`, opens a cloudflared quick tunnel.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
