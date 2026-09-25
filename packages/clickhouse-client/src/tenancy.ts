@@ -140,6 +140,38 @@ export interface TenantRouter {
 
 const DEFAULT_MAX_CACHE_ENTRIES = 10_000;
 
+/** Map preserves insertion order, so the first key is the oldest write and is evicted first. */
+function rememberBounded({
+  cache,
+  maxCacheEntries,
+  tenantId,
+  organizationId,
+}: {
+  cache: Map<string, string>;
+  maxCacheEntries: number;
+  tenantId: string;
+  organizationId: string;
+}): void {
+  if (cache.size >= maxCacheEntries) {
+    const oldest = cache.keys().next();
+    if (!oldest.done) cache.delete(oldest.value);
+  }
+  cache.set(tenantId, organizationId);
+}
+
+/** The platform tenant and any organization without a private route share the cluster. */
+function routeForOrganization({
+  table,
+  organizationId,
+}: {
+  table: TenantRouterOptions["table"];
+  organizationId: string;
+}): Awaited<ReturnType<TenantRouter["route"]>> {
+  if (organizationId === PLATFORM_TENANT) return { kind: "shared" };
+  const url = table.routes.get(organizationId);
+  return url === undefined ? { kind: "shared" } : { kind: "private", organizationId, url };
+}
+
 export function createTenantRouter({
   table,
   directory,
@@ -154,21 +186,6 @@ export function createTenantRouter({
 
   const cache = new Map<string, string>();
 
-  const remember = ({
-    tenantId,
-    organizationId,
-  }: {
-    tenantId: string;
-    organizationId: string;
-  }): void => {
-    // Map preserves insertion order, so the first key is the oldest write.
-    if (cache.size >= maxCacheEntries) {
-      const oldest = cache.keys().next();
-      if (!oldest.done) cache.delete(oldest.value);
-    }
-    cache.set(tenantId, organizationId);
-  };
-
   const organizationFor = async (tenantId: string): Promise<string> => {
     const cached = cache.get(tenantId);
     if (cached !== undefined) return cached;
@@ -180,7 +197,7 @@ export function createTenantRouter({
       // would make a newly created project unroutable until eviction.
       throw new UnknownTenantError(tenantId);
     }
-    remember({ tenantId, organizationId: resolved });
+    rememberBounded({ cache, maxCacheEntries, tenantId, organizationId: resolved });
     return resolved;
   };
 
@@ -188,10 +205,7 @@ export function createTenantRouter({
     async route(tenantId) {
       if (tenantId === "") throw new UnknownTenantError(tenantId);
 
-      const organizationId = await organizationFor(tenantId);
-      if (organizationId === PLATFORM_TENANT) return { kind: "shared" };
-      const url = table.routes.get(organizationId);
-      return url === undefined ? { kind: "shared" } : { kind: "private", organizationId, url };
+      return routeForOrganization({ table, organizationId: await organizationFor(tenantId) });
     },
     invalidateAll() {
       cache.clear();

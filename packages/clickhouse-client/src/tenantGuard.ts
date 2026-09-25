@@ -31,54 +31,21 @@ const LITERAL_TENANT_PREDICATE = /(?:^|[\s.(])TenantId\s*=\s*(?:'[^']*'|"[^"]*")
  */
 function maskNonCode(sql: string): string {
   const out = sql.split("");
-
-  const blank = (from: number, to: number): void => {
-    for (let i = from; i < to && i < out.length; i++) {
-      if (out[i] !== "\n") out[i] = " ";
-    }
-  };
-
   let cursor = 0;
   while (cursor < sql.length) {
-    const pair = sql.slice(cursor, cursor + 2);
-
-    if (pair === "/*") {
-      const close = sql.indexOf("*/", cursor + 2);
-      const end = close === -1 ? sql.length : close + 2;
-      blank(cursor, end);
-      cursor = end;
-      continue;
-    }
-
-    if (pair === "--") {
-      const newline = sql.indexOf("\n", cursor);
-      const end = newline === -1 ? sql.length : newline;
-      blank(cursor, end);
-      cursor = end;
+    const commentEnd = commentEndAt(sql, cursor);
+    if (commentEnd !== cursor) {
+      blankRange({ out, from: cursor, to: commentEnd });
+      cursor = commentEnd;
       continue;
     }
 
     const quote = sql[cursor];
     if (quote === "'" || quote === '"' || quote === "`") {
-      let scan = cursor + 1;
-      while (scan < sql.length) {
-        if (sql[scan] === "\\") {
-          scan += 2;
-          continue;
-        }
-        if (sql[scan] === quote) {
-          // A doubled quote is an escaped quote, not the end of the literal.
-          if (sql[scan + 1] === quote) {
-            scan += 2;
-            continue;
-          }
-          break;
-        }
-        scan += 1;
-      }
+      const scan = closingQuoteAt(sql, cursor);
       // The delimiters stay, so `TenantId = 'x'` is still recognisably a
       // literal predicate rather than becoming a bare `TenantId =`.
-      blank(cursor + 1, Math.min(scan, sql.length));
+      blankRange({ out, from: cursor + 1, to: Math.min(scan, sql.length) });
       cursor = Math.min(scan + 1, sql.length);
       continue;
     }
@@ -87,6 +54,46 @@ function maskNonCode(sql: string): string {
   }
 
   return out.join("");
+}
+
+function blankRange({ out, from, to }: { out: string[]; from: number; to: number }): void {
+  for (let i = from; i < to && i < out.length; i++) {
+    if (out[i] !== "\n") out[i] = " ";
+  }
+}
+
+/** Where a comment starting at `cursor` ends; `cursor` itself when none starts there. */
+function commentEndAt(sql: string, cursor: number): number {
+  const pair = sql.slice(cursor, cursor + 2);
+  if (pair === "/*") {
+    const close = sql.indexOf("*/", cursor + 2);
+    return close === -1 ? sql.length : close + 2;
+  }
+  if (pair === "--") {
+    const newline = sql.indexOf("\n", cursor);
+    return newline === -1 ? sql.length : newline;
+  }
+  return cursor;
+}
+
+/** Where the literal opened at `open` closes; backslash and doubled quotes escape. */
+function closingQuoteAt(sql: string, open: number): number {
+  const quote = sql[open];
+  let scan = open + 1;
+  while (scan < sql.length) {
+    if (sql[scan] === "\\") {
+      scan += 2;
+      continue;
+    }
+    if (sql[scan] !== quote) {
+      scan += 1;
+      continue;
+    }
+    // A doubled quote is an escaped quote, not the end of the literal.
+    if (sql[scan + 1] !== quote) return scan;
+    scan += 2;
+  }
+  return scan;
 }
 
 const isWordCharacter = (character: string | undefined): boolean =>

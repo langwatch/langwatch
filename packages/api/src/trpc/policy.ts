@@ -320,6 +320,130 @@ function rememberOrganizationRole(
   ctx.organizationRole = organizationRole;
 }
 
+async function authorizePermission<TContext extends TrpcDeclaredAuthzContext>({
+  ports,
+  ctx,
+  input,
+  required,
+  via,
+}: {
+  ports: TrpcDeclaredAuthzMembers<TContext>;
+  ctx: TrpcDeclaredCheckParams<TContext>["ctx"];
+  input: TrpcDeclaredCheckParams<TContext>["input"];
+  required: AuthzPermission;
+  via: ScopeTierField | undefined;
+}): Promise<void> {
+  // A public procedure exposes `.permission()` too, so a session is not
+  // a given. Answering "unauthenticated" before any id is looked at
+  // keeps an anonymous caller from learning anything about the scope.
+  const actor = ports.identity.actor(ctx);
+
+  if (!actor) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+
+  const scope = requireDeclaredScope({ permission: required, input, via });
+
+  const { permitted, organizationRole, denialReason } = await ports.authorization
+    .forRequest(ctx)
+    .getDecision({
+      userId: actor.id,
+      permission: required,
+      scope,
+    });
+
+  if (!permitted) {
+    throw deniedError({
+      permission: required,
+      scope,
+      organizationRole,
+      denialReason,
+      denials: ports.denials,
+    });
+  }
+
+  // Legacy parity: the organization tier never carried a role onto the
+  // context, so only the project/team resolutions (non-null role) do.
+  if (organizationRole !== null) {
+    rememberOrganizationRole(ctx, organizationRole);
+  }
+
+  markPermissionChecked(ctx);
+}
+
+async function authorizeAnyPermission<TContext extends TrpcDeclaredAuthzContext>({
+  ports,
+  ctx,
+  input,
+  permissions,
+}: {
+  ports: TrpcDeclaredAuthzMembers<TContext>;
+  ctx: TrpcDeclaredCheckParams<TContext>["ctx"];
+  input: TrpcDeclaredCheckParams<TContext>["input"];
+  permissions: readonly [AuthzPermission, ...AuthzPermission[]];
+}): Promise<void> {
+  const actor = ports.identity.actor(ctx);
+
+  if (!actor) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+
+  // Always the project tier, so the field is named outright — but read
+  // through the same resolution the single-permission seam uses, so the
+  // blank-versus-missing split is decided in exactly one place.
+  const { id: projectId } = requireDeclaredScope({
+    permission: permissions[0],
+    input,
+    via: "projectId",
+  });
+
+  const { permitted, organizationRole, denialReason } = await ports.authorization
+    .forRequest(ctx)
+    .getProjectAnyDecision({
+      userId: actor.id,
+      projectId,
+      permissions,
+    });
+
+  if (!permitted) {
+    throw deniedError({
+      permission: permissions[0],
+      scope: { tier: "project", id: projectId },
+      organizationRole,
+      denialReason,
+      denials: ports.denials,
+    });
+  }
+
+  rememberOrganizationRole(ctx, organizationRole);
+  markPermissionChecked(ctx);
+}
+
+function refuseUnallowedScopeFields<TContext extends TrpcDeclaredAuthzContext>({
+  ctx,
+  input,
+  allow,
+}: {
+  ctx: TrpcDeclaredCheckParams<TContext>["ctx"];
+  input: TrpcDeclaredCheckParams<TContext>["input"];
+  allow: Record<string, string> | undefined;
+}): void {
+  const allowedKeys = Object.keys(allow ?? {});
+  // `input` is typed as ScopeInput, but a procedure with no `.input()` hands
+  // tRPC's actual runtime value through as `undefined`. Without this guard,
+  // `key in input` throws and every such procedure 500s instead of running
+  // the (vacuous, but valid) no-permission check.
+  const safeInput: object = typeof input === "object" && input !== null ? input : {};
+
+  for (const key of SENSITIVE_SCOPE_FIELDS) {
+    if (key in safeInput && !allowedKeys.includes(key)) {
+      throw new Error(`${key} is not allowed to be used without permission check`);
+    }
+  }
+
+  markPermissionChecked(ctx);
+}
+
 export function createDeclaredAuthzMiddlewares<TContext extends TrpcDeclaredAuthzContext>(
   ports: TrpcDeclaredAuthzMembers<TContext>,
 ): TrpcDeclaredAuthzMiddlewares<TContext> {
@@ -338,42 +462,7 @@ export function createDeclaredAuthzMiddlewares<TContext extends TrpcDeclaredAuth
     declareAuthzMiddleware(
       { kind: "permission", permission: required, via },
       async ({ ctx, input, next }: TrpcDeclaredCheckParams<TContext>) => {
-        // A public procedure exposes `.permission()` too, so a session is not
-        // a given. Answering "unauthenticated" before any id is looked at
-        // keeps an anonymous caller from learning anything about the scope.
-        const actor = ports.identity.actor(ctx);
-
-        if (!actor) {
-          throw new TRPCError({ code: "UNAUTHORIZED" });
-        }
-
-        const scope = requireDeclaredScope({ permission: required, input, via });
-
-        const { permitted, organizationRole, denialReason } = await ports.authorization
-          .forRequest(ctx)
-          .getDecision({
-            userId: actor.id,
-            permission: required,
-            scope,
-          });
-
-        if (!permitted) {
-          throw deniedError({
-            permission: required,
-            scope,
-            organizationRole,
-            denialReason,
-            denials: ports.denials,
-          });
-        }
-
-        // Legacy parity: the organization tier never carried a role onto the
-        // context, so only the project/team resolutions (non-null role) do.
-        if (organizationRole !== null) {
-          rememberOrganizationRole(ctx, organizationRole);
-        }
-
-        markPermissionChecked(ctx);
+        await authorizePermission({ ports, ctx, input, required, via });
 
         return next();
       },
@@ -389,41 +478,7 @@ export function createDeclaredAuthzMiddlewares<TContext extends TrpcDeclaredAuth
     declareAuthzMiddleware(
       { kind: "permission-any", permissions },
       async ({ ctx, input, next }: TrpcDeclaredCheckParams<TContext>) => {
-        const actor = ports.identity.actor(ctx);
-
-        if (!actor) {
-          throw new TRPCError({ code: "UNAUTHORIZED" });
-        }
-
-        // Always the project tier, so the field is named outright — but read
-        // through the same resolution the single-permission seam uses, so the
-        // blank-versus-missing split is decided in exactly one place.
-        const { id: projectId } = requireDeclaredScope({
-          permission: permissions[0],
-          input,
-          via: "projectId",
-        });
-
-        const { permitted, organizationRole, denialReason } = await ports.authorization
-          .forRequest(ctx)
-          .getProjectAnyDecision({
-            userId: actor.id,
-            projectId,
-            permissions,
-          });
-
-        if (!permitted) {
-          throw deniedError({
-            permission: permissions[0],
-            scope: { tier: "project", id: projectId },
-            organizationRole,
-            denialReason,
-            denials: ports.denials,
-          });
-        }
-
-        rememberOrganizationRole(ctx, organizationRole);
-        markPermissionChecked(ctx);
+        await authorizeAnyPermission({ ports, ctx, input, permissions });
 
         return next();
       },
@@ -444,20 +499,7 @@ export function createDeclaredAuthzMiddlewares<TContext extends TrpcDeclaredAuth
     declareAuthzMiddleware(
       { kind: "no-permission", reason, allow },
       async ({ ctx, input, next }: TrpcDeclaredCheckParams<TContext>) => {
-        const allowedKeys = Object.keys(allow ?? {});
-        // `input` is typed as ScopeInput, but a procedure with no `.input()` hands
-        // tRPC's actual runtime value through as `undefined`. Without this guard,
-        // `key in input` throws and every such procedure 500s instead of running
-        // the (vacuous, but valid) no-permission check.
-        const safeInput: object = typeof input === "object" && input !== null ? input : {};
-
-        for (const key of SENSITIVE_SCOPE_FIELDS) {
-          if (key in safeInput && !allowedKeys.includes(key)) {
-            throw new Error(`${key} is not allowed to be used without permission check`);
-          }
-        }
-
-        markPermissionChecked(ctx);
+        refuseUnallowedScopeFields({ ctx, input, allow });
 
         return next();
       },
@@ -1132,6 +1174,163 @@ function handledErrorToTRPCCode(error: HandledError): TRPCError["code"] {
  * so a process composes exactly one of these and hands the pieces to its
  * mounts.
  */
+/**
+ * The TRPCError a known cause becomes: a HandledError keeps its code, a bare
+ * ZodError is promoted as the REST door does, and a process-translated cause
+ * takes its translation. None for anything else.
+ */
+function promotedTrpcErrors({
+  cause,
+  translate,
+}: {
+  cause: unknown;
+  translate: (cause: unknown) => { code: TRPCError["code"]; message: string } | null | undefined;
+}): TRPCError[] {
+  if (HandledError.isHandled(cause)) {
+    return [
+      new TRPCError({
+        code: handledErrorToTRPCCode(cause),
+        message: cause.message,
+        cause,
+      }),
+    ];
+  }
+
+  if (isZodLikeError(cause)) {
+    // `ValidationError.fromZodError` is the same promotion the error
+    // formatter performs, so the serialised payload on the wire is byte for
+    // byte what it already was — only `data.code` and the HTTP status change.
+    const validation = ValidationError.fromZodError(cause);
+
+    return [
+      new TRPCError({
+        code: handledErrorToTRPCCode(validation),
+        // The code, not `validation.message`: zod's `message` is the whole
+        // issue array as JSON, and this string is what the span and the log
+        // record carry. The wire message is the code either way (#5984).
+        message: validation.code,
+        cause: validation,
+      }),
+    ];
+  }
+
+  const translated = translate(cause);
+
+  if (translated) {
+    return [
+      new TRPCError({
+        code: translated.code,
+        message: translated.message,
+        cause,
+      }),
+    ];
+  }
+  return [];
+}
+
+/** The real admin behind an impersonated action, for security forensics. */
+function impersonationMetadata(actor: {
+  impersonatorId?: string | null;
+}): { impersonatorId: string } | undefined {
+  return actor.impersonatorId ? { impersonatorId: actor.impersonatorId } : undefined;
+}
+
+/**
+ * One traced call. In tRPC v10, next() never throws: downstream errors are
+ * returned as { ok: false, error } result objects, not thrown.
+ */
+async function traceCall<TResult extends MiddlewareResult<object>>({
+  span,
+  next,
+  asError,
+}: {
+  span: Span;
+  next: () => Promise<TResult>;
+  asError: (failure: unknown) => Error;
+}): Promise<TResult> {
+  const result = await next();
+  if (!result.ok) {
+    trpcFailureTraceIds.remember(result.error, span);
+    recordSpanError(span, result.error, asError);
+  }
+  span.end();
+  return result;
+}
+
+/** A silenced route traces nothing on success, and still records a span for a failure. */
+async function traceSilencedFailure<TResult extends MiddlewareResult<object>>({
+  tracer,
+  spanName,
+  path,
+  type,
+  parentContext,
+  next,
+  asError,
+}: {
+  tracer: ReturnType<typeof otelTrace.getTracer>;
+  spanName: string;
+  path: string;
+  type: ProcedureType;
+  parentContext: ReturnType<typeof callerTraceContext>;
+  next: () => Promise<TResult>;
+  asError: (failure: unknown) => Error;
+}): Promise<TResult> {
+  const startTime = nowInstant().epochMilliseconds;
+  const result = await next();
+  if (result.ok) return result;
+
+  const span = tracer.startSpan(
+    spanName,
+    { kind: SpanKind.SERVER, startTime, attributes: spanAttributes(path, type) },
+    parentContext,
+  );
+
+  trpcFailureTraceIds.remember(result.error, span);
+  recordSpanError(span, result.error, asError);
+  span.end();
+
+  return result;
+}
+
+/** What a finished mutation audits: the target it touched, or the error it failed with. */
+function mutationOutcome({ path, result }: { path: string; result: MiddlewareResult<object> }): {
+  target: ReturnType<typeof deriveAuditTarget> | Record<string, never>;
+  error: TRPCError | undefined;
+} {
+  if (result.ok) return { target: deriveAuditTarget(path, result.data), error: undefined };
+  return { target: {}, error: result.error };
+}
+
+/** The user agent and status code a tRPC call log line carries, when the transport has them. */
+function callerDetails(ctx: {
+  req?: { headers: { "user-agent"?: string } } | null;
+  res?: { statusCode?: number } | null;
+}): { userAgent: string | null; statusCode: number | null } {
+  return {
+    userAgent: ctx.req?.headers["user-agent"] ?? null,
+    statusCode: ctx.res?.statusCode ?? null,
+  };
+}
+
+/** A failed, non-mutation call by a signed-in actor that tRPC reports as a known error. */
+function failuresToAudit<TActor extends { id?: string }>({
+  type,
+  permissionChecked,
+  result,
+  actor,
+}: {
+  type: ProcedureType;
+  permissionChecked: boolean | undefined;
+  result: MiddlewareResult<object>;
+  actor: TActor | null | undefined;
+}): { error: TRPCError; actor: TActor & { id: string } }[] {
+  const auditedAsMutation = type === "mutation" && permissionChecked; // avoid duplicated logs
+  if (auditedAsMutation || result.ok || !actor?.id) return [];
+  const { error } = result;
+  if (!(error instanceof TRPCError) || error.code === "INTERNAL_SERVER_ERROR") return [];
+  return [{ error, actor: { ...actor, id: actor.id } }];
+}
+
 export function createTrpcRuntimePolicy<
   TContext extends TrpcPolicyContext & object,
   TAuthenticatedContext extends object,
@@ -1185,16 +1384,18 @@ export function createTrpcRuntimePolicy<
     const result = await next();
     const actor = ports.identity.actor(ctx);
 
-    const auditedAsMutation = type === "mutation" && ctx.permissionChecked; // avoid duplicated logs
-    if (auditedAsMutation || result.ok || !actor?.id) return result;
-    if (!(result.error instanceof TRPCError) || result.error.code === "INTERNAL_SERVER_ERROR") {
-      return result;
-    }
+    const [failure] = failuresToAudit({
+      type,
+      permissionChecked: ctx.permissionChecked,
+      result,
+      actor,
+    });
+    if (!failure) return result;
     const auditedInput = input ?? (await getRawInput());
     const scopeIds = auditScopeIds(auditedInput);
 
     await ports.audit.record({
-      userId: actor.id,
+      userId: failure.actor.id,
       organizationId: scopeIds.organizationId,
       projectId: scopeIds.projectId,
       action: path,
@@ -1203,13 +1404,13 @@ export function createTrpcRuntimePolicy<
       // reading the raw input is what puts the arguments, project and
       // organization on a failed call's row instead of leaving them blank.
       args: redactAuditArgs({ input: auditedInput, action: path }),
-      error: result.error,
+      error: failure.error,
       req: ctx.req,
       // When an admin is impersonating, the actor id reflects the
       // impersonated user (correct for RBAC attribution). We stamp the
       // real admin's identity in metadata so security forensics can
       // filter on `metadata.impersonatorId`.
-      metadata: actor.impersonatorId ? { impersonatorId: actor.impersonatorId } : undefined,
+      metadata: impersonationMetadata(failure.actor),
     });
 
     return result;
@@ -1235,7 +1436,7 @@ export function createTrpcRuntimePolicy<
       // no organization. Platform routers parse first and never reach it.
       const auditedInput = input ?? (await getRawInput());
 
-      const target = result.ok ? deriveAuditTarget(path, result.data) : {};
+      const { target, error } = mutationOutcome({ path, result });
       const scopeIds = auditScopeIds(auditedInput);
 
       await ports.audit.record({
@@ -1244,14 +1445,14 @@ export function createTrpcRuntimePolicy<
         projectId: scopeIds.projectId,
         action: path,
         args: redactAuditArgs({ input: auditedInput, action: path }),
-        error: !result.ok ? result.error : undefined,
+        error,
         req: ctx.req,
         targetKind: target.targetKind,
         targetId: target.targetId,
         // Stamp the real admin id when the action is happening during
         // impersonation. `userId` above is the impersonated target (the
         // RBAC actor); metadata.impersonatorId is the human performing it.
-        metadata: actor.impersonatorId ? { impersonatorId: actor.impersonatorId } : undefined,
+        metadata: impersonationMetadata(actor),
       });
 
       return result;
@@ -1273,45 +1474,14 @@ export function createTrpcRuntimePolicy<
     const parentContext = callerTraceContext({ req: ctx.req, type });
 
     if (isSilencedCall({ path, type })) {
-      const startTime = nowInstant().epochMilliseconds;
-      const result = await next();
-      if (result.ok) return result;
-
-      const span = tracer.startSpan(
-        spanName,
-        {
-          kind: SpanKind.SERVER,
-          startTime,
-          attributes: spanAttributes(path, type),
-        },
-        parentContext,
-      );
-
-      trpcFailureTraceIds.remember(result.error, span);
-      recordSpanError(span, result.error, asError);
-      span.end();
-
-      return result;
+      return traceSilencedFailure({ tracer, spanName, path, type, parentContext, next, asError });
     }
 
     return otelContext.with(parentContext, () =>
       tracer.startActiveSpan(
         spanName,
         { kind: SpanKind.SERVER, attributes: spanAttributes(path, type) },
-        async (span) => {
-          // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
-          // returned as { ok: false, error } result objects — NOT thrown.
-          const result = await next();
-
-          if (!result.ok) {
-            trpcFailureTraceIds.remember(result.error, span);
-            recordSpanError(span, result.error, asError);
-          }
-
-          span.end();
-
-          return result;
-        },
+        (span) => traceCall({ span, next, asError }),
       ),
     );
   });
@@ -1322,41 +1492,11 @@ export function createTrpcRuntimePolicy<
     const result = await next();
     if (result.ok) return result;
 
-    const cause = result.error.cause;
-
-    if (HandledError.isHandled(cause)) {
-      throw new TRPCError({
-        code: handledErrorToTRPCCode(cause),
-        message: cause.message,
-        cause,
-      });
-    }
-
-    if (isZodLikeError(cause)) {
-      // `ValidationError.fromZodError` is the same promotion the error
-      // formatter performs, so the serialised payload on the wire is byte for
-      // byte what it already was — only `data.code` and the HTTP status change.
-      const validation = ValidationError.fromZodError(cause);
-
-      throw new TRPCError({
-        code: handledErrorToTRPCCode(validation),
-        // The code, not `validation.message`: zod's `message` is the whole
-        // issue array as JSON, and this string is what the span and the log
-        // record carry. The wire message is the code either way (#5984).
-        message: validation.code,
-        cause: validation,
-      });
-    }
-
-    const translated = ports.causes.translate(cause);
-
-    if (translated) {
-      throw new TRPCError({
-        code: translated.code,
-        message: translated.message,
-        cause,
-      });
-    }
+    const [promoted] = promotedTrpcErrors({
+      cause: result.error.cause,
+      translate: (cause) => ports.causes.translate(cause),
+    });
+    if (promoted) throw promoted;
 
     return result;
   });
@@ -1383,8 +1523,7 @@ export function createTrpcRuntimePolicy<
         path,
         type,
         duration,
-        userAgent: ctx.req?.headers["user-agent"] ?? null,
-        statusCode: ctx.res?.statusCode ?? null,
+        ...callerDetails(ctx),
         log: trpcLogger,
         capture: (failure: unknown) => ports.errorReporting.capture(failure),
       });

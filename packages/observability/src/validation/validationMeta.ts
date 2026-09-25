@@ -85,6 +85,51 @@ function stringList(value: unknown): string[] | undefined {
   return value.map((entry) => String(entry));
 }
 
+type IssueFieldReader = (issue: RawIssue, schemaOnly: boolean) => Partial<ValidationIssueMeta>;
+
+const optionsFrom: IssueFieldReader = (issue) => ({ options: stringList(issue.options) });
+
+/** The fields each issue code carries in our own vocabulary; see `metaForIssue`. */
+const ISSUE_FIELD_READERS: ReadonlyMap<string, IssueFieldReader> = new Map<
+  string,
+  IssueFieldReader
+>([
+  [
+    "invalid_type",
+    // Both sides are type names here ("string", "undefined"), not values.
+    (issue) => ({
+      ...(typeof issue.expected === "string" ? { expected: issue.expected } : {}),
+      ...(typeof issue.received === "string" ? { received: issue.received } : {}),
+    }),
+  ],
+  [
+    "unrecognized_keys",
+    (issue, schemaOnly) => (schemaOnly ? {} : { keys: stringList(issue.keys) }),
+  ],
+  // `options` is the schema list; `received` holds the value that arrived, so it is not copied.
+  ["invalid_enum_value", optionsFrom],
+  ["invalid_union_discriminator", optionsFrom],
+  // Zod 4 folds enum and literal mismatches into one code carrying the permitted set as `values`.
+  ["invalid_value", (issue) => ({ options: stringList(issue.values) })],
+  ["invalid_union", (issue) => (issue.options === undefined ? {} : optionsFrom(issue, false))],
+  [
+    "invalid_literal",
+    // `expected` is the literal our schema declares, so it is ours to log.
+    (issue) =>
+      typeof issue.expected === "string" || typeof issue.expected === "number"
+        ? { expected: String(issue.expected) }
+        : {},
+  ],
+  // `invalid_string` in zod 3, `invalid_format` in zod 4; the rule name moved to `format`.
+  ["invalid_format", (issue) => (typeof issue.format === "string" ? { rule: issue.format } : {})],
+  [
+    "invalid_string",
+    (issue) => (typeof issue.validation === "string" ? { rule: issue.validation } : {}),
+  ],
+  ["too_small", (issue) => (typeof issue.minimum === "number" ? { limit: issue.minimum } : {})],
+  ["too_big", (issue) => (typeof issue.maximum === "number" ? { limit: issue.maximum } : {})],
+]);
+
 /**
  * Copy only the fields this issue code is known to populate with our own
  * vocabulary. Anything not named here is dropped, so a Zod version that adds a
@@ -98,64 +143,8 @@ function metaForIssue(issue: RawIssue, schemaOnly: boolean): ValidationIssueMeta
     code: typeof issue.code === "string" ? issue.code : "unknown",
   };
 
-  switch (meta.code) {
-    case "invalid_type":
-      // Both sides are type names here ("string", "undefined"), not values.
-      if (typeof issue.expected === "string") meta.expected = issue.expected;
-      if (typeof issue.received === "string") meta.received = issue.received;
-      break;
-
-    case "unrecognized_keys":
-      if (!schemaOnly) meta.keys = stringList(issue.keys);
-      break;
-
-    case "invalid_enum_value":
-    case "invalid_union_discriminator":
-      // `options` is the schema's own list. `received` is deliberately not
-      // copied: for these codes it holds the value that arrived.
-      meta.options = stringList(issue.options);
-      break;
-
-    // Zod 4 folds enum and literal mismatches into one code carrying the
-    // permitted set as `values`, so the older cases above stop matching.
-    // A discriminator mismatch instead routes through `invalid_union`'s
-    // `options`-carrying arm; a plain union failure carries none, left to `collectIssues`.
-    case "invalid_value":
-      meta.options = stringList(issue.values);
-      break;
-
-    case "invalid_union":
-      if (issue.options !== undefined) meta.options = stringList(issue.options);
-      break;
-
-    case "invalid_literal":
-      // `expected` is the literal our schema declares, so it is ours to log.
-      if (typeof issue.expected === "string" || typeof issue.expected === "number") {
-        meta.expected = String(issue.expected);
-      }
-      break;
-
-    // `invalid_string` in zod 3, `invalid_format` in zod 4; the rule name moved
-    // from `validation` to `format`.
-    case "invalid_format":
-      if (typeof issue.format === "string") meta.rule = issue.format;
-      break;
-
-    case "invalid_string":
-      if (typeof issue.validation === "string") meta.rule = issue.validation;
-      break;
-
-    case "too_small":
-      if (typeof issue.minimum === "number") meta.limit = issue.minimum;
-      break;
-
-    case "too_big":
-      if (typeof issue.maximum === "number") meta.limit = issue.maximum;
-      break;
-
-    default:
-      break;
-  }
+  const readFields = ISSUE_FIELD_READERS.get(meta.code);
+  if (readFields) Object.assign(meta, readFields(issue, schemaOnly));
 
   return meta;
 }

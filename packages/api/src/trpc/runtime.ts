@@ -529,6 +529,42 @@ function mountRouter<Api, Contract extends TrpcContract>(
 
 type PermissionArgument = AuthzPermission | AuthzDeclaration | readonly AuthzPermission[];
 
+type EntitlementQuestion = {
+  contract: TrpcContract;
+  name: string;
+  entitlement: ApiEntitlement | undefined;
+};
+
+/** A procedure asks one entitlement question at most. */
+function assertSingleEntitlement({ contract, name, entitlement }: EntitlementQuestion): void {
+  if (!entitlement) return;
+  throw new Error(
+    `tRPC ${contract.namespace}.${name} already asks whether its tenant holds ` +
+      `"${entitlement}"`,
+  );
+}
+
+/** Both ask a question about a tenant, and a public procedure has none. */
+function assertNoTenantQuestion({ contract, name, entitlement }: EntitlementQuestion): void {
+  if (!entitlement) return;
+  throw new Error(
+    `tRPC ${contract.namespace}.${name} runs with no caller, so there is no tenant to ` +
+      `ask whether it holds "${entitlement}"`,
+  );
+}
+
+function copiedAllowance(
+  allow: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  return allow ? { ...allow } : undefined;
+}
+
+function enforcedFields(enforces: EnforcedScopeFields | undefined): {
+  enforces?: EnforcedScopeFields;
+} {
+  return enforces === undefined ? {} : { enforces };
+}
+
 function routerBuilder<Api, Contract extends TrpcContract, Implemented extends string>(
   api: TrpcFeatureApiWitness<Api>,
   contract: Contract,
@@ -557,25 +593,14 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
         return selected(name, [...facts, ...added], entitlement);
       },
       withEntitlement: (named: ApiEntitlement) => {
-        if (entitlement) {
-          throw new Error(
-            `tRPC ${contract.namespace}.${name} already asks whether its tenant holds ` +
-              `"${entitlement}"`,
-          );
-        }
+        assertSingleEntitlement({ contract, name, entitlement });
 
         return selected(name, facts, named);
       },
       withPermission: (access: PermissionArgument, options?: { via: ScopeTierField }) =>
         implement(permissionDeclarationOf({ contract, name, access, via: options?.via })),
       withAccess: (access: PublicRouteAccess) => {
-        // Both ask a question about a tenant, and a public procedure has none.
-        if (entitlement) {
-          throw new Error(
-            `tRPC ${contract.namespace}.${name} runs with no caller, so there is no tenant to ` +
-              `ask whether it holds "${entitlement}"`,
-          );
-        }
+        assertNoTenantQuestion({ contract, name, entitlement });
 
         assertAnonymousProcedure({ contract, name });
 
@@ -585,7 +610,7 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
         implement({
           kind: "no-permission",
           reason: declaration.reason,
-          allow: declaration.allow ? { ...declaration.allow } : undefined,
+          allow: copiedAllowance(declaration.allow),
         }),
       serviceAuthorized: (declaration: {
         reason: string;
@@ -596,7 +621,7 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
           kind: "service-authorized",
           reason: declaration.reason,
           permissions: declaration.permissions,
-          ...(declaration.enforces === undefined ? {} : { enforces: declaration.enforces }),
+          ...enforcedFields(declaration.enforces),
         }),
     };
   };

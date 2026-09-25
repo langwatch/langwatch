@@ -134,47 +134,63 @@ function assertStartupActive(signal: AbortSignal): void {
     });
 }
 
-async function startupState(args: {
+type StartupScanArgs = {
   state: SystemMigrationStateRepository;
   tenants: TenantSource;
   migrations: readonly SystemMigration[];
   cohort: (input: { tenantId: string; migrationName: string }) => boolean | Promise<boolean>;
-}): Promise<StartupState> {
+};
+
+/** Every tenant id, page by page, in the source's order. */
+async function* pagedTenantIds(tenants: TenantSource): AsyncGenerator<string> {
   let cursor: string | null = null;
-  let sawTenant = false;
-  let waiting: { migrationName: string; tenantId: string; status: string } | undefined;
   for (;;) {
-    const page = await args.tenants.findTenantIdsAfter({ cursor, limit: 100 });
-    if (page.length === 0) break;
+    const page = await tenants.findTenantIdsAfter({ cursor, limit: 100 });
+    if (page.length === 0) return;
     cursor = page[page.length - 1] ?? null;
-    for (const tenantId of page) {
-      sawTenant = true;
-      for (const migration of args.migrations) {
-        if (!(await args.cohort({ tenantId, migrationName: migration.name }))) continue;
-        const record = await args.state
-          .getRecord({ migrationName: migration.name, tenantId })
-          .catch(undefinedWhenNotFound);
-        if (record?.status === "rolled_back" || record?.status === "parked") {
-          return {
-            kind: "blocked",
-            migrationName: migration.name,
-            tenantId,
-            status: record.status,
-          };
-        }
-        if (record?.status !== "finalized" && waiting === undefined) {
-          waiting = {
-            migrationName: migration.name,
-            tenantId,
-            status: record?.status ?? "pending",
-          };
-        }
-      }
+    yield* page;
+  }
+}
+
+/** A tenant is blocked by a parked or rolled-back migration, else waits on its first unfinished. */
+async function tenantStartupState({
+  args,
+  tenantId,
+}: {
+  args: StartupScanArgs;
+  tenantId: string;
+}): Promise<StartupState> {
+  let waiting: StartupState = { kind: "complete" };
+  for (const migration of args.migrations) {
+    if (!(await args.cohort({ tenantId, migrationName: migration.name }))) continue;
+    const record = await args.state
+      .getRecord({ migrationName: migration.name, tenantId })
+      .catch(undefinedWhenNotFound);
+    if (record?.status === "rolled_back" || record?.status === "parked") {
+      return { kind: "blocked", migrationName: migration.name, tenantId, status: record.status };
+    }
+    if (record?.status !== "finalized" && waiting.kind === "complete") {
+      waiting = {
+        kind: "waiting",
+        migrationName: migration.name,
+        tenantId,
+        status: record?.status ?? "pending",
+      };
     }
   }
-  return !sawTenant || waiting === undefined
-    ? { kind: "complete" }
-    : { kind: "waiting", ...waiting };
+  return waiting;
+}
+
+async function startupState(args: StartupScanArgs): Promise<StartupState> {
+  let sawTenant = false;
+  let waiting: StartupState = { kind: "complete" };
+  for await (const tenantId of pagedTenantIds(args.tenants)) {
+    sawTenant = true;
+    const tenantState = await tenantStartupState({ args, tenantId });
+    if (tenantState.kind === "blocked") return tenantState;
+    if (waiting.kind === "complete") waiting = tenantState;
+  }
+  return sawTenant ? waiting : { kind: "complete" };
 }
 
 type StartupState =

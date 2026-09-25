@@ -212,17 +212,98 @@ export interface ClickHouseStatementLimitOptions<Client extends ClickHouseVendor
   statementWaitTimeoutMs?: number | undefined;
 }
 
+const STATEMENT_METHODS: readonly ClickHouseStatementOperation[] = [
+  "query",
+  "insert",
+  "command",
+  "exec",
+];
+
+/** A statement method, bound through the limiter; none for any other property. */
+function boundStatementMethod({
+  target,
+  property,
+  run,
+}: {
+  target: ClickHouseVendorClient;
+  property: string | symbol;
+  run: (options: {
+    operation: ClickHouseStatementOperation;
+    params: unknown;
+    task: () => Promise<unknown>;
+  }) => Promise<unknown>;
+}): ((params: unknown) => Promise<unknown>)[] {
+  const operation = STATEMENT_METHODS.find((name) => name === property);
+  if (operation === undefined) return [];
+  const method: ((params: unknown) => Promise<unknown>) | undefined = target[operation];
+  if (method === undefined) return [];
+  return [(params: unknown) => run({ operation, params, task: () => method.call(target, params) })];
+}
+
+/** How many statements may wait for a slot: a floor, or a depth per open connection. */
+function statementQueueDepth<Client extends ClickHouseVendorClient>(
+  options: ClickHouseStatementLimitOptions<Client>,
+): number {
+  return Math.max(
+    options.minimumStatementQueueDepth ?? DEFAULT_MIN_STATEMENT_QUEUE_DEPTH,
+    options.input.maxOpenConnections *
+      (options.statementQueueDepthPerSlot ?? DEFAULT_STATEMENT_QUEUE_DEPTH_PER_SLOT),
+  );
+}
+
+/**
+ * What a statement that never got a slot throws: an overload error, counted as
+ * shed, when the queue was full or the wait timed out; otherwise its own error.
+ */
+function shedStatementError<Client extends ClickHouseVendorClient>({
+  error,
+  timedOut,
+  operation,
+  startedAt,
+  timeoutMs,
+  maxQueued,
+  options,
+}: {
+  error: unknown;
+  timedOut: boolean;
+  operation: ClickHouseStatementOperation;
+  startedAt: number;
+  timeoutMs: number;
+  maxQueued: number;
+  options: ClickHouseStatementLimitOptions<Client>;
+}): unknown {
+  const { input, telemetry, overloadErrorFactory, logger } = options;
+  if (error instanceof QueueFullError) {
+    telemetry.incrementStatementsShed({ instance: input.instance, operation });
+    logger?.warn(
+      { instance: input.instance, operation, maxQueued },
+      "Refused a ClickHouse statement: concurrency wait queue full",
+    );
+    return overloadErrorFactory.create({ cause: error });
+  }
+  if (timedOut) {
+    telemetry.incrementStatementsShed({ instance: input.instance, operation });
+    logger?.warn(
+      {
+        instance: input.instance,
+        operation,
+        waitedMs: Math.round(performance.now() - startedAt),
+        timeoutMs,
+      },
+      "Refused a ClickHouse statement: waited too long for a slot",
+    );
+    return overloadErrorFactory.create({ cause: error });
+  }
+  return error;
+}
+
 /** Bounds every vendor statement method while preserving the caller's cancellation signal. */
 export function withClickHouseStatementLimit<Client extends ClickHouseVendorClient>(
   options: ClickHouseStatementLimitOptions<Client>,
 ): Client {
   const { client, input, telemetry, overloadErrorFactory, logger } = options;
   const timeoutMs = options.statementWaitTimeoutMs ?? DEFAULT_STATEMENT_WAIT_TIMEOUT_MS;
-  const maxQueued = Math.max(
-    options.minimumStatementQueueDepth ?? DEFAULT_MIN_STATEMENT_QUEUE_DEPTH,
-    input.maxOpenConnections *
-      (options.statementQueueDepthPerSlot ?? DEFAULT_STATEMENT_QUEUE_DEPTH_PER_SLOT),
-  );
+  const maxQueued = statementQueueDepth(options);
   const limiter = new ConcurrencyLimiter({
     maxConcurrent: input.maxOpenConnections,
     maxQueued,
@@ -260,28 +341,16 @@ export function withClickHouseStatementLimit<Client extends ClickHouseVendorClie
         },
       });
     } catch (error) {
-      if (!admitted && error instanceof QueueFullError) {
-        telemetry.incrementStatementsShed({ instance: input.instance, operation });
-        logger?.warn(
-          { instance: input.instance, operation, maxQueued },
-          "Refused a ClickHouse statement: concurrency wait queue full",
-        );
-        throw overloadErrorFactory.create({ cause: error });
-      }
-      if (!admitted && wait.hasTimedOut()) {
-        telemetry.incrementStatementsShed({ instance: input.instance, operation });
-        logger?.warn(
-          {
-            instance: input.instance,
-            operation,
-            waitedMs: Math.round(performance.now() - startedAt),
-            timeoutMs,
-          },
-          "Refused a ClickHouse statement: waited too long for a slot",
-        );
-        throw overloadErrorFactory.create({ cause: error });
-      }
-      throw error;
+      if (admitted) throw error;
+      throw shedStatementError({
+        error,
+        timedOut: wait.hasTimedOut(),
+        operation,
+        startedAt,
+        timeoutMs,
+        maxQueued,
+        options,
+      });
     } finally {
       wait.dispose();
     }
@@ -290,24 +359,8 @@ export function withClickHouseStatementLimit<Client extends ClickHouseVendorClie
   let closePromise: Promise<void> | undefined;
   return new Proxy(client, {
     get(target, property) {
-      if (property === "query") {
-        return (params: unknown) =>
-          run({ operation: "query", params, task: () => target.query(params) });
-      }
-      if (property === "insert") {
-        return (params: unknown) =>
-          run({ operation: "insert", params, task: () => target.insert(params) });
-      }
-      const command = target.command;
-      if (property === "command" && command !== undefined) {
-        return (params: unknown) =>
-          run({ operation: "command", params, task: () => command.call(target, params) });
-      }
-      const exec = target.exec;
-      if (property === "exec" && exec !== undefined) {
-        return (params: unknown) =>
-          run({ operation: "exec", params, task: () => exec.call(target, params) });
-      }
+      const [statement] = boundStatementMethod({ target, property, run });
+      if (statement) return statement;
       const ping = target.ping;
       if (property === "ping" && ping !== undefined) return () => ping.call(target);
       if (property === "close") {

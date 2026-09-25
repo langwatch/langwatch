@@ -24,6 +24,92 @@ function applyReducedGraphicsAttribute(reducedGraphics: boolean): void {
   }
 }
 
+type FrameRateProbeOptions = {
+  sampleWindowMs: number;
+  minFps: number;
+  resampleIntervalMs: number;
+  consecutiveStrugglingSamples: number;
+  hiddenRetryMs: number;
+  isReduced: () => boolean;
+  setReduced: (reduced: boolean) => void;
+};
+
+/** One sampling loop: a window of animation frames, judged, then a wait before the next. */
+class FrameRateProbe {
+  private rafId: number | undefined;
+  private timeoutId: ReturnType<typeof setTimeout> | undefined;
+  private sample: { start: number; frames: number } | null = null;
+  private strugglingStreak = 0;
+  private readonly options: FrameRateProbeOptions;
+  private readonly onVisibilityChange = () => {
+    // A window straddling a hidden period measures throttled frames against
+    // real elapsed wall-clock time; discard it rather than read a false collapse.
+    if (document.hidden) this.sample = null;
+  };
+  private readonly onFrame = (time: number) => this.measureFrame(time);
+  private readonly onWindow = () => this.startWindow();
+
+  constructor(options: FrameRateProbeOptions) {
+    this.options = options;
+  }
+
+  start(): void {
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
+    this.startWindow();
+  }
+
+  stop(): void {
+    if (this.rafId !== undefined) cancelAnimationFrame(this.rafId);
+    if (this.timeoutId !== undefined) clearTimeout(this.timeoutId);
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
+  }
+
+  private scheduleNextWindow(delayMs: number): void {
+    this.timeoutId = setTimeout(this.onWindow, delayMs);
+  }
+
+  private startWindow(): void {
+    if (document.hidden) {
+      this.scheduleNextWindow(this.options.hiddenRetryMs);
+      return;
+    }
+    this.sample = null;
+    this.rafId = requestAnimationFrame(this.onFrame);
+  }
+
+  private measureFrame(time: number): void {
+    if (document.hidden) {
+      this.sample = null;
+      this.scheduleNextWindow(this.options.hiddenRetryMs);
+      return;
+    }
+    if (!this.sample) {
+      this.sample = { start: time, frames: 0 };
+      this.rafId = requestAnimationFrame(this.onFrame);
+      return;
+    }
+    this.sample.frames++;
+    const elapsed = time - this.sample.start;
+    if (elapsed < this.options.sampleWindowMs) {
+      this.rafId = requestAnimationFrame(this.onFrame);
+      return;
+    }
+    this.judgeWindow({ frames: this.sample.frames, elapsed });
+    this.sample = null;
+    this.scheduleNextWindow(this.options.resampleIntervalMs);
+  }
+
+  private judgeWindow({ frames, elapsed }: { frames: number; elapsed: number }): void {
+    const { minFps, consecutiveStrugglingSamples, isReduced, setReduced } = this.options;
+    const isStruggling = evaluateFpsSample({ frames, elapsedMs: elapsed, minFps });
+    this.strugglingStreak = isStruggling ? this.strugglingStreak + 1 : 0;
+    const shouldReduceGraphics = isStruggling
+      ? this.strugglingStreak >= consecutiveStrugglingSamples
+      : false;
+    if (shouldReduceGraphics !== isReduced()) setReduced(shouldReduceGraphics);
+  }
+}
+
 export function GraphicsQualityProvider({
   resampleIntervalMs = RESAMPLE_INTERVAL_MS,
   sampleWindowMs = SAMPLE_WINDOW_MS,
@@ -53,74 +139,17 @@ export function GraphicsQualityProvider({
   useEffect(() => {
     if (override !== "auto") return;
 
-    let rafId: number | undefined;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-    let sample: { start: number; frames: number } | null = null;
-    let strugglingStreak = 0;
-
-    function scheduleNextWindow(delayMs: number) {
-      timeoutId = setTimeout(startWindow, delayMs);
-    }
-
-    function startWindow() {
-      if (document.hidden) {
-        scheduleNextWindow(hiddenRetryMs);
-        return;
-      }
-      sample = null;
-      rafId = requestAnimationFrame(measureFrame);
-    }
-
-    function measureFrame(time: number) {
-      if (document.hidden) {
-        sample = null;
-        scheduleNextWindow(hiddenRetryMs);
-        return;
-      }
-      if (!sample) {
-        sample = { start: time, frames: 0 };
-        rafId = requestAnimationFrame(measureFrame);
-        return;
-      }
-      sample.frames++;
-      const elapsed = time - sample.start;
-      if (elapsed < sampleWindowMs) {
-        rafId = requestAnimationFrame(measureFrame);
-        return;
-      }
-      const isStruggling = evaluateFpsSample({
-        frames: sample.frames,
-        elapsedMs: elapsed,
-        minFps,
-      });
-      strugglingStreak = isStruggling ? strugglingStreak + 1 : 0;
-      const shouldReduceGraphics = isStruggling
-        ? strugglingStreak >= consecutiveStrugglingSamples
-        : false;
-      if (shouldReduceGraphics !== probeReducedGraphicsRef.current) {
-        setProbeReducedGraphics(shouldReduceGraphics);
-      }
-      sample = null;
-      scheduleNextWindow(resampleIntervalMs);
-    }
-
-    function handleVisibilityChange() {
-      // A window straddling a hidden period measures throttled frames
-      // against real elapsed wall-clock time — discard rather than let it
-      // read as a false frame-rate collapse.
-      if (document.hidden) {
-        sample = null;
-      }
-    }
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    startWindow();
-
-    return () => {
-      if (rafId !== undefined) cancelAnimationFrame(rafId);
-      if (timeoutId !== undefined) clearTimeout(timeoutId);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
+    const probe = new FrameRateProbe({
+      sampleWindowMs,
+      minFps,
+      resampleIntervalMs,
+      consecutiveStrugglingSamples,
+      hiddenRetryMs,
+      isReduced: () => probeReducedGraphicsRef.current,
+      setReduced: setProbeReducedGraphics,
+    });
+    probe.start();
+    return () => probe.stop();
   }, [
     override,
     sampleWindowMs,
