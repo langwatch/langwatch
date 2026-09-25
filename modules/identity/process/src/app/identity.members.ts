@@ -3,6 +3,7 @@ import type { TenantMigrationRecord } from "@langwatch/system-migrations";
 
 import type { IdentityEvent } from "../eventing/identity-state.projection.ts";
 import type { JoinRequestAudienceRepository } from "../repositories/join-request-audience.repository.ts";
+import type { ScimSyncActivityRepository } from "../repositories/scim-sync-activity.repository.ts";
 import type { ScimSyncReadRepository } from "../repositories/scim-sync.repository.ts";
 import type { SsoConnectionHistoryRepository } from "../repositories/sso-connection-history.repository.ts";
 import type { SsoPlatformOperatorRepository } from "../repositories/sso-connection.repository.ts";
@@ -256,4 +257,7 @@ export type IdentityInfrastructure = Readonly<{
   ssoConnectionHistory: SsoConnectionHistoryRepository | null;
   /** The folded state of one connection's directory sync (D08). */
   scimSyncs: ScimSyncReadRepository;
+  /** One connection's directory-sync log, read. Null, like the history, where no event
+   *  stack was composed. */
+  scimSyncActivity: ScimSyncActivityRepository | null;
 }>;

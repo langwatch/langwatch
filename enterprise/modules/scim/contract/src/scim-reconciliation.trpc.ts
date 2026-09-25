@@ -12,6 +12,7 @@ import { defineTrpcContract } from "@langwatch/api/contract";
 import {
   connectionReconciliationSchema,
   organizationReconciliationSchema,
+  scimDirectoryActivityEntrySchema,
   scimReconciliationScopeSchema,
 } from "./scim-reconciliation.ts";
 import { scimConnectionRequestsInputSchema, scimRequestEntrySchema } from "./scim-request-log.ts";
@@ -28,6 +29,10 @@ export const scimReconciliationTrpc = defineTrpcContract("scimReconciliation")
   .query("getAll")
   .withInput(scimReconciliationScopeSchema)
   .withOutput(organizationReconciliationSchema)
+  /** What the directory did on one connection, newest first: the sync log, in words (ADR-126). */
+  .query("getActivity")
+  .withInput(scimConnectionRequestsInputSchema)
+  .withOutput(scimDirectoryActivityEntrySchema.array())
   /**
    * Every request the directory made on one connection, newest first.
    *

@@ -1,5 +1,11 @@
-import type { ScimSyncReadsApi, ScimSyncState } from "@langwatch/identity-contract";
+import {
+  IdentityCapabilityUnavailableError,
+  type ScimSyncActivityEntry,
+  type ScimSyncReadsApi,
+  type ScimSyncState,
+} from "@langwatch/identity-contract";
 
+import type { ScimSyncActivityRepository } from "../repositories/scim-sync-activity.repository.ts";
 import type { ScimSyncReadRepository } from "../repositories/scim-sync.repository.ts";
 
 /**
@@ -8,11 +14,17 @@ import type { ScimSyncReadRepository } from "../repositories/scim-sync.repositor
  * reconciliation view from this beside the people it pushed itself.
  */
 export class ScimSyncReadsService implements ScimSyncReadsApi {
-  static create(deps: { syncs: ScimSyncReadRepository }): ScimSyncReadsService {
-    return new ScimSyncReadsService(deps.syncs);
+  static create(deps: {
+    syncs: ScimSyncReadRepository;
+    activity: ScimSyncActivityRepository | null;
+  }): ScimSyncReadsService {
+    return new ScimSyncReadsService(deps.syncs, deps.activity);
   }
 
-  private constructor(private readonly syncs: ScimSyncReadRepository) {}
+  private constructor(
+    private readonly syncs: ScimSyncReadRepository,
+    private readonly activity: ScimSyncActivityRepository | null,
+  ) {}
 
   /** Newest first. Empty where the organization has never synced. */
   async findForOrganization({
@@ -49,5 +61,16 @@ export class ScimSyncReadsService implements ScimSyncReadsApi {
 
   findForOperator(input: { connectionId: string }): Promise<ScimSyncState[]> {
     return this.syncs.findByConnectionForOperator(input);
+  }
+
+  /** Refused by name where this process composed no event stack: an empty log would read
+   *  as a quiet directory. */
+  async findActivity(input: {
+    organizationId: string;
+    connectionId: string;
+    limit: number;
+  }): Promise<ScimSyncActivityEntry[]> {
+    if (!this.activity) throw new IdentityCapabilityUnavailableError("SCIM directory activity");
+    return [...(await this.activity.findActivity(input))];
   }
 }

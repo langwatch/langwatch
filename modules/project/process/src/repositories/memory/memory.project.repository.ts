@@ -9,6 +9,7 @@ import {
   type InternalProject,
   type InternalProjectKind,
   type PaginatedProjects,
+  type ArchivedProject,
   type Project,
   type ProjectIdentity,
   type ProjectPath,
@@ -246,10 +247,11 @@ export class MemoryProjectRepository implements ProjectRepository {
     );
   }
 
-  async archive(input: { id: string; organizationId: string }): Promise<Project> {
+  async archive(input: { id: string; organizationId: string }): Promise<ArchivedProject> {
     const project = this.#live(input.id, input.organizationId);
+    const archivedAt = toDate(nowInstant());
 
-    return this.#database.putProject({ ...project, archivedAt: toDate(nowInstant()) });
+    return { ...this.#database.putProject({ ...project, archivedAt }), archivedAt };
   }
 
   async listAllByOrganization(input: {

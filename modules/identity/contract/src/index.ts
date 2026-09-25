@@ -639,6 +639,7 @@ export {
   SCIM_USER_PUSHED_EVENT_TYPE,
   type ScimApplyOp,
   type ScimRevokeCause,
+  type ScimSyncActivityEntry,
   type ScimSyncEventType,
   type ScimSyncFact,
   type ScimSyncFactInput,

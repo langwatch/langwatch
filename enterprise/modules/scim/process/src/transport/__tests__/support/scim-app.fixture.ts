@@ -19,7 +19,10 @@ import {
   type ScimTokenEntitlement,
 } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
-import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
+import type {
+  OrganizationSsoConnection,
+  ScimSyncActivityEntry,
+} from "@langwatch/identity-contract";
 import type { Instant } from "@langwatch/time";
 import { vi } from "vitest";
 
@@ -90,6 +93,7 @@ export function scimTestApp(
     planType?: string;
     oversight?: ScimOversightService;
     operators?: Parameters<typeof ScimApp.createWithService>[0]["operators"];
+    activity?: ScimSyncActivityEntry[];
   } = {},
 ) {
   const scim = options.scim ?? new ScimServiceFake();
@@ -127,6 +131,7 @@ export function scimTestApp(
           findByConnection: () => Promise.resolve(null),
           listForOperator: () => Promise.resolve({ syncs: [], total: 0 }),
           findForOperator: () => Promise.resolve([]),
+          findActivity: () => Promise.resolve(options.activity ?? []),
         }),
       },
       grants: { findDirectoryCausedChanges: () => Promise.resolve([]) },

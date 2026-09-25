@@ -178,7 +178,18 @@ export type IdentityLookupOperator = Readonly<{ userId: string }>;
  * The platform operator's identity lookup (D05). Every operation records the
  * act before it gates, and refuses a non-operator with the generic `not_found`.
  */
+/** A domain a person proved through a verified or primary identifier. */
+export interface VerifiedUserDomain {
+  userId: string;
+  domain: string;
+}
+
 export interface IdentityLookupApi {
+  /** Every domain these people proved, one row per person and domain. An address nobody
+   *  confirmed is not evidence of who somebody works for. */
+  findVerifiedDomainsByUserIds(input: {
+    userIds: readonly string[];
+  }): Promise<VerifiedUserDomain[]>;
   lookupAddress(input: {
     address: string;
     operator: IdentityLookupOperator;

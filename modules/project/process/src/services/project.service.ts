@@ -20,6 +20,7 @@ import {
   type InternalProjectQuery,
   type OrgAdminResolution,
   type PaginatedProjects,
+  type ArchivedProject,
   type Project,
   type ProjectIdentity,
   type ProjectPath,
@@ -399,7 +400,7 @@ export class ProjectService {
     return project;
   }
 
-  async archive(input: { id: string; organizationId: string }): Promise<Project> {
+  async archive(input: { id: string; organizationId: string }): Promise<ArchivedProject> {
     const existing = await this.repository.findWithTeam(input.id);
     if (existing && existing.team.organizationId === input.organizationId) {
       assertPersonalProjectArchivable(existing.isPersonal);

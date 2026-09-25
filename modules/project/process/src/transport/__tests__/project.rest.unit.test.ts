@@ -13,6 +13,7 @@ import {
   ProjectSlugConflictError,
   TeamNotInOrganizationError,
   type PaginatedProjects,
+  type ArchivedProject,
   type Project,
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
@@ -594,7 +595,7 @@ describe("the projects REST family", () => {
   describe("when a project is archived", () => {
     it("answers with the archived project's id, name and timestamp", async () => {
       const archivedAt = new Date("2026-08-25T00:00:00.000Z");
-      const archiveInOrganization = vi.fn(async () => project({ archivedAt }));
+      const archiveInOrganization = vi.fn(async () => ({ ...project(), archivedAt }));
       const { send } = mountProjectRest({ app: { archiveInOrganization } });
 
       const response = await send("/api/projects/project_1", { method: "DELETE" });
@@ -614,7 +615,7 @@ describe("the projects REST family", () => {
     it("reports an unknown project as not found", async () => {
       const { send } = mountProjectRest({
         app: {
-          archiveInOrganization: vi.fn(async (): Promise<Project> => {
+          archiveInOrganization: vi.fn(async (): Promise<ArchivedProject> => {
             throw new ProjectNotFoundError();
           }),
         },
@@ -626,7 +627,7 @@ describe("the projects REST family", () => {
     it("refuses to archive a personal project", async () => {
       const { send } = mountProjectRest({
         app: {
-          archiveInOrganization: vi.fn(async (): Promise<Project> => {
+          archiveInOrganization: vi.fn(async (): Promise<ArchivedProject> => {
             throw new PersonalProjectProtectedError("Personal projects cannot be archived");
           }),
         },
@@ -727,7 +728,7 @@ describe("the projects REST family", () => {
 
     it("refuses to update or archive a sibling project", async () => {
       const updateInOrganization = vi.fn(async () => project());
-      const archiveInOrganization = vi.fn(async () => project());
+      const archiveInOrganization = vi.fn(async () => ({ ...project(), archivedAt: new Date(0) }));
       const { send } = mountProjectRest({
         ...SCOPED,
         app: { updateInOrganization, archiveInOrganization },

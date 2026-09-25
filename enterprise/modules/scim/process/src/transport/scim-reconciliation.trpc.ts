@@ -19,6 +19,10 @@ export const scimReconciliationTrpcTransport = defineTrpcRouter(ScimApi, scimRec
   .withPermission("sso:view")
   .handle(({ app, input }) => app.getDirectoryReconciliation(input))
 
+  .procedure("getActivity")
+  .withPermission("sso:view")
+  .handle(({ app, input }) => app.findDirectoryActivity(input))
+
   .procedure("getRequests")
   .withPermission("sso:view")
   .handle(({ app, input }) => app.findDirectoryRequests(input))

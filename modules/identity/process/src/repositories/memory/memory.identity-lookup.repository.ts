@@ -2,6 +2,7 @@ import {
   type LookupOperatorActivityRow,
   qualifySsoDomainOwnership,
   type SsoConnectionState,
+  type VerifiedUserDomain,
 } from "@langwatch/identity-contract";
 
 import {
@@ -59,6 +60,23 @@ export class MemoryIdentityLookupRepository implements IdentityLookupRepository 
       if (seeded) return [seeded];
       const row = this.store.users.get(userId);
       return row ? [{ userId: row.id, name: null, email: row.email }] : [];
+    });
+  }
+
+  async findVerifiedDomains({
+    userIds,
+  }: {
+    userIds: readonly string[];
+  }): Promise<readonly VerifiedUserDomain[]> {
+    const asked = new Set(userIds);
+    const seen = new Set<string>();
+    return [...this.store.identifiers.values()].flatMap((fact) => {
+      if (!asked.has(fact.userId) || !fact.domain) return [];
+      if (fact.state !== "VERIFIED" && fact.state !== "PRIMARY") return [];
+      const key = `${fact.userId} ${fact.domain}`;
+      if (seen.has(key)) return [];
+      seen.add(key);
+      return [{ userId: fact.userId, domain: fact.domain }];
     });
   }
 

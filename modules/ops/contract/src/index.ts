@@ -94,6 +94,7 @@ export * from "./ops-latency.ts";
 export * from "./ops-anomaly.ts";
 export * from "./ops-event-log.ts";
 export * from "./ops-feature-flag.ts";
+export * from "./ops-sign-up-health.ts";
 export * from "./ops-system-migration.ts";
 export * from "./ops-scheduler.ts";
 export * from "./ops-scheduler.errors.ts";

@@ -74,6 +74,17 @@ export const organizationReconciliationSchema = z
   .strict();
 export type OrganizationReconciliation = z.infer<typeof organizationReconciliationSchema>;
 
+/** One line of a connection's recent directory activity, said as the directory's act (ADR-126). */
+export const scimDirectoryActivityEntrySchema = z
+  .object({
+    eventId: z.string(),
+    summary: z.string(),
+    occurredAtMs: z.number().int(),
+    outcome: z.enum(["ok", "refused"]),
+  })
+  .strict();
+export type ScimDirectoryActivityEntry = z.infer<typeof scimDirectoryActivityEntrySchema>;
+
 /**
  * One person one connection's directory has claimed, by the identifier it
  * knows them by. Scim's own row: the directory module is the only thing that
@@ -95,3 +106,6 @@ export type ScimReconciliationScope = z.infer<typeof scimReconciliationScopeSche
  * than a page: a customer who needs the whole history has the audit page.
  */
 export const RECENT_DIRECTORY_CHANGE_LIMIT = 50;
+
+/** How many lines the activity feed carries: bounded, not paged, since the audit page is the trail. */
+export const DIRECTORY_ACTIVITY_LIMIT = 25;

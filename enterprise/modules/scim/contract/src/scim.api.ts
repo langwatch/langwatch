@@ -24,6 +24,7 @@ import type {
 import type {
   ConnectionReconciliation,
   OrganizationReconciliation,
+  ScimDirectoryActivityEntry,
   ScimReconciliationScope,
 } from "./scim-reconciliation.ts";
 import type { ScimConnectionRequestsInput, ScimRequestEntry } from "./scim-request-log.ts";
@@ -155,6 +156,10 @@ export interface ScimApi {
   findConnectionReconciliation(
     input: ScimConnectionRequestsInput,
   ): Promise<ConnectionReconciliation[]>;
+
+  /** What one connection's directory did, newest first, in words (ADR-126).
+   *  Scanned in this organization's tenant, so another's connection reads empty. */
+  findDirectoryActivity(input: ScimConnectionRequestsInput): Promise<ScimDirectoryActivityEntry[]>;
 
   // ── The platform operator's oversight (ADR-122) ─────────────────────────
   // Staff-list gated: anyone else is answered as if the surface did not exist.

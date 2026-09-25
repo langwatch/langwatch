@@ -188,6 +188,18 @@ export interface OrganizationUsageCount {
   readonly secondMemberJoinedAt?: number;
 }
 
+/** An organization somebody made, who made it, and where they went next (D12). */
+export interface OrganizationFounding {
+  organizationId: string;
+  /** The earliest member: the schema records no creator, and the creator joins in the same
+   *  breath as the organization is made. */
+  founderUserId: string;
+  foundedAtMs: number;
+  /** Every membership the founder took up from the window's start to `followUntilMs`,
+   *  this one included. */
+  founderMemberships: { organizationId: string; joinedAtMs: number }[];
+}
+
 export interface OrganizationApi {
   createAndAssign(
     input: Readonly<{
@@ -270,6 +282,13 @@ export interface OrganizationApi {
   markSelfHostedCustomer(input: { organizationId: string }): Promise<void>;
   /** Every organization an operator marked as a self-hosted licence customer. */
   findSelfHostedCustomers(): Promise<{ organizationId: string; organizationName: string }[]>;
+  /** Organizations founded in [fromMs, toMs], each with its founder and the founder's
+   *  memberships up to `followUntilMs` (D12's sign-up health). */
+  findFoundedBetween(input: {
+    fromMs: number;
+    toMs: number;
+    followUntilMs: number;
+  }): Promise<OrganizationFounding[]>;
   /**
    * The organization's longest-standing member, the person a customer's CRM traits are
    * written through, with its name; empty where it has no member.

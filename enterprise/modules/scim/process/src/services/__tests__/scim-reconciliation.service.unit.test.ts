@@ -5,10 +5,15 @@
  * touches a table another module owns, and nothing identity or authz holds
  * as a code reaches the reader as one.
  */
-import type { OrganizationSsoConnection, ScimSyncState } from "@langwatch/identity-contract";
+import type {
+  OrganizationSsoConnection,
+  ScimSyncActivityEntry,
+  ScimSyncState,
+} from "@langwatch/identity-contract";
 import type { UserFullProfile } from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { directoryFailureCopy } from "../../rules/scim-reconciliation-copy.rules.ts";
 import {
   ScimReconciliationService,
   type ScimReconciliationReads,
@@ -70,6 +75,7 @@ function person(id: string, name: string): UserFullProfile {
 type PanelReads = ScimReconciliationReads & {
   findForOrganization: ReturnType<typeof vi.fn>;
   getProvider: ReturnType<typeof vi.fn>;
+  findActivity: ReturnType<typeof vi.fn>;
 };
 
 function createReads({
@@ -99,6 +105,7 @@ function createReads({
     ...Array.from({ length: 12 }, (_, index) => person(`user_${index}`, `Person ${index}`)),
     person("user_sam", "Sam Patel"),
   ],
+  activity = [],
 }: {
   connections?: OrganizationSsoConnection[];
   syncs?: ScimSyncState[];
@@ -110,6 +117,7 @@ function createReads({
     occurredAtMs: number;
   }[];
   people?: UserFullProfile[];
+  activity?: ScimSyncActivityEntry[];
 } = {}): PanelReads {
   const findForOrganization = vi.fn(async () => connections);
   const getProvider = vi.fn(async ({ connectionId }: { connectionId: string }) => ({
@@ -117,9 +125,12 @@ function createReads({
     providerId: "never asked",
   }));
 
+  const findActivity = vi.fn(async () => activity);
+
   return {
     findForOrganization,
     getProvider,
+    findActivity,
     identity: {
       ssoConnectionReads: () => ({
         findForOrganization,
@@ -131,6 +142,7 @@ function createReads({
         findByConnection: async () => null,
         listForOperator: async () => ({ syncs: [], total: 0 }),
         findForOperator: async () => [],
+        findActivity,
       }),
     },
     grants: { findDirectoryCausedChanges: vi.fn(async () => changes) },
@@ -326,6 +338,76 @@ describe("the organization's directory sync panel", () => {
         organizationId: ACME,
         limit: 50,
       });
+    });
+  });
+
+  describe("when an administrator reads what the directory has been doing", () => {
+    const at = (offsetMs: number) => T0 + offsetMs;
+    const entry = (overrides: Partial<ScimSyncActivityEntry>): ScimSyncActivityEntry => ({
+      eventId: "evt",
+      type: "lw.identity.scim_user_pushed",
+      occurredAtMs: at(0),
+      outcome: "ok",
+      userId: null,
+      externalId: null,
+      groupId: null,
+      op: null,
+      errorCode: null,
+      ...overrides,
+    });
+
+    /** @scenario "A push and the failure after it read as the directory's acts, in words" */
+    it("words each line as the directory's act, naming the person and the failure", async () => {
+      reads = createReads({
+        activity: [
+          entry({
+            eventId: "evt_failed",
+            type: "lw.identity.scim_apply_failed",
+            occurredAtMs: at(2_000),
+            outcome: "refused",
+            userId: "user_sam",
+            op: "push_user",
+            errorCode: "scim_unknown_failure_code",
+          }),
+          entry({ eventId: "evt_pushed", userId: "user_sam", op: "deactivate" }),
+          entry({ eventId: "evt_stranger", userId: "user_gone", op: "create" }),
+        ],
+      });
+      service = ScimReconciliationService.create(reads);
+
+      const activity = await service.findActivity({
+        organizationId: ACME,
+        connectionId: ACME_OKTA,
+      });
+
+      expect(activity.map((line) => [line.eventId, line.outcome])).toEqual([
+        ["evt_failed", "refused"],
+        ["evt_pushed", "ok"],
+        ["evt_stranger", "ok"],
+      ]);
+      expect(activity[0]?.summary).toBe(directoryFailureCopy("scim_unknown_failure_code").title);
+      expect(activity[1]?.summary).toBe("Your directory switched off access for Sam Patel");
+      expect(activity[2]?.summary).toBe("Your directory added a person");
+      expect(reads.findActivity).toHaveBeenCalledWith({
+        organizationId: ACME,
+        connectionId: ACME_OKTA,
+        limit: 25,
+      });
+    });
+
+    it("names each person once, however many lines are about them", async () => {
+      reads = createReads({
+        activity: [
+          entry({ eventId: "evt_1", userId: "user_sam", op: "create" }),
+          entry({ eventId: "evt_2", userId: "user_sam", op: "update" }),
+        ],
+      });
+      service = ScimReconciliationService.create(reads);
+
+      await service.findActivity({ organizationId: ACME, connectionId: ACME_OKTA });
+
+      expect(reads.people.getProfiles).toHaveBeenCalledTimes(1);
+      expect(reads.people.getProfiles).toHaveBeenCalledWith({ userIds: ["user_sam"] });
     });
   });
 });

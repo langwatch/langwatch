@@ -471,3 +471,39 @@ Feature: Enterprise SCIM package boundary
       Given a legacy token stored as the bare SHA-256 digest of a value
       When an administrator mints a token with that value
       Then minting is refused with scim_token_unavailable and nothing is written
+
+  Rule: One connection's recent directory activity reads the sync log in words (ADR-126)
+
+    @unit
+    Scenario: Directory activity is read from the connection's sync log, newest first
+      Given the directory pushed a person into "acme-okta" and an apply then failed
+      When the connection's activity is read
+      Then every fact is listed newest first, the failure marked as refused
+
+    @unit
+    Scenario: Another organization's directory activity is never scanned
+      When "globex" reads activity for a connection "acme" holds
+      Then only "globex"'s own log is scanned, and nothing is listed
+
+    @unit
+    Scenario: Directory activity is refused by name where no sync log can be read
+      Given a process composed without an event stack
+      When a connection's activity is read
+      Then the read is refused as an unavailable capability rather than answered empty
+
+    @unit
+    Scenario: A push and the failure after it read as the directory's acts, in words
+      Given the directory switched off "sam" and an apply then failed
+      When the administrator reads what the directory has been doing
+      Then each line names the person and says the failure in the failure panel's words
+
+    @unit
+    Scenario: Recent directory activity is served in words under sso:view
+      When a reader who may see single sign-on asks for "acme-okta"'s activity
+      Then the lines are answered, and no other permission is asked
+
+    @unit
+    Scenario: Recent directory activity is refused once the plan no longer includes directory sync
+      Given "acme"'s plan no longer includes directory sync
+      When its activity is read
+      Then the read is refused with enterprise_plan_required

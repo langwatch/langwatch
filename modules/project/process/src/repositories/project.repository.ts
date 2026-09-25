@@ -5,6 +5,7 @@ import type {
   InternalProject,
   InternalProjectKind,
   PaginatedProjects,
+  ArchivedProject,
   Project,
   ProjectIdentity,
   ProjectPath,
@@ -72,7 +73,7 @@ export interface ProjectRepository {
   }): Promise<SearchProjectsResult[]>;
   create(input: CreateProjectInput): Promise<Project>;
   update(input: { id: string; organizationId: string; data: UpdateProjectInput }): Promise<Project>;
-  archive(input: { id: string; organizationId: string }): Promise<Project>;
+  archive(input: { id: string; organizationId: string }): Promise<ArchivedProject>;
   listAllByOrganization(input: {
     organizationId: string;
     page: number;

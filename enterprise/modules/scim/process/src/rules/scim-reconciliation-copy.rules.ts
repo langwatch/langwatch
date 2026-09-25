@@ -2,7 +2,17 @@
 /** Customer-facing directory state and change copy (ADR-122). */
 import type { ScimSyncStatusCopy } from "@langwatch/enterprise-scim-contract";
 import { explainHandledError } from "@langwatch/error-presentation/presentation";
-import type { ScimSyncLifecycleState } from "@langwatch/identity-contract";
+import {
+  SCIM_APPLY_FAILED_EVENT_TYPE,
+  SCIM_APPLY_RECOVERED_EVENT_TYPE,
+  SCIM_APPLY_REDRIVEN_EVENT_TYPE,
+  SCIM_APPLY_RETIRED_EVENT_TYPE,
+  SCIM_GROUP_MAPPED_EVENT_TYPE,
+  SCIM_TOKEN_ISSUED_EVENT_TYPE,
+  SCIM_TOKEN_REVOKED_EVENT_TYPE,
+  SCIM_USER_PUSHED_EVENT_TYPE,
+  type ScimSyncLifecycleState,
+} from "@langwatch/identity-contract";
 
 /**
  * The remediation for every failed apply, and the reason no surface here
@@ -108,4 +118,64 @@ export function directoryFailureCopy(errorCode: string): { title: string; descri
     title: explanation.title,
     description: explanation.description || DIRECTORY_FAILURE_REMEDIATION,
   };
+}
+
+/** Who an activity line was about when the person could not be resolved. */
+export const DIRECTORY_ACTIVITY_UNKNOWN_PERSON = "a person";
+
+/**
+ * One line of the activity feed (ADR-126), said as the directory's act in the
+ * provider's vocabulary. A failure's words come from the same registry as the
+ * failure panel's, so the two surfaces cannot describe one failure differently.
+ */
+export function directoryActivityCopy({
+  type,
+  op,
+  person,
+  failure,
+}: {
+  type: string;
+  op: string | null;
+  person: string | null;
+  failure: string | null;
+}): string {
+  const who = person ?? DIRECTORY_ACTIVITY_UNKNOWN_PERSON;
+  switch (type) {
+    case SCIM_TOKEN_ISSUED_EVENT_TYPE:
+      return "A provisioning token was issued for this connection";
+    case SCIM_USER_PUSHED_EVENT_TYPE:
+      return `${directoryUserOpCopy(op)} ${who}`;
+    case SCIM_GROUP_MAPPED_EVENT_TYPE:
+      return "Your directory sent a group";
+    case SCIM_APPLY_FAILED_EVENT_TYPE:
+      return failure ?? "Something your directory sent could not be applied";
+    case SCIM_APPLY_RECOVERED_EVENT_TYPE:
+      return "A change that had been failing went through";
+    case SCIM_APPLY_RETIRED_EVENT_TYPE:
+      return failure
+        ? `${failure} — no longer being retried`
+        : "A change your directory sent will not be retried again";
+    case SCIM_APPLY_REDRIVEN_EVENT_TYPE:
+      return "A change that had been given up on was sent through again";
+    case SCIM_TOKEN_REVOKED_EVENT_TYPE:
+      return "This connection's provisioning token stopped working";
+    default:
+      return "Your directory did something we have no words for yet";
+  }
+}
+
+/** The provider's own verb for what it did to somebody. */
+function directoryUserOpCopy(op: string | null): string {
+  switch (op) {
+    case "create":
+      return "Your directory added";
+    case "update":
+      return "Your directory updated";
+    case "deactivate":
+      return "Your directory switched off access for";
+    case "remove":
+      return "Your directory removed";
+    default:
+      return "Your directory sent";
+  }
 }

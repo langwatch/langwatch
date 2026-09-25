@@ -34,7 +34,9 @@ export {
 export {
   RECENT_DIRECTORY_CHANGE_LIMIT,
   connectionReconciliationSchema,
+  DIRECTORY_ACTIVITY_LIMIT,
   organizationReconciliationSchema,
+  scimDirectoryActivityEntrySchema,
   scimReconciliationChangeSchema,
   scimReconciliationFailureSchema,
   scimReconciliationScopeSchema,
@@ -42,6 +44,7 @@ export {
   scimSyncToneSchema,
   type ConnectionReconciliation,
   type OrganizationReconciliation,
+  type ScimDirectoryActivityEntry,
   type ScimDirectoryOwnership,
   type ScimReconciliationChange,
   type ScimReconciliationFailure,

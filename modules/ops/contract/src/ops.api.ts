@@ -78,6 +78,7 @@ import type {
   SchedulerAuditEntryView,
   SetScheduleActiveInput,
 } from "./ops-scheduler.ts";
+import type { OpsSignUpHealthInput, SignUpHealth } from "./ops-sign-up-health.ts";
 import type { OpsSnapshotAbortSignal } from "./ops-snapshot.service.ts";
 import type {
   OpsMigrationCohortResult,
@@ -567,6 +568,8 @@ export interface OpsApi {
     organizationId?: string;
     limit?: number;
   }): Promise<SearchProjectsResult[]>;
+  /** The orphaned-organization rate for a window, derived from stored rows (D12). */
+  getSignUpHealth(input: OpsSignUpHealthInput): Promise<SignUpHealth>;
   featureFlagCatalogue(): Promise<OperatorFeatureFlagCatalogue>;
   setFeatureFlagEnabled(input: {
     key: string;

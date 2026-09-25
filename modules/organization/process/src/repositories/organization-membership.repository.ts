@@ -5,6 +5,7 @@ import type {
   CustomRole,
   EnrichedAuditLog as ContractEnrichedAuditLog,
   Organization,
+  OrganizationFounding,
   OrganizationIntent,
   OrganizationUser,
   OrganizationUserRole,
@@ -302,6 +303,14 @@ export abstract class OrganizationMembershipRepository {
   abstract findSelfHostedCustomers(): Promise<
     { organizationId: string; organizationName: string }[]
   >;
+
+  /** Organizations founded in the window with their founders, and the founders' memberships
+   *  up to `followUntilMs`. */
+  abstract findFoundedBetween(input: {
+    fromMs: number;
+    toMs: number;
+    followUntilMs: number;
+  }): Promise<OrganizationFounding[]>;
 
   /** The organization's oldest membership with its name; empty where it has none. */
   abstract findRepresentatives(

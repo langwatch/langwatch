@@ -227,6 +227,21 @@ export interface ScimSyncState {
   updatedAtMs: number;
 }
 
+/** One fact from a connection's directory-sync log, ids and enums only; the reader words it
+ *  (ADR-126). */
+export interface ScimSyncActivityEntry {
+  eventId: string;
+  type: ScimSyncEventType;
+  occurredAtMs: number;
+  /** A failed, retired or re-driven apply is "refused"; every other fact is "ok". */
+  outcome: "ok" | "refused";
+  userId: string | null;
+  externalId: string | null;
+  groupId: string | null;
+  op: string | null;
+  errorCode: string | null;
+}
+
 /** The sync's aggregate id, derived from the connection id. A connection has exactly one sync:
  * deriving the id avoids a lookup table and ensures no sync escapes the connection.
  */

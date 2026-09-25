@@ -73,7 +73,7 @@ import type {
   RedriveScimApplyCommandData,
   RevokeScimSyncCommandData,
 } from "./scim-sync-commands.ts";
-import type { ScimSyncFactInput, ScimSyncState } from "./scim-sync.ts";
+import type { ScimSyncActivityEntry, ScimSyncFactInput, ScimSyncState } from "./scim-sync.ts";
 import type { RoutingDecision } from "./signin-routing.ts";
 import type {
   SsoArrivingUser,
@@ -287,6 +287,13 @@ export interface ScimSyncReadsApi {
   }): Promise<{ syncs: ScimSyncState[]; total: number }>;
   /** One connection's sync across every organization, for the operator. */
   findForOperator(args: { connectionId: string }): Promise<ScimSyncState[]>;
+  /** One connection's sync log, newest first, at most `limit`. Scanned in the
+   *  organization's tenant, so another organization's connection reads empty. */
+  findActivity(args: {
+    organizationId: string;
+    connectionId: string;
+    limit: number;
+  }): Promise<ScimSyncActivityEntry[]>;
 }
 
 /**

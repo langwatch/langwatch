@@ -106,6 +106,7 @@ import {
   type TeamWithProjects,
   type OrganizationMemberProvenance,
   type OrganizationGroupService,
+  type OrganizationFounding,
 } from "@langwatch/organization-contract";
 import type * as organizationContractModule from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
@@ -778,6 +779,14 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
   findSelfHostedCustomers(): Promise<{ organizationId: string; organizationName: string }[]> {
     return this.#dependencies.membership.findSelfHostedCustomers();
+  }
+
+  findFoundedBetween(input: {
+    fromMs: number;
+    toMs: number;
+    followUntilMs: number;
+  }): Promise<OrganizationFounding[]> {
+    return this.#dependencies.membership.findFoundedBetween(input);
   }
 
   findRepresentatives(input: {

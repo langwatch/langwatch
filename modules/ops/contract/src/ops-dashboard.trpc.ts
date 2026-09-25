@@ -17,6 +17,7 @@ import {
   opsSetScheduleActiveInputSchema,
   schedulerAuditEntryViewSchema,
 } from "./ops-scheduler.ts";
+import { opsSignUpHealthInputSchema, signUpHealthSchema } from "./ops-sign-up-health.ts";
 import {
   opsApiGetBadgeCountsOutputSchema,
   opsPausedSchedulesPageSchema,
@@ -45,6 +46,11 @@ export const opsDashboardTrpc = defineTrpcContract("ops")
   .query("getBadgeCounts")
   .withInput(z.void())
   .withOutput(opsApiGetBadgeCountsOutputSchema)
+
+  /** The orphaned-organization rate join-before-create exists to reduce (D12), for any window. */
+  .query("getSignUpHealth")
+  .withInput(opsSignUpHealthInputSchema)
+  .withOutput(signUpHealthSchema)
 
   .subscription("dashboardStream")
   .withInput(z.void())

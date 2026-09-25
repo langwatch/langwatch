@@ -36,6 +36,7 @@ import {
   type ScimError,
   type ConnectionReconciliation,
   type OrganizationReconciliation,
+  type ScimDirectoryActivityEntry,
   type ScimGroup,
   type ScimListResponse,
   type ScimConnectionRequestsInput,
@@ -501,6 +502,15 @@ export class ScimApp implements ScimApiContract {
     if (!(await this.isEnterpriseEntitled(input))) throw new EnterprisePlanRequiredError("SCIM");
 
     return this.#reconciliation.findById(input);
+  }
+
+  /** Plan-gated like the panel it sits in, as main's getActivity asked the plan. */
+  async findDirectoryActivity(
+    input: ScimConnectionRequestsInput,
+  ): Promise<ScimDirectoryActivityEntry[]> {
+    if (!(await this.isEnterpriseEntitled(input))) throw new EnterprisePlanRequiredError("SCIM");
+
+    return this.#reconciliation.findActivity(input);
   }
 
   async findDirectoryRequests(input: ScimConnectionRequestsInput): Promise<ScimRequestEntry[]> {

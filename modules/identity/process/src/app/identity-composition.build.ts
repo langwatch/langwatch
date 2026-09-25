@@ -15,7 +15,12 @@ import {
   type IdentityStagedSender,
 } from "../eventing/identity-ledger.store.ts";
 import { JoinRequestLedgerStore } from "../eventing/join-request-ledger.store.ts";
+import type { ScimSyncEvent } from "../eventing/scim-sync-state.projection.ts";
 import type { SsoConnectionEvent } from "../eventing/sso-connection-state.projection.ts";
+import {
+  EventingScimSyncActivityRepository,
+  type ScimSyncEventReads,
+} from "../repositories/eventing/eventing.scim-sync-activity.repository.ts";
 import {
   EventingSsoConnectionHistoryRepository,
   type SsoConnectionEventReads,
@@ -188,6 +193,20 @@ function ssoConnectionHistoryStore(options: {
   };
 }
 
+/** How the directory-sync activity reaches this process's log, resolved per read. */
+function scimSyncActivityStore(options: {
+  eventing: EventSourcing;
+}): () => Promise<ScimSyncEventReads> {
+  const { eventing } = options;
+  return async () => {
+    const store = eventing.getEventStore<ScimSyncEvent>();
+    if (!store) {
+      throw new Error("scim sync activity cannot read: the event-sourcing stack is unavailable");
+    }
+    return store;
+  };
+}
+
 /** What this process hands `IdentityApp` at boot, built from its own rows, members and config. */
 export function buildIdentityInfrastructure(input: {
   repositories: Pick<
@@ -235,5 +254,10 @@ export function buildIdentityInfrastructure(input: {
         })
       : null,
     scimSyncs: repositories.scimSyncs,
+    scimSyncActivity: eventing.isEnabled
+      ? EventingScimSyncActivityRepository.create({
+          eventStore: scimSyncActivityStore({ eventing }),
+        })
+      : null,
   };
 }

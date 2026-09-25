@@ -46,6 +46,7 @@ describe("OrganizationMembershipService", () => {
     deleteProvisionedOrganization: vi.fn(),
     markSelfHostedCustomer: vi.fn(),
     findSelfHostedCustomers: vi.fn(),
+    findFoundedBetween: vi.fn(),
     findRepresentatives: vi.fn(),
     findAllForUser: vi.fn(),
     findOrganizationWithMembers: vi.fn(),

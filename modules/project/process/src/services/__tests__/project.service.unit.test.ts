@@ -125,7 +125,7 @@ class StubRepository implements ProjectRepository {
   findTraceSharingConfig = vi.fn(async () => null);
   searchByQuery = vi.fn(async () => []);
   update = vi.fn(async () => applicationProject);
-  archive = vi.fn(async () => applicationProject);
+  archive = vi.fn(async () => ({ ...applicationProject, archivedAt: new Date(0) }));
   listAllByOrganization = vi.fn(async () => ({
     data: [applicationProject],
     pagination: { page: 1, limit: 50, total: 1 },

@@ -33,6 +33,7 @@ import {
   projectRestUpdateSchema,
   ProjectSlugConflictError,
   TeamNotInOrganizationError,
+  type ArchivedProject,
   type Project,
   type ProjectApi,
   type ProjectWithTeam,
@@ -92,7 +93,7 @@ export interface ProjectManagementApi extends Pick<
    */
   archiveInOrganization(
     input: Readonly<{ projectId: string; organizationId: string }>,
-  ): Promise<Project>;
+  ): Promise<ArchivedProject>;
   /** Which of the organization's projects the presented credential reaches. */
   resolveVisibleProjects(
     input: Readonly<{ apiKeyId: string; organizationId: string }>,
@@ -411,7 +412,7 @@ async function archiveProject({
   app: ProjectManagementApi;
   id: string;
   organizationId: string;
-}): Promise<Project> {
+}): Promise<ArchivedProject> {
   try {
     return await app.archiveInOrganization({ projectId: id, organizationId });
   } catch (error) {

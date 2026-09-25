@@ -9,6 +9,7 @@ import {
   RoleBindingScopeType,
   TeamNotFoundError,
   type Organization,
+  type OrganizationFounding,
   type OrganizationIntent,
   type TeamUserRole,
   type User,
@@ -264,6 +265,38 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     return [...this.memory.selfHostedCustomers].flatMap((organizationId) => {
       const organization = this.memory.organizations.get(organizationId);
       return organization ? [{ organizationId, organizationName: organization.name }] : [];
+    });
+  }
+
+  /** The founder is the earliest membership, as in Postgres: the schema records no creator. */
+  async findFoundedBetween({
+    fromMs,
+    toMs,
+    followUntilMs,
+  }: {
+    fromMs: number;
+    toMs: number;
+    followUntilMs: number;
+  }): Promise<OrganizationFounding[]> {
+    const at = (row: { createdAt: Instant }) => row.createdAt.epochMilliseconds;
+    const byJoin = this.memory.organizationUsers.toSorted((left, right) => at(left) - at(right));
+    return [...this.memory.organizations.values()].flatMap((organization) => {
+      if (at(organization) < fromMs || at(organization) > toMs) return [];
+      const founder = byJoin.find((row) => row.organizationId === organization.id);
+      if (!founder) return [];
+      return [
+        {
+          organizationId: organization.id,
+          founderUserId: founder.userId,
+          foundedAtMs: at(organization),
+          founderMemberships: byJoin
+            .filter(
+              (row) =>
+                row.userId === founder.userId && at(row) >= fromMs && at(row) <= followUntilMs,
+            )
+            .map((row) => ({ organizationId: row.organizationId, joinedAtMs: at(row) })),
+        },
+      ];
     });
   }
 

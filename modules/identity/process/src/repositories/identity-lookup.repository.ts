@@ -1,4 +1,4 @@
-import type { LookupOperatorActivityRow } from "@langwatch/identity-contract";
+import type { LookupOperatorActivityRow, VerifiedUserDomain } from "@langwatch/identity-contract";
 
 /**
  * The cross-organization reads the operator lookup takes (D05 tier 1).
@@ -15,6 +15,11 @@ export abstract class IdentityLookupRepository {
   }): Promise<readonly LookupIdentifierRow[]>;
 
   abstract findUsers(input: { userIds: readonly string[] }): Promise<readonly LookupUserRow[]>;
+
+  /** Verified or primary identifiers that carry a domain, one row per person and domain. */
+  abstract findVerifiedDomains(input: {
+    userIds: readonly string[];
+  }): Promise<readonly VerifiedUserDomain[]>;
 
   abstract findMemberships(input: {
     userIds: readonly string[];

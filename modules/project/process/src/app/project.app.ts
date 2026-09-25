@@ -13,6 +13,7 @@ import {
   type InternalProjectKind,
   type InternalProjectQuery,
   type OrgAdminResolution,
+  type ArchivedProject,
   type Project,
   type ProjectIdentity,
   type ProjectWithTeam,
@@ -302,7 +303,7 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
 
   archiveInOrganization(
     input: Readonly<{ projectId: string; organizationId: string }>,
-  ): Promise<Project> {
+  ): Promise<ArchivedProject> {
     return this.#projectService.archive({
       id: input.projectId,
       organizationId: input.organizationId,

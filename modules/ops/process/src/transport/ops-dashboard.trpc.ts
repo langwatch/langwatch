@@ -23,6 +23,15 @@ export const opsDashboardTrpcTransport = defineTrpcRouter(OpsApi, opsDashboardTr
     return app.findDashboardData();
   })
 
+  .procedure("getSignUpHealth")
+  .withFacts(opsOperatorFact)
+  .serviceAuthorized(OPS_VIEW)
+  .handle(({ app, input }, operator) => {
+    app.admitOperator(operator, "ops:view");
+
+    return app.getSignUpHealth(input);
+  })
+
   .procedure("getBadgeCounts")
   .withFacts(opsOperatorFact)
   .serviceAuthorized(OPS_VIEW)

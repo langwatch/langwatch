@@ -7,6 +7,7 @@ import {
   type IdentityLookupAnswer,
   type IdentityLookupOperator,
   type LookupDomainClaim,
+  type VerifiedUserDomain,
   type LookupIdentifier,
   type LookupInvitationExpiry,
   type LookupOperatorActivityRow,
@@ -68,6 +69,15 @@ export class IdentityLookupService {
   private constructor(deps: IdentityLookupServiceDeps) {
     this.deps = deps;
     this.now = deps.now ?? Date.now;
+  }
+
+  /** A system read, not an operator act: nothing is recorded. */
+  async findVerifiedDomainsByUserIds({
+    userIds,
+  }: {
+    userIds: readonly string[];
+  }): Promise<VerifiedUserDomain[]> {
+    return [...(await this.deps.reads.findVerifiedDomains({ userIds }))];
   }
 
   /** An address nobody holds answers with the routing decision and an

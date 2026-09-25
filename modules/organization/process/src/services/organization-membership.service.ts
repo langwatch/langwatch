@@ -17,6 +17,7 @@ import { generate } from "@langwatch/ksuid";
 import {
   type OrganizationAdministrator,
   type OrganizationIntent,
+  type OrganizationFounding,
   type OrganizationUser,
   OrganizationUserRole,
   PricingModel,
@@ -323,6 +324,14 @@ export class OrganizationMembershipService {
 
   findSelfHostedCustomers(): Promise<{ organizationId: string; organizationName: string }[]> {
     return this.repo.findSelfHostedCustomers();
+  }
+
+  findFoundedBetween(input: {
+    fromMs: number;
+    toMs: number;
+    followUntilMs: number;
+  }): Promise<OrganizationFounding[]> {
+    return this.repo.findFoundedBetween(input);
   }
 
   findRepresentatives({

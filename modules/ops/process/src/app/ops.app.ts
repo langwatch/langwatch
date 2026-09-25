@@ -30,7 +30,11 @@ import {
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { GithubApi } from "@langwatch/github-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
-import { IdentityApi, type IdentityApi as IdentityApiContract } from "@langwatch/identity-contract";
+import {
+  IdentityApi,
+  IdentityLookupApi,
+  type IdentityApi as IdentityApiContract,
+} from "@langwatch/identity-contract";
 import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { LangyApi } from "@langwatch/langy-contract";
@@ -213,6 +217,8 @@ import {
   type MoveAllBlockedQueueGroupsToDlqResult,
   type RunBlobCleanupCommand,
   type StreamDashboardInput,
+  type OpsSignUpHealthInput,
+  type SignUpHealth,
 } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import {
@@ -249,6 +255,7 @@ import { withKillSwitchDescriptors } from "../rules/ops-kill-switch-catalogue.ru
 import { AnomalyDetectorService } from "../services/anomaly-detector.service.ts";
 import { OpsCheckupService } from "../services/ops-checkup.service.ts";
 import type { OpsService } from "../services/ops.service.ts";
+import { SignUpHealthService } from "../services/sign-up-health.service.ts";
 import { StorageStatsCollectionService } from "../services/storage-stats-collection.service.ts";
 import { StorageStatsGaugesService } from "../services/storage-stats-gauges.service.ts";
 import {
@@ -584,6 +591,8 @@ type OpsRuntimeDependencies = Readonly<{
   anomalies: AnomalyDetectorService | undefined;
   /** The measurement `ops_storage_stats` runs; absent where a composition built none. */
   storageStats: StorageStatsCollectionService | undefined;
+  /** The orphaned-organization rate; absent where a composition built none. */
+  signUpHealth: SignUpHealthService | undefined;
   findOpsApiKey(): string | null;
   findProductAnalyticsTargets(): ProductAnalyticsTarget[];
   isProduction: boolean;
@@ -614,6 +623,8 @@ export class OpsApp implements OpsApi {
     users: UserApi,
     auth: AuthApi,
     identity: IdentityApi,
+    // The same identity app, asked through its lookup surface for proved domains (D12).
+    identityLookup: IdentityLookupApi,
     projects: ProjectApi,
     auditLog: AuditLogApi,
     apiKeys: ApiKeyApi,
@@ -727,6 +738,10 @@ export class OpsApp implements OpsApi {
       checkup,
       anomalies,
       storageStats,
+      signUpHealth: SignUpHealthService.create({
+        organizations: dependencies.organizations,
+        identity: dependencies.identityLookup,
+      }),
     });
   }
 
@@ -742,6 +757,7 @@ export class OpsApp implements OpsApi {
     checkup?: OpsCheckupService;
     anomalies?: AnomalyDetectorService;
     storageStats?: StorageStatsCollectionService;
+    signUpHealth?: SignUpHealthService;
   }): OpsApp {
     const { infrastructure: members, dependencies, repositories } = setup;
 
@@ -772,6 +788,7 @@ export class OpsApp implements OpsApi {
       checkup: setup.checkup,
       anomalies: setup.anomalies,
       storageStats: setup.storageStats,
+      signUpHealth: setup.signUpHealth,
       findOpsApiKey: () => members.findOpsApiKey(),
       findProductAnalyticsTargets: () => members.findProductAnalyticsTargets(),
       isProduction: members.isProduction,
@@ -880,6 +897,10 @@ export class OpsApp implements OpsApi {
    * kill switch the live pipeline graph will read even before anyone has
    * flipped it.
    */
+  getSignUpHealth(input: OpsSignUpHealthInput): Promise<SignUpHealth> {
+    return this.#signUpHealth.getSignUpHealth(input);
+  }
+
   async featureFlagCatalogue(): Promise<OperatorFeatureFlagCatalogue> {
     return withKillSwitchDescriptors({
       catalogue: await this.#dependencies.featureFlags.listOperatorCatalogue(),
@@ -1651,6 +1672,12 @@ export class OpsApp implements OpsApi {
     const { storageStats } = this.#dependencies;
     if (!storageStats) throw new OpsCapabilityUnavailableError("storage stats");
     return storageStats.collect();
+  }
+
+  get #signUpHealth(): SignUpHealthService {
+    const { signUpHealth } = this.#dependencies;
+    if (!signUpHealth) throw new OpsCapabilityUnavailableError("the sign-up health reading");
+    return signUpHealth;
   }
 
   get #checkup(): OpsCheckupService {

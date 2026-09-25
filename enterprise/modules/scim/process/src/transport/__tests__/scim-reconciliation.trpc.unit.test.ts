@@ -6,7 +6,10 @@
  * single sign-on without managing it (ADR-126).
  */
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
-import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
+import type {
+  OrganizationSsoConnection,
+  ScimSyncActivityEntry,
+} from "@langwatch/identity-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
@@ -71,7 +74,7 @@ const OKTA: OrganizationSsoConnection = {
 
 function mount(
   permits: (permission: string) => boolean = () => true,
-  options: { planType?: string } = {},
+  options: { planType?: string; activity?: ScimSyncActivityEntry[] } = {},
 ) {
   const scim = new ScimServiceFake();
   scim.findRequestLog.mockResolvedValue([ENTRY]);
@@ -173,6 +176,54 @@ describe("the scimReconciliation tRPC namespace", () => {
 
       await expect(
         caller.getById({ organizationId: "org-acme", connectionId: "conn-okta" }),
+      ).rejects.toMatchObject({ cause: { code: "enterprise_plan_required" } });
+    });
+  });
+
+  describe("when one connection's recent directory activity is read", () => {
+    const pushed: ScimSyncActivityEntry = {
+      eventId: "evt-1",
+      type: "lw.identity.scim_user_pushed",
+      occurredAtMs: 1_700_000_000_000,
+      outcome: "ok",
+      userId: null,
+      externalId: "okta-sam",
+      groupId: null,
+      op: "create",
+      errorCode: null,
+    };
+
+    /** @scenario "Recent directory activity is served in words under sso:view" */
+    it("answers the log as lines of words, asking only sso:view", async () => {
+      const seen: string[] = [];
+      const { caller } = mount(
+        (permission) => {
+          seen.push(permission);
+
+          return permission === "sso:view";
+        },
+        { activity: [pushed] },
+      );
+
+      await expect(
+        caller.getActivity({ organizationId: "org-acme", connectionId: "conn-okta" }),
+      ).resolves.toEqual([
+        {
+          eventId: "evt-1",
+          occurredAtMs: 1_700_000_000_000,
+          outcome: "ok",
+          summary: "Your directory added a person",
+        },
+      ]);
+      expect(seen).toEqual(["sso:view"]);
+    });
+
+    /** @scenario "Recent directory activity is refused once the plan no longer includes directory sync" */
+    it("refuses an organization whose plan lapsed", async () => {
+      const { caller } = mount(() => true, { planType: "FREE", activity: [pushed] });
+
+      await expect(
+        caller.getActivity({ organizationId: "org-acme", connectionId: "conn-okta" }),
       ).rejects.toMatchObject({ cause: { code: "enterprise_plan_required" } });
     });
   });

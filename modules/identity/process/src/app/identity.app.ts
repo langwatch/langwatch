@@ -23,6 +23,7 @@ import {
   type IdentityLookupOperator,
   type IdentityReservationsApi,
   type LookupDomainClaim,
+  type VerifiedUserDomain,
   type LookupInvitationExpiry,
   type LookupOperatorActivityRow,
   type LookupPersonDetail,
@@ -642,7 +643,10 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
       migrations: ssoMigrationProgress,
     });
     const scimSyncGuards = ScimSyncGuardsService.create({ syncs: infrastructure.scimSyncs });
-    const scimSyncReads = ScimSyncReadsService.create({ syncs: infrastructure.scimSyncs });
+    const scimSyncReads = ScimSyncReadsService.create({
+      syncs: infrastructure.scimSyncs,
+      activity: infrastructure.scimSyncActivity,
+    });
     const auth = setup.dependencies.auth;
     const resolveAuthProvider = () => auth.resolveAuthProvider();
     // Main's router (identity/runtime.ts): projected connections, the method policy, one
@@ -1090,6 +1094,12 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
     operator: IdentityLookupOperator;
   }): Promise<LookupOperatorActivityRow[]> {
     return this.#parts.lookup.findLookupActivity(input);
+  }
+
+  findVerifiedDomainsByUserIds(input: {
+    userIds: readonly string[];
+  }): Promise<VerifiedUserDomain[]> {
+    return this.#parts.lookup.findVerifiedDomainsByUserIds(input);
   }
 
   findDomainClaimQueue(input: { operator: IdentityLookupOperator }): Promise<LookupDomainClaim[]> {

@@ -52,7 +52,7 @@ function readsOver(states: ScimSyncState[]) {
       return states.filter((state) => state.organizationId === organizationId);
     }
   }
-  return ScimSyncReadsService.create({ syncs: new StubSyncs() });
+  return ScimSyncReadsService.create({ syncs: new StubSyncs(), activity: null });
 }
 
 describe("given an organization whose connections have synced", () => {
@@ -91,5 +91,21 @@ describe("given an organization that has never synced", () => {
     const reads = readsOver([]);
 
     expect(await reads.findForOrganization({ organizationId: ACME })).toEqual([]);
+  });
+});
+
+describe("given a process composed without an event stack", () => {
+  describe("when a connection's directory activity is read", () => {
+    /** @scenario "Directory activity is refused by name where no sync log can be read" */
+    it("refuses by name rather than reading as a quiet directory", async () => {
+      const reads = readsOver([sync({ connectionId: "ssoc_okta" })]);
+
+      await expect(
+        reads.findActivity({ organizationId: ACME, connectionId: "ssoc_okta", limit: 25 }),
+      ).rejects.toMatchObject({
+        code: "service_unavailable",
+        meta: { capability: "SCIM directory activity" },
+      });
+    });
   });
 });

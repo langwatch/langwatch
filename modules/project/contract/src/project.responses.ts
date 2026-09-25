@@ -124,7 +124,7 @@ export const projectRestArchivedSchema = z
   .object({
     id: z.string().min(1),
     name: z.string(),
-    archivedAt: z.date().nullable(),
+    archivedAt: z.date(),
   })
   .strict();
 export type ProjectRestArchived = z.infer<typeof projectRestArchivedSchema>;

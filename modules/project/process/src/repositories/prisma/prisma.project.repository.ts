@@ -15,6 +15,7 @@ import {
   type InternalProject,
   type InternalProjectKind,
   type PaginatedProjects,
+  type ArchivedProject,
   type Project,
   type ProjectIdentity,
   type ProjectPath,
@@ -370,19 +371,21 @@ export class PrismaProjectRepository
     );
   }
 
-  async archive(input: { id: string; organizationId: string }): Promise<Project> {
+  async archive(input: { id: string; organizationId: string }): Promise<ArchivedProject> {
+    const archivedAt = new Date();
     const result = await this.prisma.project.updateMany({
       where: {
         id: input.id,
         archivedAt: null,
         team: { organizationId: input.organizationId },
       },
-      data: { archivedAt: new Date() },
+      data: { archivedAt },
     });
     if (result.count === 0) throw new ProjectNotFoundError("Project not found");
-    return this.mapProjectRequired(
+    const project = this.mapProjectRequired(
       await this.prisma.project.findUniqueOrThrow({ where: { id: input.id } }),
     );
+    return { ...project, archivedAt };
   }
 
   async listAllByOrganization(input: {

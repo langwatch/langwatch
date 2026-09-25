@@ -238,4 +238,51 @@ describe("IdentityLookupService", () => {
       expect(answer.resolved).toBe(normalizeIdentifierValue("Sam+ops@ACME.com"));
     });
   });
+
+  describe("when the domains people proved are read", () => {
+    function seed({
+      identifierId,
+      userId,
+      domain,
+      state,
+    }: {
+      identifierId: string;
+      userId: string;
+      domain: string | null;
+      state: "PRIMARY" | "VERIFIED" | "ATTACHED" | "DETACHED";
+    }) {
+      store.identifiers.set(identifierId, {
+        identifierId,
+        userId,
+        provider: "credential",
+        value: `${userId}@${domain ?? "nowhere"}`,
+        domain,
+        identifierHash: null,
+        accountId: null,
+        providerId: null,
+        issuer: null,
+        providerAccountId: null,
+        connectionId: null,
+        state,
+        verifiedAtMs: null,
+        attachedAtMs: 1,
+        detachedAtMs: null,
+      });
+    }
+
+    it("answers each person's proved domains once, and never an unproved one", async () => {
+      seed({ identifierId: "id_1", userId: "user_sam", domain: "acme.com", state: "PRIMARY" });
+      seed({ identifierId: "id_2", userId: "user_sam", domain: "acme.com", state: "VERIFIED" });
+      seed({ identifierId: "id_3", userId: "user_ana", domain: "globex.com", state: "ATTACHED" });
+      seed({ identifierId: "id_4", userId: "user_ana", domain: "initech.com", state: "DETACHED" });
+      seed({ identifierId: "id_5", userId: "user_lee", domain: "acme.com", state: "VERIFIED" });
+
+      const domains = await serviceFor().findVerifiedDomainsByUserIds({
+        userIds: ["user_sam", "user_ana"],
+      });
+
+      expect(domains).toEqual([{ userId: "user_sam", domain: "acme.com" }]);
+      expect(auditLog.rows).toHaveLength(0);
+    });
+  });
 });

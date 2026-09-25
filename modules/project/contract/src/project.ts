@@ -81,6 +81,11 @@ export const projectSchema = z
   .strict();
 export type Project = z.infer<typeof projectSchema>;
 
+/** A project the archive just stamped: its archive time is always set. */
+export type ArchivedProject = Omit<Project, "archivedAt"> & {
+  archivedAt: NonNullable<Project["archivedAt"]>;
+};
+
 export const teamSchema = z
   .object({
     id: z.string().min(1),

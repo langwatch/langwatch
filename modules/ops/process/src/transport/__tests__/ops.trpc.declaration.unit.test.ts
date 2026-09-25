@@ -96,6 +96,7 @@ const OPS_PROCEDURES: Readonly<Record<string, "query" | "mutation" | "subscripti
   getScope: "query",
   getDashboardSnapshot: "query",
   getBadgeCounts: "query",
+  getSignUpHealth: "query",
   dashboardStream: "subscription",
   listParkedGroups: "query",
   listQueues: "query",

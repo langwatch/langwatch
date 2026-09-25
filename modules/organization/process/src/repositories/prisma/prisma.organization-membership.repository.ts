@@ -17,7 +17,7 @@ import {
   OrganizationNotFoundError,
   OrganizationSlugTakenError,
 } from "@langwatch/organization-contract";
-import type { User } from "@langwatch/organization-contract";
+import type { OrganizationFounding, User } from "@langwatch/organization-contract";
 import type {
   Organization,
   OrganizationIntent,
@@ -502,6 +502,69 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       orderBy: { createdAt: "asc" },
     });
     return rows.map((row) => ({ organizationId: row.id, organizationName: row.name }));
+  }
+
+  /**
+   * The founder is the earliest membership. Founders' later memberships are asked of
+   * Organization, since a membership read bounded only by user spans every tenant.
+   */
+  async findFoundedBetween({
+    fromMs,
+    toMs,
+    followUntilMs,
+  }: {
+    fromMs: number;
+    toMs: number;
+    followUntilMs: number;
+  }): Promise<OrganizationFounding[]> {
+    const organizations = await this.prisma.organization.findMany({
+      where: { createdAt: { gte: new Date(fromMs), lte: new Date(toMs) } },
+      select: { id: true, createdAt: true },
+    });
+    if (organizations.length === 0) return [];
+
+    const memberships = await this.prisma.organizationUser.findMany({
+      where: { organizationId: { in: organizations.map((row) => row.id) } },
+      select: { organizationId: true, userId: true },
+      orderBy: { createdAt: "asc" },
+    });
+    const founderOf = new Map<string, string>();
+    for (const membership of memberships) {
+      if (!founderOf.has(membership.organizationId)) {
+        founderOf.set(membership.organizationId, membership.userId);
+      }
+    }
+    if (founderOf.size === 0) return [];
+
+    const followed = {
+      userId: { in: [...new Set(founderOf.values())] },
+      createdAt: { gte: new Date(fromMs), lte: new Date(followUntilMs) },
+    };
+    const joined = await this.prisma.organization.findMany({
+      where: { members: { some: followed } },
+      select: { id: true, members: { where: followed, select: { userId: true, createdAt: true } } },
+    });
+    const membershipsOf = new Map<string, { organizationId: string; joinedAtMs: number }[]>();
+    for (const organization of joined) {
+      for (const member of organization.members) {
+        const held = membershipsOf.get(member.userId) ?? [];
+        held.push({ organizationId: organization.id, joinedAtMs: member.createdAt.getTime() });
+        membershipsOf.set(member.userId, held);
+      }
+    }
+
+    return organizations.flatMap((organization) => {
+      const founderUserId = founderOf.get(organization.id);
+      if (!founderUserId) return [];
+      return [
+        {
+          organizationId: organization.id,
+          founderUserId,
+          foundedAtMs: organization.createdAt.getTime(),
+          founderMemberships: membershipsOf.get(founderUserId) ?? [],
+        },
+      ];
+    });
   }
 
   async findRepresentatives(

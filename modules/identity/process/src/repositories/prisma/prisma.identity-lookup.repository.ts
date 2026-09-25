@@ -1,4 +1,4 @@
-import type { LookupOperatorActivityRow } from "@langwatch/identity-contract";
+import type { LookupOperatorActivityRow, VerifiedUserDomain } from "@langwatch/identity-contract";
 import {
   IDENTITY_LOOKUP_AUDIT_PREFIX,
   qualifySsoDomainOwnership,
@@ -15,6 +15,9 @@ import {
   type LookupUserRow,
 } from "../identity-lookup.repository.ts";
 import { PrismaSsoConnectionProjectionRepository } from "./prisma.sso-connection-projection.repository.ts";
+
+/** The identifier states that count as proof of who somebody works for. */
+const VERIFIED_IDENTIFIER_STATES = ["VERIFIED", "PRIMARY"] as const;
 
 /** How many rows a single-address lookup reads before it stops. */
 const MATCH_CEILING = 50;
@@ -70,6 +73,24 @@ export class PrismaIdentityLookupRepository implements IdentityLookupRepository 
       select: { id: true, name: true, email: true },
     });
     return rows.map((row) => ({ userId: row.id, name: row.name, email: row.email }));
+  }
+
+  async findVerifiedDomains({
+    userIds,
+  }: {
+    userIds: readonly string[];
+  }): Promise<readonly VerifiedUserDomain[]> {
+    if (userIds.length === 0) return [];
+    const rows = await this.prisma.identifier.findMany({
+      where: {
+        userId: { in: [...userIds] },
+        state: { in: [...VERIFIED_IDENTIFIER_STATES] },
+        domain: { not: null },
+      },
+      select: { userId: true, domain: true },
+      distinct: ["userId", "domain"],
+    });
+    return rows.flatMap((row) => (row.domain ? [{ userId: row.userId, domain: row.domain }] : []));
   }
 
   async findMemberships({
