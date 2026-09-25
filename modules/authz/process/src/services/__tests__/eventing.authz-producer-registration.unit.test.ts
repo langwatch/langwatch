@@ -4,12 +4,12 @@ import {
   type EventSourcedQueueDefinition,
   type EventSourcedQueueProcessor,
 } from "@langwatch/eventing";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 // Routing keys are cross-process contract; test builds definition through adapter.
 import { describe, expect, it, vi } from "vitest";
 
 import { PostgresAuthzAdapter } from "../../app/postgres-authz.build.ts";
 import { AUTHZ_GRANT_PIPELINE_NAME } from "../../eventing/authz-grant.pipeline.ts";
-import type { PostgresAuthzDatabase } from "../../repositories/prisma/prisma.authz.database.ts";
 import {
   AuthzGrantsCommandDispatcher,
   AuthzCommandDispatcherService,
@@ -112,7 +112,7 @@ function producerRuntime() {
 
 function buildAuthz() {
   return PostgresAuthzAdapter.create({
-    database: { auditLog: { createMany: vi.fn() } } as unknown as PostgresAuthzDatabase,
+    database: prismaDouble({ auditLog: { createMany: vi.fn() } }),
     redis: null,
     dispatcher: new NullDispatcher(),
     newBindingId: () => "rolebinding_test",

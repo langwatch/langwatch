@@ -1,7 +1,5 @@
-import { createLogger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
-
-const logger = createLogger("langwatch:authz:per-organization-cached-gate");
 
 type CacheEntry = { isOn: boolean; expiresAt: number };
 type InFlightEntry = { promise: Promise<boolean>; isStale: boolean };
@@ -13,6 +11,7 @@ export type PerOrganizationCachedGateStoreOptions = {
   ttlMs: number;
   maxEntries?: number;
   now?: () => number;
+  logger?: Logger;
 };
 
 /**
@@ -22,12 +21,15 @@ export type PerOrganizationCachedGateStoreOptions = {
 export class PerOrganizationCachedGateStore {
   private readonly cached = new Map<string, CacheEntry>();
   private readonly inFlight = new Map<string, InFlightEntry>();
+  private readonly logger: Logger;
 
   static create(options: PerOrganizationCachedGateStoreOptions): PerOrganizationCachedGateStore {
     return new PerOrganizationCachedGateStore(options);
   }
 
-  private constructor(private readonly options: PerOrganizationCachedGateStoreOptions) {}
+  private constructor(private readonly options: PerOrganizationCachedGateStoreOptions) {
+    this.logger = options.logger ?? createLogger("langwatch:authz:per-organization-cached-gate");
+  }
 
   async get({
     organizationId,
@@ -87,7 +89,7 @@ export class PerOrganizationCachedGateStore {
     try {
       isOn = await read();
     } catch (error) {
-      logger.warn(
+      this.logger.warn(
         { organizationId, gate: this.options.name, error },
         "could not read the per-organization gate; caching the failure briefly and answering false",
       );

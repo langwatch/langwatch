@@ -26,7 +26,7 @@ const TEAM = "team-1";
 const PROJECT = "proj-1";
 
 type RepositoryStub = {
-  [K in keyof AuthzGrantRepository]: ReturnType<typeof vi.fn>;
+  [K in keyof AuthzGrantRepository]: Mock;
 };
 
 type CompatibilityMethod = keyof Pick<
@@ -101,7 +101,7 @@ const WRITE_ACTOR = { type: "user", id: "admin-1" };
 function makeService(repository: RepositoryStub, ledger: LedgerStub = makeLedger()) {
   const epoch = new StubAuthzEpoch();
   const service = AuthzGrantsService.create({
-    repository: repository as unknown as AuthzGrantRepository,
+    repository,
     ledger,
     epoch,
     newBindingId: () => "rb_test_ksuid",

@@ -1,26 +1,13 @@
 // Tests shared helper; logged throws, concurrent reads coalesce, invalidation racing.
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { createTestLogger } from "@langwatch/test-harness";
+import { describe, expect, it } from "vitest";
 
 import {
   PerOrganizationCachedGateStore,
   type PerOrganizationCachedGateStoreOptions,
 } from "../memory.per-organization-cached-gate.store.ts";
 
-// The module under test calls `createLogger` once, at import time (the
-// module-scope `const logger = createLogger(...)` every gate in this
-// package uses) - the spy has to exist before that call runs, hence
-// `vi.hoisted` (and `vi.mock`, itself hoisted above every import in this
-// file by vitest) rather than setting it up inside a test.
-const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
-vi.mock("@langwatch/observability", () => ({
-  createLogger: () => ({ warn }),
-}));
-
 describe("PerOrganizationCachedGateStore", () => {
-  afterEach(() => {
-    warn.mockClear();
-  });
-
   function gate(overrides?: Partial<PerOrganizationCachedGateStoreOptions>) {
     return PerOrganizationCachedGateStore.create({
       name: "test-gate",
@@ -79,22 +66,16 @@ describe("PerOrganizationCachedGateStore", () => {
     });
 
     it("logs a warning naming the organization, the gate and the error", async () => {
-      const flag = gate();
-      const error = new Error("connection refused");
-
+      const { logger, lines } = createTestLogger();
+      const flag = gate({ logger });
       await flag.get({
         organizationId: "org-1",
-        read: () => Promise.reject(error),
+        read: () => Promise.reject(new Error("connection refused")),
       });
 
-      expect(warn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          organizationId: "org-1",
-          gate: "test-gate",
-          error,
-        }),
-        expect.any(String),
-      );
+      const warning = lines.find((line) => line.level === 40);
+      expect(warning).toMatchObject({ organizationId: "org-1", gate: "test-gate" });
+      expect(warning).toHaveProperty("error");
     });
 
     it("caches the failure briefly rather than re-reading on the next ask", async () => {

@@ -11,7 +11,6 @@ import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import type { AuthzDatabase } from "../../authz-read.repository.ts";
 import { EventingAuthzReadRepository } from "../eventing.authz-read.repository.ts";
 
 const ns = `authz-rolekey-${randomUUID().slice(0, 8)}`;
@@ -66,7 +65,7 @@ function grantRowsExamined(node: PlanNode): number {
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 
 describe.skipIf(!DB_URL)("given an organization holding many live grants", () => {
-  let prisma: PrismaClient;
+  let prisma: PrismaClient<"query">;
   const grantQueries: LoggedQuery[] = [];
 
   beforeAll(async () => {
@@ -77,17 +76,13 @@ describe.skipIf(!DB_URL)("given an organization holding many live grants", () =>
 
     // The SQL under test is the SQL Prisma emits, not a paraphrase of it, so
     // it is taken from the client rather than written here.
-    (prisma as unknown as { $on: (e: string, cb: (q: never) => void) => void }).$on(
-      "query",
-      (event: never) => {
-        const e = event as unknown as { query: string; params?: string };
-        if (!e.query.includes('"Grant"')) return;
-        grantQueries.push({
-          sql: e.query,
-          params: JSON.parse(e.params ?? "[]") as unknown[],
-        });
-      },
-    );
+    prisma.$on("query", (event) => {
+      if (!event.query.includes('"Grant"')) return;
+      grantQueries.push({
+        sql: event.query,
+        params: JSON.parse(event.params ?? "[]") as unknown[],
+      });
+    });
 
     await prisma.$executeRawUnsafe(
       `INSERT INTO "Role" (id, "organizationId", name, permissions, kind, "occurredAt", "createdAt", "updatedAt")
@@ -137,7 +132,7 @@ describe.skipIf(!DB_URL)("given an organization holding many live grants", () =>
 
   describe("when an API key asks which of its custom roles it holds alone", () => {
     it("answers without reading every grant", async () => {
-      const repository = EventingAuthzReadRepository.create(prisma as unknown as AuthzDatabase);
+      const repository = EventingAuthzReadRepository.create(prisma);
       const principal: AuthzPrincipalRef = { type: "apiKey", id: apiKeyId };
 
       grantQueries.length = 0;

@@ -10,10 +10,7 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
-import {
-  PrismaAuthzBindingRepository,
-  type AuthzBindingDatabase,
-} from "../repositories/prisma/prisma.authz-binding.repository.ts";
+import { PrismaAuthzBindingRepository } from "../repositories/prisma/prisma.authz-binding.repository.ts";
 import { AuthzBindingWriterService } from "../services/authz-binding-writer.service.ts";
 
 const DB_URL = process.env.DATABASE_URL;
@@ -41,7 +38,7 @@ describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => 
     adapter: PrismaDriverAdapterService.create().create(DB_URL ?? "").adapter,
   });
   const bindings = PrismaAuthzBindingRepository.create({
-    database: prisma as unknown as AuthzBindingDatabase,
+    database: prisma,
   });
   const writer = AuthzBindingWriterService.create({
     bindings,

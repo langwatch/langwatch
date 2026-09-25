@@ -10,13 +10,9 @@ import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
 import { EventingAuthzListingRepository } from "../repositories/eventing/eventing.authz-listing.repository.ts";
 import { EventingAuthzReadRepository } from "../repositories/eventing/eventing.authz-read.repository.ts";
-import {
-  PrismaAuthzBindingRepository,
-  type AuthzBindingDatabase,
-} from "../repositories/prisma/prisma.authz-binding.repository.ts";
+import { PrismaAuthzBindingRepository } from "../repositories/prisma/prisma.authz-binding.repository.ts";
 import { AuthzService } from "../services/authz.service.ts";
 
 const DB_URL = process.env.DATABASE_URL ?? process.env.LANGWATCH_TEST_DATABASE_URL;
@@ -27,12 +23,12 @@ describe.skipIf(!DB_URL)("given an organization publishing an AI tools catalog",
   const prisma = new PrismaClient({
     adapter: PrismaDriverAdapterService.create().create(DB_URL ?? "").adapter,
   });
-  const database = prisma as unknown as AuthzDatabase;
+  const database = prisma;
   const authz = AuthzService.create({
     repository: EventingAuthzReadRepository.create(database),
     listing: EventingAuthzListingRepository.create(database),
     bindings: PrismaAuthzBindingRepository.create({
-      database: prisma as unknown as AuthzBindingDatabase,
+      database: prisma,
     }),
     isOnEngine: async () => true,
   });

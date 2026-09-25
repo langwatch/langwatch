@@ -60,7 +60,7 @@ function harness(writerOverrides: Partial<EventingAuthzLedgerAdapter> = {}) {
     revokeBindingsWhere: vi.fn().mockResolvedValue(1),
     offboardMember: vi.fn().mockResolvedValue(undefined),
     ...writerOverrides,
-  } as unknown as EventingAuthzLedgerAdapter;
+  };
   return {
     db,
     writer,
@@ -282,7 +282,13 @@ function buildRepository({
     $transaction: vi.fn(async (run: (t: typeof tx) => unknown) => run(tx)),
   } as never;
   const offboardMember = vi.fn().mockResolvedValue(undefined);
-  const writer = { offboardMember } as unknown as EventingAuthzLedgerAdapter;
+  const writer = {
+    attachBindings: vi.fn(),
+    changeBindingRole: vi.fn(),
+    revokeBindings: vi.fn(),
+    revokeBindingsWhere: vi.fn(),
+    offboardMember,
+  };
   return {
     repository: EventingAuthzGrantRepository.create({ database: prisma, writer }),
     offboardMember,

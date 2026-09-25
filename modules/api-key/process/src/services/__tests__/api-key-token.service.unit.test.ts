@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import {
   API_KEY_PREFIX,
   getTokenType,
@@ -6,11 +8,12 @@ import {
 } from "@langwatch/api-key-contract";
 import { describe, expect, it } from "vitest";
 
-import { ApiKeyTokenAdapter } from "../memory.api-key-token.repository.ts";
+import { hashApiKeySecret, verifyApiKeySecret } from "../../rules/api-key-token.rules.ts";
+import { ApiKeyTokenService } from "../api-key-token.service.ts";
 
 const PEPPER = "test-pepper";
 const generateToken = (options?: { prefix?: string }) =>
-  ApiKeyTokenAdapter.generateApiKeyToken(PEPPER, options);
+  ApiKeyTokenService.create(PEPPER).generate(options);
 
 describe("generateApiKeyToken", () => {
   /** @scenario "New API keys are minted with sk-lw- prefix" */
@@ -100,8 +103,10 @@ describe("verifySecret", () => {
   describe("when verifying with current HMAC hash", () => {
     it("returns match", () => {
       const secret = "testSecretValue123";
-      const hashed = ApiKeyTokenAdapter.hashApiKeySecret(secret, PEPPER);
-      expect(ApiKeyTokenAdapter.verifyApiKeySecret(secret, hashed, PEPPER)).toBe("match");
+      const hashed = hashApiKeySecret({ secret: secret, pepper: PEPPER });
+      expect(verifyApiKeySecret({ secret: secret, hashedSecret: hashed, pepper: PEPPER })).toBe(
+        "match",
+      );
     });
   });
 
@@ -109,8 +114,8 @@ describe("verifySecret", () => {
     it("returns match_legacy", () => {
       const secret = "legacySecretValue123";
       // Simulate a hash created with the old plain SHA-256 algorithm
-      const legacyHash = require("node:crypto").createHash("sha256").update(secret).digest("hex");
-      expect(ApiKeyTokenAdapter.verifyApiKeySecret(secret, legacyHash, PEPPER)).toBe(
+      const legacyHash = createHash("sha256").update(secret).digest("hex");
+      expect(verifyApiKeySecret({ secret: secret, hashedSecret: legacyHash, pepper: PEPPER })).toBe(
         "match_legacy",
       );
     });
@@ -118,8 +123,10 @@ describe("verifySecret", () => {
 
   describe("when secret does not match", () => {
     it("returns no_match", () => {
-      const hashed = ApiKeyTokenAdapter.hashApiKeySecret("correct", PEPPER);
-      expect(ApiKeyTokenAdapter.verifyApiKeySecret("wrong", hashed, PEPPER)).toBe("no_match");
+      const hashed = hashApiKeySecret({ secret: "correct", pepper: PEPPER });
+      expect(verifyApiKeySecret({ secret: "wrong", hashedSecret: hashed, pepper: PEPPER })).toBe(
+        "no_match",
+      );
     });
   });
 });

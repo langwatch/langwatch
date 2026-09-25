@@ -1,13 +1,8 @@
+import { createTestLogger } from "@langwatch/test-harness";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScopeLineageRepository } from "../../repositories/authz-read.repository.ts";
 import { AuthzScopeLineageService } from "../authz-scope-lineage.service.ts";
-
-const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
-
-vi.mock("@langwatch/observability", () => ({
-  createLogger: () => ({ warn }),
-}));
 
 class TestScopeLineageRepository extends ScopeLineageRepository {
   readonly findProjectLineage = vi.fn(
@@ -47,9 +42,10 @@ function createService({
   teamOrganizations?: Record<string, string | undefined>;
 } = {}) {
   const repository = new TestScopeLineageRepository(projectOrganizations, teamOrganizations);
-  const service = AuthzScopeLineageService.create({ repository });
+  const { logger, lines } = createTestLogger();
+  const service = AuthzScopeLineageService.create({ repository, logger });
 
-  return { repository, service };
+  return { repository, service, lines };
 }
 
 describe("AuthzScopeLineageService", () => {
@@ -83,7 +79,7 @@ describe("AuthzScopeLineageService", () => {
   });
 
   it("fails closed when one mixed scope is unknown and records the resolved lineage", async () => {
-    const { service } = createService({
+    const { service, lines } = createService({
       projectOrganizations: { "project-1": "organization-1" },
     });
 
@@ -97,15 +93,14 @@ describe("AuthzScopeLineageService", () => {
         { tier: "team", id: "unknown-team", organizationId: null },
       ],
     });
-    expect(warn).toHaveBeenCalledWith(
-      {
-        scopes: [
-          { tier: "project", id: "project-1", organizationId: "organization-1" },
-          { tier: "team", id: "unknown-team", organizationId: null },
-        ],
-      },
-      "refused: one request carries scope ids that do not resolve to one organization",
-    );
+    expect(
+      lines.findLine("warn", "refused: one request carries scope ids that do not resolve"),
+    ).toMatchObject({
+      scopes: [
+        { tier: "project", id: "project-1", organizationId: "organization-1" },
+        { tier: "team", id: "unknown-team", organizationId: null },
+      ],
+    });
   });
 
   it("fails closed when mixed scopes resolve to different organizations", async () => {

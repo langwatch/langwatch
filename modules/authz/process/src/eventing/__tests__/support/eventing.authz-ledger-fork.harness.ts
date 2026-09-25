@@ -1,4 +1,5 @@
 import type { LedgerActor } from "@langwatch/actor";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { vi } from "vitest";
 
 import { StubAuthzEpoch } from "../../../repositories/__tests__/support/authz-epoch.stub.ts";
@@ -79,7 +80,7 @@ export function harness({
       count: vi.fn().mockResolvedValue(0),
     },
   };
-  const database = db as unknown as AuthzLedgerDatabase;
+  const database: AuthzLedgerDatabase = prismaDouble(db);
   // The real repository over a stubbed client, so the fence's own SQL is what
   // the cases exercise rather than a hand-written map of stamps.
   const queryRaw = vi.fn<AuthzMembershipStampTransaction["$queryRaw"]>().mockResolvedValue([

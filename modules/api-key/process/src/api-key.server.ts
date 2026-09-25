@@ -6,11 +6,11 @@ import type { Instant } from "@langwatch/time";
 import { ApiKeyApp } from "./app/api-key.app.ts";
 import { apiKeyEventing } from "./eventing/api-key.pipeline.ts";
 import { apiKeyRepositories } from "./repositories/api-key-repositories.registry.ts";
-import { ApiKeyTokenAdapter } from "./repositories/memory/memory.api-key-token.repository.ts";
 import {
   PrismaApiKeyRepository,
   type PrismaApiKeyDatabase,
 } from "./repositories/prisma/prisma.api-key.repository.ts";
+import { hashApiKeySecret as hashSecret } from "./rules/api-key-token.rules.ts";
 import { AgentSandboxKeyReapService } from "./services/agent-sandbox-key-reap.service.ts";
 import { CliLoginKeyReapService } from "./services/cli-login-key-reap.service.ts";
 import { apiKeyRest, apiKeyRestCredential } from "./transport/api-key.rest.ts";
@@ -22,9 +22,9 @@ import { apiKeyTrpcTransport } from "./transport/api-key.trpc.ts";
  * dev/docs/plans/private-runtime-export-drive.md §3d).
  */
 
-/** Wraps the static secret hasher so a caller never names the token adapter class. */
+/** The secret hasher for callers outside the module, such as the seed. */
 export function hashApiKeySecret(secret: string, pepper: string): string {
-  return ApiKeyTokenAdapter.hashApiKeySecret(secret, pepper);
+  return hashSecret({ secret, pepper });
 }
 
 /** The sandbox-key sweep over the process's own Prisma-backed repository. */

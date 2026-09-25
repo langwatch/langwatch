@@ -1,6 +1,7 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKey } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { createTestLogger } from "@langwatch/test-harness";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -46,15 +47,15 @@ function harness(
   const attachBindings =
     options.attachBindings ??
     vi.fn<AuthzApi["attachBindings"]>().mockResolvedValue({ attached: [], duplicates: [] });
-  const warn = vi.fn();
+  const { logger, lines } = createTestLogger();
   const service = LegacyApiKeyGrantService.create({
     authz: createApiFixture<AuthzApi>({ findEngineCutoverAt }),
     grants: createApiFixture<AuthzApi>({ attachBindings }),
     deriveBindingId: () => "grant-derived",
-    diagnostics: { warn },
+    diagnostics: logger,
     ...(options.now ? { now: options.now } : {}),
   });
-  return { service, findEngineCutoverAt, attachBindings, warn };
+  return { service, findEngineCutoverAt, attachBindings, lines };
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -143,7 +144,7 @@ describe("LegacyApiKeyGrantService", () => {
       .fn()
       .mockRejectedValueOnce(new Error("queue down"))
       .mockResolvedValue({ attached: [], duplicates: [] });
-    const { service, warn } = harness({ attachBindings });
+    const { service, lines } = harness({ attachBindings });
 
     expect(() => service.mint(apiKey())).not.toThrow();
     await settle();
@@ -151,11 +152,11 @@ describe("LegacyApiKeyGrantService", () => {
     await settle();
 
     expect(attachBindings).toHaveBeenCalledTimes(2);
-    expect(warn).toHaveBeenCalledOnce();
-    expect(warn).toHaveBeenCalledWith(
-      expect.objectContaining({ apiKeyId: expect.any(String) }),
-      expect.stringContaining("failed to mint the legacy API key grant"),
-    );
+    const warnings = lines.filter((line) => line.level === 40);
+    expect(warnings).toHaveLength(1);
+    expect(lines.findLine("warn", "failed to mint the legacy API key grant")).toMatchObject({
+      apiKeyId: expect.any(String),
+    });
   });
 });
 

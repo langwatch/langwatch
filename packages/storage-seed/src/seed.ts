@@ -8,7 +8,7 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 
 import { API_KEY_PREFIX, INGEST_KEY_PREFIX } from "@langwatch/api-key-contract";
-import { ApiKeyTokenAdapter } from "@langwatch/api-key-process";
+import { hashApiKeySecret } from "@langwatch/api-key-process";
 import { DEFAULT_LICENSE_PUBLIC_KEY as PUBLIC_KEY } from "@langwatch/enterprise-licensing-contract";
 import {
   LOCAL_DEV_ENTERPRISE_LICENSE_KEY,
@@ -374,14 +374,14 @@ async function seedAccessTokens({
       name: "Local Dev Private Access Token",
       description: "Static local-dev personal access token seeded by @langwatch/storage-seed",
       lookupId: PRIVATE_TOKEN_LOOKUP_ID,
-      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PRIVATE_TOKEN_SECRET, apiKeyPepper),
+      hashedSecret: hashApiKeySecret(PRIVATE_TOKEN_SECRET, apiKeyPepper),
       permissionMode: "all",
       userId: userId,
       createdByUserId: userId,
       organizationId: organizationId,
     },
     update: {
-      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PRIVATE_TOKEN_SECRET, apiKeyPepper),
+      hashedSecret: hashApiKeySecret(PRIVATE_TOKEN_SECRET, apiKeyPepper),
       userId: userId,
       organizationId: organizationId,
       revokedAt: null,
@@ -427,12 +427,12 @@ async function seedAccessTokens({
       description:
         "Static local-dev ingestion-only token (traces:create) seeded by @langwatch/storage-seed",
       lookupId: PUBLIC_TOKEN_LOOKUP_ID,
-      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PUBLIC_TOKEN_SECRET, apiKeyPepper),
+      hashedSecret: hashApiKeySecret(PUBLIC_TOKEN_SECRET, apiKeyPepper),
       permissionMode: "restricted",
       organizationId: organizationId,
     },
     update: {
-      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PUBLIC_TOKEN_SECRET, apiKeyPepper),
+      hashedSecret: hashApiKeySecret(PUBLIC_TOKEN_SECRET, apiKeyPepper),
       organizationId: organizationId,
       revokedAt: null,
     },

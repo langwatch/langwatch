@@ -42,8 +42,8 @@ import { ProjectApi } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
 import type { ApiKeyRepositories } from "../repositories/api-key.repositories.ts";
-import { ApiKeyTokenAdapter } from "../repositories/memory/memory.api-key-token.repository.ts";
 import { ApiKeyBindingIdService } from "../services/api-key-binding-id.service.ts";
+import { ApiKeyTokenService } from "../services/api-key-token.service.ts";
 import { ApiKeyService } from "../services/api-key.service.ts";
 import { LegacyApiKeyGrantService } from "../services/legacy-api-key-grant.service.ts";
 
@@ -138,7 +138,7 @@ export class ApiKeyApp implements ApiKeyApi {
         }),
         // Blank is a configured state, not a refusal: a key hashed with no
         // pepper still authenticates, as the config leaf says.
-        tokens: ApiKeyTokenAdapter.create(setup.config.pepper ?? ""),
+        tokens: ApiKeyTokenService.create(setup.config.pepper ?? ""),
       }),
       authorization,
     );

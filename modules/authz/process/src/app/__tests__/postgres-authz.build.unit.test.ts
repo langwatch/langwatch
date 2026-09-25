@@ -2,12 +2,12 @@ import {
   AuthzGrantsService as AuthzGrantsServiceContract,
   AuthzService as AuthzServiceContract,
 } from "@langwatch/authz-contract";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { register } from "prom-client";
 import { describe, expect, it, vi } from "vitest";
 
 import { AUTHZ_GRANT_PIPELINE_NAME } from "../../eventing/authz-grant.pipeline.ts";
 import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../migrations/legacy-import.authz-grant.migration.ts";
-import type { PostgresAuthzDatabase } from "../../repositories/prisma/prisma.authz.database.ts";
 import {
   AuthzGrantsCommandDispatcher,
   type AuthzGrantsCommandSenders,
@@ -37,7 +37,7 @@ class RecordingDispatcher extends AuthzGrantsCommandDispatcher {
 function buildDatabase() {
   const auditLog = { createMany: vi.fn(async () => ({ count: 1 })) };
   return {
-    database: { auditLog } as unknown as PostgresAuthzDatabase,
+    database: prismaDouble({ auditLog }),
     auditLog,
   };
 }

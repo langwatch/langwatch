@@ -176,3 +176,23 @@ Feature: API key lifecycle
     When a login key's expiry is computed
     Then it is the sooner of the refresh window from now and the ceiling from the session start
     And a session already past the ceiling does not slide forward on a later refresh
+
+  @unit
+  Scenario: Tightening the organization's session ceiling brings live login keys forward and retires elapsed ones
+    Given an organization whose live CLI login keys expire after the new ceiling from their session start
+    When an admin lowers the maximum session duration
+    Then each live login key expires at the ceiling from its session start
+    And a login key already past the ceiling is revoked with cause expired and counted
+
+  @unit
+  Scenario: Clearing the session ceiling leaves refresh windows alone and still retires elapsed login keys
+    Given an organization with a live login key and an elapsed one
+    When an admin sets the maximum session duration to zero
+    Then the live login key keeps its expiry
+    And the elapsed login key is revoked and counted
+
+  @unit
+  Scenario: A login key retired by the session ceiling counts even when its ingest keys cannot be read
+    Given an elapsed login key whose minted ingest keys cannot be read
+    When the session ceiling is applied
+    Then the login key is revoked and counted

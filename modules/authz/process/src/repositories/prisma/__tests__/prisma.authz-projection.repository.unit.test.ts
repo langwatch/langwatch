@@ -1,17 +1,22 @@
 /** @vitest-environment node */
 
-import { Temporal } from "@langwatch/time";
 /**
  * Write projection store: safety properties (occurredAt guards, compat heads).
  * Assert raw-SQL guards as SQL.
  */
+import { Prisma } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
+import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import { MIGRATION_OWNED_SOURCES } from "../../../rules/authz-migration-ownership.rules.ts";
 import type { GrantProjectionWrite } from "../../authz-grant-projection.repository.ts";
 import { PrismaAuthzProjectionRepository } from "../prisma.authz-projection.repository.ts";
 
-type ExecuteRaw = (strings: readonly string[], ...values: unknown[]) => Promise<number>;
+type ExecuteRaw = (
+  query: TemplateStringsArray | Prisma.Sql,
+  ...values: unknown[]
+) => Promise<number>;
 
 const ORG = "org_acme";
 
@@ -40,7 +45,7 @@ function grantRow(overrides: Record<string, unknown> = {}) {
 
 function build() {
   const executeRaw = vi.fn<ExecuteRaw>().mockResolvedValue(1);
-  const prisma = {
+  const mocks = {
     grant: {
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       findUnique: vi.fn().mockResolvedValue(grantRow()),
@@ -61,15 +66,14 @@ function build() {
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
-    $executeRaw: executeRaw,
-    $transaction: vi.fn(async (ops: unknown[]) => ops.map(() => ({ count: 1 }))),
-  } as never;
-  const mocks = prisma as unknown as {
-    grant: { updateMany: Mock; findUnique: Mock };
-    roleBinding: { upsert: Mock; updateMany: Mock; deleteMany: Mock };
-    customRole: { upsert: Mock; updateMany: Mock; deleteMany: Mock };
-    shareLink: { upsert: Mock; updateMany: Mock; deleteMany: Mock };
   };
+  const prisma = prismaDouble({
+    ...mocks,
+    $executeRaw: executeRaw,
+    $transaction: vi.fn(async (ops: unknown) =>
+      Array.isArray(ops) ? ops.map(() => ({ count: 1 })) : [],
+    ),
+  });
   return {
     prisma: mocks,
     executeRaw,
@@ -79,7 +83,8 @@ function build() {
 
 /** The SQL the raw upserts emit, flattened to one comparable string. */
 function sqlFrom(executeRaw: Mock<ExecuteRaw>): string {
-  const strings = executeRaw.mock.calls[0]?.[0] ?? [];
+  const query = executeRaw.mock.calls[0]?.[0] ?? [];
+  const strings = query instanceof Prisma.Sql ? query.strings : query;
   return strings.join("?").replace(/\s+/g, " ");
 }
 

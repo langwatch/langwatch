@@ -98,7 +98,14 @@ export type AuthzGrantWriteDatabase = Omit<
 
 export type EventingAuthzGrantRepositoryOptions = {
   database: AuthzGrantWriteDatabase;
-  writer: EventingAuthzLedgerAdapter;
+  writer: Pick<
+    EventingAuthzLedgerAdapter,
+    | "attachBindings"
+    | "changeBindingRole"
+    | "revokeBindings"
+    | "revokeBindingsWhere"
+    | "offboardMember"
+  >;
 };
 
 const grantIdRowsSchema = z.array(z.object({ id: z.string() }));

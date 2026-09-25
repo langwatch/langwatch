@@ -17,6 +17,7 @@ import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ApiKeyBindingId } from "../../services/api-key-binding-id.service.ts";
+import { ApiKeyTokenService } from "../../services/api-key-token.service.ts";
 import { ApiKeyService, type ApiKeyDependencies } from "../../services/api-key.service.ts";
 import {
   ApiKeyRepository,
@@ -24,7 +25,6 @@ import {
   type ApiKeyRow,
   type ApiKeyUpdateRecord,
 } from "../api-key.repository.ts";
-import { ApiKeyTokenAdapter } from "../memory/memory.api-key-token.repository.ts";
 
 class TestApiKeyBindingId implements ApiKeyBindingId {
   static create(): TestApiKeyBindingId {
@@ -380,7 +380,7 @@ function dependencies(overrides: Partial<ApiKeyDependencies> = {}): ApiKeyDepend
     legacyGrants: {
       mint: vi.fn(),
     } as unknown as ApiKeyDependencies["legacyGrants"],
-    tokens: ApiKeyTokenAdapter.create("test-pepper"),
+    tokens: ApiKeyTokenService.create("test-pepper"),
     ...overrides,
   };
 }

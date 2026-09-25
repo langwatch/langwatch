@@ -6,20 +6,27 @@ import {
   SCOPE_TIER_FIELDS,
   type BindingScopeTier,
 } from "@langwatch/authz-contract";
-import { createLogger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
 
 import type { ScopeLineageRepository } from "../repositories/authz-read.repository.ts";
 
 type PresentScope = Readonly<{ tier: BindingScopeTier; id: string }>;
 
-const logger = createLogger("langwatch:authz:scope-lineage");
-
 /** Resolves every scope id in one request and enforces one tenant lineage. */
 export class AuthzScopeLineageService {
-  private constructor(private readonly repository: ScopeLineageRepository) {}
+  private constructor(
+    private readonly repository: ScopeLineageRepository,
+    private readonly logger: Logger,
+  ) {}
 
-  static create(options: { repository: ScopeLineageRepository }): AuthzScopeLineageService {
-    return new AuthzScopeLineageService(options.repository);
+  static create(options: {
+    repository: ScopeLineageRepository;
+    logger?: Logger;
+  }): AuthzScopeLineageService {
+    return new AuthzScopeLineageService(
+      options.repository,
+      options.logger ?? createLogger("langwatch:authz:scope-lineage"),
+    );
   }
 
   async check(input: AuthzScopeLineageInput): Promise<AuthzScopeLineageResult> {
@@ -34,7 +41,7 @@ export class AuthzScopeLineageService {
       return { kind: "consistent" };
     }
 
-    logger.warn(
+    this.logger.warn(
       { scopes: entries },
       "refused: one request carries scope ids that do not resolve to one organization",
     );
