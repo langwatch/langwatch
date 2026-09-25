@@ -67,6 +67,14 @@ function requests(hono: MountableRestApp) {
     patch: (path: string, body?: unknown) => send("PATCH", path, body ?? {}),
     delete: (path: string) => send("DELETE", path),
     send,
+    postRaw: (path: string, body: string) =>
+      hono.fetch(
+        new Request(`http://api.test${path}`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body,
+        }),
+      ),
   };
 }
 

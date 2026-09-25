@@ -43,6 +43,7 @@ describe("the /api/trigger/slack declaration", () => {
 
 describe("given the Slack alert door", () => {
   describe("when the body names a webhook, a condition and a severity", () => {
+    /** @scenario "A valid body creates the trigger" */
     it("creates the Slack automation and answers its one sentence", async () => {
       const api = mount();
 
@@ -94,6 +95,18 @@ describe("given the Slack alert door", () => {
 
       expect(response.status).toBe(422);
       expect(await response.json()).toMatchObject({ code: "validation_error" });
+      expect(api.created).toEqual([]);
+    });
+  });
+
+  describe("when the body is not JSON", () => {
+    /** @scenario "A body that is not JSON is refused" */
+    it("refuses it with a 400 and creates nothing", async () => {
+      const api = mount();
+
+      const response = await api.postRaw("/api/trigger/slack", "{not json");
+
+      expect(response.status).toBe(400);
       expect(api.created).toEqual([]);
     });
   });

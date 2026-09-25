@@ -252,6 +252,38 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
     });
   });
 
+  describe("when a save changes a field value", () => {
+    /** @scenario "A save that changes a field value records a version naming fields" */
+    it("records a version naming fields and snapshots the value", async () => {
+      const testSuite = await scenarios.createTestSuite({ projectId, name: "Case lookups" });
+      await database().simulationSuite.updateMany({
+        where: { id: testSuite.id, projectId },
+        data: { fields: [{ identifier: "golden_sql", type: "text" }] },
+      });
+      const scenario = await scenarios.create({
+        projectId,
+        name: "Chargebacks",
+        situation: "An analyst asks for chargebacks",
+        criteria: ["The agent answers"],
+        labels: [],
+        testSuiteId: testSuite.id,
+        actor: { userId: null, label: "api" },
+      });
+
+      const updated = await scenarios.update({
+        id: scenario.id,
+        projectId,
+        fields: { golden_sql: "SELECT 1" },
+      });
+
+      expect(updated.version).toBe(2);
+      const { versions } = await scenarios.listVersions({ projectId, scenarioId: scenario.id });
+      expect(versions[0]?.changedFields).toEqual(["fields"]);
+      const detail = await scenarios.getVersion({ projectId, scenarioId: scenario.id, version: 2 });
+      expect(detail.fields.fields).toEqual({ golden_sql: "SELECT 1" });
+    });
+  });
+
   it("does not create versions for filing, refiling or unfiling", async () => {
     const firstTestSuite = await scenarios.createTestSuite({ projectId, name: "Refunds" });
     const secondTestSuite = await scenarios.createTestSuite({ projectId, name: "Checkout" });
