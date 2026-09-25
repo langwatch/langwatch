@@ -8,6 +8,19 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
+
+// The card menu's "Add to dashboard" item reads tRPC hooks at render; the
+// header scenario never opens it, so the client is stubbed rather than provided.
+vi.mock("../../../behavior/analytics-api.ts", () => ({
+  analyticsApi: {
+    useUtils: () => ({}),
+    dashboards: { getOrCreateFirst: { useQuery: () => ({ data: undefined }) } },
+    dashboardWidgets: {
+      assignDashboard: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+    },
+  },
+}));
+
 import { GraphCardHeader } from "../graph-card-header.tsx";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (

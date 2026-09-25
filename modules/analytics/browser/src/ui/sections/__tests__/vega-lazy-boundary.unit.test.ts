@@ -9,10 +9,10 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-/** `…/analytics-query/__tests__` → `…/analytics-query` */
+/** `…/ui/sections/__tests__` → `…/ui/sections` */
 const FEATURE_DIR = fileURLToPath(new URL("../", import.meta.url));
 
-/** `…/analytics-query` → `…/src`, which the `~/` alias resolves from. */
+/** `…/ui/sections` → `…/src`, which the `~/` alias resolves from. */
 const SRC_DIR = resolve(FEATURE_DIR, "../..");
 
 /**
@@ -22,9 +22,14 @@ const SRC_DIR = resolve(FEATURE_DIR, "../..");
  */
 const LAZY_BOUNDARIES = [
   {
-    wrapper: join(FEATURE_DIR, "components/LazyLangWatchQLWidgetChart.tsx"),
-    deferred: join(FEATURE_DIR, "components/LangWatchQLWidgetChart.tsx"),
-    specifier: 'import("./LangWatchQLWidgetChart")',
+    wrapper: join(FEATURE_DIR, "lazy-langwatch-ql-widget-chart.tsx"),
+    deferred: join(FEATURE_DIR, "langwatch-ql-widget-chart.tsx"),
+    specifier: 'import("./langwatch-ql-widget-chart.tsx")',
+  },
+  {
+    wrapper: join(FEATURE_DIR, "lazy-langwatch-ql-chart-mode.tsx"),
+    deferred: join(FEATURE_DIR, "themed-langwatch-ql-chart-mode.tsx"),
+    specifier: 'import("./themed-langwatch-ql-chart-mode.tsx")',
   },
 ] as const;
 

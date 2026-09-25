@@ -5,22 +5,15 @@
  * drawer in place; a saved LangWatchQL chart gets none (its route is gone).
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { push } = vi.hoisted(() => ({ push: vi.fn() }));
-vi.mock("~/utils/compat/next-router", () => {
-  const router = { query: {}, asPath: "/", push, replace: vi.fn() };
-  return { useRouter: () => router, default: router };
-});
+import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
 
-// The menu's "Add to dashboard" item reads tRPC hooks at render; none of
-// these scenarios show it, so the client is stubbed rather than provided.
-vi.mock("~/utils/api", () => ({
-  api: {
+vi.mock("../../../behavior/analytics-api.ts", () => ({
+  analyticsApi: {
     useUtils: () => ({
       dashboardWidgets: { list: { invalidate: vi.fn() } },
       graphs: { getAll: { invalidate: vi.fn() } },
@@ -38,9 +31,15 @@ vi.mock("~/utils/api", () => ({
 
 import { GraphCardMenu } from "../graph-card-menu.tsx";
 
+let host: StubAnalyticsHost;
+
 const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <AnalyticsTestHarness host={host}>{children}</AnalyticsTestHarness>
 );
+
+beforeEach(() => {
+  host = new StubAnalyticsHost();
+});
 
 afterEach(() => {
   cleanup();
@@ -71,7 +70,7 @@ describe("a card's Edit menu item", () => {
       await user.click(editItem);
 
       expect(onEdit).toHaveBeenCalledTimes(1);
-      expect(push).not.toHaveBeenCalled();
+      expect(host.navigations).toEqual([]);
       expect(screen.queryByText("Open in playground")).not.toBeInTheDocument();
     });
   });
@@ -95,7 +94,7 @@ describe("a card's Edit menu item", () => {
       await user.click(screen.getByRole("button"));
 
       expect(screen.queryByText(/^Edit$/)).not.toBeInTheDocument();
-      expect(push).not.toHaveBeenCalled();
+      expect(host.navigations).toEqual([]);
     });
   });
 
@@ -118,7 +117,7 @@ describe("a card's Edit menu item", () => {
 
       expect(screen.queryByText(/^Edit$/)).not.toBeInTheDocument();
       expect(screen.queryByText("Open in workbench")).not.toBeInTheDocument();
-      expect(push).not.toHaveBeenCalled();
+      expect(host.navigations).toEqual([]);
     });
   });
 
@@ -140,7 +139,7 @@ describe("a card's Edit menu item", () => {
       const editItem = await screen.findByText("Edit Graph");
       await user.click(editItem);
 
-      expect(push).toHaveBeenCalledWith("/proj/analytics/custom/graph_1");
+      expect(host.navigations).toEqual(["/proj/analytics/custom/graph_1"]);
     });
   });
 });

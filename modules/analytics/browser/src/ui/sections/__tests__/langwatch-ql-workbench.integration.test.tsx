@@ -3,6 +3,11 @@
  * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
+import {
+  LWQL_PERIOD_END_PARAMETER,
+  LWQL_PERIOD_GRANULARITY_PARAMETER,
+  LWQL_PERIOD_START_PARAMETER,
+} from "@langwatch/analytics-contract";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -510,7 +515,7 @@ describe("the LangWatchQL workbench", () => {
       const awaitingStep = () =>
         handledErrorEnvelope({
           code: "lwql_parameter_missing",
-          meta: { parameters: ["period_granularity_seconds"] },
+          meta: { parameters: [LWQL_PERIOD_GRANULARITY_PARAMETER] },
         });
 
       /** Runs once so the workbench learns the statement declares the step. */
@@ -536,7 +541,7 @@ describe("the LangWatchQL workbench", () => {
         // and typing it is itself refused as a reserved name.
         const parameters = screen.getByTestId("lwql-parameters");
         expect(within(parameters).queryByText("Give these parameters a value")).toBeNull();
-        expect(parameters).not.toHaveTextContent("period_granularity_seconds");
+        expect(parameters).not.toHaveTextContent(LWQL_PERIOD_GRANULARITY_PARAMETER);
       });
 
       /** @scenario "The step a statement declares is offered as a control, not as a parameter to fill in" */
@@ -544,7 +549,7 @@ describe("the LangWatchQL workbench", () => {
         harness.mutation.mockRejectedValue(
           handledErrorEnvelope({
             code: "lwql_parameter_missing",
-            meta: { parameters: ["period_granularity_seconds", "since"] },
+            meta: { parameters: [LWQL_PERIOD_GRANULARITY_PARAMETER, "since"] },
           }),
         );
 
@@ -558,7 +563,7 @@ describe("the LangWatchQL workbench", () => {
         // reserved name must not take the rest of the refusal with it.
         expect(alert).toHaveTextContent("Give these parameters a value");
         expect(alert).toHaveTextContent("since");
-        expect(alert).not.toHaveTextContent("period_granularity_seconds");
+        expect(alert).not.toHaveTextContent(LWQL_PERIOD_GRANULARITY_PARAMETER);
       });
 
       /** @scenario "The step a statement declares is offered as a control, not as a parameter to fill in" */
@@ -588,7 +593,7 @@ describe("the LangWatchQL workbench", () => {
         const [input] = harness.mutation.mock.calls.at(-1) ?? [];
         const sent = input as { parameters?: Record<string, unknown> };
         // Sending it as a parameter is what the backend refuses outright.
-        expect(sent.parameters ?? {}).not.toHaveProperty("period_granularity_seconds");
+        expect(sent.parameters ?? {}).not.toHaveProperty(LWQL_PERIOD_GRANULARITY_PARAMETER);
       });
 
       /** @scenario "Choosing a step sends it beside the query rather than among its parameters" */
@@ -790,7 +795,7 @@ describe("the LangWatchQL workbench", () => {
           harness.mutation.mockRejectedValue(
             handledErrorEnvelope({
               code: "lwql_parameter_missing",
-              meta: { parameters: ["period_granularity_seconds", "since"] },
+              meta: { parameters: [LWQL_PERIOD_GRANULARITY_PARAMETER, "since"] },
             }),
           );
           fireEvent.click(screen.getByRole("button", { name: "Run query" }));
@@ -805,7 +810,7 @@ describe("the LangWatchQL workbench", () => {
           const alert = await within(parameters).findByRole("alert");
           expect(alert).toHaveTextContent("Give these parameters a value");
           expect(alert).toHaveTextContent("since");
-          expect(alert).not.toHaveTextContent("period_granularity_seconds");
+          expect(alert).not.toHaveTextContent(LWQL_PERIOD_GRANULARITY_PARAMETER);
         });
       });
     });
@@ -815,8 +820,10 @@ describe("the LangWatchQL workbench", () => {
       it("shows that window in the spelling the database is bound with", async () => {
         await renderWorkbench();
 
-        expect(screen.getByLabelText("period_start")).toHaveValue("2026-02-20 00:00:00");
-        expect(screen.getByLabelText("period_end")).toHaveValue("2026-02-27 00:00:00");
+        expect(screen.getByLabelText(LWQL_PERIOD_START_PARAMETER)).toHaveValue(
+          "2026-02-20 00:00:00",
+        );
+        expect(screen.getByLabelText(LWQL_PERIOD_END_PARAMETER)).toHaveValue("2026-02-27 00:00:00");
       });
 
       /** @scenario "Reserved period parameters are filled only when declared" */
@@ -826,8 +833,10 @@ describe("the LangWatchQL workbench", () => {
           endDate: "2026-03-08T06:30:00.000Z",
         });
 
-        expect(screen.getByLabelText("period_start")).toHaveValue("2026-03-01 00:00:00");
-        expect(screen.getByLabelText("period_end")).toHaveValue("2026-03-08 06:30:00");
+        expect(screen.getByLabelText(LWQL_PERIOD_START_PARAMETER)).toHaveValue(
+          "2026-03-01 00:00:00",
+        );
+        expect(screen.getByLabelText(LWQL_PERIOD_END_PARAMETER)).toHaveValue("2026-03-08 06:30:00");
       });
     });
 
@@ -836,7 +845,7 @@ describe("the LangWatchQL workbench", () => {
       it("sends the override on every run, and never as a named parameter", async () => {
         const editor = await renderWorkbench();
         typeSql(editor, SQL);
-        fireEvent.change(screen.getByLabelText("period_start"), {
+        fireEvent.change(screen.getByLabelText(LWQL_PERIOD_START_PARAMETER), {
           target: { value: "2026-02-24 09:00:00" },
         });
 
@@ -851,7 +860,7 @@ describe("the LangWatchQL workbench", () => {
         };
         for (const call of harness.mutation.mock.calls) {
           expect(call[0].timeWindow).toEqual(overridden);
-          expect(call[0].parameters ?? {}).not.toHaveProperty("period_start");
+          expect(call[0].parameters ?? {}).not.toHaveProperty(LWQL_PERIOD_START_PARAMETER);
         }
       });
 
@@ -859,7 +868,7 @@ describe("the LangWatchQL workbench", () => {
       it("goes back to the page's period when the override is dropped", async () => {
         const editor = await renderWorkbench();
         typeSql(editor, SQL);
-        fireEvent.change(screen.getByLabelText("period_start"), {
+        fireEvent.change(screen.getByLabelText(LWQL_PERIOD_START_PARAMETER), {
           target: { value: "2026-02-24 09:00:00" },
         });
 
@@ -877,12 +886,12 @@ describe("the LangWatchQL workbench", () => {
         const editor = await renderWorkbench();
         typeSql(editor, SQL);
 
-        fireEvent.change(screen.getByLabelText("period_start"), {
+        fireEvent.change(screen.getByLabelText(LWQL_PERIOD_START_PARAMETER), {
           target: { value: "2026-02-30 12:00:00" },
         });
         expect(screen.getByRole("button", { name: "Run query" })).toBeDisabled();
 
-        fireEvent.change(screen.getByLabelText("period_start"), {
+        fireEvent.change(screen.getByLabelText(LWQL_PERIOD_START_PARAMETER), {
           target: { value: "2026-02-24 09:00:00" },
         });
         expect(screen.getByRole("button", { name: "Run query" })).toBeEnabled();
@@ -900,7 +909,7 @@ describe("the LangWatchQL workbench", () => {
 
         const editor = await renderWorkbench();
         typeSql(editor, SQL);
-        fireEvent.change(screen.getByLabelText("period_start"), {
+        fireEvent.change(screen.getByLabelText(LWQL_PERIOD_START_PARAMETER), {
           target: { value: "2026-02-24 09:00:00" },
         });
         expect(screen.getByText("Set for this query")).toBeInTheDocument();
@@ -949,7 +958,7 @@ describe("the LangWatchQL workbench", () => {
         harness.mutation.mockRejectedValue(
           handledErrorEnvelope({
             code: "lwql_reserved_parameter_supplied",
-            meta: { parameters: ["period_start"] },
+            meta: { parameters: [LWQL_PERIOD_START_PARAMETER] },
           }),
         );
 
@@ -959,7 +968,9 @@ describe("the LangWatchQL workbench", () => {
 
         const parameters = await screen.findByTestId("lwql-parameters");
         await waitFor(() =>
-          expect(within(parameters).getByRole("alert")).toHaveTextContent("period_start"),
+          expect(within(parameters).getByRole("alert")).toHaveTextContent(
+            LWQL_PERIOD_START_PARAMETER,
+          ),
         );
         expect(within(parameters).getByRole("alert")).toHaveTextContent("Remove these");
       });

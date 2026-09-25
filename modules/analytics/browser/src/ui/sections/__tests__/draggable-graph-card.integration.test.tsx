@@ -4,26 +4,16 @@
  * `series` to threshold) — this test pins that exclusion staying in place.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("~/hooks/useDrawer", () => ({
-  useDrawer: () => ({ openDrawer: vi.fn() }),
-}));
-
-vi.mock("~/utils/compat/next-router", () => {
-  const router = { query: {}, asPath: "/", push: vi.fn(), replace: vi.fn() };
-  return { useRouter: () => router, default: router };
-});
-
-vi.mock("~/components/analytics/CustomGraph", () => ({
+vi.mock("../custom-graph.tsx", () => ({
   CustomGraph: () => <div data-testid="builder-graph" />,
 }));
 
-vi.mock("~/features/analytics-query/components/LangWatchQLDashboardWidget", () => ({
+vi.mock("../langwatch-ql-dashboard-widget.tsx", () => ({
   LangWatchQLDashboardWidget: ({
     chartId,
     granularitySeconds,
@@ -43,8 +33,8 @@ vi.mock("~/features/analytics-query/components/LangWatchQLDashboardWidget", () =
 // dashboard"), and the dashboard's period comes from the page's selector.
 // None of these scenarios exercise them, so both are stubbed rather than
 // provided — the claim here is which body a card draws.
-vi.mock("~/utils/api", () => ({
-  api: {
+vi.mock("../../../behavior/analytics-api.ts", () => ({
+  analyticsApi: {
     useUtils: () => ({
       dashboardWidgets: { list: { invalidate: vi.fn() } },
       graphs: { getAll: { invalidate: vi.fn() } },
@@ -63,17 +53,17 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-vi.mock("~/components/PeriodSelector", () => ({
+vi.mock("@langwatch/analytics-browser-kit", () => ({
   usePeriodSelector: () => ({
     period: { startDate: new Date(0), endDate: new Date(1) },
   }),
 }));
 
-vi.mock("~/features/custom-chart-playground/dashboard-widget-in-place-editor", () => ({
+vi.mock("../dashboard-widget-in-place-editor.tsx", () => ({
   DashboardWidgetInPlaceEditor: () => null,
 }));
 
-vi.mock("~/features/custom-chart-playground/dashboard-widget-frame", () => ({
+vi.mock("../dashboard-widget-frame.tsx", () => ({
   DashboardWidgetFrame: ({ id, graph }: { id: string; graph: unknown }) => (
     <div data-testid="dashboard-widget" data-id={id} data-graph={JSON.stringify(graph)} />
   ),
@@ -83,10 +73,11 @@ import {
   DASHBOARD_SRCDOC_CHART_KIND,
   WORKBENCH_SQL_CHART_KIND,
 } from "../../../model/chart-kinds.ts";
+import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
 import { DraggableGraphCard } from "../draggable-graph-card.tsx";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <AnalyticsTestHarness host={new StubAnalyticsHost()}>{children}</AnalyticsTestHarness>
 );
 
 const BUILDER_PAYLOAD = {
