@@ -3,7 +3,7 @@ Feature: Suite list view status with criteria count
   I want the list view to show passed/failed status with criteria counts
   So that I can see at a glance whether a scenario passed and how many criteria were met
 
-  # Parity status: 8 of 11 scenarios bound to existing tests.
+  # Parity status: 9 of 12 scenarios bound to existing tests.
   # Remaining scenarios (#3458):
   #   3 NO_TEST: shipped behavior, no integration test yet
   # NO_TEST gaps:
@@ -13,8 +13,9 @@ Feature: Suite list view status with criteria count
 
   # The list view currently shows inconsistent values like "100%" for success
   # and "failed" for failures. This feature standardizes the status display
-  # to always show "passed" or "failed" with criteria counts in parentheses,
-  # e.g. "passed (4/5)" or "failed (3/5)".
+  # to show "passed" or "failed" with criteria counts in parentheses,
+  # e.g. "passed (4/5)" or "failed (3/5)". Completed runs without evaluation
+  # results show "Not evaluated".
 
   Background:
     Given I am logged into project "my-project"
@@ -40,7 +41,14 @@ Feature: Suite list view status with criteria count
     Given a scenario run with status "success"
     And the run has no evaluation results
     When the status label is computed
-    Then the label reads "passed"
+    Then the label reads "Not evaluated"
+
+  @integration
+  Scenario: An ungraded completed run is not presented as passed
+    Given a completed scenario run with no evaluation results
+    When I view the run in list view
+    Then the status reads "Not evaluated"
+    And no passed label is displayed
 
   @unit
   Scenario: Run with zero criteria shows status without count
