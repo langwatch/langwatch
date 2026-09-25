@@ -41,7 +41,6 @@ export {
   ObservabilityAuthzCutoverAdapter,
   type AuthzCutoverCounter,
 } from "./services/authz-cutover-telemetry.service.ts";
-export { deriveGrantId } from "./rules/authz-grant-identity.rules.ts";
 export type { AuthzRepositories } from "./repositories/authz.repositories.ts";
 export { authzServer, type AuthzInfrastructure } from "./authz.server.ts";
 export { authzRoleBindingRest, roleBindingRestFacts } from "./transport/authz-role-binding.rest.ts";

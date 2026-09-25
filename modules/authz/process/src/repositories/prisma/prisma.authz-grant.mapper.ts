@@ -211,169 +211,168 @@ export type ShareLinkAudience =
   | { type: "organization"; id: string }
   | { type: "project"; id: string };
 
+/** A grant's legacy-table row, or the outcome that the legacy tables cannot hold it. */
+export type CompatProjection<Row> = { kind: "compat"; row: Row } | { kind: "noCompatForm" };
+
+const NO_COMPAT_FORM: { kind: "noCompatForm" } = { kind: "noCompatForm" };
+
 /**
  * Grants and roles between their fact form and the rows that store them,
  * both directions, plus the compat shapes older readers still expect. A
  * fact written one way and read back another is a silent authorisation change.
  */
-export class AuthzGrantMapper {
-  /**
-   * Parse stored TEXT column (no Prisma enum); undefined for unknown values
-   * to safely handle stale database rows.
-   */
-  private static resourceKindFromDb(value: string | null): ResourceGrantTerms["kind"] | undefined {
-    if (value === "TRACE" || value === "THREAD") {
-      return RESOURCE_KIND_FROM_DB[value];
-    }
-    return undefined;
-  }
-
-  static grantFactToRow({
-    grant,
+export function grantFactToRow({
+  grant,
+  organizationId,
+}: {
+  grant: GrantFact;
+  organizationId: string;
+}): GrantRowShape {
+  return {
+    id: grant.grantId,
     organizationId,
-  }: {
-    grant: GrantFact;
-    organizationId: string;
-  }): GrantRowShape {
-    return {
-      id: grant.grantId,
-      organizationId,
-      principalType: PRINCIPAL_TO_DB[grant.principal.type],
-      principalId: grant.principal.id,
-      roleKey: grant.roleKey,
-      legacyRole: grant.legacyRole ?? null,
-      source: grant.source,
-      // The ledger and Prisma scope enums share their five value names.
-      scopeType: grant.scope.type,
-      scopeId: grant.scope.id,
-      token: grant.resource?.token ?? null,
-      permission: grant.resource?.permission ?? null,
-      resourceKind: grant.resource != null ? RESOURCE_KIND_TO_DB[grant.resource.kind] : null,
-      projectId: grant.resource?.projectId ?? null,
-      createdByUserId: grant.resource?.createdByUserId ?? null,
-      expiresAt:
-        grant.resource?.expiresAtMs != null
-          ? Temporal.Instant.fromEpochMilliseconds(grant.resource.expiresAtMs)
-          : null,
-      maxViews: grant.resource?.maxViews ?? null,
-      occurredAt: Temporal.Instant.fromEpochMilliseconds(grant.occurredAtMs),
-    };
-  }
+    principalType: PRINCIPAL_TO_DB[grant.principal.type],
+    principalId: grant.principal.id,
+    roleKey: grant.roleKey,
+    legacyRole: grant.legacyRole ?? null,
+    source: grant.source,
+    // The ledger and Prisma scope enums share their five value names.
+    scopeType: grant.scope.type,
+    scopeId: grant.scope.id,
+    token: grant.resource?.token ?? null,
+    permission: grant.resource?.permission ?? null,
+    resourceKind: grant.resource != null ? RESOURCE_KIND_TO_DB[grant.resource.kind] : null,
+    projectId: grant.resource?.projectId ?? null,
+    createdByUserId: grant.resource?.createdByUserId ?? null,
+    expiresAt:
+      grant.resource?.expiresAtMs != null
+        ? Temporal.Instant.fromEpochMilliseconds(grant.resource.expiresAtMs)
+        : null,
+    maxViews: grant.resource?.maxViews ?? null,
+    occurredAt: Temporal.Instant.fromEpochMilliseconds(grant.occurredAtMs),
+  };
+}
 
-  /** A row read with {@link GRANT_ROW_COLUMNS}; throws on one that is not a Grant row. */
-  static grantRowFromStored(stored: unknown): GrantRowShape {
-    const row = storedGrantRowSchema.parse(stored);
-    return {
-      ...row,
-      expiresAt: row.expiresAt ? fromDate(row.expiresAt) : null,
-      occurredAt: fromDate(row.occurredAt),
-    };
-  }
+/** A row read with {@link GRANT_ROW_COLUMNS}; throws on one that is not a Grant row. */
+export function grantRowFromStored(stored: unknown): GrantRowShape {
+  const row = storedGrantRowSchema.parse(stored);
+  return {
+    ...row,
+    expiresAt: row.expiresAt ? fromDate(row.expiresAt) : null,
+    occurredAt: fromDate(row.occurredAt),
+  };
+}
 
-  static grantRowToFact(row: GrantRowShape): GrantFact {
-    const resourceKind = AuthzGrantMapper.resourceKindFromDb(row.resourceKind);
-    const fact: GrantFact = {
-      grantId: row.id,
-      principal: {
-        type: PRINCIPAL_FROM_DB[row.principalType],
-        id: row.principalId,
-      },
-      roleKey: row.roleKey,
-      scope: { type: row.scopeType as LedgerScopeType, id: row.scopeId },
-      source: row.source as GrantEventSource,
-      occurredAtMs: row.occurredAt.epochMilliseconds,
+export function grantRowToFact(row: GrantRowShape): GrantFact {
+  // Stored TEXT column (no Prisma enum): an unknown value from a stale row reads as no kind.
+  const resourceKind =
+    row.resourceKind === "TRACE" || row.resourceKind === "THREAD"
+      ? RESOURCE_KIND_FROM_DB[row.resourceKind]
+      : undefined;
+  const fact: GrantFact = {
+    grantId: row.id,
+    principal: {
+      type: PRINCIPAL_FROM_DB[row.principalType],
+      id: row.principalId,
+    },
+    roleKey: row.roleKey,
+    scope: { type: row.scopeType as LedgerScopeType, id: row.scopeId },
+    source: row.source as GrantEventSource,
+    occurredAtMs: row.occurredAt.epochMilliseconds,
+  };
+  if (row.legacyRole != null) {
+    fact.legacyRole = row.legacyRole as LegacyBindingRole;
+  }
+  // All four identity columns or none, and the kind has to parse as one of
+  // the two the tier supports. Partial resource identity is not a grant.
+  if (
+    row.token != null &&
+    row.permission != null &&
+    resourceKind !== undefined &&
+    row.projectId != null
+  ) {
+    const resource: NonNullable<GrantFact["resource"]> = {
+      kind: resourceKind,
+      projectId: row.projectId,
+      token: row.token,
+      permission: row.permission,
     };
-    if (row.legacyRole != null) {
-      fact.legacyRole = row.legacyRole as LegacyBindingRole;
+    if (row.createdByUserId != null) {
+      resource.createdByUserId = row.createdByUserId;
     }
-    // All four identity columns or none, and the kind has to parse as one of
-    // the two the tier supports. Partial resource identity is not a grant.
-    if (
-      row.token != null &&
-      row.permission != null &&
-      resourceKind !== undefined &&
-      row.projectId != null
-    ) {
-      const resource: NonNullable<GrantFact["resource"]> = {
-        kind: resourceKind,
-        projectId: row.projectId,
-        token: row.token,
-        permission: row.permission,
-      };
-      if (row.createdByUserId != null) {
-        resource.createdByUserId = row.createdByUserId;
-      }
-      if (row.expiresAt != null) resource.expiresAtMs = row.expiresAt.epochMilliseconds;
-      if (row.maxViews != null) resource.maxViews = row.maxViews;
-      fact.resource = resource;
-    }
-    return fact;
+    if (row.expiresAt != null) resource.expiresAtMs = row.expiresAt.epochMilliseconds;
+    if (row.maxViews != null) resource.maxViews = row.maxViews;
+    fact.resource = resource;
   }
+  return fact;
+}
 
-  static roleFactToRow({
-    role,
+export function roleFactToRow({
+  role,
+  organizationId,
+}: {
+  role: RoleFact;
+  organizationId: string;
+}): RoleRowShape {
+  return {
+    id: role.roleId,
     organizationId,
-  }: {
-    role: RoleFact;
-    organizationId: string;
-  }): RoleRowShape {
-    return {
-      id: role.roleId,
-      organizationId,
-      name: role.name,
-      description: role.description ?? null,
-      permissions: role.permissions,
-      kind: role.kind,
-      occurredAt: Temporal.Instant.fromEpochMilliseconds(role.occurredAtMs),
-    };
+    name: role.name,
+    description: role.description ?? null,
+    permissions: role.permissions,
+    kind: role.kind,
+    occurredAt: Temporal.Instant.fromEpochMilliseconds(role.occurredAtMs),
+  };
+}
+
+export function roleRowToFact(row: RoleRowShape): RoleFact {
+  const fact: RoleFact = {
+    roleId: row.id,
+    name: row.name,
+    permissions: row.permissions,
+    kind: row.kind as RoleFact["kind"],
+    occurredAtMs: row.occurredAt.epochMilliseconds,
+  };
+  if (row.description != null) fact.description = row.description;
+  return fact;
+}
+
+/**
+ * Project legacy-expressible shapes only (scopes ORGANIZATION|TEAM|PROJECT;
+ * roleKey mapping with legacyRole fallback for custom bindings).
+ */
+export function compatBindingFromGrantFact({
+  grant,
+  organizationId,
+}: {
+  grant: GrantFact;
+  organizationId: string;
+}): CompatProjection<CompatBindingRowShape> {
+  const { scope, principal, roleKey } = grant;
+  if (scope.type !== "ORGANIZATION" && scope.type !== "TEAM" && scope.type !== "PROJECT") {
+    return NO_COMPAT_FORM;
+  }
+  if (principal.type !== "user" && principal.type !== "group" && principal.type !== "apiKey") {
+    return NO_COMPAT_FORM;
+  }
+  if (roleKey == null || principal.id == null) return NO_COMPAT_FORM;
+
+  let role: TeamUserRole;
+  let customRoleId: string | null = null;
+  if (roleKey === "admin") role = "ADMIN";
+  else if (roleKey === "member") role = "MEMBER";
+  else if (roleKey === "viewer") role = "VIEWER";
+  else if (roleKey.startsWith("custom:")) {
+    role = grant.legacyRole ?? "CUSTOM";
+    customRoleId = roleKey.slice("custom:".length);
+  } else {
+    // lite-member (and any future key the enum cannot carry).
+    return NO_COMPAT_FORM;
   }
 
-  static roleRowToFact(row: RoleRowShape): RoleFact {
-    const fact: RoleFact = {
-      roleId: row.id,
-      name: row.name,
-      permissions: row.permissions,
-      kind: row.kind as RoleFact["kind"],
-      occurredAtMs: row.occurredAt.epochMilliseconds,
-    };
-    if (row.description != null) fact.description = row.description;
-    return fact;
-  }
-
-  /**
-   * Project legacy-expressible shapes only (scopes ORGANIZATION|TEAM|PROJECT;
-   * roleKey mapping with legacyRole fallback for custom bindings).
-   */
-  static findCompatBindingFromGrantFact({
-    grant,
-    organizationId,
-  }: {
-    grant: GrantFact;
-    organizationId: string;
-  }): CompatBindingRowShape | null {
-    const { scope, principal, roleKey } = grant;
-    if (scope.type !== "ORGANIZATION" && scope.type !== "TEAM" && scope.type !== "PROJECT") {
-      return null;
-    }
-    if (principal.type !== "user" && principal.type !== "group" && principal.type !== "apiKey") {
-      return null;
-    }
-    if (roleKey == null || principal.id == null) return null;
-
-    let role: TeamUserRole;
-    let customRoleId: string | null = null;
-    if (roleKey === "admin") role = "ADMIN";
-    else if (roleKey === "member") role = "MEMBER";
-    else if (roleKey === "viewer") role = "VIEWER";
-    else if (roleKey.startsWith("custom:")) {
-      role = grant.legacyRole ?? "CUSTOM";
-      customRoleId = roleKey.slice("custom:".length);
-    } else {
-      // lite-member (and any future key the enum cannot carry).
-      return null;
-    }
-
-    return {
+  return {
+    kind: "compat",
+    row: {
       id: grant.grantId,
       organizationId,
       userId: principal.type === "user" ? principal.id : null,
@@ -383,39 +382,42 @@ export class AuthzGrantMapper {
       customRoleId,
       scopeType: scope.type,
       scopeId: scope.id,
-    };
-  }
+    },
+  };
+}
 
-  static shareVisibilityAudience({
-    visibility,
-    organizationId,
-    projectId,
-  }: {
-    visibility: CompatShareLinkRowShape["visibility"];
-    organizationId: string;
-    projectId: string;
-  }): ShareLinkAudience {
-    return authzShareAudience({ visibility, organizationId, projectId });
-  }
+export function shareVisibilityAudience({
+  visibility,
+  organizationId,
+  projectId,
+}: {
+  visibility: CompatShareLinkRowShape["visibility"];
+  organizationId: string;
+  projectId: string;
+}): ShareLinkAudience {
+  return authzShareAudience({ visibility, organizationId, projectId });
+}
 
-  /**
-   * RESOURCE facts only; other scopes/audiences map to null (silently skipped;
-   * legacy table never held them).
-   */
-  static findCompatShareLinkFromGrantFact({
-    grant,
-    organizationId: _organizationId,
-  }: {
-    grant: GrantFact;
-    organizationId: string;
-  }): CompatShareLinkRowShape | null {
-    const { scope, principal, resource } = grant;
-    if (scope.type !== "RESOURCE") return null;
-    if (!resource) return null;
-    const visibility = SHARE_VISIBILITY_BY_PRINCIPAL[principal.type];
-    if (!visibility) return null;
+/**
+ * RESOURCE facts only; other scopes/audiences map to null (silently skipped;
+ * legacy table never held them).
+ */
+export function compatShareLinkFromGrantFact({
+  grant,
+  organizationId: _organizationId,
+}: {
+  grant: GrantFact;
+  organizationId: string;
+}): CompatProjection<CompatShareLinkRowShape> {
+  const { scope, principal, resource } = grant;
+  if (scope.type !== "RESOURCE") return NO_COMPAT_FORM;
+  if (!resource) return NO_COMPAT_FORM;
+  const visibility = SHARE_VISIBILITY_BY_PRINCIPAL[principal.type];
+  if (!visibility) return NO_COMPAT_FORM;
 
-    return {
+  return {
+    kind: "compat",
+    row: {
       id: grant.grantId,
       token: resource.token,
       resourceType: RESOURCE_KIND_TO_DB[resource.kind],
@@ -425,6 +427,6 @@ export class AuthzGrantMapper {
       visibility,
       expiresAt: resource.expiresAtMs != null ? new Date(resource.expiresAtMs) : null,
       maxViews: resource.maxViews ?? null,
-    };
-  }
+    },
+  };
 }

@@ -9,19 +9,14 @@ import {
   type DefineRoleCommandData,
   type GrantEventSource,
   type RevokeGrantCommandData,
-  type TeamUserRole as AuthzTeamUserRole,
-  roleKeyForTeamRole,
 } from "@langwatch/authz-contract";
-import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, nowInstant, toDate } from "@langwatch/time";
-import { z } from "zod";
 
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
 import {
   BindingMissingError,
-  type BindingPrincipalWhere,
   DuplicateBindingError,
   type RoleBindingWrite,
 } from "../repositories/authz-grant.repository.ts";
@@ -30,10 +25,21 @@ import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
 import { bindingIdentityKey } from "../repositories/eventing/eventing.authz-grant.mapper.ts";
 import { liveGrants, liveRoles } from "../repositories/eventing/eventing.authz-live-rows.mapper.ts";
 import {
-  AuthzGrantMapper,
+  compatBindingFromGrantFact,
   GRANT_ROW_COLUMNS,
-  PRINCIPAL_TO_DB,
+  grantRowFromStored,
+  grantRowToFact,
 } from "../repositories/prisma/prisma.authz-grant.mapper.ts";
+import {
+  carriesRoleKey,
+  grantWhereFromBindingWhere,
+  grantIdentityWhere,
+  newCommandId,
+  principalForWhere,
+  roleKeyFor,
+  samePermissions,
+  storedId,
+} from "../repositories/prisma/prisma.authz-ledger.mapper.ts";
 import type { PrismaAuthzRevocationRepository } from "../repositories/prisma/prisma.authz-revocation.repository.ts";
 import {
   membershipFenceFields,
@@ -56,9 +62,6 @@ export type LedgerWriteSource = GrantEventSource;
 // reads and no accuracy.
 const CONVERGENCE_POLL_MS = 250;
 const CONVERGENCE_TIMEOUT_MS = 8_000;
-
-const storedIdSchema = z.object({ id: z.string() });
-const storedRoleKeySchema = z.object({ roleKey: z.string().nullable() });
 
 export type LedgerBindingAttach = Omit<RoleBindingWrite, "organizationId"> & {
   /** Internal generation captured by a membership transaction. Callers that
@@ -133,16 +136,6 @@ export type AuthzRoleBindingFilter = Record<string, unknown> & {
   groupId?: unknown;
   userId?: unknown;
   customRoleId?: unknown;
-  scopeType?: unknown;
-  scopeId?: unknown;
-  id?: unknown;
-  organizationId?: unknown;
-};
-
-type AuthzGrantFilter = Record<string, unknown> & {
-  principalType?: unknown;
-  principalId?: unknown;
-  roleKey?: unknown;
   scopeType?: unknown;
   scopeId?: unknown;
   id?: unknown;
@@ -240,7 +233,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
         : await this.captureMembershipStamps({ organizationId, bindings: fresh });
     // One command per grant, and a command id derived from the batch's own
     // so a retry of the same attach dedupes per grant at the event store.
-    const batchId = commandId ?? this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId();
+    const batchId = commandId ?? this.options.newCommandId?.() ?? newCommandId();
     const senders = (await this.commands()).commands;
     await Promise.all(
       fresh.map((binding) =>
@@ -250,8 +243,8 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
           commandId: `${batchId}:${binding.bindingId}`,
           grant: {
             grantId: binding.bindingId,
-            principal: AuthzLedgerMapper.principalForWhere(binding.principal),
-            roleKey: AuthzLedgerMapper.roleKeyFor(binding),
+            principal: principalForWhere(binding.principal),
+            roleKey: roleKeyFor(binding),
             scope: { type: binding.scopeType, id: binding.scopeId },
             source,
             actor,
@@ -277,7 +270,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
               revokedAt: null,
               OR: fresh.map((binding) => ({
                 id: binding.bindingId,
-                ...AuthzLedgerMapper.grantIdentityWhere(binding),
+                ...grantIdentityWhere(binding),
                 occurredAt: { gte: toDate(Temporal.Instant.fromEpochMilliseconds(occurredAtMs)) },
               })),
             },
@@ -372,17 +365,18 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     const rows = await liveGrants(this.options.database).findMany({
       where: {
         organizationId,
-        OR: bindings.map((binding) => AuthzLedgerMapper.grantIdentityWhere(binding)),
+        OR: bindings.map((binding) => grantIdentityWhere(binding)),
       },
       select: GRANT_ROW_COLUMNS,
     });
     const byIdentity = new Map<string, string>();
     for (const row of rows) {
-      const binding = AuthzGrantMapper.findCompatBindingFromGrantFact({
-        grant: AuthzGrantMapper.grantRowToFact(AuthzGrantMapper.grantRowFromStored(row)),
+      const compat = compatBindingFromGrantFact({
+        grant: grantRowToFact(grantRowFromStored(row)),
         organizationId,
       });
-      if (!binding) continue;
+      if (compat.kind === "noCompatForm") continue;
+      const binding = compat.row;
       byIdentity.set(
         bindingIdentityKey({
           principal: binding,
@@ -428,7 +422,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     ).commands.attachGrant.send({
       tenantId: organizationId,
       organizationId,
-      commandId: commandId ?? this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId(),
+      commandId: commandId ?? this.options.newCommandId?.() ?? newCommandId(),
       grant: {
         grantId,
         principal,
@@ -499,7 +493,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     // so resolving "every grant this principal holds" into ids is the
     // caller's job now, and the deny below is what makes that safe.
     const revokedAtMs = this.now();
-    const batchId = this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId();
+    const batchId = this.options.newCommandId?.() ?? newCommandId();
     const senders = (await this.commands()).commands;
     await Promise.all(
       bindingIds.map((grantId) => {
@@ -551,14 +545,14 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       select: GRANT_ROW_COLUMNS,
     });
     if (stored === null || stored === undefined) throw new BindingMissingError();
-    const row = AuthzGrantMapper.grantRowFromStored(stored);
-    const binding = AuthzGrantMapper.findCompatBindingFromGrantFact({
-      grant: AuthzGrantMapper.grantRowToFact(row),
+    const row = grantRowFromStored(stored);
+    const compat = compatBindingFromGrantFact({
+      grant: grantRowToFact(row),
       organizationId,
     });
-    if (!binding) throw new BindingMissingError();
+    if (compat.kind === "noCompatForm") throw new BindingMissingError();
 
-    const to = AuthzLedgerMapper.roleKeyFor({ role, customRoleId });
+    const to = roleKeyFor({ role, customRoleId });
     if (row.roleKey === to) return;
     const sibling = await liveGrants(this.options.database).findFirst({
       where: {
@@ -579,9 +573,9 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     ).commands.changeGrantRole.send({
       tenantId: organizationId,
       organizationId,
-      commandId: this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId(),
+      commandId: this.options.newCommandId?.() ?? newCommandId(),
       grantId: bindingId,
-      from: AuthzLedgerMapper.roleKeyFor(binding),
+      from: roleKeyFor(compat.row),
       to,
       actor,
       occurredAtMs: this.now(),
@@ -594,7 +588,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
           where: { id: bindingId, organizationId },
           select: { roleKey: true },
         });
-        return AuthzLedgerMapper.carriesRoleKey({ row: updated, roleKey: to });
+        return carriesRoleKey({ row: updated, roleKey: to });
       },
     });
     await this.options.epoch.bump({ organizationId });
@@ -651,15 +645,15 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
         "revokeBindingsWhere refused a filter with no organization: a grant revocation is always tenant-scoped",
       );
     }
-    const grantWhere = AuthzLedgerMapper.findGrantWhereFromBindingWhere(where, organizationId);
-    if (grantWhere === null) {
+    const translation = grantWhereFromBindingWhere(where, organizationId);
+    if (translation.kind === "untranslatable") {
       throw new Error("revokeBindingsWhere refused a filter the grant head cannot express");
     }
     const grantRows = await liveGrants(this.options.database).findMany({
-      where: grantWhere,
+      where: translation.where,
       select: { id: true },
     });
-    const bindingIds = [...new Set(grantRows.map((row) => AuthzLedgerMapper.storedId(row)))];
+    const bindingIds = [...new Set(grantRows.map((row) => storedId(row)))];
     // revokeBindings early-returns on an empty id list, so no selector-only
     // fact is appended when nothing matched — the behaviour the old
     // skipAppendWhenNoMatches flag stood in for, now intrinsic.
@@ -697,7 +691,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     // own: a person is not an aggregate here, and an event that named one
     // would have to straddle every grant they hold.
     const offboardedAtMs = this.now();
-    const batchId = this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId();
+    const batchId = this.options.newCommandId?.() ?? newCommandId();
     const senders = (await this.commands()).commands;
     await Promise.all(
       revokedGrantIds.map((grantId) =>
@@ -765,7 +759,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     ).commands.defineRole.send({
       tenantId: organizationId,
       organizationId,
-      commandId: this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId(),
+      commandId: this.options.newCommandId?.() ?? newCommandId(),
       role,
       actor,
     });
@@ -788,7 +782,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
         return (
           row != null &&
           row.name === name &&
-          AuthzLedgerMapper.samePermissions({
+          samePermissions({
             stored: row.permissions,
             wanted: permissions,
           })
@@ -824,7 +818,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     ).commands.deleteRole.send({
       tenantId: organizationId,
       organizationId,
-      commandId: this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId(),
+      commandId: this.options.newCommandId?.() ?? newCommandId(),
       roleId,
       actor,
       occurredAtMs: this.now(),
@@ -883,182 +877,5 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     );
     if (required) throw new AuthzGrantNotConfirmedError();
     return false;
-  }
-}
-
-/** The ledger's command vocabulary over one binding fact. */
-export class AuthzLedgerMapper {
-  /** Decision 23: user-action paths mint a random command id; retries reuse it. */
-  static newCommandId(): string {
-    return generate("authzcmd").toString();
-  }
-
-  /** The id of a live grant row read with `select: { id: true }`. */
-  static storedId(row: unknown): string {
-    return storedIdSchema.parse(row).id;
-  }
-
-  /** Whether a live grant row, if there is one, carries this role key. */
-  static carriesRoleKey({ row, roleKey }: { row: unknown; roleKey: string }): boolean {
-    return row != null && storedRoleKeySchema.parse(row).roleKey === roleKey;
-  }
-
-  /**
-   * A binding's identity as the canonical `Grant` head stores it. What the
-   * read-your-writes hold matches on beside the id, so a row carrying the id
-   * but somebody else's principal, role or scope cannot confirm this write.
-   */
-  static grantIdentityWhere(binding: LedgerBindingAttach): {
-    principalType: string;
-    principalId: string;
-    roleKey: string;
-    scopeType: string;
-    scopeId: string;
-  } {
-    const principal = this.principalForWhere(binding.principal);
-
-    return {
-      principalType: PRINCIPAL_TO_DB[principal.type],
-      principalId: principal.id,
-      roleKey: this.roleKeyFor(binding),
-      scopeType: binding.scopeType,
-      scopeId: binding.scopeId,
-    };
-  }
-
-  /**
-   * Whether a stored permission payload is exactly the list just written. The
-   * column is JSON, so anything that is not an array of the same strings in the
-   * same order is a row the fold has not landed yet.
-   */
-  static samePermissions({ stored, wanted }: { stored: unknown; wanted: string[] }): boolean {
-    return (
-      Array.isArray(stored) &&
-      stored.length === wanted.length &&
-      wanted.every((permission, index) => stored[index] === permission)
-    );
-  }
-
-  /** The partial unique indexes refusing an identical binding. */
-  static isUniqueViolation(error: unknown): boolean {
-    return (error as { code?: unknown } | null)?.code === "P2002";
-  }
-
-  /** Prisma's "record to update not found". */
-  static isRecordNotFound(error: unknown): boolean {
-    return (error as { code?: unknown } | null)?.code === "P2025";
-  }
-
-  static roleKeyFor({
-    role,
-    customRoleId,
-  }: {
-    role: RoleBindingWrite["role"];
-    customRoleId: string | null;
-  }): string {
-    return customRoleId === null
-      ? roleKeyForTeamRole(role as AuthzTeamUserRole)
-      : `custom:${customRoleId}`;
-  }
-
-  static principalForWhere(principal: BindingPrincipalWhere): {
-    type: "user" | "group" | "apiKey";
-    id: string;
-  } {
-    if (principal.userId !== undefined) {
-      return { type: "user", id: principal.userId };
-    }
-    if (principal.groupId !== undefined) {
-      return { type: "group", id: principal.groupId };
-    }
-    return { type: "apiKey", id: principal.apiKeyId };
-  }
-
-  /**
-   * Translate a compat `RoleBinding` filter into the equivalent `Grant`-head predicate, so a
-   * filtered revoke reaches Grant rows the compat head never represented (a `roleKey`-only
-   * import, a PLATFORM-tier row).
-   */
-  static findGrantWhereFromBindingWhere(
-    where: AuthzRoleBindingFilter,
-    organizationId: string,
-  ): AuthzGrantFilter | null {
-    const known = new Set([
-      "apiKeyId",
-      "groupId",
-      "userId",
-      "customRoleId",
-      "scopeType",
-      "scopeId",
-      "id",
-      "organizationId",
-    ]);
-    const keys = Object.keys(where);
-    if (keys.some((key) => !known.has(key))) return null;
-
-    const grantWhere: AuthzGrantFilter = { organizationId };
-
-    const scope = this.scopeFromBindingFilter(where);
-    if (scope === null) return null;
-    Object.assign(grantWhere, scope);
-
-    const principal = (
-      [
-        ["apiKeyId", "API_KEY"],
-        ["groupId", "GROUP"],
-        ["userId", "USER"],
-      ] as const
-    ).find(([field]) => where[field] != null);
-    if (principal) {
-      const value = where[principal[0]];
-      // Only a plain-string principal id is translated; an operator shape here
-      // is outside the caller vocabulary, so bail rather than guess.
-      if (typeof value !== "string") return null;
-      grantWhere.principalType = principal[1];
-      grantWhere.principalId = value;
-    }
-
-    if (where.customRoleId != null) {
-      const roleKey = this.roleKeyFromCustomRoleFilter(where.customRoleId);
-      if (roleKey === null) return null;
-      grantWhere.roleKey = roleKey;
-    }
-
-    if (where.id != null) grantWhere.id = where.id;
-
-    return grantWhere;
-  }
-
-  /**
-   * A scoped filter names the SAME tier and id on the Grant head — the three compat tiers
-   * spell identically in `GrantScopeType`.
-   */
-  private static scopeFromBindingFilter(
-    where: AuthzRoleBindingFilter,
-  ): Pick<AuthzGrantFilter, "scopeType" | "scopeId"> | null {
-    const scope: Pick<AuthzGrantFilter, "scopeType" | "scopeId"> = {};
-    if (where.scopeType != null) {
-      if (typeof where.scopeType !== "string") return null;
-      scope.scopeType = where.scopeType;
-    }
-    if (where.scopeId != null) {
-      if (typeof where.scopeId !== "string") return null;
-      scope.scopeId = where.scopeId;
-    }
-    return scope;
-  }
-
-  /** A `customRoleId` filter as the `custom:<id>` roleKey predicate it names —
-   *  a plain string or an `in` list; any other operator shape is outside the
-   *  caller vocabulary, so null and the caller bails. */
-  private static roleKeyFromCustomRoleFilter(
-    value: NonNullable<AuthzRoleBindingFilter["customRoleId"]>,
-  ): string | { in: string[] } | null {
-    if (typeof value === "string") return `custom:${value}`;
-    if (typeof value !== "object" || value === null) return null;
-    if (!("in" in value)) return null;
-    const ids = value.in;
-    if (!Array.isArray(ids)) return null;
-    return { in: ids.map((id) => `custom:${id}`) };
   }
 }

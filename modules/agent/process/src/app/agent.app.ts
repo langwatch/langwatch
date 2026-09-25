@@ -130,6 +130,7 @@ export class AgentApp implements AgentApi {
   static readonly reads = ["redis", "publicBaseUrl"] as const;
 
   readonly #agents: AgentService;
+  readonly #presence = ConnectedAgentPresenceService.create();
   readonly #copies: AgentCopyService;
   readonly #connected: ConnectedAgentService | undefined;
   /** No process supplies HTTP-based agent testing yet; see the batch-a handoff. */
@@ -556,7 +557,7 @@ export class AgentApp implements AgentApi {
       hostLabel: agent.hostLabel ?? null,
       lastSeenAt: agent.lastSeenAt ?? null,
       parameters: declaredAgentParameters(agent),
-      ...ConnectedAgentPresenceService.agentPresenceView({
+      ...this.#presence.agentPresenceView({
         agent,
         owners,
         presence,

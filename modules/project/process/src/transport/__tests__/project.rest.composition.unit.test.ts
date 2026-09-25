@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * `/api/projects` against the real `ProjectApp`, not a stub — the stub
@@ -9,7 +10,7 @@ import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { LocalFeatureApis, ResourceScope } from "@langwatch/kernel";
 import { LangyApi } from "@langwatch/langy-contract";
-import { OrganizationApi } from "@langwatch/organization-contract";
+import { OrganizationApi, TeamNotFoundError } from "@langwatch/organization-contract";
 import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { ShareApi } from "@langwatch/share-contract";
@@ -135,8 +136,17 @@ function application(options: { apiKeys?: Partial<TestApiKeyService> } = {}): {
     ...options.apiKeys,
   });
 
+  const teams = [team(), team({ id: "team-other", organizationId: OTHER_ORGANIZATION_ID })];
+  const organizations = createApiFixture<OrganizationApi>({
+    getTeam: async ({ teamId, organizationId }) => {
+      const found = teams.find((t) => t.id === teamId && t.organizationId === organizationId);
+      if (!found) throw new TeamNotFoundError(teamId);
+      return found;
+    },
+  });
+
   const app = ProjectApp.create({
-    dependencies: { apiKeys, ...unreachablePeers() },
+    dependencies: { apiKeys, ...unreachablePeers(), organizations },
     repositories: {
       projects: MemoryProjectRepository.create({ memory: database }),
     },

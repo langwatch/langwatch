@@ -23,9 +23,12 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
 import { nextAgentId } from "../rules/agent-id.rules.ts";
+import {
+  type NormalizedParameters,
+  normalizeParameterSchema,
+} from "../rules/connected-agent-parameter-spec.rules.ts";
 import type { AgentService } from "./agent.service.ts";
 import type { ResolvedConnectCredential } from "./connected-agent-credential.service.ts";
-import { ConnectedAgentParameterSpecService } from "./connected-agent-parameter-spec.service.ts";
 import type { ConnectedAgentRuntime, InstanceMeta } from "./connected-agent-runtime.service.ts";
 import type { SessionInfo } from "./connected-agent-session.service.ts";
 
@@ -148,11 +151,9 @@ export class ConnectedAgentRegistrationService {
         });
       }
 
-      let normalized: ReturnType<
-        typeof ConnectedAgentParameterSpecService.normalizeParameterSchema
-      >;
+      let normalized: NormalizedParameters;
       try {
-        normalized = ConnectedAgentParameterSpecService.normalizeParameterSchema(agent.parameters);
+        normalized = normalizeParameterSchema(agent.parameters);
       } catch (error) {
         if (!HandledError.isHandled(error)) {
           throw error;

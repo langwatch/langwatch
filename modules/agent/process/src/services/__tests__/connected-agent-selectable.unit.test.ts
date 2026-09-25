@@ -17,7 +17,7 @@ function view({
   ownerUserId: string | null;
   viewerUserId: string | null;
 }) {
-  return ConnectedAgentPresenceService.agentPresenceView({
+  return ConnectedAgentPresenceService.create().agentPresenceView({
     agent: { id: "agent_1", ownerUserId },
     owners: NO_OWNERS,
     presence: NO_PRESENCE_MAP,

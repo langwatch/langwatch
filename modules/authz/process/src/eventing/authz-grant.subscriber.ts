@@ -12,7 +12,7 @@ import { createLogger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
 
 import {
-  type AuthzAuditTrailStore,
+  type AuthzAuditTrailRepository,
   type AuthzAuditRow,
 } from "../repositories/authz-audit-trail.repository.ts";
 import type { AuthzGrantsEvent } from "./authz-grant.events.ts";
@@ -129,14 +129,14 @@ function metadata(event: AuthzGrantsEvent): Record<string, unknown> {
 }
 
 export interface EventingAuthzAuditAdapterOptions {
-  store: AuthzAuditTrailStore;
+  store: AuthzAuditTrailRepository;
 }
 
 /** Class-backed Eventing subscriber; replay never invokes event subscribers. */
 export class EventingAuthzAuditAdapter {
   readonly events = AUTHZ_AUDIT_EVENT_TYPES;
 
-  private constructor(private readonly store: AuthzAuditTrailStore) {}
+  private constructor(private readonly store: AuthzAuditTrailRepository) {}
 
   static create(options: EventingAuthzAuditAdapterOptions): EventingAuthzAuditAdapter {
     return new EventingAuthzAuditAdapter(options.store);

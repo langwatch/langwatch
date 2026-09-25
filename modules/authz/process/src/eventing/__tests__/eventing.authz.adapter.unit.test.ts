@@ -11,7 +11,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import {
-  AuthzAuditTrailStore,
+  AuthzAuditTrailRepository,
   type AuthzAuditRow,
 } from "../../repositories/authz-audit-trail.repository.ts";
 import {
@@ -58,7 +58,7 @@ class NullAuthzGrantProjectionRepository extends AuthzGrantProjectionRepository 
   async append(_write: GrantProjectionWrite, _context: ProjectionStoreContext): Promise<void> {}
 }
 
-class NullAuthzAuditTrailStore extends AuthzAuditTrailStore {
+class NullAuthzAuditTrailRepository extends AuthzAuditTrailRepository {
   async insert(_row: AuthzAuditRow): Promise<void> {}
 }
 
@@ -78,7 +78,7 @@ async function emit(handler: EventEmitter, data: unknown): Promise<Event[]> {
 function buildPipeline() {
   return EventingAuthzAdapter.build({
     authzGrantsWriteStore: new NullAuthzGrantProjectionRepository(),
-    authzAuditTrailStore: new NullAuthzAuditTrailStore(),
+    authzAuditTrailStore: new NullAuthzAuditTrailRepository(),
   });
 }
 

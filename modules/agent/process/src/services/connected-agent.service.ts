@@ -39,6 +39,7 @@ export type ConnectedAgentOptions = {
 
 export class ConnectedAgentService {
   readonly #runtime;
+  readonly #presence = ConnectedAgentPresenceService.create();
   readonly #connections;
   readonly #polling;
 
@@ -107,7 +108,7 @@ export class ConnectedAgentService {
     projectId: string;
     agents: readonly { id: string; type: string }[];
   }): Promise<Map<string, AgentPresence>> {
-    return ConnectedAgentPresenceService.readAgentPresence({ ...input, runtime: this.#runtime });
+    return this.#presence.readAgentPresence({ ...input, runtime: this.#runtime });
   }
 
   async close(): Promise<void> {

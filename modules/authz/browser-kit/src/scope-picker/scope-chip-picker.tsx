@@ -755,7 +755,15 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
     <VStack align="start" width="full" gap={1.5}>
       {label && <SmallLabel>{label}</SmallLabel>}
       {(showQuickPicks || singleSelect) && quickPicks.length > 0 && (
-        <Wrap gap={2} role="group" aria-label="Quick scope">
+        <Wrap
+          as="fieldset"
+          gap={2}
+          border={0}
+          margin={0}
+          padding={0}
+          minWidth={0}
+          aria-label="Quick scope"
+        >
           {quickPicks.map((pick) => {
             const active = matchingQuickPick?.key === pick.key && !multipleMode;
             return (

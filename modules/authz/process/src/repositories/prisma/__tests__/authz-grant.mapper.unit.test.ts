@@ -1,9 +1,30 @@
 import type { GrantFact } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 
-import { AuthzGrantMapper } from "../prisma.authz-grant.mapper.ts";
+import {
+  compatBindingFromGrantFact,
+  type CompatBindingRowShape,
+  compatShareLinkFromGrantFact,
+  type CompatShareLinkRowShape,
+  grantFactToRow,
+  grantRowToFact,
+  roleFactToRow,
+  roleRowToFact,
+} from "../prisma.authz-grant.mapper.ts";
 
 const ORG = "org_acme";
+
+function compatBinding(grant: GrantFact): CompatBindingRowShape {
+  const projection = compatBindingFromGrantFact({ grant, organizationId: ORG });
+  if (projection.kind === "noCompatForm") throw new Error("expected a compat binding row");
+  return projection.row;
+}
+
+function compatShareLink(grant: GrantFact): CompatShareLinkRowShape {
+  const projection = compatShareLinkFromGrantFact({ grant, organizationId: ORG });
+  if (projection.kind === "noCompatForm") throw new Error("expected a compat share link row");
+  return projection.row;
+}
 
 function fact(overrides?: Partial<GrantFact>): GrantFact {
   return {
@@ -48,29 +69,29 @@ describe("grant row mapping", () => {
         },
       });
       for (const original of [fact(), resourceFact(), authorless]) {
-        const row = AuthzGrantMapper.grantFactToRow({ grant: original, organizationId: ORG });
+        const row = grantFactToRow({ grant: original, organizationId: ORG });
         expect(row.organizationId).toBe(ORG);
-        expect(AuthzGrantMapper.grantRowToFact(row)).toEqual(original);
+        expect(grantRowToFact(row)).toEqual(original);
       }
     });
 
     it("stores the resource identity in the table's own spelling", () => {
-      const row = AuthzGrantMapper.grantFactToRow({
+      const row = grantFactToRow({
         grant: resourceFact(),
         organizationId: ORG,
       });
       expect(row.resourceKind).toBe("TRACE");
       expect(row.projectId).toBe("proj_chatbot");
       expect(row.createdByUserId).toBe("user_alice");
-      expect(AuthzGrantMapper.grantRowToFact(row).resource?.kind).toBe("trace");
+      expect(grantRowToFact(row).resource?.kind).toBe("trace");
     });
 
     it("leaves the resource columns null on every other tier", () => {
-      const row = AuthzGrantMapper.grantFactToRow({ grant: fact(), organizationId: ORG });
+      const row = grantFactToRow({ grant: fact(), organizationId: ORG });
       expect(row.resourceKind).toBeNull();
       expect(row.projectId).toBeNull();
       expect(row.createdByUserId).toBeNull();
-      expect(AuthzGrantMapper.grantRowToFact(row).resource).toBeUndefined();
+      expect(grantRowToFact(row).resource).toBeUndefined();
     });
 
     it("keeps an imported binding's legacy role, so a reload is not lossy", () => {
@@ -82,22 +103,20 @@ describe("grant row mapping", () => {
         roleKey: "custom:cr_ops",
         legacyRole: "ADMIN",
       });
-      const row = AuthzGrantMapper.grantFactToRow({ grant: imported, organizationId: ORG });
+      const row = grantFactToRow({ grant: imported, organizationId: ORG });
       expect(row.legacyRole).toBe("ADMIN");
-      expect(AuthzGrantMapper.grantRowToFact(row)).toEqual(imported);
+      expect(grantRowToFact(row)).toEqual(imported);
       // Ledger-born grants have no legacy row to preserve.
-      expect(
-        AuthzGrantMapper.grantFactToRow({ grant: fact(), organizationId: ORG }).legacyRole,
-      ).toBeNull();
+      expect(grantFactToRow({ grant: fact(), organizationId: ORG }).legacyRole).toBeNull();
     });
 
     it("uppercases the principal type for the table and lowers it back", () => {
-      const row = AuthzGrantMapper.grantFactToRow({
+      const row = grantFactToRow({
         grant: fact({ principal: { type: "apiKey", id: "key_1" } }),
         organizationId: ORG,
       });
       expect(row.principalType).toBe("API_KEY");
-      expect(AuthzGrantMapper.grantRowToFact(row).principal.type).toBe("apiKey");
+      expect(grantRowToFact(row).principal.type).toBe("apiKey");
     });
   });
 });
@@ -112,8 +131,8 @@ describe("role row mapping", () => {
       kind: "custom" as const,
       occurredAtMs: 1_755_000_000_000,
     };
-    const row = AuthzGrantMapper.roleFactToRow({ role, organizationId: ORG });
-    expect(AuthzGrantMapper.roleRowToFact(row)).toEqual(role);
+    const row = roleFactToRow({ role, organizationId: ORG });
+    expect(roleRowToFact(row)).toEqual(role);
   });
 });
 
@@ -125,32 +144,23 @@ describe("compat binding mapping", () => {
         ["member", "MEMBER"],
         ["viewer", "VIEWER"],
       ] as const) {
-        const row = AuthzGrantMapper.findCompatBindingFromGrantFact({
-          grant: fact({ roleKey }),
-          organizationId: ORG,
-        });
-        expect(row?.role).toBe(role);
-        expect(row?.customRoleId).toBeNull();
+        const row = compatBinding(fact({ roleKey }));
+        expect(row.role).toBe(role);
+        expect(row.customRoleId).toBeNull();
       }
     });
 
     it("carries the grant id as the binding id, so compat rows are ledger-recognisable", () => {
-      const row = AuthzGrantMapper.findCompatBindingFromGrantFact({
-        grant: fact(),
-        organizationId: ORG,
-      });
-      expect(row?.id).toBe("grant_abc");
-      expect(row?.userId).toBe("user_alice");
-      expect(row?.scopeType).toBe("TEAM");
+      const row = compatBinding(fact());
+      expect(row.id).toBe("grant_abc");
+      expect(row.userId).toBe("user_alice");
+      expect(row.scopeType).toBe("TEAM");
     });
 
     it("splits custom role keys into CUSTOM plus the role id", () => {
-      const row = AuthzGrantMapper.findCompatBindingFromGrantFact({
-        grant: fact({ roleKey: "custom:role_sre" }),
-        organizationId: ORG,
-      });
-      expect(row?.role).toBe("CUSTOM");
-      expect(row?.customRoleId).toBe("role_sre");
+      const row = compatBinding(fact({ roleKey: "custom:role_sre" }));
+      expect(row.role).toBe("CUSTOM");
+      expect(row.customRoleId).toBe("role_sre");
     });
 
     it("writes an imported custom binding's own role, not CUSTOM", () => {
@@ -158,43 +168,31 @@ describe("compat binding mapping", () => {
       // role's permission list is empty (matchers.ts). CUSTOM resolves to
       // viewer there, so normalizing an imported ADMIN row would demote the
       // principal the moment the custom role listed nothing.
-      const row = AuthzGrantMapper.findCompatBindingFromGrantFact({
-        grant: fact({ roleKey: "custom:role_sre", legacyRole: "ADMIN" }),
-        organizationId: ORG,
-      });
-      expect(row?.role).toBe("ADMIN");
-      expect(row?.customRoleId).toBe("role_sre");
+      const row = compatBinding(fact({ roleKey: "custom:role_sre", legacyRole: "ADMIN" }));
+      expect(row.role).toBe("ADMIN");
+      expect(row.customRoleId).toBe("role_sre");
     });
 
     it("sets exactly one principal column per principal type", () => {
-      const group = AuthzGrantMapper.findCompatBindingFromGrantFact({
-        grant: fact({ principal: { type: "group", id: "grp_1" } }),
-        organizationId: ORG,
-      });
-      expect(group?.groupId).toBe("grp_1");
-      expect(group?.userId).toBeNull();
-      expect(group?.apiKeyId).toBeNull();
-      const key = AuthzGrantMapper.findCompatBindingFromGrantFact({
-        grant: fact({ principal: { type: "apiKey", id: "key_1" } }),
-        organizationId: ORG,
-      });
-      expect(key?.apiKeyId).toBe("key_1");
-      expect(key?.groupId).toBeNull();
-      expect(key?.userId).toBeNull();
+      const group = compatBinding(fact({ principal: { type: "group", id: "grp_1" } }));
+      expect(group.groupId).toBe("grp_1");
+      expect(group.userId).toBeNull();
+      expect(group.apiKeyId).toBeNull();
+      const key = compatBinding(fact({ principal: { type: "apiKey", id: "key_1" } }));
+      expect(key.apiKeyId).toBe("key_1");
+      expect(key.groupId).toBeNull();
+      expect(key.userId).toBeNull();
       // The default fixture is a user grant - the third case, and the one
       // that proves "exactly one" rather than "at least the expected one".
-      const user = AuthzGrantMapper.findCompatBindingFromGrantFact({
-        grant: fact(),
-        organizationId: ORG,
-      });
-      expect(user?.userId).toBe("user_alice");
-      expect(user?.groupId).toBeNull();
-      expect(user?.apiKeyId).toBeNull();
+      const user = compatBinding(fact());
+      expect(user.userId).toBe("user_alice");
+      expect(user.groupId).toBeNull();
+      expect(user.apiKeyId).toBeNull();
     });
   });
 
   describe("when the grant is beyond the legacy tables' vocabulary", () => {
-    it("returns null for resource and platform scopes, collectives, and lite-member", () => {
+    it("has no compat form for resource and platform scopes, collectives, and lite-member", () => {
       const beyond: Partial<GrantFact>[] = [
         {
           scope: { type: "RESOURCE", id: "trace_t1" },
@@ -208,11 +206,11 @@ describe("compat binding mapping", () => {
       ];
       for (const overrides of beyond) {
         expect(
-          AuthzGrantMapper.findCompatBindingFromGrantFact({
+          compatBindingFromGrantFact({
             grant: fact(overrides),
             organizationId: ORG,
           }),
-        ).toBeNull();
+        ).toEqual({ kind: "noCompatForm" });
       }
     });
   });
@@ -221,10 +219,7 @@ describe("compat binding mapping", () => {
 describe("compat share link mapping", () => {
   describe("when the grant is a resource fact", () => {
     it("lands the whole link row, keyed by the grant id", () => {
-      const row = AuthzGrantMapper.findCompatShareLinkFromGrantFact({
-        grant: resourceFact(),
-        organizationId: ORG,
-      });
+      const row = compatShareLink(resourceFact());
       expect(row).toEqual({
         id: "grant_share_1",
         token: "tok_1",
@@ -239,14 +234,11 @@ describe("compat share link mapping", () => {
     });
 
     it("keeps view accounting out of the shape entirely", () => {
-      const row = AuthzGrantMapper.findCompatShareLinkFromGrantFact({
-        grant: resourceFact(),
-        organizationId: ORG,
-      });
+      const row = compatShareLink(resourceFact());
       // Not "viewCount is 0" - the key is absent, so neither the create nor
       // the update the repository derives from this row can reset a share
       // link's view budget (delivery-plan decision 22).
-      expect(Object.keys(row ?? {})).not.toContain("viewCount");
+      expect(Object.keys(row)).not.toContain("viewCount");
     });
 
     it("maps each audience principal onto the stored visibility", () => {
@@ -255,17 +247,14 @@ describe("compat share link mapping", () => {
         [{ type: "organization", id: ORG }, "ORGANIZATION"],
         [{ type: "project", id: "proj_chatbot" }, "PROJECT"],
       ] as const) {
-        const row = AuthzGrantMapper.findCompatShareLinkFromGrantFact({
-          grant: resourceFact({ principal }),
-          organizationId: ORG,
-        });
-        expect(row?.visibility).toBe(visibility);
+        const row = compatShareLink(resourceFact({ principal }));
+        expect(row.visibility).toBe(visibility);
       }
     });
 
     it("carries the thread kind through in the stored spelling", () => {
-      const row = AuthzGrantMapper.findCompatShareLinkFromGrantFact({
-        grant: resourceFact({
+      const row = compatShareLink(
+        resourceFact({
           resource: {
             kind: "thread",
             projectId: "proj_chatbot",
@@ -273,17 +262,16 @@ describe("compat share link mapping", () => {
             permission: "traces:view",
           },
         }),
-        organizationId: ORG,
-      });
-      expect(row?.resourceType).toBe("THREAD");
-      expect(row?.userId).toBeNull();
-      expect(row?.expiresAt).toBeNull();
-      expect(row?.maxViews).toBeNull();
+      );
+      expect(row.resourceType).toBe("THREAD");
+      expect(row.userId).toBeNull();
+      expect(row.expiresAt).toBeNull();
+      expect(row.maxViews).toBeNull();
     });
   });
 
   describe("when the grant is not a share link the legacy table can hold", () => {
-    it("returns null for other scopes, other principals, and missing terms", () => {
+    it("has no compat form for other scopes, other principals, and missing terms", () => {
       const beyond: Partial<GrantFact>[] = [
         // Not the resource tier at all.
         { scope: { type: "TEAM", id: "team_client_a" } },
@@ -295,11 +283,11 @@ describe("compat share link mapping", () => {
       ];
       for (const overrides of beyond) {
         expect(
-          AuthzGrantMapper.findCompatShareLinkFromGrantFact({
+          compatShareLinkFromGrantFact({
             grant: resourceFact(overrides),
             organizationId: ORG,
           }),
-        ).toBeNull();
+        ).toEqual({ kind: "noCompatForm" });
       }
     });
 
@@ -309,9 +297,9 @@ describe("compat share link mapping", () => {
         roleKey: null,
         scope: { type: "RESOURCE", id: "trace_t1" },
       });
-      expect(
-        AuthzGrantMapper.findCompatShareLinkFromGrantFact({ grant: termless, organizationId: ORG }),
-      ).toBeNull();
+      expect(compatShareLinkFromGrantFact({ grant: termless, organizationId: ORG })).toEqual({
+        kind: "noCompatForm",
+      });
     });
   });
 });

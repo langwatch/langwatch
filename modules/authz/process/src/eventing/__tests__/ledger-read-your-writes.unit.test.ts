@@ -6,14 +6,11 @@ import { HandledError } from "@langwatch/handled-error";
 import { toDate } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AuthzGrantMapper } from "../../repositories/prisma/prisma.authz-grant.mapper.ts";
+import { grantFactToRow } from "../../repositories/prisma/prisma.authz-grant.mapper.ts";
 import { ACTOR, binding, harness, ORG_ID } from "./support/eventing.authz-ledger-fork.harness.ts";
 
-const grantFactToRow = (args: Parameters<typeof AuthzGrantMapper.grantFactToRow>[0]) =>
-  AuthzGrantMapper.grantFactToRow(args);
-
 /** A Grant row as Postgres returns it: Dates where the mapped shape holds Instants. */
-const storedRow = (args: Parameters<typeof AuthzGrantMapper.grantFactToRow>[0]) => {
+const storedRow = (args: Parameters<typeof grantFactToRow>[0]) => {
   const row = grantFactToRow(args);
   return {
     ...row,

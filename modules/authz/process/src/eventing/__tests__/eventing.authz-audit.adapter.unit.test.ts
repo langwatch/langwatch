@@ -11,7 +11,7 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import {
-  AuthzAuditTrailStore,
+  AuthzAuditTrailRepository,
   type AuthzAuditRow,
 } from "../../repositories/authz-audit-trail.repository.ts";
 import type { AuthzGrantsEvent } from "../authz-grant.events.ts";
@@ -21,7 +21,7 @@ const TENANT_ID = "org_acme";
 const OCCURRED_AT = 1_700_000_000_000;
 const USER_ACTOR = { type: "user" as const, id: "user_admin" };
 
-class RecordingAuditTrailStore extends AuthzAuditTrailStore {
+class RecordingAuditTrailStore extends AuthzAuditTrailRepository {
   readonly attempts: AuthzAuditRow[] = [];
   readonly rows = new Map<string, AuthzAuditRow>();
 

@@ -27,7 +27,7 @@ export class ConnectedAgentPresenceService {
     return new ConnectedAgentPresenceService();
   }
 
-  static agentPresenceView({
+  agentPresenceView({
     agent,
     owners,
     presence,
@@ -58,7 +58,7 @@ export class ConnectedAgentPresenceService {
   }
 
   /** The presence of every agent given, keyed by id; non-connected ones are offline. */
-  static async readAgentPresence({
+  async readAgentPresence({
     projectId,
     agents,
     runtime,

@@ -10,6 +10,6 @@ export interface AuthzAuditRow {
 }
 
 /** Insert is idempotent by row ID and never updates an existing audit fact. */
-export abstract class AuthzAuditTrailStore {
+export abstract class AuthzAuditTrailRepository {
   abstract insert(row: AuthzAuditRow): Promise<void>;
 }

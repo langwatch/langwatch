@@ -30,12 +30,12 @@ import type {
   ShareLinkFactRow,
 } from "../repositories/authz-migration.repository.ts";
 import {
-  AuthzGrantMapper,
   PRINCIPAL_TO_DB,
   SHARE_LINK_PERMISSION,
+  shareVisibilityAudience,
 } from "../repositories/prisma/prisma.authz-grant.mapper.ts";
-import { deriveGrantId } from "../rules/authz-grant-identity.rules.ts";
 import { isMigrationOwnedSource } from "../rules/authz-migration-ownership.rules.ts";
+import { AuthzGrantIdentityService } from "../services/authz-grant-identity.service.ts";
 
 export { AUTHZ_ENGINE_MIGRATION_NAME };
 
@@ -50,6 +50,8 @@ const ACTOR: GrantsLedgerActor = {
 /** Commands in flight at once. Sends are queue enqueues, so this bounds
  *  memory and connection pressure, not throughput. */
 const SEND_CONCURRENCY = 100;
+
+const grantIdentity = AuthzGrantIdentityService.create();
 
 /** A held report names a SAMPLE, not the world: the count is the size of the
  *  problem, the sample is enough to find it. */
@@ -580,8 +582,10 @@ function assemble({
       .slice()
       .toSorted((a, b) => a.id.localeCompare(b.id))
       .flatMap((row) => {
-        const fact = bindingToFact({ row });
-        return fact ? [fact] : [];
+        const addressee = bindingAddressee(row);
+        return addressee.kind === "principal"
+          ? [bindingToFact({ row, principal: addressee.principal })]
+          : [];
       }),
     inventory.members,
   );
@@ -642,7 +646,9 @@ function assemble({
       ...shareLinks.map((link) => link.row.id),
     ]),
     retainedGrantIds: new Set(
-      inventory.bindingRows.filter((row) => bindingPrincipal(row) === null).map((row) => row.id),
+      inventory.bindingRows
+        .filter((row) => bindingAddressee(row).kind === "unaddressed")
+        .map((row) => row.id),
     ),
   };
 }
@@ -689,9 +695,13 @@ function stampUserFacts(facts: GrantFact[], members: OrganizationMemberFact[]): 
  * principal cannot be expressed as a grant and is skipped; the proof does not expect it
  * either, so it holds nothing up.
  */
-function bindingToFact({ row }: { row: LegacyBindingRow }): GrantFact | null {
-  const principal = bindingPrincipal(row);
-  if (!principal) return null;
+function bindingToFact({
+  row,
+  principal,
+}: {
+  row: LegacyBindingRow;
+  principal: LedgerPrincipal;
+}): GrantFact {
   const fact: GrantFact = {
     grantId: row.id,
     principal,
@@ -705,11 +715,18 @@ function bindingToFact({ row }: { row: LegacyBindingRow }): GrantFact | null {
   return fact;
 }
 
-function bindingPrincipal(row: LegacyBindingRow): LedgerPrincipal | null {
-  if (row.userId !== null) return { type: "user", id: row.userId };
-  if (row.groupId !== null) return { type: "group", id: row.groupId };
-  if (row.apiKeyId !== null) return { type: "apiKey", id: row.apiKeyId };
-  return null;
+type BindingAddressee = { kind: "principal"; principal: LedgerPrincipal } | { kind: "unaddressed" };
+
+function bindingAddressee(row: LegacyBindingRow): BindingAddressee {
+  if (row.userId !== null)
+    return { kind: "principal", principal: { type: "user", id: row.userId } };
+  if (row.groupId !== null) {
+    return { kind: "principal", principal: { type: "group", id: row.groupId } };
+  }
+  if (row.apiKeyId !== null) {
+    return { kind: "principal", principal: { type: "apiKey", id: row.apiKeyId } };
+  }
+  return { kind: "unaddressed" };
 }
 
 /**
@@ -745,7 +762,7 @@ function teamMembershipFacts({
       const scope = { type: "TEAM" as const, id: row.teamId };
       return [
         {
-          grantId: deriveGrantId({
+          grantId: grantIdentity.deriveGrantId({
             organizationId,
             principal,
             scope,
@@ -785,7 +802,7 @@ function organizationLevelFacts({
   if (organizationCreatedAtMs !== null) {
     const principal = { type: "organization" as const, id: organizationId };
     facts.push({
-      grantId: deriveGrantId({
+      grantId: grantIdentity.deriveGrantId({
         organizationId,
         principal,
         scope,
@@ -806,7 +823,7 @@ function organizationLevelFacts({
     if (bindingRows.some((row) => covers({ row, userId: member.userId }))) continue;
     const principal = { type: "user" as const, id: member.userId };
     facts.push({
-      grantId: deriveGrantId({
+      grantId: grantIdentity.deriveGrantId({
         organizationId,
         principal,
         scope,
@@ -825,7 +842,7 @@ function organizationLevelFacts({
     .toSorted((a, b) => a.userId.localeCompare(b.userId))) {
     const principal = { type: "user" as const, id: member.userId };
     facts.push({
-      grantId: deriveGrantId({
+      grantId: grantIdentity.deriveGrantId({
         organizationId,
         principal,
         scope,
@@ -854,7 +871,7 @@ function credentialToFact({
   const principal = { type: "project" as const, id: credential.projectId };
   const scope = { type: "PROJECT" as const, id: credential.projectId };
   return {
-    grantId: deriveGrantId({
+    grantId: grantIdentity.deriveGrantId({
       organizationId,
       principal,
       scope,
@@ -889,7 +906,7 @@ function shareLinkToFact({
   if (row.maxViews !== null) resource.maxViews = row.maxViews;
   return {
     grantId: row.id,
-    principal: AuthzGrantMapper.shareVisibilityAudience({
+    principal: shareVisibilityAudience({
       visibility: row.visibility,
       organizationId,
       projectId: row.projectId,
@@ -1144,23 +1161,27 @@ function resourceDiffs({
   head: ResourceGrantRow;
 }): CheckResult {
   const { row } = link;
-  const principal = AuthzGrantMapper.shareVisibilityAudience({
+  const principal = shareVisibilityAudience({
     visibility: row.visibility,
     organizationId,
     projectId: row.projectId,
   });
   const compared: [string, string | null, string | null][] = [
-    ["token", tokenFingerprint(row.token), tokenFingerprint(head.token)],
+    [
+      "token",
+      row.token === null ? null : tokenFingerprint(row.token),
+      head.token === null ? null : tokenFingerprint(head.token),
+    ],
     ["kind", row.resourceType, (head.resourceKind ?? "").toUpperCase() || null],
     ["resourceId", row.resourceId, head.resourceId],
     ["projectId", row.projectId, head.projectId],
     ["principalType", PRINCIPAL_TO_DB[principal.type], head.principalType],
     ["principalId", principal.id, head.principalId],
-    ["expiresAt", numberField(row.expiresAtMs), numberField(head.expiresAtMs)],
-    ["maxViews", numberField(row.maxViews), numberField(head.maxViews)],
+    ["expiresAt", row.expiresAtMs?.toString() ?? null, head.expiresAtMs?.toString() ?? null],
+    ["maxViews", row.maxViews?.toString() ?? null, head.maxViews?.toString() ?? null],
   ];
   if (head.viewCount > row.viewCount) {
-    compared.push(["viewCount", numberField(row.viewCount), numberField(head.viewCount)]);
+    compared.push(["viewCount", String(row.viewCount), String(head.viewCount)]);
   }
   return {
     outstanding: head.viewCount < row.viewCount ? [row.id] : [],
@@ -1180,11 +1201,6 @@ function resourceDiffs({
   };
 }
 
-function tokenFingerprint(token: string | null): string | null {
-  if (token === null) return null;
+function tokenFingerprint(token: string): string {
   return createHash("sha256").update(token).digest("hex").slice(0, 12);
-}
-
-function numberField(value: number | null): string | null {
-  return value === null ? null : String(value);
 }

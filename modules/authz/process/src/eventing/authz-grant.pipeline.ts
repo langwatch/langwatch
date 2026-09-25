@@ -1,6 +1,6 @@
 import { defineAggregate, definePipeline } from "@langwatch/eventing";
 
-import type { AuthzAuditTrailStore } from "../repositories/authz-audit-trail.repository.ts";
+import type { AuthzAuditTrailRepository } from "../repositories/authz-audit-trail.repository.ts";
 import type { AuthzGrantProjectionRepository } from "../repositories/authz-grant-projection.repository.ts";
 import {
   AttachGrantCommand,
@@ -19,7 +19,7 @@ export const AUTHZ_GRANT_PIPELINE_NAME = "authz_grant" as const;
 
 export interface EventingAuthzAdapterOptions {
   authzGrantsWriteStore: AuthzGrantProjectionRepository;
-  authzAuditTrailStore: AuthzAuditTrailStore;
+  authzAuditTrailStore: AuthzAuditTrailRepository;
 }
 
 const buildAuthzGrantPipeline = (options: EventingAuthzAdapterOptions) => {

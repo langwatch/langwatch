@@ -322,13 +322,10 @@ export class AuthzService extends AuthzServiceContract {
    * the organization it sits in.
    */
   async getScope({ projectId, teamId, organizationId }: ScopeIds): Promise<AuthzScopeRef> {
-    const scope = projectId
-      ? await this.collector.findScopeRef({ projectId })
-      : teamId
-        ? await this.collector.findScopeRef({ teamId })
-        : organizationId
-          ? await this.collector.findScopeRef({ organizationId })
-          : null;
+    let scope: AuthzScopeRef | null = null;
+    if (projectId) scope = await this.collector.findScopeRef({ projectId });
+    else if (teamId) scope = await this.collector.findScopeRef({ teamId });
+    else if (organizationId) scope = await this.collector.findScopeRef({ organizationId });
     if (!scope) throw new AuthzScopeNotFoundError({ projectId, teamId, organizationId });
     return scope;
   }

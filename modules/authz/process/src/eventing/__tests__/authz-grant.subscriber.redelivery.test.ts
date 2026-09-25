@@ -6,13 +6,13 @@ import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import {
-  AuthzAuditTrailStore,
+  AuthzAuditTrailRepository,
   type AuthzAuditRow,
 } from "../../repositories/authz-audit-trail.repository.ts";
 import { AUTHZ_GRANT_AGGREGATE_TYPE, type RoleDeletedEvent } from "../authz-grant.events.ts";
 import { EventingAuthzAuditAdapter } from "../authz-grant.subscriber.ts";
 
-class KeyedAuditTrailStore extends AuthzAuditTrailStore {
+class KeyedAuditTrailStore extends AuthzAuditTrailRepository {
   readonly rows = new Map<string, AuthzAuditRow>();
 
   async insert(row: AuthzAuditRow): Promise<void> {

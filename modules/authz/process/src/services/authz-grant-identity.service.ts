@@ -13,14 +13,14 @@ const GRANT_ID_ENVIRONMENT = "prod";
  * event content).
  *   links (ADR-057 dropped one-share-per-resource), and the token is the
  */
-export class AuthzGrantIdentity {
-  static create(): AuthzGrantIdentity {
-    return new AuthzGrantIdentity();
+export class AuthzGrantIdentityService {
+  static create(): AuthzGrantIdentityService {
+    return new AuthzGrantIdentityService();
   }
 
   private constructor() {}
 
-  static deriveGrantId({
+  deriveGrantId({
     organizationId,
     principal,
     scope,

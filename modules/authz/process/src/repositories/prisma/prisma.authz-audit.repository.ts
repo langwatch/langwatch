@@ -1,7 +1,7 @@
 import type { Prisma } from "@langwatch/prisma-client/generated";
 import { toDate } from "@langwatch/time";
 
-import { type AuthzAuditRow, AuthzAuditTrailStore } from "../authz-audit-trail.repository.ts";
+import { type AuthzAuditRow, AuthzAuditTrailRepository } from "../authz-audit-trail.repository.ts";
 
 // Narrow structural type: only createMany touched; avoids burdening test doubles.
 export type AuthzAuditDatabase = {
@@ -25,7 +25,7 @@ export type AuthzAuditInsert = Omit<AuthzAuditRow, "createdAt" | "metadata"> & {
  * A redelivered subscriber action is a successful no-op; it never updates the
  * immutable row produced by the first delivery.
  */
-export class PrismaAuthzAuditRepository extends AuthzAuditTrailStore {
+export class PrismaAuthzAuditRepository extends AuthzAuditTrailRepository {
   static create(database: AuthzAuditDatabase): PrismaAuthzAuditRepository {
     return new PrismaAuthzAuditRepository(database.auditLog);
   }

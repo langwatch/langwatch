@@ -44,7 +44,7 @@ describe("ConnectedAgentPresenceService.readAgentPresence", () => {
         agentId === "agent_1" ? [instance("inst_1")] : [],
       );
 
-      const presence = await ConnectedAgentPresenceService.readAgentPresence({
+      const presence = await ConnectedAgentPresenceService.create().readAgentPresence({
         projectId: "proj_1",
         agents: [
           { id: "agent_1", type: "connected" },
@@ -67,7 +67,7 @@ describe("ConnectedAgentPresenceService.readAgentPresence", () => {
         return [instance("inst_2")];
       });
 
-      const presence = await ConnectedAgentPresenceService.readAgentPresence({
+      const presence = await ConnectedAgentPresenceService.create().readAgentPresence({
         projectId: "proj_1",
         agents: [
           { id: "agent_1", type: "connected" },

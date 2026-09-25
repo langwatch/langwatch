@@ -13,10 +13,7 @@ import {
 } from "@langwatch/authz-contract";
 import { z } from "zod";
 
-import {
-  AuthzLedgerMapper,
-  type EventingAuthzLedgerAdapter,
-} from "../../eventing/authz-grant.store.ts";
+import type { EventingAuthzLedgerAdapter } from "../../eventing/authz-grant.store.ts";
 import {
   AuthzGrantRepository,
   type BindingPrincipalWhere,
@@ -25,11 +22,18 @@ import {
 } from "../authz-grant.repository.ts";
 import type { AuthzDatabase, AuthzReadRepository } from "../authz-read.repository.ts";
 import {
-  AuthzGrantMapper,
+  compatBindingFromGrantFact,
   GRANT_ROW_COLUMNS,
+  grantRowFromStored,
+  grantRowToFact,
   PRINCIPAL_TO_DB,
 } from "../prisma/prisma.authz-grant.mapper.ts";
 import { PrismaAuthzGrantRepository } from "../prisma/prisma.authz-grant.repository.ts";
+import {
+  isRecordNotFound,
+  isUniqueViolation,
+  principalForWhere,
+} from "../prisma/prisma.authz-ledger.mapper.ts";
 import { liveGrants, liveRoles } from "./eventing.authz-live-rows.mapper.ts";
 import { EventingAuthzReadRepository } from "./eventing.authz-read.repository.ts";
 
@@ -49,10 +53,10 @@ function rethrowLedgerFailure(error: unknown): never {
   if (error instanceof DuplicateBindingError || error instanceof BindingMissingError) {
     throw error;
   }
-  if (AuthzLedgerMapper.isUniqueViolation(error)) {
+  if (isUniqueViolation(error)) {
     throw new DuplicateBindingError();
   }
-  if (AuthzLedgerMapper.isRecordNotFound(error)) {
+  if (isRecordNotFound(error)) {
     throw new BindingMissingError();
   }
   throw error;
@@ -125,12 +129,14 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
       select: GRANT_ROW_COLUMNS,
     });
     if (stored === null || stored === undefined) return null;
-    const row = AuthzGrantMapper.grantRowFromStored(stored);
-    const binding = AuthzGrantMapper.findCompatBindingFromGrantFact({
-      grant: AuthzGrantMapper.grantRowToFact(row),
+    const row = grantRowFromStored(stored);
+    const compat = compatBindingFromGrantFact({
+      grant: grantRowToFact(row),
       organizationId: row.organizationId,
     });
-    return binding ? { id: binding.id, organizationId: binding.organizationId } : null;
+    return compat.kind === "compat"
+      ? { id: compat.row.id, organizationId: compat.row.organizationId }
+      : null;
   }
 
   /** A live role definition, from the canonical role head. */
@@ -270,7 +276,7 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
   }): Promise<void> {
     // Refuse before emitting writes when the original grant is absent. A
     // lagging projection can report it absent; retry leaves access unchanged.
-    const principal = AuthzLedgerMapper.principalForWhere(deleteWhere.principal);
+    const principal = principalForWhere(deleteWhere.principal);
     const existing = await liveGrants(this.options.database).findFirst({
       where: {
         organizationId: deleteWhere.organizationId,
