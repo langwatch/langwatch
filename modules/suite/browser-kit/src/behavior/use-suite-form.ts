@@ -21,7 +21,13 @@ import {
   getArchivedTargets,
   getAvailableTargets,
   isSameTarget,
-  withTargetMapping,
+  rememberedScopeOf,
+  scopeForMode,
+  scopedScenarioIdsOf,
+  suiteFormValuesOf,
+  targetsWithMapping,
+  toggledTarget,
+  toggledValue,
 } from "../model/suite-form-derivations.ts";
 import {
   planFormSchema,
@@ -102,45 +108,18 @@ export function useSuiteForm({
     [availableTargets, targetSearch],
   );
 
-  /**
-   * The scenarios the scope covers, from lists the form already holds — the
-   * same rule the run resolves against the database, read here against the
-   * project's active scenarios, so the picker's count matches what the run will cover.
-   */
-  const scopedScenarioIds = useMemo(() => {
-    const active = scenarios ?? [];
-    if (scope.mode === "all") return active.map((scenario) => scenario.id);
-    if (scope.mode === "test_suites") {
-      return active
-        .filter(
-          (scenario) => !!scenario.testSuiteId && scope.testSuiteIds.includes(scenario.testSuiteId),
-        )
-        .map((scenario) => scenario.id);
-    }
-    if (scope.mode === "labels") {
-      return active
-        .filter((scenario) => scenario.labels.some((label) => scope.labels.includes(label)))
-        .map((scenario) => scenario.id);
-    }
-    return selectedScenarioIds;
-  }, [scenarios, scope, selectedScenarioIds]);
+  const scopedScenarioIds = useMemo(
+    () => scopedScenarioIdsOf({ scenarios, scope, selectedScenarioIds }),
+    [scenarios, scope, selectedScenarioIds],
+  );
 
   useEffect(() => {
     if (suite && isOpen) {
       const storedScope = parseSuiteScope(suite.scope);
-      setRememberedTestSuiteIds(storedScope.mode === "test_suites" ? storedScope.testSuiteIds : []);
-      setRememberedLabels(storedScope.mode === "labels" ? storedScope.labels : []);
-      form.reset({
-        scope: storedScope,
-        name: suite.name,
-        description: suite.description ?? "",
-        labels: suite.labels,
-        selectedScenarioIds: suite.scenarioIds,
-        selectedTargets: z.array(suiteTargetSchema).parse(suite.targets),
-        repeatCount: suite.repeatCount,
-        simulatorModel: suite.simulatorModel,
-        judgeModel: suite.judgeModel,
-      });
+      const remembered = rememberedScopeOf(storedScope);
+      setRememberedTestSuiteIds(remembered.testSuiteIds);
+      setRememberedLabels(remembered.labels);
+      form.reset(suiteFormValuesOf({ suite, scope: storedScope }));
     } else if (isOpen) {
       form.reset({ ...suiteFormDefaultValues, scope: defaultScope });
       setScenarioSearch("");
@@ -159,45 +138,29 @@ export function useSuiteForm({
   };
 
   /** Moves the plan to another mode, giving back what that mode last held. */
-  const setScopeMode = (mode: SuiteScopeMode) => {
-    if (mode === "all" || mode === "scenarios") return writeScope({ mode });
-    if (mode === "test_suites") return writeScope({ mode, testSuiteIds: rememberedTestSuiteIds });
-    writeScope({ mode, labels: rememberedLabels });
-  };
+  const setScopeMode = (mode: SuiteScopeMode) =>
+    writeScope(scopeForMode({ mode, rememberedTestSuiteIds, rememberedLabels }));
 
   const toggleScopeTestSuite = (testSuiteId: string) => {
     const current = scope.mode === "test_suites" ? scope.testSuiteIds : [];
-    const next = current.includes(testSuiteId)
-      ? current.filter((id) => id !== testSuiteId)
-      : [...current, testSuiteId];
+    const next = toggledValue(current, testSuiteId);
     setRememberedTestSuiteIds(next);
     writeScope({ mode: "test_suites", testSuiteIds: next });
   };
 
   const toggleScopeLabel = (label: string) => {
     const current = scope.mode === "labels" ? scope.labels : [];
-    const next = current.includes(label)
-      ? current.filter((entry) => entry !== label)
-      : [...current, label];
+    const next = toggledValue(current, label);
     setRememberedLabels(next);
     writeScope({ mode: "labels", labels: next });
   };
 
   const toggleScenario = (id: string) => {
-    const current = form.getValues("selectedScenarioIds");
-    const next = current.includes(id)
-      ? current.filter((scenarioId) => scenarioId !== id)
-      : [...current, id];
-    form.setValue("selectedScenarioIds", next);
+    form.setValue("selectedScenarioIds", toggledValue(form.getValues("selectedScenarioIds"), id));
   };
 
   const toggleTarget = (target: SuiteTarget) => {
-    const current = form.getValues("selectedTargets");
-    const exists = current.some((candidate) => isSameTarget(candidate, target));
-    const next = exists
-      ? current.filter((candidate) => !isSameTarget(candidate, target))
-      : [...current, target];
-    form.setValue("selectedTargets", next);
+    form.setValue("selectedTargets", toggledTarget(form.getValues("selectedTargets"), target));
   };
 
   const setTargetMapping = ({
@@ -209,11 +172,7 @@ export function useSuiteForm({
     identifier: string;
     mapping: FieldMapping | undefined;
   }) => {
-    const next = selectedTargets.map((candidate) =>
-      isSameTarget(candidate, target)
-        ? withTargetMapping({ target: candidate, identifier, mapping })
-        : candidate,
-    );
+    const next = targetsWithMapping({ targets: selectedTargets, target, identifier, mapping });
     form.setValue("selectedTargets", next, { shouldDirty: true });
   };
 

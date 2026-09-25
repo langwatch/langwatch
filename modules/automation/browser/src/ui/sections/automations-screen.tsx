@@ -110,6 +110,274 @@ const sectionDetails: Record<AutomationSection, { title: string; description: st
   },
 };
 
+function FilterContainer({
+  children,
+  fontSize = "sm",
+}: {
+  children: React.ReactNode;
+  fontSize?: string;
+}) {
+  return (
+    <HStack
+      border="1px solid"
+      borderColor="border"
+      borderRadius="4px"
+      fontSize={fontSize}
+      width="100%"
+      gap={2}
+      paddingX={2}
+      paddingY={1}
+    >
+      <Box color="fg.muted">
+        <Filter width={16} style={{ minWidth: 16 }} />
+      </Box>
+      {children}
+    </HStack>
+  );
+}
+
+function FilterLabel({ children }: { children: string }) {
+  const text = children
+    .split(".")
+    .filter((word, index) => index !== 0 || word.toLowerCase() === "evaluations")
+    .join(" ");
+
+  return (
+    <Box padding={1} fontWeight="500" textTransform="capitalize" color="fg.muted">
+      {text.replace("_", " ")}
+    </Box>
+  );
+}
+
+function FilterValue({ children }: { children: React.ReactNode }) {
+  return (
+    // minWidth 0 opts out of the flex child's min-width: auto, so a long
+    // unbreakable value (a monitor id) clamps inside the chip instead of
+    // widening it past its border.
+    <Box padding={1} borderRightRadius="md" minWidth={0} overflow="hidden">
+      <ClampedText lineClamp={1}>{children}</ClampedText>
+    </Box>
+  );
+}
+
+function applyChecks(checks: Monitor[]) {
+  if (!checks || checks.length === 0) {
+    return null;
+  }
+
+  return (
+    <FilterContainer fontSize="sm">
+      <FilterLabel>Evaluations</FilterLabel>
+      <FilterValue>{checks.map((check) => check?.name).join(", ")}</FilterValue>
+    </FilterContainer>
+  );
+}
+
+function volumeBadge({
+  pausedForVolume,
+  skipped,
+  cap,
+}: {
+  pausedForVolume: boolean;
+  skipped: number;
+  cap: number;
+}) {
+  if (pausedForVolume) {
+    return (
+      <Tooltip content="This automation matched almost every trace in the project, so we paused it. Narrow its condition, then switch it back on.">
+        <Badge colorPalette="red" size="sm" tabIndex={0}>
+          Paused
+        </Badge>
+      </Tooltip>
+    );
+  }
+  if (skipped > 0) {
+    return (
+      <Tooltip
+        content={`This automation passed its daily limit of ${cap.toLocaleString()} matches. It starts again tomorrow.`}
+      >
+        <Badge colorPalette="orange" size="sm" tabIndex={0}>
+          {skipped.toLocaleString()} skipped today
+        </Badge>
+      </Tooltip>
+    );
+  }
+  return null;
+}
+
+type TriggerStatRow = { currentlyFiring?: boolean | null; recentFireCount?: number | null };
+
+/** The overview tiles: what is firing, what fired lately, and the next scheduled report. */
+function overviewOf<S extends TriggerStatRow>({
+  stats,
+  schedules,
+  triggers,
+}: {
+  stats: S[];
+  schedules: { nextRunAt?: Parameters<typeof toEpochMs>[0] | null; triggerId: string }[];
+  triggers: { id: string; name: string }[];
+}) {
+  const firingNow = stats.filter((stat) => stat.currentlyFiring).length;
+  const fired30d = stats.reduce((sum, stat) => sum + (stat.recentFireCount ?? 0), 0);
+  const next = schedules
+    .filter((schedule) => schedule.nextRunAt)
+    .map((schedule) => ({
+      at: toEpochMs(schedule.nextRunAt!),
+      triggerId: schedule.triggerId,
+    }))
+    .toSorted((left, right) => left.at - right.at)[0];
+  const nextName = next
+    ? (triggers.find((trigger) => trigger.id === next.triggerId)?.name ?? null)
+    : null;
+
+  return { firingNow, fired30d, next, nextName };
+}
+
+type TriggerStats = RouterOutputs["automation"]["getTriggerStats"][number];
+
+/** Alerts react to a custom graph's metric, so they get their own table. */
+function AlertsSection({
+  alerts,
+  statsByTriggerId,
+  graphJsonById,
+  onCreate,
+  actionItems,
+  activeCell,
+  rowActionsMenu,
+  sharedRowProps,
+}: {
+  alerts: EnhancedTrigger[];
+  statsByTriggerId: Map<string, TriggerStats>;
+  graphJsonById: Map<string, unknown>;
+  onCreate: (prefill: AutomationCreatePrefill) => void;
+  actionItems: (action: TriggerAction, actionParams: TriggerActionParams) => React.ReactNode;
+  activeCell: (trigger: EnhancedTrigger) => React.ReactNode;
+  rowActionsMenu: (trigger: EnhancedTrigger) => React.ReactNode;
+  sharedRowProps: (trigger: EnhancedTrigger) => Record<string, unknown>;
+}) {
+  return (
+    <VStack align="stretch" gap={4}>
+      <SectionHeader
+        icon={<TrendingUp size={18} />}
+        accent="orange"
+        title="Alerts"
+        count={alerts.length}
+        summary="Get told when a metric crosses a threshold, and again when it recovers."
+        details="An alert watches one series on an analytics graph. When the value crosses your threshold it notifies your channel; when it returns to normal it sends a recovery notice."
+        addLabel="New alert"
+        onAdd={() => onCreate({ initialSource: "customGraph" })}
+      />
+      {alerts.length === 0 ? (
+        <AutomationUseCaseStrip kind="alert" onOpen={(prefill) => onCreate(prefill)} />
+      ) : (
+        <TableShell>
+          <Table.Root variant="line" width="full">
+            <Table.Header>
+              <Table.Row>
+                <Table.ColumnHeader width="20%">Name</Table.ColumnHeader>
+                <Table.ColumnHeader width="20%">Watches</Table.ColumnHeader>
+                <Table.ColumnHeader width="14%" whiteSpace="nowrap">
+                  Fires when
+                </Table.ColumnHeader>
+                <Table.ColumnHeader width="14%">Notifies</Table.ColumnHeader>
+                <Table.ColumnHeader width="12%" whiteSpace="nowrap">
+                  <MetricHeader
+                    label="Last fired"
+                    help="When this alert last crossed its threshold and notified you."
+                  />
+                </Table.ColumnHeader>
+                <Table.ColumnHeader width="9%" whiteSpace="nowrap">
+                  <MetricHeader
+                    label="Status"
+                    help="Firing while the metric is past its threshold, back to OK when it recovers."
+                  />
+                </Table.ColumnHeader>
+                <Table.ColumnHeader width="6%">Active</Table.ColumnHeader>
+                <Table.ColumnHeader width="5%" />
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {alerts.map((trigger) => {
+                const actionParams = trigger.actionParams as TriggerActionParams;
+                const stats = statsByTriggerId.get(trigger.id);
+                return (
+                  <Table.Row key={trigger.id} {...sharedRowProps(trigger)}>
+                    <Table.Cell fontWeight="medium">{trigger.name}</Table.Cell>
+                    <Table.Cell maxWidth="260px">
+                      <AlertSubjectCell
+                        graphName={trigger.customGraph?.name ?? null}
+                        graph={graphJsonById.get(trigger.customGraphId ?? "")}
+                        seriesName={actionParams.seriesName}
+                      />
+                    </Table.Cell>
+                    <Table.Cell whiteSpace="nowrap">
+                      <AlertRuleCell actionParams={actionParams} />
+                    </Table.Cell>
+                    <Table.Cell>{actionItems(trigger.action, actionParams)}</Table.Cell>
+                    <Table.Cell whiteSpace="nowrap">
+                      <LastFiredCell
+                        trigger={trigger}
+                        stats={stats}
+                        formatTimeAgo={formatTimeAgo}
+                      />
+                    </Table.Cell>
+                    <Table.Cell whiteSpace="nowrap">
+                      <FiringStatus firing={!!stats?.currentlyFiring} />
+                    </Table.Cell>
+                    {activeCell(trigger)}
+                    <Table.Cell>{rowActionsMenu(trigger)}</Table.Cell>
+                  </Table.Row>
+                );
+              })}
+            </Table.Body>
+          </Table.Root>
+        </TableShell>
+      )}
+    </VStack>
+  );
+}
+
+function OverviewStatTiles({ overview }: { overview: ReturnType<typeof overviewOf> }) {
+  return (
+    <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
+      <StatTile
+        label="Firing now"
+        value={overview.firingNow}
+        sub={overview.firingNow > 0 ? "alerts over their threshold" : "all clear"}
+        alert={overview.firingNow > 0}
+      />
+      <StatTile
+        label="Fired (30 days)"
+        value={overview.fired30d.toLocaleString()}
+        sub="across every automation"
+      />
+      <StatTile
+        label="Next scheduled"
+        value={overview.next ? (formatTimeAgo(overview.next.at) ?? "—") : "—"}
+        sub={overview.nextName ?? "no schedules queued"}
+      />
+    </SimpleGrid>
+  );
+}
+
+/** The dataset an ADD_TO_DATASET automation writes to, as a link; empty when none is named. */
+function datasetLinkOf({
+  projectSlug,
+  datasets,
+  actionParams,
+}: {
+  projectSlug: string | undefined;
+  datasets: { id: string; name: string }[] | undefined;
+  actionParams: TriggerActionParams;
+}) {
+  if (!actionParams.datasetId) return "";
+  return (
+    <Link href={`/${projectSlug}/datasets/${actionParams.datasetId}`}>
+      {datasets?.find((dataset) => dataset.id === actionParams.datasetId)?.name}
+    </Link>
+  );
+}
+
 /**
  * The automations screen: four tabs of one page. The tab arrives as a prop —
  * the route table already gives each of the four URLs its own page key — so
@@ -257,16 +525,8 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
     );
   };
 
-  const getDatasetName = (actionParams: TriggerActionParams) => {
-    if (actionParams.datasetId) {
-      return (
-        <Link href={`/${project?.slug}/datasets/${actionParams.datasetId}`}>
-          {getDatasets.data?.find((dataset) => dataset.id === actionParams.datasetId)?.name}
-        </Link>
-      );
-    }
-    return "";
-  };
+  const getDatasetName = (actionParams: TriggerActionParams) =>
+    datasetLinkOf({ projectSlug: project?.slug, datasets: getDatasets.data, actionParams });
 
   const deleteTrigger = (triggerId: string) => {
     deleteTriggerMutation.mutate(
@@ -315,67 +575,6 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
       default:
         return null;
     }
-  };
-
-  const FilterContainer = ({
-    children,
-    fontSize = "sm",
-  }: {
-    children: React.ReactNode;
-    fontSize?: string;
-  }) => (
-    <HStack
-      border="1px solid"
-      borderColor="border"
-      borderRadius="4px"
-      fontSize={fontSize}
-      width="100%"
-      gap={2}
-      paddingX={2}
-      paddingY={1}
-    >
-      <Box color="fg.muted">
-        <Filter width={16} style={{ minWidth: 16 }} />
-      </Box>
-      {children}
-    </HStack>
-  );
-
-  const FilterLabel = ({ children }: { children: string }) => {
-    const text = children
-      .split(".")
-      .filter((word, index) => index !== 0 || word.toLowerCase() === "evaluations")
-      .join(" ");
-
-    return (
-      <Box padding={1} fontWeight="500" textTransform="capitalize" color="fg.muted">
-        {text.replace("_", " ")}
-      </Box>
-    );
-  };
-
-  const FilterValue = ({ children }: { children: React.ReactNode }) => {
-    return (
-      // minWidth 0 opts out of the flex child's min-width: auto, so a long
-      // unbreakable value (a monitor id) clamps inside the chip instead of
-      // widening it past its border.
-      <Box padding={1} borderRightRadius="md" minWidth={0} overflow="hidden">
-        <ClampedText lineClamp={1}>{children}</ClampedText>
-      </Box>
-    );
-  };
-
-  const applyChecks = (checks: Monitor[]) => {
-    if (!checks || checks.length === 0) {
-      return null;
-    }
-
-    return (
-      <FilterContainer fontSize="sm">
-        <FilterLabel>Evaluations</FilterLabel>
-        <FilterValue>{checks.map((check) => check?.name).join(", ")}</FilterValue>
-      </FilterContainer>
-    );
   };
 
   const rowActionsMenu = (trigger: EnhancedTrigger) => (
@@ -443,30 +642,6 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
     onClick: () => openView(trigger.id),
   });
 
-  const volumeBadge = (pausedForVolume: boolean, skipped: number, cap: number) => {
-    if (pausedForVolume) {
-      return (
-        <Tooltip content="This automation matched almost every trace in the project, so we paused it. Narrow its condition, then switch it back on.">
-          <Badge colorPalette="red" size="sm" tabIndex={0}>
-            Paused
-          </Badge>
-        </Tooltip>
-      );
-    }
-    if (skipped > 0) {
-      return (
-        <Tooltip
-          content={`This automation passed its daily limit of ${cap.toLocaleString()} matches. It starts again tomorrow.`}
-        >
-          <Badge colorPalette="orange" size="sm" tabIndex={0}>
-            {skipped.toLocaleString()} skipped today
-          </Badge>
-        </Tooltip>
-      );
-    }
-    return null;
-  };
-
   const activeCell = (trigger: EnhancedTrigger) => {
     const skipped = capStatus.data?.counts[trigger.id]?.skipped ?? 0;
     const pausedForVolume = trigger.pausedReason === RUNAWAY_PAUSE_REASON;
@@ -491,7 +666,7 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
               `tabIndex` is what makes the tooltip reachable: Badge renders a
               plain span, and a span with no tab stop can be hovered but never
               focused, so the explanation would be mouse-only. */}
-          {volumeBadge(pausedForVolume, skipped, capStatus.data?.cap ?? 0)}
+          {volumeBadge({ pausedForVolume, skipped, cap: capStatus.data?.cap ?? 0 })}
         </VStack>
       </Table.Cell>
     );
@@ -499,23 +674,15 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
 
   const isLoading = triggers.isLoading;
 
-  const overview = useMemo(() => {
-    const stats = [...statsByTriggerId.values()];
-    const firingNow = stats.filter((stat) => stat.currentlyFiring).length;
-    const fired30d = stats.reduce((sum, stat) => sum + (stat.recentFireCount ?? 0), 0);
-    const next = (reportSchedules.data ?? [])
-      .filter((schedule) => schedule.nextRunAt)
-      .map((schedule) => ({
-        at: toEpochMs(schedule.nextRunAt!),
-        triggerId: schedule.triggerId,
-      }))
-      .toSorted((left, right) => left.at - right.at)[0];
-    const nextName = next
-      ? ((triggers.data ?? []).find((trigger) => trigger.id === next.triggerId)?.name ?? null)
-      : null;
-
-    return { firingNow, fired30d, next, nextName };
-  }, [reportSchedules.data, statsByTriggerId, triggers.data]);
+  const overview = useMemo(
+    () =>
+      overviewOf({
+        stats: [...statsByTriggerId.values()],
+        schedules: reportSchedules.data ?? [],
+        triggers: triggers.data ?? [],
+      }),
+    [reportSchedules.data, statsByTriggerId, triggers.data],
+  );
 
   return (
     <AutomationsLayout basePath={basePath}>
@@ -535,109 +702,21 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
           ) : (
             <>
               {section === "alerts" && (
-                <VStack align="stretch" gap={4}>
-                  <SectionHeader
-                    icon={<TrendingUp size={18} />}
-                    accent="orange"
-                    title="Alerts"
-                    count={alerts.length}
-                    summary="Get told when a metric crosses a threshold, and again when it recovers."
-                    details="An alert watches one series on an analytics graph. When the value crosses your threshold it notifies your channel; when it returns to normal it sends a recovery notice."
-                    addLabel="New alert"
-                    onAdd={() => openCreate({ initialSource: "customGraph" })}
-                  />
-                  {alerts.length === 0 ? (
-                    <AutomationUseCaseStrip
-                      kind="alert"
-                      onOpen={(prefill) => openCreate(prefill)}
-                    />
-                  ) : (
-                    <TableShell>
-                      <Table.Root variant="line" width="full">
-                        <Table.Header>
-                          <Table.Row>
-                            <Table.ColumnHeader width="20%">Name</Table.ColumnHeader>
-                            <Table.ColumnHeader width="20%">Watches</Table.ColumnHeader>
-                            <Table.ColumnHeader width="14%" whiteSpace="nowrap">
-                              Fires when
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader width="14%">Notifies</Table.ColumnHeader>
-                            <Table.ColumnHeader width="12%" whiteSpace="nowrap">
-                              <MetricHeader
-                                label="Last fired"
-                                help="When this alert last crossed its threshold and notified you."
-                              />
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader width="9%" whiteSpace="nowrap">
-                              <MetricHeader
-                                label="Status"
-                                help="Firing while the metric is past its threshold, back to OK when it recovers."
-                              />
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader width="6%">Active</Table.ColumnHeader>
-                            <Table.ColumnHeader width="5%" />
-                          </Table.Row>
-                        </Table.Header>
-                        <Table.Body>
-                          {alerts.map((trigger) => {
-                            const actionParams = trigger.actionParams as TriggerActionParams;
-                            const stats = statsByTriggerId.get(trigger.id);
-                            return (
-                              <Table.Row key={trigger.id} {...sharedRowProps(trigger)}>
-                                <Table.Cell fontWeight="medium">{trigger.name}</Table.Cell>
-                                <Table.Cell maxWidth="260px">
-                                  <AlertSubjectCell
-                                    graphName={trigger.customGraph?.name ?? null}
-                                    graph={graphJsonById.get(trigger.customGraphId ?? "")}
-                                    seriesName={actionParams.seriesName}
-                                  />
-                                </Table.Cell>
-                                <Table.Cell whiteSpace="nowrap">
-                                  <AlertRuleCell actionParams={actionParams} />
-                                </Table.Cell>
-                                <Table.Cell>{actionItems(trigger.action, actionParams)}</Table.Cell>
-                                <Table.Cell whiteSpace="nowrap">
-                                  <LastFiredCell
-                                    trigger={trigger}
-                                    stats={stats}
-                                    formatTimeAgo={formatTimeAgo}
-                                  />
-                                </Table.Cell>
-                                <Table.Cell whiteSpace="nowrap">
-                                  <FiringStatus firing={!!stats?.currentlyFiring} />
-                                </Table.Cell>
-                                {activeCell(trigger)}
-                                <Table.Cell>{rowActionsMenu(trigger)}</Table.Cell>
-                              </Table.Row>
-                            );
-                          })}
-                        </Table.Body>
-                      </Table.Root>
-                    </TableShell>
-                  )}
-                </VStack>
+                <AlertsSection
+                  alerts={alerts}
+                  statsByTriggerId={statsByTriggerId}
+                  graphJsonById={graphJsonById}
+                  onCreate={openCreate}
+                  actionItems={actionItems}
+                  activeCell={activeCell}
+                  rowActionsMenu={rowActionsMenu}
+                  sharedRowProps={sharedRowProps}
+                />
               )}
 
               {section === "overview" && (
                 <VStack align="stretch" gap={8} width="full">
-                  <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
-                    <StatTile
-                      label="Firing now"
-                      value={overview.firingNow}
-                      sub={overview.firingNow > 0 ? "alerts over their threshold" : "all clear"}
-                      alert={overview.firingNow > 0}
-                    />
-                    <StatTile
-                      label="Fired (30 days)"
-                      value={overview.fired30d.toLocaleString()}
-                      sub="across every automation"
-                    />
-                    <StatTile
-                      label="Next scheduled"
-                      value={overview.next ? (formatTimeAgo(overview.next.at) ?? "—") : "—"}
-                      sub={overview.nextName ?? "no schedules queued"}
-                    />
-                  </SimpleGrid>
+                  <OverviewStatTiles overview={overview} />
 
                   <VStack align="stretch" gap={3} width="full">
                     <OverviewSectionHeading

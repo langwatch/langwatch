@@ -4,12 +4,15 @@
  * consistent address vocabulary across the application.
  */
 
+import { RUNAWAY_PAUSE_REASON } from "@langwatch/automation-contract";
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const triggers = vi.hoisted(() => ({
   rows: [] as Record<string, unknown>[],
+  /** What the other automation reads answer, keyed by procedure name. */
+  reads: {} as Record<string, unknown>,
 }));
 
 vi.mock("../../../behavior/automation-api.ts", () => {
@@ -39,6 +42,11 @@ vi.mock("../../../behavior/automation-api.ts", () => {
                 if (procedure === "getTriggers") {
                   return { useQuery: () => ({ data: triggers.rows, isLoading: false }) };
                 }
+                if (typeof procedure === "string" && procedure in triggers.reads) {
+                  return {
+                    useQuery: () => ({ data: triggers.reads[procedure], isLoading: false }),
+                  };
+                }
                 return node();
               },
             },
@@ -65,6 +73,7 @@ vi.mock("../../../features/authoring/ui/sections/view-automation-drawer.tsx", ()
 }));
 
 import { fakeAutomationHost, renderWithAutomationHost } from "../../../testing.tsx";
+import type { AutomationSection } from "../automations-layout.tsx";
 import AutomationsPage from "../automations-screen.tsx";
 
 const TRACE_AUTOMATION = {
@@ -93,6 +102,7 @@ function openScreen(query: Record<string, string | undefined> = {}) {
 afterEach(() => {
   cleanup();
   triggers.rows = [];
+  triggers.reads = {};
 });
 
 describe("given the automations list", () => {
@@ -156,5 +166,106 @@ describe("given an address that already names one of the two overlays", () => {
       expect(screen.queryByText("the editor")).toBeNull();
       expect(screen.queryByText("the panel")).toBeNull();
     });
+  });
+});
+
+const sectionBase = {
+  filters: {},
+  filterQuery: null,
+  active: true,
+  pausedReason: null,
+  alertType: null,
+  customGraphId: null,
+  notificationCadence: "immediate",
+  traceDebounceMs: 5000,
+  checks: [],
+};
+
+const rows = [
+  {
+    ...sectionBase,
+    id: "tr_email",
+    name: "Error digest",
+    action: "SEND_EMAIL",
+    triggerKind: "AUTOMATION",
+    actionParams: { members: ["ada@example.com", "bob@example.com"] },
+    checks: [
+      { id: "m1", name: "Toxicity" },
+      { id: "m2", name: "PII" },
+    ],
+  },
+  {
+    ...sectionBase,
+    id: "tr_paused",
+    name: "Every trace",
+    action: "SEND_SLACK_MESSAGE",
+    triggerKind: "AUTOMATION",
+    actionParams: { slackWebhook: "https://hooks.slack.com/x" },
+    pausedReason: RUNAWAY_PAUSE_REASON,
+  },
+  {
+    ...sectionBase,
+    id: "tr_capped",
+    name: "Noisy one",
+    action: "SEND_EMAIL",
+    triggerKind: "AUTOMATION",
+    actionParams: { members: ["c@example.com"] },
+    active: false,
+  },
+  {
+    ...sectionBase,
+    id: "al_1",
+    name: "Latency alert",
+    action: "SEND_EMAIL",
+    triggerKind: "AUTOMATION",
+    customGraphId: "graph_1",
+    actionParams: { members: ["ops@example.com"], operator: "gt", threshold: 2, seriesName: "p95" },
+  },
+  {
+    ...sectionBase,
+    id: "rp_1",
+    name: "Weekly report",
+    action: "SEND_EMAIL",
+    triggerKind: "REPORT",
+    actionParams: { members: ["team@example.com"], cron: "0 9 * * 1" },
+  },
+];
+
+function renderSection(section: AutomationSection): string {
+  const host = fakeAutomationHost({ permissions: ["triggers:manage"], query: {} });
+  renderWithAutomationHost(<AutomationsPage section={section} />, { host });
+  return document.body.textContent ?? "";
+}
+
+describe("AutomationsPage sections", () => {
+  describe("given a project with every kind of automation", () => {
+    const withData = () => {
+      triggers.rows = rows;
+      triggers.reads = {
+        getTriggerStats: [
+          { triggerId: "al_1", currentlyFiring: true, recentFireCount: 3, lastFiredAt: null },
+          { triggerId: "tr_email", currentlyFiring: false, recentFireCount: 4, lastFiredAt: null },
+        ],
+        getDailyCapStatus: { cap: 1000, counts: { tr_capped: { skipped: 1234 } } },
+        getReportSchedules: [],
+        getRecentActivity: [],
+      };
+    };
+
+    for (const section of ["overview", "alerts", "schedules", "automations"] as const) {
+      it(`prints the ${section} section`, () => {
+        withData();
+        expect(renderSection(section)).toMatchSnapshot();
+      });
+    }
+  });
+
+  describe("given a project with no automations", () => {
+    for (const section of ["overview", "alerts", "schedules", "automations"] as const) {
+      it(`prints the empty ${section} section`, () => {
+        triggers.rows = [];
+        expect(renderSection(section)).toMatchSnapshot();
+      });
+    }
   });
 });

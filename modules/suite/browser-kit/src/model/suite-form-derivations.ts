@@ -1,11 +1,19 @@
 import type { FieldMapping } from "@langwatch/scenario-contract";
-import type { SuiteTarget } from "@langwatch/suite-contract";
+import {
+  type SuiteScope,
+  type SuiteScopeMode,
+  type SuiteTarget,
+  suiteTargetSchema,
+} from "@langwatch/suite-contract";
+import { z } from "zod";
 
 import type {
   SuiteFormAgent,
   SuiteFormAvailableTarget,
   SuiteFormPrompt,
   SuiteFormScenario,
+  SuiteFormSuite,
+  suiteFormSchema,
 } from "./suite-form.types.ts";
 
 export function getAvailableTargets(
@@ -127,5 +135,109 @@ export function withTargetMapping({
   return {
     ...target,
     scenarioMappings: Object.keys(mappings).length > 0 ? mappings : undefined,
+  };
+}
+
+/**
+ * The scenarios the scope covers, from lists the form already holds — the same rule the run
+ * resolves against the database, so the picker's count matches what the run will cover.
+ */
+export function scopedScenarioIdsOf({
+  scenarios,
+  scope,
+  selectedScenarioIds,
+}: {
+  scenarios: SuiteFormScenario[] | undefined;
+  scope: SuiteScope;
+  selectedScenarioIds: string[];
+}): string[] {
+  const active = scenarios ?? [];
+  if (scope.mode === "all") return active.map((scenario) => scenario.id);
+  if (scope.mode === "test_suites") {
+    return active
+      .filter(
+        (scenario) => !!scenario.testSuiteId && scope.testSuiteIds.includes(scenario.testSuiteId),
+      )
+      .map((scenario) => scenario.id);
+  }
+  if (scope.mode === "labels") {
+    return active
+      .filter((scenario) => scenario.labels.some((label) => scope.labels.includes(label)))
+      .map((scenario) => scenario.id);
+  }
+  return selectedScenarioIds;
+}
+
+/** The scope a mode switch lands on, giving back what that mode last held. */
+export function scopeForMode({
+  mode,
+  rememberedTestSuiteIds,
+  rememberedLabels,
+}: {
+  mode: SuiteScopeMode;
+  rememberedTestSuiteIds: string[];
+  rememberedLabels: string[];
+}): SuiteScope {
+  if (mode === "all" || mode === "scenarios") return { mode };
+  if (mode === "test_suites") return { mode, testSuiteIds: rememberedTestSuiteIds };
+  return { mode, labels: rememberedLabels };
+}
+
+/** The list with `value` removed when present, appended when not. */
+export function toggledValue(list: string[], value: string): string[] {
+  return list.includes(value) ? list.filter((entry) => entry !== value) : [...list, value];
+}
+
+export function toggledTarget<T extends Pick<SuiteTarget, "type" | "referenceId">>(
+  list: T[],
+  target: T,
+): T[] {
+  const exists = list.some((candidate) => isSameTarget(candidate, target));
+  return exists ? list.filter((candidate) => !isSameTarget(candidate, target)) : [...list, target];
+}
+
+export function targetsWithMapping({
+  targets,
+  target,
+  identifier,
+  mapping,
+}: {
+  targets: SuiteTarget[];
+  target: SuiteTarget;
+  identifier: string;
+  mapping: FieldMapping | undefined;
+}): SuiteTarget[] {
+  return targets.map((candidate) =>
+    isSameTarget(candidate, target)
+      ? withTargetMapping({ target: candidate, identifier, mapping })
+      : candidate,
+  );
+}
+
+/** The per-mode lists a stored scope seeds the form's memory with. */
+export function rememberedScopeOf(scope: SuiteScope): { testSuiteIds: string[]; labels: string[] } {
+  return {
+    testSuiteIds: scope.mode === "test_suites" ? scope.testSuiteIds : [],
+    labels: scope.mode === "labels" ? scope.labels : [],
+  };
+}
+
+export function suiteFormValuesOf({
+  suite,
+  scope,
+}: {
+  suite: SuiteFormSuite;
+  scope: SuiteScope;
+}): z.input<typeof suiteFormSchema> {
+  return {
+    scope,
+    name: suite.name,
+    description: suite.description ?? "",
+    labels: suite.labels,
+    selectedScenarioIds: suite.scenarioIds,
+    selectedTargets: z.array(suiteTargetSchema).parse(suite.targets),
+    repeatCount: suite.repeatCount,
+    simulatorModel: suite.simulatorModel,
+    judgeModel: suite.judgeModel,
   };
 }

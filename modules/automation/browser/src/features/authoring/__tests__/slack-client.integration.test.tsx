@@ -23,6 +23,9 @@ const listedChannels: { current: { id: string; name: string }[] | undefined } = 
 };
 /** Why the listing is short of the workspace, as the server would report it. */
 const listedGaps: { current: string[] } = { current: [] };
+/** The error code the listing answered with, and whether the call itself failed. */
+const listedError: { current: string | undefined } = { current: undefined };
+const listFailed: { current: boolean } = { current: false };
 
 vi.mock("../../../behavior/automation-feedback.ts", () => ({
   useDescribeError:
@@ -41,9 +44,15 @@ vi.mock("../../../behavior/automation-api.ts", () => ({
         useMutation: () => ({
           mutate: vi.fn(),
           data: listedChannels.current
-            ? { channels: listedChannels.current, gaps: listedGaps.current }
+            ? {
+                channels: listedChannels.current,
+                gaps: listedGaps.current,
+                error: listedError.current,
+              }
             : undefined,
           isPending: false,
+          isError: listFailed.current,
+          error: listFailed.current ? new Error("boom") : null,
         }),
       },
     },
@@ -322,6 +331,8 @@ describe("SlackConfigForm channel picker", () => {
     cleanup();
     listedChannels.current = undefined;
     listedGaps.current = [];
+    listedError.current = undefined;
+    listFailed.current = false;
   });
 
   describe("given a workspace whose channels have loaded", () => {
@@ -544,6 +555,58 @@ describe("SlackConfigForm channel picker", () => {
     // author scrolls, doesn't find their channel, and concludes the whole
     // integration is broken. Every way the list can come back short has to say
     // so, and point at the way through.
+    describe("when the Slack app lacks the channels:read permission", () => {
+      beforeEach(() => {
+        listedError.current = "missing_scope";
+      });
+
+      it("says which permission to add", async () => {
+        renderForm({ initial: botSlice({ channelId: "" }) });
+
+        expect(await screen.findByText(/add the channels:read permission/i)).toBeInTheDocument();
+      });
+    });
+
+    describe("when Slack refuses the listing for another reason", () => {
+      beforeEach(() => {
+        listedError.current = "invalid_auth";
+        listedGaps.current = ["page_cap"];
+      });
+
+      it("asks the author to check the token instead of naming gaps", async () => {
+        renderForm({ initial: botSlice({ channelId: "" }) });
+
+        expect(await screen.findByText(/check the token/i)).toBeInTheDocument();
+        expect(screen.queryByText(/more channels than we can list/i)).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when the listing reports no token", () => {
+      beforeEach(() => {
+        listedError.current = "no_token";
+      });
+
+      it("shows no error hint", () => {
+        renderForm({ initial: botSlice({ channelId: "" }) });
+
+        expect(screen.queryByText(/check the token/i)).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when the listing call fails outright", () => {
+      beforeEach(() => {
+        listFailed.current = true;
+      });
+
+      it("names the failure and keeps typing open", async () => {
+        renderForm({ initial: botSlice({ channelId: "" }) });
+
+        expect(
+          await screen.findByText("Couldn't load channels. You can still type the channel above."),
+        ).toBeInTheDocument();
+      });
+    });
+
     describe("when the workspace has more channels than the fetch can return", () => {
       beforeEach(() => {
         listedGaps.current = ["page_cap"];

@@ -1,0 +1,49 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`useSuiteForm() scope > given a stored plan opens > loads its values and remembers its scope 1`] = `
+{
+  "description": "",
+  "judgeModel": null,
+  "labels": [
+    "ci",
+  ],
+  "name": "Nightly",
+  "repeatCount": 2,
+  "scope": {
+    "labels": [
+      "safety",
+    ],
+    "mode": "labels",
+  },
+  "selectedScenarioIds": [],
+  "selectedTargets": [
+    {
+      "referenceId": "agent_1",
+      "type": "http",
+    },
+  ],
+  "simulatorModel": "openai/gpt-5",
+}
+`;
+
+exports[`useSuiteForm() scope > when a target gets a mapping and then loses it > writes the mapping onto that prompt only, then drops it 1`] = `
+[
+  {
+    "referenceId": "agent_1",
+    "type": "http",
+  },
+  {
+    "referenceId": "prompt_1",
+    "scenarioMappings": {
+      "input": {
+        "path": [
+          "input",
+        ],
+        "sourceId": "scenario",
+        "type": "source",
+      },
+    },
+    "type": "prompt",
+  },
+]
+`;
