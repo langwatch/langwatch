@@ -4,8 +4,6 @@ kind: PodDisruptionBudget
 metadata:
   name: {{ $.Release.Name }}-app-pdb
   labels:
-    app.kubernetes.io/name: {{ $.Release.Name }}-app
-    app.kubernetes.io/instance: {{ $.Release.Name }}
     {{- include "langwatch.labels" $ | nindent 4 }}
 spec:
   selector:

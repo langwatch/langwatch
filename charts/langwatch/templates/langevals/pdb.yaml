@@ -5,8 +5,6 @@ kind: PodDisruptionBudget
 metadata:
   name: {{ $.Release.Name }}-langevals-pdb
   labels:
-    app.kubernetes.io/name: {{ $.Release.Name }}-langevals
-    app.kubernetes.io/instance: {{ $.Release.Name }}
     app.kubernetes.io/component: langevals
     {{- include "langwatch.labels" $ | nindent 4 }}
 spec:

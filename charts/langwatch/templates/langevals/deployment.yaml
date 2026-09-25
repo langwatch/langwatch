@@ -5,8 +5,6 @@ kind: Deployment
 metadata:
   name: {{ .Release.Name }}-langevals
   labels:
-    app.kubernetes.io/name: {{ .Release.Name }}-langevals
-    app.kubernetes.io/instance: {{ .Release.Name }}
     {{- include "langwatch.labels" . | nindent 4 }}
     {{- with .Values.langevals.deployment.labels }}
     {{- toYaml . | nindent 4 }}
