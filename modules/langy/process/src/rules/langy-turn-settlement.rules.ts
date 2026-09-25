@@ -1,4 +1,4 @@
-import type { LangyStreamEntry } from "@langwatch/langy-contract";
+import { LANGY_CONVERSATION_STATUS, type LangyStreamEntry } from "@langwatch/langy-contract";
 
 import { LANGY_LIVENESS } from "./langy-streaming-constants.rules.ts";
 
@@ -75,4 +75,22 @@ export function advanceSettlement({
   }
 
   return { streaks: next, outcome: null };
+}
+
+/** The terminal a settled fold implies once the heartbeat went stale; never over a live beat. */
+export function deriveSyntheticTerminal({
+  status,
+  lastError,
+  heartbeatStale,
+}: {
+  status: string;
+  lastError: string | null;
+  heartbeatStale: boolean;
+}): LangyStreamEntry | undefined {
+  if (!heartbeatStale) return undefined;
+  if (status === LANGY_CONVERSATION_STATUS.FAILED) {
+    return { type: "error", error: lastError ?? "Turn failed" };
+  }
+  if (status === LANGY_CONVERSATION_STATUS.IDLE) return { type: "end" };
+  return undefined;
 }

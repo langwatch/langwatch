@@ -1,4 +1,5 @@
 import type { LangyStreamEntry } from "@langwatch/langy-contract";
+import { nowInstant } from "@langwatch/time";
 
 import { LANGY_EMPTY_TURN_FALLBACK } from "../../rules/langy-empty-turn.rules.ts";
 import {
@@ -116,6 +117,18 @@ export class LangyTokenBufferMemoryRepository extends LangyTokenBufferRepository
 
   async heartbeat(input: { conversationId: string; turnId: string; now?: number }): Promise<void> {
     this.store.heartbeats.set(this.store.turnKey(input), input.now ?? Date.now());
+  }
+  async liveness(input: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<{ present: boolean; stale: boolean; lastBeatAt: number | null }> {
+    const beat = this.store.heartbeats.get(this.store.turnKey(input));
+    if (beat === undefined) return { present: false, stale: true, lastBeatAt: null };
+    return {
+      present: true,
+      stale: nowInstant().epochMilliseconds - beat >= LIVENESS_WINDOW_MS,
+      lastBeatAt: beat,
+    };
   }
 
   private entries(input: { conversationId: string; turnId: string }): LangyStreamRead[] {

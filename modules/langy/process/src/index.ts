@@ -31,13 +31,10 @@ export type {
   OpenLangyRelay,
 } from "./services/langy.service.ts";
 export type { LangyTurnAdmissionCapability } from "@langwatch/langy-contract";
-export type { LangyEgressState, LangyRedis, LangyTurnRequest } from "./app/langy.app.ts";
-// `langy.*` and `langyEgress.*` are not exported: they still name the deleted
-// legacy builder, so nothing may reach them until each is converted to the
-// declared `defineTrpcRouter` shape. `setupSkills.*` is converted and exported
-// below.
+export type { LangyRedis } from "./app/langy.app.ts";
 export type { SetupSkillId } from "./services/setup-skills.service.ts";
 export { setupSkillsTrpcTransport } from "./transport/setup-skills.trpc.ts";
+export { langyEgressTrpcTransport, langyTrpcTransport } from "./transport/langy.trpc.ts";
 // The agent-to-page UI-action channel. Moved here whole from the application
 // that used to hold it; the one thing it could not bring is the workbench's
 // action manifest, which arrives as {@link LangyUiActionCatalog}.

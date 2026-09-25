@@ -86,6 +86,12 @@ export abstract class LangyTokenBufferRepository {
     turnId: string;
     now?: number;
   }): Promise<void>;
+
+  /** Whether the turn beat within the grace window; an absent beat reads stale. */
+  abstract liveness(input: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<{ present: boolean; stale: boolean; lastBeatAt: number | null }>;
 }
 
 /** The connection a stream's blocking tail borrows, handed to `open()` below. */

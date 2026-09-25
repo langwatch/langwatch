@@ -3,7 +3,10 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contract";
 import type { UserApi, UserCodeAccessPreference } from "@langwatch/user-contract";
 
-import { SkipPermissionsService } from "./langy-skip-permissions.service.ts";
+import {
+  SkipPermissionsService,
+  type SkipPermissionsDecision,
+} from "./langy-skip-permissions.service.ts";
 
 /** The GitHub half of the code access card. */
 export type LangyGithubInstallationState = { installed: boolean; accountLogin?: string };
@@ -69,7 +72,16 @@ export class LangyLocalWorkspaceService {
   async canSkipPermissions(input: { projectId: string; model: string }): Promise<{
     allowed: boolean;
   }> {
-    const { allowed } = await SkipPermissionsService.canModelSkipPermissions({
+    const { allowed } = await this.getSkipPermissionsDecision(input);
+    return { allowed };
+  }
+
+  /** The skip verdict with the provider and model it resolved, for recording the policy. */
+  getSkipPermissionsDecision(input: {
+    projectId: string;
+    model: string;
+  }): Promise<SkipPermissionsDecision> {
+    return SkipPermissionsService.canModelSkipPermissions({
       ...input,
       providerRows: {
         findAllAccessibleForProject: async (projectId) =>
@@ -79,6 +91,5 @@ export class LangyLocalWorkspaceService {
           })),
       },
     });
-    return { allowed };
   }
 }

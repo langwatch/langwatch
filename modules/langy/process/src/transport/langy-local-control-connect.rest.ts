@@ -8,14 +8,18 @@ import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
 import { anyAuthenticated } from "@langwatch/api/access";
 import {
   defineRestRouter,
+  documentedResponses,
   MANAGEMENT_API_VERSION,
   type RestProtocolRefusal,
 } from "@langwatch/api/rest";
 import {
   LangyApi,
   registerFrameSchema,
+  langyControlFramesAnswerSchema,
   langyControlFramesBodySchema,
+  langyControlPollAnswerSchema,
   langyControlPollQuerySchema,
+  langyControlRegisterAnswerSchema,
 } from "@langwatch/langy-contract";
 import { z } from "zod";
 
@@ -62,6 +66,7 @@ export const langyLocalControlConnectRest = defineRestRouter(LangyApi)
   .withDocs({
     description:
       "The registered frame with its instance token, or the refused frame with its reason.",
+    responses: documentedResponses({ 200: langyControlRegisterAnswerSchema }),
   })
   .handle(async ({ app, input, actor, scope, response }, headers) =>
     response.write({
@@ -89,6 +94,7 @@ export const langyLocalControlConnectRest = defineRestRouter(LangyApi)
   })
   .withDocs({
     description: "The frames waiting for the folder, or 410 when the instance token is not known.",
+    responses: documentedResponses({ 200: langyControlPollAnswerSchema }),
   })
   .handle(async ({ app, input, signal, response }, headers) =>
     response.write({
@@ -115,6 +121,7 @@ export const langyLocalControlConnectRest = defineRestRouter(LangyApi)
   })
   .withDocs({
     description: "How many frames were taken, or 410 when the instance token is not known.",
+    responses: documentedResponses({ 200: langyControlFramesAnswerSchema }),
   })
   .handle(async ({ app, input, response }, headers) =>
     response.write({

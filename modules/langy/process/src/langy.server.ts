@@ -30,6 +30,7 @@ import { langyLocalControlRest } from "./transport/langy-local-control.rest.ts";
 import { createLangyLocalControlWebSocketProtocol } from "./transport/langy-local-control.ws.ts";
 import { langyLocalRest } from "./transport/langy-local.rest.ts";
 import { langyTurnsRest } from "./transport/langy-turns.rest.ts";
+import { langyEgressTrpcTransport, langyTrpcTransport } from "./transport/langy.trpc.ts";
 import { setupSkillsTrpcTransport } from "./transport/setup-skills.trpc.ts";
 
 // The seams below are process-graph factories: a composing worker calls one of these
@@ -81,9 +82,8 @@ export function createLangySessionKeyReap(options: {
   });
 }
 
-// `langy.*` and `langyEgress.*` still name the deleted tRPC builder and are
-// not listed here yet; the UI-action family is unconverted too.
-// See .claude/handoffs/port-langy-routes.md for state.
+// The UI-action REST family and the two `claimUiAction`/`completeUiAction` procedures are
+// unconverted: see .claude/handoffs/apidiff-parity-langy.md.
 export const langyServer = defineServerModule("langy")
   .withRepositories(langyRepositories)
   .withApp(LangyApp)
@@ -95,6 +95,8 @@ export const langyServer = defineServerModule("langy")
     langyLocalControlConnectRest,
     createLangyLocalControlWebSocketProtocol(),
     setupSkillsTrpcTransport,
+    langyTrpcTransport,
+    langyEgressTrpcTransport,
   )
   .withTransportFacts(({ app }) => {
     if (!(app instanceof LangyApp))

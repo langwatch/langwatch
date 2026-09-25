@@ -17,13 +17,10 @@ import type { Event, StaticPipelineDefinition } from "@langwatch/eventing";
  */
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GithubApi } from "@langwatch/github-contract";
-import { ValidationError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
 import {
-  LangyConversationNotFoundError,
   type LangyConversationDetail,
   type LangyConversationEventPage,
-  type LangyConversationListCursor,
   type LangyConversationListPage,
   type LangyControlFramesInput,
   type LangyControlPollInput,
@@ -32,7 +29,6 @@ import {
   type PlatformFrame,
   type LangyCredentialSession,
   type LangyEgressAllowlist,
-  type LangyEventCursor,
   type LangyMessageRow,
   type LangyLocalRecord,
   type LangyMessagePart,
@@ -49,14 +45,42 @@ import {
   type LangyRelayConnection,
   type LocalControlConnectCredentials,
   type RelayTally,
+  type LangyConversationDetailDto,
+  type LangyConversationEventPageDto,
+  type LangyConversationListPageDto,
+  type LangyConversationMessagesDto,
+  type LangyPanelCall,
+  type LangyStreamEntry,
+  type langyAnswerLocalPermissionInputSchema,
+  type langyAnswerQuestionInputSchema,
+  type langyContinueConversationInputSchema,
+  type langyConversationUpdateFrameSchema,
+  type langyEgressGetInputSchema,
+  type langyEgressSetInputSchema,
+  type langyEgressStateSchema,
+  type langyEventsAfterInputSchema,
+  type langyFeedbackPromptShownInputSchema,
+  type langyForkInputSchema,
+  type langyListInputSchema,
+  type langyLocalWorkspaceStatusSchema,
+  type langyPanelConversationInputSchema,
+  type langyPanelCreateConversationInputSchema,
+  type langyProjectInputSchema,
+  type langyRecordFeedbackInputSchema,
+  type langyRenameInputSchema,
+  type langySetLocalPolicyInputSchema,
+  type langyStopTurnPanelInputSchema,
+  type langyTurnStreamInputSchema,
+  type langyWarmWorkerInputSchema,
 } from "@langwatch/langy-contract";
 import type * as langyContractModule from "@langwatch/langy-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { PresenceApi, type PresenceTenantEmitter } from "@langwatch/presence-contract";
+import { PresenceApi } from "@langwatch/presence-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { UserApi } from "@langwatch/user-contract";
 import type { Redis } from "ioredis";
+import type { z } from "zod";
 
 import { HttpLangyWorkerChannel } from "../channels/http/http.langy-worker.channel.ts";
 import { UnavailableLangyWorkerChannel } from "../channels/unavailable.langy-worker.channel.ts";
@@ -80,12 +104,15 @@ import { LocalControlSessionCoreService } from "../services/langy-local-session.
 import { LangyLocalWorkerService } from "../services/langy-local-worker.service.ts";
 import { LangyLocalWorkspaceService } from "../services/langy-local-workspace.service.ts";
 import { LangyMaintenanceService } from "../services/langy-maintenance.service.ts";
+import { LangyPanelAccessService } from "../services/langy-panel-access.service.ts";
+import { LangyPanelConversationService } from "../services/langy-panel-conversation.service.ts";
+import { LangyPanelEgressService } from "../services/langy-panel-egress.service.ts";
+import { LangyPanelLocalService } from "../services/langy-panel-local.service.ts";
 import { LangyPostgresService } from "../services/langy-postgres.service.ts";
 import { LangyRestCallerService } from "../services/langy-rest-caller.service.ts";
 import { LangySessionKeyMetricsOtelService } from "../services/langy-session-key-metrics-otel.service.ts";
 import { LangySessionKeyReapService } from "../services/langy-session-key-reap.service.ts";
 import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service.ts";
-import type { LangyChatMessageInput } from "../services/langy-turn-shared.service.ts";
 import { LangyTurnsBoundsService } from "../services/langy-turns-bounds.service.ts";
 import { LangyVirtualKeyProvisioningService } from "../services/langy-virtual-key-provisioning.service.ts";
 import { LangyWorkerMetricsOtelService } from "../services/langy-worker-metrics-otel.service.ts";
@@ -134,6 +161,9 @@ type LangyAppDependencies = {
   longPoll: LocalControlLongPollService;
   sockets: LocalControlConnectionService;
   sessionKeyDoor: RestIdentity;
+  panelConversations: LangyPanelConversationService;
+  panelLocal: LangyPanelLocalService;
+  panelEgress: LangyPanelEgressService;
 };
 
 /** The local-control runtime, its durable commands, its peer reads and this origin. */
@@ -142,27 +172,6 @@ export interface LangyLocalControl {
   commands: LangyConversationCommands;
   workspace: LangyLocalWorkspaceService;
   baseHost: string | undefined;
-}
-
-/** The project's egress allow-list, told the way both egress procedures tell it. */
-export interface LangyEgressState {
-  allowlist: LangyEgressAllowlist;
-  /** `false` is monitor-only: watch, never block. */
-  enforcing: boolean;
-}
-
-/** What a turn-start asks for, before the caller's session is attached. */
-export interface LangyTurnRequest {
-  projectId: string;
-  idempotencyKey?: string | undefined;
-  /** @deprecated wire alias for pre-rename client bundles — same semantics. */
-  requestId?: string | undefined;
-  conversationId?: string | null | undefined;
-  messages: LangyChatMessageInput[];
-  modelOverride?: string | undefined;
-  trigger?: "submit-message" | "regenerate-message" | "resume-stream" | undefined;
-  /** The composer's page context and skills, bounded and sanitised downstream. */
-  turnContext: object;
 }
 
 const langyStores = reads("prisma", "redis", "eventing", "rateLimiter");
@@ -288,17 +297,24 @@ export class LangyApp implements LangyApiContract {
       instanceTokenHeader: INSTANCE_TOKEN_HEADER,
       verify: (presented) => longPoll.verifySessionKey(presented),
     });
+    const turnBounds = LangyTurnsBoundsService.create({
+      entitlement: setup.dependencies.plans,
+      projects: setup.dependencies.projects,
+      rateLimiter: setup.members.rateLimiter,
+    });
+    const access = LangyPanelAccessService.create({
+      featureFlags: setup.dependencies.featureFlags,
+      projects: setup.dependencies.projects,
+      authz: setup.dependencies.authz,
+    });
+    const redis = setup.members.redis;
     return new LangyApp({
       langy,
       internalDoor: door,
       repositories: setup.repositories,
       redis: setup.members.redis,
       presence: setup.dependencies.presence,
-      turnBounds: LangyTurnsBoundsService.create({
-        entitlement: setup.dependencies.plans,
-        projects: setup.dependencies.projects,
-        rateLimiter: setup.members.rateLimiter,
-      }),
+      turnBounds,
       virtualKeyProvisioning: LangyVirtualKeyProvisioningService.create({
         virtualKeys: built.credentials.virtualKeys,
       }),
@@ -324,6 +340,33 @@ export class LangyApp implements LangyApiContract {
       longPoll,
       sockets,
       sessionKeyDoor,
+      panelConversations: LangyPanelConversationService.create({
+        access,
+        langy,
+        turnBounds,
+        rateLimiter: setup.members.rateLimiter,
+        presence: setup.dependencies.presence,
+        turnAccess: redis ? setup.repositories.turnAccess : null,
+        openBuffer: redis
+          ? () => {
+              const blocking = redis.duplicate();
+              return {
+                buffer: setup.repositories.tokenBuffer.open({ redis, blockingRedis: blocking }),
+                release: () => blocking.disconnect(),
+              };
+            }
+          : null,
+      }),
+      panelLocal: LangyPanelLocalService.create({
+        access,
+        conversations: langy,
+        runtime,
+        commands,
+        workspace,
+        projects: setup.dependencies.projects,
+        baseHost: setup.members.publicBaseUrl,
+      }),
+      panelEgress: LangyPanelEgressService.create({ access, langy }),
     });
   }
 
@@ -646,33 +689,6 @@ export class LangyApp implements LangyApiContract {
     return this.dependencies.langy.recordPlanUpdated(input);
   }
 
-  // -- conversation reads ----------------------------------------------------
-
-  /** One page of the caller's slim conversation spine. */
-  listPage(input: {
-    projectId: string;
-    userId: string;
-    limit: number;
-    cursor?: LangyConversationListCursor;
-    query?: string;
-  }): Promise<LangyConversationListPage> {
-    return this.dependencies.langy.getPage(input);
-  }
-
-  /** The conversation's durable turn events strictly after a cursor. */
-  eventsAfter(input: {
-    projectId: string;
-    conversationId: string;
-    userId: string;
-    after: LangyEventCursor;
-  }): Promise<LangyConversationEventPage> {
-    return this.dependencies.langy.getEventsAfter(input);
-  }
-
-  /**
-   * Every card and connection state for one conversation, off the durable
-   * record (ADR-129) — the live stream can't answer either for an adopted tab.
-   */
   /** Writes one line into the transcript without starting a turn (ADR-129). */
   recordUserMessage(input: {
     projectId: string;
@@ -684,25 +700,13 @@ export class LangyApp implements LangyApiContract {
     return this.dependencies.langy.recordUserMessage(input);
   }
 
+  /** Every card and connection state for one conversation, off the durable record (ADR-129). */
   getLocalRecord(input: {
     projectId: string;
     conversationId: string;
     userId: string;
   }): Promise<LangyLocalRecord> {
     return this.dependencies.langy.getLocalRecord(input);
-  }
-
-  /**
-   * Whether this caller may attribute a side effect to this conversation. Lifted out of
-   * `claimUiAction`, `recordFeedback` and `feedbackPromptShown`, which each ran the same
-   * visible-read and each decided for themselves what absence meant.
-   */
-  async isVisibleToCaller(input: {
-    id: string;
-    projectId: string;
-    userId: string;
-  }): Promise<boolean> {
-    return (await this.dependencies.langy.findByIdVisible(input)) !== null;
   }
 
   /** The conversation spine, raising the feature's not-found when it is not visible. */
@@ -712,15 +716,6 @@ export class LangyApp implements LangyApiContract {
     userId: string;
   }): Promise<LangyConversationDetail> {
     return this.dependencies.langy.getById(input);
-  }
-
-  /** The conversation's stored message history. */
-  messages(input: {
-    conversationId: string;
-    projectId: string;
-    userId: string;
-  }): Promise<LangyMessageRow[]> {
-    return this.dependencies.langy.getAllByConversation(input);
   }
 
   /** Whether the panel should ask for feedback under the latest answer. */
@@ -737,44 +732,6 @@ export class LangyApp implements LangyApiContract {
     return this.dependencies.langy.markFeedbackShown(input);
   }
 
-  /** The model allow-list the composer narrows to, or null when every model is allowed. */
-  findModelsAllowed(projectId: string): Promise<string[] | null> {
-    return this.dependencies.langy.findModelsAllowedForProject(projectId);
-  }
-
-  // -- conversation writes ---------------------------------------------------
-
-  /** Archives a conversation the caller owns. A shared one reports `false`. */
-  deleteConversation(input: { id: string; projectId: string; userId: string }): Promise<boolean> {
-    return this.dependencies.langy.deleteById(input);
-  }
-
-  /**
-   * Renames a conversation the caller owns. The service already raises the same typed not-found
-   * for "no such conversation" and "not yours" (deliberately indistinguishable), so the null
-   * branch is unreachable in practice.
-   */
-  async renameConversation(input: {
-    id: string;
-    projectId: string;
-    userId: string;
-    title: string;
-  }): Promise<LangyConversationDetail> {
-    const detail = await this.dependencies.langy.updateById(input);
-    if (!detail) throw new LangyConversationNotFoundError(input.id);
-    return detail;
-  }
-
-  /** Branches a visible conversation into a private, independently editable one. */
-  async forkConversation(input: {
-    id: string;
-    projectId: string;
-    userId: string;
-  }): Promise<LangyConversationDetail> {
-    const { conversation } = await this.dependencies.langy.forkById(input);
-    return conversation;
-  }
-
   /** Records the durable stopped terminal for an in-flight turn. Idempotent. */
   stopTurn(input: {
     projectId: string;
@@ -785,115 +742,159 @@ export class LangyApp implements LangyApiContract {
     return this.dependencies.langy.stopTurn(input);
   }
 
-  /**
-   * Starts a turn for the caller's session. Create and continue are the SAME operation —
-   * `adoptConversationId` is the only difference, and it is what lets a first message land on
-   * the conversation a panel-open warm already booted a worker for.
-   */
-  startTurn(
-    input: LangyTurnRequest,
-    session: LangyCredentialSession,
-    options: Readonly<{ adoptConversationId?: boolean }> = {},
+  // -- the panel's procedures -------------------------------------------------
+
+  listConversations(
+    input: LangyPanelCall<typeof langyListInputSchema>,
+  ): Promise<LangyConversationListPageDto> {
+    return this.dependencies.panelConversations.listConversations(input);
+  }
+
+  getConversationEventsAfter(
+    input: LangyPanelCall<typeof langyEventsAfterInputSchema>,
+  ): Promise<LangyConversationEventPageDto> {
+    return this.dependencies.panelConversations.getConversationEventsAfter(input);
+  }
+
+  findVisibleConversationDetails(
+    input: LangyPanelCall<typeof langyPanelConversationInputSchema>,
+  ): Promise<LangyConversationDetailDto[]> {
+    return this.dependencies.panelConversations.findVisibleConversationDetails(input);
+  }
+
+  getConversationMessages(
+    input: LangyPanelCall<typeof langyPanelConversationInputSchema>,
+  ): Promise<LangyConversationMessagesDto> {
+    return this.dependencies.panelConversations.getConversationMessages(input);
+  }
+
+  archiveConversation(
+    input: LangyPanelCall<typeof langyPanelConversationInputSchema>,
+  ): Promise<{ success: boolean }> {
+    return this.dependencies.panelConversations.archiveConversation(input);
+  }
+
+  renameConversation(
+    input: LangyPanelCall<typeof langyRenameInputSchema>,
+  ): Promise<LangyConversationDetailDto> {
+    return this.dependencies.panelConversations.renameConversation(input);
+  }
+
+  forkConversation(
+    input: LangyPanelCall<typeof langyForkInputSchema>,
+  ): Promise<LangyConversationDetailDto> {
+    return this.dependencies.panelConversations.forkConversation(input);
+  }
+
+  createConversationTurn(
+    input: LangyPanelCall<typeof langyPanelCreateConversationInputSchema>,
   ): Promise<{ conversationId: string; turnId: string }> {
-    // Imperative rather than a schema `.refine`: the procedures carry a
-    // projectId input and tRPC merges `.input()` calls, which requires plain
-    // object schemas rather than the effects a refine produces.
-    const idempotencyKey = input.idempotencyKey ?? input.requestId;
-    if (!idempotencyKey) {
-      const message = "idempotencyKey is required.";
-      // `meta.message` is the channel that survives serialize() (ADR-045) —
-      // the HandledError's own `message` is not put on the wire.
-      throw new ValidationError(message, { meta: { message } });
-    }
-    // Routed through the app's own `startConversationTurn` so the composer
-    // path and the REST door count against the same per-project window.
-    return this.startConversationTurn({
-      projectId: input.projectId,
-      idempotencyKey,
-      session,
-      requestedConversationId: input.conversationId ?? null,
-      ...(options.adoptConversationId ? { adoptConversationId: true } : {}),
-      messages: input.messages,
-      ...(input.modelOverride ? { modelOverride: input.modelOverride } : {}),
-      isRetry: input.trigger === "regenerate-message",
-      turnContext: input.turnContext,
-    });
+    return this.dependencies.panelConversations.createConversationTurn(input);
   }
 
-  /** Pre-boots the conversation's worker before the first message. */
-  warmWorker(input: {
-    projectId: string;
-    session: LangyCredentialSession;
-    requestedConversationId: string | null;
-    modelOverride?: string;
-  }): Promise<{ conversationId: string | null; warmed: boolean }> {
-    return this.dependencies.langy.warmConversationWorker(input);
+  continueConversationTurn(
+    input: LangyPanelCall<typeof langyContinueConversationInputSchema>,
+  ): Promise<{ conversationId: string; turnId: string }> {
+    return this.dependencies.panelConversations.continueConversationTurn(input);
   }
 
-  // -- the project's egress allow-list ---------------------------------------
-
-  /**
-   * The project's egress allow-list and whether it is enforced. `null` from the service means
-   * monitor-only — watch, never block. Both egress procedures translated that null for
-   * themselves, which is one rule written twice about a network policy.
-   */
-  async egressAllowlist(input: { projectId: string }): Promise<LangyEgressState> {
-    return toEgressState(await this.dependencies.langy.findEgressAllowlist(input));
+  stopPanelTurn(
+    input: LangyPanelCall<typeof langyStopTurnPanelInputSchema>,
+  ): Promise<{ stopped: boolean }> {
+    return this.dependencies.panelConversations.stopPanelTurn(input);
   }
 
-  /** Replaces the allow-list. An empty list clears it back to monitor-only. */
-  async setEgressAllowlist(input: {
-    projectId: string;
-    allowlist: LangyEgressAllowlist;
-  }): Promise<LangyEgressState> {
-    const allowlist = await this.dependencies.langy.setEgressAllowlist(input);
-
-    return toEgressState(allowlist.length > 0 ? allowlist : null);
+  warmPanelWorker(
+    input: LangyPanelCall<typeof langyWarmWorkerInputSchema>,
+  ): Promise<{ conversationId: string | null; warmed: boolean }> {
+    return this.dependencies.panelConversations.warmPanelWorker(input);
   }
 
-  // -- the live edge ---------------------------------------------------------
-
-  /** The tenant's conversation-update signals. */
-  conversationUpdates(projectId: string): PresenceTenantEmitter {
-    return this.dependencies.presence.getTenantEmitter(projectId);
+  getModelsAllowed(
+    input: LangyPanelCall<typeof langyProjectInputSchema>,
+  ): Promise<{ modelsAllowed: string[] | null }> {
+    return this.dependencies.panelConversations.getModelsAllowed(input);
   }
 
-  /** Releases the tenant emitter this subscription borrowed. */
-  releaseConversationUpdates(projectId: string): void {
-    this.dependencies.presence.cleanupTenantEmitter(projectId);
+  recordFeedback(input: LangyPanelCall<typeof langyRecordFeedbackInputSchema>): Promise<void> {
+    return this.dependencies.panelConversations.recordFeedback(input);
   }
 
-  /**
-   * May this caller watch this turn's live stream?
-   */
-  async canWatchTurn(input: {
-    projectId: string;
-    conversationId: string;
-    turnId: string;
-    userId: string;
-  }): Promise<boolean> {
-    const { projectId, conversationId, turnId, userId } = input;
-    const { redis, langy, repositories } = this.dependencies;
-    if (
-      redis &&
-      (await repositories.turnAccess.isTurnActor({
-        projectId,
-        conversationId,
-        turnId,
-        userId,
-      }))
-    ) {
-      return true;
-    }
-    const conversation = await langy.findByIdVisible({
-      id: conversationId,
-      projectId,
-      userId,
-    });
-    return !!conversation;
+  markFeedbackPromptShown(
+    input: LangyPanelCall<typeof langyFeedbackPromptShownInputSchema>,
+  ): Promise<void> {
+    return this.dependencies.panelConversations.markFeedbackPromptShown(input);
   }
-}
 
-function toEgressState(allowlist: LangyEgressAllowlist | null): LangyEgressState {
-  return { allowlist: allowlist ?? [], enforcing: allowlist !== null };
+  watchConversationUpdates(
+    input: LangyPanelCall<typeof langyProjectInputSchema> & { signal?: AbortSignal },
+  ): AsyncIterable<z.infer<typeof langyConversationUpdateFrameSchema>> {
+    return this.dependencies.panelConversations.watchConversationUpdates(input);
+  }
+
+  watchTurnStream(
+    input: LangyPanelCall<typeof langyTurnStreamInputSchema> & { signal?: AbortSignal },
+  ): AsyncIterable<LangyStreamEntry> {
+    return this.dependencies.panelConversations.watchTurnStream(input);
+  }
+
+  getPanelLocalRecord(
+    input: LangyPanelCall<typeof langyPanelConversationInputSchema>,
+  ): Promise<LangyLocalRecord> {
+    return this.dependencies.panelLocal.getPanelLocalRecord(input);
+  }
+
+  getPanelLocalWorkspace(
+    input: LangyPanelCall<typeof langyPanelConversationInputSchema>,
+  ): Promise<z.infer<typeof langyLocalWorkspaceStatusSchema>> {
+    return this.dependencies.panelLocal.getPanelLocalWorkspace(input);
+  }
+
+  getCodeAccessPreference(
+    input: LangyPanelCall<typeof langyProjectInputSchema>,
+  ): Promise<{ preference: "github" | null }> {
+    return this.dependencies.panelLocal.getCodeAccessPreference(input);
+  }
+
+  answerLocalPermission(
+    input: LangyPanelCall<typeof langyAnswerLocalPermissionInputSchema>,
+  ): Promise<{ answered: true }> {
+    return this.dependencies.panelLocal.answerLocalPermission(input);
+  }
+
+  answerLocalQuestion(
+    input: LangyPanelCall<typeof langyAnswerQuestionInputSchema>,
+  ): Promise<{ answered: true }> {
+    return this.dependencies.panelLocal.answerLocalQuestion(input);
+  }
+
+  setLocalPolicy(
+    input: LangyPanelCall<typeof langySetLocalPolicyInputSchema>,
+  ): Promise<{ skipPermissions: boolean }> {
+    return this.dependencies.panelLocal.setLocalPolicy(input);
+  }
+
+  disconnectLocalWorkspace(
+    input: LangyPanelCall<typeof langyPanelConversationInputSchema>,
+  ): Promise<{ disconnected: boolean }> {
+    return this.dependencies.panelLocal.disconnectLocalWorkspace(input);
+  }
+
+  renewLocalControlRequest(
+    input: LangyPanelCall<typeof langyPanelConversationInputSchema>,
+  ): Promise<{ expiresAt: string }> {
+    return this.dependencies.panelLocal.renewLocalControlRequest(input);
+  }
+
+  getEgressState(
+    input: LangyPanelCall<typeof langyEgressGetInputSchema>,
+  ): Promise<z.infer<typeof langyEgressStateSchema>> {
+    return this.dependencies.panelEgress.getEgressState(input);
+  }
+
+  setEgressState(
+    input: LangyPanelCall<typeof langyEgressSetInputSchema>,
+  ): Promise<z.infer<typeof langyEgressStateSchema>> {
+    return this.dependencies.panelEgress.setEgressState(input);
+  }
 }

@@ -22,6 +22,35 @@ import type {
   RelayTally,
 } from "./langy-rest.schemas.ts";
 import type {
+  LangyPanelCall,
+  langyAnswerLocalPermissionInputSchema,
+  langyAnswerQuestionInputSchema,
+  langyContinueConversationInputSchema,
+  langyPanelConversationInputSchema,
+  langyPanelCreateConversationInputSchema,
+  langyEgressGetInputSchema,
+  langyEgressSetInputSchema,
+  langyEgressStateSchema,
+  langyEventsAfterInputSchema,
+  langyFeedbackPromptShownInputSchema,
+  langyForkInputSchema,
+  langyListInputSchema,
+  langyProjectInputSchema,
+  langyRecordFeedbackInputSchema,
+  langyRenameInputSchema,
+  langySetLocalPolicyInputSchema,
+  langyStopTurnPanelInputSchema,
+  langyTurnStreamInputSchema,
+  langyWarmWorkerInputSchema,
+} from "./langy-trpc.schemas.ts";
+import type {
+  LangyConversationDetailDto,
+  LangyConversationEventPageDto,
+  LangyConversationListPageDto,
+  LangyConversationMessagesDto,
+  langyConversationUpdateFrameSchema,
+} from "./langy.dtos.ts";
+import type {
   ApproveControlRequestResponse,
   CreateControlRequestResponse,
   ListControlRequestsResponse,
@@ -31,6 +60,7 @@ import type {
   StartCallResponse,
   StartWaitResponse,
   WorkspaceStatus,
+  langyLocalWorkspaceStatusSchema,
 } from "./langy.local-control-http.ts";
 import type {
   CliFrame,
@@ -38,6 +68,7 @@ import type {
   PlatformFrame,
   RegisterFrame,
 } from "./langy.local-control-protocol.ts";
+import type { LangyStreamEntry } from "./langy.stream-entry.ts";
 import type { LangyCredentialSession, LangyEgressAllowlist, LangyStopTurnInput } from "./langy.ts";
 
 /**
@@ -296,6 +327,85 @@ export interface LangyApi {
     connection: ProtocolConnection,
     credentials: LocalControlConnectCredentials,
   ): Promise<void>;
+
+  // The panel's `langy.*` and `langyEgress.*` procedures, each behind the Langy rollout gate.
+  listConversations(
+    input: LangyPanelCall<typeof langyListInputSchema>,
+  ): Promise<LangyConversationListPageDto>;
+  getConversationEventsAfter(
+    input: LangyPanelCall<typeof langyEventsAfterInputSchema>,
+  ): Promise<LangyConversationEventPageDto>;
+  /** Empty while the conversation is not visible, or not projected yet. */
+  findVisibleConversationDetails(
+    input: LangyPanelCall<typeof langyPanelConversationInputSchema>,
+  ): Promise<LangyConversationDetailDto[]>;
+  getConversationMessages(
+    input: LangyPanelCall<typeof langyPanelConversationInputSchema>,
+  ): Promise<LangyConversationMessagesDto>;
+  archiveConversation(
+    input: LangyPanelCall<typeof langyPanelConversationInputSchema>,
+  ): Promise<{ success: boolean }>;
+  renameConversation(
+    input: LangyPanelCall<typeof langyRenameInputSchema>,
+  ): Promise<LangyConversationDetailDto>;
+  forkConversation(
+    input: LangyPanelCall<typeof langyForkInputSchema>,
+  ): Promise<LangyConversationDetailDto>;
+  createConversationTurn(
+    input: LangyPanelCall<typeof langyPanelCreateConversationInputSchema>,
+  ): Promise<{ conversationId: string; turnId: string }>;
+  continueConversationTurn(
+    input: LangyPanelCall<typeof langyContinueConversationInputSchema>,
+  ): Promise<{ conversationId: string; turnId: string }>;
+  stopPanelTurn(
+    input: LangyPanelCall<typeof langyStopTurnPanelInputSchema>,
+  ): Promise<{ stopped: boolean }>;
+  warmPanelWorker(
+    input: LangyPanelCall<typeof langyWarmWorkerInputSchema>,
+  ): Promise<{ conversationId: string | null; warmed: boolean }>;
+  getModelsAllowed(
+    input: LangyPanelCall<typeof langyProjectInputSchema>,
+  ): Promise<{ modelsAllowed: string[] | null }>;
+  recordFeedback(input: LangyPanelCall<typeof langyRecordFeedbackInputSchema>): Promise<void>;
+  markFeedbackPromptShown(
+    input: LangyPanelCall<typeof langyFeedbackPromptShownInputSchema>,
+  ): Promise<void>;
+  watchConversationUpdates(
+    input: LangyPanelCall<typeof langyProjectInputSchema> & { signal?: AbortSignal },
+  ): AsyncIterable<z.infer<typeof langyConversationUpdateFrameSchema>>;
+  watchTurnStream(
+    input: LangyPanelCall<typeof langyTurnStreamInputSchema> & { signal?: AbortSignal },
+  ): AsyncIterable<LangyStreamEntry>;
+  getPanelLocalRecord(
+    input: LangyPanelCall<typeof langyPanelConversationInputSchema>,
+  ): Promise<LangyLocalRecord>;
+  getPanelLocalWorkspace(
+    input: LangyPanelCall<typeof langyPanelConversationInputSchema>,
+  ): Promise<z.infer<typeof langyLocalWorkspaceStatusSchema>>;
+  getCodeAccessPreference(
+    input: LangyPanelCall<typeof langyProjectInputSchema>,
+  ): Promise<{ preference: "github" | null }>;
+  answerLocalPermission(
+    input: LangyPanelCall<typeof langyAnswerLocalPermissionInputSchema>,
+  ): Promise<{ answered: true }>;
+  answerLocalQuestion(
+    input: LangyPanelCall<typeof langyAnswerQuestionInputSchema>,
+  ): Promise<{ answered: true }>;
+  setLocalPolicy(
+    input: LangyPanelCall<typeof langySetLocalPolicyInputSchema>,
+  ): Promise<{ skipPermissions: boolean }>;
+  disconnectLocalWorkspace(
+    input: LangyPanelCall<typeof langyPanelConversationInputSchema>,
+  ): Promise<{ disconnected: boolean }>;
+  renewLocalControlRequest(
+    input: LangyPanelCall<typeof langyPanelConversationInputSchema>,
+  ): Promise<{ expiresAt: string }>;
+  getEgressState(
+    input: LangyPanelCall<typeof langyEgressGetInputSchema>,
+  ): Promise<z.infer<typeof langyEgressStateSchema>>;
+  setEgressState(
+    input: LangyPanelCall<typeof langyEgressSetInputSchema>,
+  ): Promise<z.infer<typeof langyEgressStateSchema>>;
 }
 
 export const LangyApi = moduleApi<LangyApi>()("langy");

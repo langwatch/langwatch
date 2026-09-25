@@ -44,8 +44,14 @@ describe("LangyApp", () => {
       truncated: false,
     });
 
-    await app.listPage({ projectId: "project_1", userId: "user_1", limit: 10 });
-    await app.eventsAfter({ ...CONVERSATION, after: { acceptedAt: 0, eventId: "" } });
+    const caller = { userId: "user_1", name: null, email: null };
+    await app.listConversations({ projectId: "project_1", caller, limit: 10 });
+    await app.getConversationEventsAfter({
+      projectId: CONVERSATION.projectId,
+      conversationId: CONVERSATION.conversationId,
+      caller,
+      after: { acceptedAt: 0, eventId: "" },
+    });
 
     expect(getPage).toHaveBeenCalledOnce();
     expect(getEventsAfter).toHaveBeenCalledOnce();
@@ -172,12 +178,12 @@ function createApp({
   return LangyApp.create({
     dependencies: {
       presence: fakePresence(),
-      featureFlags: createApiFixture<FeatureFlagApi>(),
+      featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => true }),
       users: createApiFixture<UserApi>(),
       github: createApiFixture<GithubApi>(),
       modelProviders: createApiFixture<ModelProviderApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
-      authz: createApiFixture<AuthzApi>(),
+      authz: createApiFixture<AuthzApi>({ isDemoProject: () => false }),
       projects: createApiFixture<ProjectApi>({
         getOrganizationId: async () => "org_1",
       }),
