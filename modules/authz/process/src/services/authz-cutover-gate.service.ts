@@ -1,4 +1,5 @@
 import type { MigrationTenantStatus } from "@langwatch/authz-contract";
+import type { Instant } from "@langwatch/time";
 
 import type { AuthzCutoverRepository } from "../repositories/authz-cutover.repository.ts";
 import { PerOrganizationCachedGateStore } from "../stores/memory/memory.per-organization-cached-gate.store.ts";
@@ -56,7 +57,7 @@ export class AuthzCutoverGateService {
     });
   }
 
-  async findFinalizedAt({ organizationId }: { organizationId: string }): Promise<Date | null> {
+  async findFinalizedAt({ organizationId }: { organizationId: string }): Promise<Instant | null> {
     try {
       const row = await this.options.repository.findCutover({ organizationId });
       return row && (ON_ENGINE_STATUSES as readonly string[]).includes(row.status)

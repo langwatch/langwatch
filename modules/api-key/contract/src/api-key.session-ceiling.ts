@@ -3,6 +3,7 @@
  * and the hourly sweep — which re-derives a live key's expiry from a
  * changed policy — share one rule instead of two computing it differently.
  */
+import { Temporal, type Instant } from "@langwatch/time";
 
 /**
  * The sooner of the refresh window from now and the org's max session
@@ -19,9 +20,9 @@ export function loginKeyExpiresAt({
   sessionStartedAtMs: number;
   maxSessionDurationDays: number;
   refreshWindowMs: number;
-}): Date {
+}): Instant {
   const refreshBoundMs = nowMs + refreshWindowMs;
-  if (maxSessionDurationDays <= 0) return new Date(refreshBoundMs);
+  if (maxSessionDurationDays <= 0) return Temporal.Instant.fromEpochMilliseconds(refreshBoundMs);
   const ceilingMs = sessionStartedAtMs + maxSessionDurationDays * 24 * 60 * 60 * 1000;
-  return new Date(Math.min(refreshBoundMs, ceilingMs));
+  return Temporal.Instant.fromEpochMilliseconds(Math.min(refreshBoundMs, ceilingMs));
 }

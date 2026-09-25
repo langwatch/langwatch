@@ -3,7 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { toDate } from "@langwatch/time";
 
-import { AuthzMigrationOwnershipMapper } from "../../migrations/legacy-import.authz-grant.migration.ts";
+import { isMigrationOwnedSource } from "../../rules/authz-migration-ownership.rules.ts";
 import {
   type GrantProjectionWrite,
   AuthzGrantProjectionRepository,
@@ -55,31 +55,29 @@ const GRANT_FACT_COLUMNS = {
 } as const;
 
 // Back-dated migrations may append after revoke; migration must enforce ordering.
-class AuthzProjectionResultMapper {
-  static reportMissedRow(write: GrantProjectionWrite, result: unknown): void {
-    // Upserts create their own row, so a 0-count is not a miss. A revoke is
-    // also skipped, but for a different reason: direct enforcement has
-    // already applied the deny before projection delivery.
-    if (
-      write.kind === "grant.upsert" ||
-      write.kind === "role.upsert" ||
-      write.kind === "grant.revoke"
-    ) {
-      return;
-    }
-    const count = (result as { count?: unknown } | null)?.count;
-    if (count !== 0) return;
-    logger.warn(
-      { write: write.kind, occurredAt: write.occurredAt.toString({ fractionalSecondDigits: 3 }) },
-      "authz projection write matched no row; the grant it names is absent or newer",
-    );
+function reportMissedRow(write: GrantProjectionWrite, result: unknown): void {
+  // Upserts create their own row, so a 0-count is not a miss. A revoke is
+  // also skipped, but for a different reason: direct enforcement has
+  // already applied the deny before projection delivery.
+  if (
+    write.kind === "grant.upsert" ||
+    write.kind === "role.upsert" ||
+    write.kind === "grant.revoke"
+  ) {
+    return;
   }
+  const count = (result as { count?: unknown } | null)?.count;
+  if (count !== 0) return;
+  logger.warn(
+    { write: write.kind, occurredAt: write.occurredAt.toString({ fractionalSecondDigits: 3 }) },
+    "authz projection write matched no row; the grant it names is absent or newer",
+  );
+}
 
-  /** Prisma's codes for "a unique or foreign key says no". */
-  static isCompatConflict(error: unknown): boolean {
-    const code = (error as { code?: unknown } | null)?.code;
-    return code === "P2002" || code === "P2003";
-  }
+/** Prisma's codes for "a unique or foreign key says no". */
+function isCompatConflict(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return code === "P2002" || code === "P2003";
 }
 
 // Structural type for five models; composition root adapts client once.
@@ -99,7 +97,7 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
 
   async append(write: GrantProjectionWrite): Promise<void> {
     const result = await this.statementFor(write);
-    AuthzProjectionResultMapper.reportMissedRow(write, result);
+    reportMissedRow(write, result);
     await this.writeCompatHeads([{ write, result }]);
   }
 
@@ -108,9 +106,7 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
     // about round trips. One transaction keeps a partial batch from leaving
     // the model half-written.
     const results = await this.prisma.$transaction(writes.map((write) => this.statementFor(write)));
-    writes.forEach((write, index) =>
-      AuthzProjectionResultMapper.reportMissedRow(write, results[index]),
-    );
+    writes.forEach((write, index) => reportMissedRow(write, results[index]));
     await this.writeCompatHeads(writes.map((write, index) => ({ write, result: results[index] })));
   }
 
@@ -122,7 +118,7 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
       try {
         await this.writeCompatHead(write, result);
       } catch (error) {
-        if (!AuthzProjectionResultMapper.isCompatConflict(error)) throw error;
+        if (!isCompatConflict(error)) throw error;
         logger.warn(
           { write: write.kind, error },
           "could not write a compat row; the authoritative head still holds the grant",
@@ -204,7 +200,7 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
     // changes before an organization finalizes). An adopted binding or link
     // converges onto its own row - a byte-identical update - while a fact the
     // legacy schema only inferred has no row here and must not be given one.
-    const migrationSourced = AuthzMigrationOwnershipMapper.includes(grant.source);
+    const migrationSourced = isMigrationOwnedSource(grant.source);
 
     const binding = AuthzGrantMapper.findCompatBindingFromGrantFact({ grant, organizationId });
     if (binding) {

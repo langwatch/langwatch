@@ -61,25 +61,23 @@ export {
   REVOKE_GRANT_COMMAND_TYPE,
 };
 
-class AuthzEventingCommandMapper {
-  static schema<Payload, const Type extends string>(
-    type: Type,
-    schema: ZodSchema<Payload>,
-    description: string,
-  ): CommandSchema<Payload, Type> {
-    return defineCommandSchema(type, schema, description);
-  }
+function authzCommandSchema<Payload, const Type extends string>(
+  type: Type,
+  schema: ZodSchema<Payload>,
+  description: string,
+): CommandSchema<Payload, Type> {
+  return defineCommandSchema(type, schema, description);
+}
 
-  static idempotencyKey(commandId: string): string {
-    return `${commandId}:0`;
-  }
+function idempotencyKeyFor(commandId: string): string {
+  return `${commandId}:0`;
 }
 
 export class AttachGrantCommand implements CommandHandler<
   Command<AttachGrantCommandData>,
   GrantAttachedEvent
 > {
-  static readonly schema = AuthzEventingCommandMapper.schema(
+  static readonly schema = authzCommandSchema(
     ATTACH_GRANT_COMMAND_TYPE,
     attachGrantCommandDataSchema,
     "Record one access fact",
@@ -102,7 +100,7 @@ export class AttachGrantCommand implements CommandHandler<
         data,
         metadata: {},
         occurredAt: occurredAtMs,
-        idempotencyKey: AuthzEventingCommandMapper.idempotencyKey(commandId),
+        idempotencyKey: idempotencyKeyFor(commandId),
       }),
     ];
   }
@@ -112,7 +110,7 @@ export class ChangeGrantRoleCommand implements CommandHandler<
   Command<ChangeGrantRoleCommandData>,
   GrantRoleChangedEvent
 > {
-  static readonly schema = AuthzEventingCommandMapper.schema(
+  static readonly schema = authzCommandSchema(
     CHANGE_GRANT_ROLE_COMMAND_TYPE,
     changeGrantRoleCommandDataSchema,
     "Change the role one grant confers",
@@ -134,7 +132,7 @@ export class ChangeGrantRoleCommand implements CommandHandler<
         data: { grantId, from, to, actor },
         metadata: {},
         occurredAt: occurredAtMs,
-        idempotencyKey: AuthzEventingCommandMapper.idempotencyKey(commandId),
+        idempotencyKey: idempotencyKeyFor(commandId),
       }),
     ];
   }
@@ -144,7 +142,7 @@ export class RevokeGrantCommand implements CommandHandler<
   Command<RevokeGrantCommandData>,
   GrantRevokedEvent
 > {
-  static readonly schema = AuthzEventingCommandMapper.schema(
+  static readonly schema = authzCommandSchema(
     REVOKE_GRANT_COMMAND_TYPE,
     revokeGrantCommandDataSchema,
     "Revoke one grant",
@@ -168,7 +166,7 @@ export class RevokeGrantCommand implements CommandHandler<
         data,
         metadata: {},
         occurredAt: occurredAtMs,
-        idempotencyKey: AuthzEventingCommandMapper.idempotencyKey(commandId),
+        idempotencyKey: idempotencyKeyFor(commandId),
       }),
     ];
   }
@@ -178,7 +176,7 @@ export class DefineRoleCommand implements CommandHandler<
   Command<DefineRoleCommandData>,
   RoleDefinedEvent
 > {
-  static readonly schema = AuthzEventingCommandMapper.schema(
+  static readonly schema = authzCommandSchema(
     DEFINE_ROLE_COMMAND_TYPE,
     defineRoleCommandDataSchema,
     "Record one role definition",
@@ -201,7 +199,7 @@ export class DefineRoleCommand implements CommandHandler<
         data: { ...data, actor },
         metadata: {},
         occurredAt: occurredAtMs,
-        idempotencyKey: AuthzEventingCommandMapper.idempotencyKey(commandId),
+        idempotencyKey: idempotencyKeyFor(commandId),
       }),
     ];
   }
@@ -211,7 +209,7 @@ export class ChangeRolePermissionsCommand implements CommandHandler<
   Command<ChangeRolePermissionsCommandData>,
   RolePermissionsChangedEvent
 > {
-  static readonly schema = AuthzEventingCommandMapper.schema(
+  static readonly schema = authzCommandSchema(
     CHANGE_ROLE_PERMISSIONS_COMMAND_TYPE,
     changeRolePermissionsCommandDataSchema,
     "Change the permissions one role confers",
@@ -233,7 +231,7 @@ export class ChangeRolePermissionsCommand implements CommandHandler<
         data: { roleId, permissions, actor },
         metadata: {},
         occurredAt: occurredAtMs,
-        idempotencyKey: AuthzEventingCommandMapper.idempotencyKey(commandId),
+        idempotencyKey: idempotencyKeyFor(commandId),
       }),
     ];
   }
@@ -243,7 +241,7 @@ export class DeleteRoleCommand implements CommandHandler<
   Command<DeleteRoleCommandData>,
   RoleDeletedEvent
 > {
-  static readonly schema = AuthzEventingCommandMapper.schema(
+  static readonly schema = authzCommandSchema(
     DELETE_ROLE_COMMAND_TYPE,
     deleteRoleCommandDataSchema,
     "Delete one role definition",
@@ -265,7 +263,7 @@ export class DeleteRoleCommand implements CommandHandler<
         data: { roleId, actor },
         metadata: {},
         occurredAt: occurredAtMs,
-        idempotencyKey: AuthzEventingCommandMapper.idempotencyKey(commandId),
+        idempotencyKey: idempotencyKeyFor(commandId),
       }),
     ];
   }

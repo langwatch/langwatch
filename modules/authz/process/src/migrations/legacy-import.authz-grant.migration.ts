@@ -34,7 +34,8 @@ import {
   PRINCIPAL_TO_DB,
   SHARE_LINK_PERMISSION,
 } from "../repositories/prisma/prisma.authz-grant.mapper.ts";
-import { AuthzGrantIdentity } from "../services/authz-grant-identity.service.ts";
+import { deriveGrantId } from "../rules/authz-grant-identity.rules.ts";
+import { isMigrationOwnedSource } from "../rules/authz-migration-ownership.rules.ts";
 
 export { AUTHZ_ENGINE_MIGRATION_NAME };
 
@@ -133,7 +134,7 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
   }): Promise<TenantMigrationOutcome> {
     const organizationId = tenantId;
     const inventory = await this.readInventory(organizationId);
-    const expected = AuthzExpectedFactsMapper.assemble({
+    const expected = assemble({
       organizationId,
       inventory,
     });
@@ -249,7 +250,7 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
     heads: HeadState;
     signal?: AbortSignal;
   }): Promise<void> {
-    const { roles, grants } = AuthzMigrationProofMapper.unstated({
+    const { roles, grants } = unstated({
       organizationId,
       expected,
       heads,
@@ -260,7 +261,7 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
       send: (role) =>
         this.deps.ledger.defineRole({
           organizationId,
-          commandId: AuthzMigrationCommandMapper.contentId({
+          commandId: migrationContentId({
             kind: "role",
             id: role.roleId,
             content: role,
@@ -275,7 +276,7 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
       send: (fact) =>
         this.deps.ledger.attachGrant({
           organizationId,
-          commandId: AuthzMigrationCommandMapper.contentId({
+          commandId: migrationContentId({
             kind: "grant",
             id: fact.grantId,
             content: fact,
@@ -310,18 +311,14 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
       ...heads.grantRows
         .filter(
           (row) =>
-            AuthzMigrationOwnershipMapper.includes(row.source) &&
+            isMigrationOwnedSource(row.source) &&
             !row.revoked &&
             !expected.grantIds.has(row.id) &&
             !expected.retainedGrantIds.has(row.id),
         )
         .map((row) => row.id),
       ...heads.resourceRows
-        .filter(
-          (row) =>
-            AuthzMigrationOwnershipMapper.includes(row.source) &&
-            !expected.grantIds.has(row.grantId),
-        )
+        .filter((row) => isMigrationOwnedSource(row.source) && !expected.grantIds.has(row.grantId))
         .map((row) => row.grantId),
     ].toSorted();
     await this.each({
@@ -331,7 +328,7 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
         this.deps.ledger.revokeGrant({
           organizationId,
           // Business time in key ensures idempotency: deleted/restored rows don't collide.
-          commandId: AuthzMigrationCommandMapper.contentId({
+          commandId: migrationContentId({
             kind: "deny:grant",
             id: grantId,
             content: { occurredAtMs },
@@ -358,7 +355,7 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
       send: (roleId) =>
         this.deps.ledger.deleteRole({
           organizationId,
-          commandId: AuthzMigrationCommandMapper.contentId({
+          commandId: migrationContentId({
             kind: "deny:role",
             id: roleId,
             content: { occurredAtMs },
@@ -401,7 +398,7 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
       send: (rekey) =>
         this.deps.ledger.changeGrantRole({
           organizationId,
-          commandId: AuthzMigrationCommandMapper.contentId({
+          commandId: migrationContentId({
             kind: "rekey",
             id: rekey.grantId,
             content: { to: rekey.to, occurredAtMs },
@@ -420,7 +417,7 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
     const roleHeadById = new Map(heads.roleHeads.map((head) => [head.id, head]));
     const redefines = expected.roles.flatMap((role) => {
       const head = roleHeadById.get(role.roleId);
-      if (!head || !AuthzMigrationProofMapper.roleDrifted({ role, head })) return [];
+      if (!head || !roleDrifted({ role, head })) return [];
       return [{ ...role, occurredAtMs }];
     });
     await this.each({
@@ -429,7 +426,7 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
       send: (role) =>
         this.deps.ledger.defineRole({
           organizationId,
-          commandId: AuthzMigrationCommandMapper.contentId({
+          commandId: migrationContentId({
             kind: "redefine",
             id: role.roleId,
             content: role,
@@ -454,12 +451,12 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
     expected: ExpectedFacts;
     heads: HeadState;
   }): { outstanding: string[]; diffs: AuthzEngineDiff[] } {
-    const grants = AuthzMigrationProofMapper.checkGrantHeads({
+    const grants = checkGrantHeads({
       expected,
       heads,
     });
-    const roles = AuthzMigrationProofMapper.checkRoleHeads({ expected, heads });
-    const resources = AuthzMigrationProofMapper.checkResourceHeads({
+    const roles = checkRoleHeads({ expected, heads });
+    const resources = checkResourceHeads({
       organizationId,
       expected,
       heads,
@@ -499,29 +496,17 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
  * enough: the event store dedupes on the idempotency key, so a legacy row edited between
  * two passes would restate under the first pass's key and be silently swallowed.
  */
-class AuthzMigrationCommandMapper {
-  static contentId({ kind, id, content }: { kind: string; id: string; content: unknown }): string {
-    const digest = createHash("sha256").update(JSON.stringify(content)).digest("hex").slice(0, 16);
-    return `authz-engine:${kind}:${id}:${digest}`;
-  }
-}
-
-/**
- * The sources this migration owns in the Grant head — its own, plus the
- * three-stage rollout it replaces (ADR-110 collapsed genesis-import,
- * backfill-b and cutover-import into this one migration).
- */
-export const MIGRATION_OWNED_SOURCES = [
-  "migration",
-  "genesis-import",
-  "backfill-b",
-  "cutover-import",
-] as const;
-
-export class AuthzMigrationOwnershipMapper {
-  static includes(source: string): boolean {
-    return (MIGRATION_OWNED_SOURCES as readonly string[]).includes(source);
-  }
+function migrationContentId({
+  kind,
+  id,
+  content,
+}: {
+  kind: string;
+  id: string;
+  content: unknown;
+}): string {
+  const digest = createHash("sha256").update(JSON.stringify(content)).digest("hex").slice(0, 16);
+  return `authz-engine:${kind}:${id}:${digest}`;
 }
 
 /** Whether one binding row covers one user — named directly, or held
@@ -569,359 +554,352 @@ export type ExpectedFacts = {
   retainedGrantIds: Set<string>;
 };
 
-export class AuthzExpectedFactsMapper {
-  static assemble({
-    organizationId,
-    inventory,
-  }: {
-    organizationId: string;
-    inventory: {
-      organizationCreatedAtMs: number | null;
-      roleRows: LegacyRoleRow[];
-      bindingRows: LegacyBindingRow[];
-      members: OrganizationMemberFact[];
-      teamRows: LegacyTeamRow[];
-      shareLinkRows: ShareLinkFactRow[];
-      externalMembers: ExternalMemberFact[];
-      credentials: ProjectCredentialFact[];
-      groupMemberships: { userId: string; groupId: string }[];
-    };
-  }): ExpectedFacts {
-    const roles = inventory.roleRows
-      .slice()
-      .toSorted((a, b) => a.id.localeCompare(b.id))
-      .map((row) => this.legacyRoleToFact(row));
-    const bindingFacts = this.stampUserFacts(
-      inventory.bindingRows
-        .slice()
-        .toSorted((a, b) => a.id.localeCompare(b.id))
-        .flatMap((row) => {
-          const fact = this.bindingToFact({ row });
-          return fact ? [fact] : [];
-        }),
-      inventory.members,
-    );
-    // One coverage predicate for both suppression rules below: a user is
-    // "already bound" identically whether the binding names them or a group
-    // they belong to, and the two rules must never disagree about that.
-    const covers = AuthzBindingCoverageMapper.create({
-      groupMemberships: inventory.groupMemberships,
-    });
-    const teamFacts = this.stampUserFacts(
-      this.teamMembershipFacts({
-        organizationId,
-        teamRows: inventory.teamRows,
-        bindingRows: inventory.bindingRows,
-        covers,
-      }),
-      inventory.members,
-    );
-    const organizationFacts = this.stampUserFacts(
-      this.organizationLevelFacts({
-        organizationId,
-        members: inventory.members,
-        externalMembers: inventory.externalMembers,
-        bindingRows: inventory.bindingRows,
-        covers,
-        organizationCreatedAtMs: inventory.organizationCreatedAtMs,
-      }),
-      inventory.members,
-    );
-    const credentialFacts = inventory.credentials
-      .slice()
-      .toSorted((a, b) => a.projectId.localeCompare(b.projectId))
-      .map((credential) => this.credentialToFact({ organizationId, credential }));
-    const shareLinks = inventory.shareLinkRows
-      .slice()
-      .toSorted((a, b) => a.id.localeCompare(b.id))
-      .map((row): ExpectedShareLink => ({
-        row,
-        fact: this.shareLinkToFact({ organizationId, row }),
-      }));
-
-    const nonResourceFacts = [
-      ...bindingFacts,
-      ...teamFacts,
-      ...organizationFacts,
-      ...credentialFacts,
-    ];
-    return {
-      roles,
-      bindingFacts,
-      teamFacts,
-      organizationFacts,
-      credentialFacts,
-      shareLinks,
-      nonResourceFacts,
-      grantIds: new Set([
-        ...nonResourceFacts.map((fact) => fact.grantId),
-        ...shareLinks.map((link) => link.row.id),
-      ]),
-      retainedGrantIds: new Set(
-        inventory.bindingRows
-          .filter((row) => this.bindingPrincipal(row) === null)
-          .map((row) => row.id),
-      ),
-    };
-  }
-
-  /**
-   * A CustomRole as the ledger defines it, adopting the row's own id. The
-   * stored permissions column is jsonb: anything that is not an array of
-   * strings imports as the empty list, which grants nothing.
-   */
-  private static legacyRoleToFact(row: LegacyRoleRow): RoleFact {
-    const fact: RoleFact = {
-      roleId: row.id,
-      name: row.name,
-      permissions: this.permissionStrings(row.permissions),
-      kind: row.kind === "system_api_key" ? "system_api_key" : "custom",
-      occurredAtMs: row.createdAtMs,
-    };
-    if (row.description !== null) fact.description = row.description;
-    return fact;
-  }
-
-  static permissionStrings(stored: unknown): string[] {
-    return Array.isArray(stored)
-      ? stored.filter((entry): entry is string => typeof entry === "string" && entry !== "")
-      : [];
-  }
-
-  /**
-   * Stamp imported USER facts with the membership lifetime in the inventory.
-   * Disabled seats keep the stamp so replay survives re-enable; a user with
-   * no current membership drops the fact fail-closed.
-   */
-  private static stampUserFacts(
-    facts: GrantFact[],
-    members: OrganizationMemberFact[],
-  ): GrantFact[] {
-    const stamps = new Map(members.map((member) => [member.userId, member.membershipStamp]));
-    return facts.flatMap((fact) => {
-      if (fact.principal.type !== "user" || fact.scope.type === "RESOURCE") return [fact];
-      const membershipStamp = fact.principal.id ? stamps.get(fact.principal.id) : undefined;
-      return membershipStamp === undefined ? [] : [{ ...fact, membershipStamp }];
-    });
-  }
-
-  /**
-   * A RoleBinding as the ledger attaches it. The grant id IS the row id. A row naming no
-   * principal cannot be expressed as a grant and is skipped; the proof does not expect it
-   * either, so it holds nothing up.
-   */
-  private static bindingToFact({ row }: { row: LegacyBindingRow }): GrantFact | null {
-    const principal = this.bindingPrincipal(row);
-    if (!principal) return null;
-    const fact: GrantFact = {
-      grantId: row.id,
-      principal,
-      roleKey:
-        row.customRoleId === null ? roleKeyForTeamRole(row.role) : `custom:${row.customRoleId}`,
-      scope: { type: row.scopeType, id: row.scopeId },
-      source: "migration",
-      occurredAtMs: row.createdAtMs,
-    };
-    if (row.customRoleId !== null) fact.legacyRole = row.role;
-    return fact;
-  }
-
-  private static bindingPrincipal(row: LegacyBindingRow): LedgerPrincipal | null {
-    if (row.userId !== null) return { type: "user", id: row.userId };
-    if (row.groupId !== null) return { type: "group", id: row.groupId };
-    if (row.apiKeyId !== null) return { type: "apiKey", id: row.apiKeyId };
-    return null;
-  }
-
-  /**
-   * Team memberships stated DIRECTLY (ADR-110), never promoted into binding
-   * rows first — and only where the legacy resolver actually grants from them. Its
-   * predicate, mirrored exactly:
-   */
-  private static teamMembershipFacts({
-    organizationId,
-    teamRows,
-    bindingRows,
-    covers,
-  }: {
-    organizationId: string;
-    teamRows: LegacyTeamRow[];
-    bindingRows: LegacyBindingRow[];
-    covers: BindingCoverage;
-  }): GrantFact[] {
-    const suppressed = ({ userId, teamId }: { userId: string; teamId: string }) =>
-      bindingRows.some((row) => {
-        const inPlay =
-          (row.scopeType === "ORGANIZATION" && row.scopeId === organizationId) ||
-          (row.scopeType === "TEAM" && row.scopeId === teamId);
-        return inPlay && covers({ row, userId });
-      });
-    return teamRows
-      .slice()
-      .toSorted((a, b) => a.teamId.localeCompare(b.teamId) || a.userId.localeCompare(b.userId))
-      .flatMap((row) => {
-        if (row.role === "CUSTOM") return [];
-        if (suppressed(row)) return [];
-        const principal = { type: "user" as const, id: row.userId };
-        const scope = { type: "TEAM" as const, id: row.teamId };
-        return [
-          {
-            grantId: AuthzGrantIdentity.deriveGrantId({
-              organizationId,
-              principal,
-              scope,
-              occurredAtMs: row.createdAtMs,
-            }),
-            principal,
-            roleKey: roleKeyForTeamRole(row.role),
-            scope,
-            source: "migration" as const,
-            occurredAtMs: row.createdAtMs,
-          },
-        ];
-      });
-  }
-
-  /**
-   * The facts the legacy schema inferred instead of storing.
-   */
-  private static organizationLevelFacts({
-    organizationId,
-    members,
-    externalMembers,
-    bindingRows,
-    covers,
-    organizationCreatedAtMs,
-  }: {
-    organizationId: string;
-    members: OrganizationMemberFact[];
-    externalMembers: ExternalMemberFact[];
-    bindingRows: LegacyBindingRow[];
-    covers: BindingCoverage;
+function assemble({
+  organizationId,
+  inventory,
+}: {
+  organizationId: string;
+  inventory: {
     organizationCreatedAtMs: number | null;
-  }): GrantFact[] {
-    const scope = { type: "ORGANIZATION" as const, id: organizationId };
-    const facts: GrantFact[] = [];
-
-    if (organizationCreatedAtMs !== null) {
-      const principal = { type: "organization" as const, id: organizationId };
-      facts.push({
-        grantId: AuthzGrantIdentity.deriveGrantId({
-          organizationId,
-          principal,
-          scope,
-          occurredAtMs: organizationCreatedAtMs,
-        }),
-        principal,
-        roleKey: "member",
-        scope,
-        source: "migration",
-        occurredAtMs: organizationCreatedAtMs,
-      });
-    }
-
-    for (const member of members.slice().toSorted((a, b) => a.userId.localeCompare(b.userId))) {
-      if (member.role !== "ADMIN") continue;
-      // "No binding anywhere" reads group-held bindings too — the same
-      // predicate the team-membership suppression uses.
-      if (bindingRows.some((row) => covers({ row, userId: member.userId }))) continue;
-      const principal = { type: "user" as const, id: member.userId };
-      facts.push({
-        grantId: AuthzGrantIdentity.deriveGrantId({
-          organizationId,
-          principal,
-          scope,
-          occurredAtMs: member.createdAtMs,
-        }),
-        principal,
-        roleKey: "legacy-admin",
-        scope,
-        source: "migration",
-        occurredAtMs: member.createdAtMs,
-      });
-    }
-
-    for (const member of externalMembers
+    roleRows: LegacyRoleRow[];
+    bindingRows: LegacyBindingRow[];
+    members: OrganizationMemberFact[];
+    teamRows: LegacyTeamRow[];
+    shareLinkRows: ShareLinkFactRow[];
+    externalMembers: ExternalMemberFact[];
+    credentials: ProjectCredentialFact[];
+    groupMemberships: { userId: string; groupId: string }[];
+  };
+}): ExpectedFacts {
+  const roles = inventory.roleRows
+    .slice()
+    .toSorted((a, b) => a.id.localeCompare(b.id))
+    .map((row) => legacyRoleToFact(row));
+  const bindingFacts = stampUserFacts(
+    inventory.bindingRows
       .slice()
-      .toSorted((a, b) => a.userId.localeCompare(b.userId))) {
-      const principal = { type: "user" as const, id: member.userId };
-      facts.push({
-        grantId: AuthzGrantIdentity.deriveGrantId({
-          organizationId,
-          principal,
-          scope,
-          occurredAtMs: member.createdAtMs,
-        }),
-        principal,
-        roleKey: "lite-member",
-        scope,
-        source: "migration",
-        occurredAtMs: member.createdAtMs,
-      });
-    }
-    return facts;
-  }
+      .toSorted((a, b) => a.id.localeCompare(b.id))
+      .flatMap((row) => {
+        const fact = bindingToFact({ row });
+        return fact ? [fact] : [];
+      }),
+    inventory.members,
+  );
+  // One coverage predicate for both suppression rules below: a user is
+  // "already bound" identically whether the binding names them or a group
+  // they belong to, and the two rules must never disagree about that.
+  const covers = AuthzBindingCoverageMapper.create({
+    groupMemberships: inventory.groupMemberships,
+  });
+  const teamFacts = stampUserFacts(
+    teamMembershipFacts({
+      organizationId,
+      teamRows: inventory.teamRows,
+      bindingRows: inventory.bindingRows,
+      covers,
+    }),
+    inventory.members,
+  );
+  const organizationFacts = stampUserFacts(
+    organizationLevelFacts({
+      organizationId,
+      members: inventory.members,
+      externalMembers: inventory.externalMembers,
+      bindingRows: inventory.bindingRows,
+      covers,
+      organizationCreatedAtMs: inventory.organizationCreatedAtMs,
+    }),
+    inventory.members,
+  );
+  const credentialFacts = inventory.credentials
+    .slice()
+    .toSorted((a, b) => a.projectId.localeCompare(b.projectId))
+    .map((credential) => credentialToFact({ organizationId, credential }));
+  const shareLinks = inventory.shareLinkRows
+    .slice()
+    .toSorted((a, b) => a.id.localeCompare(b.id))
+    .map((row): ExpectedShareLink => ({
+      row,
+      fact: shareLinkToFact({ organizationId, row }),
+    }));
 
-  /** The legacy per-project credential (`Project.apiKey`): the PROJECT itself
-   *  is the principal — that key authenticates as the project and names no
-   *  user or key row at all. */
-  private static credentialToFact({
-    organizationId,
-    credential,
-  }: {
-    organizationId: string;
-    credential: ProjectCredentialFact;
-  }): GrantFact {
-    const principal = { type: "project" as const, id: credential.projectId };
-    const scope = { type: "PROJECT" as const, id: credential.projectId };
-    return {
-      grantId: AuthzGrantIdentity.deriveGrantId({
+  const nonResourceFacts = [
+    ...bindingFacts,
+    ...teamFacts,
+    ...organizationFacts,
+    ...credentialFacts,
+  ];
+  return {
+    roles,
+    bindingFacts,
+    teamFacts,
+    organizationFacts,
+    credentialFacts,
+    shareLinks,
+    nonResourceFacts,
+    grantIds: new Set([
+      ...nonResourceFacts.map((fact) => fact.grantId),
+      ...shareLinks.map((link) => link.row.id),
+    ]),
+    retainedGrantIds: new Set(
+      inventory.bindingRows.filter((row) => bindingPrincipal(row) === null).map((row) => row.id),
+    ),
+  };
+}
+
+/**
+ * A CustomRole as the ledger defines it, adopting the row's own id. The
+ * stored permissions column is jsonb: anything that is not an array of
+ * strings imports as the empty list, which grants nothing.
+ */
+function legacyRoleToFact(row: LegacyRoleRow): RoleFact {
+  const fact: RoleFact = {
+    roleId: row.id,
+    name: row.name,
+    permissions: permissionStrings(row.permissions),
+    kind: row.kind === "system_api_key" ? "system_api_key" : "custom",
+    occurredAtMs: row.createdAtMs,
+  };
+  if (row.description !== null) fact.description = row.description;
+  return fact;
+}
+
+function permissionStrings(stored: unknown): string[] {
+  return Array.isArray(stored)
+    ? stored.filter((entry): entry is string => typeof entry === "string" && entry !== "")
+    : [];
+}
+
+/**
+ * Stamp imported USER facts with the membership lifetime in the inventory.
+ * Disabled seats keep the stamp so replay survives re-enable; a user with
+ * no current membership drops the fact fail-closed.
+ */
+function stampUserFacts(facts: GrantFact[], members: OrganizationMemberFact[]): GrantFact[] {
+  const stamps = new Map(members.map((member) => [member.userId, member.membershipStamp]));
+  return facts.flatMap((fact) => {
+    if (fact.principal.type !== "user" || fact.scope.type === "RESOURCE") return [fact];
+    const membershipStamp = fact.principal.id ? stamps.get(fact.principal.id) : undefined;
+    return membershipStamp === undefined ? [] : [{ ...fact, membershipStamp }];
+  });
+}
+
+/**
+ * A RoleBinding as the ledger attaches it. The grant id IS the row id. A row naming no
+ * principal cannot be expressed as a grant and is skipped; the proof does not expect it
+ * either, so it holds nothing up.
+ */
+function bindingToFact({ row }: { row: LegacyBindingRow }): GrantFact | null {
+  const principal = bindingPrincipal(row);
+  if (!principal) return null;
+  const fact: GrantFact = {
+    grantId: row.id,
+    principal,
+    roleKey:
+      row.customRoleId === null ? roleKeyForTeamRole(row.role) : `custom:${row.customRoleId}`,
+    scope: { type: row.scopeType, id: row.scopeId },
+    source: "migration",
+    occurredAtMs: row.createdAtMs,
+  };
+  if (row.customRoleId !== null) fact.legacyRole = row.role;
+  return fact;
+}
+
+function bindingPrincipal(row: LegacyBindingRow): LedgerPrincipal | null {
+  if (row.userId !== null) return { type: "user", id: row.userId };
+  if (row.groupId !== null) return { type: "group", id: row.groupId };
+  if (row.apiKeyId !== null) return { type: "apiKey", id: row.apiKeyId };
+  return null;
+}
+
+/**
+ * Team memberships stated DIRECTLY (ADR-110), never promoted into binding
+ * rows first — and only where the legacy resolver actually grants from them. Its
+ * predicate, mirrored exactly:
+ */
+function teamMembershipFacts({
+  organizationId,
+  teamRows,
+  bindingRows,
+  covers,
+}: {
+  organizationId: string;
+  teamRows: LegacyTeamRow[];
+  bindingRows: LegacyBindingRow[];
+  covers: BindingCoverage;
+}): GrantFact[] {
+  const suppressed = ({ userId, teamId }: { userId: string; teamId: string }) =>
+    bindingRows.some((row) => {
+      const inPlay =
+        (row.scopeType === "ORGANIZATION" && row.scopeId === organizationId) ||
+        (row.scopeType === "TEAM" && row.scopeId === teamId);
+      return inPlay && covers({ row, userId });
+    });
+  return teamRows
+    .slice()
+    .toSorted((a, b) => a.teamId.localeCompare(b.teamId) || a.userId.localeCompare(b.userId))
+    .flatMap((row) => {
+      if (row.role === "CUSTOM") return [];
+      if (suppressed(row)) return [];
+      const principal = { type: "user" as const, id: row.userId };
+      const scope = { type: "TEAM" as const, id: row.teamId };
+      return [
+        {
+          grantId: deriveGrantId({
+            organizationId,
+            principal,
+            scope,
+            occurredAtMs: row.createdAtMs,
+          }),
+          principal,
+          roleKey: roleKeyForTeamRole(row.role),
+          scope,
+          source: "migration" as const,
+          occurredAtMs: row.createdAtMs,
+        },
+      ];
+    });
+}
+
+/**
+ * The facts the legacy schema inferred instead of storing.
+ */
+function organizationLevelFacts({
+  organizationId,
+  members,
+  externalMembers,
+  bindingRows,
+  covers,
+  organizationCreatedAtMs,
+}: {
+  organizationId: string;
+  members: OrganizationMemberFact[];
+  externalMembers: ExternalMemberFact[];
+  bindingRows: LegacyBindingRow[];
+  covers: BindingCoverage;
+  organizationCreatedAtMs: number | null;
+}): GrantFact[] {
+  const scope = { type: "ORGANIZATION" as const, id: organizationId };
+  const facts: GrantFact[] = [];
+
+  if (organizationCreatedAtMs !== null) {
+    const principal = { type: "organization" as const, id: organizationId };
+    facts.push({
+      grantId: deriveGrantId({
         organizationId,
         principal,
         scope,
-        occurredAtMs: credential.createdAtMs,
+        occurredAtMs: organizationCreatedAtMs,
       }),
       principal,
-      roleKey: "admin",
+      roleKey: "member",
       scope,
       source: "migration",
-      occurredAtMs: credential.createdAtMs,
-    };
+      occurredAtMs: organizationCreatedAtMs,
+    });
   }
 
-  /** A share link as the ledger attaches it, adopting the row's own id so the
-   *  token a customer already circulated keeps resolving to it. Resource facts
-   *  carry no role: their single permission is in the terms. */
-  private static shareLinkToFact({
-    organizationId,
-    row,
-  }: {
-    organizationId: string;
-    row: ShareLinkFactRow;
-  }): GrantFact {
-    const resource: NonNullable<GrantFact["resource"]> = {
-      kind: row.resourceType === "THREAD" ? "thread" : "trace",
-      projectId: row.projectId,
-      token: row.token,
-      permission: SHARE_LINK_PERMISSION,
-    };
-    if (row.userId !== null) resource.createdByUserId = row.userId;
-    if (row.expiresAtMs !== null) resource.expiresAtMs = row.expiresAtMs;
-    if (row.maxViews !== null) resource.maxViews = row.maxViews;
-    return {
-      grantId: row.id,
-      principal: AuthzGrantMapper.shareVisibilityAudience({
-        visibility: row.visibility,
+  for (const member of members.slice().toSorted((a, b) => a.userId.localeCompare(b.userId))) {
+    if (member.role !== "ADMIN") continue;
+    // "No binding anywhere" reads group-held bindings too — the same
+    // predicate the team-membership suppression uses.
+    if (bindingRows.some((row) => covers({ row, userId: member.userId }))) continue;
+    const principal = { type: "user" as const, id: member.userId };
+    facts.push({
+      grantId: deriveGrantId({
         organizationId,
-        projectId: row.projectId,
+        principal,
+        scope,
+        occurredAtMs: member.createdAtMs,
       }),
-      roleKey: null,
-      scope: { type: "RESOURCE", id: row.resourceId },
-      resource,
+      principal,
+      roleKey: "legacy-admin",
+      scope,
       source: "migration",
-      occurredAtMs: row.createdAtMs,
-    };
+      occurredAtMs: member.createdAtMs,
+    });
   }
+
+  for (const member of externalMembers
+    .slice()
+    .toSorted((a, b) => a.userId.localeCompare(b.userId))) {
+    const principal = { type: "user" as const, id: member.userId };
+    facts.push({
+      grantId: deriveGrantId({
+        organizationId,
+        principal,
+        scope,
+        occurredAtMs: member.createdAtMs,
+      }),
+      principal,
+      roleKey: "lite-member",
+      scope,
+      source: "migration",
+      occurredAtMs: member.createdAtMs,
+    });
+  }
+  return facts;
+}
+
+/** The legacy per-project credential (`Project.apiKey`): the PROJECT itself
+ *  is the principal — that key authenticates as the project and names no
+ *  user or key row at all. */
+function credentialToFact({
+  organizationId,
+  credential,
+}: {
+  organizationId: string;
+  credential: ProjectCredentialFact;
+}): GrantFact {
+  const principal = { type: "project" as const, id: credential.projectId };
+  const scope = { type: "PROJECT" as const, id: credential.projectId };
+  return {
+    grantId: deriveGrantId({
+      organizationId,
+      principal,
+      scope,
+      occurredAtMs: credential.createdAtMs,
+    }),
+    principal,
+    roleKey: "admin",
+    scope,
+    source: "migration",
+    occurredAtMs: credential.createdAtMs,
+  };
+}
+
+/** A share link as the ledger attaches it, adopting the row's own id so the
+ *  token a customer already circulated keeps resolving to it. Resource facts
+ *  carry no role: their single permission is in the terms. */
+function shareLinkToFact({
+  organizationId,
+  row,
+}: {
+  organizationId: string;
+  row: ShareLinkFactRow;
+}): GrantFact {
+  const resource: NonNullable<GrantFact["resource"]> = {
+    kind: row.resourceType === "THREAD" ? "thread" : "trace",
+    projectId: row.projectId,
+    token: row.token,
+    permission: SHARE_LINK_PERMISSION,
+  };
+  if (row.userId !== null) resource.createdByUserId = row.userId;
+  if (row.expiresAtMs !== null) resource.expiresAtMs = row.expiresAtMs;
+  if (row.maxViews !== null) resource.maxViews = row.maxViews;
+  return {
+    grantId: row.id,
+    principal: AuthzGrantMapper.shareVisibilityAudience({
+      visibility: row.visibility,
+      organizationId,
+      projectId: row.projectId,
+    }),
+    roleKey: null,
+    scope: { type: "RESOURCE", id: row.resourceId },
+    resource,
+    source: "migration",
+    occurredAtMs: row.createdAtMs,
+  };
 }
 
 /** One named disagreement between a head and the legacy row it mirrors.
@@ -943,293 +921,270 @@ export type HeadState = {
 
 export type CheckResult = { outstanding: string[]; diffs: AuthzEngineDiff[] };
 
-export class AuthzMigrationProofMapper {
-  static checkGrantHeads({
-    expected,
-    heads,
-  }: {
-    expected: ExpectedFacts;
-    heads: HeadState;
-  }): CheckResult {
-    const outstanding: string[] = [];
-    const diffs: AuthzEngineDiff[] = [];
-    const headById = new Map(heads.grantRows.map((row) => [row.id, row]));
-    for (const fact of expected.nonResourceFacts) {
-      const head = headById.get(fact.grantId);
-      if (!head) {
-        outstanding.push(fact.grantId);
-        continue;
-      }
-      if (head.revoked) {
-        diffs.push({ kind: "grant_revoked", id: fact.grantId });
-        continue;
-      }
-      diffs.push(...this.grantDiffs({ fact, head }));
+function checkGrantHeads({
+  expected,
+  heads,
+}: {
+  expected: ExpectedFacts;
+  heads: HeadState;
+}): CheckResult {
+  const outstanding: string[] = [];
+  const diffs: AuthzEngineDiff[] = [];
+  const headById = new Map(heads.grantRows.map((row) => [row.id, row]));
+  for (const fact of expected.nonResourceFacts) {
+    const head = headById.get(fact.grantId);
+    if (!head) {
+      outstanding.push(fact.grantId);
+      continue;
     }
-    // Stale rows revoked this pass, not yet folded: outstanding, never a diff.
-    // The guard matches the sweep's exactly, `retainedGrantIds` included — a
-    // row the sweep deliberately did NOT revoke is never going to disappear
-    // from the head, so counting it outstanding would hold the organization
-    // for a condition no later pass can clear.
-    outstanding.push(
-      ...heads.grantRows
-        .filter(
-          (row) =>
-            !row.revoked &&
-            AuthzMigrationOwnershipMapper.includes(row.source) &&
-            !expected.grantIds.has(row.id) &&
-            !expected.retainedGrantIds.has(row.id),
-        )
-        .map((row) => row.id),
-    );
-    return { outstanding, diffs };
+    if (head.revoked) {
+      diffs.push({ kind: "grant_revoked", id: fact.grantId });
+      continue;
+    }
+    diffs.push(...grantDiffs({ fact, head }));
   }
+  // Stale rows revoked this pass, not yet folded: outstanding, never a diff.
+  // The guard matches the sweep's exactly, `retainedGrantIds` included — a
+  // row the sweep deliberately did NOT revoke is never going to disappear
+  // from the head, so counting it outstanding would hold the organization
+  // for a condition no later pass can clear.
+  outstanding.push(
+    ...heads.grantRows
+      .filter(
+        (row) =>
+          !row.revoked &&
+          isMigrationOwnedSource(row.source) &&
+          !expected.grantIds.has(row.id) &&
+          !expected.retainedGrantIds.has(row.id),
+      )
+      .map((row) => row.id),
+  );
+  return { outstanding, diffs };
+}
 
-  static checkRoleHeads({
-    expected,
-    heads,
-  }: {
-    expected: ExpectedFacts;
-    heads: HeadState;
-  }): CheckResult {
-    const outstanding: string[] = [];
-    const diffs: AuthzEngineDiff[] = [];
-    const headById = new Map(heads.roleHeads.map((head) => [head.id, head]));
-    const expectedRoleIds = new Set(expected.roles.map((role) => role.roleId));
-    for (const role of expected.roles) {
-      const head = headById.get(role.roleId);
-      if (!head) {
-        outstanding.push(role.roleId);
-        continue;
-      }
-      // A buried head whose legacy row exists again. The projection keeps
-      // the role tombstoned — `role.upsert` leaves `deletedAt` alone — so
-      // comparing only the ordinary fields called it converged and finalized
-      // an organization whose role the engine still refuses. Named, never
-      // restored: repair is the operator's.
-      if (head.deleted) {
-        diffs.push({ kind: "role_deleted", id: role.roleId });
-        continue;
-      }
-      diffs.push(...this.roleDiffs({ role, head }));
+function checkRoleHeads({
+  expected,
+  heads,
+}: {
+  expected: ExpectedFacts;
+  heads: HeadState;
+}): CheckResult {
+  const outstanding: string[] = [];
+  const diffs: AuthzEngineDiff[] = [];
+  const headById = new Map(heads.roleHeads.map((head) => [head.id, head]));
+  const expectedRoleIds = new Set(expected.roles.map((role) => role.roleId));
+  for (const role of expected.roles) {
+    const head = headById.get(role.roleId);
+    if (!head) {
+      outstanding.push(role.roleId);
+      continue;
     }
-    for (const head of heads.roleHeads) {
-      // A buried head with no legacy row is a deletion this migration
-      // already made, folded. Counting it outstanding held the organization
-      // on a condition no later pass could clear.
-      if (!head.deleted && !expectedRoleIds.has(head.id)) {
-        outstanding.push(head.id);
-      }
+    // A buried head whose legacy row exists again. The projection keeps
+    // the role tombstoned — `role.upsert` leaves `deletedAt` alone — so
+    // comparing only the ordinary fields called it converged and finalized
+    // an organization whose role the engine still refuses. Named, never
+    // restored: repair is the operator's.
+    if (head.deleted) {
+      diffs.push({ kind: "role_deleted", id: role.roleId });
+      continue;
     }
-    return { outstanding, diffs };
+    diffs.push(...roleDiffs({ role, head }));
   }
+  for (const head of heads.roleHeads) {
+    // A buried head with no legacy row is a deletion this migration
+    // already made, folded. Counting it outstanding held the organization
+    // on a condition no later pass could clear.
+    if (!head.deleted && !expectedRoleIds.has(head.id)) {
+      outstanding.push(head.id);
+    }
+  }
+  return { outstanding, diffs };
+}
 
-  static checkResourceHeads({
+function checkResourceHeads({
+  organizationId,
+  expected,
+  heads,
+}: {
+  organizationId: string;
+  expected: ExpectedFacts;
+  heads: HeadState;
+}): CheckResult {
+  const outstanding: string[] = [];
+  const diffs: AuthzEngineDiff[] = [];
+  const headById = new Map(heads.resourceRows.map((row) => [row.grantId, row]));
+  const expectedLinkIds = new Set(expected.shareLinks.map((link) => link.row.id));
+  for (const link of expected.shareLinks) {
+    const head = headById.get(link.row.id);
+    if (!head) {
+      outstanding.push(link.row.id);
+      continue;
+    }
+    const result = resourceDiffs({ organizationId, link, head });
+    outstanding.push(...result.outstanding);
+    diffs.push(...result.diffs);
+  }
+  for (const row of heads.resourceRows) {
+    // Only rows the migration owns: a live-write row (a ledger-first share
+    // whose compat write was stepped over) is not this migration's to hold
+    // an organization on, and never its to revoke.
+    if (isMigrationOwnedSource(row.source) && !expectedLinkIds.has(row.grantId)) {
+      outstanding.push(row.grantId);
+    }
+  }
+  return { outstanding, diffs };
+}
+
+/**
+ * What a pass has to state: the facts the heads do not already carry. Every skip is the
+ * check's own predicate read backwards — a fact the check would call converged is one the
+ * ledger already holds — so what a pass skips can never change what it reports.
+ */
+function unstated({
+  organizationId,
+  expected,
+  heads,
+}: {
+  organizationId: string;
+  expected: ExpectedFacts;
+  heads: HeadState;
+}): { roles: RoleFact[]; grants: GrantFact[] } {
+  const roleHeadById = new Map(heads.roleHeads.map((head) => [head.id, head]));
+  const roles = expected.roles.filter((role) => {
+    const head = roleHeadById.get(role.roleId);
+    return !head || roleDrifted({ role, head });
+  });
+
+  const grantHeadById = new Map(heads.grantRows.map((row) => [row.id, row]));
+  const grants = expected.nonResourceFacts.filter((fact) => {
+    const head = grantHeadById.get(fact.grantId);
+    if (!head) return true;
+    return head.revoked || grantDiffs({ fact, head }).length > 0;
+  });
+
+  const resourceHeadById = new Map(heads.resourceRows.map((row) => [row.grantId, row]));
+  const shareLinks = expected.shareLinks.filter((link) => {
+    const head = resourceHeadById.get(link.row.id);
+    if (!head) return true;
+    return resourceDiffs({ organizationId, link, head }).diffs.length > 0;
+  });
+
+  return { roles, grants: [...grants, ...shareLinks.map((link) => link.fact)] };
+}
+
+function roleDrifted({ role, head }: { role: RoleFact; head: RoleHeadRow }): boolean {
+  return (
+    head.name !== role.name ||
+    (head.description ?? null) !== (role.description ?? null) ||
+    permissionStrings(head.permissions).join(",") !== role.permissions.join(",") ||
+    (head.kind === "system_api_key" ? "system_api_key" : "custom") !== role.kind
+  );
+}
+
+/** Field equality for one stated fact against its head row — against what
+ *  the migration SAID, since that is what the head is supposed to hold. */
+function grantDiffs({ fact, head }: { fact: GrantFact; head: GrantHeadRow }): AuthzEngineDiff[] {
+  const compared: [string, string | null, string | null][] = [
+    ["principalType", PRINCIPAL_TO_DB[fact.principal.type], head.principalType],
+    ["principalId", fact.principal.id, head.principalId],
+    ["roleKey", fact.roleKey, head.roleKey],
+    ["legacyRole", fact.legacyRole ?? null, head.legacyRole],
+    ["scopeType", fact.scope.type, head.scopeType],
+    ["scopeId", fact.scope.id, head.scopeId],
+  ];
+  return compared.flatMap(([field, expected, actual]) =>
+    expected === actual
+      ? []
+      : [
+          {
+            kind: "grant_changed" as const,
+            id: fact.grantId,
+            field,
+            expected,
+            actual,
+          },
+        ],
+  );
+}
+
+function roleDiffs({ role, head }: { role: RoleFact; head: RoleHeadRow }): AuthzEngineDiff[] {
+  const compared: [string, string | null, string | null][] = [
+    ["name", role.name, head.name],
+    ["description", role.description ?? null, head.description],
+    ["permissions", role.permissions.join(","), permissionStrings(head.permissions).join(",")],
+    ["kind", role.kind, head.kind === "system_api_key" ? "system_api_key" : "custom"],
+  ];
+  return compared.flatMap(([field, expected, actual]) =>
+    expected === actual
+      ? []
+      : [
+          {
+            kind: "role_changed" as const,
+            id: role.roleId,
+            field,
+            expected,
+            actual,
+          },
+        ],
+  );
+}
+
+/**
+ * Field equality for one imported link against its RESOURCE head row, and the id when its
+ * head lags. The stored spellings differ (the head keeps the database's uppercase), so the
+ * comparison is against what the import said, mapped to that spelling.
+ */
+function resourceDiffs({
+  organizationId,
+  link,
+  head,
+}: {
+  organizationId: string;
+  link: ExpectedShareLink;
+  head: ResourceGrantRow;
+}): CheckResult {
+  const { row } = link;
+  const principal = AuthzGrantMapper.shareVisibilityAudience({
+    visibility: row.visibility,
     organizationId,
-    expected,
-    heads,
-  }: {
-    organizationId: string;
-    expected: ExpectedFacts;
-    heads: HeadState;
-  }): CheckResult {
-    const outstanding: string[] = [];
-    const diffs: AuthzEngineDiff[] = [];
-    const headById = new Map(heads.resourceRows.map((row) => [row.grantId, row]));
-    const expectedLinkIds = new Set(expected.shareLinks.map((link) => link.row.id));
-    for (const link of expected.shareLinks) {
-      const head = headById.get(link.row.id);
-      if (!head) {
-        outstanding.push(link.row.id);
-        continue;
-      }
-      const result = this.resourceDiffs({ organizationId, link, head });
-      outstanding.push(...result.outstanding);
-      diffs.push(...result.diffs);
-    }
-    for (const row of heads.resourceRows) {
-      // Only rows the migration owns: a live-write row (a ledger-first share
-      // whose compat write was stepped over) is not this migration's to hold
-      // an organization on, and never its to revoke.
-      if (AuthzMigrationOwnershipMapper.includes(row.source) && !expectedLinkIds.has(row.grantId)) {
-        outstanding.push(row.grantId);
-      }
-    }
-    return { outstanding, diffs };
+    projectId: row.projectId,
+  });
+  const compared: [string, string | null, string | null][] = [
+    ["token", tokenFingerprint(row.token), tokenFingerprint(head.token)],
+    ["kind", row.resourceType, (head.resourceKind ?? "").toUpperCase() || null],
+    ["resourceId", row.resourceId, head.resourceId],
+    ["projectId", row.projectId, head.projectId],
+    ["principalType", PRINCIPAL_TO_DB[principal.type], head.principalType],
+    ["principalId", principal.id, head.principalId],
+    ["expiresAt", numberField(row.expiresAtMs), numberField(head.expiresAtMs)],
+    ["maxViews", numberField(row.maxViews), numberField(head.maxViews)],
+  ];
+  if (head.viewCount > row.viewCount) {
+    compared.push(["viewCount", numberField(row.viewCount), numberField(head.viewCount)]);
   }
-
-  /**
-   * What a pass has to state: the facts the heads do not already carry. Every skip is the
-   * check's own predicate read backwards — a fact the check would call converged is one the
-   * ledger already holds — so what a pass skips can never change what it reports.
-   */
-  static unstated({
-    organizationId,
-    expected,
-    heads,
-  }: {
-    organizationId: string;
-    expected: ExpectedFacts;
-    heads: HeadState;
-  }): { roles: RoleFact[]; grants: GrantFact[] } {
-    const roleHeadById = new Map(heads.roleHeads.map((head) => [head.id, head]));
-    const roles = expected.roles.filter((role) => {
-      const head = roleHeadById.get(role.roleId);
-      return !head || this.roleDrifted({ role, head });
-    });
-
-    const grantHeadById = new Map(heads.grantRows.map((row) => [row.id, row]));
-    const grants = expected.nonResourceFacts.filter((fact) => {
-      const head = grantHeadById.get(fact.grantId);
-      if (!head) return true;
-      return head.revoked || this.grantDiffs({ fact, head }).length > 0;
-    });
-
-    const resourceHeadById = new Map(heads.resourceRows.map((row) => [row.grantId, row]));
-    const shareLinks = expected.shareLinks.filter((link) => {
-      const head = resourceHeadById.get(link.row.id);
-      if (!head) return true;
-      return this.resourceDiffs({ organizationId, link, head }).diffs.length > 0;
-    });
-
-    return { roles, grants: [...grants, ...shareLinks.map((link) => link.fact)] };
-  }
-
-  static roleDrifted({ role, head }: { role: RoleFact; head: RoleHeadRow }): boolean {
-    return (
-      head.name !== role.name ||
-      (head.description ?? null) !== (role.description ?? null) ||
-      AuthzExpectedFactsMapper.permissionStrings(head.permissions).join(",") !==
-        role.permissions.join(",") ||
-      (head.kind === "system_api_key" ? "system_api_key" : "custom") !== role.kind
-    );
-  }
-
-  /** Field equality for one stated fact against its head row — against what
-   *  the migration SAID, since that is what the head is supposed to hold. */
-  private static grantDiffs({
-    fact,
-    head,
-  }: {
-    fact: GrantFact;
-    head: GrantHeadRow;
-  }): AuthzEngineDiff[] {
-    const compared: [string, string | null, string | null][] = [
-      ["principalType", PRINCIPAL_TO_DB[fact.principal.type], head.principalType],
-      ["principalId", fact.principal.id, head.principalId],
-      ["roleKey", fact.roleKey, head.roleKey],
-      ["legacyRole", fact.legacyRole ?? null, head.legacyRole],
-      ["scopeType", fact.scope.type, head.scopeType],
-      ["scopeId", fact.scope.id, head.scopeId],
-    ];
-    return compared.flatMap(([field, expected, actual]) =>
+  return {
+    outstanding: head.viewCount < row.viewCount ? [row.id] : [],
+    diffs: compared.flatMap(([field, expected, actual]) =>
       expected === actual
         ? []
         : [
             {
-              kind: "grant_changed" as const,
-              id: fact.grantId,
+              kind: "resource_changed" as const,
+              id: row.id,
               field,
               expected,
               actual,
             },
           ],
-    );
-  }
+    ),
+  };
+}
 
-  private static roleDiffs({
-    role,
-    head,
-  }: {
-    role: RoleFact;
-    head: RoleHeadRow;
-  }): AuthzEngineDiff[] {
-    const compared: [string, string | null, string | null][] = [
-      ["name", role.name, head.name],
-      ["description", role.description ?? null, head.description],
-      [
-        "permissions",
-        role.permissions.join(","),
-        AuthzExpectedFactsMapper.permissionStrings(head.permissions).join(","),
-      ],
-      ["kind", role.kind, head.kind === "system_api_key" ? "system_api_key" : "custom"],
-    ];
-    return compared.flatMap(([field, expected, actual]) =>
-      expected === actual
-        ? []
-        : [
-            {
-              kind: "role_changed" as const,
-              id: role.roleId,
-              field,
-              expected,
-              actual,
-            },
-          ],
-    );
-  }
+function tokenFingerprint(token: string | null): string | null {
+  if (token === null) return null;
+  return createHash("sha256").update(token).digest("hex").slice(0, 12);
+}
 
-  /**
-   * Field equality for one imported link against its RESOURCE head row, and the id when its
-   * head lags. The stored spellings differ (the head keeps the database's uppercase), so the
-   * comparison is against what the import said, mapped to that spelling.
-   */
-  private static resourceDiffs({
-    organizationId,
-    link,
-    head,
-  }: {
-    organizationId: string;
-    link: ExpectedShareLink;
-    head: ResourceGrantRow;
-  }): CheckResult {
-    const { row } = link;
-    const principal = AuthzGrantMapper.shareVisibilityAudience({
-      visibility: row.visibility,
-      organizationId,
-      projectId: row.projectId,
-    });
-    const compared: [string, string | null, string | null][] = [
-      ["token", this.tokenFingerprint(row.token), this.tokenFingerprint(head.token)],
-      ["kind", row.resourceType, (head.resourceKind ?? "").toUpperCase() || null],
-      ["resourceId", row.resourceId, head.resourceId],
-      ["projectId", row.projectId, head.projectId],
-      ["principalType", PRINCIPAL_TO_DB[principal.type], head.principalType],
-      ["principalId", principal.id, head.principalId],
-      ["expiresAt", this.numberField(row.expiresAtMs), this.numberField(head.expiresAtMs)],
-      ["maxViews", this.numberField(row.maxViews), this.numberField(head.maxViews)],
-    ];
-    if (head.viewCount > row.viewCount) {
-      compared.push([
-        "viewCount",
-        this.numberField(row.viewCount),
-        this.numberField(head.viewCount),
-      ]);
-    }
-    return {
-      outstanding: head.viewCount < row.viewCount ? [row.id] : [],
-      diffs: compared.flatMap(([field, expected, actual]) =>
-        expected === actual
-          ? []
-          : [
-              {
-                kind: "resource_changed" as const,
-                id: row.id,
-                field,
-                expected,
-                actual,
-              },
-            ],
-      ),
-    };
-  }
-
-  private static tokenFingerprint(token: string | null): string | null {
-    if (token === null) return null;
-    return createHash("sha256").update(token).digest("hex").slice(0, 12);
-  }
-
-  private static numberField(value: number | null): string | null {
-    return value === null ? null : String(value);
-  }
+function numberField(value: number | null): string | null {
+  return value === null ? null : String(value);
 }

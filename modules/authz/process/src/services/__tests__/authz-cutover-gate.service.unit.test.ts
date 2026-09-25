@@ -1,3 +1,4 @@
+import { fromDate } from "@langwatch/time";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../migrations/legacy-import.authz-grant.migration.ts";
@@ -100,7 +101,9 @@ describe("AuthzCutoverGateService", () => {
       reporter: new RecordingReporter(),
     });
 
-    await expect(adapter.findFinalizedAt({ organizationId: ORG_ID })).resolves.toEqual(occurredAt);
+    await expect(adapter.findFinalizedAt({ organizationId: ORG_ID })).resolves.toEqual(
+      fromDate(occurredAt),
+    );
     await expect(adapter.findFinalizedAt({ organizationId: ORG_ID })).resolves.toBeNull();
   });
 

@@ -140,7 +140,7 @@ export class GatewayBudgetNotFoundError extends HandledError {
   }
 }
 
-/** A voice provider has no usable API key stored; the same code the scenario voice session refuses with. */
+/** A voice provider has no usable API key stored; the scenario voice session refuses with it too. */
 export class GatewayVoiceKeyMissingError extends HandledError {
   declare readonly code: "voice_key_missing";
 

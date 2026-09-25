@@ -60,13 +60,17 @@ const configSchema: z.ZodType<Prisma.JsonObject> = z
     ),
   );
 
+const workflowConfigSchema = z.record(z.string(), z.unknown());
+
+const agentReferenceStatesSchema = agentReferenceStateSchema.array();
+
 export class PrismaAgentRepository
   extends PrismaRepository.for("Agent")
   implements AgentRepository
 {
   static readonly create = this.factory((prisma) => new PrismaAgentRepository(prisma));
 
-  async listWorkflowConfigs(input: AgentWorkflowInput): Promise<AgentWorkflowConfig[]> {
+  async findWorkflowConfigs(input: AgentWorkflowInput): Promise<AgentWorkflowConfig[]> {
     const agents = await this.prisma.agent.findMany({
       where: { projectId: input.projectId, workflowId: input.workflowId, archivedAt: null },
       select: { id: true, config: true },
@@ -74,7 +78,7 @@ export class PrismaAgentRepository
 
     return agents.map(({ id, config }) => ({
       id,
-      config: z.record(z.string(), z.unknown()).safeParse(config).data ?? {},
+      config: workflowConfigSchema.safeParse(config).data ?? {},
     }));
   }
 
@@ -150,7 +154,7 @@ export class PrismaAgentRepository
       },
     });
 
-    return agentReferenceStateSchema.array().parse(rows);
+    return agentReferenceStatesSchema.parse(rows);
   }
 
   findNamesByIds(input: AgentIdsInput): Promise<AgentName[]> {
@@ -168,7 +172,7 @@ export class PrismaAgentRepository
     );
   }
 
-  async findPage(input: ListAgentsInput): Promise<{ data: Agent[]; total: number }> {
+  async listPage(input: ListAgentsInput): Promise<{ data: Agent[]; total: number }> {
     const where = {
       projectId: input.projectId,
       archivedAt: null,

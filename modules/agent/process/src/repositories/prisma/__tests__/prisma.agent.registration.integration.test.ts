@@ -199,7 +199,7 @@ describe.skipIf(!databaseUrl)("Prisma Agent registration", () => {
       data: { lastSeenAt: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000) },
     });
     const agents = await repository.findAll({ projectId });
-    const page = await repository.findPage({ projectId, page: 1, limit: 20 });
+    const page = await repository.listPage({ projectId, page: 1, limit: 20 });
 
     expect(agents.map((agent) => agent.id)).toContain(fresh.id);
     expect(agents.map((agent) => agent.id)).not.toContain(stale.id);
@@ -250,10 +250,10 @@ describe.skipIf(!databaseUrl)("Prisma Agent registration", () => {
 
     const scope = { projectId, workflowId };
     const requestScope = { ...scope, actorId: "extra" };
-    expect(await repository.listWorkflowConfigs(requestScope)).toEqual([{ id, config }]);
+    expect(await repository.findWorkflowConfigs(requestScope)).toEqual([{ id, config }]);
     const updated = { ...config, scenarioOutputField: "answer" };
     await repository.updateWorkflowConfig({ ...scope, id, config: updated });
-    expect(await repository.listWorkflowConfigs(scope)).toEqual([{ id, config: updated }]);
+    expect(await repository.findWorkflowConfigs(scope)).toEqual([{ id, config: updated }]);
     await expect(
       repository.updateWorkflowConfig({ ...scope, projectId: otherProjectId, id, config: {} }),
     ).rejects.toBeInstanceOf(AgentNotFoundError);

@@ -77,7 +77,7 @@ export {
 export {
   ProcessRetentionMetrics,
   type RetentionFamily,
-} from "./maintenance/retention-metrics.port.ts";
+} from "./maintenance/retention-metrics.channel.ts";
 export {
   OtelProcessRetentionMetricsAdapter,
   PROCESS_RETENTION_FAILURES_METRIC_NAME,

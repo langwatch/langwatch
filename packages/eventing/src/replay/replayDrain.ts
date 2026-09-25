@@ -1,7 +1,7 @@
 import { nowInstant } from "@langwatch/time";
 
-import type { ReplayRedis } from "./replay-redis.port.ts";
 import type { DiscoveredAggregate } from "./replayEventSource.ts";
+import type { ReplayRedis } from "./replayRedis.ts";
 import type { ProjectionKind } from "./types.ts";
 
 /**

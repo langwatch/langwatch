@@ -231,7 +231,7 @@ export class EventSourcing {
     return pipeline;
   }
 
-  /** The blob and process-manager sweeps this runtime was built with; none when it drains nothing. */
+  /** The blob and process-manager sweeps this runtime was built with; none if it drains nothing. */
   maintenancePipelines(): readonly StaticPipelineDefinition[] {
     return this._maintenance?.() ?? [];
   }

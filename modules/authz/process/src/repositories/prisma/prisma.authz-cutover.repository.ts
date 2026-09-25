@@ -1,4 +1,5 @@
 import type { MigrationTenantStatus } from "@langwatch/authz-contract";
+import { fromDate } from "@langwatch/time";
 
 import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../migrations/legacy-import.authz-grant.migration.ts";
 import { AuthzCutoverRepository, type AuthzCutoverRow } from "../authz-cutover.repository.ts";
@@ -44,7 +45,7 @@ export class PrismaAuthzCutoverRepository extends AuthzCutoverRepository {
     if (!record) return null;
     return {
       status: record.status as MigrationTenantStatus,
-      occurredAt: record.occurredAt ?? null,
+      occurredAt: record.occurredAt ? fromDate(record.occurredAt) : null,
     };
   }
 }

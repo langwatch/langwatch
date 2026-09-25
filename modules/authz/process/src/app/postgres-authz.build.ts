@@ -4,7 +4,6 @@ import {
 } from "@langwatch/authz-contract";
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import type { SystemMigration } from "@langwatch/system-migrations";
-import { fromDate } from "@langwatch/time";
 
 import { EventingAuthzAdapter } from "../eventing/authz-grant.pipeline.ts";
 import {
@@ -238,11 +237,7 @@ export class PostgresAuthzAdapter {
       bindings: bindingRepository,
       epoch,
       isOnEngine,
-      findEngineCutoverAt: async (organizationId) => {
-        const finalizedAt = await cutover.findFinalizedAt({ organizationId });
-
-        return finalizedAt === null ? null : fromDate(finalizedAt);
-      },
+      findEngineCutoverAt: (organizationId) => cutover.findFinalizedAt({ organizationId }),
     };
     if (this.options.cacheEnabled) {
       authzOptions.cacheEnabled = this.options.cacheEnabled;

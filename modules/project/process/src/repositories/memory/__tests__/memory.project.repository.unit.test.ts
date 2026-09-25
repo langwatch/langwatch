@@ -115,7 +115,7 @@ describe("MemoryProjectRepository", () => {
         await repository.findAllByTeam({ organizationId: ORGANIZATION_ID, teamId: TEAM_ID }),
       ).toEqual([]);
       expect(
-        await repository.findAllByOrganization({
+        await repository.listAllByOrganization({
           organizationId: ORGANIZATION_ID,
           page: 1,
           limit: 10,

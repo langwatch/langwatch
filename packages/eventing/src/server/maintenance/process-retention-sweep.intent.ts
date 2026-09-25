@@ -12,7 +12,7 @@ import {
   RETENTION_SWEEP_INITIAL_BATCHES_PER_WAKE,
   RETENTION_SWEEP_MAX_BATCHES_PER_WAKE,
 } from "./process-retention-sweep.process.ts";
-import type { ProcessRetentionMetrics, RetentionFamily } from "./retention-metrics.port.ts";
+import type { ProcessRetentionMetrics, RetentionFamily } from "./retention-metrics.channel.ts";
 
 const logger = createLogger("langwatch:process-manager:retention-sweep");
 

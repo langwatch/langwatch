@@ -22,7 +22,7 @@ describe("loginKeyExpiresAt", () => {
         refreshWindowMs,
       });
 
-      expect(result.getTime()).toBe(nowMs + refreshWindowMs);
+      expect(result.epochMilliseconds).toBe(nowMs + refreshWindowMs);
     });
   });
 
@@ -39,7 +39,7 @@ describe("loginKeyExpiresAt", () => {
         refreshWindowMs,
       });
 
-      expect(result.getTime()).toBe(nowMs + refreshWindowMs);
+      expect(result.epochMilliseconds).toBe(nowMs + refreshWindowMs);
     });
   });
 
@@ -58,7 +58,7 @@ describe("loginKeyExpiresAt", () => {
         refreshWindowMs,
       });
 
-      expect(result.getTime()).toBe(sessionStartedAtMs + maxSessionDurationDays * DAY_MS);
+      expect(result.epochMilliseconds).toBe(sessionStartedAtMs + maxSessionDurationDays * DAY_MS);
     });
   });
 
@@ -76,7 +76,7 @@ describe("loginKeyExpiresAt", () => {
         refreshWindowMs: 60_000,
       });
 
-      expect(result.getTime()).toBe(sessionStartedAtMs + maxSessionDurationDays * DAY_MS);
+      expect(result.epochMilliseconds).toBe(sessionStartedAtMs + maxSessionDurationDays * DAY_MS);
     });
   });
 });

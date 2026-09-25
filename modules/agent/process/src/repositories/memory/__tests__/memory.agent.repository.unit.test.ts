@@ -39,11 +39,11 @@ describe("MemoryAgentRepository", () => {
     await repository.archive(agent("archived"));
 
     const scope = { projectId: "project-a", workflowId: "workflow-a" };
-    expect(await repository.listWorkflowConfigs(scope)).toEqual([{ id: "a", config: {} }]);
+    expect(await repository.findWorkflowConfigs(scope)).toEqual([{ id: "a", config: {} }]);
     const config = { customMetadata: { value: "retained" }, scenarioOutputField: "answer" };
     await repository.updateWorkflowConfig({ ...scope, id: "a", config });
     config.customMetadata.value = "changed";
-    expect(await repository.listWorkflowConfigs(scope)).toEqual([
+    expect(await repository.findWorkflowConfigs(scope)).toEqual([
       { id: "a", config: { customMetadata: { value: "retained" }, scenarioOutputField: "answer" } },
     ]);
     await expect(
@@ -96,7 +96,7 @@ describe("MemoryAgentRepository", () => {
     ).rejects.toBeInstanceOf(AgentNotFoundError);
     expect(await repository.exists(foreign)).toBe(false);
     expect(await repository.findAll(foreign)).toEqual([]);
-    expect(await repository.findPage({ ...foreign, page: 1, limit: 10 })).toEqual({
+    expect(await repository.listPage({ ...foreign, page: 1, limit: 10 })).toEqual({
       data: [],
       total: 0,
     });
@@ -187,7 +187,7 @@ describe("MemoryAgentRepository", () => {
     expect(
       await repository.findConnectedByNameAndEnvironment({ ...input, environment: "production" }),
     ).toEqual([]);
-    expect((await repository.findPage({ ...input, page: 1, limit: 10 })).total).toBe(1);
+    expect((await repository.listPage({ ...input, page: 1, limit: 10 })).total).toBe(1);
     expect(await repository.getById(input)).toMatchObject({ id: "a" });
     await repository.touchLastSeenAt({ ...input, at: nowInstant() });
     expect(
@@ -204,8 +204,8 @@ describe("MemoryAgentRepository", () => {
     await repository.create(agent("a"));
     await repository.create(agent("b"));
     await repository.create(agent("foreign", "project-b"));
-    const first = await repository.findPage({ projectId: "project-a", page: 1, limit: 1 });
-    const second = await repository.findPage({ projectId: "project-a", page: 2, limit: 1 });
+    const first = await repository.listPage({ projectId: "project-a", page: 1, limit: 1 });
+    const second = await repository.listPage({ projectId: "project-a", page: 2, limit: 1 });
 
     expect(first.total).toBe(2);
     expect(second.total).toBe(2);

@@ -7,7 +7,7 @@ import { Temporal } from "@langwatch/time";
  */
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
-import { MIGRATION_OWNED_SOURCES } from "../../../migrations/legacy-import.authz-grant.migration.ts";
+import { MIGRATION_OWNED_SOURCES } from "../../../rules/authz-migration-ownership.rules.ts";
 import type { GrantProjectionWrite } from "../../authz-grant-projection.repository.ts";
 import { PrismaAuthzProjectionRepository } from "../prisma.authz-projection.repository.ts";
 

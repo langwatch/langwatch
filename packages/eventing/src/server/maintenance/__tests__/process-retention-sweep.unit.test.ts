@@ -16,7 +16,7 @@ import {
   RETENTION_SWEEP_MAX_BATCHES_PER_WAKE,
   retentionSweepBatchBudget,
 } from "../process-retention-sweep.process.ts";
-import { ProcessRetentionMetrics, type RetentionFamily } from "../retention-metrics.port.ts";
+import { ProcessRetentionMetrics, type RetentionFamily } from "../retention-metrics.channel.ts";
 
 /** Records what the sweep reported, family by family, as the counters do. */
 class RecordingRetentionMetrics extends ProcessRetentionMetrics {

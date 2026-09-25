@@ -14,7 +14,7 @@ import {
   isRegistryPermission,
   type AuthzPermission,
 } from "@langwatch/authz-contract";
-import { Temporal, fromDate, type Instant } from "@langwatch/time";
+import { Temporal, fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
 import type { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
@@ -196,7 +196,7 @@ export class ApiKeyCliService {
         role: "CUSTOM" as const,
       })),
       createdByDeviceLabel: input.deviceLabel,
-      ...(expiresAt === void 0 ? {} : { expiresAt }),
+      ...(expiresAt === void 0 ? {} : { expiresAt: toDate(expiresAt) }),
     });
     try {
       await this.revokeCliLoginKeysForDevice({
@@ -329,7 +329,7 @@ export class ApiKeyCliService {
     refreshWindowMs: number;
   }): Promise<void> {
     const expiresAt = loginKeyExpiresAt({
-      nowMs: Date.now(),
+      nowMs: nowInstant().epochMilliseconds,
       sessionStartedAtMs: input.sessionStartedAtMs,
       maxSessionDurationDays: input.maxSessionDurationDays,
       refreshWindowMs: input.refreshWindowMs,
@@ -338,7 +338,7 @@ export class ApiKeyCliService {
       id: input.apiKeyId,
       organizationId: input.organizationId,
       userId: input.userId,
-      expiresAt: fromDate(expiresAt),
+      expiresAt,
     });
   }
 

@@ -40,7 +40,7 @@ export type RegisterPersistedAgentInput = PersistAgentInput & { identity: Connec
 export type AgentPresenceInput = GetAgentInput & { at: Instant };
 
 export interface AgentRepository {
-  listWorkflowConfigs(input: AgentWorkflowInput): Promise<AgentWorkflowConfig[]>;
+  findWorkflowConfigs(input: AgentWorkflowInput): Promise<AgentWorkflowConfig[]>;
   updateWorkflowConfig(input: UpdateAgentWorkflowConfigInput): Promise<void>;
   getById(input: GetAgentInput): Promise<Agent>;
   getByIdOnly(id: string): Promise<Agent>;
@@ -49,7 +49,7 @@ export interface AgentRepository {
   findReferenceStates(input: AgentIdsInput): Promise<AgentReferenceState[]>;
   findNamesByIds(input: AgentIdsInput): Promise<AgentName[]>;
   exists(input: GetAgentInput): Promise<boolean>;
-  findPage(input: ListAgentsInput): Promise<{ data: Agent[]; total: number }>;
+  listPage(input: ListAgentsInput): Promise<{ data: Agent[]; total: number }>;
   create(input: PersistAgentInput): Promise<Agent>;
   update(input: UpdatePersistedAgentInput): Promise<Agent>;
   archive(input: GetAgentInput): Promise<Agent>;

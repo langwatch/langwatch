@@ -135,7 +135,7 @@ export class GatewayService {
 
   async listPageWithHealth(input: GatewayBudgetPageInput): Promise<BudgetPageWithHealth> {
     const tenantIds = await this.listSpendTenantIds(input.organizationId);
-    const result = await this.repository.listPageWithHealth({ ...input, tenantIds });
+    const result = await this.repository.findPageWithHealth({ ...input, tenantIds });
 
     return this.withScopeReach(result, input.organizationId);
   }

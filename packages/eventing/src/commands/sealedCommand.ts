@@ -8,7 +8,7 @@ import type { CommandSchema } from "./commandSchema.ts";
 /** Every command payload names its tenant; the dispatcher scopes the command by it. */
 export type TenantScopedPayload = { readonly tenantId: unknown };
 
-/** A handler class whose payload is read from its schema alone; its other members must accept it. */
+/** A handler class whose payload is read from its schema alone; its other members accept it. */
 export type SchemaTypedCommandClass<
   Payload extends TenantScopedPayload,
   Type extends CommandType,
@@ -19,7 +19,7 @@ export type SchemaTypedCommandClass<
   E
 >;
 
-/** A command as registered: its static half, a handler factory and options, typed by one payload. */
+/** A command as registered: static half, handler factory and options, typed by one payload. */
 export interface CommandRegistration<
   Payload extends TenantScopedPayload,
   Type extends CommandType,

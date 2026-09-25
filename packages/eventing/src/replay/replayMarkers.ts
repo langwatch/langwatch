@@ -1,4 +1,3 @@
-import type { ReplayRedis } from "./replay-redis.port.ts";
 import {
   COMPLETED_KEY_PREFIX,
   CUTOFF_KEY_PREFIX,
@@ -7,6 +6,7 @@ import {
   MARKER_TTL_SECONDS,
 } from "./replayConstants.ts";
 import type { ReplayLogWriter } from "./replayLog.ts";
+import type { ReplayRedis } from "./replayRedis.ts";
 
 /** Throw if any command in a pipeline result has an error. */
 function checkPipelineErrors(

@@ -2,8 +2,6 @@ import type { SealedCommand } from "../commands/sealedCommand.ts";
 import type { AggregateType } from "../domain/aggregateType.ts";
 import type { Event, Projection } from "../domain/types.ts";
 import type { KillSwitch } from "../kill-switch/index.ts";
-import type { FoldProjectionDefinition } from "../projections/foldProjection.types.ts";
-import type { MapProjectionDefinition } from "../projections/mapProjection.types.ts";
 import type { ProjectionRegistry } from "../projections/projectionRegistry.ts";
 import type { ReplayMarkerChecker } from "../projections/replayMarkerCheck.ts";
 import type {
@@ -11,7 +9,6 @@ import type {
   SealedMapProjection,
   SealedStateProjection,
 } from "../projections/sealedProjection.ts";
-import type { StateProjectionDefinition } from "../projections/stateProjection.types.ts";
 import type { EventSourcedQueueProcessor } from "../queues/index.ts";
 import type { ExecutionTarget, RetentionPolicyResolver } from "../runtime.types.ts";
 import type { EventSourcingService } from "../services/eventSourcingService.ts";

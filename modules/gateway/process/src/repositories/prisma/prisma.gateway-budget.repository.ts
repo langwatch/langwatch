@@ -617,7 +617,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
    * scope-type filter is pushed into the query, not applied after the page —
    * that would make limit mean "rows examined", silently shorting a caller.
    */
-  async listPageWithHealth(
+  async findPageWithHealth(
     args: GatewayBudgetPageInput & GatewayOrganizationBudgetReadInput,
   ): Promise<BudgetPageWithHealth> {
     const filter = {

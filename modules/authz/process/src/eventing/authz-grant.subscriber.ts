@@ -74,60 +74,58 @@ class UnmappedAuthzAuditEventError extends Error {
   }
 }
 
-class AuthzAuditRowMapper {
-  static isAuditable(event: AuthzGrantsEvent): boolean {
-    const { source, actor } = this.guardFields(event);
-    if (source !== undefined && (NON_AUDITABLE_SOURCES as readonly string[]).includes(source)) {
-      return false;
-    }
-    if (actor?.type === "system" && actor.id !== null && NON_AUDITABLE_ACTOR_IDS.has(actor.id)) {
-      return false;
-    }
-    return true;
+function isAuditable(event: AuthzGrantsEvent): boolean {
+  const { source, actor } = guardFields(event);
+  if (source !== undefined && (NON_AUDITABLE_SOURCES as readonly string[]).includes(source)) {
+    return false;
   }
-
-  static rowId(eventId: string): string {
-    return `authz-evt-${eventId}`;
+  if (actor?.type === "system" && actor.id !== null && NON_AUDITABLE_ACTOR_IDS.has(actor.id)) {
+    return false;
   }
+  return true;
+}
 
-  static toRow(event: AuthzGrantsEvent): AuthzAuditRow {
-    const { actor } = this.guardFields(event);
-    const verb = AUDIT_VERB_BY_EVENT_TYPE[event.type];
-    if (verb === undefined) {
-      logger.error(
-        { eventType: event.type, eventId: event.id },
-        "the authz audit trail has no verb for an event it subscribes to; no row was written",
-      );
-      throw new UnmappedAuthzAuditEventError(event.type);
-    }
-    return {
-      id: this.rowId(event.id),
-      createdAt: Temporal.Instant.fromEpochMilliseconds(event.occurredAt),
-      userId: actor?.type === "user" ? actor.id : null,
-      organizationId: event.tenantId,
-      action: `${AUTHZ_AUDIT_ACTION_PREFIX}${verb}`,
-      metadata: this.metadata(event),
-    };
+function rowId(eventId: string): string {
+  return `authz-evt-${eventId}`;
+}
+
+function toRow(event: AuthzGrantsEvent): AuthzAuditRow {
+  const { actor } = guardFields(event);
+  const verb = AUDIT_VERB_BY_EVENT_TYPE[event.type];
+  if (verb === undefined) {
+    logger.error(
+      { eventType: event.type, eventId: event.id },
+      "the authz audit trail has no verb for an event it subscribes to; no row was written",
+    );
+    throw new UnmappedAuthzAuditEventError(event.type);
   }
+  return {
+    id: rowId(event.id),
+    createdAt: Temporal.Instant.fromEpochMilliseconds(event.occurredAt),
+    userId: actor?.type === "user" ? actor.id : null,
+    organizationId: event.tenantId,
+    action: `${AUTHZ_AUDIT_ACTION_PREFIX}${verb}`,
+    metadata: metadata(event),
+  };
+}
 
-  private static guardFields(event: AuthzGrantsEvent): {
+function guardFields(event: AuthzGrantsEvent): {
+  source?: string;
+  actor?: { type: string; id: string | null };
+} {
+  return event.data as {
     source?: string;
     actor?: { type: string; id: string | null };
-  } {
-    return event.data as {
-      source?: string;
-      actor?: { type: string; id: string | null };
-    };
-  }
+  };
+}
 
-  private static metadata(event: AuthzGrantsEvent): Record<string, unknown> {
-    const data = event.data as Record<string, unknown>;
-    const metadata: Record<string, unknown> = {};
-    for (const field of AUDIT_METADATA_FIELDS[event.type] ?? []) {
-      if (data[field] !== undefined) metadata[field] = data[field];
-    }
-    return metadata;
+function metadata(event: AuthzGrantsEvent): Record<string, unknown> {
+  const data = event.data as Record<string, unknown>;
+  const metadata: Record<string, unknown> = {};
+  for (const field of AUDIT_METADATA_FIELDS[event.type] ?? []) {
+    if (data[field] !== undefined) metadata[field] = data[field];
   }
+  return metadata;
 }
 
 export interface EventingAuthzAuditAdapterOptions {
@@ -145,11 +143,11 @@ export class EventingAuthzAuditAdapter {
   }
 
   when(event: AuthzGrantsEvent): boolean {
-    return AuthzAuditRowMapper.isAuditable(event);
+    return isAuditable(event);
   }
 
   async handler(event: AuthzGrantsEvent, _context?: TriggerContext<unknown>): Promise<void> {
-    if (!AuthzAuditRowMapper.isAuditable(event)) return;
-    await this.store.insert(AuthzAuditRowMapper.toRow(event));
+    if (!isAuditable(event)) return;
+    await this.store.insert(toRow(event));
   }
 }

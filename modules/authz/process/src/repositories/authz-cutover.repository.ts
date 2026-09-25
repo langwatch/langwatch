@@ -1,8 +1,9 @@
 import type { MigrationTenantStatus } from "@langwatch/authz-contract";
+import type { Instant } from "@langwatch/time";
 
 export type AuthzCutoverRow = Readonly<{
   status: MigrationTenantStatus;
-  occurredAt: Date | null;
+  occurredAt: Instant | null;
 }>;
 
 /**

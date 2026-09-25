@@ -4,6 +4,7 @@
  * backend the package can reach. The memory tier always runs; Postgres
  * joins as a second row when this package declares that datastore.
  */
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import type { AuthzRepositories } from "../authz.repositories.ts";
@@ -73,7 +74,7 @@ describe.each(backends)("given the $name authz backend", (backend) => {
   describe("when a finalized cutover has been written", () => {
     it("reads the status and the business time back", async () => {
       const repositories = backend.create();
-      const occurredAt = new Date("2026-08-18T09:00:00.000Z");
+      const occurredAt = Temporal.Instant.from("2026-08-18T09:00:00.000Z");
       repositories.store.cutovers.set(ORGANIZATION_ID, {
         organizationId: ORGANIZATION_ID,
         status: "finalized",

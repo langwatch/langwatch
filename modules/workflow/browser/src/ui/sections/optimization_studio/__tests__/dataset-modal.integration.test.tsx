@@ -173,7 +173,7 @@ describe("Workflow dataset dialog", () => {
       await user.click(screen.getByTestId("dataset-card-turn 10"));
 
       const entry = getEntryNode();
-      expect((entry?.data as Entry).dataset).toEqual({
+      expect((entry?.data as Entry | undefined)?.dataset).toEqual({
         id: "ds-1",
         name: "turn 10",
       });
@@ -213,7 +213,7 @@ describe("Workflow dataset dialog", () => {
       await user.click(screen.getByTestId("new-draft-dataset"));
 
       const entry = getEntryNode();
-      const dataset = (entry?.data as Entry).dataset;
+      const dataset = (entry?.data as Entry | undefined)?.dataset;
       expect(dataset?.name).toBe("Draft Dataset");
       expect(dataset?.inline?.columnTypes.map((c) => c.name)).toEqual(["input", "expected_output"]);
     });
@@ -240,7 +240,7 @@ describe("Workflow dataset dialog", () => {
 
       expect(await screen.findByTestId("dataset-editor-table")).toBeInTheDocument();
       const entry = getEntryNode();
-      expect((entry?.data as Entry).dataset?.name).toBe("Draft Dataset");
+      expect((entry?.data as Entry | undefined)?.dataset?.name).toBe("Draft Dataset");
     });
   });
 
@@ -280,7 +280,9 @@ describe("Workflow dataset dialog", () => {
       // The change landed in the workflow DSL, not in any database
       await waitFor(() => {
         const entry = getEntryNode();
-        expect((entry?.data as Entry).dataset?.inline?.records.input?.[0]).toBe("bonjour");
+        expect((entry?.data as Entry | undefined)?.dataset?.inline?.records.input?.[0]).toBe(
+          "bonjour",
+        );
       });
 
       // Promotion to a real dataset is offered

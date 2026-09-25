@@ -193,8 +193,4 @@ describe("createCommand", () => {
       expect(command.metadata).toBeNull();
     });
   });
-
-  describe("when working with different command types", () => {
-    it.todo("preserves different command types correctly");
-  });
 });

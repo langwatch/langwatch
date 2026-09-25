@@ -3,21 +3,14 @@ import type { AggregateDefinition } from "../domain/definitions.ts";
 import type { PipelineEventSchema } from "../domain/eventSchemas.ts";
 import type { Event, Projection } from "../domain/types.ts";
 import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys.ts";
-import type {
-  FoldProjectionDefinition,
-  FoldProjectionOptions,
-} from "../projections/foldProjection.types.ts";
-import type {
-  MapProjectionDefinition,
-  MapProjectionOptions,
-} from "../projections/mapProjection.types.ts";
+import type { FoldProjectionOptions } from "../projections/foldProjection.types.ts";
+import type { MapProjectionOptions } from "../projections/mapProjection.types.ts";
 import type { ProjectionRegistry } from "../projections/projectionRegistry.ts";
 import type {
   SealedFoldProjection,
   SealedMapProjection,
   SealedStateProjection,
 } from "../projections/sealedProjection.ts";
-import type { StateProjectionDefinition } from "../projections/stateProjection.types.ts";
 import type { DeduplicationStrategy } from "../queues/queue.types.ts";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
 import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types.ts";

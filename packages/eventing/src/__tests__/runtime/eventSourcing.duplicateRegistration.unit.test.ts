@@ -74,7 +74,7 @@ describe("given a pipeline name already registered on this runtime", () => {
 
       expect(() =>
         eventSourcing.register(definePipelineOverOneName({ withSubscriber: false })),
-      ).toThrow();
+      ).toThrow('Pipeline "trace_processing"');
 
       expect(eventSourcing.definitions).toHaveLength(1);
       expect(eventSourcing.getPipeline("trace_processing")).toBe(first);

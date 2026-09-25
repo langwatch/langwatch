@@ -1,7 +1,7 @@
 import { Box, Field, HStack, Spacer, type SystemStyleObject, VStack } from "@chakra-ui/react";
 import type { PropsWithChildren, ReactNode } from "react";
 import { Info } from "react-feather";
-import type { FieldErrors } from "react-hook-form";
+import type { FieldErrors, FieldValues } from "react-hook-form";
 
 import { FormErrorDisplay } from "./form-error-display.tsx";
 import { Tooltip } from "./tooltip.tsx";
@@ -14,7 +14,7 @@ export interface HorizontalFormControlProps extends SystemStyleObject {
   inputWidth?: string;
   direction?: "horizontal" | "vertical";
   size?: "sm" | "md";
-  error?: FieldErrors<any>[0] | ReactNode;
+  error?: FieldErrors<FieldValues>[0] | ReactNode;
   align?: "start" | "end";
   labelProps?: SystemStyleObject;
 }

@@ -225,7 +225,9 @@ describe("the ClickHouse tenant-scope guard", () => {
         logger: undefined,
       });
 
-      await expect(guarded.query({ query: "SELECT 1 FROM trace_summaries" })).rejects.toThrow();
+      await expect(guarded.query({ query: "SELECT 1 FROM trace_summaries" })).rejects.toThrow(
+        /not tenant-scoped/,
+      );
     });
   });
 });

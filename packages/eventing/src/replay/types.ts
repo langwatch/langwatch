@@ -3,8 +3,8 @@ import type { FoldProjectionDefinition } from "../projections/foldProjection.typ
 import type { MapProjectionDefinition } from "../projections/mapProjection.types.ts";
 import type { StateProjectionDefinition } from "../projections/stateProjection.types.ts";
 import type { RetentionPolicyResolver } from "../runtime.types.ts";
-import type { ReplayRedis } from "./replay-redis.port.ts";
 import type { DiscoveredAggregate, ReplayEventSource } from "./replayEventSource.ts";
+import type { ReplayRedis } from "./replayRedis.ts";
 
 export interface RegisteredFoldProjection {
   projectionName: string;

@@ -41,7 +41,7 @@ export class AgentService {
   }
 
   listWorkflowConfigs(input: AgentWorkflowInput): Promise<AgentWorkflowConfig[]> {
-    return this.#repository.listWorkflowConfigs(input);
+    return this.#repository.findWorkflowConfigs(input);
   }
 
   updateWorkflowConfig(input: UpdateAgentWorkflowConfigInput): Promise<void> {
@@ -65,7 +65,7 @@ export class AgentService {
   }
 
   async list(input: ListAgentsInput): Promise<AgentPage> {
-    const { data, total } = await this.#repository.findPage(input);
+    const { data, total } = await this.#repository.listPage(input);
 
     return {
       data,

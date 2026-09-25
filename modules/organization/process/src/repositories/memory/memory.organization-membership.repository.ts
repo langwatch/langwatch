@@ -375,11 +375,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       .map((row) => toUser(this.userRow(row.userId)));
   }
 
-  async findMembersWithDepartments({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<
+  async findMembersWithDepartments({ organizationId }: { organizationId: string }): Promise<
     {
       userId: string;
       departmentId: string | null;
@@ -436,7 +432,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     userIds: readonly string[];
     dayUtc: string;
   }): Promise<{ userId: string; departmentId: string }[]> {
-    const endOfDay = Date.parse(`${input.dayUtc}T23:59:59.999Z`);
+    const endOfDay = Temporal.Instant.from(`${input.dayUtc}T23:59:59.999Z`).epochMilliseconds;
     return this.#links(input)
       .filter(
         (link) =>

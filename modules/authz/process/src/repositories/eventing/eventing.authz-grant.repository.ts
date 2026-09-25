@@ -37,28 +37,25 @@ import { EventingAuthzReadRepository } from "./eventing.authz-read.repository.ts
  * Restore the port's two typed failures (DuplicateBindingError,
  * BindingMissingError) from any ledger write path; everything else passes.
  */
-class AuthzGrantFailureMapper {
-  /** Run a write, and let only the port's own vocabulary out of it. */
-  static async run<T>(write: () => Promise<T>): Promise<T> {
-    try {
-      return await write();
-    } catch (error) {
-      this.rethrow(error);
-    }
+async function runLedgerWrite<T>(write: () => Promise<T>): Promise<T> {
+  try {
+    return await write();
+  } catch (error) {
+    rethrowLedgerFailure(error);
   }
+}
 
-  private static rethrow(error: unknown): never {
-    if (error instanceof DuplicateBindingError || error instanceof BindingMissingError) {
-      throw error;
-    }
-    if (AuthzLedgerMapper.isUniqueViolation(error)) {
-      throw new DuplicateBindingError();
-    }
-    if (AuthzLedgerMapper.isRecordNotFound(error)) {
-      throw new BindingMissingError();
-    }
+function rethrowLedgerFailure(error: unknown): never {
+  if (error instanceof DuplicateBindingError || error instanceof BindingMissingError) {
     throw error;
   }
+  if (AuthzLedgerMapper.isUniqueViolation(error)) {
+    throw new DuplicateBindingError();
+  }
+  if (AuthzLedgerMapper.isRecordNotFound(error)) {
+    throw new BindingMissingError();
+  }
+  throw error;
 }
 
 /**
@@ -188,7 +185,7 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
     source?: GrantEventSource;
   }): Promise<void> {
     const { organizationId, ...binding } = row;
-    await AuthzGrantFailureMapper.run(() =>
+    await runLedgerWrite(() =>
       this.options.writer.attachBindings({
         organizationId,
         bindings: [binding],
@@ -218,7 +215,7 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
     customRoleId: string | null;
     actor: LedgerActor;
   }): Promise<void> {
-    await AuthzGrantFailureMapper.run(() =>
+    await runLedgerWrite(() =>
       this.options.writer.changeBindingRole({
         organizationId,
         bindingId,
@@ -244,7 +241,7 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
     // as missing, so the existence check stays explicit.
     const existing = await this.findBinding({ bindingId });
     if (existing?.organizationId !== organizationId) throw new BindingMissingError();
-    await AuthzGrantFailureMapper.run(() =>
+    await runLedgerWrite(() =>
       this.options.writer.revokeBindings({
         organizationId,
         bindingIds: [bindingId],
@@ -286,7 +283,7 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
     });
     if (existing === null || existing === undefined) throw new BindingMissingError();
 
-    await AuthzGrantFailureMapper.run(() =>
+    await runLedgerWrite(() =>
       this.options.writer.revokeBindingsWhere({
         organizationId: deleteWhere.organizationId,
         where: {
@@ -299,7 +296,7 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
       }),
     );
     const { organizationId, ...binding } = create;
-    await AuthzGrantFailureMapper.run(() =>
+    await runLedgerWrite(() =>
       this.options.writer.attachBindings({
         organizationId,
         bindings: [binding],

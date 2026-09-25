@@ -1,4 +1,5 @@
 import type { MigrationTenantStatus, OrganizationRole } from "@langwatch/authz-contract";
+import type { Instant } from "@langwatch/time";
 
 import type {
   AuthzAssignableRoleRow,
@@ -28,7 +29,7 @@ export type AuthzMemoryAdmissionGrantRow = {
 export type AuthzMemoryCutoverRow = {
   organizationId: string;
   status: MigrationTenantStatus;
-  occurredAt: Date | null;
+  occurredAt: Instant | null;
 };
 
 /**

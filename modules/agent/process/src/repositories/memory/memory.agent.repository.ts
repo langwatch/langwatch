@@ -90,7 +90,7 @@ export class MemoryAgentRepository implements AgentRepository {
     return agent?.projectId === input.projectId && agent.archivedAt === null;
   }
 
-  async findPage(input: ListAgentsInput): Promise<{ data: Agent[]; total: number }> {
+  async listPage(input: ListAgentsInput): Promise<{ data: Agent[]; total: number }> {
     const rows = this.#visible(input.projectId);
     const offset = (input.page - 1) * input.limit;
 
@@ -147,7 +147,7 @@ export class MemoryAgentRepository implements AgentRepository {
     return this.#save({ ...agent, archivedAt: toDate(nowInstant()) });
   }
 
-  async listWorkflowConfigs(input: AgentWorkflowInput): Promise<AgentWorkflowConfig[]> {
+  async findWorkflowConfigs(input: AgentWorkflowInput): Promise<AgentWorkflowConfig[]> {
     return [...this.#agents.values()]
       .filter(
         (agent) =>
