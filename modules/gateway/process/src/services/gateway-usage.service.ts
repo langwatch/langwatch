@@ -1,12 +1,20 @@
-import { usdToNanoUsd } from "@langwatch/gateway-contract";
+import { nanoUsdToDecimalString, usdToNanoUsd } from "@langwatch/gateway-contract";
 /**
  * Aggregate read-side queries for AI Gateway usage surfaces. Spend comes from trace_summaries, not
  * the budget ledger, which writes once per applicable budget and never for an uncapped key. Every
  * read spans the org's projects, since traces land in the key's resolved trace destination.
  */
-import { type Instant, toDate } from "@langwatch/time";
+import { type Instant, Temporal, toDate } from "@langwatch/time";
+import type { TraceApi } from "@langwatch/trace-contract";
 
-import type { GatewayBudgetSpend, GatewayVirtualKeySpend } from "../app/gateway.members.ts";
+import type { GatewayBudgetSpend } from "../app/gateway.members.ts";
+
+type GatewayUsageTraces = Pick<
+  TraceApi,
+  "findSpendByAttributeValue" | "findAttributeUsageBuckets" | "findAttributedTraces"
+>;
+
+const VIRTUAL_KEY_ATTRIBUTE = "langwatch.virtual_key_id";
 
 /**
  * The one project read these surfaces make: which tenants an org's gateway traces can land in.
@@ -83,41 +91,40 @@ export class GatewayUsageService {
   private readonly projects: GatewayUsageProjects;
   private readonly virtualKeys: GatewayUsageVirtualKeys;
   private readonly chRepo?: GatewayBudgetSpend;
-  private readonly spendRepo?: GatewayVirtualKeySpend;
+  private readonly traces: GatewayUsageTraces;
 
   private constructor({
     projects,
     virtualKeys,
     chRepo,
-    spendRepo,
+    traces,
   }: {
     projects: GatewayUsageProjects;
     virtualKeys: GatewayUsageVirtualKeys;
     chRepo?: GatewayBudgetSpend;
-    spendRepo?: GatewayVirtualKeySpend;
+    traces: GatewayUsageTraces;
   }) {
     this.projects = projects;
     this.virtualKeys = virtualKeys;
     this.chRepo = chRepo;
-    this.spendRepo = spendRepo;
+    this.traces = traces;
   }
 
   /**
-   * Both repositories are required keys with optional values: a ClickHouse-less deploy passes
-   * undefined explicitly and gets empty summaries by configuration, while a caller forgetting the
-   * dependency fails to compile instead of silently reporting nothing.
+   * `chRepo` is a required key with an optional value: a ClickHouse-less deploy passes undefined
+   * explicitly, while a caller forgetting it fails to compile instead of silently reporting nothing.
    */
   static create(args: {
     projects: GatewayUsageProjects;
     virtualKeys: GatewayUsageVirtualKeys;
     chRepo: GatewayBudgetSpend | undefined;
-    spendRepo: GatewayVirtualKeySpend | undefined;
+    traces: GatewayUsageTraces;
   }): GatewayUsageService {
     return new GatewayUsageService({
       projects: args.projects,
       virtualKeys: args.virtualKeys,
       chRepo: args.chRepo,
-      spendRepo: args.spendRepo,
+      traces: args.traces,
     });
   }
 
@@ -132,25 +139,28 @@ export class GatewayUsageService {
     window: UsageWindow;
   }): Promise<Map<string, { spentUsd: string; requests: number }>> {
     const out = new Map<string, { spentUsd: string; requests: number }>();
-    if (!this.spendRepo || args.virtualKeyIds.length === 0) {
+    if (args.virtualKeyIds.length === 0) {
       return out;
     }
 
-    const tenantIds = await this.orgProjectIds(args.organizationId);
-    if (tenantIds.length === 0) {
-      return out;
-    }
-
-    const rows = await this.spendRepo.spendByVirtualKey({
-      tenantIds,
-      virtualKeyIds: args.virtualKeyIds,
-      window: { fromDate: args.window.fromDate, toDate: args.window.toDate },
-    });
+    const rows = await this.acrossTenants(args.organizationId, (projectId) =>
+      this.traces.findSpendByAttributeValue({
+        projectId,
+        attributeKey: VIRTUAL_KEY_ATTRIBUTE,
+        values: args.virtualKeyIds,
+        window: spendWindow(args.window),
+      }),
+    );
+    const byKey = new Map<string, { nano: bigint; requests: number }>();
     for (const row of rows) {
-      out.set(row.virtualKeyId, {
-        spentUsd: row.spentUsd,
-        requests: row.requests,
+      const sum = byKey.get(row.value) ?? { nano: 0n, requests: 0 };
+      byKey.set(row.value, {
+        nano: sum.nano + usdToNanoUsd(row.spentUsd),
+        requests: sum.requests + row.requests,
       });
+    }
+    for (const [virtualKeyId, sum] of byKey) {
+      out.set(virtualKeyId, { spentUsd: nanoUsdToDecimalString(sum.nano), requests: sum.requests });
     }
 
     return out;
@@ -166,17 +176,12 @@ export class GatewayUsageService {
     virtualKeyIds: string[];
     window: UsageWindow;
   }): Promise<UsageSummary> {
-    if (!this.spendRepo || args.virtualKeyIds.length === 0) {
+    if (args.virtualKeyIds.length === 0) {
       return this.emptySummary();
     }
 
-    const tenantIds = await this.orgProjectIds(args.organizationId);
-    if (tenantIds.length === 0) {
-      return this.emptySummary();
-    }
-
-    const buckets = await this.spendRepo.usageBuckets({
-      tenantIds,
+    const buckets = await this.usageBuckets({
+      organizationId: args.organizationId,
       window: args.window,
       virtualKeyIds: args.virtualKeyIds,
     });
@@ -197,7 +202,7 @@ export class GatewayUsageService {
       blockedRequests += bucket.blockedRequests;
       this.bumpBucket({
         map: byVk,
-        key: bucket.virtualKeyId,
+        key: bucket.value,
         amount: bucket.totalUsd,
         requests: bucket.requests,
       });
@@ -256,31 +261,28 @@ export class GatewayUsageService {
      */
     model?: string;
   }): Promise<VirtualKeyUsageSummary> {
-    if (!this.spendRepo) {
-      return this.emptyVirtualKeySummary();
-    }
-
-    const tenantIds = await this.orgProjectIds(args.organizationId);
-    if (tenantIds.length === 0) {
-      return this.emptyVirtualKeySummary();
-    }
-
     // Slices aggregate in ClickHouse; only the 20-row recent list pulls
-    // raw traces, and that pull carries its own LIMIT.
-    const [buckets, recentTraces] = await Promise.all([
-      this.spendRepo.usageBuckets({
-        tenantIds,
+    // raw traces, and each tenant's pull carries its own LIMIT.
+    const [buckets, tenantTraces] = await Promise.all([
+      this.usageBuckets({
+        organizationId: args.organizationId,
         window: args.window,
         virtualKeyIds: [args.virtualKeyId],
       }),
-      this.spendRepo.gatewayTraces({
-        tenantIds,
-        window: args.window,
-        virtualKeyIds: [args.virtualKeyId],
-        model: args.model,
-        limit: RECENT_DEBITS_LIMIT,
-      }),
+      this.acrossTenants(args.organizationId, (projectId) =>
+        this.traces.findAttributedTraces({
+          projectId,
+          attributeKey: VIRTUAL_KEY_ATTRIBUTE,
+          window: spendWindow(args.window),
+          values: [args.virtualKeyId],
+          model: args.model,
+          limit: RECENT_DEBITS_LIMIT,
+        }),
+      ),
     ]);
+    const recentTraces = tenantTraces
+      .toSorted((a, b) => b.occurredAtMs - a.occurredAtMs)
+      .slice(0, RECENT_DEBITS_LIMIT);
 
     const byModel = new Map<string, { totalUsd: bigint; requests: number }>();
     const byDay = new Map<string, { totalUsd: bigint; requests: number }>();
@@ -319,7 +321,9 @@ export class GatewayUsageService {
       byDay: this.sortedDays(byDay),
       recentDebits: recentTraces.map((trace) => ({
         id: trace.traceId,
-        occurredAt: toDate(trace.occurredAt).toISOString(),
+        occurredAt: toDate(
+          Temporal.Instant.fromEpochMilliseconds(trace.occurredAtMs),
+        ).toISOString(),
         model: trace.models[0] ?? "unknown",
         providerSlot: null,
         amountUsd: trace.costUsd,
@@ -340,9 +344,29 @@ export class GatewayUsageService {
     return new Map(keys.map((k) => [k.id, { name: k.name, displayPrefix: k.displayPrefix }]));
   }
 
-  /** Every project of the org: the tenant set gateway traces can land in. */
-  private orgProjectIds(organizationId: string): Promise<string[]> {
-    return this.projects.listIdsByOrganization({ organizationId });
+  /** Every tenant's buckets, concatenated: the callers sum them per key, as one query would. */
+  private usageBuckets(args: {
+    organizationId: string;
+    window: UsageWindow;
+    virtualKeyIds: string[];
+  }) {
+    return this.acrossTenants(args.organizationId, (projectId) =>
+      this.traces.findAttributeUsageBuckets({
+        projectId,
+        attributeKey: VIRTUAL_KEY_ATTRIBUTE,
+        window: spendWindow(args.window),
+        values: args.virtualKeyIds,
+      }),
+    );
+  }
+
+  /** One single-tenant read per project of the org: the tenant set gateway traces can land in. */
+  private async acrossTenants<T>(
+    organizationId: string,
+    read: (projectId: string) => Promise<T[]>,
+  ): Promise<T[]> {
+    const projectIds = await this.projects.listIdsByOrganization({ organizationId });
+    return (await Promise.all(projectIds.map(read))).flat();
   }
 
   private averagePerRequest(totalUsd: bigint, requests: number): string {
@@ -452,4 +476,8 @@ function nanoUsdToFixed6(nano: bigint): string {
 function traceStatusOf(trace: { blockedByGuardrail: boolean; hasError: boolean }) {
   if (trace.blockedByGuardrail) return "BLOCKED_BY_GUARDRAIL";
   return trace.hasError ? "PROVIDER_ERROR" : "SUCCESS";
+}
+
+function spendWindow(window: UsageWindow): { startMs: number; endMs: number } {
+  return { startMs: window.fromDate.epochMilliseconds, endMs: window.toDate.epochMilliseconds };
 }

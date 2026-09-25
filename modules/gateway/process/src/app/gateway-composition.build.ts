@@ -5,11 +5,11 @@ import { virtualKeyBudgetInputSchema } from "@langwatch/gateway-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi, ProjectIdentity } from "@langwatch/project-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
 
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import { ClickHouseGatewayPrincipalSpendRepository } from "../repositories/clickhouse/clickhouse.gateway-principal-spend.repository.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
-import { GatewayVirtualKeySpendRepository } from "../repositories/clickhouse/clickhouse.gateway-virtual-key-spend.repository.ts";
 import { PrismaGatewayAuditRepository } from "../repositories/prisma/prisma.gateway-audit.repository.ts";
 import { PrismaGatewayChangeEventsRepository } from "../repositories/prisma/prisma.gateway-change-event.repository.ts";
 import { PrismaGatewayKeyBudgetRepository } from "../repositories/prisma/prisma.gateway-key-budget.repository.ts";
@@ -146,6 +146,11 @@ export type GatewayControlPlanePeers = Readonly<{
   monitors: MonitorApi;
   /** The deployment's own providers, which a license's managed key dispatches on. */
   platformProviders: GatewayPlatformProviders;
+  /** The per-virtual-key spend the usage surfaces read, one tenant at a time. */
+  traces: Pick<
+    TraceApi,
+    "findSpendByAttributeValue" | "findAttributeUsageBuckets" | "findAttributedTraces"
+  >;
 }>;
 
 export type GatewayControlPlaneOptions = Readonly<{
@@ -211,7 +216,6 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
   });
 
   const budgetSpend = GatewayBudgetClickHouseRepository.create(resolveClickHouse);
-  const virtualKeySpend = GatewayVirtualKeySpendRepository.create(resolveClickHouse);
   const principalSpend = ClickHouseGatewayPrincipalSpendRepository.create(resolveClickHouse);
   const spendLedger = ClickHouseGatewaySpendEventsRepository.create(resolveClickHouse);
   const spendEvents = GatewaySpendEventsService.create(spendLedger);
@@ -237,7 +241,7 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
     // operations service the gateway application itself is built on.
     virtualKeys: PrismaGatewayVirtualKeyRepository.create(prisma),
     chRepo: budgetSpend,
-    spendRepo: virtualKeySpend,
+    traces: peers.traces,
   });
 
   // No type arguments: the two budget row shapes the wire contract carries are
@@ -249,7 +253,6 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
     budgetDecisions,
     budgetSpend,
     changeEvents: changes,
-    virtualKeySpend,
     principalSpend,
     spendEvents,
     projects,

@@ -6,6 +6,7 @@ import { MemoryNullTraceListRepository } from "./memory.null-trace-list.reposito
 import { MemorySpanStorageRepository } from "./memory.span-storage.repository.ts";
 import { MemoryTraceAnalyticsRollupRepository } from "./memory.trace-analytics-rollup.repository.ts";
 import { MemoryTraceAnalyticsRepository } from "./memory.trace-analytics.repository.ts";
+import { MemoryTraceAttributeSpendRepository } from "./memory.trace-attribute-spend.repository.ts";
 import { MemoryTraceDerivationSpanRepository } from "./memory.trace-derivation-span.repository.ts";
 import { MemoryTraceEditOverlayRepository } from "./memory.trace-edit-overlay.repository.ts";
 import { MemoryTraceExistenceRepository } from "./memory.trace-existence.repository.ts";
@@ -48,6 +49,7 @@ export class MemoryTraceRepositories {
       clusteringSample: MemoryNullTraceClusteringSampleRepository.create(),
       usageCount: MemoryTraceUsageCountRepository.create(),
       modelSpend: MemoryTraceModelSpendRepository.create(),
+      attributeSpend: MemoryTraceAttributeSpendRepository.create(),
     };
   }
 }

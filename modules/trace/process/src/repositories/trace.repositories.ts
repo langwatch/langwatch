@@ -6,6 +6,7 @@ import type { TraceAnalyticsRollupRepository } from "./projection/trace-analytic
 import type { TraceSummaryProjectionRepository } from "./projection/trace-summary-projection.repository.ts";
 import type { SessionGroupsRepository } from "./session-groups.repository.ts";
 import type { SpanStorageRepository } from "./span-storage.repository.ts";
+import type { TraceAttributeSpendRepository } from "./trace-attribute-spend.repository.ts";
 import type { TraceClusteringSampleRepository } from "./trace-clustering-sample.repository.ts";
 import type { TraceDerivationSpanReaderRepository } from "./trace-derivation-span-reader.repository.ts";
 import type { TraceEditOverlayRepository } from "./trace-edit-overlay.repository.ts";
@@ -37,4 +38,5 @@ export interface TraceRepositories {
   readonly clusteringSample: TraceClusteringSampleRepository;
   readonly usageCount: TraceUsageCountRepository;
   readonly modelSpend: TraceModelSpendRepository;
+  readonly attributeSpend: TraceAttributeSpendRepository;
 }

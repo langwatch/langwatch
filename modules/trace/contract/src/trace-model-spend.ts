@@ -43,3 +43,34 @@ export interface TraceAttributeMatch {
   readonly key: string;
   readonly value: string;
 }
+
+/** Spend of the traces whose attribute holds `value`, deduped per trace; `spentUsd` is decimal. */
+export interface TraceAttributeValueSpend {
+  readonly value: string;
+  readonly spentUsd: string;
+  readonly requests: number;
+}
+
+/** One (attribute value, first model or "unknown", UTC day) slice of deduped traces. */
+export interface TraceAttributeUsageBucket {
+  readonly value: string;
+  readonly model: string;
+  readonly day: string;
+  readonly totalUsd: string;
+  readonly requests: number;
+  readonly blockedRequests: number;
+}
+
+/** One deduped trace carrying the attribute, as the latest version reads. */
+export interface TraceAttributedTrace {
+  readonly traceId: string;
+  readonly value: string;
+  readonly costUsd: string;
+  readonly models: readonly string[];
+  readonly occurredAtMs: number;
+  readonly promptTokens: number;
+  readonly completionTokens: number;
+  readonly durationMs: number;
+  readonly hasError: boolean;
+  readonly blockedByGuardrail: boolean;
+}

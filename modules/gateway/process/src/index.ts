@@ -33,6 +33,8 @@ export { elevenLabsSignature, elevenLabsWebhookRest } from "./transport/elevenla
 export { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";
 export { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trpc.ts";
 export { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
+export { personalVirtualKeysTrpcTransport } from "./transport/personal-virtual-keys.trpc.ts";
+export { routingPolicyTrpcTransport } from "./transport/routing-policy.trpc.ts";
 export { gatewaySpendEventTrpcTransport } from "./transport/gateway-spend-event.trpc.ts";
 export { gatewaySessionFact, virtualKeyTrpcTransport } from "./transport/virtual-key.trpc.ts";
 export { PrismaGatewayAdapter, type GatewayPersistence } from "./app/prisma.gateway.composition.ts";
@@ -76,13 +78,6 @@ export type {
   GatewayClickHouse,
 } from "./app/gateway.members.ts";
 export type { GatewaySettlementPolicy } from "./app/gateway.members.ts";
-export type {
-  GatewayVirtualKeySpendRow,
-  GatewaySpendWindow,
-  GatewayUsageBucket,
-  GatewayTraceRow,
-  GatewayVirtualKeySpend,
-} from "./app/gateway.members.ts";
 export * from "./services/fixed-gateway-settlement-policy.service.ts";
 export { GatewayBudgetClickHouseRepository } from "./repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 export * from "./eventing/gateway-spend.intent.ts";

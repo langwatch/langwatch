@@ -1,10 +1,10 @@
-import type {
-  GatewayTraceRow,
-  GatewayUsageBucket,
-  GatewayVirtualKeySpend,
-} from "@langwatch/gateway-process";
 import { Prisma } from "@langwatch/prisma-client/generated";
-import { Temporal, toDate } from "@langwatch/time";
+import { type Instant, Temporal, toDate } from "@langwatch/time";
+import type {
+  TraceApi,
+  TraceAttributedTrace,
+  TraceAttributeUsageBucket,
+} from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -13,14 +13,21 @@ import {
   type GatewayUsageVirtualKeys,
 } from "../services/gateway-usage.service.ts";
 
-type TraceStub = Pick<GatewayTraceRow, "virtualKeyId" | "costUsd" | "occurredAt"> & {
+type TraceStub = {
+  virtualKeyId: string;
+  costUsd: string;
+  occurredAt: Instant;
   model?: string;
   blockedByGuardrail?: boolean;
+  projectId?: string;
 };
 
+const DEFAULT_PROJECT = "proj_01";
+
 /** The org's projects: the tenant set gateway traces can land in. */
-function mockProjects(): GatewayUsageProjects {
-  return { listIdsByOrganization: async () => ["proj_01"] };
+function mockProjects(traces: TraceStub[]): GatewayUsageProjects {
+  const ids = new Set([DEFAULT_PROJECT, ...traces.map((t) => t.projectId ?? DEFAULT_PROJECT)]);
+  return { listIdsByOrganization: async () => [...ids] };
 }
 
 /**
@@ -40,57 +47,68 @@ function mockVirtualKeys(
   };
 }
 
-function mockSpendRepo(traces: TraceStub[]): GatewayVirtualKeySpend {
-  const rows: GatewayTraceRow[] = traces.map((t, i) => ({
-    traceId: `trace_${i}`,
-    virtualKeyId: t.virtualKeyId,
-    costUsd: t.costUsd,
-    models: [t.model ?? "gpt-5-mini"],
-    occurredAt: t.occurredAt,
-    promptTokens: 0,
-    completionTokens: 0,
-    durationMs: 0,
-    hasError: false,
-    blockedByGuardrail: t.blockedByGuardrail ?? false,
+/** Trace's single-tenant reads over the stubs: each call answers one project only. */
+function mockTraces(
+  traces: TraceStub[],
+): Pick<
+  TraceApi,
+  "findSpendByAttributeValue" | "findAttributeUsageBuckets" | "findAttributedTraces"
+> {
+  const rows = traces.map((t, i) => ({
+    projectId: t.projectId ?? DEFAULT_PROJECT,
+    trace: {
+      traceId: `trace_${i}`,
+      value: t.virtualKeyId,
+      costUsd: t.costUsd,
+      models: [t.model ?? "gpt-5-mini"],
+      occurredAtMs: t.occurredAt.epochMilliseconds,
+      promptTokens: 0,
+      completionTokens: 0,
+      durationMs: 0,
+      hasError: false,
+      blockedByGuardrail: t.blockedByGuardrail ?? false,
+    } satisfies TraceAttributedTrace,
   }));
-  // The mock derives buckets from the same stub traces the raw query
-  // serves, mirroring what ClickHouse's GROUP BY produces, so the suite
-  // exercises the service fold over both shapes without a database.
-  const bucketsFor = (subset: GatewayTraceRow[]): GatewayUsageBucket[] => {
-    const byKey = new Map<string, GatewayUsageBucket>();
-    for (const r of subset) {
-      const model = r.models[0] ?? "unknown";
-      const day = toDate(r.occurredAt).toISOString().slice(0, 10);
-      const key = `${r.virtualKeyId}|${model}|${day}`;
+  const inTenant = (input: { projectId: string; values?: string[] }) =>
+    rows
+      .filter((r) => r.projectId === input.projectId)
+      .map((r) => r.trace)
+      .filter((t) => !input.values || input.values.includes(t.value));
+  const bucketsFor = (subset: TraceAttributedTrace[]): TraceAttributeUsageBucket[] => {
+    const byKey = new Map<string, TraceAttributeUsageBucket>();
+    for (const t of subset) {
+      const model = t.models[0] ?? "unknown";
+      const day = toDate(Temporal.Instant.fromEpochMilliseconds(t.occurredAtMs))
+        .toISOString()
+        .slice(0, 10);
+      const key = `${t.value}|${model}|${day}`;
       const existing = byKey.get(key);
-      if (existing) {
-        existing.totalUsd = new Prisma.Decimal(existing.totalUsd).plus(r.costUsd).toString();
-        existing.requests += 1;
-        existing.blockedRequests += r.blockedByGuardrail ? 1 : 0;
-      } else {
-        byKey.set(key, {
-          virtualKeyId: r.virtualKeyId,
-          model,
-          day,
-          totalUsd: r.costUsd,
-          requests: 1,
-          blockedRequests: r.blockedByGuardrail ? 1 : 0,
-        });
-      }
+      byKey.set(key, {
+        value: t.value,
+        model,
+        day,
+        totalUsd: existing
+          ? new Prisma.Decimal(existing.totalUsd).plus(t.costUsd).toString()
+          : t.costUsd,
+        requests: (existing?.requests ?? 0) + 1,
+        blockedRequests: (existing?.blockedRequests ?? 0) + (t.blockedByGuardrail ? 1 : 0),
+      });
     }
     return [...byKey.values()];
   };
-  const filtered = (virtualKeyIds?: string[]) =>
-    virtualKeyIds ? rows.filter((r) => virtualKeyIds.includes(r.virtualKeyId)) : rows;
   return {
-    usageBuckets: async ({ virtualKeyIds }: { virtualKeyIds?: string[] }) =>
-      bucketsFor(filtered(virtualKeyIds)),
-    gatewayTraces: async ({ virtualKeyIds, limit }: { virtualKeyIds?: string[]; limit: number }) =>
-      filtered(virtualKeyIds)
-        .slice()
-        .toSorted((a, b) => b.occurredAt.epochMilliseconds - a.occurredAt.epochMilliseconds)
-        .slice(0, limit),
-    spendByVirtualKey: async () => [],
+    findSpendByAttributeValue: async (input) =>
+      bucketsFor(inTenant(input)).map((b) => ({
+        value: b.value,
+        spentUsd: b.totalUsd,
+        requests: b.requests,
+      })),
+    findAttributeUsageBuckets: async (input) => bucketsFor(inTenant(input)),
+    findAttributedTraces: async (input) =>
+      inTenant(input)
+        .filter((t) => !input.model || (t.models[0] ?? "unknown") === input.model)
+        .toSorted((a, b) => b.occurredAtMs - a.occurredAtMs)
+        .slice(0, input.limit),
   };
 }
 
@@ -99,10 +117,10 @@ function service(
   traces: TraceStub[],
 ): GatewayUsageService {
   return GatewayUsageService.create({
-    projects: mockProjects(),
+    projects: mockProjects(traces),
     virtualKeys: mockVirtualKeys(virtualKeys),
     chRepo: undefined,
-    spendRepo: mockSpendRepo(traces),
+    traces: mockTraces(traces),
   });
 }
 
@@ -263,6 +281,113 @@ describe("GatewayUsageService.summary", () => {
         window,
       });
       expect(result.avgUsdPerRequest).toBe("1.790123");
+    });
+  });
+});
+
+describe("GatewayUsageService across the org's projects", () => {
+  const keys = [
+    { id: "vk_01", name: "prod", displayPrefix: "lw_a" },
+    { id: "vk_02", name: "org", displayPrefix: "lw_b" },
+  ];
+  const at = (iso: string) => Temporal.Instant.from(iso);
+  const traffic: TraceStub[] = [
+    { virtualKeyId: "vk_01", costUsd: "0.4", occurredAt: at("2026-04-02T10:00:00Z") },
+    {
+      virtualKeyId: "vk_01",
+      costUsd: "0.25",
+      occurredAt: at("2026-04-03T10:00:00Z"),
+      model: "claude-sonnet-4",
+    },
+    { virtualKeyId: "vk_02", costUsd: "0.123456", occurredAt: at("2026-04-04T10:00:00Z") },
+    {
+      virtualKeyId: "vk_02",
+      costUsd: "0.000045",
+      occurredAt: at("2026-04-05T10:00:00Z"),
+      blockedByGuardrail: true,
+    },
+  ];
+  const split = traffic.map((t, i) => ({ ...t, projectId: i % 2 === 0 ? "proj_01" : "proj_gov" }));
+
+  describe("when the same traces land in two tenants instead of one", () => {
+    /** @scenario "Spend that lands in the key's trace project is visible from anywhere in the organization" */
+    it("merges each tenant's reads into the answer one query over both would give", async () => {
+      const whole = service(keys, traffic);
+      const merged = service(keys, split);
+      const ids = ["vk_01", "vk_02"];
+
+      expect(
+        await merged.summary({ organizationId: "org_01", virtualKeyIds: ids, window }),
+      ).toEqual(await whole.summary({ organizationId: "org_01", virtualKeyIds: ids, window }));
+      expect(
+        await merged.spendByVirtualKey({ organizationId: "org_01", virtualKeyIds: ids, window }),
+      ).toEqual(
+        await whole.spendByVirtualKey({ organizationId: "org_01", virtualKeyIds: ids, window }),
+      );
+      for (const virtualKeyId of ids) {
+        expect(
+          await merged.summaryForVirtualKey({ organizationId: "org_01", virtualKeyId, window }),
+        ).toEqual(
+          await whole.summaryForVirtualKey({ organizationId: "org_01", virtualKeyId, window }),
+        );
+      }
+    });
+  });
+
+  describe("when spend is read per key for the keys table", () => {
+    /** @scenario "A key with no budget still reports what it spent" */
+    /** @scenario "A key covered by several budgets is not counted once per budget" */
+    it("reports each key's trace spend once, summed across tenants", async () => {
+      const spend = await service(keys, split).spendByVirtualKey({
+        organizationId: "org_01",
+        virtualKeyIds: ["vk_01", "vk_02"],
+        window,
+      });
+
+      expect(spend.get("vk_01")).toEqual({ spentUsd: "0.65", requests: 2 });
+      expect(spend.get("vk_02")).toEqual({ spentUsd: "0.123501", requests: 2 });
+    });
+  });
+
+  describe("when one key's usage is read", () => {
+    /** @scenario "Spend is reported per key with its own daily and model split" */
+    it("splits the key's spend by day and model", async () => {
+      const summary = await service(keys, split).summaryForVirtualKey({
+        organizationId: "org_01",
+        virtualKeyId: "vk_01",
+        window,
+      });
+
+      expect(summary.byModel.map((m) => m.model).toSorted()).toEqual([
+        "claude-sonnet-4",
+        "gpt-5-mini",
+      ]);
+      expect(summary.byDay.map((d) => d.day)).toEqual(["2026-04-02", "2026-04-03"]);
+      expect(summary.recentDebits.map((d) => d.occurredAt)).toEqual([
+        "2026-04-03T10:00:00.000Z",
+        "2026-04-02T10:00:00.000Z",
+      ]);
+    });
+
+    /** @scenario "Picking a model narrows the recent activity to that model" */
+    /** @scenario "Clicking the picked model again clears the filter" */
+    it("narrows only the recent list to the picked model, and widens it again without one", async () => {
+      const usage = service(keys, split);
+      const all = await usage.summaryForVirtualKey({
+        organizationId: "org_01",
+        virtualKeyId: "vk_01",
+        window,
+      });
+      const picked = await usage.summaryForVirtualKey({
+        organizationId: "org_01",
+        virtualKeyId: "vk_01",
+        window,
+        model: "claude-sonnet-4",
+      });
+
+      expect(picked.recentDebits.map((d) => d.model)).toEqual(["claude-sonnet-4"]);
+      expect(all.recentDebits).toHaveLength(2);
+      expect({ ...picked, recentDebits: [] }).toEqual({ ...all, recentDebits: [] });
     });
   });
 });
