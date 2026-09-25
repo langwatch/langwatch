@@ -18,10 +18,7 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { Encryption } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
-import {
-  type ScenarioExecutionService,
-  type SimulationService,
-} from "@langwatch/scenario-contract";
+import { type SimulationService } from "@langwatch/scenario-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
@@ -32,10 +29,8 @@ import {
   scenarioHostMembers,
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
+import type { ScenarioEventBroadcastPublisher } from "../../channels/redis/redis.scenario-event-broadcast.channel.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
-import type { AgentTestService } from "../../services/agent-test.service.ts";
-import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
-import type { RunConfigurationsService } from "../../services/run-configurations.service.ts";
 import { ScenarioApp, type ScenarioReadOnlyClickHouse } from "../scenario.app.ts";
 
 function buildProductionApp(publicBaseUrl: string | undefined, emitter = new EventEmitter()) {
@@ -48,7 +43,10 @@ function buildProductionApp(publicBaseUrl: string | undefined, emitter = new Eve
       projects: createApiFixture<ProjectApi>(),
       plans: createApiFixture<EntitlementApi>(),
       modelProviders: createApiFixture<ModelProviderApi>(),
-      presence: createApiFixture<PresenceApi>(),
+      presence: createApiFixture<PresenceApi>({
+        getTenantEmitter: () => emitter,
+        cleanupTenantEmitter: () => {},
+      }),
       auditLog: createApiFixture<AuditLogApi>(),
       traces: createApiFixture<TraceApi>(),
       billing: createApiFixture<BillingApi>(),
@@ -62,22 +60,14 @@ function buildProductionApp(publicBaseUrl: string | undefined, emitter = new Eve
     secrets: {} as never,
     members: {
       ...scenarioHostMembers,
+      redis: createApiFixture<ScenarioEventBroadcastPublisher>(),
       publicBaseUrl,
       encryption: createApiFixture<Encryption>({
         encrypt: (value: string) => value,
         decrypt: (value: string) => value,
       }),
       clickhouse: createApiFixture<ScenarioReadOnlyClickHouse>(),
-      agentTesting: createApiFixture<AgentTestService>(),
       simulations: createApiFixture<SimulationService>(),
-      scenarioExecution: createApiFixture<ScenarioExecutionService>(),
-      broadcast: {
-        getTenantEmitter: () => emitter,
-        broadcastToTenant: async () => {},
-        broadcastToTenantRateLimited: async () => {},
-      },
-      resultAtoms: createApiFixture<ResultAtomsService>(),
-      runConfigurations: createApiFixture<RunConfigurationsService>(),
       rateLimiter: { check: async () => ({ allowed: true }) },
       idempotency: { claim: async () => true },
     },

@@ -1,7 +1,6 @@
-import { on, type EventEmitter } from "node:events";
-
 import {
   AgentApi,
+  MAX_CALL_TIMEOUT_MS,
   type AgentTestRunResult,
   type AgentTestTurnResult,
 } from "@langwatch/agent-contract";
@@ -13,7 +12,7 @@ import { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { DEFAULT_MODEL, ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { PresenceApi } from "@langwatch/presence-contract";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -51,7 +50,6 @@ import {
   type ScenarioEventBrowserTabOfferResult,
   type ScenarioEventReportInput,
   type ScenarioEventReportResult,
-  type ScenarioExecutionService,
   type ScenarioIdInput,
   type ScenarioMoveInput,
   type ScenarioRunConfig,
@@ -103,6 +101,7 @@ import {
   type SimulationStreamFrame,
   type ChildProcessJobData,
   type ScenarioExecutionJob,
+  type ScenarioUnsuccessfulExecutionInput,
   type ScenarioExecutionResult,
   type TestAgentRunInput,
   type TestAgentTurnInput,
@@ -122,20 +121,24 @@ import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi, type UserFullProfile, type UserProfilesInput } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
-import type { ScenarioEventBroadcast } from "../channels/scenario-event-broadcast.channel.ts";
+import type { ScenarioEventBroadcastPublisher } from "../channels/redis/redis.scenario-event-broadcast.channel.ts";
+import { scenarioEventBroadcastChannels } from "../channels/scenario-event-broadcast-channels.registry.ts";
+import { SerializedAgentChannelRegistry } from "../channels/serialized-agent-channels.registry.ts";
 import {
   buildScenarioLifecyclePipeline,
   type ScenarioLifecyclePipeline,
 } from "../eventing/scenario-lifecycle.pipeline.ts";
 import type { SimulationProcessingPipelineDefinition } from "../eventing/simulation-processing.pipeline.ts";
 import type { ScenarioRepositories } from "../repositories/scenario.repositories.ts";
-import type { AgentTestService } from "../services/agent-test.service.ts";
+import { AgentTestService } from "../services/agent-test.service.ts";
 import { ConnectedTargetService } from "../services/connected-target.service.ts";
-import type { ResultAtomsService } from "../services/result-atoms.service.ts";
-import type { RunConfigurationsService } from "../services/run-configurations.service.ts";
+import { ResultAtomsService } from "../services/result-atoms.service.ts";
+import { RunConfigurationsService } from "../services/run-configurations.service.ts";
 import { ScenarioEventService } from "../services/scenario-event.service.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
+import { ScenarioExecutionPrefetcherService } from "../services/scenario-execution-prefetcher.service.ts";
 import { ScenarioExecutorService } from "../services/scenario-executor.service.ts";
+import { ScenarioFailureHandlerService } from "../services/scenario-failure-handler.service.ts";
 import { ScenarioGenerateBoundsService } from "../services/scenario-generate-bounds.service.ts";
 import { ScenarioGenerationService } from "../services/scenario-generation.service.ts";
 import { ScenarioPlatformLinkService } from "../services/scenario-platform-link.service.ts";
@@ -149,32 +152,24 @@ import {
   SimulationProcessingService,
   type SimulationPipelineSetup,
 } from "../services/simulation-processing.service.ts";
-import {
-  buildScenarioComposition,
-  undeliveredSnapshotUpdates,
-} from "./scenario-composition.build.ts";
+import { SimulationUpdateStreamService } from "../services/simulation-update-stream.service.ts";
+import { buildScenarioComposition } from "./scenario-composition.build.ts";
 
 const lifecycleLogger = createLogger("langwatch:scenario:lifecycle");
-
-/**
- * The process's per-tenant fan-out, as this feature uses it: one emitter per project that relays
- * the events another pod published. Structural rather than the concrete broadcast service, because
- * the subscription needs nothing else from it.
- */
-export type ScenarioBroadcast = ScenarioEventBroadcast &
-  Readonly<{
-    getTenantEmitter(projectId: string): EventEmitter;
-  }>;
 
 /** What the process composes this feature's application from. */
 export interface ScenarioAppDependencies {
   agentTesting: AgentTestService;
   scenarios: ScenarioService;
   simulations: SimulationService;
-  scenarioExecution: ScenarioExecutionService;
+  /** Validates a run against its target before anything is queued. */
+  prefetcher: ScenarioExecutionPrefetcherService;
+  /** Closes a run that can no longer finish on its own. */
+  failures: ScenarioFailureHandlerService;
   scenarioTabs: ScenarioTabRegistry;
   users: UserApi;
-  broadcast: ScenarioBroadcast;
+  /** The project's `simulation_updated` frames. */
+  updates: SimulationUpdateStreamService;
   /** Reads results as atoms and folds them into the Results tab's views. */
   resultAtoms: ResultAtomsService;
   /** The run dialog's configuration history. */
@@ -194,13 +189,8 @@ export interface ScenarioAppDependencies {
  * services (agent testing, executor, buffer, reads) and four small ports.
  */
 export interface ScenarioAppInfrastructure {
-  agentTesting: AgentTestService;
   simulations: SimulationService;
-  scenarioExecution: ScenarioExecutionService;
   scenarioTabs: ScenarioTabRegistry;
-  broadcast: ScenarioBroadcast;
-  resultAtoms: ResultAtomsService;
-  runConfigurations: RunConfigurationsService;
   ids: ScenarioId;
   testSuiteIds: ScenarioTestSuiteId;
   clock: ScenarioClock;
@@ -258,6 +248,7 @@ type ScenarioProcessMembers = Readonly<{
     ): Promise<Readonly<{ allowed: boolean; retryAfterSeconds?: number }>>;
   }>;
   idempotency: Readonly<{ claim(key: string, ttlSeconds: number): Promise<boolean> }>;
+  redis: ScenarioEventBroadcastPublisher;
   publicBaseUrl: string | undefined;
   nlpServiceUrl: string | undefined;
   isSaas: boolean;
@@ -284,6 +275,7 @@ export class ScenarioApp implements ScenarioApi {
     "encryption",
     "rateLimiter",
     "idempotency",
+    "redis",
     "publicBaseUrl",
     "nlpServiceUrl",
     "isSaas",
@@ -327,18 +319,53 @@ export class ScenarioApp implements ScenarioApi {
       store: setup.repositories.tabs,
       clock,
     });
+    const { dependencies: peers, repositories, config } = setup;
+    const prefetchConfig = {
+      langwatchEndpoint: config.langwatchEndpoint ?? "",
+      nlpServiceUrl: setup.members.nlpServiceUrl ?? "",
+      legacyDefaultModel: config.defaultModel ?? DEFAULT_MODEL,
+    };
+    const broadcast = scenarioEventBroadcastChannels.live.create(setup.members.redis);
 
     return new ScenarioApp({
-      agentTesting: setup.members.agentTesting,
+      agentTesting: AgentTestService.create({
+        agents: peers.agents,
+        projects: peers.projects,
+        workflows: peers.workflows,
+        prompts: peers.prompts,
+        secrets: peers.secrets,
+        modelProviders: peers.modelProviders,
+        simulations,
+        config: prefetchConfig,
+        agentAdapters: SerializedAgentChannelRegistry.create({ nlpTimeouts: config.nlpTimeouts }),
+        maxCallTimeoutMs: MAX_CALL_TIMEOUT_MS,
+      }),
       connectedTargets: ConnectedTargetService.create(setup.dependencies.agents),
       scenarios,
       simulations,
-      scenarioExecution: setup.members.scenarioExecution,
+      prefetcher: ScenarioExecutionPrefetcherService.create({
+        secretCipher,
+        config: prefetchConfig,
+        scenarios,
+        suites: peers.suites,
+        prompts: peers.prompts,
+        agents: peers.agents,
+        workflows: peers.workflows,
+        projects: peers.projects,
+        modelProviders: peers.modelProviders,
+        secrets: peers.secrets,
+        traces: peers.traces,
+        voiceTargets: null,
+      }),
+      failures: ScenarioFailureHandlerService.create({ agents: peers.agents, simulations }),
       scenarioTabs,
       users: setup.dependencies.users,
-      broadcast: setup.members.broadcast,
-      resultAtoms: setup.members.resultAtoms,
-      runConfigurations: setup.members.runConfigurations,
+      updates: SimulationUpdateStreamService.create(peers.presence),
+      resultAtoms: ResultAtomsService.create(repositories.resultAtoms, repositories.scenarios),
+      runConfigurations: RunConfigurationsService.create(
+        repositories.runConfigurations,
+        repositories.scenarios,
+      ),
       generateBounds,
       generation: ScenarioGenerationService.create({
         bounds: generateBounds,
@@ -352,7 +379,7 @@ export class ScenarioApp implements ScenarioApi {
       events: ScenarioEventService.create({
         simulations,
         scenarioTabs,
-        broadcast: setup.members.broadcast,
+        broadcast,
         traces: setup.dependencies.traces,
         entitlement: setup.dependencies.plans,
         projects: setup.dependencies.projects,
@@ -380,7 +407,14 @@ export class ScenarioApp implements ScenarioApi {
           completeSuiteRunItem: (data) => setup.dependencies.suites.completeSuiteRunItem(data),
           regradeSuiteRunItem: (data) => setup.dependencies.suites.regradeSuiteRunItem(data),
         },
-        snapshotUpdates: undeliveredSnapshotUpdates(),
+        snapshotUpdates: {
+          broadcastUpdate: ({ tenantId, payload }) =>
+            broadcast.broadcastToTenant({
+              projectId: tenantId,
+              message: payload,
+              eventType: "simulation_updated",
+            }),
+        },
         grading: {
           scenarios: { getById: (input) => scenarios.getById(input) },
           suites: {
@@ -757,7 +791,12 @@ export class ScenarioApp implements ScenarioApi {
   prefetchExecution(
     input: ScenarioExecutionPrefetchInput,
   ): Promise<ScenarioExecutionPrefetchResult> {
-    return this.#dependencies.scenarioExecution.prefetch(input);
+    return this.#dependencies.prefetcher.prefetch(input);
+  }
+
+  /** Closes a run that can no longer finish on its own; the stalled-runs task's one write. */
+  finishUnsuccessfulRun(input: ScenarioUnsuccessfulExecutionInput): Promise<void> {
+    return this.#dependencies.failures.finishUnsuccessfulRun(input);
   }
 
   /**
@@ -950,17 +989,11 @@ export class ScenarioApp implements ScenarioApi {
   // -- the live stream -------------------------------------------------------
 
   /** Relays frames from the project's fan-out until its subscriber disconnects. */
-  async *simulationUpdates({
-    projectId,
-    signal,
-  }: {
+  simulationUpdates(input: {
     projectId: string;
     signal?: AbortSignal;
   }): AsyncIterable<SimulationStreamFrame> {
-    const emitter = this.#dependencies.broadcast.getTenantEmitter(projectId);
-    for await (const [frame] of on(emitter, "simulation_updated", { signal })) {
-      yield frame;
-    }
+    return this.#dependencies.updates.watch(input);
   }
 
   /**

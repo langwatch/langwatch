@@ -30,9 +30,9 @@ export const scenarioServer = defineServerModule("scenario")
   .withTransportFacts(() => [bindRestHeader(scenarioRestSurface, "x-langwatch-surface")])
   .withEventing(scenarioLifecycleEventing)
   .withEventing(simulationProcessingEventing)
-  .withTasks(({ repositories, members }) => [
+  .withTasks(({ repositories, app }) => [
     StalledRunsBackfillTask.create({
       finder: () => repositories.stalledRuns,
-      execution: () => members.scenarioExecution,
+      execution: () => app,
     }),
   ]);

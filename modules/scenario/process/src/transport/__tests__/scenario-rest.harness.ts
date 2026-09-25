@@ -20,10 +20,7 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { Encryption } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
-import {
-  type ScenarioExecutionService,
-  type SimulationService,
-} from "@langwatch/scenario-contract";
+import { type SimulationService } from "@langwatch/scenario-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
@@ -35,16 +32,10 @@ import {
   scenarioHostMembers,
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
-import type {
-  ScenarioBroadcast,
-  ScenarioReadOnlyClickHouse,
-  ScenarioTabStore,
-} from "../../app/scenario.app.ts";
+import type { ScenarioReadOnlyClickHouse, ScenarioTabStore } from "../../app/scenario.app.ts";
 import { ScenarioApp } from "../../app/scenario.app.ts";
+import type { ScenarioEventBroadcastPublisher } from "../../channels/redis/redis.scenario-event-broadcast.channel.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
-import type { AgentTestService } from "../../services/agent-test.service.ts";
-import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
-import type { RunConfigurationsService } from "../../services/run-configurations.service.ts";
 
 export const PROJECT_ID = "project_scenario_rest";
 export const PROJECT_SLUG = "scenario-rest-project";
@@ -54,7 +45,7 @@ export function createScenarioRestTestApp(
   options: {
     simulations?: Partial<SimulationService>;
     tabs?: Partial<ScenarioTabStore>;
-    broadcast?: Partial<ScenarioBroadcast>;
+    redis?: Partial<ScenarioEventBroadcastPublisher>;
     traces?: Partial<TraceApi>;
     billing?: Partial<BillingApi>;
     plans?: Partial<EntitlementApi>;
@@ -66,13 +57,7 @@ export function createScenarioRestTestApp(
     options.simulations ?? {},
     "Simulation service",
   );
-  const broadcast = createApiFixture<ScenarioBroadcast>(
-    {
-      getTenantEmitter: () => new EventEmitter(),
-      ...options.broadcast,
-    },
-    "Scenario broadcast",
-  );
+  const redis = createApiFixture<ScenarioEventBroadcastPublisher>(options.redis ?? {}, "Redis");
 
   const app = ScenarioApp.create({
     repositories: {
@@ -94,7 +79,10 @@ export function createScenarioRestTestApp(
         "Entitlement API",
       ),
       modelProviders: createApiFixture<ModelProviderApi>(),
-      presence: createApiFixture<PresenceApi>(),
+      presence: createApiFixture<PresenceApi>({
+        getTenantEmitter: () => new EventEmitter(),
+        cleanupTenantEmitter: () => {},
+      }),
       auditLog: createApiFixture<AuditLogApi>(),
       traces: createApiFixture<TraceApi>(options.traces, "Trace API"),
       billing: createApiFixture<BillingApi>(options.billing ?? {}, "Billing API"),
@@ -109,12 +97,8 @@ export function createScenarioRestTestApp(
     members: {
       ...scenarioHostMembers,
       clickhouse: createApiFixture<ScenarioReadOnlyClickHouse>(),
-      agentTesting: createApiFixture<AgentTestService>(),
+      redis,
       simulations,
-      scenarioExecution: createApiFixture<ScenarioExecutionService>(),
-      broadcast,
-      resultAtoms: createApiFixture<ResultAtomsService>(),
-      runConfigurations: createApiFixture<RunConfigurationsService>(),
       encryption: createApiFixture<Encryption>(),
       rateLimiter: { check: async () => ({ allowed: true }) },
       idempotency: { claim: async () => true },
@@ -125,7 +109,7 @@ export function createScenarioRestTestApp(
     secrets: {} as never,
   });
 
-  return { app, simulations, broadcast };
+  return { app, simulations, redis };
 }
 
 export function createScenarioRestTestRuntime(

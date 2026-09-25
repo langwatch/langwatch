@@ -1,5 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import type { ScenarioExecutionService } from "@langwatch/scenario-contract";
+
+/** The one write the backfill makes: closing a run that can no longer finish. */
+type StalledRunCloser = Pick<ScenarioExecutionService, "finishUnsuccessfulRun">;
 import { Task } from "@langwatch/task";
 import { nowInstant } from "@langwatch/time";
 
@@ -33,7 +36,7 @@ export async function backfillStalledRuns({
   thresholdMs = BACKFILL_STALE_THRESHOLD_MS,
 }: {
   finder: StalledRunFinder;
-  execution: ScenarioExecutionService;
+  execution: StalledRunCloser;
   dryRun: boolean;
   now?: number;
   thresholdMs?: number;
@@ -88,7 +91,7 @@ export class StalledRunsBackfillTask extends Task {
 
   private constructor(
     private readonly finder: () => StalledRunFinder,
-    private readonly execution: () => ScenarioExecutionService,
+    private readonly execution: () => StalledRunCloser,
     private readonly dryRun: boolean,
   ) {
     super();
@@ -100,7 +103,7 @@ export class StalledRunsBackfillTask extends Task {
     dryRun = false,
   }: {
     finder: () => StalledRunFinder;
-    execution: () => ScenarioExecutionService;
+    execution: () => StalledRunCloser;
     /** Report what would close without closing it. Stated by the task launcher. */
     dryRun?: boolean;
   }): StalledRunsBackfillTask {

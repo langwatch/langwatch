@@ -138,11 +138,11 @@ export class ScenarioEventService {
       tabKey: input.tabKey,
       url: input.url,
     });
-    await this.#broadcast.broadcastToTenant(
-      input.projectId,
-      JSON.stringify(payload),
-      "simulation_updated",
-    );
+    await this.#broadcast.broadcastToTenant({
+      projectId: input.projectId,
+      message: JSON.stringify(payload),
+      eventType: "simulation_updated",
+    });
 
     logger.info(
       { projectId: input.projectId, batchRunId: input.batchRunId },
@@ -289,12 +289,12 @@ export class ScenarioEventService {
         event.type === ScenarioEventType.TOOL_CALL_ARGS
           ? "delta"
           : "structural";
-      await this.#broadcast.broadcastToTenantRateLimited(
+      await this.#broadcast.broadcastToTenantRateLimited({
         projectId,
-        payload,
-        "simulation_updated",
+        message: payload,
+        eventType: "simulation_updated",
         tier,
-      );
+      });
     } catch (error) {
       logger.warn({ error, projectId }, "Failed to broadcast streaming event");
     }

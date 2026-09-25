@@ -1,5 +1,7 @@
 import type { ScenarioRepositories } from "../scenario.repositories.ts";
 import { MemoryCancellationChannelRepository } from "./memory.cancellation-channel.repository.ts";
+import { MemoryResultAtomsRepository } from "./memory.result-atoms.repository.ts";
+import { MemoryRunConfigurationsRepository } from "./memory.run-configurations.repository.ts";
 import { MemoryScenarioTabStoreRepository } from "./memory.scenario-tab-store.repository.ts";
 import { MemoryScenarioRepository } from "./memory.scenario.repository.ts";
 import { MemorySimulationRunProcessingRepository } from "./memory.simulation-run-processing.repository.ts";
@@ -18,6 +20,8 @@ export class MemoryScenarioRepositories {
       cancellationSubscriptions: cancellations,
       stalledRuns: MemoryStalledSimulationRunRepository.create(),
       tabs: MemoryScenarioTabStoreRepository.create(),
+      resultAtoms: MemoryResultAtomsRepository.create(),
+      runConfigurations: MemoryRunConfigurationsRepository.create(),
     };
   }
 }

@@ -11,6 +11,7 @@ export const scenarioTestConfig: ScenarioServerConfig = {
   blockLocalHttpCalls: true,
   allowedProxyHosts: [],
   defaultModel: void 0,
+  nlpTimeouts: { engineCodeBlockTimeoutSeconds: void 0, maxTimeoutMs: void 0 },
   childParentEnvironment: {
     path: void 0,
     home: void 0,

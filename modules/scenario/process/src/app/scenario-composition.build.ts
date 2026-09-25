@@ -6,7 +6,6 @@ import type { Encryption } from "@langwatch/process-stores/members";
 import { ScenarioSecretsUnavailableError } from "@langwatch/scenario-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
-import type { SnapshotUpdateBroadcastSubscriberDeps } from "../eventing/snapshot-update-broadcast.subscriber.ts";
 import { SimulationClickHouseRepository } from "../repositories/clickhouse/simulation-clickhouse.repository.ts";
 import type { SimulationExecutionRepository } from "../repositories/simulation-execution.repository.ts";
 import {
@@ -140,11 +139,6 @@ export function buildScenarioComposition(input: {
         )
       : void 0,
   };
-}
-
-/** No module offers scenario a tenant broadcast yet; main without Redis skipped it too. */
-export function undeliveredSnapshotUpdates(): SnapshotUpdateBroadcastSubscriberDeps {
-  return { broadcastUpdate: () => Promise.resolve() };
 }
 
 /**

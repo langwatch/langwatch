@@ -18,7 +18,6 @@ import type { ProjectApi } from "@langwatch/project-contract";
  */
 import type {
   QueueSimulationRunInput,
-  ScenarioExecutionService,
   SimulationQueueRun,
   SimulationService,
 } from "@langwatch/scenario-contract";
@@ -33,10 +32,8 @@ import {
   scenarioHostMembers,
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
+import type { ScenarioEventBroadcastPublisher } from "../../channels/redis/redis.scenario-event-broadcast.channel.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
-import type { AgentTestService } from "../../services/agent-test.service.ts";
-import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
-import type { RunConfigurationsService } from "../../services/run-configurations.service.ts";
 import { ScenarioApp, type ScenarioReadOnlyClickHouse } from "../scenario.app.ts";
 
 function harness() {
@@ -75,23 +72,13 @@ function harness() {
     // missing property, which is the loud failure we want.
     members: {
       ...scenarioHostMembers,
+      redis: createApiFixture<ScenarioEventBroadcastPublisher>(),
       publicBaseUrl: "https://langwatch.test",
       clickhouse: createApiFixture<ScenarioReadOnlyClickHouse>(),
-      agentTesting: createApiFixture<AgentTestService>(),
       simulations: simulations as SimulationService,
-      scenarioExecution: {} as ScenarioExecutionService,
-      resultAtoms: {} as ResultAtomsService,
-      runConfigurations: {} as RunConfigurationsService,
       encryption: createApiFixture<Encryption>(),
       rateLimiter: { check: async () => ({ allowed: true }) },
       idempotency: { claim: async () => true },
-      broadcast: {
-        getTenantEmitter: () => {
-          throw new Error("the queue path subscribes to nothing");
-        },
-        broadcastToTenant: async () => {},
-        broadcastToTenantRateLimited: async () => {},
-      },
     },
   });
 
@@ -376,25 +363,15 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
         secrets: {} as never,
         members: {
           ...scenarioHostMembers,
+          redis: createApiFixture<ScenarioEventBroadcastPublisher>(),
           publicBaseUrl: undefined,
           // No ClickHouse either: the refusal is what a deployment that
           // composed neither the member nor the store it derives from owes.
           clickhouse: undefined as never,
-          agentTesting: createApiFixture<AgentTestService>(),
           simulations: undefined as never,
-          scenarioExecution: {} as ScenarioExecutionService,
-          resultAtoms: {} as ResultAtomsService,
-          runConfigurations: {} as RunConfigurationsService,
           encryption: createApiFixture<Encryption>(),
           rateLimiter: { check: async () => ({ allowed: true }) },
           idempotency: { claim: async () => true },
-          broadcast: {
-            getTenantEmitter: () => {
-              throw new Error("this read subscribes to nothing");
-            },
-            broadcastToTenant: async () => {},
-            broadcastToTenantRateLimited: async () => {},
-          },
         },
       });
 
@@ -432,6 +409,7 @@ describe("given a process that supplies no simulations member but does read Clic
       secrets: {} as never,
       members: {
         ...scenarioHostMembers,
+        redis: createApiFixture<ScenarioEventBroadcastPublisher>(),
         publicBaseUrl: undefined,
         clickhouse: {
           query: <Row>(input: { tenantId: string }) => {
@@ -440,21 +418,10 @@ describe("given a process that supplies no simulations member but does read Clic
             return Promise.resolve({ rows: [] as Row[] });
           },
         },
-        agentTesting: createApiFixture<AgentTestService>(),
         simulations: undefined as never,
-        scenarioExecution: {} as ScenarioExecutionService,
-        resultAtoms: {} as ResultAtomsService,
-        runConfigurations: {} as RunConfigurationsService,
         encryption: createApiFixture<Encryption>(),
         rateLimiter: { check: async () => ({ allowed: true }) },
         idempotency: { claim: async () => true },
-        broadcast: {
-          getTenantEmitter: () => {
-            throw new Error("this read subscribes to nothing");
-          },
-          broadcastToTenant: async () => {},
-          broadcastToTenantRateLimited: async () => {},
-        },
       },
     });
 

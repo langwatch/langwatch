@@ -3,6 +3,8 @@ import type {
   CancellationSubscriber,
   ScenarioTabStore,
 } from "../app/scenario.app.ts";
+import type { ResultAtomsRepository } from "./result-atoms.repository.ts";
+import type { RunConfigurationsRepository } from "./run-configurations.repository.ts";
 import type { ScenarioRepository } from "./scenario.repository.ts";
 import type { SimulationRunProcessingRepository } from "./simulation-run-processing.repository.ts";
 import type { StalledSimulationRunRepository } from "./stalled-simulation-run.repository.ts";
@@ -22,4 +24,8 @@ export interface ScenarioRepositories {
   readonly stalledRuns: StalledSimulationRunRepository;
   /** Which browser tabs are open on a project's simulations, and the run parked for each. */
   readonly tabs: ScenarioTabStore;
+  /** The Results tab's atoms, read from the run fold in ClickHouse. */
+  readonly resultAtoms: ResultAtomsRepository;
+  /** The configurations a project's run plans already ran with. */
+  readonly runConfigurations: RunConfigurationsRepository;
 }

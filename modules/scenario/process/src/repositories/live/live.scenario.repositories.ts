@@ -1,5 +1,8 @@
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 
+import { ResultAtomsClickHouseRepository } from "../clickhouse/clickhouse.result-atoms.repository.ts";
+import { RunConfigurationsClickHouseRepository } from "../clickhouse/clickhouse.run-configurations.repository.ts";
+import { ClickHouseSimulationSession } from "../clickhouse/clickhouse.simulation-session.store.ts";
 import { ClickHouseStalledSimulationRunRepository } from "../clickhouse/clickhouse.stalled-simulation-run.repository.ts";
 import { PostgresScenarioRepositories } from "../prisma/prisma.scenario.repositories.ts";
 import {
@@ -20,6 +23,7 @@ export class LiveScenarioRepositories {
     clickhouse,
     redis,
   }: Pick<ProcessMembers, "prisma" | "clickhouse" | "redis">): ScenarioRepositories {
+    const sessions = ClickHouseSimulationSession.resolver(clickhouse);
     return {
       ...PostgresScenarioRepositories.create({ prisma }),
       simulationRunProcessing: RedisSimulationRunProcessingRepository.create({ clickhouse, redis }),
@@ -29,6 +33,8 @@ export class LiveScenarioRepositories {
       ),
       stalledRuns: ClickHouseStalledSimulationRunRepository.create(clickhouse),
       tabs: RedisScenarioTabStoreRepository.create(redis),
+      resultAtoms: ResultAtomsClickHouseRepository.create(sessions),
+      runConfigurations: RunConfigurationsClickHouseRepository.create(sessions),
     };
   }
 }

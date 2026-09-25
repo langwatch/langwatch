@@ -51,7 +51,6 @@ export {
   scenarioAppDependencyTokens,
   type ScenarioAppDependencies,
   type ScenarioAppInfrastructure,
-  type ScenarioBroadcast,
 } from "./app/scenario.app.ts";
 // CancellationPublisher/CancellationSubscriber are not re-exported here: the
 // redis adapter above already exports its own same-named types (a different

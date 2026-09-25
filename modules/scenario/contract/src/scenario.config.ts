@@ -12,6 +12,10 @@ const trimmedOptional = z
   .optional()
   .transform((value) => value?.trim() || void 0);
 const passthrough = z.string().optional();
+const optionalNumber = z
+  .string()
+  .optional()
+  .transform((value) => (value === void 0 ? void 0 : Number(value)));
 
 /**
  * What a scenario child is started with. The ten passthrough values are main's
@@ -25,6 +29,11 @@ export const scenarioConfig = Config.define((c) => ({
   blockLocalHttpCalls,
   allowedProxyHosts,
   defaultModel: langwatchDefaultModel,
+  /** The nlpgo deadlines an agent-test turn answers inside; unusable values clamp to defaults. */
+  nlpTimeouts: {
+    engineCodeBlockTimeoutSeconds: c.env("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", optionalNumber),
+    maxTimeoutMs: c.env("NLP_FETCH_MAX_TIMEOUT_MS", optionalNumber),
+  },
   childParentEnvironment: {
     path: c.env("PATH", passthrough),
     home: c.env("HOME", passthrough),

@@ -13,7 +13,8 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   createLogger: () => ({ info: logInfo, warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }));
 
-import type { ScenarioBroadcast, ScenarioTabStore } from "../../app/scenario.app.ts";
+import type { ScenarioTabStore } from "../../app/scenario.app.ts";
+import type { ScenarioEventBroadcastPublisher } from "../../channels/redis/redis.scenario-event-broadcast.channel.ts";
 import { scenarioEventsRest } from "../scenario-event.rest.ts";
 import {
   createScenarioRestTestApp,
@@ -27,7 +28,7 @@ function buildEventFamily(
   options: {
     simulations?: Partial<SimulationService>;
     tabs?: Partial<ScenarioTabStore>;
-    broadcast?: Partial<ScenarioBroadcast>;
+    redis?: Partial<ScenarioEventBroadcastPublisher>;
     extractInlineMedia?: (input: {
       event: unknown;
       projectId: string;
@@ -43,7 +44,7 @@ function buildEventFamily(
   const world = createScenarioRestTestApp({
     simulations: options.simulations,
     tabs: options.tabs,
-    broadcast: options.broadcast,
+    redis: options.redis,
     plans: options.plans,
     featureFlags: options.featureFlags,
     traces: {
@@ -294,10 +295,10 @@ describe("the scenario-events REST declaration", () => {
     /** @scenario "Nothing is parked when no tab was listening" */
     it("reports undelivered without parking or broadcasting", async () => {
       const setPending = vi.fn();
-      const broadcastToTenant = vi.fn();
+      const publish = vi.fn(async () => 1);
       const family = buildEventFamily({
         tabs: { countAfter: async () => 0, setPending },
-        broadcast: { broadcastToTenant },
+        redis: { publish },
       });
 
       const response = await postJson(family, "/api/scenario-events/browser-tab", {
@@ -306,7 +307,7 @@ describe("the scenario-events REST declaration", () => {
       });
       await expect(response.json()).resolves.toMatchObject({ delivered: false });
       expect(setPending).not.toHaveBeenCalled();
-      expect(broadcastToTenant).not.toHaveBeenCalled();
+      expect(publish).not.toHaveBeenCalled();
     });
 
     /** @scenario "The handoff is delivered when a tab is listening" */
@@ -315,12 +316,13 @@ describe("the scenario-events REST declaration", () => {
       const setPending = vi.fn(async () => {
         calls.push("park");
       });
-      const broadcastToTenant = vi.fn(async () => {
+      const publish = vi.fn(async () => {
         calls.push("broadcast");
+        return 1;
       });
       const family = buildEventFamily({
         tabs: { countAfter: async () => 1, setPending },
-        broadcast: { broadcastToTenant },
+        redis: { publish },
       });
 
       const response = await postJson(family, "/api/scenario-events/browser-tab", {
@@ -334,7 +336,7 @@ describe("the scenario-events REST declaration", () => {
         url: "https://app.langwatch.test/scenario-rest-project/simulations/checkout/batch-a",
       });
       expect(setPending).toHaveBeenCalledTimes(1);
-      expect(broadcastToTenant).toHaveBeenCalledTimes(1);
+      expect(publish).toHaveBeenCalledTimes(1);
       expect(calls).toEqual(["park", "broadcast"]);
     });
 
@@ -371,10 +373,10 @@ describe("the scenario-events REST declaration", () => {
     /** @scenario "The handoff URL must belong to this LangWatch instance" */
     it("ignores a caller-supplied URL and broadcasts this instance's URL", async () => {
       const setPending = vi.fn(async () => {});
-      const broadcastToTenant = vi.fn(async () => {});
+      const publish = vi.fn(async () => 1);
       const family = buildEventFamily({
         tabs: { countAfter: async () => 1, setPending },
-        broadcast: { broadcastToTenant },
+        redis: { publish },
       });
 
       const response = await postJson(family, "/api/scenario-events/browser-tab", {
@@ -392,7 +394,7 @@ describe("the scenario-events REST declaration", () => {
           url: "https://app.langwatch.test/scenario-rest-project/simulations/default/batch-a",
         }),
       );
-      expect(broadcastToTenant).toHaveBeenCalledTimes(1);
+      expect(publish).toHaveBeenCalledTimes(1);
     });
   });
 
