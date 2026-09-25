@@ -10,9 +10,19 @@ import type { EvaluationV3Event } from "./workbench/execution/types.ts";
 
 export const runIdParamsSchema = z.object({ runId: z.string().min(1) });
 
+/** A positive integer as main published it; anything else reads as absent, never a refusal. */
+export const lenientPositiveIntSchema = z.coerce
+  .number()
+  .int()
+  .positive()
+  .optional()
+  .catch(undefined);
+
 export const slugVersionParamsSchema = z.object({
   slug: z.string().min(1),
-  version: z.string().min(1),
+  version: lenientPositiveIntSchema.describe(
+    "The version to restore, as listed by `GET /api/experiments/{slug}/versions`",
+  ),
 });
 
 /** `/api/evaluations/v3`'s slug segment: `:slug`'s position, named for what it identifies. */
@@ -22,14 +32,14 @@ export const evaluationSlugParamsSchema = z.object({
 
 export const evaluationSlugVersionParamsSchema = z.object({
   evaluationSlug: z.string().min(1),
-  version: z.string().min(1),
+  version: lenientPositiveIntSchema,
 });
 
 /** A bad page number falls back rather than refusing; a missing slug 400s in the handler. */
 export const listRunsQuerySchema = z.object({
   experimentSlug: z.string().optional().describe("Slug of the experiment whose runs you want"),
-  page: z.string().optional().describe("1-based page number"),
-  pageSize: z.string().optional().describe("Runs per page, capped at 200"),
+  page: lenientPositiveIntSchema.describe("1-based page number"),
+  pageSize: lenientPositiveIntSchema.describe("Runs per page, capped at 200"),
 });
 
 export const runResultsQuerySchema = z.object({
@@ -47,8 +57,8 @@ export const workbenchStateQuerySchema = z.object({
 });
 
 export const listVersionsQuerySchema = z.object({
-  limit: z.string().optional().describe("Versions per page, capped at 100"),
-  cursor: z.string().optional().describe("The `nextCursor` of the previous page"),
+  limit: lenientPositiveIntSchema.describe("Versions per page, capped at 100"),
+  cursor: lenientPositiveIntSchema.describe("The `nextCursor` of the previous page"),
 });
 
 /** Run lifecycle as the poll endpoint reports it. */

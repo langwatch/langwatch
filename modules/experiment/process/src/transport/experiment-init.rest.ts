@@ -6,11 +6,16 @@ import { publicRoute } from "@langwatch/api/access";
 import {
   defineRestMiddleware,
   defineRestRouter,
+  documentedResponses,
   MANAGEMENT_API_VERSION,
   type RestProtocolProducer,
 } from "@langwatch/api/rest";
 import { zodErrorMessage } from "@langwatch/config";
-import { ExperimentApi, experimentInitBodySchema } from "@langwatch/experiment-contract";
+import {
+  ExperimentApi,
+  experimentInitBodySchema,
+  experimentInitResponseSchema,
+} from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
@@ -97,6 +102,8 @@ export const experimentInitRest = defineRestRouter(ExperimentApi)
     summary: "Create an experiment",
     description:
       "Create an experiment, or return the existing one when the slug is already taken. This is the first call in an experiment run: take the slug back, report results against it, and every run under that slug groups together in the app. The SDKs call this endpoint for you. The body carries `experiment_type` and at least one of `experiment_slug` (the stable slug you choose, which is what makes repeated runs land together) or `experiment_id`; `experiment_name` names it on creation and `workflowId` ties it to an Optimization Studio workflow.",
+    requestBody: { schema: experimentInitBodySchema },
+    responses: documentedResponses({ 200: experimentInitResponseSchema }),
     errors: [
       {
         status: 400,

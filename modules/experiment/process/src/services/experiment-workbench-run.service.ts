@@ -287,7 +287,7 @@ export class ExperimentWorkbenchRunService {
     }
 
     const pageSize = pageSizeOf(input.pageSize);
-    const page = pageOf(input.page);
+    const page = input.page ?? 1;
 
     const { experiment, runs, totalHits } = await this.experiments
       .getRunsPageBySlug({ projectId: input.projectId, experimentSlug, page, pageSize })
@@ -477,17 +477,7 @@ export class ExperimentWorkbenchRunService {
   }
 }
 
-/** The page size a list asks for: 50 unless a positive number, never above 200. */
-function pageSizeOf(raw: string | undefined): number {
-  const parsed = raw ? parseInt(raw, 10) : 50;
-  if (!Number.isFinite(parsed) || parsed <= 0) return 50;
-
-  return Math.min(parsed, 200);
-}
-
-/** The 1-based page a list asks for, falling back to the first. */
-function pageOf(raw: string | undefined): number {
-  const parsed = raw ? parseInt(raw, 10) : 1;
-
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+/** The page size a list asks for: 50 unless given, never above 200. */
+function pageSizeOf(requested: number | undefined): number {
+  return Math.min(requested ?? 50, 200);
 }

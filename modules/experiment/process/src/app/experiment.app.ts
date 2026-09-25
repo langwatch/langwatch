@@ -650,7 +650,7 @@ export class ExperimentApp implements ExperimentApi {
 
   /** Puts a past version back by the slug and path segment a REST door names. */
   restoreWorkbenchVersionBySlug(
-    input: Readonly<{ projectId: string; slug: string; version: string }>,
+    input: Readonly<{ projectId: string; slug: string; version: number | undefined }>,
     by: ExperimentCaller,
   ): Promise<WorkbenchSaveResult> {
     return this.#workbenchVersions.restoreBySlug({ ...input, actor: ExperimentApp.actorFor(by) });

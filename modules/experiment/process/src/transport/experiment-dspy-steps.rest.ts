@@ -7,13 +7,15 @@ import { publicRoute } from "@langwatch/api/access";
 import {
   defineRestMiddleware,
   defineRestRouter,
+  documentedResponses,
   MANAGEMENT_API_VERSION,
   type RestProtocolProducer,
 } from "@langwatch/api/rest";
 import { zodErrorMessage } from "@langwatch/config";
 import {
+  dSPyLogStepsBodySchema,
+  dSPyLogStepsResponseSchema,
   type DSPyStepRESTParams,
-  dSPyStepRESTParamsSchema,
   ExperimentApi,
 } from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
@@ -130,6 +132,8 @@ export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
     summary: "Report DSPy optimizer steps",
     description:
       "Report the steps of a DSPy optimizer run against an experiment, so the run's progress and scores show up in the app. Send the steps as an array; the optimizer typically posts each batch as it finishes. Bodies up to 20MB are accepted.",
+    requestBody: { schema: dSPyLogStepsBodySchema },
+    responses: documentedResponses({ 200: dSPyLogStepsResponseSchema }),
     errors: [
       {
         status: 400,
@@ -164,7 +168,7 @@ export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
       "DSPy log_steps request received",
     );
 
-    const parsed = z.array(dSPyStepRESTParamsSchema).safeParse(body);
+    const parsed = dSPyLogStepsBodySchema.safeParse(body);
     if (!parsed.success) {
       logger.error(
         { error: parsed.error, payloadSize, projectId },

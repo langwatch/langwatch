@@ -6,6 +6,7 @@
 
 import { z } from "zod";
 
+import { lenientPositiveIntSchema } from "./experiment-workbench-rest.ts";
 import type { ExperimentType } from "./experiment.ts";
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -34,37 +35,11 @@ export const experimentsListResponseSchema = z.object({
   }),
 });
 
-const parsePositiveInt = ({
-  value,
-  fallback,
-  max,
-}: {
-  value: string | undefined;
-  fallback: number;
-  max?: number;
-}): number => {
-  if (value === undefined) return fallback;
-  const parsed = parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
-
-  return max ? Math.min(parsed, max) : parsed;
-};
-
-/**
- * A page number that never rejects: a value that is not a positive integer has
- * always fallen back rather than refused the request, so the schema says that.
- */
-const lenientPositiveInt = (fallback: number, max?: number) =>
-  z
-    .string()
-    .optional()
-    .transform((value) => parsePositiveInt({ value, fallback, ...(max ? { max } : {}) }));
-
 export const listExperimentsQuerySchema = z.object({
-  page: lenientPositiveInt(1).describe("1-based page number"),
-  pageSize: lenientPositiveInt(DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE).describe(
-    `Experiments per page, capped at ${MAX_PAGE_SIZE}`,
-  ),
+  page: lenientPositiveIntSchema.transform((page) => page ?? 1).describe("1-based page number"),
+  pageSize: lenientPositiveIntSchema
+    .transform((size) => Math.min(size ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE))
+    .describe(`Experiments per page, capped at ${MAX_PAGE_SIZE}`),
 });
 
 export const slugParamsSchema = z.object({

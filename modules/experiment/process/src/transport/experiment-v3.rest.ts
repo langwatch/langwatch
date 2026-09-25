@@ -6,6 +6,7 @@
 import {
   defineRestMiddleware,
   defineRestRouter,
+  documentedResponses,
   MANAGEMENT_API_VERSION,
   projectRestFacts,
   type RestRawResult,
@@ -20,12 +21,14 @@ import {
   runIdParamsSchema,
   runRefusalSchema,
   runResultsQuerySchema,
+  runInputsBodySchema,
   runResultsResponseSchema,
   runStatusResponseSchema,
   saveWorkbenchStateBodySchema,
   saveWorkbenchStateResponseSchema,
   slugParamsSchema,
   slugVersionParamsSchema,
+  startRunResponseSchema,
   workbenchStateQuerySchema,
   workbenchStateAnswerSchema,
   type SavedRunAnswer,
@@ -110,7 +113,20 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
     description:
       "Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send `Accept: text/event-stream` instead to stream progress events until the run finishes.",
     tags: ["Experiments"],
+    requestBody: { schema: runInputsBodySchema },
     responses: {
+      200: {
+        description: "Run started",
+        content: {
+          ...documentedResponses({ 200: startRunResponseSchema })[200]?.content,
+          "text/event-stream": {
+            schema: {
+              type: "string",
+              description: "Progress events, ending with a done event carrying the summary",
+            },
+          },
+        },
+      },
       400: {
         description:
           "The body was not valid JSON, failed input validation, or the experiment has no dataset configured",

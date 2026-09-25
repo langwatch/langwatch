@@ -28,12 +28,54 @@ import { experimentSchema } from "./experiment.ts";
 const projectScopeSchema = z.object({ projectId: z.string() });
 
 /**
- * The legacy wizard's stored setup, as the wire carries it. Open on purpose:
- * its vocabulary is the deployment's evaluation preconditions and trace
- * mappings, which this module does not own and stores without reading.
+ * The legacy wizard's stored setup, named as main named it. Preconditions and
+ * trace mappings are another module's vocabulary, so those stay open here.
  */
 export const legacyWorkbenchStateSchema = z
-  .record(z.string(), z.unknown())
+  .looseObject({
+    name: z.string().optional(),
+    step: z.enum(["task", "dataset", "execution", "evaluation", "results"]).optional(),
+    task: z
+      .enum(["real_time", "llm_app", "prompt_creation", "custom_evaluator", "scan"])
+      .optional(),
+    dataSource: z.enum(["choose", "from_production", "manual", "upload"]).optional(),
+    executionMethod: z
+      .enum([
+        "realtime_on_message",
+        "realtime_guardrail",
+        "realtime_manually",
+        "offline_prompt",
+        "offline_http",
+        "offline_workflow",
+        "offline_notebook",
+        "offline_code_execution",
+        "api",
+      ])
+      .optional(),
+    evaluatorCategory: z
+      .enum(["expected_answer", "llm_judge", "quality", "rag", "safety", "custom_evaluators"])
+      .optional(),
+    realTimeTraceMappings: z.record(z.string(), z.unknown()).optional(),
+    realTimeExecution: z
+      .looseObject({
+        sample: z.number().min(0).max(1).optional(),
+        preconditions: z.array(z.unknown()).optional(),
+      })
+      .optional(),
+    workspaceTab: z.enum(["dataset", "workflow", "results", "code-implementation"]).optional(),
+    isThreadMapping: z.boolean().optional(),
+    realTimeThreadMappings: z
+      .looseObject({
+        mapping: z.record(
+          z.string(),
+          z.looseObject({
+            source: z.enum(["", "thread_id", "traces", "formatted_traces"]),
+            selectedFields: z.array(z.string()).optional(),
+          }),
+        ),
+      })
+      .optional(),
+  })
   .describe("The wizard's stored setup: read it, change it, send it back whole.");
 
 /** `saveExperiment`: the legacy wizard's setup and the graph it writes a version of. */

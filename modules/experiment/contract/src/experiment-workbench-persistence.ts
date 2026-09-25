@@ -13,17 +13,16 @@ import {
 // ============================================================================
 
 /**
- * Schema for persisted results.
- * Arrays can contain null/undefined for rows that haven't been executed.
- * Uses targetRowMetadataSchema from types.ts as single source of truth.
+ * Persisted results; arrays hold null for rows not yet executed. Each group
+ * defaults to empty so `results: {}` clears a run from outside the editor.
  */
 export const persistedResultsSchema = z.object({
   runId: z.string().optional(),
   versionId: z.string().optional(),
-  targetOutputs: z.record(z.string(), z.array(z.unknown())),
-  targetMetadata: z.record(z.string(), z.array(targetRowMetadataSchema.nullish())),
-  evaluatorResults: z.record(z.string(), z.record(z.string(), z.array(z.unknown()))),
-  errors: z.record(z.string(), z.array(z.string().nullish())),
+  targetOutputs: z.record(z.string(), z.array(z.unknown())).default({}),
+  targetMetadata: z.record(z.string(), z.array(targetRowMetadataSchema.nullish())).default({}),
+  evaluatorResults: z.record(z.string(), z.record(z.string(), z.array(z.unknown()))).default({}),
+  errors: z.record(z.string(), z.array(z.string().nullish())).default({}),
 });
 
 /**

@@ -32,7 +32,7 @@ describe("ExperimentWorkbenchVersionService.restoreBySlug", () => {
     const answer = await service.restoreBySlug({
       projectId: "project_1",
       slug: "my-experiment",
-      version: "2",
+      version: 2,
       actor,
     });
 
@@ -42,7 +42,7 @@ describe("ExperimentWorkbenchVersionService.restoreBySlug", () => {
     ]);
   });
 
-  it("refuses a segment that is not a version number as a version never had", async () => {
+  it("refuses a path segment that parsed as no version as a version never had", async () => {
     const service = ExperimentWorkbenchVersionService.create({
       experiments: createApiFixture<ExperimentService>({
         getWorkbenchState: async () => workbench,
@@ -53,7 +53,7 @@ describe("ExperimentWorkbenchVersionService.restoreBySlug", () => {
       service.restoreBySlug({
         projectId: "project_1",
         slug: "my-experiment",
-        version: "two",
+        version: undefined,
         actor,
       }),
     ).rejects.toMatchObject({ code: "experiment_version_not_found" });

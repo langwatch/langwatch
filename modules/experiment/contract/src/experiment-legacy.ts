@@ -97,6 +97,13 @@ export const dSPyStepRESTParamsSchema = z.object({
 
 export type DSPyStepRESTParams = z.infer<typeof dSPyStepRESTParamsSchema>;
 
+/** `POST /api/dspy/log_steps`'s body: the optimizer's steps, in the order they ran. */
+export const dSPyLogStepsBodySchema = z.array(dSPyStepRESTParamsSchema);
+
+export const dSPyLogStepsResponseSchema = z.object({
+  message: z.string().describe("Human-readable confirmation"),
+});
+
 export const dSPyStepSummarySchema = z.object({
   run_id: z.string(),
   index: z.string(),
