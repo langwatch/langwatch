@@ -116,7 +116,7 @@ Self-hosted, two more variables shape the phone transport. Set `VOICE_PUBLIC_BAS
 
 ## Write voice scenarios in code
 
-The Scenario SDK runs the call from your own test runner, against the transport your agent is deployed on. The scenario, the simulated caller and the judge are the same as above, and with `LANGWATCH_API_KEY` set every run appears under **Agent Testing > Results** with the recording and the transcript.
+The Scenario SDK runs the call from your own test runner. The agent under test can be one deployed on a voice transport (Pipecat, ElevenLabs, Twilio), or one running directly on a realtime model through `OpenAIRealtimeAgentAdapter` or `GeminiLiveAgentAdapter`. The scenario, the simulated caller and the judge are the same as above, and with `LANGWATCH_API_KEY` set every run appears under **Agent Testing > Results** with the recording and the transcript.
 
 <Tip>
   **Quick setup?** Run `/scenarios add voice testing to my agent` in your coding assistant after installing the [`/scenarios` skill](/skills/directory). It detects your transport, picks the adapter and wires it to your agent.
@@ -138,51 +138,62 @@ Give the user simulator a voice and it becomes the caller. Audio effects, interr
 <Tabs>
   <Tab title="Python">
     ```python
+    import pytest
     import scenario
 
     scenario.configure(default_model="openai/gpt-5-mini")
 
-    result = await scenario.run(
-        name="billing inquiry",
-        description="An upset customer calls about a duplicate charge.",
-        agents=[
-            scenario.PipecatAgentAdapter(url="ws://localhost:8765/stream"),
-            scenario.UserSimulatorAgent(
-                voice="elevenlabs/EXAVITQu4vr4xnSDxMaL",
-                audio_effects=[scenario.effects.phone_quality()],
-            ),
-            scenario.JudgeAgent(criteria=[
-                "Acknowledged the frustration before logistics",
-                "Verified identity before any account action",
-            ]),
-        ],
-        script=[scenario.agent(), scenario.user(), scenario.proceed(turns=5), scenario.judge()],
-    )
-    assert result.success
+    @pytest.mark.agent_test
+    @pytest.mark.asyncio
+    async def test_billing_inquiry():
+        result = await scenario.run(
+            name="billing inquiry",
+            description="An upset customer calls about a duplicate charge.",
+            agents=[
+                scenario.PipecatAgentAdapter(url="ws://localhost:8765/stream"),
+                scenario.UserSimulatorAgent(
+                    voice="elevenlabs/EXAVITQu4vr4xnSDxMaL",
+                    audio_effects=[scenario.effects.phone_quality()],
+                ),
+                scenario.JudgeAgent(criteria=[
+                    "Acknowledged the frustration before logistics",
+                    "Verified identity before any account action",
+                ]),
+            ],
+            script=[scenario.agent(), scenario.user(), scenario.proceed(turns=5), scenario.judge()],
+        )
+        assert result.success
     ```
+
+    The `asyncio` marker needs `pytest-asyncio` installed.
   </Tab>
   <Tab title="TypeScript">
     ```typescript
+    import { it, expect } from "vitest";
     import scenario, { voice } from "@langwatch/scenario";
 
-    const result = await scenario.run({
-      name: "billing inquiry",
-      description: "An upset customer calls about a duplicate charge.",
-      agents: [
-        scenario.pipecatAgent({ url: "ws://localhost:8765/stream" }),
-        scenario.userSimulatorAgent({
-          voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
-          audioEffects: [voice.effects.phoneQuality()],
-        }),
-        scenario.judgeAgent({
-          criteria: [
-            "Acknowledged the frustration before logistics",
-            "Verified identity before any account action",
-          ],
-        }),
-      ],
-      script: [scenario.agent(), scenario.user(), scenario.proceed(5), scenario.judge()],
-    });
+    it("handles a billing inquiry", async () => {
+      const result = await scenario.run({
+        name: "billing inquiry",
+        description: "An upset customer calls about a duplicate charge.",
+        agents: [
+          scenario.pipecatAgent({ url: "ws://localhost:8765/stream" }),
+          scenario.userSimulatorAgent({
+            voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
+            audioEffects: [voice.effects.phoneQuality()],
+          }),
+          scenario.judgeAgent({
+            criteria: [
+              "Acknowledged the frustration before logistics",
+              "Verified identity before any account action",
+            ],
+          }),
+        ],
+        script: [scenario.agent(), scenario.user(), scenario.proceed(5), scenario.judge()],
+      });
+
+      expect(result.success).toBe(true);
+    }, 180_000);
     ```
   </Tab>
 </Tabs>
