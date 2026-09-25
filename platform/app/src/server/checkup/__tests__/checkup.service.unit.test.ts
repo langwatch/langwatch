@@ -233,6 +233,44 @@ describe("CheckupService", () => {
     });
   });
 
+  describe("when REDIS_URL carries a password", () => {
+    const target = "redis://:s3cr3t-pass@langwatch-redis-master:6379";
+
+    /** @scenario "The Redis address is shown without its password" */
+    it("shows the host and port but never the password", async () => {
+      const answering = rowOf(
+        (
+          await new CheckupService(
+            healthyDeps({ redis: { target, ready: async () => undefined } }),
+          ).cheap()
+        ).rows,
+        "redis",
+      );
+      const silent = rowOf(
+        (
+          await new CheckupService(
+            healthyDeps({
+              redis: {
+                target,
+                ready: async () => {
+                  throw new Error(`connect ECONNREFUSED ${target}`);
+                },
+              },
+            }),
+          ).cheap()
+        ).rows,
+        "redis",
+      );
+
+      for (const verdict of [answering, silent]) {
+        expect(verdict.detail).toContain("langwatch-redis-master:6379");
+        expect(verdict.detail).not.toContain("s3cr3t-pass");
+      }
+      expect(answering.outcome).toBe("verified");
+      expect(silent.outcome).toBe("refused");
+    });
+  });
+
   describe("when the goose binary is absent", () => {
     /** @scenario "A ClickHouse install where the goose binary is absent leaves migrations not checked" */
     it("passes ClickHouse and leaves its migrations not checked", async () => {

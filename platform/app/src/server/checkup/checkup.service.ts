@@ -423,14 +423,15 @@ export class CheckupService {
         docsPath: CHECKUP_DOCS.environment,
       };
     }
+    const shown = withoutUserInfo(target);
     try {
       await this.deps.redis.ready();
-      return { outcome: "verified", detail: `Redis answers at ${target}.` };
+      return { outcome: "verified", detail: `Redis answers at ${shown}.` };
     } catch (error) {
       return {
         outcome: "refused",
         code: "checkup_redis_unreachable",
-        detail: `Redis did not answer at ${target}: ${reasonOf(error)}`,
+        detail: `Redis did not answer at ${shown}: ${withoutUserInfo(reasonOf(error))}`,
         fix: "Check REDIS_URL and that the app can reach the host on that port.",
         docsPath: CHECKUP_DOCS.troubleshooting,
       };
@@ -883,6 +884,11 @@ function inDefinitionOrder(rows: CheckRow[]): CheckRow[] {
     if (!row) throw new Error(`the checkup lost the ${definition.id} row`);
     return row;
   });
+}
+
+/** Masks the user and password of every URL in the text before a row shows it. */
+function withoutUserInfo(text: string): string {
+  return text.replace(/(\/\/)[^/@\s]+@/g, "$1***@");
 }
 
 function reasonOf(error: unknown): string {
