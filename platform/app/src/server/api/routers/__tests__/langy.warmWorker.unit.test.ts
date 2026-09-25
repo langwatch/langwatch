@@ -58,14 +58,20 @@ vi.mock("../langyAccessMiddleware", () => ({
   refuseDemoProject: ({ next }: any) => next(),
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  const passthrough = async ({ ctx, next }: any) => {
-    ctx.permissionChecked = true;
-    return next();
-  };
-  return { ...actual, checkProjectPermission: () => passthrough };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    const passthrough = async ({ ctx, next }: any) => {
+      ctx.permissionChecked = true;
+      return next();
+    };
+    return { ...actual, checkProjectPermission: () => passthrough };
+  },
+);
 
 import { createInnerTRPCContext } from "../../trpc";
 import { langyRouter } from "../langy";

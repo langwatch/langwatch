@@ -85,11 +85,15 @@ const fixturePage1 = {
   ],
   next_cursor: "page-2",
 };
+// The newest instant the fixture serves. The run reports reading through to
+// the newest event it emitted rather than to the wall clock, so the fixture and
+// the expectation below read it from the same place.
+const lastEventAt = "2026-05-01T10:10:00.000Z";
 const fixturePage2 = {
   events: [
     {
       id: "evt-003",
-      created_at: "2026-05-01T10:10:00.000Z",
+      created_at: lastEventAt,
       user: { email: "alice@acme.test" },
       event_type: "completion",
       model: "claude-sonnet-4-6",
@@ -260,6 +264,10 @@ describe("PullerAdapter framework — end-to-end with real CH + real fetch", () 
       nextCursor: null,
       eventCount: 3,
       errorCount: 0,
+      // The feed drained, so nothing was left half-read.
+      completeness: "complete",
+      // No adapter statement, so the run reports the newest event it emitted.
+      readThroughAt: new Date(lastEventAt),
     });
     const updated = await prisma.ingestionSource.findUnique({
       where: { id: ingestionSourceId },

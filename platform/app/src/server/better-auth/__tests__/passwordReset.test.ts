@@ -1,19 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock the boundaries the reset callbacks reach for: the transactional mailer
-// (SendGrid / SES) and the session-revocation helper (Postgres + Redis). The
+// (SendGrid / SES) and the session-revocation service (Postgres + Redis). The
 // callbacks under test are the real ones wired into the `auth` instance.
 vi.mock("../../mailer/resetPasswordEmail", () => ({
   sendResetPasswordEmail: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock("../revokeSessions", () => ({
-  revokeAllSessionsForUser: vi.fn().mockResolvedValue(undefined),
+const { revokeAll } = vi.hoisted(() => ({
+  revokeAll: vi.fn().mockResolvedValue(undefined),
+}));
+// Only the revocation factory is replaced: the rest of the identity runtime is
+// what wires the `auth` instance under test.
+vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("~/server/app-layer/identity/runtime")
+  >()),
+  sessionRevocation: () => ({ revokeAll }),
 }));
 
 import { env } from "~/env.mjs";
 import { sendResetPasswordEmail } from "../../mailer/resetPasswordEmail";
 import { auth } from "../index";
-import { revokeAllSessionsForUser } from "../revokeSessions";
 
 type EmailAndPasswordOptions = {
   sendResetPassword?: (args: {
@@ -80,8 +87,8 @@ describe("better-auth password reset wiring", () => {
         user: { id: "user_1", email: "forgot@acme.test" },
       });
 
-      expect(revokeAllSessionsForUser).toHaveBeenCalledTimes(1);
-      expect(revokeAllSessionsForUser).toHaveBeenCalledWith(
+      expect(revokeAll).toHaveBeenCalledTimes(1);
+      expect(revokeAll).toHaveBeenCalledWith(
         expect.objectContaining({ userId: "user_1" }),
       );
     });

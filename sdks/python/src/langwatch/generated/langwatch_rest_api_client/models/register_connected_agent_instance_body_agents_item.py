@@ -22,7 +22,6 @@ class RegisterConnectedAgentInstanceBodyAgentsItem:
     Attributes:
         name (str):
         environment (str):
-        description (str | Unset):
         parameters (RegisterConnectedAgentInstanceBodyAgentsItemParameters | Unset):
         concurrency (int | Unset):
         timeout_ms (int | Unset):
@@ -31,7 +30,6 @@ class RegisterConnectedAgentInstanceBodyAgentsItem:
 
     name: str
     environment: str
-    description: str | Unset = UNSET
     parameters: RegisterConnectedAgentInstanceBodyAgentsItemParameters | Unset = UNSET
     concurrency: int | Unset = UNSET
     timeout_ms: int | Unset = UNSET
@@ -41,8 +39,6 @@ class RegisterConnectedAgentInstanceBodyAgentsItem:
         name = self.name
 
         environment = self.environment
-
-        description = self.description
 
         parameters: dict[str, Any] | Unset = UNSET
         if not isinstance(self.parameters, Unset):
@@ -62,8 +58,6 @@ class RegisterConnectedAgentInstanceBodyAgentsItem:
                 "environment": environment,
             }
         )
-        if description is not UNSET:
-            field_dict["description"] = description
         if parameters is not UNSET:
             field_dict["parameters"] = parameters
         if concurrency is not UNSET:
@@ -86,8 +80,6 @@ class RegisterConnectedAgentInstanceBodyAgentsItem:
 
         environment = d.pop("environment")
 
-        description = d.pop("description", UNSET)
-
         _parameters = d.pop("parameters", UNSET)
         parameters: RegisterConnectedAgentInstanceBodyAgentsItemParameters | Unset
         if isinstance(_parameters, Unset):
@@ -104,7 +96,6 @@ class RegisterConnectedAgentInstanceBodyAgentsItem:
         register_connected_agent_instance_body_agents_item = cls(
             name=name,
             environment=environment,
-            description=description,
             parameters=parameters,
             concurrency=concurrency,
             timeout_ms=timeout_ms,

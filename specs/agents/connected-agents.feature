@@ -84,6 +84,13 @@ Feature: Connected agents
     Then the identity key is "support-agent@production"
     And the row records no owner and no host label
 
+  @integration
+  Scenario: The registered frame reports the scope
+    Given a personal API key of user "u_1"
+    When a process registers an agent in "development"
+    Then the registered frame says the agent has scope "owner", with no user id on the wire
+    And an agent registered in "production" is reported with scope "shared"
+
   # ---------------------------------------------------------------------------
   # Owner-only refusal at scheduling
   # ---------------------------------------------------------------------------
@@ -152,10 +159,143 @@ Feature: Connected agents
     And the refusal names the environments that are online
 
   @unit
+  Scenario: A name with no environment picks another person's personal agent only to refuse it as owner-only
+    Given "support-agent" registered in development as the personal agent of user "u_1", with its process connected
+    When a run with no actor, or with user "u_2" as its actor, targets "connected:support-agent"
+    Then the target resolves to that agent's id
+    And the run is refused with "agent_owner_only" naming user "u_1"
+
+  @unit
+  Scenario: A name with no environment prefers a shared online agent over another person's personal one
+    Given "support-agent" registered in development as the personal agent of user "u_1" and in staging as a shared agent, with a process connected in both
+    When a run with no actor targets "connected:support-agent"
+    Then the target resolves to the staging agent's id
+
+  @unit
+  Scenario: A name with no environment ignores another person's personal agent that is offline
+    Given "support-agent" registered in development as the personal agent of user "u_1", with no process connected
+    When a run with no actor targets "connected:support-agent"
+    Then the run is refused with "agent_environment_unresolved"
+
+  @unit
+  Scenario: A name and environment naming only another person's personal agent is refused as owner-only
+    Given "support-agent" registered in development as the personal agent of user "u_1"
+    When a run with no actor targets "connected:support-agent@development"
+    Then the target resolves to that agent's id
+    And the run is refused with "agent_owner_only" naming user "u_1"
+
+  @unit
+  Scenario: The unresolved refusal says a personal development agent is visible only to its owner
+    Given a run refused with "agent_environment_unresolved"
+    Then its remediation says an agent started in development with a personal key is visible only to its owner
+    And it names LANGWATCH_AGENT_ENVIRONMENT as the way to share it
+
+  @unit
   Scenario: A name with no environment that matches no connected agent is read as an id
     Given no connected agent named "agent_1"
     When a run targets "connected:agent_1"
     Then the reference is left as written
+
+  # ---------------------------------------------------------------------------
+  # Offline refusal at scheduling
+  # ---------------------------------------------------------------------------
+
+  # A run against a connected agent no process is holding would only fail on
+  # its first turn, so it is refused before a job exists. Only connected
+  # agents have a presence: an HTTP, code or workflow agent is never offline.
+
+  @integration
+  Scenario: A run plan cannot target an offline connected agent
+    Given a shared connected agent with no process connected
+    When a run targets it
+    Then the run is refused with "agent_offline"
+    And nothing is scheduled
+
+  @integration
+  Scenario: A run plan against an online connected agent is scheduled
+    Given a shared connected agent with a process connected
+    When a run targets it
+    Then the run is scheduled
+
+  @integration
+  Scenario: A scenario run cannot target an offline connected agent
+    Given a shared connected agent with no process connected
+    When a single scenario run targets it
+    Then the run is refused with "agent_offline"
+
+  @integration
+  Scenario: A scenario run against an online connected agent resolves its target
+    Given a shared connected agent with a process connected
+    When a single scenario run targets it
+    Then the target resolves to that agent's id
+
+  @integration
+  Scenario: A scenario run against an HTTP agent reads no presence
+    Given an HTTP agent
+    When a single scenario run targets it
+    Then the target is answered as written
+
+  @unit
+  Scenario: An HTTP agent target is never offline
+    Given a run that targets an HTTP agent
+    When the targets are checked before scheduling
+    Then no presence is read
+    And the run is scheduled
+
+  @unit
+  Scenario: The owner-only refusal comes before the offline one
+    Given a personal development agent of user "u_1" with no process connected
+    When user "u_2" starts a run that targets it
+    Then the run is refused with "agent_owner_only"
+
+  # ---------------------------------------------------------------------------
+  # What a listing shows
+  # ---------------------------------------------------------------------------
+
+  # One name and one environment can hold more than one row: the person who
+  # ran it from their laptop with their own key, and the machine that ran it
+  # with the project key. A listing shows every row the caller is allowed to
+  # read, and says of each whether the caller can choose it. Hiding a row the
+  # caller may read leaves two agents of one name with no way to tell them
+  # apart.
+
+  @unit
+  Scenario: A listing carries every row of a name, whoever holds it
+    Given "support-agent" in "development" has a row owned by user "u_1" and a row scoped to a host
+    When a project key lists the project's agents
+    Then both rows are in the answer
+
+  @unit
+  Scenario: A row the caller cannot choose is listed and marked
+    Given a personal development agent owned by user "u_1"
+    When user "u_2" lists the project's agents
+    Then the row is in the answer
+    And it is marked as not selectable
+    And the mark reads "owned_by_another_person"
+
+  @unit
+  Scenario: A row the caller can choose is marked selectable
+    Given a personal development agent owned by user "u_1"
+    When user "u_1" lists the project's agents
+    Then the row is marked as selectable
+
+  @unit
+  Scenario: A host-scoped row is selectable by anybody in the project
+    Given a development agent scoped to a host and owned by no person
+    When a project key lists the project's agents
+    Then the row is marked as selectable
+
+  @unit
+  Scenario: A personal row is not selectable by a key that names no person
+    Given a personal development agent owned by user "u_1"
+    When a project key lists the project's agents
+    Then the row is marked as not selectable
+
+  @unit
+  Scenario: The listing mark and the run refusal read one rule
+    Given a set of connected agents and a caller
+    When each agent is read for the listing mark and for the run refusal
+    Then an agent marked not selectable is exactly one the run refuses with "agent_owner_only"
 
   # ---------------------------------------------------------------------------
   # Presence
@@ -272,6 +412,31 @@ Feature: Connected agents
     When the call deadline passes
     Then the call fails with "agent_call_timeout"
     And the instance receives a cancel frame
+
+  # An instance that answers with something the schema refuses has answered:
+  # it will not answer again, so the call fails now rather than at the
+  # deadline, and the error names the field the platform could not read.
+
+  @unit
+  Scenario: A result frame the platform cannot read names the field it failed on
+    Given a result frame whose output is a dict of fields with no role
+    When the gateway reads the frame
+    Then it is an unreadable result for that call id
+    And the issue names "output.role"
+
+  @integration
+  Scenario: A result the platform cannot read fails the call at once
+    Given an instance holding a call
+    When it answers with an output that is a dict of fields with no role
+    Then the call fails with "agent_call_failed" before the deadline
+    And the error says the agent answered a result LangWatch cannot read, naming "output.role"
+
+  @integration
+  Scenario: An unreadable result for a call the instance does not hold is dropped
+    Given an instance holding a call
+    When it sends an unreadable result under another call id
+    Then the call it holds is still waiting
+    And its later answer is returned
 
   @unit
   Scenario: A call is refused when every instance is full

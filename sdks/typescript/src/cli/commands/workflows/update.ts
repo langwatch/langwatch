@@ -9,6 +9,7 @@ import { buildAuthHeaders } from "@/internal/api/auth";
 import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 export const updateWorkflowCommand = async (
   id: string,
   options: { name?: string; icon?: string; description?: string },
@@ -37,7 +38,7 @@ export const updateWorkflowCommand = async (
       process.exit(1);
     }
 
-    const response = await fetch(
+    const response = await langwatchFetch(
       `${endpoint}/api/workflows/${encodeURIComponent(id)}`,
       {
         method: "PATCH",

@@ -74,7 +74,12 @@ const scalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
     }
     return v.boolValue;
   }
-  if ("intValue" in v && v.intValue) {
+  // `!= null` rather than a truthiness check: zero is a value, and the one a
+  // truthiness check cannot tell apart from an absent attribute. A tracked
+  // event with a vote of 0, a count of 0 or a score of 0 was accepted and then
+  // stored with the metric missing entirely, so downstream it read as an event
+  // carrying no vote rather than a neutral one.
+  if ("intValue" in v && v.intValue != null) {
     if (typeof v.intValue === "string") {
       return parseInt(v.intValue, 10);
     }
@@ -90,7 +95,7 @@ const scalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
     }
     return v.intValue;
   }
-  if ("doubleValue" in v && v.doubleValue) {
+  if ("doubleValue" in v && v.doubleValue != null) {
     if (typeof v.doubleValue === "string") {
       return parseFloat(v.doubleValue);
     }

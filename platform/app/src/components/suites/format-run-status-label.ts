@@ -29,6 +29,7 @@ const STATUS_LABELS: Record<ScenarioRunStatus, string> = {
   [ScenarioRunStatus.PENDING]: "Pending",
   [ScenarioRunStatus.QUEUED]: "Queued",
   [ScenarioRunStatus.RUNNING]: "Running",
+  [ScenarioRunStatus.PENDING_EVALUATION]: "Evaluating",
 };
 
 const TERMINAL_WITH_CRITERIA: Set<ScenarioRunStatus> = new Set([

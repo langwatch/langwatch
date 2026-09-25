@@ -2,6 +2,7 @@ import type { IdentitySecretCarryService } from "@langwatch/identity-server";
 import type {
   SystemMigration,
   TenantMigrationOutcome,
+  TenantSource,
 } from "@langwatch/system-migrations";
 
 /** Its own state-table key, separate from the backfill's on purpose — see
@@ -33,6 +34,7 @@ export const IDENTITY_SECRET_HEAL_MIGRATION_NAME =
  * and the parity check.
  */
 export class IdentitySecretHealMigration implements SystemMigration {
+  readonly startupSettlement = "recurring" as const;
   readonly name = IDENTITY_SECRET_HEAL_MIGRATION_NAME;
   readonly title = "Sign-in credential repair";
   readonly description =
@@ -40,16 +42,31 @@ export class IdentitySecretHealMigration implements SystemMigration {
     "places they can be written during the migration, so a password changed " +
     "at any moment keeps working. Sign-in behavior does not change.";
   readonly requiresOperatorConfirmation = false;
-  // Follows the backfill it repairs after: nothing to heal on an
-  // installation where no user has latched.
-  readonly runsAutomaticallyOnSelfHosted = false;
-  // Paced with the backfill it repairs after, for the same reason: a user
-  // outside the backfill's cohort has nothing to heal.
-  readonly enrolledAutomatically = false;
+  // Follows the automatic backfill and repairs writes made during rollout.
+  readonly runsAutomaticallyOnSelfHosted = true;
+  readonly enrolledAutomatically = true;
 
-  constructor(
-    private readonly secrets: Pick<IdentitySecretCarryService, "carryForUser">,
-  ) {}
+  /**
+   * The users whose two branches could actually have drifted apart, rather
+   * than every user. This migration never finalizes a tenant, so without the
+   * narrowing every user it is handed is re-claimed, re-read and re-recorded
+   * on every pass — twice over in the boot preflight, before any process may
+   * serve. See the source's own docblock.
+   */
+  readonly candidateTenants: TenantSource;
+
+  private readonly secrets: Pick<IdentitySecretCarryService, "carryForUser">;
+
+  constructor({
+    secrets,
+    candidateTenants,
+  }: {
+    secrets: Pick<IdentitySecretCarryService, "carryForUser">;
+    candidateTenants: TenantSource;
+  }) {
+    this.secrets = secrets;
+    this.candidateTenants = candidateTenants;
+  }
 
   async migrateTenant({
     tenantId,

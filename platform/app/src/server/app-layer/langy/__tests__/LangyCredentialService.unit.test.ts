@@ -681,6 +681,18 @@ describe("resolveWorkerGatewayBaseUrl", () => {
     });
   });
 
+  describe("given the chart sets the in-cluster gateway address", () => {
+    /** @scenario "The Langy worker dials the in-cluster gateway, not its public URL" */
+    it("prefers LW_GATEWAY_INTERNAL_URL over LW_GATEWAY_PUBLIC_URL", () => {
+      const url = resolveWorkerGatewayBaseUrl({
+        LW_GATEWAY_INTERNAL_URL: "http://acme-gateway:80",
+        LW_GATEWAY_PUBLIC_URL: "https://gateway.acme.example",
+        LW_GATEWAY_BASE_URL: "http://acme-gateway:80",
+      });
+      expect(url).toBe("http://acme-gateway:80");
+    });
+  });
+
   describe("given no override (the host tier)", () => {
     it("uses LW_GATEWAY_PUBLIC_URL, then LW_GATEWAY_BASE_URL", () => {
       expect(

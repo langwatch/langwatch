@@ -32,6 +32,9 @@ export async function handleGetAgent({ id }: { id: string }): Promise<string> {
   if (agent.status) lines.push(`**Status**: ${agent.status}`);
   if (agent.owner?.name) lines.push(`**Owner**: ${agent.owner.name}`);
   else if (agent.hostLabel) lines.push(`**Host**: ${agent.hostLabel}`);
+  if (agent.selectable === false) {
+    lines.push("**Run**: only its owner can run this agent");
+  }
   if (agent.lastSeenAt) lines.push(`**Last seen**: ${agent.lastSeenAt}`);
   lines.push(`**Created**: ${agent.createdAt}`);
   lines.push(`**Updated**: ${agent.updatedAt}`);

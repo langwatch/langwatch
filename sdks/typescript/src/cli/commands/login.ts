@@ -17,6 +17,11 @@ import {
   fetchProjectKeyBySlug,
   SessionApiError,
 } from "@/cli/utils/governance/session-api";
+import { recordCliLocation } from "@/cli/utils/governance/cli-location";
+import {
+  globalConfigIsolationWarning,
+  rewritesGlobalConfigForLocalInstance,
+} from "@/cli/utils/governance/global-config-isolation";
 import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpoint";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 import { normalizeEndpoint } from "@/internal/endpoint";
@@ -63,6 +68,19 @@ function printAgentHintBanner(): void {
   );
   console.log();
 }
+
+/**
+ * Says once, on stderr, that the control plane just persisted is a local
+ * instance and the whole machine now follows it. `~/.langwatch/config.json` is
+ * one file for every shell, so a QA login against a dev server takes over the
+ * next `langwatch ingest context` and every wrapped tool until the next login.
+ * Not a refusal: logging into a local instance is a normal thing to do.
+ * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
+ */
+const warnIfLocalEndpointTakesOverGlobalConfig = (endpoint: string): void => {
+  if (!rewritesGlobalConfigForLocalInstance({ endpoint })) return;
+  console.error(chalk.yellow(globalConfigIsolationWarning(endpoint)));
+};
 
 const updateEnvFile = (
   apiKey: string,
@@ -199,6 +217,10 @@ export const loginCommand = async (
   },
 ): Promise<void> => {
   try {
+    // First, so every flow below reads a config that already says how to run
+    // this CLI; the Claude Code plugin's hooks look it up there.
+    recordCliLocation();
+
     // Honor `--endpoint` flag OR `LANGWATCH_ENDPOINT` env. Persist the
     // resolved value BEFORE the chosen flow runs so subsequent reads
     // (in the device flow, the API-key flow, any sub-command spawned
@@ -216,6 +238,7 @@ export const loginCommand = async (
       const cfg = loadConfig();
       cfg.control_plane_url = trimmed;
       saveConfig(cfg);
+      warnIfLocalEndpointTakesOverGlobalConfig(trimmed);
     }
 
     // --token: pre-minted device-session escape hatch (CI / agent contexts
@@ -408,6 +431,7 @@ export const loginCommand = async (
         cfg.control_plane_url = normalizeEndpoint(url.url as string);
         saveConfig(cfg);
       }
+      warnIfLocalEndpointTakesOverGlobalConfig(cfg.control_plane_url);
     }
 
     // Q2 — auth mode (AI tools = device-flow vs Project SDK = API key)

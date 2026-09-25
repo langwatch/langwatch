@@ -14,6 +14,10 @@
  */
 import { OffboardIncompleteError } from "@langwatch/authz-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  CannotDisableLastAdminError,
+  CannotRemoveLastAdminError,
+} from "~/server/app-layer/organizations/errors";
 import { ScimDeprovisionService } from "../scim-deprovision.service";
 
 const ORGANIZATION = "org_acme";
@@ -153,6 +157,52 @@ describe("ScimDeprovisionService", () => {
       ];
       expect(failure.errorCode).toBe("offboard_incomplete");
       expect(failure.errorCode).not.toMatch(/\s/);
+    });
+  });
+
+  describe("when the offboard invariant protects the last administrator", () => {
+    beforeEach(() => {
+      grants.offboard = vi
+        .fn()
+        .mockRejectedValue(new CannotRemoveLastAdminError());
+    });
+
+    it("keeps deletion's cannot-remove error", async () => {
+      await expect(
+        service().removeAccess({
+          userId: USER,
+          organizationId: ORGANIZATION,
+          connectionId: CONNECTION,
+          op: "delete_user",
+        }),
+      ).rejects.toMatchObject({ code: "cannot_remove_last_admin" });
+
+      expect(syncLifecycle.applyFailed).toHaveBeenCalledWith(
+        expect.objectContaining({
+          op: "delete_user",
+          errorCode: "cannot_remove_last_admin",
+          retryable: false,
+        }),
+      );
+    });
+
+    it("maps deactivation to cannot-disable while retaining the failure", async () => {
+      await expect(
+        service().removeAccess({
+          userId: USER,
+          organizationId: ORGANIZATION,
+          connectionId: CONNECTION,
+          op: "deactivate_user",
+        }),
+      ).rejects.toBeInstanceOf(CannotDisableLastAdminError);
+
+      expect(syncLifecycle.applyFailed).toHaveBeenCalledWith(
+        expect.objectContaining({
+          op: "deactivate_user",
+          errorCode: "cannot_disable_last_admin",
+          retryable: false,
+        }),
+      );
     });
   });
 

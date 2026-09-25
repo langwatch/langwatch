@@ -15,6 +15,7 @@
  * that registration, and rejects unless redirect_uri is an exact string
  * match against one of the registered URIs.
  */
+import { grantFactToRow } from "@langwatch/authz-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type * as AppLayerApp from "~/server/app-layer/app";
@@ -39,13 +40,7 @@ const { mockPrisma, mockRedis, SESSION } = vi.hoisted(() => {
           .mockResolvedValue({ role: "MEMBER", disabledAt: null }),
       },
       groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
-      roleBinding: {
-        findMany: vi
-          .fn()
-          .mockResolvedValue([
-            { role: "ADMIN", customRoleId: null, scopeType: "TEAM" },
-          ]),
-      },
+      grant: { findMany: vi.fn().mockResolvedValue([]) },
       customRole: { findUnique: vi.fn().mockResolvedValue(null) },
       teamUser: { findFirst: vi.fn().mockResolvedValue(null) },
       project: {
@@ -74,7 +69,7 @@ vi.mock("~/server/app-layer/app", async (importOriginal) => {
   // misc.ts reads its connection through tryGetApp; getApp is overridden too
   // so both accessors agree on the fake.
   // The authorize route decides through the App's permissions (ADR-092);
-  // composing over this file's mocked ~/server/db keeps the roleBinding
+  // composing over this file's mocked ~/server/db keeps the Grant
   // stubs in charge of every outcome.
   const { permissionsServiceFor } = await import(
     "~/server/app-layer/permissions/runtime"
@@ -125,11 +120,19 @@ async function authorize(overrides: Record<string, unknown> = {}) {
 function resetMocks() {
   mockRedis.set.mockReset().mockResolvedValue("OK");
   mockRedis.get.mockReset();
-  mockPrisma.roleBinding.findMany
-    .mockReset()
-    .mockResolvedValue([
-      { role: "ADMIN", customRoleId: null, scopeType: "TEAM" },
-    ]);
+  mockPrisma.grant.findMany.mockReset().mockResolvedValue([
+    grantFactToRow({
+      organizationId: ORG_ID,
+      grant: {
+        grantId: "grant_admin",
+        principal: { type: "user", id: SESSION.user.id },
+        roleKey: "admin",
+        scope: { type: "TEAM", id: TEAM_ID },
+        source: "grants-service",
+        occurredAtMs: 1,
+      },
+    }),
+  ]);
   mockPrisma.organizationUser.findFirst
     .mockReset()
     .mockResolvedValue({ role: "MEMBER", disabledAt: null });
@@ -281,7 +284,7 @@ describe("POST /api/mcp/authorize — where failures are reported", () => {
     /** @scenario A project the user cannot reach is reported to the client as access denied */
     it("sends the browser back to the registered redirect URI as access denied", async () => {
       mockRedis.get.mockResolvedValueOnce(registeredClient());
-      mockPrisma.roleBinding.findMany.mockResolvedValueOnce([]);
+      mockPrisma.grant.findMany.mockResolvedValueOnce([]);
       mockPrisma.organizationUser.findFirst.mockResolvedValueOnce(null);
 
       const res = await authorize();

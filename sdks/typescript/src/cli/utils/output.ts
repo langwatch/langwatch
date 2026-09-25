@@ -346,10 +346,11 @@ const parsePathSteps = (expression: string): PathStep[] => {
 
 /**
  * The built-in jq subset: `.`, `.a.b`, `.items[]`, `.items[].name`, `.items[0]`
- * (negative indexes count from the end), and a terminal `| length` on arrays,
- * strings and objects, and bare `length` too, which is how jq itself spells the
- * count of the whole document. Iteration collects into an array, the way
- * `jq '[ .items[].name ]'` reads.
+ * (negative indexes count from the end), a pipe into another path
+ * (`.items[] | .name`, the same thing as `.items[].name`), and a terminal
+ * `| length` on arrays, strings and objects, and bare `length` too, which is
+ * how jq itself spells the count of the whole document. Iteration collects
+ * into an array, the way `jq '[ .items[].name ]'` reads.
  *
  * Everything else throws. A wrong expression must fail loudly, not silently
  * print `null` into a pipeline, and an out-of-range index is not a wrong
@@ -367,9 +368,29 @@ export const applyJq = (expression: string, data: unknown): unknown => {
   if (pipeIndex !== -1 || trimmed === "length") {
     const path = pipeIndex === -1 ? "." : trimmed.slice(0, pipeIndex).trim();
     const operator = pipeIndex === -1 ? "length" : trimmed.slice(pipeIndex + 1).trim();
-    if (operator !== "length" || path.length === 0) {
+    if (path.length === 0) {
       throw new Error(
-        `Invalid --jq expression "${expression}": only a terminal "| length" pipe is supported.` +
+        `Invalid --jq expression "${expression}": nothing before the pipe.` +
+          USE_THE_SHELL,
+      );
+    }
+
+    // `a | b` where b is a path is just b applied to what a produced, which is
+    // how `.data[] | .slug` is written and the first thing anyone reaches for.
+    // Refusing it was refusing the plainest expression in the language the
+    // flag is named after, for something the supported subset already spells
+    // as `.data[].slug`. An iterating left side produced a list, and jq
+    // applies the right side to each of its elements.
+    if (operator.startsWith(".")) {
+      const left = applyJq(path, data);
+      return path.includes("[]") && Array.isArray(left)
+        ? left.map((item) => applyJq(operator, item))
+        : applyJq(operator, left);
+    }
+
+    if (operator !== "length") {
+      throw new Error(
+        `Invalid --jq expression "${expression}": after a pipe this supports a path (".slug") or "length".` +
           USE_THE_SHELL,
       );
     }
@@ -812,7 +833,7 @@ export const assertFormatIsSupported = async (
   // Auto-detected agent mode: keep the human table, but never let a caller
   // believe it is parsing structured output.
   process.stderr.write(
-    `note: \`${name}\` does not emit structured output yet — the table below is not machine-readable.\n`,
+    `note: \`${name}\` does not emit structured output yet. The table below is not machine-readable.\n`,
   );
   return { ...resolved, format: "table" };
 };

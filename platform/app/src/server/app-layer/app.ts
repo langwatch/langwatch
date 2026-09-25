@@ -66,6 +66,7 @@ export class App {
     AppCommands["topicClustering"];
   readonly codingAgents: AppDependencies["codingAgents"] &
     AppCommands["codingAgents"];
+  readonly instantEvals: AppDependencies["instantEvals"];
   readonly gateway: AppDependencies["gateway"];
   readonly filters: AppDependencies["filters"];
   readonly clickhouse: AppDependencies["clickhouse"];
@@ -152,6 +153,7 @@ export class App {
       ...deps.codingAgents,
       ...deps.commands.codingAgents,
     };
+    this.instantEvals = deps.instantEvals;
     this.gateway = deps.gateway;
     this.filters = deps.filters;
     this.clickhouse = deps.clickhouse;

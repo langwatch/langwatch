@@ -93,8 +93,7 @@
                 ]
               },
               "integration/cli",
-              "integration/mcp",
-              "better-agents/overview"
+              "integration/mcp"
             ]
           },
           {
@@ -124,6 +123,7 @@
                 "pages": [
                   "agent-testing/scenarios",
                   "agent-testing/test-suites",
+                  "agent-testing/evaluators",
                   "agent-testing/run-parameters"
                 ]
               },
@@ -148,6 +148,7 @@
                 ]
               },
               "agent-testing/voice-agents",
+              "agent-testing/voice-agents-in-app",
               "agent-testing/red-teaming"
             ]
           },
@@ -167,6 +168,7 @@
                   "user-events/custom"
                 ]
               },
+              "features/querying-your-data",
               "features/automations",
               "features/embedded-analytics"
             ]
@@ -196,8 +198,18 @@
                 "group": "Online Evaluation",
                 "pages": [
                   "evaluations/online-evaluation/overview",
-                  "evaluations/online-evaluation/setup-monitors",
-                  "evaluations/online-evaluation/by-thread"
+                  "evaluations/online-evaluation/setup-monitors"
+                ]
+              },
+              {
+                "group": "Instant Evals",
+                "pages": [
+                  "features/instant-evals/overview",
+                  "features/instant-evals/questions",
+                  "features/instant-evals/targets",
+                  "features/instant-evals/results",
+                  "features/instant-evals/limits-and-cost",
+                  "features/instant-evals/cli"
                 ]
               },
               {
@@ -222,13 +234,19 @@
                 "pages": [
                   "datasets/overview",
                   "datasets/programmatic-access",
-                  "datasets/ai-dataset-generation",
                   "datasets/automatically-from-traces",
                   "datasets/dataset-threads",
                   "datasets/dataset-images"
                 ]
               },
-              "features/annotations"
+              {
+                "group": "Annotations",
+                "pages": [
+                  "annotations/overview",
+                  "annotations/queues",
+                  "annotations/scores"
+                ]
+              }
             ]
           },
           {
@@ -250,27 +268,18 @@
                   "prompt-management/features/essential/github-integration",
                   "prompt-management/features/essential/tags",
                   "prompt-management/features/advanced/link-to-traces",
-                  "prompt-management/features/advanced/optimization-studio",
+                  "prompt-management/features/advanced/workflows",
                   "prompt-management/features/advanced/guaranteed-availability",
                   "prompt-management/features/advanced/a-b-testing"
                 ]
               },
               {
-                "group": "Optimization Studio",
+                "group": "Workflows",
                 "pages": [
-                  "optimization-studio/overview",
-                  "optimization-studio/llm-nodes",
-                  "optimization-studio/datasets",
-                  "optimization-studio/evaluating",
-                  "optimization-studio/optimizing"
-                ]
-              },
-              {
-                "group": "DSPy Optimization",
-                "pages": [
-                  "dspy-visualization/quickstart",
-                  "dspy-visualization/custom-optimizer",
-                  "dspy-visualization/rag-visualization"
+                  "workflows/overview",
+                  "workflows/building-a-workflow",
+                  "workflows/workflow-as-evaluator",
+                  "workflows/workflow-as-agent"
                 ]
               }
             ]
@@ -278,16 +287,22 @@
           {
             "group": "Platform",
             "pages": [
+              "platform/command-bar",
               {
                 "group": "Administration",
                 "pages": [
-                  "platform/api-keys",
+                  "platform/members-and-teams",
                   "platform/rbac",
+                  "platform/sso",
+                  "platform/sso-update",
+                  "platform/api-keys",
                   "platform/audit-log",
+                  "platform/data-privacy",
+                  "platform/data-retention",
+                  "platform/secrets",
                   "platform/scim",
                   "platform/scim-groups",
-                  "platform/model-providers",
-                  "platform/data-retention"
+                  "platform/model-providers"
                 ]
               }
             ]
@@ -478,11 +493,18 @@
                 ]
               },
               "integration/typescript/integrations/vercel-ai-sdk",
-              "integration/python/integrations/lite-llm",
               "integration/python/integrations/open-ai-agents",
               "integration/python/integrations/pydantic-ai",
               "integration/typescript/integrations/mastra",
               "integration/python/integrations/dspy",
+              {
+                "group": "DSPy Optimization",
+                "pages": [
+                  "dspy-visualization/quickstart",
+                  "dspy-visualization/custom-optimizer",
+                  "dspy-visualization/rag-visualization"
+                ]
+              },
               "integration/python/integrations/llamaindex",
               "integration/python/integrations/haystack",
               "integration/python/integrations/strand-agents",
@@ -495,6 +517,7 @@
               "integration/python/integrations/instructor",
               "integration/python/integrations/smolagents",
               "integration/python/integrations/google-ai",
+              "integration/go/integrations/genkit",
               "integration/python/integrations/other"
             ]
           },
@@ -536,13 +559,21 @@
               {
                 "group": "Amazon Web Services",
                 "pages": [
-                  "integration/python/integrations/aws-bedrock"
+                  "integration/python/integrations/aws-bedrock",
+                  "integration/go/integrations/amazon-bedrock"
                 ]
               },
               "integration/go/integrations/groq",
               "integration/go/integrations/grok",
               "integration/go/integrations/ollama",
-              "integration/go/integrations/openrouter"
+              "integration/go/integrations/openrouter",
+              {
+                "group": "LiteLLM",
+                "pages": [
+                  "integration/litellm-proxy",
+                  "integration/python/integrations/lite-llm"
+                ]
+              }
             ]
           },
           {
@@ -601,59 +632,10 @@
             ]
           },
           {
-            "group": "Coding CLI Integrations",
-            "pages": [
-              "ai-gateway/cli/overview",
-              {
-                "group": "Claude Code",
-                "icon": "/images/logos/anthropic.svg",
-                "pages": [
-                  "ai-gateway/cli/claude-code"
-                ]
-              },
-              {
-                "group": "Codex",
-                "icon": "/images/logos/openai.svg",
-                "pages": [
-                  "ai-gateway/cli/codex"
-                ]
-              },
-              {
-                "group": "Gemini CLI",
-                "icon": "/images/logos/google.svg",
-                "pages": [
-                  "ai-gateway/cli/gemini-cli"
-                ]
-              },
-              {
-                "group": "OpenCode",
-                "icon": "code",
-                "pages": [
-                  "ai-gateway/cli/opencode"
-                ]
-              },
-              {
-                "group": "Cursor",
-                "icon": "arrow-pointer",
-                "pages": [
-                  "ai-gateway/cli/cursor"
-                ]
-              },
-              {
-                "group": "Aider",
-                "icon": "wand-magic-sparkles",
-                "pages": [
-                  "ai-gateway/cli/aider"
-                ]
-              }
-            ]
-          },
-          {
             "group": "Virtual Keys & Budgets",
             "pages": [
               "ai-gateway/virtual-keys",
               "ai-gateway/budgets",
-              "ai-gateway/provider-bindings",
               "ai-gateway/rate-limits",
               "ai-gateway/rbac"
             ]
@@ -676,8 +658,7 @@
               "ai-gateway/governance/routing-policies",
               "ai-gateway/governance/retention",
               "ai-gateway/governance/ocsf-export",
-              "ai-gateway/governance/architecture",
-              "ai-gateway/governance/activity-monitor-event-sourcing"
+              "ai-gateway/governance/architecture"
             ]
           },
           {
@@ -690,6 +671,13 @@
               "ai-gateway/providers/bedrock",
               "ai-gateway/providers/vertex",
               "ai-gateway/providers/gemini",
+              "ai-gateway/providers/xai",
+              "ai-gateway/providers/groq",
+              "ai-gateway/providers/cerebras",
+              "ai-gateway/providers/deepseek",
+              "ai-gateway/providers/voyage",
+              "ai-gateway/providers/elevenlabs",
+              "ai-gateway/providers/openai-account",
               "ai-gateway/providers/custom-openai-compatible",
               "ai-gateway/providers/fallback-chains"
             ]
@@ -700,7 +688,6 @@
               {
                 "group": "Caching & Performance",
                 "pages": [
-                  "ai-gateway/caching-passthrough",
                   "ai-gateway/cache-control",
                   "ai-gateway/streaming"
                 ]
@@ -731,10 +718,13 @@
             "pages": [
               "ai-gateway/api/chat-completions",
               "ai-gateway/api/messages",
+              "ai-gateway/api/responses",
               "ai-gateway/api/embeddings",
               "ai-gateway/api/audio",
               "ai-gateway/api/images",
+              "ai-gateway/api/elevenlabs",
               "ai-gateway/api/realtime",
+              "ai-gateway/api/gemini-native",
               "ai-gateway/api/models",
               "ai-gateway/api/errors",
               "ai-gateway/api/management"
@@ -757,12 +747,10 @@
               "ai-gateway/cookbooks/ci-smoke-test",
               "ai-gateway/cookbooks/migrate-from-direct",
               "ai-gateway/cookbooks/migrate-from-portkey",
+              "ai-gateway/cookbooks/migrate-from-litellm",
               "ai-gateway/cookbooks/credential-leak-incident",
-              "ai-gateway/cookbooks/multi-tenant-reseller",
-              "ai-gateway/cookbooks/cache-control-rollout",
               "ai-gateway/cookbooks/prometheus-alerts",
-              "ai-gateway/cookbooks/grafana-dashboard",
-              "ai-gateway/cookbooks/production-runbook"
+              "ai-gateway/cookbooks/grafana-dashboard"
             ]
           }
         ]
@@ -793,23 +781,19 @@
             "group": "Workspaces & Access",
             "pages": [
               "ai-governance/workspaces",
-              "ai-governance/members-and-invites",
-              "ai-governance/roles-and-permissions",
-              "ai-governance/personas",
-              "ai-governance/audit-log"
+              "ai-governance/personas"
             ]
           },
           {
             "group": "Dashboards",
             "pages": [
               "ai-governance/governance-dashboard",
-              "ai-governance/departments"
+              "ai-governance/people"
             ]
           },
           {
             "group": "Privacy",
             "pages": [
-              "ai-governance/data-privacy",
               "ai-governance/no-spy-mode"
             ]
           },
@@ -1000,6 +984,9 @@
             "pages": [
               "self-hosting/overview",
               "self-hosting/licensing",
+              "self-hosting/connect",
+              "self-hosting/data-and-telemetry",
+              "self-hosting/usage-report-dictionary",
               "hybrid-setup/overview",
               "self-hosting/troubleshooting"
             ]
@@ -1061,7 +1048,8 @@
               "self-hosting/langy/setup",
               "self-hosting/langy/github-app",
               "self-hosting/langy/environment-variables",
-              "self-hosting/langy/networking-and-egress"
+              "self-hosting/langy/networking-and-egress",
+              "self-hosting/langy/health-check"
             ]
           }
         ]
@@ -1080,6 +1068,7 @@
             "group": "Traces",
             "pages": [
               "api-reference/traces/overview",
+              "api-reference/traces/discover-what-the-trace-filter-fields-ho",
               "api-reference/traces/search",
               "api-reference/traces/get-trace",
               "api-reference/traces/get-transcript",
@@ -1095,6 +1084,7 @@
               "api-reference/datasets/overview",
               "api-reference/datasets/list-dataset",
               "api-reference/datasets/create-dataset",
+              "api-reference/datasets/create-attachments",
               "api-reference/datasets/create-direct-upload",
               "api-reference/datasets/evaluate-a-dataset",
               "api-reference/datasets/create-upload",
@@ -1294,6 +1284,20 @@
             ]
           },
           {
+            "group": "Instant Evals",
+            "pages": [
+              "api-reference/instant-evals/overview",
+              "api-reference/instant-evals/estimate-a-run",
+              "api-reference/instant-evals/create-instant-evals",
+              "api-reference/instant-evals/list-instant-evals",
+              "api-reference/instant-evals/get-instant-evals",
+              "api-reference/instant-evals/read-a-run-s-results",
+              "api-reference/instant-evals/sample-a-run",
+              "api-reference/instant-evals/cancel-a-run",
+              "api-reference/instant-evals/running-an-instant-eval"
+            ]
+          },
+          {
             "group": "Run Plans",
             "pages": [
               "api-reference/run-plans/overview",
@@ -1424,8 +1428,10 @@
             "group": "Query",
             "pages": [
               "api-reference/query/overview",
+              "api-reference/query/discover-both-query-languages",
               "api-reference/query/discover-the-queryable-langwatchql-schema",
-              "api-reference/query/run-a-langwatchql-query"
+              "api-reference/query/run-a-langwatchql-query",
+              "api-reference/query/extraction-functions"
             ]
           },
           {
@@ -1704,7 +1710,11 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1788674350",
+      "source": "/features/instant-evals/shorthand",
+      "destination": "/features/instant-evals/targets"
+    },
+    {
+      "source": "/ci/cache/busted/1789807595",
       "destination": "/introduction"
     },
     {
@@ -1757,7 +1767,7 @@
     },
     {
       "source": "/evaluations/evaluation-by-thread",
-      "destination": "/evaluations/online-evaluation/by-thread"
+      "destination": "/evaluations/online-evaluation/setup-monitors"
     },
     {
       "source": "/llm-evaluation/overview",
@@ -2042,6 +2052,122 @@
     {
       "source": "/agent-simulations/red-teaming",
       "destination": "/agent-testing/red-teaming"
+    },
+    {
+      "source": "/optimization-studio/overview",
+      "destination": "/workflows/overview"
+    },
+    {
+      "source": "/optimization-studio/llm-nodes",
+      "destination": "/workflows/building-a-workflow"
+    },
+    {
+      "source": "/optimization-studio/datasets",
+      "destination": "/workflows/building-a-workflow"
+    },
+    {
+      "source": "/optimization-studio/evaluating",
+      "destination": "/workflows/workflow-as-evaluator"
+    },
+    {
+      "source": "/optimization-studio/optimizing",
+      "destination": "/workflows/overview"
+    },
+    {
+      "source": "/prompt-management/features/advanced/optimization-studio",
+      "destination": "/prompt-management/features/advanced/workflows"
+    },
+    {
+      "source": "/ai-gateway/cli/overview",
+      "destination": "/coding-agents/overview"
+    },
+    {
+      "source": "/ai-gateway/cli/aider",
+      "destination": "/coding-agents/overview"
+    },
+    {
+      "source": "/ai-gateway/cli/claude-code",
+      "destination": "/coding-agents/claude-code"
+    },
+    {
+      "source": "/ai-gateway/cli/codex",
+      "destination": "/coding-agents/openai-codex"
+    },
+    {
+      "source": "/ai-gateway/cli/gemini-cli",
+      "destination": "/coding-agents/gemini-cli"
+    },
+    {
+      "source": "/ai-gateway/cli/opencode",
+      "destination": "/coding-agents/opencode"
+    },
+    {
+      "source": "/ai-gateway/cli/cursor",
+      "destination": "/coding-agents/overview"
+    },
+    {
+      "source": "/ai-gateway/provider-bindings",
+      "destination": "/ai-gateway/providers/overview"
+    },
+    {
+      "source": "/ai-gateway/governance/activity-monitor-event-sourcing",
+      "destination": "/ai-gateway/governance/architecture"
+    },
+    {
+      "source": "/ai-gateway/caching-passthrough",
+      "destination": "/ai-gateway/cache-control"
+    },
+    {
+      "source": "/ai-gateway/cookbooks/cache-control-rollout",
+      "destination": "/ai-gateway/cache-control"
+    },
+    {
+      "source": "/ai-gateway/cookbooks/multi-tenant-reseller",
+      "destination": "/ai-gateway/cookbooks/metering-and-rebilling"
+    },
+    {
+      "source": "/ai-gateway/cookbooks/production-runbook",
+      "destination": "/ai-gateway/troubleshooting"
+    },
+    {
+      "source": "/evaluations/online-evaluation/by-thread",
+      "destination": "/evaluations/online-evaluation/setup-monitors"
+    },
+    {
+      "source": "/datasets/ai-dataset-generation",
+      "destination": "/datasets/overview"
+    },
+    {
+      "source": "/features/annotations",
+      "destination": "/annotations/overview"
+    },
+    {
+      "source": "/scenarios",
+      "destination": "/agent-testing/overview"
+    },
+    {
+      "source": "/ai-governance/roles-and-permissions",
+      "destination": "/platform/rbac"
+    },
+    {
+      "source": "/ai-governance/audit-log",
+      "destination": "/platform/audit-log"
+    },
+    {
+      "source": "/ai-governance/data-privacy",
+      "destination": "/platform/data-privacy"
+    },
+    {
+      "source": "/ai-governance/members-and-invites",
+      "destination": "/platform/members-and-teams"
+    },
+    {
+      "source": "/ai-governance/departments",
+      "destination": "/ai-governance/people"
+    },
+    {
+      "source": "/better-agents/overview",
+      "destination": "/skills/directory"
     }
   ]
 }

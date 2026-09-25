@@ -30,7 +30,20 @@ describe("ColumnTypeSelect", () => {
 
       const trigger = screen.getByLabelText("Column 1 type");
       expect(trigger).toBeInTheDocument();
-      expect(trigger).toHaveTextContent(/image \(url\)/i);
+      expect(trigger).toHaveTextContent(/^image$/i);
+    });
+  });
+
+  describe("when the column holds an attachment", () => {
+    it("offers a File type", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      renderSelect({ value: "string", onChange });
+
+      await user.click(screen.getByLabelText("Column 1 type"));
+      await user.click(await screen.findByRole("option", { name: /^file$/i }));
+
+      expect(onChange).toHaveBeenCalledWith("file");
     });
   });
 

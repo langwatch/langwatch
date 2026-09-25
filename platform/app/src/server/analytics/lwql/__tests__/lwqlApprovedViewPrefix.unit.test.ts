@@ -14,8 +14,8 @@
  * for that reason: this guard has to be able to disagree with the catalog, and
  * one that read the name from the catalog never could.
  *
- * @see ../views.ts — the statements under test
- * @see specs/analytics/lwql-api.feature
+ * @see ../provisioning/catalogStatements.ts — the statements under test
+ * @see specs/lwql/api.feature
  */
 
 import { describe, expect, it } from "vitest";
@@ -25,7 +25,7 @@ import { lwqlPostgresViews } from "../catalog/types";
 import {
   lwqlApprovedPostgresViewNames,
   lwqlPostgresApprovedViewStatements,
-} from "../views";
+} from "../provisioning/catalogStatements";
 
 /**
  * The prefix the infrastructure bootstrap's grant predicate matches
@@ -36,13 +36,16 @@ const GRANTED_PREFIX = "lwql_";
 
 const SCHEMA = "public";
 
-/** Relation a `CREATE OR REPLACE VIEW` statement actually creates. */
+/**
+ * Relation an approved-view `DO` block creates. Each statement is now one
+ * `DO $lwql$ ... CREATE OR REPLACE VIEW ... CREATE VIEW ... $lwql$` block per
+ * view (see postgresMapping.ts), so the relation name is found inside the
+ * block's fallback `CREATE VIEW`, not anchored at the statement's start.
+ */
 function createdRelation(statement: string): string {
-  const match = /^CREATE OR REPLACE VIEW "[^"]+"\."([^"]+)"/.exec(statement);
+  const match = /CREATE VIEW "[^"]+"\."([^"]+)"/.exec(statement);
   if (!match?.[1]) {
-    throw new Error(
-      `not an approved-view statement: ${statement.slice(0, 80)}`,
-    );
+    throw new Error(`not an approved-view DO block: ${statement.slice(0, 80)}`);
   }
   return match[1];
 }

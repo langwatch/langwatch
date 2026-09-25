@@ -17,7 +17,7 @@
  * it would refuse and teaching a caller the wrong rule.
  *
  * @see ~/server/analytics/lwql — the service and everything under it
- * @see specs/analytics/lwql-workbench.feature
+ * @see specs/lwql/workbench.feature
  */
 
 import { z } from "zod";
@@ -33,7 +33,6 @@ import {
 } from "~/server/analytics/lwql/timeWindowSchema";
 
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
-import { getUserProtectionsForProject } from "../../utils";
 
 import { resolveLangWatchQLCaller } from "./lwqlCaller";
 import { enforceWorkbenchEnabled } from "./workbenchAccessMiddleware";
@@ -72,9 +71,8 @@ export interface LangWatchQLAvailability {
 /**
  * Whether the LangWatchQL query path is switched on and provisioned.
  *
- * Separate from `schema` because the schema is answerable without an executor
- * (it is the catalog), so a deployment with no LangWatchQL identity would describe
- * a surface it cannot run. The navigation gates on this, never on the schema.
+ * The navigation this used to gate (the Custom query page) is gone, but other
+ * callers still read this to decide whether LangWatchQL is usable at all.
  *
  * The one procedure that reads the switch rather than being gated by it: its
  * whole job is to answer "off" out loud, so `enforceWorkbenchEnabled` — which
@@ -101,19 +99,6 @@ const availability = protectedProcedure
     return { available: true };
   });
 
-/** The LangWatchQL datasets and columns this member's permissions unlock. */
-const schema = protectedProcedure
-  .input(projectScopeSchema)
-  .permission("analytics:view")
-  .use(enforceWorkbenchEnabled)
-  .query(async ({ ctx, input }) => {
-    return getLangWatchQLService().describeSchema({
-      protections: await getUserProtectionsForProject(ctx, {
-        projectId: input.projectId,
-      }),
-    });
-  });
-
 /**
  * Runs one submitted statement, exactly as written.
  *
@@ -133,7 +118,7 @@ const query = protectedProcedure
       timeWindow: lwqlTimeWindowSchema.optional(),
       /**
        * The datapoint step for a statement that declares
-       * `{period_granularity_seconds:UInt32}`, in seconds — restricted to the
+       * `{dashboard_context_granularity_seconds:UInt32}`, in seconds — restricted to the
        * offered steps ({@link lwqlGranularityStepSchema}) so an off-list value
        * is a schema rejection here rather than reaching the service's backstop.
        * The bucket-budget arithmetic and its refusal are still the service's.
@@ -150,7 +135,8 @@ const query = protectedProcedure
     });
 
     return getLangWatchQLService().execute({
-      project,
+      // A workbench run is bound to the one project the surface is showing.
+      projects: [project],
       protections,
       sql: input.sql,
       ...(input.parameters ? { parameters: input.parameters } : {}),
@@ -163,6 +149,5 @@ const query = protectedProcedure
 
 export const lwqlRouter = createTRPCRouter({
   availability,
-  schema,
   query,
 });

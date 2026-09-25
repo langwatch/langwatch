@@ -67,7 +67,14 @@ encode_property() {
   printf '%s' "$value"
 }
 
+# awk compares against the limit numerically only when it reads as a number.
+# A limit of "eighty" or "80 " compares as a string, every paragraph passes and
+# the rule is off with nothing to show for it, so refuse it up front.
 MAX_PARAGRAPH_WORDS="${DOCS_PROSE_MAX_PARAGRAPH_WORDS:-80}"
+if [[ ! "$MAX_PARAGRAPH_WORDS" =~ ^[0-9]+$ ]]; then
+  echo "DOCS_PROSE_MAX_PARAGRAPH_WORDS must be a whole number, got: $MAX_PARAGRAPH_WORDS" >&2
+  exit 2
+fi
 
 MODE="diff"
 if [[ "${1:-}" == "--all" ]]; then
@@ -97,8 +104,10 @@ for file in "${FILES[@]}"; do
   [[ -f "$file" ]] || continue
   rel="${file#"$REPO_ROOT"/}"
 
-  # Blank out code fences (including indented ones, up to 3 spaces per the
-  # CommonMark spec) and founder-decision exemptions. Print blank lines for
+  # Blank out code fences and founder-decision exemptions. A fence is
+  # recognised at any indentation: MDX nests fences inside JSX components such
+  # as <Tab>, where four or more leading spaces are ordinary formatting rather
+  # than the CommonMark indented-code-block they would be in plain Markdown. Print blank lines for
   # skipped records so grep -n reports the real source line number.
   #
   # A block opened with N fence characters closes only on a line of at least N
@@ -107,9 +116,9 @@ for file in "${FILES[@]}"; do
   # for the rest of a page that nests fences, and everything after it reads as
   # prose.
   cleaned=$(awk '
-    /^ {0,3}(`{3,}|~{3,})/ {
+    /^[[:space:]]*(`{3,}|~{3,})/ {
       line = $0
-      sub(/^ {0,3}/, "", line)
+      sub(/^[[:space:]]*/, "", line)
       char = substr(line, 1, 1)
       length_ = 0
       while (substr(line, length_ + 1, 1) == char) length_++
@@ -150,7 +159,9 @@ for file in "${FILES[@]}"; do
   # blank lines end a paragraph and are not counted; everything else is prose.
   # A heading may carry up to three leading spaces, and a table may be written
   # without its outer pipes, in which case the separator row is what identifies
-  # it and the header row above it has to be taken back out of the count.
+  # it and the header row above it has to be taken back out of the count. That
+  # row also ends the paragraph that ran into it, so prose written on either
+  # side of such a table without a blank line is two paragraphs, not one.
   long=$(echo "$cleaned" | awk -v max="$MAX_PARAGRAPH_WORDS" '
     function flush() {
       if (words > max) printf "%d\t%d\n", start, words
@@ -166,7 +177,7 @@ for file in "${FILES[@]}"; do
     /^[[:space:]]*:?-+[-:|[:space:]]*\|[-:|[:space:]]*$/ {
       words -= last
       if (words <= 0) { words = 0; start = 0 }
-      last = 0
+      flush()
       in_table = 1
       next
     }

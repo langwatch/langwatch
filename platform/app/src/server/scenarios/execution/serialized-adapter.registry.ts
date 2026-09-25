@@ -9,6 +9,7 @@
 import type { AgentAdapter } from "@langwatch/scenario";
 import type { RunParameterValues } from "../parameters";
 import {
+  createSerializedVoiceAgentAdapter,
   SerializedCodeAgentAdapter,
   SerializedConnectedAgentAdapter,
   SerializedHttpAgentAdapter,
@@ -22,6 +23,7 @@ import type {
   LiteLLMParams,
   PromptConfigData,
   TargetAdapterData,
+  VoiceAgentData,
   WorkflowAgentData,
 } from "./types";
 
@@ -83,6 +85,12 @@ export const SERIALIZED_ADAPTER_FACTORIES: Record<string, AdapterFactory> = {
       parameters,
     });
   },
+  // The voice adapter reads its transport, agent id and credential from the
+  // pre-fetched data and dials the transport. A missing credential fails the
+  // run with the transport's named message (no vendor name leaks here — the
+  // registry owns it).
+  voice: ({ data }) =>
+    createSerializedVoiceAgentAdapter({ data: data as VoiceAgentData }),
   // The relay route authenticates the child with the project key, the same
   // credential the code and workflow adapters carry to the engine.
   connected: ({ data, projectApiKey, parameters }) => {

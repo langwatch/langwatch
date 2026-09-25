@@ -843,6 +843,7 @@ export const automationRouter = createTRPCRouter({
             "release_webhook_automations",
             {
               distinctId: ctx.session.user.id,
+              userEmail: ctx.session.user.email,
               projectId: input.projectId,
               // The drawer reads the same flag with both ids, so the route
               // resolves the organization too. Without it an organization
@@ -1037,6 +1038,7 @@ export const automationRouter = createTRPCRouter({
             "release_webhook_automations",
             {
               distinctId: ctx.session.user.id,
+              userEmail: ctx.session.user.email,
               projectId: input.projectId,
               // The drawer reads the same flag with both ids, so the route
               // resolves the organization too. Without it an organization

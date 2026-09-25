@@ -41,28 +41,34 @@ type MiddlewareParams = {
 };
 
 // Mock the permission check to always allow
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    hasProjectPermission: vi.fn(() => Promise.resolve(true)),
-    resolveProjectPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
-    resolveTeamPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
-    hasOrganizationPermission: vi.fn().mockResolvedValue(true),
-    skipPermissionCheck: ({ ctx, next }: MiddlewareParams) => {
-      ctx.permissionChecked = true;
-      return next();
-    },
-    skipPermissionCheckProjectCreation: ({ ctx, next }: MiddlewareParams) => {
-      ctx.permissionChecked = true;
-      return next();
-    },
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      hasProjectPermission: vi.fn(() => Promise.resolve(true)),
+      resolveProjectPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+      resolveTeamPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+      hasOrganizationPermission: vi.fn().mockResolvedValue(true),
+      skipPermissionCheck: ({ ctx, next }: MiddlewareParams) => {
+        ctx.permissionChecked = true;
+        return next();
+      },
+      skipPermissionCheckProjectCreation: ({ ctx, next }: MiddlewareParams) => {
+        ctx.permissionChecked = true;
+        return next();
+      },
+    };
+  },
+);
 
 describe("translateRouter.translate()", () => {
   let caller: ReturnType<typeof translateRouter.createCaller>;

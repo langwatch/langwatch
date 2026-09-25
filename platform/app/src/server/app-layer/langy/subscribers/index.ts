@@ -6,6 +6,12 @@ export {
   type LangyFailTurnCommandPort,
 } from "./agent-turn-liveness.subscriber";
 export {
+  createGuidedOnboardingTurnFailedSubscriber,
+  type GuidedOnboardingReader,
+  type GuidedOnboardingTurnFailedSubscriberDeps,
+  type LangyConversationOwnerReader,
+} from "./guided-onboarding-turn-failed.subscriber";
+export {
   createLangyConversationUpdateBroadcastSubscriber,
   type LangyConversationFreshnessReader,
   type LangyConversationFreshnessRecord,

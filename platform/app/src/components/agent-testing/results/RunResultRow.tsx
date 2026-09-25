@@ -18,9 +18,12 @@ import { isCancellableStatus } from "~/components/suites/useCancelScenarioRun";
 import { Menu } from "~/components/ui/menu";
 import { isTerminalStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
-import { ROW_HOVER_BG } from "../shared/design";
+import { FG_MUTED, ROW_HOVER_BG } from "../shared/design";
+import { EvaluatorPill, readingOfEvaluation } from "../shared/EvaluatorPill";
 import { LastResultLabel } from "../shared/LastResultLabel";
 import { ResultMetricsInline } from "../shared/ResultMetricsInline";
+import { callerLabel, runCallerKind } from "./caller-display";
+import { evaluationsOf, isAwaitingEvaluations } from "./evaluation-summaries";
 import type { RunResultsTableProps } from "./RunResultsTable";
 
 export type RunResultRowProps = Pick<
@@ -37,6 +40,10 @@ export type RunResultRowProps = Pick<
   templateColumns: string;
   /** True while any row of the run can still be stopped. */
   hasStoppable: boolean;
+  /** True when the table draws an Evaluators column. */
+  hasEvaluators: boolean;
+  /** True when the table draws a Caller column (AC24). */
+  hasCaller: boolean;
 };
 
 /** The row menu: reach the conversation, run the case again, or edit it. */
@@ -137,6 +144,40 @@ function StopRunButton({
   );
 }
 
+/**
+ * One pill per evaluator that ran on the scenario. A row still waiting for
+ * its evaluators says it is grading, in muted text, so it does not read as a
+ * row on which no check ran. A skipped evaluator keeps its pill, muted, so a
+ * row that skipped a check reads differently from one the check never ran on.
+ */
+function RowEvaluators({ scenarioRun }: { scenarioRun: ScenarioRunData }) {
+  const evaluations = evaluationsOf(scenarioRun);
+  if (evaluations.length === 0) {
+    if (!isAwaitingEvaluations(scenarioRun)) return null;
+    return (
+      <HStack gap={1.5} data-testid="run-result-evaluators-grading">
+        <Spinner size="xs" color={FG_MUTED} />
+        <Text fontSize="12px" fontWeight="medium" color={FG_MUTED}>
+          Grading
+        </Text>
+      </HStack>
+    );
+  }
+
+  return (
+    <HStack gap={1} flexWrap="wrap" data-testid="run-result-evaluators">
+      {evaluations.map((evaluation, at) => (
+        <EvaluatorPill
+          key={`${evaluation.evaluatorId}-${at}`}
+          evaluatorId={evaluation.evaluatorId}
+          name={evaluation.name}
+          reading={readingOfEvaluation(evaluation)}
+        />
+      ))}
+    </HStack>
+  );
+}
+
 /** The time and the cost, which only a settled run carries. */
 function RowMetrics({ scenarioRun }: { scenarioRun: ScenarioRunData }) {
   // A run that is still going has no duration and no cost to read: the
@@ -153,10 +194,22 @@ function RowMetrics({ scenarioRun }: { scenarioRun: ScenarioRunData }) {
   );
 }
 
+function RowCaller({ scenarioRun }: { scenarioRun: ScenarioRunData }) {
+  const kind = runCallerKind(scenarioRun);
+  if (!kind) return null;
+  return (
+    <Text fontSize="12px" color={FG_MUTED}>
+      {callerLabel(kind)}
+    </Text>
+  );
+}
+
 export function RunResultRow({
   scenarioRun,
   templateColumns,
   hasStoppable,
+  hasEvaluators,
+  hasCaller,
   resolveTargetName,
   iterationMap,
   onScenarioRunClick,
@@ -209,7 +262,17 @@ export function RunResultRow({
         </chakra.button>
       </HStack>
 
-      <Box />
+      {hasEvaluators ? (
+        <Box minWidth={0}>
+          <RowEvaluators scenarioRun={scenarioRun} />
+        </Box>
+      ) : null}
+
+      {hasCaller ? (
+        <Box paddingTop="1px" minWidth={0}>
+          <RowCaller scenarioRun={scenarioRun} />
+        </Box>
+      ) : null}
 
       <Box paddingTop="1px" textAlign="right">
         <RowMetrics scenarioRun={scenarioRun} />

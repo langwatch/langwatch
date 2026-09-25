@@ -392,3 +392,57 @@ export class ScenarioReservedSetIdError extends HandledError {
     this.name = "ScenarioReservedSetIdError";
   }
 }
+
+/**
+ * Thrown when a scenario is saved with a value for a field its test suite does
+ * not declare.
+ *
+ * Both lists are on `meta` because the editor renders them: the refused names
+ * beside the ones the suite declares, so a typo is visible.
+ */
+export class ScenarioFieldUnknownError extends HandledError {
+  declare readonly code: "scenario_field_unknown";
+
+  constructor({
+    identifiers,
+    declared,
+  }: {
+    identifiers: string[];
+    declared: string[];
+  }) {
+    super(
+      "scenario_field_unknown",
+      `Unknown scenario fields: ${identifiers.join(", ")}. Declared: ${
+        declared.length > 0 ? declared.join(", ") : "none"
+      }`,
+      {
+        httpStatus: 422,
+        fault: "customer",
+        meta: { identifiers, declared },
+      },
+    );
+    this.name = "ScenarioFieldUnknownError";
+  }
+}
+
+/**
+ * Thrown when a scenario field value cannot be read as the type the test
+ * suite declares for it: text where a number was declared, a word that is
+ * neither true nor false for a boolean.
+ */
+export class ScenarioFieldTypeInvalidError extends HandledError {
+  declare readonly code: "scenario_field_type_invalid";
+
+  constructor({ identifier, type }: { identifier: string; type: string }) {
+    super(
+      "scenario_field_type_invalid",
+      `The value of ${identifier} cannot be read as ${type}`,
+      {
+        httpStatus: 422,
+        fault: "customer",
+        meta: { identifier, type },
+      },
+    );
+    this.name = "ScenarioFieldTypeInvalidError";
+  }
+}

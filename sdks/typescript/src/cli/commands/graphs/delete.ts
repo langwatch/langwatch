@@ -7,6 +7,7 @@ import { buildAuthHeaders } from "@/internal/api/auth";
 import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 /**
  * Returns the deletion outcome rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
@@ -22,7 +23,7 @@ export const deleteGraphCommand = async (
   const spinner = createSpinner(`Deleting graph "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/graphs/${encodeURIComponent(id)}`, {
+    const response = await langwatchFetch(`${endpoint}/api/graphs/${encodeURIComponent(id)}`, {
       method: "DELETE",
       headers: buildAuthHeaders({ apiKey }),
     });

@@ -1,234 +1,240 @@
 ---
 title: "Access Control (RBAC)"
-description: "Manage user permissions and access levels in LangWatch with RBAC to secure evaluation workflows and agent testing environments."
+description: "Roles, permissions, custom roles and role bindings: who can do what in an organization, a team or a project."
 sidebarTitle: Access Control (RBAC)
-keywords: rbac, langwatch, llm, ai, rbac, role-based access control
+keywords: rbac, roles, permissions, custom roles, role bindings, groups, langwatch
 ---
 
 <Note>
-  **Custom roles are available on Enterprise plans.** The built-in organization, team and project roles below work on every plan. Creating custom roles and assigning them needs an Enterprise plan, and a self-hosted deployment needs an Enterprise license. Calls to the [Roles API](/api-reference/roles/overview) without one are refused with HTTP 402 and the error code `enterprise_plan_required`. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+  **Custom roles, role bindings and groups are Enterprise features.** The built-in organization and team roles work on every plan. Creating custom roles, listing role bindings and creating groups need an Enterprise plan, and a self-hosted deployment needs an Enterprise license. The [Roles API](/api-reference/roles/overview) refuses calls without one with HTTP 402 and the error code `enterprise_plan_required`. To enable it, contact [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
 </Note>
 
-LangWatch provides role-based access control (RBAC) to manage user permissions and access levels. This allows you to control who can access your LangWatch workspace and what they can do.
-
-# Role-Based Access Control (RBAC) System
-
-LangWatch implements a Role-Based Access Control (RBAC) system that manages permissions across organizations, teams, and projects. Role bindings can be assigned directly to users or to groups, including groups synced from your identity provider via SCIM.
-
-<Info>
-  For group-based access control and identity provider integration, see [SCIM Groups](/platform/scim-groups).
-</Info>
-
-## Permission Structure
-
-### Actions
-The system defines six core actions that can be performed on resources:
-
-| Action | Description |
-|--------|-------------|
-| `view` | Read-only access to view resources |
-| `create` | Ability to create new resources |
-| `update` | Ability to modify existing resources |
-| `delete` | Ability to remove resources |
-| `manage` | Full CRUD access plus administrative settings |
-| `share` | Ability to share resources with others |
-
-### Resources
-Permissions are applied to the following resource types:
-
-| Resource | Description |
-|----------|-------------|
-| `organization` | Organization-level settings and management |
-| `project` | Individual projects within teams |
-| `team` | Team management and settings |
-| `analytics` | Analytics dashboards and reports |
-| `cost` | Cost tracking and billing information |
-| `traces` | LLM trace data and logs |
-| `scenarios` | Test scenarios and evaluations |
-| `annotations` | Data annotations and labeling |
-| `evaluations` | Creating and managing evaluations |
-| `datasets` | Managing datasets |
-| `automations` | Creating and managing automations |
-| `workflows` | Creating and managing workflows |
-| `prompts` | Creating and managing prompts |
-
-
-## Predefined Roles
-
-### Team Roles
-
-#### Admin
-Full administrative access to all team resources and settings.
-
-| Resource | Permissions |
-|----------|-------------|
-| Projects | `view`, `manage` |
-| Analytics | `view`, `manage` |
-| Cost | `view` |
-| Traces | `view`, `share` |
-| Annotations | `view`, `manage` |
-| Evaluations | `view`, `manage` |
-| Datasets | `view`, `manage` |
-| Automations | `view`, `manage` |
-| Workflows | `view`, `manage` |
-| Prompts | `view`, `manage` |
-| Scenarios | `view`, `manage` |
-| Team | `view`, `manage` |
-
-#### Member
-Same permissions as Admin but cannot manage team settings.
-
-#### Viewer
-Read-only access to the resources listed below, for observation and reporting.
-
-| Resource | Permissions |
-|----------|-------------|
-| Projects | `view` |
-| Analytics | `view` |
-| Traces | `view` |
-| Annotations | `view` |
-| Evaluations | `view` |
-| Datasets | `view` |
-| Automations | `view` |
-| Workflows | `view` |
-| Prompts | `view` |
-| Scenarios | `view` |
-| Team | `view` |
-
-### Organization Roles
-
-#### Admin
-Complete control over organization settings and all teams.
-
-| Resource | Permissions |
-|----------|-------------|
-| Organization | `view`, `manage`, `delete` |
-
-#### Member
-Basic organization access for team members.
-
-| Resource | Permissions |
-|----------|-------------|
-| Organization | `view` |
-
-## Permission Hierarchy
-
-The system implements a hierarchical permission model where:
-
-- **`manage` permissions automatically include** `view`, `create`, `update`, and `delete` permissions
-- This means if a user has `analytics:manage`, they automatically have `analytics:view`, `analytics:create`, `analytics:update`, and `analytics:delete`
-
-## Organization Structure
-
-LangWatch uses three layers for access and ownership:
-
-- **Organization**: the top-level container for billing, users, and shared policy.
-- **Team**: the container that groups projects and members together.
-- **Project**: the actual unit where traces, evaluations, prompts, and API keys live.
-
-Practical rules:
-
-- Create teams first when you want a new workspace boundary for a department or product line.
-- Create projects inside a team, or move an existing project to another team when ownership changes.
-- Moving a project between teams changes the inherited RBAC boundary. Team members on the destination team gain access, and source-team inheritance no longer applies.
-- Groups are the scale mechanism on top of this hierarchy. Use them to assign the same role bindings to many users at once.
-
-The day-to-day flows live in the UI under **Settings → Teams**, **Settings → Projects**, and **Settings → Groups**. The same operations are available through the Teams, Projects, and Groups APIs.
-
-## Custom Roles
-
-### Overview
-Organizations can create custom roles to provide more granular permission control beyond the predefined roles. Custom roles allow organizations to:
-
-- Define specific permission combinations
-- Create roles tailored to specific job functions
-- Implement least-privilege access principles
-- Maintain compliance with organizational policies
-
-### Creating Custom Roles
-
-Custom roles are created at the organization level and can be assigned to users within any team in that organization. Custom roles can be found under settings.
-
-#### Required Fields
-- **Name**: Unique role name (1-50 characters)
-- **Description**: Optional description of the role's purpose
-- **Permissions**: Array of specific permissions
-
-
-The following screenshot shows the roles interface in LangWatch.
+Teams and the built-in Admin, Member and Viewer roles work on every plan.
+Creating or editing a custom role requires Enterprise.
 
 <Frame>
-<img src="/images/rbac/roles.png" alt="LangWatch RBAC Roles Interface" />
+  <img src="/images/access/roles-light.png" alt="Built-in roles and the New role action in LangWatch" className="block dark:hidden" />
+  <img src="/images/access/roles-dark.png" alt="Built-in roles and the New role action in LangWatch" className="hidden dark:block" />
 </Frame>
 
-To create a new role, click the "Create Role" button.
+## How access is structured
 
-Add the name and description of the role and click the "Create" button.
+A permission is a `resource:action` pair, for example `traces:view` or `datasets:manage`. A role is a named set of permissions. A role binding gives a role to a person, a group or an API key at one scope: the organization, a team or a project.
+
+LangWatch has three scopes:
+
+| Scope | What it contains |
+|-------|------------------|
+| **Organization** | Billing, members, seats, groups, roles, the audit log and the organization-wide settings |
+| **Team** | A set of projects and the people who work on them |
+| **Project** | Traces, evaluations, prompts, datasets, API keys and everything else you send data to |
+
+Every member of the organization has an organization role. A role binding at the organization scope applies to every team and project in it, which is how an organization Admin reaches everything. Below that, access to a team or a project comes from a binding on that team or that project.
+
+## Organization roles
+
+Set the organization role per member in **Settings > Directory > People**. The role
+decides what a person can do at the organization level and how their seat is
+counted.
+
+| Role | What it grants |
+|------|----------------|
+| **Admin** | Every permission on every team and project in the organization, plus the organization settings: members, teams, roles, groups, billing, the audit log, AI Governance, webhook endpoints and spend data |
+| **Member** | `organization:view` and `aiTools:view`. Access to a team or a project comes from a binding on that team or that project |
+| **Lite Member** | `organization:view` and `aiTools:view`. On a team or a project a Lite Member is capped at the Viewer permissions below, plus `annotations:create` and `annotations:update`, and never sees costs, the AI Gateway pages or the audit log |
+
+A Lite Member uses a Lite seat, which is counted separately from full seats. In the settings pages a Lite Member can only be given the Viewer role on a team or a project. A group binding above Viewer applies as Viewer for a Lite Member.
+
+**Also check:** [Members and Teams](/platform/members-and-teams) for seats, invites and how to change a member's role.
+
+## Team roles
+
+A team role applies to one team and, through inheritance, to every project in it. A binding on a single project adds access on that project only, and never removes what the team role already grants. The built-in roles are **Admin**, **Member** and **Viewer**.
+
+| Resource | Viewer | Member | Admin |
+|----------|--------|--------|-------|
+| `project` | view | view, create, update | view, create, update, delete, manage |
+| `analytics` | view | view, manage | view, manage |
+| `traces` | view | view, create, update, share | view, create, update, share |
+| `annotations` | view | view, manage | view, manage |
+| `evaluations` | view | view, manage | view, manage |
+| `datasets` | view | view, manage | view, manage |
+| `workflows` | view | view, manage | view, manage |
+| `experiments` | view | view, manage | view, manage |
+| `prompts` | view | view, manage | view, manage |
+| `scenarios` | view | view, manage | view, manage |
+| `secrets` | view | view, manage | view, manage |
+| `team` | view | view | view, manage |
+| `virtualKeys` | view | view, create, update, rotate | view, create, update, rotate, delete, manage, viewOtherPersonal |
+| `gatewayBudgets` | view | view | view, create, update, delete, manage |
+| `gatewayProviders` | view | view | view, update, manage |
+| `routingPolicies` | view | view | view, manage |
+| `gatewayGuardrails` | view | view | view, attach, detach, manage |
+| `gatewayLogs` | view | view | view |
+| `auditLog` | view | view | view |
+| `gatewayUsage` | view | view | view |
+| `gatewayCacheRules` | view | view | view, create, update, delete, manage |
+| `cost` |  | view | view |
+| `triggers` |  | view, manage | view, manage |
+| `agentCache` |  | view, manage | view, manage |
+| `langy` |  | view, create, update, delete | view, create, update, delete, manage |
+
+A Viewer reads. A Member creates and edits project work, sees costs, and manages its own virtual keys. An Admin also manages the team, deletes projects, and manages the AI Gateway configuration.
+
+## Actions
+
+| Action | Meaning |
+|--------|---------|
+| `view` | Read the resource |
+| `create` | Create a new one |
+| `update` | Edit an existing one |
+| `delete` | Delete one |
+| `manage` | Implies `view`, `create`, `update`, `delete`, `rotate`, `attach` and `detach` on the same resource |
+| `share` | Create a public share link for a trace |
+| `rotate` | Rotate a virtual key |
+| `attach`, `detach` | Attach a guardrail to a virtual key, or detach it |
+| `viewOtherPersonal` | See the personal virtual keys of other members, for off-boarding |
+
+`share` and `viewOtherPersonal` are never implied by `manage`. Grant them explicitly.
+
+## Resources
+
+Each table lists the actions a resource accepts. Resources marked **organization only** can only be granted by an organization-scoped binding; a team or project binding never grants them, even through a custom role that lists them.
+
+### Core
+
+| Resource | Actions | Scope |
+|----------|---------|-------|
+| `organization` | view, manage, delete | organization only |
+| `sso` | view, manage | organization only |
+| `team` | view, manage | any |
+| `project` | view, create, update, delete, manage | any |
+
+### Product
+
+| Resource | Actions |
+|----------|---------|
+| `analytics` | view, create, update, delete, manage |
+| `cost` | view |
+| `traces` | view, create, update, share |
+| `scenarios` | view, create, update, delete, manage |
+| `annotations` | view, create, update, delete, manage |
+| `evaluations` | view, create, update, delete, manage |
+| `experiments` | view, create, update, delete, manage |
+| `datasets` | view, create, update, delete, manage |
+| `triggers` | view, create, update, delete, manage |
+| `workflows` | view, create, update, delete, manage |
+| `prompts` | view, create, update, delete, manage |
+| `secrets` | view, create, update, delete, manage |
+| `langy` | view, create, update, delete, manage |
+| `agentCache` | view, manage |
+
+### Platform
+
+| Resource | Actions |
+|----------|---------|
+| `auditLog` | view |
+
+### LangWatch AI Gateway
+
+| Resource | Actions | Scope |
+|----------|---------|-------|
+| `virtualKeys` | view, create, update, delete, rotate, manage, viewOtherPersonal | any |
+| `gatewayBudgets` | view, create, update, delete, manage | any |
+| `gatewayProviders` | view, update, manage | any |
+| `routingPolicies` | view, manage | any |
+| `gatewayGuardrails` | view, attach, detach, manage | any |
+| `gatewayCacheRules` | view, create, update, delete, manage | any |
+| `gatewayUsage` | view | any |
+| `gatewayLogs` | view | any |
+| `gatewaySpend` | view, manage | organization only |
+| `webhookEndpoints` | view, manage | organization only |
+
+### AI Governance
+
+| Resource | Actions | Scope |
+|----------|---------|-------|
+| `governance` | view, manage | organization only |
+| `governanceCost` | view | organization only |
+| `ingestionSources` | view, create, update, delete, manage | organization only |
+| `anomalyRules` | view, create, update, delete, manage | organization only |
+| `complianceExport` | view | organization only |
+| `activityMonitor` | view | organization only |
+| `aiTools` | view, manage | organization only |
+
+## Custom roles
+
+A custom role is a named permission set you define. Open **Roles**, choose the
+**Roles** tab and select **New role**. You need `organization:manage`.
+Custom roles are Enterprise.
+
+A custom role has:
+
+| Field | Rule |
+|-------|------|
+| Name | Required, 1 to 50 characters, unique in the organization |
+| Description | Optional |
+| Permissions | One or more `resource:action` pairs |
+
+Expand a permission category and choose **None**, **Read** or **Full access**
+for each resource. Some resources only support Read. The preview explains what
+the role permits at the selected scope. Select **Create role** to save it.
 
 <Frame>
-<img src="/images/rbac/roles-create.png" alt="Creating Custom Roles in LangWatch" />
+  <img src="/images/access/custom-role-light.png" alt="The custom-role editor with permission levels and a scope preview" className="block dark:hidden" />
+  <img src="/images/access/custom-role-dark.png" alt="The custom-role editor with permission levels and a scope preview" className="hidden dark:block" />
 </Frame>
 
-Once the role is created, you can attach it to a user under the teams page. 
+The permission picker groups resources by product area. The [Roles API](/api-reference/roles/overview) accepts every resource and action in the tables above.
+
+To assign a custom role directly, open **Settings > Directory > People** and edit the
+person's access, or open **Settings > Directory > Teams & projects** and add access to a team or
+project. You can also choose a role while creating an invite, or assign the
+role to a group in **Settings > Directory > Groups**. A custom role can be assigned at
+organization, team or project scope.
+
+An organization Admin who also holds a
+custom team role keeps the Admin access.
+
+## Role assignments
+
+The API calls this a role binding. In the product, a role assignment is one
+row: who, which role and which scope.
+
+| Part | Options |
+|------|---------|
+| Who | A user, a group, or an API key |
+| Role | Admin, Member, Viewer, or a custom role |
+| Scope | The organization, one team, or one project |
+
+You create role assignments for users from **Settings > Directory > People** and
+**Settings > Directory > Teams & projects**, and for groups from **Settings > Directory > Groups**. Open
+**Roles**, then choose **Role assignments** to list every assignment in the
+organization. Filter it by organization, team or project scope. This tab is
+read only.
 
 <Frame>
-<img src="/images/rbac/roles-add.png" alt="Adding Roles to Users in LangWatch" />
+  <img src="/images/access/role-assignments-light.png" alt="Role assignments grouped by person and scope" className="block dark:hidden" />
+  <img src="/images/access/role-assignments-dark.png" alt="Role assignments grouped by person and scope" className="hidden dark:block" />
 </Frame>
 
+An API key can hold bindings too. A key with restricted permissions stores its scopes as bindings on the key, and LangWatch intersects them with the permissions of the user who owns the key on every request. A key never grants more than its owner holds at that moment. A service key with no owner has no such ceiling.
 
-### Custom Role Management
+**Also check:** [API Keys](/platform/api-keys) for how to scope a key.
 
-#### Permissions Required
-- **Create/Update/Delete Custom Roles**: `organization:manage` permission
-- **Assign Custom Roles**: `team:manage` permission
+## Groups
 
-#### Best Practices
-- **Naming Convention**: Use descriptive names that clearly indicate the role's purpose
-- **Documentation**: Provide clear descriptions explaining when to use each role
-- **Regular Review**: Periodically review custom roles to ensure they're still needed
-- **Least Privilege**: Grant only the minimum permissions required for the role's function
-- **Testing**: Test custom roles in a development environment before deploying
+A group gives the same assignments to many people at once. Create a group at
+**Settings > Directory > Groups** (Enterprise), add members, and assign roles at any
+scope. An assignment on a group applies to every member of the group, and the
+People tab shows it as "via" the group.
 
-### Custom Role Limitations
+A group synced from your identity provider through SCIM keeps its name and membership under the identity provider's control: you bind roles to it in LangWatch, and the identity provider decides who is in it.
 
-- Custom roles cannot grant permissions that exceed the organization admin's capabilities
-- Custom roles are organization-scoped and cannot be shared across organizations
+**Also check:** [SCIM Groups](/platform/scim-groups).
 
-### Public Sharing
-The system supports public sharing of traces, allowing access without authentication when resources are explicitly shared publicly.
+## How a request is authorized
 
----
+LangWatch first checks that the caller is an active member of the organization; a disabled member is refused, and API keys skip this check. It then collects every binding on the scope chain of the request, the project, its team and the organization, including bindings held through groups.
 
-## Scoped Role Bindings
-
-Roles in LangWatch are assigned via **role bindings**: a binding links a principal (user or group) to a role at a specific scope.
-
-### Scopes
-
-| Scope | What it grants |
-|-------|---------------|
-| **Organization** | Access across the entire organization at the specified role level |
-| **Team** | Access to a specific team and all its projects |
-| **Project** | Access to a single project only |
-
-### Resolution Rules
-
-- **Most specific scope wins**: a project-level binding overrides a team-level binding for that project
-- **Org Admin always wins**: an org-level Admin binding grants full access everywhere regardless of narrower bindings
-- **Multiple bindings at the same scope**: the highest role is used (e.g. Member + Viewer → Member)
-
-Role bindings can be assigned to users directly from **Settings → Members**, or to groups from **Settings → Groups**. Users inherit all bindings assigned to groups they belong to.
-
-<Tip>
-  Use group bindings (especially SCIM groups from your IdP) to manage access at scale, assigning a binding to a group is equivalent to assigning it to every member of that group. See [SCIM Groups](/platform/scim-groups).
-</Tip>
-
----
-
-## Security Considerations
-
-- **Principle of Least Privilege**: Grant only necessary permissions
-- **Regular Audits**: Periodically review role assignments and permissions
-- **Separation of Duties**: Use different roles for different functions
-- **Access Reviews**: Implement regular access reviews for sensitive roles
-- **Monitoring**: Track permission usage and changes for security auditing
+Any binding that grants the permission allows the request; a narrower binding never cancels a wider one. An organization-scoped Admin binding grants every permission. At organization scope, every active member holds the Member organization permissions. Organization-only resources need an organization-scoped binding.

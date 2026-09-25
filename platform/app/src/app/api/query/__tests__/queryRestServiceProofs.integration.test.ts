@@ -41,7 +41,7 @@
  *  - Two tenants throughout, both seeded, so an isolation assertion has
  *    something to fail on.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  * @see ./queryRestApi.integration.test.ts — the request/error contract this suite relies on but does not re-prove
  * @see ~/server/analytics/lwql — the service under test
  * @see https://github.com/langwatch/langwatch/issues/7565#issuecomment-5424087900
@@ -68,15 +68,19 @@ import {
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
 } from "~/server/analytics/lwql/__tests__/lwqlClickHouseHarness";
-import { LWQL_VIEW_CATALOG } from "~/server/analytics/lwql/catalog/lwqlViews";
+import {
+  LWQL_VIEW_CATALOG,
+  lwqlViewByName,
+} from "~/server/analytics/lwql/catalog/lwqlViews";
 import {
   isPostgresResident,
   type LangWatchQLViewDefinition,
+  lwqlPhysicalColumn,
 } from "~/server/analytics/lwql/catalog/types";
 import {
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
-} from "~/server/analytics/lwql/views";
+} from "~/server/analytics/lwql/provisioning";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
@@ -86,6 +90,7 @@ import {
 } from "~/server/app-layer/subscription/plan-provider";
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
 import { prisma } from "~/server/db";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { pinTimezone } from "~/test-utils/pinTimezone";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
@@ -94,6 +99,8 @@ import { app } from "../[[...route]]/app";
 const SEEDED_TRACES = 6;
 const SEEDED_EVALUATIONS = 4;
 const SEEDED_SIMULATIONS = 2;
+const SEEDED_CODING_SESSIONS = 2;
+const SEEDED_CODING_EVENTS_PER_SESSION = 3;
 
 /** Everything is seeded at one instant, inside the window the queries ask for. */
 const SEED_AT = "2026-02-20 12:00:00.000";
@@ -233,6 +240,36 @@ async function seedTenant({
       },
       Cost: 0.0021,
     })),
+  });
+
+  // A `claude_code.tool` span, so `coding_tool_results` (a view over
+  // `stored_spans`) has a row for this tenant — every view in the catalog is
+  // asserted isolated elsewhere in this suite.
+  await admin.insert({
+    table: `${database}.stored_spans`,
+    format: "JSONEachRow",
+    values: [
+      {
+        ProjectionId: `${tenantId}/tool-span`,
+        TenantId: tenantId,
+        TraceId: `${tenantId}-tool-trace`,
+        SpanId: `${tenantId}-tool-span`,
+        Sampled: 1,
+        StartTime: SEED_AT,
+        EndTime: SEED_AT,
+        DurationMs: 40,
+        SpanName: "claude_code.tool",
+        SpanKind: 3,
+        ServiceName: "api",
+        ScopeName: "langwatch",
+        ResourceAttributes: {},
+        SpanAttributes: {
+          "langwatch.input": marks.spanInput,
+          "langwatch.output": marks.spanOutput,
+        },
+        Cost: 0,
+      },
+    ],
   });
 
   await admin.insert({
@@ -383,6 +420,87 @@ async function seedTenant({
     ],
   });
 
+  // The coding-agent datasets (#8085 / #8116 Part A): one row per session,
+  // and a handful of ordered events per session.
+  const sessionIds = [...Array(SEEDED_CODING_SESSIONS).keys()].map(
+    (index) => `${tenantId}-coding-session-${index}`,
+  );
+  await admin.insert({
+    table: `${database}.coding_agent_sessions`,
+    format: "JSONEachRow",
+    values: sessionIds.map((sessionId, index) => ({
+      TenantId: tenantId,
+      SessionId: sessionId,
+      SessionKeySource: "agent",
+      Version: "1",
+      StartedAt: SEED_AT,
+      Agent: "claude_code",
+      AgentVersion: "1.0.0",
+      GitBranch: `feature/${index}`,
+      RepositoryHost: "github.com",
+      RepositoryOwner: "langwatch",
+      RepositoryName: "langwatch",
+      ModelCalls: 5 + index,
+      ToolCalls: 10 + index,
+      SubAgents: index,
+      ToolCounts: { Bash: 3 },
+      ToolDurationMs: { Bash: 1200 + index },
+      CostUsd: 1.5 + index,
+      UpdatedAt: SEED_AT,
+    })),
+  });
+
+  await admin.insert({
+    table: `${database}.coding_agent_session_events`,
+    format: "JSONEachRow",
+    values: sessionIds.flatMap((sessionId) =>
+      [...Array(SEEDED_CODING_EVENTS_PER_SESSION).keys()].map((eventIndex) => ({
+        TenantId: tenantId,
+        SessionId: sessionId,
+        // Ordered strictly after SEED_AT, one second apart, so "every event in
+        // order" has an order to prove rather than one indistinguishable instant.
+        TimeUnixMs: new Date(
+          new Date(`${SEED_AT.replace(" ", "T")}Z`).getTime() +
+            (eventIndex + 1) * 1000,
+        )
+          .toISOString()
+          .replace("T", " ")
+          .replace("Z", ""),
+        RecordId: `${sessionId}-event-${eventIndex}`.padEnd(64, "0"),
+        EventKind: eventIndex === 0 ? "user_prompt" : "model_call",
+        Agent: "claude_code",
+        SessionKeySource: "agent",
+        CostUsd: 0.01 * (eventIndex + 1),
+        UpdatedAt: SEED_AT,
+      })),
+    ),
+  });
+
+  // One judgement per seeded trace: the judgments view reads this table, and
+  // an isolation read over a view whose table is empty proves nothing.
+  await admin.insert({
+    table: `${database}.instant_eval_judgments`,
+    format: "JSONEachRow",
+    values: traceIds.map((traceId, index) => ({
+      TenantId: tenantId,
+      RunId: `${tenantId}-instant-eval-run`,
+      TraceId: traceId,
+      QuestionId: "annoyed",
+      ThreadId: `${tenantId}-thread`,
+      SpanId: "",
+      Kind: "boolean",
+      Status: "judged",
+      Passed: index % 2,
+      Score: null,
+      Label: "",
+      Probability: 0.5 + index / 100,
+      Probabilities: "",
+      Error: "",
+      OccurredAt: SEED_AT,
+      CreatedAt: SEED_AT,
+    })),
+  });
+
   await admin.insert({
     table: `${database}.evaluation_analytics_rollup`,
     format: "JSONEachRow",
@@ -407,6 +525,142 @@ async function seedTenant({
       },
     ],
   });
+
+  // `logs` (log_records): one request-body record correlated to the first
+  // seeded trace, so the alias proof (TraceId/SpanId/SessionId <- Correlation*
+  // /ProviderSessionId) and the content-gate proof (BodyText) have a row.
+  await admin.insert({
+    table: `${database}.log_records`,
+    format: "JSONEachRow",
+    values: [
+      {
+        TenantId: tenantId,
+        CorrelationTraceId: traceIds[0]!,
+        CorrelationSpanId: `${tenantId}-span-0`,
+        ProviderSessionId: `${tenantId}-provider-session`,
+        TimeUnixMs: SEED_AT,
+        RecordId: `${tenantId}-log-record`.padEnd(64, "0"),
+        EventName: "api_request_body",
+        BodyText: `${marks.spanInput}-log-body`,
+      },
+    ],
+  });
+
+  // `langy_conversation_messages` (langy_messages): one message, content
+  // gated `output` by the derived classifier — the only column here a
+  // permission-less caller cannot read.
+  await admin.insert({
+    table: `${database}.langy_messages`,
+    format: "JSONEachRow",
+    values: [
+      {
+        TenantId: tenantId,
+        ConversationId: `${tenantId}-conversation`,
+        MessageId: `${tenantId}-message-0`,
+        Role: "assistant",
+        Parts: `${marks.spanOutput}-langy-message`,
+        CreatedAt: SEED_AT,
+        UpdatedAt: SEED_AT,
+      },
+    ],
+  });
+
+  // `experiment_items` (experiment_run_items): input/output/costs gated
+  // columns, per `overrides/experiments.ts`.
+  await admin.insert({
+    table: `${database}.experiment_run_items`,
+    format: "JSONEachRow",
+    values: [
+      {
+        TenantId: tenantId,
+        RunId: `${tenantId}-run-0`,
+        ExperimentId: `${tenantId}-experiment`,
+        ProjectionId: `${tenantId}/item-0`,
+        OccurredAt: SEED_AT,
+        DatasetEntry: `${marks.spanInput}-dataset-entry`,
+        Predicted: `${marks.spanOutput}-predicted`,
+        TargetCost: 0.03,
+        EvaluationCost: 0.01,
+      },
+    ],
+  });
+
+  // `simulation_metric_rollups` (simulation_run_metrics_rollup): an
+  // AggregatingMergeTree, so only reachable through *State() combinators. Two
+  // partial states for the SAME (TenantId, ScenarioRunId, TraceId) key, at two
+  // different OccurredAt values — the read path's `argMaxMerge` must resolve
+  // to the LATER one, which is the whole point of the engine choice.
+  const rollupKey = {
+    scenarioRunId: `${tenantId}-rollup-sim`,
+    traceId: `${tenantId}-rollup-trace`,
+  };
+  for (const part of [
+    { occurredAt: "2026-02-16 00:00:00.000", totalCost: 0.11 },
+    { occurredAt: "2026-02-20 12:00:00.000", totalCost: 0.87 },
+  ]) {
+    await admin.command({
+      query:
+        `INSERT INTO ${database}.simulation_run_metrics_rollup ` +
+        `(TenantId, ScenarioRunId, TraceId, TotalCost, RoleCosts, RoleLatencies, OccurredAt, PartitionMonth) ` +
+        `SELECT '${tenantId}', '${rollupKey.scenarioRunId}', '${rollupKey.traceId}', ` +
+        `argMaxState(toFloat64(${part.totalCost}), toDateTime64('${part.occurredAt}', 3)), ` +
+        `argMaxState(map('assistant', ${part.totalCost}), toDateTime64('${part.occurredAt}', 3)), ` +
+        `argMaxState(map('assistant', 120.0), toDateTime64('${part.occurredAt}', 3)), ` +
+        `maxState(toDateTime64('${part.occurredAt}', 3)), toYYYYMM(toDateTime64('${part.occurredAt}', 3))`,
+    });
+  }
+
+  // `gateway_budget_scope_totals`: the other AggregatingMergeTree table in
+  // the catalog, same reasoning as the rollup above — a plain INSERT cannot
+  // populate an AggregateFunction column.
+  await admin.command({
+    query:
+      `INSERT INTO ${database}.gateway_budget_scope_totals ` +
+      `(TenantId, Scope, ScopeId, Window, BudgetId, PeriodStart, SpendUSD, TokensInput, TokensOutput, TokensCacheRead, TokensCacheWrite, RequestCount, UpdatedAt, SpendNanoUSD) ` +
+      `SELECT '${tenantId}', 'project', '${tenantId}', 'day', 'budget-1', now64(3), ` +
+      `sumState(toDecimal64(1.5, 6)), sumState(toUInt64(100)), sumState(toUInt64(20)), sumState(toUInt64(5)), sumState(toUInt64(3)), countState(), now64(3), sumState(toInt64(1500000000))`,
+  });
+
+  // Every remaining ClickHouse-resident source table this suite's isolation
+  // proof reads but has no dedicated fixture above: one row per tenant so
+  // "reads every LangWatchQL view, seeing exactly its own tenant's rows" has
+  // something real to check rather than an empty result passing vacuously.
+  // Driven off `LWQL_VIEW_CATALOG` itself — see the identical sweep in
+  // `lwqlClickHouseHarness.ts`'s `seedRemainingDerivedSourceTables`.
+  const alreadySeededHere = new Set([
+    "trace_summaries",
+    "stored_spans",
+    "evaluation_runs",
+    "simulation_runs",
+    "trace_analytics",
+    "trace_analytics_rollup",
+    "evaluation_analytics",
+    "evaluation_analytics_rollup",
+    "coding_agent_sessions",
+    "coding_agent_session_events",
+    "log_records",
+    "langy_messages",
+    "experiment_run_items",
+    "simulation_run_metrics_rollup",
+    "gateway_budget_scope_totals",
+    "instant_eval_judgments",
+  ]);
+  const remainingSourceTables = new Set(
+    LWQL_VIEW_CATALOG.filter((view) => !isPostgresResident(view))
+      .map((view) => view.sourceTable)
+      .filter((table) => !alreadySeededHere.has(table)),
+  );
+  for (const table of remainingSourceTables) {
+    const view = LWQL_VIEW_CATALOG.find(
+      (candidate) => candidate.sourceTable === table,
+    )!;
+    const tenantColumn = lwqlPhysicalColumn(view, "TenantId");
+    await admin.insert({
+      table: `${database}.${table}`,
+      format: "JSONEachRow",
+      values: [{ [tenantColumn]: tenantId }],
+    });
+  }
 }
 
 describe("given the /api/v1/query REST family's service, isolation and policy proofs", () => {
@@ -420,6 +674,15 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
   let gatedProject: Project;
   let database: string;
   let facts: string;
+
+  /** Looks a view up by name, failing loudly rather than passing `undefined` on. */
+  const viewByName = (name: string): LangWatchQLViewDefinition => {
+    const view = lwqlViewByName(name);
+    if (!view) {
+      throw new Error(`${name} is not registered in LWQL_VIEW_CATALOG`);
+    }
+    return view;
+  };
 
   /** The two paths this family serves. */
   const runPath = "/api/v1/query";
@@ -538,10 +801,16 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
     view: LangWatchQLViewDefinition,
     tenantId: string,
   ) => {
+    // A PostgreSQL-resident source's engine table is already mapped onto the
+    // catalog's exposed names, so its physical tenant column IS `TenantId`;
+    // `stored_objects` (ClickHouse-resident) polices on `project_id`.
+    const tenantColumn = isPostgresResident(view)
+      ? "TenantId"
+      : lwqlPhysicalColumn(view, "TenantId");
     const [row] = await selectRows<{ value: string }>(
       harness.admin,
       `SELECT count() AS value FROM ${isPostgresResident(view) ? database : facts}.${view.sourceTable} ` +
-        `WHERE TenantId = '${tenantId}'`,
+        `WHERE ${tenantColumn} = '${tenantId}'`,
     );
     return Number(row!.value);
   };
@@ -570,9 +839,17 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
         dedup: SHIPPED_LWQL_DEDUP,
       }),
     );
+    // Grants and source-table policies for the whole catalog, from the single
+    // access-model emitter (#8258) — the view statements are structural only.
+    await harness.applyAccessModel({
+      views: LWQL_VIEW_CATALOG,
+      sourceDatabase: facts,
+    });
 
     await resetApp();
+    const eventSourcing = createAuthzTestEventSourcing(prisma);
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: eventSourcing,
       planProvider: PlanProviderService.create({
         getActivePlan: vi
           .fn()
@@ -632,7 +909,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
     // gateway sends — if the two ever disagreed, every query would succeed and
     // return nothing, which reads exactly like a tenant with no data.
     await harness.admin.insert({
-      table: `${database}.${harness.names.keyMapTable}`,
+      table: `${facts}.${harness.names.keyMapTable}`,
       format: "JSONEachRow",
       values: [openProject, gatedProject].map((project) => ({
         KeyHash: lwqlTenantCapability({ secret: project.lwqlKey }),
@@ -725,8 +1002,8 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
       ]);
     });
 
-    /** @scenario "Results carry typed columns, rows, execution statistics, truncation state, and diagnostics" */
-    it("answers with typed columns, rows, execution statistics, truncation state and diagnostics", async () => {
+    /** @scenario "Results carry typed columns, rows, execution statistics, and diagnostics" */
+    it("answers with typed columns, rows, execution statistics and diagnostics", async () => {
       const body = await run(
         openProject,
         `SELECT TraceId, TotalDurationMs FROM ${database}.traces ` +
@@ -746,7 +1023,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
       expect(body.statistics.rowsReturned).toBe(3);
       expect(typeof body.statistics.elapsedMs).toBe("number");
       expect(typeof body.statistics.bytesRead).toBe("number");
-      expect(body.truncated).toBe(false);
+      expect(body.truncated).toBeUndefined();
       expect(body.diagnostics).toEqual([]);
     });
 
@@ -825,7 +1102,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
 
     const PERIOD_SQL = () =>
       `SELECT count() AS value FROM ${database}.traces ` +
-      `WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}`;
+      `WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}`;
 
     /** Rows a period-aware statement returns for one window. */
     const countFor = async (timeWindow: { start: Date; end: Date }) => {
@@ -893,7 +1170,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
       const response = await post(
         {
           sql: PERIOD_SQL(),
-          parameters: { period_start: "2020-01-01 00:00:00" },
+          parameters: { dashboard_context_period_start: "2020-01-01 00:00:00" },
           timeWindow: { start: second(-60), end: second(60) },
         },
         { token: openProject.apiKey },
@@ -1121,6 +1398,93 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
       );
       expect(Number(body.rows[0].value)).toBeGreaterThan(0);
     });
+
+    /**
+     * The same content-gate proof as above, over three more datasets —
+     * #8085/#8116 Part B AC3: every input/output-gated column across the
+     * expanded catalog is refused by permission, not merely `traces`'.
+     */
+    it.each([
+      ["logs", "BodyText"],
+      ["langy_conversation_messages", "Parts"],
+      ["experiment_items", "DatasetEntry"],
+    ] as const)("refuses %s.%s for the gated caller, and answers it for the permitted one", async (view, column) => {
+      // Built here, not in the table above: the table is evaluated once at
+      // collection time, before `beforeAll` assigns `database`.
+      const sql = `SELECT ${column} FROM ${database}.${view} LIMIT 1`;
+      const body = await refuse(gatedProject, sql);
+      expect(body.code, sql).toBe("lwql_not_permitted");
+      expect(
+        body.meta.violations.map((violation: any) => violation.code),
+        sql,
+      ).toContain("GATED_COLUMN");
+
+      const response = await post({ sql }, { token: openProject.apiKey });
+      expect(response.status, sql).toBe(200);
+    });
+
+    /**
+     * The `costs` gate is structurally the same mechanism (`GATED_COLUMN`,
+     * `validateLangWatchQL`'s `columnGates`), but every API-key caller through
+     * this REST family resolves `canSeeCosts: true` unconditionally —
+     * `getProtectionsForProject` in `~/server/api/utils.ts` grants cost:view
+     * to every API key regardless of the project's data-privacy policy ("API
+     * key holders have full project access — all roles grant cost:view").
+     * A costs-gated column can therefore never be refused through this
+     * surface today; this proves the column reads (not that it CAN be
+     * refused, which would be a false claim about current behavior) and
+     * documents why no refusal case exists here for it.
+     */
+    it("answers a costs-gated column (TargetCost) for every API-key caller, gated or not", async () => {
+      const sql = `SELECT TargetCost FROM ${database}.experiment_items LIMIT 1`;
+      for (const project of [openProject, gatedProject]) {
+        const response = await post({ sql }, { token: project.apiKey });
+        expect(response.status, project.slug).toBe(200);
+      }
+    });
+  });
+
+  describe("when a caller reads the logs view", () => {
+    it("returns the correlation and provider-session values under TraceId/SpanId/SessionId", async () => {
+      const body = await run(
+        openProject,
+        `SELECT TraceId, SpanId, SessionId FROM ${database}.logs LIMIT 1`,
+      );
+      expect(body.rows).toHaveLength(1);
+      const [row] = body.rows;
+      expect(row.TraceId).toBe(`${openProject.id}-trace-0`);
+      expect(row.SpanId).toBe(`${openProject.id}-span-0`);
+      expect(row.SessionId).toBe(`${openProject.id}-provider-session`);
+    });
+  });
+
+  describe("when a merged-aggregate view is read", () => {
+    it("returns simulation_metric_rollups finalised to the later of two partial states", async () => {
+      const body = await run(
+        openProject,
+        `SELECT TotalCost, RoleCosts['assistant'] AS assistant_cost FROM ${database}.simulation_metric_rollups ` +
+          `WHERE ScenarioRunId = '${openProject.id}-rollup-sim'`,
+      );
+      expect(body.rows).toHaveLength(1);
+      // Seeded as two argMaxState parts: 0.11 at 2026-02-16, 0.87 at
+      // 2026-02-20 — argMax resolves to the later OccurredAt's value, over
+      // both the plain measure and the Map measure, proving the view merges
+      // rather than picking whichever part a read happens to see first.
+      expect(Number(body.rows[0].TotalCost)).toBeCloseTo(0.87);
+      expect(Number(body.rows[0].assistant_cost)).toBeCloseTo(0.87);
+    });
+  });
+
+  describe("when a Map column on a derived view is read", () => {
+    it("returns coding_sessions.ToolDurationMs indexed by tool name", async () => {
+      const body = await run(
+        openProject,
+        `SELECT ToolDurationMs['Bash'] AS bash_ms FROM ${database}.coding_sessions ` +
+          `WHERE SessionId = '${openProject.id}-coding-session-0'`,
+      );
+      expect(body.rows).toHaveLength(1);
+      expect(Number(body.rows[0].bash_ms)).toBe(1200);
+    });
   });
 
   describe("when the schema door is called", () => {
@@ -1130,12 +1494,12 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
       const gated = await readSchema(gatedProject);
 
       expect(permitted.database).toBe(database);
-      expect(permitted.datasets.map((dataset: any) => dataset.name)).toEqual(
+      expect(permitted.views.map((dataset: any) => dataset.name)).toEqual(
         LWQL_VIEW_CATALOG.map((view) => `${database}.${view.name}`),
       );
 
       const columnOf = (schema: any, dataset: string, column: string) =>
-        schema.datasets
+        schema.views
           .find((entry: any) => entry.name === `${database}.${dataset}`)
           .columns.find((entry: any) => entry.name === column);
 
@@ -1156,7 +1520,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
         true,
       );
       expect(
-        permitted.datasets.flatMap((dataset: any) =>
+        permitted.views.flatMap((dataset: any) =>
           dataset.columns.filter((column: any) => !column.available),
         ),
       ).toEqual([]);
@@ -1165,7 +1529,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
     it("publishes an example query the caller can actually run", async () => {
       const schema = await readSchema(gatedProject);
 
-      for (const dataset of schema.datasets) {
+      for (const dataset of schema.views) {
         const response = await post(
           { sql: dataset.exampleSql },
           { token: gatedProject.apiKey },
@@ -1181,8 +1545,8 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
       for (const project of [openProject, gatedProject]) {
         const schema = await readSchema(project);
 
-        expect(schema.datasets.length).toBeGreaterThan(0);
-        for (const dataset of schema.datasets) {
+        expect(schema.views.length).toBeGreaterThan(0);
+        for (const dataset of schema.views) {
           const where = `${project.slug}: ${dataset.name}`;
           expect(dataset.description, where).not.toBe("");
           expect(dataset.grain, where).not.toBe("");
@@ -1204,7 +1568,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
           }
         }
 
-        const units = schema.datasets.flatMap((dataset: any) =>
+        const units = schema.views.flatMap((dataset: any) =>
           dataset.columns
             .filter((column: any) => column.unit !== null)
             .map((column: any) => column.unit),
@@ -1260,9 +1624,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
       );
       try {
         const names = async (project: Project) =>
-          (await readSchema(project)).datasets.map(
-            (dataset: any) => dataset.name,
-          );
+          (await readSchema(project)).views.map((dataset: any) => dataset.name);
 
         // The gated project's data-privacy rule withholds captured input, so
         // the dataset that needs it is not there at all.
@@ -1282,7 +1644,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
      * validator's `allowedTables` is what makes it the second thing, and it is
      * the half a caller who reads no documentation would find.
      */
-    /** @scenario "A dataset withheld from a caller cannot be named in a query" */
+    /** @scenario "A view withheld from a caller cannot be named in a query" */
     it("refuses a query naming a dataset the caller's permissions withhold, and answers it for one who holds them", async () => {
       const transcripts: LangWatchQLViewDefinition = {
         name: "transcripts",
@@ -1328,6 +1690,13 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
           dedup: SHIPPED_LWQL_DEDUP,
         }),
       );
+      // View creation is structural only (#8258); the reader gets no grant from
+      // it. Re-mint the whole access model over the catalog plus the ad-hoc view
+      // so the permitted caller's read of `transcripts` is granted.
+      await harness.applyAccessModel({
+        views,
+        sourceDatabase: facts,
+      });
       setLangWatchQLService(
         new LangWatchQLService({
           executor: createLangWatchQLExecutor({
@@ -1357,6 +1726,12 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
         await harness.applyAsAdmin([
           `DROP VIEW IF EXISTS ${database}.transcripts`,
         ]);
+        // Re-mint the catalog-only model so the dropped view leaves no lingering
+        // grant for later tests (CREATE USER OR REPLACE re-mints the whole model).
+        await harness.applyAccessModel({
+          views: LWQL_VIEW_CATALOG,
+          sourceDatabase: facts,
+        });
       }
     });
 
@@ -1404,7 +1779,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
         .mockRejectedValue(new Error("policy store unreachable"));
       try {
         const schema = await readSchema(openProject);
-        const contentColumns = schema.datasets.flatMap((dataset: any) =>
+        const contentColumns = schema.views.flatMap((dataset: any) =>
           dataset.columns.filter(
             (column: any) =>
               column.gates.includes("input") || column.gates.includes("output"),
@@ -1482,44 +1857,58 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
     });
   });
 
-  describe("when the result outgrows the response ceiling", () => {
-    /**
-     * The ceiling value is lowered for this case rather than seeding ten
-     * thousand rows: the mechanism is the same code either way, and the claim
-     * under test is that overflow is *marked* rather than silently dropped.
-     */
-    /** @scenario "Truncation diagnostic fires when results are cut off" */
-    it("cuts the result at the ceiling and says so, in the body and in a diagnostic", async () => {
-      // Bounded on the time column, so the only diagnostic either run can earn
-      // is the truncation one this case is about.
-      const traceIds =
-        `SELECT TraceId FROM ${database}.traces ` +
-        `WHERE OccurredAt >= toDateTime64('${SEED_WINDOW.from}', 3) ` +
-        `ORDER BY TraceId`;
-      const full = await run(openProject, traceIds);
+  describe("when the result is larger than one response holds", () => {
+    // The bound is lowered rather than seeding ten thousand rows: the mechanism
+    // is the same code either way. Built lazily: `database` is only bound in
+    // `beforeAll`, so a value captured at describe-eval time would be undefined.
+    const traceIds = () =>
+      `SELECT TraceId FROM ${database}.traces ` +
+      `WHERE OccurredAt >= toDateTime64('${SEED_WINDOW.from}', 3) ` +
+      `ORDER BY TraceId`;
+
+    const serviceWithLimits = (limits: {
+      maxRows: number;
+      maxResultBytes: number;
+    }) =>
+      new LangWatchQLService({
+        executor: createLangWatchQLExecutor({
+          ...harness.restrictedConnection(),
+          database,
+          tenantSetting: harness.names.tenantSetting,
+        }),
+        database,
+        limits,
+      });
+
+    /** @scenario "A capped result comes back as one page, never silently cut" */
+    it("caps a LIMIT-less statement at the row ceiling by appending it, with no diagnostic", async () => {
+      const full = await run(openProject, traceIds());
       expect(full.rows.length).toBeGreaterThan(2);
-      expect(full.truncated).toBe(false);
 
       setLangWatchQLService(
-        new LangWatchQLService({
-          executor: createLangWatchQLExecutor({
-            ...harness.restrictedConnection(),
-            database,
-            tenantSetting: harness.names.tenantSetting,
-          }),
-          database,
-          limits: { maxRows: 2, maxResultBytes: 8_000_000 },
-        }),
+        serviceWithLimits({ maxRows: 2, maxResultBytes: 8_000_000 }),
       );
       try {
-        const capped = await run(openProject, traceIds);
+        const capped = await run(openProject, traceIds());
         expect(capped.rows).toHaveLength(2);
         expect(capped.rows).toEqual(full.rows.slice(0, 2));
-        expect(capped.truncated).toBe(true);
-        expect(capped.statistics.rowsReturned).toBe(2);
-        expect(capped.diagnostics.map((entry: any) => entry.code)).toEqual([
-          "RESULT_TRUNCATED",
-        ]);
+        expect(capped.truncated).toBeUndefined();
+        expect(capped.diagnostics).toEqual([]);
+      } finally {
+        restoreShippedService();
+      }
+    });
+
+    /** @scenario "Overflow throws and never silently truncates" */
+    /** @scenario "A result past the byte ceiling is refused, never cut" */
+    it("refuses a result past the byte ceiling with lwql_result_too_large, never a partial body", async () => {
+      setLangWatchQLService(
+        serviceWithLimits({ maxRows: 10_000, maxResultBytes: 10 }),
+      );
+      try {
+        const error = await refuse(openProject, traceIds());
+        expect(error.code).toBe("lwql_result_too_large");
+        expect(error.meta).toMatchObject({ maxResultBytes: 10 });
       } finally {
         restoreShippedService();
       }
@@ -1575,6 +1964,29 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
         `SELECT now() AS value FROM ${database}.traces LIMIT 1`,
       );
       expect(body.rows).toHaveLength(1);
+    });
+
+    /**
+     * Issue #8085 (AC7): a coding agent refused for calling a function it
+     * should not have carries the full allowlist back, so it can recover
+     * without a second round trip to `GET /api/v1/query/schema`.
+     */
+    /** @scenario "The REST caller receives allowedFunctions on a function violation" */
+    it("carries allowedFunctions on the FUNCTION_NOT_ALLOWED violation", async () => {
+      const body = await refuse(
+        openProject,
+        `SELECT currentUser() AS value FROM ${database}.traces`,
+      );
+
+      const violation = body.meta.violations.find(
+        (entry: any) => entry.code === "FUNCTION_NOT_ALLOWED",
+      );
+      expect(violation, JSON.stringify(body.meta.violations)).toBeDefined();
+      expect(
+        Array.isArray(violation.allowedFunctions) &&
+          violation.allowedFunctions.length > 0,
+        `expected a non-empty allowedFunctions list, got: ${JSON.stringify(violation.allowedFunctions)}`,
+      ).toBe(true);
     });
   });
 
@@ -1662,10 +2074,25 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
         openProject.id,
         openProject.apiKey,
         openProject.lwqlKey,
-        ...LWQL_VIEW_CATALOG.map((view) => view.sourceTable),
         facts,
         ...relayed,
       ];
+
+      // Physical source table names get their own, stricter check: a
+      // response is allowed — expected, even — to name a dataset's PUBLIC
+      // view (e.g. the schema door's `availableViews` hint), and one view's
+      // physical table can sit inside another view's public name as plain
+      // text (the "legacy_event_log" view's own name contains the physical
+      // table "event_log" belonging to it). A bare substring match would
+      // flag that legitimate name as a leak of the table backing it, so this
+      // only counts an occurrence that isn't glued to a larger identifier.
+      const sourceTables = LWQL_VIEW_CATALOG.map((view) => view.sourceTable);
+      const leaksPhysicalTable = (text: string, table: string): boolean => {
+        const escaped = table.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        return new RegExp(`(?<![A-Za-z0-9_])${escaped}(?![A-Za-z0-9_])`).test(
+          text,
+        );
+      };
 
       const probes: readonly {
         sql: string;
@@ -1738,6 +2165,12 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
             `"${secret}" reached the caller through: ${sql}\n${text}`,
           ).toBe(false);
         }
+        for (const table of sourceTables) {
+          expect(
+            leaksPhysicalTable(text, table),
+            `"${table}" (physical table) reached the caller through: ${sql}\n${text}`,
+          ).toBe(false);
+        }
       }
     });
 
@@ -1757,7 +2190,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
 
   describe("when the statement the database ran is compared with the one submitted", () => {
     /** @scenario "Submitted SQL is never automatically rewritten" */
-    it("executes the submitted statement, with nothing injected into it", async () => {
+    it("executes the submitted statement, with nothing but the default LIMIT appended after it", async () => {
       const marker = `rewrite_probe_${nanoid(8).replace(/[^a-zA-Z0-9]/g, "")}`;
       const sql = `SELECT count() AS ${marker} FROM ${database}.traces`;
       await run(openProject, sql);
@@ -1778,9 +2211,132 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
         logged[0]!.query.includes(sql),
         `the database ran a different statement:\n${logged[0]!.query}`,
       ).toBe(true);
-      // Nothing was added inside the statement: the only thing the transport
-      // appends is the FORMAT the driver needs to read the response back.
-      expect(logged[0]!.query.replace(sql, "").trim()).toBe("FORMAT JSON");
+      // The caller's text is untouched; the only additions are the default row
+      // LIMIT this API appends when the caller names none, and the FORMAT the
+      // driver needs to read the response back. Nothing is injected *inside* it.
+      const appended = logged[0]!.query.replace(sql, "").trim();
+      expect(appended).toMatch(/^LIMIT\s+\d+/i);
+      expect(appended).toContain("FORMAT JSON");
+    });
+  });
+
+  /**
+   * The two bound scenarios of `specs/lwql/coding-agent-datasets.feature`
+   * (#8085 / #8116 Part A), run against the issue's own example query shapes.
+   */
+  describe("when a caller asks for coding-agent sessions and their events", () => {
+    /** @scenario "List sessions" */
+    it("returns one row per session with when it ran, its branch, repository and cost", async () => {
+      const body = await run(
+        openProject,
+        `SELECT SessionId, GitBranch, StartedAt, CostUsd, ModelCalls, ToolCalls, SubAgents, ` +
+          `ToolDurationMs['Bash'] AS BashMs ` +
+          `FROM ${database}.coding_sessions ` +
+          `WHERE StartedAt >= toDateTime64('${SEED_WINDOW.from}', 3) ` +
+          `ORDER BY SessionId`,
+      );
+
+      expect(body.rows).toHaveLength(SEEDED_CODING_SESSIONS);
+      const rowIds = body.rows.map((row: any) => row.SessionId);
+      expect(new Set(rowIds).size, "returned duplicate sessions").toBe(
+        rowIds.length,
+      );
+      for (const row of body.rows) {
+        expect(row.SessionId).toContain(openProject.id);
+        expect(typeof row.GitBranch).toBe("string");
+        expect(row.StartedAt).toBeTruthy();
+        expect(Number(row.CostUsd)).toBeGreaterThan(0);
+        expect(Number(row.ModelCalls)).toBeGreaterThan(0);
+        expect(Number(row.ToolCalls)).toBeGreaterThan(0);
+        expect(Number(row.BashMs)).toBeGreaterThan(0);
+      }
+    });
+
+    /** @scenario "List sessions" */
+    it("sees only its own tenant's sessions, never the other tenant's", async () => {
+      expect(
+        await adminSourceRowCount(
+          viewByName("coding_sessions"),
+          gatedProject.id,
+        ),
+        "the other tenant has no coding-agent sessions — the read below proves nothing",
+      ).toBeGreaterThan(0);
+
+      const body = await run(
+        openProject,
+        `SELECT DISTINCT TenantId FROM ${database}.coding_sessions`,
+      );
+      expect(body.rows.map((row: any) => row.TenantId)).toEqual([
+        openProject.id,
+      ]);
+    });
+
+    /** @scenario "Read every event of a session" */
+    it("returns every model call, tool call and sub-agent call of one session, in order", async () => {
+      const sessionId = `${openProject.id}-coding-session-0`;
+      const body = await run(
+        openProject,
+        `SELECT EventKind, TimeUnixMs, CostUsd FROM ${database}.coding_session_events ` +
+          `WHERE SessionId = '${sessionId}' ORDER BY TimeUnixMs`,
+      );
+
+      expect(body.rows).toHaveLength(SEEDED_CODING_EVENTS_PER_SESSION);
+      const timestamps = body.rows.map((row: any) =>
+        new Date(row.TimeUnixMs).getTime(),
+      );
+      const sorted = [...timestamps].sort((a, b) => a - b);
+      expect(
+        timestamps,
+        "the endpoint did not preserve the ORDER BY TimeUnixMs the caller asked for",
+      ).toEqual(sorted);
+      expect(body.rows[0].EventKind).toBe("user_prompt");
+    });
+
+    /** @scenario "Read every event of a session" */
+    it("sees only its own tenant's events, never the other tenant's", async () => {
+      expect(
+        await adminSourceRowCount(
+          viewByName("coding_session_events"),
+          gatedProject.id,
+        ),
+        "the other tenant has no coding-agent events — the read below proves nothing",
+      ).toBeGreaterThan(0);
+
+      const body = await run(
+        openProject,
+        `SELECT DISTINCT TenantId FROM ${database}.coding_session_events`,
+      );
+      expect(body.rows.map((row: any) => row.TenantId)).toEqual([
+        openProject.id,
+      ]);
+    });
+
+    /**
+     * The one conversation-derived column on `coding_sessions`, gated on
+     * `input` per migration 00075 — proved the same way the `traces` content
+     * gate is above. `CostUsd` is NOT proved refused here: every API-key
+     * caller resolves `canSeeCosts: true` unconditionally
+     * (`getProtectionsForProject` in `~/server/api/utils.ts`), so this REST
+     * door has no caller shape that can exercise a costs refusal — there is
+     * no project a caller can hold a valid key for and lack the costs gate.
+     */
+    it("refuses Title for the caller without captured-input permission, and answers it for the caller with it", async () => {
+      const sessionId = `${gatedProject.id}-coding-session-0`;
+      const refused = await refuse(
+        gatedProject,
+        `SELECT Title FROM ${database}.coding_sessions WHERE SessionId = '${sessionId}'`,
+      );
+      expect(refused.code).toBe("lwql_not_permitted");
+      expect(
+        refused.meta.violations.map((violation: any) => violation.code),
+      ).toContain("GATED_COLUMN");
+
+      const permittedSessionId = `${openProject.id}-coding-session-0`;
+      const answered = await run(
+        openProject,
+        `SELECT Title FROM ${database}.coding_sessions WHERE SessionId = '${permittedSessionId}'`,
+      );
+      expect(answered.rows).toHaveLength(1);
     });
   });
 

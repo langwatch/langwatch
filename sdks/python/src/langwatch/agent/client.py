@@ -40,6 +40,7 @@ except ImportError:  # pragma: no cover
     websockets = None  # type: ignore[assignment]
 
 from langwatch.__version__ import __version__
+from langwatch.http_client import create_async_client
 from langwatch.state import get_api_key, get_endpoint, get_instance
 from langwatch.utils.initialization import ensure_setup
 
@@ -58,7 +59,7 @@ from .protocol import (
     register_frame,
     result_frame,
 )
-from .schema import AgentParameterInvalid
+from .schema import AgentParameterInvalid, AgentReplyInvalid
 
 if TYPE_CHECKING:
     from .decorator import ConnectedAgent
@@ -696,7 +697,7 @@ class AgentClient:
         """
         base = http_url(self.resolved_endpoint)
         timeout = httpx.Timeout(POLL_TIMEOUT_SECONDS, connect=OPEN_TIMEOUT_SECONDS)
-        async with httpx.AsyncClient(timeout=timeout) as http:
+        async with create_async_client(timeout=timeout) as http:
             self._http = http
             self._instance_token = None
             self._session_lost = False
@@ -951,6 +952,11 @@ class AgentClient:
         except AgentParameterInvalid as error:
             result = error_result_frame(
                 call_id=call_id, code=error.code, message=str(error)
+            )
+        except AgentReplyInvalid as error:
+            logger.warning("connect_agent: %s %s", agent.name, error)
+            result = error_result_frame(
+                call_id=call_id, code=error.code, message=f"{agent.name} {error}"
             )
         except Exception as error:
             logger.exception("connect_agent: %s raised on call %s", agent.name, call_id)

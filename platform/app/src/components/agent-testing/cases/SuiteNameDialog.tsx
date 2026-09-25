@@ -1,9 +1,9 @@
 /**
- * Asks for the name of a test suite, and nothing else.
+ * Asks for the name of a new test suite, and nothing else.
  *
- * A suite is only a grouping: it carries no targets, no repeat count, no
- * simulation models and no evaluators, so naming it is the whole of editing
- * one. The same dialog creates one and renames one.
+ * A new suite starts as a grouping with a name. What else it declares, its
+ * fields and its evaluators, is the suite editor's to ask for once the suite
+ * exists.
  *
  * @see specs/features/agent-testing/suites-rail.feature
  * @see specs/suites/test-suites.feature
@@ -18,27 +18,23 @@ export const SUITE_NAME_REQUIRED = "A test suite needs a name.";
 
 export type SuiteNameDialogProps = {
   open: boolean;
-  /** The name to start from. Empty when a suite is being created. */
-  initialName?: string;
   onClose: () => void;
   onConfirm: (name: string) => void;
 };
 
 export function SuiteNameDialog({
   open,
-  initialName = "",
   onClose,
   onConfirm,
 }: SuiteNameDialogProps) {
-  const isEditing = initialName !== "";
-  const [name, setName] = useState(initialName);
+  const [name, setName] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
-    setName(initialName);
+    setName("");
     setProblem(null);
-  }, [open, initialName]);
+  }, [open]);
 
   const submit = () => {
     const trimmed = name.trim();
@@ -64,7 +60,7 @@ export function SuiteNameDialog({
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title fontSize="md" fontWeight="500">
-            {isEditing ? "Rename test suite" : "New test suite"}
+            New test suite
           </Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
@@ -103,7 +99,7 @@ export function SuiteNameDialog({
             onClick={submit}
             data-testid="suite-name-confirm"
           >
-            {isEditing ? "Save" : "Create"}
+            Create
           </Button>
         </Dialog.Footer>
       </Dialog.Content>

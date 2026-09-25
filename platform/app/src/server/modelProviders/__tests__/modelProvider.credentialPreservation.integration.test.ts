@@ -22,6 +22,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
@@ -84,14 +85,12 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
           role: OrganizationUserRole.ADMIN,
         },
       });
-      await prisma.roleBinding.create({
-        data: {
-          organizationId,
-          userId: orgAdmin.id,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: organizationId,
-        },
+      await seedRoleBinding(prisma, {
+        organizationId,
+        userId: orgAdmin.id,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: organizationId,
       });
     });
 
@@ -101,6 +100,7 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
           "modelProvider",
           { scopes: { some: { scopeType: "PROJECT", scopeId: projectId } } },
         ],
+        ["grant", { organizationId }],
         ["roleBinding", { organizationId }],
         ["organizationUser", { organizationId }],
         ["user", { id: orgAdminUserId }],

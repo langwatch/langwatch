@@ -24,6 +24,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import { OrganizationService } from "~/server/app-layer/organizations/organization.service";
 import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
 import { createTestApp } from "~/server/app-layer/presets";
@@ -32,6 +33,8 @@ import {
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import { seedCustomRole, seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
@@ -117,13 +120,12 @@ describe("enterprise feature guards", () => {
     });
 
     // Create a custom role for tests that need one
-    const role = await prisma.customRole.create({
-      data: {
-        name: `Test Role ${testNamespace}`,
-        description: "Test role for enterprise guard tests",
-        permissions: ["analytics:view"],
-        organizationId: organization.id,
-      },
+    const rolePermissions = ["analytics:view"];
+    const role = await seedCustomRole(prisma, {
+      name: `Test Role ${testNamespace}`,
+      description: "Test role for enterprise guard tests",
+      permissions: rolePermissions,
+      organizationId: organization.id,
     });
     customRoleId = role.id;
   });
@@ -131,7 +133,9 @@ describe("enterprise feature guards", () => {
   beforeEach(async () => {
     await resetApp();
     mockGetActivePlan = vi.fn();
+    resetAuthzGrantsCommandsForTests();
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
       }),
@@ -156,11 +160,13 @@ describe("enterprise feature guards", () => {
     // carry this org anyway. The bindings hold an FK to CustomRole, so
     // they go first.
     await cleanupTestRows(prisma, [
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       // The suite's own tests create invites and teams, so everything is
       // swept by organization rather than by the ids beforeAll captured.
       ["organizationInvite", { organizationId }],
       ["teamUser", { team: { organizationId } }],
+      ["role", { organizationId }],
       ["customRole", { organizationId }],
       ["team", { organizationId }],
       ["organizationUser", { organizationId }],
@@ -546,7 +552,7 @@ describe("enterprise feature guards", () => {
 
   // --- createInvites conditional guard ---
 
-  describe("organization.createInvites", () => {
+  describe("invite.createInvites", () => {
     describe("when invites include custom role on non-enterprise plan", () => {
       /** @scenario Non-enterprise org cannot invite members with custom roles */
       /** @scenario Batch invite rejects entirely when any invite has a custom role */
@@ -555,7 +561,7 @@ describe("enterprise feature guards", () => {
         const caller = createCaller();
 
         await expect(
-          caller.organization.createInvites({
+          caller.invite.createInvites({
             organizationId,
             invites: [
               {
@@ -584,7 +590,7 @@ describe("enterprise feature guards", () => {
         mockGetActivePlan.mockResolvedValue(freePlan);
         const caller = createCaller();
 
-        const result = await caller.organization.createInvites({
+        const result = await caller.invite.createInvites({
           organizationId,
           invites: [
             {
@@ -655,14 +661,12 @@ describe("enterprise feature guards", () => {
         });
         // The role update reads and rewrites TEAM-scoped role bindings, so
         // membership has to exist there too, not only in TeamUser.
-        await prisma.roleBinding.create({
-          data: {
-            organizationId,
-            userId: target.id,
-            role: TeamUserRole.ADMIN,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: teamId,
-          },
+        await seedRoleBinding(prisma, {
+          organizationId,
+          userId: target.id,
+          role: TeamUserRole.ADMIN,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: teamId,
         });
 
         const result = await caller.organization.updateTeamMemberRole({
@@ -684,7 +688,7 @@ describe("enterprise feature guards", () => {
   // through changed. AUDIT_MANIFEST.md already records the scenario itself
   // as a duplicate of the createInvites pair above.
 
-  describe("organization.createInvites via the invite-request surface", () => {
+  describe("invite.createInvites via the invite-request surface", () => {
     describe("when invites include custom role on non-enterprise plan", () => {
       /** @scenario Non-enterprise org cannot create invite requests with custom roles */
       it("rejects with FORBIDDEN", async () => {
@@ -692,7 +696,7 @@ describe("enterprise feature guards", () => {
         const caller = createCaller();
 
         await expect(
-          caller.organization.createInvites({
+          caller.invite.createInvites({
             organizationId,
             invites: [
               {
@@ -720,7 +724,7 @@ describe("enterprise feature guards", () => {
         mockGetActivePlan.mockResolvedValue(freePlan);
         const caller = createCaller();
 
-        const result = await caller.organization.createInvites({
+        const result = await caller.invite.createInvites({
           organizationId,
           invites: [
             {

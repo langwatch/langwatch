@@ -60,10 +60,18 @@ Feature: MCP outbound request and browser capability hardening
       When a client requests the application root
       Then the response contains the Permissions-Policy header
       And geolocation is disabled
-      And microphone is disabled
+      And microphone is allowed only for the app's own origin, for the voice agents panel
       And camera is disabled
       And payment is disabled
       And USB is disabled
+
+    @unit @regression
+    Scenario: Development responses report the production CSP without enforcing it
+      Given LangWatch is running in development mode
+      When a client requests the application root
+      Then the response carries no Content-Security-Policy header
+      And it carries the production policy as Content-Security-Policy-Report-Only
+      And a directive that would break production is visible as a console violation locally
 
   Rule: Other MCP HTTP tools cannot reach non-public destinations
 

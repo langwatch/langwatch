@@ -54,6 +54,36 @@ You set CPU + RAM, everything else is computed. Any computed value can be overri
 
 See the [Docker image README](../../infra/clickhouse-serverless/README.md) for the full list of computed parameters and their formulas.
 
+### LangWatchQL (LWQL)
+
+This chart renders no LangWatchQL access model — the application owns it (see
+[ADR-142](../../dev/docs/adr/142-the-app-owns-the-lwql-access-model.md)). How the
+model reaches ClickHouse depends on the deployment, and the two paths are
+distinct:
+
+- **Chart-managed ClickHouse (the umbrella chart's default): RENDERED delivery.**
+  A deploy-time Job in the umbrella chart renders the `langwatch_lwql` restricted
+  user, the `<database>_profile` settings profile (`langwatch_profile` by
+  default; fixed grants, row-level tenant filters) and the `lwql_postgres`
+  PostgreSQL-bridge named collection into a Secret, and every ClickHouse pod
+  mounts it into `users.d` / `config.d`. No access SQL DDL runs against the
+  server.
+- **Bring-your-own / external ClickHouse: SQL DDL.** The chart cannot write a
+  server it does not manage, so the app self-provisions the same objects via SQL
+  DDL, degrading to a logged, fail-closed refusal if the server rejects a
+  statement.
+
+Either way this image renders the server-level prerequisites the model needs:
+the `default` user is granted `access_management` and `named_collection_control`
+(the right to create users, profiles, row policies and named collections through
+SQL — exercised by the SQL-DDL path); the `custom_` settings prefix is declared
+so the per-query tenant capability the app's queries rely on is accepted rather
+than rejected with `UNKNOWN_SETTING`; and
+`access_control_improvements.settings_constraints_replace_previous` is set, so
+the settings profile's `CHANGEABLE_IN_READONLY` constraint on
+`custom_api_key_hash` is accepted rather than refused. There is no plaintext
+password caveat — this chart renders no config carrying one.
+
 ## Parameters
 
 ### Primary Inputs

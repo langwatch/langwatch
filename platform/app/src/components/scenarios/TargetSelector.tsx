@@ -4,6 +4,7 @@ import {
   ChevronDown,
   Code,
   Globe,
+  Mic,
   Plug,
   Plus,
   Workflow,
@@ -21,13 +22,13 @@ import {
 import {
   agentTargetLabel,
   isAgentTarget,
-  ownerOnlyCopy,
+  notRunnableCopy,
   type ScenarioAgent,
   useFilteredAgents,
 } from "./useFilteredScenarioTargets";
 
 export type TargetValue = {
-  type: "prompt" | "http" | "code" | "workflow" | "connected";
+  type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
   id: string;
 } | null;
 
@@ -171,6 +172,7 @@ export function TargetSelector({
         <HStack gap={2}>
           {value?.type === "prompt" && <BookText size={14} />}
           {value?.type === "http" && <Globe size={14} />}
+          {value?.type === "voice" && <Mic size={14} />}
           {value?.type === "code" && <Code size={14} />}
           {value?.type === "workflow" && <Workflow size={14} />}
           {value?.type === "connected" && <Plug size={14} />}
@@ -357,6 +359,9 @@ function AgentOptionMark({ agent }: { agent: ScenarioAgent }) {
   if (agent.type === "code") {
     return <Code size={14} color="var(--chakra-colors-gray-500)" />;
   }
+  if (agent.type === "voice") {
+    return <Mic size={14} color="var(--chakra-colors-gray-500)" />;
+  }
   return <Globe size={14} color="var(--chakra-colors-gray-500)" />;
 }
 
@@ -413,9 +418,9 @@ function AgentOptionRow({
  * One agent in the list: its kind, its label, and, for a connected agent,
  * whether a process is holding it right now.
  *
- * A development agent of another person is drawn but cannot be picked: only
- * its owner can run it, and hiding the reason would leave the reader clicking
- * a row that does nothing.
+ * A development agent of another person, or an agent no process is holding,
+ * is drawn but cannot be picked: hiding the reason would leave the reader
+ * clicking a row that does nothing.
  */
 function AgentOption({
   agent,
@@ -432,7 +437,7 @@ function AgentOption({
 
   if (agent.isRunnable) return row;
   return (
-    <Tooltip content={ownerOnlyCopy(agent.owner?.name)}>
+    <Tooltip content={notRunnableCopy(agent)}>
       <Box>{row}</Box>
     </Tooltip>
   );

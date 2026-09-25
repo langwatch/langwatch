@@ -14,7 +14,7 @@ import { baseParams, buildTimeWhere } from "./helpers";
  * since `JSONExtractArrayRaw` returns the raw quoted form.
  */
 export function buildLabelFacetQuery(ctx: FacetQueryContext): FacetQuery {
-  const where = buildTimeWhere("OccurredAt");
+  const where = buildTimeWhere("OccurredAt", ctx);
   const prefixFilter = ctx.prefix
     ? "AND lower(trim(BOTH '\"' FROM label)) ILIKE concat({prefix:String}, '%')"
     : "";

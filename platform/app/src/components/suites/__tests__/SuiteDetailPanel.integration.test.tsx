@@ -27,6 +27,8 @@ type SimulationSuite = {
   slug: string;
   kind: string;
   scope: null;
+  fields: null;
+  evaluators: null;
   description: string | null;
   scenarioIds: string[];
   targets: Array<{ type: string; referenceId: string }>;
@@ -132,6 +134,8 @@ function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
     name: "Critical Path",
     slug: "critical-path",
     kind: "run_plan",
+    fields: null,
+    evaluators: null,
     scope: null,
     description: "Core test scenarios",
     scenarioIds: ["scen_1", "scen_2", "scen_3"],

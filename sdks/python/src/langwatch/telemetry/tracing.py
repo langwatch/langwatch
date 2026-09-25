@@ -7,6 +7,7 @@ import threading
 from deprecated import deprecated
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 from langwatch.attributes import AttributeKey
+from langwatch.http_client import create_client
 from langwatch.utils.auth import build_auth_headers
 from langwatch.utils.exceptions import better_raise_for_status
 from langwatch.utils.transformation import (
@@ -365,7 +366,7 @@ class LangWatchTrace:
 
         @_retry_on_transient
         def _do_share() -> str:
-            with httpx.Client() as client:
+            with create_client() as client:
                 response = client.post(
                     f"{endpoint}/api/trace/{trace_id}/share",
                     headers=build_auth_headers(get_api_key()),
@@ -387,7 +388,7 @@ class LangWatchTrace:
 
         @_retry_on_transient
         def _do_unshare() -> None:
-            with httpx.Client() as client:
+            with create_client() as client:
                 response = client.post(
                     f"{endpoint}/api/trace/{trace_id}/unshare",
                     headers=build_auth_headers(get_api_key()),

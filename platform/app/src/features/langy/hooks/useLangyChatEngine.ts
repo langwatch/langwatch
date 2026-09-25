@@ -1,7 +1,8 @@
 import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
+import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
 import type { LangyMessageDto } from "../data/langy.dtos";
@@ -47,6 +48,7 @@ export function useLangyChatEngine({
     error,
     regenerate,
     clearError,
+    resumeStream,
   } = useChat({
     transport,
     onError: (error) => {
@@ -60,6 +62,26 @@ export function useLangyChatEngine({
       // here: one calm surface only.
     },
   });
+
+  // Langy can mutate server-side state (e.g. dashboard widgets) mid-turn, and
+  // the dashboard grid reads them through graphs.getAll, so both go stale.
+  // Nothing else observes a turn's completion, so invalidate here, once, on
+  // the submitted/streaming -> ready/error transition — a ref (not state)
+  // tracks the previous status so this doesn't re-fire every render.
+  // Invalidating on a page with no dashboard mounted is a harmless no-op.
+  const utils = api.useUtils();
+  const previousStatusRef = useRef(status);
+  useEffect(() => {
+    const wasInFlight =
+      previousStatusRef.current === "submitted" ||
+      previousStatusRef.current === "streaming";
+    const isSettled = status === "ready" || status === "error";
+    if (wasInFlight && isSettled) {
+      void utils.dashboardWidgets.list.invalidate();
+      void utils.graphs.getAll.invalidate();
+    }
+    previousStatusRef.current = status;
+  }, [status, utils]);
 
   // useChat's setMessages identity is not guaranteed stable across renders.
   // Capture it in a ref so callers' effects key on real state changes (a
@@ -105,6 +127,12 @@ export function useLangyChatEngine({
     status,
     error,
     regenerate,
+    /**
+     * Reattach to a turn this tab did not dispatch (the transport's
+     * `getResumeTarget` names it). The stream then writes into a new
+     * assistant message, or into the last message when it already is one.
+     */
+    resumeStream,
     applyHistoryToEngine,
     resetEngine,
     /**

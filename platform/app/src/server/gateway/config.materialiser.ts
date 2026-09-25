@@ -30,6 +30,7 @@ import {
 } from "./budgetResolution.service";
 import { GatewayCacheRuleService } from "./cacheRule.service";
 import { computeConfigETag } from "./configETag";
+import { connectLangWatchProviderSlot } from "./connectManagedModels";
 import { withTierFallthrough } from "./modelTierFallthrough";
 import { declaredModelsForProvider } from "./providerModelCatalog";
 import {
@@ -357,6 +358,7 @@ export class GatewayConfigMaterialiser {
       eligibleProviders,
       config.providersAllowed,
     );
+    const slots = await this.providerSlots(vk, providers);
     const policySides = resolvePolicySideOfBundle(vk, config);
     const guardrailSides = await this.resolveGuardrailSideOfBundle(
       vk,
@@ -382,9 +384,9 @@ export class GatewayConfigMaterialiser {
         vk.purpose === "LANGY" && traceProject?.id
           ? resolveLangyMirrorTier({ projectId: traceProject.id })
           : "skip",
-      providers: providers.map((mp, index) => buildProviderSlot(mp, index)),
+      providers: slots,
       fallback: {
-        chain: providers.map((mp) => mp.id),
+        chain: slots.map((slot) => slot.id),
         // routing_mode NONE means the request never leaves the provider
         // that serves the model, so the attempt budget is one. Pinning it
         // here makes no-fallback real for gateways that predate the
@@ -414,6 +416,29 @@ export class GatewayConfigMaterialiser {
       vk_tags: config.metadata?.tags ?? [],
       expires_at: expiresAtWire(vk.expiresAt),
     };
+  }
+
+  /**
+   * The dispatch chain as the gateway reads it: the organization's own
+   * providers, then, on a connected install that switched managed models on,
+   * the LangWatch gateway itself.
+   *
+   * The LangWatch slot goes last on purpose. A credential the customer
+   * configured keeps serving the models it serves, and LangWatch is reached
+   * only where the caller wrote `langwatch/...`. Its license token is read
+   * here, at materialisation, and never stored on a provider row.
+   */
+  private async providerSlots(
+    vk: VirtualKeyWithScopes,
+    providers: ModelProvider[],
+  ): Promise<ProviderSlot[]> {
+    const slots = providers.map((mp, index) => buildProviderSlot(mp, index));
+    const connectSlot = await connectLangWatchProviderSlot({
+      prisma: this.prisma,
+      organizationId: vk.organizationId,
+      slot: `fallback_${slots.length}`,
+    });
+    return connectSlot ? [...slots, connectSlot] : slots;
   }
 
   private async applicableCacheRules(

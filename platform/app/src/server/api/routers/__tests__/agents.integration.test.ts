@@ -5,7 +5,9 @@
  * Tests the actual CRUD operations through the tRPC layer.
  * Config formats must be DSL-compatible for direct execution.
  */
+import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { AgentService } from "~/server/agents/agent.service";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
@@ -547,6 +549,36 @@ describe("Agents Endpoints", () => {
             where: { projectId, name: { contains: "Test Run HTTP Agent" } },
           }),
         ).toBe(0);
+      });
+    });
+
+    describe("when Test agent is requested for a connected agent no process is holding", () => {
+      /** @scenario "The API refuses to test an offline connected agent" */
+      it("refuses with agent_offline", async () => {
+        const agent = await AgentService.create(prisma).registerConnected({
+          id: `agent_${nanoid()}`,
+          projectId,
+          name: "offline-agent",
+          config: {
+            parameters: [],
+            sdk: { name: "langwatch", version: "1.0.0", language: "python" },
+          },
+          identity: {
+            environment: "production",
+            ownerUserId: null,
+            hostLabel: null,
+            identityKey: `offline-agent@production-${nanoid(6)}`,
+          },
+        });
+
+        await expect(
+          caller.agents.testRun({ projectId, agentId: agent.id }),
+        ).rejects.toMatchObject({
+          cause: {
+            code: "agent_offline",
+            meta: { agentName: "offline-agent", environment: "production" },
+          },
+        });
       });
     });
 

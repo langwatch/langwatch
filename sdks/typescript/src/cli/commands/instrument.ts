@@ -19,7 +19,16 @@
  */
 
 import { lwTag } from "../utils/governance/brand";
+import { recordCliLocation } from "../utils/governance/cli-location";
 import { isLoggedIn, loadConfig, saveConfig } from "../utils/governance/config";
+import {
+	globalConfigIsolationWarning,
+	rewritesGlobalConfigForLocalInstance,
+} from "../utils/governance/global-config-isolation";
+import {
+	cleartextIngestEndpointWarning,
+	sendsIngestKeyInClear,
+} from "../utils/governance/ingest-endpoint-scheme";
 import { installTelemetryWiring } from "../utils/governance/instrument-wiring";
 import { SOURCE_TYPE_BY_TOOL } from "../utils/governance/otel-env-block";
 import { resolvePlatformToolPolicy } from "../utils/governance/platform-tool-policy";
@@ -76,6 +85,9 @@ export async function instrumentCommand(
 		);
 	}
 
+	// Before the config is read, so the copy this command saves carries it;
+	// the Claude Code plugin's hooks run the CLI through this record.
+	recordCliLocation();
 	const cfg = loadConfig();
 
 	// Every wiring target this command writes is the direct-OTLP path, the
@@ -144,6 +156,29 @@ export async function instrumentCommand(
 		}
 	}
 
+	// Said once, here, because this is where the endpoint that will carry the
+	// key is settled for every wire the command is about to write: the tool's
+	// own OTel exporter and the session context hook both post this bearer to
+	// this URL. A pinned `--endpoint`, a self-hosted control plane, either way
+	// the key travels the same way, so the scheme is worth one line. It is a
+	// warning and not a refusal: a private network on plain http is a real
+	// deployment, and refusing it would take its telemetry and protect nothing.
+	if (sendsIngestKeyInClear(credential.endpoint)) {
+		process.stderr.write(
+			`${lwTag()} ${cleartextIngestEndpointWarning(credential.endpoint)}\n`,
+		);
+	}
+
+	// A local endpoint is not a key exposure, so the warning above skips it,
+	// but it is the wiring the rest of the machine inherits: the file this
+	// command is about to write is the tool's global one. Said before the
+	// write, so a QA shell can stop and isolate itself instead.
+	if (rewritesGlobalConfigForLocalInstance({ endpoint: credential.endpoint })) {
+		process.stderr.write(
+			`${lwTag()} ${globalConfigIsolationWarning(credential.endpoint)}\n`,
+		);
+	}
+
 	const result = installTelemetryWiring({
 		cfg,
 		tool,
@@ -168,6 +203,16 @@ export async function instrumentCommand(
 	}
 	for (const label of result.labels) {
 		process.stdout.write(`${lwTag()} wrote telemetry wiring to ${label}.\n`);
+	}
+	// The wiring landed, but nothing confirmed the key in it: this device is
+	// signed out, so the key could not be checked and could not be replaced.
+	// Said after the wiring is known to have been written, and before the
+	// success line, so it qualifies a setup that happened rather than one
+	// that may have failed for another reason entirely.
+	if (credential.sessionExpired) {
+		process.stderr.write(
+			`${lwTag()} this device is signed out, so \`${tool}\` was wired with the ingest key it already had. If telemetry stops arriving, run \`langwatch login --device\` and then \`langwatch instrument ${tool}\` again.\n`,
+		);
 	}
 	const destination =
 		credential.scope === "project"

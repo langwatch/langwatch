@@ -23,16 +23,19 @@ import { lwqlQuerySchema } from "../[[...route]]/schemas";
 
 const RUN_PATH = "/api/v1/query";
 const SCHEMA_PATH = "/api/v1/query/schema";
+const REFERENCE_PATH = "/api/v1/query/reference";
 
 /**
- * The door is shut to an anonymous caller.
+ * The doors are shut to an anonymous caller.
  *
- * A regression suite for a real hole: the routes were first declared with
- * `handlerManagedAuth`, which applies NO middleware — it is a declaration that
- * the HANDLER authenticates. The handlers never did. They read the project off
- * a context nothing had populated, so every anonymous call reached the service
- * and died on `project.id` of `undefined`: a 500 where a 401 belonged, and
- * `analytics:view` enforced nowhere.
+ * A regression suite for a real hole. The door is `handlerManagedAuth` — it
+ * fans any key out across the projects it can read, which no route-level policy
+ * chain can express (#8085) — so it must prepend its OWN auth middleware
+ * ({@link createUnifiedKeyAuthMiddleware}) and actually apply it. It once did
+ * not: declared handler-managed with the handlers reading the project off a
+ * context nothing populated, every anonymous call reached the service and died
+ * on `project.id` of `undefined` — a 500 where a 401 belonged. These pin that
+ * the middleware is present and refuses before any handler runs.
  *
  * Driven through the real mounted app rather than a stub, because the hole was
  * that a declared policy installed nothing — and only the assembled app can
@@ -59,10 +62,14 @@ describe("given a caller presents no credential", () => {
 
   const schemaCall = () => send(SCHEMA_PATH, { method: "GET" });
 
-  describe("when either door is called", () => {
+  const referenceCall = () => send(REFERENCE_PATH, { method: "GET" });
+
+  describe("when any door is called", () => {
+    /** @scenario "An anonymous caller is refused before reaching the handler" */
     it.each([
       ["POST /api/v1/query", runCall],
       ["GET /api/v1/query/schema", schemaCall],
+      ["GET /api/v1/query/reference", referenceCall],
     ])("refuses %s with 401 rather than reaching the handler", async (_label, call) => {
       const { status, body } = await call();
 

@@ -73,7 +73,7 @@ For production, you should:
 
 ### 1. Create the app Secret
 
-One Secret holds every chart-required value (app keys + AI gateway shared-auth keys when the gateway sub-chart is enabled). Both `langwatch-app` and the gateway pod mount it.
+One Secret holds every chart-required value (app keys + AI Gateway shared-auth keys when the gateway sub-chart is enabled). Both `langwatch-app` and the gateway pod mount it.
 
 ```bash
 kubectl create namespace langwatch
@@ -87,7 +87,7 @@ kubectl -n langwatch create secret generic langwatch-app-secrets \
   --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"
 ```
 
-If you run with `gateway.chartManaged: false` (no AI gateway proxy), skip the two `LW_GATEWAY_*` lines.
+If you run with `gateway.chartManaged: false` (no AI Gateway proxy), skip the two `LW_GATEWAY_*` lines.
 
 For chart-managed ClickHouse (the default), create the credentials Secret too. With `autogen.enabled=false` the chart does not materialise this Secret itself. The deployment composes `CLICKHOUSE_URL` at runtime from the password key:
 
@@ -401,22 +401,24 @@ clickhouse:
 
 You only need to set these two values, the subchart computes optimal settings for query limits, merge threads, insert batching, and S3 download parallelism.
 
-### AI Gateway sub-chart (optional)
+### AI Gateway sub-chart
 
-The umbrella chart bundles the AI Gateway as an opt-in sub-chart that runs alongside the core LangWatch app. Enabling it gives you virtual keys, hierarchical budgets, multi-provider routing via Bifrost, guardrails, and prompt caching, all governed by the same control plane.
+The umbrella chart bundles the AI Gateway as a sub-chart that runs alongside the core LangWatch app, and installs it by default. It gives you virtual keys, hierarchical budgets, multi-provider routing via Bifrost, guardrails, and prompt caching, all governed by the same control plane.
 
-Minimum viable opt-in:
+To run without it:
 
 ```yaml
 gateway:
-  enabled: true
+  chartManaged: false
 ```
 
-That ships sane defaults (2 replicas, ClusterIP service, no ingress). For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
+The defaults are 2 replicas, a ClusterIP service and an ingress for the placeholder host `gateway.langwatch.ai`. Set `gateway.ingress.host` to your own hostname, or `gateway.ingress.enabled: false` to reach the gateway only from inside the cluster. For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
 
-Three things to know before flipping it on:
+Three things to know when running it:
 
-1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` + `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`) that also holds the app keys (`credentialsEncryptionKey`, `cronApiKey`, `nextAuthSecret`, `virtualKeyPepper`). The [Production Deployment](#production-deployment) section above shows the single `kubectl create secret generic` command. With `autogen.enabled=false` and any required key missing, the preflight Job aborts the install with a clear list of what is missing; under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
+1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI Gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`), which also holds the app keys `credentialsEncryptionKey`, `cronApiKey`, `nextAuthSecret` and `virtualKeyPepper`.
+
+   The [Production Deployment](#production-deployment) section above shows the single `kubectl create secret generic` command. With `autogen.enabled=false` and any required key missing, the preflight Job aborts the install with a list of what is missing; under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
 2. **Public ingress needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate ingress rule. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
 3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that trace-processing folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
 
@@ -462,6 +464,18 @@ cronjobs:
     annotations:
       sidecar.istio.io/inject: "false"
 ```
+
+### Two installs in one cluster
+
+The bundled Prometheus creates a cluster-scoped ClusterRole named `<release>-prometheus-server`. A second install with the same release name in another namespace, for example a staging `langwatch` beside a production `langwatch`, fails with `ClusterRole "langwatch-prometheus-server" ... exists and cannot be imported into the current release`. Give the second install its own ClusterRole name, or use a different release name:
+
+```yaml
+prometheus:
+  server:
+    clusterRoleNameOverride: langwatch-staging-prometheus-server
+```
+
+Both installs render ingress rules for the same default hosts and paths, and overlapping host and path rules conflict in the ingress controller. Give each install its own `ingress.hosts` and `gateway.ingress.host`, or disable an ingress that install does not need.
 
 ### Custom StorageClass
 

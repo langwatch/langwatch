@@ -56,10 +56,26 @@ const TIMEOUT_EXCEEDED: ServerError = {
 const TOO_MANY_ROWS: ServerError = { code: "158", name: "TOO_MANY_ROWS" };
 const TOO_MANY_BYTES: ServerError = { code: "307", name: "TOO_MANY_BYTES" };
 
+// `max_result_rows` / `max_result_bytes` under `result_overflow_mode =
+// 'throw'` — the *output* ceiling, distinct from TOO_MANY_ROWS/TOO_MANY_BYTES
+// above (which bound how much the query may *read*). Both settings raise the
+// same code.
+const TOO_MANY_ROWS_OR_BYTES: ServerError = {
+  code: "396",
+  name: "TOO_MANY_ROWS_OR_BYTES",
+};
+
 // The three shapes of "the object this query names is not there for you":
-// missing table, missing database, and an RBAC refusal. Grouped because a
-// caller cannot tell them apart and must not be able to — which of the three
-// fired describes the server's internals, not the query.
+// missing table, missing database, and an RBAC refusal. None of the three is
+// ever echoed back to the caller — the LangWatchQL validator only lets
+// catalog-approved names reach the database, so which one fired describes the
+// server's internals (and this deployment's provisioning), never the query —
+// but the two callers below intentionally group them differently: the first
+// pair means the objects the catalog promises are not there at all, the third
+// means they exist but this identity's grants are incomplete. That is a real
+// difference for the customer-facing message (see
+// `LangWatchQLUnavailableError` vs `LangWatchQLProvisioningIncompleteError`),
+// so it must not be a difference the two predicates below erase.
 /**
  * A name in the query that resolves to no column.
  *
@@ -75,6 +91,7 @@ const UNKNOWN_IDENTIFIER: ServerError = {
 const UNKNOWN_TABLE: ServerError = { code: "60", name: "UNKNOWN_TABLE" };
 const UNKNOWN_DATABASE: ServerError = { code: "81", name: "UNKNOWN_DATABASE" };
 const ACCESS_DENIED: ServerError = { code: "497", name: "ACCESS_DENIED" };
+const UNKNOWN_FUNCTION: ServerError = { code: "46", name: "UNKNOWN_FUNCTION" };
 
 /**
  * Whether `error` is one of `variants`, by any of the three forms a server
@@ -105,21 +122,20 @@ function raisedServerError({
 
 /**
  * True when the server refused because an object the query names does not
- * exist or the connecting identity is not allowed to read it — UNKNOWN_TABLE
- * (60), UNKNOWN_DATABASE (81), ACCESS_DENIED (497).
+ * exist for this identity at all — UNKNOWN_TABLE (60), UNKNOWN_DATABASE (81).
  *
  * Not mapped inside {@link translateClickHouseQueryError}: on the
  * application's own connection these are plain bugs and must degrade to
  * "unknown" (ADR-045). Exported for the one caller with a stronger invariant —
  * the LangWatchQL executor, whose validator only lets catalog-approved names
- * through, so any of the three there means the deployment's provisioning is
- * incomplete rather than anything about the submitted query.
+ * through, so either of these there means the deployment never provisioned
+ * the object at all, distinct from {@link isClickHouseObjectAccessDeniedError}.
  */
-export function isClickHouseObjectUnavailableError(error: unknown): boolean {
+export function isClickHouseObjectMissingError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   return raisedServerError({
     error,
-    variants: [UNKNOWN_TABLE, UNKNOWN_DATABASE, ACCESS_DENIED],
+    variants: [UNKNOWN_TABLE, UNKNOWN_DATABASE],
   });
 }
 
@@ -137,6 +153,23 @@ export function isClickHouseObjectUnavailableError(error: unknown): boolean {
 export function isClickHouseUnknownIdentifierError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   return raisedServerError({ error, variants: [UNKNOWN_IDENTIFIER] });
+}
+
+/**
+ * True when the server refused because the query called a function it does not
+ * have: UNKNOWN_FUNCTION (46).
+ *
+ * Not mapped inside {@link translateClickHouseQueryError}, like its two
+ * siblings above: on the application's own connection every function name is
+ * one this repository wrote, so a rejected one is a plain bug and must degrade
+ * to "unknown" (ADR-045). Exported for the LangWatchQL executor, whose
+ * validator admits a function name only from its own allowlist or from the
+ * app-function catalog — so there, this means the server is missing the
+ * projection UDFs that catalog declares.
+ */
+export function isClickHouseUnknownFunctionError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return raisedServerError({ error, variants: [UNKNOWN_FUNCTION] });
 }
 
 /**
@@ -191,6 +224,40 @@ export function unknownIdentifierFromError(error: unknown): string | undefined {
     }
   }
   return undefined;
+}
+
+/**
+ * True when the server refused because the connecting identity is not
+ * allowed to read an object the query names — ACCESS_DENIED (497).
+ *
+ * Kept apart from {@link isClickHouseObjectMissingError}: on the LangWatchQL
+ * executor's stronger invariant (validator-approved names only), this means
+ * the object exists and the catalog is otherwise working, but this
+ * identity's grants on it are incomplete — a narrower, purely-our-fault
+ * condition than "nothing is provisioned," and one whose customer-facing
+ * message must not send a customer to their own workspace administrator for
+ * something only we can fix.
+ */
+export function isClickHouseObjectAccessDeniedError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return raisedServerError({ error, variants: [ACCESS_DENIED] });
+}
+
+/**
+ * True when the server refused because the finished result exceeded
+ * `max_result_rows` / `max_result_bytes` — TOO_MANY_ROWS_OR_BYTES (396).
+ *
+ * Not mapped inside {@link translateClickHouseQueryError}: on the
+ * application's own connection nothing pins those settings, so this can only
+ * fire on a connection that does — the LangWatchQL executor, which pins them
+ * as the server-side backstop for its row cap (a `LIMIT` written as a bound
+ * parameter evades the TypeScript-side check, this does not). Exported so
+ * that caller can map it to its own `lwql_result_too_large`, never relaying
+ * the raw driver error.
+ */
+export function isClickHouseResultTooLargeError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return raisedServerError({ error, variants: [TOO_MANY_ROWS_OR_BYTES] });
 }
 
 /**

@@ -193,9 +193,11 @@ export function createTraceProcessingPipeline(
       }),
     )
     // Deferred origin resolution for pure OTEL traces: reject pre-enqueue as
-    // soon as the committed fold shows a resolved origin.
+    // soon as the committed fold shows a resolved origin. Span arrivals only —
+    // see needsOriginResolution for why enrichment events must not open it.
     .withSubscriber("originGate", {
       fold: "traceSummary",
+      events: [SPAN_RECEIVED_EVENT_TYPE],
       when: (event, context) =>
         needsOriginResolution({ event, foldState: context.state }),
       delay: ORIGIN_GATE_DELAY_MS,

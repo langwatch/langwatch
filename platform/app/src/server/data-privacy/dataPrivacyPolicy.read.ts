@@ -1,5 +1,5 @@
 import type { PrismaClient } from "~/generated/prisma/client";
-import { batchScopePermissions } from "~/server/api/rbac";
+import { batchScopePermissions } from "~/server/app-layer/authz/permission-adapters";
 import {
   probeOrganizationPermission,
   probeProjectPermission,
@@ -143,7 +143,10 @@ export async function getDataPrivacySnapshot(
         orderBy: { name: "asc" },
       }),
       ctx.prisma.project.findMany({
-        where: { team: { organizationId } },
+        where: {
+          team: { organizationId },
+          kind: { not: "internal_governance" },
+        },
         select: { id: true, name: true, teamId: true },
         orderBy: { name: "asc" },
       }),

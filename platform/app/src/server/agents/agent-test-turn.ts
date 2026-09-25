@@ -30,8 +30,12 @@ import {
   prefetchScenarioData,
 } from "~/server/scenarios/execution/data-prefetcher";
 import { createAdapter } from "~/server/scenarios/execution/serialized-adapter.registry";
+import { resolveRunParameters } from "~/server/scenarios/resolve-run-parameters";
 import type { RunActor } from "~/server/scenarios/run-actor";
-import { assertConnectedAgentsRunnable } from "~/server/suites/connected-targets";
+import {
+  agentParameterDefinitionsOf,
+  assertConnectedAgentsRunnable,
+} from "~/server/suites/connected-targets";
 import type { AgentWithFields } from "./agent-fields";
 import { agentTestTarget } from "./agent-test-run";
 import { AgentNotFoundError, AgentTestRefusedError } from "./errors";
@@ -156,6 +160,10 @@ async function dispatchConnectedTurn({
  * @throws {AgentNotFoundError} when no such agent is in the project
  * @throws {AgentTestRefusedError} when the agent cannot be run as it is
  * @throws {AgentOwnerOnlyError} when the agent belongs to someone else
+ * @throws {ScenarioParameterUnknownError} when a value names a parameter the
+ *   connected agent does not declare
+ * @throws {ScenarioParameterOptionInvalidError} when a value is outside the
+ *   options the connected agent declares
  */
 export async function sendAgentTestTurn({
   projectId,
@@ -196,6 +204,15 @@ export async function sendAgentTestTurn({
   });
 
   if (agent.type === "connected") {
+    // The checks the Run dialog's values go through: a name the agent does
+    // not declare and a value outside its options are refused by name, before
+    // any instance is reached. A name left out reads the code default.
+    await resolveRunParameters({
+      scenarios: [],
+      targetDefinitions: agentParameterDefinitionsOf(agent),
+      targetLabel: agent.name,
+      values: params,
+    });
     return await dispatchConnectedTurn({ projectId, agent, message, params });
   }
 

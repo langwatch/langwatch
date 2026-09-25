@@ -28,8 +28,8 @@
  * @see ~/app/api/shared/canonical-error — the mapping every refusal here goes
  *   through, including the 5xx redaction one case below turns on
  *
- * @see specs/analytics/lwql-saved-charts.feature
- * @see specs/analytics/lwql-langy-authoring.feature — the placement routes
+ * @see specs/lwql/saved-charts.feature
+ * @see specs/lwql/langy-authoring.feature — the placement routes
  * @see ~/server/analytics/saved-workbench-charts — the service under test
  */
 
@@ -65,6 +65,7 @@ import {
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
 import { getFeatureFlagStore } from "~/server/featureFlag";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app as queryApp } from "../../query/[[...route]]/app";
 import { app } from "../[[...route]]/app";
@@ -114,6 +115,7 @@ describe("given the saved workbench chart REST endpoints", () => {
   let otherProject: Project;
   /** A scoped key holding `analytics:view` on this organization and nothing else. */
   let viewOnlyToken: string;
+  let eventSourcing: ReturnType<typeof createAuthzTestEventSourcing>;
 
   const chartsPath = (project: Project) =>
     `/api/v1/projects/${project.id}/analytics/charts`;
@@ -255,7 +257,9 @@ describe("given the saved workbench chart REST endpoints", () => {
     process.env.RELEASE_LWQL_WORKBENCH = "1";
 
     await resetApp();
+    eventSourcing = createAuthzTestEventSourcing(prisma);
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: eventSourcing,
       planProvider: PlanProviderService.create({
         getActivePlan: vi
           .fn()
@@ -368,6 +372,9 @@ describe("given the saved workbench chart REST endpoints", () => {
     }
     if (team) {
       await prisma.dataPrivacyPolicy.deleteMany({
+        where: { organizationId: organization.id },
+      });
+      await prisma.grant.deleteMany({
         where: { organizationId: organization.id },
       });
       await prisma.roleBinding.deleteMany({

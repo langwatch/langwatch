@@ -211,6 +211,13 @@ app:
   ## @param app.nodeEnv [string] Node.js environment override (falls back to global.env if empty).
   nodeEnv: ""
 
+  # Proxy hops allowed to append the X-Forwarded-For chain used by public auth
+  # rate limits. Set this to the ingress controller or load balancer egress
+  # addresses/CIDRs for the deployment. Empty keeps the safe socket-peer
+  # fallback; the chart cannot infer network-specific CIDRs.
+  ## @param app.trustedProxyAddresses [string, default: ""] Comma-separated trusted proxy addresses or IPv4 CIDR ranges. Required only for a proxy that reaches the app from a public address; a private, loopback or link-local hop is read as infrastructure without it.
+  trustedProxyAddresses: ""
+
   # Encryption key for securing sensitive credentials
   # This key is used to encrypt/decrypt stored API keys and secrets
   ## @extra app.credentialsEncryptionKey Configuration for credentials encryption.
@@ -614,6 +621,33 @@ app:
       value: ""
       secretKeyRef: { name: "", key: "" }
 
+  # LangWatch-hosted services this install may call with the license it holds.
+  #
+  # There is no switch that turns these on. The license decides: one that names
+  # a hosted service can reach it, one that names none reaches nothing. So a
+  # default render carries no LANGWATCH_CONNECT_ variable and an install on an
+  # offline license calls nothing, which an operator checks against the license
+  # blob rather than against this file.
+  #
+  # `disabled` is the escape hatch an audit asks for: set it and this install
+  # calls LangWatch for nothing at all, hosted services and usage reporting
+  # alike, whatever its license says.
+  # See https://docs.langwatch.ai/self-hosting/connect
+  ## @extra app.connect Connected hosted services configuration.
+  ## @param app.connect.disabled [boolean] Switches hosted services and usage reporting off entirely.
+  ## @param app.connect.gatewayEndpoint [string] Where hosted services are called. Empty uses the published endpoint.
+  ## @param app.connect.licenseEndpoint [string] Where the license registers itself. Empty uses the published endpoint.
+  ## @param app.connect.instanceId [string] Identity this install presents. Empty uses the id minted into its own database.
+  connect:
+    disabled: false
+    gatewayEndpoint: ""
+    licenseEndpoint: ""
+    # Set this only when an operator has a reason to name the identity. The
+    # default is minted once into this install's own database, so it survives
+    # restarts, backups and hostname changes; a second install with a database
+    # of its own presents another id and is refused as the wrong instance.
+    instanceId: ""
+
   # NextAuth.js authentication configuration
   # Handles user authentication and session management
   # Note: publicUrl is automatically used from http.publicUrl
@@ -622,7 +656,7 @@ app:
   ## @param app.nextAuth.secret.value [string] NextAuth secret value (not recommended inline for production).
   nextAuth:
     # Authentication provider to use. This value is passed to the app verbatim
-    # as NEXTAUTH_PROVIDER, so it has to be one the app recognises:
+    # as AUTH_PROVIDER, so it has to be one the app recognises:
     #   email (default), google, github, gitlab, azure-ad, auth0, okta,
     #   cognito, onelogin, oidc
     # Note that Azure AD is 'azure-ad' here while its credentials live under
@@ -1957,7 +1991,10 @@ clickhouse:
     ## @param clickhouse.auth.password [string] ClickHouse password (auto-generated when empty).
     password: ""
     ## @param clickhouse.auth.existingSecret [string] Name of existing secret containing the password. Supports tpl expressions.
-    existingSecret: '{{ printf "%s-clickhouse" .Release.Name }}'
+    ## Defaults to the chart-managed ClickHouse Service name (release name truncated
+    ## to 36 chars, matching clickhouse-serverless.fullname), so the parent-rendered
+    ## Secret and the subchart mount agree on a release name of any length.
+    existingSecret: '{{ include "langwatch.clickhouse.serviceName" . }}'
     ## @extra clickhouse.auth.secretKeys Key mappings for existing secret.
     secretKeys:
       ## @param clickhouse.auth.secretKeys.passwordKey [string, default: password] Key name in the existing secret.
@@ -1976,6 +2013,94 @@ clickhouse:
     affinity: {}
     ## @param clickhouse.scheduling.tolerations [array] Tolerations for ClickHouse pods.
     tolerations: []
+
+  # ---------------------------------------------------------------------------
+  # LangWatchQL access-model delivery (issue #8258)
+  # ---------------------------------------------------------------------------
+  # The app owns the LangWatchQL access model in code; on chart-managed
+  # ClickHouse it is DELIVERED to every replica (not provisioned by DDL on the
+  # one pod behind the Service). The <release>-lwql-access-render Job writes the
+  # rendered files into the Secret <release>-lwql-clickhouse-access, and every
+  # ClickHouse pod mounts them here. Nested single-file (subPath) mounts, so they
+  # coexist with the files ch-config renders into config.d / users.d at startup.
+  #
+  # optional:false is DELIBERATE. The Secret is written at runtime by the
+  # main-phase <release>-lwql-access-render Job, not by a chart Secret manifest,
+  # so on a first install it does not exist yet when these pods are created. A
+  # required mount does NOT hard-fail in that window — the kubelet retries a
+  # missing required Secret (FailedMount events, pod stays in ContainerCreating)
+  # and starts the pod once the Job writes it, exactly as the install race needs.
+  # What optional:false BUYS us: if the render Job never delivers the access model
+  # (a broken render, a bad token, RBAC drift), ClickHouse stays visibly not-Ready
+  # and `helm install --wait --wait-for-jobs` fails, instead of ClickHouse coming
+  # up healthy with NO LWQL access set — the silent-success failure that shipped
+  # once and was only caught much later by an in-cluster row-count assertion.
+  #
+  # The mount is NOT delivered through the operator-facing extraVolumes /
+  # extraVolumeMounts: Helm replaces lists wholesale, so an operator adding one
+  # extra volume there would silently drop the LWQL mount. It rides its own
+  # value instead — clickhouse.lwqlAccess.secretName — which the subchart
+  # StatefulSet renders unconditionally into the pod (see that chart's
+  # statefulset.yaml), leaving extraVolumes free for operators. The value is a
+  # template string rendered through `tpl ... $`, so it calls the parent helper
+  # directly — the single source of truth for the Secret name, no drift.
+  ## @param clickhouse.lwqlAccess.secretName [string] Secret carrying the rendered LWQL access files; mounted unconditionally into every ClickHouse pod. Rendered from the parent helper — leave as-is.
+  lwqlAccess:
+    secretName: '{{ include "langwatch.lwql.accessSecretName" $ }}'
+  ## @param clickhouse.extraVolumes [array] Extra volumes for the ClickHouse pod.
+  extraVolumes: []
+  ## @param clickhouse.extraVolumeMounts [array] Extra mounts for the ClickHouse container.
+  extraVolumeMounts: []
+
+  # Roll every ClickHouse pod when the app catalog (hence the rendered access
+  # model) changes, so an upgrade re-mounts the freshly rendered Secret.
+  # Kubernetes does not propagate Secret updates into a subPath mount, so a pod
+  # only picks up a changed model on (re)start; this annotation, bumped in
+  # release lockstep with the app image, is what forces that restart on upgrade.
+  # ClickHouse 25.10 hot-reloads users.d/config.d from disk in ~3s, but that
+  # only helps a non-subPath mount, which ch-config's writable config dirs
+  # preclude here. A values-only upgrade at the same version does NOT roll
+  # ClickHouse; rotate a live secret with `kubectl rollout restart statefulset`.
+  ## @param clickhouse.podAnnotations [object] Annotations on the ClickHouse pod template (carries the LWQL catalog version so upgrades re-mount the access Secret).
+  podAnnotations:
+    langwatch.com/lwql-access-catalog: "3.17.0" # x-release-please-version
+
+# =============================================================================
+# LangWatchQL (LWQL) Configuration
+# =============================================================================
+# The governed analytics SQL API. Its backend is the restricted ClickHouse
+# identity (langwatch_lwql), the <database>_profile settings profile
+# (langwatch_profile by default), the tenant row policies, the lwql_postgres
+# named collection and the caller-facing views.
+# The `release_lwql_workbench` feature flag still gates the HTTP endpoint; the
+# backend objects exist regardless.
+#
+# One rule, one owner (issue #8258): the APPLICATION owns the access model in
+# code. How it reaches ClickHouse depends on the posture:
+#
+#   - Chart-managed ClickHouse (default): RENDERED delivery. The
+#     <release>-lwql-access-render Job renders the model and writes it into the
+#     Secret <release>-lwql-clickhouse-access, which every ClickHouse pod mounts
+#     (see clickhouse.lwqlAccess.secretName above, rendered into the pod by the
+#     subchart StatefulSet), so every replica carries the whole
+#     set. No access SQL DDL runs; the ClickHouse identity holds no ACCESS
+#     MANAGEMENT. This is LWQL_ACCESS_MODEL_MODE=rendered (the default when
+#     unset); the chart never sets the variable for chart-managed ClickHouse.
+#   - Bring-your-own ClickHouse: SQL DDL. The chart cannot write the server's
+#     config files, so the app self-provisions via SQL DDL, degrading to a
+#     logged, fail-closed refusal if the server rejects a statement. Select it
+#     with LWQL_ACCESS_MODEL_MODE=sql (see examples/overlays/clickhouse-external.yaml),
+#     which needs an admin user allowed access-management DDL.
+#
+# `lwql.enabled` is the only switch here: the chart's remaining job is handing
+# the app the two passwords (LWQL_CLICKHOUSE_PASSWORD, LWQL_POSTGRES_READER_PASSWORD)
+# it converges the identities with.
+## @section LangWatchQL (LWQL)
+lwql:
+  ## @param lwql.enabled [default: true] Provision the LangWatchQL backend (identity, policies, named collection, views). Delivered as rendered config to every pod on chart-managed ClickHouse (default), or via SQL DDL on bring-your-own ClickHouse (LWQL_ACCESS_MODEL_MODE=sql). The feature flag still gates the endpoint.
+  enabled: true
+  ## @param lwql.imagePullSecrets [array] Pull secrets for the app image the access-render Job runs. That Job uses its own ServiceAccount, so secrets on the namespace default ServiceAccount do not reach it (same reason app.storedObjects.localFilesystem.serializeUpgradesPullSecrets exists).
+  imagePullSecrets: []
 
 # =============================================================================
 # Redis Configuration

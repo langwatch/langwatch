@@ -93,6 +93,66 @@ def test_create_posts_only_the_name():
     assert created["id"] == "suite_1"
 
 
+GOLDEN_SQL_FIELD = {"identifier": "golden_sql", "type": "text"}
+
+SQL_EVALUATOR = {
+    "id": "att_1",
+    "evaluatorId": "evaluator_1",
+    "required": True,
+    "mappings": {
+        "output": {
+            "type": "source",
+            "sourceId": "trace",
+            "path": ["tool_calls", "run_sql", "input"],
+        },
+        "expected_output": {
+            "type": "source",
+            "sourceId": "scenario",
+            "path": ["fields", "golden_sql"],
+        },
+    },
+}
+
+
+# @scenario "Creating a test suite with fields and evaluators sends both"
+def test_create_sends_the_fields_and_the_evaluators():
+    facade, calls = recorder(status=201)
+
+    facade.create(
+        name="Case lookups", fields=[GOLDEN_SQL_FIELD], evaluators=[SQL_EVALUATOR]
+    )
+
+    method, url, body = calls[0]
+    assert method == "POST"
+    assert url.path == "/api/v1/test-suites"
+    assert body == {
+        "name": "Case lookups",
+        "fields": [GOLDEN_SQL_FIELD],
+        "evaluators": [SQL_EVALUATOR],
+    }
+
+
+# @scenario "Updating a test suite sends only what the caller gave"
+def test_update_patches_the_fields_alone():
+    facade, calls = recorder()
+
+    facade.update("suite_1", fields=[GOLDEN_SQL_FIELD])
+
+    method, url, body = calls[0]
+    assert method == "PATCH"
+    assert url.path == "/api/v1/test-suites/suite_1"
+    assert body == {"fields": [GOLDEN_SQL_FIELD]}
+
+
+# @scenario "Updating a test suite can replace its evaluators"
+def test_update_patches_the_evaluators_alone():
+    facade, calls = recorder()
+
+    facade.update("suite_1", evaluators=[SQL_EVALUATOR])
+
+    assert calls[0][2] == {"evaluators": [SQL_EVALUATOR]}
+
+
 # @scenario "Reading a test suite returns the scenarios filed under it"
 def test_get_reads_one_suite_with_its_scenarios():
     facade, calls = recorder()

@@ -37,6 +37,10 @@ Configure your experiment once in the LangWatch Experiments via UI, then trigger
    ```
    Or open the **Run Options** menu in the experiment toolbar and choose **Run in CI/CD** for ready-to-copy snippets.
 
+<Frame>
+<img src="/images/evaluations/workbench-run-via-api.png" alt="The Run via API dialog with the Python, TypeScript and Shell tabs, the data source tabs and the Python snippet" />
+</Frame>
+
 3. **Run from CI/CD:**
 
 <Tabs>
@@ -191,6 +195,7 @@ for idx, row in experiment.loop(dataset.iterrows()):
     experiment.evaluate(
         "ragas/faithfulness",
         index=idx,
+        settings={},
         data={
             "input": row["input"],
             "output": response,
@@ -289,7 +294,7 @@ for idx, row in experiment.loop(dataset.iterrows()):
         with experiment.target("gpt-5-mini", {"model": "gpt-5-mini"}):
             response = call_openai("gpt-5-mini", row["input"])
             experiment.log_response(response)
-            experiment.evaluate("ragas/faithfulness", index=idx, data={
+            experiment.evaluate("ragas/faithfulness", index=idx, settings={}, data={
                 "input": row["input"],
                 "output": response,
                 "contexts": row["contexts"],
@@ -299,7 +304,7 @@ for idx, row in experiment.loop(dataset.iterrows()):
         with experiment.target("claude-sonnet-5", {"model": "claude-sonnet-5"}):
             response = call_anthropic("claude-sonnet-5", row["input"])
             experiment.log_response(response)
-            experiment.evaluate("ragas/faithfulness", index=idx, data={
+            experiment.evaluate("ragas/faithfulness", index=idx, settings={}, data={
                 "input": row["input"],
                 "output": response,
                 "contexts": row["contexts"],
@@ -462,7 +467,7 @@ except EvaluationRunFailedError as e:
   <Tab title="TypeScript">
 ```typescript
 import {
-  EvaluationNotFoundError,
+  ExperimentNotFoundError,
   EvaluationTimeoutError,
   EvaluationRunFailedError,
 } from "langwatch";
@@ -471,7 +476,7 @@ try {
   const result = await langwatch.experiments.run("my-experiment", { timeout: 300000 });
   result.printSummary();
 } catch (error) {
-  if (error instanceof EvaluationNotFoundError) {
+  if (error instanceof ExperimentNotFoundError) {
     console.error("Experiment not found - check the slug");
   } else if (error instanceof EvaluationTimeoutError) {
     console.error(`Timeout: only ${error.progress}/${error.total} completed`);
@@ -488,12 +493,12 @@ try {
 
 ## REST API (Platform Experiments)
 
-For custom integrations, you can use the REST API directly:
+For custom integrations, you can use the REST API directly. The paths below are also served under `/api/evaluations/v3/`, the prefix earlier SDK versions call.
 
 ### Start a Run
 
 ```bash
-curl -X POST "https://app.langwatch.ai/api/evaluations/v3/{slug}/run" \
+curl -X POST "https://app.langwatch.ai/api/experiments/{slug}/run" \
   -H "X-Auth-Token: ${LANGWATCH_API_KEY}"
 ```
 
@@ -510,7 +515,7 @@ Response:
 ### Poll for Status
 
 ```bash
-curl "https://app.langwatch.ai/api/evaluations/v3/runs/{runId}" \
+curl "https://app.langwatch.ai/api/experiments/runs/{runId}" \
   -H "X-Auth-Token: ${LANGWATCH_API_KEY}"
 ```
 
@@ -533,11 +538,11 @@ Response (completed):
 ### Fetch Results
 
 ```bash
-curl "https://app.langwatch.ai/api/evaluations/v3/runs/{runId}/results?experimentSlug={slug}" \
+curl "https://app.langwatch.ai/api/experiments/runs/{runId}/results?experimentSlug={slug}" \
   -H "X-Auth-Token: ${LANGWATCH_API_KEY}"
 ```
 
-Returns the per-row dataset entries (input, output, trace id, duration) and evaluation scores for the run.
+Returns the per-row dataset entries (input, output, trace id, duration) and evaluation scores for the run. `experimentSlug` is optional for the first 24 hours after the run and required after that.
 
 ---
 

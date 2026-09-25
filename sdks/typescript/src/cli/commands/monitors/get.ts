@@ -8,6 +8,7 @@ import type { CommandResult } from "../../utils/output";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 /**
  * Returns the monitor rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts).
@@ -38,7 +39,7 @@ export const getMonitorCommand = async (
     platformUrl?: string;
   };
   try {
-    const response = await fetch(`${endpoint}/api/monitors/${id}`, {
+    const response = await langwatchFetch(`${endpoint}/api/monitors/${id}`, {
       headers: buildAuthHeaders({ apiKey }),
     });
 

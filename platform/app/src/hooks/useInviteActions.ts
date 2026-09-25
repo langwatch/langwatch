@@ -46,9 +46,10 @@ export function useInviteActions({
   const openSeats = useUpgradeModalStore((s) => s.openSeats);
   const queryClient = api.useUtils();
 
-  /** Invalidate license-limit cache so the next check uses fresh seat counts. */
+  /** Invitations reserve seats used by both the allowance check and directory. */
   const invalidateLimits = () => {
     void queryClient.licenseEnforcement.checkLimit.invalidate();
+    void queryClient.limits.getUsage.invalidate({ organizationId });
   };
 
   // SaaS-only: subscription API for seat expansion (not available in OSS builds).
@@ -61,9 +62,9 @@ export function useInviteActions({
       | { mutateAsync: (input: Record<string, unknown>) => Promise<unknown> }
       | undefined;
 
-  const createInvitesMutation = api.organization.createInvites.useMutation();
-  const deleteInviteMutation = api.organization.deleteInvite.useMutation();
-  const resendInviteMutation = api.organization.resendInvite.useMutation();
+  const createInvitesMutation = api.invite.createInvites.useMutation();
+  const deleteInviteMutation = api.invite.deleteInvite.useMutation();
+  const resendInviteMutation = api.invite.resendInvite.useMutation();
 
   const performAdminInvite = (data: MembersForm) => {
     createInvitesMutation.mutate(
@@ -253,6 +254,7 @@ export function useInviteActions({
             duration: 5000,
           });
           refetchInvites();
+          invalidateLimits();
         },
         onError: (error) =>
           showErrorToast({

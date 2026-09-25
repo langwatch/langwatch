@@ -21,6 +21,7 @@ import { app as gatewaySpendApp } from "../app/api/gateway-spend/[[...route]]/ap
 import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
 import { app as groupsApp } from "../app/api/groups/[[...route]]/app";
+import { app as instantEvalsApp } from "../app/api/instant-evals/[[...route]]/app";
 import { app as langyControlApp } from "../app/api/langy-control/[[...route]]/app";
 import { app as meApp } from "../app/api/me/[[...route]]/app";
 import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
@@ -36,6 +37,7 @@ import { app as roleBindingsApp } from "../app/api/role-bindings/[[...route]]/ap
 import { app as rolesApp } from "../app/api/roles/[[...route]]/app";
 import { app as runPlansApp } from "../app/api/run-plans/[[...route]]/app";
 import { app as scimTokensApp } from "../app/api/scim-tokens/[[...route]]/app";
+import { normalizeExclusiveBounds } from "../server/api/openapi-exclusive-bounds";
 import { requireDefaultedResponseFields } from "../server/api/openapi-response-required";
 import {
   allRegisteredRoutes,
@@ -49,6 +51,7 @@ import {
 // so the unannotated siblings sharing these files (the stripe webhook, the demo
 // bot, the MCP authorize step) cannot reach a public document merely by living
 // next to something that is published.
+import { app as checkupApp } from "../server/routes/checkup";
 import { app as evaluationsLegacyApp } from "../server/routes/evaluations-legacy";
 import { app as experimentsV3App } from "../server/routes/experiments-v3";
 import { app as miscApp } from "../server/routes/misc";
@@ -77,6 +80,7 @@ const generateSpecs: typeof generateSpecsUnpinned = async (hono, options, c) =>
 // the merge union forever.
 const APP_DERIVED_PREFIXES = [
   "/api/agent-cache",
+  "/api/checkup",
   "/api/agents",
   "/api/v1/agents",
   "/api/api-keys",
@@ -132,6 +136,7 @@ const APP_DERIVED_PREFIXES = [
   "/api/secrets",
   "/api/simulation-runs",
   "/api/suites",
+  "/api/v1/instant-evals",
   "/api/v1/run-plans",
   "/api/v1/test-suites",
   "/api/teams",
@@ -231,6 +236,8 @@ export default async function execute() {
   const experimentsV3Spec = await generateSpecs(experimentsV3App);
   console.log("Building experiment init spec...");
   const miscSpec = await generateSpecs(miscApp);
+  console.log("Building checkup spec...");
+  const checkupSpec = await generateSpecs(checkupApp);
   console.log("Building gateway-platform spec...");
   const gatewayPlatformSpec = await generateSpecs(gatewayPlatformApp);
   console.log("Building governance spec...");
@@ -280,6 +287,8 @@ export default async function execute() {
   const simulationRunsSpec = await generateSpecs(simulationRunsApp);
   console.log("Building suites spec...");
   const suitesSpec = await generateSpecs(suitesApp);
+  console.log("Building instant evals spec...");
+  const instantEvalsSpec = await generateSpecs(instantEvalsApp);
   console.log("Building run plans spec...");
   const runPlansSpec = await generateSpecs(runPlansApp);
   console.log("Building test suites spec...");
@@ -317,6 +326,7 @@ export default async function execute() {
       evaluationsLegacySpec,
       experimentsV3Spec,
       miscSpec,
+      checkupSpec,
       gatewayPlatformSpec,
       governanceSpec,
       graphsSpec,
@@ -338,6 +348,7 @@ export default async function execute() {
       secretsSpec,
       simulationRunsSpec,
       suitesSpec,
+      instantEvalsSpec,
       runPlansSpec,
       testSuitesSpec,
       teamsSpec,
@@ -366,6 +377,7 @@ export default async function execute() {
 
   console.log("Stamping per-operation security...");
   stampSecurityFromRegistry(mergedSpec as SpecShape);
+  normalizeExclusiveBounds(mergedSpec);
 
   fs.writeFileSync(
     path.join(__dirname, "../app/api/openapiLangWatch.json"),

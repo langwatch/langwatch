@@ -10,6 +10,7 @@ import {
 } from "@chakra-ui/react";
 import { ChevronsDownUp, ChevronsUpDown, Inbox } from "lucide-react";
 import { lazy, Suspense, useCallback, useState } from "react";
+import { isHumanCallerRun } from "~/components/agent-testing/results/caller-display";
 import { CopyButton } from "~/components/CopyButton";
 import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
 import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
@@ -25,6 +26,7 @@ import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { Drawer } from "../ui/drawer";
 import { CopyIdChip } from "./CopyIdChip";
+import { CutAtLimitBadge, isCutAtLimitOf } from "./CutAtLimitBadge";
 import { RunCriteriaChip } from "./RunCriteriaChip";
 import { RunDetailSection } from "./RunDetailSection";
 import { ScenarioMessageRenderer } from "./ScenarioMessageRenderer";
@@ -318,6 +320,9 @@ function ClassicScenarioRunDetailDrawer({
                     <Heading size="md" truncate title={displayTitle}>
                       {displayTitle}
                     </Heading>
+                    {isCutAtLimitOf(scenarioState.metadata) ? (
+                      <CutAtLimitBadge />
+                    ) : null}
                   </HStack>
                   <HStack gap={1} flexShrink={0}>
                     <ScenarioRunActions
@@ -434,6 +439,9 @@ function ClassicScenarioRunDetailDrawer({
                         streamingMessages={streamingMessages}
                         variant="drawer"
                         projectId={project?.id ?? ""}
+                        // A voice "Call it myself" caller is a real person, so
+                        // their turns read as "You", not "User Simulator" (#8020).
+                        isHumanCaller={isHumanCallerRun(scenarioState.metadata)}
                       />
                     </ConversationExpandContext.Provider>
                   </RunDetailSection>

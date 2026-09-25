@@ -13,11 +13,17 @@ import {
   runPlanScopeSchema,
   runPlanTargetSchema,
 } from "./schemas/run-plan.js";
+import {
+  evaluatorAttachmentsSchema,
+  scenarioFieldValuesSchema,
+  suiteFieldsSchema,
+} from "./schemas/suite-fields.js";
 import { handleExperimentResults } from "./tools/get-experiment-results.js";
 import { handleExperimentListRuns } from "./tools/list-experiment-runs.js";
 import { handleExperimentList } from "./tools/list-experiments.js";
 import { handleRunExperiment, handleExperimentStatus } from "./tools/run-experiment.js";
 import { handleTestAgent } from "./tools/test-agent.js";
+import { handleUpdateTestSuite } from "./tools/update-test-suite.js";
 
 const modelSchema = z
   .string()
@@ -142,11 +148,12 @@ function registerTools(server: McpServer): void {
 
   server.tool(
     "discover_schema",
-    "Discover available filter fields, metrics, aggregation types, group-by options, scenario schema, and evaluator types for LangWatch queries. Call this before using search_traces, get_analytics, scenario tools, or evaluator tools to understand available options.",
+    "Discover what LangWatch can be queried with: the trace filter fields and syntax, the analytics SQL views and columns, the analytics metrics, aggregation types, group-by options, scenario schema and evaluator types. Call this before using search_traces, run_query, get_analytics, scenario tools or evaluator tools, so you never guess a field, a column or a value.",
     {
       category: z
         .enum([
           "filters",
+          "lwql",
           "metrics",
           "aggregations",
           "groups",
@@ -154,7 +161,9 @@ function registerTools(server: McpServer): void {
           "evaluators",
           "all",
         ])
-        .describe("Which schema category to discover"),
+        .describe(
+          "Which schema category to discover. 'filters' is the trace filter language, 'lwql' the analytics SQL views; both are read from the platform and need the API key"
+        ),
       evaluatorType: z
         .string()
         .optional()
@@ -162,7 +171,7 @@ function registerTools(server: McpServer): void {
           "When category is 'evaluators', provide a specific evaluator type (e.g. 'langevals/llm_boolean') to get its full schema details"
         ),
     },
-    async ({ category, evaluatorType }) => {
+    withToolLogging("discover_schema", async ({ category, evaluatorType }) => {
       if (category === "scenarios") {
         const { formatScenarioSchema } = await import(
           "./tools/discover-scenario-schema.js"
@@ -181,8 +190,14 @@ function registerTools(server: McpServer): void {
           ],
         };
       }
-      const { formatSchema } = await import("./tools/discover-schema.js");
-      let text = formatSchema(category);
+      const { formatSchema, needsQueryReference } = await import(
+        "./tools/discover-schema.js"
+      );
+      // The filter and analytics-SQL halves are the PLATFORM's registries, not
+      // copies of them, so those categories need the credential. The static
+      // ones still answer without it.
+      if (needsQueryReference(category)) requireApiKey();
+      let text = await formatSchema(category);
       if (category === "all") {
         const { formatScenarioSchema } = await import(
           "./tools/discover-scenario-schema.js"
@@ -194,7 +209,32 @@ function registerTools(server: McpServer): void {
         text += "\n\n" + formatEvaluatorSchema();
       }
       return { content: [{ type: "text", text }] };
-    }
+    })
+  );
+
+  server.tool(
+    "run_query",
+    "Run one read-only analytics SQL statement (LangWatchQL) over this project's traces, spans, evaluations and metrics, and get the rows back as a table. This is the tool for a count, a rate, a sum, a percentile or any of them grouped or over time — questions search_traces would need many calls to answer. The statement runs exactly as written. Call discover_schema with category 'lwql' first for the views, columns and worked statements.",
+    {
+      sql: z
+        .string()
+        .describe(
+          "The SELECT to run. Filter on the dataset's time column so the read is bounded, and never select a whole attribute map"
+        ),
+      parameters: z
+        .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+        .optional()
+        .describe(
+          'Values for the parameters the statement declares, e.g. {"days": 7} for {days:UInt32}'
+        ),
+    },
+    withToolLogging("run_query", async (params) => {
+      requireApiKey();
+      const { handleRunQuery } = await import("./tools/run-query.js");
+      return {
+        content: [{ type: "text", text: await handleRunQuery(params) }],
+      };
+    })
   );
 
   server.tool(
@@ -206,7 +246,13 @@ function registerTools(server: McpServer): void {
         .record(z.string(), z.array(z.string()))
         .optional()
         .describe(
-          'Filter traces. Format: {"field": ["value"]}. Use discover_schema for field names.'
+          'Filter traces by the older per-field map. Format: {"field": ["value"]}. Use discover_schema for field names.'
+        ),
+      filter: z
+        .string()
+        .optional()
+        .describe(
+          'Filter traces with the Trace Explorer\'s own query language: "status:error AND model:gpt-*", "trace.attribute.langwatch.user_id:alice", "evaluatorVerdict:fail", a quoted phrase for free text. Reaches attribute keys, span events and evaluator verdicts that the `filters` map cannot. Combined with `filters` and `query` when you send more than one. Call discover_schema with category \'filters\' for every field and the syntax.'
         ),
       startDate: z
         .string()
@@ -546,6 +592,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .describe(
           "The test suite to file this scenario in. Pass a test suite ID, or null to unfile it."
         ),
+      fields: scenarioFieldValuesSchema.optional(),
     },
     withToolLogging("platform_create_scenario", async (params) => {
       requireApiKey();
@@ -630,6 +677,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .describe(
           "The test suite to file this scenario in. Pass a test suite ID, or null to unfile it."
         ),
+      fields: scenarioFieldValuesSchema.optional(),
     },
     withToolLogging("platform_update_scenario", async (params) => {
       requireApiKey();
@@ -708,6 +756,11 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .string()
         .optional()
         .describe("Model that judges the criteria. Omit for the project default."),
+      evaluators: evaluatorAttachmentsSchema
+        .optional()
+        .describe(
+          "The plan's own evaluators, run beside the ones attached to the test suites its scenarios belong to. A plan evaluator reads the conversation and the trace, never a scenario field. Omit to keep what the plan already holds. See discover_schema({ category: 'scenarios' }) for the mapping paths.",
+        ),
       parameters: runParametersSchema
         .optional()
         .describe(
@@ -838,9 +891,11 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_create_test_suite",
-    "Create a test suite. A test suite groups scenarios: file a scenario in it by passing the suite ID as testSuiteId on platform_create_scenario or platform_update_scenario.",
+    "Create a test suite. A test suite groups scenarios: file a scenario in it by passing the suite ID as testSuiteId on platform_create_scenario or platform_update_scenario. A suite can declare typed fields every scenario carries a value for, and attach saved evaluators that run after every scenario run with mappings from their inputs to the conversation, the scenario's fields or the trace. Call discover_schema({ category: 'scenarios' }) first for the field rules and the mapping paths.",
     {
       name: z.string().describe("Test suite name"),
+      fields: suiteFieldsSchema.optional(),
+      evaluators: evaluatorAttachmentsSchema.optional(),
     },
     withToolLogging("platform_create_test_suite", async (params) => {
       requireApiKey();
@@ -868,6 +923,27 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       const { handleGetTestSuite } = await import("./tools/get-test-suite.js");
       return {
         content: [{ type: "text", text: await handleGetTestSuite(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_update_test_suite",
+    "Edit a test suite: any of its name, its fields and its evaluators. A field list or an evaluator list replaces the one the suite holds; a key left out keeps what the suite has. A field an attached evaluator still reads cannot be removed. Call discover_schema({ category: 'scenarios' }) first for the field rules and the mapping paths.",
+    {
+      id: z.string().describe("The test suite ID"),
+      name: z.string().optional().describe("The new name. The slug is kept."),
+      fields: suiteFieldsSchema
+        .optional()
+        .describe("The full list of fields the suite declares. It replaces the list the suite holds."),
+      evaluators: evaluatorAttachmentsSchema
+        .optional()
+        .describe("The full list of evaluators attached to the suite. It replaces the list the suite holds."),
+    },
+    withToolLogging("platform_update_test_suite", async (params) => {
+      requireApiKey();
+      return {
+        content: [{ type: "text", text: await handleUpdateTestSuite(params) }],
       };
     })
   );
@@ -981,7 +1057,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_get_simulation_run",
-    "Get full details of a simulation run including conversation messages, results, costs, and verdict.",
+    "Get full details of a simulation run including conversation messages, results, costs, the verdict and the result of every evaluator attached to its test suite or run plan.",
     {
       scenarioRunId: z.string().describe("The simulation run ID"),
       format: z.enum(["digest", "json"]).optional().describe("Output format"),

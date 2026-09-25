@@ -61,10 +61,14 @@ export class LangWatchQLNotEnabledError extends HandledError {
  *
  * Two ways to arrive here, one condition: the deployment configured no
  * restricted identity at all (no executor is built), or it configured one but
- * the database objects the catalog promises — the views, the grants — are not
- * there for it (the server answers UNKNOWN_TABLE / UNKNOWN_DATABASE /
- * ACCESS_DENIED for a name the validator already approved, so it cannot be
- * the caller's SQL; see `executor.ts`).
+ * the database objects the catalog promises are not there at all for it (the
+ * server answers UNKNOWN_TABLE / UNKNOWN_DATABASE for a name the validator
+ * already approved, so it cannot be the caller's SQL; see `executor.ts`).
+ *
+ * An ACCESS_DENIED refusal is deliberately NOT one of the two — that means
+ * the objects exist but this identity's grants on one are incomplete, a
+ * narrower condition than "not provisioned" that gets its own code and copy:
+ * {@link LangWatchQLProvisioningIncompleteError}.
  *
  * Fail-closed, and the reason this is an error rather than a fallback: without
  * the restricted identity there is no identity to run a customer's SQL as
@@ -144,6 +148,88 @@ export class LangWatchQLUnknownIdentifierError extends HandledError {
 }
 
 /**
+ * The execution path IS provisioned — the restricted identity connects, and
+ * the catalog's views and tables mostly exist for it — but this query hit a
+ * ClickHouse access refusal (`ACCESS_DENIED`) rather than a missing object
+ * (`UNKNOWN_TABLE` / `UNKNOWN_DATABASE`).
+ *
+ * Split from {@link LangWatchQLUnavailableError} on purpose: that code's copy
+ * tells the caller to ask their *own* workspace administrator, which is
+ * correct for a self-hosted deployment that never provisioned LangWatchQL at
+ * all, but wrong here — an access refusal on an otherwise-working deployment
+ * means our own grants are incomplete for one catalog object, something no
+ * customer's administrator can act on. Sending them to their admin anyway
+ * both wastes their time and hides a real provisioning gap behind "config the
+ * customer owns."
+ *
+ * Still `platform` fault, 503, and still fail-closed for the same reason:
+ * ACCESS_DENIED for a name the validator already approved cannot be the
+ * caller's SQL (see `executor.ts`), and it is not safe to retry as a
+ * different identity.
+ */
+export class LangWatchQLProvisioningIncompleteError extends HandledError {
+  declare readonly code: "lwql_provisioning_incomplete";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super(
+      "lwql_provisioning_incomplete",
+      "The LangWatchQL analytics SQL API could not read one of the datasets this query needs.",
+      {
+        httpStatus: 503,
+        fault: "platform",
+        ...remediation("lwql_provisioning_incomplete"),
+        ...options,
+      },
+    );
+    this.name = "LangWatchQLProvisioningIncompleteError";
+  }
+}
+
+/**
+ * The finished result is larger than the byte ceiling the API serialises.
+ *
+ * A hard refusal rather than a silent cut: a JSON body that looks whole but is
+ * missing its tail is the worse failure for an analytics caller, so the result
+ * is refused outright and the caller told how to bring it under the cap — fewer
+ * columns, or a smaller `LIMIT`. The row cap is enforced separately, by the
+ * `LIMIT` the service appends to a bare statement; this is the ceiling a query
+ * can still exceed inside that row count when its columns are wide.
+ *
+ * `customer` fault, 413: nothing the platform did causes it and the caller can
+ * act on it, so it earns no incident.
+ */
+export class LangWatchQLResultTooLargeError extends HandledError {
+  declare readonly code: "lwql_result_too_large";
+
+  constructor(
+    /** The byte ceiling the result exceeded — the caller's target to get under. */
+    maxResultBytes: number,
+    /**
+     * The raw ClickHouse error, present when this was raised from the
+     * server's own `max_result_rows` / `max_result_bytes` backstop
+     * (TOO_MANY_ROWS_OR_BYTES) rather than the post-fetch byte check — carried
+     * for the operator's logs and never relayed to the caller.
+     */
+    options: { reasons?: readonly Error[] } = {},
+  ) {
+    super(
+      "lwql_result_too_large",
+      "The result is larger than this API returns in one response.",
+      {
+        httpStatus: 413,
+        fault: "customer",
+        // Named consumer: the agent that wrote the SQL, which needs the cap it
+        // overshot to decide how much to narrow the query by.
+        meta: { maxResultBytes },
+        ...remediation("lwql_result_too_large"),
+        ...options,
+      },
+    );
+    this.name = "LangWatchQLResultTooLargeError";
+  }
+}
+
+/**
  * The query declares a bound parameter the request supplied no value for.
  *
  * Caught at the gateway rather than left to the database: ClickHouse answers a
@@ -175,7 +261,7 @@ export class LangWatchQLParameterMissingError extends HandledError {
 
 /**
  * The refusal sentence for exactly the names the request carried, agreeing in
- * number so a single supplied name does not read as "values for period_start".
+ * number so a single supplied name does not read as "values for dashboard_context_period_start".
  *
  * Built from the supplied names rather than a fixed phrase because the same
  * code covers the two window bounds and the granularity step, and naming the
@@ -196,7 +282,7 @@ function suppliedParameterSentence(supplied: readonly string[]): string {
 /**
  * The request carried a value for a parameter the surface owns.
  *
- * `period_start`, `period_end` and `period_granularity_seconds` are supplied by
+ * `dashboard_context_period_start`, `dashboard_context_period_end` and `dashboard_context_granularity_seconds` are supplied by
  * whatever is showing the chart — the dashboard's period and step, the
  * workbench's page period — and a caller that sets one is pinning something
  * that will then ignore the surface it sits on. Refused rather than
@@ -305,7 +391,7 @@ export class LangWatchQLReservedGranularityTypeError extends HandledError {
       "lwql_granularity_parameter_type",
       fault === "step-value"
         ? "The datapoint granularity must be one of the offered steps: 1 second, 1 minute, or 1 hour."
-        : "The query declares period_granularity_seconds with a type that is not UInt32.",
+        : "The query declares dashboard_context_granularity_seconds with a type that is not UInt32.",
       {
         httpStatus: 400,
         fault: "customer",
@@ -359,7 +445,7 @@ export class LangWatchQLGranularityTooFineError extends HandledError {
 }
 
 /**
- * A statement declared `period_granularity_seconds` without a usable period
+ * A statement declared `dashboard_context_granularity_seconds` without a usable period
  * window for the bucket budget to be computed against -- either bound absent,
  * or present but declared as something other than a date-time.
  *
@@ -370,7 +456,7 @@ export class LangWatchQLGranularityTooFineError extends HandledError {
  * the fix, and the schema browser spells them.
  *
  * The two causes get different copy. Telling an author to declare
- * `period_start` when it is on screen, declared `String`, sends them looking
+ * `dashboard_context_period_start` when it is on screen, declared `String`, sends them looking
  * for a line that is already there.
  */
 export class LangWatchQLGranularityRequiresTimeWindowError extends HandledError {
@@ -388,8 +474,8 @@ export class LangWatchQLGranularityRequiresTimeWindowError extends HandledError 
     super(
       "lwql_granularity_requires_window",
       mistyped.length > 0 && absent.length === 0
-        ? "A chart declaring period_granularity_seconds must declare period_start and period_end as DateTime."
-        : "A chart declaring period_granularity_seconds must also declare period_start and period_end.",
+        ? "A chart declaring dashboard_context_granularity_seconds must declare dashboard_context_period_start and dashboard_context_period_end as DateTime."
+        : "A chart declaring dashboard_context_granularity_seconds must also declare dashboard_context_period_start and dashboard_context_period_end.",
       {
         httpStatus: 400,
         fault: "customer",
@@ -400,5 +486,151 @@ export class LangWatchQLGranularityRequiresTimeWindowError extends HandledError 
       },
     );
     this.name = "LangWatchQLGranularityRequiresTimeWindowError";
+  }
+}
+
+/**
+ * The statement's app functions would need more distinct keys than one
+ * execution may hydrate.
+ *
+ * A refusal rather than a partial answer, and that is the whole decision. The
+ * alternative — hydrate the first thousand keys and leave the rest as raw ids —
+ * produces a result that looks complete, carries no marker a consumer could
+ * branch on, and is wrong. An analytics caller cannot detect that; they can
+ * detect a 422 naming the cap.
+ *
+ * Remediation is arithmetic: lower the `LIMIT`, aggregate to fewer keys, or
+ * page with a keyset predicate on the dataset's time column and trace id.
+ */
+export class LangWatchQLAppFunctionKeyCapError extends HandledError {
+  declare readonly code: "lwql_app_function_key_cap";
+
+  constructor({
+    keyKind,
+    cap,
+    distinct,
+    functions,
+  }: {
+    /** Which cap this is: `trace`, `thread` or `span`. */
+    readonly keyKind: string;
+    readonly cap: number;
+    /** How many distinct keys of that kind the result carried. */
+    readonly distinct: number;
+    /** The functions of that kind the statement called. Sorted by the caller. */
+    readonly functions: readonly string[];
+  }) {
+    super(
+      "lwql_app_function_key_cap",
+      "The query asks for more conversations, traces or spans than one run may read. Narrow it with a smaller LIMIT or a coarser grouping.",
+      {
+        httpStatus: 422,
+        fault: "customer",
+        // Named consumer: the agent that wrote the SQL, which needs the number
+        // to lower its own LIMIT to, and the functions to know which call cost
+        // it. Nothing here is internal: the caps are published by the schema
+        // endpoint.
+        meta: { keyKind, cap, distinct, functions },
+        ...remediation("lwql_app_function_key_cap"),
+      },
+    );
+    this.name = "LangWatchQLAppFunctionKeyCapError";
+  }
+}
+
+/**
+ * The traces the statement's app functions named hold more bytes than one
+ * hydration may read.
+ *
+ * The key cap bounds how many traces a run names; this bounds what they weigh.
+ * A thousand keys under the cap can still name a thousand multi-megabyte
+ * traces, and reading them all before the result ceiling drops the rows would
+ * hold every one of them in memory first. So the reads are chunked and stop at
+ * the budget, and the refusal names it, for the same reason the key cap is a
+ * refusal rather than a partial answer.
+ */
+export class LangWatchQLAppFunctionReadBudgetError extends HandledError {
+  declare readonly code: "lwql_app_function_read_budget";
+
+  constructor({
+    budgetBytes,
+    readBytes,
+  }: {
+    /** The budget one hydration may read, in bytes. */
+    readonly budgetBytes: number;
+    /** How many bytes had been read when the budget was passed. */
+    readonly readBytes: number;
+  }) {
+    super(
+      "lwql_app_function_read_budget",
+      "The query asks for more trace content than one run may read. Narrow it with a smaller LIMIT or run it in pages.",
+      {
+        httpStatus: 422,
+        fault: "customer",
+        // Named consumer: the agent that wrote the SQL, which needs the budget
+        // to size its pages by. Both numbers are about the caller's own data.
+        meta: { budgetBytes, readBytes },
+        ...remediation("lwql_app_function_read_budget"),
+      },
+    );
+    this.name = "LangWatchQLAppFunctionReadBudgetError";
+  }
+}
+
+/**
+ * The query ran, but the values its app functions asked for could not be read
+ * or computed.
+ *
+ * `platform` fault and a 503 on purpose: the statement passed every gate and
+ * the caller wrote nothing wrong, so this is a failure of ours — and the one
+ * thing it must never do is degrade into a result with null columns, which
+ * would read as "these conversations are empty".
+ */
+export class LangWatchQLAppFunctionHydrationFailedError extends HandledError {
+  declare readonly code: "lwql_app_function_hydration_failed";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super(
+      "lwql_app_function_hydration_failed",
+      "The query ran, but the conversation or trace content it asked for could not be read.",
+      {
+        httpStatus: 503,
+        fault: "platform",
+        ...remediation("lwql_app_function_hydration_failed"),
+        ...options,
+      },
+    );
+    this.name = "LangWatchQLAppFunctionHydrationFailedError";
+  }
+}
+
+/**
+ * The server does not hold the projection UDF behind an app function.
+ *
+ * ClickHouse answers UNKNOWN_FUNCTION (46), which cannot be the caller's SQL:
+ * the validator admits app-function names from the catalog alone, and the
+ * catalog is what the provisioning statements are generated from. So the
+ * deployment's app functions were never applied — a self-provisioning boot that
+ * degraded, or a server provisioned before this feature existed.
+ *
+ * A sibling of {@link LangWatchQLProvisioningIncompleteError} with its own code
+ * because the copy differs: that one is about a dataset's grants, and telling a
+ * caller their query "could not read one of its datasets" for a missing
+ * function sends whoever reads the log to the wrong place.
+ */
+export class LangWatchQLAppFunctionUnavailableError extends HandledError {
+  declare readonly code: "lwql_app_function_unavailable";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super(
+      "lwql_app_function_unavailable",
+      "The functions this query uses are not available on this deployment yet.",
+      {
+        httpStatus: 503,
+        fault: "platform",
+        ...remediation("lwql_app_function_unavailable"),
+        ...options,
+      },
+    );
+    this.name = "LangWatchQLAppFunctionUnavailableError";
   }
 }

@@ -34,14 +34,16 @@ import {
   toError,
   withScope,
 } from "~/utils/posthogErrorCapture";
+import { azureBillSourceId } from "../activity-monitor/azureBillIdentity";
 import { decryptCredentials } from "../activity-monitor/ingestionCredentials";
 import type { SourceType } from "../activity-monitor/ingestionSource.service";
+import { DirectoryDepartmentSyncService } from "../directoryDepartmentSync.service";
 import {
-  type GovernanceOcsfEventInput,
-  OCSF_ACTIVITY,
-  OCSF_SEVERITY,
-} from "../governanceOcsfEvents.clickhouse.repository";
+  loadErasureSuppression,
+  partitionSuppressedEvents,
+} from "../erasureSuppression.service";
 import { ensureHiddenGovernanceProject } from "../governanceProject.service";
+import { PersonDiscoveryService } from "../personDiscovery.service";
 import type {
   ConversationRoutingProfile,
   RoutingOrigin,
@@ -61,6 +63,7 @@ import {
   pullerAdapterRegistry,
   registerBuiltInPullers,
 } from "./index";
+import { mapToOcsfRow } from "./ocsfPullEventMapping";
 import { buildPulledUsageRecord } from "./pulledUsageRecord";
 
 const logger = createLogger("langwatch:workers:ingestionPuller");
@@ -136,6 +139,22 @@ export interface PulledUsageDispatcher {
       occurredAt: number;
     },
   ): Promise<void>;
+}
+
+/**
+ * The identity-match engine, as the pull run is allowed to know it (ADR-128
+ * §12). A port rather than an import: the suggestion half scores names —
+ * quadratic, gated off every request path by the import-graph guard next to
+ * the engine — and this worker is statically reachable from the ops router
+ * through the pipeline registry. The composition root builds the
+ * implementation on the worker role and hands it in; this file never names
+ * the scorer.
+ *
+ * Optional. Without it discovery still records people; the review queue just
+ * waits for a process that composes the engine.
+ */
+export interface DiscoveredPeopleMatcher {
+  runFor(args: { organizationId: string }): Promise<void>;
 }
 
 /**
@@ -288,11 +307,15 @@ function assertRunMadeProgress(params: {
   );
 }
 
-export async function runIngestionPull(params: {
-  sourceId: string;
-  cursor: string | null;
-  pulledUsage?: PulledUsageDispatcher;
-}): Promise<{
+/**
+ * What one pull run reports back to whoever asked for it.
+ *
+ * Named a report rather than an outcome because `IngestionPullRunOutcome` in
+ * the pipeline's own constants is already taken, and means something
+ * narrower: the single word "completed" or "failed" that lands on the
+ * run-status row. This is the whole of what the run has to say.
+ */
+export type IngestionPullRunReport = {
   nextCursor: string | null;
   eventCount: number;
   /**
@@ -301,7 +324,75 @@ export async function runIngestionPull(params: {
    * instead of returning, so a nonzero value here always means partial success.
    */
   errorCount: number;
-}> {
+  /**
+   * Whether the run reached the end of what it set out to read.
+   *
+   * Carried up from the adapter unchanged. A truncated run is NOT a failed
+   * one: the money and audit rows it gathered are written and its cursor
+   * advances, so `errorCount` stays zero and this is the only thing that
+   * distinguishes a source permanently stuck on a fraction of its data from a
+   * healthy quiet one. Adapters that say nothing read as complete.
+   */
+  completeness: "complete" | "truncated";
+  /**
+   * Set when the adapter banked progress over a page it could not read at all.
+   *
+   * Carried up unchanged, and absent stays absent. It is what lets the run
+   * status count the failure while keeping the advance: a completion is the
+   * only way the banked events and cursor survive, so without this the source
+   * would read as working while collecting a fraction of its window.
+   */
+  unreadPage?: true;
+  /**
+   * The instant the source is known to have been read up to, or null when the
+   * adapter states none.
+   *
+   * Deliberately NOT the instant the run finished. The run clock advances on
+   * every attempt, so a stuck source re-reading the same half would look like
+   * steady progress to anything reasoning from it.
+   */
+  readThroughAt: Date | null;
+};
+
+/**
+ * The outcome a source that is not currently pulling reports, or null when it
+ * is pulling and the run should go ahead.
+ *
+ * A paused or archived source is not a failure and not an empty read: it is a
+ * run that never started. Reporting it as complete with the incoming cursor
+ * untouched is what keeps a pause from moving the source's position, and
+ * `readThroughAt` null is what keeps it from claiming it read up to now.
+ */
+function outcomeForSourceNotPulling({
+  status,
+  ingestionSourceId,
+  cursor,
+}: {
+  status: string;
+  ingestionSourceId: string;
+  cursor: string | null;
+}): IngestionPullRunReport | null {
+  if (status === "active" || status === "awaiting_first_event") return null;
+  logger.info(
+    { ingestionSourceId, status },
+    "IngestionSource not active, skipping",
+  );
+  return {
+    nextCursor: cursor,
+    eventCount: 0,
+    errorCount: 0,
+    // Nothing was read, so nothing was left half-read either.
+    completeness: "complete",
+    readThroughAt: null,
+  };
+}
+
+export async function runIngestionPull(params: {
+  sourceId: string;
+  cursor: string | null;
+  pulledUsage?: PulledUsageDispatcher;
+  identityMatch?: DiscoveredPeopleMatcher;
+}): Promise<IngestionPullRunReport> {
   registerBuiltInPullers();
 
   const ingestionSourceId = params.sourceId;
@@ -313,13 +404,12 @@ export async function runIngestionPull(params: {
   if (!source) {
     throw new Error(`IngestionSource ${ingestionSourceId} not found`);
   }
-  if (source.status !== "active" && source.status !== "awaiting_first_event") {
-    logger.info(
-      { ingestionSourceId, status: source.status },
-      "IngestionSource not active, skipping",
-    );
-    return { nextCursor: params.cursor, eventCount: 0, errorCount: 0 };
-  }
+  const notPulling = outcomeForSourceNotPulling({
+    status: source.status,
+    ingestionSourceId,
+    cursor: params.cursor,
+  });
+  if (notPulling !== null) return notPulling;
 
   const pullConfig = (source.parserConfig ?? {}) as Record<string, unknown>;
   const { adapterId, adapter, validatedConfig } = resolvePullAdapter({
@@ -351,6 +441,10 @@ export async function runIngestionPull(params: {
       events: result.events,
       source,
       pulledUsage: params.pulledUsage,
+      identityMatch: params.identityMatch,
+      // Same default as the run report takes below: an adapter that says
+      // nothing is claiming it read to the end of its window.
+      completeness: result.completeness ?? "complete",
     });
     logger.info(
       {
@@ -377,17 +471,75 @@ export async function runIngestionPull(params: {
     nextCursor: result.cursor,
     eventCount: result.events.length,
     errorCount: result.errorCount,
+    completeness: result.completeness ?? "complete",
+    // Absent unless the adapter says so, for the reason the two fields above
+    // are optional: a report that invents an answer is worse than one that
+    // says nothing.
+    ...(result.unreadPage === true ? { unreadPage: true as const } : {}),
+    readThroughAt: readThroughInstant(result),
   };
+}
+
+/**
+ * The instant a run read through to.
+ *
+ * Three sources, in falling order of authority, and the ordering is the point.
+ *
+ * The adapter's own statement wins: it alone knows what its cursor means. Next
+ * comes the newest event this run actually emitted, which is a fact about the
+ * data rather than about the attempt — it does not move when a run stalls, so
+ * a source stuck re-reading the same half reports the same point every time,
+ * which is precisely how being stuck becomes visible. Only a run that reached
+ * the END falls through to the clock, and there it is not a guess: a complete
+ * read has been read through to now by definition.
+ *
+ * A truncated run that emitted nothing gets null. It read up to nowhere, and
+ * the clock would say otherwise.
+ */
+/**
+ * The newest timestamp among the events one run emitted, or null when it
+ * emitted none this run could read.
+ *
+ * Unreadable stamps are skipped rather than treated as the epoch: one adapter
+ * writing a malformed timestamp would otherwise drag the answer to 1970 and
+ * report the source as read through to a point half a century behind.
+ */
+function newestEventInstant(events: PullResult["events"]): Date | null {
+  let newestMs: number | null = null;
+  for (const event of events) {
+    const ms = Date.parse(event.event_timestamp);
+    if (Number.isNaN(ms)) continue;
+    if (newestMs === null || ms > newestMs) newestMs = ms;
+  }
+  return newestMs === null ? null : new Date(newestMs);
+}
+
+function readThroughInstant(result: PullResult): Date | null {
+  if (result.readThroughAt !== undefined) {
+    const stated = new Date(result.readThroughAt);
+    if (!Number.isNaN(stated.getTime())) return stated;
+  }
+
+  const newest = newestEventInstant(result.events);
+  if (newest !== null) return newest;
+
+  return (result.completeness ?? "complete") === "complete" ? new Date() : null;
 }
 
 /** The IngestionSource fields the write paths below actually read. */
 type PullingSource = {
   id: string;
+  parserConfig?: unknown;
   sourceType: string;
   organizationId: string;
   teamId: string | null;
+  /** ADR-129: the named-or-blank line compares against this, no stored field. */
+  createdAt: Date;
   /** ADR-088 v7: trace destination for conversation routing. Null = don't route. */
   traceProjectId: string | null;
+  /** ADR-088: the window already read without pricing. See `recordUnpricedUsageWindow`. */
+  unpricedUsageSince: Date | null;
+  unpricedUsageThrough: Date | null;
 };
 
 /**
@@ -410,10 +562,16 @@ async function writePulledEvents({
   events,
   source,
   pulledUsage,
+  identityMatch,
+  completeness,
 }: {
   events: NormalizedPullEvent[];
   source: PullingSource;
   pulledUsage?: PulledUsageDispatcher;
+  identityMatch?: DiscoveredPeopleMatcher;
+  /** Passed through untouched to `recordUnpricedUsageWindow`, which is the
+   * only decision here that turns on whether the run read to its end. */
+  completeness: "complete" | "truncated";
 }): Promise<void> {
   const govProject = await ensureHiddenGovernanceProject(
     prisma,
@@ -441,24 +599,179 @@ async function writePulledEvents({
   // from the same pull disagreeing about when they were observed could order a
   // corrected figure behind the one it corrects.
   const observedAt = new Date();
-  for (const event of events) {
-    await ocsfRepo.insertEvent(
-      mapToOcsfRow({
-        event,
-        tenantId: govProject.id,
-        ingestionSourceId: source.id,
-        sourceType: source.sourceType,
-      }),
+  // The do-not-reimport list, resolved once per run for the same reason the
+  // cost flag above is. Without this check the pullers undo every erasure on
+  // their next pass: each re-reads a window behind its own watermark so a
+  // restated figure is not missed, so an actor erased today is re-read and
+  // re-written on the next run (ADR-128 §9 step 1). `event.actor` is what
+  // becomes the audit row's actor — `ActorEmail` when it is an address and
+  // `ActorUserId` when it is anything else (`ocsfActorFields`) — and rides
+  // inside the raw OCSF payload, and it is the actor id the cost record
+  // carries. One check covers every one of those writes because a suppressed
+  // event is not written at all rather than written and erased again later.
+  const suppression = await loadErasureSuppression({
+    prisma,
+    organizationId: source.organizationId,
+    provider: source.sourceType,
+  });
+  const { kept, suppressedCount } = partitionSuppressedEvents({
+    events,
+    actorOf: (event) => event.actor,
+    suppression,
+  });
+  const { droppedPeriodsMs, recordedPeriodsMs } = await writeAuditAndUsageRows({
+    kept,
+    source,
+    govProjectId: govProject.id,
+    observedAt,
+    ocsfRepo,
+    pulledUsage,
+    costRecordingEnabled,
+  });
+  await recordUnpricedUsageWindow({
+    source,
+    droppedPeriodsMs,
+    recordedPeriodsMs,
+    completeness,
+  });
+  if (suppressedCount > 0) {
+    // Worth a line: these are real provider rows this run deliberately did not
+    // store, so a total that looks short has an explanation here rather than
+    // looking like a pull that lost data.
+    logger.info(
+      { ingestionSourceId: source.id, suppressedCount },
+      "skipped pulled events naming an erased identifier",
     );
-    await recordPulledUsageFor({
+  }
+  const { discovered } = await syncPeopleFactsFromPull({
+    source,
+    events: kept,
+  });
+  // `kept`, not `events`. This is the export that leaves our storage entirely
+  // — it writes the conversation into the customer's own trace project, with
+  // the provider's user id on it and the question and answer in the spans. A
+  // suppressed person is suppressed here most of all.
+  await routeConversationsToTraceDestination({ events: kept, source });
+  // ADR-128 §12: the feed that discovers people is the engine's trigger.
+  // After routing, so a slow or failing pass never delays the export above.
+  if (discovered > 0 && identityMatch) {
+    try {
+      await identityMatch.runFor({ organizationId: source.organizationId });
+    } catch (error) {
+      logger.error(
+        { error: toError(error), ingestionSourceId: source.id },
+        "identity match pass failed; the discovered people are kept and the next pull retries",
+      );
+    }
+  }
+}
+
+/**
+ * The writes of one run: the kept events' OCSF audit rows in chunked inserts,
+ * then each event's usage record. Returns the priced periods split by whether
+ * the cost flag let them be stored — the dropped ones become the source's
+ * unpriced window, and the recorded ones are what later closes that window.
+ *
+ * One insert per chunk, not per row: the per-row loop awaited each statement
+ * in turn, but it still put ~150 of the ~2,600 statements a pull issues
+ * against a dev ClickHouse budgeted at 32 (#8064).
+ */
+async function writeAuditAndUsageRows({
+  kept,
+  source,
+  govProjectId,
+  observedAt,
+  ocsfRepo,
+  pulledUsage,
+  costRecordingEnabled,
+}: {
+  kept: NormalizedPullEvent[];
+  source: PullingSource;
+  govProjectId: string;
+  observedAt: Date;
+  ocsfRepo: NonNullable<ReturnType<typeof getApp>["governance"]["ocsfEvents"]>;
+  pulledUsage?: PulledUsageDispatcher;
+  costRecordingEnabled: boolean;
+}): Promise<{ droppedPeriodsMs: number[]; recordedPeriodsMs: number[] }> {
+  const droppedPeriodsMs: number[] = [];
+  const recordedPeriodsMs: number[] = [];
+  if (kept.length > 0) {
+    await ocsfRepo.insertEvents(
+      kept.map((event) =>
+        mapToOcsfRow({
+          event,
+          tenantId: govProjectId,
+          ingestionSourceId: source.id,
+          sourceType: source.sourceType,
+        }),
+      ),
+    );
+  }
+  for (const event of kept) {
+    const { pricedPeriodMs } = await recordPulledUsageFor({
       event,
       source,
-      govProjectId: govProject.id,
+      govProjectId,
       observedAt,
-      pulledUsage: costRecordingEnabled ? pulledUsage : undefined,
+      pulledUsage,
+      costRecordingEnabled,
     });
+    if (pricedPeriodMs !== null) {
+      (costRecordingEnabled ? recordedPeriodsMs : droppedPeriodsMs).push(
+        pricedPeriodMs,
+      );
+    }
   }
-  await routeConversationsToTraceDestination({ events, source });
+  return { droppedPeriodsMs, recordedPeriodsMs };
+}
+
+/**
+ * People and department facts, off one delivery's events.
+ *
+ * `events` must be the post-partition list — the caller's `kept`, never the
+ * raw pull: discovery running on the pre-partition list would re-create a
+ * plaintext person row for an erased identifier on the next re-read of the
+ * puller's lookback window (ADR-128 §9 step 1). And a discovery failure never costs the run
+ * its events — the next run sees the same actors again, while audit rows
+ * missed would be gone for good. Department facts ride the same directory
+ * events, behind the same partition, with the same isolation: the directory
+ * read runs again tomorrow, so a failed sync costs a day, never the run.
+ */
+async function syncPeopleFactsFromPull({
+  source,
+  events,
+}: {
+  source: PullingSource;
+  events: NormalizedPullEvent[];
+}): Promise<{ discovered: number }> {
+  let discovered = 0;
+  try {
+    ({ discovered } = await PersonDiscoveryService.create(
+      prisma,
+    ).recordFromPulledEvents({
+      organizationId: source.organizationId,
+      provider: source.sourceType,
+      events,
+    }));
+  } catch (error) {
+    logger.error(
+      { error: toError(error), ingestionSourceId: source.id },
+      "could not record discovered people; the pulled events are still delivered",
+    );
+  }
+  try {
+    await DirectoryDepartmentSyncService.create(prisma).applyDirectoryEvents({
+      organizationId: source.organizationId,
+      provider: source.sourceType,
+      events,
+    });
+  } catch (error) {
+    logger.error(
+      { error: toError(error), ingestionSourceId: source.id },
+      "could not apply directory departments; the pulled events are still delivered",
+    );
+  }
+  return { discovered };
 }
 
 /**
@@ -705,25 +1018,48 @@ async function recordPulledUsageFor({
   govProjectId,
   observedAt,
   pulledUsage,
+  costRecordingEnabled,
 }: {
   event: NormalizedPullEvent;
   source: PullingSource;
   govProjectId: string;
   observedAt: Date;
   pulledUsage?: PulledUsageDispatcher;
-}): Promise<void> {
-  if (!pulledUsage) return;
+  /**
+   * Whether the organization's pulled cost is allowed to be stored. False
+   * still maps the event: the caller has to know a price WAS on the table to
+   * record that this run dropped it, and the mapping is pure — the only cost
+   * of doing it anyway is arithmetic the run was about to skip.
+   */
+  costRecordingEnabled: boolean;
+}): Promise<{
+  /**
+   * The bucket instant of the price this event carried, or null when it
+   * carried none. Reported whether or not the price was stored — a dropped
+   * price is exactly what the caller needs to hear about.
+   */
+  pricedPeriodMs: number | null;
+}> {
+  if (!pulledUsage) return { pricedPeriodMs: null };
 
   let record: ReturnType<typeof buildPulledUsageRecord>;
   try {
     record = buildPulledUsageRecord({
       event,
       source: {
-        ingestionSourceId: source.id,
+        // Only the subscription bill shares history with a retired source.
+        // Conversation usage and audit records keep the current source id.
+        ingestionSourceId:
+          source.sourceType === "copilot_studio_dataverse" &&
+          event.source_event_id.startsWith("azure_cost:")
+            ? azureBillSourceId(source)
+            : source.id,
         sourceType: source.sourceType,
         organizationId: source.organizationId,
         teamId: source.teamId,
+        createdAt: source.createdAt,
       },
+      governanceProjectId: govProjectId,
       observedAt,
     });
   } catch (error) {
@@ -740,94 +1076,133 @@ async function recordPulledUsageFor({
       scope.setExtra?.("ingestionSourceId", source.id);
       captureException(toError(error));
     });
-    return;
+    return { pricedPeriodMs: null };
   }
 
   // Not a usage item — an ordinary audit event, and there was never a cost.
-  if (!record) return;
+  if (!record) return { pricedPeriodMs: null };
+
+  // The price existed either way; only storing it is gated.
+  if (!costRecordingEnabled) {
+    return { pricedPeriodMs: record.occurredAtMs };
+  }
 
   await pulledUsage.recordPulledUsage({
     ...record,
     tenantId: govProjectId,
     occurredAt: record.occurredAtMs,
   });
+  return { pricedPeriodMs: record.occurredAtMs };
 }
 
 /**
- * Map a NormalizedPullEvent to a GovernanceOcsfEventInput row. Each
- * pull event becomes ONE OCSF row (ClassUid 6003 / API Activity, with
- * ActivityId INVOKE for completion-style events). The raw_payload is
- * preserved verbatim under metadata.extension.raw_event so SIEM
- * consumers can still drill back to the source-of-truth bytes.
+ * Remembers the window this source read but was not allowed to price, and
+ * forgets it once a later run has read back across the whole of it.
  *
- * EventId includes the source id so two same-type sources cannot collide.
+ * The pull cursor advances whether or not the money path is live, because
+ * audit-only is a supported mode — a source whose organization leaves
+ * `release_pulled_usage_cost_enabled` off is working as configured, and
+ * holding its cursor still would re-read one window forever instead of
+ * following the provider. The consequence is that turning the flag on later
+ * recovers nothing by itself: every day already pulled has an audit row, no
+ * price, and no way to tell the two apart from a day that genuinely cost
+ * nothing. Recording the window is what makes that difference sayable — the
+ * cost screen reads it and reports those days as unknown rather than zero.
  *
- * `tenantId` MUST be the hidden internal_governance Project ID for the
- * org — same key the trace-fold subscriber and OCSF export service use.
- * Resolved by the worker before this is called.
+ * Widen-only while the flag is off: a run that drops a price can only ever
+ * extend the window, never shrink it, so a short run in the middle of a gap
+ * cannot make the gap look smaller than it is.
+ *
+ * Clearing is deliberately all-or-nothing. A run that prices a period at or
+ * before the start of the gap has re-read every later day in it too, so
+ * reaching back past the start is evidence the whole gap was re-priced. A
+ * partial re-read leaves the window alone: half a repair is not a repair, and
+ * narrowing it would claim days that were never re-priced.
+ *
+ * AND ONLY IF THE RUN THAT REACHED BACK RAN TO ITS END. The evidence above
+ * assumes the read covered its whole window, and a truncated one did not.
+ * Adapters that own their cost read walk the bill oldest-first — anthropic and
+ * openai resume from a high-water mark and page forward, the polling adapters
+ * the same — so a run cut off by its page limit or by the clock emits exactly
+ * the earliest days, which are the ones that satisfy the test above, and never
+ * reaches the tail of the gap it would be credited with repairing. Clearing
+ * there forgets a loss that is still present, and nothing reopens it: the
+ * window is the source's only memory of those days, so once dropped they read
+ * as free from then on.
+ *
+ * An earlier version of this comment justified the clear by claiming the cost
+ * adapters re-read a whole trailing window from the source's start date. They
+ * do not: `anthropicAdmin` advances its cursor to the newest instant it
+ * emitted and the window start only ever moves forward. The lookbacks are
+ * three days, or seven — bounded, and unrelated to where the gap begins.
+ *
+ * ONE ADAPTER IS NOT COVERED. `copilotStudioDataverse` takes its completeness
+ * from the transcript walk while its cost half advances independently, so a
+ * truncated cost read there can still report a complete run. That is
+ * over-inclusive in the safe direction — the window is kept when it might have
+ * been cleared — and it is a separate defect from this one.
  */
-function mapToOcsfRow({
-  event,
-  tenantId,
-  ingestionSourceId,
-  sourceType,
+async function recordUnpricedUsageWindow({
+  source,
+  droppedPeriodsMs,
+  recordedPeriodsMs,
+  completeness,
 }: {
-  event: NormalizedPullEvent;
-  tenantId: string;
-  ingestionSourceId: string;
-  sourceType: string;
-}): GovernanceOcsfEventInput {
-  const eventTime = new Date(event.event_timestamp);
-  const safeEventTime = Number.isFinite(eventTime.getTime())
-    ? eventTime
-    : new Date();
-  const eventId = `${sourceType}:${ingestionSourceId}:${event.source_event_id}`;
-  const occurredAtMs = safeEventTime.getTime();
-  const rawOcsfJson = JSON.stringify({
-    class_uid: 6003,
-    category_uid: 6,
-    activity_id: OCSF_ACTIVITY.INVOKE,
-    type_uid: 6003 * 100 + OCSF_ACTIVITY.INVOKE,
-    severity_id: OCSF_SEVERITY.INFO,
-    time: occurredAtMs,
-    actor: {
-      user: { uid: "", email_addr: event.actor },
-      enduser: { uid: "" },
-    },
-    api: { operation: event.action },
-    dst_endpoint: { name: event.target },
-    metadata: {
-      product: { name: "LangWatch", vendor_name: "LangWatch" },
-      extension: {
-        uid: "langwatch.governance",
-        source_type: sourceType,
-        source_id: ingestionSourceId,
-        ingest_mode: "pull",
-        cost_usd: event.cost_usd,
-        tokens_input: event.tokens_input,
-        tokens_output: event.tokens_output,
-        raw_event: event.raw_payload,
-        ...(event.extra ?? {}),
+  source: PullingSource;
+  droppedPeriodsMs: number[];
+  recordedPeriodsMs: number[];
+  /** Whether the run that produced these periods read to the end of its window. */
+  completeness: "complete" | "truncated";
+}): Promise<void> {
+  if (droppedPeriodsMs.length > 0) {
+    const since = new Date(Math.min(...droppedPeriodsMs));
+    const through = new Date(Math.max(...droppedPeriodsMs));
+    const widened = {
+      unpricedUsageSince: earliest(source.unpricedUsageSince, since),
+      unpricedUsageThrough: latest(source.unpricedUsageThrough, through),
+    };
+    logger.warn(
+      {
+        ingestionSourceId: source.id,
+        organizationId: source.organizationId,
+        droppedCount: droppedPeriodsMs.length,
+        unpricedSince: widened.unpricedUsageSince.toISOString(),
+        unpricedThrough: widened.unpricedUsageThrough.toISOString(),
       },
-    },
+      "pulled cost recording is off for this organization — audit rows landed but this run's spend was not priced",
+    );
+    await prisma.ingestionSource.update({
+      where: { id: source.id },
+      data: widened,
+    });
+    return;
+  }
+
+  const gapStart = source.unpricedUsageSince;
+  if (!gapStart || recordedPeriodsMs.length === 0) return;
+  if (Math.min(...recordedPeriodsMs) > gapStart.getTime()) return;
+  if (completeness === "truncated") {
+    logger.info(
+      { ingestionSourceId: source.id },
+      "a re-read reached back across the unpriced window but stopped short of its end; the window is kept",
+    );
+    return;
+  }
+
+  logger.info(
+    { ingestionSourceId: source.id },
+    "a re-read reached back across the unpriced window; its spend is priced again",
+  );
+  await prisma.ingestionSource.update({
+    where: { id: source.id },
+    data: { unpricedUsageSince: null, unpricedUsageThrough: null },
   });
-  return {
-    tenantId,
-    eventId,
-    // Pull events are atomic — synthesize a stable trace id from the
-    // event id so SIEM-side pivot ("show me this trace") still works.
-    traceId: `pull:${eventId}`,
-    sourceId: ingestionSourceId,
-    sourceType,
-    activityId: OCSF_ACTIVITY.INVOKE,
-    severityId: OCSF_SEVERITY.INFO,
-    eventTime: safeEventTime,
-    actorUserId: "",
-    actorEmail: event.actor,
-    actorEnduserId: "",
-    actionName: event.action,
-    targetName: event.target,
-    anomalyAlertId: "",
-    rawOcsfJson,
-  };
+}
+
+function earliest(existing: Date | null, candidate: Date): Date {
+  return existing && existing < candidate ? existing : candidate;
+}
+
+function latest(existing: Date | null, candidate: Date): Date {
+  return existing && existing > candidate ? existing : candidate;
 }

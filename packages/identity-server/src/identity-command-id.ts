@@ -34,6 +34,23 @@ export function adoptAccountCommandId({
   return `backfill:${accountId}`;
 }
 
+/**
+ * Adopting the NATIVE identifier an Auth0-brokered `Account` row implies
+ * (D09): the compound subject names the upstream provider, and this states
+ * the same row's fact under that provider's own key. Keyed on both the
+ * source row and the derived provider, so the broker identifier's own
+ * adoption (`adoptAccountCommandId`) and this stay two commands.
+ */
+export function adoptDerivedAccountCommandId({
+  accountId,
+  providerId,
+}: {
+  accountId: string;
+  providerId: string;
+}): string {
+  return `backfill:derived:${accountId}:${providerId}`;
+}
+
 /** Adopting the identifier `User.email` implies. */
 export function adoptUserEmailCommandId({
   userId,

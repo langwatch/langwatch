@@ -69,6 +69,12 @@ clickhouse:
     size: 1Gi
   auth:
     password: "e2etest"
+  # LangWatchQL is not configured here on purpose: the app self-provisions the
+  # whole access model — including the lwql_postgres named collection and the
+  # lwql_ro PostgreSQL reader — from CLICKHOUSE_URL/DATABASE_URL at boot, the
+  # single-replica scenario asserts (specs/lwql/api.feature). The e2e reads an
+  # approved view through the collection after provisioning, so it dials
+  # PostgreSQL as lwql_ro for real, not just against rendered config.
 
 # ── PostgreSQL ─────────────────────────────────────────────────────────────────
 postgresql:

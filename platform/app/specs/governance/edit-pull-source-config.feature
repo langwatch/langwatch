@@ -36,16 +36,19 @@ Feature: Edit the configuration of a pull-mode ingestion source
 
   Rule: Adapter settings are validated before they reach the database
 
-    Scenario: A backfill start date is normalized before saving
-      When the admin enters a backfill start of "2026-08-01"
+    Scenario: A date read from history is normalized before saving
+      When the admin picks a "Read history from" date of "2026-08-01"
       And saves the form
-      Then the stored backfill start is a timezone-carrying instant
+      Then the stored start is a timezone-carrying instant
 
-    Scenario: An invalid bucket width is rejected at save time
-      When the admin enters a bucket width of "5m"
-      And saves the form
-      Then the form reports the value as invalid
-      And the source configuration is left unchanged
+    # The adapter reads usage in daily buckets and prices cost in daily
+    # buckets, so a width is a question with one answer. Asking it only gave
+    # an admin a way to answer it wrongly and have the save refused.
+
+    Scenario: The bucket width is decided for the admin, not asked of them
+      When the admin opens the edit form
+      Then no bucket width field is shown
+      And saving a usage source stores a bucket width of "1d"
 
     Scenario: An invalid cron expression is rejected at save time
       When the admin enters a pull schedule of "not a cron"
@@ -55,26 +58,39 @@ Feature: Edit the configuration of a pull-mode ingestion source
 
   Rule: A setting that can no longer take effect is not offered as editable
 
-    # The usage cursor deliberately never rewinds, so a backfill start edited
+    # The usage cursor deliberately never rewinds, so a start date edited
     # after the first successful run is accepted and then ignored. An input
-    # that silently does nothing is worse than no input.
+    # that silently does nothing is worse than no input. The cost cursor is a
+    # different animal: it binds the start into its own identity, so moving
+    # the start there is the deliberate lever for repairing wrong figures and
+    # locking it would hide the only repair an admin has.
 
-    Scenario: Backfill start is editable before the source has run
+    Scenario: The start date is editable before the source has run
       Given the source has not yet completed a pull
       When the admin opens the edit form
-      Then the backfill start is editable
+      Then "Read history from" is editable
 
-    Scenario: Backfill start is not editable once the cursor has moved
+    Scenario: A usage source's start date is fixed once the cursor has moved
       Given the source has completed at least one pull
       When the admin opens the edit form
-      Then the backfill start is shown but cannot be changed
-      And the form explains that the cursor has already moved past it
+      Then "Read history from" is shown but cannot be changed
+      And the drawer title carries an information marker explaining why
+      # The explanation sits behind that marker rather than as a paragraph
+      # under the fields, where three of them pushed the fields below the
+      # fold. See dev/docs/best_practices/copywriting.md.
+
+    Scenario: A cost source's start date stays editable after it has pulled
+      Given the source reads the cost report
+      And the source has completed at least one pull
+      When the admin opens the edit form
+      Then "Read history from" is editable
+      And the marker says moving it re-reads and restates cost history
 
   Rule: The report kind is fixed once a source has pulled
 
     # The adapter's two reports price the same spend twice over, and its own
     # header states the rule as "Never both". A changed report no longer
-    # matches the stored cursor, so the new report replays from the backfill
+    # matches the stored cursor, so the new report replays from the configured
     # start and its events land beside the old ones under different ids —
     # nothing collides, nothing complains, and the same money is counted twice.
 

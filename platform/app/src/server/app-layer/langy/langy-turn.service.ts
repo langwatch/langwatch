@@ -43,7 +43,12 @@ import {
   resolveLangyPrompt,
 } from "~/server/app-layer/langy/langyPromptRegistry";
 import type { LangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
-import { renderLangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
+import {
+  disabledSkillIds,
+  renderLangyTurnContext,
+  skillGateFlagFor,
+  skillGateFlags,
+} from "~/server/app-layer/langy/langyTurnContext.schema";
 import type { LangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import type {
   LangyMessageRepository,
@@ -55,9 +60,11 @@ import type { LangyTurnAccessStore } from "~/server/app-layer/langy/streaming/la
 import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import type { Session } from "~/server/auth";
 import { featureFlagService } from "~/server/featureFlag";
+import type { FeatureFlagKey } from "~/server/featureFlag/registry";
 import { cancelLocalWorkForTurn } from "~/server/langy-local-control/runtime";
 import { getLangyTurnsCounter } from "~/server/metrics";
 import type { PromptService } from "~/server/prompt-config/prompt.service";
+import { LANGY_SKILLS } from "~/shared/langy/langySkills";
 import {
   LangyAgentUnavailableError,
   LangyConversationNotOwnedError,
@@ -66,15 +73,20 @@ import {
   LangyInsufficientScopeError,
   LangyModelNotAllowedError,
   LangyModelNotConfiguredError,
+  LangySkillNotAvailableError,
   LangyTurnInProgressError,
   LangyTurnNotStoppableError,
 } from "./errors";
 import type { LangyConversationService } from "./langy-conversation.service";
 import { buildFinalAssistantParts } from "./langy-final-parts";
+import {
+  type GuidedKickoffFactsPort,
+  settleGuidedKickoffMessage,
+} from "./langy-guided-kickoff";
 import { extractTextFromParts } from "./langy-message.service";
 import { LangyTurnAttempt } from "./langy-turn-attempt";
 import { resolveLangyTurnBaseDependencies } from "./langy-turn-base-dependencies";
-import { normalizeLangyConversationTitle } from "./langyConversationTitle";
+import { titleFromFirstUserMessage } from "./langyConversationTitle";
 import type { LangyTurnAdmissionRepository } from "./repositories/langy-turn-admission.repository";
 
 const logger = createLogger("langwatch:langy:turn-service");
@@ -86,6 +98,17 @@ const logger = createLogger("langwatch:langy:turn-service");
  * same bytes. Aliased here to keep the composition below readable.
  */
 const LANGY_OVERRIDE = LANGY_TURN_OVERRIDE_FALLBACK;
+
+/**
+ * Every skill id the worker can be handed, minus `client-command` (composer-
+ * intercepted, never reaches the agent — nothing to hide). The base for the
+ * per-turn disabled-skill computation below, so the worker is told about a
+ * flag-gated skill's absence the same way the wire schema already rejects an
+ * explicit request for it.
+ */
+const LANGY_SKILL_CATALOGUE_IDS = LANGY_SKILLS.filter(
+  (skill) => skill.source !== "client-command",
+).map((skill) => skill.id);
 
 /** Which path produced the turn's system-block override. */
 type LangyOverrideSource =
@@ -231,6 +254,67 @@ async function resolveLangyUiActionsOpen({
 }
 
 /**
+ * Which of the given skill ids are gated off for this caller.
+ *
+ * Called ONCE per turn over the full skill catalogue (`LANGY_SKILL_CATALOGUE_IDS`)
+ * — never separately for the turn's requested ids — so a flag is resolved at
+ * most once no matter how many gated skills exist or were asked for. Its
+ * result serves two callers: rejecting a turn that explicitly asked for a
+ * gated skill (below), and telling the worker which skill ids to hide from
+ * the model entirely (`credentials.disabledSkillIds`).
+ *
+ * With zero gated skills in `ids` (the overwhelmingly common case today,
+ * since only the `playground-widgets` / `lwql-charts` pair declares a gate)
+ * this returns immediately with no flag lookup at all. Fails CLOSED per flag
+ * on a flag-store error: same reasoning as `resolveLangyUiActionsOpen` —
+ * treating an unreadable flag as off is the safe half of the trade both
+ * ways here, since it means the experimental skill
+ * (`release_custom_chart_playground`-gated) stays disabled AND the stable
+ * default it is mutually exclusive with stays available.
+ */
+async function resolveDisabledSkillIds({
+  ids,
+  userId,
+  projectId,
+  organizationId,
+}: {
+  ids: readonly string[];
+  userId: string;
+  projectId: string;
+  organizationId: string;
+}): Promise<string[]> {
+  const flagsToCheck = skillGateFlags(ids);
+  if (flagsToCheck.length === 0) return [];
+
+  const enabledFlags = new Set<string>();
+  await Promise.all(
+    flagsToCheck.map(async (flag) => {
+      try {
+        if (
+          // `flag` comes from a skill's own generated `feature-flag`
+          // front-matter (a plain string at the JSON boundary) — not a
+          // literal, so it can't be typed as `FeatureFlagKey` at its source.
+          await featureFlagService.isEnabled(flag as FeatureFlagKey, {
+            distinctId: userId,
+            projectId,
+            organizationId,
+          })
+        ) {
+          enabledFlags.add(flag);
+        }
+      } catch (error) {
+        logger.warn(
+          { error, projectId, flag },
+          "langy skill flag evaluation failed, treating the skill as gated off",
+        );
+      }
+    }),
+  );
+
+  return disabledSkillIds(ids, (flag) => enabledFlags.has(flag));
+}
+
+/**
  * Turn identity binds the client's idempotency key to WHO sent it and WHAT was
  * sent. Three properties fall out structurally:
  *
@@ -343,6 +427,14 @@ export interface StartConversationTurnInput {
 export interface LangyTurnServiceDeps {
   conversations: LangyConversationService;
   credentials: LangyCredentialService;
+  /**
+   * Reads the guided onboarding facts the kickoff brief carries, from the
+   * organization's state as stored. A kickoff message is settled with them
+   * before it is recorded, so the brief never depends on the snapshot the
+   * panel composed it from. Optional: absent (tests) records the message as
+   * sent.
+   */
+  guidedKickoffFacts?: GuidedKickoffFactsPort;
   /**
    * Reads Langy's versioned prompts (ADR-050). Optional: absent (tests, and any
    * composition that has not wired it) means the in-repo fallback text, which
@@ -907,17 +999,25 @@ export class LangyTurnService {
     );
 
     try {
-      const questionParts = lastUserMessage?.parts ?? [];
+      const userMessage = await settleGuidedKickoffMessage({
+        message: lastUserMessage,
+        organizationId: credentials.organizationId,
+        facts: this.deps.guidedKickoffFacts,
+      });
+      const questionParts = userMessage?.parts ?? [];
+      // The model reads the settled message as well: a kickoff the panel
+      // composed from a snapshot older than the guided state says no key was
+      // minted, and the prompt has to say what the record says.
+      const promptText = userMessage
+        ? extractTextFromParts(userMessage.parts)
+        : userText;
       // The FIRST USER message names the conversation, never messages[0]
       // verbatim: a client can send assistant parts it still held (a new chat
       // started while the previous reply streamed), and those must not become
       // the title.
-      const title =
-        normalizeLangyConversationTitle(
-          extractTextFromParts(
-            messages.find((message) => message.role === "user")?.parts,
-          ),
-        ) || null;
+      const title = titleFromFirstUserMessage(
+        messages.find((message) => message.role === "user")?.parts,
+      );
 
       // The per-conversation frame-signing key is created from resolved
       // conversation state, never from a caller-supplied "new" flag.
@@ -1134,7 +1234,7 @@ export class LangyTurnService {
         memoryResult.status === "fulfilled" ? memoryResult.value : [];
       const conversationTranscript = renderLangyConversationTranscript({
         messages: durableMessages,
-        currentPrompt: userText,
+        currentPrompt: promptText,
       });
       const conversationMemory = renderLangyConversationMemory(
         extractLangyConversationMemory({ messages: durableMessages }),
@@ -1204,6 +1304,37 @@ export class LangyTurnService {
           ? uiActionsOpenResult.value
           : true;
 
+      // Resolved ONCE, over the full catalogue, for two callers: rejecting an
+      // explicit request for a gated skill (below, same as an unknown skill
+      // id would be at the zod boundary), and telling the worker which ids
+      // to hide from the model so it never even offers one this caller can't
+      // use. Costs nothing on the overwhelmingly common turn (no gated skill
+      // in the catalogue's current flag state): see `resolveDisabledSkillIds`.
+      const disabledSkills = await resolveDisabledSkillIds({
+        ids: LANGY_SKILL_CATALOGUE_IDS,
+        userId,
+        projectId,
+        organizationId: credentials.organizationId,
+      });
+      const requestedSkillIds = new Set(
+        (turnContext.skills ?? []).map((skill) => skill.id),
+      );
+      const disabledSkillId = disabledSkills.find((id) =>
+        requestedSkillIds.has(id),
+      );
+      if (disabledSkillId !== undefined) {
+        const flag = skillGateFlagFor(disabledSkillId);
+        // Counted exactly once: the outer catch classifies
+        // `LangySkillNotAvailableError` as `rejected`, so this path must not
+        // also increment a counter of its own.
+        // `flag` is always defined here: `disabledSkillIds` only returns ids
+        // `SKILL_GATES` (and therefore `skillGateFlagFor`) has an entry for.
+        throw new LangySkillNotAvailableError(disabledSkillId, flag ?? "");
+      }
+      if (disabledSkills.length > 0) {
+        credentials.disabledSkillIds = disabledSkills;
+      }
+
       // The per-turn user-message lane: what the user is looking at and the
       // turn-scoped cap note precede a clearly labelled ask, so the model
       // reads the DATA before the message that may refer to it.
@@ -1213,7 +1344,7 @@ export class LangyTurnService {
           isUiActionSurfaceOpen,
         }),
         capNote: capReachedNote,
-        userText,
+        userText: promptText,
       });
       // The seed ends with the ask's label when the prompt itself carries
       // none: the manager folds `seed + prompt` into a fresh session's first
@@ -1287,13 +1418,13 @@ export class LangyTurnService {
                 },
               }
             : {}),
-          ...(!isRetry && lastUserMessage?.role === "user"
+          ...(!isRetry && userMessage?.role === "user"
             ? {
                 userMessage: {
                   userId,
                   messageId: identity.messageId,
-                  role: lastUserMessage.role,
-                  parts: lastUserMessage.parts,
+                  role: userMessage.role,
+                  parts: userMessage.parts,
                   title,
                 },
               }
@@ -1360,7 +1491,8 @@ export class LangyTurnService {
       getLangyTurnsCounter(
         error instanceof LangyTurnInProgressError
           ? "busy"
-          : error instanceof LangyAgentUnavailableError
+          : error instanceof LangyAgentUnavailableError ||
+              error instanceof LangySkillNotAvailableError
             ? "rejected"
             : "error",
       ).inc();

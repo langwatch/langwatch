@@ -79,6 +79,10 @@ export function createGatewaySpendProcessingPipeline(
     .withCommand("confirmSpend", ConfirmSpendCommand)
     .withCommand("failSpend", FailSpendCommand)
     .withCommand("settleSpend", SettleSpendCommand);
+  // No daily cost rollup here, on purpose. The governance cost screen reads
+  // the metered lane straight off `gateway_spend` (the per-request ledger this
+  // pipeline projects), so a rollup half for it summarized cells nothing ever
+  // read. The rollup fold stays on the pulled-usage pipeline alone.
   if (deps.webhookDelivery) {
     pipeline = pipeline.withProcessManager(
       WEBHOOK_DELIVERY_PROCESS_NAME,

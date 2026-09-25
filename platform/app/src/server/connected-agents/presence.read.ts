@@ -7,8 +7,12 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { LiveInstance } from "./instance.registry";
+import type { InstanceRegistry, LiveInstance } from "./instance.registry";
 import { getConnectedAgentRuntime } from "./runtime";
+import {
+  type ConnectedAgentSelectability,
+  connectedAgentSelectability,
+} from "./selectable";
 
 const logger = createLogger("langwatch:connected-agents:presence");
 
@@ -35,6 +39,19 @@ export interface AgentPresence {
 /** Presence for an agent that can never be connected: offline, nothing. */
 export const NO_PRESENCE: AgentPresence = { status: "offline", instances: [] };
 
+/** The presence read a run makes before it schedules: the registry in the app, a fixture in a test. */
+export type PresenceReads = Pick<InstanceRegistry, "listLive">;
+
+/**
+ * The presence read of this process's runtime.
+ *
+ * The runtime is reached at call time rather than when a service is built,
+ * so a service built before the App exists still reads the App's Redis.
+ */
+export const runtimePresence: PresenceReads = {
+  listLive: (params) => getConnectedAgentRuntime().registry.listLive(params),
+};
+
 /** The owner of an agent, as every surface reports it. */
 export interface AgentOwnerView {
   userId: string;
@@ -42,23 +59,30 @@ export interface AgentOwnerView {
 }
 
 /**
- * The owner and the presence of one agent, as the response schemas declare
- * them.
+ * The owner, the presence and the selectability of one agent, as the response
+ * schemas declare them.
  *
- * Both the REST routes and the tRPC router answer with these three fields, so
- * the fold lives here beside the presence it reads. An owner the name lookup
+ * Both the REST routes and the tRPC router answer with these fields, so the
+ * fold lives here beside the presence it reads. An owner the name lookup
  * missed still reports its id, because the row knows the agent belongs to
  * somebody even when the person cannot be named.
+ *
+ * A row a caller may read but may not choose is answered all the same, marked
+ * with the reason, so the client can show it and say why it is not on offer.
  */
 export function agentPresenceView({
   agent,
   owners,
   presence,
+  viewerUserId,
 }: {
   agent: { id: string; ownerUserId: string | null };
   owners: Map<string, AgentOwnerView>;
   presence: Map<string, AgentPresence>;
-}): { owner: AgentOwnerView | null } & AgentPresence {
+  /** The person behind the caller; nothing for a key that names none. */
+  viewerUserId?: string | null;
+}): { owner: AgentOwnerView | null } & AgentPresence &
+  ConnectedAgentSelectability {
   const { status, instances } = presence.get(agent.id) ?? NO_PRESENCE;
   return {
     owner: agent.ownerUserId
@@ -69,6 +93,10 @@ export function agentPresenceView({
       : null,
     status,
     instances,
+    ...connectedAgentSelectability({
+      ownerUserId: agent.ownerUserId,
+      viewerUserId,
+    }),
   };
 }
 

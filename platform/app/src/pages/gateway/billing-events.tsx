@@ -16,6 +16,7 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { ReceiptText, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
+import { spendKeyLabel } from "~/components/gateway/spendKeyLabel";
 import { Link } from "~/components/ui/link";
 import { Select } from "~/components/ui/select";
 import { Tooltip as UITooltip } from "~/components/ui/tooltip";
@@ -50,6 +51,9 @@ function tokensSummary(row: SpendRow) {
   if (row.tokensCacheRead > 0) parts.push(`${row.tokensCacheRead} cr`);
   if (row.tokensCacheWrite > 0) parts.push(`${row.tokensCacheWrite} cw`);
   if (row.tokensReasoning > 0) parts.push(`${row.tokensReasoning} rsn`);
+  if (row.tokensInputImage > 0) parts.push(`${row.tokensInputImage} img in`);
+  if (row.tokensOutputImage > 0) parts.push(`${row.tokensOutputImage} img out`);
+  if (row.imageCount > 0) parts.push(`${row.imageCount} img`);
   return parts.join(" / ");
 }
 
@@ -351,7 +355,7 @@ function BillingEventRow({
           </Text>
         )}
       </Table.Cell>
-      <Table.Cell>{virtualKeyName ?? row.virtualKeyId}</Table.Cell>
+      <Table.Cell>{spendKeyLabel({ row, virtualKeyName })}</Table.Cell>
       <Table.Cell>{row.endUserId || ""}</Table.Cell>
       <Table.Cell>
         <HStack gap={1}>
@@ -364,7 +368,7 @@ function BillingEventRow({
         </HStack>
       </Table.Cell>
       <Table.Cell whiteSpace="nowrap">
-        <UITooltip content="input / output / cache read / cache write / reasoning">
+        <UITooltip content="input / output / cache read / cache write / reasoning / image in / image out / image count">
           <Text fontSize="xs">{tokensSummary(row)}</Text>
         </UITooltip>
       </Table.Cell>

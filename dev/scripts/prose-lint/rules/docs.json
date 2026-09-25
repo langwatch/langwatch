@@ -1,0 +1,335 @@
+{
+  "set": "docs",
+  "source": "docs-writing-rules (product documentation)",
+  "rules": [
+    {
+      "id": "em-dash",
+      "name": "Rule 10: no em dashes",
+      "kind": "regex",
+      "pattern": "[\\u2014\\u2015]",
+      "flags": "g"
+    },
+    {
+      "id": "marketing-words",
+      "name": "Rule 3: no marketing words",
+      "kind": "regex",
+      "pattern": "\\bpowerful\\b|\\bseamless(?:ly)?\\b|\\brobust\\b|\\beffortless(?:ly)?\\b|\\bcutting-edge\\b|\\bunlocks?\\b|\\bunlocked\\b|\\bunlocking\\b|\\bleverages?\\b|\\bleveraged\\b|\\bleveraging\\b|\\bsimply\\b|\\beasily\\b|\\bblazing-fast\\b|\\benterprise-grade\\b|\\bworld-class\\b",
+      "flags": "gi",
+      "note": "A sentence marked with a {/* Founder decision: ... */} comment is exempt."
+    },
+    {
+      "id": "release-flag",
+      "name": "Rule 11: do not document a feature flag or rollout gate",
+      "kind": "regex",
+      "pattern": "\\brelease_[a-z0-9_]+\\b|\\b(?:release|feature) flag\\b|\\brollout gate\\b|\\bbehind a flag\\b",
+      "flags": "gi"
+    },
+    {
+      "id": "pairs-with",
+      "name": "Rule 10: cross-link callouts are labeled \"Also check:\"",
+      "kind": "regex",
+      "pattern": "\\bPairs with\\b|\\bSee also:\\b|\\bRelated:\\b",
+      "flags": "g"
+    },
+    {
+      "id": "bare-ai-gateway",
+      "name": "Rule 10: always \"LangWatch AI Gateway\", never bare \"AI gateway\"",
+      "kind": "regex",
+      "pattern": "(?<!LangWatch )\\bAI [Gg]ateway\\b",
+      "flags": "g"
+    },
+    {
+      "id": "product-casing",
+      "name": "Rule 10 and 24: consistent product nouns and casing",
+      "kind": "regex",
+      "pattern": "\\b(?:langwatch|Langwatch|LANGWATCH|Gvisor|gvisor|GVisor|Opencode|Langy's harness)\\b",
+      "flags": "g",
+      "note": "Applies to prose only; the command keeps its own casing in code spans."
+    },
+    {
+      "id": "rides",
+      "name": "Rule 17: \"rides\" is banned outright",
+      "kind": "regex",
+      "pattern": "\\brides?\\b|\\briding\\b",
+      "flags": "gi"
+    },
+    {
+      "id": "artifact-verbs-literal",
+      "name": "Rule 17: artifact as subject of a cognitive, transport or posture verb (literal shape)",
+      "kind": "regex",
+      "pattern": "\\b(?:the|a|an|its|each|every|that|this|your) [a-z][a-z-]* (?:names|knows|decides|teaches|owns|carries|sits|travels|lands|lives)\\b",
+      "flags": "gi",
+      "note": "\"the trace names the layer\", \"the chip carries the filename\". A component doing a mechanical verb is fine."
+    },
+    {
+      "id": "it-matters-because",
+      "name": "\"It matters because\" is AI-coded language (changelog 2026-09-04)",
+      "kind": "regex",
+      "pattern": "\\bit matters because\\b|\\bwhy (?:this|it) matters\\b",
+      "flags": "gi"
+    },
+    {
+      "id": "dev-process",
+      "name": "Rule 18: docs describe the product, never our development process",
+      "kind": "regex",
+      "pattern": "\\bdogfood\\w*\\b|\\bin this PR\\b|\\bIter \\d+\\b|\\bbefore you roll out to your team\\b|\\bmake [a-z][a-z-]+ target\\b",
+      "flags": "gi"
+    },
+    {
+      "id": "aspirational-literal",
+      "name": "Rule 6: no aspirational tense in reference material (literal)",
+      "kind": "regex",
+      "pattern": "\\bcoming soon\\b|\\bwill soon\\b|\\bwe plan to\\b|\\bon the roadmap\\b|\\bin a future release\\b",
+      "flags": "gi",
+      "note": "Roadmap goes in its own note marked \"Not yet available:\"."
+    },
+    {
+      "id": "you-may-wish",
+      "name": "Rule 4: imperative for tasks (literal)",
+      "kind": "regex",
+      "pattern": "\\byou may wish to\\b|\\byou might want to\\b|\\bone can\\b",
+      "flags": "gi"
+    },
+    {
+      "id": "heading-question-mark",
+      "name": "Rule 29: a heading takes no question mark",
+      "kind": "regex",
+      "pattern": "^#{1,6} .*\\?\\s*$",
+      "flags": "gm",
+      "target": "headings"
+    },
+    {
+      "id": "card-without-icon",
+      "name": "Rule 24: icons on every card in a card grid",
+      "kind": "regex",
+      "pattern": "<Card\\b(?![^>]*\\bicon=)[^>]*>",
+      "flags": "g",
+      "target": "raw"
+    },
+    {
+      "id": "paragraph-over-80-words",
+      "name": "Rule 13: one idea per paragraph, 80 words max",
+      "kind": "local",
+      "check": "paragraph-words",
+      "max": 80
+    },
+    {
+      "id": "title-repeated-as-heading",
+      "name": "Rule 19: the title renders as the H1, never repeat it as the first body heading",
+      "kind": "local",
+      "check": "title-repeated-as-heading"
+    },
+    {
+      "id": "title-how-to",
+      "name": "Rule 27: the title names the product feature first",
+      "kind": "local",
+      "check": "title-how-to",
+      "note": "A title that starts with \"How to\" and never names the feature is a bug."
+    },
+    {
+      "id": "preamble-opener",
+      "name": "Rule 1: answer first, no preamble",
+      "kind": "judge",
+      "scope": "first-section",
+      "instruction": "Does `text` open with a contentless announcement that names no outcome? Banned openers: \"In this guide we will explore the concepts of simulations\", \"Learn how to track user interactions using the LangWatch REST API\", \"LangWatch is a powerful platform that\". An opener that gives the answer, the command, the definition, or states what the reader will accomplish (\"This guide demonstrates how to build an evaluation pipeline for a conversational AI\", \"This guide will walk you through the setup required to run your first simulation and see the results\") is the answer and passes. Test: delete the first sentence; if the reader still knows what the page is about, it was preamble.",
+      "yes": "the opening sentence announces the page or invites the reader to learn, and deleting it loses nothing",
+      "no": "the opening sentence gives the answer, the command, the definition, or the reader's goal and outcome"
+    },
+    {
+      "id": "description-restated",
+      "name": "Rule 12: the description renders on the page, never restate it in the body's opening",
+      "kind": "judge",
+      "scope": "first-section",
+      "instruction": "Read `description` (the page's lede, printed under the title) and the first paragraph of `text` back to back. Does the body's opening repeat the same claim the description already made, in the same or slightly different words, instead of adding information the description did not give (how you use it, the mechanism, the boundary)?",
+      "yes": "the first body sentences and the description say the same thing twice",
+      "no": "the body opening adds something the description did not say"
+    },
+    {
+      "id": "concept-opener",
+      "name": "Rule 15: open a concept page with the definition of its noun",
+      "kind": "judge",
+      "scope": "first-section",
+      "instruction": "If `text` is the opening of a concept page, does its first body sentence fail to define the page's subject with the feature as grammatical subject and an active verb? The landed shape: \"A run parameter is a named value that a scenario receives when a run starts.\" Failures: opening on \"You declare...\", on a scene, on an example placed before the definition, or on a passive (\"A parameter is declared\"). A task or reference page that opens on the command or the answer is not a failure.",
+      "yes": "the page opens on an instruction, a scene, an example, or a passive instead of defining its subject",
+      "no": "the first sentence defines the subject actively, or the page is a task or reference page opening on the command or answer"
+    },
+    {
+      "id": "paraphrased-artifact",
+      "name": "Rule 2: show the real artifact, always",
+      "kind": "judge",
+      "instruction": "Does `text` describe a command, config key, environment variable, API request, flag or file path in prose instead of showing the real copy-pasteable thing (\"run the migration command with the force flag\" instead of the command itself in a code block or code span)?",
+      "yes": "a command, flag, key, variable or path is described only in words, with no code block and no inline code span showing it",
+      "no": "every artifact mentioned appears in a code block or an inline code span (backticks), or the text is conceptual and names no artifact"
+    },
+    {
+      "id": "marketing-pitch",
+      "name": "Rule 3 and page shapes: docs do not sell, no feature-tour prose",
+      "kind": "judge",
+      "instruction": "Does `text` sell instead of describe? Selling is a benefit claim with no mechanism behind it, feature-tour prose, superlatives, or a sentence like \"Langy integrates seamlessly with your workflow\" that carries no command, value, path, constraint or concrete behavior. Describing is stating what the product does, a value, a limit or a step: \"Langy reads your traces through the LangWatch API and opens PRs through the GitHub App you install.\"",
+      "yes": "at least one sentence reads as product marketing or as a benefit claim with no mechanism behind it",
+      "no": "every sentence states what the product does, a value, a limit or a step"
+    },
+    {
+      "id": "voice-and-tense",
+      "name": "Rule 4: second person, imperative for tasks, present tense for behavior",
+      "kind": "judge",
+      "instruction": "Does `text` describe a task without the imperative (\"You may wish to run\", \"One can set\", \"Users should configure\") or describe product behavior in the future tense (\"Langy will open a pull request\") instead of the present (\"Langy opens a pull request\")? A sentence right after a command telling the reader what happens next (\"This will open LangWatch for you to sign in\") is fine.",
+      "yes": "a task step avoids the imperative, or product behavior is written in the future tense",
+      "no": "tasks are imperative and behavior is present tense"
+    },
+    {
+      "id": "vague-boundary",
+      "name": "Rule 5: state the limits and the boundaries, exactly",
+      "kind": "judge",
+      "instruction": "On anything touching data, sandboxing, credentials, permissions, limits or cost, does `text` stay vague (\"runs securely\", \"handles large volumes\", \"affordable\", \"scales with you\") instead of stating exactly what goes where, what is reachable, and what the constraint is (\"runs in a gVisor sandbox with no outbound network except the LangWatch API and the model provider you configure\")?",
+      "yes": "a data, security, permission, limit or cost claim is made in vague terms",
+      "no": "such claims are exact, or the text makes none"
+    },
+    {
+      "id": "aspirational-claim",
+      "name": "Rule 6: every claim is verifiable in the product today",
+      "kind": "judge",
+      "instruction": "Does `text` describe behavior that is not available today as if it were, or use aspirational tense (\"will soon support\", \"we plan to\", \"is being added\", \"coming soon\") outside a clearly marked \"Not yet available:\" note?",
+      "yes": "roadmap or aspirational behavior is presented in reference prose",
+      "no": "everything is stated as present behavior, or roadmap is in a marked note"
+    },
+    {
+      "id": "wall-of-prose",
+      "name": "Rule 7: structure for scanning, not reading",
+      "kind": "judge",
+      "instruction": "Does `text` bury a procedure of three or more steps inside one running paragraph instead of numbered steps, or list five or more env vars, flags or fields inside a sentence instead of a table? A short paragraph with one command and one or two sentences around it is fine; so is a paragraph that explains one idea. Only fire when the reader would have to read a paragraph to extract steps or reference values they should be able to scan.",
+      "yes": "a paragraph hides three or more steps, or five or more reference values, that should be a list or a table",
+      "no": "steps are numbered, reference values are in a table or code, and paragraphs explain rather than enumerate"
+    },
+    {
+      "id": "rollout-gate",
+      "name": "Rule 11: do not document a rollout gate, describe the feature as available",
+      "kind": "judge",
+      "instruction": "Does `text` document a feature flag, release gate or rollout switch for a feature, or tell the reader to ask LangWatch to enable it (\"behind a release flag\", \"ask us to turn it on for your project\", \"contact us to enable\")? By the time someone reads the page the feature is available.",
+      "yes": "a rollout gate or an enable-on-request note is documented",
+      "no": "the feature is described as available"
+    },
+    {
+      "id": "narration-in-concept",
+      "name": "Rule 14: statements, not narration",
+      "kind": "judge",
+      "instruction": "Does `text` explain what the product is by narrating a scene or by addressing the reader (\"You ask it a question in plain language\" as a concept opener; \"Imagine you have a bug\") instead of stating what it is and does (\"Langy is a full coding-agent harness running in a sandbox\")? Second person in task steps (\"Run the migration.\") is fine.",
+      "yes": "concept prose narrates a scene or addresses the reader instead of stating what the product is and does",
+      "no": "concept prose is statements about the product, and second person appears only in task steps"
+    },
+    {
+      "id": "infra-poetry",
+      "name": "Rule 14: engineer voice, not infra-poetry",
+      "kind": "judge",
+      "instruction": "Does `text` describe architecture with abstract actors and dramatic verbs (\"A Go manager pod spawns and supervises\", \"the platform orchestrates\", \"the engine weaves the pieces together\") instead of naming the actual service, process, path or command the way an engineer explains it to another engineer (\"langyagent runs opencode in the sandbox and calls the langwatch CLI\")? Plain statements about what a component does (\"the harness injects its tool map\", \"the request is refused with a 401\") are engineer voice and do not count.",
+      "yes": "architecture is described with abstract actors and dramatic verbs and no concrete service, process, path or command is named",
+      "no": "the prose names concrete components, commands, codes or paths, or does not describe architecture"
+    },
+    {
+      "id": "heading-unanswered",
+      "name": "Rule 15: the first sentence answers the heading",
+      "kind": "judge",
+      "locate": "first-sentence",
+      "instruction": "Look at `heading` and the first sentence of `text` after it. When the heading asks what something is, or what it is for, does the first sentence fail to answer it directly? Under \"What agent testing is for\", \"Write a scenario\" skips to the how; \"Agent testing ensures your agent handles real conversations correctly before production\" answers it. A heading that names a command or a reference table is answered by the command or the table.",
+      "yes": "the heading asks what something is or is for and the first sentence jumps to mechanism, an example or an instruction instead",
+      "no": "the first sentence answers the heading, or the heading is not a what-is or what-for question"
+    },
+    {
+      "id": "comparison-to-other-area",
+      "name": "Rule 16: never explain a feature by comparison to another product area",
+      "kind": "judge",
+      "instruction": "Does `text` explain the feature by comparison with another product area the reader may not know (\"the same field the experiments run API takes\", \"unlike offline evals, which score a dataset\", \"the third kind after online and offline\") instead of standing alone and defining its own concepts?",
+      "yes": "the explanation leans on a comparison with another product area",
+      "no": "the page defines its own concepts and only links to related areas"
+    },
+    {
+      "id": "artifact-as-subject",
+      "name": "Rule 17: give the verbs to the reader",
+      "kind": "judge",
+      "instruction": "Does `text` make an artifact or abstraction (a trace, a scenario, a chip, a filter, a target, a shorthand, a cursor) the subject of a cognitive, transport or posture verb: names, knows, decides, teaches, owns, settles, speaks, answers, honours, rides, carries, sits, travels, lands, lives (\"the trace names the layer that broke it\", \"a failing scenario names the broken behavior\", \"the chip carries the filename\", \"a thumbnail sits next to the preview\", \"an image rides an image_url part\")? Or aim an imperative at an abstraction (\"Follow your harness\")? A component as subject of a mechanical verb (\"the harness injects the tool list\", \"LangWatch stores the trace\", \"the CLI prints the statement\") is fine, and so are plain state verbs (\"the socket stays open\", \"the port is closed\", \"the call is refused with a 403\"). Test: would a developer say the sentence to a colleague at their desk?",
+      "yes": "at least one sentence gives a thing a cognitive, transport or posture verb, or aims an imperative at an abstraction",
+      "no": "things only do mechanical verbs and judgment belongs to the reader"
+    },
+    {
+      "id": "timeline-narration",
+      "name": "Rule 20: state capabilities, not timelines",
+      "kind": "judge",
+      "instruction": "Does `text` state a standing capability as an event on a timeline the reader cannot see (\"When the data privacy policy drops content, the session keeps its cost\") instead of as a capability the reader has (\"You can drop the conversation content in the data privacy policy and keep the cost\")? \"When\" for a condition that gates a step the reader performs is fine.",
+      "yes": "a standing property is narrated as a when-event",
+      "no": "capabilities are stated as capabilities, and \"when\" only gates real steps"
+    },
+    {
+      "id": "metaphorical-verb",
+      "name": "Rule 21: pick the simplest true verb",
+      "kind": "judge",
+      "instruction": "Does `text` use a metaphorical verb where a plain one is also true (\"the pull requests it drove\" for \"it created\", \"what it reached for\" for \"the tools it used\", \"the config it leans on\" for \"the config it reads\", \"the key is handed back\" for \"the command prints the key\")?",
+      "yes": "a metaphorical verb stands where a plain verb a colleague would say is also true",
+      "no": "verbs are the plain ones a colleague would say"
+    },
+    {
+      "id": "unshown-ui-element",
+      "name": "Rule 22: never reference a UI element the reader has not seen",
+      "kind": "judge",
+      "instruction": "Does `text` refer to a UI element, prompt, banner or question with a definite article (\"the question asks how to connect\", \"the banner\", \"the prompt\", \"the dialog\") without that element being quoted, shown or screenshotted above the reference in `text`?",
+      "yes": "a UI element is referenced as known but is never shown",
+      "no": "every referenced element is shown or quoted first, or none is referenced"
+    },
+    {
+      "id": "restated-tool-guidance",
+      "name": "Rule 23: if the product guides, the docs do not restate the guidance",
+      "kind": "judge",
+      "instruction": "Does `text` explain the choices, exceptions or mechanics of a prompt that the tool itself shows on first run, instead of one line on what the first run does (\"the first run opens a browser to sign you in\")?",
+      "yes": "the tool's own on-screen prompt is explained at length",
+      "no": "first-run guidance is one line, or no such prompt is involved"
+    },
+    {
+      "id": "tool-seat-expectations",
+      "name": "Rule 25: set expectations from the reader's seat, not the tool's",
+      "kind": "judge",
+      "instruction": "Right after a command, does `text` narrate the tool's internal mechanism (\"The first run opens a browser, then starts your agent. LangWatch reads only the telemetry the agent already emits. The quickstart shows what to open next.\") instead of telling the reader what they will see and get and what to do next (\"This will open LangWatch for you to sign in, then start your agent with all telemetry already set up. Check out the quickstart for next steps.\")?",
+      "yes": "post-command prose narrates mechanism instead of the reader's outcome and next instruction",
+      "no": "post-command prose leads with the outcome for the reader and hands them the next step, or there is no command"
+    },
+    {
+      "id": "indefinite-event-opener",
+      "name": "Rule 26: do not open a sentence with an indefinite event",
+      "kind": "judge",
+      "instruction": "Does a sentence in `text` start with an anonymous noun doing something, of the shape \"A [noun] [verb]s\", narrating a scene (\"A developer connects the agent to LangWatch once\", \"A tunnel URL is public\", \"A token expires after an hour\") instead of an instruction to the reader (\"Connect your agent to LangWatch\"), a statement about the product (\"The tunnel URL is public\"), or a concrete step? A definition of the page's noun (\"A run parameter is a named value that...\") does not count.",
+      "yes": "at least one sentence narrates an anonymous \"A noun verbs\" event that is not a definition",
+      "no": "sentences address the reader or the product, and \"A noun is...\" appears only as a definition"
+    },
+    {
+      "id": "statement-stack",
+      "name": "Rule 28: prose, not a stack of statements",
+      "kind": "judge",
+      "instruction": "Does a paragraph of running prose in `text` read as a stack of three or more short declaratives, one bare fact per sentence with nothing saying how one fact leads to the next, like a spec dump? Example that lost the reader: \"Quality is a test suite of scenarios that pass on the agent you trust today. Turns, tokens, cost and latency are metrics you push down while that suite keeps passing. The suite is the gate because an agent has no single expected output.\" Prose whose sentences connect with \"so\", \"because\", \"which means\", \"and\", \"instead of\" passes. Tables, lists and code blocks are reference material and never count.",
+      "yes": "a prose paragraph is a list of bullet points with the bullets removed, three or more unconnected facts in a row",
+      "no": "prose paragraphs connect their facts with reasoning, and only tables or lists stack facts"
+    },
+    {
+      "id": "heading-indirect-form",
+      "name": "Rule 29: headings are the question the reader types",
+      "kind": "judge",
+      "locate": "heading",
+      "instruction": "Is `heading` written in an indirect form (\"What the improvement loop is\", \"How the cache is invalidated\", \"Why the key expires\") instead of the direct question a reader would type into a search box (\"What is the improvement loop\", \"How is the cache invalidated\", \"Why does the key expire\")? A heading that is a command name, a noun phrase, or already a direct question passes.",
+      "yes": "the heading is an indirect-form question",
+      "no": "the heading is direct, a noun phrase, or a command name"
+    },
+    {
+      "id": "filler-sentence",
+      "name": "What \"less bs\" means: no honest-but-empty sentences",
+      "kind": "judge",
+      "instruction": "Does `text` contain a sentence that carries no command, value, path, constraint or concrete behavior (\"Langy integrates seamlessly with your workflow\", \"That is deliberate\", \"which is the whole point\", \"and that is what makes it work\")? Such a sentence is filler even when it breaks no other rule.",
+      "yes": "at least one sentence carries no command, value, path, constraint or concrete behavior",
+      "no": "every sentence carries one"
+    },
+    {
+      "id": "example-constructor",
+      "name": "\"For example,\" is the preferred constructor (changelog 2026-08-19)",
+      "kind": "judge",
+      "instruction": "Does `text` introduce a full-sentence example (a concrete scenario or instance that illustrates the preceding claim) with a colon splice, a parenthetical aside, \"e.g.\", \"say\" or \"like\", instead of announcing it with \"For example,\"? A colon that introduces a list of items or cases is not an example sentence and does not count.",
+      "yes": "an illustrative example sentence is introduced by a colon splice, an aside, \"e.g.\", \"say\" or \"like\"",
+      "no": "example sentences start with \"For example,\", or the text has no example sentences"
+    }
+  ]
+}

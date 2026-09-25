@@ -27,6 +27,7 @@ import { appSettingsTargetFor, installAppEnv } from "./app-settings";
 import { readClaudePluginState } from "./claude-plugin";
 import type { GovernanceConfig } from "./config";
 import { buildOtelEnvBlock } from "./otel-env-block";
+import { runningCodeRestartNotice } from "./running-code";
 import {
 	installSessionContextHooks,
 	removeSessionContextHooks,
@@ -40,6 +41,7 @@ import {
 	removeBlockFromRc,
 	tildify,
 	rcPath,
+	rcHasLangwatchBlock,
 	toolMarkers,
 } from "./shell-rc";
 
@@ -136,6 +138,13 @@ export function installTelemetryWiring({
 		);
 		return { labels, warnings, requiredFailures };
 	}
+	const codeWiringChanged =
+		tool === "code" &&
+		!rcHasLangwatchBlock({
+			shell,
+			markers: toolMarkers(tool),
+			requiredKeys: [buildScopedToolFunction(tool, vars, shell)],
+		});
 	try {
 		persistBlockToRc(
 			shell,
@@ -193,6 +202,10 @@ export function installTelemetryWiring({
 				);
 			}
 		}
+	}
+	if (codeWiringChanged && labels.length > 0 && requiredFailures.length === 0) {
+		const notice = runningCodeRestartNotice();
+		if (notice) warnings.push(notice);
 	}
 	return { labels, warnings, requiredFailures };
 }

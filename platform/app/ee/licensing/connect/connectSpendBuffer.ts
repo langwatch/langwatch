@@ -1,0 +1,130 @@
+/**
+ * Meters hosted judgements without writing one spend row per judged text.
+ *
+ * An install judging ten thousand conversations makes ten thousand classify
+ * calls worth a few cents in total. Inside LangWatch Cloud the same work is one
+ * spend record per run. Here the calls arrive one by one, so they are summed per
+ * managed key and written as one record every few seconds, with `requests`
+ * saying how many it covers.
+ *
+ * The trade is stated rather than hidden: a process that dies loses at most one
+ * window of spend for the keys it was serving, and the budget sees spend up to
+ * one window late. Both are bounded by `flushIntervalMs`.
+ */
+
+import { createLogger } from "@langwatch/observability";
+import type { InstantEvalSpendRecorder } from "~/server/app-layer/instant-evals/instant-eval-spend.recorder";
+
+const logger = createLogger("langwatch:connect:spend");
+
+export interface ConnectSpendEntry {
+  virtualKeyId: string;
+  projectId: string;
+  inputTokens: number;
+  costUsd: number;
+  priceUsd: number;
+}
+
+interface Pending extends ConnectSpendEntry {
+  requests: number;
+}
+
+export interface ConnectSpendBufferOptions {
+  recorder: InstantEvalSpendRecorder;
+  /** How long spend waits before it is written. */
+  flushIntervalMs?: number;
+  /** Calls under one key that force a write before the interval is up. */
+  maxRequestsPerKey?: number;
+  now?: () => Date;
+}
+
+const DEFAULT_FLUSH_INTERVAL_MS = 5_000;
+const DEFAULT_MAX_REQUESTS_PER_KEY = 500;
+
+export class ConnectSpendBuffer {
+  private readonly pending = new Map<string, Pending>();
+  private readonly flushIntervalMs: number;
+  private readonly maxRequestsPerKey: number;
+  private readonly now: () => Date;
+  private timer: ReturnType<typeof setTimeout> | undefined;
+
+  constructor(private readonly options: ConnectSpendBufferOptions) {
+    this.flushIntervalMs = options.flushIntervalMs ?? DEFAULT_FLUSH_INTERVAL_MS;
+    this.maxRequestsPerKey =
+      options.maxRequestsPerKey ?? DEFAULT_MAX_REQUESTS_PER_KEY;
+    this.now = options.now ?? (() => new Date());
+  }
+
+  add(entry: ConnectSpendEntry): void {
+    if (entry.inputTokens <= 0) return;
+    const merged = this.merge(entry, 1);
+    if (merged.requests >= this.maxRequestsPerKey) {
+      void this.flush();
+      return;
+    }
+    this.armTimer();
+  }
+
+  /** Writes everything pending. Safe to call at any time, and on shutdown. */
+  async flush(): Promise<void> {
+    this.disarmTimer();
+    const batch = [...this.pending.values()];
+    this.pending.clear();
+    await Promise.all(batch.map((record) => this.write(record)));
+  }
+
+  private async write(record: Pending): Promise<void> {
+    try {
+      await this.options.recorder.recordSpend({
+        projectId: record.projectId,
+        virtualKeyId: record.virtualKeyId,
+        inputTokens: record.inputTokens,
+        requests: record.requests,
+        costUsd: record.costUsd,
+        priceUsd: record.priceUsd,
+        occurredAt: this.now(),
+      });
+    } catch (error) {
+      // Kept for the next write rather than dropped: usage that was served
+      // and not metered is revenue lost without a trace.
+      logger.error(
+        { virtualKeyId: record.virtualKeyId, error },
+        "Hosted spend could not be recorded, keeping it for the next write",
+      );
+      this.merge(record, record.requests);
+      this.armTimer();
+    }
+  }
+
+  private merge(entry: ConnectSpendEntry, requests: number): Pending {
+    const key = `${entry.virtualKeyId}/${entry.projectId}`;
+    const current = this.pending.get(key);
+    const merged: Pending = {
+      virtualKeyId: entry.virtualKeyId,
+      projectId: entry.projectId,
+      inputTokens: (current?.inputTokens ?? 0) + entry.inputTokens,
+      costUsd: (current?.costUsd ?? 0) + entry.costUsd,
+      priceUsd: (current?.priceUsd ?? 0) + entry.priceUsd,
+      requests: (current?.requests ?? 0) + requests,
+    };
+    this.pending.set(key, merged);
+    return merged;
+  }
+
+  private armTimer(): void {
+    if (this.timer) return;
+    this.timer = setTimeout(() => {
+      this.timer = undefined;
+      void this.flush();
+    }, this.flushIntervalMs);
+    // The process may exit with spend pending only through `flush`, which the
+    // shutdown sequence calls. The timer itself must not keep it alive.
+    this.timer.unref?.();
+  }
+
+  private disarmTimer(): void {
+    if (!this.timer) return;
+    clearTimeout(this.timer);
+    this.timer = undefined;
+  }
+}

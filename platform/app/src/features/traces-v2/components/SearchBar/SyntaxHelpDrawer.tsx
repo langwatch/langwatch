@@ -29,7 +29,7 @@ import {
   SEARCH_FIELDS,
   type SearchFieldMeta,
 } from "~/server/app-layer/traces/query-language/metadata";
-import { useFilterStore } from "../../stores/filterStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { useUIStore } from "../../stores/uiStore";
 import { QueryPreview } from "./QueryPreview";
 
@@ -193,13 +193,13 @@ interface SyntaxHelpBodyProps {
 const SyntaxHelpBody: React.FC<SyntaxHelpBodyProps> = ({
   onClose: _onClose,
 }) => {
-  const applyQueryText = useFilterStore((s) => s.applyQueryText);
+  const applyQueryText = useExplorerStore((s) => s.applyQueryText);
   // Append onto whatever is already in the bar so the user can stack
   // suggestions while learning. Empty bar → first suggestion lands as-is.
   // Non-empty → joined with AND. The drawer stays open so the user can
   // keep picking; they close it manually when they're done.
   const apply = (query: string) => {
-    const current = useFilterStore.getState().queryText.trim();
+    const current = useExplorerStore.getState().queryText.trim();
     const next = current ? `${current} AND ${query}` : query;
     applyQueryText(next);
   };

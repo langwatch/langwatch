@@ -9,6 +9,7 @@ import { buildAuthHeaders } from "@/internal/api/auth";
 import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 /**
  * Returns the listing rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts). The `table` closure
@@ -29,7 +30,7 @@ export const listGraphsCommand = async (options: {
     if (options.dashboardId) params.set("dashboardId", options.dashboardId);
     const qs = params.toString() ? `?${params}` : "";
 
-    const response = await fetch(`${endpoint}/api/graphs${qs}`, {
+    const response = await langwatchFetch(`${endpoint}/api/graphs${qs}`, {
       headers: buildAuthHeaders({ apiKey }),
     });
 
