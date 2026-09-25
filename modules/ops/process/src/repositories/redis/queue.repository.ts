@@ -17,6 +17,7 @@ import { createLogger } from "@langwatch/observability";
 import type {
   ErrorCluster,
   GroupInfo,
+  OpsQueueReconcileOutcome,
   ParkedGroupInfo,
   ParkedTenant,
   QueueInfo,
@@ -34,7 +35,6 @@ import type {
   DrainPreview,
   JobEntry,
   ParkedTenantsPage,
-  ReconcileResult,
 } from "../queue.repository.ts";
 
 const logger = createLogger("langwatch:ops:queue-redis-repository");
@@ -1879,10 +1879,10 @@ export class QueueRedisRepository extends QueueRepository {
   /**
    * Reconcile the total-pending counter against the live ground truth.
    */
-  async tryReconcileTotalPending(
+  async reconcileTotalPending(
     queueName: string,
     singleFlightWindowMs = 55_000,
-  ): Promise<ReconcileResult | null> {
+  ): Promise<OpsQueueReconcileOutcome> {
     const prefix = `${queueName}:gq:`;
     const counterKey = `${prefix}stats:total-pending`;
     const markerKey = `${prefix}stats:pending-recon-ts`;
@@ -1899,7 +1899,7 @@ export class QueueRedisRepository extends QueueRepository {
       PENDING_RECONCILE_LEASE_MS,
       "NX",
     );
-    if (acquired !== "OK") return null;
+    if (acquired !== "OK") return { kind: "skipped" };
 
     try {
       // Read the pre-reconcile counter.
@@ -1922,12 +1922,12 @@ export class QueueRedisRepository extends QueueRepository {
         prefix,
         refreshLease,
       });
-      if (groupIds === null) return null;
+      if (groupIds === null) return { kind: "skipped" };
 
       const jobsKeys = Array.from(groupIds, (groupId) => `${prefix}group:${groupId}:jobs`);
 
       const summed = await this.sumPendingJobs({ jobsKeys, refreshLease });
-      if (summed === null) return null;
+      if (summed === null) return { kind: "skipped" };
       const { groundTruth, emptyJobsKeys } = summed;
 
       const drift = counter - groundTruth;
@@ -1953,12 +1953,12 @@ export class QueueRedisRepository extends QueueRepository {
           { queueName },
           "Pending reconcile lost its single-flight marker before writing — discarding the pass",
         );
-        return null;
+        return { kind: "skipped" };
       }
 
       await this.prunePendingIndex({ prefix, emptyJobsKeys, refreshLease });
 
-      return { counter, groundTruth, drift };
+      return { kind: "reconciled", result: { counter, groundTruth, drift } };
     } finally {
       // Hand the marker back as the unspent remainder of the window, so the
       // cadence stays one reconcile per window measured from when this pass

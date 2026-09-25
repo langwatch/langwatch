@@ -8,19 +8,20 @@ import {
   type LicenseFeaturesResolver,
   type LicenseGenerator,
   type LicensePurchaseDelivery,
+  type PurchasedCheckout,
 } from "../license-purchase.service.ts";
 
 /**
  * Spec: enterprise/modules/billing/specs/stripe-webhook.feature
  */
 
-function checkoutSession(): Stripe.Checkout.Session {
+function checkoutSession(): PurchasedCheckout {
   return {
     id: "cs_1",
     customer_details: { email: "buyer@acme.example", name: "Acme Corp" },
     amount_total: 99_900,
     currency: "usd",
-  } as unknown as Stripe.Checkout.Session;
+  };
 }
 
 function fakeStripe(): Stripe {

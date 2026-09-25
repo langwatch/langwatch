@@ -8,7 +8,6 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
 import { buildExperimentInfrastructure } from "../../app/experiment-composition.build.ts";
-import type { ExperimentV3RunLoop } from "../../app/experiment-workbench.members.ts";
 import { runLoopOf, runProgressOf } from "../../rules/experiment-run-loop.rules.ts";
 import { UnavailableExperimentExecution } from "../../services/experiment.service.ts";
 
@@ -51,7 +50,7 @@ describe("a process that composes the progress store but starts no runs", () => 
 describe("a process that composed no progress store at all", () => {
   /** @scenario "A read with no progress store refuses by name" */
   it("refuses the read by name", () => {
-    const runLoop = { ports: null, progress: null } as unknown as ExperimentV3RunLoop;
+    const runLoop = infrastructure(void 0).runLoop;
 
     expect(() => runProgressOf(runLoop)).toThrow(ExperimentRunLoopUnavailableError);
   });

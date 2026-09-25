@@ -77,7 +77,7 @@ import type {
   OpsQueueDrainPreview,
   OpsQueueGroupsPage,
   OpsQueueJobsPage,
-  OpsQueueReconcileResult,
+  OpsQueueReconcileOutcome,
   QueueInfo,
   QueueSummaryInfo,
 } from "./ops-queue.ts";
@@ -390,7 +390,7 @@ export type GetQueueDrainPreviewInput = {
   errorFilter?: string;
 };
 
-export type TryReconcileQueuePendingInput = { queueName: string };
+export type ReconcileQueuePendingInput = { queueName: string };
 
 export type ListParkedQueueTenantsInput = {
   queueNames: string[];
@@ -473,9 +473,7 @@ export interface OpsApi {
   getQueueDrainPreview(input: GetQueueDrainPreviewInput): Promise<OpsQueueDrainPreview>;
   discoverQueueNames(): Promise<string[]>;
   scanQueues(input: ScanQueuesInput): Promise<QueueInfo[]>;
-  tryReconcileQueuePending(
-    input: TryReconcileQueuePendingInput,
-  ): Promise<OpsQueueReconcileResult | null>;
+  reconcileQueuePending(input: ReconcileQueuePendingInput): Promise<OpsQueueReconcileOutcome>;
   readQueuePendingDrift(input: ReadQueuePendingDriftInput): Promise<number>;
   listParkedQueueTenants(input: ListParkedQueueTenantsInput): Promise<OpsParkedTenantsPage>;
   isAdmin(identity: AdminIdentity): boolean;

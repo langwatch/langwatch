@@ -172,3 +172,7 @@ export const opsRetryBlockedQueueJobInputSchema = z.object({
   groupId: z.string(),
   jobId: z.string(),
 });
+
+export type OpsQueueReconcileOutcome =
+  | { kind: "reconciled"; result: OpsQueueReconcileResult }
+  | { kind: "skipped" };

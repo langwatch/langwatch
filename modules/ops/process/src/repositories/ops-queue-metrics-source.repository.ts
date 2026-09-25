@@ -1,7 +1,7 @@
 import type {
   OpsBlockedSummary,
   OpsParkedTenantsPage,
-  OpsQueueReconcileResult,
+  OpsQueueReconcileOutcome,
   QueueInfo,
 } from "@langwatch/ops-contract";
 
@@ -14,9 +14,7 @@ export abstract class OpsQueueMetricsSourceRepository {
 
   abstract scanQueues(input: { queueNames: string[] }): Promise<QueueInfo[]>;
 
-  abstract tryReconcileQueuePending(input: {
-    queueName: string;
-  }): Promise<OpsQueueReconcileResult | null>;
+  abstract reconcileQueuePending(input: { queueName: string }): Promise<OpsQueueReconcileOutcome>;
 
   abstract readQueuePendingDrift(input: { queueNames: string[] }): Promise<number>;
 

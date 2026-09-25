@@ -64,7 +64,7 @@ function createMockRepo(overrides: Partial<QueueRepository> = {}): QueueReposito
     unpauseTenant: vi.fn().mockResolvedValue(undefined),
     findPausedTenants: vi.fn().mockResolvedValue([]),
     drainTenant: vi.fn().mockResolvedValue({ groupsDrained: 0, jobsDrained: 0 }),
-    tryReconcileTotalPending: vi.fn().mockResolvedValue(null),
+    reconcileTotalPending: vi.fn().mockResolvedValue({ kind: "skipped" }),
     readPublishedPendingDrift: vi.fn().mockResolvedValue(0),
     ...overrides,
   };

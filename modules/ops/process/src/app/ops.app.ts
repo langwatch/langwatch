@@ -174,7 +174,7 @@ import {
   type OpsQueueDrainPreview,
   type OpsQueueGroupsPage,
   type OpsQueueJobsPage,
-  type OpsQueueReconcileResult,
+  type OpsQueueReconcileOutcome,
   type OpsScheduledJob,
   type PauseQueuePipelineInput,
   type PauseQueueTenantInput,
@@ -207,7 +207,7 @@ import {
   type StartReplayInput,
   type StartReplayResult,
   type StopImpersonationInput,
-  type TryReconcileQueuePendingInput,
+  type ReconcileQueuePendingInput,
   type UnblockAllQueueGroupsInput,
   type UnblockAllQueueGroupsResult,
   type UnblockQueueGroupInput,
@@ -1311,10 +1311,8 @@ export class OpsApp implements OpsApi {
   getQueueDrainPreview(input: GetQueueDrainPreviewInput): Promise<OpsQueueDrainPreview> {
     return this.#dependencies.ops.getQueueDrainPreview(input);
   }
-  tryReconcileQueuePending(
-    input: TryReconcileQueuePendingInput,
-  ): Promise<OpsQueueReconcileResult | null> {
-    return this.#dependencies.ops.tryReconcileQueuePending(input);
+  reconcileQueuePending(input: ReconcileQueuePendingInput): Promise<OpsQueueReconcileOutcome> {
+    return this.#dependencies.ops.reconcileQueuePending(input);
   }
   listParkedQueueTenants(input: ListParkedQueueTenantsInput): Promise<OpsParkedTenantsPage> {
     return this.#dependencies.ops.listParkedQueueTenants(input);

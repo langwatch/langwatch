@@ -3,7 +3,7 @@ import type {
   ParkedGroupInfo,
   QueueSummaryInfo,
   OpsParkedTenantsPage,
-  OpsQueueReconcileResult,
+  OpsQueueReconcileOutcome,
   QueueInfo,
 } from "@langwatch/ops-contract";
 
@@ -466,8 +466,8 @@ export class QueueService {
     return this.repository.scanQueues(input);
   }
 
-  tryReconcilePending(input: { queueName: string }): Promise<OpsQueueReconcileResult | null> {
-    return this.repository.tryReconcileTotalPending(input.queueName);
+  reconcilePending(input: { queueName: string }): Promise<OpsQueueReconcileOutcome> {
+    return this.repository.reconcileTotalPending(input.queueName);
   }
 
   readPublishedPendingDrift(input: { queueNames: string[] }): Promise<number> {

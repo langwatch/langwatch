@@ -216,9 +216,9 @@ export class OpsMetricsCollectorService {
       let measuredDrift = 0;
       let measuredAny = false;
       for (const queueName of this.groupQueueNames) {
-        const result = await this.ops.tryReconcileQueuePending({ queueName });
-        if (result) {
-          measuredDrift += Math.abs(result.drift);
+        const outcome = await this.ops.reconcileQueuePending({ queueName });
+        if (outcome.kind === "reconciled") {
+          measuredDrift += Math.abs(outcome.result.drift);
           measuredAny = true;
         }
       }

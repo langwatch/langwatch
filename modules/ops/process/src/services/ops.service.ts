@@ -31,7 +31,7 @@ import {
   type OpsQueueDrainPreview,
   type OpsQueueGroupsPage,
   type OpsQueueJobsPage,
-  type OpsQueueReconcileResult,
+  type OpsQueueReconcileOutcome,
   type QueueInfo,
   type QueueSummaryInfo,
 } from "@langwatch/ops-contract";
@@ -377,8 +377,8 @@ export class OpsService {
     return this.queues.scanQueues(input);
   }
 
-  tryReconcileQueuePending(input: { queueName: string }): Promise<OpsQueueReconcileResult | null> {
-    return this.queues.tryReconcilePending(input);
+  reconcileQueuePending(input: { queueName: string }): Promise<OpsQueueReconcileOutcome> {
+    return this.queues.reconcilePending(input);
   }
 
   readQueuePendingDrift(input: { queueNames: string[] }): Promise<number> {

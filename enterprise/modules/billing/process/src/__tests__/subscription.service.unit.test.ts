@@ -1,10 +1,12 @@
 import { PlanTypes, SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
 import { stripeDouble } from "@langwatch/test-harness/client-doubles/stripe";
+import { Temporal } from "@langwatch/time";
 import Stripe from "stripe";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import { type BillingSubscriptionRepository, type BillingSubscriptionNotifier } from "../index.ts";
 import { type BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
+import type { BillingSubscriptionRecord } from "../repositories/subscription.repository.ts";
 import type { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
 import { type SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
@@ -12,6 +14,24 @@ import {
   BillingSubscriptionService,
   RECENT_INVOICES_LIMIT,
 } from "../services/subscription.service.ts";
+
+const subscriptionRecord = (
+  overrides: Partial<BillingSubscriptionRecord>,
+): BillingSubscriptionRecord => ({
+  id: "sub_1",
+  organizationId: "org_123",
+  status: "ACTIVE",
+  plan: "LAUNCH",
+  stripeSubscriptionId: null,
+  createdAt: Temporal.Instant.from("2026-01-01T00:00:00Z"),
+  startDate: null,
+  endDate: null,
+  maxMembers: null,
+  maxMembersLite: null,
+  maxMessagesPerMonth: null,
+  lastPaymentFailedDate: null,
+  ...overrides,
+});
 
 const mockSendSlackSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
 
@@ -37,7 +57,7 @@ const createMockStripe = () => ({
 });
 
 const createMockRepository = (): {
-  [K in keyof BillingSubscriptionRepository]: ReturnType<typeof vi.fn>;
+  [K in keyof BillingSubscriptionRepository]: Mock<BillingSubscriptionRepository[K]>;
 } => ({
   findActive: vi.fn(),
   findLastNonCancelled: vi.fn(),
@@ -61,7 +81,7 @@ const createMockItemCalculator = () => ({
 });
 
 const createMockOrganizationRepository = (): {
-  [K in keyof BillingAccountFactsRepository]: ReturnType<typeof vi.fn>;
+  [K in keyof BillingAccountFactsRepository]: Mock<BillingAccountFactsRepository[K]>;
 } => ({
   findPricingModel: vi.fn(),
   findStripeCustomerId: vi.fn(),
@@ -95,8 +115,8 @@ const createServiceWithSeatEventFns = ({
   seatEventService: ReturnType<typeof createMockSeatEventService>;
 }) =>
   BillingSubscriptionService.create({
-    repository: repository as unknown as BillingSubscriptionRepository,
-    organizationRepository: orgRepo as unknown as BillingAccountFactsRepository,
+    repository,
+    organizationRepository: orgRepo,
     stripe: stripeDouble(stripeInstance),
     itemCalculator: calc as unknown as SubscriptionItemCalculatorService,
     seatEventService,
@@ -115,9 +135,8 @@ describe("BillingSubscriptionService", () => {
     /** @scenario "New class implements the same interface as old factory" */
     it("implements the SubscriptionService app-layer interface", () => {
       const localService = BillingSubscriptionService.create({
-        repository: createMockRepository() as unknown as BillingSubscriptionRepository,
-        organizationRepository:
-          createMockOrganizationRepository() as unknown as BillingAccountFactsRepository,
+        repository: createMockRepository(),
+        organizationRepository: createMockOrganizationRepository(),
         stripe: stripeDouble(createMockStripe()),
         itemCalculator: createMockItemCalculator() as unknown as SubscriptionItemCalculatorService,
         notifier: createMockNotifier(),
@@ -139,8 +158,8 @@ describe("BillingSubscriptionService", () => {
     itemCalculator = createMockItemCalculator();
     organizationRepository = createMockOrganizationRepository();
     service = BillingSubscriptionService.create({
-      repository: repository as unknown as BillingSubscriptionRepository,
-      organizationRepository: organizationRepository as unknown as BillingAccountFactsRepository,
+      repository,
+      organizationRepository: organizationRepository,
       stripe: stripeDouble(stripe),
       itemCalculator: itemCalculator as unknown as SubscriptionItemCalculatorService,
       notifier: createMockNotifier(),
@@ -152,12 +171,14 @@ describe("BillingSubscriptionService", () => {
     describe("when active subscription exists", () => {
       /** @scenario EESubscriptionService updates subscription items via Stripe */
       it("updates subscription items via Stripe", async () => {
-        repository.findLastNonCancelled.mockResolvedValue({
-          id: "sub_db_1",
-          stripeSubscriptionId: "sub_stripe_1",
-          status: SubscriptionStatus.ACTIVE,
-          plan: PlanTypes.LAUNCH,
-        });
+        repository.findLastNonCancelled.mockResolvedValue(
+          subscriptionRecord({
+            id: "sub_db_1",
+            stripeSubscriptionId: "sub_stripe_1",
+            status: SubscriptionStatus.ACTIVE,
+            plan: PlanTypes.LAUNCH,
+          }),
+        );
         stripe.subscriptions.retrieve.mockResolvedValue({
           items: { data: [{ id: "si_1", price: { id: "price_launch" } }] },
         });
@@ -182,12 +203,14 @@ describe("BillingSubscriptionService", () => {
 
     describe("when upgradeTraces is false", () => {
       it("passes zero traces to the item calculator", async () => {
-        repository.findLastNonCancelled.mockResolvedValue({
-          id: "sub_db_1",
-          stripeSubscriptionId: "sub_stripe_1",
-          status: SubscriptionStatus.ACTIVE,
-          plan: PlanTypes.LAUNCH,
-        });
+        repository.findLastNonCancelled.mockResolvedValue(
+          subscriptionRecord({
+            id: "sub_db_1",
+            stripeSubscriptionId: "sub_stripe_1",
+            status: SubscriptionStatus.ACTIVE,
+            plan: PlanTypes.LAUNCH,
+          }),
+        );
         stripe.subscriptions.retrieve.mockResolvedValue({
           items: { data: [{ id: "si_1", price: { id: "price_launch" } }] },
         });
@@ -214,12 +237,14 @@ describe("BillingSubscriptionService", () => {
 
     describe("when upgradeMembers is false", () => {
       it("passes zero members to the item calculator", async () => {
-        repository.findLastNonCancelled.mockResolvedValue({
-          id: "sub_db_1",
-          stripeSubscriptionId: "sub_stripe_1",
-          status: SubscriptionStatus.ACTIVE,
-          plan: PlanTypes.LAUNCH,
-        });
+        repository.findLastNonCancelled.mockResolvedValue(
+          subscriptionRecord({
+            id: "sub_db_1",
+            stripeSubscriptionId: "sub_stripe_1",
+            status: SubscriptionStatus.ACTIVE,
+            plan: PlanTypes.LAUNCH,
+          }),
+        );
         stripe.subscriptions.retrieve.mockResolvedValue({
           items: { data: [{ id: "si_1", price: { id: "price_launch" } }] },
         });
@@ -266,11 +291,13 @@ describe("BillingSubscriptionService", () => {
     describe("when cancelling to FREE with existing subscription", () => {
       /** @scenario EESubscriptionService cancels subscription when downgrading to free */
       it("cancels Stripe subscription and updates status via repository", async () => {
-        repository.findLastNonCancelled.mockResolvedValue({
-          id: "sub_db_1",
-          stripeSubscriptionId: "sub_stripe_1",
-          status: SubscriptionStatus.ACTIVE,
-        });
+        repository.findLastNonCancelled.mockResolvedValue(
+          subscriptionRecord({
+            id: "sub_db_1",
+            stripeSubscriptionId: "sub_stripe_1",
+            status: SubscriptionStatus.ACTIVE,
+          }),
+        );
         stripe.subscriptions.cancel.mockResolvedValue({
           status: "canceled",
         });
@@ -292,11 +319,13 @@ describe("BillingSubscriptionService", () => {
 
     describe("when upgrading existing subscription", () => {
       it("updates Stripe subscription items and plan via repository", async () => {
-        repository.findLastNonCancelled.mockResolvedValue({
-          id: "sub_db_1",
-          stripeSubscriptionId: "sub_stripe_1",
-          status: SubscriptionStatus.ACTIVE,
-        });
+        repository.findLastNonCancelled.mockResolvedValue(
+          subscriptionRecord({
+            id: "sub_db_1",
+            stripeSubscriptionId: "sub_stripe_1",
+            status: SubscriptionStatus.ACTIVE,
+          }),
+        );
         stripe.subscriptions.retrieve.mockResolvedValue({
           items: { data: [] },
         });
@@ -323,7 +352,7 @@ describe("BillingSubscriptionService", () => {
       /** @scenario EESubscriptionService creates checkout for new subscription */
       it("creates checkout session for new plan", async () => {
         repository.findLastNonCancelled.mockResolvedValue(null);
-        repository.createPending.mockResolvedValue({ id: "sub_new" });
+        repository.createPending.mockResolvedValue(subscriptionRecord({ id: "sub_new" }));
         stripe.checkout.sessions.create.mockResolvedValue({
           url: "https://checkout.stripe.com/session",
         });
@@ -385,7 +414,7 @@ describe("BillingSubscriptionService", () => {
     describe("when createPending succeeds but stripe checkout throws", () => {
       it("propagates the error", async () => {
         repository.findLastNonCancelled.mockResolvedValue(null);
-        repository.createPending.mockResolvedValue({ id: "sub_new" });
+        repository.createPending.mockResolvedValue(subscriptionRecord({ id: "sub_new" }));
         stripe.checkout.sessions.create.mockRejectedValue(new Error("Stripe checkout failed"));
 
         await expect(
@@ -401,11 +430,13 @@ describe("BillingSubscriptionService", () => {
 
     describe("when upgrading and stripe subscriptions.update throws", () => {
       it("does not call repository.updatePlan", async () => {
-        repository.findLastNonCancelled.mockResolvedValue({
-          id: "sub_db_1",
-          stripeSubscriptionId: "sub_stripe_1",
-          status: SubscriptionStatus.ACTIVE,
-        });
+        repository.findLastNonCancelled.mockResolvedValue(
+          subscriptionRecord({
+            id: "sub_db_1",
+            stripeSubscriptionId: "sub_stripe_1",
+            status: SubscriptionStatus.ACTIVE,
+          }),
+        );
         stripe.subscriptions.retrieve.mockResolvedValue({
           items: { data: [] },
         });
@@ -426,11 +457,13 @@ describe("BillingSubscriptionService", () => {
 
     describe("when cancelling and stripe subscriptions.cancel throws", () => {
       it("does not call repository.updateStatus", async () => {
-        repository.findLastNonCancelled.mockResolvedValue({
-          id: "sub_db_1",
-          stripeSubscriptionId: "sub_stripe_1",
-          status: SubscriptionStatus.ACTIVE,
-        });
+        repository.findLastNonCancelled.mockResolvedValue(
+          subscriptionRecord({
+            id: "sub_db_1",
+            stripeSubscriptionId: "sub_stripe_1",
+            status: SubscriptionStatus.ACTIVE,
+          }),
+        );
         stripe.subscriptions.cancel.mockRejectedValue(new Error("Stripe cancel failed"));
 
         await expect(
@@ -473,7 +506,7 @@ describe("BillingSubscriptionService", () => {
   describe("findLastNonCancelledSubscription()", () => {
     describe("when querying for an organization", () => {
       it("delegates to repository and returns the result", async () => {
-        const mockSub = { id: "sub_1", status: "ACTIVE" };
+        const mockSub = subscriptionRecord({ id: "sub_1", status: "ACTIVE" });
         repository.findLastNonCancelled.mockResolvedValue(mockSub);
 
         const result = await service.findLastNonCancelledSubscription("org_123");

@@ -1,7 +1,7 @@
 import type {
   OpsBlockedSummary,
   OpsParkedTenantsPage,
-  OpsQueueReconcileResult,
+  OpsQueueReconcileOutcome,
   QueueInfo,
 } from "@langwatch/ops-contract";
 
@@ -9,7 +9,7 @@ import type {
 export class OpsMetricsTestAdapter {
   private queueNames: string[] = [];
   private queues: QueueInfo[] = [];
-  private pendingReconciliations: (OpsQueueReconcileResult | null)[] = [];
+  private pendingReconciliations: OpsQueueReconcileOutcome[] = [];
   private pendingDrift = 0;
   private scanCalls = 0;
 
@@ -27,7 +27,7 @@ export class OpsMetricsTestAdapter {
     this.queues = queues;
   }
 
-  enqueuePendingReconciliations(results: (OpsQueueReconcileResult | null)[]): void {
+  enqueuePendingReconciliations(results: OpsQueueReconcileOutcome[]): void {
     this.pendingReconciliations.push(...results);
   }
 
@@ -236,8 +236,8 @@ export class OpsMetricsTestAdapter {
     return this.queues;
   }
 
-  async tryReconcileQueuePending(): Promise<OpsQueueReconcileResult | null> {
-    return this.pendingReconciliations.shift() ?? null;
+  async reconcileQueuePending(): Promise<OpsQueueReconcileOutcome> {
+    return this.pendingReconciliations.shift() ?? { kind: "skipped" };
   }
 
   async readQueuePendingDrift(): Promise<number> {

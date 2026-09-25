@@ -323,9 +323,7 @@ const parseInto = async (params: {
       // whole CSV is never materialized in memory. Serialize the backpressured
       // chunk writes by pausing the parser while a flush is in flight.
       let chain: Promise<void> = Promise.resolve();
-      // papaparse's Node build accepts a Readable as a streaming source, but
-      // its types only model browser File/string inputs — cast at this one seam.
-      Papa.parse<string[]>(stream as unknown as Papa.LocalFile, {
+      Papa.parse<string[]>(stream, {
         header: false,
         skipEmptyLines: true,
         // Bound papaparse's read buffer so it pulls the stream in fixed-size

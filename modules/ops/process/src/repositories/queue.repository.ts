@@ -7,7 +7,7 @@ import type {
   OpsQueueDlqGroup,
   OpsQueueDrainPreview,
   OpsQueueJob,
-  OpsQueueReconcileResult,
+  OpsQueueReconcileOutcome,
   ParkedGroupInfo,
   QueueInfo,
 } from "@langwatch/ops-contract";
@@ -20,7 +20,6 @@ export type BlockedSummary = OpsBlockedSummary;
 export type DlqGroupInfo = OpsQueueDlqGroup;
 export type DrainPreview = OpsQueueDrainPreview;
 export type JobEntry = OpsQueueJob;
-export type ReconcileResult = OpsQueueReconcileResult;
 
 export abstract class QueueRepository {
   abstract discoverQueueNames(): Promise<string[]>;
@@ -149,7 +148,7 @@ export abstract class QueueRepository {
     errorFilter?: string;
   }): Promise<DrainPreview>;
 
-  abstract tryReconcileTotalPending(queueName: string): Promise<ReconcileResult | null>;
+  abstract reconcileTotalPending(queueName: string): Promise<OpsQueueReconcileOutcome>;
 
   /**
    * The drift the most recent reconcile pass published for each named queue,
@@ -292,8 +291,8 @@ export class NullQueueRepository extends QueueRepository {
     return { totalAffected: 0, byPipeline: [], byError: [] };
   }
 
-  async tryReconcileTotalPending(): Promise<ReconcileResult | null> {
-    return null;
+  async reconcileTotalPending(): Promise<OpsQueueReconcileOutcome> {
+    return { kind: "skipped" };
   }
 
   async readPublishedPendingDrift(): Promise<number> {

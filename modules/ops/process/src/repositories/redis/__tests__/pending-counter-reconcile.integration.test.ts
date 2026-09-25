@@ -9,7 +9,7 @@ const hasRedis = !!redisUrl;
 // Module-level incrementing counter for unique queue names — no Date.now() or random.
 let queueCounter = 0;
 
-describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () => {
+describe.skipIf(!hasRedis)("QueueRedisRepository.reconcileTotalPending", () => {
   let redis: Redis;
   let repo: QueueRedisRepository;
   let queueName: string;
@@ -56,12 +56,12 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
         // SET counter = 100 (drifted well above ground truth 5)
         await redis.set(counterKey, "100");
 
-        const result = await repo.tryReconcileTotalPending(queueName);
+        const result = await repo.reconcileTotalPending(queueName);
 
-        expect(result).not.toBeNull();
-        expect(result!.counter).toBe(100);
-        expect(result!.groundTruth).toBe(5);
-        expect(result!.drift).toBe(95);
+        expect(result).toMatchObject({ kind: "reconciled" });
+        expect(result).toMatchObject({ kind: "reconciled", result: { counter: 100 } });
+        expect(result).toMatchObject({ kind: "reconciled", result: { groundTruth: 5 } });
+        expect(result).toMatchObject({ kind: "reconciled", result: { drift: 95 } });
 
         // Counter must be healed to ground truth
         expect(await redis.get(counterKey)).toBe("5");
@@ -84,12 +84,12 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
         await redis.zadd(`${queueName}:gq:ready`, 1, "groupX");
         await redis.set(counterKey, "2");
 
-        const result = await repo.tryReconcileTotalPending(queueName);
+        const result = await repo.reconcileTotalPending(queueName);
 
-        expect(result).not.toBeNull();
-        expect(result!.counter).toBe(2);
-        expect(result!.groundTruth).toBe(2);
-        expect(result!.drift).toBe(0);
+        expect(result).toMatchObject({ kind: "reconciled" });
+        expect(result).toMatchObject({ kind: "reconciled", result: { counter: 2 } });
+        expect(result).toMatchObject({ kind: "reconciled", result: { groundTruth: 2 } });
+        expect(result).toMatchObject({ kind: "reconciled", result: { drift: 0 } });
         expect(await redis.get(counterKey)).toBe("2");
       });
     });
@@ -111,13 +111,13 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
         await redis.set(counterKey, "999");
 
         // First call — heals the counter
-        const firstResult = await repo.tryReconcileTotalPending(queueName);
-        expect(firstResult).not.toBeNull();
+        const firstResult = await repo.reconcileTotalPending(queueName);
+        expect(firstResult).toMatchObject({ kind: "reconciled" });
         expect(await redis.get(counterKey)).toBe("1");
 
         // Second call — marker key should still be set, so it is skipped
-        const secondResult = await repo.tryReconcileTotalPending(queueName);
-        expect(secondResult).toBeNull();
+        const secondResult = await repo.reconcileTotalPending(queueName);
+        expect(secondResult).toEqual({ kind: "skipped" });
 
         // Counter must be unchanged from the first heal
         expect(await redis.get(counterKey)).toBe("1");
@@ -143,12 +143,12 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
         // SET counter = 3 (under-counted)
         await redis.set(counterKey, "3");
 
-        const result = await repo.tryReconcileTotalPending(queueName);
+        const result = await repo.reconcileTotalPending(queueName);
 
-        expect(result).not.toBeNull();
-        expect(result!.counter).toBe(3);
-        expect(result!.groundTruth).toBe(7);
-        expect(result!.drift).toBe(-4);
+        expect(result).toMatchObject({ kind: "reconciled" });
+        expect(result).toMatchObject({ kind: "reconciled", result: { counter: 3 } });
+        expect(result).toMatchObject({ kind: "reconciled", result: { groundTruth: 7 } });
+        expect(result).toMatchObject({ kind: "reconciled", result: { drift: -4 } });
 
         // Counter must be healed upward to ground truth
         expect(await redis.get(counterKey)).toBe("7");
@@ -168,11 +168,11 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
         // Seed NO group:*:jobs keys — queue is empty
         await redis.set(counterKey, "50");
 
-        const result = await repo.tryReconcileTotalPending(queueName);
+        const result = await repo.reconcileTotalPending(queueName);
 
-        expect(result).not.toBeNull();
-        expect(result!.groundTruth).toBe(0);
-        expect(result!.drift).toBe(50);
+        expect(result).toMatchObject({ kind: "reconciled" });
+        expect(result).toMatchObject({ kind: "reconciled", result: { groundTruth: 0 } });
+        expect(result).toMatchObject({ kind: "reconciled", result: { drift: 50 } });
 
         // Counter must be healed to zero
         expect(await redis.get(counterKey)).toBe("0");
@@ -202,9 +202,9 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
 
         await redis.set(counterKey, "0");
 
-        const result = await repo.tryReconcileTotalPending(queueName);
+        const result = await repo.reconcileTotalPending(queueName);
 
-        expect(result!.groundTruth).toBe(6);
+        expect(result).toMatchObject({ kind: "reconciled", result: { groundTruth: 6 } });
         expect(await redis.get(counterKey)).toBe("6");
       });
     });
@@ -223,9 +223,9 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
         await redis.sadd(`${queueName}:gq:blocked`, "groupDup");
         await redis.set(counterKey, "0");
 
-        const result = await repo.tryReconcileTotalPending(queueName);
+        const result = await repo.reconcileTotalPending(queueName);
 
-        expect(result!.groundTruth).toBe(2);
+        expect(result).toMatchObject({ kind: "reconciled", result: { groundTruth: 2 } });
       });
     });
   });
@@ -244,13 +244,13 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
 
         // A zero-length window is the same state a pass reaches by outliving
         // its window: nothing of it remains to hand back.
-        const result = await repo.tryReconcileTotalPending(queueName, 0);
+        const result = await repo.reconcileTotalPending(queueName, 0);
 
-        expect(result).not.toBeNull();
+        expect(result).toMatchObject({ kind: "reconciled" });
         expect(await redis.exists(markerKey)).toBe(0);
 
         // The next cycle is free to run rather than being told to wait.
-        expect(await repo.tryReconcileTotalPending(queueName)).not.toBeNull();
+        expect(await repo.reconcileTotalPending(queueName)).toMatchObject({ kind: "reconciled" });
       });
     });
   });
@@ -277,9 +277,9 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
         await redis.sadd(`${queueName}:gq:pending-groups`, "tenant-a/in-flight-move");
         await redis.set(counterKey, "0");
 
-        const result = await repo.tryReconcileTotalPending(queueName);
+        const result = await repo.reconcileTotalPending(queueName);
 
-        expect(result!.groundTruth).toBe(3);
+        expect(result).toMatchObject({ kind: "reconciled", result: { groundTruth: 3 } });
         expect(await redis.get(counterKey)).toBe("3");
       });
     });
@@ -300,9 +300,9 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
         await redis.sadd(indexKey, "tenant-a/live");
         await redis.set(`${queueName}:gq:stats:total-pending`, "0");
 
-        const result = await repo.tryReconcileTotalPending(queueName);
+        const result = await repo.reconcileTotalPending(queueName);
 
-        expect(result!.groundTruth).toBe(1);
+        expect(result).toMatchObject({ kind: "reconciled", result: { groundTruth: 1 } });
         expect((await redis.smembers(indexKey)).toSorted()).toEqual(["tenant-a/live"]);
       });
     });
@@ -327,9 +327,9 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
 
         expect(await redis.exists(indexKey)).toBe(0);
 
-        const result = await repo.tryReconcileTotalPending(queueName);
+        const result = await repo.reconcileTotalPending(queueName);
 
-        expect(result!.groundTruth).toBe(2);
+        expect(result).toMatchObject({ kind: "reconciled", result: { groundTruth: 2 } });
         // Adopted, so it no longer depends on the sequential lifecycle read.
         expect(await redis.sismember(indexKey, "legacy-group")).toBe(1);
       });
@@ -349,9 +349,9 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
         await redis.zadd(`${queueName}:gq:group:orphan-mover:jobs`, 1, "j1", 2, "j2", 3, "j3");
         await redis.set(`${queueName}:gq:stats:total-pending`, "0");
 
-        const result = await repo.tryReconcileTotalPending(queueName);
+        const result = await repo.reconcileTotalPending(queueName);
 
-        expect(result!.groundTruth).toBe(3);
+        expect(result).toMatchObject({ kind: "reconciled", result: { groundTruth: 3 } });
         expect(await redis.sismember(indexKey, "orphan-mover")).toBe(1);
       });
     });
@@ -363,9 +363,9 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
       it("leaves the holder's marker and its expiry alone", async () => {
         await redis.set(markerKey, "other-instance-token", "PX", 30_000);
 
-        const result = await repo.tryReconcileTotalPending(queueName);
+        const result = await repo.reconcileTotalPending(queueName);
 
-        expect(result).toBeNull();
+        expect(result).toEqual({ kind: "skipped" });
         expect(await redis.get(markerKey)).toBe("other-instance-token");
         expect(await redis.pttl(markerKey)).toBeGreaterThan(0);
       });
@@ -406,7 +406,7 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
     }
     if (jobs > 0) await redis.zadd(`${prefix}ready`, 1, "g");
     await redis.set(`${prefix}stats:total-pending`, String(counter));
-    return (by ?? repo).tryReconcileTotalPending(queue);
+    return (by ?? repo).reconcileTotalPending(queue);
   };
 
   describe("given one instance reconciled a queue and measured a drift", () => {
@@ -418,13 +418,13 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
           jobs: 5,
           drift: 95,
         });
-        expect(measured!.drift).toBe(95);
+        expect(measured).toMatchObject({ kind: "reconciled", result: { drift: 95 } });
 
         // A second repository standing in for a second process. It wins no
         // marker (the first pass holds it for the rest of the window), so it
         // measures nothing of its own.
         const otherInstance = QueueRedisRepository.create({ redis });
-        expect(await otherInstance.tryReconcileTotalPending(queueName)).toBeNull();
+        expect(await otherInstance.reconcileTotalPending(queueName)).toBeNull();
 
         expect(await otherInstance.readPublishedPendingDrift([queueName])).toBe(95);
       });
@@ -544,7 +544,10 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
           drift: -10,
           by: QueueRedisRepository.create({ redis }),
         });
-        expect([a!.drift, b!.drift]).toEqual([30, -10]);
+        expect([a, b]).toMatchObject([
+          { kind: "reconciled", result: { drift: 30 } },
+          { kind: "reconciled", result: { drift: -10 } },
+        ]);
 
         expect(await repo.readPublishedPendingDrift([queueName, second])).toBe(40);
       });

@@ -53,8 +53,8 @@ describe("OpsMetricsCollectorService", () => {
           const ops = OpsMetricsTestAdapter.create();
           ops.setQueueNames(["queue-alpha", "queue-beta"]);
           ops.enqueuePendingReconciliations([
-            { counter: 130, groundTruth: 100, drift: 30 },
-            { counter: 40, groundTruth: 50, drift: -10 },
+            { kind: "reconciled", result: { counter: 130, groundTruth: 100, drift: 30 } },
+            { kind: "reconciled", result: { counter: 40, groundTruth: 50, drift: -10 } },
           ]);
           ops.setPendingDrift(97);
 
@@ -71,7 +71,7 @@ describe("OpsMetricsCollectorService", () => {
         it("still reports the drift another instance published", async () => {
           const ops = OpsMetricsTestAdapter.create();
           ops.setQueueNames(["queue-alpha", "queue-beta"]);
-          ops.enqueuePendingReconciliations([null, null]);
+          ops.enqueuePendingReconciliations([{ kind: "skipped" }, { kind: "skipped" }]);
           ops.setPendingDrift(42);
 
           expect(await runReconcile(ops)).toBe(42);
@@ -84,7 +84,9 @@ describe("OpsMetricsCollectorService", () => {
         it("reports zero", async () => {
           const ops = OpsMetricsTestAdapter.create();
           ops.setQueueNames(["queue-alpha"]);
-          ops.enqueuePendingReconciliations([{ counter: 5, groundTruth: 5, drift: 0 }]);
+          ops.enqueuePendingReconciliations([
+            { kind: "reconciled", result: { counter: 5, groundTruth: 5, drift: 0 } },
+          ]);
 
           expect(await runReconcile(ops)).toBe(0);
         });

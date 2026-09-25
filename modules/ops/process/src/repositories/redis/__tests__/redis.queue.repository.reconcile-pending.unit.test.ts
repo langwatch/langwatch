@@ -184,7 +184,7 @@ class ReconcileScene {
   }
 }
 
-describe("QueueRedisRepository.tryReconcileTotalPending", () => {
+describe("QueueRedisRepository.reconcileTotalPending", () => {
   let redis: ReconcileScene;
   let repo: QueueRedisRepository;
 
@@ -219,9 +219,12 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
 
     describe("when reconcile runs", () => {
       it("sums the jobs of every indexed group and heals the counter", async () => {
-        const result = await repo.tryReconcileTotalPending(QUEUE_NAME);
+        const result = await repo.reconcileTotalPending(QUEUE_NAME);
 
-        expect(result).toEqual({ counter: 100, groundTruth: 9, drift: 91 });
+        expect(result).toEqual({
+          kind: "reconciled",
+          result: { counter: 100, groundTruth: 9, drift: 91 },
+        });
         expect(redis.strings.get(COUNTER_KEY)).toBe("9");
       });
 
@@ -232,7 +235,7 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
         // does not know about yet.
         redis.strings.set(`${PREFIX}stats:pending-recon-sweep-due`, String(Date.now() + 60_000));
 
-        await repo.tryReconcileTotalPending(QUEUE_NAME);
+        await repo.reconcileTotalPending(QUEUE_NAME);
 
         expect(redis.scan).not.toHaveBeenCalled();
       });
@@ -252,9 +255,9 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
 
     describe("when reconcile runs", () => {
       it("counts the group's jobs once", async () => {
-        const result = await repo.tryReconcileTotalPending(QUEUE_NAME);
+        const result = await repo.reconcileTotalPending(QUEUE_NAME);
 
-        expect(result?.groundTruth).toBe(5);
+        expect(result).toMatchObject({ kind: "reconciled", result: { groundTruth: 5 } });
       });
     });
   });
@@ -275,13 +278,13 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
 
     describe("when reconcile runs", () => {
       it("counts every group across all pages", async () => {
-        const result = await repo.tryReconcileTotalPending(QUEUE_NAME);
+        const result = await repo.reconcileTotalPending(QUEUE_NAME);
 
-        expect(result?.groundTruth).toBe(groupCount);
+        expect(result).toMatchObject({ kind: "reconciled", result: { groundTruth: groupCount } });
       });
 
       it("re-arms the single-flight marker after each ZCARD batch", async () => {
-        await repo.tryReconcileTotalPending(QUEUE_NAME);
+        await repo.reconcileTotalPending(QUEUE_NAME);
 
         const batches = redis.events.filter((event) => event === "zcard-batch").length;
         expect(batches).toBe(3);
@@ -297,7 +300,7 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
       });
 
       it("re-arms the single-flight marker while paging the indexes, before any ZCARD runs", async () => {
-        await repo.tryReconcileTotalPending(QUEUE_NAME);
+        await repo.reconcileTotalPending(QUEUE_NAME);
 
         // Collection is a paging walk of its own and on a large queue can outlast
         // a lease before the first ZCARD is ever issued. If nothing re-armed
@@ -321,9 +324,9 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
 
     describe("when reconcile runs", () => {
       it("declines the pass and leaves the counter untouched", async () => {
-        const result = await repo.tryReconcileTotalPending(QUEUE_NAME);
+        const result = await repo.reconcileTotalPending(QUEUE_NAME);
 
-        expect(result).toBeNull();
+        expect(result).toEqual({ kind: "skipped" });
         expect(redis.strings.get(COUNTER_KEY)).toBe("42");
         expect(redis.strings.get(MARKER_KEY)).toBe("other-instance-token");
       });
@@ -342,7 +345,7 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
 
     describe("when reconcile completes", () => {
       it("leaves the marker holding the unspent remainder of the window", async () => {
-        await repo.tryReconcileTotalPending(QUEUE_NAME, SINGLE_FLIGHT_WINDOW_MS);
+        await repo.reconcileTotalPending(QUEUE_NAME, SINGLE_FLIGHT_WINDOW_MS);
 
         expect(redis.strings.has(MARKER_KEY)).toBe(true);
         const remainder = redis.expiries.get(MARKER_KEY)!;
@@ -372,13 +375,13 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
 
     describe("when reconcile completes", () => {
       it("releases the marker so the next cycle is not made to wait", async () => {
-        await repo.tryReconcileTotalPending(QUEUE_NAME, SINGLE_FLIGHT_WINDOW_MS);
+        await repo.reconcileTotalPending(QUEUE_NAME, SINGLE_FLIGHT_WINDOW_MS);
 
         expect(redis.strings.has(MARKER_KEY)).toBe(false);
       });
 
       it("holds the marker for the whole pass rather than letting it lapse mid-pass", async () => {
-        await repo.tryReconcileTotalPending(QUEUE_NAME, SINGLE_FLIGHT_WINDOW_MS);
+        await repo.reconcileTotalPending(QUEUE_NAME, SINGLE_FLIGHT_WINDOW_MS);
 
         // Ownership is the claim, not the call count: every re-arm has to find
         // this pass's own token still on the marker. A count-only assertion
@@ -407,13 +410,13 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
     describe("when reconcile finishes computing", () => {
       /** @scenario "A pass that loses the marker mid-run publishes nothing" */
       it("discards the pass instead of publishing its count", async () => {
-        const result = await repo.tryReconcileTotalPending(QUEUE_NAME);
+        const result = await repo.reconcileTotalPending(QUEUE_NAME);
 
-        expect(result).toBeNull();
+        expect(result).toEqual({ kind: "skipped" });
       });
 
       it("leaves the counter for the instance that now holds the marker", async () => {
-        await repo.tryReconcileTotalPending(QUEUE_NAME);
+        await repo.reconcileTotalPending(QUEUE_NAME);
 
         // Writing 4 here would put this pass's count over whatever the newer
         // holder has since published.
@@ -440,9 +443,9 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
     describe("when reconcile goes to write its result", () => {
       /** @scenario "The counter write itself refuses to run without the marker" */
       it("does not publish, because the write itself checks ownership", async () => {
-        const result = await repo.tryReconcileTotalPending(QUEUE_NAME);
+        const result = await repo.reconcileTotalPending(QUEUE_NAME);
 
-        expect(result).toBeNull();
+        expect(result).toEqual({ kind: "skipped" });
         expect(redis.strings.get(COUNTER_KEY)).toBe("42");
       });
 
@@ -454,7 +457,7 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
        * announce a drift of 35 for a heal it never landed.
        */
       it("publishes no drift either, having published no count", async () => {
-        await repo.tryReconcileTotalPending(QUEUE_NAME);
+        await repo.reconcileTotalPending(QUEUE_NAME);
 
         expect(redis.strings.get(DRIFT_KEY)).toBeUndefined();
       });
@@ -476,9 +479,9 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
     describe("when reconcile finishes computing", () => {
       /** @scenario "A pass whose marker lapses unclaimed publishes nothing" */
       it("still declines to write, having lost the right to", async () => {
-        const result = await repo.tryReconcileTotalPending(QUEUE_NAME);
+        const result = await repo.reconcileTotalPending(QUEUE_NAME);
 
-        expect(result).toBeNull();
+        expect(result).toEqual({ kind: "skipped" });
         expect(redis.strings.get(COUNTER_KEY)).toBe("50");
       });
     });
@@ -502,9 +505,9 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
 
     describe("when reconcile runs", () => {
       it("still counts the group's jobs", async () => {
-        const result = await repo.tryReconcileTotalPending(QUEUE_NAME);
+        const result = await repo.reconcileTotalPending(QUEUE_NAME);
 
-        expect(result?.groundTruth).toBe(6);
+        expect(result).toMatchObject({ kind: "reconciled", result: { groundTruth: 6 } });
       });
     });
   });
@@ -524,9 +527,9 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
 
     describe("when reconcile runs", () => {
       it("counts it and adopts it into the pending index", async () => {
-        const result = await repo.tryReconcileTotalPending(QUEUE_NAME);
+        const result = await repo.reconcileTotalPending(QUEUE_NAME);
 
-        expect(result?.groundTruth).toBe(4);
+        expect(result).toMatchObject({ kind: "reconciled", result: { groundTruth: 4 } });
         // Adopted on first sight, so later passes no longer depend on reading the
         // lifecycle indexes in sequence to find it.
         expect(redis.setMembers(`${PREFIX}pending-groups`)).toContain("tenant-a/legacy");
@@ -547,9 +550,9 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
     describe("when reconcile runs", () => {
       /** @scenario "A group no index lists is still counted and adopted" */
       it("counts it from the keyspace and adopts it for later passes", async () => {
-        const result = await repo.tryReconcileTotalPending(QUEUE_NAME);
+        const result = await repo.reconcileTotalPending(QUEUE_NAME);
 
-        expect(result?.groundTruth).toBe(5);
+        expect(result).toMatchObject({ kind: "reconciled", result: { groundTruth: 5 } });
         expect(redis.setMembers(`${PREFIX}pending-groups`)).toContain("tenant-a/mover");
       });
     });
@@ -567,11 +570,11 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
 
     describe("when reconcile runs twice", () => {
       it("stops walking the keyspace once the index is complete", async () => {
-        await repo.tryReconcileTotalPending(QUEUE_NAME, 0);
+        await repo.reconcileTotalPending(QUEUE_NAME, 0);
         const afterFirst = redis.scan.mock.calls.length;
         expect(afterFirst).toBeGreaterThan(0);
 
-        await repo.tryReconcileTotalPending(QUEUE_NAME, 0);
+        await repo.reconcileTotalPending(QUEUE_NAME, 0);
 
         // Nothing was adopted, so the sweep backs off instead of paying the
         // keyspace walk on every pass.
@@ -601,7 +604,7 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
     const runPassesOver = async (totalMs: number, passes: number) => {
       for (let i = 0; i < passes; i++) {
         vi.advanceTimersByTime(Math.floor(totalMs / passes));
-        await repo.tryReconcileTotalPending(QUEUE_NAME, 0);
+        await repo.reconcileTotalPending(QUEUE_NAME, 0);
       }
     };
 
@@ -610,7 +613,7 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
       it("still sweeps once the backstop elapses", async () => {
         // First pass sweeps and finds nothing to adopt, so the next is scheduled
         // a backstop away.
-        await repo.tryReconcileTotalPending(QUEUE_NAME, 0);
+        await repo.reconcileTotalPending(QUEUE_NAME, 0);
         const afterFirstSweep = redis.scan.mock.calls.length;
         expect(afterFirstSweep).toBeGreaterThan(0);
 
@@ -620,7 +623,7 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
 
         // Once the interval has genuinely elapsed, the sweep comes due.
         vi.advanceTimersByTime(120_000);
-        await repo.tryReconcileTotalPending(QUEUE_NAME, 0);
+        await repo.reconcileTotalPending(QUEUE_NAME, 0);
 
         expect(redis.scan.mock.calls.length).toBeGreaterThan(afterFirstSweep);
       });
@@ -629,19 +632,19 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
     describe("when a sweep finds a group the index does not list", () => {
       /** @scenario "A sweep that adopts keeps sweeping on the next pass" */
       it("sweeps again on the very next pass", async () => {
-        await repo.tryReconcileTotalPending(QUEUE_NAME, 0);
+        await repo.reconcileTotalPending(QUEUE_NAME, 0);
         const afterFirstSweep = redis.scan.mock.calls.length;
 
         // Arrives after the first sweep, indexed nowhere: the state a pod on the
         // previous release leaves behind mid-rollout.
         redis.seedZset(`${PREFIX}group:tenant-a/late:jobs`, ["j1"]);
         vi.advanceTimersByTime(BACKSTOP_MS + 1);
-        await repo.tryReconcileTotalPending(QUEUE_NAME, 0);
+        await repo.reconcileTotalPending(QUEUE_NAME, 0);
         const afterAdoptingSweep = redis.scan.mock.calls.length;
         expect(afterAdoptingSweep).toBeGreaterThan(afterFirstSweep);
 
         // That sweep adopted, so the next pass sweeps again without waiting.
-        await repo.tryReconcileTotalPending(QUEUE_NAME, 0);
+        await repo.reconcileTotalPending(QUEUE_NAME, 0);
 
         expect(redis.scan.mock.calls.length).toBeGreaterThan(afterAdoptingSweep);
       });
@@ -656,10 +659,10 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
         redis.seedZset(`${PREFIX}ready`, ["tenant-a/drained"]);
         redis.seedZset(`${PREFIX}group:tenant-a/drained:jobs`, []);
 
-        await repo.tryReconcileTotalPending(QUEUE_NAME, 0);
+        await repo.reconcileTotalPending(QUEUE_NAME, 0);
         const afterFirstSweep = redis.scan.mock.calls.length;
 
-        await repo.tryReconcileTotalPending(QUEUE_NAME, 0);
+        await repo.reconcileTotalPending(QUEUE_NAME, 0);
 
         expect(redis.scan.mock.calls.length).toBe(afterFirstSweep);
       });
@@ -688,10 +691,10 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
         // — so what is under test is that the work stops, rather than the pass
         // grinding through the rest of a backlog for an instance that has moved
         // on. That overlap is the cost the marker exists to prevent.
-        const result = await repo.tryReconcileTotalPending(QUEUE_NAME);
+        const result = await repo.reconcileTotalPending(QUEUE_NAME);
 
         expect(redis.saddBatches).toBe(1);
-        expect(result).toBeNull();
+        expect(result).toEqual({ kind: "skipped" });
         expect(redis.strings.get(COUNTER_KEY)).toBe("9999");
       });
     });
@@ -706,9 +709,9 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
 
     describe("when reconcile runs", () => {
       it("counts it as zero and prunes it from the index", async () => {
-        const result = await repo.tryReconcileTotalPending(QUEUE_NAME);
+        const result = await repo.reconcileTotalPending(QUEUE_NAME);
 
-        expect(result?.groundTruth).toBe(0);
+        expect(result).toMatchObject({ kind: "reconciled", result: { groundTruth: 0 } });
         expect(redis.setMembers(`${PREFIX}pending-groups`)).toEqual([]);
       });
     });
@@ -734,9 +737,9 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
 
     describe("when reconcile runs", () => {
       it("aborts without writing a partial under-count", async () => {
-        const result = await repo.tryReconcileTotalPending(QUEUE_NAME);
+        const result = await repo.reconcileTotalPending(QUEUE_NAME);
 
-        expect(result).toBeNull();
+        expect(result).toEqual({ kind: "skipped" });
         expect(redis.strings.get(COUNTER_KEY)).toBe("77");
       });
     });

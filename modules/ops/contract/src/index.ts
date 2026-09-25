@@ -83,7 +83,7 @@ export type {
   CanaryUnblockQueueGroupsInput,
   CanaryUnblockQueueGroupsResult,
   GetQueueDrainPreviewInput,
-  TryReconcileQueuePendingInput,
+  ReconcileQueuePendingInput,
   ListParkedQueueTenantsInput,
 } from "./ops.api.ts";
 export * from "./ops-dashboard.ts";

@@ -392,47 +392,81 @@ export const mapNlpEvent = ({
     return null;
   }
 
-  const isError = execution_state.status === "error";
-
-  // Determine if this is a target or evaluator node
+  const settled = { ...execution_state, status: execution_state.status };
   if (targetNodes.has(component_id)) {
-    // Target node
-    const isEvaluatorAsTarget = config?.evaluatorTargetNodeIds?.has(component_id) ?? false;
-    return mapTargetResult({
+    return mapTargetNodeState({ nodeId: component_id, rowIndex, state: settled, config });
+  }
+  if (isEvaluatorNode(component_id)) {
+    return mapEvaluatorNodeState({
       nodeId: component_id,
       rowIndex,
-      executionState: {
-        outputs: execution_state.outputs,
-        cost: execution_state.cost,
-        timestamps: execution_state.timestamps,
-        trace_id: execution_state.trace_id,
-        error: isError ? execution_state.error : undefined,
-        error_type: isError ? execution_state.error_type : undefined,
-        upstream_status: isError ? execution_state.upstream_status : undefined,
-      },
-      options: { isEvaluatorAsTarget },
-    });
-  } else if (isEvaluatorNode(component_id)) {
-    // Evaluator node - check if score should be stripped
-    const { evaluatorId } = parseNodeId(component_id);
-    const stripScore = evaluatorId ? config?.stripScoreEvaluatorIds?.has(evaluatorId) : false;
-
-    return mapEvaluatorResult({
-      nodeId: component_id,
-      rowIndex,
-      executionState: {
-        status: execution_state.status,
-        outputs: execution_state.outputs,
-        cost: execution_state.cost,
-        timestamps: execution_state.timestamps,
-        error: isError ? execution_state.error : undefined,
-      },
-      options: { stripScore, inputs: evaluatorInputs },
+      state: settled,
+      config,
+      evaluatorInputs,
     });
   }
-
-  // Unknown node type
   return null;
+};
+
+type SettledComponentState = NonNullable<
+  Extract<StudioServerEvent, { type: "component_state_change" }>["payload"]["execution_state"]
+> & { status: "success" | "error" };
+
+const mapTargetNodeState = ({
+  nodeId,
+  rowIndex,
+  state,
+  config,
+}: {
+  nodeId: string;
+  rowIndex: number;
+  state: SettledComponentState;
+  config?: ResultMapperConfig;
+}): EvaluationV3Event => {
+  const isError = state.status === "error";
+  return mapTargetResult({
+    nodeId,
+    rowIndex,
+    executionState: {
+      outputs: state.outputs,
+      cost: state.cost,
+      timestamps: state.timestamps,
+      trace_id: state.trace_id,
+      error: isError ? state.error : undefined,
+      error_type: isError ? state.error_type : undefined,
+      upstream_status: isError ? state.upstream_status : undefined,
+    },
+    options: { isEvaluatorAsTarget: config?.evaluatorTargetNodeIds?.has(nodeId) ?? false },
+  });
+};
+
+const mapEvaluatorNodeState = ({
+  nodeId,
+  rowIndex,
+  state,
+  config,
+  evaluatorInputs,
+}: {
+  nodeId: string;
+  rowIndex: number;
+  state: SettledComponentState;
+  config?: ResultMapperConfig;
+  evaluatorInputs?: Record<string, unknown>;
+}): EvaluationV3Event => {
+  const { evaluatorId } = parseNodeId(nodeId);
+  const stripScore = evaluatorId ? config?.stripScoreEvaluatorIds?.has(evaluatorId) : false;
+  return mapEvaluatorResult({
+    nodeId,
+    rowIndex,
+    executionState: {
+      status: state.status,
+      outputs: state.outputs,
+      cost: state.cost,
+      timestamps: state.timestamps,
+      error: state.status === "error" ? state.error : undefined,
+    },
+    options: { stripScore, inputs: evaluatorInputs },
+  });
 };
 
 /**
