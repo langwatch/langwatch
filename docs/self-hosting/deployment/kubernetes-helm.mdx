@@ -475,7 +475,7 @@ prometheus:
     clusterRoleNameOverride: langwatch-staging-prometheus-server
 ```
 
-The ingress controller routes a host to only one install, so each install also needs its own ingress hosts: set `ingress.hosts` and `gateway.ingress.host` per install, or disable an ingress that install does not need.
+Both installs render ingress rules for the same default hosts and paths, and overlapping host and path rules conflict in the ingress controller. Give each install its own `ingress.hosts` and `gateway.ingress.host`, or disable an ingress that install does not need.
 
 ### Custom StorageClass
 
