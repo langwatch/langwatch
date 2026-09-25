@@ -86,6 +86,7 @@ import { aiToolsTrpcTransport } from "./transport/ai-tools.trpc.ts";
 import { anomalyRulesTrpcTransport } from "./transport/anomaly-rules.trpc.ts";
 import { departmentsTrpcTransport } from "./transport/departments.trpc.ts";
 import { governanceAgentsTrpcTransport } from "./transport/governance-agents.trpc.ts";
+import { governanceCliRest } from "./transport/governance-cli.rest.ts";
 import { governanceCostTrpcTransport } from "./transport/governance-cost.trpc.ts";
 import { governancePeopleTrpcTransport } from "./transport/governance-people.trpc.ts";
 import {
@@ -103,23 +104,16 @@ import { routingPolicyTrpcTransport } from "./transport/routing-policy.trpc.ts";
 import { sessionPolicyTrpcTransport } from "./transport/session-policy.trpc.ts";
 
 /**
- * The whole module, declared: one application and the REST family it answers.
- * A process installs this and mounts what it wants; the repositories and
- * services behind the application stay private to this feature server.
- *
- * `governanceCliRest` and `governanceIngestRest` are not mounted here: both
- * bind tokens their own transport files declare
- * (`transport/governance-cli.rest.ts`, `transport/governance-ingest.rest.ts`)
- * that no process resolves, because nothing builds the
- * `createGovernanceInstallation` facade behind them yet. Dropping them from
- * the boot graph is wire-neutral — neither surfaces in the platform's route
- * list today.
+ * The whole module, declared: one application and the families it answers.
+ * `governanceIngestRest` is not mounted yet: its receivers still read the
+ * facade (.claude/handoffs/governance-facade-removal.md, lane C).
  */
 export const governanceServer = defineServerModule("governance")
   .withRepositories(governanceRepositories)
   .withApp(GovernanceApp)
   .withTransports(
     governanceRest,
+    governanceCliRest,
     departmentsTrpcTransport,
     ingestionTemplatesTrpcTransport,
     aiToolsTrpcTransport,

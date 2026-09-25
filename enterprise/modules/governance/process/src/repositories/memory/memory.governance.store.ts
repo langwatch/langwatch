@@ -8,8 +8,6 @@ import type {
   RoutingPolicy,
 } from "@langwatch/enterprise-governance-contract";
 
-import type { GovernanceDirectoryProject } from "../governance-directory.repository.ts";
-
 /** A seat in an organization, and whether it still answers as active. */
 export type MemoryGovernanceMember = {
   userId: string;
@@ -22,13 +20,6 @@ export type MemoryGovernanceMember = {
 export type MemoryGovernancePerson = {
   name: string | null;
   email: string | null;
-};
-
-/** A project row the directory resolves a credential or a slug to. */
-export type MemoryGovernanceProject = GovernanceDirectoryProject & {
-  organizationId: string;
-  apiKey: string;
-  archived: boolean;
 };
 
 /** An alert the spend-spike evaluator has already raised for a rule. */
@@ -48,7 +39,6 @@ export class MemoryGovernanceStore {
   readonly supportContacts = new Map<string, string>();
   readonly governanceTenantIds = new Map<string, string>();
   readonly members: MemoryGovernanceMember[] = [];
-  readonly projects: MemoryGovernanceProject[] = [];
   readonly departments: Department[] = [];
   readonly ingestionTemplates: IngestionTemplate[] = [];
   readonly anomalyRules: AnomalyRule[] = [];

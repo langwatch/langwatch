@@ -10,7 +10,6 @@ import { MemoryDiscoveredPeopleStore } from "./memory.discovered-people.store.ts
 import { MemoryDiscoveredPersonRepository } from "./memory.discovered-person.repository.ts";
 import { MemoryErasedIdentifierSuppressionRepository } from "./memory.erased-identifier-suppression.repository.ts";
 import { MemoryGovernanceCostRollupRepository } from "./memory.governance-cost-rollup.repository.ts";
-import { MemoryGovernanceDirectoryRepository } from "./memory.governance-directory.repository.ts";
 import { MemoryGovernanceOcsfExportRepository } from "./memory.governance-ocsf-export.repository.ts";
 import { MemoryRoutingPolicyRepository } from "./memory.governance-routing.repository.ts";
 import { MemoryGovernanceSetupStateRepository } from "./memory.governance-setup-state.repository.ts";
@@ -45,7 +44,6 @@ export class MemoryGovernanceRepositories {
       aiTools: MemoryAiToolCatalogRepository.create(),
       anomalyRules: MemoryAnomalyRuleRepository.create(store),
       departments: MemoryDepartmentRepository.create(store),
-      directory: MemoryGovernanceDirectoryRepository.create(store),
       discoveredAgents: MemoryDiscoveredAgentRepository.create(people),
       discoveredPeople: MemoryDiscoveredPersonRepository.create(people),
       erasedIdentifierSuppressions: MemoryErasedIdentifierSuppressionRepository.create(people),

@@ -30,11 +30,7 @@ import type { GovernanceEncryptor } from "../../app/governance.members.ts";
 import { governanceServer } from "../../governance.server.ts";
 import type { GovernanceRepositories } from "../../repositories/governance.repositories.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
-import {
-  GovernanceApp,
-  type GovernanceCliMembers,
-  type GovernanceIngestMembers,
-} from "../governance.app.ts";
+import { GovernanceApp, type GovernanceIngestMembers } from "../governance.app.ts";
 import { TestGovernanceService } from "./support/test-governance-service.ts";
 
 /** A dependency these operations never reach; calling one is the test's bug. */
@@ -117,11 +113,6 @@ async function buildAppWithUnfinishedCapability(planType = "ENTERPRISE") {
       encryption: createApiFixture<GovernanceEncryptor>(),
       isSaas: false,
       governance,
-      cli: {
-        members: unreachable<GovernanceCliMembers["members"]>(),
-        persons: unreachable<GovernanceCliMembers["persons"]>(),
-        supportContacts: unreachable<GovernanceCliMembers["supportContacts"]>(),
-      },
       ingest: {
         projects: unreachable<GovernanceIngestMembers["projects"]>(),
         principals: unreachable<GovernanceIngestMembers["principals"]>(),
@@ -279,6 +270,7 @@ describe("GovernanceApp as the module a process installs", () => {
       const { app } = await buildAppWithUnfinishedCapability();
 
       expect(governanceServer.transports.map((transport) => transport.protocol)).toEqual([
+        "rest",
         "rest",
         "trpc",
         "trpc",

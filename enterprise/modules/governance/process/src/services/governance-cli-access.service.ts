@@ -11,6 +11,8 @@ import {
   type PlanProvider,
 } from "@langwatch/entitlement-contract";
 import { createLogger } from "@langwatch/observability";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { UserApi } from "@langwatch/user-contract";
 
 const logger = createLogger("langwatch:governance-cli");
 
@@ -43,14 +45,6 @@ export type GovernanceCliAccessToken = Readonly<{
   revoke: (input: { authHeader: string | null | undefined; userId: string }) => Promise<void>;
 }>;
 
-/**
- * The membership read this gate re-derives its decision from, stated as the
- * one method it needs rather than as the repository that answers it.
- */
-export type GovernanceCliMemberDirectory = Readonly<{
-  membershipStatus(input: { userId: string; organizationId: string }): Promise<string>;
-}>;
-
 /** Which Enterprise surface a route sits behind, for the plan gate's copy. */
 export type GovernanceCliEnterpriseFeature = "ingestionSources" | "activityMonitor";
 
@@ -78,7 +72,9 @@ const ENTERPRISE_MESSAGE: Record<GovernanceCliEnterpriseFeature, string> = {
 /** Everything the gates reach that they do not own. */
 export type GovernanceCliAccessMembers = Readonly<{
   accessTokens: GovernanceCliAccessToken;
-  directory: () => GovernanceCliMemberDirectory;
+  users: Pick<UserApi, "findById">;
+  /** Active seats only: a disabled seat is not a membership. */
+  organizations: Pick<OrganizationApi, "isMember">;
   plans: () => PlanProvider;
   permittedOnOrganization: (input: {
     userId: string;
@@ -215,7 +211,7 @@ export class GovernanceCliAccessService implements GovernanceCliAccessApi {
     authHeader: string | null;
   }): Promise<GovernanceCliMembershipDecision> {
     const { caller } = input;
-    const status = await this.members.directory().membershipStatus({
+    const status = await this.membershipStatus({
       userId: caller.user_id,
       organizationId: caller.organization_id,
     });
@@ -240,6 +236,21 @@ export class GovernanceCliAccessService implements GovernanceCliAccessApi {
     );
 
     return { active: false };
+  }
+
+  /** Main's `ensureActiveOrgMemberOr403` read: the user row, then the active seat. */
+  private async membershipStatus(input: {
+    userId: string;
+    organizationId: string;
+  }): Promise<"active" | "user_missing" | "user_deactivated" | "not_org_member"> {
+    const [user, member] = await Promise.all([
+      this.members.users.findById({ id: input.userId }),
+      this.members.organizations.isMember(input),
+    ]);
+
+    if (!user) return "user_missing";
+    if (user.deactivatedAt !== null) return "user_deactivated";
+    return member ? "active" : "not_org_member";
   }
 
   private consoleBaseUrl(): string {

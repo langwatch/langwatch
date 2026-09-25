@@ -9,8 +9,8 @@ import {
   PersonalVirtualKeyAlreadyExistsError,
   PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE,
   RoutingPolicyHasNoProvidersError,
-  type GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
@@ -19,9 +19,14 @@ import { createLogger } from "@langwatch/observability";
  * transport renders these outcomes; every branch between them is decided here.
  */
 import { TeamNotFoundError } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { UserApi } from "@langwatch/user-contract";
 
+import type { DefaultGovernanceAiToolCatalogService } from "./ai-tool-catalog.service.ts";
 import type { GovernanceCliCaller } from "./governance-cli-access.service.ts";
+import type { DefaultGovernancePersonalVirtualKeyService } from "./governance-personal-key.service.ts";
 import type { OrganizationSupportContactService } from "./organization-support-contact.service.ts";
+import type { PersonalIngestionKeyService } from "./personal-ingestion-key.service.ts";
 
 const logger = createLogger("langwatch:governance-cli");
 
@@ -31,58 +36,8 @@ export type GovernanceCliPersonalWorkspace = Readonly<{
   project: Readonly<{ id: string; slug: string; name: string; apiKey: string }>;
 }>;
 
-/**
- * The budget evaluation the pre-flight check runs, or none.
- *
- * The SAME decision the gateway makes at request time, asked with a projected
- * cost of zero so nothing is committed. Absent on a deployment with no spend
- * store: the pre-flight then reads clear and the gateway surfaces the real
- * block on the first request through the same code path.
- */
-export type GovernanceCliBudgetReader = Readonly<{
-  check: (input: {
-    organizationId: string;
-    teamId: string;
-    projectId: string;
-    virtualKeyId: string;
-    principalUserId: string;
-    projectedCostUsd: number;
-  }) => Promise<
-    Readonly<{
-      decision: string;
-      blockedBy: readonly {
-        scope: string;
-        scopeId: string;
-        limitUsd: string;
-        spentUsd: string;
-        window: string;
-      }[];
-    }>
-  >;
-}>;
-
 /** One project, as the two handout routes answer it. */
 export type GovernanceCliProject = Readonly<{ id: string; slug: string; name: string }>;
-
-/** A project as the directory reports it, with whose workspace it is. */
-type GovernanceCliDirectoryProject = GovernanceCliProject &
-  Readonly<{ isPersonal: boolean; ownerUserId: string | null }>;
-
-/**
- * The identity and project reads these operations perform, stated as the
- * methods they need rather than as the repository that answers them.
- */
-export type GovernanceCliPersonDirectory = Readonly<{
-  findPersonProfile(userId: string): Promise<{ name: string | null; email: string | null } | null>;
-  findLiveProjectBySlug(input: {
-    slug: string;
-    organizationId: string;
-  }): Promise<(GovernanceCliDirectoryProject & { apiKey: string }) | null>;
-  findLiveProjectByRef(input: {
-    projectRef: string;
-    organizationId: string;
-  }): Promise<GovernanceCliDirectoryProject | null>;
-}>;
 
 export type GovernanceCliBudgetStatus =
   | Readonly<{ outcome: "clear" }>
@@ -130,10 +85,15 @@ export type GovernanceCliIngestionKeyOutcome =
 
 /** Everything the credential operations reach that they do not own. */
 export type GovernanceCliCredentialMembers = Readonly<{
-  /** The SAME governance service the console's tRPC procedures call. */
-  governance: () => GovernanceApi;
-  /** The identity and project reads these operations perform. */
-  directory: () => GovernanceCliPersonDirectory;
+  /** The SAME services the console's tRPC procedures call. */
+  personalKeys: Pick<
+    DefaultGovernancePersonalVirtualKeyService,
+    "list" | "ensureDefault" | "issue"
+  >;
+  ingestionKeys: Pick<PersonalIngestionKeyService, "issueForProject" | "mint">;
+  aiTools: Pick<DefaultGovernanceAiToolCatalogService, "resolveToolPolicy">;
+  users: Pick<UserApi, "findById">;
+  projects: Pick<ProjectApi, "findLiveBySlug" | "findLiveByRef">;
   /** Who to point a blocked caller at, when a budget refuses the request. */
   supportContacts: () => Pick<OrganizationSupportContactService, "findSupportContact">;
   ensurePersonalWorkspace: (input: {
@@ -157,8 +117,8 @@ export type GovernanceCliCredentialMembers = Readonly<{
     projectId: string;
     permission: AuthzPermission;
   }) => Promise<boolean>;
-  /** The spend decision the budget pre-flight asks, where one is composed. */
-  budgets?: GovernanceCliBudgetReader | undefined;
+  /** The spend decision the gateway makes at request time, asked with zero projected cost. */
+  budgets: Pick<GatewayApi, "checkBudget">;
   /** The deployment's public origin; the links this family answers are built from it. */
   publicBaseUrl?: string | undefined;
 }>;
@@ -226,16 +186,14 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
 
     if (!workspace) return { outcome: "clear" };
 
-    const keys = await this.members.governance().personalVirtualKeyList({
+    const keys = await this.members.personalKeys.list({
       userId: caller.user_id,
       organizationId: caller.organization_id,
     });
     const personalKey = keys[0];
-    const budgets = this.members.budgets;
+    if (!personalKey) return { outcome: "clear" };
 
-    if (!personalKey || !budgets) return { outcome: "clear" };
-
-    const decision = await budgets.check({
+    const decision = await this.members.budgets.checkBudget({
       organizationId: caller.organization_id,
       teamId: workspace.team.id,
       projectId: workspace.project.id,
@@ -274,7 +232,7 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
   async resolvePersonalProject(
     caller: GovernanceCliCaller,
   ): Promise<GovernanceCliPersonalProjectOutcome> {
-    const person = await this.members.directory().findPersonProfile(caller.user_id);
+    const person = await this.members.users.findById({ id: caller.user_id });
 
     try {
       const workspace = await this.members.ensurePersonalWorkspace({
@@ -305,7 +263,7 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
     deviceLabel: string | undefined;
   }): Promise<GovernanceCliVirtualKeyOutcome> {
     const { caller } = input;
-    const person = await this.members.directory().findPersonProfile(caller.user_id);
+    const person = await this.members.users.findById({ id: caller.user_id });
 
     try {
       const issued = await this.ensureOrIssueVirtualKey({
@@ -364,7 +322,7 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
     caller: GovernanceCliCaller;
     slug: string;
   }): Promise<GovernanceCliProjectKeyOutcome> {
-    const project = await this.members.directory().findLiveProjectBySlug({
+    const [project] = await this.members.projects.findLiveBySlug({
       slug: input.slug,
       organizationId: input.caller.organization_id,
     });
@@ -433,7 +391,7 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
 
     if (!toolSlug) return null;
 
-    const policy = await this.members.governance().aiToolResolvePolicy({
+    const policy = await this.members.aiTools.resolveToolPolicy({
       organizationId: input.caller.organization_id,
       userId: input.caller.user_id,
       slug: toolSlug,
@@ -454,7 +412,7 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
     sourceType: string;
     deviceLabel: string | undefined;
   }): Promise<GovernanceCliIngestionKeyOutcome> {
-    const project = await this.members.directory().findLiveProjectByRef({
+    const [project] = await this.members.projects.findLiveByRef({
       projectRef: input.projectRef,
       organizationId: input.caller.organization_id,
     });
@@ -474,7 +432,7 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
     if (!permitted) return { outcome: "forbidden" };
 
     try {
-      const result = await this.members.governance().ingestionKeyIssueForProject({
+      const result = await this.members.ingestionKeys.issueForProject({
         callerUserId: input.caller.user_id,
         // A shared project's key is an org service key, owned by nobody, so it
         // stays visible to the whole team. The caller's own personal workspace
@@ -520,7 +478,7 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
     sourceType: string;
   }): Promise<GovernanceCliIngestionKeyOutcome> {
     try {
-      const result = await this.members.governance().ingestionKeyIssueForPersonalProject({
+      const result = await this.members.ingestionKeys.mint({
         userId: input.caller.user_id,
         organizationId: input.caller.organization_id,
         sourceType: input.sourceType,
@@ -569,11 +527,10 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
     displayEmail?: string | null;
     deviceLabel: string | null;
   }) {
-    const governance = this.members.governance();
     const { user_id: userId, organization_id: organizationId } = input.caller;
 
     try {
-      return await governance.personalVirtualKeyEnsureDefault({
+      return await this.members.personalKeys.ensureDefault({
         userId,
         organizationId,
         displayName: input.displayName,
@@ -591,7 +548,7 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
     });
     const suffix = input.deviceLabel ?? randomBytes(3).toString("hex");
 
-    return governance.personalVirtualKeyIssue({
+    return this.members.personalKeys.issue({
       userId,
       organizationId,
       personalProjectId: workspace.project.id,

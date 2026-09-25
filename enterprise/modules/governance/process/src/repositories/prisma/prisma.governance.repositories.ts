@@ -9,7 +9,6 @@ import { PrismaDepartmentRepository } from "./prisma.department.repository.ts";
 import { PrismaDiscoveredAgentRepository } from "./prisma.discovered-agent.repository.ts";
 import { PrismaDiscoveredPersonRepository } from "./prisma.discovered-person.repository.ts";
 import { PrismaErasedIdentifierSuppressionRepository } from "./prisma.erased-identifier-suppression.repository.ts";
-import { PrismaGovernanceDirectoryRepository } from "./prisma.governance-directory.repository.ts";
 import { PrismaRoutingPolicyRepository } from "./prisma.governance-routing.repository.ts";
 import { PrismaGovernanceSetupStateRepository } from "./prisma.governance-setup-state.repository.ts";
 import { PrismaGovernanceTenantHistoryRepository } from "./prisma.governance-tenant-history.repository.ts";
@@ -47,7 +46,6 @@ export class PostgresGovernanceRepositories {
       aiTools: PrismaAiToolCatalogRepository.create(prisma),
       anomalyRules: PrismaAnomalyRuleRepository.create(prisma),
       departments: PrismaDepartmentRepository.create(prisma),
-      directory: PrismaGovernanceDirectoryRepository.create(prisma),
       discoveredAgents: PrismaDiscoveredAgentRepository.create(prisma),
       discoveredPeople: PrismaDiscoveredPersonRepository.create(prisma),
       erasedIdentifierSuppressions: PrismaErasedIdentifierSuppressionRepository.create(prisma),

@@ -1,4 +1,11 @@
-import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * `/api/auth/cli`: who each route admits, in which order, and the
+ * `{ error, error_description }` bodies released `langwatch` builds parse.
+ * Spec: specs/ai-gateway/cli-token-revoke-on-deactivation.feature
+ */
+import { createApiFixture } from "@langwatch/api-fixture";
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   IngestionKeyNotFoundError,
@@ -6,27 +13,25 @@ import {
   type GovernanceRestApi,
 } from "@langwatch/enterprise-governance-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/**
- * `/api/auth/cli`: who each route admits, in which order, and the
- * `{ error, error_description }` bodies released `langwatch` builds parse.
- * Spec: specs/ai-gateway/cli-token-revoke-on-deactivation.feature
- */
+import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { TeamNotFoundError } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { TestGovernanceService } from "../../app/__tests__/support/test-governance-service.ts";
-import {
-  GovernanceCliAccessService,
-  type GovernanceCliMemberDirectory,
-} from "../../services/governance-cli-access.service.ts";
+import type { DefaultGovernanceAiToolCatalogService } from "../../services/ai-tool-catalog.service.ts";
+import { GovernanceCliAccessService } from "../../services/governance-cli-access.service.ts";
 import { GovernanceCliActivityService } from "../../services/governance-cli-activity.service.ts";
-import {
-  GovernanceCliCredentialService,
-  type GovernanceCliBudgetReader,
-  type GovernanceCliPersonDirectory,
-} from "../../services/governance-cli-credentials.service.ts";
+import { GovernanceCliCredentialService } from "../../services/governance-cli-credentials.service.ts";
+import type { DefaultGovernanceCliBootstrapService } from "../../services/governance-cli-tool-bootstrap.service.ts";
 import { GovernanceCliService } from "../../services/governance-cli.service.ts";
+import type { DefaultGovernancePersonalVirtualKeyService } from "../../services/governance-personal-key.service.ts";
+import type { DefaultGovernanceSetupStateService } from "../../services/governance-setup-state.service.ts";
+import type { ActivityMonitorService } from "../../services/ingestion-source-activity.service.ts";
+import type { IngestionSourceService } from "../../services/ingestion-source.service.ts";
+import type { IngestionTemplateService } from "../../services/ingestion-template.service.ts";
+import type { PersonalIngestionKeyService } from "../../services/personal-ingestion-key.service.ts";
 import { governanceCliRest } from "../governance-cli.rest.ts";
 
 const USER_ID = "user_1";
@@ -48,13 +53,19 @@ const PROJECT = {
   apiKey: "lw-base-key-secret",
 };
 
-/** A dependency this door never reaches; calling one is the test's own bug. */
-const unreachable = <Method>(): Method =>
-  (() => Promise.reject(new Error("not reachable through the CLI door"))) as Method;
-
 type World = {
-  governance?: Partial<TestGovernanceService>;
-  directory?: Partial<GovernanceCliMemberDirectory & GovernanceCliPersonDirectory>;
+  personalKeys?: Partial<
+    Pick<DefaultGovernancePersonalVirtualKeyService, "list" | "ensureDefault" | "issue">
+  >;
+  ingestionKeys?: Partial<
+    Pick<PersonalIngestionKeyService, "issueForProject" | "mint" | "list" | "getPersonalKeyState">
+  >;
+  sources?: Partial<Pick<IngestionSourceService, "list" | "getById">>;
+  templates?: Partial<Pick<IngestionTemplateService, "listForUser">>;
+  users?: Partial<Pick<UserApi, "findById">>;
+  organizations?: Partial<Pick<OrganizationApi, "isMember">>;
+  projects?: Partial<Pick<ProjectApi, "findLiveBySlug" | "findLiveByRef">>;
+  budgets?: Partial<Pick<GatewayApi, "checkBudget" | "budgetOverviewForUser">>;
   resolve?: () => Promise<typeof CALLER | null>;
   planType?: string;
   permittedOnOrganization?: boolean;
@@ -63,7 +74,6 @@ type World = {
     projectId: string;
     permission: AuthzPermission;
   }) => Promise<boolean>;
-  budgets?: GovernanceCliBudgetReader;
   supportContact?: string | null;
   personalWorkspace?: {
     team: { id: string };
@@ -71,185 +81,123 @@ type World = {
   } | null;
 };
 
-/**
- * The refusal a real mount renders for anything the handlers did not answer
- * themselves — every declared refusal on this family is its own body, so a 500
- * here means a handler threw.
- */
-const renderHandled: RestErrorHandler = (_error, c) => c.json({ error: "server_error" }, 500);
+const BOB = {
+  id: USER_ID,
+  name: "Bob",
+  email: "bob@acme.test",
+  emailVerified: true,
+  image: null,
+  pendingSsoSetup: false,
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+  lastLoginAt: null,
+  deactivatedAt: null,
+};
 
 function mountCli(world: World = {}) {
-  const governance = Object.assign(new TestGovernanceService(), world.governance);
   const revoke = vi.fn().mockResolvedValue(void 0);
   const permittedOnProject = world.permittedOnProject ?? vi.fn().mockResolvedValue(true);
-  const directory: GovernanceCliMemberDirectory & GovernanceCliPersonDirectory = {
-    membershipStatus: vi.fn().mockResolvedValue("active"),
-    findPersonProfile: vi.fn().mockResolvedValue({ name: "Bob", email: "bob@acme.test" }),
-    findLiveProjectBySlug: vi.fn().mockResolvedValue(PROJECT),
-    findLiveProjectByRef: vi.fn().mockResolvedValue(PROJECT),
-    ...world.directory,
-  };
+  const users = createApiFixture<Pick<UserApi, "findById">>({
+    findById: vi.fn().mockResolvedValue(BOB),
+    ...world.users,
+  });
+  const organizations = createApiFixture<Pick<OrganizationApi, "isMember">>({
+    isMember: vi.fn().mockResolvedValue(true),
+    ...world.organizations,
+  });
+  const projects = createApiFixture<Pick<ProjectApi, "findLiveBySlug" | "findLiveByRef">>({
+    findLiveBySlug: vi.fn().mockResolvedValue([PROJECT]),
+    findLiveByRef: vi.fn().mockResolvedValue([PROJECT]),
+    ...world.projects,
+  });
+  const budgets = createApiFixture<Pick<GatewayApi, "checkBudget" | "budgetOverviewForUser">>({
+    checkBudget: vi.fn().mockResolvedValue({ decision: "allow", blockedBy: [] }),
+    ...world.budgets,
+  });
+  const personalKeys = createApiFixture<
+    Pick<DefaultGovernancePersonalVirtualKeyService, "list" | "ensureDefault" | "issue">
+  >(world.personalKeys, "personalKeys");
+  const ingestionKeys = createApiFixture<
+    Pick<PersonalIngestionKeyService, "issueForProject" | "mint" | "list" | "getPersonalKeyState">
+  >(world.ingestionKeys, "ingestionKeys");
   const plans = (): PlanProvider => ({
     getActivePlan: vi.fn().mockResolvedValue({ type: world.planType ?? "ENTERPRISE" }),
   });
-  const accessTokens = {
-    resolve: world.resolve ?? (() => Promise.resolve(CALLER)),
-    revoke,
-  };
 
   const cli = GovernanceCliService.create({
     access: GovernanceCliAccessService.create({
-      accessTokens,
-      directory: () => directory,
+      accessTokens: { resolve: world.resolve ?? (() => Promise.resolve(CALLER)), revoke },
+      users,
+      organizations,
       plans,
       permittedOnOrganization: () => Promise.resolve(world.permittedOnOrganization ?? true),
       publicBaseUrl: "https://app.test",
     }),
     credentials: GovernanceCliCredentialService.create({
-      governance: () => governance,
-      directory: () => directory,
+      personalKeys,
+      ingestionKeys,
+      aiTools: createApiFixture<Pick<DefaultGovernanceAiToolCatalogService, "resolveToolPolicy">>(
+        {},
+        "aiTools",
+      ),
+      users,
+      projects,
       supportContacts: () => ({
         findSupportContact: vi.fn().mockResolvedValue(world.supportContact ?? null),
       }),
-      ensurePersonalWorkspace: unreachable<() => Promise<never>>(),
+      ensurePersonalWorkspace: () =>
+        Promise.reject(new Error("not reachable through the CLI door")),
       getPersonalWorkspace: vi.fn(async () => {
         if (!world.personalWorkspace) throw new TeamNotFoundError();
         return world.personalWorkspace;
       }),
       permittedOnProject,
-      ...(world.budgets ? { budgets: world.budgets } : {}),
+      budgets,
       publicBaseUrl: "https://app.test",
     }),
-    activity: GovernanceCliActivityService.create({ governance: () => governance }),
-    governance,
+    activity: GovernanceCliActivityService.create({
+      sources: createApiFixture<Pick<IngestionSourceService, "list" | "getById">>(
+        world.sources,
+        "sources",
+      ),
+      activity: createApiFixture<
+        Pick<ActivityMonitorService, "eventsForSource" | "sourceHealthMetrics">
+      >({}, "activity"),
+    }),
+    bootstraps: createApiFixture<Pick<DefaultGovernanceCliBootstrapService, "resolve">>(
+      {},
+      "bootstraps",
+    ),
+    budgets,
+    setupState: createApiFixture<Pick<DefaultGovernanceSetupStateService, "resolve">>(
+      {},
+      "setupState",
+    ),
+    templates: createApiFixture<Pick<IngestionTemplateService, "listForUser">>(
+      world.templates,
+      "templates",
+    ),
+    ingestionKeys,
   });
-  const unavailable = (): Promise<never> =>
-    Promise.reject(new Error("not reachable through the CLI door"));
-  const app: GovernanceRestApi = {
-    cliBudgetStatus: (input) => cli.budgetStatus(input),
-    cliBootstrapRead: (input) => cli.bootstrap(input),
-    cliBudgetOverview: (input) => cli.budgetOverview(input),
-    cliPersonalProject: (input) => cli.personalProject(input),
-    cliVirtualKey: (input) => cli.virtualKey(input),
-    cliProjectKey: (input) => cli.projectKey(input),
-    cliIngestionSources: (input) => cli.ingestionSources(input),
-    cliIngestionSourceEvents: (input) => cli.ingestionSourceEvents(input),
-    cliIngestionSourceHealth: (input) => cli.ingestionSourceHealth(input),
-    cliGovernanceStatus: (input) => cli.governanceStatus(input),
-    cliIngestionTemplates: (input) => cli.ingestionTemplates(input),
-    cliIngestionKey: (input) => cli.ingestionKey(input),
-    cliIngestionKeys: (input) => cli.ingestionKeys(input),
-    cliIngestionKeyState: (input) => cli.ingestionKeyState(input),
-    ingestOtlpTraces: unavailable,
-    ingestWebhook: unavailable,
-    ingestOtlpLogs: unavailable,
-    ingestOtlpMetrics: unavailable,
-    ingestionSourceList: unavailable,
-    ingestionSourceGet: unavailable,
-    ingestionSourceCreate: unavailable,
-    ingestionSourceUpdate: unavailable,
-    ingestionSourceRotateSecret: unavailable,
-    ingestionSourceArchive: unavailable,
-    ingestionSourceValidateOttl: unavailable,
-    governanceResolveHome: unavailable,
-    ingestionSourceOttlStarter: () => {
-      throw new Error("not reachable through this door");
+  const app = createApiFixture<GovernanceRestApi>(
+    {
+      cliBudgetStatus: (input) => cli.budgetStatus(input),
+      cliBootstrapRead: (input) => cli.bootstrap(input),
+      cliBudgetOverview: (input) => cli.budgetOverview(input),
+      cliPersonalProject: (input) => cli.personalProject(input),
+      cliVirtualKey: (input) => cli.virtualKey(input),
+      cliProjectKey: (input) => cli.projectKey(input),
+      cliIngestionSources: (input) => cli.ingestionSources(input),
+      cliIngestionSourceEvents: (input) => cli.ingestionSourceEvents(input),
+      cliIngestionSourceHealth: (input) => cli.ingestionSourceHealth(input),
+      cliGovernanceStatus: (input) => cli.governanceStatus(input),
+      cliIngestionTemplates: (input) => cli.ingestionTemplates(input),
+      cliIngestionKey: (input) => cli.ingestionKey(input),
+      cliIngestionKeys: (input) => cli.ingestionKeys(input),
+      cliIngestionKeyState: (input) => cli.ingestionKeyState(input),
     },
-    listIngestionTemplatesForMember: unavailable,
-    listIngestionTemplatesForAdmin: unavailable,
-    getIngestionTemplate: unavailable,
-    createIngestionTemplate: unavailable,
-    updateIngestionTemplateOttlRules: unavailable,
-    archiveIngestionTemplate: unavailable,
-    cloneIngestionTemplate: unavailable,
-    departmentResolveByNameOrCreate: unavailable,
-    departmentAssignUser: unavailable,
-    aiToolListForUser: unavailable,
-    aiToolProviderAvailability: unavailable,
-    aiToolClaudeCodeOtlpEndpoint: unavailable,
-    aiToolListForAdmin: unavailable,
-    aiToolGetById: unavailable,
-    aiToolCreate: unavailable,
-    aiToolUpdate: unavailable,
-    aiToolRemove: unavailable,
-    aiToolSeedStarterPack: unavailable,
-    aiToolListProviderOptionsForAdmin: unavailable,
-    aiToolListRoutingPolicyOptionsForAdmin: unavailable,
-    aiToolReorder: unavailable,
-    aiToolStarterPackCatalog: () => [],
-    templateListForUser: unavailable,
-    templateListForOrgAdmin: unavailable,
-    templateGetByIdForOrg: unavailable,
-    templateCreateOrg: unavailable,
-    templateUpdateOttlRules: unavailable,
-    templateArchiveOrg: unavailable,
-    templateCloneFromPlatform: unavailable,
-    findActorWorkspace: unavailable,
-    anomalyRuleList: unavailable,
-    anomalyRuleGetById: unavailable,
-    anomalyRuleCreate: unavailable,
-    anomalyRuleUpdate: unavailable,
-    anomalyRuleArchive: unavailable,
-    activitySummary: unavailable,
-    activitySpendByUser: unavailable,
-    activitySpendByTeam: unavailable,
-    activitySpendByDepartment: unavailable,
-    activitySpendOverTime: unavailable,
-    activityRecentAnomalies: unavailable,
-    activityIngestionSourcesHealth: unavailable,
-    activityEventsForSource: unavailable,
-    activitySourceHealthMetrics: unavailable,
-    sessionPolicyGet: unavailable,
-    sessionPolicySetMaxDuration: unavailable,
-    governanceAgentsSyncSources: unavailable,
-    governanceAgentsRequestListing: unavailable,
-    governanceAgentsList: unavailable,
-    governanceCostSummary: unavailable,
-    governanceCostDailyByProvider: unavailable,
-    governanceCostSpendByModel: unavailable,
-    governanceCostPeriodRecords: unavailable,
-    governanceCostSpenders: unavailable,
-    governancePeopleList: unavailable,
-    governancePeopleSuggestions: unavailable,
-    governancePeopleRunMatch: unavailable,
-    governancePeopleConfirmSuggestion: unavailable,
-    ingestionKeyList: unavailable,
-    ingestionKeyInstall: unavailable,
-    ingestionKeyRotate: unavailable,
-    ingestionKeyRevoke: unavailable,
-    governanceSetupState: unavailable,
-    governanceRecordWorkspaceView: unavailable,
-    governanceOcsfExport: unavailable,
-    governanceQuarantineFillStats: unavailable,
-    cliSessionListForUser: unavailable,
-    cliSessionRevoke: unavailable,
-    cliSessionRevokeAll: unavailable,
-    personalWebSessionList: unavailable,
-    personalWebSessionEnd: unavailable,
-    personalWebSessionsEndForIdentifier: unavailable,
-    listPersonalVirtualKeys: unavailable,
-    issuePersonalVirtualKey: unavailable,
-    revokePersonalVirtualKey: unavailable,
-    listRoutingPolicies: unavailable,
-    getRoutingPolicy: unavailable,
-    routingPolicyTierSuggestions: () => {
-      throw new Error("not reachable through the CLI door");
-    },
-    createRoutingPolicy: unavailable,
-    updateRoutingPolicy: unavailable,
-    setDefaultRoutingPolicy: unavailable,
-    deleteRoutingPolicy: unavailable,
-    departmentList: unavailable,
-    departmentAssignments: unavailable,
-    departmentCreate: unavailable,
-    departmentRename: unavailable,
-    departmentArchive: unavailable,
-    departmentAssignTeam: unavailable,
-    departmentAssignProject: unavailable,
-    personalUsageDashboard: unavailable,
-    personalBudgetOverview: unavailable,
-    cliBootstrap: unavailable,
-  };
+    "GovernanceRestApi",
+  );
 
   const runtime = createRestRuntime({
     identity: {
@@ -261,7 +209,7 @@ function mountCli(world: World = {}) {
   const hono = runtime.mount(governanceCliRest.router(), {
     app: () => app,
     credential: "public",
-    onError: renderHandled,
+    onError: canonicalErrorResponse,
   });
   const fetchAt = async (path: string, init?: RequestInit): Promise<Response> =>
     hono.fetch(new Request(`http://api.test${path}`, init));
@@ -269,7 +217,6 @@ function mountCli(world: World = {}) {
   return {
     revoke,
     permittedOnProject,
-    directory,
     get: (path: string, headers: Record<string, string> = { Authorization: BEARER }) =>
       fetchAt(path, { headers }),
     post: (path: string, body: unknown) =>
@@ -288,7 +235,7 @@ describe("the CLI governance plane", () => {
       const personalVirtualKeyList = vi.fn().mockResolvedValue([]);
       const api = mountCli({
         resolve: () => Promise.resolve(null),
-        governance: { personalVirtualKeyList },
+        personalKeys: { list: personalVirtualKeyList },
       });
 
       const response = await api.get("/api/auth/cli/budget/status");
@@ -305,7 +252,7 @@ describe("the CLI governance plane", () => {
   describe("given an organization that is not on the Enterprise plan", () => {
     it("answers 402 with the upgrade page inline and never reads the sources", async () => {
       const ingestionSourceList = vi.fn().mockResolvedValue([]);
-      const api = mountCli({ planType: "FREE", governance: { ingestionSourceList } });
+      const api = mountCli({ planType: "FREE", sources: { list: ingestionSourceList } });
 
       const response = await api.get("/api/auth/cli/governance/ingest/sources");
 
@@ -323,7 +270,7 @@ describe("the CLI governance plane", () => {
       const ingestionSourceList = vi.fn().mockResolvedValue([]);
       const api = mountCli({
         permittedOnOrganization: false,
-        governance: { ingestionSourceList },
+        sources: { list: ingestionSourceList },
       });
 
       const response = await api.get("/api/auth/cli/governance/ingest/sources");
@@ -342,8 +289,8 @@ describe("the CLI governance plane", () => {
     it("refuses the mint, severs the presented session, and mints nothing", async () => {
       const ingestionKeyIssueForPersonalProject = vi.fn();
       const api = mountCli({
-        directory: { membershipStatus: vi.fn().mockResolvedValue("removed") },
-        governance: { ingestionKeyIssueForPersonalProject },
+        organizations: { isMember: vi.fn().mockResolvedValue(false) },
+        ingestionKeys: { mint: ingestionKeyIssueForPersonalProject },
       });
 
       const response = await api.post("/api/auth/cli/governance/ingestion-key", {
@@ -401,7 +348,7 @@ describe("the CLI governance plane", () => {
 
     it("answers not_found for a slug no project in the organization carries", async () => {
       const api = mountCli({
-        directory: { findLiveProjectBySlug: vi.fn().mockResolvedValue(null) },
+        projects: { findLiveBySlug: vi.fn().mockResolvedValue([]) },
       });
 
       const response = await api.post("/api/auth/cli/project-key", { slug: "elsewhere" });
@@ -420,7 +367,7 @@ describe("the CLI governance plane", () => {
       const ingestionKeyIssueForPersonalProject = vi
         .fn()
         .mockRejectedValue(new IngestionKeySourceNotAllowedError("spreadsheet"));
-      const api = mountCli({ governance: { ingestionKeyIssueForPersonalProject } });
+      const api = mountCli({ ingestionKeys: { mint: ingestionKeyIssueForPersonalProject } });
 
       const response = await api.post("/api/auth/cli/governance/ingestion-key", {
         source_type: "spreadsheet",
@@ -439,7 +386,7 @@ describe("the CLI governance plane", () => {
       const ingestionKeyIssueForPersonalProject = vi
         .fn()
         .mockResolvedValue({ token: "ik-lw-abc_secret", prefix: "ik-lw-abc" });
-      const api = mountCli({ governance: { ingestionKeyIssueForPersonalProject } });
+      const api = mountCli({ ingestionKeys: { mint: ingestionKeyIssueForPersonalProject } });
 
       const response = await api.post("/api/auth/cli/governance/ingestion-key", {
         source_type: "internal_codex",
@@ -461,8 +408,8 @@ describe("the CLI governance plane", () => {
     /** @scenario The CLI can ask what became of its own key */
     it("answers with the cause for a revoked key and unknown for one it does not hold", async () => {
       const revoked = mountCli({
-        governance: {
-          getPersonalIngestionKeyState: vi.fn().mockResolvedValue({
+        ingestionKeys: {
+          getPersonalKeyState: vi.fn().mockResolvedValue({
             live: false,
             sourceType: "internal_codex",
             revocationCause: "cap_retired",
@@ -470,10 +417,8 @@ describe("the CLI governance plane", () => {
         },
       });
       const absent = mountCli({
-        governance: {
-          getPersonalIngestionKeyState: vi
-            .fn()
-            .mockRejectedValue(new IngestionKeyNotFoundError("lookup-2")),
+        ingestionKeys: {
+          getPersonalKeyState: vi.fn().mockRejectedValue(new IngestionKeyNotFoundError("lookup-2")),
         },
       });
 
@@ -500,7 +445,7 @@ describe("the CLI governance plane", () => {
           project: { id: "project_personal", slug: "bob", name: "Bob", apiKey: "k" },
         },
         budgets: {
-          check: vi.fn().mockResolvedValue({
+          checkBudget: vi.fn().mockResolvedValue({
             decision: "hard_block",
             blockedBy: [
               {
@@ -513,7 +458,7 @@ describe("the CLI governance plane", () => {
             ],
           }),
         },
-        governance: { personalVirtualKeyList: vi.fn().mockResolvedValue([{ id: "vk_1" }]) },
+        personalKeys: { list: vi.fn().mockResolvedValue([{ id: "vk_1" }]) },
       });
 
       const response = await api.get("/api/auth/cli/budget/status");
@@ -533,13 +478,13 @@ describe("the CLI governance plane", () => {
       });
     });
 
-    it("reads clear when this deployment composed no spend store", async () => {
+    it("reads clear when no budget blocks the personal key", async () => {
       const api = mountCli({
         personalWorkspace: {
           team: { id: "team_1" },
           project: { id: "project_personal", slug: "bob", name: "Bob", apiKey: "k" },
         },
-        governance: { personalVirtualKeyList: vi.fn().mockResolvedValue([{ id: "vk_1" }]) },
+        personalKeys: { list: vi.fn().mockResolvedValue([{ id: "vk_1" }]) },
       });
 
       const response = await api.get("/api/auth/cli/budget/status");
@@ -552,8 +497,8 @@ describe("the CLI governance plane", () => {
   describe("when the CLI lists the organization's ingestion templates", () => {
     it("answers the snake_case envelope, distinct from the project-key door's", async () => {
       const api = mountCli({
-        governance: {
-          templateListForUser: vi.fn().mockResolvedValue([
+        templates: {
+          listForUser: vi.fn().mockResolvedValue([
             {
               id: "tmpl_1",
               organizationId: ORGANIZATION_ID,

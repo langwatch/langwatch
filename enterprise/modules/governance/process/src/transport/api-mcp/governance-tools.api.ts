@@ -3,9 +3,8 @@
 
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { type ZodRawShape, z } from "zod";
-
-import type { GovernanceDirectoryRepository } from "../../repositories/governance-directory.repository.ts";
 
 type ToolCallback = (
   // The MCP SDK passes parsed input as the first arg; we don't currently
@@ -41,7 +40,7 @@ const FORBIDDEN_PREFIX = "FORBIDDEN: ";
 const NEEDS_OAUTH_PREFIX = "AUTH_REQUIRED: ";
 
 export interface GovernanceMcpContext {
-  directory: GovernanceDirectoryRepository;
+  projects: Pick<ProjectApi, "findIdByLegacyApiKey" | "getOrganizationId">;
   governance: GovernanceApi;
   /** The organization permission decision this surface is judged by. */
   permissions: GovernanceMcpPermissionProbe;
@@ -70,12 +69,13 @@ export function registerGovernanceMcpTools(server: McpServerLike, ctx: Governanc
   const resolve = async (): Promise<ResolvedContext> => {
     if (!resolvedPromise) {
       resolvedPromise = (async () => {
-        const organizationId = await ctx.directory.findOrganizationIdByProjectApiKey(ctx.apiKey);
-        if (organizationId === null) {
+        const projectId = await ctx.projects.findIdByLegacyApiKey({ token: ctx.apiKey });
+        if (projectId === null) {
           throw new Error(
             "MCP session apiKey did not resolve to a project — cannot derive organization context for governance tools.",
           );
         }
+        const organizationId = await ctx.projects.getOrganizationId(projectId);
         return { organizationId, callerUserId: ctx.callerUserId };
       })();
     }

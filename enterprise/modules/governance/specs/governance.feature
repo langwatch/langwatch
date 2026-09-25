@@ -165,3 +165,10 @@ Feature: Enterprise governance package boundary
     And the organization has no source that can list agents
     When an admin asks every source for its agents
     Then the ask is refused with agent_listing_unavailable, as on main
+
+  @unit
+  Scenario: The api answers the CLI governance routes main serves
+    Given governance installed over memory stores in the api role
+    When a CLI presents a bearer the access-token store does not know on /api/auth/cli/budget/status
+    Then the family carries main's fourteen /api/auth/cli routes
+    And the route answers 401 with main's unauthorized body

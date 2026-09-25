@@ -8,10 +8,6 @@ export type { DepartmentService } from "./services/department.service.ts";
 export type { GovernanceSignalService } from "./services/governance-signal.service.ts";
 export type { SpendSpikeAnomalyEvaluatorService } from "./services/spend-spike-anomaly-evaluator.service.ts";
 
-export type {
-  GovernanceDirectoryProject,
-  GovernanceMembershipStatus,
-} from "./repositories/governance-directory.repository.ts";
 /**
  * The landing decision, re-exported beside the service it gathers signals from.
  */
@@ -125,18 +121,15 @@ export type {
   GovernanceCliAccessMembers,
   GovernanceCliAccessToken,
   GovernanceCliCaller,
-  GovernanceCliMemberDirectory,
 } from "./services/governance-cli-access.service.ts";
 export type {
   GovernanceCliActivityApi,
   GovernanceCliActivityMembers,
 } from "./services/governance-cli-activity.service.ts";
 export type {
-  GovernanceCliBudgetReader,
   GovernanceCliCredentialApi,
   GovernanceCliCredentialMembers,
   GovernanceCliPersonalWorkspace,
-  GovernanceCliPersonDirectory,
 } from "./services/governance-cli-credentials.service.ts";
 
 // The Activity Monitor's push-mode receivers. A signal whose collection this

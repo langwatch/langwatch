@@ -19,7 +19,6 @@ import {
   governanceCliProjectKeyRequestSchema,
   governanceCliRefusalAnswers,
   governanceCliVirtualKeyRequestSchema,
-  type GovernanceApi,
   type GovernanceCliBudgetStatusAnswer,
   type GovernanceCliBootstrapAnswer,
   type GovernanceCliBudgetOverviewAnswer,
@@ -44,6 +43,7 @@ import {
   type GovernanceCliSourceRequest,
   type GovernanceCliSourcesRequest,
 } from "@langwatch/enterprise-governance-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 
 import type {
@@ -57,25 +57,41 @@ import type {
   GovernanceCliCredentialApi,
   GovernanceCliIngestionKeyOutcome,
 } from "./governance-cli-credentials.service.ts";
+import type { DefaultGovernanceCliBootstrapService } from "./governance-cli-tool-bootstrap.service.ts";
+import type { DefaultGovernanceSetupStateService } from "./governance-setup-state.service.ts";
+import type { IngestionTemplateService } from "./ingestion-template.service.ts";
+import type { PersonalIngestionKeyService } from "./personal-ingestion-key.service.ts";
 
 type GovernanceCliServiceMembers = Readonly<{
   access: GovernanceCliAccessApi;
   credentials: GovernanceCliCredentialApi;
   activity: GovernanceCliActivityApi;
-  governance: GovernanceApi;
+  bootstraps: Pick<DefaultGovernanceCliBootstrapService, "resolve">;
+  budgets: Pick<GatewayApi, "budgetOverviewForUser">;
+  setupState: Pick<DefaultGovernanceSetupStateService, "resolve">;
+  templates: Pick<IngestionTemplateService, "listForUser">;
+  ingestionKeys: Pick<PersonalIngestionKeyService, "list" | "getPersonalKeyState">;
 }>;
 
 export class GovernanceCliService {
   #access: GovernanceCliAccessApi;
   #credentials: GovernanceCliCredentialApi;
   #activity: GovernanceCliActivityApi;
-  #governance: GovernanceApi;
+  #bootstraps: GovernanceCliServiceMembers["bootstraps"];
+  #budgets: GovernanceCliServiceMembers["budgets"];
+  #setupState: GovernanceCliServiceMembers["setupState"];
+  #templates: GovernanceCliServiceMembers["templates"];
+  #ingestionKeys: GovernanceCliServiceMembers["ingestionKeys"];
 
   private constructor(members: GovernanceCliServiceMembers) {
     this.#access = members.access;
     this.#credentials = members.credentials;
     this.#activity = members.activity;
-    this.#governance = members.governance;
+    this.#bootstraps = members.bootstraps;
+    this.#budgets = members.budgets;
+    this.#setupState = members.setupState;
+    this.#templates = members.templates;
+    this.#ingestionKeys = members.ingestionKeys;
   }
 
   static create(members: GovernanceCliServiceMembers): GovernanceCliService {
@@ -112,7 +128,7 @@ export class GovernanceCliService {
     if ("refusal" in gate) return gate.refusal;
     return ok(
       governanceCliBootstrapAnswers[200],
-      await this.#governance.cliBootstrapResolve({
+      await this.#bootstraps.resolve({
         userId: gate.caller.user_id,
         organizationId: gate.caller.organization_id,
       }),
@@ -124,7 +140,7 @@ export class GovernanceCliService {
     if ("refusal" in gate) return gate.refusal;
     return ok(
       governanceCliBudgetOverviewAnswers[200],
-      await this.#governance.personalBudgetOverviewForUser({
+      await this.#budgets.budgetOverviewForUser({
         userId: gate.caller.user_id,
         organizationId: gate.caller.organization_id,
       }),
@@ -277,7 +293,7 @@ export class GovernanceCliService {
     const gate = await this.#admit({ ...input, feature: "ingestionSources" });
     if ("refusal" in gate) return gate.refusal;
     return ok(governanceCliGovernanceStatusAnswers[200], {
-      setup: await this.#governance.resolveSetupState(gate.caller.organization_id),
+      setup: await this.#setupState.resolve(gate.caller.organization_id),
     });
   }
 
@@ -286,7 +302,7 @@ export class GovernanceCliService {
   ): Promise<GovernanceCliIngestionTemplatesAnswer> {
     const gate = await this.#admit(input);
     if ("refusal" in gate) return gate.refusal;
-    const rows = await this.#governance.templateListForUser({
+    const rows = await this.#templates.listForUser({
       organizationId: gate.caller.organization_id,
     });
     return ok(governanceCliIngestionTemplatesAnswers[200], {
@@ -312,7 +328,7 @@ export class GovernanceCliService {
   async ingestionKeys(input: GovernanceCliRequest): Promise<GovernanceCliIngestionKeysAnswer> {
     const gate = await this.#admit(input);
     if ("refusal" in gate) return gate.refusal;
-    const keys = await this.#governance.ingestionKeyListForPersonalProject({
+    const keys = await this.#ingestionKeys.list({
       userId: gate.caller.user_id,
       organizationId: gate.caller.organization_id,
     });
@@ -324,8 +340,8 @@ export class GovernanceCliService {
   ): Promise<GovernanceCliIngestionKeyStateAnswer> {
     const gate = await this.#admit(input);
     if ("refusal" in gate) return gate.refusal;
-    const key = await this.#governance
-      .getPersonalIngestionKeyState({
+    const key = await this.#ingestionKeys
+      .getPersonalKeyState({
         userId: gate.caller.user_id,
         organizationId: gate.caller.organization_id,
         lookupId: input.lookupId,

@@ -127,5 +127,20 @@ describe("GovernanceApp personal surface", () => {
         userId: CALLER.id,
       });
     });
+
+    it("passes the ask for top models through to the gateway", async () => {
+      const { app, budgetOverviewForUser } = await buildApp({ workspace });
+
+      await app.personalBudgetOverview(
+        { organizationId: ORGANIZATION_ID, includeTopModels: true },
+        CALLER,
+      );
+
+      expect(budgetOverviewForUser).toHaveBeenCalledWith({
+        organizationId: ORGANIZATION_ID,
+        userId: CALLER.id,
+        includeTopModels: true,
+      });
+    });
   });
 });

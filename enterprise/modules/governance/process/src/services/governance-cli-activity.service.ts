@@ -7,10 +7,12 @@
  */
 import type {
   ActivityEventDetailRow,
-  GovernanceApi,
   GovernanceIngestionSource,
   SourceHealthMetrics,
 } from "@langwatch/enterprise-governance-contract";
+
+import type { ActivityMonitorService } from "./ingestion-source-activity.service.ts";
+import type { IngestionSourceService } from "./ingestion-source.service.ts";
 
 /** One source as the CLI's Activity Monitor lists it. */
 export type GovernanceCliSourceSummary = Readonly<{
@@ -42,9 +44,10 @@ export interface GovernanceCliActivityApi {
   }): Promise<GovernanceCliSourceHealth>;
 }
 
+/** The SAME services the console's Activity Monitor reads. */
 export type GovernanceCliActivityMembers = Readonly<{
-  /** The SAME governance service the console's Activity Monitor reads. */
-  governance: () => GovernanceApi;
+  sources: Pick<IngestionSourceService, "list" | "getById">;
+  activity: Pick<ActivityMonitorService, "eventsForSource" | "sourceHealthMetrics">;
 }>;
 
 export class GovernanceCliActivityService implements GovernanceCliActivityApi {
@@ -59,7 +62,7 @@ export class GovernanceCliActivityService implements GovernanceCliActivityApi {
     organizationId: string;
     includeArchived: boolean;
   }): Promise<readonly GovernanceIngestionSource[]> {
-    const sources = await this.members.governance().ingestionSourceList(input.organizationId);
+    const sources = await this.members.sources.list(input.organizationId);
 
     return input.includeArchived ? sources : sources.filter((source) => source.archivedAt === null);
   }
@@ -70,15 +73,13 @@ export class GovernanceCliActivityService implements GovernanceCliActivityApi {
     limit: number;
     beforeIso: string | undefined;
   }): Promise<ActivityEventDetailRow[]> {
-    const governance = this.members.governance();
-
     // Ownership is proved before the analytics read.
-    await governance.ingestionSourceGetById({
+    await this.members.sources.getById({
       id: input.sourceId,
       organizationId: input.organizationId,
     });
 
-    return governance.activityEventsForSource({
+    return this.members.activity.eventsForSource({
       organizationId: input.organizationId,
       sourceId: input.sourceId,
       limit: input.limit,
@@ -90,12 +91,11 @@ export class GovernanceCliActivityService implements GovernanceCliActivityApi {
     organizationId: string;
     sourceId: string;
   }): Promise<GovernanceCliSourceHealth> {
-    const governance = this.members.governance();
-    const source = await governance.ingestionSourceGetById({
+    const source = await this.members.sources.getById({
       id: input.sourceId,
       organizationId: input.organizationId,
     });
-    const health = await governance.activitySourceHealthMetrics({
+    const health = await this.members.activity.sourceHealthMetrics({
       organizationId: input.organizationId,
       sourceId: input.sourceId,
     });
