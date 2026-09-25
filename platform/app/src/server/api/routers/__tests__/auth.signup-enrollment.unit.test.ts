@@ -7,11 +7,13 @@ const {
   validateUnconfirmedAddressProof,
   localSignUpDecision,
   hasEmailProvider,
+  isEmailUnconfigured,
 } = vi.hoisted(() => ({
   validateAddressProof: vi.fn(),
   validateUnconfirmedAddressProof: vi.fn(),
   localSignUpDecision: vi.fn(),
   hasEmailProvider: vi.fn(),
+  isEmailUnconfigured: vi.fn(),
 }));
 
 vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
@@ -28,7 +30,7 @@ vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
 vi.mock("~/server/mailer/providers", async (importOriginal) => ({
   ...(await importOriginal<typeof import("~/server/mailer/providers")>()),
   hasEmailProvider,
-  isEmailUnconfigured: () => !hasEmailProvider(),
+  isEmailUnconfigured,
 }));
 
 const passwordAndPasskey = [
@@ -42,6 +44,7 @@ describe("auth.signUpEnrollment", () => {
     validateAddressProof.mockResolvedValue(true);
     validateUnconfirmedAddressProof.mockResolvedValue(false);
     hasEmailProvider.mockReturnValue(true);
+    isEmailUnconfigured.mockReturnValue(false);
     localSignUpDecision.mockResolvedValue({
       outcome: "enroll",
       methodSet: [{ id: "password", kind: "password", connectionId: null }],
@@ -80,6 +83,7 @@ describe("auth.signUpEnrollment", () => {
   describe("given an installation with no email provider", () => {
     beforeEach(() => {
       hasEmailProvider.mockReturnValue(false);
+      isEmailUnconfigured.mockReturnValue(true);
       validateAddressProof.mockResolvedValue(false);
       validateUnconfirmedAddressProof.mockResolvedValue(true);
       localSignUpDecision.mockResolvedValue({
@@ -114,6 +118,24 @@ describe("auth.signUpEnrollment", () => {
       });
 
       expect(decision.methodSet).toEqual(passwordAndPasskey);
+    });
+  });
+
+  describe("given a named email provider that cannot be used", () => {
+    /** @scenario "A misconfigured email provider keeps sign-up on the mailed link" */
+    it("refuses an unconfirmed proof", async () => {
+      hasEmailProvider.mockReturnValue(false);
+      isEmailUnconfigured.mockReturnValue(false);
+      validateAddressProof.mockResolvedValue(false);
+      validateUnconfirmedAddressProof.mockResolvedValue(true);
+
+      await expect(
+        caller().signUpEnrollment({
+          email: "sam@example.com",
+          addressProof: "unconfirmed-proof",
+        }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      expect(localSignUpDecision).not.toHaveBeenCalled();
     });
   });
 

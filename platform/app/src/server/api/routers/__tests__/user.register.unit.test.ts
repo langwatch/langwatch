@@ -51,13 +51,14 @@ const { claimAddressProofMock, claimUnconfirmedAddressProofMock } = vi.hoisted(
     claimUnconfirmedAddressProofMock: vi.fn(),
   }),
 );
-const { hasEmailProviderMock } = vi.hoisted(() => ({
+const { hasEmailProviderMock, isEmailUnconfiguredMock } = vi.hoisted(() => ({
   hasEmailProviderMock: vi.fn(),
+  isEmailUnconfiguredMock: vi.fn(),
 }));
 vi.mock("~/server/mailer/providers", async (importOriginal) => ({
   ...(await importOriginal<typeof import("~/server/mailer/providers")>()),
   hasEmailProvider: hasEmailProviderMock,
-  isEmailUnconfigured: () => !hasEmailProviderMock(),
+  isEmailUnconfigured: isEmailUnconfiguredMock,
 }));
 const { registerMock } = vi.hoisted(() => ({
   registerMock: vi.fn(),
@@ -118,6 +119,7 @@ describe("userRouter.register()", () => {
     claimAddressProofMock.mockResolvedValue(true);
     claimUnconfirmedAddressProofMock.mockResolvedValue(false);
     hasEmailProviderMock.mockReturnValue(true);
+    isEmailUnconfiguredMock.mockReturnValue(false);
   });
 
   const createCaller = () =>
@@ -240,9 +242,30 @@ describe("userRouter.register()", () => {
     });
   });
 
+  describe("given a named email provider that cannot be used", () => {
+    /** @scenario "A misconfigured email provider keeps sign-up on the mailed link" */
+    it("refuses an unconfirmed proof without spending it", async () => {
+      hasEmailProviderMock.mockReturnValue(false);
+      isEmailUnconfiguredMock.mockReturnValue(false);
+      claimAddressProofMock.mockResolvedValue(false);
+      claimUnconfirmedAddressProofMock.mockResolvedValue(true);
+
+      await expect(
+        createCaller().register({
+          email: "sam@acme.com",
+          password: "correct horse battery staple",
+          addressProof: "unconfirmed-proof",
+        }),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+      expect(claimUnconfirmedAddressProofMock).not.toHaveBeenCalled();
+      expect(registerMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given an installation with no email provider", () => {
     beforeEach(() => {
       hasEmailProviderMock.mockReturnValue(false);
+      isEmailUnconfiguredMock.mockReturnValue(true);
       claimAddressProofMock.mockResolvedValue(false);
       claimUnconfirmedAddressProofMock.mockResolvedValue(true);
     });
