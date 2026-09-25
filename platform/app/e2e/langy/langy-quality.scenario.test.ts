@@ -158,7 +158,7 @@ describe("Langy quality bar", () => {
    * call. The turn is written as `completed`, so it carries no error and never
    * reaches remediation: from every dashboard the platform has, a blank reply
    * looks healthy. AGENTS.md forbids it outright: "Every turn ends with at
-   * least one visible line of text; an empty reply is never correct."
+   * least one visible line of text, never one that only restates the cards."
    *
    * Asserted structurally, not by the judge. A judge grading an empty string
    * can rationalise it as terse; `length === 0` cannot.
