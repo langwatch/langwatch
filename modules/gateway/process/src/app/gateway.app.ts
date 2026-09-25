@@ -42,6 +42,8 @@ import {
   type UpdateGatewayCacheRuleInput,
   type UpdateGatewayGuardrailInput,
   type GatewayApi,
+  type GatewaySpendEventEnvelope,
+  gatewaySpendEventEnvelopeSchema,
   type GatewayUsageCount,
   gatewayConfig,
   type GatewayDeploymentAddresses,
@@ -1082,8 +1084,8 @@ export class GatewayApp implements GatewayApi {
   }
 
   /** One spend row rendered as the canonical billing envelope. */
-  spendEventEnvelope(row: WebhookSpendEventRow): ReturnType<typeof webhookEnvelopeFromSpendRow> {
-    return webhookEnvelopeFromSpendRow(row);
+  spendEventEnvelope(row: WebhookSpendEventRow): GatewaySpendEventEnvelope {
+    return gatewaySpendEventEnvelopeSchema.parse(webhookEnvelopeFromSpendRow(row));
   }
 
   /** Whether an endpoint's subscriptions cover one event type. */

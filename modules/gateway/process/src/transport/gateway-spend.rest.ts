@@ -7,8 +7,10 @@ import {
 } from "@langwatch/api/rest";
 import {
   gatewaySpendEnvelopeSchema,
+  gatewaySpendEventEnvelopeSchema,
   USD_DISPLAY_STRING_FORMAT,
   type GatewaySpendEnvelope,
+  type GatewaySpendEventEnvelope,
 } from "@langwatch/gateway-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import { generate } from "@langwatch/ksuid";
@@ -120,7 +122,7 @@ export type GatewaySpendApp = Readonly<{
    * is the webhook platform's, and the pull and the push must answer the same
    * bytes, so the mapping arrives rather than being restated here.
    */
-  spendEventEnvelope(row: SpendLedgerRow): GatewaySpendEnvelope;
+  spendEventEnvelope(row: SpendLedgerRow): GatewaySpendEventEnvelope;
 
   /** Selector grammar is the webhook platform's; a second reading here could disagree with push. */
   endpointAcceptsEvent(input: { enabledEvents: readonly string[]; eventType: string }): boolean;
@@ -625,7 +627,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
   .withPermission("gatewaySpend:view")
   .withOutput(
     z.object({
-      data: z.array(gatewaySpendEnvelopeSchema),
+      data: z.array(gatewaySpendEventEnvelopeSchema),
       next_cursor: nextCursorSchema,
     }),
   )

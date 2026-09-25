@@ -60,7 +60,21 @@ function testEnvelope(row: SpendEventRow) {
     type: `gateway.request.${family}`,
     created: toDate(row.occurredAt).toISOString(),
     schema_version: "1",
-    data: { gateway_request_id: row.gatewayRequestId, status: row.status },
+    data: {
+      event_id: `${row.gatewayRequestId}:${family}`,
+      event_type: `gateway.request.${family}`,
+      gateway_request_id: row.gatewayRequestId,
+      occurred_at: toDate(row.occurredAt).toISOString(),
+      usage: null,
+      cost: null,
+      status: row.status,
+      needs_reconciliation: null,
+      settle_reason: null,
+      error: null,
+      duration_ms: null,
+      labels: row.labels,
+      metadata: {},
+    },
   };
 }
 

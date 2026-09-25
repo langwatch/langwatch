@@ -193,3 +193,55 @@ export const gatewaySpendEnvelopeSchema = z.object({
   data: z.record(z.string(), z.unknown()),
 });
 export type GatewaySpendEnvelope = z.infer<typeof gatewaySpendEnvelopeSchema>;
+
+const spendEventUsageSchema = z.object({
+  input_tokens: z.number().int(),
+  output_tokens: z.number().int(),
+  cache_read_input_tokens: z.number().int(),
+  cache_creation_input_tokens: z.number().int(),
+  reasoning_tokens: z.number().int(),
+  input_image_tokens: z
+    .number()
+    .int()
+    .optional()
+    .describe("Image tokens billed on the input side, disjoint from input_tokens."),
+  output_image_tokens: z
+    .number()
+    .int()
+    .optional()
+    .describe("Image tokens the answer was billed for, disjoint from output_tokens."),
+  image_count: z
+    .number()
+    .int()
+    .optional()
+    .describe("Images the request carried. Display only: never part of a cost sum."),
+});
+
+const spendEventCostSchema = z.object({
+  total_usd: z.string().describe("Display value. Use nano_usd for arithmetic."),
+  nano_usd: z.number().int().describe("Canonical integer cost, nano-USD."),
+  rate_version: z.string().nullable().optional(),
+});
+
+/** The pulled billing envelope, its `data` typed as the webhooks deliver it. */
+export const gatewaySpendEventEnvelopeSchema = z.object({
+  ...gatewaySpendEnvelopeSchema.shape,
+  data: z.looseObject({
+    event_id: z.string(),
+    event_type: z.string(),
+    /** The join key across the settled/completed pair. */
+    gateway_request_id: z.string(),
+    occurred_at: z.string(),
+    /** Null while quantities are unknown (admitted) or no longer authoritative (settled). */
+    usage: spendEventUsageSchema.nullable(),
+    cost: spendEventCostSchema.nullable(),
+    status: z.string(),
+    needs_reconciliation: z.boolean().nullable(),
+    settle_reason: z.string().nullable(),
+    error: z.object({ class: z.string(), http_status: z.number().int().nullable() }).nullable(),
+    duration_ms: z.number().int().nullable(),
+    labels: z.array(z.string()),
+    metadata: z.record(z.string(), z.unknown()),
+  }),
+});
+export type GatewaySpendEventEnvelope = z.infer<typeof gatewaySpendEventEnvelopeSchema>;
