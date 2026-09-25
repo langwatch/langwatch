@@ -8150,6 +8150,9 @@ importers:
       '@langwatch/api-fixture':
         specifier: workspace:*
         version: link:../../../packages/api-fixture
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
