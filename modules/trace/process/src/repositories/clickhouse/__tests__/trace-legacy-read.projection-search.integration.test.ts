@@ -196,6 +196,9 @@ class FakeAnnotationService implements AnnotationApi {
   getQueue(): never {
     throw new Error("Not used by projection search tests: getQueue.");
   }
+  getQueueWalkStep(): never {
+    throw new Error("Not used by projection search tests: getQueueWalkStep.");
+  }
   createReview(): never {
     throw new Error("Not used by projection search tests: createReview.");
   }

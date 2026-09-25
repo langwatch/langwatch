@@ -58,6 +58,10 @@ export class TestModelProviderService implements ModelProviderApi {
     throw new Error("Not used by Workflow tests.");
   }
 
+  generateText(): Promise<never> {
+    throw new Error("Not used by Workflow tests.");
+  }
+
   platformProviderChain(): Promise<never> {
     throw new Error("Not used by Workflow tests.");
   }

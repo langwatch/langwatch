@@ -119,6 +119,20 @@ export type ModelProviderStructuredGenerationInput = Readonly<{
   maxRetries: number;
 }>;
 
+/** One message of a feature-owned text completion. */
+export type ModelProviderTextMessage = Readonly<{ role: "user" | "assistant"; content: string }>;
+
+/** A feature-owned plain-text completion, run on the feature's configured model. */
+export type ModelProviderTextGenerationInput = Readonly<{
+  projectId: string;
+  featureKey: string;
+  system: string;
+  messages: readonly ModelProviderTextMessage[];
+  maxOutputTokens?: number;
+  temperature?: number;
+  reasoningEffort?: "low" | "medium" | "high";
+}>;
+
 export const modelProviderTenantInputSchema = z
   .object({
     projectId: z.string().min(1).optional(),

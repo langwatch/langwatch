@@ -49,6 +49,7 @@ import {
   type ModelProviderExecutionParameters,
   type ModelProviderExecutionPrepareInput,
   type ModelProviderStructuredGenerationInput,
+  type ModelProviderTextGenerationInput,
   type ModelProviderPlaygroundCompletion,
   type ModelProviderPlaygroundRequest,
   type ModelProviderListOrganizationInput,
@@ -82,6 +83,7 @@ import { ModelProviderExecutionHandleService } from "../services/model-provider-
 import { ModelProviderKeysService } from "../services/model-provider-keys.service.ts";
 import { ModelProviderPlaygroundService } from "../services/model-provider-playground.service.ts";
 import { ModelProviderStructuredGenerationService } from "../services/model-provider-structured-generation.service.ts";
+import { ModelProviderTextGenerationService } from "../services/model-provider-text-generation.service.ts";
 import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
 import { ModelProviderService as ModelProviderGateway } from "../services/model-provider.service.ts";
 import { PlatformProviderChainService } from "../services/platform-provider-chain.service.ts";
@@ -338,6 +340,7 @@ export class ModelProviderApp implements ModelProviderApi {
   readonly #playground: ModelProviderPlaygroundService;
   readonly #evaluatorModelEnv: ModelProviderEvaluatorModelEnvService;
   readonly #structuredGeneration: ModelProviderStructuredGenerationService;
+  readonly #textGeneration: ModelProviderTextGenerationService;
 
   private readonly platformChain: PlatformProviderChainService;
 
@@ -394,6 +397,10 @@ export class ModelProviderApp implements ModelProviderApi {
     this.#structuredGeneration = ModelProviderStructuredGenerationService.create({
       execution,
     });
+    this.#textGeneration = ModelProviderTextGenerationService.create({
+      execution,
+      aiCallFailures: this.#aiCallFailures,
+    });
   }
 
   // ── providers ──────────────────────────────────────────────────────────────
@@ -440,6 +447,10 @@ export class ModelProviderApp implements ModelProviderApi {
 
   generateStructured(input: ModelProviderStructuredGenerationInput): Promise<unknown> {
     return this.#structuredGeneration.generate(input);
+  }
+
+  generateText(input: ModelProviderTextGenerationInput): Promise<{ text: string }> {
+    return this.#textGeneration.generate(input);
   }
 
   runPlaygroundCompletion(

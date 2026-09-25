@@ -145,6 +145,9 @@ export class TestModelProviderService implements ModelProviderApi {
   generateStructured(): Promise<never> {
     throw new Error("Not used by Coding Agent tests.");
   }
+  generateText(): Promise<never> {
+    throw new Error("Not used by coding-agent tests.");
+  }
 
   platformProviderChain(): Promise<never> {
     throw new Error("Not used by Coding Agent tests.");

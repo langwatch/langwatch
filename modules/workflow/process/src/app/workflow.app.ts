@@ -1,5 +1,9 @@
 import { AgentApi } from "@langwatch/agent-contract";
-import { ProjectPermissionDeniedError, type AuthzPermission } from "@langwatch/authz-contract";
+import {
+  AuthzApi,
+  ProjectPermissionDeniedError,
+  type AuthzPermission,
+} from "@langwatch/authz-contract";
 /**
  * The workflow module's application: what all five of its doors call. A caller
  * arrives as an argument, never read from a session or a request, so one
@@ -10,7 +14,7 @@ import { EvaluatorApi, newEvaluatorId, type Evaluator } from "@langwatch/evaluat
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
-import { ModelProviderApi, type ModelRole } from "@langwatch/model-provider-contract";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import type { Instant } from "@langwatch/time";
 import {
@@ -66,9 +70,12 @@ import {
   type WorkflowServerConfig,
   type WorkflowUsageCount,
 } from "@langwatch/workflow-contract";
-import type { LanguageModel } from "ai";
 
 import { UnconfiguredWorkflowNlpRuntimeAdapter } from "../channels/http/http.workflow-nlp-runtime.channel.ts";
+import {
+  HttpWorkflowStudioStreamAdapter,
+  UnconfiguredWorkflowStudioStreamAdapter,
+} from "../channels/http/http.workflow-studio-stream.channel.ts";
 import {
   workflowRepositories,
   type WorkflowRepositories,
@@ -78,13 +85,16 @@ import { workflowPlatformUrl } from "../rules/workflow-platform-url.rules.ts";
 import { NlpLambdaCleanupService } from "../services/nlp-lambda-cleanup.service.ts";
 import { StudioEventPreparerService } from "../services/studio-event-preparer.service.ts";
 import { WorkflowAgentMappingService } from "../services/workflow-agent-mapping.service.ts";
+import { WorkflowCodeCompletionService } from "../services/workflow-code-completion.service.ts";
+import { WorkflowCommitMessageService } from "../services/workflow-commit-message.service.ts";
 import { WorkflowCopyLineageService } from "../services/workflow-copy-lineage.service.ts";
 import { ContractWorkflowDslMigrationService } from "../services/workflow-dsl-migration.service.ts";
 import { WorkflowNlpExecutionService } from "../services/workflow-nlp-execution.service.ts";
+import { WorkflowPermissionService } from "../services/workflow-permission.service.ts";
 import { WorkflowProjectEnvironmentService } from "../services/workflow-project-environment.service.ts";
 import { WorkflowPublicationService } from "../services/workflow-publication.service.ts";
 import { WorkflowStudioCopyService } from "../services/workflow-studio-copy.service.ts";
-import type { WorkflowStudioDispatchService } from "../services/workflow-studio-dispatch.service.ts";
+import { WorkflowStudioDispatchService } from "../services/workflow-studio-dispatch.service.ts";
 import { ModelProviderWorkflowStudioDslService } from "../services/workflow-studio-dsl.service.ts";
 import { WorkflowStudioVersionService } from "../services/workflow-studio-version.service.ts";
 import { WorkflowService } from "../services/workflow.service.ts";
@@ -295,12 +305,29 @@ export interface WorkflowInfrastructure {
  */
 export type WorkflowHostMembers = Omit<
   WorkflowInfrastructure,
-  "evaluators" | "studioDsl" | "agentMappings" | "workflowRows" | "workflows" | "datasets"
+  | "evaluators"
+  | "studioDsl"
+  | "agentMappings"
+  | "workflowRows"
+  | "workflows"
+  | "datasets"
+  | "permissions"
+  | "commitMessages"
+  | "codeCompletions"
+  | "studioRuns"
+  | "studioDispatch"
+  | "publicBaseUrl"
 >;
+
+/** The engine address and public origin are process facts, not this module's env spellings. */
+type WorkflowProcessFacts = Readonly<{
+  nlpServiceUrl: string | undefined;
+  publicBaseUrl: string | undefined;
+}>;
 
 type WorkflowSetup = FeatureSetup<
   typeof WorkflowApp.dependencies,
-  WorkflowHostMembers & MembersRead<typeof WorkflowApp.reads>,
+  WorkflowHostMembers & MembersRead<readonly ["prisma", "encryption"]> & WorkflowProcessFacts,
   WorkflowServerConfig,
   WorkflowRepositories
 >;
@@ -384,6 +411,8 @@ export class WorkflowApp implements WorkflowApi {
     agents: AgentApi,
     /** The dataset copies a Studio graph carries with it into another project. */
     datasets: DatasetApi,
+    /** Whether one person holds a permission on a project the caller names. */
+    authz: AuthzApi,
   };
   static readonly config = workflowConfig;
   /**
@@ -391,7 +420,11 @@ export class WorkflowApp implements WorkflowApi {
    * module's own `workflowRepositories` registry; `encryption` for decrypting
    * the project secrets `projectEnvironment` reads.
    */
-  static readonly reads = reads("prisma", "encryption");
+  static readonly reads = [
+    ...reads("prisma", "encryption"),
+    "nlpServiceUrl",
+    "publicBaseUrl",
+  ] as const;
   static readonly repositories = workflowRepositories;
 
   static create(setup: WorkflowSetup): WorkflowApp {
@@ -426,8 +459,24 @@ export class WorkflowApp implements WorkflowApi {
       ids,
     });
 
+    const modelProviders = setup.dependencies.modelProviders;
+    const studioDispatch = WorkflowStudioDispatchService.create({
+      stream: setup.members.nlpServiceUrl
+        ? HttpWorkflowStudioStreamAdapter.create({ serviceUrl: setup.members.nlpServiceUrl })
+        : UnconfiguredWorkflowStudioStreamAdapter.create(),
+      modelProviders,
+    });
+
     return new WorkflowApp({
       ...setup.members,
+      permissions: WorkflowPermissionService.create({ authz: setup.dependencies.authz }),
+      commitMessages: WorkflowCommitMessageService.create({ modelProviders }),
+      codeCompletions: WorkflowCodeCompletionService.create({ modelProviders }),
+      studioDispatch,
+      studioRuns: studioDispatch,
+      ...(setup.members.publicBaseUrl === undefined
+        ? {}
+        : { publicBaseUrl: setup.members.publicBaseUrl }),
       workflows,
       datasets,
       evaluators: setup.dependencies.evaluators,
@@ -1092,26 +1141,6 @@ export class WorkflowApp implements WorkflowApi {
 
     return workflowPlatformUrl({ publicBaseUrl: this.#members.publicBaseUrl, ...input });
   }
-}
-
-/** Resolves one feature key's model for one project. */
-export interface WorkflowCommitMessageModel {
-  resolve(input: { projectId: string; featureKey: string }): Promise<LanguageModel>;
-}
-
-/** The registered feature a call runs under, as the failure policy reads it. */
-export type WorkflowAiCallFeature = Readonly<{
-  key: string;
-  role: ModelRole;
-  displayName: string;
-}>;
-
-/**
- * Runs one model call for a named feature, turning any provider or SDK failure
- * into the application's typed `ai_call_failed` cause.
- */
-export interface WorkflowAiCall {
-  run<T>(feature: WorkflowAiCallFeature, call: () => Promise<T>): Promise<T>;
 }
 
 export type WorkflowExecutionInput = {

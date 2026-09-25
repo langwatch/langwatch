@@ -6,6 +6,7 @@
 // @vitest-environment node
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -41,11 +42,14 @@ function appWith(fleet?: NlpLambdaFleet): WorkflowApp {
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
       encryption: new NoopTestEncryption(),
+      nlpServiceUrl: void 0,
+      publicBaseUrl: void 0,
     },
     dependencies: {
       evaluators: members.evaluators,
       modelProviders: createApiFixture<ModelProviderApi>({}, "ModelProviderApi"),
       agents: createApiFixture<AgentApi>({}, "AgentApi"),
+      authz: createApiFixture<AuthzApi>({}, "AuthzApi"),
       datasets: members.datasets,
     },
     config: {

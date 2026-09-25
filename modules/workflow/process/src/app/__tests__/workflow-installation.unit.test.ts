@@ -50,7 +50,10 @@ function process_() {
       encrypt: (value: string) => value,
       decrypt: (value: string) => value,
     })
+    .withMember("nlpServiceUrl", undefined)
+    .withMember("publicBaseUrl", undefined)
     .provide({
+      authz: createApiFixture({}, "AuthzApi"),
       evaluator: members.evaluators,
       dataset: members.datasets,
       agent: createApiFixture({}, "AgentApi"),

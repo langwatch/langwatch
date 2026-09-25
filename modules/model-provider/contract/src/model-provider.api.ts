@@ -26,6 +26,7 @@ import type {
   ModelProviderExecutionParameters,
   ModelProviderExecutionPrepareInput,
   ModelProviderStructuredGenerationInput,
+  ModelProviderTextGenerationInput,
   ModelProviderListOrganizationInput,
   ModelProviderListProjectInput,
   ModelProviderResolution,
@@ -215,6 +216,11 @@ export interface ModelProviderApi {
   }): Promise<Record<string, string>>;
   /** Resolves a feature's configured model and returns schema-validated structured data. */
   generateStructured(input: ModelProviderStructuredGenerationInput): Promise<unknown>;
+  /**
+   * Runs a feature's plain-text completion on its configured model. Throws
+   * `ModelNotConfiguredError` when nothing resolves, `AiCallFailedError` when the provider fails.
+   */
+  generateText(input: ModelProviderTextGenerationInput): Promise<{ text: string }>;
   /** Streams one browser playground completion through the configured execution proxy. */
   runPlaygroundCompletion(
     input: ModelProviderPlaygroundRequest,

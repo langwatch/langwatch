@@ -14,6 +14,7 @@ import {
   type StudioLambdaConfig,
   type StudioLambdaFleetFields,
 } from "#rules/nlp-lambda-config.rules";
+import { WorkflowPermissionService } from "#services/workflow-permission.service";
 import { cronRest } from "#transport/cron.rest";
 import { workflowOptimizationTrpcTransport } from "#transport/workflow-optimization.trpc";
 import { workflowRunRest } from "#transport/workflow-run.rest";
@@ -32,7 +33,7 @@ export const workflowServer = defineServerModule("workflow")
     workflowStudioRest,
     cronRest,
   )
-  .withTransportFacts(({ members }) => [
+  .withTransportFacts(({ dependencies }) => [
     bindRestMiddleware(workflowStudioSession, (context) => {
       const caller = browserCallerOfRequest(context.req.raw);
 
@@ -47,7 +48,7 @@ export const workflowServer = defineServerModule("workflow")
       if (credential.type === "legacyProjectKey") return true;
       if (!credential.userId) return false;
 
-      return members.permissions.has({
+      return WorkflowPermissionService.create({ authz: dependencies.authz }).has({
         userId: credential.userId,
         projectId: credential.project.id,
         permission: "evaluations:view",

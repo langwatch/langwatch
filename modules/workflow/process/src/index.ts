@@ -96,11 +96,6 @@ export type {
   WorkflowNlpDispatchResponse,
 } from "./app/workflow.app.ts";
 export type { WorkflowStudioStream } from "./channels/nlp-lambda.channel.ts";
-export type {
-  WorkflowAiCall,
-  WorkflowCommitMessageModel,
-  WorkflowAiCallFeature,
-} from "./app/workflow.app.ts";
 export { WorkflowService, type WorkflowServiceOptions } from "./services/workflow.service.ts";
 export {
   StudioEventPreparerService,
@@ -113,7 +108,6 @@ export type {
   SaveStudioWorkflowVersionInput,
   WorkflowStudioVersionServiceOptions,
 } from "./services/workflow-studio-version.service.ts";
-export type { WorkflowModelResolver } from "./services/workflow-code-completion.service.ts";
 export { AwsNlpLambdaFleetChannel } from "./channels/aws/aws.nlp-lambda-fleet.channel.ts";
 export type { NlpLambdaCleanupReport } from "./services/nlp-lambda-cleanup.service.ts";
 export type {

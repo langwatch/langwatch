@@ -181,6 +181,7 @@ function forwarded(app: ModelProviderApp): ModelProviderApi {
     prepareExecution: (...args) => app.prepareExecution(...args),
     prepareEvaluatorModelEnv: (...args) => app.prepareEvaluatorModelEnv(...args),
     generateStructured: (...args) => app.generateStructured(...args),
+    generateText: (...args) => app.generateText(...args),
     runPlaygroundCompletion: (...args) => app.runPlaygroundCompletion(...args),
     upsert: (...args) => app.upsert(...args),
     upsertUnattributed: (...args) => app.upsertUnattributed(...args),
