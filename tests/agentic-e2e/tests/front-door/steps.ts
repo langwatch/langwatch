@@ -321,6 +321,7 @@ export async function thenIAmCalledByMyEmailNeverNull(
   // A fresh sign-up can still be redirecting to "/", which interrupts a goto.
   await expect(async () => {
     await page.goto(`/${projectSlug}/messages`);
+    expect(new URL(page.url()).pathname).toBe(`/${projectSlug}/messages`);
   }).toPass({ timeout: 15000 });
   await page.waitForURL((url) => !url.pathname.startsWith("/auth/"), {
     timeout: 15000,
