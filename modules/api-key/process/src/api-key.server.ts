@@ -12,10 +12,6 @@ import {
   type PrismaApiKeyDatabase,
 } from "./repositories/prisma/prisma.api-key.repository.ts";
 import { AgentSandboxKeyReapService } from "./services/agent-sandbox-key-reap.service.ts";
-import {
-  EventingAgentSandboxMaintenanceAdapter,
-  type AgentSandboxMaintenancePipelineDeps,
-} from "./services/agent-sandbox-maintenance.service.ts";
 import { CliLoginKeyReapService } from "./services/cli-login-key-reap.service.ts";
 import { apiKeyRest, apiKeyRestCredential } from "./transport/api-key.rest.ts";
 import { apiKeyTrpcTransport } from "./transport/api-key.trpc.ts";
@@ -60,13 +56,6 @@ export function createCliLoginKeyReapService(options: {
       }),
     now: options.now,
   });
-}
-
-/** The built maintenance pipeline, ready to register on the eventing runtime. */
-export function buildAgentSandboxMaintenancePipeline(
-  deps: AgentSandboxMaintenancePipelineDeps,
-): ReturnType<EventingAgentSandboxMaintenanceAdapter["build"]> {
-  return EventingAgentSandboxMaintenanceAdapter.create(deps).build();
 }
 
 /**

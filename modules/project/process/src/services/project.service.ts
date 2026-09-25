@@ -9,9 +9,6 @@ import {
   createProjectInputSchema,
   internalProjectKindSchema,
   internalProjectQuerySchema,
-  personalWorkspaceArchiveViolation,
-  personalWorkspaceCreateViolation,
-  personalWorkspaceMoveViolation,
   projectPaginationSchema,
   projectIdsByOrganizationInputSchema,
   projectNamesByIdsInputSchema,
@@ -37,8 +34,9 @@ import {
   traceDestinationProjectIdsSchema,
   type UpdateProjectInput,
   DestinationTeamNotFoundError,
-  PersonalProjectProtectedError,
-  PersonalWorkspaceBoundaryError,
+  assertPersonalProjectArchivable,
+  assertPersonalWorkspaceCreate,
+  assertPersonalWorkspaceMove,
   ProjectNotFoundError,
   ProjectSlugConflictError,
   TeamNotInOrganizationError,
@@ -285,10 +283,7 @@ export class ProjectService {
       throw new TeamNotInOrganizationError("Team does not belong to this organization");
     }
 
-    const violation = personalWorkspaceCreateViolation(destinationTeam.isPersonal);
-    if (violation) {
-      throw new PersonalWorkspaceBoundaryError(violation);
-    }
+    assertPersonalWorkspaceCreate(destinationTeam.isPersonal);
   }
 
   async create(input: {
@@ -388,13 +383,10 @@ export class ProjectService {
         current.team.organizationId === input.organizationId &&
         current.teamId !== data.teamId
       ) {
-        const violation = personalWorkspaceMoveViolation({
+        assertPersonalWorkspaceMove({
           isProjectPersonal: current.isPersonal,
           isDestinationTeamPersonal: team.isPersonal,
         });
-        if (violation) {
-          throw new PersonalWorkspaceBoundaryError(violation);
-        }
       }
     }
 
@@ -409,12 +401,8 @@ export class ProjectService {
 
   async archive(input: { id: string; organizationId: string }): Promise<Project> {
     const existing = await this.repository.findWithTeam(input.id);
-    const violation =
-      existing && existing.team.organizationId === input.organizationId
-        ? personalWorkspaceArchiveViolation(existing.isPersonal)
-        : null;
-    if (violation) {
-      throw new PersonalProjectProtectedError(violation);
+    if (existing && existing.team.organizationId === input.organizationId) {
+      assertPersonalProjectArchivable(existing.isPersonal);
     }
 
     try {

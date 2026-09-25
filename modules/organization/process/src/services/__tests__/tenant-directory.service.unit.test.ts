@@ -40,7 +40,10 @@ describe("the tenant directory", () => {
     it("answers the organization the project belongs to", async () => {
       const { directory } = directoryOver({ projects: { "project-1": "org-1" } });
 
-      await expect(directory.tryFindOrganizationForTenant("project-1")).resolves.toBe("org-1");
+      await expect(directory.getTenantPlacement("project-1")).resolves.toEqual({
+        kind: "placed",
+        organizationId: "org-1",
+      });
     });
   });
 
@@ -49,7 +52,10 @@ describe("the tenant directory", () => {
     it("answers that organization, with no project needing to exist", async () => {
       const { directory } = directoryOver({ organizations: ["org-1"] });
 
-      await expect(directory.tryFindOrganizationForTenant("org-1")).resolves.toBe("org-1");
+      await expect(directory.getTenantPlacement("org-1")).resolves.toEqual({
+        kind: "placed",
+        organizationId: "org-1",
+      });
     });
   });
 
@@ -58,7 +64,10 @@ describe("the tenant directory", () => {
     it("answers the platform tenant rather than resolving a membership", async () => {
       const { asked, directory } = directoryOver({ users: ["user-1"] });
 
-      await expect(directory.tryFindOrganizationForTenant("user-1")).resolves.toBe(PLATFORM_TENANT);
+      await expect(directory.getTenantPlacement("user-1")).resolves.toEqual({
+        kind: "placed",
+        organizationId: PLATFORM_TENANT,
+      });
       expect(asked).toEqual(["project:user-1", "organization:user-1", "user:user-1"]);
     });
   });
@@ -73,17 +82,20 @@ describe("the tenant directory", () => {
         users: ["user-1"],
       });
 
-      await expect(directory.tryFindOrganizationForTenant("user-1")).resolves.toBe(PLATFORM_TENANT);
+      await expect(directory.getTenantPlacement("user-1")).resolves.toEqual({
+        kind: "placed",
+        organizationId: PLATFORM_TENANT,
+      });
       expect(asked).not.toContain("organization:org-private");
     });
   });
 
   describe("given a tenant that names nothing at all", () => {
     /** @scenario "A tenant that names no project, organization or user is refused" */
-    it("answers null rather than falling back to the shared instance", async () => {
+    it("answers unplaced rather than falling back to the shared instance", async () => {
       const { directory } = directoryOver({});
 
-      await expect(directory.tryFindOrganizationForTenant("nobody")).resolves.toBeNull();
+      await expect(directory.getTenantPlacement("nobody")).resolves.toEqual({ kind: "unplaced" });
     });
   });
 });

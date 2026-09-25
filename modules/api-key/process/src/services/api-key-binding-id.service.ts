@@ -13,9 +13,9 @@ export interface ApiKeyBindingId {
 // it).
 const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
 
-export class ApiKeyBindingIdAdapter implements ApiKeyBindingId {
-  static create(): ApiKeyBindingIdAdapter {
-    return new ApiKeyBindingIdAdapter();
+export class ApiKeyBindingIdService implements ApiKeyBindingId {
+  static create(): ApiKeyBindingIdService {
+    return new ApiKeyBindingIdService();
   }
 
   private constructor() {}

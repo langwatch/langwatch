@@ -4,7 +4,6 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ApiKeyDiagnostics } from "../api-key-diagnostics.service.ts";
 import { LegacyApiKeyGrantService } from "../legacy-api-key-grant.service.ts";
 
 const CREATED_AT = new Date("2024-03-01T10:00:00.000Z");
@@ -34,17 +33,6 @@ function apiKey(overrides: Partial<ApiKey> = {}): ApiKey {
   };
 }
 
-class RecordingDiagnostics implements ApiKeyDiagnostics {
-  readonly warnings: {
-    context: Record<string, unknown>;
-    message: string;
-  }[] = [];
-
-  warn(context: Record<string, unknown>, message: string): void {
-    this.warnings.push({ context, message });
-  }
-}
-
 function harness(
   options: {
     cutoverAt?: Date | null;
@@ -58,15 +46,15 @@ function harness(
   const attachBindings =
     options.attachBindings ??
     vi.fn<AuthzApi["attachBindings"]>().mockResolvedValue({ attached: [], duplicates: [] });
-  const diagnostics = new RecordingDiagnostics();
+  const warn = vi.fn();
   const service = LegacyApiKeyGrantService.create({
     authz: createApiFixture<AuthzApi>({ findEngineCutoverAt }),
     grants: createApiFixture<AuthzApi>({ attachBindings }),
     deriveBindingId: () => "grant-derived",
-    diagnostics,
+    diagnostics: { warn },
     ...(options.now ? { now: options.now } : {}),
   });
-  return { service, findEngineCutoverAt, attachBindings, diagnostics };
+  return { service, findEngineCutoverAt, attachBindings, warn };
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -146,13 +134,16 @@ describe("LegacyApiKeyGrantService", () => {
     expect(attachBindings).not.toHaveBeenCalled();
   });
 
-  /** @scenario "A mint that fails leaves the credential working" */
+  /**
+   * @scenario "A mint that fails leaves the credential working"
+   * @scenario "An API-key grant warning reaches the process logger"
+   */
   it("swallows a failed write, reports it, and lets the next request retry", async () => {
     const attachBindings = vi
       .fn()
       .mockRejectedValueOnce(new Error("queue down"))
       .mockResolvedValue({ attached: [], duplicates: [] });
-    const { service, diagnostics } = harness({ attachBindings });
+    const { service, warn } = harness({ attachBindings });
 
     expect(() => service.mint(apiKey())).not.toThrow();
     await settle();
@@ -160,7 +151,11 @@ describe("LegacyApiKeyGrantService", () => {
     await settle();
 
     expect(attachBindings).toHaveBeenCalledTimes(2);
-    expect(diagnostics.warnings).toHaveLength(1);
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ apiKeyId: expect.any(String) }),
+      expect.stringContaining("failed to mint the legacy API key grant"),
+    );
   });
 });
 

@@ -2,6 +2,7 @@ import {
   AuthzGrantsService as AuthzGrantsServiceContract,
   AuthzService as AuthzServiceContract,
 } from "@langwatch/authz-contract";
+import { register } from "prom-client";
 import { describe, expect, it, vi } from "vitest";
 
 import { AUTHZ_GRANT_PIPELINE_NAME } from "../../eventing/authz-grant.pipeline.ts";
@@ -11,7 +12,6 @@ import {
   AuthzGrantsCommandDispatcher,
   type AuthzGrantsCommandSenders,
 } from "../../services/authz-grants-command-dispatcher.service.ts";
-import { type AuthzCounter, AuthzMetrics } from "../../services/authz-metrics.service.ts";
 import { PostgresAuthzAdapter } from "../postgres-authz.build.ts";
 
 class RecordingDispatcher extends AuthzGrantsCommandDispatcher {
@@ -42,21 +42,6 @@ function buildDatabase() {
   };
 }
 
-/** Answers the two counters and remembers which were asked for. */
-class RecordingMetrics extends AuthzMetrics {
-  readonly asked: string[] = [];
-
-  revocationCounter(reason: string): AuthzCounter {
-    this.asked.push(`revocation:${reason}`);
-    return { inc: () => {} };
-  }
-
-  engineGateReadFailureCounter(): AuthzCounter {
-    this.asked.push("engine-gate-read-failure");
-    return { inc: () => {} };
-  }
-}
-
 describe("PostgresAuthzAdapter", () => {
   /** @scenario "A process with no metric registry composes AuthZ" */
   it("builds the complete feature without resolving runtime command handles", () => {
@@ -82,20 +67,20 @@ describe("PostgresAuthzAdapter", () => {
     expect(auditLog.createMany).not.toHaveBeenCalled();
   });
 
-  describe("when the composing process renders its own metrics", () => {
-    /** @scenario "A process with a metric registry counts through its own port" */
-    it("resolves both counters from the port it was given", () => {
-      const metrics = new RecordingMetrics();
-
+  describe("when a process composes AuthZ", () => {
+    /** @scenario "AuthZ counts on the process registry" */
+    it("renders both of its counters into the process registry", () => {
       PostgresAuthzAdapter.create({
         database: buildDatabase().database,
         redis: null,
         dispatcher: new RecordingDispatcher(),
-        metrics,
         newBindingId: () => "binding_1",
       }).build();
 
-      expect(metrics.asked).toContain("engine-gate-read-failure");
+      expect(register.getSingleMetric("authz_engine_gate_read_failures_total")).toBeDefined();
+      expect(
+        register.getSingleMetric("langwatch_authz_direct_projection_write_total"),
+      ).toBeDefined();
     });
   });
 });

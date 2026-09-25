@@ -1,3 +1,4 @@
+import { createTestLogger } from "@langwatch/test-harness";
 import { fromDate } from "@langwatch/time";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -10,31 +11,17 @@ import {
   AuthzCutoverGateService,
   ENGINE_GATE_CACHE_TTL_MS,
 } from "../authz-cutover-gate.service.ts";
-import {
-  AuthzCutoverFailureReporter,
-  type AuthzCutoverReadFailure,
-} from "../authz-cutover-telemetry.service.ts";
 
 const ORG_ID = "org_gate";
 
-class RecordingReporter extends AuthzCutoverFailureReporter {
-  readonly failures: AuthzCutoverReadFailure[] = [];
-
-  report(failure: AuthzCutoverReadFailure): void {
-    this.failures.push(failure);
-  }
-}
-
 function stateTable(status: string | null) {
   const findUnique = vi.fn().mockResolvedValue(status === null ? null : { status });
-  const reporter = new RecordingReporter();
   const adapter = AuthzCutoverGateService.create({
     repository: PrismaAuthzCutoverRepository.create({
       database: { systemMigrationTenantState: { findUnique } } as AuthzCutoverDatabase,
     }),
-    reporter,
   });
-  return { adapter, findUnique, reporter };
+  return { adapter, findUnique };
 }
 
 describe("AuthzCutoverGateService", () => {
@@ -72,20 +59,21 @@ describe("AuthzCutoverGateService", () => {
   /** @scenario "A failed migration-state read is reported" */
   it("reports a failed state read and fails safe to legacy", async () => {
     const error = new Error("pg is down");
-    const reporter = new RecordingReporter();
+    const { logger, lines } = createTestLogger();
     const adapter = AuthzCutoverGateService.create({
       repository: PrismaAuthzCutoverRepository.create({
         database: {
           systemMigrationTenantState: { findUnique: vi.fn().mockRejectedValue(error) },
         } as AuthzCutoverDatabase,
       }),
-      reporter,
+      logger,
     });
 
     await expect(adapter.isOn({ organizationId: ORG_ID })).resolves.toBe(false);
-    expect(reporter.failures).toEqual([
-      { organizationId: ORG_ID, error, ttlMs: ENGINE_GATE_CACHE_TTL_MS },
-    ]);
+    expect(lines.findLine("warn", "could not read the authz migration state")).toMatchObject({
+      organizationId: ORG_ID,
+      ttlMs: ENGINE_GATE_CACHE_TTL_MS,
+    });
   });
 
   it("returns only the finalized cutover business time", async () => {
@@ -98,7 +86,6 @@ describe("AuthzCutoverGateService", () => {
       repository: PrismaAuthzCutoverRepository.create({
         database: { systemMigrationTenantState: { findUnique } } as AuthzCutoverDatabase,
       }),
-      reporter: new RecordingReporter(),
     });
 
     await expect(adapter.findFinalizedAt({ organizationId: ORG_ID })).resolves.toEqual(
@@ -116,7 +103,6 @@ describe("AuthzCutoverGateService", () => {
           },
         } as AuthzCutoverDatabase,
       }),
-      reporter: new RecordingReporter(),
     });
 
     await expect(adapter.readUncached({ organizationId: ORG_ID })).rejects.toThrow("pg is down");
@@ -141,7 +127,6 @@ describe("AuthzCutoverGateService", () => {
       repository: PrismaAuthzCutoverRepository.create({
         database: { systemMigrationTenantState: { findUnique } } as AuthzCutoverDatabase,
       }),
-      reporter: new RecordingReporter(),
     });
 
     await expect(adapter.isOn({ organizationId: ORG_ID })).resolves.toBe(true);

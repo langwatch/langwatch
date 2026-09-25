@@ -12,7 +12,6 @@ import {
   AuthzGrantsCommandDispatcher,
   type AuthzGrantsCommandSenders,
 } from "../../../services/authz-grants-command-dispatcher.service.ts";
-import { AuthzRevocationTelemetry } from "../../../services/authz-revocation-telemetry.service.ts";
 import { type AuthzLedgerDatabase, EventingAuthzLedgerAdapter } from "../../authz-grant.store.ts";
 
 export const ORG_ID = "org_fork";
@@ -26,10 +25,6 @@ const COMMAND_VERBS = [
   "changeRolePermissions",
   "deleteRole",
 ] as const;
-
-class SilentRevocationTelemetry extends AuthzRevocationTelemetry {
-  record(): void {}
-}
 
 class RecordingDispatcher extends AuthzGrantsCommandDispatcher {
   constructor(private readonly sent: { verb: string; data: unknown }[]) {
@@ -98,7 +93,6 @@ export function harness({
   const epoch = epochOverride ?? new StubAuthzEpoch();
   const revocation = PrismaAuthzRevocationRepository.create({
     database: database as never,
-    telemetry: new SilentRevocationTelemetry(),
   });
   const writer = EventingAuthzLedgerAdapter.create({
     database,

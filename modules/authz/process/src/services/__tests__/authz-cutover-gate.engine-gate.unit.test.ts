@@ -14,20 +14,16 @@ import {
   AuthzCutoverGateService,
   ENGINE_GATE_CACHE_TTL_MS,
 } from "../authz-cutover-gate.service.ts";
-import { AuthzCutoverFailureReporter } from "../authz-cutover-telemetry.service.ts";
 
 const ORGANIZATION_ID = "org_acme";
 
-class SilentReporter extends AuthzCutoverFailureReporter {
-  report(): void {}
-}
-
-function adapterOver(findUnique: ReturnType<typeof vi.fn>): AuthzCutoverGateService {
+function adapterOver(
+  findUnique: AuthzCutoverDatabase["systemMigrationTenantState"]["findUnique"],
+): AuthzCutoverGateService {
   return AuthzCutoverGateService.create({
     repository: PrismaAuthzCutoverRepository.create({
-      database: { systemMigrationTenantState: { findUnique } } as unknown as AuthzCutoverDatabase,
+      database: { systemMigrationTenantState: { findUnique } },
     }),
-    reporter: new SilentReporter(),
   });
 }
 

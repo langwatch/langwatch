@@ -3,9 +3,9 @@ import { generate } from "@langwatch/ksuid";
 // Grant id is caller-minted KSUID; persisted format shared across processes.
 const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
 
-export class KsuidAuthzBindingIdAdapter {
-  static create(): KsuidAuthzBindingIdAdapter {
-    return new KsuidAuthzBindingIdAdapter();
+export class AuthzBindingIdService {
+  static create(): AuthzBindingIdService {
+    return new AuthzBindingIdService();
   }
 
   private constructor() {}

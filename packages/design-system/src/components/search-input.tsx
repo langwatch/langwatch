@@ -21,7 +21,7 @@ export const SearchInput = React.forwardRef<HTMLInputElement, InputProps>(
         }
         startOffset="2px"
       >
-        <Input ref={ref} role="searchbox" aria-label={props["aria-label"] ?? "Search"} {...props} />
+        <Input ref={ref} type="search" aria-label={props["aria-label"] ?? "Search"} {...props} />
       </InputGroup>
     );
   },

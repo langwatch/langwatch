@@ -88,6 +88,9 @@ export function bindTenantDirectoryReader(
   const directory = TenantDirectoryService.create(reader);
   return {
     ...reader,
-    organizationForTenant: (tenantId) => directory.tryFindOrganizationForTenant(tenantId),
+    organizationForTenant: async (tenantId) => {
+      const placement = await directory.getTenantPlacement(tenantId);
+      return placement.kind === "placed" ? placement.organizationId : null;
+    },
   };
 }

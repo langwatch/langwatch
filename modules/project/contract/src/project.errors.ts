@@ -168,24 +168,26 @@ export const PERSONAL_TEAM_PROJECT_CREATE_REFUSAL =
 export const PERSONAL_PROJECT_ARCHIVE_REFUSAL =
   "Personal workspace projects cannot be archived. A personal workspace is its project, and archiving it leaves the owner without one in this organization.";
 
-export function personalWorkspaceMoveViolation({
+export function assertPersonalWorkspaceMove({
   isProjectPersonal,
   isDestinationTeamPersonal,
 }: {
   isProjectPersonal: boolean;
   isDestinationTeamPersonal: boolean;
-}): string | null {
-  if (isProjectPersonal) return PERSONAL_PROJECT_MOVE_OUT_REFUSAL;
-  if (isDestinationTeamPersonal) return PERSONAL_PROJECT_MOVE_IN_REFUSAL;
-  return null;
+}): void {
+  if (isProjectPersonal)
+    throw new PersonalWorkspaceBoundaryError(PERSONAL_PROJECT_MOVE_OUT_REFUSAL);
+  if (isDestinationTeamPersonal) {
+    throw new PersonalWorkspaceBoundaryError(PERSONAL_PROJECT_MOVE_IN_REFUSAL);
+  }
 }
 
-export function personalWorkspaceArchiveViolation(isProjectPersonal: boolean): string | null {
-  return isProjectPersonal ? PERSONAL_PROJECT_ARCHIVE_REFUSAL : null;
+export function assertPersonalProjectArchivable(isProjectPersonal: boolean): void {
+  if (isProjectPersonal) throw new PersonalProjectProtectedError(PERSONAL_PROJECT_ARCHIVE_REFUSAL);
 }
 
-export function personalWorkspaceCreateViolation(
-  isDestinationTeamPersonal: boolean,
-): string | null {
-  return isDestinationTeamPersonal ? PERSONAL_TEAM_PROJECT_CREATE_REFUSAL : null;
+export function assertPersonalWorkspaceCreate(isDestinationTeamPersonal: boolean): void {
+  if (isDestinationTeamPersonal) {
+    throw new PersonalWorkspaceBoundaryError(PERSONAL_TEAM_PROJECT_CREATE_REFUSAL);
+  }
 }

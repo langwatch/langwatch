@@ -109,7 +109,7 @@ describe("findDeclaredScopeId", () => {
       expect(
         findDeclaredScopeId({
           permission: "traces:view",
-          input: { projectId: 42 as unknown as string },
+          input: { projectId: 42 },
         }),
       ).toBeNull();
     });
@@ -168,7 +168,7 @@ describe("resolveDeclaredScope", () => {
       expect(
         resolveDeclaredScope({
           permission: "traces:view",
-          input: { projectId: 42 as unknown as string },
+          input: { projectId: 42 },
         }),
       ).toEqual({
         resolved: false,
@@ -190,7 +190,7 @@ describe("resolveDeclaredScope", () => {
         resolveDeclaredScope({
           permission: "traces:view",
           input: {
-            projectId: 42 as unknown as string,
+            projectId: 42,
             organizationId: "org_1",
           },
         }),

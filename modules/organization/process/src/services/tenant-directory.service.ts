@@ -14,9 +14,12 @@ export interface TenantOwnershipReader {
   userExists(tenantId: string): Promise<boolean>;
 }
 
+/** The organization a tenant's data lives under, or that the id names no tenant at all. */
+export type TenantPlacement = { kind: "placed"; organizationId: string } | { kind: "unplaced" };
+
 /**
  * Where a tenant's data lives, for every kind the event store carries. An id that is none of
- * project/organization/user answers null, which the router refuses.
+ * project/organization/user is unplaced, which the router refuses.
  */
 export class TenantDirectoryService {
   static create(reader: TenantOwnershipReader): TenantDirectoryService {
@@ -30,21 +33,22 @@ export class TenantDirectoryService {
    * organizations, and picking one would put their identity history on an
    * instance chosen by accident.
    */
-  async tryFindOrganizationForTenant(tenantId: string): Promise<string | null> {
+  async getTenantPlacement(tenantId: string): Promise<TenantPlacement> {
     try {
-      return await this.reader.getProjectOrganizationId(tenantId);
+      const organizationId = await this.reader.getProjectOrganizationId(tenantId);
+      return { kind: "placed", organizationId };
     } catch (error) {
       if (!HandledError.isHandled(error) || error.code !== "project_not_found") throw error;
     }
 
     if (await this.reader.organizationExists(tenantId)) {
-      return tenantId;
+      return { kind: "placed", organizationId: tenantId };
     }
 
     if (await this.reader.userExists(tenantId)) {
-      return PLATFORM_TENANT;
+      return { kind: "placed", organizationId: PLATFORM_TENANT };
     }
 
-    return null;
+    return { kind: "unplaced" };
   }
 }

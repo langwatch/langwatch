@@ -38,9 +38,9 @@ function isSender(value: unknown): value is UntypedSender {
 }
 
 // Late binding; writes wait for connect; duplicate different senders is a bug.
-export class EventingAuthzCommandDispatcherAdapter extends AuthzGrantsCommandDispatcher {
-  static create(options: { waitMs?: number } = {}): EventingAuthzCommandDispatcherAdapter {
-    return new EventingAuthzCommandDispatcherAdapter(options.waitMs ?? LEDGER_APP_HANDLE_WAIT_MS);
+export class AuthzCommandDispatcherService extends AuthzGrantsCommandDispatcher {
+  static create(options: { waitMs?: number } = {}): AuthzCommandDispatcherService {
+    return new AuthzCommandDispatcherService(options.waitMs ?? LEDGER_APP_HANDLE_WAIT_MS);
   }
 
   // Check senders at registration time; throw instead of hidden undefined.send errors.

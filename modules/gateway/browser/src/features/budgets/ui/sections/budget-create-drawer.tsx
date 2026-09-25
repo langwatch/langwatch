@@ -373,7 +373,15 @@ export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCrea
                   testId="budget-applies-to-info"
                 />
               </Field.Label>
-              <Wrap gap={2} role="group" aria-label="Budget target kind">
+              <Wrap
+                as="fieldset"
+                gap={2}
+                border={0}
+                margin={0}
+                padding={0}
+                minWidth={0}
+                aria-label="Budget target kind"
+              >
                 {KIND_OPTIONS.map((o) => {
                   const active = scopeKind === o.kind;
                   return (

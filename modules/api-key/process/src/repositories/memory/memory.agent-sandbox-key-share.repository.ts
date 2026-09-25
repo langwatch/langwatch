@@ -8,9 +8,9 @@ import { AgentSandboxKeyShareRepository } from "../agent-sandbox-key-share.repos
  * plaintext token is the whole value of a share, so a process that cannot seal
  * it holds none and every run mints its own key.
  */
-export class AbsentAgentSandboxKeyShareAdapter extends AgentSandboxKeyShareRepository {
-  static create(): AbsentAgentSandboxKeyShareAdapter {
-    return new AbsentAgentSandboxKeyShareAdapter();
+export class AbsentAgentSandboxKeyShareRepository extends AgentSandboxKeyShareRepository {
+  static create(): AbsentAgentSandboxKeyShareRepository {
+    return new AbsentAgentSandboxKeyShareRepository();
   }
 
   async findSharedKey(): Promise<string | undefined> {

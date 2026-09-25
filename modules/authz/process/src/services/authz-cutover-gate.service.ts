@@ -1,17 +1,24 @@
 import type { MigrationTenantStatus } from "@langwatch/authz-contract";
+import { createLogger, type Logger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
+import { Counter } from "prom-client";
 
 import type { AuthzCutoverRepository } from "../repositories/authz-cutover.repository.ts";
 import { PerOrganizationCachedGateStore } from "../stores/memory/memory.per-organization-cached-gate.store.ts";
-import type { AuthzCutoverFailureReporter } from "./authz-cutover-telemetry.service.ts";
 
 export const ENGINE_GATE_CACHE_TTL_MS = 60_000;
+
+/** The metric name is an external interface; dashboards and alerts read it. */
+export const authzEngineGateReadFailuresTotal = new Counter({
+  name: "authz_engine_gate_read_failures_total",
+  help: "Failed reads of an organization's AuthZ migration state; the organization stays on the legacy path for the cache TTL.",
+});
 
 const ON_ENGINE_STATUSES: readonly MigrationTenantStatus[] = ["finalized"];
 
 export type AuthzCutoverGateOptions = {
   repository: AuthzCutoverRepository;
-  reporter: AuthzCutoverFailureReporter;
+  logger?: Logger;
   cache?: PerOrganizationCachedGateStore;
 };
 
@@ -22,12 +29,14 @@ export type AuthzCutoverGateOptions = {
  */
 export class AuthzCutoverGateService {
   private readonly cache: PerOrganizationCachedGateStore;
+  private readonly logger: Logger;
 
   static create(options: AuthzCutoverGateOptions): AuthzCutoverGateService {
     return new AuthzCutoverGateService(options);
   }
 
   private constructor(private readonly options: AuthzCutoverGateOptions) {
+    this.logger = options.logger ?? createLogger("langwatch:authz:engine-gate");
     this.cache =
       options.cache ??
       PerOrganizationCachedGateStore.create({
@@ -78,6 +87,10 @@ export class AuthzCutoverGateService {
   }
 
   private report({ organizationId, error }: { organizationId: string; error: unknown }): void {
-    this.options.reporter.report({ organizationId, error, ttlMs: ENGINE_GATE_CACHE_TTL_MS });
+    this.logger.warn(
+      { organizationId, error, ttlMs: ENGINE_GATE_CACHE_TTL_MS },
+      "could not read the authz migration state; compatibility migration completion remains unknown until the cache expires",
+    );
+    authzEngineGateReadFailuresTotal.inc();
   }
 }

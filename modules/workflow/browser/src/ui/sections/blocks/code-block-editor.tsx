@@ -1,4 +1,4 @@
-import { Box, Center, HStack, Text } from "@chakra-ui/react";
+import { Box, chakra, HStack, Text } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { RenderCode } from "@langwatch/workflow-browser-kit";
 import { Edit2 } from "lucide-react";
@@ -81,8 +81,11 @@ export function CodeBlockEditor({
   return (
     <Box position="relative" width="full">
       {/* Edit overlay - appears on hover */}
-      <Center
-        role="button"
+      <chakra.button
+        type="button"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
         aria-label="Edit code"
         onClick={handleOpen}
         position="absolute"
@@ -112,7 +115,7 @@ export function CodeBlockEditor({
           <Edit2 size={20} />
           <Text>Edit</Text>
         </HStack>
-      </Center>
+      </chakra.button>
 
       {/* Code preview */}
       <RenderCode

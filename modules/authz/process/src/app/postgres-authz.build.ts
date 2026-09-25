@@ -46,14 +46,11 @@ import type { PostgresAuthzDatabase } from "../repositories/prisma/prisma.authz.
 import type { AuthzEpochRedis } from "../repositories/redis/redis.authz-epoch.repository.ts";
 import { RedisAuthzEpochRepository } from "../repositories/redis/redis.authz-epoch.repository.ts";
 import { AuthzCutoverGateService } from "../services/authz-cutover-gate.service.ts";
-import { ObservabilityAuthzCutoverAdapter } from "../services/authz-cutover-telemetry.service.ts";
 import type {
   AuthzGrantsCommandDispatcher,
   AuthzGrantsCommandSenders,
 } from "../services/authz-grants-command-dispatcher.service.ts";
 import { AuthzGrantsService } from "../services/authz-grants.service.ts";
-import { type AuthzMetrics, UncountedAuthzMetrics } from "../services/authz-metrics.service.ts";
-import { ObservabilityAuthzRevocationAdapter } from "../services/authz-revocation-telemetry.service.ts";
 import { AuthzService, type AuthzServiceOptions } from "../services/authz.service.ts";
 
 /**
@@ -80,11 +77,6 @@ export type PostgresAuthzAdapterOptions = {
   repositories?: AuthzRepositories;
   redis: AuthzEpochRedis | null;
   dispatcher: AuthzGrantsCommandDispatcher;
-  /**
-   * Operational metrics; optional so non-scrape processes count nothing.
-   * Behavior (cutover warning, revocation record) always built here.
-   */
-  metrics?: AuthzMetrics;
   newBindingId: () => string;
   newCommandId?: () => string;
   now?: () => number;
@@ -192,17 +184,10 @@ export class PostgresAuthzAdapter {
 
   build(): PostgresAuthzBuild {
     const database = this.options.database as unknown as InternalPostgresAuthzDatabase;
-    const metrics = this.options.metrics ?? UncountedAuthzMetrics.create();
     const epoch = RedisAuthzEpochRepository.create({ redis: this.options.redis });
     const cutover = AuthzCutoverGateService.create({
       repository:
         this.options.repositories?.cutover ?? PrismaAuthzCutoverRepository.create({ database }),
-      // Composed here rather than received, so the WHEN of each counter is
-      // described once for every process. A caller that passed its own
-      // reporter would be a second description of "warn, then increment".
-      reporter: ObservabilityAuthzCutoverAdapter.create({
-        counter: metrics.engineGateReadFailureCounter(),
-      }),
     });
     // Migration completion still answers compatibility writes and legacy
     // API-key adoption; every decision and listing reads the grants head.
@@ -210,9 +195,6 @@ export class PostgresAuthzAdapter {
 
     const revocation = PrismaAuthzRevocationRepository.create({
       database,
-      telemetry: ObservabilityAuthzRevocationAdapter.create({
-        counter: (reason) => metrics.revocationCounter(reason),
-      }),
     });
     const ledgerOptions: EventingAuthzLedgerAdapterOptions = {
       database,

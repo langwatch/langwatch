@@ -1,6 +1,6 @@
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
-import type { AuthzDatabase } from "../../authz-read.repository.ts";
 import { EventingAuthzListingRepository } from "../eventing.authz-listing.repository.ts";
 
 /**
@@ -55,7 +55,7 @@ const prismaWith = (data: {
   };
   return {
     prisma,
-    repository: EventingAuthzListingRepository.create(prisma as unknown as AuthzDatabase),
+    repository: EventingAuthzListingRepository.create(prismaDouble(prisma)),
   };
 };
 

@@ -5,9 +5,8 @@ import type {
   LedgerPrincipal,
   LedgerScope,
 } from "@langwatch/authz-contract";
+import type { Logger } from "@langwatch/observability";
 import { Temporal, fromDate, nowInstant, type Instant } from "@langwatch/time";
-
-import type { ApiKeyDiagnostics } from "./api-key-diagnostics.service.ts";
 
 const MINT_GUARD_TTL_MS = 60_000;
 const MINT_GUARD_MAX_ENTRIES = 10_000;
@@ -68,7 +67,7 @@ export class LegacyApiKeyGrantService {
     authz: AuthzApi;
     grants: AuthzApi;
     deriveBindingId: AuthzBindingIdDeriver;
-    diagnostics: ApiKeyDiagnostics;
+    diagnostics: Pick<Logger, "warn">;
     now?: () => number;
   }): LegacyApiKeyGrantService {
     return new LegacyApiKeyGrantService(options);
@@ -79,7 +78,7 @@ export class LegacyApiKeyGrantService {
       authz: AuthzApi;
       grants: AuthzApi;
       deriveBindingId: AuthzBindingIdDeriver;
-      diagnostics: ApiKeyDiagnostics;
+      diagnostics: Pick<Logger, "warn">;
       now?: () => number;
     },
   ) {}

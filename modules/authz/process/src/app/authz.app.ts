@@ -27,9 +27,9 @@ import { reads, type MembersRead } from "@langwatch/process-stores/members";
 
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import { AuthzAdmissionService } from "../services/authz-admission.service.ts";
-import { KsuidAuthzBindingIdAdapter } from "../services/authz-binding-id.service.ts";
+import { AuthzBindingIdService } from "../services/authz-binding-id.service.ts";
 import { AuthzGrantIdentityService } from "../services/authz-grant-identity.service.ts";
-import { EventingAuthzCommandDispatcherAdapter } from "../services/authz-grants-command-dispatcher.service.ts";
+import { AuthzCommandDispatcherService } from "../services/authz-grants-command-dispatcher.service.ts";
 import {
   PostgresAuthzAdapter,
   type AuthzPipeline,
@@ -86,7 +86,7 @@ export class AuthzApp implements AuthzApi {
    * composition registers the pipeline and connects the dispatcher itself, so
    * it has no use for either and this app never holds one.
    */
-  #dispatcher: EventingAuthzCommandDispatcherAdapter | undefined;
+  #dispatcher: AuthzCommandDispatcherService | undefined;
   #pipeline: AuthzPipeline | undefined;
   #demoProjectId: string | undefined;
   #demoProjectUserId: string | undefined;
@@ -105,7 +105,7 @@ export class AuthzApp implements AuthzApi {
       admissions?: AuthzAdmissionService;
       eventing?: Readonly<{
         pipeline: AuthzPipeline;
-        dispatcher: EventingAuthzCommandDispatcherAdapter;
+        dispatcher: AuthzCommandDispatcherService;
       }>;
     }> = {},
   ) {
@@ -138,8 +138,8 @@ export class AuthzApp implements AuthzApi {
    * (needs pipeline's registered senders). Metrics optional for non-scrape.
    */
   static create(setup: AuthzSetup): AuthzApp {
-    const dispatcher = EventingAuthzCommandDispatcherAdapter.create();
-    const bindingIds = KsuidAuthzBindingIdAdapter.create();
+    const dispatcher = AuthzCommandDispatcherService.create();
+    const bindingIds = AuthzBindingIdService.create();
     const config = authzRuntimeConfig(setup.config);
     const built = PostgresAuthzAdapter.create({
       database: setup.members.prisma,
@@ -163,7 +163,7 @@ export class AuthzApp implements AuthzApi {
    * registered and answered with its senders.
    */
   connectCommands(commands: Readonly<Record<string, unknown>>): void {
-    this.#dispatcher?.connect(EventingAuthzCommandDispatcherAdapter.sendersFrom(commands));
+    this.#dispatcher?.connect(AuthzCommandDispatcherService.sendersFrom(commands));
   }
 
   /**

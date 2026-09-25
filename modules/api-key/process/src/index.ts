@@ -1,8 +1,8 @@
 export type { PrismaApiKeyDatabase } from "./repositories/prisma/prisma.api-key.repository.ts";
 export {
   type AgentSandboxMaintenancePipelineDeps,
-  EventingAgentSandboxMaintenanceAdapter,
-} from "./services/agent-sandbox-maintenance.service.ts";
+  buildAgentSandboxMaintenancePipeline,
+} from "./eventing/api-key.pipeline.ts";
 export type { AgentSandboxKeyReapDeps } from "./eventing/agent-sandbox-key-reap.intent.ts";
 export type { AgentSandboxKeyReapService } from "./services/agent-sandbox-key-reap.service.ts";
 export type { AgentSandboxKeyShareRedis } from "./repositories/redis/redis.agent-sandbox-key-share.repository.ts";
@@ -29,7 +29,6 @@ export {
   hashApiKeySecret,
   createAgentSandboxKeyReapService,
   createCliLoginKeyReapService,
-  buildAgentSandboxMaintenancePipeline,
 } from "./api-key.server.ts";
 export { apiKeyRest, apiKeyRestCredential } from "./transport/api-key.rest.ts";
 export { apiKeyTrpcTransport } from "./transport/api-key.trpc.ts";

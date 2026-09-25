@@ -13,7 +13,7 @@ export function FirstTraceRedirect() {
 
   if (watchState === "redirecting") {
     return (
-      <HStack gap={2} role="status" aria-live="polite">
+      <HStack as="output" gap={2} aria-live="polite">
         <Icon as={CheckCircle2} boxSize={4} color="green.fg" />
         <Text textStyle="sm" color="fg.muted">
           First trace received. Taking you there now.
@@ -24,7 +24,7 @@ export function FirstTraceRedirect() {
 
   if (watchState === "waiting") {
     return (
-      <HStack gap={2} role="status" aria-live="polite">
+      <HStack as="output" gap={2} aria-live="polite">
         <Spinner size="sm" color="orange.400" />
         <Text textStyle="sm" color="fg.muted">
           Waiting for your first trace. We will take you there when it arrives.

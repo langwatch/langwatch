@@ -1,23 +1,22 @@
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import type { AuthzDatabase } from "../../authz-read.repository.ts";
 import { EventingAuthzReadRepository } from "../eventing.authz-read.repository.ts";
 
 /**
  * Grants-head adapter contract: answers stay legacy-compatible (membership
  * fence, API key role binding, token-keyed shares); skip cut-over facts.
  */
-const clientFor = (models: Record<string, unknown>) => models as unknown as AuthzDatabase;
 
-const member = () => vi.fn().mockResolvedValue({ userId: "alice" }) as ReturnType<typeof vi.fn>;
+const member = () => vi.fn().mockResolvedValue({ userId: "alice" });
 
 describe("EventingAuthzReadRepository", () => {
   describe("when findOrganizationMembership reads the membership row", () => {
     it("reads the membership row, which the ledger never projected", async () => {
       const findFirst = vi.fn().mockResolvedValue({ role: "ADMIN", disabledAt: null });
       const repository = EventingAuthzReadRepository.create(
-        clientFor({ organizationUser: { findFirst } }),
+        prismaDouble({ organizationUser: { findFirst } }),
       );
 
       expect(
@@ -34,7 +33,7 @@ describe("EventingAuthzReadRepository", () => {
 
     it("reports a seat-disabled row as disabled, so the denial can name the seat", async () => {
       const repository = EventingAuthzReadRepository.create(
-        clientFor({
+        prismaDouble({
           organizationUser: {
             findFirst: vi.fn().mockResolvedValue({ role: "MEMBER", disabledAt: new Date() }),
           },
@@ -61,7 +60,7 @@ describe("EventingAuthzReadRepository", () => {
         },
       ]);
       const repository = EventingAuthzReadRepository.create(
-        clientFor({
+        prismaDouble({
           organizationUser: { findFirst: member() },
           grant: { findMany },
         }),
@@ -100,7 +99,7 @@ describe("EventingAuthzReadRepository", () => {
 
     it("translates member and viewer keys onto their legacy roles", async () => {
       const repository = EventingAuthzReadRepository.create(
-        clientFor({
+        prismaDouble({
           organizationUser: { findFirst: member() },
           grant: {
             findMany: vi.fn().mockResolvedValue([
@@ -129,7 +128,7 @@ describe("EventingAuthzReadRepository", () => {
       it("returns nothing, without reading a single grant", async () => {
         const findMany = vi.fn();
         const repository = EventingAuthzReadRepository.create(
-          clientFor({
+          prismaDouble({
             organizationUser: { findFirst: vi.fn().mockResolvedValue(null) },
             grant: { findMany },
           }),
@@ -151,7 +150,7 @@ describe("EventingAuthzReadRepository", () => {
     describe("when a grant carries a key no decision reads yet", () => {
       it("skips lite-member, null and unrecognised keys rather than defaulting them", async () => {
         const repository = EventingAuthzReadRepository.create(
-          clientFor({
+          prismaDouble({
             organizationUser: { findFirst: member() },
             grant: {
               findMany: vi.fn().mockResolvedValue([
@@ -207,7 +206,7 @@ describe("EventingAuthzReadRepository", () => {
         },
       ]);
       const repository = EventingAuthzReadRepository.create(
-        clientFor({
+        prismaDouble({
           organizationUser: { findFirst: member() },
           groupMembership: { findMany: groupFindMany },
           grant: { findMany: grantFindMany },
@@ -252,7 +251,7 @@ describe("EventingAuthzReadRepository", () => {
       it("returns nothing, because a GroupMembership row outlives the membership", async () => {
         const groupFindMany = vi.fn();
         const repository = EventingAuthzReadRepository.create(
-          clientFor({
+          prismaDouble({
             organizationUser: { findFirst: vi.fn().mockResolvedValue(null) },
             groupMembership: { findMany: groupFindMany },
             grant: { findMany: vi.fn() },
@@ -275,7 +274,7 @@ describe("EventingAuthzReadRepository", () => {
       const findMany = vi
         .fn()
         .mockResolvedValue([{ roleKey: "viewer", scopeType: "PROJECT", scopeId: "proj-1" }]);
-      const repository = EventingAuthzReadRepository.create(clientFor({ grant: { findMany } }));
+      const repository = EventingAuthzReadRepository.create(prismaDouble({ grant: { findMany } }));
 
       const bindings = await repository.findApiKeyBindings({
         apiKeyId: "key-1",
@@ -310,7 +309,7 @@ describe("EventingAuthzReadRepository", () => {
       /** @scenario "A poisoned cross-organization binding does not grant access" */
       it("fences on the organization and excludes every API-key system role", async () => {
         const findMany = vi.fn().mockResolvedValue([]);
-        const repository = EventingAuthzReadRepository.create(clientFor({ role: { findMany } }));
+        const repository = EventingAuthzReadRepository.create(prismaDouble({ role: { findMany } }));
 
         await repository.findCustomRolePermissions({
           organizationId: "org-1",
@@ -331,7 +330,7 @@ describe("EventingAuthzReadRepository", () => {
 
       it("returns the stored permission payload unparsed", async () => {
         const repository = EventingAuthzReadRepository.create(
-          clientFor({
+          prismaDouble({
             role: {
               findMany: vi.fn().mockResolvedValue([
                 {
@@ -371,7 +370,7 @@ describe("EventingAuthzReadRepository", () => {
           },
         ]);
         const repository = EventingAuthzReadRepository.create(
-          clientFor({
+          prismaDouble({
             role: { findMany: roleFindMany },
             grant: { findMany: grantFindMany },
           }),
@@ -405,7 +404,7 @@ describe("EventingAuthzReadRepository", () => {
       /** @scenario "A poisoned cross-key binding does not inherit the other key's permissions" */
       it("excludes a system role another principal also holds", async () => {
         const repository = EventingAuthzReadRepository.create(
-          clientFor({
+          prismaDouble({
             role: {
               findMany: vi
                 .fn()
@@ -443,7 +442,7 @@ describe("EventingAuthzReadRepository", () => {
       describe("when a system role carries no grants at all", () => {
         it("excludes it, because `every` alone is vacuously true over nothing", async () => {
           const repository = EventingAuthzReadRepository.create(
-            clientFor({
+            prismaDouble({
               role: {
                 findMany: vi.fn().mockResolvedValue([
                   {
@@ -472,7 +471,7 @@ describe("EventingAuthzReadRepository", () => {
 
       it("keeps ordinary custom roles beside the fenced system one", async () => {
         const repository = EventingAuthzReadRepository.create(
-          clientFor({
+          prismaDouble({
             role: {
               findMany: vi.fn().mockResolvedValue([
                 { id: "role-1", permissions: ["traces:view"], kind: "custom" },
@@ -500,7 +499,7 @@ describe("EventingAuthzReadRepository", () => {
     describe("when the principal references no custom role", () => {
       it("asks nothing of storage", async () => {
         const findMany = vi.fn();
-        const repository = EventingAuthzReadRepository.create(clientFor({ role: { findMany } }));
+        const repository = EventingAuthzReadRepository.create(prismaDouble({ role: { findMany } }));
 
         expect(
           await repository.findCustomRolePermissions({
@@ -521,7 +520,7 @@ describe("EventingAuthzReadRepository", () => {
     it("filters by presented token AND the resource links, organization-anchored", async () => {
       const grantFindMany = vi.fn().mockResolvedValue([]);
       const repository = EventingAuthzReadRepository.create(
-        clientFor({
+        prismaDouble({
           project: { findUnique: lineageStub() },
           grant: { findMany: grantFindMany },
           grantUsage: { findMany: vi.fn() },
@@ -570,7 +569,7 @@ describe("EventingAuthzReadRepository", () => {
         const lineageFindUnique = vi.fn();
         const grantFindMany = vi.fn().mockResolvedValue([]);
         const repository = EventingAuthzReadRepository.create(
-          clientFor({
+          prismaDouble({
             project: { findUnique: lineageFindUnique },
             grant: { findMany: grantFindMany },
             grantUsage: { findMany: vi.fn() },
@@ -596,7 +595,7 @@ describe("EventingAuthzReadRepository", () => {
     it("maps each principal onto the share audience it stands for", async () => {
       const expiresAt = new Date("2026-01-01T00:00:00.000Z");
       const repository = EventingAuthzReadRepository.create(
-        clientFor({
+        prismaDouble({
           project: { findUnique: lineageStub() },
           grant: {
             findMany: vi.fn().mockResolvedValue([
@@ -675,7 +674,7 @@ describe("EventingAuthzReadRepository", () => {
     it("reads the view budget by grant id, since the fold never writes it", async () => {
       const usageFindMany = vi.fn().mockResolvedValue([]);
       const repository = EventingAuthzReadRepository.create(
-        clientFor({
+        prismaDouble({
           project: { findUnique: lineageStub() },
           grant: {
             findMany: vi.fn().mockResolvedValue([
@@ -711,7 +710,7 @@ describe("EventingAuthzReadRepository", () => {
     describe("when a resource grant names an audience the legacy shim never held", () => {
       it("skips the row", async () => {
         const repository = EventingAuthzReadRepository.create(
-          clientFor({
+          prismaDouble({
             project: { findUnique: lineageStub() },
             grant: {
               findMany: vi.fn().mockResolvedValue([
@@ -744,7 +743,7 @@ describe("EventingAuthzReadRepository", () => {
       it("returns nothing rather than reading grants unfenced", async () => {
         const grantFindMany = vi.fn();
         const repository = EventingAuthzReadRepository.create(
-          clientFor({
+          prismaDouble({
             project: { findUnique: vi.fn().mockResolvedValue(null) },
             grant: { findMany: grantFindMany },
           }),
@@ -765,7 +764,7 @@ describe("EventingAuthzReadRepository", () => {
       it("asks nothing of storage", async () => {
         const findUnique = vi.fn();
         const repository = EventingAuthzReadRepository.create(
-          clientFor({ project: { findUnique } }),
+          prismaDouble({ project: { findUnique } }),
         );
 
         expect(
@@ -786,7 +785,9 @@ describe("EventingAuthzReadRepository", () => {
         .fn()
         .mockResolvedValueOnce({ userId: null })
         .mockResolvedValueOnce(null);
-      const repository = EventingAuthzReadRepository.create(clientFor({ apiKey: { findUnique } }));
+      const repository = EventingAuthzReadRepository.create(
+        prismaDouble({ apiKey: { findUnique } }),
+      );
 
       expect(await repository.findApiKeyOwner("service-key")).toEqual({
         userId: null,
@@ -803,7 +804,9 @@ describe("EventingAuthzReadRepository", () => {
           team: { id: "team-1", organizationId: "org-1" },
         })
         .mockResolvedValueOnce(null);
-      const repository = EventingAuthzReadRepository.create(clientFor({ project: { findUnique } }));
+      const repository = EventingAuthzReadRepository.create(
+        prismaDouble({ project: { findUnique } }),
+      );
 
       expect(await repository.findProjectLineage({ projectId: "proj-1" })).toEqual({
         teamId: "team-1",
@@ -819,7 +822,7 @@ describe("EventingAuthzReadRepository", () => {
         .fn()
         .mockResolvedValueOnce({ organizationId: "org-1" })
         .mockResolvedValueOnce(null);
-      const repository = EventingAuthzReadRepository.create(clientFor({ team: { findUnique } }));
+      const repository = EventingAuthzReadRepository.create(prismaDouble({ team: { findUnique } }));
 
       expect(await repository.findTeamOrganization({ teamId: "team-1" })).toEqual({
         organizationId: "org-1",

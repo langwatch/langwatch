@@ -191,7 +191,15 @@ export function VirtualKeyOwnershipSection({
           testId="vk-ownership-info"
         />
       </HStack>
-      <Wrap gap={2} role="group" aria-label="Ownership">
+      <Wrap
+        as="fieldset"
+        gap={2}
+        border={0}
+        margin={0}
+        padding={0}
+        minWidth={0}
+        aria-label="Ownership"
+      >
         {kinds.map((o) => {
           const active = value.kind === o.kind;
           return (

@@ -12,7 +12,7 @@ import { AUTHZ_GRANT_PIPELINE_NAME } from "../../eventing/authz-grant.pipeline.t
 import type { PostgresAuthzDatabase } from "../../repositories/prisma/prisma.authz.database.ts";
 import {
   AuthzGrantsCommandDispatcher,
-  EventingAuthzCommandDispatcherAdapter,
+  AuthzCommandDispatcherService,
 } from "../authz-grants-command-dispatcher.service.ts";
 import type { AuthzGrantsCommandSenders } from "../authz-grants-command-dispatcher.service.ts";
 
@@ -128,16 +128,14 @@ describe("the grants pipeline registered by a producer-only process", () => {
       const registered = eventSourcing.register(buildAuthz().pipeline);
 
       expect(registered.constructor.name).not.toBe("DisabledPipeline");
-      expect(() =>
-        EventingAuthzCommandDispatcherAdapter.sendersFrom(registered.commands),
-      ).not.toThrow();
+      expect(() => AuthzCommandDispatcherService.sendersFrom(registered.commands)).not.toThrow();
     });
 
     /** @scenario "A produced command carries the consuming process's routing key" */
     it("stamps the routing key the consuming process's registry claims", async () => {
       const { queue, eventSourcing } = producerRuntime();
       const registered = eventSourcing.register(buildAuthz().pipeline);
-      const senders = EventingAuthzCommandDispatcherAdapter.sendersFrom(registered.commands);
+      const senders = AuthzCommandDispatcherService.sendersFrom(registered.commands);
 
       for (const [name, payload] of COMMANDS) {
         await senders[name].send(payload as never);
