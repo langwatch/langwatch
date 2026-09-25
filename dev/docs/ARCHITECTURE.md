@@ -101,6 +101,8 @@ A tRPC namespace belongs to one module: a procedure main hosted under another su
 moves into its owner's namespace and the wire path moves with it (Alex, 2026-09-25).
 Operator views over enterprise subjects (license registry, self-hosted instances) live in an enterprise
 ops module that calls the owners' `*Api`s; core ops never depends on an enterprise contract (Alex, 2026-09-25).
+Enterprise-licensed subjects moving to their owner land in that owner's enterprise module
+(`enterprise-gateway` owns routing policy and personal virtual keys), never relicensed into core (Alex, 2026-09-25).
 Enterprise modules mirror the shape exactly under `enterprise/modules/`.
 
 ```
