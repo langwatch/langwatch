@@ -75,6 +75,9 @@
       "path": "../../enterprise/modules/scim/process/tsconfig.build.json"
     },
     {
+      "path": "../../enterprise/modules/seed-demo/process/tsconfig.build.json"
+    },
+    {
       "path": "../../enterprise/modules/sso/process/tsconfig.build.json"
     },
     {

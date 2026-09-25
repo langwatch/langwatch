@@ -93,10 +93,11 @@ export const serverModuleMembers = {
   webhook: ["isSaas", "rateLimiter", "redis"],
   workflow: ["encryption", "prisma"],
   billing: ["isSaas", "mail", "nodeEnvironment", "publicBaseUrl"],
-  governance: ["encryption", "prisma"],
+  governance: ["encryption", "isSaas"],
   licensing: ["logger", "prisma"],
   "managed-provider": [],
   saas: ["isSaas"],
   scim: [],
+  "seed-demo": [],
   sso: ["isSaas", "logger", "publicBaseUrl"],
 } as const;

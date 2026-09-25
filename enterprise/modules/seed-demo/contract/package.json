@@ -1,0 +1,30 @@
+{
+  "name": "@langwatch/enterprise-seed-demo-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable contract of the demo-organization seeding on the LangWatch demo instance.",
+  "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@langwatch/config": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

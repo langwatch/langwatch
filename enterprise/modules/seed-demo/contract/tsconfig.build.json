@@ -1,0 +1,31 @@
+{
+  "extends": ["./tsconfig.json", "../../../../tsconfig.emit.json"],
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
+    "paths": {
+      "@langwatch/enterprise-seed-demo-contract": ["./src/index.ts"]
+    }
+  },
+  "files": ["./src/index.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
+  "exclude": [
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/tests/**",
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/*.stories.*",
+    "**/*.bench.*",
+    "**/__bench__/**"
+  ],
+  "references": [
+    {
+      "path": "../../../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/kernel/tsconfig.build.json"
+    }
+  ]
+}

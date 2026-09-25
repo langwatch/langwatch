@@ -20,6 +20,7 @@ import { licensingServer } from "@langwatch/enterprise-licensing-process";
 import { managedProviderServer } from "@langwatch/enterprise-managed-provider-process";
 import { saasServer } from "@langwatch/enterprise-saas-process";
 import { scimServer } from "@langwatch/enterprise-scim-process";
+import { seedDemoServer } from "@langwatch/enterprise-seed-demo-process";
 import { ssoServer } from "@langwatch/enterprise-sso-process";
 import { entitlementServer } from "@langwatch/entitlement-process";
 import { evaluationServer } from "@langwatch/evaluation-process";
@@ -103,6 +104,7 @@ export const serverModules = [
   scenarioServer,
   scimServer,
   secretServer,
+  seedDemoServer,
   shareServer,
   ssoServer,
   storedObjectServer,

@@ -54,5 +54,6 @@ export const FEATURE_NAMES = [
   "managed-provider",
   "saas",
   "scim",
+  "seed-demo",
   "sso",
 ] as const;

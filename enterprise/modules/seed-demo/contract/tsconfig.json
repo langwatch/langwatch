@@ -1,0 +1,25 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "lib": ["es2023"],
+    "types": [],
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/kernel/tsconfig.build.json"
+    }
+  ]
+}

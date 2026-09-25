@@ -363,6 +363,12 @@
       "subjects": ["scim"]
     },
     {
+      "id": "seed-demo",
+      "root": "enterprise/modules/seed-demo",
+      "classification": "enterprise",
+      "subjects": ["seed-demo"]
+    },
+    {
       "id": "sso",
       "root": "enterprise/modules/sso",
       "classification": "enterprise",

@@ -1,0 +1,47 @@
+{
+  "name": "@langwatch/enterprise-seed-demo-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Seeds the allowlisted demo organization on the LangWatch demo instance, daily and on demand.",
+  "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "imports": {
+    "#*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/enterprise-seed-demo-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/task": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

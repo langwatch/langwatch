@@ -256,6 +256,12 @@
       "path": "enterprise/modules/scim/process/tsconfig.json"
     },
     {
+      "path": "enterprise/modules/seed-demo/contract/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/seed-demo/process/tsconfig.json"
+    },
+    {
       "path": "enterprise/modules/sso/browser/tsconfig.json"
     },
     {

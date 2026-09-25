@@ -36,6 +36,7 @@
     "@langwatch/enterprise-managed-provider-process": "workspace:*",
     "@langwatch/enterprise-saas-process": "workspace:*",
     "@langwatch/enterprise-scim-process": "workspace:*",
+    "@langwatch/enterprise-seed-demo-process": "workspace:*",
     "@langwatch/enterprise-sso-process": "workspace:*",
     "@langwatch/entitlement-process": "workspace:*",
     "@langwatch/evaluation-process": "workspace:*",

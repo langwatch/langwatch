@@ -62,6 +62,7 @@ const EXPECTED_PUBLIC_NAMESPACES = {
   "managed-provider": "managed-providers",
   saas: "saas",
   scim: "scim",
+  "seed-demo": "seed-demos",
   sso: "sso",
   webhook: "webhooks",
 } as const satisfies { [F in ModuleName]: PublicNamespace<F> };
