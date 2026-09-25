@@ -26,10 +26,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import WebSocket from "ws";
 
 import { testRedisUrl } from "../../__tests__/support/test-redis-url.ts";
-import {
-  RedisLangyLocalControlRuntimeRepository,
-  type LocalControlRuntime,
-} from "../../repositories/redis/redis.langy-local-control-runtime.repository.ts";
+import type { LocalControlRuntime } from "../../app/langy.members.ts";
+import { RedisLangyLocalControlRuntimeRepository } from "../../repositories/redis/redis.langy-local-control-runtime.repository.ts";
 import { presenceKey } from "../../rules/langy-local-control-keys.rules.ts";
 import type { LocalCallLookup } from "../../services/langy-local-call-dispatcher.service.ts";
 import { LocalControlConnectionService } from "../../services/langy-local-control-connection.service.ts";

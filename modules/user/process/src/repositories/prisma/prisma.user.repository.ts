@@ -268,6 +268,13 @@ export class PrismaUserRepository
     return { preference: row.langyCodeAccessPreference === "github" ? "github" : null };
   }
 
+  async setLangyCodeAccessPreference(id: string, preference: "github" | null): Promise<void> {
+    await this.prisma.user.update({
+      where: { id },
+      data: { langyCodeAccessPreference: preference },
+    });
+  }
+
   async findTraceExplorerTourPreference(id: string): Promise<UserTourPreference> {
     const row = await this.prisma.user.findUniqueOrThrow({
       where: { id },

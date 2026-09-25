@@ -27,8 +27,7 @@ import {
 } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { LangyConversationCommands } from "../app/langy.members.ts";
-import type { LocalControlRuntime } from "../repositories/redis/redis.langy-local-control-runtime.repository.ts";
+import type { LangyConversationCommands, LocalControlRuntime } from "../app/langy.members.ts";
 import { conversationTitle, conversationUrl } from "../rules/langy-local-session-text.rules.ts";
 import { reconcileSkipPolicy } from "../rules/langy-local-skip-policy.rules.ts";
 import { ControlRequestService } from "./langy-local-control-request.service.ts";

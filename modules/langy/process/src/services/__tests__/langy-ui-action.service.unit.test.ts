@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import type { LangyUiActionCatalog, LangyUiActionDefinition } from "../../app/langy.members.ts";
+import { LangyUiActionPageService } from "../langy-ui-action-page.service.ts";
 import {
   LangyUiActionService,
   UI_ACTION_MAX_BUDGET_MS,
@@ -123,7 +124,7 @@ function makeService({
     experimentSlug?: string;
   }) => Promise<unknown>;
 }) {
-  return LangyUiActionService.create({
+  const dispatcher = LangyUiActionService.create({
     redis,
     conversations: {
       getById: async ({ id }) => {
@@ -144,6 +145,12 @@ function makeService({
         }
       : {}),
   });
+  const page = LangyUiActionPageService.create({ redis });
+  return {
+    dispatch: dispatcher.dispatch.bind(dispatcher),
+    claim: page.claim.bind(page),
+    complete: page.complete.bind(page),
+  };
 }
 
 const DISPATCH = {

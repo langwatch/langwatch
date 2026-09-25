@@ -57,6 +57,7 @@ class StubRepository implements UserRepository {
   findJoinOfferDismissedDomains = vi.fn(async (): Promise<string[]> => ["acme.com"]);
   addJoinOfferDismissedDomain = vi.fn(async () => undefined);
   getLangyCodeAccessPreference = vi.fn(async () => ({ preference: null }));
+  setLangyCodeAccessPreference = vi.fn(async () => undefined);
   findTraceExplorerTourPreference = vi.fn(async () => ({
     dismissed: false,
     dismissedAt: null,

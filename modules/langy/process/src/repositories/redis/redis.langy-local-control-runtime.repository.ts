@@ -6,6 +6,7 @@
 
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 
+import type { LocalControlRuntime } from "../../app/langy.members.ts";
 import type { LocalCallBuffer } from "../../rules/langy-local-call-record.rules.ts";
 import type {
   UserWaitBuffer,
@@ -19,14 +20,6 @@ import {
 } from "../../services/langy-local-control-request.service.ts";
 import { UserWaitService } from "../../services/langy-local-user-wait.service.ts";
 import { LangyLocalPresenceRedisRepository } from "./redis.langy-local-presence.repository.ts";
-
-export interface LocalControlRuntime {
-  store: SessionStateStore;
-  presence: LangyLocalPresenceRedisRepository;
-  dispatcher: LocalCallDispatcherService;
-  waits: UserWaitService;
-  requests: ControlRequestService;
-}
 
 export class RedisLangyLocalControlRuntimeRepository {
   private constructor() {}

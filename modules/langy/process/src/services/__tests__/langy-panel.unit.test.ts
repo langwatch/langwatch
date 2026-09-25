@@ -11,6 +11,12 @@ import {
   LangyPanelConversationService,
   type LangyPanelConversationMembers,
 } from "../langy-panel-conversation.service.ts";
+import {
+  LangyPanelLocalService,
+  type LangyPanelLocalMembers,
+} from "../langy-panel-local.service.ts";
+
+type UiActions = NonNullable<LangyPanelConversationMembers["uiActions"]>;
 
 const caller = { userId: "user_1", name: "Ada", email: "ada@example.com" };
 const projectId = "project_1";
@@ -34,6 +40,7 @@ function panel(
     presence: createApiFixture<PresenceApi>(),
     turnAccess: null,
     openBuffer: null,
+    uiActions: null,
     ...overrides,
   });
 }
@@ -126,5 +133,78 @@ describe("LangyPanelConversationService", () => {
     await expect(
       service.warmPanelWorker({ caller, projectId, conversationId: "conversation_1" }),
     ).resolves.toEqual({ conversationId: "conversation_1", warmed: false });
+  });
+
+  /** @scenario "A tab cannot claim an action in a conversation it cannot see" */
+  it("answers a claim in an invisible conversation as not claimed", async () => {
+    const service = panel({
+      langy: createApiFixture<LangyPanelConversationMembers["langy"]>({
+        findByIdVisible: async () => null,
+      }),
+      uiActions: createApiFixture<UiActions>(),
+    });
+
+    await expect(
+      service.claimUiAction({ caller, projectId, conversationId: "c_1", actionId: "a_1" }),
+    ).resolves.toEqual({ isClaimed: false });
+  });
+
+  /** @scenario "A tab's completion reaches the action as the signed-in person's" */
+  it("hands the completion on under the caller's id", async () => {
+    const seen: Parameters<UiActions["complete"]>[0][] = [];
+    const service = panel({
+      uiActions: createApiFixture<UiActions>({
+        complete: async (args) => {
+          seen.push(args);
+          return { isAccepted: true };
+        },
+      }),
+    });
+
+    await expect(
+      service.completeUiAction({
+        caller,
+        projectId,
+        conversationId: "c_1",
+        actionId: "a_1",
+        ok: true,
+        result: { rows: 2 },
+      }),
+    ).resolves.toEqual({ isAccepted: true });
+    expect(seen).toEqual([
+      {
+        projectId,
+        userId: "user_1",
+        conversationId: "c_1",
+        actionId: "a_1",
+        completion: { ok: true, result: { rows: 2 } },
+      },
+    ]);
+  });
+});
+
+describe("LangyPanelLocalService", () => {
+  /** @scenario "Remembering the code access choice writes it for the signed-in person" */
+  it("writes the remembered choice for the caller", async () => {
+    const written: { userId: string; preference: "github" | null }[] = [];
+    const service = LangyPanelLocalService.create({
+      access: access(),
+      conversations: createApiFixture<LangyPanelLocalMembers["conversations"]>(),
+      runtime: createApiFixture<LangyPanelLocalMembers["runtime"]>(),
+      commands: createApiFixture<LangyPanelLocalMembers["commands"]>(),
+      workspace: createApiFixture<LangyPanelLocalMembers["workspace"]>({
+        setCodeAccessPreference: async (input) => {
+          written.push(input);
+          return { preference: input.preference };
+        },
+      }),
+      projects: createApiFixture<ProjectApi>(),
+      baseHost: undefined,
+    });
+
+    await expect(
+      service.setCodeAccessPreference({ caller, projectId, preference: "github" }),
+    ).resolves.toEqual({ preference: "github" });
+    expect(written).toEqual([{ userId: "user_1", preference: "github" }]);
   });
 });

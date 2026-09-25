@@ -29,6 +29,8 @@ import {
   type langyRenameInputSchema,
   type langyStopTurnPanelInputSchema,
   type langyTurnStreamInputSchema,
+  type langyClaimUiActionInputSchema,
+  type langyCompleteUiActionInputSchema,
   type langyWarmWorkerInputSchema,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
@@ -43,6 +45,7 @@ import { LangyPanelAccessService } from "./langy-panel-access.service.ts";
 import type { OpenLangyTurnBuffer } from "./langy-turn-settlement-waiter.service.ts";
 import { LangyTurnTailService } from "./langy-turn-tail.service.ts";
 import type { LangyTurnsBoundsService } from "./langy-turns-bounds.service.ts";
+import type { LangyUiActionPageService } from "./langy-ui-action-page.service.ts";
 import type { LangyService } from "./langy.service.ts";
 
 const logger = createLogger("langwatch:langy:panel");
@@ -77,6 +80,8 @@ export type LangyPanelConversationMembers = Readonly<{
   presence: Pick<PresenceApi, "getTenantEmitter" | "cleanupTenantEmitter">;
   turnAccess: LangyTurnAccessRepository | null;
   openBuffer: OpenLangyTurnBuffer | null;
+  /** Absent without Redis: no action is ever published, so no tab can claim or complete one. */
+  uiActions: Pick<LangyUiActionPageService, "claim" | "complete"> | null;
 }>;
 
 /**
@@ -117,6 +122,45 @@ export class LangyPanelConversationService {
   }
 
   /** The open conversation's spine; empty while it is not visible or not projected yet. */
+  /** The tab asking to run a published action; the conversation must be visible to it. */
+  async claimUiAction(
+    input: LangyPanelCall<typeof langyClaimUiActionInputSchema>,
+  ): Promise<{ isClaimed: boolean }> {
+    await this.members.access.assertPanelAccess(input);
+    const { uiActions } = this.members;
+    const conversation = await this.members.langy.findByIdVisible({
+      id: input.conversationId,
+      projectId: input.projectId,
+      userId: input.caller.userId,
+    });
+    if (!conversation || !uiActions) return { isClaimed: false };
+    return uiActions.claim({
+      projectId: input.projectId,
+      userId: input.caller.userId,
+      conversationId: input.conversationId,
+      actionId: input.actionId,
+    });
+  }
+
+  /** Only the claiming user may complete; anything else is dropped as not accepted. */
+  async completeUiAction(
+    input: LangyPanelCall<typeof langyCompleteUiActionInputSchema>,
+  ): Promise<{ isAccepted: boolean }> {
+    await this.members.access.assertPanelAccess(input);
+    if (!this.members.uiActions) return { isAccepted: false };
+    return this.members.uiActions.complete({
+      projectId: input.projectId,
+      userId: input.caller.userId,
+      conversationId: input.conversationId,
+      actionId: input.actionId,
+      completion: {
+        ok: input.ok,
+        ...(input.result !== undefined ? { result: input.result } : {}),
+        ...(input.errorCode ? { errorCode: input.errorCode } : {}),
+      },
+    });
+  }
+
   async findVisibleConversationDetails(
     input: LangyPanelCall<typeof langyPanelConversationInputSchema>,
   ): Promise<LangyConversationDetailDto[]> {

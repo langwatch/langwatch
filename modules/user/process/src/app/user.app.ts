@@ -346,6 +346,10 @@ export class UserApp implements UserApi {
     return this.#users.getLangyCodeAccessPreference(input);
   }
 
+  setLangyCodeAccessPreference(input: UserIdInput & UserCodeAccessPreference): Promise<void> {
+    return this.#users.setLangyCodeAccessPreference(input);
+  }
+
   /**
    * Whether an identity is a platform operator. Synchronous, and it takes the
    * identity rather than an id, because that is what the operator list is.

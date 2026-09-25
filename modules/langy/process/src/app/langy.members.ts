@@ -26,6 +26,7 @@ import type {
   LangyUserWaitEndedEventData,
   LangyUserWaitStartedEventData,
 } from "@langwatch/langy-contract";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import type { LanguageModel } from "ai";
 import type { z } from "zod";
 
@@ -36,7 +37,11 @@ import type {
   langyProcessEventViewSchema,
   langyWorkerDispatchIntentSchema,
 } from "../eventing/langy-conversation-process.schemas.ts";
+import type { LangyLocalPresenceRepository } from "../repositories/langy-local-presence.repository.ts";
 import type { LangyNavigateResourceKind } from "../rules/langy-navigate-resources.rules.ts";
+import type { LocalCallDispatcherService } from "../services/langy-local-call-dispatcher.service.ts";
+import type { ControlRequestService } from "../services/langy-local-control-request.service.ts";
+import type { UserWaitService } from "../services/langy-local-user-wait.service.ts";
 
 export type LangyProcessIntentType =
   (typeof LANGY_PROCESS_INTENT_TYPES)[keyof typeof LANGY_PROCESS_INTENT_TYPES];
@@ -413,4 +418,13 @@ export abstract class LangyConversationCommands {
   abstract changeLocalPolicy: Dispatch<LangyLocalPolicyChangedEventData>;
   abstract startUserWait: Dispatch<LangyUserWaitStartedEventData>;
   abstract endUserWait: Dispatch<LangyUserWaitEndedEventData>;
+}
+
+/** One process's local-control composition around one session store (ADR-129). */
+export interface LocalControlRuntime {
+  store: SessionStateStore;
+  presence: LangyLocalPresenceRepository;
+  dispatcher: LocalCallDispatcherService;
+  waits: UserWaitService;
+  requests: ControlRequestService;
 }

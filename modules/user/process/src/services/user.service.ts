@@ -255,6 +255,12 @@ export class UserService {
     return this.repository.getLangyCodeAccessPreference(parsed.id);
   }
 
+  async setLangyCodeAccessPreference(input: UserIdInput & UserCodeAccessPreference): Promise<void> {
+    const parsed = userIdInputSchema.parse(input);
+
+    await this.repository.setLangyCodeAccessPreference(parsed.id, input.preference);
+  }
+
   dismissTraceExplorerTour(input: UserIdInput): Promise<UserTourPreference> {
     const parsed = userIdInputSchema.parse(input);
 

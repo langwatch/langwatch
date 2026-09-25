@@ -13,15 +13,15 @@ import {
   type langyAnswerQuestionInputSchema,
   type langyPanelConversationInputSchema,
   type langyProjectInputSchema,
+  type langySetCodeAccessPreferenceInputSchema,
   type langySetLocalPolicyInputSchema,
 } from "@langwatch/langy-contract";
 import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, Temporal } from "@langwatch/time";
 import type { z } from "zod";
 
-import type { LangyConversationCommands } from "../app/langy.members.ts";
+import type { LangyConversationCommands, LocalControlRuntime } from "../app/langy.members.ts";
 import type { ConnectedWorkspace } from "../repositories/langy-local-presence.repository.ts";
-import type { LocalControlRuntime } from "../repositories/redis/redis.langy-local-control-runtime.repository.ts";
 import { workspaceChannel } from "../rules/langy-local-control-keys.rules.ts";
 import { conversationTitle, conversationUrl } from "../rules/langy-local-session-text.rules.ts";
 import { reconcileSkipPolicy } from "../rules/langy-local-skip-policy.rules.ts";
@@ -42,7 +42,10 @@ export type LangyPanelLocalMembers = Readonly<{
   >;
   workspace: Pick<
     LangyLocalWorkspaceService,
-    "getCodeAccessPreference" | "canSkipPermissions" | "getSkipPermissionsDecision"
+    | "getCodeAccessPreference"
+    | "setCodeAccessPreference"
+    | "canSkipPermissions"
+    | "getSkipPermissionsDecision"
   >;
   projects: Pick<ProjectApi, "findIdentity">;
   baseHost: string | undefined;
@@ -115,6 +118,17 @@ export class LangyPanelLocalService {
   ): Promise<{ preference: "github" | null }> {
     await this.members.access.assertPanelAccess(input);
     return this.members.workspace.getCodeAccessPreference(input.caller.userId);
+  }
+
+  /** Remember, or forget, how Langy should reach this person's code. */
+  async setCodeAccessPreference(
+    input: LangyPanelCall<typeof langySetCodeAccessPreferenceInputSchema>,
+  ): Promise<{ preference: "github" | null }> {
+    await this.members.access.assertPanelAccess(input);
+    return this.members.workspace.setCodeAccessPreference({
+      userId: input.caller.userId,
+      preference: input.preference,
+    });
   }
 
   /** A card that already settled refuses `langy_wait_expired`; the panel then sends a message. */

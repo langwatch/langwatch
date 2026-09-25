@@ -53,6 +53,7 @@ export interface UserRepository {
   findAccountInfo(id: string): Promise<UserAccountInfo | null>;
   findTraceExplorerTourPreference(id: string): Promise<UserTourPreference>;
   getLangyCodeAccessPreference(id: string): Promise<UserCodeAccessPreference>;
+  setLangyCodeAccessPreference(id: string, preference: "github" | null): Promise<void>;
   setTraceExplorerTourDismissedAt(input: {
     id: string;
     dismissedAt: Instant;

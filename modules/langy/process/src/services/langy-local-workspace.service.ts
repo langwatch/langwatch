@@ -17,7 +17,7 @@ export type LangyGithubInstallationState = { installed: boolean; accountLogin?: 
  * model may skip permission cards. Ported from main's `routes/langy-local.ts`.
  */
 export class LangyLocalWorkspaceService {
-  readonly #users: Pick<UserApi, "getLangyCodeAccessPreference">;
+  readonly #users: Pick<UserApi, "getLangyCodeAccessPreference" | "setLangyCodeAccessPreference">;
   readonly #github: Pick<GithubApi, "getAllForOrganization">;
   readonly #projects: Pick<
     ProjectApi,
@@ -26,7 +26,7 @@ export class LangyLocalWorkspaceService {
   readonly #modelProviders: Pick<ModelProviderApi, "findAllAccessibleForProject">;
 
   private constructor(options: {
-    users: Pick<UserApi, "getLangyCodeAccessPreference">;
+    users: Pick<UserApi, "getLangyCodeAccessPreference" | "setLangyCodeAccessPreference">;
     github: Pick<GithubApi, "getAllForOrganization">;
     projects: Pick<ProjectApi, "findOrganizationId" | "getOrganizationId" | "findSummaryById">;
     modelProviders: Pick<ModelProviderApi, "findAllAccessibleForProject">;
@@ -38,7 +38,7 @@ export class LangyLocalWorkspaceService {
   }
 
   static create(options: {
-    users: Pick<UserApi, "getLangyCodeAccessPreference">;
+    users: Pick<UserApi, "getLangyCodeAccessPreference" | "setLangyCodeAccessPreference">;
     github: Pick<GithubApi, "getAllForOrganization">;
     projects: Pick<ProjectApi, "findOrganizationId" | "getOrganizationId" | "findSummaryById">;
     modelProviders: Pick<ModelProviderApi, "findAllAccessibleForProject">;
@@ -48,6 +48,17 @@ export class LangyLocalWorkspaceService {
 
   getCodeAccessPreference(userId: string): Promise<UserCodeAccessPreference> {
     return this.#users.getLangyCodeAccessPreference({ id: userId });
+  }
+
+  async setCodeAccessPreference(input: {
+    userId: string;
+    preference: "github" | null;
+  }): Promise<UserCodeAccessPreference> {
+    await this.#users.setLangyCodeAccessPreference({
+      id: input.userId,
+      preference: input.preference,
+    });
+    return { preference: input.preference };
   }
 
   /** The first installation that is not suspended; "not installed" without an organization. */

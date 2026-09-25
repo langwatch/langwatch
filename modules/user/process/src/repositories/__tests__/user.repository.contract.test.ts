@@ -243,6 +243,25 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
       });
     });
 
+    it("remembers the Langy code-access choice, and forgets it again", async () => {
+      const { users } = create();
+      const created = await users.createPasskeyUser({
+        email: EMAIL,
+        issuer: ISSUER,
+        emailVerified: true,
+      });
+
+      await users.setLangyCodeAccessPreference(created.id, "github");
+      await expect(users.getLangyCodeAccessPreference(created.id)).resolves.toEqual({
+        preference: "github",
+      });
+
+      await users.setLangyCodeAccessPreference(created.id, null);
+      await expect(users.getLangyCodeAccessPreference(created.id)).resolves.toEqual({
+        preference: null,
+      });
+    });
+
     it("refuses a preference write for a user nobody minted", async () => {
       const { users } = create();
 

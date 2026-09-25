@@ -10,6 +10,7 @@ import { z } from "zod";
 
 import { testRedisUrl } from "../../__tests__/support/test-redis-url.ts";
 import type { LangyUiActionCatalog, LangyUiActionDefinition } from "../../app/langy.members.ts";
+import { LangyUiActionPageService } from "../langy-ui-action-page.service.ts";
 import { LangyUiActionService, uiActionKeys } from "../langy-ui-action.service.ts";
 
 const FAKE_DEFINITIONS: Record<string, LangyUiActionDefinition> = {
@@ -44,7 +45,7 @@ function makeService({
   appended: { actionId: string }[];
   backendRunner?: (args: { kind: string }) => Promise<unknown>;
 }) {
-  return LangyUiActionService.create({
+  const dispatcher = LangyUiActionService.create({
     redis,
     conversations: {
       getById: async () => ({ currentTurnId: IDS.turnId }),
@@ -57,6 +58,12 @@ function makeService({
     actions: new FakeUiActionCatalog(),
     ...(backendRunner ? { backendRunner } : {}),
   });
+  const page = LangyUiActionPageService.create({ redis });
+  return {
+    dispatch: dispatcher.dispatch.bind(dispatcher),
+    claim: page.claim.bind(page),
+    complete: page.complete.bind(page),
+  };
 }
 
 async function clearUiKeys() {

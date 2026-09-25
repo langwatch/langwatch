@@ -53,6 +53,8 @@ import {
   type LangyStreamEntry,
   type langyAnswerLocalPermissionInputSchema,
   type langyAnswerQuestionInputSchema,
+  type langyClaimUiActionInputSchema,
+  type langyCompleteUiActionInputSchema,
   type langyContinueConversationInputSchema,
   type langyConversationUpdateFrameSchema,
   type langyEgressGetInputSchema,
@@ -68,6 +70,7 @@ import {
   type langyProjectInputSchema,
   type langyRecordFeedbackInputSchema,
   type langyRenameInputSchema,
+  type langySetCodeAccessPreferenceInputSchema,
   type langySetLocalPolicyInputSchema,
   type langyStopTurnPanelInputSchema,
   type langyTurnStreamInputSchema,
@@ -91,10 +94,7 @@ import type {
   LangyStreamRedis,
 } from "../repositories/langy-token-buffer.repository.ts";
 import { PrismaLangySessionKeyReapRepository } from "../repositories/prisma/prisma.langy-session-key-reap.repository.ts";
-import {
-  RedisLangyLocalControlRuntimeRepository,
-  type LocalControlRuntime,
-} from "../repositories/redis/redis.langy-local-control-runtime.repository.ts";
+import { RedisLangyLocalControlRuntimeRepository } from "../repositories/redis/redis.langy-local-control-runtime.repository.ts";
 import { readSessionKeyCredential } from "../rules/langy-local-control-connect.rules.ts";
 import { LangyInternalService } from "../services/langy-internal.service.ts";
 import { LocalControlConnectionService } from "../services/langy-local-control-connection.service.ts";
@@ -114,6 +114,7 @@ import { LangySessionKeyMetricsOtelService } from "../services/langy-session-key
 import { LangySessionKeyReapService } from "../services/langy-session-key-reap.service.ts";
 import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service.ts";
 import { LangyTurnsBoundsService } from "../services/langy-turns-bounds.service.ts";
+import { LangyUiActionPageService } from "../services/langy-ui-action-page.service.ts";
 import { LangyVirtualKeyProvisioningService } from "../services/langy-virtual-key-provisioning.service.ts";
 import { LangyWorkerMetricsOtelService } from "../services/langy-worker-metrics-otel.service.ts";
 import type { LangyService } from "../services/langy.service.ts";
@@ -121,7 +122,7 @@ import { langyRestPrometheusMetrics } from "../services/prometheus.langy-rest-me
 import { SetupSkillsService } from "../services/setup-skills.service.ts";
 import { buildLangyInfrastructure } from "./langy-composition.build.ts";
 import { buildLangyConversationCommands } from "./langy-eventing.build.ts";
-import type { LangyConversationCommands } from "./langy.members.ts";
+import type { LangyConversationCommands, LocalControlRuntime } from "./langy.members.ts";
 
 /**
  * The Redis surface the live-turn edge needs: the turn-access record a
@@ -356,6 +357,7 @@ export class LangyApp implements LangyApiContract {
               };
             }
           : null,
+        uiActions: redis ? LangyUiActionPageService.create({ redis }) : null,
       }),
       panelLocal: LangyPanelLocalService.create({
         access,
@@ -854,6 +856,24 @@ export class LangyApp implements LangyApiContract {
     input: LangyPanelCall<typeof langyProjectInputSchema>,
   ): Promise<{ preference: "github" | null }> {
     return this.dependencies.panelLocal.getCodeAccessPreference(input);
+  }
+
+  setCodeAccessPreference(
+    input: LangyPanelCall<typeof langySetCodeAccessPreferenceInputSchema>,
+  ): Promise<{ preference: "github" | null }> {
+    return this.dependencies.panelLocal.setCodeAccessPreference(input);
+  }
+
+  claimUiAction(
+    input: LangyPanelCall<typeof langyClaimUiActionInputSchema>,
+  ): Promise<{ isClaimed: boolean }> {
+    return this.dependencies.panelConversations.claimUiAction(input);
+  }
+
+  completeUiAction(
+    input: LangyPanelCall<typeof langyCompleteUiActionInputSchema>,
+  ): Promise<{ isAccepted: boolean }> {
+    return this.dependencies.panelConversations.completeUiAction(input);
   }
 
   answerLocalPermission(

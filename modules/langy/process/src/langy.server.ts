@@ -82,8 +82,7 @@ export function createLangySessionKeyReap(options: {
   });
 }
 
-// The UI-action REST family and the two `claimUiAction`/`completeUiAction` procedures are
-// unconverted: see .claude/handoffs/apidiff-parity-langy.md.
+// The UI-action REST family is unconverted: see .claude/handoffs/apidiff-parity-langy.md.
 export const langyServer = defineServerModule("langy")
   .withRepositories(langyRepositories)
   .withApp(LangyApp)

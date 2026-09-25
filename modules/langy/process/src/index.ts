@@ -229,7 +229,7 @@ export {
 // ADR-129 local control: the developer's own folder, and the cards that wait
 // for the developer. One runtime per process, two transports over it, and the
 // worker's REST door onto both.
-export type { LocalControlRuntime } from "./repositories/redis/redis.langy-local-control-runtime.repository.ts";
+export type { LocalControlRuntime } from "./app/langy.members.ts";
 export type {
   ControlRequestKeyMinter,
   ControlRequestProjects,

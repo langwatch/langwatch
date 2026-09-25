@@ -43,3 +43,24 @@ Feature: The Langy panel's tRPC procedures
     Given a person who has spent this minute's warm budget
     When the panel opens
     Then the warm answers not warmed with the conversation it was asked for
+
+  @unit
+  Scenario: A tab cannot claim an action in a conversation it cannot see
+    Given a conversation that is not visible to the person
+    When their tab claims an action published in it
+    Then the claim answers not claimed
+    And no action is claimed
+
+  @unit
+  Scenario: A tab's completion reaches the action as the signed-in person's
+    Given a person whose tab claimed a published action
+    When the tab reports the action's outcome
+    Then the outcome is handed on under that person's id
+    And the answer says whether it was accepted
+
+  @unit
+  Scenario: Remembering the code access choice writes it for the signed-in person
+    Given a person inside the rollout
+    When they choose to have Langy reach their code through GitHub
+    Then the choice is written for that person
+    And the answer carries the remembered choice

@@ -7,6 +7,8 @@ import { defineTrpcContract } from "@langwatch/api/contract";
 import {
   langyAnswerLocalPermissionInputSchema,
   langyAnswerQuestionInputSchema,
+  langyClaimUiActionInputSchema,
+  langyCompleteUiActionInputSchema,
   langyContinueConversationInputSchema,
   langyControlRequestRenewedSchema,
   langyPanelConversationInputSchema,
@@ -24,6 +26,7 @@ import {
   langyProjectInputSchema,
   langyRecordFeedbackInputSchema,
   langyRenameInputSchema,
+  langySetCodeAccessPreferenceInputSchema,
   langySetLocalPolicyInputSchema,
   langyStopTurnPanelInputSchema,
   langyTurnStreamInputSchema,
@@ -39,6 +42,8 @@ import {
   langyModelsAllowedSchema,
   langyTurnStartedSchema,
   langyTurnStoppedSchema,
+  langyUiActionClaimedSchema,
+  langyUiActionCompletedSchema,
   langyWarmedWorkerSchema,
 } from "./langy.dtos.ts";
 import {
@@ -90,6 +95,14 @@ export const langyTrpc = defineTrpcContract("langy")
   .withInput(langyStopTurnPanelInputSchema)
   .withOutput(langyTurnStoppedSchema)
 
+  .mutation("claimUiAction")
+  .withInput(langyClaimUiActionInputSchema)
+  .withOutput(langyUiActionClaimedSchema)
+
+  .mutation("completeUiAction")
+  .withInput(langyCompleteUiActionInputSchema)
+  .withOutput(langyUiActionCompletedSchema)
+
   .mutation("answerLocalPermission")
   .withInput(langyAnswerLocalPermissionInputSchema)
   .withOutput(langyLocalAnsweredSchema)
@@ -105,6 +118,10 @@ export const langyTrpc = defineTrpcContract("langy")
   .mutation("disconnectLocalWorkspace")
   .withInput(langyPanelConversationInputSchema)
   .withOutput(langyLocalDisconnectedSchema)
+
+  .mutation("setCodeAccessPreference")
+  .withInput(langySetCodeAccessPreferenceInputSchema)
+  .withOutput(langyCodeAccessPreferenceSchema)
 
   .query("getCodeAccessPreference")
   .withInput(langyProjectInputSchema)

@@ -93,6 +93,7 @@ export interface UserApi {
   getTraceExplorerTourPreference(input: UserIdInput): Promise<UserTourPreference>;
   dismissTraceExplorerTour(input: UserIdInput): Promise<UserTourPreference>;
   getLangyCodeAccessPreference(input: UserIdInput): Promise<UserCodeAccessPreference>;
+  setLangyCodeAccessPreference(input: UserIdInput & UserCodeAccessPreference): Promise<void>;
   isAdmin(identity: Readonly<{ email?: string | null }>): boolean;
   /** Whether the account behind an id is a platform operator, by its own address. */
   isOperator(input: { userId: string }): Promise<boolean>;

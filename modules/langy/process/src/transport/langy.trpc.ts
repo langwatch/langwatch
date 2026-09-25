@@ -99,6 +99,20 @@ export const langyTrpcTransport = defineTrpcRouter(LangyApi, langyTrpc)
     app.stopPanelTurn({ ...input, caller: callerOf(actor, person) }),
   )
 
+  .procedure("claimUiAction")
+  .withFacts(sessionPersonFact)
+  .withPermission("langy:view")
+  .handle(({ app, input, actor }, person) =>
+    app.claimUiAction({ ...input, caller: callerOf(actor, person) }),
+  )
+
+  .procedure("completeUiAction")
+  .withFacts(sessionPersonFact)
+  .withPermission("langy:view")
+  .handle(({ app, input, actor }, person) =>
+    app.completeUiAction({ ...input, caller: callerOf(actor, person) }),
+  )
+
   .procedure("answerLocalPermission")
   .withFacts(sessionPersonFact)
   .withPermission("langy:create")
@@ -125,6 +139,13 @@ export const langyTrpcTransport = defineTrpcRouter(LangyApi, langyTrpc)
   .withPermission("langy:create")
   .handle(({ app, input, actor }, person) =>
     app.disconnectLocalWorkspace({ ...input, caller: callerOf(actor, person) }),
+  )
+
+  .procedure("setCodeAccessPreference")
+  .withFacts(sessionPersonFact)
+  .withPermission("langy:update")
+  .handle(({ app, input, actor }, person) =>
+    app.setCodeAccessPreference({ ...input, caller: callerOf(actor, person) }),
   )
 
   .procedure("getCodeAccessPreference")

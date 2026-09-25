@@ -25,6 +25,8 @@ import type {
   LangyPanelCall,
   langyAnswerLocalPermissionInputSchema,
   langyAnswerQuestionInputSchema,
+  langyClaimUiActionInputSchema,
+  langyCompleteUiActionInputSchema,
   langyContinueConversationInputSchema,
   langyPanelConversationInputSchema,
   langyPanelCreateConversationInputSchema,
@@ -38,6 +40,7 @@ import type {
   langyProjectInputSchema,
   langyRecordFeedbackInputSchema,
   langyRenameInputSchema,
+  langySetCodeAccessPreferenceInputSchema,
   langySetLocalPolicyInputSchema,
   langyStopTurnPanelInputSchema,
   langyTurnStreamInputSchema,
@@ -385,6 +388,16 @@ export interface LangyApi {
   getCodeAccessPreference(
     input: LangyPanelCall<typeof langyProjectInputSchema>,
   ): Promise<{ preference: "github" | null }>;
+  setCodeAccessPreference(
+    input: LangyPanelCall<typeof langySetCodeAccessPreferenceInputSchema>,
+  ): Promise<{ preference: "github" | null }>;
+  /** Not claimed while the conversation is not visible, or when no action is pending. */
+  claimUiAction(
+    input: LangyPanelCall<typeof langyClaimUiActionInputSchema>,
+  ): Promise<{ isClaimed: boolean }>;
+  completeUiAction(
+    input: LangyPanelCall<typeof langyCompleteUiActionInputSchema>,
+  ): Promise<{ isAccepted: boolean }>;
   answerLocalPermission(
     input: LangyPanelCall<typeof langyAnswerLocalPermissionInputSchema>,
   ): Promise<{ answered: true }>;

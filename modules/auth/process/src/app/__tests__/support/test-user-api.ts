@@ -51,6 +51,10 @@ export class TestUserApi implements UserApi {
     this.overrides.getLangyCodeAccessPreference?.(input) ??
     this.unimplemented("getLangyCodeAccessPreference");
 
+  setLangyCodeAccessPreference: UserApi["setLangyCodeAccessPreference"] = (input) =>
+    this.overrides.setLangyCodeAccessPreference?.(input) ??
+    this.unimplemented("setLangyCodeAccessPreference");
+
   isAdmin: UserApi["isAdmin"] = (identity) =>
     this.overrides.isAdmin?.(identity) ?? this.refuse("isAdmin");
 

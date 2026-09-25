@@ -193,6 +193,11 @@ export class MemoryUserRepository implements UserRepository {
     return { preference: row.langyCodeAccessPreference === "github" ? "github" : null };
   }
 
+  async setLangyCodeAccessPreference(id: string, preference: "github" | null): Promise<void> {
+    const row = this.#require(id);
+    this.#database.writeUser({ ...row, langyCodeAccessPreference: preference });
+  }
+
   async findTraceExplorerTourPreference(id: string): Promise<UserTourPreference> {
     const row = this.#require(id);
 
