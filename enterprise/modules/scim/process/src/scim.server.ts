@@ -14,6 +14,7 @@ import { defineServerModule } from "@langwatch/kernel";
 
 import { ScimApp } from "./app/scim.app.ts";
 import type { ScimSyncLifecycle } from "./app/scim.members.ts";
+import { scimDirectoryEventing } from "./eventing/scim-directory.pipeline.ts";
 import { scimEventing } from "./eventing/scim.pipeline.ts";
 import { scimRepositories } from "./repositories/scim-repositories.registry.ts";
 import { SCIM_WEBHOOK_SIGNATURE_HEADER } from "./rules/scim-webhook-signature.rules.ts";
@@ -59,7 +60,8 @@ export const scimServer = defineServerModule("scim")
       authorization: context.req.header("authorization") ?? null,
     })),
   ])
-  .withEventing(scimEventing);
+  .withEventing(scimEventing)
+  .withEventing(scimDirectoryEventing);
 
 export type { ScimSyncLifecycleAdapterDeps };
 

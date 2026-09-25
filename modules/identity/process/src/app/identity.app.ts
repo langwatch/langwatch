@@ -8,6 +8,7 @@ import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import { ScimApi } from "@langwatch/enterprise-scim-contract";
 import { EntitlementApi, isEnterpriseTier } from "@langwatch/entitlement-contract";
 import {
   IdentityApi,
@@ -19,13 +20,15 @@ import {
   type IdentityServerConfig,
   type VerifiedEmailsResolution,
 } from "@langwatch/identity-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
+import type { EmailDelivery } from "@langwatch/mail";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { reads, type MembersRead, type RateLimiter } from "@langwatch/process-stores/members";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
+import { joinRequestNotificationMailChannels } from "../channels/join-request-notification-mail-channels.registry.ts";
 import { LoggedSsoBreakGlassWarningChannel } from "../channels/sso-break-glass-warning.channel.ts";
 import {
   ssoDomainProofChannels,
@@ -33,6 +36,19 @@ import {
 } from "../channels/sso-domain-proof-channels.registry.ts";
 import { SSO_DOMAIN_PROOF_PUBLIC_EGRESS } from "../channels/sso-domain-proof-file.channel.ts";
 import { ssoIssuerDiscoveryChannels } from "../channels/sso-issuer-discovery-channels.registry.ts";
+import {
+  composeJoinRequestPipeline,
+  type JoinRequestPipeline,
+} from "../eventing/join-request.pipeline.ts";
+import { composeScimSyncPipeline, type ScimSyncPipeline } from "../eventing/scim-sync.pipeline.ts";
+import {
+  composeSsoConnectionGraph,
+  type SsoConnectionPipeline,
+} from "../eventing/sso-connection.pipeline.ts";
+import {
+  composeIdentityPipeline,
+  type IdentityPipeline,
+} from "../eventing/user-identity.pipeline.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import { LocalDoorBreakGlassBindingRepository } from "../repositories/local/local.door-break-glass-binding.repository.ts";
 import { breakGlassHolderEligibility } from "../rules/break-glass-eligibility.rules.ts";
@@ -58,7 +74,7 @@ import { IdentitySecretCarryService } from "../services/identity-secret-carry.se
 import { IdentityService } from "../services/identity.service.ts";
 import { JoinAdmissionsService } from "../services/join-admissions.service.ts";
 import { JoinRequestGuardsService } from "../services/join-request-guards.service.ts";
-import { JoinRequestNotificationService } from "../services/join-request-notification.service.ts";
+import { JoinRequestNotifierService } from "../services/join-request-notifier.service.ts";
 import { JoinRequestService } from "../services/join-request.service.ts";
 import { JoinRequestsService } from "../services/join-requests.service.ts";
 import { MfaGuardsService } from "../services/mfa-guards.service.ts";
@@ -77,9 +93,10 @@ import {
   type SsoBreakGlassDirectory,
 } from "../services/sso-break-glass.service.ts";
 import { SsoConnectionBackofficeService } from "../services/sso-connection-backoffice.service.ts";
-import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
+import { SsoConnectionDirectoryMoveService } from "../services/sso-connection-directory-move.service.ts";
+import type { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import { SsoConnectionHistoryService } from "../services/sso-connection-history.service.ts";
-import { SsoConnectionService } from "../services/sso-connection.service.ts";
+import type { SsoConnectionService } from "../services/sso-connection.service.ts";
 import { SsoDomainCeremonyService } from "../services/sso-domain-ceremony.service.ts";
 import { SsoDomainReproofService } from "../services/sso-domain-reproof.service.ts";
 import { SsoEngineProviderService } from "../services/sso-engine-provider.service.ts";
@@ -104,23 +121,23 @@ import {
 import { IdentityIdentifierBackfillMigrationService } from "../services/system-migration-identity-identifier-backfill.service.ts";
 import { IdentitySecretHealMigrationService } from "../services/system-migration-identity-secret-heal.service.ts";
 import { VerificationCeremonyService } from "../services/verification-ceremony.service.ts";
-import { buildIdentityInfrastructure } from "./identity-composition.build.ts";
+import {
+  buildIdentityInfrastructure,
+  ConnectedIdentityEventing,
+} from "./identity-composition.build.ts";
+import { IdentityProducerPipelines } from "./identity-producer-composition.build.ts";
 /**
  * The boundary `reservations().reapOrphans()` call takes no args, so it bounds
  * itself per pass the same way `IdentityNewbornReconciliationService`'s own
  * internal reap of this exact repository call does.
  */
 const RESERVATIONS_REAP_LIMIT_PER_PASS = 200;
-/**
- * `registersPipelines` is the composition's own word — which process
- * produces the four identity pipelines — never a deployment's; unresolved,
- * see the handoff. Default preserves the deleted schema's producer-role default.
- */
 type IdentityMembers = MembersRead<readonly ["prisma", "eventing", "encryption", "rateLimiter"]> &
   Readonly<{
     /** LangWatch's own cloud: what licenses federation, and so automatic joining. */
     isSaas: boolean;
-    producesPipelines: boolean;
+    /** The process mail member; with mail off each send is skipped with one line. */
+    mail: EmailDelivery;
     adminEmails: readonly string[];
     /** Where this deployment answers, which is what a SAML identity provider
      *  is told LangWatch is called. A process fact, not one of the fourteen. */
@@ -145,7 +162,6 @@ type IdentityAppParts = {
   backfill: IdentityBackfillService;
   secrets: IdentitySecretCarryService;
   joinRequestGuards: JoinRequestGuardsService;
-  joinRequestNotifications: JoinRequestNotificationService | null;
   ssoConnections: SsoConnectionService | null;
   ssoConnectionGuards: SsoConnectionGuardsService;
   ssoBackoffice: SsoConnectionBackofficeService | null;
@@ -166,6 +182,17 @@ type IdentityAppParts = {
   ssoSetupCommands: SsoSetupCommandsService | null;
   scimSyncGuards: ScimSyncGuardsService;
   scimSyncReads: ScimSyncReadsService;
+  pipelines: IdentityPipelineBuilders;
+};
+
+/** The four pipelines' definitions: producer stand-ins, or the full graph built only on consume. */
+type IdentityPipelineBuilders = {
+  eventing: ConnectedIdentityEventing;
+  producer: IdentityProducerPipelines;
+  identity: () => IdentityPipeline;
+  joinRequests: () => JoinRequestPipeline;
+  scimSync: () => ScimSyncPipeline;
+  ssoConnections: () => SsoConnectionPipeline;
 };
 
 /**
@@ -341,13 +368,13 @@ export class IdentityApp implements IdentityApi {
     auditLog: AuditLogApi,
     /** Whether this deployment's licence allows automatic joining. */
     licensing: LicensingApi,
+    /** Where a finished SSO migration's directory sync is moved; called only from the worker. */
+    scim: ScimApi,
   };
-  /** `registersPipelines` is named raw so the process can answer it through
-   * `withMember`/`withMembers` (see {@link IdentityMembers}). */
   static readonly reads = [
     ...reads("prisma", "eventing", "encryption", "rateLimiter"),
     "isSaas",
-    "producesPipelines",
+    "mail",
     "adminEmails",
     "publicBaseUrl",
   ] as const;
@@ -359,12 +386,12 @@ export class IdentityApp implements IdentityApi {
       baseUrl: setup.members.publicBaseUrl ?? "",
       providerConfig: sealedProviderConfigCipher(setup.members.encryption),
     });
+    const identityEventing = ConnectedIdentityEventing.create();
     const infrastructure = buildIdentityInfrastructure({
       repositories: setup.repositories,
       eventing: setup.members.eventing,
+      identityEventing,
       adminEmails: setup.members.adminEmails,
-      registersPipelines: setup.members.producesPipelines,
-      engineProvider: engineProviders,
     });
     const reservations = setup.repositories.reservations;
     const identityGuards = IdentityGuardsService.create({
@@ -405,30 +432,27 @@ export class IdentityApp implements IdentityApi {
     const joinRequestGuards = JoinRequestGuardsService.create({
       requests: setup.repositories.joinRequests,
     });
-    const joinRequestNotifications = infrastructure.mail
-      ? JoinRequestNotificationService.create({
-          audience: infrastructure.joinRequestAudience,
-          mail: infrastructure.mail,
-        })
-      : null;
     // One answer to "is there a way back in", shared: activation's second
     // precondition and the setup sign-in exemption must not disagree.
     const breakGlass = RequiresLocalDoorAndBinding.create({
       localDoor: LocalDoorBreakGlassBindingRepository.create(),
       bindings: SsoBreakGlassRecoveryService.create({ bindings: setup.repositories.ssoBreakGlass }),
     });
-    const ssoConnectionGuards = SsoConnectionGuardsService.create({
+    const ssoConnectionReads = OrganizationSsoConnectionsService.create({
       connections: setup.repositories.ssoConnections,
-      registrationSlots: setup.repositories.ssoRegistrationSlots,
-      breakGlass,
-      stranding: setup.repositories.ssoStranding,
-      platformOperators: infrastructure.ssoPlatformOperators,
     });
-    // Q3(c): the ledger is nullable exactly like `mail`; without it neither
-    // capability has a store to write through, so both refuse by name.
-    const ssoConnections = infrastructure.ssoConnectionLedger
-      ? SsoConnectionService.create(ssoConnectionGuards, infrastructure.ssoConnectionLedger)
-      : null;
+    // One connection service: the back office, the setup journey and the teardown timer share it.
+    const ssoConnectionGraph = composeSsoConnectionGraph({
+      repositories: setup.repositories,
+      eventSourcing: setup.members.eventing,
+      directoryMove: SsoConnectionDirectoryMoveService.create({
+        connections: ssoConnectionReads,
+        scim: setup.dependencies.scim,
+      }),
+      engineProvider: engineProviders,
+    });
+    const ssoConnectionGuards = ssoConnectionGraph.guards;
+    const ssoConnections: SsoConnectionService | null = ssoConnectionGraph.connections;
     const ssoConnectionHistory = infrastructure.ssoConnectionHistory
       ? SsoConnectionHistoryService.create({ history: infrastructure.ssoConnectionHistory })
       : null;
@@ -440,9 +464,6 @@ export class IdentityApp implements IdentityApi {
             history: () => ssoConnectionHistory,
           })
         : null;
-    const ssoConnectionReads = OrganizationSsoConnectionsService.create({
-      connections: setup.repositories.ssoConnections,
-    });
     const ssoIssuers = SsoIssuerDirectoryService.create({
       connections: setup.repositories.ssoConnections,
     });
@@ -595,7 +616,6 @@ export class IdentityApp implements IdentityApi {
       backfill,
       secrets,
       joinRequestGuards,
-      joinRequestNotifications,
       ssoConnections,
       ssoConnectionGuards,
       ssoBackoffice,
@@ -616,7 +636,70 @@ export class IdentityApp implements IdentityApi {
       ssoSetupCommands,
       scimSyncGuards,
       scimSyncReads,
+      pipelines: {
+        eventing: identityEventing,
+        producer: IdentityProducerPipelines.create({ processName: "identity" }),
+        identity: () => composeIdentityPipeline(setup.repositories),
+        joinRequests: () =>
+          composeJoinRequestPipeline({
+            repositories: setup.repositories,
+            eventSourcing: setup.members.eventing,
+            notifier: JoinRequestNotifierService.create({
+              audience: setup.repositories.joinRequestAudience,
+              context: setup.repositories.joinRequestNotificationContext,
+              mail: joinRequestNotificationMailChannels.ses.create({
+                mailer: setup.members.mail,
+                baseUrl: setup.members.publicBaseUrl ?? "",
+              }),
+              baseHost: setup.members.publicBaseUrl ?? "",
+              plans: setup.dependencies.entitlements,
+            }),
+          }),
+        scimSync: () => composeScimSyncPipeline(setup.repositories),
+        ssoConnections: ssoConnectionGraph.pipeline,
+      },
     });
+  }
+
+  identityPipeline({ participation }: { participation: EventingParticipation }): IdentityPipeline {
+    const pipelines = this.#parts.pipelines;
+    return participation === "produce"
+      ? pipelines.producer.identityPipeline()
+      : pipelines.identity();
+  }
+
+  joinRequestPipeline({
+    participation,
+  }: {
+    participation: EventingParticipation;
+  }): JoinRequestPipeline {
+    const pipelines = this.#parts.pipelines;
+    return participation === "produce"
+      ? pipelines.producer.joinRequestPipeline()
+      : pipelines.joinRequests();
+  }
+
+  scimSyncPipeline({ participation }: { participation: EventingParticipation }): ScimSyncPipeline {
+    const pipelines = this.#parts.pipelines;
+    return participation === "produce"
+      ? pipelines.producer.scimSyncPipeline()
+      : pipelines.scimSync();
+  }
+
+  ssoConnectionPipeline({
+    participation,
+  }: {
+    participation: EventingParticipation;
+  }): SsoConnectionPipeline {
+    const pipelines = this.#parts.pipelines;
+    return participation === "produce"
+      ? pipelines.producer.ssoConnectionPipeline()
+      : pipelines.ssoConnections();
+  }
+
+  /** Hands identity a registered pipeline's senders; a missing verb fails the install. */
+  connectPipeline(input: { pipeline: string; commands: object }): void {
+    this.#parts.pipelines.eventing.connect(input);
   }
 
   readonly #parts: IdentityAppParts;

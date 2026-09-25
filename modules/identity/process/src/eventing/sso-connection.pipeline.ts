@@ -1,4 +1,3 @@
-import type { ScimSsoMigrationSubscriberService } from "@langwatch/enterprise-scim-contract";
 import {
   defineAggregate,
   definePipeline,
@@ -10,6 +9,8 @@ import {
   type RegisteredCommand,
   type StateProjectionStore,
   type StaticPipelineDefinition,
+  defineEventingModule,
+  type EventingSetup,
 } from "@langwatch/eventing";
 import {
   CONNECTION_TORN_DOWN_EVENT_TYPE,
@@ -22,12 +23,14 @@ import {
 } from "@langwatch/identity-contract";
 import type { ZodType } from "zod";
 
+import type { IdentityApp } from "../app/identity.app.ts";
 import type { SsoDomainProofMail } from "../app/identity.members.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import { LocalDoorBreakGlassBindingRepository } from "../repositories/local/local.door-break-glass-binding.repository.ts";
 import type { SsoEngineProviderProjection } from "../repositories/sso-engine-provider.repository.ts";
 import { SsoBreakGlassRecoveryService } from "../services/sso-break-glass-recovery.service.ts";
 import { RequiresLocalDoorAndBinding } from "../services/sso-break-glass.service.ts";
+import type { SsoConnectionDirectoryMoveService } from "../services/sso-connection-directory-move.service.ts";
 import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import {
   SsoConnectionTeardownCompletionService,
@@ -164,7 +167,7 @@ export interface SsoConnectionPipelineDeps {
   /** Who is told when a verified domain's evidence goes missing (ADR-123). */
   proofNotifications: SsoDomainProofNotifications;
   /** Moves directory sync onto the replacement once a migration finishes. */
-  directorySync: ScimSsoMigrationSubscriberService;
+  directoryMove: Pick<SsoConnectionDirectoryMoveService, "migrationFinalized">;
 }
 
 /**
@@ -344,10 +347,10 @@ export function defineSsoConnectionPipeline(
       events: [MIGRATION_FINALIZED_EVENT_TYPE],
       handler: async (event, context) => {
         if (event.type !== MIGRATION_FINALIZED_EVENT_TYPE) return;
-        await deps.directorySync.handleMigrationFinalized(
-          { data: { connectionId: event.data.connectionId } },
-          { tenantId: context.tenantId },
-        );
+        await deps.directoryMove.migrationFinalized({
+          organizationId: context.tenantId,
+          connectionId: event.data.connectionId,
+        });
       },
     })
     .build();
@@ -407,7 +410,9 @@ function mountDomainProofNotification(
 /** The connection graph a process commands through, and the pipeline built over the same one. */
 export type SsoConnectionGraph = {
   connections: SsoConnectionService;
-  pipeline: SsoConnectionPipeline;
+  guards: SsoConnectionGuardsService;
+  /** Built only where the process drains the pipeline; the api constructs no reaction. */
+  pipeline: () => SsoConnectionPipeline;
 };
 
 /**
@@ -426,7 +431,7 @@ export function composeSsoConnectionGraph(options: {
     | "joinRequestAudience"
   >;
   eventSourcing: EventSourcing;
-  directorySync: ScimSsoMigrationSubscriberService;
+  directoryMove: Pick<SsoConnectionDirectoryMoveService, "migrationFinalized">;
   directory?: SsoConnectionDirectoryRevocation;
   mail?: SsoDomainProofMail;
   engineProvider?: SsoEngineProviderProjection;
@@ -451,20 +456,29 @@ export function composeSsoConnectionGraph(options: {
     SsoConnectionLedgerStore.forEventSourcing({ projectionStore: head, eventSourcing }),
   );
   const mail = options.mail;
-  const pipeline = defineSsoConnectionPipeline({
-    connectionProjectionStore: head,
-    connectionGuards: guards,
-    teardown: SsoConnectionTeardownCompletionService.create({
-      connections: () => connections,
-      directory: options.directory ?? UnrevokedSsoConnectionDirectory.create(),
-    }),
-    proofNotifications: mail
-      ? SsoDomainProofNotificationService.create({
-          audience: repositories.joinRequestAudience,
-          mail,
-        })
-      : UnaddressedSsoDomainProofNotifications.create(),
-    directorySync: options.directorySync,
-  });
-  return { connections, pipeline };
+  const pipeline = () =>
+    defineSsoConnectionPipeline({
+      connectionProjectionStore: head,
+      connectionGuards: guards,
+      teardown: SsoConnectionTeardownCompletionService.create({
+        connections: () => connections,
+        directory: options.directory ?? UnrevokedSsoConnectionDirectory.create(),
+      }),
+      proofNotifications: mail
+        ? SsoDomainProofNotificationService.create({
+            audience: repositories.joinRequestAudience,
+            mail,
+          })
+        : UnaddressedSsoDomainProofNotifications.create(),
+      directoryMove: options.directoryMove,
+    });
+  return { connections, guards, pipeline };
 }
+
+export const ssoConnectionEventing = defineEventingModule({
+  pipeline: SSO_CONNECTION_PIPELINE_NAME,
+  build: ({ app, participation }: EventingSetup<IdentityRepositories, IdentityApp>) =>
+    app.ssoConnectionPipeline({ participation }),
+  connect: ({ app, commands }) =>
+    app.connectPipeline({ pipeline: SSO_CONNECTION_PIPELINE_NAME, commands }),
+});

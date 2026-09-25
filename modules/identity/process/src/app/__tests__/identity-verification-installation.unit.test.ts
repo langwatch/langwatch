@@ -3,9 +3,11 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { IdentityApi } from "@langwatch/identity-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import type { EmailDelivery } from "@langwatch/mail";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { UserApi } from "@langwatch/user-contract";
@@ -18,7 +20,7 @@ describe("identity verification installation", () => {
     const runtime = await createApp({ role: "api" })
       .withModules([withMemoryRepositories(identityServer)])
       .withMembers({
-        producesPipelines: false,
+        mail: createApiFixture<EmailDelivery>(),
         adminEmails: [],
         publicBaseUrl: undefined,
         isSaas: false,
@@ -36,6 +38,7 @@ describe("identity verification installation", () => {
         entitlement: createApiFixture<EntitlementApi>(),
         "audit-log": createApiFixture<AuditLogApi>(),
         licensing: createApiFixture<LicensingApi>(),
+        scim: createApiFixture<ScimApi>(),
       })
       .boot();
 

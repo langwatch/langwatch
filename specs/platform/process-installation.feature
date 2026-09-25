@@ -24,6 +24,14 @@ Feature: Every installed module boots in the process that installs it
     And the worker hosts at least one scheduled process
 
   @integration
+  Scenario: The worker hosts identity's four pipelines with their reactions
+    Given the worker's installed modules over memory stores
+    When the worker process boots
+    Then it hosts the identity, join-requests, scim-sync and sso-connections pipelines
+    And the connection pipeline reacts to a finished migration by asking scim to move the directory
+    And scim's own directory pipeline hosts the move
+
+  @integration
   Scenario: Two process installations share no state
     Given two api processes booted over memory stores
     When one of them records a prompt tag

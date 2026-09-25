@@ -15,21 +15,17 @@ import {
   type IdentityStagedSender,
 } from "../eventing/identity-ledger.store.ts";
 import { JoinRequestLedgerStore } from "../eventing/join-request-ledger.store.ts";
-import { EngineFollowingSsoConnectionHeadStore } from "../eventing/sso-connection-head.store.ts";
-import { SsoConnectionLedgerStore } from "../eventing/sso-connection-ledger.store.ts";
 import type { SsoConnectionEvent } from "../eventing/sso-connection-state.projection.ts";
 import {
   EventingSsoConnectionHistoryRepository,
   type SsoConnectionEventReads,
 } from "../repositories/eventing/eventing.sso-connection-history.repository.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
-import type { SsoEngineProviderProjection } from "../repositories/sso-engine-provider.repository.ts";
 import { isPlatformOperatorEmail } from "../rules/platform-operator.rules.ts";
 import {
   IDENTITY_LATCH_CACHE_MAX_USERS,
   IDENTITY_LATCH_CACHE_TTL_MS,
 } from "../services/per-subject-cached-latch.service.ts";
-import { IdentityProducerPipelines } from "./identity-producer-composition.build.ts";
 import type { IdentityEventing, IdentityInfrastructure } from "./identity.members.ts";
 
 /** The one shape a command dispatcher has, checked rather than asserted. */
@@ -123,60 +119,6 @@ const SSO_CONNECTION_COMMAND_NAMES = [
   "grandfatherConnection",
 ] as const;
 
-/**
- * This process's own producer-only registration of the four identity
- * pipelines, implementing {@link IdentityEventing} over the resolved senders.
- * Registering here is the whole point of the App declaring `reads(...)`.
- */
-class RegisteredIdentityEventing implements IdentityEventing {
-  static create(eventing: EventSourcing): RegisteredIdentityEventing {
-    const producers = IdentityProducerPipelines.create({ processName: "identity" });
-    const senders = new Map<string, Map<string, IdentityCommandSender>>();
-    senders.set(
-      IDENTITY_PIPELINE_NAME,
-      resolveSenders({
-        pipeline: IDENTITY_PIPELINE_NAME,
-        registered: eventing.register(producers.identityPipeline()),
-        expected: IDENTITY_COMMAND_NAMES,
-      }),
-    );
-    senders.set(
-      JOIN_REQUEST_PIPELINE_NAME,
-      resolveSenders({
-        pipeline: JOIN_REQUEST_PIPELINE_NAME,
-        registered: eventing.register(producers.joinRequestPipeline()),
-        expected: JOIN_REQUEST_COMMAND_NAMES,
-      }),
-    );
-    senders.set(
-      SSO_CONNECTION_PIPELINE_NAME,
-      resolveSenders({
-        pipeline: SSO_CONNECTION_PIPELINE_NAME,
-        registered: eventing.register(producers.ssoConnectionPipeline()),
-        expected: SSO_CONNECTION_COMMAND_NAMES,
-      }),
-    );
-    senders.set(
-      SCIM_SYNC_PIPELINE_NAME,
-      resolveSenders({
-        pipeline: SCIM_SYNC_PIPELINE_NAME,
-        registered: eventing.register(producers.scimSyncPipeline()),
-        expected: SCIM_SYNC_COMMAND_NAMES,
-      }),
-    );
-    return new RegisteredIdentityEventing(senders);
-  }
-
-  private constructor(private readonly senders: Map<string, Map<string, IdentityCommandSender>>) {}
-
-  async tryPipelineCommand(input: {
-    pipeline: string;
-    command: string;
-  }): Promise<IdentityStagedSender | null> {
-    return this.senders.get(input.pipeline)?.get(input.command) ?? null;
-  }
-}
-
 /** The four pipelines and the verbs each one is expected to publish. */
 const EXPECTED_COMMANDS: ReadonlyMap<string, readonly string[]> = new Map<
   string,
@@ -189,34 +131,37 @@ const EXPECTED_COMMANDS: ReadonlyMap<string, readonly string[]> = new Map<
 ]);
 
 /**
- * The senders of the four identity registrations a process makes SOMEWHERE
- * ELSE, resolved at first send because nothing exists to resolve until the
- * install phase registers the full definition.
+ * Identity's command senders, handed over by each of its four eventing modules as the process
+ * connects them. A pipeline not yet connected answers null: not commandable on this process.
  */
-class ProcessRegisteredIdentityEventing implements IdentityEventing {
-  static create(eventing: EventSourcing): ProcessRegisteredIdentityEventing {
-    return new ProcessRegisteredIdentityEventing(eventing);
+export class ConnectedIdentityEventing implements IdentityEventing {
+  static create(): ConnectedIdentityEventing {
+    return new ConnectedIdentityEventing();
   }
 
-  private constructor(private readonly eventing: EventSourcing) {}
+  readonly #senders = new Map<string, Map<string, IdentityCommandSender>>();
+
+  private constructor() {}
+
+  /** Fails the install by name when a registration produced some of identity's verbs, not all. */
+  connect(input: { pipeline: string; commands: object }): void {
+    // A runtime with no command queue hands over no senders at all: nothing is commandable here.
+    if (Object.keys(input.commands).length === 0) return;
+    this.#senders.set(
+      input.pipeline,
+      resolveSenders({
+        pipeline: input.pipeline,
+        registered: { commands: input.commands },
+        expected: EXPECTED_COMMANDS.get(input.pipeline) ?? [],
+      }),
+    );
+  }
 
   async tryPipelineCommand(input: {
     pipeline: string;
     command: string;
   }): Promise<IdentityStagedSender | null> {
-    const expected = EXPECTED_COMMANDS.get(input.pipeline);
-    if (!expected?.includes(input.command)) return null;
-    // Throws by name when nothing has registered the pipeline yet — a caller
-    // that reaches identity before the install phase is a composition-order
-    // bug and says so, rather than dropping the command.
-    const registered = this.eventing.getPipeline(input.pipeline);
-    const sender = (registered.commands as Record<string, unknown>)[input.command];
-    if (!isSender(sender)) {
-      throw new Error(
-        `The ${input.pipeline} registration on this process produced no "${input.command}" command sender; the pipeline was registered incompletely.`,
-      );
-    }
-    return sender;
+    return this.#senders.get(input.pipeline)?.get(input.command) ?? null;
   }
 }
 
@@ -247,30 +192,22 @@ export function buildIdentityInfrastructure(input: {
     IdentityRepositories,
     | "identityProjection"
     | "joinRequestProjection"
-    | "ssoConnectionHeads"
     | "secretCarry"
     | "joinRequestAudience"
     | "ssoPlatformOperators"
     | "scimSyncs"
   >;
   eventing: EventSourcing;
+  identityEventing: ConnectedIdentityEventing;
   adminEmails: readonly string[];
-  /** The composition's own word (unresolved, see the handoff), never a deployment's. */
-  registersPipelines: boolean;
-  /** How the engine's provider rows follow the connection head (D09). */
-  engineProvider: SsoEngineProviderProjection | undefined;
 }): IdentityInfrastructure {
-  const { repositories, eventing, adminEmails, registersPipelines, engineProvider } = input;
-  const identityEventing = registersPipelines
-    ? RegisteredIdentityEventing.create(eventing)
-    : ProcessRegisteredIdentityEventing.create(eventing);
+  const { repositories, eventing, identityEventing, adminEmails } = input;
 
   return {
     eventing: identityEventing,
     operators: {
       isPlatformOperatorEmail: ({ email }) => isPlatformOperatorEmail({ adminEmails, email }),
     },
-    mail: null,
     latch: {
       ttlMs: IDENTITY_LATCH_CACHE_TTL_MS,
       maxUsers: IDENTITY_LATCH_CACHE_MAX_USERS,
@@ -287,14 +224,6 @@ export function buildIdentityInfrastructure(input: {
     secrets: repositories.secretCarry,
     joinRequestAudience: repositories.joinRequestAudience,
     ssoPlatformOperators: repositories.ssoPlatformOperators,
-    // Not-yet-staged commands answer null, which guards read as "not commandable on this process".
-    ssoConnectionLedger: SsoConnectionLedgerStore.forEventSourcing({
-      projectionStore: EngineFollowingSsoConnectionHeadStore.create({
-        heads: repositories.ssoConnectionHeads,
-        engineProvider,
-      }),
-      eventSourcing: eventing,
-    }),
     // Absent where this process composed no event stack: the history refuses
     // by name rather than reading as empty, which is indistinguishable from
     // a connection nothing ever happened to.

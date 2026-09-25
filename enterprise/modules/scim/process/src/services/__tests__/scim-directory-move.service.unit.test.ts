@@ -4,30 +4,18 @@
  * When a move to the organization's own identity provider finishes, the
  * directory sync of the connection it replaced moves across with it.
  */
-import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
 import type { ScimSyncLifecycle } from "../../app/scim.members.ts";
 import { MemoryScimRepository } from "../../repositories/memory/memory.scim.repository.ts";
 import type { ScimDirectoryIdentityRecord } from "../../repositories/scim.repository.ts";
-import { ScimSsoMigrationSubscriberService } from "../scim-sso-migration-subscriber.service.ts";
+import { ScimDirectoryMoveService } from "../scim-directory-move.service.ts";
 
 const ORGANIZATION_ID = "org_acme";
 const LEGACY = "ssoc_legacy";
 const REPLACEMENT = "ssoc_direct";
 
-const replacement: OrganizationSsoConnection = {
-  connectionId: REPLACEMENT,
-  displayName: "Okta",
-  providerId: "Okta",
-  verifiedDomains: [],
-  type: "oidc",
-  state: "ACTIVE",
-  replacesConnectionId: LEGACY,
-  migrationPhase: "FINALIZED",
-};
-
-function setup(held: OrganizationSsoConnection[] = [replacement]) {
+function setup() {
   const directory = MemoryScimRepository.create();
   const history: string[] = [];
   const lifecycle: Pick<ScimSyncLifecycle, "tokenIssued" | "revoked"> = {
@@ -44,16 +32,13 @@ function setup(held: OrganizationSsoConnection[] = [replacement]) {
       history.push(`revoked ${connectionId} ${tokenId}`);
     },
   };
-  const subscriber = ScimSsoMigrationSubscriberService.create({
-    connections: { findHeldConnections: async () => held },
-    directory,
-    lifecycle,
-  });
+  const service = ScimDirectoryMoveService.create({ directory, lifecycle });
   const finish = () =>
-    subscriber.handleMigrationFinalized(
-      { data: { connectionId: REPLACEMENT } },
-      { tenantId: ORGANIZATION_ID },
-    );
+    service.moveToConnection({
+      organizationId: ORGANIZATION_ID,
+      fromConnectionId: LEGACY,
+      toConnectionId: REPLACEMENT,
+    });
   return { directory, history, finish };
 }
 
@@ -83,6 +68,7 @@ async function seed(directory: MemoryScimRepository) {
 }
 
 describe("when an update finishes and the previous connection's sync moves across", () => {
+  /** @scenario "Finishing a move to the organization's own identity provider moves its directory sync across" */
   it("re-homes the tokens and the identities they provisioned, and starts the replacement's sync history", async () => {
     const { directory, history, finish } = setup();
     const tokenId = await seed(directory);
@@ -106,6 +92,7 @@ describe("when an update finishes and the previous connection's sync moves acros
     expect(history).toEqual([`issued ${REPLACEMENT} ${tokenId}`, `revoked ${LEGACY} null`]);
   });
 
+  /** @scenario "A directory move delivered again moves nothing more" */
   it("moves nothing more when the event is delivered again", async () => {
     const { directory, history, finish } = setup();
     await seed(directory);
@@ -116,19 +103,5 @@ describe("when an update finishes and the previous connection's sync moves acros
 
     expect(directory.directoryIdentities).toEqual(identities);
     expect(history.filter((line) => line.startsWith("issued"))).toHaveLength(1);
-  });
-
-  it("moves nothing for a connection that replaces none", async () => {
-    const { directory, history, finish } = setup([
-      { ...replacement, replacesConnectionId: null, migrationPhase: null },
-    ]);
-    await seed(directory);
-
-    await finish();
-
-    await expect(directory.findTokenByHash("hash-1")).resolves.toMatchObject({
-      connectionId: LEGACY,
-    });
-    expect(history).toEqual([]);
   });
 });

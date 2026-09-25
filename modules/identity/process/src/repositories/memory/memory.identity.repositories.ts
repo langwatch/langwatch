@@ -16,6 +16,7 @@ import {
 } from "./memory.identity-user.repositories.ts";
 import { MemoryIdentityStore } from "./memory.identity.store.ts";
 import { MemoryJoinRequestAudienceRepository } from "./memory.join-request-audience.repository.ts";
+import { MemoryJoinRequestNotificationContextRepository } from "./memory.join-request-notification-context.repository.ts";
 import {
   MemoryJoinCandidateRepository,
   MemoryJoinRequestReadRepository,
@@ -85,6 +86,7 @@ export function identityRepositoriesOverMemory(
     scimSyncs: MemoryScimSyncProjectionRepository.create(),
     secretCarry: MemoryIdentitySecretCarryRepository.create(),
     joinRequestAudience: MemoryJoinRequestAudienceRepository.create(store),
+    joinRequestNotificationContext: MemoryJoinRequestNotificationContextRepository.create(store),
     ssoPlatformOperators: MemorySsoPlatformOperatorsRepository.create({ store, adminEmails }),
     ssoDomainOwnership: MemorySsoDomainOwnershipRepository.create(store),
   };

@@ -4,7 +4,6 @@
  * break-glass binding and ledger writer as a second composition.
  * @see ../../eventing/sso-connection.pipeline.ts
  */
-import { ScimSsoMigrationSubscriberService } from "@langwatch/enterprise-scim-contract";
 import { EventSourcing } from "@langwatch/eventing";
 import {
   MIGRATION_FINALIZED_EVENT_TYPE,
@@ -36,15 +35,11 @@ function testEventSourcing(): EventSourcing {
   return new EventSourcing({ enabled: false });
 }
 
-class TestDirectorySync extends ScimSsoMigrationSubscriberService {
-  readonly moved: { connectionId: string; tenantId: string }[] = [];
+class TestDirectoryMove {
+  readonly moved: { connectionId: string; organizationId: string }[] = [];
 
-  handleMigrationFinalized(
-    event: { data: { connectionId: string } },
-    context: { tenantId: string },
-  ): Promise<void> {
-    this.moved.push({ connectionId: event.data.connectionId, tenantId: context.tenantId });
-    return Promise.resolve();
+  async migrationFinalized(input: { organizationId: string; connectionId: string }): Promise<void> {
+    this.moved.push(input);
   }
 }
 
@@ -64,11 +59,11 @@ const migrationFinalized = migrationFinalizedEventSchema.parse({
   },
 });
 
-function testGraph(directorySync: TestDirectorySync = new TestDirectorySync()): SsoConnectionGraph {
+function testGraph(directoryMove: TestDirectoryMove = new TestDirectoryMove()): SsoConnectionGraph {
   return composeSsoConnectionGraph({
     repositories: liveRepositories(testDatabase()),
     eventSourcing: testEventSourcing(),
-    directorySync,
+    directoryMove,
   });
 }
 
@@ -79,7 +74,7 @@ describe("composeSsoConnectionGraph", () => {
       const graph = testGraph();
 
       expect(graph.connections.registerConnection).toBeTypeOf("function");
-      expect(graph.pipeline.eventSubscribers.get("scimDirectoryMove")).toBeDefined();
+      expect(graph.pipeline().eventSubscribers.get("scimDirectoryMove")).toBeDefined();
     });
 
     it("exposes the connection verbs the operator back office commands through", () => {
@@ -93,19 +88,20 @@ describe("composeSsoConnectionGraph", () => {
 
   describe("when a move to the organization's own identity provider finishes", () => {
     it("declares directory sync as a subscriber to the finished migration only", () => {
-      const subscriber = testGraph().pipeline.eventSubscribers.get("scimDirectoryMove");
+      const subscriber = testGraph().pipeline().eventSubscribers.get("scimDirectoryMove");
 
       expect(subscriber?.eventTypes).toEqual([MIGRATION_FINALIZED_EVENT_TYPE]);
     });
 
-    it("hands directory sync the replacement connection and the organization", async () => {
-      const directorySync = new TestDirectorySync();
-      const subscriber =
-        testGraph(directorySync).pipeline.eventSubscribers.get("scimDirectoryMove");
+    it("hands the directory move the replacement connection and the organization", async () => {
+      const directoryMove = new TestDirectoryMove();
+      const subscriber = testGraph(directoryMove)
+        .pipeline()
+        .eventSubscribers.get("scimDirectoryMove");
 
       await subscriber?.handle(migrationFinalized, { tenantId: "org_1", aggregateId: "conn_new" });
 
-      expect(directorySync.moved).toEqual([{ connectionId: "conn_new", tenantId: "org_1" }]);
+      expect(directoryMove.moved).toEqual([{ connectionId: "conn_new", organizationId: "org_1" }]);
     });
   });
 });

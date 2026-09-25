@@ -17,6 +17,7 @@ import { PrismaIdentitySignInAccountsRepository } from "./prisma.identity-signin
 import { PrismaIdentityUsersRepository } from "./prisma.identity-users.repository.ts";
 import { PrismaIdentityVerificationRepository } from "./prisma.identity-verification.repository.ts";
 import { PrismaJoinRequestAudienceRepository } from "./prisma.join-request-audience.repository.ts";
+import { PrismaJoinRequestNotificationContextRepository } from "./prisma.join-request-notification-context.repository.ts";
 import { PrismaJoinRequestProjectionRepository } from "./prisma.join-request-projection.repository.ts";
 import {
   PrismaJoinCandidateRepository,
@@ -91,6 +92,8 @@ export class PostgresIdentityRepositories {
       scimSyncs: PrismaScimSyncProjectionRepository.create(database),
       secretCarry: PrismaIdentitySecretCarryRepository.create(database),
       joinRequestAudience: PrismaJoinRequestAudienceRepository.create(database),
+      joinRequestNotificationContext:
+        PrismaJoinRequestNotificationContextRepository.create(database),
       ssoPlatformOperators: AdminEmailPlatformOperatorsRepository.create({
         database,
         adminEmails: members.adminEmails,

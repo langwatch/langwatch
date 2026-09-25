@@ -64,21 +64,28 @@ import {
   EntitlementApi,
   isEnterpriseTier,
 } from "@langwatch/entitlement-contract";
+import type { EventingCommandSender } from "@langwatch/eventing";
 import { IdentityApi } from "@langwatch/identity-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
-import type { Instant } from "@langwatch/time";
+import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 import type { ZodError, ZodType } from "zod";
 
+import type { RequestDirectoryMoveCommandData } from "../eventing/scim-directory-move.intent.ts";
+import {
+  buildScimDirectoryPipeline,
+  type ScimDirectoryDefinition,
+} from "../eventing/scim-directory.pipeline.ts";
 import type { ScimRepositories } from "../repositories/scim.repositories.ts";
 import { PostgresScimService } from "../services/postgres-scim.service.ts";
 import { ScimConnectionRetirementService } from "../services/scim-connection-retirement.service.ts";
 import { ScimConnectionsService } from "../services/scim-connections.service.ts";
 import { ScimDeprovisionService } from "../services/scim-deprovision.service.ts";
 import { ScimDirectoryExternalIdsService } from "../services/scim-directory-external-ids.service.ts";
+import { ScimDirectoryMoveService } from "../services/scim-directory-move.service.ts";
 import { ScimDirectoryStreamService } from "../services/scim-directory-stream.service.ts";
 import { ScimOversightService } from "../services/scim-oversight.service.ts";
 import { ScimReconciliationService } from "../services/scim-reconciliation.service.ts";
@@ -206,6 +213,8 @@ function findBearer(authorization: string | null): string | null {
 /** Whether this user is on the staff list that may read across every customer. */
 type ScimOperatorGate = (userId: string) => Promise<boolean>;
 
+type ScimDirectoryMoveSender = Pick<EventingCommandSender<RequestDirectoryMoveCommandData>, "send">;
+
 type ScimAppOptions = {
   scim: ScimService;
   connections: ScimConnectionsService;
@@ -245,6 +254,8 @@ export class ScimApp implements ScimApiContract {
   readonly #reconciliation: ScimReconciliationService;
   readonly #oversight: ScimOversightService | undefined;
   readonly #operators: ScimOperatorGate | undefined;
+  #directoryMove: ScimDirectoryMoveService | undefined;
+  #requestDirectoryMove: ScimDirectoryMoveSender | undefined;
 
   private constructor(options: ScimAppOptions) {
     this.#scim = options.scim;
@@ -282,7 +293,7 @@ export class ScimApp implements ScimApiContract {
 
     const connections = ScimConnectionsService.create(dependencies.identity);
 
-    return ScimApp.createWithService({
+    const app = ScimApp.createWithService({
       scim,
       connections,
       directoryExternalIds: ScimDirectoryExternalIdsService.create({
@@ -314,7 +325,36 @@ export class ScimApp implements ScimApiContract {
         return dependencies.operators.isAdmin({ email: profile?.email });
       },
     });
+    app.#directoryMove = ScimDirectoryMoveService.create({
+      directory: repositories.scim,
+      lifecycle: members.lifecycle,
+    });
+    return app;
   }
+
+  /** scim_directory for this role: the worker also hosts the move itself. */
+  directoryPipeline({
+    participation,
+  }: {
+    participation: EventingParticipation;
+  }): ScimDirectoryDefinition {
+    if (participation === "produce") return buildScimDirectoryPipeline({});
+    return buildScimDirectoryPipeline({ move: this.#directoryMove });
+  }
+
+  connectDirectory(commands: Readonly<{ requestDirectoryMove: ScimDirectoryMoveSender }>): void {
+    this.#requestDirectoryMove = commands.requestDirectoryMove;
+  }
+
+  moveToConnection: ScimApiContract["moveToConnection"] = async (input) => {
+    const sender = this.#requestDirectoryMove;
+    if (!sender) throw new Error("scim_directory is not registered in this process");
+    await sender.send({
+      ...input,
+      tenantId: input.organizationId,
+      occurredAt: nowInstant().epochMilliseconds,
+    });
+  };
 
   /**
    * Split from {@link create} so a test can substitute a fake SCIM service

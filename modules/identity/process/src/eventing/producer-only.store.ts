@@ -1,4 +1,3 @@
-import { ScimSsoMigrationSubscriberService } from "@langwatch/enterprise-scim-contract";
 import type { StateProjectionStore } from "@langwatch/eventing";
 
 import type { ConnectionTeardown } from "./connection-teardown.process.ts";
@@ -123,13 +122,11 @@ export class ProducerOnlyConnectionTeardown implements ConnectionTeardown {
   }
 }
 
-/** The directory move on a finished migration, refused: only the draining process moves it. */
-export class ProducerOnlyScimSsoMigrationSubscriber extends ScimSsoMigrationSubscriberService {
-  constructor(private readonly processName: string) {
-    super();
-  }
+/** The directory move on a finished migration, refused: only the draining process asks for it. */
+export class ProducerOnlySsoConnectionDirectoryMove {
+  constructor(private readonly processName: string) {}
 
-  handleMigrationFinalized(): Promise<void> {
+  migrationFinalized(): Promise<void> {
     return Promise.reject(
       producerOnly({
         processName: this.processName,

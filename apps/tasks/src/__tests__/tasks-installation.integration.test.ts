@@ -108,7 +108,6 @@ async function bootTasks() {
         nlpServiceUrl: config.process.nlpServiceUrl,
         adminEmails: config.process.adminEmails,
         processName: "langwatch-tasks",
-        producesPipelines: true,
         dataPrivacy: { directory: unreachable<object>("dataPrivacy.directory") },
         elevenLabsWebhook: void 0,
         storageResolver: void 0,
@@ -147,6 +146,7 @@ describe("the tasks process installation", () => {
         "model-registry-sync",
         "process-manager-purge",
         "stalled-runs-backfill",
+        "seed-demo",
         "topic-clustering-run",
       ]);
     } finally {

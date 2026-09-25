@@ -175,7 +175,6 @@ export class ProcessServer implements ProcessBoot {
               adminEmails: this.settings.adminEmails ?? [],
               // Role facts: the composition's word, never a deployment's.
               processName: this.server.name,
-              producesPipelines: pipelines.mode === "produce",
               ...Object.fromEntries(
                 Object.entries(suppliedMembers).map(([name, build]) => [name, build(opened)]),
               ),

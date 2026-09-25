@@ -1,13 +1,15 @@
-/** Spec: specs/identity/sso-process-composition.feature */
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+/** Spec: specs/identity/sso-process-composition.feature */
+import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import type { EmailDelivery } from "@langwatch/mail";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { UserApi } from "@langwatch/user-contract";
@@ -60,7 +62,7 @@ async function installed() {
   const runtime = await createApp({ role: "worker" })
     .withModules([withMemoryRepositories(identityServer)])
     .withMembers({
-      producesPipelines: false,
+      mail: createApiFixture<EmailDelivery>(),
       adminEmails: [],
       publicBaseUrl: undefined,
       isSaas: false,
@@ -78,6 +80,7 @@ async function installed() {
       entitlement: createApiFixture<EntitlementApi>(),
       "audit-log": createApiFixture<AuditLogApi>(),
       licensing: createApiFixture<LicensingApi>(),
+      scim: createApiFixture<ScimApi>(),
     })
     .boot();
   const definition = registered[0];
@@ -99,7 +102,9 @@ describe("given identity's eventing declaration", () => {
   describe("when the module is declared", () => {
     /** @scenario "The worker hosts identity's scheduled sweeps from the module" */
     it("carries the declaration onto the installable module", () => {
-      expect(identityServer.eventing).toBe(identityEventing);
+      const eventing = identityServer.eventing;
+      const declarations = eventing && "declarations" in eventing ? eventing.declarations : [];
+      expect(declarations).toContain(identityEventing);
       expect(identityEventing.pipeline).toBe(IDENTITY_MAINTENANCE_PIPELINE_NAME);
     });
   });

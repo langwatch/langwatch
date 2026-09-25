@@ -5,9 +5,12 @@ import {
   type RegisteredCommand,
   type StateProjectionStore,
   type StaticPipelineDefinition,
+  defineEventingModule,
+  type EventingSetup,
 } from "@langwatch/eventing";
 import { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
 
+import type { IdentityApp } from "../app/identity.app.ts";
 import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
@@ -201,3 +204,11 @@ export function composeIdentityPipeline(
     mfaGuards,
   });
 }
+
+export const identityPipelineEventing = defineEventingModule({
+  pipeline: IDENTITY_PIPELINE_NAME,
+  build: ({ app, participation }: EventingSetup<IdentityRepositories, IdentityApp>) =>
+    app.identityPipeline({ participation }),
+  connect: ({ app, commands }) =>
+    app.connectPipeline({ pipeline: IDENTITY_PIPELINE_NAME, commands }),
+});

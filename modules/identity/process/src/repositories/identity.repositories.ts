@@ -16,6 +16,7 @@ import type { IdentitySignInAccountsRepository } from "./identity-signin-account
 import type { IdentityUsersRepository } from "./identity-users.repository.ts";
 import type { IdentityVerificationRepository } from "./identity-verification.repository.ts";
 import type { JoinRequestAudienceRepository } from "./join-request-audience.repository.ts";
+import type { JoinRequestNotificationContextRepository } from "./join-request-notification-context.repository.ts";
 import type {
   JoinCandidateRepository,
   JoinRequestListReadRepository,
@@ -82,6 +83,8 @@ export interface IdentityRepositories {
   readonly secretCarry: IdentitySecretCarryRepository;
   /** Who a join-request or domain-proof notice reaches. */
   readonly joinRequestAudience: JoinRequestAudienceRepository;
+  /** What a join-request mail says beyond names: intent, domain habit, personal teams. */
+  readonly joinRequestNotificationContext: JoinRequestNotificationContextRepository;
   /** Who counts as a LangWatch platform operator, by the deployment's `ADMIN_EMAILS`. */
   readonly ssoPlatformOperators: SsoPlatformOperatorRepository;
   /** Which domains a connection owns, re-projected by the ownership backfill. */

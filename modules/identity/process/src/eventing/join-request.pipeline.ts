@@ -9,6 +9,8 @@ import {
   type RegisteredCommand,
   type StateProjectionStore,
   type StaticPipelineDefinition,
+  defineEventingModule,
+  type EventingSetup,
 } from "@langwatch/eventing";
 import {
   JOIN_APPROVED_EVENT_TYPE,
@@ -21,6 +23,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { ZodType } from "zod";
 
+import type { IdentityApp } from "../app/identity.app.ts";
 import type { JoinRequestMail } from "../app/identity.members.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import type { JoinRequestNotifier } from "../rules/join-requests-contract.rules.ts";
@@ -201,3 +204,11 @@ export function composeJoinRequestNotifications(options: {
     mail: options.mail,
   });
 }
+
+export const joinRequestEventing = defineEventingModule({
+  pipeline: JOIN_REQUEST_PIPELINE_NAME,
+  build: ({ app, participation }: EventingSetup<IdentityRepositories, IdentityApp>) =>
+    app.joinRequestPipeline({ participation }),
+  connect: ({ app, commands }) =>
+    app.connectPipeline({ pipeline: JOIN_REQUEST_PIPELINE_NAME, commands }),
+});

@@ -375,3 +375,30 @@ Feature: Enterprise SCIM package boundary
       Given a directory that pushes a JSON resource under a media type that is not JSON
       When the resource is valid
       Then it is provisioned as if the media type had named JSON
+
+  Rule: A directory sync moves with the sign-in it came with
+
+  @unit
+  Scenario: A finished move asks scim for the directory move as a command on its own pipeline
+    Given scim's directory pipeline is connected on this process
+    When identity asks scim to move a connection's directory to its replacement
+    Then one directory-move command is recorded on scim's pipeline, tenanted by the organization
+
+  @unit
+  Scenario: Finishing a move to the organization's own identity provider moves its directory sync across
+    Given a directory sync provisioned through the replaced connection
+    When scim's worker moves it to the replacement
+    Then the tokens and the identities they provisioned belong to the replacement
+    And the replacement's sync history starts and the previous one's ends
+
+  @unit
+  Scenario: A directory move delivered again moves nothing more
+    Given a directory sync already moved to the replacement
+    When the same move is delivered again
+    Then nothing moves and no second history starts
+
+  @unit
+  Scenario: A directory move asked of a process without scim's directory pipeline is refused by name
+    Given a process that registered no scim directory pipeline
+    When identity asks scim to move a directory
+    Then the request is refused naming the scim_directory pipeline

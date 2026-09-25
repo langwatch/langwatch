@@ -5,9 +5,12 @@ import {
   type RegisteredCommand,
   type StateProjectionStore,
   type StaticPipelineDefinition,
+  defineEventingModule,
+  type EventingSetup,
 } from "@langwatch/eventing";
 import { SCIM_SYNC_AGGREGATE_TYPE, SCIM_SYNC_PIPELINE_NAME } from "@langwatch/identity-contract";
 
+import type { IdentityApp } from "../app/identity.app.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
 import {
@@ -116,3 +119,11 @@ export function composeScimSyncPipeline(
     scimSyncGuards: ScimSyncGuardsService.create({ syncs: repositories.scimSyncs }),
   });
 }
+
+export const scimSyncEventing = defineEventingModule({
+  pipeline: SCIM_SYNC_PIPELINE_NAME,
+  build: ({ app, participation }: EventingSetup<IdentityRepositories, IdentityApp>) =>
+    app.scimSyncPipeline({ participation }),
+  connect: ({ app, commands }) =>
+    app.connectPipeline({ pipeline: SCIM_SYNC_PIPELINE_NAME, commands }),
+});

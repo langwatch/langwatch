@@ -8,7 +8,7 @@ import type { MfaFoldState } from "../eventing/mfa-enrollment-state.projection.t
 import {
   ProducerOnlyConnectionTeardown,
   ProducerOnlyJoinRequestLifecycle,
-  ProducerOnlyScimSsoMigrationSubscriber,
+  ProducerOnlySsoConnectionDirectoryMove,
   ProducerOnlySsoDomainProofNotifications,
   ProducerOnlyStateProjectionStore,
   producerOnlyReads,
@@ -155,7 +155,7 @@ export class IdentityProducerPipelines {
       }),
       teardown: new ProducerOnlyConnectionTeardown(this.processName),
       proofNotifications: new ProducerOnlySsoDomainProofNotifications(this.processName),
-      directorySync: new ProducerOnlyScimSsoMigrationSubscriber(this.processName),
+      directoryMove: new ProducerOnlySsoConnectionDirectoryMove(this.processName),
     });
   }
 

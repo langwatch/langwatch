@@ -8,7 +8,6 @@ import type { SsoConnectionHistoryRepository } from "../repositories/sso-connect
 import type { SsoPlatformOperatorRepository } from "../repositories/sso-connection.repository.ts";
 import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
 import type { JoinRequestLedger } from "../rules/join-request-ledger.rules.ts";
-import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
 import type { IdentitySecretCarryRepository } from "../services/identity-secret-carry.service.ts";
 
 /**
@@ -234,11 +233,6 @@ export type IdentityInfrastructure = Readonly<{
   eventing: IdentityEventing;
   /** The deployment's operator list, for the SSO connection guards. `ADMIN_EMAILS`, not `ops:*`. */
   operators: PlatformOperator;
-  /**
-   * How the two wake-driven join-request mails are rendered and sent, or
-   * nothing where the process composed no gateway.
-   */
-  mail: JoinRequestMail | null;
   /** Overridden only by tests that need the latch to expire or evict inside one run. */
   latch: Readonly<{ ttlMs: number; maxUsers: number; now: () => number }>;
   /**
@@ -254,12 +248,6 @@ export type IdentityInfrastructure = Readonly<{
   joinRequestAudience: JoinRequestAudienceRepository;
   /** Who counts as a LangWatch platform operator, for the SSO connection guards (D05 tier 1). */
   ssoPlatformOperators: SsoPlatformOperatorRepository;
-  /**
-   * The SSO connection ledger's append surface, or nothing where the process
-   * composed no SSO connection store. Mirrors `mail`: absent means the
-   * capability refuses by name rather than answering emptily.
-   */
-  ssoConnectionLedger: SsoConnectionLedger | null;
   /**
    * One connection's own log, read. Null where the process composed no event
    * stack — the history refuses by name rather than reading as empty, which

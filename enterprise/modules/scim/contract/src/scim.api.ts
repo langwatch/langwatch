@@ -88,6 +88,15 @@ export interface ScimApi {
    */
   isEnterpriseEntitled(input: { organizationId: string }): Promise<boolean>;
   /**
+   * Re-homes one connection's directory sync onto the connection that replaced it: the tokens,
+   * people and external ids follow. Recorded on scim's own pipeline and moved by its worker.
+   */
+  moveToConnection(input: {
+    organizationId: string;
+    fromConnectionId: string;
+    toConnectionId: string;
+  }): Promise<void>;
+  /**
    * Records a management-API write on a token. The ledger is the deployment's,
    * composed in: only the door that has always written to it calls this, so
    * the settings page does not start filing rows the audit never had.

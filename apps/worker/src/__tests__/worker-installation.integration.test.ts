@@ -108,7 +108,6 @@ async function bootWorker() {
         nlpServiceUrl: config.process.nlpServiceUrl,
         adminEmails: config.process.adminEmails,
         processName: "langwatch-worker",
-        producesPipelines: false,
         dataPrivacy: { directory: unreachable<object>("dataPrivacy.directory") },
         elevenLabsWebhook: void 0,
         storageResolver: void 0,
@@ -165,6 +164,25 @@ describe("the worker process installation", () => {
         ),
       );
       expect(schedules).not.toEqual([]);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "The worker hosts identity's four pipelines with their reactions" */
+  it("hosts identity's four pipelines as consumers, and scim's directory move", async () => {
+    const { runtime, eventing } = await bootWorker();
+
+    try {
+      const byName = new Map(
+        eventing.definitions.map((definition) => [definition.metadata.name, definition]),
+      );
+      for (const name of ["identity", "join-requests", "scim-sync", "sso-connections"]) {
+        expect(byName.has(name)).toBe(true);
+      }
+      expect(byName.get("sso-connections")?.eventSubscribers.has("scimDirectoryMove")).toBe(true);
+      expect(byName.get("join-requests")?.processManagers.size).toBeGreaterThan(0);
+      expect(byName.get("scim_directory")?.eventSubscribers.has("moveDirectory")).toBe(true);
     } finally {
       await runtime.stop();
     }
