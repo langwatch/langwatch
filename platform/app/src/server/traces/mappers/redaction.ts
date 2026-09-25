@@ -1,19 +1,33 @@
+import { z } from "zod";
 import {
   redactSpanContent,
   redactTraceContent,
 } from "~/server/app-layer/traces/visibility-window.service";
-import { PRIVACY_DROPPED_MARKER_ATTR } from "~/server/data-privacy/dropKeyCatalog";
+import {
+  CONTENT_CATEGORIES,
+  type ContentCategory,
+} from "~/server/data-privacy/dataPrivacy.types";
+import {
+  CONTENT_KEY_CATALOG,
+  PRIVACY_DROPPED_MARKER_ATTR,
+} from "~/server/data-privacy/dropKeyCatalog";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
-import type {
-  Event,
-  Span,
-  SpanInputOutput,
-  SpanMetrics,
-  Trace,
-  TraceInput,
-  TraceOutput,
+import {
+  chatMessageSchema,
+  chatRichContentSchema,
+  type Event,
+  type Span,
+  type SpanInputOutput,
+  type SpanMetrics,
+  spanInputOutputSchema,
+  type Trace,
+  type TraceInput,
+  type TraceOutput,
 } from "~/server/tracer/types";
-import type { Protections } from "~/server/traces/protections";
+import type {
+  CategoryVisibility,
+  Protections,
+} from "~/server/traces/protections";
 import { parsePythonInsideJson } from "~/utils/parsePythonInsideJson";
 import { redactHiddenAttributes } from "./redactAttributes";
 
@@ -57,10 +71,57 @@ export function collectDroppedCategories(spans: Span[] | undefined): string[] {
   ];
 }
 
+/** The string literal each union member pins its `type` key to, if any. */
+function typeLiteralsOf(options: readonly z.ZodTypeAny[]): string[] {
+  return options.flatMap((option) => {
+    if (!(option instanceof z.ZodObject)) return [];
+    const type: unknown = option.shape.type;
+    return type instanceof z.ZodLiteral && typeof type.value === "string"
+      ? [type.value]
+      : [];
+  });
+}
+
+/**
+ * Every literal a `role` or `type` key takes in the span input/output shapes:
+ * the chat roles, the content-part types and the typed-value types, read off
+ * the schemas so a new shape is covered the day it is added. They describe a
+ * message's shape, not what anyone wrote.
+ */
+const SPAN_IO_SHAPE_LITERALS: ReadonlySet<string> = new Set([
+  ...chatMessageSchema.shape.role.unwrap().options.map((role) => role.value),
+  ...typeLiteralsOf(chatRichContentSchema.options),
+  ...typeLiteralsOf(
+    (
+      spanInputOutputSchema as unknown as z.ZodLazy<
+        z.ZodUnion<[z.ZodTypeAny, ...z.ZodTypeAny[]]>
+      >
+    ).schema.options,
+  ),
+]);
+
+/**
+ * Keys whose shape-describing values (`SPAN_IO_SHAPE_LITERALS`: "user",
+ * "text", "image_url", ...) are left out of the redaction set, or every
+ * attribute that mentions a role would be blanked along with the content. Any
+ * other value under those keys is content and is kept.
+ */
+const STRUCTURAL_KEYS: ReadonlySet<string> = new Set(["role", "type"]);
+
+/**
+ * Below this length a hidden string is redacted inside another value only
+ * where it stands as a whole word. Matching it as a bare substring blanks
+ * unrelated attributes that merely contain a short word the content also used
+ * ("user" in "user_selected").
+ */
+const MIN_CONTAINED_REDACTION_LENGTH = 8;
+
 /**
  * Extracts string values from an object for redaction purposes.
  * When input/output is not visible, we need to collect all string values
- * so they can be redacted from any visible fields.
+ * so they can be redacted from any visible fields. Blank strings and the
+ * values of structural keys are skipped: they carry no content, and an empty
+ * string is contained in every value.
  *
  * @param object - The object to extract redaction strings from
  * @returns Array of strings that should be redacted
@@ -80,17 +141,65 @@ export function extractRedactionsForObject(object: unknown): string[] {
       } catch {
         // Not valid Python repr either
       }
-      return [object];
+      return object.trim() === "" ? [] : [object];
     }
   }
   if (Array.isArray(object)) {
     return object.flatMap(extractRedactionsForObject);
   }
   if (typeof object === "object" && object !== null) {
-    return Object.values(object).flatMap(extractRedactionsForObject);
+    return Object.entries(object)
+      .filter(
+        ([key, value]) =>
+          !(
+            STRUCTURAL_KEYS.has(key) &&
+            typeof value === "string" &&
+            SPAN_IO_SHAPE_LITERALS.has(value)
+          ),
+      )
+      .flatMap(([, value]) => extractRedactionsForObject(value));
   }
 
   return [];
+}
+
+interface RedactionMatchers {
+  long: string[];
+  short: RegExp[];
+}
+
+const matchersByRedactions = new WeakMap<Set<string>, RedactionMatchers>();
+
+/** The redaction set split by how each string is matched, compiled once. */
+function matchersFor(redactions: Set<string>): RedactionMatchers {
+  const cached = matchersByRedactions.get(redactions);
+  if (cached) return cached;
+  const matchers: RedactionMatchers = { long: [], short: [] };
+  for (const redaction of redactions) {
+    if (redaction.length >= MIN_CONTAINED_REDACTION_LENGTH) {
+      matchers.long.push(redaction);
+    } else {
+      const escaped = redaction.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      matchers.short.push(
+        new RegExp(`(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])`, "u"),
+      );
+    }
+  }
+  matchersByRedactions.set(redactions, matchers);
+  return matchers;
+}
+
+/**
+ * Whether a string leaf carries hidden content: it is one of the hidden
+ * strings, quotes a long one anywhere, or holds a short one as a whole word.
+ */
+function carriesRedaction(value: string, redactions: Set<string>): boolean {
+  if (redactions.has(value)) return true;
+  const { long, short } = matchersFor(redactions);
+  return (
+    long.some((redaction) => value.includes(redaction)) ||
+    short.some((pattern) => pattern.test(value))
+  );
 }
 
 /**
@@ -118,9 +227,7 @@ export function redactObject<T>(object: T, redactions: Set<string>): T {
       } catch {
         // Not valid Python repr either
       }
-      return Array.from(redactions).filter((redaction) =>
-        object.includes(redaction),
-      ).length > 0
+      return carriesRedaction(object, redactions)
         ? ("[REDACTED]" as T)
         : object;
     }
@@ -158,6 +265,63 @@ export function extractRedactionsFromAllSpanInputs(spans: Span[]): string[] {
 export function extractRedactionsFromAllSpanOutputs(spans: Span[]): string[] {
   return spans.flatMap((span) =>
     extractRedactionsForObject(span.output?.value),
+  );
+}
+
+/**
+ * Synthetic hidden-attribute rules for the attribute keys that carry each
+ * content category the viewer cannot see (`langwatch.input`, the gen_ai
+ * message keys, `gen_ai.system_instructions`, `gen_ai.tool.call.*`, ...), so
+ * their values are replaced whole by the placeholder naming who can see them,
+ * like a custom restrict rule. Shared by the span protections and the v2 read
+ * mappers so one attribute never carries two different audience labels.
+ */
+export function hiddenContentCategoryRules(protections: {
+  canSeeCapturedInput?: boolean | null;
+  canSeeCapturedOutput?: boolean | null;
+  capturedInputVisibleTo?: string | null;
+  capturedOutputVisibleTo?: string | null;
+  contentCategories?: Record<ContentCategory, CategoryVisibility>;
+}): Array<{ pattern: string; visibleTo: string }> {
+  const categories: Record<
+    ContentCategory,
+    { canSee: boolean; visibleTo: string | null | undefined }
+  > = {
+    input: {
+      canSee:
+        protections.contentCategories?.input.canSee ??
+        protections.canSeeCapturedInput === true,
+      visibleTo:
+        protections.contentCategories?.input.restrictVisibleTo ??
+        protections.capturedInputVisibleTo,
+    },
+    output: {
+      canSee:
+        protections.contentCategories?.output.canSee ??
+        protections.canSeeCapturedOutput === true,
+      visibleTo:
+        protections.contentCategories?.output.restrictVisibleTo ??
+        protections.capturedOutputVisibleTo,
+    },
+    system: {
+      canSee: protections.contentCategories?.system.canSee ?? true,
+      visibleTo: protections.contentCategories?.system.restrictVisibleTo,
+    },
+    tools: {
+      canSee: protections.contentCategories?.tools.canSee ?? true,
+      visibleTo: protections.contentCategories?.tools.restrictVisibleTo,
+    },
+  };
+  return CONTENT_CATEGORIES.flatMap((category) =>
+    categories[category].canSee
+      ? []
+      : CONTENT_KEY_CATALOG[category].map((pattern) => ({
+          pattern,
+          // No restrict label means the content is hidden by membership
+          // (or a fail-closed policy read), not by an audience rule.
+          visibleTo:
+            categories[category].visibleTo ?? "members of this project",
+        })),
   );
 }
 
@@ -216,17 +380,23 @@ export function applySpanProtections(
     }
   }
 
-  // Custom attribute rules with a restrict disposition: replace matched span
-  // params (the mapper unflattens dotted keys into nested objects, so the
+  // A copy of hidden content riding along in any param is scrubbed by the
+  // redactions set first. Then custom attribute rules with a restrict
+  // disposition, plus the attributes that carry a hidden content category
+  // (`langwatch.input`, the gen_ai message keys), replace matched span params
+  // whole (the mapper unflattens dotted keys into nested objects, so the
   // matcher walks the nested paths) with the placeholder naming who can see
-  // them. Hidden input/output content riding along inside params (e.g. the
-  // raw gen_ai message attributes) is scrubbed by the redactions set.
-  const transformedParams = redactObject(
-    redactHiddenAttributes(
+  // them. In that order the scrub never rewrites a placeholder that happens to
+  // share a word with the hidden content.
+  const transformedParams = redactHiddenAttributes(
+    redactObject(
       span.params as Record<string, unknown> | null | undefined,
-      protections.hiddenAttributes,
+      redactions,
     ),
-    redactions,
+    [
+      ...(protections.hiddenAttributes ?? []),
+      ...hiddenContentCategoryRules(protections),
+    ],
   );
 
   const transformed = {
