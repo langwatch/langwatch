@@ -33,7 +33,7 @@ import type { UiActiveScopeReading } from "@langwatch/browser-host/session";
 
 import type { UiAuthClient } from "../../session";
 import { useBrowserUiSession, useUiSessionReading } from "../ui-session";
-import type { UiFeatureApiTransport } from "../ui-session-queries";
+import { answeringTransport } from "./answering-transport.test-helpers";
 
 const JANE = "user_jane";
 
@@ -81,9 +81,9 @@ const RESOLVED_SCOPE: UiActiveScopeReading = {
 };
 
 /** Grants and flags answer at once, so nothing here waits on them. */
-const answeringTransport = {
-  query: () => Promise.resolve({ permissions: [], enabled: false }),
-} as unknown as UiFeatureApiTransport;
+const instantTransport = answeringTransport(() =>
+  Promise.resolve({ permissions: [], enabled: false }),
+);
 
 const ROUTE_PATHS = ["/", "/auth/signin", "/:project/traces"];
 
@@ -115,7 +115,7 @@ function SessionProbe({
     authClient,
   });
   const session = useBrowserUiSession({
-    transport: answeringTransport,
+    transport: instantTransport,
     session: reading,
     scope: RESOLVED_SCOPE,
   });

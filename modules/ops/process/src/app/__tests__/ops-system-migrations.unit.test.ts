@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { SystemMigrationRecordNotFoundError } from "@langwatch/system-migrations";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -232,8 +233,10 @@ describe("project-rooted migration composition", () => {
     projectFindMany.mockResolvedValueOnce([{ id: "project_1" }]);
     vi.spyOn(RedisMigrationLeaseRepository.prototype, "acquire").mockResolvedValue(true);
     vi.spyOn(RedisMigrationLeaseRepository.prototype, "release").mockResolvedValue();
-    vi.spyOn(PrismaSystemMigrationStateRepository.prototype, "tryFindRecord").mockResolvedValue(
-      null,
+    vi.spyOn(PrismaSystemMigrationStateRepository.prototype, "getRecord").mockImplementation(
+      async (args) => {
+        throw new SystemMigrationRecordNotFoundError(args);
+      },
     );
     const checkpoint = vi
       .spyOn(PrismaSystemMigrationStateRepository.prototype, "upsertRecordUnlessRolledBack")

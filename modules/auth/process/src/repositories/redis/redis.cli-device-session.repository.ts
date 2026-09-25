@@ -1,23 +1,12 @@
 import { CliSessionRecordNotFoundError } from "@langwatch/auth-contract";
+import type { RedisConnection } from "@langwatch/redis-client";
 
 import type { CliDeviceSessionRepository } from "../cli-device-session.repository.ts";
 
-type CliDeviceSessionRedis = Readonly<{
-  get(key: string): Promise<string | null>;
-  set(key: string, value: string, mode: "EX", ttlSeconds: number): Promise<unknown>;
-  set(
-    key: string,
-    value: string,
-    mode: "EX",
-    ttlSeconds: number,
-    condition: "NX",
-  ): Promise<"OK" | null>;
-  del(key: string): Promise<number>;
-  sadd(key: string, ...members: string[]): Promise<number>;
-  pexpire(key: string, ttlMs: number): Promise<number>;
-  srem(key: string, ...members: string[]): Promise<number>;
-  smembers(key: string): Promise<string[]>;
-}>;
+type CliDeviceSessionRedis = Pick<
+  RedisConnection,
+  "get" | "set" | "del" | "sadd" | "pexpire" | "srem" | "smembers"
+>;
 
 /** The Auth-owned Redis backing store for RFC 8628 device sessions. */
 export class RedisCliDeviceSessionRepository implements CliDeviceSessionRepository {

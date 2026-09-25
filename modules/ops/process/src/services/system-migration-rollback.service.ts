@@ -5,6 +5,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import { SystemMigrationRecordNotFoundError } from "@langwatch/system-migrations";
 import type { TenantMigrationRecord } from "@langwatch/system-migrations";
 import { nowInstant } from "@langwatch/time";
 
@@ -38,10 +39,10 @@ export class SystemMigrationRollbackService {
     actorUserId: string;
   }): Promise<void> {
     systemMigrationLookup.registeredMigration(this.deps, migrationName);
-    const record = await this.deps.state.tryFindRecord({
-      migrationName,
-      tenantId,
-    });
+    const [found] = await this.deps.state
+      .getRecord({ migrationName, tenantId })
+      .then((found) => [found], noneWhenNotFound);
+    const record = found ?? null;
     // The migration's own preconditions, before anything is written: a
     // refusal here leaves no pin behind, so the tenant's state is exactly
     // what it was when the operator asked.
@@ -153,4 +154,9 @@ function extractRollbackDecidedAt(report: Record<string, unknown>): string | nul
   const at = (rolledBack as Record<string, unknown>).at;
 
   return typeof at === "string" && at !== "" ? at : null;
+}
+
+function noneWhenNotFound(error: unknown): [] {
+  if (error instanceof SystemMigrationRecordNotFoundError) return [];
+  throw error;
 }

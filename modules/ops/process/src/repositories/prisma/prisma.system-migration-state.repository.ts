@@ -1,5 +1,6 @@
 import type { OpsMigrationOverview } from "@langwatch/ops-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { SystemMigrationRecordNotFoundError } from "@langwatch/system-migrations";
 import type {
   SystemMigrationStateRepository,
   TenantMigrationRecord,
@@ -30,17 +31,17 @@ export class PrismaSystemMigrationStateRepository implements SystemMigrationStat
 
   private constructor(private readonly prisma: PrismaClient) {}
 
-  async tryFindRecord({
+  async getRecord({
     migrationName,
     tenantId,
   }: {
     migrationName: string;
     tenantId: string;
-  }): Promise<TenantMigrationRecord | null> {
+  }): Promise<TenantMigrationRecord> {
     const row = await this.prisma.systemMigrationTenantState.findUnique({
       where: { migrationName_tenantId: { migrationName, tenantId } },
     });
-    if (!row) return null;
+    if (!row) throw new SystemMigrationRecordNotFoundError({ migrationName, tenantId });
     return {
       migrationName: row.migrationName,
       tenantId: row.tenantId,

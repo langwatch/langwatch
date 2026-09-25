@@ -306,7 +306,7 @@ export class BrowserSessionService {
 
     try {
       const indexKey = activeSessionsKey(userId);
-      const cached = parseCachedSessions(await cache.findValue({ key: indexKey }));
+      const cached = (await cache.findValues({ key: indexKey })).flatMap(parseCachedSessions);
       const retained = cached.filter(({ token }) => token === keepToken);
       for (const { token } of cached) {
         if (token !== keepToken) {
@@ -334,7 +334,7 @@ export class BrowserSessionService {
   }
 }
 
-function parseCachedSessions(value: string | null): CachedSession[] {
+function parseCachedSessions(value: string): CachedSession[] {
   if (!value) {
     return [];
   }

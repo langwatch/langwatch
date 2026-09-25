@@ -4,6 +4,7 @@
  * engine gate (ADR-110: finishing the migration IS the switch). `migrated`
  */
 import { createLogger } from "@langwatch/observability";
+import { SystemMigrationRecordNotFoundError } from "@langwatch/system-migrations";
 import { Counter, register } from "prom-client";
 
 import type { IdentityWriteGateState } from "../app/identity.members.ts";
@@ -94,10 +95,9 @@ export class IdentityWriteGateService {
 
   private async readUserOnIdentityWrites({ userId }: { userId: string }): Promise<boolean> {
     try {
-      const record = await this.state.tryFindRecord({
-        migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
-        tenantId: userId,
-      });
+      const [record] = await this.state
+        .getRecord({ migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME, tenantId: userId })
+        .then((found) => [found], noneWhenNotFound);
 
       // Only `finalized` opens the gate; `migrated` is held (see above). The
       // D03 READ fork will ask the same question of the same row.
@@ -135,4 +135,9 @@ export class IdentityWriteGateService {
       return false;
     }
   }
+}
+
+function noneWhenNotFound(error: unknown): [] {
+  if (error instanceof SystemMigrationRecordNotFoundError) return [];
+  throw error;
 }

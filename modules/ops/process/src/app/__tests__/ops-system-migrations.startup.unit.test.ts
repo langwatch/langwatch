@@ -1,7 +1,10 @@
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { TenantMigrationRecord, SystemMigration } from "@langwatch/system-migrations";
-import { SystemMigrationStartupIncompleteError } from "@langwatch/system-migrations";
+import {
+  SystemMigrationStartupIncompleteError,
+  SystemMigrationRecordNotFoundError,
+} from "@langwatch/system-migrations";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PrismaOrganizationTenantSourceRepository } from "../../repositories/prisma/prisma.organization-tenant-source.repository.ts";
@@ -66,8 +69,12 @@ function harness({
     PrismaSystemMigrationEnrollmentRepository.prototype,
     "findEnrolledOrganizationIdsByMigration",
   ).mockResolvedValue(enrollments);
-  vi.spyOn(PrismaSystemMigrationStateRepository.prototype, "tryFindRecord").mockImplementation(
-    async ({ migrationName, tenantId }) => records.get(`${migrationName}:${tenantId}`) ?? null,
+  vi.spyOn(PrismaSystemMigrationStateRepository.prototype, "getRecord").mockImplementation(
+    async ({ migrationName, tenantId }) => {
+      const record = records.get(`${migrationName}:${tenantId}`);
+      if (!record) throw new SystemMigrationRecordNotFoundError({ migrationName, tenantId });
+      return record;
+    },
   );
   vi.spyOn(
     PrismaSystemMigrationStateRepository.prototype,

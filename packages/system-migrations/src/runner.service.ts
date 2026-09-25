@@ -1,7 +1,10 @@
 import { createLogger } from "@langwatch/observability";
 
 import type { MigrationLeaseRepository } from "./lease.repository.ts";
-import type { SystemMigrationStateRepository } from "./state.repository.ts";
+import {
+  SystemMigrationRecordNotFoundError,
+  type SystemMigrationStateRepository,
+} from "./state.repository.ts";
 import type { SystemMigration } from "./system-migration.ts";
 import type { TenantSource } from "./tenant-source.ts";
 import {
@@ -241,10 +244,9 @@ export class SystemMigrationRunnerService {
     summary: MigrationPassSummary;
   }): Promise<void> {
     const { state } = this.deps;
-    const existing = await state.tryFindRecord({
-      migrationName: migration.name,
-      tenantId,
-    });
+    const existing = await state
+      .getRecord({ migrationName: migration.name, tenantId })
+      .catch(undefinedWhenNotFound);
     // Terminal states (`isTerminalTenantStatus`): `finalized` is the
     // one-way latch, and `rolled_back` is the operator's pin holding a
     // tenant on its legacy path. Re-running either would undo the
@@ -323,7 +325,7 @@ async function recordParkedTenant({
   state: SystemMigrationStateRepository;
   migration: SystemMigration;
   tenantId: string;
-  existing: TenantMigrationRecord | null;
+  existing: TenantMigrationRecord | undefined;
   error: unknown;
   summary: MigrationPassSummary;
 }): Promise<void> {
@@ -359,4 +361,9 @@ async function recordParkedTenant({
       "could not record a parked tenant; continuing the pass",
     );
   }
+}
+
+function undefinedWhenNotFound(error: unknown): undefined {
+  if (error instanceof SystemMigrationRecordNotFoundError) return undefined;
+  throw error;
 }

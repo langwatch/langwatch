@@ -1,6 +1,7 @@
-import type {
-  SystemMigrationStateRepository,
-  TenantMigrationStatus,
+import {
+  SystemMigrationRecordNotFoundError,
+  type SystemMigrationStateRepository,
+  type TenantMigrationStatus,
 } from "@langwatch/system-migrations";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -14,9 +15,12 @@ const USER = "user_sam";
 
 function stateWithStatus(status: TenantMigrationStatus | null) {
   return {
-    tryFindRecord: vi.fn(
-      async ({ migrationName, tenantId }: { migrationName: string; tenantId: string }) =>
-        status === null ? null : { migrationName, tenantId, status, report: null },
+    getRecord: vi.fn(
+      async ({ migrationName, tenantId }: { migrationName: string; tenantId: string }) => {
+        if (status === null)
+          throw new SystemMigrationRecordNotFoundError({ migrationName, tenantId });
+        return { migrationName, tenantId, status, report: null };
+      },
     ),
     upsertRecord: vi.fn(async () => undefined),
     upsertRecordUnlessRolledBack: vi.fn(async () => true),
@@ -42,7 +46,7 @@ describe("identifier write gate", () => {
         IdentityWriteGateService.create({ state }).isUserOnIdentityWrites({ userId: USER }),
       ).resolves.toBe(false);
       // The whole point of the short-circuit: no per-user read is issued.
-      expect(state.tryFindRecord).not.toHaveBeenCalled();
+      expect(state.getRecord).not.toHaveBeenCalled();
     });
 
     it("reads once per pod, not once per user", async () => {
@@ -63,7 +67,7 @@ describe("identifier write gate", () => {
       await expect(
         IdentityWriteGateService.create({ state }).isUserOnIdentityWrites({ userId: USER }),
       ).resolves.toBe(false);
-      expect(state.tryFindRecord).toHaveBeenCalledWith({
+      expect(state.getRecord).toHaveBeenCalledWith({
         migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
         tenantId: USER,
       });
@@ -106,7 +110,7 @@ describe("identifier write gate", () => {
   describe("when the state table is unreadable", () => {
     it("fails safe to closed", async () => {
       const state: SystemMigrationStateRepository = {
-        tryFindRecord: vi.fn(async () => {
+        getRecord: vi.fn(async () => {
           throw new Error("postgres unavailable");
         }),
         upsertRecord: vi.fn(async () => undefined),

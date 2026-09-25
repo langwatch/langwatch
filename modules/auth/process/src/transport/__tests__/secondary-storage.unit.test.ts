@@ -3,7 +3,7 @@
  * @see specs/server/redis-client-ownership.feature — ADR-093: the store makes no
  * client, reads the connection its caller supplied, and namespaces every key.
  */
-import type { RedisConnection } from "@langwatch/redis-client";
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
@@ -42,7 +42,7 @@ function fakeRedis() {
 }
 
 function storeOver(redis: ReturnType<typeof fakeRedis>) {
-  return createSecondaryStorage(redis as unknown as RedisConnection);
+  return createSecondaryStorage(redisDouble(redis));
 }
 
 describe("better-auth secondary storage", () => {

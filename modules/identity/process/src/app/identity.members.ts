@@ -89,11 +89,8 @@ export interface IdentityEventing {
  * whichever store answers them, and nothing here needs the runner's writes.
  */
 export interface IdentityWriteGateState {
-  /** One tenant's record for a migration, or null when it has none. */
-  tryFindRecord(input: {
-    migrationName: string;
-    tenantId: string;
-  }): Promise<TenantMigrationRecord | null>;
+  /** One tenant's record for a migration; throws `SystemMigrationRecordNotFoundError` if none. */
+  getRecord(input: { migrationName: string; tenantId: string }): Promise<TenantMigrationRecord>;
 
   /** Whether ANY tenant has finalized this migration. */
   hasFinalizedTenant(input: { migrationName: string }): Promise<boolean>;

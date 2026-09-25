@@ -19,6 +19,7 @@ import {
   UI_FEATURE_FLAG_PROCEDURE,
   type UiFeatureApiTransport,
 } from "../ui-session-queries";
+import { answeringTransport } from "./answering-transport.test-helpers";
 
 const JANE = "user-jane";
 
@@ -30,23 +31,21 @@ function recordingTransport({
   enabledFlags = [],
 }: { permissions?: readonly string[]; enabledFlags?: readonly string[] } = {}) {
   const calls: Call[] = [];
-  const transport = {
-    query: (path: string, input: unknown) => {
-      calls.push({ path, input });
-      switch (path) {
-        case UI_EFFECTIVE_PERMISSIONS_PROCEDURE:
-          return Promise.resolve({ permissions });
-        case UI_FEATURE_FLAG_PROCEDURE:
-          return Promise.resolve({
-            enabled: enabledFlags.includes((input as { flag: string }).flag),
-          });
-        default:
-          return Promise.reject(new Error(`No test answer for ${path}`));
-      }
-    },
-  };
+  const transport = answeringTransport((path, input) => {
+    calls.push({ path, input });
+    switch (path) {
+      case UI_EFFECTIVE_PERMISSIONS_PROCEDURE:
+        return Promise.resolve({ permissions });
+      case UI_FEATURE_FLAG_PROCEDURE:
+        return Promise.resolve({
+          enabled: typeof input.flag === "string" && enabledFlags.includes(input.flag),
+        });
+      default:
+        return Promise.reject(new Error(`No test answer for ${path}`));
+    }
+  });
   const callsTo = (path: string) => calls.filter((call) => call.path === path);
-  return { transport: transport as unknown as UiFeatureApiTransport, callsTo };
+  return { transport, callsTo };
 }
 
 /**

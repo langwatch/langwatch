@@ -101,8 +101,9 @@ class Cache implements AuthSessionCacheRepository {
   readonly values = new Map<string, string>();
   readonly deleted = vi.fn();
 
-  async findValue({ key }: { key: string }): Promise<string | null> {
-    return this.values.get(key) ?? null;
+  async findValues({ key }: { key: string }): Promise<string[]> {
+    const value = this.values.get(key);
+    return value === undefined ? [] : [value];
   }
 
   async set({ key, value }: { key: string; value: string }): Promise<void> {
@@ -282,7 +283,7 @@ describe("BrowserSessionService", () => {
 
     it("still revokes persisted sessions when the cache operation fails", async () => {
       class FailingCache implements AuthSessionCacheRepository {
-        async findValue(): Promise<string | null> {
+        async findValues(): Promise<string[]> {
           throw new Error("redis unavailable");
         }
 

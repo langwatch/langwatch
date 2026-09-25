@@ -14,6 +14,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { useBrowserUiSession } from "../ui-session";
 import { UI_EFFECTIVE_PERMISSIONS_PROCEDURE } from "../ui-session-queries";
 import type { UiFeatureApiTransport } from "../ui-session-queries";
+import { answeringTransport } from "./answering-transport.test-helpers";
 
 const JANE: UiSessionReading = {
   status: "authenticated",
@@ -47,14 +48,6 @@ function deferred<T>() {
     resolve = settle;
   });
   return { promise, resolve };
-}
-
-type Answer = (path: string, input: Record<string, string>) => Promise<unknown>;
-
-function answering(answer: Answer): UiFeatureApiTransport {
-  return {
-    query: (path: string, input: unknown) => answer(path, input as Record<string, string>),
-  } as unknown as UiFeatureApiTransport;
 }
 
 function GrantProbe({
@@ -104,7 +97,7 @@ function renderGrants({
 describe("given grants answered for the scope the reader is standing in", () => {
   it("keeps project grants out of organization permission checks", async () => {
     const view = renderGrants({
-      transport: answering((path, input) =>
+      transport: answeringTransport((path, input) =>
         path === UI_EFFECTIVE_PERMISSIONS_PROCEDURE && "projectId" in input
           ? Promise.resolve({ permissions: ["annotations:update"] })
           : Promise.resolve({ permissions: [] }),
@@ -118,7 +111,9 @@ describe("given grants answered for the scope the reader is standing in", () => 
   describe("when the scope goes back to resolving", () => {
     it("refuses the grant it had just answered, rather than reading it across", async () => {
       const view = renderGrants({
-        transport: answering(() => Promise.resolve({ permissions: ["annotations:update"] })),
+        transport: answeringTransport(() =>
+          Promise.resolve({ permissions: ["annotations:update"] }),
+        ),
       });
       await waitFor(() => expect(view.getByTestId("can-project").textContent).toBe("true"));
 
@@ -133,7 +128,7 @@ describe("given grants answered for the scope the reader is standing in", () => 
     it("never applies the late grant, because it was never about this project", async () => {
       const late = deferred<unknown>();
       const view = renderGrants({
-        transport: answering((path, input) =>
+        transport: answeringTransport((path, input) =>
           input.projectId === "proj-app" ? late.promise : Promise.resolve({ permissions: [] }),
         ),
       });
@@ -149,7 +144,7 @@ describe("given grants answered for the scope the reader is standing in", () => 
     it("clears both readers rather than leaving the last answer standing", async () => {
       let refuse = false;
       const view = renderGrants({
-        transport: answering(() =>
+        transport: answeringTransport(() =>
           refuse
             ? Promise.reject(new Error("refused"))
             : Promise.resolve({ permissions: ["annotations:update"] }),

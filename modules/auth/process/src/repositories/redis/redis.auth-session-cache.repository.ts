@@ -7,16 +7,18 @@ import type { AuthSessionCacheRepository } from "../auth-session-cache.repositor
  * exactly as Better Auth writes them, prefix included: this repository exists
  * to evict what that library wrote, and a namespace of our own would revoke nothing.
  */
-export class RedisAuthSessionCacheRepository implements AuthSessionCacheRepository {
-  private constructor(private readonly redis: RedisConnection) {}
+type AuthSessionCacheRedis = Pick<RedisConnection, "get" | "set" | "del">;
 
-  /** `null` where the deployment composed no connection: the cache is optional. */
-  static create({ redis }: { redis: RedisConnection | null }): AuthSessionCacheRepository | null {
-    return redis ? new RedisAuthSessionCacheRepository(redis) : null;
+export class RedisAuthSessionCacheRepository implements AuthSessionCacheRepository {
+  private constructor(private readonly redis: AuthSessionCacheRedis) {}
+
+  static create({ redis }: { redis: AuthSessionCacheRedis }): AuthSessionCacheRepository {
+    return new RedisAuthSessionCacheRepository(redis);
   }
 
-  async findValue({ key }: { key: string }): Promise<string | null> {
-    return this.redis.get(key);
+  async findValues({ key }: { key: string }): Promise<string[]> {
+    const value = await this.redis.get(key);
+    return value === null ? [] : [value];
   }
 
   async set({ key, value }: { key: string; value: string }): Promise<void> {

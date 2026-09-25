@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it } from "vitest";
 
 import { PrismaIdentityVerificationRepository } from "../prisma.identity-verification.repository.ts";
@@ -16,43 +17,53 @@ interface Row {
   createdAt: Date;
 }
 
+function field(value: unknown, key: string): unknown {
+  return typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined;
+}
+
 function makeFakePrisma() {
   const rows: Row[] = [];
   let seq = 0;
+  const newestFirst = (args: unknown) =>
+    rows
+      .filter((row) => row.identifier === field(field(args, "where"), "identifier"))
+      .toSorted((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
   const store = {
-    async deleteMany(args: { where: { identifier: string; token?: { in: string[] } } }) {
+    async deleteMany(args: unknown) {
+      const where = field(args, "where");
+      const tokens = field(field(where, "token"), "in");
       const before = rows.length;
       const matches = (row: Row) =>
-        row.identifier === args.where.identifier &&
-        (!args.where.token || args.where.token.in.includes(row.token));
+        row.identifier === field(where, "identifier") &&
+        (!Array.isArray(tokens) || tokens.includes(row.token));
       for (let i = rows.length - 1; i >= 0; i--) {
         if (matches(rows[i]!)) rows.splice(i, 1);
       }
       return { count: before - rows.length };
     },
-    async create(args: { data: { identifier: string; token: string; expires: Date } }) {
+    async create(args: unknown) {
+      const data = field(args, "data");
+      const [identifier, token, expires] = ["identifier", "token", "expires"].map((key) =>
+        field(data, key),
+      );
+      if (typeof identifier !== "string" || typeof token !== "string") throw new Error("bad row");
+      if (!(expires instanceof Date)) throw new Error("bad expiry");
       seq += 1;
-      rows.push({ ...args.data, createdAt: new Date(seq) });
+      rows.push({ identifier, token, expires, createdAt: new Date(seq) });
     },
-    async findMany(args: { where: { identifier: string } }) {
-      return rows
-        .filter((row) => row.identifier === args.where.identifier)
-        .toSorted((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    },
-    async findFirst(args: { where: { identifier: string } }) {
-      return (await store.findMany(args))[0] ?? null;
-    },
+    findMany: async (args: unknown) => newestFirst(args),
+    findFirst: async (args: unknown) => newestFirst(args)[0] ?? null,
   };
 
-  const prisma = {
+  const prisma: PrismaClient = prismaDouble({
     verificationToken: store,
-    async $transaction(arg: unknown) {
-      if (typeof arg === "function") return (arg as (tx: unknown) => unknown)(prisma);
-      return Promise.all(arg as Promise<unknown>[]);
+    $transaction: async (arg: unknown) => {
+      if (typeof arg === "function") return arg(prisma);
+      return Array.isArray(arg) ? Promise.all(arg) : arg;
     },
-  };
-  return prisma as unknown as PrismaClient;
+  });
+  return prisma;
 }
 
 describe("PrismaIdentityVerificationRepository", () => {

@@ -312,7 +312,9 @@ export class AuthApp implements AuthApiContract {
 
     const sessions = BrowserSessionService.create({
       sessions: repositories.sessions,
-      cache: RedisAuthSessionCacheRepository.create({ redis: members.redis }),
+      cache: members.redis
+        ? RedisAuthSessionCacheRepository.create({ redis: members.redis })
+        : null,
       identityEmails: members.identityEmails,
       users: dependencies.users,
       sessionBound: SessionBoundService.create({

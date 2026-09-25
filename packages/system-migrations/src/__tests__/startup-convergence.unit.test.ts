@@ -4,7 +4,10 @@ import {
   runSystemMigrationsAtStartup,
   SystemMigrationStartupIncompleteError,
 } from "../convergence.ts";
-import type { SystemMigrationStateRepository } from "../state.repository.ts";
+import {
+  SystemMigrationRecordNotFoundError,
+  type SystemMigrationStateRepository,
+} from "../state.repository.ts";
 import type { SystemMigration } from "../system-migration.ts";
 import type { TenantSource } from "../tenant-source.ts";
 import type { TenantMigrationRecord } from "../types.ts";
@@ -25,7 +28,10 @@ const tenants: TenantSource = {
 function state(initial: TenantMigrationRecord | null): SystemMigrationStateRepository {
   let record = initial;
   return {
-    tryFindRecord: async () => record,
+    getRecord: async ({ migrationName, tenantId }) => {
+      if (!record) throw new SystemMigrationRecordNotFoundError({ migrationName, tenantId });
+      return record;
+    },
     upsertRecord: async (next) => {
       record = next;
     },

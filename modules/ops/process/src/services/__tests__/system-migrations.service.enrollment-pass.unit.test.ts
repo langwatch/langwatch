@@ -8,6 +8,7 @@ import {
   SystemMigrationRunnerService,
   type SystemMigrationStateRepository,
   type TenantMigrationRecord,
+  SystemMigrationRecordNotFoundError,
 } from "@langwatch/system-migrations";
 import { describe, expect, it, vi } from "vitest";
 
@@ -19,14 +20,16 @@ import {
 class InMemoryStateRepository implements SystemMigrationStateRepository {
   private readonly rows = new Map<string, TenantMigrationRecord>();
 
-  async tryFindRecord({
+  async getRecord({
     migrationName,
     tenantId,
   }: {
     migrationName: string;
     tenantId: string;
-  }): Promise<TenantMigrationRecord | null> {
-    return this.rows.get(`${migrationName}:${tenantId}`) ?? null;
+  }): Promise<TenantMigrationRecord> {
+    const record = this.rows.get(`${migrationName}:${tenantId}`);
+    if (!record) throw new SystemMigrationRecordNotFoundError({ migrationName, tenantId });
+    return record;
   }
 
   async upsertRecord(record: TenantMigrationRecord): Promise<void> {
@@ -37,10 +40,7 @@ class InMemoryStateRepository implements SystemMigrationStateRepository {
     // The production contract: an operator's `rolled_back` pin refuses the
     // write. The fake honors it so a pass that WOULD overwrite a pin fails
     // here instead of passing against a stub looser than the real store.
-    const existing = await this.tryFindRecord({
-      migrationName: record.migrationName,
-      tenantId: record.tenantId,
-    });
+    const existing = this.rows.get(`${record.migrationName}:${record.tenantId}`);
     if (existing?.status === "rolled_back") return false;
     await this.upsertRecord(record);
     return true;
@@ -165,12 +165,12 @@ describe("the migration pass under its cohort rules", () => {
       expect(unreleased.migrateTenant).not.toHaveBeenCalled();
       // Never attempted means never reported either: no state row exists for
       // the unreleased migration, so nothing reads as parked or held.
-      expect(
-        await state.tryFindRecord({
+      await expect(
+        state.getRecord({
           migrationName: "unreleased",
           tenantId: "acme",
         }),
-      ).toBeNull();
+      ).rejects.toBeInstanceOf(SystemMigrationRecordNotFoundError);
       expect(summary?.finalized).toBe(2);
     });
   });
@@ -264,12 +264,12 @@ describe("the migration pass under its cohort rules", () => {
       expect(cutoverLike.migrateTenant).not.toHaveBeenCalled();
       // Untouched means no state either: "not enrolled yet" and "not
       // started" stay the same pending state for the unenrolled migration.
-      expect(
-        await state.tryFindRecord({
+      await expect(
+        state.getRecord({
           migrationName: "cutover-like",
           tenantId: "acme",
         }),
-      ).toBeNull();
+      ).rejects.toBeInstanceOf(SystemMigrationRecordNotFoundError);
     });
   });
 

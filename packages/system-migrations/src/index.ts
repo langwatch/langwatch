@@ -5,7 +5,10 @@ export {
   type SystemMigrationRunnerDeps,
   SystemMigrationRunnerService,
 } from "./runner.service.ts";
-export type { SystemMigrationStateRepository } from "./state.repository.ts";
+export {
+  SystemMigrationRecordNotFoundError,
+  type SystemMigrationStateRepository,
+} from "./state.repository.ts";
 export type { SystemMigration } from "./system-migration.ts";
 export type { TenantSource } from "./tenant-source.ts";
 export {

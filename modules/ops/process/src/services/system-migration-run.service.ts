@@ -9,6 +9,7 @@ import {
   MigrationPassAlreadyRunningError,
   MigrationRunRequiresEnrollmentError,
 } from "@langwatch/ops-contract";
+import { SystemMigrationRecordNotFoundError } from "@langwatch/system-migrations";
 import type { TenantMigrationStatus } from "@langwatch/system-migrations";
 
 import {
@@ -112,10 +113,9 @@ export class SystemMigrationRunService {
     migrationName: string;
     organizationId: string;
   }): Promise<{ status: TenantMigrationStatus | null; waiting: boolean }> {
-    const record = await this.deps.state.tryFindRecord({
-      migrationName,
-      tenantId: organizationId,
-    });
+    const [record] = await this.deps.state
+      .getRecord({ migrationName, tenantId: organizationId })
+      .then((found) => [found], noneWhenNotFound);
 
     // `migrated` covers two outcomes an operator must not confuse: the
     // migration ran and is held for review, or it did nothing because it is
@@ -127,4 +127,9 @@ export class SystemMigrationRunService {
         record != null && (this.deps.waitingReports?.[migrationName]?.(record.report) ?? false),
     };
   }
+}
+
+function noneWhenNotFound(error: unknown): [] {
+  if (error instanceof SystemMigrationRecordNotFoundError) return [];
+  throw error;
 }

@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -20,41 +20,44 @@ interface Claim {
   report: { kind: string };
 }
 
+function field(value: unknown, key: string): unknown {
+  return typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined;
+}
+
 function makeFakePrisma(claims: Claim[], users: string[]) {
-  return {
+  return prismaDouble({
     systemMigrationTenantState: {
-      findMany: async (args: {
-        where: {
-          migrationName: string;
-          status: string;
-          updatedAt: { lt: Date };
-          report: { path: string[]; equals: string };
-        };
-        orderBy: { updatedAt: "asc" | "desc" };
-        take: number;
-      }) => {
-        const { where, orderBy, take } = args;
-        const matched = claims
+      findMany: async (args: unknown) => {
+        const where = field(args, "where");
+        const before = field(field(where, "updatedAt"), "lt");
+        const take = field(args, "take");
+        const ascending = field(field(args, "orderBy"), "updatedAt") === "asc";
+        if (!(before instanceof Date) || typeof take !== "number") throw new Error("bad query");
+        return claims
           .filter(
             (c) =>
-              c.status === where.status &&
-              c.updatedAt < where.updatedAt.lt &&
-              c.report.kind === where.report.equals,
+              c.status === field(where, "status") &&
+              c.updatedAt < before &&
+              c.report.kind === field(field(where, "report"), "equals"),
           )
           .toSorted((a, b) =>
-            orderBy.updatedAt === "asc"
+            ascending
               ? a.updatedAt.getTime() - b.updatedAt.getTime()
               : b.updatedAt.getTime() - a.updatedAt.getTime(),
           )
-          .slice(0, take);
-        return matched.map((c) => ({ tenantId: c.tenantId, updatedAt: c.updatedAt }));
+          .slice(0, take)
+          .map((c) => ({ tenantId: c.tenantId, updatedAt: c.updatedAt }));
       },
     },
     user: {
-      findMany: async (args: { where: { id: { in: string[] } } }) =>
-        args.where.id.in.filter((id) => users.includes(id)).map((id) => ({ id })),
+      findMany: async (args: unknown) => {
+        const ids = field(field(field(args, "where"), "id"), "in");
+        return (Array.isArray(ids) ? ids : [])
+          .filter((id) => users.includes(id))
+          .map((id) => ({ id }));
+      },
     },
-  } as unknown as PrismaClient;
+  });
 }
 
 describe("PrismaIdentityNewbornRepository.findAbandoned", () => {

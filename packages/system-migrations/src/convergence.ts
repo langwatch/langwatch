@@ -1,6 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 
-import type { SystemMigrationStateRepository } from "./state.repository.ts";
+import {
+  SystemMigrationRecordNotFoundError,
+  type SystemMigrationStateRepository,
+} from "./state.repository.ts";
 import type { SystemMigration } from "./system-migration.ts";
 import type { TenantSource } from "./tenant-source.ts";
 import type { MigrationPassSummary } from "./types.ts";
@@ -148,10 +151,9 @@ async function startupState(args: {
       sawTenant = true;
       for (const migration of args.migrations) {
         if (!(await args.cohort({ tenantId, migrationName: migration.name }))) continue;
-        const record = await args.state.tryFindRecord({
-          migrationName: migration.name,
-          tenantId,
-        });
+        const record = await args.state
+          .getRecord({ migrationName: migration.name, tenantId })
+          .catch(undefinedWhenNotFound);
         if (record?.status === "rolled_back" || record?.status === "parked") {
           return {
             kind: "blocked",
@@ -296,4 +298,9 @@ function sleep({ ms, signal }: { ms: number; signal: AbortSignal }): Promise<voi
     timer.unref?.();
     signal.addEventListener("abort", done, { once: true });
   });
+}
+
+function undefinedWhenNotFound(error: unknown): undefined {
+  if (error instanceof SystemMigrationRecordNotFoundError) return undefined;
+  throw error;
 }

@@ -69,10 +69,7 @@ export interface SystemMigrationStateReader {
     limit: number;
   }): Promise<OpsMigrationOverview["attention"]>;
 
-  tryFindRecord(args: {
-    migrationName: string;
-    tenantId: string;
-  }): Promise<TenantMigrationRecord | null>;
+  getRecord(args: { migrationName: string; tenantId: string }): Promise<TenantMigrationRecord>;
 
   upsertRecord(record: TenantMigrationRecord): Promise<void>;
 }

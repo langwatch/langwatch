@@ -6,6 +6,7 @@ import {
   MigrationRunRequiresEnrollmentError,
   MigrationUnknownError,
 } from "@langwatch/ops-contract";
+import { SystemMigrationRecordNotFoundError } from "@langwatch/system-migrations";
 import type { MigrationPassSummary, TenantMigrationRecord } from "@langwatch/system-migrations";
 import { describe, expect, it, vi } from "vitest";
 
@@ -126,7 +127,13 @@ function serviceWith({
       rolled_back: 0,
     }),
     findRecordsByStatus: vi.fn().mockResolvedValue([]),
-    tryFindRecord: vi.fn().mockImplementation(() => Promise.resolve(stored)),
+    getRecord: vi
+      .fn()
+      .mockImplementation((args: { migrationName: string; tenantId: string }) =>
+        stored
+          ? Promise.resolve(stored)
+          : Promise.reject(new SystemMigrationRecordNotFoundError(args)),
+      ),
     upsertRecord: vi.fn().mockImplementation((written) => {
       stored = written as TenantMigrationRecord;
       upserts.push(written as TenantMigrationRecord);

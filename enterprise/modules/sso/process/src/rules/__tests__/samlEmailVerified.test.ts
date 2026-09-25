@@ -54,30 +54,24 @@ describe("auth0 mapProfileToUser emailVerified", () => {
       auth0ClientId: "auth0-client-id",
       auth0ClientSecret: "auth0-client-secret",
       auth0Issuer: "https://acme.eu.auth0.com",
-    } as any);
-    // Through `unknown` deliberately. better-auth 1.7 types the profile as
-    // `GenericOAuthUserInfo`, which REQUIRES `emailVerified` — and the whole
-    // point of this suite is what the mapper does when the claim is absent,
-    // so the fixtures below omit it on purpose. Widening the fixture to
-    // satisfy the parameter type would delete the case under test.
-    const auth0Config = configs.find(
-      (c) => (c as { providerId?: string }).providerId === "auth0",
-    ) as unknown as {
-      mapProfileToUser: (p: Record<string, any>) => Record<string, unknown>;
-    };
-    return auth0Config.mapProfileToUser;
+    });
+    const mapper = configs.find((config) => config.providerId === "auth0")?.mapProfileToUser;
+    if (!mapper) throw new Error("auth0 composed no profile mapper");
+    return mapper;
   };
 
-  const profile = (sub: unknown) => ({
-    sub,
+  // Auth0 reports `email_verified: false` for every SAML connection (ADR-096).
+  const profile = (sub?: string) => ({
+    ...(sub === undefined ? {} : { sub }),
     name: "Alice Smith",
     email: "alice@acme.test",
+    emailVerified: false,
     picture: "https://img.acme.test/alice.png",
   });
 
   /** @invariant SAML profiles map to emailVerified: true */
-  it("marks a SAML profile's email as verified", () => {
-    const mapped = mapProfileToUser()(profile("samlp|AcmeConn|alice"));
+  it("marks a SAML profile's email as verified", async () => {
+    const mapped = await mapProfileToUser()(profile("samlp|AcmeConn|alice"));
     expect(mapped.emailVerified).toBe(true);
   });
 
@@ -87,20 +81,19 @@ describe("auth0 mapProfileToUser emailVerified", () => {
     ["google social", "google-oauth2|103547991597142817347"],
     ["azure enterprise", "waad|AbCdEf"],
     ["forged database user_id", "auth0|samlp|x"],
-  ])("leaves emailVerified absent for a %s sub", (_label, sub) => {
-    const mapped = mapProfileToUser()(profile(sub));
+  ])("leaves emailVerified absent for a %s sub", async (_label, sub) => {
+    const mapped = await mapProfileToUser()(profile(sub));
     expect("emailVerified" in mapped).toBe(false);
   });
 
-  it("leaves emailVerified absent when sub is missing", () => {
-    const { sub: _sub, ...noSub } = profile("x");
-    const mapped = mapProfileToUser()(noSub);
+  it("leaves emailVerified absent when sub is missing", async () => {
+    const mapped = await mapProfileToUser()(profile());
     expect("emailVerified" in mapped).toBe(false);
   });
 
   /** @invariant Rest of the mapping unchanged */
-  it("keeps name, email and image mapping identical for SAML profiles", () => {
-    const mapped = mapProfileToUser()(profile("samlp|AcmeConn|alice"));
+  it("keeps name, email and image mapping identical for SAML profiles", async () => {
+    const mapped = await mapProfileToUser()(profile("samlp|AcmeConn|alice"));
     expect(mapped).toEqual({
       name: "Alice Smith",
       email: "alice@acme.test",

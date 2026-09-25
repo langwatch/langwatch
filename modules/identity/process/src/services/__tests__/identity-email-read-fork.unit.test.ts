@@ -4,6 +4,7 @@ import type { Logger } from "@langwatch/observability";
  */
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createTestLogger } from "@langwatch/test-harness";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it } from "vitest";
 
 import { liveRepositories } from "../../__tests__/support/live-repositories.ts";
@@ -16,6 +17,10 @@ import {
 } from "../per-subject-cached-latch.service.ts";
 
 type Row = Record<string, unknown>;
+
+function field(value: unknown, key: string): unknown {
+  return typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined;
+}
 
 const NOW = Date.parse("2026-09-01T12:00:00.000Z");
 
@@ -58,40 +63,33 @@ function stubClient(options: {
   failLatch?: boolean;
 }): { client: PrismaClient; calls: Recorded } {
   const calls: Recorded = { latchAnyone: 0, latchUser: 0, identifiers: 0 };
-  const refuse = () => {
-    throw new Error("This scenario describes only the identity delegates.");
-  };
   const state = {
-    findFirst: ({ where }: { where: Row }) => {
+    findFirst: (args: unknown) => {
       calls.latchAnyone += 1;
       if (options.failLatch) return Promise.reject(new Error("state table unreadable"));
-      expect(where.migrationName).toBe(IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME);
-      expect(where.status).toBe("finalized");
+      const where = field(args, "where");
+      expect(field(where, "migrationName")).toBe(IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME);
+      expect(field(where, "status")).toBe("finalized");
       return Promise.resolve(options.anyoneFinalized ? { tenantId: "user-1" } : null);
     },
-    findUnique: ({ where }: { where: { migrationName_tenantId: Row } }) => {
+    findUnique: (args: unknown) => {
       calls.latchUser += 1;
       if (options.failLatch) return Promise.reject(new Error("state table unreadable"));
-      const key = where.migrationName_tenantId;
-      expect(key.migrationName).toBe(IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME);
-      const status = options.statusByUser?.[String(key.tenantId)];
+      const key = field(field(args, "where"), "migrationName_tenantId");
+      expect(field(key, "migrationName")).toBe(IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME);
+      const status = options.statusByUser?.[String(field(key, "tenantId"))];
       return Promise.resolve(status === undefined ? null : { status });
     },
   };
   const identifiers = {
-    findMany: ({ where }: { where: Row }) => {
+    findMany: (args: unknown) => {
       calls.identifiers += 1;
-      return Promise.resolve(
-        (options.identifiers ?? []).filter((row) => row.userId === where.userId),
-      );
+      const userId = field(field(args, "where"), "userId");
+      return Promise.resolve((options.identifiers ?? []).filter((row) => row.userId === userId));
     },
   };
-  const refusingDelegate = new Proxy({}, { get: () => refuse });
-  const client = new Proxy(
-    { systemMigrationTenantState: state, identifier: identifiers } as Record<string, unknown>,
-    { get: (target, key: string) => (key in target ? target[key] : refusingDelegate) },
-  );
-  return { client: client as unknown as PrismaClient, calls };
+  const client = prismaDouble({ systemMigrationTenantState: state, identifier: identifiers });
+  return { client, calls };
 }
 
 function build(

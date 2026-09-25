@@ -22,6 +22,7 @@ import { describe, expect, it } from "vitest";
 import {
   type SsoConnectionFoldState,
   SsoConnectionStateFoldProjection,
+  ssoConnectionEventSchema,
   type SsoConnectionEvent,
 } from "../eventing/sso-connection-state.projection.ts";
 
@@ -42,7 +43,7 @@ let sequence = 0;
 
 function event(type: string, data: Record<string, unknown>, offsetMs: number): SsoConnectionEvent {
   sequence += 1;
-  return {
+  return ssoConnectionEventSchema.parse({
     id: `evt_${String(sequence).padStart(4, "0")}`,
     aggregateId: CONNECTION,
     aggregateType: "sso_connection",
@@ -53,7 +54,7 @@ function event(type: string, data: Record<string, unknown>, offsetMs: number): S
     metadata: {},
     occurredAt: T0 + offsetMs,
     createdAt: T0 + offsetMs,
-  } as unknown as SsoConnectionEvent;
+  });
 }
 
 /** A connection's whole life, in log order. */

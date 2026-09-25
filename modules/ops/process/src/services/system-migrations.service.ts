@@ -9,6 +9,7 @@ import {
   MigrationDrainProofRequiresMigratedError,
   MigrationStateNotFoundError,
 } from "@langwatch/ops-contract";
+import { SystemMigrationRecordNotFoundError } from "@langwatch/system-migrations";
 import { nowInstant } from "@langwatch/time";
 
 import {
@@ -184,13 +185,9 @@ export class SystemMigrationsService {
     minimumWriterGeneration: string;
     actorUserId: string;
   }): Promise<void> {
-    const record = await this.deps.state.tryFindRecord({
-      migrationName,
-      tenantId,
-    });
-    if (!record) {
-      throw new MigrationStateNotFoundError();
-    }
+    const record = await this.deps.state
+      .getRecord({ migrationName, tenantId })
+      .catch(refuseWhenNotFound);
 
     if (record.status !== "migrated") {
       throw new MigrationDrainProofRequiresMigratedError({
@@ -225,4 +222,9 @@ export class SystemMigrationsService {
       "operator asserted that legacy-only writers are drained",
     );
   }
+}
+
+function refuseWhenNotFound(error: unknown): never {
+  if (error instanceof SystemMigrationRecordNotFoundError) throw new MigrationStateNotFoundError();
+  throw error;
 }
