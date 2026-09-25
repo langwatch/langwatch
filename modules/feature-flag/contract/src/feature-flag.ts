@@ -161,6 +161,13 @@ export const FEATURE_FLAGS = [
       "Gates the whole LangWatchQL surface — the Custom query workbench UI and the analytics.lwql tRPC endpoints — while it is experimental. Off by default; enable per project or organization via a targeting rule, or globally via the operator store.",
   },
   {
+    key: "release_analytics_v2",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Adds the Analytics v2 page: the standard analytics charts rendered as dashboard widgets over LangWatchQL, beside the existing Analytics pages. Off by default; enable per project or organization via a targeting rule. The page still requires LangWatchQL to be available for the project.",
+  },
+  {
     key: "release_ui_ai_gateway_menu_enabled",
     scope: "PRODUCT",
     defaultValue: true,
