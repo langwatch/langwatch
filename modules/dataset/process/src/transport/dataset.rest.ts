@@ -184,7 +184,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
 
       // The legacy spelling of the batch-records route above; same grain, and
       // the same application operation, so the two can never disagree.
-      .post("/:datasetSlug/entries", "postApiDatasetBySlugEntries")
+      .post("/:slug/entries", "postApiDatasetBySlugEntries")
       .withParams(datasetRestSlugParamsSchema)
       .withInput(datasetRestLegacyEntriesSchema)
       .withPermission("datasets:update")
@@ -193,7 +193,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
       .handle(async ({ app, input, scope }) => {
         await app
           .batchCreateRecords({
-            slugOrId: input.datasetSlug,
+            slugOrId: input.slug,
             projectId: scope.id,
             entries: input.entries,
           })

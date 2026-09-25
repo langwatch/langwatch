@@ -327,6 +327,21 @@ describe("given a bare path parameter on a route main already publishes", () => 
     expect(report(literal)).toEqual([]);
   });
 
+  /** @scenario "A route main already publishes keeps its parameter names" */
+  it("reports nothing on a deprecated alias whose successor main publishes", () => {
+    const alias = (successor) =>
+      `const SUCCESSOR = "/api/v1/agents";\nexport const aliasRest = defineRestRouter(AgentApi)\n` +
+      `  .withNamespace("old-agents")\n  .withAddressing("dated", { v1Twin: false })\n` +
+      `  .withDeprecated({ successor: ${successor} })\n` +
+      '  .get("/:id/runs", "readRuns").withOutput(s).handle(({ app }) => app.get());\n';
+
+    expect(report(alias("SUCCESSOR"))).toEqual([]);
+    expect(report(alias('"/api/v1/agents"'))).toEqual([]);
+    expect(where(report(alias('"/api/v1/old"')))).toEqual([
+      { messageId: "pathParam", line: 6, column: 7 },
+    ]);
+  });
+
   /** @scenario "A new route with a bare parameter is still reported" */
   it("reports a path, a method or a parameter name main does not publish", () => {
     const found = [

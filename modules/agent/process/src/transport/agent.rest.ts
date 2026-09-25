@@ -136,7 +136,7 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
         return response(agent, app, facts.projectSlug);
       })
 
-      .get("/:agentId", "getAgent")
+      .get("/:id", "getAgent")
       .withParams(agentRestParamsSchema)
       .withPermission("project:view")
       .withOutput(agentResponseSchema)
@@ -145,7 +145,6 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .handle(async ({ app, input, scope }, facts) => {
         const agent = await app.getById({
           ...input,
-          id: input.agentId,
           projectId: scope.id,
           viewerUserId: facts.viewerUserId,
         });
@@ -153,7 +152,7 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
         return response(agent, app, facts.projectSlug);
       })
 
-      .patch("/:agentId", "updateAgent")
+      .patch("/:id", "updateAgent")
       .withParams(agentRestParamsSchema)
       .withInput(updateAgentRequestSchema)
       .withPermission("project:update")
@@ -161,9 +160,9 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .withDocs({ summary: "Update an authored agent" })
       .withMiddleware(projectRestFacts)
       .handle(async ({ app, input, scope }, facts) => {
-        await app.update({ ...input, id: input.agentId, projectId: scope.id });
+        await app.update({ ...input, projectId: scope.id });
         const agent = await app.getById({
-          id: input.agentId,
+          id: input.id,
           projectId: scope.id,
           viewerUserId: facts.viewerUserId,
         });
@@ -171,7 +170,7 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
         return response(agent, app, facts.projectSlug);
       })
 
-      .put("/:agentId", "replaceAgent")
+      .put("/:id", "replaceAgent")
       .withParams(agentRestParamsSchema)
       .withInput(updateAgentRequestSchema)
       .withPermission("project:update")
@@ -179,9 +178,9 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .withDocs({ summary: "Update an authored agent; PUT retains partial update semantics" })
       .withMiddleware(projectRestFacts)
       .handle(async ({ app, input, scope }, facts) => {
-        await app.update({ ...input, id: input.agentId, projectId: scope.id });
+        await app.update({ ...input, projectId: scope.id });
         const agent = await app.getById({
-          id: input.agentId,
+          id: input.id,
           projectId: scope.id,
           viewerUserId: facts.viewerUserId,
         });
@@ -189,18 +188,18 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
         return response(agent, app, facts.projectSlug);
       })
 
-      .delete("/:agentId", "archiveAgent")
+      .delete("/:id", "archiveAgent")
       .withParams(agentRestParamsSchema)
       .withPermission("project:delete")
       .withOutput(archiveResultSchema)
       .withDocs({ summary: "Archive an agent while keeping its runs" })
       .handle(async ({ app, input, scope }) => {
-        const agent = await app.archive({ ...input, id: input.agentId, projectId: scope.id });
+        const agent = await app.archive({ ...input, projectId: scope.id });
 
         return { id: agent.id, name: agent.name, type: agent.type, archivedAt: agent.archivedAt };
       })
 
-      .post("/:agentId/test", "testAgent")
+      .post("/:id/test", "testAgent")
       .withParams(agentRestParamsSchema)
       .withInput(testAgentBodySchema)
       .withPermission("scenarios:create")
@@ -208,10 +207,10 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .withDocs({ summary: "Schedule a scripted test run and return its run identifiers" })
       .withMiddleware(projectRestFacts)
       .handle(({ app, input, scope }, facts) =>
-        app.testRun({ agentId: input.agentId, projectId: scope.id, actorId: facts.actorId }),
+        app.testRun({ agentId: input.id, projectId: scope.id, actorId: facts.actorId }),
       )
 
-      .post("/:agentId/call", "callConnectedAgent")
+      .post("/:id/call", "callConnectedAgent")
       .withParams(agentRestParamsSchema)
       .withInput(relayCallBodySchema)
       .withPermission("scenarios:create")
@@ -223,9 +222,9 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
           new AgentPayloadTooLargeError({ what: "envelope", limitBytes: relayMaxBytes }),
       })
       .withMiddleware(projectRestFacts, agentTraceparent)
-      .handle(({ app, input: { agentId, ...turn }, scope, signal }, facts, header) =>
+      .handle(({ app, input: { id, ...turn }, scope, signal }, facts, header) =>
         app.call(
-          { ...turn, id: agentId, projectId: scope.id },
+          { ...turn, id, projectId: scope.id },
           { viewerUserId: facts.viewerUserId, traceparent: header, signal },
         ),
       )

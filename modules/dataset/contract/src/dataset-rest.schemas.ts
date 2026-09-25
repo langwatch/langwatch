@@ -68,7 +68,7 @@ export const datasetRestLegacyEntriesSchema = z
   .meta({ id: "DatasetPostEntries" });
 
 export const datasetRestSlugOrIdParamsSchema = z.object({ slugOrId: z.string() });
-export const datasetRestSlugParamsSchema = z.object({ datasetSlug: z.string() });
+export const datasetRestSlugParamsSchema = z.object({ slug: z.string() });
 
 /** `PATCH /api/dataset/:slugOrId/records/:recordId`: one record in one dataset. */
 export const datasetRestRecordParamsSchema = z.object({

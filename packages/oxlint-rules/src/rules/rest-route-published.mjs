@@ -61,6 +61,14 @@ function optionsOf(node) {
   return options;
 }
 
+function successorOf(node) {
+  if (node?.type !== "ObjectExpression") return void 0;
+
+  return node.properties.find(
+    (property) => property.type === "Property" && property.key.name === "successor",
+  )?.value;
+}
+
 /** The router's namespace and addressing, read from the chain beneath a route's opener. */
 export function familyOf(opener) {
   const family = { addressing: "dated", options: {} };
@@ -69,6 +77,7 @@ export function familyOf(opener) {
   while (current?.type === "CallExpression" && current.callee.type === "MemberExpression") {
     const name = memberName(current.callee);
     if (name === "withNamespace") family.namespace = literalOf(current.arguments[0]);
+    if (name === "withDeprecated") family.successor = successorOf(current.arguments[0]);
     if (name === "withAddressing") {
       family.addressing = literalOf(current.arguments[0]);
       family.options = optionsOf(current.arguments[1]);
@@ -107,11 +116,12 @@ function addressesOf(path, family) {
   return [address, twin].filter(Boolean);
 }
 
-/** Whether main's published document already lists this route, parameter names included. */
-export function isPublishedRoute({ cwd, method, path, family }) {
+/** Whether main publishes this route, or the successor a deprecated alias serves. */
+export function isPublishedRoute({ cwd, method, path, family, successor }) {
   const published = publishedOperations(cwd);
+  const aliased = successor ? [`${successor}${path === "/" ? "" : path}`] : [];
 
-  return addressesOf(path, family).some((address) =>
+  return [...addressesOf(path, family), ...aliased].some((address) =>
     published.has(`${method.toUpperCase()} ${address.replace(COLON_PARAM, "{$1}")}`),
   );
 }

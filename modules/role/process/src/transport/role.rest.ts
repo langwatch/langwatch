@@ -109,7 +109,7 @@ export const roleRest: Readonly<{
   })
   .handle(async ({ app }) => app.getPermissionCatalog())
 
-  .get("/:roleId", "getRole")
+  .get("/:id", "getRole")
   .withParams(roleRestParamsSchema)
   .withPermission("organization:manage")
   .withOutput(roleRestSchema)
@@ -122,13 +122,13 @@ export const roleRest: Readonly<{
   .handle(async ({ app, input }, organization) =>
     wire(
       await app.getRoleInOrganization({
-        roleId: input.roleId,
+        roleId: input.id,
         organizationId: organization.organizationId,
       }),
     ),
   )
 
-  .patch("/:roleId", "updateRole")
+  .patch("/:id", "updateRole")
   .withParams(roleRestParamsSchema)
   .withInput(roleRestUpdateSchema)
   .withPermission("organization:manage")
@@ -143,7 +143,7 @@ export const roleRest: Readonly<{
     wire(
       await app.updateRoleInOrganization(
         {
-          roleId: input.roleId,
+          roleId: input.id,
           organizationId: organization.organizationId,
           changes: {
             ...(input.name === void 0 ? {} : { name: input.name }),
@@ -156,7 +156,7 @@ export const roleRest: Readonly<{
     ),
   )
 
-  .delete("/:roleId", "deleteRole")
+  .delete("/:id", "deleteRole")
   .withParams(roleRestParamsSchema)
   .withPermission("organization:manage")
   .withOutput(roleRestDeletedSchema)
@@ -168,7 +168,7 @@ export const roleRest: Readonly<{
   .withMiddleware(roleRestFacts)
   .handle(async ({ app, input, actor }, organization) =>
     app.deleteRoleInOrganization(
-      { roleId: input.roleId, organizationId: organization.organizationId },
+      { roleId: input.id, organizationId: organization.organizationId },
       callerOf(actor),
     ),
   )

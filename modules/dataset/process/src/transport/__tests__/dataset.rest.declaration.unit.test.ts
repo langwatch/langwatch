@@ -52,7 +52,7 @@ describe("the dataset REST declaration", () => {
         },
         {
           method: "post",
-          path: "/:datasetSlug/entries",
+          path: "/:slug/entries",
           operation: "postApiDatasetBySlugEntries",
           permission: "datasets:update",
         },

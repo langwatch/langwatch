@@ -117,7 +117,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
     return { id: saved.id };
   })
 
-  .put("/:modelDefaultId", "putApiModelDefaultsById")
+  .put("/:id", "putApiModelDefaultsById")
   .withParams(modelDefaultsRestParamsSchema)
   .withInput(updateModelDefaultConfigInputSchema)
   .withOutput(z.void())
@@ -134,17 +134,17 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
     await authorizeRequestedScopes({ app, credential, scopes: input.scopes });
 
     await app.saveDefaultConfig(
-      { id: input.modelDefaultId, config: input.config, scopes: input.scopes },
+      { id: input.id, config: input.config, scopes: input.scopes },
       author,
     );
 
     logger.info(
-      { projectId: scope.id, configId: input.modelDefaultId, userId: author.id },
+      { projectId: scope.id, configId: input.id, userId: author.id },
       "Updated default-model config",
     );
   })
 
-  .delete("/:modelDefaultId", "deleteApiModelDefaultsById")
+  .delete("/:id", "deleteApiModelDefaultsById")
   .withParams(modelDefaultsRestParamsSchema)
   .withOutput(z.void())
   .withPermission(MODEL_DEFAULTS_WRITE_PERMISSION)
@@ -156,10 +156,10 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
   .handle(async ({ app, input, scope }, credential) => {
     const author = keyOwner(credential);
 
-    await app.deleteDefaultConfig({ id: input.modelDefaultId }, author);
+    await app.deleteDefaultConfig({ id: input.id }, author);
 
     logger.info(
-      { projectId: scope.id, configId: input.modelDefaultId, userId: author.id },
+      { projectId: scope.id, configId: input.id, userId: author.id },
       "Deleted default-model config",
     );
   })

@@ -244,7 +244,9 @@ function pathParamFindings(context, chain) {
   const family = familyOf(chain.opener);
   const bare = bareParamsOf(path, family.namespace);
   if (bare.length === 0) return [];
-  if (isPublishedRoute({ cwd: context.cwd, method: chain.opens, path, family })) return [];
+  const successor = stringLiteral(constInitOf(context, family.successor));
+  if (isPublishedRoute({ cwd: context.cwd, method: chain.opens, path, family, successor }))
+    return [];
 
   return bare.map((data) => ({ node, messageId: "pathParam", data }));
 }
