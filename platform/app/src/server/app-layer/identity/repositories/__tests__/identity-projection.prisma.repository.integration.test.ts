@@ -278,6 +278,82 @@ describe("PrismaIdentityProjectionRepository", () => {
     });
   });
 
+  describe("when another user's live identifier already holds the provider subject", () => {
+    const HOLDER = `${namespace}-holder`;
+    const holderContext = {
+      aggregateId: HOLDER,
+      tenantId: createTenantId(HOLDER),
+    };
+    const githubFact = (id: string, userId: string, accountId: string) => ({
+      ...linkedFact(id, "VERIFIED", { accountId }),
+      userId,
+      provider: "github" as const,
+      providerId: "github",
+      issuer: "local:oauth:github",
+    });
+
+    afterEach(async () => {
+      await prisma.identifierReservation.deleteMany({
+        where: { userId: HOLDER },
+      });
+      await prisma.identifier.deleteMany({ where: { userId: HOLDER } });
+      await prisma.identityProjectionCursor.deleteMany({
+        where: { userId: HOLDER },
+      });
+      await prisma.account.deleteMany({ where: { userId: HOLDER } });
+      await prisma.user.deleteMany({ where: { id: HOLDER } });
+    });
+
+    /** @scenario "An identifier parked on another user's subject projects to no Account row" */
+    it("parks the identifier, projects no Account row for it, and commits the cursor", async () => {
+      await withUserRow();
+      await prisma.user.create({
+        data: { id: HOLDER, email: `${HOLDER}@acme.com` },
+      });
+      const holding = `${namespace}-holding`;
+      const holderAccount = `${namespace}-holder-acc`;
+      const held = projection(
+        { [holding]: githubFact(holding, HOLDER, holderAccount) },
+        { acceptedAt: 10, eventId: "evt_holder" },
+      );
+      await repository.store(
+        { ...held, state: { ...held.state, userId: HOLDER } },
+        holderContext,
+      );
+
+      // The backfill derived this one from a broker subject naming the same
+      // GitHub account the holder already signed in with natively.
+      const parked = `${namespace}-derived`;
+      const derivedAccount = `drvacct:github:${namespace}-broker`;
+      await repository.store(
+        projection(
+          { [parked]: githubFact(parked, USER, derivedAccount) },
+          { acceptedAt: 20, eventId: "evt_parked" },
+        ),
+        context,
+      );
+
+      expect(
+        await prisma.identityProjectionCursor.findUnique({
+          where: { userId: USER },
+        }),
+      ).toMatchObject({ lastEventId: "evt_parked" });
+      expect(
+        await prisma.account.findUnique({ where: { id: holderAccount } }),
+      ).toMatchObject({
+        userId: HOLDER,
+        provider: "github",
+        providerAccountId: `${namespace}-sub`,
+      });
+      expect(
+        await prisma.account.findUnique({ where: { id: derivedAccount } }),
+      ).toBeNull();
+      expect(
+        await prisma.identifier.findUnique({ where: { id: parked } }),
+      ).toBeNull();
+    });
+  });
+
   describe("when one user holds two proven identifiers for one address", () => {
     it("writes both, because a sign-in method is not an address claim", async () => {
       await withUserRow();
