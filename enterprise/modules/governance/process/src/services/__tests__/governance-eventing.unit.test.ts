@@ -270,6 +270,8 @@ describe("governance Eventing adapters", () => {
       rateVersion: "v1",
       costBasis: "computed" as const,
       costStatus: "estimate" as const,
+      rawActorId: "",
+      agentId: "",
       occurredAtMs: 1_000,
       observedAtMs,
     });

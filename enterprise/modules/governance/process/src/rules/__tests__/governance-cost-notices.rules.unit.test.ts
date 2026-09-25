@@ -118,4 +118,25 @@ describe("readStoredCostCursor", () => {
       costHeldSinceMs: null,
     });
   });
+
+  it("reads nothing when any other field of the position is malformed, as the puller does", () => {
+    const withBadSeats = {
+      costPricedThroughDay: "2026-09-20",
+      costHeldSinceMs: 7,
+      seatsReportedThroughDay: "yesterday",
+    };
+    const withBadTranscript = {
+      costPricedThroughDay: "2026-09-20",
+      conversationtranscriptid: "not-a-uuid",
+    };
+
+    expect(readStoredCostCursor(withBadSeats)).toEqual({
+      costPricedThroughDay: null,
+      costHeldSinceMs: null,
+    });
+    expect(readStoredCostCursor(JSON.stringify(withBadTranscript))).toEqual({
+      costPricedThroughDay: null,
+      costHeldSinceMs: null,
+    });
+  });
 });

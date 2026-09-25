@@ -32,6 +32,7 @@ import {
   type PullRunOptions,
   copilotStudioDataversePullConfigSchema,
   type CopilotStudioDataversePullConfig,
+  copilotStudioStoredCursorSchema,
   ProviderSignInError,
 } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
@@ -209,26 +210,6 @@ const cursorSchema = z.object({
   conversationtranscriptid: z.string().uuid(),
 });
 type Cursor = z.infer<typeof cursorSchema>;
-
-const dayField = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/)
-  .nullish();
-const heldField = z.number().int().nonnegative().nullish();
-
-/** Transcript fields stay top-level and every later field is optional, so positions written by older builds still parse. */
-const storedCursorSchema = z.object({
-  createdon: z.string().datetime({ offset: true }).optional(),
-  conversationtranscriptid: z.string().uuid().optional(),
-  costPricedThroughDay: dayField,
-  costHeldSinceMs: heldField,
-  costReadAtMs: heldField,
-  costDeepReadDay: z.string().nullish(),
-  seatsReportedThroughDay: dayField,
-  seatsHeldSinceMs: heldField,
-  directoryReportedThroughDay: dayField,
-  directoryHeldSinceMs: heldField,
-});
 
 interface CostPosition {
   pricedThroughDay: string | null;
@@ -853,7 +834,7 @@ export class HttpCopilotStudioDataverseChannel
   private static parseCursor(raw: string | null): StoredCursor {
     if (!raw) return NO_CURSOR;
     try {
-      const parsed = storedCursorSchema.safeParse(JSON.parse(raw));
+      const parsed = copilotStudioStoredCursorSchema.safeParse(JSON.parse(raw));
       if (!parsed.success) return NO_CURSOR;
       const data = parsed.data;
       return {

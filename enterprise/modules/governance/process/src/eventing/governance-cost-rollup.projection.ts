@@ -99,7 +99,7 @@ export class GovernanceCostRollupFoldProjection
     return new GovernanceCostRollupFoldProjection(store, actorIds);
   }
 
-  /** Same fields for both events; this branch's observed schema carries no spender or agent yet. */
+  /** Both events name the whole cell, the spender and the agent included (ADR-129, #7881). */
   cellOf(event: GovernanceCostRollupEvent): GovernanceCostRollupCell {
     const tenantId = String(event.tenantId);
     return {
@@ -109,11 +109,11 @@ export class GovernanceCostRollupFoldProjection
       ingestionSourceId: event.data.ingestionSourceId,
       provider: event.data.source,
       model: event.data.model,
-      agentId: event.type === PULLED_USAGE_EVENT_TYPES.RETRACTED ? event.data.agentId : "",
+      agentId: event.data.agentId,
       currencyCode: readPulledUsageMoney(event.data).currencyCode,
       rawActorId: this.actorIds.actorIdForRollupWrite({
         tenantId,
-        rawActorId: event.type === PULLED_USAGE_EVENT_TYPES.RETRACTED ? event.data.rawActorId : "",
+        rawActorId: event.data.rawActorId,
       }),
     };
   }

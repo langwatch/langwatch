@@ -72,6 +72,7 @@ const SOURCE = {
   sourceType: OPENAI_ADMIN_ADAPTER_ID,
   organizationId: "org_acme",
   teamId: "team_platform",
+  createdAt: new Date("2026-07-01T00:00:00.000Z"),
 };
 /** The record service must not allow callers to choose a storage project. */
 const GOV_PROJECT_ID = "proj_governance_acme";

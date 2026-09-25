@@ -59,6 +59,8 @@ describe("governance contract", () => {
       rateVersion: null,
       costBasis: "provider_reported" as const,
       costStatus: "exact" as const,
+      rawActorId: "",
+      agentId: "",
       occurredAtMs: 1,
     };
     expect(pulledUsageObservationKey({ ...base, observedAtMs: 1 })).not.toBe(

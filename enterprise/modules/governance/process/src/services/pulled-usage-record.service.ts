@@ -26,8 +26,9 @@ import {
   type PulledUsageObservedEventData,
   type PulledUsageSourceAttribution,
 } from "@langwatch/enterprise-governance-contract";
-import { type Instant, toEpochMs } from "@langwatch/time";
+import { fromDate, type Instant, Temporal, toEpochMs } from "@langwatch/time";
 
+import { actorForPulledDay } from "../rules/pulled-actor-naming.rules.ts";
 import type { PulledUsagePricingService } from "./pulled-usage-pricing.service.ts";
 
 /**
@@ -192,6 +193,8 @@ export class PulledUsageRecordService {
       });
     }
 
+    const sourceCreatedAt = fromDate(source.createdAt);
+    const pulledDay = Temporal.Instant.fromEpochMilliseconds(occurredAtMs).toString().slice(0, 10);
     return {
       itemKey: event.source_event_id,
       restatementKey: restatementKeyFor({
@@ -217,6 +220,17 @@ export class PulledUsageRecordService {
       rateVersion: priced.rateVersion,
       costBasis: priced.costBasis,
       costStatus: priced.costStatus,
+      // Spender and agent walk ADR-129's one named-or-blank line; neither enters the restatement key.
+      rawActorId: actorForPulledDay({
+        sourceCreatedAt,
+        dayUtc: pulledDay,
+        reportedActor: event.actor,
+      }),
+      agentId: actorForPulledDay({
+        sourceCreatedAt,
+        dayUtc: pulledDay,
+        reportedActor: hint.agentId ?? "",
+      }),
       occurredAtMs,
       observedAtMs: observedAt.epochMilliseconds,
     };

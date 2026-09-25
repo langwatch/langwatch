@@ -73,3 +73,18 @@ describe("the pulled-usage pipeline's cost rollup fold", () => {
     });
   });
 });
+
+describe("the pulled-usage pipeline's commands", () => {
+  describe.each(["consume", "produce"] as const)("when the process %ss the pipeline", (role) => {
+    it("registers retractPulledUsage beside recordPulledUsage, so a logged withdrawal still applies", async () => {
+      const app = await buildApp();
+
+      const pipeline = app.pulledUsagePipeline({ participation: role });
+
+      expect(pipeline.commands.map((command) => command.definition.name)).toEqual([
+        "recordPulledUsage",
+        "retractPulledUsage",
+      ]);
+    });
+  });
+});

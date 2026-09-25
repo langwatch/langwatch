@@ -1,46 +1,47 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** The cost screen's caveats: stopped sources, unpriced windows and the Azure bill note (ADR-128 §4a, ADR-088). */
 import {
+  copilotStudioStoredCursorSchema,
   deriveNoDataSinceNotice,
   type GovernanceCostSummary,
   type GovernanceIngestionSource,
 } from "@langwatch/enterprise-governance-contract";
 import type { Instant } from "@langwatch/time";
-import { z } from "zod";
 
 import type { UnpricedUsageSourceWindow } from "../repositories/ingestion-source.repository.ts";
 import { extractClaimedSubscription } from "./azure-bill-ownership.rules.ts";
 
-const storedCostCursorSchema = z.object({
-  costPricedThroughDay: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .nullish(),
-  costHeldSinceMs: z.number().int().nonnegative().nullish(),
-});
-
 const isoOf = (at: Instant): string => at.toString({ fractionalSecondDigits: 3 });
 
-function parseJson(raw: string): unknown {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-/** Main's `readStoredCostCursor`: how far the Copilot Studio bill has been priced, or held. */
+/**
+ * Main's `readStoredCostCursor`, over the puller's own whole-cursor schema: any malformed field reads
+ * as no completed read, the same collapse a run applies. Older writers stored objects, so both parse.
+ */
 export function readStoredCostCursor(pollerCursor: unknown): {
   costPricedThroughDay: string | null;
   costHeldSinceMs: number | null;
 } {
-  const raw = typeof pollerCursor === "string" ? parseJson(pollerCursor) : pollerCursor;
-  const parsed = storedCostCursorSchema.safeParse(raw);
+  const parsed = copilotStudioStoredCursorSchema.safeParse(storedCursorJson(pollerCursor));
   if (!parsed.success) return { costPricedThroughDay: null, costHeldSinceMs: null };
   return {
     costPricedThroughDay: parsed.data.costPricedThroughDay ?? null,
     costHeldSinceMs: parsed.data.costHeldSinceMs ?? null,
   };
+}
+
+/** The column is `Json?`: this build stores a string, older writers an object, unpulled null. */
+function storedCursorJson(pollerCursor: unknown): unknown {
+  let raw: string | undefined;
+  if (typeof pollerCursor === "string") raw = pollerCursor;
+  else if (pollerCursor !== null && typeof pollerCursor === "object") {
+    raw = JSON.stringify(pollerCursor);
+  }
+  if (!raw) return undefined;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
 }
 
 type CostCaveats = Pick<GovernanceCostSummary, "staleSources" | "unpricedWindow" | "azureBilling">;

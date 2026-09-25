@@ -19,20 +19,20 @@ import type {
   PulledUsageDispatcher,
   PulledUsageEntitlements,
 } from "../app/governance.members.ts";
+import type { IngestionSourceRepository } from "../repositories/ingestion-source.repository.ts";
 import type {
   ConversationRoutingProfile,
   RoutingOrigin,
 } from "../rules/conversation-trace-assembly-service.rules.ts";
 import { COPILOT_ROUTING_PROFILE } from "../rules/copilot-studio-trace-mapper-service.rules.ts";
 import * as CopilotStudioTraceMapperService from "../rules/copilot-studio-trace-mapper-service.rules.ts";
+import { partitionSuppressedEvents } from "../rules/erasure-suppression.rules.ts";
 import { GENIE_ROUTING_PROFILE } from "../rules/genie-trace-mapper-service.rules.ts";
 import * as GenieTraceMapperService from "../rules/genie-trace-mapper-service.rules.ts";
-import { partitionSuppressedEvents } from "../rules/erasure-suppression.rules.ts";
 import { pullReadThrough } from "../rules/pull-read-through.rules.ts";
-import type { IngestionSourceRepository } from "../repositories/ingestion-source.repository.ts";
+import type { DirectoryDepartmentSyncService } from "./directory-department-sync.service.ts";
 import type { ErasureSuppressionService } from "./erasure-suppression.service.ts";
 import type { IngestionCredentialsService } from "./ingestion-credentials.service.ts";
-import type { DirectoryDepartmentSyncService } from "./directory-department-sync.service.ts";
 import type { PersonDiscoveryService } from "./person-discovery.service.ts";
 import type { PulledUsageRecordService } from "./pulled-usage-record.service.ts";
 import type { PullerRegistryService } from "./puller-registry.service.ts";
@@ -319,7 +319,11 @@ export class IngestionPullWorkerService {
       actorOf: (event) => event.actor,
       suppression,
     });
-    const periods = await this.writeEvents({ events: kept, source, pulledUsage: input.pulledUsage });
+    const periods = await this.writeEvents({
+      events: kept,
+      source,
+      pulledUsage: input.pulledUsage,
+    });
     await this.recordUnpricedUsageWindow({ source, ...periods, completeness: input.completeness });
     if (suppressedCount > 0) {
       this.diagnostics.info("skipped pulled events naming an erased identifier", {
@@ -495,6 +499,7 @@ export class IngestionPullWorkerService {
             sourceType: input.source.sourceType,
             organizationId: input.source.organizationId,
             teamId: input.source.teamId,
+            createdAt: input.source.createdAt,
           },
           governanceProjectId: project.id,
           observedAt,

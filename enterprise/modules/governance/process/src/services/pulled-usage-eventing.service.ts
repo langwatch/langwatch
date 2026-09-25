@@ -6,6 +6,8 @@ import {
   PULLED_USAGE_PIPELINE_NAME,
   pulledUsageObservationKey,
   pulledUsageObservedEventDataSchema,
+  pulledUsageRetractedEventDataSchema,
+  pulledUsageRetractionKey,
   type PulledUsageObservedEvent,
   type PulledUsageRetractedEvent,
   pulledUsageObservedEventSchema,
@@ -62,6 +64,27 @@ const RecordPulledUsageCommand = defineCommand({
   makeJobId: (data) => pulledUsageObservationKey(data),
 });
 
+/**
+ * Main's `retractPulledUsage`: registered unconditionally although only the ledger process
+ * sends it, so a deployment without the ledger still applies a withdrawal already logged.
+ */
+const RetractPulledUsageCommand = defineCommand({
+  commandType: PULLED_USAGE_COMMAND_TYPES.RETRACT,
+  eventType: PULLED_USAGE_EVENT_TYPES.RETRACTED,
+  eventVersion: PULLED_USAGE_EVENT_VERSIONS.RETRACTED,
+  aggregateType: PULLED_USAGE_AGGREGATE_TYPE,
+  schema: pulledUsageRetractedEventDataSchema,
+  aggregateId: (data) => data.restatementKey,
+  idempotencyKey: (data) => pulledUsageRetractionKey(data),
+  spanAttributes: (data) => ({
+    "payload.source": data.source,
+    "payload.ingestion_source_id": data.ingestionSourceId,
+    "payload.currency_code": data.currencyCode,
+    "payload.retracted_model": data.model,
+  }),
+  makeJobId: (data) => pulledUsageRetractionKey(data),
+});
+
 export class PulledUsageEventingAdapter {
   private constructor(
     private readonly ledger: PulledUsageLedgerProcess | undefined,
@@ -85,8 +108,14 @@ export class PulledUsageEventingAdapter {
     );
   }
 
-  static commandHandlers(): { recordPulledUsage: typeof RecordPulledUsageCommand } {
-    return { recordPulledUsage: RecordPulledUsageCommand } as const;
+  static commandHandlers(): {
+    recordPulledUsage: typeof RecordPulledUsageCommand;
+    retractPulledUsage: typeof RetractPulledUsageCommand;
+  } {
+    return {
+      recordPulledUsage: RecordPulledUsageCommand,
+      retractPulledUsage: RetractPulledUsageCommand,
+    } as const;
   }
 
   build(): PulledUsageDefinition {
@@ -97,7 +126,8 @@ export class PulledUsageEventingAdapter {
       }),
     })
       .withEvents([pulledUsageObservedEventSchema, pulledUsageRetractedEventSchema])
-      .withCommand("recordPulledUsage", RecordPulledUsageCommand);
+      .withCommand("recordPulledUsage", RecordPulledUsageCommand)
+      .withCommand("retractPulledUsage", RetractPulledUsageCommand);
     if (this.costRollup) {
       pipeline.withClickHouseFoldProjection(this.costRollup);
     }

@@ -1,9 +1,13 @@
 import { z } from "zod";
 
-import { pulledUsageObservedEventDataSchema } from "./pulled-usage.events.ts";
+import {
+  type PulledUsageRetractedEventData,
+  pulledUsageObservedEventDataSchema,
+} from "./pulled-usage.events.ts";
 
 export const PULLED_USAGE_COMMAND_TYPES = {
   RECORD: "lw.obs.pulled_usage.record",
+  RETRACT: "lw.obs.pulled_usage.retract",
 } as const;
 export const PULLED_USAGE_PROCESSING_COMMAND_TYPES = Object.values(PULLED_USAGE_COMMAND_TYPES);
 
@@ -36,6 +40,19 @@ export function pulledUsageObservationKey(
     data.tokensCacheWrite,
     data.costBasis,
     data.costStatus,
+    data.observedAtMs,
+  ].join(":");
+}
+
+/** One withdrawal per superseded cell and superseding pull; a redelivery sends the same key. */
+export function pulledUsageRetractionKey(data: PulledUsageRetractedEventData): string {
+  return [
+    "retract",
+    data.restatementKey,
+    data.currencyCode,
+    data.agentId,
+    data.rawActorId,
+    data.model,
     data.observedAtMs,
   ].join(":");
 }

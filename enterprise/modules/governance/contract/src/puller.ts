@@ -17,6 +17,30 @@ export type CopilotStudioDataversePullConfig = z.infer<
   typeof copilotStudioDataversePullConfigSchema
 >;
 
+const copilotCursorDayField = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .nullish();
+const copilotCursorHeldField = z.number().int().nonnegative().nullish();
+
+/**
+ * The Copilot Studio puller's whole stored position. Transcript fields stay top-level and
+ * every later field is optional, so older positions still parse; the cost screen reads the
+ * cost half through it too.
+ */
+export const copilotStudioStoredCursorSchema = z.object({
+  createdon: z.string().datetime({ offset: true }).optional(),
+  conversationtranscriptid: z.string().uuid().optional(),
+  costPricedThroughDay: copilotCursorDayField,
+  costHeldSinceMs: copilotCursorHeldField,
+  costReadAtMs: copilotCursorHeldField,
+  costDeepReadDay: z.string().nullish(),
+  seatsReportedThroughDay: copilotCursorDayField,
+  seatsHeldSinceMs: copilotCursorHeldField,
+  directoryReportedThroughDay: copilotCursorDayField,
+  directoryHeldSinceMs: copilotCursorHeldField,
+});
+
 export const DATABRICKS_GENIE_ADAPTER_ID = "databricks_genie" as const;
 
 export const databricksGeniePullConfigSchema = z.object({
@@ -200,6 +224,11 @@ export const pulledUsageHintSchema = z
      * it from a rate of ours. Not a dimension, same reason as above.
      */
     costUsdBiller: z.string().optional(),
+    /**
+     * The agent within the source when the provider names one (a Genie space).
+     * Not a dimension: it is derivable from one already there, so keying on it changes nothing.
+     */
+    agentId: z.string().optional(),
     model: z.string().optional(),
     tokensCacheRead: z.number().int().nonnegative().default(0),
     tokensCacheWrite: z.number().int().nonnegative().default(0),
@@ -223,6 +252,8 @@ export const pulledUsageSourceAttributionSchema = z
     sourceType: z.string().min(1),
     organizationId: z.string().min(1),
     teamId: z.string().min(1).nullable(),
+    /** When the source was connected: the input to ADR-129's named-or-blank line. */
+    createdAt: z.date(),
   })
   .strict();
 export type PulledUsageSourceAttribution = z.infer<typeof pulledUsageSourceAttributionSchema>;

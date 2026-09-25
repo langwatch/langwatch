@@ -69,10 +69,12 @@ export function retracted({
   restatementKey,
   observedAtMs,
   rawActorId = "",
+  currencyCode = "USD",
 }: {
   restatementKey: string;
   observedAtMs: number;
   rawActorId?: string;
+  currencyCode?: string;
 }): PulledUsageRetractedEvent {
   return pulledUsageRetractedEventSchema.parse({
     ...envelope(restatementKey),
@@ -85,7 +87,7 @@ export function retracted({
       organizationId: "org-1",
       model: "gpt-5-mini",
       costNanoMinor: 0,
-      currencyCode: "USD",
+      currencyCode,
       costNanoUsd: null,
       rawActorId,
       agentId: "",

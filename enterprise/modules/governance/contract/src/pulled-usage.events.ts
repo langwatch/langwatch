@@ -68,6 +68,13 @@ export const pulledUsageObservedEventDataSchema = z
     rateVersion: z.string().nullable(),
     costBasis: pulledUsageCostBasisSchema,
     costStatus: pulledUsageCostStatusSchema,
+    /**
+     * The provider's raw id for who spent, or `""` when it named nobody or the day is pre-line
+     * (ADR-129). Defaulted like `currencyCode`: events already on the log carry no spender.
+     */
+    rawActorId: z.string().default(""),
+    /** The agent within the source (a Genie space), or `""` (#7881); keyed like the spender. */
+    agentId: z.string().default(""),
     occurredAtMs: z.number().int().positive(),
     observedAtMs: z.number().int().positive(),
   })
