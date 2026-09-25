@@ -271,7 +271,7 @@ describe("the back-office single sign-on surface", () => {
       });
     });
 
-    it("records the command in the audit log once the ledger has run it", async () => {
+    it("records the command in the audit log", async () => {
       const caller = context.callerFor({ id: STAFF_ID });
       await caller.attestDomain({ ...TARGET, ...EVIDENCE, domain: "acme.com" });
 

@@ -2,8 +2,8 @@ import { createApiFixture } from "@langwatch/api-fixture";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
- * When the back office writes the audit row: after the ledger answered, so the
- * row says what happened rather than what somebody tried.
+ * When the back office writes the audit row: before the ledger is asked, as main's
+ * back office did, so a refused attempt still leaves its row.
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
@@ -48,20 +48,23 @@ describe("the back office's audit trail", () => {
   });
 
   describe("given a ledger that refuses the command", () => {
-    /** @scenario "A refused command leaves no audit row" */
-    it("writes no audit row for a command the ledger threw on", async () => {
+    /** @scenario "A command the ledger refuses still leaves its audit row" */
+    it("writes the attempt's row even though the ledger threw", async () => {
       const refusal = new Error("the ledger refused this transition");
       context.connections.attestDomain.mockRejectedValueOnce(refusal);
 
       await expect(context.app.attestDomain(TARGET, { id: STAFF_ID })).rejects.toBe(refusal);
 
       expect(context.connections.attestDomain).toHaveBeenCalledTimes(1);
-      expect(context.record).not.toHaveBeenCalled();
+      expect(context.record).toHaveBeenCalledTimes(1);
+      expect(context.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: "ssoConnections.attestDomain" }),
+      );
     });
   });
 
   describe("given somebody outside the staff list", () => {
-    /** @scenario "A refused command leaves no audit row" */
+    /** @scenario "Somebody outside the staff list leaves no audit row" */
     it("writes no audit row when the gate refuses before the ledger is asked", async () => {
       const denial = await context.app.attestDomain(TARGET, { id: CUSTOMER_ID }).then(
         () => {
@@ -78,8 +81,8 @@ describe("the back office's audit trail", () => {
   });
 
   describe("given a ledger that completes the command", () => {
-    /** @scenario "A command that succeeds is recorded once, after it ran" */
-    it("writes exactly one row, after the ledger answered", async () => {
+    /** @scenario "An operator command is recorded before it runs" */
+    it("writes exactly one row, before the ledger is asked", async () => {
       await context.app.attestDomain(TARGET, { id: STAFF_ID });
 
       expect(context.record).toHaveBeenCalledTimes(1);
@@ -93,23 +96,23 @@ describe("the back office's audit trail", () => {
       );
 
       // vitest numbers every mock call across the run, so the two orders read
-      // as one sequence: the ledger was asked first, the row written second.
+      // as one sequence: the row written first, the ledger asked second.
       const commanded = context.connections.attestDomain.mock.invocationCallOrder[0];
       const recorded = context.record.mock.invocationCallOrder[0];
       expect(commanded).toBeDefined();
       expect(recorded).toBeDefined();
-      expect(recorded!).toBeGreaterThan(commanded!);
+      expect(recorded!).toBeLessThan(commanded!);
     });
 
-    /** @scenario "A command that succeeds is recorded once, after it ran" */
-    it("records a read after the ledger answered it", async () => {
+    /** @scenario "An operator command is recorded before it runs" */
+    it("records a read before the ledger answers it", async () => {
       await context.app.listConnections({ page: 0, pageSize: 25 }, { id: STAFF_ID });
 
       expect(context.record).toHaveBeenCalledTimes(1);
       const listed = context.connections.list.mock.invocationCallOrder[0];
       const recorded = context.record.mock.invocationCallOrder[0];
       expect(listed).toBeDefined();
-      expect(recorded!).toBeGreaterThan(listed!);
+      expect(recorded!).toBeLessThan(listed!);
     });
   });
 });

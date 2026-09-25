@@ -549,7 +549,7 @@ export class SsoApp implements SsoApiContract {
     input: SsoSetupStartMigrationInput,
     by: SsoOperator,
   ): Promise<SsoSetupRegistered> {
-    return this.#auditedAttempt({
+    return this.#audited({
       by,
       action: "startLegacyMigration",
       args: {
@@ -904,29 +904,10 @@ export class SsoApp implements SsoApiContract {
   }
 
   /**
-   * Gate, run, then record. The row says the ledger answered, so a refusal at
-   * the gate and a command the ledger threw on both leave nothing behind.
+   * Gate, record, then run, as main's back office did: every operator verb is
+   * cross-tenant, so a refused or failed attempt still leaves its row.
    */
   async #audited<T>({
-    by,
-    action,
-    args,
-    command,
-  }: {
-    by: SsoOperator;
-    action: string;
-    args: Record<string, unknown>;
-    command: (operator: SsoConnectionLedgerOperator) => Promise<T>;
-  }): Promise<T> {
-    const operator = await this.#requireOperator(by);
-    const answer = await command(operator);
-    await this.#recordOperatorAction({ operator, action, args });
-
-    return answer;
-  }
-
-  /** Gate, record, then run, as main's back office did: a refused attempt still leaves its row. */
-  async #auditedAttempt<T>({
     by,
     action,
     args,

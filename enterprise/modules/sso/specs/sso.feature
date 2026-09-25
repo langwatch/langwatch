@@ -27,17 +27,23 @@ Feature: Enterprise SSO package boundary
     Then it returns email
 
   @unit
-  Scenario: A refused command leaves no audit row
-    Given an operator commands the connection ledger and the ledger refuses the command
-    When the back office reports the refusal
-    Then no audit row is written for that command
+  Scenario: An operator command is recorded before it runs
+    Given an operator commands the connection ledger
+    When the back office runs the command
+    Then exactly one audit row is written
+    And it is written before the ledger is asked
 
   @unit
-  Scenario: A command that succeeds is recorded once, after it ran
-    Given an operator commands the connection ledger
-    When the ledger completes the command
-    Then exactly one audit row is written
-    And it is written after the ledger answered
+  Scenario: A command the ledger refuses still leaves its audit row
+    Given an operator commands the connection ledger and the ledger refuses the command
+    When the back office reports the refusal
+    Then the attempt's audit row is written
+
+  @unit
+  Scenario: Somebody outside the staff list leaves no audit row
+    Given somebody outside the staff list commands the connection ledger
+    When the gate refuses them
+    Then no audit row is written and the ledger is not asked
 
   @unit
   Scenario: Without a license the provider is not offered
