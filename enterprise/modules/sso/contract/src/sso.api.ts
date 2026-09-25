@@ -1,4 +1,6 @@
 import { moduleApi } from "@langwatch/kernel/module-api";
+import type { BetterAuthOptions } from "better-auth";
+import type { GenericOAuthConfig } from "better-auth/plugins/generic-oauth";
 
 import type { SsoSelfServeContext } from "./sso-self-serve.contract.ts";
 import type {
@@ -61,6 +63,12 @@ export type SsoAdministrator = Readonly<{
   impersonatorId?: string | undefined;
 }>;
 
+/** The deployment's sign-in providers, shaped for Better Auth to mount (main's providers.ts). */
+export type SignInProviderMounts = Readonly<{
+  socialProviders: NonNullable<BetterAuthOptions["socialProviders"]>;
+  genericOAuthConfigs: readonly GenericOAuthConfig[];
+}>;
+
 /** Single sign-on: what a deployment may federate with, and the operator's ledger. */
 export interface SsoApi {
   /** Whether this deployment's licence permits platform single sign-on. */
@@ -69,6 +77,8 @@ export interface SsoApi {
   providerIsMounted(): boolean;
   /** The provider a sign-in page should offer, or `"email"`. */
   resolveProvider(): Promise<string>;
+  /** The configured providers, with callbacks under Better Auth's own `baseUrl`. */
+  getSignInProviderMounts(input: { baseUrl: string }): Promise<SignInProviderMounts>;
 
   listConnections(
     input: ListSsoConnectionsInput,

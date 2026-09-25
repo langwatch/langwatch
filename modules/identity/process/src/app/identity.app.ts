@@ -293,8 +293,8 @@ function joinOfferDismissals(users: UserApi): JoinOfferDismissals {
 /** The audit row main writes for a joining change: both values, and both domain lists. */
 function joinSettingAudit(auditLog: AuditLogApi): JoinSettingAudit {
   return {
-    joiningChanged: ({ organizationId, actorUserId, change }) =>
-      auditLog.record({
+    joiningChanged: async ({ organizationId, actorUserId, change }) => {
+      await auditLog.record({
         userId: actorUserId,
         organizationId,
         action: "organization.joining.changed",
@@ -306,7 +306,8 @@ function joinSettingAudit(auditLog: AuditLogApi): JoinSettingAudit {
         },
         targetKind: "organization",
         targetId: organizationId,
-      }),
+      });
+    },
   };
 }
 

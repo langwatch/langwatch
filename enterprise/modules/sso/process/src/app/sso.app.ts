@@ -15,6 +15,7 @@ import {
   ssoConfig,
   SsoApi,
   type SsoApi as SsoApiContract,
+  type SignInProviderMounts,
   type ActivateSsoConnectionInput,
   type BackofficeSsoConnection,
   type BackofficeSsoConnectionPage,
@@ -72,6 +73,10 @@ import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
 import { signInProviderSecrets } from "@langwatch/secrets";
 import { UserApi } from "@langwatch/user-contract";
 
+import {
+  buildGenericOAuthConfigs,
+  buildSocialProviders,
+} from "../rules/sign-in-providers.rules.ts";
 import { ssoServiceProviderAddresses } from "../rules/sso-service-provider.rules.ts";
 import { SsoGateService, SsoProviderMountInspector } from "../services/sso-gate.service.ts";
 import { SsoHistoryActivityService } from "../services/sso-history-activity.service.ts";
@@ -186,6 +191,8 @@ export class SsoApp implements SsoApiContract {
   readonly #setup: SsoSetupReads;
   /** The deployment an identity provider is pointed back at. */
   readonly #baseUrl: string;
+  /** The providers this deployment configured, with their resolved credentials. */
+  readonly #configuration: SsoConfiguration;
   readonly #historyActivity: SsoHistoryActivityService;
   readonly #selfServeContext: SsoSelfServeContextService;
   readonly #operators: OpsApi;
@@ -224,6 +231,7 @@ export class SsoApp implements SsoApiContract {
     this.#history = history;
     this.#setup = setup;
     this.#baseUrl = configuration.baseUrl;
+    this.#configuration = configuration;
     this.#historyActivity = SsoHistoryActivityService.create({ history, logger });
     const isHosted = () => configuration.isSaas;
     this.#selfServeContext = SsoSelfServeContextService.create({
@@ -374,6 +382,14 @@ export class SsoApp implements SsoApiContract {
 
   resolveProvider(): Promise<string> {
     return this.#gate.resolveProvider();
+  }
+
+  getSignInProviderMounts(input: { baseUrl: string }): Promise<SignInProviderMounts> {
+    return Promise.resolve({
+      socialProviders: buildSocialProviders(this.#configuration),
+      genericOAuthConfigs:
+        buildGenericOAuthConfigs({ ...this.#configuration, baseUrl: input.baseUrl }) ?? [],
+    });
   }
 
   async listConnections(

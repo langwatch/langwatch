@@ -30,6 +30,7 @@ import {
   type AuthUsageCount,
 } from "@langwatch/auth-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import { SsoApi } from "@langwatch/enterprise-sso-contract";
 import {
   configuredAuthProvider,
   resolveSignInProviders,
@@ -203,6 +204,8 @@ export class AuthApp implements AuthApiContract {
     entitlements: EntitlementApi,
     /** Whether a signed license permits platform single sign-on (ADR-027). */
     licensing: LicensingApi,
+    /** The sign-in providers, shaped for Better Auth by enterprise SSO. */
+    sso: SsoApi,
   };
   static readonly config = authServerConfig;
   /** `secrets` resolves NEXTAUTH_SECRET (ADR-132); `publicBaseUrl` is the
@@ -232,11 +235,12 @@ export class AuthApp implements AuthApiContract {
   /** The administrator's side of the two sign-in security rules. */
   readonly #signInSecurity: SignInSecuritySettingsService;
   /**
-   * The deployment's ONE Better Auth instance, or nothing where it named no
-   * browser-session identity. Assigned once in {@link AuthApp.create}: it must
-   * revoke sessions on the same application every other caller revokes through.
+   * Composes the deployment's ONE Better Auth instance on first use (it asks
+   * the SSO peer, which construction may not), or nothing where it named no
+   * browser-session identity. Every caller shares {@link AuthApp.#betterAuth}.
    */
-  #betterAuth: BetterAuthTransport | null = null;
+  #composeBetterAuth: (() => Promise<BetterAuthTransport>) | null = null;
+  #betterAuth: Promise<BetterAuthTransport> | null = null;
   /** The identity {@link AuthApp.create} resolved, held for {@link baseUrl}. */
   #browserSession: BetterAuthDeploymentIdentity | undefined;
 
@@ -375,36 +379,38 @@ export class AuthApp implements AuthApiContract {
       app.#browserSession = identity;
 
       if (identity) {
-        app.#betterAuth = buildBetterAuth({
-          identity,
-          signInLockout: SignInLockoutService.create({
-            locks: repositories.signInLocks,
-            settings: repositories.signInSecurity,
-            directory: {
-              findUserIdFor: async ({ identifier }) =>
-                (await dependencies.users.findByEmail({ email: identifier }))?.id ?? null,
-            },
-            evidence: auditedLockoutEvidence(dependencies.auditLog),
-            hashIdentifier: keyedIdentifierHasher(sessionSecret),
-            now,
-          }),
-          prisma: members.prisma,
-          encryption: members.encryption,
-          redis: members.redis,
-          auth: app,
-          users: dependencies.users,
-          identityApi: dependencies.identity,
-          signInRouting: members.route ?? null,
-          authProvider: configuredAuthProvider(config.signInProviders).provider,
-          signInProviders,
-          licensing: dependencies.licensing,
-          isSaas: members.isSaas,
-          localPasswords: config.localPasswords,
-          trustedIdpOrigins: config.trustedIdpOrigins,
-          idpSimulatorUrl: config.idpSimulatorUrl,
-          isProduction: members.nodeEnvironment === "production",
-          logger: members.logger,
-        });
+        app.#composeBetterAuth = () =>
+          buildBetterAuth({
+            identity,
+            signInLockout: SignInLockoutService.create({
+              locks: repositories.signInLocks,
+              settings: repositories.signInSecurity,
+              directory: {
+                findUserIdFor: async ({ identifier }) =>
+                  (await dependencies.users.findByEmail({ email: identifier }))?.id ?? null,
+              },
+              evidence: auditedLockoutEvidence(dependencies.auditLog),
+              hashIdentifier: keyedIdentifierHasher(sessionSecret),
+              now,
+            }),
+            prisma: members.prisma,
+            encryption: members.encryption,
+            redis: members.redis,
+            auth: app,
+            users: dependencies.users,
+            identityApi: dependencies.identity,
+            signInRouting: members.route ?? null,
+            authProvider: configuredAuthProvider(config.signInProviders).provider,
+            signInProviders,
+            licensing: dependencies.licensing,
+            sso: dependencies.sso,
+            isSaas: members.isSaas,
+            localPasswords: config.localPasswords,
+            trustedIdpOrigins: config.trustedIdpOrigins,
+            idpSimulatorUrl: config.idpSimulatorUrl,
+            isProduction: members.nodeEnvironment === "production",
+            logger: members.logger,
+          });
       } else {
         members.logger.info(
           { module: "auth" },
@@ -454,8 +460,9 @@ export class AuthApp implements AuthApiContract {
   }
 
   /** The deployment's ONE Better Auth instance, or the refusal that names why there is none. */
-  betterAuth(): BetterAuthTransport {
-    if (!this.#betterAuth) {
+  async betterAuth(): Promise<BetterAuthTransport> {
+    const compose = this.#composeBetterAuth;
+    if (!compose) {
       throw new AuthUnavailableError({
         capability:
           "browser-session identity (NEXTAUTH_SECRET and NEXTAUTH_URL), so it composes no sign-in door",
@@ -463,6 +470,10 @@ export class AuthApp implements AuthApiContract {
       });
     }
 
+    this.#betterAuth ??= compose().catch((error: unknown) => {
+      this.#betterAuth = null;
+      throw error;
+    });
     return this.#betterAuth;
   }
 
@@ -474,9 +485,11 @@ export class AuthApp implements AuthApiContract {
   async tryVerifyBrowserSession(input: {
     headers: Headers;
   }): Promise<VerifiedBrowserSession | null> {
-    if (!this.#betterAuth) return null;
+    if (!this.#composeBetterAuth) return null;
 
-    return (await this.#betterAuth.api.getSession({
+    return (await (
+      await this.betterAuth()
+    ).api.getSession({
       headers: input.headers,
     })) as VerifiedBrowserSession | null;
   }
@@ -831,21 +844,22 @@ function signInSecurityPlanGate(entitlements: EntitlementApi): SignInSecurityPla
 
 function auditedReleaseEvidence(auditLog: AuditLogApi): SignInSecurityReleaseEvidence {
   return {
-    released: ({ organizationId, userId, actorUserId }) =>
-      auditLog.record({
+    released: async ({ organizationId, userId, actorUserId }) => {
+      await auditLog.record({
         userId: actorUserId,
         organizationId,
         action: "identity.sign_in.lock_released",
         targetKind: "user",
         targetId: userId,
-      }),
+      });
+    },
   };
 }
 
 function auditedLockoutEvidence(auditLog: AuditLogApi): SignInLockoutEvidence {
   return {
-    locked: async ({ userId, failedCount, consecutiveLockouts, lockedUntil }) =>
-      auditLog.record({
+    locked: async ({ userId, failedCount, consecutiveLockouts, lockedUntil }) => {
+      await auditLog.record({
         ...(userId === null ? {} : { userId }),
         action: "identity.sign_in_locked_out",
         metadata: {
@@ -854,12 +868,14 @@ function auditedLockoutEvidence(auditLog: AuditLogApi): SignInLockoutEvidence {
           lockedUntil: lockedUntil.toString(),
           addressHadAccount: userId !== null,
         },
-      }),
-    escalated: async ({ userId, consecutiveLockouts }) =>
-      auditLog.record({
+      });
+    },
+    escalated: async ({ userId, consecutiveLockouts }) => {
+      await auditLog.record({
         ...(userId === null ? {} : { userId }),
         action: "identity.sign_in_lockout_escalated",
         metadata: { consecutiveLockouts, addressHadAccount: userId !== null },
-      }),
+      });
+    },
   };
 }

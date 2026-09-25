@@ -1,4 +1,9 @@
-export { SsoApi, type SsoAdministrator, type SsoOperator } from "./sso.api.ts";
+export {
+  SsoApi,
+  type SignInProviderMounts,
+  type SsoAdministrator,
+  type SsoOperator,
+} from "./sso.api.ts";
 export { ssoConnectionTrpc } from "./sso-connection.trpc.ts";
 export { ssoSetupTrpc } from "./sso-setup.trpc.ts";
 export {

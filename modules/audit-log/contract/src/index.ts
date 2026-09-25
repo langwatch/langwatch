@@ -7,6 +7,8 @@ export {
   auditLogHistoryEntrySchema,
   type AuditLogHistoryEntry,
   type ListAuditLogEntityHistoryInput,
+  type RecordedAuditLogEntry,
+  type RecordedSinceInput,
 } from "./audit-log.ts";
 export { recordAuditLogCommandSchema, type RecordAuditLogCommand } from "./audit-log.commands.ts";
 export { AuditLogApi, type AuditLogApi as AuditLogApiContract } from "./audit-log.api.ts";

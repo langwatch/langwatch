@@ -602,10 +602,10 @@ class RedisWebhookDispatchRateLimiter extends WebhookDispatchRateLimiter {
 class AuditLogAutomationAuditSink implements AutomationAuditSink {
   constructor(private readonly auditLog: AuditLogApi) {}
 
-  record(
+  async record(
     entry: Readonly<{ userId: string; projectId?: string; action: string; args?: unknown }>,
   ): Promise<void> {
-    return this.auditLog.record({
+    await this.auditLog.record({
       userId: entry.userId,
       ...(entry.projectId === undefined ? {} : { projectId: entry.projectId }),
       action: entry.action,

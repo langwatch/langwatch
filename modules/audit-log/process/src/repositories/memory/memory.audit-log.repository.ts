@@ -4,6 +4,8 @@ import {
   type AuditLogHistoryEntry,
   type AuditLogJsonValue,
   type ListAuditLogEntityHistoryInput,
+  type RecordedAuditLogEntry,
+  type RecordedSinceInput,
 } from "@langwatch/audit-log-contract";
 import { generate } from "@langwatch/ksuid";
 import { Temporal, nowInstant, toDate } from "@langwatch/time";
@@ -18,8 +20,21 @@ export class MemoryAuditLogRepository implements AuditLogRepository {
     return new MemoryAuditLogRepository(store);
   }
 
-  async create(entry: AuditLogEntry): Promise<void> {
-    this.store.rows.push({ ...entry, id: generate("audit").toString(), createdAt: nowInstant() });
+  async create(entry: AuditLogEntry): Promise<RecordedAuditLogEntry> {
+    const row = { ...entry, id: generate("audit").toString(), createdAt: nowInstant() };
+    this.store.rows.push(row);
+    return { id: row.id, occurredAt: row.createdAt.epochMilliseconds };
+  }
+
+  async hasRecordedSince(input: RecordedSinceInput): Promise<boolean> {
+    return this.store.rows.some(
+      (row) =>
+        row.userId === input.userId &&
+        row.action === input.action &&
+        row.targetKind === input.targetKind &&
+        row.targetId === input.targetId &&
+        row.createdAt.epochMilliseconds >= input.sinceMs,
+    );
   }
 
   async findEntityHistory(input: ListAuditLogEntityHistoryInput): Promise<AuditLogHistoryEntry[]> {

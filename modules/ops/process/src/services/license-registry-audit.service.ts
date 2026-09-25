@@ -258,12 +258,12 @@ export class LicenseRegistryAuditService {
     }
   }
 
-  private record(
+  private async record(
     operatorId: string,
     action: string,
     entry: { args: AuditArgs; targetKind?: TargetKind; targetId?: string; error?: string },
   ): Promise<void> {
-    return this.auditLog.record({
+    await this.auditLog.record({
       userId: operatorId,
       action: `licenseRegistry.${action}`,
       args: entry.args,

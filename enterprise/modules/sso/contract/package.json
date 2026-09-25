@@ -29,6 +29,7 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/secrets": "workspace:*",
+    "better-auth": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

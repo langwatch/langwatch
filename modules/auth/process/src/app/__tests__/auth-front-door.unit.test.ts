@@ -1,6 +1,7 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import type { SsoApi } from "@langwatch/enterprise-sso-contract";
 /**
  * A signed-in caller's own confirmation link: refused without an address,
  * metered per caller, and mailed through sign-up's own link.
@@ -61,7 +62,10 @@ async function appFor(
       organizations: createApiFixture<OrganizationApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
       licensing: createApiFixture<LicensingApi>(),
-      auditLog: createApiFixture<AuditLogApi>({ record: async () => {} }),
+      sso: createApiFixture<SsoApi>(),
+      auditLog: createApiFixture<AuditLogApi>({
+        record: async () => ({ id: "audit", occurredAt: 0 }),
+      }),
     },
     members: {
       encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },

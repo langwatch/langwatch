@@ -427,8 +427,8 @@ export class GithubApp implements GithubApiContract {
 
     return session?.user.id === input.userId;
   }
-  recordAudit(entry: GithubConnectionAuditEntry): Promise<void> {
-    return this.#auditLog.record(entry);
+  async recordAudit(entry: GithubConnectionAuditEntry): Promise<void> {
+    await this.#auditLog.record(entry);
   }
   async backfillPullRequestMappings(input: { organizationId: string }): Promise<void> {
     await this.#codingAgents.backfillPullRequestMappings(input);

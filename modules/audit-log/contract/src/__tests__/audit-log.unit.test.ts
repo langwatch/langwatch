@@ -23,11 +23,11 @@ describe("recordAuditLogCommandSchema", () => {
   /** @scenario "Non-portable audit metadata is rejected" */
   it("rejects non-portable metadata", () => {
     expect(
-      recordAuditLogCommandSchema.safeParse({
+      recordAuditLogCommandSchema.validate({
         userId: "user_1",
         action: "project.update",
         metadata: { callback: () => undefined },
-      }).success,
+      }),
     ).toBe(false);
   });
 });

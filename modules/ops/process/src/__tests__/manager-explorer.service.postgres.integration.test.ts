@@ -9,6 +9,7 @@ import type {
   AuditLogApi,
   AuditLogHistoryEntry,
   RecordAuditLogCommand,
+  RecordedAuditLogEntry,
 } from "@langwatch/audit-log-contract";
 import { PrismaProcessStore } from "@langwatch/eventing/server";
 import { createLogger } from "@langwatch/observability";
@@ -39,7 +40,16 @@ class PrismaAuditLogTestSink implements AuditLogApi {
 
   private constructor(private readonly prisma: PrismaClient) {}
 
-  async record(command: RecordAuditLogCommand): Promise<void> {
+  async record(command: RecordAuditLogCommand): Promise<RecordedAuditLogEntry> {
+    await this.write(command);
+    return { id: "audit", occurredAt: 0 };
+  }
+
+  async hasRecordedSince(): Promise<boolean> {
+    return false;
+  }
+
+  private async write(command: RecordAuditLogCommand): Promise<void> {
     await this.prisma.auditLog.create({
       data: {
         ...command,

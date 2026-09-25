@@ -54,7 +54,7 @@ async function bytes(stream: AsyncIterable<Uint8Array>): Promise<Buffer> {
 describe("ScenarioRunExportDownloadService", () => {
   /** @scenario "The scenario-runs download is attributed and compressed" */
   it("audits the viewer, streams canonical CSV as gzip, and publishes progress", async () => {
-    const audit = vi.fn<AuditLogApi["record"]>().mockResolvedValue();
+    const audit = vi.fn<AuditLogApi["record"]>().mockResolvedValue({ id: "audit", occurredAt: 0 });
     const publish = vi.fn<PresenceApi["publishProjectEvent"]>().mockResolvedValue();
     const simulations = createApiFixture<SimulationService>({
       countRunsForExport: async () => 1,
@@ -97,7 +97,9 @@ describe("ScenarioRunExportDownloadService", () => {
     const controller = new AbortController();
     controller.abort(new Error("client disconnected"));
     const service = ScenarioRunExportDownloadService.create({
-      auditLog: createApiFixture<AuditLogApi>({ record: async () => {} }),
+      auditLog: createApiFixture<AuditLogApi>({
+        record: async () => ({ id: "audit", occurredAt: 0 }),
+      }),
       exports: ScenarioRunExportService.create(
         createApiFixture<SimulationService>({ countRunsForExport, findRunsForExport }),
       ),
@@ -126,7 +128,9 @@ describe("ScenarioRunExportDownloadService", () => {
       .fn<SimulationService["findRunsForExport"]>()
       .mockReturnValue(firstPage);
     const service = ScenarioRunExportDownloadService.create({
-      auditLog: createApiFixture<AuditLogApi>({ record: async () => {} }),
+      auditLog: createApiFixture<AuditLogApi>({
+        record: async () => ({ id: "audit", occurredAt: 0 }),
+      }),
       exports: ScenarioRunExportService.create(
         createApiFixture<SimulationService>({
           countRunsForExport: async () => 2,

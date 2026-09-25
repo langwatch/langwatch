@@ -5,6 +5,7 @@
 import type { AuthApi } from "@langwatch/auth-contract";
 import { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import type { SsoApi } from "@langwatch/enterprise-sso-contract";
 import {
   isNamedProviderMounted,
   type SignInProviderConfiguration,
@@ -49,10 +50,6 @@ import { SignInRouterShadow } from "../channels/http/http.sign-in-router-shadow.
 import { MemoryBetterAuthSecondaryStorageRepository } from "../repositories/memory/memory.better-auth-secondary-storage.repository.ts";
 import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
 import { RedisBetterAuthSecondaryStorageRepository } from "../repositories/redis/redis.better-auth-secondary-storage.repository.ts";
-import {
-  buildGenericOAuthConfigs,
-  buildSocialProviders,
-} from "../rules/sign-in-providers.rules.ts";
 import { openingSsoProviderConfigs } from "../rules/sso-provider-config.rules.ts";
 import { CredentialSignInPolicyService } from "../services/credential-sign-in-policy.service.ts";
 import { SsoRegisteredIssuersService } from "../services/sso-registered-issuers.service.ts";
@@ -415,6 +412,8 @@ export type BuildBetterAuthOptions = Readonly<{
   authProvider: string | undefined;
   /** Every provider's registration, from which the ones this deployment names mount. */
   signInProviders: SignInProviderConfiguration;
+  /** Enterprise SSO, which shapes those providers for Better Auth (ARCHITECTURE §3.3). */
+  sso: Pick<SsoApi, "getSignInProviderMounts">;
   /** Whether a signed license permits platform single sign-on (ADR-027). */
   licensing: Pick<LicensingApi, "isPlatformSsoLicensed">;
   /** Whether this is the hosted product rather than a self-hosted install. */
@@ -440,11 +439,13 @@ export function createSecondaryStorage(
 }
 
 /**
- * Builds this deployment's Better Auth instance. Built ONCE per process and
- * shared. Calling this twice would produce two instances over one cookie
- * namespace, and the second would be the one that happened to be asked.
+ * Builds this deployment's Better Auth instance on first use, never during
+ * construction, because it asks the SSO peer. Built ONCE per process: a second
+ * instance over one cookie namespace would answer whoever happened to ask it.
  */
-export function buildBetterAuth(options: BuildBetterAuthOptions): BetterAuthTransport {
+export async function buildBetterAuth(
+  options: BuildBetterAuthOptions,
+): Promise<BetterAuthTransport> {
   const { identity, logger, signInRouting } = options;
   const secondaryStorage = createSecondaryStorage(options.redis);
 
@@ -468,6 +469,10 @@ export function buildBetterAuth(options: BuildBetterAuthOptions): BetterAuthTran
     );
   }
 
+  const { socialProviders, genericOAuthConfigs } = await options.sso.getSignInProviderMounts({
+    baseUrl: identity.baseUrl,
+  });
+
   return createBetterAuthTransport({
     auth: options.auth,
     users: options.users,
@@ -490,8 +495,8 @@ export function buildBetterAuth(options: BuildBetterAuthOptions): BetterAuthTran
       trustedIdpOrigins: options.trustedIdpOrigins,
       idpSimulatorUrl: options.idpSimulatorUrl,
       isProduction: options.isProduction,
-      socialProviders: buildSocialProviders(options.signInProviders),
-      genericOAuthConfigs: buildGenericOAuthConfigs(options.signInProviders) ?? [],
+      socialProviders,
+      genericOAuthConfigs,
     },
     federation: ModuleBetterAuthFederation.create({
       authProvider: options.authProvider,

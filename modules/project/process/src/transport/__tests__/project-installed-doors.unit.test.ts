@@ -52,6 +52,7 @@ function recordingAuditLog(recorded: RecordAuditLogCommand[]): AuditLogApi {
   return createApiFixture<AuditLogApi>({
     record: async (command) => {
       recorded.push(command);
+      return { id: "audit", occurredAt: 0 };
     },
   });
 }

@@ -41,6 +41,7 @@ function licensedAt(commitUsdCents: number) {
     auditLog: createApiFixture<ConnectedBillingPeers["auditLog"]>({
       record: async (command) => {
         audited.push(command);
+        return { id: "audit", occurredAt: 0 };
       },
     }),
     organizations: createApiFixture<ConnectedBillingPeers["organizations"]>({

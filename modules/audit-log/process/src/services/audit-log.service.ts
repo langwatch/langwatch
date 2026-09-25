@@ -4,6 +4,8 @@ import {
   type AuditLogJsonValue,
   type ListAuditLogEntityHistoryInput,
   type RecordAuditLogCommand,
+  type RecordedAuditLogEntry,
+  type RecordedSinceInput,
 } from "@langwatch/audit-log-contract";
 
 import type { AuditLogRepository } from "../repositories/audit-log.repository.ts";
@@ -26,9 +28,9 @@ export class AuditLogService {
     return new AuditLogService(repository, maxArgsBytes);
   }
 
-  async record(command: RecordAuditLogCommand): Promise<void> {
+  async record(command: RecordAuditLogCommand): Promise<RecordedAuditLogEntry> {
     const parsed = recordAuditLogCommandSchema.parse(command);
-    await this.repository.create({
+    return this.repository.create({
       ...parsed,
       args:
         parsed.args === undefined
@@ -39,6 +41,10 @@ export class AuditLogService {
 
   listEntityHistory(input: ListAuditLogEntityHistoryInput): Promise<AuditLogHistoryEntry[]> {
     return this.repository.findEntityHistory(input);
+  }
+
+  hasRecordedSince(input: RecordedSinceInput): Promise<boolean> {
+    return this.repository.hasRecordedSince(input);
   }
 
   private static truncateString(value: string, maxLength: number): string {

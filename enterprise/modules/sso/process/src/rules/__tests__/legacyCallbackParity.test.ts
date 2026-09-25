@@ -16,7 +16,7 @@ import { PLAIN_OIDC_PROVIDERS } from "@langwatch/enterprise-sso-contract/sign-in
  */
 import { describe, expect, it } from "vitest";
 
-import * as authProcess from "../../index.ts";
+import * as ssoProcess from "../../index.ts";
 import {
   buildGenericOAuthConfigs,
   LEGACY_CALLBACK_PROVIDER_IDS,
@@ -98,7 +98,7 @@ describe("legacy callback rewrites", () => {
      * mounted by a process is that process's own regression test to write.
      */
     it("ships no callback rewrite of its own, which is what would break the pin", () => {
-      expect(Object.keys(authProcess).filter((name) => /rewrite/i.test(name))).toEqual([]);
+      expect(Object.keys(ssoProcess).filter((name) => /rewrite/i.test(name))).toEqual([]);
     });
   });
 

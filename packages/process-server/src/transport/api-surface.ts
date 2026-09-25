@@ -578,8 +578,8 @@ const aiFailureSchema = z.object({
 
 function restAudit(audit: AuditLogApi): RestAuditSink {
   return {
-    record: (row) =>
-      audit.record({
+    record: async (row) => {
+      await audit.record({
         userId: row.actorId ?? "anonymous",
         action: row.action,
         args: { ...row.params, scope: row.scope },
@@ -588,17 +588,18 @@ function restAudit(audit: AuditLogApi): RestAuditSink {
           typeof row.params.organizationId === "string" ? row.params.organizationId : void 0,
         targetId: row.resultId || void 0,
         error: row.errorCode,
-      }),
+      });
+    },
   };
 }
 
 function trpcAudit(audit: AuditLogApi | undefined): TrpcAuditSink | undefined {
   if (!audit) return void 0;
   return {
-    record: (entry) => {
+    record: async (entry) => {
       let args: unknown;
       if (entry.args !== void 0) args = JSON.parse(JSON.stringify(entry.args));
-      return audit.record(
+      await audit.record(
         recordAuditLogCommandSchema.parse({
           userId: entry.userId,
           action: entry.action,

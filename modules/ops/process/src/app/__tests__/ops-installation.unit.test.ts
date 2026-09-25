@@ -95,7 +95,9 @@ function process(role: "api" | "worker", redisCommands: unknown[][] = []) {
       auth: createApiFixture<AuthApi>(),
       identity: createApiFixture<IdentityApi>(),
       project: createApiFixture<ProjectApi>({ searchByQuery: async () => [] }),
-      "audit-log": createApiFixture<AuditLogApi>({ record: async () => {} }),
+      "audit-log": createApiFixture<AuditLogApi>({
+        record: async () => ({ id: "audit", occurredAt: 0 }),
+      }),
       "api-key": createApiFixture<ApiKeyApi>({ findResolvedToken: async () => null }),
       "feature-flag": createApiFixture<FeatureFlagApi>(),
       organization: createApiFixture<OrganizationApi>(),

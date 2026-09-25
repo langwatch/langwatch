@@ -66,7 +66,7 @@ function runtimePorts(): TrpcRuntimeMembers<TestContext> {
 
 async function harness() {
   const connections = RecordingSsoConnectionLedger.create();
-  const record = vi.fn<AuditLogApi["record"]>(async () => {});
+  const record = vi.fn<AuditLogApi["record"]>(async () => ({ id: "audit", occurredAt: 0 }));
   const app = await createSsoTestApp({
     connections,
     dependencies: {
@@ -74,7 +74,7 @@ async function harness() {
         [STAFF_ID]: SSO_TEST_STAFF_EMAIL,
         [CUSTOMER_ID]: "ana@acme.com",
       }),
-      auditLog: { record, listEntityHistory: async () => [] },
+      auditLog: { record, listEntityHistory: async () => [], hasRecordedSince: async () => false },
     },
   });
 

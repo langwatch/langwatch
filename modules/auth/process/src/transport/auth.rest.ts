@@ -49,12 +49,14 @@ export type AuthRestFederatedLogout = (input: { returnTo: string }) => Promise<s
  */
 export interface AuthDoorApi {
   /** The deployment's ONE Better Auth instance. */
-  betterAuth: () => Readonly<{
-    handler(request: Request): Promise<Response>;
-    api: Readonly<{
-      getSession(input: { headers: Headers }): Promise<{ session: { id: string } } | null>;
-    }>;
-  }>;
+  betterAuth: () => Promise<
+    Readonly<{
+      handler(request: Request): Promise<Response>;
+      api: Readonly<{
+        getSession(input: { headers: Headers }): Promise<{ session: { id: string } } | null>;
+      }>;
+    }>
+  >;
   /** Ends one browser session. */
   revokeBrowserSession: (input: { sessionId: string }) => Promise<void>;
   /** The session as this process resolves it, for the browser's own poll. */
@@ -205,7 +207,7 @@ async function endSession({
 
       headers.set("cookie", cookies);
 
-      const session = await app.betterAuth().api.getSession({ headers });
+      const session = await (await app.betterAuth()).api.getSession({ headers });
 
       if (session) await app.revokeBrowserSession({ sessionId: session.session.id });
     } catch (error) {
@@ -276,11 +278,13 @@ async function betterAuthHandshake({
     request,
   });
 
+  const betterAuth = await app.betterAuth();
+
   if (bornFinalized) {
-    return app.runWithIdentityBirth(() => app.betterAuth().handler(request));
+    return app.runWithIdentityBirth(() => betterAuth.handler(request));
   }
 
-  return app.betterAuth().handler(request);
+  return betterAuth.handler(request);
 }
 
 /** One `Set-Cookie` per session cookie, in both spellings, all expired. */

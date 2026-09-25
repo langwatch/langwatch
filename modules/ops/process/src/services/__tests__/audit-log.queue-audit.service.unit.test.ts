@@ -2,6 +2,7 @@ import type {
   AuditLogApi,
   AuditLogHistoryEntry,
   RecordAuditLogCommand,
+  RecordedAuditLogEntry,
 } from "@langwatch/audit-log-contract";
 import { describe, expect, it } from "vitest";
 
@@ -12,7 +13,16 @@ import { QueueAuditAdapter } from "../audit-log.queue-audit.service.ts";
 class RecordingAuditLog implements AuditLogApi {
   readonly commands: RecordAuditLogCommand[] = [];
 
-  async record(command: RecordAuditLogCommand): Promise<void> {
+  async record(command: RecordAuditLogCommand): Promise<RecordedAuditLogEntry> {
+    await this.write(command);
+    return { id: "audit", occurredAt: 0 };
+  }
+
+  async hasRecordedSince(): Promise<boolean> {
+    return false;
+  }
+
+  private async write(command: RecordAuditLogCommand): Promise<void> {
     this.commands.push(command);
   }
 

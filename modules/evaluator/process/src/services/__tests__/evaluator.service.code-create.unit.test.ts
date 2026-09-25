@@ -95,7 +95,11 @@ function buildService() {
     repository,
     workflows,
     history: EvaluatorHistoryService.create({
-      auditLog: { record: async () => void 0, listEntityHistory: async () => [] },
+      auditLog: {
+        record: async () => ({ id: "audit", occurredAt: 0 }),
+        listEntityHistory: async () => [],
+        hasRecordedSince: async () => false,
+      },
       users: createApiFixture<UserApi>({ getProfiles: async () => [] }),
     }),
     codeExecution,

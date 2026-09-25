@@ -2,6 +2,7 @@ import {
   AuditLogApi,
   type AuditLogApiContract,
   type AuditLogHistoryEntry,
+  type RecordedAuditLogEntry,
 } from "@langwatch/audit-log-contract";
 
 /** The audit log an installation without the Enterprise feature answers with. */
@@ -15,8 +16,12 @@ export class NullAuditLog implements AuditLogApiContract {
     return new NullAuditLog();
   }
 
-  async record(): Promise<void> {
-    return void 0;
+  async record(): Promise<RecordedAuditLogEntry> {
+    return { id: "", occurredAt: 0 };
+  }
+
+  async hasRecordedSince(): Promise<boolean> {
+    return false;
   }
 
   async listEntityHistory(): Promise<AuditLogHistoryEntry[]> {

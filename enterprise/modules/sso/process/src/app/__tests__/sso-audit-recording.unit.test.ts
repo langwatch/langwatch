@@ -21,7 +21,7 @@ const CUSTOMER_ID = "user_customer";
 const TARGET = { organizationId: "org_acme", connectionId: "ssoc_1", domain: "acme.com" };
 
 async function harness() {
-  const record = vi.fn<AuditLogApi["record"]>(async () => {});
+  const record = vi.fn<AuditLogApi["record"]>(async () => ({ id: "audit", occurredAt: 0 }));
   const connections = RecordingSsoConnectionLedger.create();
   const app = await createSsoTestApp({
     dependencies: {

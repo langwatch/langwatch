@@ -98,7 +98,9 @@ export function createOpsTestApp(options: OpsTestAppOptions = {}): OpsTestApp {
       auth: createApiFixture<AuthApi>(),
       identity: createApiFixture<IdentityApi>(),
       projects: options.projects ?? createApiFixture<ProjectApi>({ searchByQuery: async () => [] }),
-      auditLog: options.auditLog ?? createApiFixture<AuditLogApi>({ record: async () => {} }),
+      auditLog:
+        options.auditLog ??
+        createApiFixture<AuditLogApi>({ record: async () => ({ id: "audit", occurredAt: 0 }) }),
       apiKeys:
         options.apiKeys ?? createApiFixture<ApiKeyApi>({ findResolvedToken: async () => null }),
       featureFlags: options.featureFlags ?? createApiFixture<FeatureFlagApi>(),

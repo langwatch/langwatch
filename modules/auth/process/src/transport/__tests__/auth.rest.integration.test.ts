@@ -29,7 +29,7 @@ function authWorld(overrides: Partial<AuthDoorApi> = {}) {
     async () => {},
   );
   const door: AuthDoorApi = {
-    betterAuth: () => ({ handler, api: { getSession } }),
+    betterAuth: async () => ({ handler, api: { getSession } }),
     revokeBrowserSession,
     resolveSession: async () => ({ kind: "signed_in", session: SIGNED_IN }),
     findProjectSlugByToken: async () => null,

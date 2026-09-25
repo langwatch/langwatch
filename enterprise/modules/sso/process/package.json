@@ -18,7 +18,8 @@
   },
   "scripts": {
     "typecheck": "tsc -b",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
@@ -32,6 +33,7 @@
     "@langwatch/secrets": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@trpc/server": "catalog:",
+    "better-auth": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

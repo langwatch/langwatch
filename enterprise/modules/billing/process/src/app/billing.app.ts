@@ -548,7 +548,7 @@ export class BillingApp implements BillingApi {
     });
   }
 
-  #record({
+  async #record({
     staff,
     action,
     args,
@@ -559,7 +559,7 @@ export class BillingApp implements BillingApi {
     args: RecordAuditLogCommand["args"];
     organizationId: string;
   }): Promise<void> {
-    return this.#auditLog.record({
+    await this.#auditLog.record({
       userId: staff.id,
       action,
       args,

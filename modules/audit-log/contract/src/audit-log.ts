@@ -24,6 +24,18 @@ export const auditLogEntrySchema = z.object({
 
 export type AuditLogEntry = z.infer<typeof auditLogEntrySchema>;
 
+/** The row a write created; `occurredAt` is epoch milliseconds. */
+export type RecordedAuditLogEntry = { id: string; occurredAt: number };
+
+/** Main's workspace-view dedup: one actor's action on one target since a moment. */
+export type RecordedSinceInput = {
+  userId: string;
+  action: string;
+  targetKind: string;
+  targetId: string;
+  sinceMs: number;
+};
+
 export const auditLogHistoryEntrySchema = z.object({
   id: z.string(),
   userId: z.string().nullable(),

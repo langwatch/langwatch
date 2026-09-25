@@ -120,7 +120,11 @@ async function harness(
     legacyRoute: null,
     migration: null,
   };
-  const auditLog = { record: vi.fn(async () => {}), listEntityHistory: vi.fn() };
+  const auditLog = {
+    record: vi.fn(async () => ({ id: "audit", occurredAt: 0 })),
+    listEntityHistory: vi.fn(),
+    hasRecordedSince: vi.fn(async () => false),
+  };
   const app = await createSsoTestApp({
     connections,
     dependencies: {

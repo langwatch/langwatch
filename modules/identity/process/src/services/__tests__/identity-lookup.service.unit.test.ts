@@ -1,4 +1,8 @@
-import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
+import type {
+  AuditLogApi,
+  RecordAuditLogCommand,
+  RecordedAuditLogEntry,
+} from "@langwatch/audit-log-contract";
 import { normalizeIdentifierValue } from "@langwatch/identity-contract";
 import type { RateLimiter } from "@langwatch/process-stores";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -22,7 +26,16 @@ class FakeAuditLog implements AuditLogApi {
   readonly rows: RecordAuditLogCommand[] = [];
   constructor(private readonly reads: MemoryIdentityLookupRepository) {}
 
-  async record(command: RecordAuditLogCommand): Promise<void> {
+  async record(command: RecordAuditLogCommand): Promise<RecordedAuditLogEntry> {
+    await this.write(command);
+    return { id: "audit", occurredAt: 0 };
+  }
+
+  async hasRecordedSince(): Promise<boolean> {
+    return false;
+  }
+
+  private async write(command: RecordAuditLogCommand): Promise<void> {
     this.rows.unshift(command);
     this.reads.record({
       auditId: `audit_${this.rows.length}`,

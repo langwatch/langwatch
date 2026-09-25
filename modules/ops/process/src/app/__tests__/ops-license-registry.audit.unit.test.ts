@@ -66,6 +66,7 @@ function build(registry: Partial<Registry> = {}) {
     auditLog: createApiFixture<AuditLogApi>({
       record: async (entry) => {
         entries.push(entry);
+        return { id: "audit", occurredAt: 0 };
       },
     }),
     members: {

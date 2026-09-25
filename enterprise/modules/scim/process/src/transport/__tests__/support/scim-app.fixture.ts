@@ -108,7 +108,7 @@ export function scimTestApp(
   const auditLog: Pick<AuditLogApi, "record"> = {
     record: (entry) => {
       audited.push(entry);
-      return Promise.resolve();
+      return Promise.resolve({ id: "audit", occurredAt: 0 });
     },
   };
   const connections = ScimConnectionsService.create(identity);

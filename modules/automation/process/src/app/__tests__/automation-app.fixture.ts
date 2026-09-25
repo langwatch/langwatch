@@ -198,8 +198,9 @@ export function createCanonicalAutomationApp(): {
   const resources = new ResourceScope();
   resources.own("automation-test-database", () => database.$disconnect());
   const auditLog: AuditLogApi = {
-    record: vi.fn(async () => undefined),
+    record: vi.fn(async () => ({ id: "audit", occurredAt: 0 })),
     listEntityHistory: vi.fn(async () => []),
+    hasRecordedSince: vi.fn(async () => false),
   };
   return {
     app: AutomationApp.fromInfrastructure({

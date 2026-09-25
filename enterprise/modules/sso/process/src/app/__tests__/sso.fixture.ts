@@ -103,7 +103,7 @@ export function createSsoTestUsers(profiles: Record<string, string | null> = {})
 }
 
 export function createSsoTestAuditLog(): AuditLogApi {
-  return createApiFixture<AuditLogApi>({ record: async () => {} });
+  return createApiFixture<AuditLogApi>({ record: async () => ({ id: "audit", occurredAt: 0 }) });
 }
 
 /**

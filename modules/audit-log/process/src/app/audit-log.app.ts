@@ -6,6 +6,8 @@ import {
   type ListAuditLogEntityHistoryInput,
   type RecentItem,
   type RecordAuditLogCommand,
+  type RecordedAuditLogEntry,
+  type RecordedSinceInput,
 } from "@langwatch/audit-log-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
@@ -71,8 +73,12 @@ export class AuditLogApp implements AuditLogApiContract, AuditLogHomeApi {
     });
   }
 
-  record(command: RecordAuditLogCommand): Promise<void> {
+  record(command: RecordAuditLogCommand): Promise<RecordedAuditLogEntry> {
     return this.#entries.record(command);
+  }
+
+  hasRecordedSince(input: RecordedSinceInput): Promise<boolean> {
+    return this.#entries.hasRecordedSince(input);
   }
 
   listEntityHistory(input: ListAuditLogEntityHistoryInput): Promise<AuditLogHistoryEntry[]> {

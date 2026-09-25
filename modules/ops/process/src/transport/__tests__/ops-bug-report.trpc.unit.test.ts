@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * The `bugReports.*` surface: the staff gate, the audit row written before
@@ -7,7 +8,6 @@
 import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { OpsOperator } from "@langwatch/ops-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -26,7 +26,7 @@ const IMPERSONATING: OpsOperator = {
 };
 
 function harness() {
-  const record = vi.fn<AuditLogApi["record"]>(async () => {});
+  const record = vi.fn<AuditLogApi["record"]>(async () => ({ id: "audit", occurredAt: 0 }));
   const { app, repositories } = createOpsTestApp({
     auditLog: createApiFixture<AuditLogApi>({ record }),
   });
@@ -146,6 +146,7 @@ describe("the bugReports tRPC namespace", () => {
       const { staffCaller, record, reports } = harness();
       record.mockImplementation(async () => {
         order.push("audit");
+        return { id: "audit", occurredAt: 0 };
       });
       const findAll = reports.findAll.bind(reports);
       vi.spyOn(reports, "findAll").mockImplementation(async (input) => {
