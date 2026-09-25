@@ -242,7 +242,7 @@ describe("userRouter.register()", () => {
     });
   });
 
-  describe("given a named email provider that cannot be used", () => {
+  describe("when the named email provider cannot be used", () => {
     /** @scenario "A misconfigured email provider keeps sign-up on the mailed link" */
     it("refuses an unconfirmed proof without spending it", async () => {
       hasEmailProviderMock.mockReturnValue(false);
