@@ -10,8 +10,12 @@ import {
   projectRestFacts,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
-import { HandledError, NotFoundError, ValidationError } from "@langwatch/handled-error";
-import type { WorkflowApi, WorkflowEvaluationStarted } from "@langwatch/workflow-contract";
+import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import {
+  WorkflowVersionRequiredError,
+  type WorkflowApi,
+  type WorkflowEvaluationStarted,
+} from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { createWorkflowRest, workflowEvaluationRunCeiling } from "../workflow.rest.ts";
@@ -221,21 +225,20 @@ describe("POST /api/workflows/:id/evaluate", () => {
 
   describe("given the workflow has no committed version", () => {
     /** @scenario A workflow with no committed version cannot be evaluated */
-    it("returns 400 explaining a version must be committed first", async () => {
+    it("answers main's 400 with the refusal's own sentence", async () => {
+      const refusal = new WorkflowVersionRequiredError();
       const response = await post(
         buildApi({
           triggerEvaluation: vi.fn<() => never>(() => {
-            throw new ValidationError("A version must be committed before it can be evaluated");
+            throw refusal;
           }),
         }),
         "workflow_1",
       );
 
-      expect(response.status).toBe(422);
-
-      const body = (await response.json()) as Record<string, unknown>;
-
-      expect(body.error).toMatch(/version/i);
+      expect(refusal.code).toBe("workflow_version_required");
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: refusal.message });
     });
   });
 });

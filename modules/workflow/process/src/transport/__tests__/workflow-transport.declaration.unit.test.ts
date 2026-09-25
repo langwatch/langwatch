@@ -156,7 +156,7 @@ describe("the workflow module's transport declarations", () => {
 
     it("keeps the studio editor's two doors, answering their own refusals", () => {
       expect(routesOf(workflowStudioRest)).toEqual([
-        ["POST", "/api/workflows/code-completion", "completeWorkflowCode", "public"],
+        ["POST", "/api/workflows/code-completion", "completeWorkflowCode", "authenticated"],
         ["POST", "/api/workflows/post_event", "postWorkflowStudioEvent", "public"],
       ]);
       expect(workflowStudioRest.router().credential).toBe("browser");

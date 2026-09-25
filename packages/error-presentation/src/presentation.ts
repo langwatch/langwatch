@@ -574,6 +574,10 @@ const presentations = {
     title: "That version is gone",
     describe: () => "Reload to see this workflow's current versions.",
   },
+  workflow_version_required: {
+    title: "This workflow has no saved version yet",
+    describe: () => "Save a version of the workflow first, then try again.",
+  },
   workflow_not_found: {
     title: "Workflow not found",
     describe: () => "It may have been deleted. Reload to see the current list.",

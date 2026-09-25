@@ -90,12 +90,12 @@ export function rulesToUI(rules: FeatureFlagRules): UIRule[] {
         otherConditions: without({ match: rule.match, key: "organizationCreatedAfter" }),
       };
     }
-    if (rule.match.percentage !== undefined) {
+    if (rule.match.percentageRollout !== undefined) {
       return {
         ...base,
         scopeKind: "PERCENTAGE" as const,
-        target: String(rule.match.percentage),
-        otherConditions: without({ match: rule.match, key: "percentage" }),
+        target: String(rule.match.percentageRollout),
+        otherConditions: without({ match: rule.match, key: "percentageRollout" }),
       };
     }
     if (rule.match.emailDomain !== undefined) {
@@ -127,7 +127,7 @@ export function uiToRules(rules: UIRule[]): FeatureFlagRules {
       return { match: { ...rest, organizationCreatedAfter: target }, enabled: rule.enabled };
     }
     if (rule.scopeKind === "PERCENTAGE") {
-      return { match: { ...rest, percentage: Number(target) }, enabled: rule.enabled };
+      return { match: { ...rest, percentageRollout: Number(target) }, enabled: rule.enabled };
     }
     if (rule.scopeKind === "EMAIL_DOMAIN") {
       return {

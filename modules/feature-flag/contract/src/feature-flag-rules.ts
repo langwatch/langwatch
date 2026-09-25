@@ -12,7 +12,7 @@ const KNOWN_MATCH_KEYS = [
   "projectId",
   "organizationId",
   "organizationCreatedAfter",
-  "percentage",
+  "percentageRollout",
   "emailDomain",
 ] as const;
 type KnownMatchKey = (typeof KNOWN_MATCH_KEYS)[number];
@@ -31,12 +31,7 @@ const featureFlagRuleMatchSchema = z
      * with the other conditions rather than replacing them, so "20% of this
      * organization" is one rule.
      */
-    percentage: z
-      .number()
-      .int()
-      .min(0, "A rollout percentage must be between 0 and 100")
-      .max(100, "A rollout percentage must be between 0 and 100")
-      .optional(),
+    percentageRollout: z.number().optional(),
     /**
      * Team QA in production: matches every signed-in user whose email is at
      * one of these lowercase domains (no `@`), compared exactly against the
@@ -83,6 +78,19 @@ export const featureFlagRulesWriteSchema = featureFlagRulesSchema
       ),
     {
       message: "A new-users targeting rule needs a date the organization was created on or after",
+    },
+  )
+  .refine(
+    (rules) =>
+      rules.every(
+        (rule) =>
+          rule.match.percentageRollout === undefined ||
+          (Number.isFinite(rule.match.percentageRollout) &&
+            rule.match.percentageRollout >= 0 &&
+            rule.match.percentageRollout <= 100),
+      ),
+    {
+      message: "A percentage rollout rule needs a percentage between 0 and 100",
     },
   )
   .refine(
@@ -234,11 +242,11 @@ function matchesContext(
     return false;
   }
   if (
-    match.percentage !== undefined &&
+    match.percentageRollout !== undefined &&
     !isWithinRolloutPercentage({
       flagKey,
       subject: ctx.bucketingId,
-      percentage: match.percentage,
+      percentage: match.percentageRollout,
     })
   ) {
     return false;

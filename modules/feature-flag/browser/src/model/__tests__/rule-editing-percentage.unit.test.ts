@@ -1,6 +1,6 @@
 /**
  * The percentage-of-users scope in the targeting rules dialog: a stored
- * `percentage` opens as that scope with its number, saving writes it
+ * `percentageRollout` opens as that scope with its number, saving writes it
  * back unchanged.
  * @see specs/features/onboarding/guided-onboarding-variant.feature
  */
@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { findUnfillableRule, rulesToUI, uiToRules } from "../rule-editing.ts";
 
 describe("given a stored rule enabling the flag for a quarter of the users", () => {
-  const stored = [{ match: { percentage: 25 }, enabled: true }];
+  const stored = [{ match: { percentageRollout: 25 }, enabled: true }];
 
   describe("when the rule is opened in the targeting rules dialog", () => {
     /** @scenario "the ops page reads and writes a percentage rollout rule" */
@@ -43,17 +43,17 @@ describe("given a stored rule enabling the flag for a quarter of the users", () 
   describe("when the stored rule also names an organization", () => {
     it("keeps the organization as the scope and carries the percentage along", () => {
       const ui = rulesToUI([
-        { match: { organizationId: "organization_acme", percentage: 25 }, enabled: true },
+        { match: { organizationId: "organization_acme", percentageRollout: 25 }, enabled: true },
       ]);
 
       expect(ui[0]).toMatchObject({
         scopeKind: "ORGANIZATION",
         target: "organization_acme",
-        otherConditions: { percentage: 25 },
+        otherConditions: { percentageRollout: 25 },
       });
       expect(uiToRules(ui)[0]?.match).toEqual({
         organizationId: "organization_acme",
-        percentage: 25,
+        percentageRollout: 25,
       });
     });
   });

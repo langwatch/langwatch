@@ -275,6 +275,23 @@ describe("SavedWorkbenchChartService", () => {
       });
     });
 
+    describe("when the definition is missing", () => {
+      /** @scenario "A saved chart posted without a definition is refused by the service" */
+      it("refuses it before the policy or the repository runs", async () => {
+        const { service, validated } = build();
+
+        await expect(
+          service.create({
+            projectId: "project-1",
+            protections: PROTECTIONS,
+            name: "Spend",
+            definition: undefined,
+          }),
+        ).rejects.toMatchObject({ code: "validation_error" });
+        expect(validated).toHaveLength(0);
+      });
+    });
+
     describe("when the definition is not the shape a saved chart has", () => {
       it("refuses it before the policy is troubled", async () => {
         const { service, validated } = build();

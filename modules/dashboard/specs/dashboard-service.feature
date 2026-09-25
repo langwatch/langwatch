@@ -33,6 +33,12 @@ Feature: Shared Dashboard service
     Then the policy validates its definition before the repository writes it
 
   @unit
+  Scenario: A saved chart posted without a definition is refused by the service
+    Given the saved chart REST body documents the definition as optional, as main published it
+    When a saved workbench chart is created without a definition
+    Then the service refuses it as a validation error before the policy or repository runs
+
+  @unit
   Scenario: Compatibility transports share one service instance
     When tRPC, REST, or RPC handles a Dashboard operation
     Then it reads DashboardService from process application context

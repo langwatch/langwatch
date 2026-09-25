@@ -78,13 +78,11 @@ describe("deriveRuleOutcome", () => {
   describe("when a rule carries an unknown match key (forward-compat)", () => {
     /** @scenario "A rule condition the reader does not understand matches nobody" */
     it("fails closed so a newer writer's condition doesn't silently match everyone", () => {
-      // A future writer ships { match: { percentageRollout: 10 }, enabled: true }.
-      // An older reader doesn't know about percentageRollout — without
+      // A future writer ships { match: { country: "NL" }, enabled: true }.
+      // An older reader doesn't know about country — without
       // the fail-closed guard this would degenerate to an empty match
       // and turn into a global on-switch.
-      const rules = featureFlagRulesSchema.parse([
-        { match: { percentageRollout: 10 }, enabled: true },
-      ]);
+      const rules = featureFlagRulesSchema.parse([{ match: { country: "NL" }, enabled: true }]);
       expect(
         deriveRuleOutcome(
           rules,
@@ -104,7 +102,7 @@ describe("a percentage rule", () => {
     /** @scenario "a percentage outside 0 to 100 cannot be written" */
     it("is rejected with a message naming the valid range, and both ends are accepted", () => {
       const rule = (percentage: number): FeatureFlagRules => [
-        { match: { percentage }, enabled: true },
+        { match: { percentageRollout: percentage }, enabled: true },
       ];
       const result = featureFlagRulesWriteSchema.safeParse(rule(150));
 
@@ -119,7 +117,7 @@ describe("a percentage rule", () => {
   describe("when it is combined with an organization and another organization's user is read", () => {
     it("does not match, because every condition of a match must hold", () => {
       const rules: FeatureFlagRules = [
-        { match: { organizationId: "org_acme", percentage: 100 }, enabled: true },
+        { match: { organizationId: "org_acme", percentageRollout: 100 }, enabled: true },
       ];
 
       expect(
@@ -133,7 +131,7 @@ describe("a percentage rule", () => {
 
   describe("when the flag is read without a flag key to salt the bucket", () => {
     it("matches nothing rather than bucketing every flag the same way", () => {
-      const rules: FeatureFlagRules = [{ match: { percentage: 100 }, enabled: true }];
+      const rules: FeatureFlagRules = [{ match: { percentageRollout: 100 }, enabled: true }];
 
       expect(deriveRuleOutcome(rules, { bucketingId: "user_1" })).toBeNull();
     });

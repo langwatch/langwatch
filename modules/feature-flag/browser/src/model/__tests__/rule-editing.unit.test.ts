@@ -26,12 +26,12 @@ function uiRule(id: string, patch: Partial<UIRule> = {}): UIRule {
 describe("operator feature-flag rule conversion", () => {
   it("round-trips percentages, tenant conditions, and unknown future conditions", () => {
     const rules = featureFlagRulesSchema.parse([
-      { match: { organizationId: "organization_1", percentage: 25 }, enabled: true },
+      { match: { organizationId: "organization_1", percentageRollout: 25 }, enabled: true },
       {
         match: {
           projectId: "project_1",
           organizationId: "organization_1",
-          percentage: 60,
+          percentageRollout: 60,
           futureCondition: "preserved",
         },
         enabled: false,

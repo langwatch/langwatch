@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import {
+  createSavedWorkbenchChartSchema,
   dashboardCreateInputSchema,
   graphLayoutSchema,
   savedWorkbenchChartDefinitionSchema,
@@ -9,9 +11,7 @@ import {
 
 describe("dashboard contract", () => {
   it("bounds dashboard names at the contract boundary", () => {
-    expect(dashboardCreateInputSchema.safeParse({ projectId: "project_1", name: "" }).success).toBe(
-      false,
-    );
+    expect(dashboardCreateInputSchema.validate({ projectId: "project_1", name: "" })).toBe(false);
     expect(dashboardCreateInputSchema.parse({ projectId: "project_1", name: "Reports" })).toEqual({
       projectId: "project_1",
       name: "Reports",
@@ -20,23 +20,23 @@ describe("dashboard contract", () => {
 
   it("keeps graph layout values integer and within the persisted grid", () => {
     expect(
-      graphLayoutSchema.safeParse({
+      graphLayoutSchema.validate({
         gridColumn: 2,
         gridRow: 0,
         colSpan: 1,
         rowSpan: 1,
-      }).success,
+      }),
     ).toBe(false);
   });
 
   it("requires the versioned saved-workbench definition shape", () => {
     expect(
-      savedWorkbenchChartDefinitionSchema.safeParse({
+      savedWorkbenchChartDefinitionSchema.validate({
         version: 1,
         sql: "SELECT 1",
-      }).success,
+      }),
     ).toBe(true);
-    expect(savedWorkbenchChartDefinitionSchema.safeParse({ sql: "SELECT 1" }).success).toBe(false);
+    expect(savedWorkbenchChartDefinitionSchema.validate({ sql: "SELECT 1" })).toBe(false);
   });
 
   /** @scenario "A saved definition carries the query, its parameter values and its specification" */
@@ -91,11 +91,11 @@ describe("dashboard contract", () => {
       savedWorkbenchChartDefinitionSchema.parse({ version: 1, sql: "SELECT 1" }).parameters,
     ).toEqual({});
     expect(
-      savedWorkbenchChartDefinitionSchema.safeParse({
+      savedWorkbenchChartDefinitionSchema.validate({
         version: 1,
         sql: "SELECT 1",
         parameters: { unsupported: ["array"] },
-      }).success,
+      }),
     ).toBe(false);
   });
 
@@ -103,25 +103,25 @@ describe("dashboard contract", () => {
   /** @scenario "A definition larger than the stored ceilings is refused" */
   it("refuses definitions outside the persisted SQL and parameter ceilings", () => {
     expect(
-      savedWorkbenchChartDefinitionSchema.safeParse({
+      savedWorkbenchChartDefinitionSchema.validate({
         version: 1,
         sql: "x".repeat(50_001),
-      }).success,
+      }),
     ).toBe(false);
     expect(
-      savedWorkbenchChartDefinitionSchema.safeParse({
+      savedWorkbenchChartDefinitionSchema.validate({
         version: 2,
         sql: "SELECT 1",
-      }).success,
+      }),
     ).toBe(false);
     expect(
-      savedWorkbenchChartDefinitionSchema.safeParse({
+      savedWorkbenchChartDefinitionSchema.validate({
         version: 1,
         sql: "SELECT 1",
         parameters: Object.fromEntries(
           Array.from({ length: 65 }, (_, index) => [`parameter_${index}`, index]),
         ),
-      }).success,
+      }),
     ).toBe(false);
   });
 
@@ -169,18 +169,18 @@ describe("dashboard contract", () => {
       }),
     );
     expect(
-      savedWorkbenchChartDefinitionSchema.safeParse({
+      savedWorkbenchChartDefinitionSchema.validate({
         version: 1,
         sql: "SELECT 1",
         parameters: { value: Number.POSITIVE_INFINITY },
-      }).success,
+      }),
     ).toBe(false);
   });
 
   /** @scenario "Placing a chart requires a dashboard id and accepts an optional grid position" */
   it("requires a dashboard on a placement and leaves the grid position optional", () => {
-    expect(savedWorkbenchChartPlacementSchema.safeParse({ gridRow: 2 }).success).toBe(false);
-    expect(savedWorkbenchChartPlacementSchema.safeParse({ dashboardId: "" }).success).toBe(false);
+    expect(savedWorkbenchChartPlacementSchema.validate({ gridRow: 2 })).toBe(false);
+    expect(savedWorkbenchChartPlacementSchema.validate({ dashboardId: "" })).toBe(false);
     expect(savedWorkbenchChartPlacementSchema.parse({ dashboardId: "dashboard_1" })).toEqual({
       dashboardId: "dashboard_1",
     });
@@ -188,11 +188,11 @@ describe("dashboard contract", () => {
 
   it("keeps saved-chart placement inside the two-column persisted grid", () => {
     expect(
-      savedWorkbenchChartPlacementSchema.safeParse({
+      savedWorkbenchChartPlacementSchema.validate({
         dashboardId: "dashboard_1",
         gridColumn: 1,
         colSpan: 2,
-      }).success,
+      }),
     ).toBe(false);
     expect(
       savedWorkbenchChartPlacementSchema.parse({
@@ -203,5 +203,12 @@ describe("dashboard contract", () => {
         rowSpan: 1,
       }),
     ).toMatchObject({ dashboardId: "dashboard_1", gridRow: 2 });
+  });
+
+  /** @scenario "A saved chart posted without a definition is refused by the service" */
+  it("documents a saved chart's definition as optional, as main published it", () => {
+    expect(z.toJSONSchema(createSavedWorkbenchChartSchema, { io: "input" }).required).toEqual([
+      "name",
+    ]);
   });
 });

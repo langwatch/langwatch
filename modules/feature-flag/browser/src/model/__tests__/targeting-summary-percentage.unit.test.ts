@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { summarizeTargeting, targetingLabel } from "../targeting-summary.ts";
 
 describe("given a rule enabling the flag for half the users", () => {
-  const rules = [{ match: { percentage: 50 }, enabled: true }];
+  const rules = [{ match: { percentageRollout: 50 }, enabled: true }];
 
   describe("when the summary is rendered", () => {
     it("names the share", () => {
@@ -24,7 +24,7 @@ describe("given a rule enabling the flag for half the users", () => {
 describe("given a percentage rule that disables the flag", () => {
   describe("when the summary is rendered", () => {
     it("names no share, because the rule switches no one on", () => {
-      const summary = summarizeTargeting([{ match: { percentage: 50 }, enabled: false }]);
+      const summary = summarizeTargeting([{ match: { percentageRollout: 50 }, enabled: false }]);
 
       expect(summary.enabledPercentage).toBeNull();
       expect(targetingLabel(summary)).toBeNull();
@@ -36,7 +36,7 @@ describe("given a percentage rule scoped to one organization", () => {
   describe("when the summary is rendered", () => {
     it("counts the organization and not the share", () => {
       const summary = summarizeTargeting([
-        { match: { organizationId: "organization_acme", percentage: 50 }, enabled: true },
+        { match: { organizationId: "organization_acme", percentageRollout: 50 }, enabled: true },
       ]);
 
       expect(summary.enabledPercentage).toBeNull();

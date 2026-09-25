@@ -65,7 +65,7 @@ describe("given a domain rule next to a percentage rule", () => {
     it("names both, in the order the label lists them", () => {
       const summary = summarizeTargeting([
         { match: { emailDomain: "acme.com" }, enabled: true },
-        { match: { percentage: 50 }, enabled: true },
+        { match: { percentageRollout: 50 }, enabled: true },
       ]);
 
       expect(targetingLabel(summary)).toBe("Enabled for 50% of users, users at acme.com");

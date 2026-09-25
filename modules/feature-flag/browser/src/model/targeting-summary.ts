@@ -109,7 +109,7 @@ export function targetingLabel(summary: TargetingSummary): string | null {
  */
 function enabledPercentage(rules: FeatureFlagRules): number | null {
   for (const rule of rules) {
-    const percentage = rule.match.percentage;
+    const percentage = rule.match.percentageRollout;
     if (percentage === undefined || Object.keys(rule.match).length > 1) continue;
     return rule.enabled ? percentage : null;
   }

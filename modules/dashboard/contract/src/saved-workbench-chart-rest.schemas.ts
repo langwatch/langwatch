@@ -38,9 +38,10 @@ export const placeSavedWorkbenchChartSchema = z.object({
   rowSpan: z.number().int().optional(),
 });
 
+/** Optional on the wire as main published it; the service refuses a missing definition. */
 export const createSavedWorkbenchChartSchema = z.object({
   name: chartNameInputSchema,
-  definition: chartDefinitionInputSchema,
+  definition: chartDefinitionInputSchema.optional(),
 });
 
 export const updateSavedWorkbenchChartSchema = z

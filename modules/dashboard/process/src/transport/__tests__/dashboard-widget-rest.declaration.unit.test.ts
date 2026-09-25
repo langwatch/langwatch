@@ -78,9 +78,7 @@ describe("given the dashboard widget REST family", () => {
         (route) => route.operation === "postApiV1ProjectsByProjectIdAnalyticsDashboardWidgets",
       );
 
-      expect(create?.input?.safeParse({ name: "widget", code: "x", queries: [] }).success).toBe(
-        true,
-      );
+      expect(create?.input?.validate({ name: "widget", code: "x", queries: [] })).toBe(true);
     });
   });
 });

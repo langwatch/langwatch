@@ -30,7 +30,7 @@ describe("the guided onboarding flag", () => {
         const { service } = buildService();
         await service.setRules({
           key: FLAG,
-          rules: [{ match: { percentage: 50 }, enabled: true }],
+          rules: [{ match: { percentageRollout: 50 }, enabled: true }],
           lastEditedBy: "operator-1",
         });
         const users = Array.from({ length: 20 }, (_, index) => `user_${index}`);
@@ -73,7 +73,7 @@ describe("the guided onboarding flag", () => {
         });
         await service.setRules({
           key: FLAG,
-          rules: [{ match: { percentage: 0 }, enabled: true }],
+          rules: [{ match: { percentageRollout: 0 }, enabled: true }],
           lastEditedBy: "operator-1",
         });
 

@@ -42,10 +42,14 @@ export class WorkflowDslValidationError extends Error {
   }
 }
 
-export class WorkflowVersionRequiredError extends Error {
-  readonly code = "workflow_version_required" as const;
+export class WorkflowVersionRequiredError extends HandledError {
+  declare readonly code: "workflow_version_required";
+
   constructor() {
-    super("This workflow has no committed version.");
+    super("workflow_version_required", "This workflow has no committed version.", {
+      httpStatus: 400,
+      fault: "customer",
+    });
     this.name = "WorkflowVersionRequiredError";
   }
 }

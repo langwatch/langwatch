@@ -729,6 +729,7 @@ export const APP_ERROR_CODES = [
   "workflow_not_a_copy",
   "workflow_not_found",
   "workflow_version_not_found",
+  "workflow_version_required",
 ] as const;
 
 export type AppErrorCode = (typeof APP_ERROR_CODES)[number];
