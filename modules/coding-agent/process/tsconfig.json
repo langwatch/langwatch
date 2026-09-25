@@ -82,6 +82,9 @@
       "path": "../../../packages/secrets/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/test-harness/tsconfig.build.json"
+    },
+    {
       "path": "../../trace/process/tsconfig.build.json"
     },
     {

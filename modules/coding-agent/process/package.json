@@ -59,6 +59,7 @@
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/metric-process": "workspace:*",
     "@langwatch/secrets": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
     "@langwatch/trace-process": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@testcontainers/redis": "catalog:",
