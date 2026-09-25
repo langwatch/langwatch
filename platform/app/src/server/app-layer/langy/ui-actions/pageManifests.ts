@@ -4,8 +4,8 @@ import {
   WORKBENCH_ACTIONS,
   type WorkbenchActionDefinition,
 } from "~/experiments-v3/actions/manifest";
-import { DASHBOARD_ACTIONS } from "~/server/analytics/dashboardWidgetRenderActions";
 import { EXPLORER_ACTIONS } from "~/features/traces-v2/actions/manifest";
+import { DASHBOARD_ACTIONS } from "~/server/analytics/dashboardWidgetRenderActions";
 
 /**
  * The server's own registry of every page action an agent may dispatch.

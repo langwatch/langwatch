@@ -381,7 +381,8 @@ export function sanitizeRenderReceipt(
   const markup = isMarkupOverCap
     ? candidate.markup.slice(0, CHART_FRAME_RECEIPT_MAX_MARKUP_CHARS)
     : candidate.markup;
-  const isMarkupTruncated = isMarkupOverCap || candidate.isMarkupTruncated === true;
+  const isMarkupTruncated =
+    isMarkupOverCap || candidate.isMarkupTruncated === true;
 
   const errorText =
     typeof candidate.errorText === "string"

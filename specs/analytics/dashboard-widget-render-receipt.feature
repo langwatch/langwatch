@@ -39,6 +39,13 @@ Feature: A dashboard widget reports what it rendered so the agent can see it
     And a later receipt for the same widget replaces the earlier one
     And the receipt is dropped when the widget's card leaves the grid
 
+  @integration
+  Scenario: The dashboard page clears stale receipts when the frame cannot be rendered
+    Given a widget that has already reported a receipt
+    When the widget's graph definition becomes invalid and its frame can no longer render
+    Then the page clears that widget's stored receipt
+    And the agent is not shown a stale receipt for it
+
   @unit
   Scenario: Langy reads one widget's receipt with its markup
     Given the user has the dashboard open and an agent turn is running
