@@ -131,7 +131,7 @@ export class PrismaUserRepository
     return createdUserSchema.parse(
       await this.transaction(async (transaction) => {
         const user = await transaction.user.create({
-          data: { name: input.name, email: input.email },
+          data: { name: input.name, email: input.email, emailVerified: input.emailVerified },
           select: createdUserSelect,
         });
         const parsed = createdUserSchema.parse(user);
@@ -152,7 +152,7 @@ export class PrismaUserRepository
     return createdUserSchema.parse(
       await this.transaction(async (transaction) => {
         const user = await transaction.user.create({
-          data: { name: null, email: input.email },
+          data: { name: null, email: input.email, emailVerified: input.emailVerified },
           select: createdUserSelect,
         });
         const parsed = createdUserSchema.parse(user);

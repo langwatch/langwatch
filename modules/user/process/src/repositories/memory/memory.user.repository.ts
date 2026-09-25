@@ -90,13 +90,17 @@ export class MemoryUserRepository implements UserRepository {
   }
 
   async create(input: CreateUserInput): Promise<UserProfile> {
-    const row = this.#insertUser({ name: input.name, email: input.email });
+    const row = this.#insertUser({ name: input.name, email: input.email, emailVerified: false });
 
     return userProfileSchema.parse(profileOf(row));
   }
 
   async createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedUser> {
-    const row = this.#insertUser({ name: input.name, email: input.email });
+    const row = this.#insertUser({
+      name: input.name,
+      email: input.email,
+      emailVerified: input.emailVerified,
+    });
     this.#insertCredentialAccount({
       userId: row.id,
       issuer: input.issuer,
@@ -107,7 +111,11 @@ export class MemoryUserRepository implements UserRepository {
   }
 
   async createPasskeyUser(input: CreatePasskeyUserRow): Promise<CreatedUser> {
-    const row = this.#insertUser({ name: null, email: input.email });
+    const row = this.#insertUser({
+      name: null,
+      email: input.email,
+      emailVerified: input.emailVerified,
+    });
     this.#insertCredentialAccount({ userId: row.id, issuer: input.issuer, password: null });
 
     return createdUserSchema.parse({ id: row.id });
@@ -264,13 +272,17 @@ export class MemoryUserRepository implements UserRepository {
       .find((account) => account.provider === CREDENTIAL_PROVIDER);
   }
 
-  #insertUser(input: { name: string | null; email: string }): MemoryUserRow {
+  #insertUser(input: {
+    name: string | null;
+    email: string;
+    emailVerified: boolean;
+  }): MemoryUserRow {
     const stamp = nowInstant();
     const row: MemoryUserRow = {
       id: generate(USER_KSUID_RESOURCE).toString(),
       name: input.name,
       email: input.email,
-      emailVerified: false,
+      emailVerified: input.emailVerified,
       image: null,
       pendingSsoSetup: false,
       createdAt: stamp,

@@ -103,10 +103,11 @@ describe("PrismaUserRepository credential creation", () => {
         email: "ada@example.com",
         passwordHash: "hash",
         issuer: ISSUER,
+        emailVerified: true,
       }),
     ).resolves.toEqual({ id: "user-1" });
     expect(userCreate).toHaveBeenCalledWith({
-      data: { name: "Ada", email: "ada@example.com" },
+      data: { name: "Ada", email: "ada@example.com", emailVerified: true },
       select: { id: true },
     });
     expect(accountCreate).toHaveBeenCalledWith({
@@ -127,6 +128,7 @@ describe("PrismaUserRepository credential creation", () => {
     await repositoryOver(database).createPasskeyUser({
       email: "ada@example.com",
       issuer: ISSUER,
+      emailVerified: true,
     });
 
     expect(accountCreate).toHaveBeenCalledWith({
@@ -149,6 +151,7 @@ describe("PrismaUserRepository credential creation", () => {
           email: "ada@example.com",
           passwordHash: "hash",
           issuer: ISSUER,
+          emailVerified: false,
         }),
       ).resolves.toEqual({ id: "user-1" });
       expect(userCreate.mock.calls[0]?.[0].select).toEqual({ id: true });
@@ -161,6 +164,7 @@ describe("PrismaUserRepository credential creation", () => {
         repositoryOver(database).createPasskeyUser({
           email: "ada@example.com",
           issuer: ISSUER,
+          emailVerified: true,
         }),
       ).resolves.toEqual({ id: "user-1" });
       expect(userCreate.mock.calls[0]?.[0].select).toEqual({ id: true });
@@ -264,6 +268,7 @@ describe("PrismaUserRepository credential creation", () => {
         email: "ada@example.com",
         passwordHash: "hash",
         issuer: ISSUER,
+        emailVerified: true,
       }),
     ).rejects.toBe(failure);
     expect(database.$transaction).toHaveBeenCalledTimes(1);

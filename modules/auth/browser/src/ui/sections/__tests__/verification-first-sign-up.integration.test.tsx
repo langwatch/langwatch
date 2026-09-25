@@ -209,6 +209,22 @@ describe("given the sign-up screen", () => {
       expect(registerMock.mock.calls[0]?.[0]).not.toHaveProperty("name");
     });
 
+    it("sends no second confirmation link, because the proof already confirmed the address", async () => {
+      registerMock.mockResolvedValue({ id: "user_1" });
+      signInMock.mockResolvedValue({});
+
+      const { container } = renderScreen();
+      await screen.findByTestId("signup-identifier");
+
+      await fillPasswordPair(container, "a-good-password");
+      await userEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+      await waitFor(() => {
+        expect(signInMock).toHaveBeenCalled();
+      });
+      expect(sendConfirmationMock).not.toHaveBeenCalled();
+    });
+
     /** @scenario "Mismatched passwords say so" */
     it("says the two passwords differ and creates nothing", async () => {
       renderScreen();
@@ -432,7 +448,8 @@ describe("given the sign-up screen", () => {
       });
     });
 
-    it("carries the typed address into the ceremony", async () => {
+    /** @scenario Signing up with a passkey consumes the verified address proof */
+    it("carries the typed address and its proof into the ceremony", async () => {
       addPasskeyMock.mockResolvedValue({ data: { id: "passkey_1" } });
       await reachCredentialStep();
 
@@ -440,7 +457,9 @@ describe("given the sign-up screen", () => {
 
       await waitFor(() => {
         expect(addPasskeyMock).toHaveBeenCalledWith(
-          expect.objectContaining({ context: "sam@acme.com" }),
+          expect.objectContaining({
+            context: JSON.stringify({ email: "sam@acme.com", addressProof: "proof-1" }),
+          }),
         );
       });
     });

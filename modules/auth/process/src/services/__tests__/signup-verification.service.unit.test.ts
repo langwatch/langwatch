@@ -48,6 +48,13 @@ function makeService({ registered = false }: { registered?: boolean } = {}) {
         issued.splice(index, 1);
         return true;
       },
+      hasExpected: async ({ token, identifier, now }) =>
+        issued.some(
+          (record) =>
+            record.token === token &&
+            record.identifier === identifier &&
+            Temporal.Instant.compare(record.expires, now) > 0,
+        ),
     },
     mailer: {
       sendVerificationLink: async (message) => {
@@ -271,6 +278,28 @@ describe("given the proof a spent link handed to the credential step", () => {
       await expect(
         harness.service.claimAddressProof({ token: "token-2", email: "sam@acme.com" }),
       ).resolves.toBe(true);
+    });
+  });
+
+  describe("when a ceremony checks it before starting", () => {
+    it("answers for its own address and spends nothing", async () => {
+      await expect(
+        harness.service.validateAddressProof({ token: "token-2", email: " Sam@Acme.com " }),
+      ).resolves.toBe(true);
+      await expect(
+        harness.service.validateAddressProof({ token: "token-2", email: "eve@acme.com" }),
+      ).resolves.toBe(false);
+      await expect(
+        harness.service.claimAddressProof({ token: "token-2", email: "sam@acme.com" }),
+      ).resolves.toBe(true);
+    });
+
+    it("refuses a proof that was already spent", async () => {
+      await harness.service.claimAddressProof({ token: "token-2", email: "sam@acme.com" });
+
+      await expect(
+        harness.service.validateAddressProof({ token: "token-2", email: "sam@acme.com" }),
+      ).resolves.toBe(false);
     });
   });
 

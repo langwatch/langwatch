@@ -65,4 +65,22 @@ export class MemorySignUpVerificationTokenRepository implements SignUpVerificati
 
     return true;
   }
+
+  async hasExpected({
+    token,
+    identifier,
+    now,
+  }: {
+    token: string;
+    identifier: string;
+    now: Instant;
+  }): Promise<boolean> {
+    const row = this.memory.verificationTokens.get(token);
+
+    return (
+      row !== undefined &&
+      row.identifier === identifier &&
+      Temporal.Instant.compare(row.expires, now) > 0
+    );
+  }
 }

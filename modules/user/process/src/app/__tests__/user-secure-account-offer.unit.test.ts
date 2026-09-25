@@ -36,6 +36,7 @@ async function offerFor({
     email: "sam@acme.com",
     issuer: "local:credential",
     passwordHash: "hashed",
+    emailVerified: false,
   });
   const [row] = database.usersById([id]);
   if (!row) throw new Error("the user was not stored");

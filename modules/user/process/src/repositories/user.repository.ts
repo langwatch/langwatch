@@ -23,8 +23,15 @@ import type {
  */
 export type UserCredentialIssuer = Readonly<{ issuer: string }>;
 
-export type CreateCredentialUserRow = CreateCredentialUserInput & UserCredentialIssuer;
-export type CreatePasskeyUserRow = CreatePasskeyUserInput & UserCredentialIssuer;
+/** Whether a mailbox proof already confirmed the address, so the account is born confirmed. */
+export type UserAddressConfirmation = Readonly<{ emailVerified: boolean }>;
+
+export type CreateCredentialUserRow = CreateCredentialUserInput &
+  UserCredentialIssuer &
+  UserAddressConfirmation;
+export type CreatePasskeyUserRow = CreatePasskeyUserInput &
+  UserCredentialIssuer &
+  UserAddressConfirmation;
 export type SetFirstUserPasswordRow = SetFirstUserPasswordInput & UserCredentialIssuer;
 
 /** Persistence owned by User. It never crosses the feature boundary. */

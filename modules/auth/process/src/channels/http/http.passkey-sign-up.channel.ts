@@ -5,19 +5,18 @@ import { createLogger } from "@langwatch/observability";
 import type { UserApi } from "@langwatch/user-contract";
 import type { GenericEndpointContext } from "better-auth";
 import { APIError } from "better-auth/api";
+import { z } from "zod";
 
 import type { BetterAuthAnnouncements } from "../better-auth.channel.ts";
 
 /** Everything the passkey ceremony asks of the user directory. */
 export type PasskeySignUpDirectory = Pick<UserApi, "findByEmail" | "createPasskeyUser">;
 
-/**
- * What passkey sign-up needs from sign-up's address confirmation. Named here
- * rather than taken from identity, since the process composing better-auth
- * owns that wiring — a consumer naming the one method it calls needs nothing else.
- */
+/** The mailbox proof a spent confirmation link minted: checked before the ceremony,
+ *  spent after it. */
 export interface SignUpVerification {
-  requestVerification(input: { email: string }): Promise<void>;
+  validateAddressProof(input: { token: string; email: string }): Promise<boolean>;
+  claimAddressProof(input: { token: string; email: string }): Promise<boolean>;
 }
 
 const logger = createLogger("langwatch:better-auth:passkey-signup");
@@ -31,6 +30,15 @@ export const PASSKEY_SIGNUP_EMAIL_TAKEN = "EMAIL_ALREADY_REGISTERED";
 
 /** The code for an address the endpoint will not accept at all. */
 export const PASSKEY_SIGNUP_EMAIL_INVALID = "INVALID_EMAIL";
+
+/** The code for a ceremony whose address proof is missing, spent, expired or another address's. */
+export const PASSKEY_SIGNUP_VERIFICATION_REQUIRED = "VERIFICATION_REQUIRED";
+
+/** What the sign-up screen bakes into the registration challenge. */
+const signUpContextSchema = z.object({
+  email: z.string(),
+  addressProof: z.string().min(1),
+});
 
 /**
  * Account creation WITH passkey. Requires no session and account created only
@@ -55,19 +63,43 @@ function provisionalHandle({
     .slice(0, 32)}`;
 }
 
-/** The address the ceremony was started for, or a refusal. */
-function resolveEmail(context: string | null | undefined): string {
-  const resolvedEmail = normalizeIdentifierValue(context ?? "");
-  // Deliberately shallow: whether the address RECEIVES mail is settled by
-  // the confirmation that follows, not by a regex (ADR-117 §6). An empty
-  // string has no "@" either, so it's refused by the same clause.
+function parseContext(context: string | null | undefined): unknown {
+  try {
+    return JSON.parse(context ?? "");
+  } catch {
+    return null;
+  }
+}
+
+/** The address the ceremony was started for and the proof it carries, or a refusal. */
+function resolveSignUpContext(context: string | null | undefined): {
+  email: string;
+  addressProof: string;
+} {
+  const carried = signUpContextSchema.safeParse(parseContext(context));
+  const resolvedEmail = carried.success ? normalizeIdentifierValue(carried.data.email) : "";
+  // Deliberately shallow: whether the address RECEIVES mail was settled by the
+  // link that minted the proof, not by a regex (ADR-117 §6).
   if (!resolvedEmail.includes("@") || resolvedEmail.length > 320) {
     throw new APIError("BAD_REQUEST", {
       code: PASSKEY_SIGNUP_EMAIL_INVALID,
       message: "Enter an email address to create an account.",
     });
   }
-  return resolvedEmail;
+  if (!carried.success) {
+    throw new APIError("BAD_REQUEST", {
+      code: PASSKEY_SIGNUP_EMAIL_INVALID,
+      message: "Restart passkey sign-up from this browser.",
+    });
+  }
+  return { email: resolvedEmail, addressProof: carried.data.addressProof };
+}
+
+function verificationRequired(): APIError {
+  return new APIError("FORBIDDEN", {
+    code: PASSKEY_SIGNUP_VERIFICATION_REQUIRED,
+    message: "Verify this email address before creating a passkey.",
+  });
 }
 
 async function refuseIfRegistered({
@@ -96,14 +128,19 @@ async function refuseIfRegistered({
 async function resolveUser({
   handleSecret,
   users,
+  verification,
   context,
 }: {
   ctx: GenericEndpointContext;
   handleSecret: string;
   users: PasskeySignUpDirectory;
+  verification: SignUpVerification;
   context?: string | null | undefined;
 }): Promise<{ id: string; name: string; displayName: string }> {
-  const resolvedEmail = resolveEmail(context);
+  const { email: resolvedEmail, addressProof } = resolveSignUpContext(context);
+  if (!(await verification.validateAddressProof({ token: addressProof, email: resolvedEmail }))) {
+    throw verificationRequired();
+  }
   await refuseIfRegistered({ users, email: resolvedEmail });
 
   return {
@@ -135,23 +172,20 @@ function createAfterVerification({
     ctx: GenericEndpointContext;
     context?: string | null | undefined;
   }): Promise<{ userId: string; name: string }> {
-    const resolvedEmail = resolveEmail(context);
+    const { email: resolvedEmail, addressProof } = resolveSignUpContext(context);
     // Again, because the check in `resolveUser` was one network round trip ago
     // and an account can be created in that window. The unique index on the
     // address is the real backstop; this is the one that answers in words.
     await refuseIfRegistered({ users, email: resolvedEmail });
 
+    // Spent before anything is written: the proof is the authority to enrol.
+    if (!(await verification.claimAddressProof({ token: addressProof, email: resolvedEmail }))) {
+      logger.info("a passkey sign-up finished without a live address proof; nothing was created");
+      throw verificationRequired();
+    }
+
     const user = await users.createPasskeyUser({ email: resolvedEmail });
     announcements.trackServerEvent({ userId: user.id, event: "signed_up" });
-
-    // Address confirmation sent here (not from screen to avoid races, ADR-117 §6).
-    // Not awaited; if mailer is down, account is still made and recovery is in-app.
-    void verification.requestVerification({ email: resolvedEmail }).catch((failure: unknown) => {
-      logger.warn(
-        { error: failure, userId: user.id },
-        "passkey sign-up could not send the address confirmation",
-      );
-    });
 
     return {
       userId: user.id,
@@ -185,7 +219,13 @@ export function passkeySignUpRegistration(options: {
   return {
     requireSession: false,
     resolveUser: ({ ctx, context }: { ctx: GenericEndpointContext; context?: string | null }) =>
-      resolveUser({ ctx, context, users: options.users, handleSecret: options.handleSecret }),
+      resolveUser({
+        ctx,
+        context,
+        users: options.users,
+        verification: options.verification,
+        handleSecret: options.handleSecret,
+      }),
     afterVerification: createAfterVerification(options),
   };
 }

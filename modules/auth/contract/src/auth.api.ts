@@ -176,6 +176,19 @@ export interface AuthApi {
    */
   claimSignUpAddressProof(input: Readonly<{ token: string; email: string }>): Promise<boolean>;
   /**
+   * Creates the provider account a confirmed link proposal earned, through Better Auth, so
+   * the ordinary account ceremony runs; the issuer is the connection's own, else the provider's.
+   */
+  linkProviderAccount(
+    input: Readonly<{
+      userId: string;
+      connectionId: string | null;
+      provider: string;
+      subject: string;
+      normalizedEmail: string;
+    }>,
+  ): Promise<void>;
+  /**
    * The invitation behind a code. Missing and revoked both raise `invite_not_found`
    * to prevent code guessing; expired raises `invite_expired` for recovery (D11).
    */

@@ -140,11 +140,27 @@ describe("UserService", () => {
       email: "grace@example.com",
       passwordHash: "hash",
       issuer: ISSUER,
+      emailVerified: false,
     });
     expect(repository.createPasskeyUser).toHaveBeenCalledWith({
       email: "passkey@example.com",
       issuer: ISSUER,
+      emailVerified: true,
     });
+  });
+
+  it("creates the account a spent mailbox proof earned already confirmed", async () => {
+    const { service, repository } = createService();
+
+    await service.createConfirmedCredentialUser({
+      name: "Grace",
+      email: "grace@example.com",
+      passwordHash: "hash",
+    });
+
+    expect(repository.createCredentialUser).toHaveBeenCalledWith(
+      expect.objectContaining({ email: "grace@example.com", emailVerified: true }),
+    );
   });
 
   it("checks whether a credential password exists through its private repository", async () => {

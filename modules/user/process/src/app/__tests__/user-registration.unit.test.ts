@@ -65,6 +65,18 @@ describe("registering a credential account", () => {
     });
   });
 
+  describe("when the address proof was spent", () => {
+    it("creates the account already confirmed, since the proof confirmed the address", async () => {
+      const app = createUserTestApp();
+
+      const created = await register(app);
+
+      await expect(app.findById({ id: created.id })).resolves.toMatchObject({
+        emailVerified: true,
+      });
+    });
+  });
+
   describe("when the email is typed with capital letters", () => {
     /**
      * Sign-in lowercases the address on every lookup, so an account stored as

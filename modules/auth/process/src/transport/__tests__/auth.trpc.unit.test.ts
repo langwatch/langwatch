@@ -41,6 +41,7 @@ const door: AuthApi = {
   sendMyAddressConfirmation,
   completeSignUpVerification,
   claimSignUpAddressProof: () => unreached("claimSignUpAddressProof"),
+  linkProviderAccount: () => unreached("linkProviderAccount"),
   readInviteLanding,
   requestFreshInvite,
   resolveAuthProvider: () => unreached("resolveAuthProvider"),

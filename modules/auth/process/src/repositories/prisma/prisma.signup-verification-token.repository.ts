@@ -67,4 +67,20 @@ export class PrismaSignUpVerificationTokenRepository
 
     return claimed.count === 1;
   }
+
+  async hasExpected({
+    token,
+    identifier,
+    now,
+  }: {
+    token: string;
+    identifier: string;
+    now: Instant;
+  }): Promise<boolean> {
+    const live = await this.prisma.verificationToken.count({
+      where: { token, identifier, expires: { gt: toDate(now) } },
+    });
+
+    return live === 1;
+  }
 }

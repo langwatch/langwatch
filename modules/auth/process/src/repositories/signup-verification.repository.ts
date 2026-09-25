@@ -15,4 +15,6 @@ export interface SignUpVerificationTokenRepository {
   findAndClaim(input: { token: string; now: Instant }): Promise<{ identifier: string } | null>;
   /** Spends a live token only when it was issued for exactly this identifier. */
   claimExpected(input: { token: string; identifier: string; now: Instant }): Promise<boolean>;
+  /** Whether a live token was issued for exactly this identifier; spends nothing. */
+  hasExpected(input: { token: string; identifier: string; now: Instant }): Promise<boolean>;
 }

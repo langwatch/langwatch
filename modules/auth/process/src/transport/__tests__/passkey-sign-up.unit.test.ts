@@ -4,16 +4,42 @@ import { BetterAuthAnnouncements } from "../../channels/better-auth.channel.ts";
 import {
   PASSKEY_SIGNUP_EMAIL_INVALID,
   PASSKEY_SIGNUP_EMAIL_TAKEN,
+  PASSKEY_SIGNUP_VERIFICATION_REQUIRED,
   passkeySignUpRegistration,
   type PasskeySignUpDirectory,
   type SignUpVerification,
 } from "../../channels/http/http.passkey-sign-up.channel.ts";
 
-const requestVerification = vi.fn();
-const createPasskeyUser = vi.fn();
+/** Every write and spend, in the order it happened. */
+const journal: string[] = [];
+const createPasskeyUser = vi.fn(async ({ email }: { email: string }) => {
+  journal.push(`create:${email}`);
+  return { id: "user_1" };
+});
 const findByEmail = vi.fn();
 const users: PasskeySignUpDirectory = { createPasskeyUser, findByEmail };
-const verification: SignUpVerification = { requestVerification };
+
+/** Live single-use proofs, keyed by token and bound to one address, as the token
+ *  store keeps them. */
+class ProofLedger implements SignUpVerification {
+  readonly live = new Map<string, string>();
+
+  async validateAddressProof({ token, email }: { token: string; email: string }) {
+    return this.live.get(token) === email;
+  }
+
+  async claimAddressProof({ token, email }: { token: string; email: string }) {
+    if (this.live.get(token) !== email) return false;
+    this.live.delete(token);
+    journal.push(`claim:${token}`);
+    return true;
+  }
+}
+
+const verification = new ProofLedger();
+
+/** What the sign-up screen bakes into the challenge. */
+const signUp = (email: string, addressProof = "proof_1") => JSON.stringify({ email, addressProof });
 
 /** Records the announcements without letting one fail the ceremony. */
 class SilentAnnouncements extends BetterAuthAnnouncements {
@@ -58,9 +84,11 @@ const afterVerification = registration.afterVerification;
 describe("given passkey sign-up, which creates an account with no session", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    journal.length = 0;
+    verification.live.clear();
+    verification.live.set("proof_1", "someone@example.com");
+    verification.live.set("proof_victim", "victim@corp.com");
     findByEmail.mockResolvedValue(null);
-    createPasskeyUser.mockResolvedValue({ id: "user_1" });
-    requestVerification.mockResolvedValue(void 0);
   });
 
   describe("when the address already has an account", () => {
@@ -75,7 +103,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
       findByEmail.mockResolvedValue({ id: "someone_else" });
 
       await expect(
-        resolveUser({ ctx: fakeContext().ctx, context: "victim@corp.com" }),
+        resolveUser({ ctx: fakeContext().ctx, context: signUp("victim@corp.com", "proof_victim") }),
       ).rejects.toMatchObject({
         body: { code: PASSKEY_SIGNUP_EMAIL_TAKEN },
       });
@@ -85,7 +113,9 @@ describe("given passkey sign-up, which creates an account with no session", () =
       const { ctx } = fakeContext();
       findByEmail.mockResolvedValue({ id: "someone_else" });
 
-      await expect(afterVerification({ ctx, context: "victim@corp.com" })).rejects.toMatchObject({
+      await expect(
+        afterVerification({ ctx, context: signUp("victim@corp.com", "proof_victim") }),
+      ).rejects.toMatchObject({
         body: { code: PASSKEY_SIGNUP_EMAIL_TAKEN },
       });
       expect(createPasskeyUser).not.toHaveBeenCalled();
@@ -96,7 +126,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
 
       await resolveUser({
         ctx: fakeContext().ctx,
-        context: "victim@corp.com",
+        context: signUp("victim@corp.com", "proof_victim"),
       }).catch(() => void 0);
 
       expect(findByEmail).toHaveBeenCalledWith({ email: "victim@corp.com" });
@@ -123,7 +153,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
     it("shows the address in the prompt, which is what a person recognises", async () => {
       const resolved = await resolveUser({
         ctx: fakeContext().ctx,
-        context: "Someone@Example.com",
+        context: signUp("Someone@Example.com"),
       });
 
       expect(resolved.name).toBe("someone@example.com");
@@ -133,7 +163,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
     it("hands the authenticator a handle that is not the address", async () => {
       const resolved = await resolveUser({
         ctx: fakeContext().ctx,
-        context: "someone@example.com",
+        context: signUp("someone@example.com"),
       });
 
       expect(resolved.id).not.toContain("someone");
@@ -143,11 +173,11 @@ describe("given passkey sign-up, which creates an account with no session", () =
     it("hands back the same handle every time, so a retry replaces the credential", async () => {
       const first = await resolveUser({
         ctx: fakeContext().ctx,
-        context: "someone@example.com",
+        context: signUp("someone@example.com"),
       });
       const second = await resolveUser({
         ctx: fakeContext().ctx,
-        context: "someone@example.com",
+        context: signUp("someone@example.com"),
       });
 
       expect(first.id).toBe(second.id);
@@ -156,7 +186,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
     it("creates nothing merely for being asked", async () => {
       await resolveUser({
         ctx: fakeContext().ctx,
-        context: "someone@example.com",
+        context: signUp("someone@example.com"),
       });
 
       expect(createPasskeyUser).not.toHaveBeenCalled();
@@ -167,7 +197,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
     it("creates the account for the address the ceremony was started with", async () => {
       const { ctx } = fakeContext();
 
-      await afterVerification({ ctx, context: "Someone@Example.com" });
+      await afterVerification({ ctx, context: signUp("Someone@Example.com") });
 
       expect(createPasskeyUser).toHaveBeenCalledWith(
         expect.objectContaining({ email: "someone@example.com" }),
@@ -179,7 +209,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
 
       const result = await afterVerification({
         ctx,
-        context: "someone@example.com",
+        context: signUp("someone@example.com"),
       });
 
       expect(result.userId).toBe("user_1");
@@ -197,7 +227,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
 
       const result = await afterVerification({
         ctx,
-        context: "someone@example.com",
+        context: signUp("someone@example.com"),
       });
 
       expect(createSession).not.toHaveBeenCalled();
@@ -205,23 +235,47 @@ describe("given passkey sign-up, which creates an account with no session", () =
       expect(result.userId).toBe("user_1");
     });
 
-    it("sends the address confirmation after them, not in front of them", async () => {
+    /** @scenario Signing up with a passkey consumes the verified address proof */
+    it("spends the address proof before it writes the account", async () => {
       const { ctx } = fakeContext();
 
-      await afterVerification({ ctx, context: "someone@example.com" });
+      await afterVerification({ ctx, context: signUp("someone@example.com") });
 
-      expect(requestVerification).toHaveBeenCalledWith({
-        email: "someone@example.com",
-      });
+      expect(journal).toEqual(["claim:proof_1", "create:someone@example.com"]);
+      expect(verification.live.has("proof_1")).toBe(false);
+    });
+  });
+
+  describe("when the proof it carries is not live", () => {
+    it("refuses to start a ceremony for a proof that belongs to another address", async () => {
+      await expect(
+        resolveUser({
+          ctx: fakeContext().ctx,
+          context: signUp("someone@example.com", "proof_victim"),
+        }),
+      ).rejects.toMatchObject({ body: { code: PASSKEY_SIGNUP_VERIFICATION_REQUIRED } });
+      expect(verification.live.has("proof_victim")).toBe(true);
     });
 
-    it("finishes the sign-up even when the mailer is down", async () => {
+    /** @scenario A spent mailbox proof cannot start a second enrollment */
+    it("refuses a second enrollment with a proof already spent, creating nothing", async () => {
       const { ctx } = fakeContext();
-      requestVerification.mockRejectedValue(new Error("mailer unreachable"));
+      await afterVerification({ ctx, context: signUp("someone@example.com") });
+      createPasskeyUser.mockClear();
 
       await expect(
-        afterVerification({ ctx, context: "someone@example.com" }),
-      ).resolves.toMatchObject({ userId: "user_1" });
+        afterVerification({ ctx, context: signUp("someone@example.com") }),
+      ).rejects.toMatchObject({ body: { code: PASSKEY_SIGNUP_VERIFICATION_REQUIRED } });
+      expect(createPasskeyUser).not.toHaveBeenCalled();
+    });
+
+    it("refuses a ceremony that carries no proof at all", async () => {
+      await expect(
+        resolveUser({
+          ctx: fakeContext().ctx,
+          context: JSON.stringify({ email: "someone@example.com" }),
+        }),
+      ).rejects.toMatchObject({ body: { code: PASSKEY_SIGNUP_EMAIL_INVALID } });
     });
   });
 });

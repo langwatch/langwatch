@@ -141,13 +141,26 @@ export class UserService {
     return this.repository.createCredentialUser({
       ...createCredentialUserInputSchema.parse(input),
       issuer: this.credentialIssuer,
+      emailVerified: false,
     });
   }
 
+  /** The account a spent mailbox proof earned: born confirmed, as the proof confirmed
+   *  the address. */
+  createConfirmedCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser> {
+    return this.repository.createCredentialUser({
+      ...createCredentialUserInputSchema.parse(input),
+      issuer: this.credentialIssuer,
+      emailVerified: true,
+    });
+  }
+
+  /** Only passkey sign-up mints this, after it spent the address proof: born confirmed. */
   createPasskeyUser(input: CreatePasskeyUserInput): Promise<CreatedUser> {
     return this.repository.createPasskeyUser({
       ...createPasskeyUserInputSchema.parse(input),
       issuer: this.credentialIssuer,
+      emailVerified: true,
     });
   }
 

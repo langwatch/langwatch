@@ -43,6 +43,7 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
         email: "Ada@Example.com",
         passwordHash: "hash",
         issuer: ISSUER,
+        emailVerified: false,
       });
 
       await expect(users.hasAccountOnDomain("example.com")).resolves.toBe(true);
@@ -57,6 +58,7 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
         email: EMAIL,
         passwordHash: "hash",
         issuer: ISSUER,
+        emailVerified: false,
       });
 
       await expect(users.findById(created.id)).resolves.toMatchObject({
@@ -80,6 +82,7 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
         email: EMAIL,
         passwordHash: "hash",
         issuer: ISSUER,
+        emailVerified: false,
       });
 
       await expect(users.findByEmailInsensitive("Ada@Example.com")).resolves.toMatchObject({
@@ -96,6 +99,7 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
         email: EMAIL,
         passwordHash: "hash",
         issuer: ISSUER,
+        emailVerified: false,
       });
 
       await expect(users.hasPassword(created.id)).resolves.toBe(true);
@@ -109,6 +113,7 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
         email: EMAIL,
         passwordHash: "hash",
         issuer: ISSUER,
+        emailVerified: false,
       });
 
       await expect(
@@ -124,6 +129,7 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
         email: EMAIL,
         passwordHash: "hash",
         issuer: ISSUER,
+        emailVerified: false,
       });
 
       await expect(
@@ -132,11 +138,39 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
     });
   });
 
+  describe("when an account is minted with its address already confirmed", () => {
+    it("reads it back confirmed, and an unconfirmed one back unconfirmed", async () => {
+      const { users } = create();
+
+      const confirmed = await users.createCredentialUser({
+        name: "Ada",
+        email: EMAIL,
+        passwordHash: "hash",
+        issuer: ISSUER,
+        emailVerified: true,
+      });
+      const unconfirmed = await users.createPasskeyUser({
+        email: "grace@example.com",
+        issuer: ISSUER,
+        emailVerified: false,
+      });
+
+      await expect(users.findById(confirmed.id)).resolves.toMatchObject({ emailVerified: true });
+      await expect(users.findById(unconfirmed.id)).resolves.toMatchObject({
+        emailVerified: false,
+      });
+    });
+  });
+
   describe("when a passkey account is minted", () => {
     it("leaves the credential row empty, so a first password can still be set", async () => {
       const { users } = create();
 
-      const created = await users.createPasskeyUser({ email: EMAIL, issuer: ISSUER });
+      const created = await users.createPasskeyUser({
+        email: EMAIL,
+        issuer: ISSUER,
+        emailVerified: true,
+      });
 
       await expect(users.hasPassword(created.id)).resolves.toBe(false);
       await expect(
@@ -149,7 +183,11 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
   describe("when the account's preferences are written", () => {
     it("reads back the pinned home path", async () => {
       const { users } = create();
-      const created = await users.createPasskeyUser({ email: EMAIL, issuer: ISSUER });
+      const created = await users.createPasskeyUser({
+        email: EMAIL,
+        issuer: ISSUER,
+        emailVerified: true,
+      });
 
       await users.setLastHomePath({ id: created.id, path: "/me/usage" });
 
@@ -158,7 +196,11 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
 
     it("dates the trace-explorer dismissal rather than flagging it", async () => {
       const { users } = create();
-      const created = await users.createPasskeyUser({ email: EMAIL, issuer: ISSUER });
+      const created = await users.createPasskeyUser({
+        email: EMAIL,
+        issuer: ISSUER,
+        emailVerified: true,
+      });
       const dismissedAt = new Date(42);
 
       await expect(
@@ -175,7 +217,11 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
 
     it("dates the passkey-nudge dismissal", async () => {
       const { users } = create();
-      const created = await users.createPasskeyUser({ email: EMAIL, issuer: ISSUER });
+      const created = await users.createPasskeyUser({
+        email: EMAIL,
+        issuer: ISSUER,
+        emailVerified: true,
+      });
       const dismissedAt = new Date(42);
 
       await users.setPasskeyNudgeDismissedAt({
@@ -202,7 +248,11 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
   describe("when the account is retired and restored", () => {
     it("stamps and then clears the deactivation date", async () => {
       const { users } = create();
-      const created = await users.createPasskeyUser({ email: EMAIL, issuer: ISSUER });
+      const created = await users.createPasskeyUser({
+        email: EMAIL,
+        issuer: ISSUER,
+        emailVerified: true,
+      });
       const deactivatedAt = new Date(42);
 
       await expect(
@@ -217,7 +267,11 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
   describe("when the avatar column is written", () => {
     it("reads the stored URL back on the profile, and clears it again", async () => {
       const { users } = create();
-      const created = await users.createPasskeyUser({ email: EMAIL, issuer: ISSUER });
+      const created = await users.createPasskeyUser({
+        email: EMAIL,
+        issuer: ISSUER,
+        emailVerified: true,
+      });
 
       await users.setAvatar({ id: created.id, image: "/api/user-avatar/p/o" });
       await expect(users.findById(created.id)).resolves.toMatchObject({
@@ -240,6 +294,7 @@ describe.each(backends)("given the $name credential repository", ({ create }) =>
         email: EMAIL,
         passwordHash: "hash",
         issuer: ISSUER,
+        emailVerified: false,
       });
       const [linked] = await credentials.findLinkedAccounts({ userId: created.id });
 
@@ -255,6 +310,7 @@ describe.each(backends)("given the $name credential repository", ({ create }) =>
         email: EMAIL,
         passwordHash: "hash",
         issuer: ISSUER,
+        emailVerified: false,
       });
 
       const linked = await credentials.findLinkedAccounts({ userId: created.id });
@@ -272,6 +328,7 @@ describe.each(backends)("given the $name credential repository", ({ create }) =>
         email: EMAIL,
         passwordHash: "hash",
         issuer: ISSUER,
+        emailVerified: false,
       });
 
       await expect(
@@ -288,6 +345,7 @@ describe.each(backends)("given the $name credential repository", ({ create }) =>
         email: EMAIL,
         passwordHash: "hash",
         issuer: ISSUER,
+        emailVerified: false,
       });
       const account = await credentials.findCredentialAccount({ userId: created.id });
 

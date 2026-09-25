@@ -79,6 +79,10 @@ import {
   type LegacySsoAccessConnections,
   type LegacySsoAccessMemberships,
 } from "../services/legacy-sso-access.service.ts";
+import {
+  ProviderAccountLinkService,
+  type ProviderAccountRow,
+} from "../services/provider-account-link.service.ts";
 import { SessionBoundService } from "../services/session-bound.service.ts";
 import {
   SignInLockoutService,
@@ -96,6 +100,7 @@ import {
   type SignUpAccountFactory,
   type SignUpVerificationMailer,
 } from "../services/signup-verification.service.ts";
+import type { SsoIssuerDirectory } from "../services/sso-registered-issuers.service.ts";
 import type { AuthRestFederatedLogout, AuthRestSessionAnswer } from "../transport/auth.rest.ts";
 import { buildBetterAuth, type BetterAuthDeploymentIdentity } from "./auth-composition.build.ts";
 import type { AuthDirectory } from "./auth.members.ts";
@@ -245,6 +250,8 @@ export class AuthApp implements AuthApiContract {
   readonly #federatedAccounts: FederatedAccountReadsService;
   /** The administrator's side of the two sign-in security rules. */
   readonly #signInSecurity: SignInSecuritySettingsService;
+  /** A confirmed link proposal's provider account, written through Better Auth. */
+  readonly #providerAccountLinks: ProviderAccountLinkService;
   /**
    * Composes the deployment's ONE Better Auth instance on first use (it asks
    * the SSO peer, which construction may not), or nothing where it named no
@@ -297,6 +304,7 @@ export class AuthApp implements AuthApiContract {
     legacySsoAccess,
     federatedAccounts,
     signInSecurity,
+    connectionIssuers,
   }: {
     sessions: BrowserSessionService;
     cliSessions: CliDeviceSessionService;
@@ -307,6 +315,7 @@ export class AuthApp implements AuthApiContract {
     legacySsoAccess: LegacySsoAccessService;
     federatedAccounts: FederatedAccountReadsService;
     signInSecurity: SignInSecuritySettingsService;
+    connectionIssuers: Pick<SsoIssuerDirectory, "findIssuersForConnection">;
   }) {
     this.#sessions = sessions;
     this.#cliSessions = cliSessions;
@@ -319,6 +328,10 @@ export class AuthApp implements AuthApiContract {
     this.#legacySsoAccess = legacySsoAccess;
     this.#federatedAccounts = federatedAccounts;
     this.#signInSecurity = signInSecurity;
+    this.#providerAccountLinks = ProviderAccountLinkService.create({
+      issuers: connectionIssuers,
+      accounts: { createAccount: (row) => this.#createProviderAccount(row) },
+    });
   }
 
   static async create(setup: AuthSetup): Promise<AuthApp> {
@@ -377,6 +390,10 @@ export class AuthApp implements AuthApiContract {
         evidence: auditedReleaseEvidence(dependencies.auditLog),
         sessions,
       }),
+      connectionIssuers: {
+        findIssuersForConnection: (args) =>
+          dependencies.identity.ssoIssuers().findIssuersForConnection(args),
+      },
     });
 
     app.#offersPasskeys = config.passkeysEnabled;
@@ -425,6 +442,7 @@ export class AuthApp implements AuthApiContract {
               hashIdentifier: keyedIdentifierHasher(sessionSecret),
               now,
             }),
+            signUpProofs: app.#signUp,
             prisma: members.prisma,
             encryption: members.encryption,
             redis: members.redis,
@@ -798,6 +816,23 @@ export class AuthApp implements AuthApiContract {
     input: Readonly<{ token: string; email: string }>,
   ): Promise<boolean> {
     return this.requireSignUp().claimAddressProof(input);
+  }
+
+  linkProviderAccount(
+    input: Readonly<{
+      userId: string;
+      connectionId: string | null;
+      provider: string;
+      subject: string;
+      normalizedEmail: string;
+    }>,
+  ): Promise<void> {
+    return this.#providerAccountLinks.link(input);
+  }
+
+  async #createProviderAccount(row: ProviderAccountRow): Promise<void> {
+    const context = await (await this.betterAuth()).$context;
+    await context.internalAdapter.createAccount(row);
   }
 
   async readInviteLanding(input: Readonly<{ inviteCode: string }>): Promise<InviteLanding> {

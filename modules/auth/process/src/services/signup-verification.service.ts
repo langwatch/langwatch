@@ -173,6 +173,16 @@ export class SignUpVerificationService {
     });
   }
 
+  /** Whether the proof is live for this address, spending nothing: a ceremony checks
+   *  before it starts. */
+  async validateAddressProof({ token, email }: { token: string; email: string }): Promise<boolean> {
+    return this.deps.tokens.hasExpected({
+      token,
+      identifier: `${CONFIRMED_ADDRESS_NAMESPACE}${normalizeIdentifierValue(email)}`,
+      now: this.now(),
+    });
+  }
+
   private async issueAddressProof({ email }: { email: string }): Promise<string> {
     const token = this.mintToken();
 

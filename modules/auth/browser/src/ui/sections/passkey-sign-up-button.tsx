@@ -42,14 +42,20 @@ type Refusal =
   | { kind: "report"; error: { error: string } };
 
 /**
- * Runs the ceremony and says what came of it. The address travels as the
- * registration `context`, baked into the stored challenge, so the created
- * account is for the address the ceremony started with — not swappable mid-flow.
+ * Runs the ceremony and says what came of it. The address and its mailbox proof
+ * travel as the registration `context`, baked into the stored challenge, so the
+ * created account is for the address the proof confirmed — not swappable mid-flow.
  */
-async function createAccountWithPasskey(email: string): Promise<Refusal | "created"> {
+async function createAccountWithPasskey({
+  email,
+  addressProof,
+}: {
+  email: string;
+  addressProof: string;
+}): Promise<Refusal | "created"> {
   try {
     const result = await authClient.passkey.addPasskey({
-      context: email,
+      context: JSON.stringify({ email, addressProof }),
       name: email,
       // The session is minted by the same transaction that writes the
       // credential, so this button ends with somebody signed in rather than
@@ -87,12 +93,15 @@ function readRefusal(error: { status: number } & object): Refusal {
  */
 export function PasskeySignUpButton({
   email,
+  addressProof,
   callbackUrl,
   onError,
   onAddressAlreadyRegistered,
 }: {
   /** The address typed on the step before. Becomes the account's. */
   email: string;
+  /** The proof the spent link returned; the ceremony spends it. */
+  addressProof: string;
   callbackUrl: string;
   /** A refused ceremony, sent to the card's one alert at the top. */
   onError: (error: unknown) => void;
@@ -108,7 +117,7 @@ export function PasskeySignUpButton({
     onError(null);
     setIsBusy(true);
 
-    const outcome = await createAccountWithPasskey(email);
+    const outcome = await createAccountWithPasskey({ email, addressProof });
     if (outcome === "created") {
       // Busy stays on: the session is open and the next thing to happen is a
       // navigation, so releasing the button first only flashes it back.

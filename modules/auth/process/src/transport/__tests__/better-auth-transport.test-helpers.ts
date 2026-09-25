@@ -109,7 +109,10 @@ export function betterAuthTransportFor(
     sendResetPassword: async () => undefined,
     redis: null,
     secondaryStorage: createSecondaryStorage(null),
-    signUpVerification: { requestVerification: async () => undefined } as never,
+    signUpVerification: {
+      validateAddressProof: async () => false,
+      claimAddressProof: async () => false,
+    },
     users: {} as never,
     ...ports,
   });

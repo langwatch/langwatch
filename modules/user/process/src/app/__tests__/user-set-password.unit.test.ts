@@ -35,6 +35,7 @@ function passwordlessAccount(): {
       repositories.users.createPasskeyUser({
         email: SELF.email,
         issuer: TEST_CREDENTIAL_ISSUER,
+        emailVerified: true,
       }),
   };
 }

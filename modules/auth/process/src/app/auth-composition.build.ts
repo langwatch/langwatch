@@ -257,8 +257,8 @@ export class OffSignInRouterShadow extends SignInRouterShadow {
 }
 
 /**
- * Sign-up's address confirmation, absent. Reached only from the passkey sign-up
- * ceremony, and only when the passkey plugin is mounted.
+ * Sign-up's address proofs, absent: no proof is live, so passkey sign-up refuses.
+ * Reached only when the passkey plugin is mounted.
  */
 export class AbsentSignUpVerification implements SignUpVerification {
   static create(logger: Logger): AbsentSignUpVerification {
@@ -267,10 +267,19 @@ export class AbsentSignUpVerification implements SignUpVerification {
 
   private constructor(private readonly logger: Logger) {}
 
-  async requestVerification(): Promise<void> {
+  async validateAddressProof(): Promise<boolean> {
+    return this.refuse();
+  }
+
+  async claimAddressProof(): Promise<boolean> {
+    return this.refuse();
+  }
+
+  private refuse(): boolean {
     this.logger.warn(
-      "Passkey sign-up could not send an address confirmation: this process composes no sign-up verification service",
+      "Passkey sign-up refused: this process composes no sign-up verification service, so no address proof can be checked",
     );
+    return false;
   }
 }
 
@@ -402,6 +411,9 @@ export type BuildBetterAuthOptions = Readonly<{
   identityApi: IdentityApi;
   /** The consecutive-failure counter behind account lock-out (GAC-09). */
   signInLockout: SignInAttemptCounter;
+  /** The mailbox proofs passkey sign-up checks and spends, or `null` where this
+   *  process composed no sign-up ceremony — then passkey sign-up refuses. */
+  signUpProofs: SignUpVerification | null;
   /** Where an address signs in, or `null` where this process composed no
    *  routing directory - then no connection governs a credential sign-in. */
   signInRouting:
@@ -533,7 +545,7 @@ export async function buildBetterAuth(
       authorizeAndRecordAuthentication: (args) =>
         options.identityApi.ssoMigrationCallbacks().authorizeAndRecordAuthentication(args),
     },
-    signUpVerification: AbsentSignUpVerification.create(logger),
+    signUpVerification: options.signUpProofs ?? AbsentSignUpVerification.create(logger),
     sendResetPassword: () => unconfiguredPasswordResetMail(),
     signInLockout: options.signInLockout,
     addressRoutesToConnection: async ({ email }) =>

@@ -98,11 +98,6 @@ export function SignUpCredentialForm({
     },
   });
   const register = api.user.register.useMutation();
-  // Sent once the session exists, and deliberately not waited on: confirming
-  // the address follows somebody in rather than standing in front of them, so
-  // a slow or failing mailer must not hold up the door it is following them
-  // through. A send that does not happen is recoverable from inside the app.
-  const sendConfirmation = api.auth.sendMyAddressConfirmation.useMutation();
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [serverErrorIsOnTheForm, setServerErrorIsOnTheForm] = useState(false);
@@ -164,10 +159,6 @@ export function SignUpCredentialForm({
       return;
     }
     rememberLastUsedMethod({ id: "password" });
-    // Fire and forget, and swallow: the account is made and the person is
-    // signed in, so a mailer that is down is not their problem to solve on
-    // this screen.
-    sendConfirmation.mutate({});
   };
 
   return (
@@ -198,6 +189,7 @@ export function SignUpCredentialForm({
           <>
             <PasskeySignUpButton
               email={email}
+              addressProof={addressProof}
               callbackUrl={callbackUrl}
               onError={setPasskeyError}
               onAddressAlreadyRegistered={onAddressAlreadyRegistered}

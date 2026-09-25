@@ -430,7 +430,7 @@ export class UserApp implements UserApi {
     // accounts answering for one person.
     if (await this.#users.emailIsTaken({ email })) throw new EmailAlreadyRegisteredError();
 
-    const created = await this.#users.createCredentialUser({
+    const created = await this.#users.createConfirmedCredentialUser({
       name: input.name,
       email,
       passwordHash: await this.#members.passwords.hash({ password: input.password }),
