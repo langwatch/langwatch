@@ -1974,6 +1974,11 @@ const presentations = {
     title: "Too many token checks",
     describe: () => "Wait a minute, then validate the token again.",
   },
+  auth_direct_registration_unavailable: {
+    title: "Sign up through your identity provider",
+    describe: () =>
+      "This deployment signs you in through your identity provider, so accounts are not created with a password here.",
+  },
   auth_no_address_to_confirm: {
     title: "This account has no email address",
     describe: () => "Add an email address in your account settings, then confirm it.",

@@ -503,3 +503,10 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     When the reconciliation runs
     Then each user's state is re-derived from their identifier data
     And the column is dropped once nothing reads it
+
+  @unit
+  Scenario: The installed router sends an address nobody holds to sign-up
+    Given an email-mode deployment with the identity module installed through the process chain
+    When "nobody@home.net" is submitted through IdentityApi.routeSignIn
+    Then the decision routes to sign-up with the reason code "identifier_unknown"
+    And the decision offers no method at all

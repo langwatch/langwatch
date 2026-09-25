@@ -121,13 +121,6 @@ export class PrismaUserRepository
     return row ? userProfileSchema.parse(row) : null;
   }
 
-  async confirmEmailAddress(email: string): Promise<void> {
-    await this.prisma.user.updateMany({
-      where: { email: { equals: email, mode: "insensitive" } },
-      data: { emailVerified: true },
-    });
-  }
-
   async create(input: CreateUserInput): Promise<UserProfile> {
     return userProfileSchema.parse(
       await this.prisma.user.create({ data: input, select: userProfileSelect }),

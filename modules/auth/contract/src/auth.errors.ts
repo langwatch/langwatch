@@ -158,3 +158,16 @@ export class TwoStepPasswordInvalidError extends HandledError {
     this.name = "TwoStepPasswordInvalidError";
   }
 }
+
+/** Sign-up asked for a password account where the address's organization signs in through SSO. */
+export class DirectRegistrationUnavailableError extends HandledError {
+  declare readonly code: "auth_direct_registration_unavailable";
+
+  constructor() {
+    super("auth_direct_registration_unavailable", "auth_direct_registration_unavailable", {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "DirectRegistrationUnavailableError";
+  }
+}

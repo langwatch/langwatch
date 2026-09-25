@@ -64,6 +64,8 @@ describe("MemorySignUpVerificationTokenRepository", () => {
     });
   }
 
+  const GRACE = NOW.add({ hours: 24 });
+
   describe("given a live confirmation token", () => {
     describe("when it is spent", () => {
       it("answers the identifier it was issued for", async () => {
@@ -74,14 +76,14 @@ describe("MemorySignUpVerificationTokenRepository", () => {
           expires: NOW.add({ hours: 1 }),
         });
 
-        await expect(repository.findAndClaim({ token: "live", now: NOW })).resolves.toEqual({
-          identifier: "signup:someone@example.com",
-        });
+        await expect(
+          repository.claim({ token: "live", now: NOW, keepSpentUntil: GRACE }),
+        ).resolves.toEqual({ claimed: true, identifier: "signup:someone@example.com" });
       });
     });
 
     describe("when it is spent twice", () => {
-      it("refuses the second attempt, so a link cannot be replayed", async () => {
+      it("refuses the second attempt and recognises the spent link instead", async () => {
         const repository = tokens();
         await repository.issue({
           identifier: "signup:someone@example.com",
@@ -89,16 +91,37 @@ describe("MemorySignUpVerificationTokenRepository", () => {
           expires: NOW.add({ hours: 1 }),
         });
 
-        await repository.findAndClaim({ token: "live", now: NOW });
+        await repository.claim({ token: "live", now: NOW, keepSpentUntil: GRACE });
 
-        await expect(repository.findAndClaim({ token: "live", now: NOW })).resolves.toBeNull();
+        await expect(
+          repository.claim({ token: "live", now: NOW, keepSpentUntil: GRACE }),
+        ).resolves.toEqual({ claimed: false });
+        await expect(repository.findSpent({ token: "live", now: NOW })).resolves.toEqual({
+          identifier: "signup:someone@example.com",
+        });
+      });
+    });
+
+    describe("when the spent marker's grace has run out", () => {
+      it("recognises nothing", async () => {
+        const repository = tokens();
+        await repository.issue({
+          identifier: "signup:someone@example.com",
+          token: "live",
+          expires: NOW.add({ hours: 1 }),
+        });
+        await repository.claim({ token: "live", now: NOW, keepSpentUntil: GRACE });
+
+        await expect(
+          repository.findSpent({ token: "live", now: GRACE.add({ seconds: 1 }) }),
+        ).resolves.toBeNull();
       });
     });
   });
 
   describe("given an expired token", () => {
     describe("when it is spent", () => {
-      it("answers nothing and still destroys the row", async () => {
+      it("answers nothing and leaves nothing to recognise", async () => {
         const repository = tokens();
         await repository.issue({
           identifier: "signup:someone@example.com",
@@ -106,15 +129,19 @@ describe("MemorySignUpVerificationTokenRepository", () => {
           expires: NOW.subtract({ hours: 1 }),
         });
 
-        await expect(repository.findAndClaim({ token: "stale", now: NOW })).resolves.toBeNull();
-        await expect(repository.findAndClaim({ token: "stale", now: NOW })).resolves.toBeNull();
+        await expect(
+          repository.claim({ token: "stale", now: NOW, keepSpentUntil: GRACE }),
+        ).resolves.toEqual({ claimed: false });
+        await expect(repository.findSpent({ token: "stale", now: NOW })).resolves.toBeNull();
       });
     });
   });
 
   describe("given a token nobody issued", () => {
     it("answers nothing", async () => {
-      await expect(tokens().findAndClaim({ token: "guessed", now: NOW })).resolves.toBeNull();
+      await expect(
+        tokens().claim({ token: "guessed", now: NOW, keepSpentUntil: GRACE }),
+      ).resolves.toEqual({ claimed: false });
     });
   });
 });

@@ -59,8 +59,6 @@ export class TestUserApi implements UserApi {
 
   findByEmail: UserApi["findByEmail"] = (input) =>
     this.overrides.findByEmail?.(input) ?? this.unimplemented("findByEmail");
-  confirmEmailAddress: UserApi["confirmEmailAddress"] = (input) =>
-    this.overrides.confirmEmailAddress?.(input) ?? this.unimplemented("confirmEmailAddress");
 
   create: UserApi["create"] = (input) =>
     this.overrides.create?.(input) ?? this.unimplemented("create");

@@ -1,13 +1,17 @@
 import { Temporal, type Instant } from "@langwatch/time";
 
-import type { SignUpVerificationTokenRepository } from "../signup-verification.repository.ts";
+import type {
+  SignUpVerificationTokenRepository,
+  TokenClaim,
+} from "../signup-verification.repository.ts";
 import type { MemoryAuthDatabase } from "./memory.auth.database.ts";
 
-/**
- * The `VerificationToken` rows in memory. Spending removes the row before the
- * expiry is judged, exactly as the delete-then-check the Prisma twin runs: a
- * link that arrives late is still spent, so it cannot be replayed.
- */
+/** A spent row's namespace: recognised by `findSpent`, never claimable. */
+const SPENT_NAMESPACE = "identity-signup-spent:";
+
+const UNCLAIMED: TokenClaim = { claimed: false };
+
+/** The `VerificationToken` rows in memory; a claim renames the row into the spent namespace. */
 export class MemorySignUpVerificationTokenRepository implements SignUpVerificationTokenRepository {
   private constructor(private readonly memory: MemoryAuthDatabase) {}
 
@@ -31,21 +35,40 @@ export class MemorySignUpVerificationTokenRepository implements SignUpVerificati
     this.memory.verificationTokens.set(token, { identifier, token, expires });
   }
 
-  async findAndClaim({
+  async claim({
+    token,
+    now,
+    keepSpentUntil,
+  }: {
+    token: string;
+    now: Instant;
+    keepSpentUntil: Instant;
+  }): Promise<TokenClaim> {
+    const row = this.memory.verificationTokens.get(token);
+    if (!row || Temporal.Instant.compare(row.expires, now) <= 0) return UNCLAIMED;
+    if (row.identifier.startsWith(SPENT_NAMESPACE)) return UNCLAIMED;
+
+    this.memory.verificationTokens.set(token, {
+      identifier: `${SPENT_NAMESPACE}${row.identifier}`,
+      token,
+      expires: keepSpentUntil,
+    });
+
+    return { claimed: true, identifier: row.identifier };
+  }
+
+  async findSpent({
     token,
     now,
   }: {
     token: string;
     now: Instant;
   }): Promise<{ identifier: string } | null> {
-    const claimed = this.memory.verificationTokens.get(token);
+    const row = this.memory.verificationTokens.get(token);
+    if (!row || Temporal.Instant.compare(row.expires, now) <= 0) return null;
+    if (!row.identifier.startsWith(SPENT_NAMESPACE)) return null;
 
-    if (!claimed) return null;
-    this.memory.verificationTokens.delete(token);
-
-    if (Temporal.Instant.compare(claimed.expires, now) <= 0) return null;
-
-    return { identifier: claimed.identifier };
+    return { identifier: row.identifier.slice(SPENT_NAMESPACE.length) };
   }
 
   async claimExpected({

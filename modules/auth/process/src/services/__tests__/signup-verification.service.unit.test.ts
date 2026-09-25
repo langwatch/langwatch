@@ -1,124 +1,113 @@
-import { Temporal, type Instant } from "@langwatch/time";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { RoutingDecision } from "@langwatch/identity-contract";
+import { Temporal } from "@langwatch/time";
+import type { UserApi, UserProfile } from "@langwatch/user-contract";
+import { beforeEach, describe, expect, it } from "vitest";
 
+import { MemorySignUpVerificationMailChannel } from "../../channels/memory/memory.sign-up-verification-mail.channel.ts";
+import { MemoryAuthDatabase } from "../../repositories/memory/memory.auth.database.ts";
+import { MemorySignUpVerificationTokenRepository } from "../../repositories/memory/memory.signup-verification-token.repository.ts";
 import {
   CONFIRMED_ADDRESS_TTL_MS,
   SIGN_UP_VERIFICATION_TTL_MS,
+  SPENT_LINK_GRACE_MS,
   SignUpVerificationService,
 } from "../signup-verification.service.ts";
 
-/**
- * Sign-up's address confirmation (D13, ADR-117 §6). The service is composed
- * from ports, so the whole flow runs here with no datastore and no mailer.
- */
+/** Sign-up's address confirmation (D13, ADR-117 §6), over the memory token rows and mail twin. */
 const NOW = Temporal.Instant.from("2026-08-24T12:00:00.000Z");
 
-/** Stands in for bcrypt: what matters is that it is not the password. */
-const FAKE_PASSWORD_HASH = "$2b$10$notthepassword";
+const SIGN_UP_DECISION: RoutingDecision = {
+  outcome: "route_to_signup",
+  methodSet: [],
+  reasonCode: "identifier_unknown",
+};
 
-function makeService({ registered = false }: { registered?: boolean } = {}) {
-  const issued: { identifier: string; token: string; expires: Instant }[] = [];
-  const sent: { email: string; verificationUrl: string }[] = [];
-  const created: { email: string; passwordHash: string }[] = [];
-  /** Addresses a spent link proved. The whole job of a link now. */
-  const confirmed: string[] = [];
-  let addressIsTaken = registered;
+const DOMAIN_DECISION: RoutingDecision = {
+  outcome: "redirect_to_connection",
+  connectionId: "conn_acme",
+  methodSet: [{ id: "conn_acme", kind: "federated", connectionId: "conn_acme" }],
+  reasonCode: "domain_routed",
+};
+
+function account({ emailVerified }: { emailVerified: boolean }): UserProfile {
+  return {
+    id: "user_sam",
+    name: "Sam",
+    email: "sam@acme.com",
+    emailVerified,
+    image: null,
+    pendingSsoSetup: false,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    lastLoginAt: null,
+    deactivatedAt: null,
+  };
+}
+
+function makeService({
+  holder = null,
+  decision = SIGN_UP_DECISION,
+  budgetAllowed = true,
+}: {
+  holder?: UserProfile | null;
+  decision?: RoutingDecision;
+  budgetAllowed?: boolean;
+} = {}) {
+  const memory = MemoryAuthDatabase.create();
+  const mail = MemorySignUpVerificationMailChannel.create();
+  const budgets: string[] = [];
+  let clock = NOW;
   let minted = 0;
+  let current = holder;
 
   const service = SignUpVerificationService.create({
-    tokens: {
-      issue: async (record) => {
-        issued.push(record);
-      },
-      findAndClaim: async ({ token, now }) => {
-        const index = issued.findIndex((record) => record.token === token);
-        if (index === -1) return null;
-        const [record] = issued.splice(index, 1);
-        if (!record || Temporal.Instant.compare(record.expires, now) <= 0) return null;
-        return { identifier: record.identifier };
-      },
-      claimExpected: async ({ token, identifier, now }) => {
-        const index = issued.findIndex(
-          (record) =>
-            record.token === token &&
-            record.identifier === identifier &&
-            Temporal.Instant.compare(record.expires, now) > 0,
-        );
-        if (index === -1) return false;
-        issued.splice(index, 1);
-        return true;
-      },
-      hasExpected: async ({ token, identifier, now }) =>
-        issued.some(
-          (record) =>
-            record.token === token &&
-            record.identifier === identifier &&
-            Temporal.Instant.compare(record.expires, now) > 0,
-        ),
-    },
-    mailer: {
-      sendVerificationLink: async (message) => {
-        sent.push(message);
-      },
-    },
-    directory: { hasAccountFor: async () => addressIsTaken },
-    accounts: {
-      createCredentialAccount: async (account) => {
-        created.push(account);
-        addressIsTaken = true;
-      },
-      markAddressConfirmed: async ({ email }) => {
-        confirmed.push(email);
-      },
+    tokens: MemorySignUpVerificationTokenRepository.create({ memory }),
+    mailer: mail,
+    users: createApiFixture<UserApi>({ findByEmail: async () => current }),
+    route: async () => decision,
+    isWithinBudget: async ({ key }) => {
+      budgets.push(key);
+      return budgetAllowed ? { allowed: true } : { allowed: false, retryAfterSeconds: 60 };
     },
     buildVerificationUrl: ({ token }) => `https://app.test/auth/signup?verify=${token}`,
-    now: () => NOW,
-    mintToken: vi.fn(() => `token-${++minted}`),
+    now: () => clock,
+    mintToken: () => `token-${++minted}`,
   });
 
   return {
     service,
-    issued,
-    sent,
-    created,
-    confirmed,
-    takeAddress: () => {
-      addressIsTaken = true;
+    memory,
+    mail,
+    budgets,
+    advance: (milliseconds: number) => {
+      clock = clock.add({ milliseconds });
+    },
+    hold: (profile: UserProfile) => {
+      current = profile;
     },
   };
 }
 
 describe("given a sign-up address to confirm", () => {
-  let harness: ReturnType<typeof makeService>;
-
-  beforeEach(() => {
-    harness = makeService();
-  });
-
   describe("when the address is submitted", () => {
-    it("emails a link that expires, and creates nothing else", async () => {
-      await harness.service.requestVerification({ email: "Sam@Acme.com" });
+    it("emails a normalized link that expires in an hour", async () => {
+      const harness = makeService();
 
-      expect(harness.sent).toHaveLength(1);
-      expect(harness.sent[0]?.email).toBe("sam@acme.com");
-      expect(harness.sent[0]?.verificationUrl).toContain("token-1");
-      expect(harness.issued[0]?.expires).toEqual(
+      await harness.service.requestVerification({ email: " Sam@Acme.com " });
+
+      expect(harness.mail.sent).toEqual([
+        { email: "sam@acme.com", verificationUrl: "https://app.test/auth/signup?verify=token-1" },
+      ]);
+      expect(harness.memory.verificationTokens.get("token-1")?.expires).toEqual(
         NOW.add({ milliseconds: SIGN_UP_VERIFICATION_TTL_MS }),
       );
     });
-
-    it("normalizes the address the way an attach does", async () => {
-      await harness.service.requestVerification({ email: " Sam@Acme.com " });
-      const { email } = await harness.service.completeVerification({
-        token: "token-1",
-      });
-
-      expect(email).toBe("sam@acme.com");
-    });
   });
 
-  describe("when the emailed link comes back", () => {
-    it("confirms the address once and never again", async () => {
+  describe("when the emailed link comes back for an address with no account", () => {
+    it("answers the address with a proof that lives for the credential step", async () => {
+      const harness = makeService();
       await harness.service.requestVerification({ email: "sam@acme.com" });
 
       await expect(harness.service.completeVerification({ token: "token-1" })).resolves.toEqual({
@@ -127,6 +116,32 @@ describe("given a sign-up address to confirm", () => {
         accountExists: false,
         addressProof: "token-2",
       });
+      expect(harness.memory.verificationTokens.get("token-2")?.expires).toEqual(
+        NOW.add({ milliseconds: CONFIRMED_ADDRESS_TTL_MS }),
+      );
+    });
+  });
+
+  describe("when the same link is opened a second time", () => {
+    let harness: ReturnType<typeof makeService>;
+
+    beforeEach(async () => {
+      harness = makeService();
+      await harness.service.requestVerification({ email: "sam@acme.com" });
+      await harness.service.completeVerification({ token: "token-1" });
+    });
+
+    it("answers as the first opening did, without a fresh proof", async () => {
+      await expect(harness.service.completeVerification({ token: "token-1" })).resolves.toEqual({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: false,
+        addressProof: null,
+      });
+    });
+
+    it("refuses once the spent link's grace has run out", async () => {
+      harness.advance(SPENT_LINK_GRACE_MS + 1);
 
       await expect(
         harness.service.completeVerification({ token: "token-1" }),
@@ -134,207 +149,152 @@ describe("given a sign-up address to confirm", () => {
     });
   });
 
-  describe("when the link never existed or has expired", () => {
+  describe("when the address gained an account before the link came back", () => {
+    it("refuses rather than adopting the account", async () => {
+      const harness = makeService();
+      await harness.service.requestVerification({ email: "sam@acme.com" });
+      harness.hold(account({ emailVerified: false }));
+
+      await expect(
+        harness.service.completeVerification({ token: "token-1" }),
+      ).rejects.toMatchObject({ code: "identity_verification_expired" });
+    });
+  });
+
+  describe("when the link never existed or belongs to another feature", () => {
     it("refuses both the same way", async () => {
+      const harness = makeService();
+      harness.memory.verificationTokens.set("borrowed", {
+        identifier: "password-reset:sam@acme.com",
+        token: "borrowed",
+        expires: NOW.add({ hours: 1 }),
+      });
+
       await expect(
         harness.service.completeVerification({ token: "never-issued" }),
       ).rejects.toMatchObject({ code: "identity_verification_expired" });
-    });
-
-    it("refuses a token minted for something other than a sign-up", async () => {
-      harness.issued.push({
-        identifier: "password-reset:sam@acme.com",
-        token: "borrowed",
-        expires: NOW.add({ milliseconds: 1000 }),
-      });
-
       await expect(
         harness.service.completeVerification({ token: "borrowed" }),
       ).rejects.toMatchObject({ code: "identity_verification_expired" });
     });
   });
 
-  describe("when the address already has an account", () => {
-    it("says so, which is the door back into a half-created account", async () => {
-      const registered = makeService({ registered: true });
+  describe("when a link minted before the doors converged carries a credential", () => {
+    it("treats the credential as untrusted and hands back the proof instead", async () => {
+      const harness = makeService();
+      harness.memory.verificationTokens.set("in-flight", {
+        identifier: `identity-signup-verification:${JSON.stringify({
+          email: "sam@acme.com",
+          passwordHash: "$2b$10$notthepassword",
+        })}`,
+        token: "in-flight",
+        expires: NOW.add({ milliseconds: SIGN_UP_VERIFICATION_TTL_MS }),
+      });
 
-      await expect(registered.service.addressIsRegistered({ email: "sam@acme.com" })).resolves.toBe(
-        true,
-      );
-    });
-  });
-
-  describe("when a link is asked for", () => {
-    it("carries the address alone, with no credential on it", async () => {
-      await harness.service.requestVerification({ email: "sam@acme.com" });
-
-      expect(harness.sent).toHaveLength(1);
-      expect(harness.created).toHaveLength(0);
-      // Nothing that could become a password travels on the link. Both doors
-      // send this one, and the password is chosen once, on the screen the
-      // link lands on, where it is typed twice and held to a length.
-      expect(harness.issued[0]?.identifier).toContain('"passwordHash":null');
-    });
-
-    it("leaves the account to be finished, never creating one itself", async () => {
-      await harness.service.requestVerification({ email: "sam@acme.com" });
-
-      await expect(harness.service.completeVerification({ token: "token-1" })).resolves.toEqual({
+      await expect(harness.service.completeVerification({ token: "in-flight" })).resolves.toEqual({
         email: "sam@acme.com",
         accountCreated: false,
         accountExists: false,
-        addressProof: "token-2",
+        addressProof: "token-1",
       });
-      expect(harness.created).toHaveLength(0);
     });
   });
+});
 
-  describe("when a link minted before the doors converged comes back", () => {
-    /**
-     * Nothing writes a credential onto a link any more, but links that were issued with one
-     * are still in inboxes with an hour to live, and each was promised an account. Seeded
-     * directly, because the method that used to write them is gone.
-     */
-    function seedLinkCarryingCredential(harnessed: typeof harness) {
-      harnessed.issued.push({
-        identifier: `identity-signup-verification:${JSON.stringify({
-          email: "sam@acme.com",
-          passwordHash: FAKE_PASSWORD_HASH,
-        })}`,
-        token: "link-in-flight",
-        expires: NOW.add({ milliseconds: SIGN_UP_VERIFICATION_TTL_MS }),
-      });
-    }
-
-    it("still creates the account it promised", async () => {
-      seedLinkCarryingCredential(harness);
-
-      await expect(
-        harness.service.completeVerification({ token: "link-in-flight" }),
-      ).resolves.toEqual({
+describe("given what an address already is", () => {
+  it("answers unknown, awaiting confirmation and confirmed", async () => {
+    await expect(makeService().service.addressState({ email: "sam@acme.com" })).resolves.toBe(
+      "unknown",
+    );
+    await expect(
+      makeService({ holder: account({ emailVerified: false }) }).service.addressState({
         email: "sam@acme.com",
-        accountCreated: true,
-        accountExists: true,
-        addressProof: null,
-      });
-      expect(harness.created).toEqual([
-        { email: "sam@acme.com", passwordHash: FAKE_PASSWORD_HASH },
-      ]);
-      // Created AND proven: the link that made the account confirmed the
-      // address in the same breath.
-      expect(harness.confirmed).toEqual(["sam@acme.com"]);
-    });
-
-    it("creates nothing when the address gained an account meanwhile", async () => {
-      seedLinkCarryingCredential(harness);
-      harness.takeAddress();
-
-      // The link confirms an ADDRESS; it does not entitle it to overwrite
-      // whatever now answers for it. So the account stands and the address is
-      // still proven — which is the whole of what a link is for now.
-      await expect(
-        harness.service.completeVerification({ token: "link-in-flight" }),
-      ).resolves.toEqual({
+      }),
+    ).resolves.toBe("awaiting_confirmation");
+    await expect(
+      makeService({ holder: account({ emailVerified: true }) }).service.addressState({
         email: "sam@acme.com",
-        accountCreated: false,
-        accountExists: true,
-        addressProof: null,
-      });
-      expect(harness.confirmed).toEqual(["sam@acme.com"]);
-      expect(harness.created).toHaveLength(0);
-    });
+      }),
+    ).resolves.toBe("confirmed");
   });
 });
 
 describe("given the proof a spent link handed to the credential step", () => {
-  let harness: ReturnType<typeof makeService>;
-
-  beforeEach(async () => {
-    harness = makeService();
+  async function proven() {
+    const harness = makeService();
     await harness.service.requestVerification({ email: "sam@acme.com" });
     await harness.service.completeVerification({ token: "token-1" });
+    return harness;
+  }
+
+  it("is spent exactly once, and only for the address it proved", async () => {
+    const harness = await proven();
+
+    await expect(
+      harness.service.claimAddressProof({ token: "token-2", email: "eve@acme.com" }),
+    ).resolves.toBe(false);
+    await expect(
+      harness.service.claimAddressProof({ token: "token-2", email: " Sam@Acme.com " }),
+    ).resolves.toBe(true);
+    await expect(
+      harness.service.claimAddressProof({ token: "token-2", email: "sam@acme.com" }),
+    ).resolves.toBe(false);
   });
 
-  it("lives for the credential step and no longer", () => {
-    expect(harness.issued[0]?.expires).toEqual(NOW.add({ milliseconds: CONFIRMED_ADDRESS_TTL_MS }));
-  });
+  it("is checked by a ceremony without being spent", async () => {
+    const harness = await proven();
 
-  describe("when it is claimed for the address it proved", () => {
-    it("spends it exactly once", async () => {
-      await expect(
-        harness.service.claimAddressProof({ token: "token-2", email: " Sam@Acme.com " }),
-      ).resolves.toBe(true);
-      await expect(
-        harness.service.claimAddressProof({ token: "token-2", email: "sam@acme.com" }),
-      ).resolves.toBe(false);
-    });
-  });
-
-  describe("when it is claimed for another address", () => {
-    it("refuses without spending it", async () => {
-      await expect(
-        harness.service.claimAddressProof({ token: "token-2", email: "eve@acme.com" }),
-      ).resolves.toBe(false);
-      await expect(
-        harness.service.claimAddressProof({ token: "token-2", email: "sam@acme.com" }),
-      ).resolves.toBe(true);
-    });
-  });
-
-  describe("when a ceremony checks it before starting", () => {
-    it("answers for its own address and spends nothing", async () => {
-      await expect(
-        harness.service.validateAddressProof({ token: "token-2", email: " Sam@Acme.com " }),
-      ).resolves.toBe(true);
-      await expect(
-        harness.service.validateAddressProof({ token: "token-2", email: "eve@acme.com" }),
-      ).resolves.toBe(false);
-      await expect(
-        harness.service.claimAddressProof({ token: "token-2", email: "sam@acme.com" }),
-      ).resolves.toBe(true);
-    });
-
-    it("refuses a proof that was already spent", async () => {
-      await harness.service.claimAddressProof({ token: "token-2", email: "sam@acme.com" });
-
-      await expect(
-        harness.service.validateAddressProof({ token: "token-2", email: "sam@acme.com" }),
-      ).resolves.toBe(false);
-    });
-  });
-
-  describe("when the token offered is the emailed link rather than the proof", () => {
-    it("refuses it", async () => {
-      await harness.service.requestVerification({ email: "sam@acme.com" });
-
-      await expect(
-        harness.service.claimAddressProof({ token: "token-3", email: "sam@acme.com" }),
-      ).resolves.toBe(false);
-    });
+    await expect(
+      harness.service.validateAddressProof({ token: "token-2", email: "sam@acme.com" }),
+    ).resolves.toBe(true);
+    await expect(
+      harness.service.claimAddressProof({ token: "token-2", email: "sam@acme.com" }),
+    ).resolves.toBe(true);
   });
 });
 
-describe("given a sign-up asking for a new account's link", () => {
-  describe("when the address already has an account", () => {
+describe("given a signed-out sign-up asking for a new account's link", () => {
+  describe("when the address's organization signs in through its own connection", () => {
     it("refuses by name and mails nothing", async () => {
-      const harness = makeService({ registered: true });
+      const harness = makeService({ decision: DOMAIN_DECISION });
+
+      await expect(
+        harness.service.requestNewAccountVerification({ email: "sam@acme.com" }),
+      ).rejects.toMatchObject({ code: "auth_direct_registration_unavailable" });
+      expect(harness.mail.sent).toEqual([]);
+    });
+  });
+
+  describe("when the address already holds a confirmed account", () => {
+    it("refuses by name and mails nothing", async () => {
+      const harness = makeService({ holder: account({ emailVerified: true }) });
 
       await expect(
         harness.service.requestNewAccountVerification({ email: "sam@acme.com" }),
       ).rejects.toMatchObject({ code: "email_already_registered" });
-      expect(harness.sent).toEqual([]);
+      expect(harness.mail.sent).toEqual([]);
     });
   });
 
-  describe("when the address has no account", () => {
-    it("mails the confirmation link", async () => {
-      const harness = makeService();
+  describe("when the address holds an account still awaiting confirmation", () => {
+    it("mails the link again", async () => {
+      const harness = makeService({ holder: account({ emailVerified: false }) });
 
       await harness.service.requestNewAccountVerification({ email: "sam@acme.com" });
 
-      expect(harness.sent).toEqual([
-        { email: "sam@acme.com", verificationUrl: "https://app.test/auth/signup?verify=token-1" },
-      ]);
+      expect(harness.mail.sent).toHaveLength(1);
+    });
+  });
+
+  describe("when the address has spent its hourly budget", () => {
+    it("refuses with the wait, keyed on the address", async () => {
+      const harness = makeService({ budgetAllowed: false });
+
+      await expect(
+        harness.service.requestNewAccountVerification({ email: "Sam@Acme.com" }),
+      ).rejects.toMatchObject({ code: "auth_rate_limited", meta: { retryAfterSeconds: 60 } });
+      expect(harness.budgets).toEqual(["auth.requestSignUpVerification:address:sam@acme.com"]);
+      expect(harness.mail.sent).toEqual([]);
     });
   });
 });

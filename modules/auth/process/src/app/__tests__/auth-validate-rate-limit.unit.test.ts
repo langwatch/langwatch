@@ -12,6 +12,7 @@ import type { SsoApi } from "@langwatch/enterprise-sso-contract";
  */
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
+import type { EmailDelivery } from "@langwatch/mail";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { resolveRequestBound } from "@langwatch/plans";
@@ -89,7 +90,7 @@ async function appFor(
       },
       publicBaseUrl: undefined,
       identityEmails: undefined as never,
-      signUp: null,
+      mail: createApiFixture<EmailDelivery>(),
       invites: null,
       isSaas: false,
       nodeEnvironment: undefined,

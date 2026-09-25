@@ -1,52 +1,45 @@
 import { randomBytes } from "node:crypto";
 
 import {
+  DirectRegistrationUnavailableError,
+  FrontDoorRateLimitedError,
+} from "@langwatch/auth-contract";
+import {
   IdentityVerificationExpiredError,
+  isOrganizationManagedDecision,
   normalizeIdentifierValue,
+  type RoutingDecision,
 } from "@langwatch/identity-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
-import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
+import { EmailAlreadyRegisteredError, type UserApi } from "@langwatch/user-contract";
 
+import type { SignUpVerificationMailChannel } from "../channels/sign-up-verification-mail.channel.ts";
 import type { SignUpVerificationTokenRepository } from "../repositories/signup-verification.repository.ts";
 
 /**
- * Sign-up's address confirmation (D13, ADR-117 §6).
+ * Sign-up's address confirmation (D13, ADR-117 §6), main's current service: the link proves
+ * an address before an account exists, and never adopts an account that already does.
  */
 
-export interface SignUpVerificationMailer {
-  sendVerificationLink(input: { email: string; verificationUrl: string }): Promise<void>;
-}
-
-/** Whether an address already has an account (epic Q12: sign-up may say so). */
-export interface SignUpAccountDirectory {
-  hasAccountFor(input: { email: string }): Promise<boolean>;
-}
-
-/** Creates the account a confirmed pending credential earned. */
-export interface SignUpAccountFactory {
-  createCredentialAccount(input: { email: string; passwordHash: string }): Promise<void>;
-  /**
-   * The link came back, so the address is proven.
-   */
-  markAddressConfirmed(input: { email: string }): Promise<void>;
-}
+/** What an address already is to us: no account, an unconfirmed one, or a confirmed one. */
+export type SignUpAddressState = "unknown" | "awaiting_confirmation" | "confirmed";
 
 export interface SignUpVerificationDeps {
   tokens: SignUpVerificationTokenRepository;
-  mailer: SignUpVerificationMailer;
-  directory: SignUpAccountDirectory;
-  accounts: SignUpAccountFactory;
+  mailer: SignUpVerificationMailChannel;
+  users: Pick<UserApi, "findByEmail">;
+  /** Where the address signs in; an organization's own connection refuses a password sign-up. */
+  route(input: Readonly<{ identifier: string; breakGlass: boolean }>): Promise<RoutingDecision>;
+  isWithinBudget(
+    input: Readonly<{ key: string; windowSeconds: number; max: number }>,
+  ): Promise<Readonly<{ allowed: boolean; retryAfterSeconds?: number | undefined }>>;
   /** Builds the link the email carries, from a minted token. */
   buildVerificationUrl(input: { token: string }): string;
   now?: () => Instant;
   mintToken?: () => string;
 }
 
-/**
- * The identifier prefix the token rows carry. Namespaced because the same
- * table holds password-reset and other tokens: a sign-up token must never be
- * spendable anywhere else, and nothing else must be spendable here.
- */
+/** Namespaced: the same table holds other tokens, and none may be spent across features. */
 const SIGN_UP_TOKEN_NAMESPACE = "identity-signup-verification:";
 
 /** One hour, matching the reset link's lifetime and the email's promise. */
@@ -58,14 +51,24 @@ const CONFIRMED_ADDRESS_NAMESPACE = "identity-signup-confirmed:";
 /** Long enough to choose a password on the next screen; worthless in a closed tab. */
 export const CONFIRMED_ADDRESS_TTL_MS = 30 * 60 * 1000;
 
-/**
- * What a sign-up token stands for: an address, and — only on links minted before both
- * doors converged — a credential.
- */
+/** How long a spent link, opened again, still answers as it did the first time. */
+export const SPENT_LINK_GRACE_MS = 24 * 60 * 60 * 1000;
+
+/** The per-address budget: at most this many links an hour, whoever asks. */
+const LINKS_PER_ADDRESS_PER_HOUR = 5;
+
+/** A token's address, and a credential only on links minted before both doors converged. */
 interface PendingSignUp {
   email: string;
   passwordHash: string | null;
 }
+
+type CompletedVerification = {
+  email: string;
+  accountCreated: boolean;
+  accountExists: boolean;
+  addressProof: string | null;
+};
 
 export class SignUpVerificationService {
   private readonly deps: SignUpVerificationDeps;
@@ -78,87 +81,81 @@ export class SignUpVerificationService {
     return new SignUpVerificationService(deps);
   }
 
-  /**
-   * Whether the address already holds an account — the one question sign-up
-   * is allowed to answer out loud (epic Q12), because refusing to say it is
-   * what strands somebody on an account they half-created.
-   */
-  async addressIsRegistered({ email }: { email: string }): Promise<boolean> {
-    return this.deps.directory.hasAccountFor({
-      email: normalizeIdentifierValue(email),
-    });
+  /** What the address already is: the one question sign-up may answer out loud (epic Q12). */
+  async addressState({ email }: { email: string }): Promise<SignUpAddressState> {
+    const account = await this.deps.users.findByEmail({ email: normalizeIdentifierValue(email) });
+    if (!account) return "unknown";
+
+    return account.emailVerified ? "confirmed" : "awaiting_confirmation";
   }
 
-  /**
-   * Sends a fresh confirmation link. Idempotent from the customer's side:
-   * asking twice sends twice and both links work until one is spent, which is
-   * the behavior a person who cannot find the first email expects.
-   */
+  /** Whether the address holds an account, confirmed or not. */
+  async addressIsRegistered({ email }: { email: string }): Promise<boolean> {
+    return (await this.addressState({ email })) !== "unknown";
+  }
+
+  /** Sends a fresh confirmation link; asking twice sends twice and both links work. */
   async requestVerification({ email }: { email: string }): Promise<void> {
     await this.issueLink({ email, passwordHash: null });
   }
 
-  /** A sign-up's link: an address that already holds an account is told so rather than mailed. */
+  /**
+   * A signed-out sign-up's link, as main's router answers it: an organization's connection
+   * refuses, a confirmed address is told so, and each address gets its own hourly budget.
+   */
   async requestNewAccountVerification({ email }: { email: string }): Promise<void> {
-    if (await this.addressIsRegistered({ email })) {
+    const decision = await this.deps.route({ identifier: email, breakGlass: false });
+    if (isOrganizationManagedDecision(decision)) {
+      throw new DirectRegistrationUnavailableError();
+    }
+    if ((await this.addressState({ email })) === "confirmed") {
       throw new EmailAlreadyRegisteredError();
+    }
+
+    const budget = await this.deps.isWithinBudget({
+      key: `auth.requestSignUpVerification:address:${email.toLowerCase()}`,
+      windowSeconds: 60 * 60,
+      max: LINKS_PER_ADDRESS_PER_HOUR,
+    });
+    if (!budget.allowed) {
+      throw new FrontDoorRateLimitedError("Too many signup attempts. Please try again later.", {
+        retryAfterSeconds: budget.retryAfterSeconds,
+      });
     }
 
     await this.requestVerification({ email });
   }
 
   /**
-   * Spends a link, and answers the address it confirmed. Both doors answer `accountCreated:
-   * false` and send the person to the one screen that chooses a password.
+   * Spends a link and answers the address it proved, with the proof `user.register` spends.
+   * An address that already holds an account is refused: the link never adopts it.
    */
-  async completeVerification({ token }: { token: string }): Promise<{
-    email: string;
-    accountCreated: boolean;
-    accountExists: boolean;
-    addressProof: string | null;
-  }> {
-    const claimed = await this.deps.tokens.findAndClaim({ token, now: this.now() });
-    const pending = claimed ? parsePendingSignUp(claimed.identifier) : null;
+  async completeVerification({ token }: { token: string }): Promise<CompletedVerification> {
+    const now = this.now();
+    const claimed = await this.deps.tokens.claim({
+      token,
+      now,
+      keepSpentUntil: now.add({ milliseconds: SPENT_LINK_GRACE_MS }),
+    });
+    const pending = claimed.claimed ? parsePendingSignUp(claimed.identifier) : null;
 
     if (!pending) {
+      const reopened = await this.reopenSpentLink({ token });
+      if (reopened) return reopened;
       throw new IdentityVerificationExpiredError();
     }
 
-    const alreadyRegistered = await this.addressIsRegistered({
-      email: pending.email,
-    });
-
-    // The ordinary case now: sign-up made the account and this link is the
-    // address catching up with it. Confirming is the whole job.
-    if (alreadyRegistered) {
-      await this.deps.accounts.markAddressConfirmed({ email: pending.email });
-
-      return {
-        email: pending.email,
-        accountCreated: false,
-        accountExists: true,
-        addressProof: null,
-      };
+    if (await this.addressIsRegistered({ email: pending.email })) {
+      throw new IdentityVerificationExpiredError();
     }
 
-    // No account, and no credential to make one from. The screen takes it from
-    // here, carrying the single-use proof `user.register` spends.
-    if (!pending.passwordHash) {
-      return {
-        email: pending.email,
-        accountCreated: false,
-        accountExists: false,
-        addressProof: await this.issueAddressProof({ email: pending.email }),
-      };
-    }
-
-    await this.deps.accounts.createCredentialAccount({
+    // A credential on an old link is untrusted: the mailbox proves the address, not the hash.
+    return {
       email: pending.email,
-      passwordHash: pending.passwordHash,
-    });
-    await this.deps.accounts.markAddressConfirmed({ email: pending.email });
-
-    return { email: pending.email, accountCreated: true, accountExists: true, addressProof: null };
+      accountCreated: false,
+      accountExists: false,
+      addressProof: await this.issueAddressProof({ email: pending.email }),
+    };
   }
 
   /**
@@ -181,6 +178,24 @@ export class SignUpVerificationService {
       identifier: `${CONFIRMED_ADDRESS_NAMESPACE}${normalizeIdentifierValue(email)}`,
       now: this.now(),
     });
+  }
+
+  /** The same link opened again inside its grace: status only, no fresh proof. */
+  private async reopenSpentLink({
+    token,
+  }: {
+    token: string;
+  }): Promise<CompletedVerification | null> {
+    const spent = await this.deps.tokens.findSpent({ token, now: this.now() });
+    const pending = spent ? parsePendingSignUp(spent.identifier) : null;
+    if (!pending) return null;
+
+    return {
+      email: pending.email,
+      accountCreated: false,
+      accountExists: await this.addressIsRegistered({ email: pending.email }),
+      addressProof: null,
+    };
   }
 
   private async issueAddressProof({ email }: { email: string }): Promise<string> {
@@ -246,13 +261,13 @@ function parsePendingSignUp(identifier: string): PendingSignUp | null {
       return null;
     }
 
-    const { email, passwordHash } = parsed as Record<string, unknown>;
-    if (typeof email !== "string" || email.length === 0) {
+    if (!("email" in parsed) || typeof parsed.email !== "string" || parsed.email.length === 0) {
       return null;
     }
+    const passwordHash = "passwordHash" in parsed ? parsed.passwordHash : null;
 
     return {
-      email,
+      email: parsed.email,
       passwordHash: typeof passwordHash === "string" ? passwordHash : null,
     };
   } catch {

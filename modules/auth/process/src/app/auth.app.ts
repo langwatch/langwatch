@@ -56,6 +56,7 @@ import {
   SignInMethodPolicyService,
 } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import type { EmailDelivery } from "@langwatch/mail";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
@@ -64,6 +65,7 @@ import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
 import type { BetterAuthTransport } from "../channels/http/http.better-auth.channel.ts";
+import { signUpVerificationMailChannels } from "../channels/sign-up-verification-mail-channels.registry.ts";
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import { PrismaAuthDirectoryRepository } from "../repositories/prisma/prisma.auth-directory.repository.ts";
 import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
@@ -106,9 +108,7 @@ import {
 import { SignUpEnrollmentService } from "../services/sign-up-enrollment.service.ts";
 import {
   SignUpVerificationService,
-  type SignUpAccountDirectory,
-  type SignUpAccountFactory,
-  type SignUpVerificationMailer,
+  type SignUpVerificationDeps,
 } from "../services/signup-verification.service.ts";
 import type { SsoIssuerDirectory } from "../services/sso-registered-issuers.service.ts";
 import {
@@ -120,16 +120,6 @@ import { buildBetterAuth, type BetterAuthDeploymentIdentity } from "./auth-compo
 import type { AuthDirectory } from "./auth.members.ts";
 
 /**
- * The account rows sign-up reads and confirms. Auth owns neither: the `User`
- * table is the user module's, so the process hands over the two reads rather
- * than a connection, and the account MINT goes through `UserApi` itself.
- */
-export interface AuthAccountRows extends SignUpAccountDirectory {
-  /** The link came back, so the address is proven. */
-  markAddressConfirmed(input: { email: string }): Promise<void>;
-}
-
-/**
  * The invitation a landing page reads, and the reissue request behind it. Both
  * run over the organization module's rows, so both arrive from the process.
  */
@@ -137,14 +127,6 @@ export interface AuthInviteDirectory {
   readLanding(input: Readonly<{ inviteCode: string }>): Promise<InviteLanding>;
   requestFresh(input: Readonly<{ inviteCode: string }>): Promise<void>;
 }
-
-/** The sign-up ceremony's collaborators, present together or absent together. */
-export type AuthSignUpCollaborators = Readonly<{
-  accounts: AuthAccountRows;
-  mailer: SignUpVerificationMailer;
-  /** The public base URL the confirmation link is built from. */
-  baseUrl: string;
-}>;
 
 /**
  * The closed members this module reads through {@link reads}, restated as a
@@ -175,12 +157,8 @@ export type AuthInfrastructure = MembersRead<typeof AUTH_CLOSED_READS> &
      * service — the session read then falls back to the stored user's own
      * address, which is the documented chain, not a degraded one. */
     identityEmails: IdentityEmailService | undefined;
-    /**
-     * The sign-up ceremony, or nothing. Absent together and that is not an
-     * accident: without a base URL a confirmation link points at nowhere, and
-     * without a mail gateway it is never sent.
-     */
-    signUp: AuthSignUpCollaborators | null;
+    /** The process mail member the sign-up link goes out through; mail off skips each send. */
+    mail: EmailDelivery;
     /** The invitation reads, or nothing where this process composed none. */
     invites: AuthInviteDirectory | null;
     /** Whether this is the hosted product: the process's own fact, supplied
@@ -242,6 +220,7 @@ export class AuthApp implements AuthApiContract {
     "publicBaseUrl",
     "isSaas",
     "nodeEnvironment",
+    "mail",
   ] as const;
   /** The browser-session key. Only the identity built from it ever escapes (ADR-132). */
   static readonly secrets = {
@@ -407,7 +386,14 @@ export class AuthApp implements AuthApiContract {
         featureFlags: () => dependencies.featureFlags,
         publicBaseUrl: () => members.publicBaseUrl,
       },
-      signUp: buildSignUpVerification({ members, repositories, now, users: dependencies.users }),
+      signUp: buildSignUpVerification({
+        members,
+        repositories,
+        now,
+        users: dependencies.users,
+        route: (input) => dependencies.identity.routeSignIn(input),
+        isWithinBudget: (input) => app.isWithinBudget(input),
+      }),
       members,
       dependencies: {
         apiKeys: dependencies.apiKeys,
@@ -962,8 +948,7 @@ export class AuthApp implements AuthApiContract {
   private requireSignUp(): SignUpVerificationService {
     if (!this.#signUp) {
       throw new AuthUnavailableError({
-        capability:
-          "mail gateway with a public base URL, so it cannot send a sign-up confirmation link",
+        capability: "public base URL, so it cannot build a sign-up confirmation link",
         processName: this.#members.processName,
       });
     }
@@ -985,37 +970,33 @@ export class AuthApp implements AuthApiContract {
   }
 }
 
-/** The ceremony this process can run, or nothing where a collaborator is missing. */
+/** The ceremony this process can run, or nothing where it has no public base URL to link to. */
 function buildSignUpVerification({
   members,
   repositories,
   now,
   users,
+  route,
+  isWithinBudget,
 }: {
   members: AuthInfrastructure;
   repositories: AuthRepositories;
   now: () => Instant;
   users: UserApi;
+  route: SignUpVerificationDeps["route"];
+  isWithinBudget: SignUpVerificationDeps["isWithinBudget"];
 }): SignUpVerificationService | null {
-  const signUp = members.signUp;
-  if (!signUp) return null;
-
-  const accounts: SignUpAccountFactory = {
-    // Nobody has been asked for a name on this path: the person typed an
-    // address and a password into a log-in form. Onboarding asks.
-    createCredentialAccount: async ({ email, passwordHash }) => {
-      await users.createCredentialUser({ name: null, email, passwordHash });
-    },
-    markAddressConfirmed: (input) => signUp.accounts.markAddressConfirmed(input),
-  };
+  const baseUrl = members.publicBaseUrl;
+  if (!baseUrl) return null;
 
   return SignUpVerificationService.create({
     tokens: repositories.signUpTokens,
-    mailer: signUp.mailer,
-    directory: signUp.accounts,
-    accounts,
+    mailer: signUpVerificationMailChannels.ses.create({ mailer: members.mail }),
+    users,
+    route,
+    isWithinBudget,
     buildVerificationUrl: ({ token }) =>
-      `${signUp.baseUrl}/auth/signup?verify=${encodeURIComponent(token)}`,
+      `${baseUrl}/auth/signup?verify=${encodeURIComponent(token)}`,
     now,
   });
 }

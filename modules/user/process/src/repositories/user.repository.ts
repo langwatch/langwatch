@@ -41,8 +41,6 @@ export interface UserRepository {
   findByEmail(email: string): Promise<UserProfile | null>;
   /** The same lookup ignoring case, for rows written before sign-in lowercased. */
   findByEmailInsensitive(email: string): Promise<UserProfile | null>;
-  /** Marks every account holding the address, case aside, as confirmed. */
-  confirmEmailAddress(email: string): Promise<void>;
   create(input: CreateUserInput): Promise<UserProfile>;
   createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedUser>;
   createPasskeyUser(input: CreatePasskeyUserRow): Promise<CreatedUser>;

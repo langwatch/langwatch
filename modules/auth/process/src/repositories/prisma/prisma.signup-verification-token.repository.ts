@@ -1,7 +1,15 @@
 import { PrismaRepository } from "@langwatch/prisma-client";
 import { Temporal, fromDate, toDate, type Instant } from "@langwatch/time";
 
-import type { SignUpVerificationTokenRepository } from "../signup-verification.repository.ts";
+import type {
+  SignUpVerificationTokenRepository,
+  TokenClaim,
+} from "../signup-verification.repository.ts";
+
+/** A spent row's namespace: recognised by `findSpent`, never claimable. */
+const SPENT_NAMESPACE = "identity-signup-spent:";
+
+const UNCLAIMED: TokenClaim = { claimed: false };
 
 /**
  * Sign-up's address-confirmation tokens, over the `VerificationToken` table.
@@ -29,26 +37,48 @@ export class PrismaSignUpVerificationTokenRepository
   }
 
   /**
-   * Deleting is the claim. A token that survived the delete never existed or was already
-   * spent, and one that is deleted but out of date is refused all the same - the row goes
-   * either way, so a spent link cannot be replayed even by the racer that lost.
+   * Renaming the row into the spent namespace is the claim. The update is conditional on
+   * the identifier it read, so of two racing openings only one wins.
    */
-  async findAndClaim({
+  async claim({
+    token,
+    now,
+    keepSpentUntil,
+  }: {
+    token: string;
+    now: Instant;
+    keepSpentUntil: Instant;
+  }): Promise<TokenClaim> {
+    const row = await this.prisma.verificationToken.findUnique({
+      where: { token },
+      select: { identifier: true, expires: true },
+    });
+    if (!row || Temporal.Instant.compare(fromDate(row.expires), now) <= 0) return UNCLAIMED;
+    if (row.identifier.startsWith(SPENT_NAMESPACE)) return UNCLAIMED;
+
+    const marked = await this.prisma.verificationToken.updateMany({
+      where: { token, identifier: row.identifier },
+      data: { identifier: `${SPENT_NAMESPACE}${row.identifier}`, expires: toDate(keepSpentUntil) },
+    });
+
+    return marked.count === 0 ? UNCLAIMED : { claimed: true, identifier: row.identifier };
+  }
+
+  async findSpent({
     token,
     now,
   }: {
     token: string;
     now: Instant;
   }): Promise<{ identifier: string } | null> {
-    const claimed = await this.prisma.verificationToken
-      .delete({ where: { token }, select: { identifier: true, expires: true } })
-      .catch(() => null);
+    const row = await this.prisma.verificationToken.findUnique({
+      where: { token },
+      select: { identifier: true, expires: true },
+    });
+    if (!row || Temporal.Instant.compare(fromDate(row.expires), now) <= 0) return null;
+    if (!row.identifier.startsWith(SPENT_NAMESPACE)) return null;
 
-    if (!claimed) return null;
-    const expired = Temporal.Instant.compare(fromDate(claimed.expires), now) <= 0;
-    if (expired) return null;
-
-    return { identifier: claimed.identifier };
+    return { identifier: row.identifier.slice(SPENT_NAMESPACE.length) };
   }
 
   /** One conditional delete, so the identifier binding and the spend cannot race apart. */

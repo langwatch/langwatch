@@ -52,6 +52,7 @@ async function bootIdentity() {
 
 describe("sign-in routing installation", () => {
   describe("when an address nobody holds is submitted to the installed router", () => {
+    /** @scenario "The installed router sends an address nobody holds to sign-up" */
     it("routes it to sign-up and offers no method", async () => {
       const runtime = await bootIdentity();
       try {

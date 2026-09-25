@@ -162,27 +162,6 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
     });
   });
 
-  describe("when a sign-up link for the address comes back", () => {
-    it("confirms the account holding it, whatever the case it was typed in", async () => {
-      const { users } = create();
-      const account = await users.createPasskeyUser({
-        email: "Grace@Example.com",
-        issuer: ISSUER,
-        emailVerified: false,
-      });
-      const bystander = await users.createPasskeyUser({
-        email: "ada@example.com",
-        issuer: ISSUER,
-        emailVerified: false,
-      });
-
-      await users.confirmEmailAddress("grace@example.com");
-
-      await expect(users.findById(account.id)).resolves.toMatchObject({ emailVerified: true });
-      await expect(users.findById(bystander.id)).resolves.toMatchObject({ emailVerified: false });
-    });
-  });
-
   describe("when a passkey account is minted", () => {
     it("leaves the credential row empty, so a first password can still be set", async () => {
       const { users } = create();
