@@ -22,6 +22,9 @@
       "path": "../../modules/api-key/process/tsconfig.build.json"
     },
     {
+      "path": "../../modules/authz/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../enterprise/modules/licensing/contract/tsconfig.build.json"
     },
     {
@@ -44,6 +47,9 @@
     },
     {
       "path": "../secrets/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
     },
     {
       "path": "../../modules/prompt/contract/tsconfig.build.json"

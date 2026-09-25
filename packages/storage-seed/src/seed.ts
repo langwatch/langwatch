@@ -18,17 +18,20 @@ import { ENTERPRISE_LICENSE_KEY as TEST_SUITE_ENTERPRISE_LICENSE_KEY } from "@la
 import { modelProviders } from "@langwatch/model-provider-contract";
 import { runScript, writeScriptWarning } from "@langwatch/observability";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
-import {
-  PrismaClient,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@langwatch/prisma-client/generated";
+import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ROLE_KIND } from "@langwatch/role-contract";
 import { AesGcmSecretEncryptionService } from "@langwatch/secret-process";
 import { hash as hashPassword } from "bcrypt";
 import { parse as parseDotenv } from "dotenv";
 
 import { resolveApiKeyPepper } from "./api-key-pepper.ts";
+import {
+  adminGrantBindings,
+  privateTokenGrantBinding,
+  publicTokenGrantBinding,
+  seedGrantBinding,
+  seedRoleProjection,
+} from "./seed-authz.ts";
 import { seedDemoPlatform } from "./seed-demo-platform.ts";
 import {
   buildAdminUserUpsertArgs,
@@ -78,6 +81,9 @@ const PUBLIC_TOKEN_LOOKUP_ID = "LocalDevPublicIk";
 const PUBLIC_TOKEN_SECRET = "LocalDevPublicIngestionTokenSecretFixedValue0000";
 const PUBLIC_ACCESS_TOKEN = `${INGEST_KEY_PREFIX}${PUBLIC_TOKEN_LOOKUP_ID}_${PUBLIC_TOKEN_SECRET}`;
 const PUBLIC_TOKEN_ROLE_NAME = "local-dev-public-ingestion";
+const PUBLIC_TOKEN_ROLE_ID = "local-dev-public-ingestion-role";
+const PUBLIC_TOKEN_ROLE_DESCRIPTION =
+  "Restricted role for the static local-dev public ingestion token (traces:create only)";
 
 const MODEL_DEFAULT_CONFIG_ID = "local-dev-model-default-config";
 
@@ -249,30 +255,16 @@ async function main() {
     update: { role: "ADMIN" },
   });
 
-  // RoleBinding has no single compound @@unique Prisma can upsert against
-  // (see the model comment in schema.prisma), so dedupe by replace — the
-  // same pattern scripts/seed-local-admin.ts already established.
   await prisma.roleBinding.deleteMany({
     where: { organizationId: organization.id, userId: user.id },
   });
-  await prisma.roleBinding.createMany({
-    data: [
-      {
-        organizationId: organization.id,
-        userId: user.id,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organization.id,
-      },
-      {
-        organizationId: organization.id,
-        userId: user.id,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.TEAM,
-        scopeId: team.id,
-      },
-    ],
-  });
+  for (const binding of adminGrantBindings({
+    organizationId: organization.id,
+    teamId: team.id,
+    userId: user.id,
+  })) {
+    await seedGrantBinding({ prisma, binding });
+  }
 
   // The two ApiKey rows are the only seeded state that needs the pepper, so a
   // checkout without one still gets its organization, team, project and admin
@@ -390,14 +382,9 @@ async function seedAccessTokens({
   await prisma.roleBinding.deleteMany({
     where: { apiKeyId: privateApiKey.id },
   });
-  await prisma.roleBinding.create({
-    data: {
-      organizationId: organizationId,
-      apiKeyId: privateApiKey.id,
-      role: TeamUserRole.ADMIN,
-      scopeType: RoleBindingScopeType.ORGANIZATION,
-      scopeId: organizationId,
-    },
+  await seedGrantBinding({
+    prisma,
+    binding: privateTokenGrantBinding({ organizationId, apiKeyId: privateApiKey.id }),
   });
 
   // Public access token: ik-lw- ingestion-only token, PROJECT-scoped, CUSTOM
@@ -411,14 +398,25 @@ async function seedAccessTokens({
       },
     },
     create: {
+      id: PUBLIC_TOKEN_ROLE_ID,
       organizationId: organizationId,
       name: PUBLIC_TOKEN_ROLE_NAME,
-      description:
-        "Restricted role for the static local-dev public ingestion token (traces:create only)",
+      description: PUBLIC_TOKEN_ROLE_DESCRIPTION,
       permissions: ["traces:create"],
       kind: ROLE_KIND.SYSTEM_API_KEY,
     },
     update: { permissions: ["traces:create"] },
+  });
+  const roleProjected = await seedRoleProjection({
+    prisma,
+    role: {
+      id: ingestionRole.id,
+      organizationId,
+      name: PUBLIC_TOKEN_ROLE_NAME,
+      description: PUBLIC_TOKEN_ROLE_DESCRIPTION,
+      permissions: ["traces:create"],
+      kind: ROLE_KIND.SYSTEM_API_KEY,
+    },
   });
   const publicApiKey = await prisma.apiKey.upsert({
     where: { lookupId: PUBLIC_TOKEN_LOOKUP_ID },
@@ -438,16 +436,17 @@ async function seedAccessTokens({
     },
   });
   await prisma.roleBinding.deleteMany({ where: { apiKeyId: publicApiKey.id } });
-  await prisma.roleBinding.create({
-    data: {
-      organizationId: organizationId,
-      apiKeyId: publicApiKey.id,
-      role: TeamUserRole.CUSTOM,
-      customRoleId: ingestionRole.id,
-      scopeType: RoleBindingScopeType.PROJECT,
-      scopeId: projectId,
-    },
-  });
+  if (roleProjected) {
+    await seedGrantBinding({
+      prisma,
+      binding: publicTokenGrantBinding({
+        organizationId,
+        projectId,
+        apiKeyId: publicApiKey.id,
+        roleId: ingestionRole.id,
+      }),
+    });
+  }
 }
 
 // Model providers from the environment: for every registry provider whose

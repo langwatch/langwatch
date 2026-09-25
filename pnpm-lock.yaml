@@ -15876,6 +15876,9 @@ importers:
       '@langwatch/api-key-process':
         specifier: workspace:*
         version: link:../../modules/api-key/process
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../modules/authz/contract
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../enterprise/modules/licensing/contract
@@ -15900,6 +15903,9 @@ importers:
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../secrets
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../time
       bcrypt:
         specifier: 'catalog:'
         version: 6.0.0

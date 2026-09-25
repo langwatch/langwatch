@@ -13,6 +13,7 @@
   "dependencies": {
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/api-key-process": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/enterprise-licensing-process": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
@@ -21,6 +22,7 @@
     "@langwatch/role-contract": "workspace:*",
     "@langwatch/secret-process": "workspace:*",
     "@langwatch/secrets": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "bcrypt": "catalog:",
     "dotenv": "catalog:"
   },
