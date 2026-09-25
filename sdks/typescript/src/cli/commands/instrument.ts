@@ -22,6 +22,10 @@ import { lwTag } from "../utils/governance/brand";
 import { recordCliLocation } from "../utils/governance/cli-location";
 import { isLoggedIn, loadConfig, saveConfig } from "../utils/governance/config";
 import {
+	globalConfigIsolationWarning,
+	rewritesGlobalConfigForLocalInstance,
+} from "../utils/governance/global-config-isolation";
+import {
 	cleartextIngestEndpointWarning,
 	sendsIngestKeyInClear,
 } from "../utils/governance/ingest-endpoint-scheme";
@@ -162,6 +166,16 @@ export async function instrumentCommand(
 	if (sendsIngestKeyInClear(credential.endpoint)) {
 		process.stderr.write(
 			`${lwTag()} ${cleartextIngestEndpointWarning(credential.endpoint)}\n`,
+		);
+	}
+
+	// A local endpoint is not a key exposure, so the warning above skips it,
+	// but it is the wiring the rest of the machine inherits: the file this
+	// command is about to write is the tool's global one. Said before the
+	// write, so a QA shell can stop and isolate itself instead.
+	if (rewritesGlobalConfigForLocalInstance({ endpoint: credential.endpoint })) {
+		process.stderr.write(
+			`${lwTag()} ${globalConfigIsolationWarning(credential.endpoint)}\n`,
 		);
 	}
 

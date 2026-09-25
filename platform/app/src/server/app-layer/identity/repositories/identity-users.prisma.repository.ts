@@ -1,26 +1,40 @@
 import type { IdentityUsersRepository } from "@langwatch/identity-server";
-import type { PrismaClient } from "~/generated/prisma/client";
-import type {
-  LegacySignInAccount,
-  LegacySignInAccountDirectory,
-} from "../signin-account-lookup";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
+import type { LegacySignInAccount } from "../signin-account-lookup";
+
+/** One `User` row, as the sign-in and account-linking decisions read it. */
+export interface IdentityUserRow {
+  id: string;
+  email: string | null;
+  name: string | null;
+  deactivatedAt: Date | null;
+  pendingSsoSetup: boolean;
+  signupConfirmationPending: boolean;
+}
 
 /**
- * The `User` columns identity touches.
+ * The `User` columns identity touches — the two the ceremonies write, and the
+ * handful the sign-in boundary reads about a person it already has an id for.
  *
  * The `userHashKey` write is guarded (ADR-101 §4): only a user without a key
  * takes one, so a key minted concurrently — by the ceremony at user
  * creation, by another backfill pass — is never overwritten. Rewriting it
  * would orphan every identifier hash already computed with the old key.
  *
+ * The guard is SQL with the condition against the table. Through
+ * `updateMany` it sits in a subquery, and a statement that waited on the row
+ * lock re-checks only the outer id predicate against the committed row, so
+ * two mints meeting on one user would both land and the later key would
+ * overwrite the one hashes were already emitted under.
+ *
  * `User` is an identity table under the multitenancy middleware's
  * Identifier/Account exemption, so these queries carry no `projectId` — the
  * model has none, and a user is not scoped to a project.
  */
-export class PrismaIdentityUsersRepository
-  implements IdentityUsersRepository, LegacySignInAccountDirectory
-{
-  constructor(private readonly prisma: PrismaClient) {}
+export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
+  constructor(
+    private readonly prisma: PrismaClient | Prisma.TransactionClient,
+  ) {}
 
   async storeUserHashKeyIfMissing({
     userId,
@@ -29,10 +43,14 @@ export class PrismaIdentityUsersRepository
     userId: string;
     userHashKey: string;
   }): Promise<void> {
-    await this.prisma.user.updateMany({
-      where: { id: userId, userHashKey: null },
-      data: { userHashKey },
-    });
+    await this.prisma.$executeRaw`
+      -- @tenancy: User is an identity table, addressed by its own id.
+      UPDATE "User"
+         SET "userHashKey" = ${userHashKey},
+             "updatedAt" = now()
+       WHERE "id" = ${userId}
+         AND "userHashKey" IS NULL
+    `;
   }
 
   async findEmail({ userId }: { userId: string }): Promise<string | null> {
@@ -178,6 +196,31 @@ export class PrismaIdentityUsersRepository
   }
 
   /**
+   * One person by id, for the hooks that already hold one.
+   *
+   * A single shape rather than a select per caller: four hooks read this row
+   * about the same person on the same request, and four different selects of
+   * five small columns bought nothing but four places to keep in step.
+   */
+  async findById({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<IdentityUserRow | null> {
+    return await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        deactivatedAt: true,
+        pendingSsoSetup: true,
+        signupConfirmationPending: true,
+      },
+    });
+  }
+
+  /**
    * Marks the address confirmed on whoever holds it.
    *
    * Case-insensitive for the same reason `findUserIdByEmail` is: rows written
@@ -194,5 +237,53 @@ export class PrismaIdentityUsersRepository
       where: { email: { equals: email, mode: "insensitive" } },
       data: { emailVerified: true, signupConfirmationPending: false },
     });
+  }
+
+  /** The soft-block banner's flag (ADR-027): set when somebody signs in with
+   *  a provider their organization's SSO does not name. */
+  async updatePendingSsoSetup({
+    userId,
+    pendingSsoSetup,
+  }: {
+    userId: string;
+    pendingSsoSetup: boolean;
+  }): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { pendingSsoSetup },
+    });
+  }
+
+  async updateLastLoginAt({
+    userId,
+    lastLoginAt,
+  }: {
+    userId: string;
+    lastLoginAt: Date;
+  }): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { lastLoginAt },
+    });
+  }
+
+  /**
+   * How many organizations this person belongs to.
+   *
+   * Counted through `User._count.orgMemberships` rather than over
+   * `OrganizationUser` directly, because the multitenancy middleware refuses
+   * an `OrganizationUser` query that names no organization — and this
+   * question names no organization by definition.
+   */
+  async countOrganizationMemberships({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<number> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { _count: { select: { orgMemberships: true } } },
+    });
+    return user?._count.orgMemberships ?? 0;
   }
 }

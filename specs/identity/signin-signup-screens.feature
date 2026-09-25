@@ -82,6 +82,21 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     When I click into the field or start typing my address
     Then the passkey offer starts, once, and never again for this visit
 
+  # Focus has not moved yet when a pointer goes down, so it still names what
+  # somebody is clicking AWAY from, which on a screen that autofocuses the
+  # address field is the address field. Reading focus there armed the offer
+  # from a click on any control on the card, "Continue" included — and
+  # Continue runs a passkey ceremony of its own. Two ceremonies share one
+  # server-side challenge: the second overwrites the first, and both
+  # assertions are then turned down, so a passkey that was fine reads as one
+  # the account does not hold.
+  @integration
+  Scenario: Clicking a button on the card is not reaching for the address field
+    Given this deployment offers passkeys
+    And the entrance focuses the address field for me
+    When I click a button on the card without touching the field
+    Then no passkey request has started
+
   # ── The device is being asked, and the card says so ────────────────────
   #
   # A WebAuthn ceremony hands the screen to the browser and the operating
@@ -260,7 +275,7 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   # The link proves the address but does not choose or create a credential.
   # Its proof is bound to the address and may be consumed only once by the
   # account-creation boundary.
-  @integration @e2e
+  @integration
   Scenario: Opening the link unlocks credential choice
     Given I asked to sign up and have not opened the confirmation link
     When I open the link
@@ -298,7 +313,7 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   # precedes the account and credential writes; those writes are not one
   # cross-resource transaction. If enrollment then fails, recovery starts
   # with a fresh email proof rather than replaying the claimed one.
-  @unit @e2e
+  @unit
   Scenario: Signing up with a passkey consumes the verified address proof
     Given I returned with a valid proof for an address that has no account
     When I create a passkey instead of choosing a password
@@ -341,6 +356,52 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     When I reopen its confirmation link
     Then no password or passkey control is shown
     And I am offered a fresh confirmation link
+
+  # An installation with no email provider cannot prove an address (ADR-117,
+  # revision 2026-09-25). Sign-up there enrolls a password and leaves the
+  # address unconfirmed, so domain join requests and OAuth account linking,
+  # which require a confirmed address, stay closed for that account.
+  @unit @integration @e2e
+  Scenario: An installation that cannot send email signs up with a password and leaves the address unconfirmed
+    Given the installation has no email provider configured
+    When I start sign-up with my email
+    Then no confirmation link is sent
+    And the screen says the address is not confirmed and asks for a password
+    And no passkey sign-up is offered
+    When I choose a password
+    Then my account is created with its address unconfirmed
+    And I am signed in
+
+  # A provider that is named but unusable (a mistyped EMAIL_PROVIDER, a
+  # missing credential) is a misconfiguration: sign-up keeps asking for the
+  # mailed link and fails loudly rather than skipping address confirmation.
+  @unit
+  Scenario: A misconfigured email provider keeps sign-up on the mailed link
+    Given the installation names an email provider it cannot use
+    When I start sign-up with my email
+    Then no unconfirmed address proof is issued
+    And the confirmation link is attempted through the provider
+
+  @unit
+  Scenario: An unconfirmed address proof is refused once the installation can send email
+    Given I hold an unconfirmed address proof minted while no email provider was configured
+    And the installation now has an email provider
+    When I try to enroll or register with that proof
+    Then it is refused and no account is created
+
+  @unit
+  Scenario: A confirmed address proof and an unconfirmed one never stand in for each other
+    Given an unconfirmed address proof for my address
+    When it is checked or claimed as a confirmed proof
+    Then it is refused
+    And a confirmed proof is refused where an unconfirmed one is asked for
+
+  @unit @integration
+  Scenario: Without a way to send email, the address confirmation nudge stays silent
+    Given the installation has no email provider configured
+    And my account's address is unconfirmed
+    Then no resend confirmation action is offered for it
+    And asking to send the confirmation anyway is refused with a named error
 
   @integration
   Scenario: Post-link routing still governs credential enrollment
@@ -421,7 +482,8 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   # The interstitial's CONTRACT ships with D13 and is bound below (verified
   # email in, decision out, nothing rendered when there is nothing to offer).
   # Which organizations will take an address, and the words that go with them,
-  # are D12's - so this stays parked until D12 fills the seam.
+  # are D12's, and D12 has filled the seam - so this is bound rather than
+  # parked, against the page at /auth/join.
   @integration
   Scenario: Sign-up offers my team before offering a new workspace
     Given my verified domain matches an organization that allows joining
@@ -506,6 +568,45 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     When the picker renders
     Then nothing is promoted and nothing is badged
     And the methods stay in the order the decision named
+
+  # The dial cannot write the badge — a consent screen somebody backs out of
+  # would wear it forever — so the method is parked and only a session may
+  # promote it. Nothing on the sign-in screen can be what notices: a federated
+  # callback returns the browser to wherever the sign-in was heading, and that
+  # screen is never mounted again. The session fetch is the one thing every
+  # landing passes through, so it is where the promotion belongs.
+  @unit
+  Scenario: A social provider that got me in is badged, wherever the callback lands
+    Given I dialled a social provider and it signed me in
+    When the browser lands anywhere in the app holding a session
+    Then that provider is badged the next time the door is drawn
+
+  @unit
+  Scenario: A social provider I backed out of is never badged
+    Given I dialled a social provider and abandoned it before it signed me in
+    When the browser comes back with no session
+    Then nothing is badged
+
+  # The parked method has to be retired by whatever gets the person in next,
+  # or an abandoned dial outlives its own flow: back out of the consent
+  # screen, sign in with a password, and the first session fetch after that
+  # promotes the provider straight over the badge the password just earned.
+  @unit
+  Scenario: A method I abandoned cannot take the badge from the one that got me in
+    Given I dialled a social provider and abandoned it
+    When I sign in with my password instead
+    Then the password is badged, and stays badged once I am let in
+
+  # The hand-off nobody clicks. A typed address that routes to an organization's
+  # identity provider is dialled for the person, with no button pressed, and
+  # that is the ordinary way in for everybody whose organization owns their
+  # domain. It has to earn the badge the same way a pressed button does, or
+  # the people who sign in this way every day are the ones never badged.
+  @integration
+  Scenario: A provider my address was routed to is badged once it lets me in
+    Given my address routes to my organization's identity provider
+    When I am taken there without pressing anything, and it lets me in
+    Then that provider is badged
 
   # Every button on the rail is live, or it is not there. A screen that drew a
   # provider the deployment never mounted would be offering a door that opens
@@ -879,3 +980,26 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   Scenario: No unauthenticated journey touches an Auth0-hosted page
     When every unauthenticated journey is walked
     Then no page, asset, or redirect resolves to an Auth0-hosted surface
+
+  @integration @regression
+  Scenario: Signing out does not start another provider sign-in
+    Given an identity provider still has an active session
+    When I reach the signed-out confirmation page
+    Then no sign-in routing or provider handoff starts
+    And I can explicitly choose to log in again
+
+  @integration @regression
+  Scenario: A sole SSO provider waits for a sign-in gesture
+    Given the self-hosted installation has one active SSO connection
+    When I open the sign-in page without submitting an address
+    Then I see a button for that provider without an automatic redirect
+    When I choose to continue with that provider
+    Then the provider sign-in starts
+
+  @unit @regression
+  Scenario: Logout reports a revocation failure instead of confirming success
+    Given a signed-in session is stored in the database and session cache
+    When either store cannot complete revocation
+    Then logout reports the failure
+    And it still attempts to revoke the session from the other store
+    And it does not confirm that the person is signed out

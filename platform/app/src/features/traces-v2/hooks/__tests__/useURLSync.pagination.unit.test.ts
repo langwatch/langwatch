@@ -18,8 +18,9 @@ import { act, renderHook } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { INITIAL_TIME_RANGE, useFilterStore } from "../../stores/filterStore";
-import { ACTIVE_LENS_KEY, useViewStore } from "../../stores/viewStore";
+import { useExplorerStore } from "../../stores/explorerStore";
+import { INITIAL_TIME_RANGE } from "../../stores/querySlice";
+import { ACTIVE_LENS_KEY } from "../../stores/viewSlice";
 import { getPresetById } from "../../utils/timeRangePresets";
 import { useURLSync } from "../useURLSync";
 
@@ -31,7 +32,7 @@ const CURSOR_PAGE_3 = { sortValue: 1_700_000_001_000, traceId: "trace-c" };
 
 /** Put the store where a user lands after clicking Next twice. */
 function seedThirdPage(): void {
-  useFilterStore.setState({
+  useExplorerStore.setState({
     page: 3,
     pageCursors: { 1: null, 2: CURSOR_PAGE_2, 3: CURSOR_PAGE_3 },
   });
@@ -42,7 +43,7 @@ function popState(): void {
 }
 
 const pagination = () => {
-  const { page, pageCursors } = useFilterStore.getState();
+  const { page, pageCursors } = useExplorerStore.getState();
   return { page, pageCursors };
 };
 
@@ -51,7 +52,7 @@ function selectSevenDayRange(): void {
   const preset = getPresetById("7d");
   if (!preset) throw new Error("the 7d preset went missing");
   const { from, to } = preset.compute();
-  useFilterStore
+  useExplorerStore
     .getState()
     .setTimeRange({ from, to, label: preset.label, presetId: preset.id });
 }
@@ -64,12 +65,15 @@ beforeEach(() => {
   // The bare-URL branch reads the stored last-used lens, so leaving one behind
   // would make these tests depend on their own execution order.
   window.localStorage.removeItem(ACTIVE_LENS_KEY);
-  useFilterStore.getState().clearAll();
-  useFilterStore.setState({
+  useExplorerStore.getState().clearAll();
+  useExplorerStore.setState({
     timeRange: INITIAL_TIME_RANGE,
     debouncedTimeRange: INITIAL_TIME_RANGE,
   });
-  useViewStore.setState({ activeLensId: "all-traces", draftState: new Map() });
+  useExplorerStore.setState({
+    activeLensId: "all-traces",
+    draftState: new Map(),
+  });
 });
 
 describe("useURLSync pagination across browser history navigation", () => {
@@ -102,7 +106,7 @@ describe("useURLSync pagination across browser history navigation", () => {
           popState();
         });
 
-        expect(useFilterStore.getState().queryText).toBe("status:error");
+        expect(useExplorerStore.getState().queryText).toBe("status:error");
         expect(pagination()).toEqual({ page: 1, pageCursors: { 1: null } });
       });
     });
@@ -132,7 +136,7 @@ describe("useURLSync pagination across browser history navigation", () => {
           popState();
         });
 
-        expect(useViewStore.getState().activeLensId).toBe("all-traces");
+        expect(useExplorerStore.getState().activeLensId).toBe("all-traces");
         expect(pagination()).toEqual({ page: 1, pageCursors: { 1: null } });
       });
     });
@@ -198,7 +202,7 @@ describe("useURLSync pagination across browser history navigation", () => {
           popState();
         });
 
-        expect(useFilterStore.getState().timeRange.presetId).toBe("30d");
+        expect(useExplorerStore.getState().timeRange.presetId).toBe("30d");
         expect(pagination()).toEqual({ page: 1, pageCursors: { 1: null } });
       });
     });

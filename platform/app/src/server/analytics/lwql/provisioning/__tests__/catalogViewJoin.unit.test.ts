@@ -19,20 +19,30 @@ import { describe, expect, it } from "vitest";
 import { lwqlNamesForSuite } from "../../__tests__/lwqlClickHouseHarness";
 import { lwqlViewByName } from "../../catalog/lwqlViews";
 import type { LangWatchQLViewDefinition } from "../../catalog/types";
-import { lwqlRowPolicyStatement } from "../accessModel";
+import { renderLwqlAccessModelDdl } from "../accessModelDdl";
+import { buildLwqlAccessModelDefinition } from "../accessModelDefinition";
 import {
   LWQL_SOURCE_ALIAS,
   lwqlJoinSourceColumnGrantStatement,
   lwqlSourceColumnGrantStatement,
   lwqlSourceTables,
-  lwqlViewSetupStatements,
   lwqlViewStatement,
   SHIPPED_LWQL_DEDUP,
 } from "../catalogStatements";
+import type { PostgresNamedCollection } from "../postgresMapping";
 
 /** The names the snapshot fixture was captured under. */
 const NAMES = lwqlNamesForSuite("snap");
 const SOURCE_DATABASE = "langwatch";
+
+const NAMED_COLLECTION: PostgresNamedCollection = {
+  collection: "lwql_postgres",
+  host: "pg.internal",
+  port: 5432,
+  database: SOURCE_DATABASE,
+  user: "lwql_ro",
+  password: "reader-secret",
+};
 
 /**
  * A synthetic two-table view — `join_left` ⋈ `join_right` on `Key`, with a
@@ -190,26 +200,27 @@ describe("given a catalog view that joins a second table", () => {
     });
   });
 
-  describe("when the full setup is generated", () => {
-    const statements = lwqlViewSetupStatements({
-      names: NAMES,
-      sourceDatabase: SOURCE_DATABASE,
-      views: [JOIN_VIEW],
-      dedup: SHIPPED_LWQL_DEDUP,
-    });
+  describe("when the full access model is generated", () => {
+    const statements = renderLwqlAccessModelDdl(
+      buildLwqlAccessModelDefinition({
+        names: NAMES,
+        passwordSha256Hex: "a".repeat(64),
+        namedCollection: NAMED_COLLECTION,
+        sourceDatabase: SOURCE_DATABASE,
+        views: [JOIN_VIEW],
+      }),
+    );
 
     it("creates a row policy for both physical tables", () => {
       for (const table of ["join_left", "join_right"]) {
-        const expected = lwqlRowPolicyStatement({
-          names: NAMES,
-          lwqlTable: {
-            table,
-            tenantColumn: "TenantId",
-            database: SOURCE_DATABASE,
-          },
-          sourceDatabase: SOURCE_DATABASE,
-        });
-        expect(statements).toContain(expected);
+        expect(
+          statements.some((statement) =>
+            statement.startsWith(
+              `CREATE ROW POLICY OR REPLACE ${table}_tenant ON ${SOURCE_DATABASE}.${table}`,
+            ),
+          ),
+          `${table} must carry a tenant row policy`,
+        ).toBe(true);
       }
     });
 

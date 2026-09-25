@@ -31,6 +31,7 @@ export const originColors: Record<
   sample: { background: "gray.subtle", color: "gray.emphasized" },
   coding_agent: { background: "orange.subtle", color: "orange.emphasized" },
   ai_tool: { background: "yellow.subtle", color: "yellow.emphasized" },
+  langy: { background: "orange.subtle", color: "orange.emphasized" },
 };
 
 /**

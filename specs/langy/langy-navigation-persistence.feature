@@ -69,6 +69,16 @@ Feature: Langy persists across in-project navigation
     When I reload the window
     Then I am on the new, empty conversation — not the one before it
 
+  # The row click and the composer read the same pointer: what the panel
+  # draws after picking a conversation from the recent list is where the
+  # next message goes.
+  @integration
+  Scenario: A message typed into a reopened conversation continues it
+    Given I opened a past conversation from the recent chats list
+    When I type a message into the panel's composer and send it
+    Then the turn continues that conversation, by its id
+    And no new conversation is created
+
   @unit
   Scenario: Nothing follows me into another account
     Given I had a conversation open in project "demo"

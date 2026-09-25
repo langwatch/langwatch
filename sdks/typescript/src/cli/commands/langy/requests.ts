@@ -20,7 +20,12 @@ import type { WorkspaceInfo } from "../../../agent/local-control-protocol";
 import { buildAuthHeaders } from "../../../internal/api/auth";
 import { LANGWATCH_SDK_VERSION } from "../../../internal/constants";
 import { langwatchFetch } from "../../../internal/http/langwatchFetch";
-import { resolveCredentials } from "../../utils/apiKey";
+import {
+  type LoginElsewhere,
+  loginElsewhereMessage as sessionElsewhereMessage,
+  loginMadeElsewhere,
+  resolvePersonCredentials,
+} from "../../utils/apiKey";
 import { isLoggedIn, loadConfig } from "../../utils/governance/config";
 import {
   askBox,
@@ -59,7 +64,15 @@ export interface ApprovedControl {
   conversation: { id: string; title: string; url: string };
 }
 
-export class ShareControlError extends Error {}
+export class ShareControlError extends Error {
+  /** The HTTP status of the refusal, when the platform answered with one. */
+  readonly status?: number;
+
+  constructor(message: string, { status }: { status?: number } = {}) {
+    super(message);
+    if (status !== undefined) this.status = status;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // The folder
@@ -108,14 +121,40 @@ const quiet = (command: string, args: string[], cwd: string): string | null => {
 };
 
 /** The lockfile that says which package manager the folder uses. */
+/** The file's text, or nothing when it is not there or cannot be read. */
+function readText(file: string): string {
+  try {
+    return fs.readFileSync(file, "utf8");
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * uv owns a Python folder when its lock file is there, when `pyproject.toml`
+ * carries a `[tool.uv]` table, or when the virtual environment was made by
+ * uv: its `pyvenv.cfg` carries a `uv = <version>` line. The last one matters
+ * most, because a venv uv made has no pip in it, so every pip spelling fails
+ * there while `uv add` works.
+ */
+function uvOwns(root: string): boolean {
+  if (fs.existsSync(path.join(root, "uv.lock"))) return true;
+  if (/^\[tool\.uv[\].]/m.test(readText(path.join(root, "pyproject.toml")))) {
+    return true;
+  }
+  return /^uv\s*=/m.test(readText(path.join(root, ".venv", "pyvenv.cfg")));
+}
+
 export function packageManagerOf(root: string): string | undefined {
+  // uv wins over every other signal: a folder with a JS lockfile beside its
+  // Python project still installs the Python package through uv.
+  if (uvOwns(root)) return "uv";
   const lockfiles: Array<[string, string]> = [
     ["pnpm-lock.yaml", "pnpm"],
     ["yarn.lock", "yarn"],
     ["bun.lockb", "bun"],
     ["bun.lock", "bun"],
     ["package-lock.json", "npm"],
-    ["uv.lock", "uv"],
     ["poetry.lock", "poetry"],
     ["Pipfile.lock", "pipenv"],
     ["requirements.txt", "pip"],
@@ -134,8 +173,12 @@ export function packageManagerOf(root: string): string | undefined {
  * shares its folder, the skill just learns less about it.
  */
 export function describeWorkspace(root: string): WorkspaceInfo {
-  const inside = quiet("git", ["rev-parse", "--is-inside-work-tree"], root);
-  const isRepository = inside === "true";
+  // rev-parse fails the same way when git is missing and when the folder is
+  // not a repository; only with git present does the failure say "not a repository".
+  const gitPresent = quiet("git", ["--version"], root) !== null;
+  const isRepository =
+    gitPresent &&
+    quiet("git", ["rev-parse", "--is-inside-work-tree"], root) === "true";
   const branch = isRepository
     ? quiet("git", ["rev-parse", "--abbrev-ref", "HEAD"], root)
     : null;
@@ -151,6 +194,7 @@ export function describeWorkspace(root: string): WorkspaceInfo {
   return {
     root,
     name: path.basename(root),
+    ...(gitPresent ? { gitRepository: isRepository } : {}),
     ...(branch ? { gitBranch: branch } : {}),
     ...(remote ? { gitRemote: remote } : {}),
     ...(status === null ? {} : { gitDirty: status !== "" }),
@@ -222,6 +266,7 @@ export function createControlApi({
     if (!response.ok) {
       throw new ShareControlError(
         refusalText(body) ?? `LangWatch answered ${response.status} for ${urlPath}`,
+        { status: response.status },
       );
     }
     return body;
@@ -247,6 +292,25 @@ export function createControlApi({
   };
 }
 
+/**
+ * Whether the platform takes the login's key. Only a 401 says it does not:
+ * any other failure is left for the request list to report in its own words.
+ */
+export async function platformTakesTheKey(
+  credentials: PersonCredentials,
+  { fetchImpl }: { fetchImpl?: typeof fetch } = {},
+): Promise<boolean> {
+  try {
+    await createControlApi({
+      ...credentials,
+      ...(fetchImpl === undefined ? {} : { fetchImpl }),
+    }).list();
+    return true;
+  } catch (error) {
+    return !(error instanceof ShareControlError && error.status === 401);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // The terminal
 // ---------------------------------------------------------------------------
@@ -260,22 +324,84 @@ export function hasDeviceSession(): boolean {
   }
 }
 
+/** What the command says when the sign-in left no login it can use. */
+export const SIGN_IN_FAILED_MESSAGE =
+  "Could not sign you in, so this folder is not shared. Run `langwatch login --device`, then run `langwatch langy --share-control` again.";
+
 /**
- * Signs in when the machine has no device session, then resolves the
- * credentials. The login is the standard flow, called rather than repeated.
+ * What the command says when the login belongs to another address. A project
+ * key is no way out here, since the command acts as a person.
+ */
+export const loginElsewhereMessage = (elsewhere: LoginElsewhere): string =>
+  sessionElsewhereMessage({
+    ...elsewhere,
+    outcome: ", so this folder is not shared",
+    canUseApiKey: false,
+  });
+
+export type PersonCredentials = {
+  apiKey: string;
+  endpoint: string;
+  projectId?: string;
+};
+
+/**
+ * The credentials the command acts with: the device login on this machine,
+ * and only that. A control request is addressed to the person who asked, and
+ * a `LANGWATCH_API_KEY`, in the folder's .env or in the shell, names no
+ * person the command line can see, so it is never read here and the folder's
+ * .env is never written.
+ *
+ * With no login, or with one that cannot be used (the server refuses it, it
+ * holds no login key, or `isAccepted` says the platform turned its key down),
+ * the device login runs right away and the login is read again. The login is
+ * the standard flow, called rather than repeated. A sign-in that still leaves
+ * no usable login ends the command with `SIGN_IN_FAILED_MESSAGE`.
+ *
+ * A login made against another address than the one the command targets ends
+ * the command before any key is read: the key stays with the address that
+ * issued it, and replacing the machine's login is the person's call.
  */
 export async function ensureSignedIn({
   login,
+  isAccepted = async () => true,
 }: {
   login: (options: { device: boolean }) => Promise<void>;
-}): Promise<{ apiKey: string; endpoint: string; projectId?: string }> {
-  if (!hasDeviceSession() && !process.env.LANGWATCH_API_KEY?.trim()) {
+  /** Whether the platform takes the login's key. Defaults to yes. */
+  isAccepted?: (credentials: PersonCredentials) => Promise<boolean>;
+}): Promise<PersonCredentials> {
+  const elsewhere = loginMadeElsewhere();
+  if (elsewhere) throw new ShareControlError(loginElsewhereMessage(elsewhere));
+
+  const usableLogin = async () => {
+    const found = await resolvePersonCredentials();
+    return found && (await isAccepted(found)) ? found : undefined;
+  };
+
+  const hadLogin = hasDeviceSession();
+  let credentials = await usableLogin();
+  if (!credentials) {
     console.log(
-      chalk.gray("No login on this machine yet. Signing in first."),
+      chalk.gray(
+        hadLogin
+          ? "The login on this machine can no longer be used. Signing in again."
+          : "No login on this machine yet. Signing in first.",
+      ),
     );
-    await login({ device: true });
+    try {
+      await login({ device: true });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message.trim() : "";
+      throw new ShareControlError(
+        reason === ""
+          ? SIGN_IN_FAILED_MESSAGE
+          : `${SIGN_IN_FAILED_MESSAGE} (${reason})`,
+      );
+    }
+    credentials = await usableLogin();
+    if (!credentials) throw new ShareControlError(SIGN_IN_FAILED_MESSAGE);
   }
-  const credentials = await resolveCredentials();
+  console.log(chalk.gray(loginLine()));
   return {
     apiKey: credentials.apiKey,
     endpoint: credentials.endpoint,
@@ -283,6 +409,33 @@ export async function ensureSignedIn({
       ? {}
       : { projectId: credentials.projectId }),
   };
+}
+
+/**
+ * The one line that says who the command acts as: the person and their
+ * organization, as the login recorded them. A request is addressed to the
+ * person and answered on the request's own project, so no project and no
+ * --project belong in this line.
+ */
+const nonEmpty = (value: string | undefined): string | undefined => {
+  const trimmed = value?.trim();
+  return trimmed === "" ? undefined : trimmed;
+};
+
+export function loginLine(): string {
+  let cfg: ReturnType<typeof loadConfig> | undefined;
+  try {
+    cfg = loadConfig();
+  } catch {
+    cfg = undefined;
+  }
+  const person = nonEmpty(cfg?.user?.name) ?? nonEmpty(cfg?.user?.email);
+  const organization = nonEmpty(cfg?.organization?.name);
+  if (person && organization) {
+    return `Using your login as ${person} at ${organization}.`;
+  }
+  if (person) return `Using your login as ${person}.`;
+  return "Using your login.";
 }
 
 const requestTitle = (
@@ -588,7 +741,10 @@ function refusalText(body: unknown): string | undefined {
     code?: unknown;
   };
   if (Array.isArray(tips)) {
-    const lines = tips.filter((t): t is string => typeof t === "string" && t !== "");
+    const lines = tips
+      .filter((t): t is string => typeof t === "string" && t.trim() !== "")
+      .map((t) => t.trim())
+      .map((t) => (/[.!?]$/.test(t) ? t : `${t}.`));
     if (lines.length > 0) return lines.join(" ");
   }
   if (typeof message === "string" && message !== "" && message !== code) {

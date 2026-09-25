@@ -9,6 +9,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentCacheRepository } from "../agent-cache.repository";
 import { AgentCacheService } from "../agent-cache.service";
 
+// Reload the logger so reused unit workers cannot retain another suite's output configuration.
+vi.hoisted(() => vi.resetModules());
+
 vi.mock("~/utils/encryption", () => ({
   encrypt: (value: string) => `sealed:${value}`,
   decrypt: (value: string) => {

@@ -16,6 +16,7 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { ReceiptText, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
+import { spendKeyLabel } from "~/components/gateway/spendKeyLabel";
 import { Link } from "~/components/ui/link";
 import { Select } from "~/components/ui/select";
 import { Tooltip as UITooltip } from "~/components/ui/tooltip";
@@ -354,7 +355,7 @@ function BillingEventRow({
           </Text>
         )}
       </Table.Cell>
-      <Table.Cell>{virtualKeyName ?? row.virtualKeyId}</Table.Cell>
+      <Table.Cell>{spendKeyLabel({ row, virtualKeyName })}</Table.Cell>
       <Table.Cell>{row.endUserId || ""}</Table.Cell>
       <Table.Cell>
         <HStack gap={1}>

@@ -34,7 +34,7 @@ func AuthMiddleware(resolver app.AuthResolver) func(http.Handler) http.Handler {
 				return
 			}
 
-			bundle, err := resolver.Resolve(r.Context(), token)
+			bundle, err := resolver.Resolve(r.Context(), presentedKey(r, token))
 			if err != nil {
 				herr.WriteHTTP(w, err)
 				return
@@ -152,6 +152,17 @@ func BundleFromContext(ctx context.Context) *domain.Bundle {
 	return nil
 }
 
+// presentedKey pairs a license token with the install that sent it. The
+// instance header is read for a license token only, so a virtual key resolves
+// and caches exactly as it would without the header.
+func presentedKey(r *http.Request, token string) domain.PresentedKey {
+	key := domain.PresentedKey{Token: token}
+	if key.IsLicenseToken() {
+		key.InstanceID = strings.TrimSpace(r.Header.Get(headerInstanceID))
+	}
+	return key
+}
+
 func extractToken(r *http.Request) string {
 	if a := r.Header.Get("Authorization"); a != "" {
 		if len(a) > 7 && strings.EqualFold(a[:7], "Bearer ") {
@@ -178,6 +189,7 @@ func extractToken(r *http.Request) string {
 }
 
 const (
+	headerInstanceID       = "X-LangWatch-Instance"
 	headerEndUserID        = "X-LangWatch-End-User-Id"
 	headerEndUserIDLiteLLM = "X-Litellm-End-User-Id"
 	headerRequestMetadata  = "X-LangWatch-Metadata"

@@ -16,7 +16,13 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -64,10 +70,17 @@ vi.mock("~/features/langy/stores/langyStore", () => {
 // SearchBar pulls in tRPC via useOrganizationTeamProject + useModelProvidersSettings
 // (used by the global AI shortcut). These tests don't wrap with withTRPC, so
 // stub them out to keep the smoke render free of provider boilerplate.
+//
+// Mutable so the Instant Evals gate suite can give the SearchBar a project id
+// (typedEvalRunOf needs one) without disturbing every other suite's default
+// of no project.
+const orgProjectMock: { project: { id: string } | undefined } = {
+  project: undefined,
+};
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
-    project: undefined,
-    organization: undefined,
+    project: orgProjectMock.project,
+    organization: { id: "org-1" },
     team: undefined,
     isFetching: false,
   }),
@@ -93,6 +106,47 @@ vi.mock("../../../hooks/useFacetSearch", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 
+// Enter on a sentence calls `tracesV2.routeSearch`; the hook's own routing
+// is covered by useSubmitSearch.integration, so the mutation is stubbed
+// here rather than mounting a tRPC provider.
+//
+// The estimate mutate and the feature-flag read are mutable so the Instant
+// Evals gate suite can flip the flag result and assert on one shared spy —
+// a fresh `vi.fn()` per render (the old shape) can never be asserted on.
+const estimateMutate = vi.fn();
+const routeSearchMutate = vi.fn();
+const featureFlagMock: {
+  data: { enabled: boolean } | undefined;
+  isLoading: boolean;
+} = { data: { enabled: true }, isLoading: false };
+vi.mock("~/utils/api", () => ({
+  api: {
+    tracesV2: {
+      routeSearch: {
+        useMutation: () => ({ mutate: routeSearchMutate, isPending: false }),
+      },
+      instantEval: {
+        estimate: {
+          useMutation: () => ({ mutate: estimateMutate, isPending: false }),
+        },
+        start: {
+          useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+        },
+      },
+    },
+    // The Instant Evals gate reads this flag; stub it enabled so these
+    // smoke tests exercise the flag-on path unless a test overrides it.
+    featureFlag: {
+      isEnabled: {
+        useQuery: () => ({
+          data: featureFlagMock.data,
+          isLoading: featureFlagMock.isLoading,
+        }),
+      },
+    },
+  },
+}));
+
 // @paper-design/shaders-react requires WebGL, which jsdom does not provide.
 // The shader backdrop is decorative; rendering nothing keeps the SearchBar
 // mountable without crashing on an unhandled WebGL constructor rejection.
@@ -100,17 +154,42 @@ vi.mock("@paper-design/shaders-react", () => ({
   MeshGradient: () => null,
 }));
 
-import { useFilterStore } from "../../../stores/filterStore";
+import { traceViewContextChip } from "~/features/langy/hooks/useLangyTraceViewContext";
+import { useExplorerStore } from "../../../stores/explorerStore";
+import { useSearchSubmitRequestStore } from "../../../stores/searchSubmitRequestStore";
+import { SEARCH_BAR_PLACEHOLDER } from "../PlaceholderEditor";
 import { SearchBar } from "../SearchBar";
 import { SEARCH_HANDOFF_DRAFT } from "../searchLangyHandoff";
 
+/** The view chip the handoff attaches, built the way the page builds it. */
+function expectedViewChip(): { type: "filter"; id: string; label: string } {
+  const view = useExplorerStore.getState();
+  const filter = view;
+  const lens = view.allLenses.find((l) => l.id === view.activeLensId);
+  const chip = traceViewContextChip({
+    queryText: filter.queryText,
+    timeRange: filter.timeRange,
+    lens: lens
+      ? {
+          id: view.activeLensId,
+          name: lens.name,
+          isSavedView: !lens.isBuiltIn,
+          hasLocalChanges: view.draftState.has(view.activeLensId),
+        }
+      : undefined,
+    grouping: view.grouping,
+    sort: view.sort,
+  });
+  return { type: "filter", id: chip.ref ?? chip.id, label: chip.label };
+}
+
 afterEach(() => {
   cleanup();
-  useFilterStore.getState().clearAll();
+  useExplorerStore.getState().clearAll();
 });
 
 beforeEach(() => {
-  useFilterStore.getState().clearAll();
+  useExplorerStore.getState().clearAll();
   langyMock.enabled = false;
   langyMock.panelOpen = false;
   langyMock.draft = "";
@@ -118,6 +197,12 @@ beforeEach(() => {
   langyMock.open.mockClear();
   langyMock.attach.mockClear();
   langyMock.setDraft.mockClear();
+  orgProjectMock.project = undefined;
+  estimateMutate.mockClear();
+  routeSearchMutate.mockClear();
+  featureFlagMock.data = { enabled: true };
+  featureFlagMock.isLoading = false;
+  useSearchSubmitRequestStore.getState().clear();
 });
 
 function renderSearchBar() {
@@ -130,11 +215,18 @@ function renderSearchBar() {
 
 describe("<SearchBar /> wiring smoke", () => {
   describe("when the component mounts with no active query", () => {
-    it("renders the placeholder", () => {
+    /** @scenario "Search bar renders with placeholder text" */
+    it("renders the placeholder, which invites a filter or a sentence", () => {
       renderSearchBar();
 
-      const placeholder = document.querySelector("[data-placeholder]");
+      const placeholder = document.querySelector(
+        "[data-placeholder]",
+      ) as HTMLElement;
       expect(placeholder).toBeInTheDocument();
+      expect(placeholder.dataset.placeholder).toBe(SEARCH_BAR_PLACEHOLDER);
+      expect(placeholder.dataset.placeholder).toBe(
+        "Search filters or type what you are looking for",
+      );
     });
 
     it("defers TipTap mount until interaction", () => {
@@ -157,7 +249,7 @@ describe("<SearchBar /> wiring smoke", () => {
 
   describe("when the store has an active query", () => {
     it("renders the query text inside the placeholder", () => {
-      useFilterStore.getState().applyQueryText("@status:error");
+      useExplorerStore.getState().applyQueryText("@status:error");
       renderSearchBar();
 
       const placeholder = document.querySelector(
@@ -167,7 +259,7 @@ describe("<SearchBar /> wiring smoke", () => {
     });
 
     it("shows the clear button", () => {
-      useFilterStore.getState().applyQueryText("@status:error");
+      useExplorerStore.getState().applyQueryText("@status:error");
       renderSearchBar();
 
       expect(screen.getByText(/clear/i)).toBeInTheDocument();
@@ -176,10 +268,10 @@ describe("<SearchBar /> wiring smoke", () => {
 
   describe("when the store has a parse error", () => {
     it("records the parse error in the store", () => {
-      useFilterStore.getState().applyQueryText('@status:"unclosed');
+      useExplorerStore.getState().applyQueryText('@status:"unclosed');
       renderSearchBar();
 
-      expect(useFilterStore.getState().parseError).not.toBeNull();
+      expect(useExplorerStore.getState().parseError).not.toBeNull();
     });
   });
 });
@@ -193,13 +285,13 @@ describe("<SearchBar /> ask affordance", () => {
       expect(screen.queryByText("Ask Langy")).not.toBeInTheDocument();
     });
 
-    it("keeps the Ask AI placeholder wording", () => {
+    it("keeps the ask out of the placeholder: the button is the way to ask", () => {
       renderSearchBar();
 
       const placeholder = document.querySelector(
         "[data-placeholder]",
       ) as HTMLElement;
-      expect(placeholder.dataset.placeholder).toContain("Ask AI");
+      expect(placeholder.dataset.placeholder).not.toContain("Ask");
     });
   });
 
@@ -208,20 +300,16 @@ describe("<SearchBar /> ask affordance", () => {
       langyMock.enabled = true;
     });
 
-    it("labels the affordance Ask Langy", () => {
+    /** @scenario "The ask button reads Ask Langy" */
+    it("labels the affordance Ask Langy and keeps the placeholder the same", () => {
       renderSearchBar();
 
       expect(screen.getByText("Ask Langy")).toBeInTheDocument();
       expect(screen.queryByText("Ask AI")).not.toBeInTheDocument();
-    });
-
-    it("swaps the placeholder wording to Ask Langy", () => {
-      renderSearchBar();
-
       const placeholder = document.querySelector(
         "[data-placeholder]",
       ) as HTMLElement;
-      expect(placeholder.dataset.placeholder).toContain("Ask Langy");
+      expect(placeholder.dataset.placeholder).toBe(SEARCH_BAR_PLACEHOLDER);
     });
 
     describe("when Ask Langy is clicked with the panel closed", () => {
@@ -240,7 +328,7 @@ describe("<SearchBar /> ask affordance", () => {
       });
 
       it("shows that the applied search will go with the question", () => {
-        useFilterStore.getState().applyQueryText("@status:error");
+        useExplorerStore.getState().applyQueryText("@status:error");
         renderSearchBar();
 
         fireEvent.click(screen.getByRole("button", { name: "Ask Langy" }));
@@ -250,9 +338,11 @@ describe("<SearchBar /> ask affordance", () => {
     });
 
     describe("when a question is typed into the floating bar and sent", () => {
-      it("asks Langy the question with the applied search attached, and the bar dissolves", () => {
-        useFilterStore.getState().applyQueryText("@status:error");
-        const applied = useFilterStore.getState().queryText;
+      /** @scenario "Ask Langy sends the whole view with the question" */
+      it("asks Langy the question with the view and the applied search attached, and the bar dissolves", () => {
+        useExplorerStore.getState().applyQueryText("@status:error");
+        const applied = useExplorerStore.getState().queryText;
+        const viewChip = expectedViewChip();
         renderSearchBar();
         fireEvent.click(screen.getByRole("button", { name: "Ask Langy" }));
 
@@ -263,7 +353,13 @@ describe("<SearchBar /> ask affordance", () => {
         fireEvent.keyDown(input, { key: "Enter" });
 
         expect(langyMock.ask).toHaveBeenCalledWith("why are these failing?");
-        expect(langyMock.attach).toHaveBeenCalledWith({
+        // The view first (time range, lens, sort, the search), then the
+        // filter chip the agent applies: at least what the passive page
+        // context sends.
+        expect(langyMock.attach).toHaveBeenNthCalledWith(1, viewChip);
+        expect(viewChip.id).toContain("search and attribute filters:");
+        expect(viewChip.id).toContain(applied);
+        expect(langyMock.attach).toHaveBeenNthCalledWith(2, {
           type: "filter",
           id: applied,
           label: `filtered: ${applied}`,
@@ -288,8 +384,8 @@ describe("<SearchBar /> ask affordance", () => {
       });
 
       it("uses the open panel — the search attaches, no second composer floats", () => {
-        useFilterStore.getState().applyQueryText("@status:error");
-        const applied = useFilterStore.getState().queryText;
+        useExplorerStore.getState().applyQueryText("@status:error");
+        const applied = useExplorerStore.getState().queryText;
         renderSearchBar();
 
         fireEvent.click(screen.getByRole("button", { name: "Ask Langy" }));
@@ -308,6 +404,86 @@ describe("<SearchBar /> ask affordance", () => {
           document.querySelector("[data-placeholder]"),
         ).toBeInTheDocument();
       });
+    });
+  });
+});
+
+// `isInstantEvalAvailable = instantEvalsReleased || instantEvalsFlagLoading`
+// (SearchBar.tsx) is the gate every eval-chip submit runs through before it
+// is allowed to reach the estimate. These tests drive a real submit through
+// `useSearchSubmitRequestStore` — the same door a page button uses — since
+// jsdom cannot type into TipTap (see the file banner). That store's request
+// reaches `useSubmitSearch` the way Enter would, which reaches the real
+// `useInstantEvalRoute` mounted inside `SearchBar`, so the wiring under test
+// is the production wiring end to end, not a stub of it.
+//
+// Spec: specs/traces-v2/instant-eval-search.feature ("A refusal is a
+// popover, never an error state").
+describe("<SearchBar /> Instant Evals gate", () => {
+  beforeEach(() => {
+    orgProjectMock.project = { id: "project-1" };
+  });
+
+  describe("given the Instant Evals flag is off for the project", () => {
+    beforeEach(() => {
+      featureFlagMock.data = { enabled: false };
+      featureFlagMock.isLoading = false;
+    });
+
+    /** @scenario "Instant Evals switched off open the contact-us popover and nothing is searched" */
+    it("opens the contact-us popover and searches nothing", async () => {
+      const typed = 'eval:"the user is annoyed"';
+      // Seeds the store the way the bar shows a recognized chip while the
+      // reader is still typing it, so the post-submit assertion can tell a
+      // preserved value apart from an incidental empty default.
+      useExplorerStore.getState().applyQueryText(typed);
+      renderSearchBar();
+
+      act(() => {
+        useSearchSubmitRequestStore.getState().requestSubmit({ text: typed });
+      });
+
+      expect(
+        await screen.findByTestId("instant-eval-refusal"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Instant Evals aren't enabled for this project yet"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Contact us" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Not now" }),
+      ).toBeInTheDocument();
+      expect(estimateMutate).not.toHaveBeenCalled();
+      expect(routeSearchMutate).not.toHaveBeenCalled();
+      // Nothing was applied over it: the chip stays exactly where the
+      // reader left it, under the popover that explains why it did not run.
+      expect(useExplorerStore.getState().queryText).toBe(typed);
+    });
+  });
+
+  describe("given the Instant Evals flag read is still in flight", () => {
+    beforeEach(() => {
+      featureFlagMock.data = undefined;
+      featureFlagMock.isLoading = true;
+    });
+
+    /** @scenario "A flag read still in flight lets the submit reach the estimate" */
+    it("lets the submit reach the estimate and opens no popover", () => {
+      renderSearchBar();
+
+      act(() => {
+        useSearchSubmitRequestStore
+          .getState()
+          .requestSubmit({ text: 'eval:"the user is annoyed"' });
+      });
+
+      expect(estimateMutate).toHaveBeenCalledTimes(1);
+      expect(routeSearchMutate).not.toHaveBeenCalled();
+      expect(
+        screen.queryByTestId("instant-eval-refusal"),
+      ).not.toBeInTheDocument();
     });
   });
 });

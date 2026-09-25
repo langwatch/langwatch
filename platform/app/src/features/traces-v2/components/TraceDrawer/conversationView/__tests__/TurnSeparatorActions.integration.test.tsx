@@ -100,7 +100,7 @@ function renderTurn({ showSessionCheckbox = false } = {}) {
         assistantText="the original answer"
         assistantReasoning=""
         gapSecs={0}
-        showGap={false}
+        shouldShowGap={false}
         index={1}
         isCurrent={false}
         onSelect={() => undefined}

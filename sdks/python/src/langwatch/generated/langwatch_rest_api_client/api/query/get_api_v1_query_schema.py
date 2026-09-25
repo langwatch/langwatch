@@ -99,8 +99,13 @@ def sync_detailed(
     the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join
     keys, partition-pruning time column, freshness and a runnable example query.
 
-    Scoped to the credential's own project and its permissions: a column this key cannot read is listed
-    with `available: false` rather than hidden, so a caller can see what a wider key would unlock.
+    Also lists the app functions a projection may call (`functions`), each with its signature, the type
+    and encoding of the value it returns, how many distinct keys one run may read, and the permissions
+    it needs.
+
+    Scoped to the credential's own project and its permissions: a column or function this key cannot
+    read is listed with `available: false` rather than hidden, so a caller can see what a wider key
+    would unlock.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -136,8 +141,13 @@ def sync(
     the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join
     keys, partition-pruning time column, freshness and a runnable example query.
 
-    Scoped to the credential's own project and its permissions: a column this key cannot read is listed
-    with `available: false` rather than hidden, so a caller can see what a wider key would unlock.
+    Also lists the app functions a projection may call (`functions`), each with its signature, the type
+    and encoding of the value it returns, how many distinct keys one run may read, and the permissions
+    it needs.
+
+    Scoped to the credential's own project and its permissions: a column or function this key cannot
+    read is listed with `available: false` rather than hidden, so a caller can see what a wider key
+    would unlock.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -168,8 +178,13 @@ async def asyncio_detailed(
     the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join
     keys, partition-pruning time column, freshness and a runnable example query.
 
-    Scoped to the credential's own project and its permissions: a column this key cannot read is listed
-    with `available: false` rather than hidden, so a caller can see what a wider key would unlock.
+    Also lists the app functions a projection may call (`functions`), each with its signature, the type
+    and encoding of the value it returns, how many distinct keys one run may read, and the permissions
+    it needs.
+
+    Scoped to the credential's own project and its permissions: a column or function this key cannot
+    read is listed with `available: false` rather than hidden, so a caller can see what a wider key
+    would unlock.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -203,8 +218,13 @@ async def asyncio(
     the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join
     keys, partition-pruning time column, freshness and a runnable example query.
 
-    Scoped to the credential's own project and its permissions: a column this key cannot read is listed
-    with `available: false` rather than hidden, so a caller can see what a wider key would unlock.
+    Also lists the app functions a projection may call (`functions`), each with its signature, the type
+    and encoding of the value it returns, how many distinct keys one run may read, and the permissions
+    it needs.
+
+    Scoped to the credential's own project and its permissions: a column or function this key cannot
+    read is listed with `available: false` rather than hidden, so a caller can see what a wider key
+    would unlock.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

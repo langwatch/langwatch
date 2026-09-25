@@ -12,7 +12,6 @@
 
 import { Box, Button, Text, VStack } from "@chakra-ui/react";
 import { ArrowLeft } from "lucide-react";
-import { NewSimulationsCallout } from "~/components/suites/NewSimulationsCallout";
 import { FG_MUTED } from "../shared/design";
 import { AgentTestingPeriodPicker } from "../shared/PeriodPicker";
 import type { PeriodControls } from "./period-controls";
@@ -140,8 +139,8 @@ export function RunsSidebar({
         <ArrowLeft size={13} /> Results
       </Button>
 
-      {/* Only the list scrolls: the announcement and the period picker stay
-          in reach however long the run history grows. */}
+      {/* Only the list scrolls: the period picker stays in reach however
+          long the run history grows. */}
       <VStack align="stretch" gap={1} flex={1} minHeight={0} overflow="auto">
         {isPendingShown ? <PendingEntry /> : null}
 
@@ -152,8 +151,6 @@ export function RunsSidebar({
           isPendingShown={isPendingShown}
         />
       </VStack>
-
-      <NewSimulationsCallout target="runs" />
 
       <Box paddingLeft={1} paddingTop={4}>
         <AgentTestingPeriodPicker

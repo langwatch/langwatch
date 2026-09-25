@@ -1,20 +1,21 @@
 Feature: License Generation
 
-  # All scenarios in this file describe admin-side UI flows on the license
-  # generation drawer (form validation, plan-template auto-population,
-  # download filename, "Generate Another" reset). The underlying
-  # generateLicenseKey function is unit-tested in
-  # ee/licensing/__tests__/licenseGenerationService.unit.test.ts but the
-  # drawer UI itself has no component-level test fixture yet — all
-  # aspirational pending that harness.
+  # Licenses are issued by a LangWatch operator on the Backoffice Licenses
+  # screen, signed with the server's signing key. No private key is ever typed
+  # or pasted into a form. What the registry records for each issued license is
+  # specified in specs/self-hosting/connected-services/license-registry.feature.
+  #
+  # The UI scenarios below describe the issue drawer on that screen and have no
+  # component-level harness yet. The underlying generateLicenseKey function is
+  # unit-tested in ee/licensing/__tests__/licenseGenerationService.unit.test.ts.
 
-  As an administrator
-  I want to generate licenses for organizations
+  As a LangWatch operator
+  I want to issue licenses for customer organizations
   So that I can provide valid license keys for self-hosted deployments
 
   Background:
-    Given I am logged in as an administrator
-    And I am on the licensing settings page
+    Given I am signed in as a LangWatch operator
+    And I am on the Backoffice Licenses screen
 
   # Happy path - full system flow
   @e2e @unimplemented

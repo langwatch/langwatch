@@ -9,10 +9,15 @@ import {
 import { fireSignupNurturingCalls } from "~/../ee/billing/nurturing/hooks/signupIdentification";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
-import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
+import { trackOnboardingVariantAssigned } from "~/server/onboarding/guided-onboarding.analytics";
+import {
+  onboardingVariantSchema,
+  signUpDataSchema,
+} from "~/server/schemas/sign-up-data.schema";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { organizationRouter } from "../organization";
 import { projectRouter } from "../project";
+import { guidedOnboardingProcedures } from "./guided";
 
 /**
  * Router for handling onboarding-related operations.
@@ -36,6 +41,10 @@ export const onboardingRouter = createTRPCRouter({
         // ADR-038: declared signup intent. Optional for rolling-deploy
         // tolerance; absent means NULL, the safe legacy default.
         primaryIntent: z.enum(["AGENT_GOVERNANCE", "LLM_OPS"]).optional(),
+        // Which onboarding the user is going through, resolved by the welcome
+        // flow from the experiment flag. Absent leaves the sign-up data as it
+        // was: a deployment without the experiment records no variant.
+        onboardingVariant: onboardingVariantSchema.optional(),
 
         // Project details
         projectName: z.string().optional(),
@@ -48,12 +57,20 @@ export const onboardingRouter = createTRPCRouter({
     })
     .mutation(async ({ input, ctx }) => {
       try {
+        const signUpData =
+          input.onboardingVariant === undefined
+            ? input.signUpData
+            : {
+                ...input.signUpData,
+                onboardingVariant: input.onboardingVariant,
+              };
+
         // Create and assign organization
         const orgRouter = organizationRouter.createCaller(ctx);
         const orgResult = await orgRouter.createAndAssign({
           orgName: input.orgName,
           phoneNumber: input.phoneNumber,
-          signUpData: input.signUpData,
+          signUpData,
           primaryIntent: input.primaryIntent,
         });
         if (!orgResult.success) {
@@ -167,6 +184,14 @@ export const onboardingRouter = createTRPCRouter({
           primaryIntent: input.primaryIntent,
         });
 
+        if (input.onboardingVariant) {
+          trackOnboardingVariantAssigned({
+            userId: ctx.session.user.id,
+            organizationId: orgResult.organization.id,
+            variant: input.onboardingVariant,
+          });
+        }
+
         // Return success response with team and project slugs
         // (projectSlug is null for governance-intent signups)
         return {
@@ -216,4 +241,6 @@ export const onboardingRouter = createTRPCRouter({
 
       return { success: true };
     }),
+
+  ...guidedOnboardingProcedures,
 });

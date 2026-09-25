@@ -92,6 +92,16 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
         dedup: SHIPPED_LWQL_DEDUP,
       }),
     );
+    // Grants and row policies for the PG-resident half, from the single
+    // access-model emitter (#8258) — the mapping and view statements are
+    // structural only. `extraViews` (not `views`): the whole model is re-minted
+    // on every apply (CREATE USER OR REPLACE), so it must carry the base fixture
+    // grants too, or the compound-shape reads over the native `traces` fixture
+    // lose their grant.
+    await harness.applyAccessModel({
+      extraViews: POSTGRES_VIEWS,
+      sourceDatabase: harness.factDatabase,
+    });
     tenantA = await harness.restrictedClient({
       keyHash: harness.tenantA.keyHash,
     });
@@ -186,6 +196,80 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
           serialised.includes("excluded-"),
           `${view.name}: an excluded column's data reached the LangWatchQL schema`,
         ).toBe(false);
+      }
+    });
+  });
+
+  describe("when a caller queries an organization-scoped view", () => {
+    /**
+     * `virtual_keys` derives its TenantId by walking
+     * Organization -> Team -> Project, so it fans out to one row per project
+     * in the organization rather than filtering a single owning column. Two
+     * organizations, each with its own project and one VirtualKey, is what
+     * makes this a meaningful negative test rather than a vacuous one.
+     */
+    /** @scenario "An organization-scoped view never shows another organization's rows" */
+    it("returns only the caller's own organization's virtual keys", async () => {
+      const rowsA = await selectRows<{
+        TenantId: string;
+        VirtualKeyId: string;
+        Name: string;
+      }>(
+        tenantA,
+        `SELECT TenantId, VirtualKeyId, Name FROM ${database}.virtual_keys ORDER BY VirtualKeyId`,
+      );
+      expect(rowsA).toHaveLength(1);
+      expect(rowsA[0]?.TenantId).toBe(harness.tenantA.tenantId);
+      expect(rowsA[0]?.Name).toBe(`VK ${harness.tenantA.tenantId}`);
+
+      const tenantB = await harness.restrictedClient({
+        keyHash: harness.tenantB.keyHash,
+      });
+      const rowsB = await selectRows<{
+        TenantId: string;
+        VirtualKeyId: string;
+        Name: string;
+      }>(
+        tenantB,
+        `SELECT TenantId, VirtualKeyId, Name FROM ${database}.virtual_keys ORDER BY VirtualKeyId`,
+      );
+      expect(rowsB).toHaveLength(1);
+      expect(rowsB[0]?.TenantId).toBe(harness.tenantB.tenantId);
+      expect(rowsB[0]?.Name).toBe(`VK ${harness.tenantB.tenantId}`);
+    });
+  });
+
+  describe("when a caller asks for traffic by topic name", () => {
+    /**
+     * The fixture `traces` table this suite provisions (`FACT_TABLE_DDL` in
+     * `lwqlClickHouseHarness.ts`, since this file starts the harness with no
+     * `facts` option and so gets the `"fixture"` default) carries no TopicId
+     * column, so the JOIN the scenario names cannot be exercised against it —
+     * only the shipped, migrated `trace_summaries` table carries `TopicId`.
+     * Falling back to asserting the `topics` view alone still proves the
+     * property this file owns: only the caller's own project's topics are
+     * ever reachable. The real JOIN binding for "Traffic by topic name" lives
+     * in `catalogStatements.integration.test.ts`, so this test carries no such
+     * annotation.
+     */
+    it("lists only the caller's own project's topics", async () => {
+      const rows = await selectRows<{
+        TopicId: string;
+        TopicName: string;
+        ParentTopicId: string | null;
+      }>(
+        tenantA,
+        `SELECT TopicId, TopicName, ParentTopicId FROM ${database}.topics ORDER BY TopicId`,
+      );
+
+      expect(rows.map((row) => row.TopicId)).toEqual([
+        `${harness.tenantA.tenantId}-topic-1`,
+        `${harness.tenantA.tenantId}-topic-2`,
+      ]);
+      for (const row of rows) {
+        expect(
+          row.TopicName.startsWith(`Topic ${harness.tenantA.tenantId}`),
+        ).toBe(true);
       }
     });
   });
@@ -765,5 +849,124 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
         "the key map was not restored, later tests would still see the duplicate",
       ).toBe(control.tenantA);
     });
+  });
+
+  describe("when a project has a private conversation and a shared one", () => {
+    /**
+     * The generic per-tenant seed's one Langy conversation is forced shared
+     * (`SEED_COLUMN_OVERRIDES.LangyConversationProjection.isShared` in
+     * `lwqlPostgresModelSeed.ts`) precisely so every *other* generic
+     * per-dataset isolation proof in this file keeps finding a visible
+     * tenant-a row through the five Langy views' rowFilter — that generic
+     * row is this test's *shared* conversation, with no extra seeding
+     * needed. Only the *private* one is hand-seeded here: the generic
+     * seeder produces one row per model per tenant, so a second
+     * conversation in the same project needs its own statements.
+     *
+     * `langy-conversation.prisma.repository.ts` would show tenant-a's
+     * private conversation to its own owner and hide it from every other
+     * member; LWQL has no caller-identity concept below the project, so the
+     * approved view's `rowFilter` is the only place left to enforce that a
+     * project member reading through analytics sees the shared conversation
+     * and never the private one.
+     */
+    const SHARED_CONVERSATION_ID = () =>
+      `${harness.tenantA.tenantId}-conversationId`;
+    const PRIVATE_CONVERSATION_ID = () =>
+      `${harness.tenantA.tenantId}-private-conversation`;
+
+    const LANGY_VIEWS = [
+      "langy_conversation_projections",
+      "langy_conversation_turn_projections",
+      "langy_message_projections",
+      "langy_turn_requests",
+      "langy_active_turns",
+    ];
+
+    const privateSeedStatements = (): string[] => {
+      const tenantId = harness.tenantA.tenantId;
+      const conversationId = PRIVATE_CONVERSATION_ID();
+      const userId = `${tenantId}-user-b`;
+      const turnId = `${tenantId}-private-turn-1`;
+      const requestId = `${tenantId}-private-req-1`;
+      return [
+        `INSERT INTO "LangyConversationProjection" (` +
+          `id, "projectId", "conversationId", "userId", "titleSource", "status", ` +
+          `"isShared", "messageCount", "createdAt", "updatedAt", "occurredAt", ` +
+          `"acceptedAt", "lastEventId", "projectionVersion") VALUES (` +
+          `'${tenantId}-private-conv', '${tenantId}', '${conversationId}', '${userId}', ` +
+          `'user', 'active', false, 0, 1700000000000, 1700000000000, 1700000000000, ` +
+          `1700000000000, 'evt-private-1', '1')`,
+        `INSERT INTO "LangyConversationTurnProjection" (` +
+          `id, "projectId", "conversationId", "turnId", "status", "questionParts", ` +
+          `"answerParts", "toolCalls", "createdAt", "updatedAt", "occurredAt", ` +
+          `"acceptedAt", "lastEventId", "projectionVersion") VALUES (` +
+          `'${tenantId}-private-turn', '${tenantId}', '${conversationId}', '${turnId}', ` +
+          `'completed', '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, 1700000000000, ` +
+          `1700000000000, 1700000000000, 1700000000000, 'evt-private-turn-1', '1')`,
+        `INSERT INTO "LangyMessageProjection" (` +
+          `id, "projectId", "conversationId", "messageId", "role", "parts", ` +
+          `"sourceEventId", "occurredAt", "acceptedAt", "createdAt", "updatedAt") VALUES (` +
+          `'${tenantId}-private-msg', '${tenantId}', '${conversationId}', ` +
+          `'${tenantId}-private-msg-1', 'user', '[]'::jsonb, 'evt-private-msg-1', ` +
+          `1700000000000, 1700000000000, 1700000000000, 1700000000000)`,
+        `INSERT INTO "LangyTurnRequest" (` +
+          `id, "projectId", "userId", "requestId", "conversationId", "turnId", ` +
+          `"status", "leaseOwner", "leaseExpiresAt") VALUES (` +
+          `'${tenantId}-private-req', '${tenantId}', '${userId}', '${requestId}', ` +
+          `'${conversationId}', '${turnId}', 'completed', 'worker-1', now())`,
+        `INSERT INTO "LangyActiveTurn" (` +
+          `id, "projectId", "conversationId", "turnId", "requestId", "userId", ` +
+          `"status", "leaseOwner", "leaseExpiresAt") VALUES (` +
+          `'${tenantId}-private-active', '${tenantId}', '${conversationId}', '${turnId}', ` +
+          `'${requestId}', '${userId}', 'active', 'worker-1', now() + interval '1 hour')`,
+      ];
+    };
+
+    const deletePrivateSeed = async (): Promise<void> => {
+      const conversationId = PRIVATE_CONVERSATION_ID();
+      for (const table of [
+        "LangyActiveTurn",
+        "LangyTurnRequest",
+        "LangyMessageProjection",
+        "LangyConversationTurnProjection",
+        "LangyConversationProjection",
+      ]) {
+        await postgres.asAdmin(
+          `DELETE FROM "${table}" WHERE "conversationId" = '${conversationId}'`,
+        );
+      }
+    };
+
+    /** @scenario "Per-user visibility is enforced at the approved view" */
+    it("shows the shared conversation and hides the private one, across all five Langy views", async () => {
+      for (const sql of privateSeedStatements()) {
+        const result = await postgres.asAdmin(sql);
+        expect(
+          result.exitCode,
+          `seeding failed: ${sql}\n${result.stderr}`,
+        ).toBe(0);
+      }
+
+      try {
+        for (const view of LANGY_VIEWS) {
+          const rows = await selectRows(
+            tenantA,
+            `SELECT * FROM ${database}.${view}`,
+          );
+          const serialised = JSON.stringify(rows);
+          expect(
+            serialised.includes(PRIVATE_CONVERSATION_ID()),
+            `${view}: the private conversation's data reached the caller`,
+          ).toBe(false);
+          expect(
+            serialised.includes(SHARED_CONVERSATION_ID()),
+            `${view}: the shared conversation never reached the caller`,
+          ).toBe(true);
+        }
+      } finally {
+        await deletePrivateSeed();
+      }
+    }, 60_000);
   });
 });

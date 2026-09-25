@@ -16,6 +16,7 @@ import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import { createLogger } from "@langwatch/observability";
 import { WebSocket, WebSocketServer } from "ws";
+import type { ZodError, ZodIssue } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { ResolvedToken } from "~/server/api-key/token-resolver";
 import type { UpgradeRouter } from "~/server/websockets/upgrade-router";
@@ -31,6 +32,8 @@ import { instanceChannel, pendingKey } from "./keys";
 import {
   type PlatformFrame,
   PROTOCOL_VERSION,
+  resultFrameSchema,
+  type SdkFrame,
   sdkFrameSchema,
 } from "./protocol";
 import type { ConnectedAgentRuntime } from "./runtime";
@@ -46,6 +49,10 @@ const SERVICE_RESTART_CLOSE_CODE = 1012;
 
 /** Close code for a refused connection: the SDK prints and backs off. */
 const POLICY_VIOLATION_CLOSE_CODE = 1008;
+
+/** The start of the error a call fails with when its result fails the schema. */
+export const UNREADABLE_RESULT_MESSAGE =
+  "the agent answered a result LangWatch cannot read";
 
 export interface ConnectGatewayOptions {
   runtime: ConnectedAgentRuntime;
@@ -169,8 +176,8 @@ export class ConnectGateway {
     resolved: ResolvedToken,
     raw: WebSocket.RawData,
   ): Promise<void> {
-    const parsed = parseSdkFrame(raw);
-    if (parsed?.type !== "register") {
+    const read = readSdkFrame(raw);
+    if (read.kind !== "frame" || read.frame.type !== "register") {
       this.refuse(
         ws,
         new AgentRegisterRefusedError({
@@ -180,7 +187,7 @@ export class ConnectGateway {
       );
       return;
     }
-    const frame = parsed;
+    const frame = read.frame;
 
     let info: SessionInfo;
     let registered: PlatformFrame;
@@ -285,8 +292,13 @@ export class ConnectGateway {
     session: Session,
     raw: WebSocket.RawData,
   ): Promise<void> {
-    const frame = parseSdkFrame(raw);
-    if (!frame) return;
+    const read = readSdkFrame(raw);
+    if (read.kind === "dropped") return;
+    if (read.kind === "unreadable_result") {
+      await this.failUnreadableResult(session, read);
+      return;
+    }
+    const { frame } = read;
     switch (frame.type) {
       case "ack":
         await this.core.ack(session.info, frame.callId);
@@ -303,6 +315,33 @@ export class ConnectGateway {
         // with a fresh socket to change what it serves.
         return;
     }
+  }
+
+  /**
+   * A result the platform cannot read, for a call this socket holds, fails
+   * that call now: the instance has answered and will not answer again, so
+   * waiting for the deadline only delays the same outcome. A result under a
+   * call id this socket does not hold is dropped, as any unreadable frame is.
+   */
+  private async failUnreadableResult(
+    session: Session,
+    { callId, issue }: { callId: string; issue: string },
+  ): Promise<void> {
+    if (!session.activeCallIds.has(callId)) return;
+    session.activeCallIds.delete(callId);
+    logger.warn(
+      { instanceId: session.info.instanceId, callId, issue },
+      "result frame fails the schema, failing the call",
+    );
+    await this.core.result(session.info, {
+      type: "result",
+      protocol: PROTOCOL_VERSION,
+      callId,
+      error: {
+        code: "agent_call_failed",
+        message: `${UNREADABLE_RESULT_MESSAGE}: ${issue}`,
+      },
+    });
   }
 
   /** Presence refresh on the SDK's pongs, and the ping that asks for them. */
@@ -374,16 +413,64 @@ export class ConnectGateway {
   }
 }
 
-function parseSdkFrame(raw: WebSocket.RawData) {
+/** What one message off the socket turned out to be. */
+export type SdkFrameRead =
+  | { kind: "frame"; frame: SdkFrame }
+  /** A result under a call id that fails the schema: the call can be failed. */
+  | { kind: "unreadable_result"; callId: string; issue: string }
+  /** Not JSON, or not a frame the platform knows: nothing to act on. */
+  | { kind: "dropped" };
+
+export function readSdkFrame(raw: WebSocket.RawData | string): SdkFrameRead {
+  let json: unknown;
   try {
-    const parsed = sdkFrameSchema.safeParse(JSON.parse(rawToString(raw)));
-    return parsed.success ? parsed.data : null;
+    json = JSON.parse(rawToString(raw));
   } catch {
-    return null;
+    return { kind: "dropped" };
   }
+  const parsed = sdkFrameSchema.safeParse(json);
+  if (parsed.success) return { kind: "frame", frame: parsed.data };
+  const callId = resultCallIdOf(json);
+  if (callId === null) return { kind: "dropped" };
+  // The result schema on its own names the field that failed; the union of
+  // every frame only says that no member matched.
+  const result = resultFrameSchema.safeParse(json);
+  if (result.success) return { kind: "frame", frame: result.data };
+  return {
+    kind: "unreadable_result",
+    callId,
+    issue: describeIssue(result.error),
+  };
 }
 
-function rawToString(raw: WebSocket.RawData): string {
+function resultCallIdOf(json: unknown): string | null {
+  if (typeof json !== "object" || json === null) return null;
+  const { type, callId } = json as Record<string, unknown>;
+  return type === "result" && typeof callId === "string" && callId
+    ? callId
+    : null;
+}
+
+/** The deepest issue as "path: message": in a union, the member that got furthest. */
+function describeIssue(error: ZodError): string {
+  const leaves = leafIssues(error.issues);
+  const deepest = leaves.reduce(
+    (best, issue) => (issue.path.length > best.path.length ? issue : best),
+    leaves[0] ?? { path: [], message: "Invalid input" },
+  );
+  const path = deepest.path.join(".");
+  return path ? `${path}: ${deepest.message}` : deepest.message;
+}
+
+function leafIssues(issues: ZodIssue[]): ZodIssue[] {
+  return issues.flatMap((issue) =>
+    issue.code === "invalid_union"
+      ? leafIssues(issue.unionErrors.flatMap((member) => member.issues))
+      : [issue],
+  );
+}
+
+function rawToString(raw: WebSocket.RawData | string): string {
   if (typeof raw === "string") return raw;
   if (Array.isArray(raw)) return Buffer.concat(raw).toString("utf8");
   if (Buffer.isBuffer(raw)) return raw.toString("utf8");

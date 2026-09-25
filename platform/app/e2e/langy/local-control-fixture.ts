@@ -20,13 +20,25 @@
  * @see dev/docs/adr/129-langy-local-control.md
  */
 
-import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, promises as fs, readFileSync } from "node:fs";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
+import {
+  closeSync,
+  existsSync,
+  promises as fs,
+  openSync,
+  readFileSync,
+  realpathSync,
+} from "node:fs";
 import * as net from "node:net";
+import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { APP_BASE, PROJECT_ID } from "./config";
-import type { LangyAdapter } from "./langy-agent";
+import {
+  type LangyAdapter,
+  type LangyToolEvent,
+  toolEventOf,
+} from "./langy-agent";
 import { getSessionCookie, trpcMutate, trpcQuery } from "./trpc";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -34,31 +46,68 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** The repository root of this checkout, from `platform/app/e2e/langy`. */
 export const REPO_ROOT = path.resolve(__dirname, "../../../..");
 
-/** Where a run puts the temporary repositories it shares with Langy. */
-const SCENARIO_REPO_DIR = path.join(
-  REPO_ROOT,
-  ".claude",
-  "tmp",
-  "scenario-repos",
-);
+/**
+ * Where a run puts the temporary folders it shares with Langy.
+ *
+ * Outside every checkout, and that is the whole point. git finds a repository
+ * by walking up, so a folder with no repository of its own that sits inside a
+ * checkout is inside that checkout's repository: the scenario whose premise is
+ * a folder with no repository had Langy run `git checkout -b` there, and the
+ * branch landed on the lane's own checkout while the run was going, moving its
+ * HEAD and firing its hooks. A folder outside every checkout cannot be walked
+ * into one.
+ *
+ * The share-control profile also exports `GIT_CEILING_DIRECTORIES`, which stops
+ * the walk when a command can read it. That is a second belt and not the fix:
+ * the CLI hands each command an allowlisted environment, on purpose, and the
+ * ceiling is not on the list, so it never reaches the command that needs it.
+ */
+export const SCENARIO_REPO_DIR =
+  process.env.LANGY_SCENARIO_REPO_DIR ??
+  path.join(os.homedir(), ".langwatch-scenario-repos");
 
-/** The demo applications a scenario can share. */
-export type DemoLanguage = "python" | "typescript";
+/**
+ * The demo applications a scenario can share: the two ACME support agents,
+ * and the ACME checkout agent, a LangGraph application with no LangWatch
+ * dependency at all that the guided onboarding has Langy instrument.
+ */
+export type DemoLanguage = "python" | "typescript" | "langgraph";
 
-const DEMO_SOURCE: Record<DemoLanguage, string> = {
-  python: path.join(REPO_ROOT, "dev", "dogfood", "acme-support", "python"),
-  typescript: path.join(
-    REPO_ROOT,
-    "dev",
-    "dogfood",
-    "acme-support",
-    "typescript",
-  ),
+interface DemoSource {
+  /** The folder copied into the temporary repository. */
+  dir: string;
+  /** What installs and runs the copy. */
+  runtime: "uv" | "npm";
+  /** The subject of the copy's first commit. */
+  commit: string;
+}
+
+const DEMO: Record<DemoLanguage, DemoSource> = {
+  python: {
+    dir: path.join(REPO_ROOT, "dev", "dogfood", "acme-support", "python"),
+    runtime: "uv",
+    commit: "chore: the ACME support agent",
+  },
+  typescript: {
+    dir: path.join(REPO_ROOT, "dev", "dogfood", "acme-support", "typescript"),
+    runtime: "npm",
+    commit: "chore: the ACME support agent",
+  },
+  langgraph: {
+    dir: path.join(REPO_ROOT, "dev", "dogfood", "acme-checkout", "python"),
+    runtime: "uv",
+    commit: "chore: the ACME checkout agent",
+  },
 };
 
-/** Never copied: they are rebuilt in the temporary repository, or they are noise. */
+/**
+ * Never copied: they are rebuilt in the temporary repository, or they are
+ * noise. `.env` is the developer's own credentials in the source folder; the
+ * copy gets the ones its launcher writes.
+ */
 const SKIPPED_ENTRIES = new Set([
   ".git",
+  ".env",
   ".venv",
   "node_modules",
   "__pycache__",
@@ -88,7 +137,7 @@ const sleep = (ms: number): Promise<void> =>
  * The model key the demo applications need, from the environment or from the
  * app's own `.env`, which is where this checkout keeps it.
  */
-function openaiKey(): string {
+export function openaiKey(): string {
   const fromEnvironment = process.env.OPENAI_API_KEY;
   if (fromEnvironment) return fromEnvironment;
   try {
@@ -100,6 +149,30 @@ function openaiKey(): string {
   } catch {
     return "";
   }
+}
+
+/**
+ * The provider values the demo application reads from its own `.env`.
+ * `app/graph.py` builds an Azure model when the three Azure values are set and
+ * an OpenAI one otherwise, so a run moves the demo with LANGY_GUIDED_PROVIDER
+ * the same way it moves Langy and the judge.
+ */
+export function demoProviderEnvLines(): string[] {
+  if (process.env.LANGY_GUIDED_PROVIDER !== "azure") {
+    return [`OPENAI_API_KEY=${openaiKey()}`];
+  }
+  const resource = process.env.AZURE_RESOURCE_NAME;
+  const key = process.env.AZURE_API_KEY;
+  if (!resource || !key) {
+    throw new Error(
+      "AZURE_RESOURCE_NAME and AZURE_API_KEY are required with LANGY_GUIDED_PROVIDER=azure",
+    );
+  }
+  return [
+    `AZURE_OPENAI_ENDPOINT=https://${resource}.openai.azure.com`,
+    `AZURE_OPENAI_API_KEY=${key}`,
+    `AZURE_OPENAI_API_VERSION=${process.env.AZURE_API_VERSION ?? "2024-10-21"}`,
+  ];
 }
 
 /**
@@ -150,19 +223,179 @@ async function waitFor<T>({
 
 let cliApiKeyPromise: Promise<string> | null = null;
 
+/** The organization that holds the test project. */
+async function organizationIdOfProject(cookie: string): Promise<string> {
+  const organizations = await trpcQuery<
+    Array<{
+      id: string;
+      teams?: Array<{ projects?: Array<{ id: string }> }>;
+    }>
+  >({ cookie, path: "organization.getAll", input: {} });
+  const organizationId =
+    organizations.find((organization) =>
+      (organization.teams ?? []).some((team) =>
+        (team.projects ?? []).some((project) => project.id === PROJECT_ID),
+      ),
+    )?.id ?? organizations[0]?.id;
+  if (!organizationId) {
+    throw new Error(
+      `no organization holds project ${PROJECT_ID}; check LANGY_PROJECT_ID`,
+    );
+  }
+  return organizationId;
+}
+
+/** What `POST /api/auth/cli/exchange` answers a device-session login with. */
+interface DeviceSessionExchange {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  user: { id: string; email: string; name?: string | null };
+  organization: { id: string; slug: string; name: string };
+  default_personal_vk?: { id?: string; secret?: string; prefix?: string };
+  personal_project?: {
+    id: string;
+    slug: string;
+    name: string;
+    api_key?: string;
+  };
+  cli_api_key?: string;
+  cli_api_key_scope?: {
+    kind: "organization" | "projects";
+    project_ids?: string[];
+    permissions?: string[];
+  };
+  endpoint?: string;
+}
+
+async function postCliAuth<T>({
+  route,
+  body,
+  cookie,
+}: {
+  route: string;
+  body: Record<string, unknown>;
+  cookie?: string;
+}): Promise<T> {
+  const response = await fetch(`${APP_BASE}/api/auth/cli/${route}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(cookie === undefined ? {} : { Cookie: cookie }),
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!response.ok) {
+    throw new Error(
+      `/api/auth/cli/${route} answered ${response.status}: ${(await response.text()).slice(0, 300)}`,
+    );
+  }
+  return (await response.json()) as T;
+}
+
+/**
+ * Sign the command line in the way `langwatch login --device` does, as the
+ * test's own user, and write the config file that login writes.
+ *
+ * The three steps are the product's own device flow: the command line's
+ * `device-code` request, the browser's `approve` (sent here with the user's
+ * session cookie, with no key selection, so the server stamps the default the
+ * authorize screen offers), and the command line's `exchange`. The file
+ * carries what `persistDeviceSession` keeps of the exchange, so
+ * `resolveCredentials` walks the same path a developer's login walks: the
+ * session, the personal project and the login key. No project key reaches the
+ * terminal's environment; a control request belongs to a person, and the
+ * person is who the login names.
+ */
+export async function writeCliLoginConfig({
+  configPath,
+}: {
+  configPath: string;
+}): Promise<void> {
+  const cookie = await getSessionCookie();
+  const organizationId = await organizationIdOfProject(cookie);
+  const code = await postCliAuth<{ device_code: string; user_code: string }>({
+    route: "device-code",
+    body: { credential_type: "device_session" },
+  });
+  await postCliAuth<unknown>({
+    route: "approve",
+    body: { user_code: code.user_code, organization_id: organizationId },
+    cookie,
+  });
+  const result = await postCliAuth<DeviceSessionExchange>({
+    route: "exchange",
+    body: { device_code: code.device_code },
+  });
+  const now = Math.floor(Date.now() / 1000);
+  const config = {
+    gateway_url: process.env.LANGWATCH_GATEWAY_URL ?? "http://localhost:5563",
+    control_plane_url: result.endpoint ?? APP_BASE,
+    access_token: result.access_token,
+    refresh_token: result.refresh_token,
+    expires_at: now + result.expires_in,
+    user: {
+      id: result.user.id,
+      email: result.user.email,
+      name: result.user.name,
+    },
+    organization: {
+      id: result.organization.id,
+      slug: result.organization.slug,
+      name: result.organization.name,
+    },
+    ...(result.default_personal_vk
+      ? { default_personal_vk: result.default_personal_vk }
+      : {}),
+    ...(result.personal_project?.api_key
+      ? {
+          personal_project: {
+            id: result.personal_project.id,
+            slug: result.personal_project.slug,
+            name: result.personal_project.name,
+            api_key: result.personal_project.api_key,
+            validated_at: now,
+          },
+        }
+      : {}),
+    ...(result.cli_api_key
+      ? {
+          cli_api_key: result.cli_api_key,
+          ...(result.cli_api_key_scope
+            ? {
+                cli_api_key_scope: {
+                  kind: result.cli_api_key_scope.kind,
+                  project_ids: result.cli_api_key_scope.project_ids ?? [],
+                  ...(Array.isArray(result.cli_api_key_scope.permissions)
+                    ? { permissions: result.cli_api_key_scope.permissions }
+                    : {}),
+                },
+              }
+            : {}),
+        }
+      : {}),
+  };
+  await fs.mkdir(path.dirname(configPath), { recursive: true, mode: 0o700 });
+  await fs.writeFile(configPath, JSON.stringify(config, null, 2), {
+    encoding: "utf8",
+    mode: 0o600,
+  });
+}
+
 /**
  * A user-scoped API key for the test's own user, bound to the test project.
  *
- * The command line signs in with a device session, and a control request
- * belongs to a person: a plain project key has no user behind it and lists no
- * requests. Rather than clicking through the device-code screens, the fixture
- * mints the same class of credential the login mints, through the product's
- * own `apiKey.create` mutation, as the signed-in user. `LANGWATCH_API_KEY` in
- * the command line's environment is then the credential it resolves, which is
- * the documented environment path of `resolveCredentials`.
+ * The scenario library reports its runs to the platform and the demo
+ * application it shares needs a key of its own, and the platform reads the
+ * test makes (open requests, conversations) authenticate the same way. The
+ * fixture mints the same class of credential the login mints, through the
+ * product's own `apiKey.create` mutation, as the signed-in user. The
+ * share-control terminal never sees it: that one signs in through
+ * `writeCliLoginConfig`.
  *
  * The key carries one PROJECT-scoped binding, so the platform resolves the
- * project from the key alone and the command line never has to name one.
+ * project from the key alone.
  *
  * The mint is read back before it is used. A `apiKey.create` that answers 200
  * has been seen to leave the binding unwritten under load, and the key that
@@ -174,23 +407,7 @@ export function getCliApiKey(): Promise<string> {
   cliApiKeyPromise ??= (async () => {
     try {
       const cookie = await getSessionCookie();
-      const organizations = await trpcQuery<
-        Array<{
-          id: string;
-          teams?: Array<{ projects?: Array<{ id: string }> }>;
-        }>
-      >({ cookie, path: "organization.getAll", input: {} });
-      const organizationId =
-        organizations.find((organization) =>
-          (organization.teams ?? []).some((team) =>
-            (team.projects ?? []).some((project) => project.id === PROJECT_ID),
-          ),
-        )?.id ?? organizations[0]?.id;
-      if (!organizationId) {
-        throw new Error(
-          `no organization holds project ${PROJECT_ID}; check LANGY_PROJECT_ID`,
-        );
-      }
+      const organizationId = await organizationIdOfProject(cookie);
       let refusal = "";
       for (let attempt = 0; attempt < 3; attempt += 1) {
         const created = await trpcMutate<{ token: string }>({
@@ -290,11 +507,14 @@ async function copyTree(from: string, to: string): Promise<void> {
 /**
  * Point the demo's LangWatch SDK dependency at this checkout by absolute path.
  *
- * Both applications depend on the SDK through a relative path that only
+ * The support applications depend on the SDK through a relative path that only
  * resolves inside the monorepo (`../../../../sdks/python`,
  * `file:../../../../sdks/typescript`). A copy outside it must name the same
  * SDK by its absolute path, or the install fails and the scenario measures the
  * fixture rather than the product.
+ *
+ * The checkout application has no SDK dependency, Langy adds it, so the
+ * rewrite finds nothing there and its manifest stays byte for byte as shipped.
  */
 async function pointSdkAtThisCheckout({
   root,
@@ -303,7 +523,7 @@ async function pointSdkAtThisCheckout({
   root: string;
   language: DemoLanguage;
 }): Promise<void> {
-  if (language === "python") {
+  if (DEMO[language].runtime === "uv") {
     const file = path.join(root, "pyproject.toml");
     const source = await fs.readFile(file, "utf8");
     await fs.writeFile(
@@ -401,7 +621,7 @@ export async function createDemoRepo({
     `${name}-${Date.now().toString(36)}`,
   );
   await fs.rm(root, { recursive: true, force: true });
-  await copyTree(DEMO_SOURCE[language], root);
+  await copyTree(DEMO[language].dir, root);
   await pointSdkAtThisCheckout({ root, language });
 
   const git = (args: string[]): string => sh("git", args, { cwd: root });
@@ -410,7 +630,7 @@ export async function createDemoRepo({
   git(["config", "user.email", "scenario@langwatch.localhost"]);
   git(["config", "commit.gpgsign", "false"]);
   git(["add", "-A"]);
-  git(["commit", "-m", "chore: the ACME support agent"]);
+  git(["commit", "-m", DEMO[language].commit]);
 
   // A repository with no remote makes `git push` exit 128, and the pull
   // request path can then never finish in a scenario. A bare repository beside
@@ -424,7 +644,7 @@ export async function createDemoRepo({
   git(["push", "-u", "origin", "main"]);
 
   if (install) {
-    if (language === "python") {
+    if (DEMO[language].runtime === "uv") {
       sh("uv", ["sync"], { cwd: root, timeoutMs: 600_000 });
     } else {
       sh("npm", ["install", "--no-audit", "--no-fund"], {
@@ -464,6 +684,222 @@ export async function createDemoRepo({
         .map((line) => line.trim())
         .filter(Boolean),
     git,
+  };
+}
+
+/**
+ * The folders a scenario can share that are NOT one of the demo applications.
+ *
+ * A demo repository is a working project: installed, committed, with a remote.
+ * These are the opposite, and each one exists for a scenario about the folder
+ * rather than about the code. `acme-notes` is a pip project: its manifest is
+ * `requirements.txt`, there is no lock file and no virtual environment, and
+ * nothing is installed until Langy installs it.
+ */
+export type FixtureFolderName = "acme-notes";
+
+const FIXTURE_FOLDER: Record<FixtureFolderName, string> = {
+  "acme-notes": path.join(REPO_ROOT, "dev", "dogfood", "acme-notes", "python"),
+};
+
+/** A shared folder that is not a demo repository, and what a test reads of it. */
+export interface FixtureFolder {
+  root: string;
+  /** Whether a repository exists in it, which a scenario can be about. */
+  isGitRepo: () => boolean;
+  read: (relativePath: string) => string;
+  exists: (relativePath: string) => boolean;
+  /** Any git command. Answers "" while there is no repository. */
+  git: (args: string[]) => string;
+  /** Every local branch name, empty while there is no repository. */
+  branches: () => string[];
+  /** The subject line of every commit, newest first. */
+  log: () => string[];
+  /** The porcelain status, empty while there is no repository. */
+  status: () => string;
+}
+
+/**
+ * Copy a fixture folder somewhere temporary and hand it to a scenario.
+ *
+ * Nothing is installed: a scenario that shares one of these is about what
+ * Langy does with a project as it finds it, and an install by the fixture
+ * would answer the question the scenario is asking. `git: false` leaves the
+ * copy with no repository at all, which is its own scenario.
+ */
+export async function createFixtureFolder({
+  fixture,
+  name,
+  git: withGit,
+}: {
+  fixture: FixtureFolderName;
+  /** Names the folder, so a failed run is readable on disk. */
+  name: string;
+  git: boolean;
+}): Promise<FixtureFolder> {
+  await pruneDemoRepos();
+  const root = path.join(
+    SCENARIO_REPO_DIR,
+    `${name}-${Date.now().toString(36)}`,
+  );
+  await fs.rm(root, { recursive: true, force: true });
+  await copyTree(FIXTURE_FOLDER[fixture], root);
+
+  const git = (args: string[]): string => {
+    try {
+      return sh("git", args, { cwd: root });
+    } catch {
+      return "";
+    }
+  };
+  if (withGit) {
+    git(["init", "--initial-branch=main"]);
+    git(["config", "user.name", "LangWatch scenario"]);
+    git(["config", "user.email", "scenario@langwatch.localhost"]);
+    git(["config", "commit.gpgsign", "false"]);
+    git(["add", "-A"]);
+    git(["commit", "-m", `chore: the ${fixture} application`]);
+  }
+
+  return {
+    root,
+    isGitRepo: () => existsSync(path.join(root, ".git")),
+    read: (relativePath: string) =>
+      existsSync(path.join(root, relativePath))
+        ? readFileSync(path.join(root, relativePath), "utf8")
+        : "",
+    exists: (relativePath: string) => existsSync(path.join(root, relativePath)),
+    git,
+    branches: () =>
+      git(["for-each-ref", "--format=%(refname:short)", "refs/heads"])
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean),
+    log: () =>
+      git(["log", "--all", "--pretty=%s"])
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean),
+    status: () => git(["status", "--porcelain"]),
+  };
+}
+
+/**
+ * The newest interpreter on this machine that the published SDK supports.
+ *
+ * Every `langwatch` release from 0.2.11 to 1.4.0 declares
+ * `requires-python >=3.10,<3.14`. On a machine whose `python3` is 3.14, pip
+ * resolves `pip install langwatch` past all of them and down to 0.1.32, a
+ * release from before `setup()` and `connect_agent()` existed: the install
+ * reports success, and the tracing code the project just gained cannot
+ * import. A scenario about a missing package manager spelling would then be
+ * failing on the interpreter instead, so the venv is built from a version the
+ * SDK actually ships for.
+ */
+function supportedPython(): string {
+  for (const name of ["python3.13", "python3.12", "python3"]) {
+    const found = spawnSync("which", [name], { encoding: "utf8" });
+    if (found.status === 0 && found.stdout.trim()) {
+      return realPython(found.stdout.trim());
+    }
+  }
+  return "python3";
+}
+
+/**
+ * The interpreter behind whatever `which` answered.
+ *
+ * A uv-installed Python is reached through a symlink in `~/.local/bin`, and
+ * `venv` writes the directory of the interpreter it was invoked as into
+ * `pyvenv.cfg` as `home`. Invoked through the symlink that is `~/.local/bin`,
+ * which holds no `lib/pythonX.Y`, so the environment it builds starts with
+ * `Fatal Python error: Failed to import encodings module` and every scenario
+ * that needs one fails in setup on a machine where the interpreter itself is
+ * fine. Resolving the link first puts the real install's `bin` in `home`.
+ */
+function realPython(candidate: string): string {
+  try {
+    return realpathSync(candidate);
+  } catch {
+    return candidate;
+  }
+}
+
+/** A Python interpreter of a scenario's own, and the ways it uses one. */
+export interface PythonEnv {
+  /** Goes on the terminal's PATH: it carries `python3`, `pip3` and `pip`. */
+  binDir: string;
+  /** The interpreter itself, for a test that asserts on what got installed. */
+  python: string;
+  /** Its `major.minor`, for a scenario whose premise is the version. */
+  version: string;
+  /** Whether the interpreter can import a module, which an install proves. */
+  canImport: (module: string) => boolean;
+}
+
+/**
+ * Build a Python interpreter beside the shared folder, for the terminal to use.
+ *
+ * A packaged interpreter refuses to install into itself (Homebrew and the
+ * system Python both ship `EXTERNALLY-MANAGED`), so on such a machine every
+ * rung of the install ladder fails for a reason that has nothing to do with
+ * what a scenario is asking. A virtual environment of the scenario's own is
+ * the ordinary machine that scenario assumes: `pip3` installs, `python3`
+ * imports, and the developer's own Python is left alone.
+ *
+ * It sits BESIDE the shared folder, never in it: a `.venv` inside the folder
+ * is a fact about the project that the install ladder reads, and these
+ * scenarios are about a project that has none.
+ *
+ * Pass `forFolder` and the project's own `requirements.txt` is installed into
+ * it, so the only thing the terminal is short of is what the scenario took
+ * away. Without it the first command that imports a declared dependency fails
+ * for a reason the scenario never set up.
+ */
+export async function createPythonEnv({
+  at,
+  forFolder,
+  interpreter = "supported",
+}: {
+  at: string;
+  forFolder?: string;
+  /**
+   * Which interpreter the environment is built from. `supported` is the
+   * newest version the published SDK ships for, which is what a scenario
+   * about anything else wants. `machine-default` is whatever `python3` is on
+   * this machine, for the one scenario whose subject IS the interpreter.
+   */
+  interpreter?: "supported" | "machine-default";
+}): Promise<PythonEnv> {
+  await fs.rm(at, { recursive: true, force: true });
+  const base = interpreter === "supported" ? supportedPython() : "python3";
+  sh(base, ["-m", "venv", at], { timeoutMs: 300_000 });
+  const binDir = path.join(at, "bin");
+  const python = path.join(binDir, "python3");
+  const requirements = forFolder && path.join(forFolder, "requirements.txt");
+  if (requirements && existsSync(requirements)) {
+    sh(python, ["-m", "pip", "install", "-r", requirements], {
+      timeoutMs: 600_000,
+    });
+  }
+  return {
+    binDir,
+    python,
+    version: sh(
+      python,
+      ["-c", "import sys; print('%d.%d' % sys.version_info[:2])"],
+      {
+        timeoutMs: 120_000,
+      },
+    ).trim(),
+    canImport: (module: string) => {
+      try {
+        sh(python, ["-c", `import ${module}`], { timeoutMs: 120_000 });
+        return true;
+      } catch {
+        return false;
+      }
+    },
   };
 }
 
@@ -510,6 +946,46 @@ export function buildCli(): Promise<void> {
     }
   })();
   return cliBuildPromise;
+}
+
+/**
+ * A folder holding one `langwatch` that runs the build this test made.
+ *
+ * The terminal starts the command line by its built entry point, but every
+ * `langwatch` the agent types into the shared folder is resolved on PATH, and
+ * that finds whatever copy is installed on the machine. A scenario asserting on
+ * a flag the branch just added would read the installed copy's "unknown option"
+ * instead.
+ */
+/**
+ * A directory of stand-in commands, for the terminal's PATH.
+ *
+ * Each body is run by `/bin/sh` with the call's own arguments, so a stand-in
+ * can refuse (`exit 127`), answer something fixed, or hand the call on.
+ */
+async function shimBinDir(
+  at: string,
+  shims: Record<string, string>,
+): Promise<string> {
+  await fs.mkdir(at, { recursive: true });
+  for (const [name, body] of Object.entries(shims)) {
+    await fs.writeFile(path.join(at, name), `#!/bin/sh\n${body}\n`, {
+      encoding: "utf8",
+      mode: 0o755,
+    });
+  }
+  return at;
+}
+
+async function cliBinDir(at: string): Promise<string> {
+  await fs.mkdir(at, { recursive: true });
+  const shim = path.join(at, "langwatch");
+  await fs.writeFile(
+    shim,
+    `#!/bin/sh\nexec node ${JSON.stringify(CLI_ENTRY)} "$@"\n`,
+    { encoding: "utf8", mode: 0o755 },
+  );
+  return at;
 }
 
 /** The terminal the command line runs in, and the ways a test drives it. */
@@ -588,29 +1064,60 @@ export async function cancelOpenControlRequests(): Promise<void> {
 export async function startShareControl({
   repo,
   label,
+  clearOpenRequests = true,
+  shims = {},
+  pathDirs = [],
 }: {
-  repo: DemoRepo;
+  repo: Pick<DemoRepo, "root">;
   label: string;
+  /**
+   * Whether to cancel the requests already open on the project first. The
+   * default suits scenarios that share one project, where a leftover from
+   * an earlier run would turn the command line into a picker. A scenario
+   * whose own conversation asked for the folder BEFORE the command line
+   * starts, on a project of its own, keeps that ask: it is the one the
+   * terminal is about to answer.
+   */
+  clearOpenRequests?: boolean;
+  /**
+   * Commands to put FIRST on the terminal's PATH, as a name to the shell body
+   * that stands in for it. A scenario about what Langy does when a tool is
+   * missing or broken writes that here, so the absence lives in the terminal
+   * the scenario owns rather than in the machine running it.
+   */
+  shims?: Record<string, string>;
+  /**
+   * Directories to put on the terminal's PATH after the shims, before the
+   * machine's own. A scenario that needs a working interpreter, or any other
+   * tool it built for itself, names its bin directory here.
+   */
+  pathDirs?: string[];
 }): Promise<CliTerminal> {
   await buildCli();
-  await cancelOpenControlRequests();
-  const apiKey = await getCliApiKey();
+  if (clearOpenRequests) await cancelOpenControlRequests();
   const sessionName = `langy-${label}-${Date.now().toString(36)}`;
   const configPath = path.join(repo.root, "..", `${sessionName}-config.json`);
+  await writeCliLoginConfig({ configPath });
+  const binDir = await cliBinDir(
+    path.join(repo.root, "..", `${sessionName}-bin`),
+  );
+  const shimDir = await shimBinDir(
+    path.join(repo.root, "..", `${sessionName}-shims`),
+    shims,
+  );
   const script = path.join(repo.root, "..", `${sessionName}.sh`);
+  // The terminal signs in through the login config alone, which is the one
+  // credential the command takes: a control request is addressed to the
+  // person.
   await fs.writeFile(
     script,
-    [
-      "#!/bin/bash",
-      `cd ${JSON.stringify(repo.root)}`,
-      `export LANGWATCH_ENDPOINT=${JSON.stringify(APP_BASE)}`,
-      `export LANGWATCH_API_KEY=${JSON.stringify(apiKey)}`,
-      `export LANGWATCH_CLI_CONFIG=${JSON.stringify(configPath)}`,
-      "export FORCE_COLOR=0",
-      "unset TRACEPARENT",
-      `exec node ${JSON.stringify(CLI_ENTRY)} langy --share-control`,
-      "",
-    ].join("\n"),
+    shareControlProfile({
+      root: repo.root,
+      configPath,
+      binDir,
+      shimDir,
+      pathDirs,
+    }),
     { encoding: "utf8", mode: 0o755 },
   );
 
@@ -771,7 +1278,10 @@ export interface PermissionAsk {
 /** One question card the panel showed, and what the fixture answered. */
 export interface QuestionAsk {
   waitId: string;
-  questions: Array<{ question: string; options?: Array<{ label: string }> }>;
+  questions: Array<{
+    question: string;
+    options?: Array<{ label: string; quiet?: boolean }>;
+  }>;
   answered: Array<{ question: string; selected: string[] }>;
   turnId: string;
 }
@@ -786,11 +1296,16 @@ export interface PermissionPolicy {
   fallback?: "allow_once" | "deny";
 }
 
-/** Picks the answer to one question card. Default: the first option. */
+/**
+ * Picks the answer to one question card. Default: the first option.
+ *
+ * It may read the world before it answers: the guided onboarding suite
+ * checks that nothing was created yet while Langy's proposal is still open.
+ */
 export type QuestionAnswerPicker = (question: {
   question: string;
-  options?: Array<{ label: string }>;
-}) => string[];
+  options?: Array<{ label: string; quiet?: boolean }>;
+}) => string[] | Promise<string[]>;
 
 /** One message in the shape the scenario judge reads. */
 export type JudgeMessage =
@@ -845,6 +1360,19 @@ export interface ConversationWatcher {
   leaveNextPermissionToTerminal: (match: RegExp) => void;
   /** `connected` and `disconnected` entries, in order. */
   workspaceEvents: Array<{ state: string; name: string; root: string }>;
+  /**
+   * Every `navigate` instruction on the turns the watcher followed, in order.
+   *
+   * A turn the panel starts on its own never passes through the adapter, so
+   * its navigations are readable here and nowhere else.
+   */
+  navigateHrefs: string[];
+  /**
+   * Every tool frame on the turns the watcher followed, start and end, in
+   * stream order, across every turn including the ones the panel started on
+   * its own. The ordering assertions read this.
+   */
+  toolEvents: LangyToolEvent[];
   /** Every turn the watcher observed, in the order it observed them. */
   turnIds: string[];
   /** The turns the panel started on its own, without a message from the test. */
@@ -854,6 +1382,17 @@ export interface ConversationWatcher {
     knownTurnIds: string[];
     timeoutMs?: number;
   }) => Promise<string>;
+  /**
+   * Whether a turn's own question card was answered while its call was still
+   * open.
+   *
+   * The question tool returns inside the turn when the answer reaches it in
+   * time, and ends the turn when it does not, in which case the answer starts
+   * a turn of its own. A step waiting for the work a card unlocks has to know
+   * which of the two shapes it got, or it waits out its timeout on a turn that
+   * already did that work.
+   */
+  cardAnsweredInsideTurn: (input: { turnId: string }) => Promise<boolean>;
   /**
    * Wait until no turn is in flight.
    *
@@ -898,6 +1437,226 @@ export interface StoredMessage {
   id: string;
   role: string;
   parts: Array<Record<string, unknown>>;
+}
+
+/**
+ * The words one stored part carries, or null when it carries none.
+ *
+ * A line said with the `say` tool is Langy's own prose, drawn where the call
+ * happened, so it reads here exactly as a text part does. The empty text part
+ * a turn ends on when every line was said that way carries nothing.
+ */
+export function partProse(part: Record<string, unknown>): string | null {
+  const said =
+    part.type === "tool-say"
+      ? (part.input as { text?: unknown } | undefined)?.text
+      : part.text;
+  return typeof said === "string" && said.trim() !== "" ? said : null;
+}
+
+/**
+ * What one settled tool call returned.
+ *
+ * A call that failed stores its reason in `errorText` and no output at all, so
+ * reading the output alone hands the judge an empty string where the reason
+ * for the failure was.
+ */
+export function toolOutputText(part: Record<string, unknown>): string {
+  if (part.state === "output-error" && typeof part.errorText === "string") {
+    return part.errorText;
+  }
+  return typeof part.output === "string"
+    ? part.output
+    : JSON.stringify(part.output ?? "");
+}
+
+/** Whether one stored part is a tool call rather than something Langy wrote. */
+export function isToolCallPart(part: Record<string, unknown>): boolean {
+  return (
+    typeof part.type === "string" &&
+    part.type.startsWith("tool-") &&
+    part.type !== "tool-say" &&
+    typeof part.toolCallId === "string"
+  );
+}
+
+/**
+ * Everything a stored message says, in the order the panel draws it.
+ *
+ * A turn that ends on a `say` call is folded into a reply carrying that same
+ * line, so the last line arrives twice. It is one line, and a judge reading it
+ * twice grades a turn that repeated itself.
+ */
+export function storedProse(parts: Array<Record<string, unknown>>): string {
+  return storedPassages(parts).join("\n");
+}
+
+/**
+ * The same lines, each on its own, which is how the panel draws them and how a
+ * judge reads a turn: one passage per `say`, in order.
+ */
+export function storedPassages(
+  parts: Array<Record<string, unknown>>,
+): string[] {
+  const said: string[] = [];
+  for (const part of parts) {
+    const text = partProse(part);
+    if (text === null || text.trim() === said[said.length - 1]?.trim()) {
+      continue;
+    }
+    said.push(text);
+  }
+  return said;
+}
+
+/**
+ * One stored message as the judge reads it: the tool calls and their results
+ * as their own messages, in the order the turn ran them, with the lines
+ * written between them in front of the calls they introduce. The part type
+ * carries the tool name as `tool-<name>`, which is the panel's own shape.
+ *
+ * This is the shape the streaming adapter builds for a turn the scenario
+ * drives itself, so a turn the panel started on its own grades the same way.
+ */
+export function judgeMessages(message: {
+  role: string;
+  parts: Array<Record<string, unknown>>;
+}): JudgeMessage[] {
+  const messages: JudgeMessage[] = [];
+  let narration: string[] = [];
+  let batch: Array<Record<string, unknown>> = [];
+
+  const flush = () => {
+    if (batch.length === 0 && narration.length === 0) return;
+    messages.push({
+      role: "assistant",
+      content: [
+        ...narration.map((text) => ({ type: "text" as const, text })),
+        ...batch.map((part) => ({
+          type: "tool-call" as const,
+          toolCallId: String(part.toolCallId),
+          toolName: String(part.type).slice("tool-".length),
+          input: part.input,
+        })),
+      ],
+    });
+    if (batch.length > 0) {
+      messages.push({
+        role: "tool",
+        content: batch.map((part) => ({
+          type: "tool-result" as const,
+          toolCallId: String(part.toolCallId),
+          toolName: String(part.type).slice("tool-".length),
+          output: {
+            type:
+              part.state === "output-error"
+                ? ("error-text" as const)
+                : ("text" as const),
+            value: toolOutputText(part),
+          },
+        })),
+      });
+    }
+    narration = [];
+    batch = [];
+  };
+
+  for (const part of message.parts) {
+    const said = partProse(part);
+    if (said !== null) {
+      // A passage after a call opens the next stretch of work, so the calls
+      // already gathered close here and keep their place in front of it.
+      if (batch.length > 0) flush();
+      // The reply a turn folds down to repeats the line it ended on.
+      if (said.trim() !== narration[narration.length - 1]?.trim()) {
+        narration.push(said);
+      }
+      continue;
+    }
+    if (isToolCallPart(part)) {
+      batch.push(part);
+    }
+  }
+  flush();
+
+  // The turn's reply is the line it ended on, on its own.
+  //
+  // Every passage is already above, in front of the calls it introduces, so
+  // the reply repeats one line rather than adding anything new: what it adds
+  // is an ending. Two shapes went wrong without it. A turn that ended on a
+  // tool call and then stored an empty text part, which is what the whole
+  // llmops path does (two `navigate open` calls after the closing line),
+  // handed the judge a transcript ending on a tool result with no reply at
+  // all, and it was graded as a turn that trailed off. A turn that did end on
+  // a passage got every passage of the turn joined into one reply, and a
+  // judge asked whether the reply answers with concrete results or reads as a
+  // work log fairly called twenty joined lines a log.
+  const passages = storedPassages(message.parts);
+  messages.push({
+    role: "assistant",
+    content: passages[passages.length - 1] ?? "",
+  });
+  return messages;
+}
+
+/**
+ * The shell profile the shared terminal starts from.
+ *
+ * The terminal signs in through the login config alone, which is the one
+ * credential the command takes: a control request is addressed to the person.
+ * The key is unset so the commands Langy runs in the folder start from a clean
+ * shell, not because the command line would read it.
+ */
+export function shareControlProfile({
+  root,
+  configPath,
+  binDir,
+  shimDir,
+  pathDirs = [],
+  ceiling = SCENARIO_REPO_DIR,
+  appBase = APP_BASE,
+  cliEntry = CLI_ENTRY,
+}: {
+  root: string;
+  configPath: string;
+  binDir: string;
+  shimDir: string;
+  pathDirs?: string[];
+  ceiling?: string;
+  appBase?: string;
+  cliEntry?: string;
+}): string {
+  return [
+    "#!/bin/bash",
+    `cd ${JSON.stringify(root)}`,
+    "unset LANGWATCH_API_KEY",
+    `export LANGWATCH_ENDPOINT=${JSON.stringify(appBase)}`,
+    `export LANGWATCH_CLI_CONFIG=${JSON.stringify(configPath)}`,
+    // The shims come before the command line's own shim dir, then whatever
+    // the scenario built for itself, then the machine's PATH: a scenario's
+    // stand-in wins, and everything it does not name resolves as it
+    // normally would.
+    `export PATH=${[shimDir, binDir, ...pathDirs]
+      .map((dir) => JSON.stringify(dir))
+      .join(":")}:"$PATH"`,
+    "export FORCE_COLOR=0",
+    "unset TRACEPARENT",
+    // A folder a scenario shares is one of ours, whatever is above it.
+    //
+    // The folders live under the checkout's own `.claude/tmp`, and git looks
+    // for a repository by walking up. A folder a scenario built WITHOUT one
+    // answered every git command from this checkout instead: the no-repo
+    // scenario, whose whole premise is a folder with no repository, ran
+    // `git checkout -b` and created that branch on the lane, moving its HEAD
+    // mid-run. A folder with no repository that sits inside a checkout IS
+    // inside a repository, so the command line reading the parent was right
+    // and the premise was the lie. The ceiling stops the walk at the folder
+    // the scenarios live in: a folder with no repository of its own now has
+    // none, and a folder with one is unaffected.
+    `export GIT_CEILING_DIRECTORIES=${JSON.stringify(ceiling)}`,
+    `exec node ${JSON.stringify(cliEntry)} langy --share-control`,
+    "",
+  ].join("\n");
 }
 
 /**
@@ -967,6 +1726,54 @@ export function questionAnswerNote(ask: QuestionAsk): string {
 interface StreamEntry {
   type?: string;
   [key: string]: unknown;
+}
+
+/** One card as the conversation's durable record holds it. */
+export interface RecordWait {
+  waitId: string;
+  kind: string;
+  status: string;
+  turnId: string;
+  [key: string]: unknown;
+}
+
+/**
+ * The cards on the record that still need an answer, oldest first.
+ *
+ * A turn's live stream is one fetch with no reconnect, so a stream that ends
+ * before its turn does takes every card raised after it: the card stays on
+ * screen, nothing answers it, and the run sits there until a step times out.
+ * That is not hypothetical, it is what happened when a folder connected, the
+ * app restarted on the .env write, and the next card went up half a second
+ * later.
+ *
+ * Every card is also written to the conversation's record, which no stream can
+ * end, so the watcher reads the pending ones from there on each poll. The
+ * fields a card carries are the same on the record as on the stream, so the
+ * same two answer paths take either without knowing which it came from.
+ */
+export function pendingWaitDispatches({
+  waits,
+  answered,
+}: {
+  waits: RecordWait[];
+  answered: ReadonlySet<string>;
+}): Array<{ entry: StreamEntry; turnId: string; kind: string }> {
+  const dispatches: Array<{
+    entry: StreamEntry;
+    turnId: string;
+    kind: string;
+  }> = [];
+  for (const wait of waits) {
+    if (!wait.waitId || wait.status !== "pending") continue;
+    if (answered.has(wait.waitId)) continue;
+    dispatches.push({
+      entry: wait as StreamEntry,
+      turnId: wait.turnId,
+      kind: wait.kind,
+    });
+  }
+  return dispatches;
 }
 
 /**
@@ -1056,6 +1863,8 @@ export function watchLangyConversation({
     root: string;
   }> = [];
   const turnIds: string[] = [];
+  const navigateHrefs: string[] = [];
+  const toolEvents: LangyToolEvent[] = [];
   const answeredWaits = new Set<string>();
   const watchedTurns = new Set<string>();
   const controller = new AbortController();
@@ -1130,12 +1939,15 @@ export function watchLangyConversation({
     const asked = (
       Array.isArray(entry.questions) ? entry.questions : []
     ) as QuestionAsk["questions"];
-    const answers = asked.map((question) => ({
-      question: question.question,
-      selected:
-        answerQuestion?.(question) ??
-        (question.options?.[0]?.label ? [question.options[0].label] : []),
-    }));
+    const answers: Array<{ question: string; selected: string[] }> = [];
+    for (const question of asked) {
+      answers.push({
+        question: question.question,
+        selected:
+          (await answerQuestion?.(question)) ??
+          (question.options?.[0]?.label ? [question.options[0].label] : []),
+      });
+    }
     const ask: QuestionAsk = {
       waitId,
       questions: asked,
@@ -1175,6 +1987,14 @@ export function watchLangyConversation({
             void answerPermission(entry, turnId);
           } else if (entry.type === "question") {
             void answerQuestionCard(entry, turnId);
+          } else if (
+            entry.type === "navigate" &&
+            typeof entry.href === "string"
+          ) {
+            navigateHrefs.push(entry.href);
+          } else if (entry.type === "tool") {
+            const event = toolEventOf({ entry, turnId });
+            if (event) toolEvents.push(event);
           } else if (entry.type === "local_workspace") {
             workspaceEvents.push({
               state: String(entry.state ?? ""),
@@ -1207,6 +2027,19 @@ export function watchLangyConversation({
     });
   };
 
+  /** Every card this conversation's record holds, answered ones included. */
+  const readRecordWaits = async (): Promise<RecordWait[]> => {
+    const conversationId = adapter.state.conversationId;
+    if (!conversationId) return [];
+    const cookie = await getSessionCookie();
+    const record = await trpcQuery<{ waits?: RecordWait[] }>({
+      cookie,
+      path: "langy.localRecord",
+      input: { projectId: PROJECT_ID, conversationId },
+    });
+    return record?.waits ?? [];
+  };
+
   void (async () => {
     while (!stopped) {
       try {
@@ -1214,6 +2047,22 @@ export function watchLangyConversation({
         if (snapshot?.currentTurnId) watchTurn(snapshot.currentTurnId);
         if (adapter.state.currentTurnId) {
           watchTurn(adapter.state.currentTurnId);
+        }
+        // Cards come off the record, not off the stream. The record folds the
+        // whole event log per call, so it is read while a turn is in flight and
+        // not between turns, which is also the only time a card can be up.
+        if (snapshot?.currentTurnId ?? adapter.state.currentTurnId) {
+          const dispatches = pendingWaitDispatches({
+            waits: await readRecordWaits(),
+            answered: answeredWaits,
+          });
+          for (const dispatch of dispatches) {
+            if (dispatch.kind === "question") {
+              void answerQuestionCard(dispatch.entry, dispatch.turnId);
+            } else {
+              void answerPermission(dispatch.entry, dispatch.turnId);
+            }
+          }
         }
       } catch {
         // The conversation may not exist yet, or the app may be busy.
@@ -1225,60 +2074,7 @@ export function watchLangyConversation({
   const messageText = (message: {
     role: string;
     parts: Array<Record<string, unknown>>;
-  }): string =>
-    message.parts
-      .filter((part) => typeof part.text === "string")
-      .map((part) => String(part.text))
-      .join("\n");
-
-  /**
-   * One stored message as the judge reads it: the tool calls and their results
-   * as their own messages, then the reply. The part type carries the tool name
-   * as `tool-<name>`, which is the panel's own shape.
-   */
-  const judgeMessagesOf = (message: {
-    role: string;
-    parts: Array<Record<string, unknown>>;
-  }): JudgeMessage[] => {
-    const calls = message.parts.filter(
-      (part) =>
-        typeof part.type === "string" &&
-        part.type.startsWith("tool-") &&
-        typeof part.toolCallId === "string",
-    );
-    const text = messageText(message);
-    if (calls.length === 0) return [{ role: "assistant", content: text }];
-    return [
-      {
-        role: "assistant",
-        content: calls.map((part) => ({
-          type: "tool-call" as const,
-          toolCallId: String(part.toolCallId),
-          toolName: String(part.type).slice("tool-".length),
-          input: part.input,
-        })),
-      },
-      {
-        role: "tool",
-        content: calls.map((part) => ({
-          type: "tool-result" as const,
-          toolCallId: String(part.toolCallId),
-          toolName: String(part.type).slice("tool-".length),
-          output: {
-            type:
-              part.state === "output-error"
-                ? ("error-text" as const)
-                : ("text" as const),
-            value:
-              typeof part.output === "string"
-                ? part.output
-                : JSON.stringify(part.output ?? ""),
-          },
-        })),
-      },
-      { role: "assistant", content: text },
-    ];
-  };
+  }): string => storedProse(message.parts);
 
   /**
    * Read a turn's answer, waiting for it to be stored.
@@ -1335,6 +2131,8 @@ export function watchLangyConversation({
       leftToTerminal = match;
     },
     workspaceEvents,
+    navigateHrefs,
+    toolEvents,
     turnIds,
     turnsStartedWithoutUs: (knownTurnIds) =>
       turnIds.filter((id) => !knownTurnIds.includes(id)),
@@ -1375,7 +2173,14 @@ export function watchLangyConversation({
     lastTurnMessages: async (input = {}) => {
       const answer = await readTurnAnswer(input);
       if (!answer) return [];
-      return judgeMessagesOf(answer);
+      return judgeMessages(answer);
+    },
+    cardAnsweredInsideTurn: async ({ turnId }) => {
+      const answer = await readTurnAnswer({ turnId });
+      return (answer?.parts ?? []).some(
+        (part) =>
+          part.type === "tool-question" && part.state === "output-available",
+      );
     },
     stop: () => {
       stopped = true;
@@ -1505,6 +2310,19 @@ async function excludeFromGit({
   await fs.appendFile(excludeFile, `${separator}${entry}\n`, "utf8");
 }
 
+/** How the repository itself starts the demo application, on one port. */
+function demoStartCommand({ repo, port }: { repo: DemoRepo; port: number }): {
+  command: string;
+  args: string[];
+} {
+  return DEMO[repo.language].runtime === "uv"
+    ? {
+        command: "uv",
+        args: ["run", "uvicorn", "app.main:app", "--port", String(port)],
+      }
+    : { command: "npm", args: ["run", "start"] };
+}
+
 /** The demo application, running from the shared folder. */
 export interface DemoApp {
   port: number;
@@ -1548,7 +2366,7 @@ export async function startDemoApp({
       `LANGWATCH_ENDPOINT=${APP_BASE}`,
       `LANGWATCH_API_KEY=${apiKey}`,
       "LANGWATCH_AGENT_CONNECT=1",
-      `OPENAI_API_KEY=${openaiKey()}`,
+      ...demoProviderEnvLines(),
       "",
     ].join("\n"),
     "utf8",
@@ -1556,10 +2374,8 @@ export async function startDemoApp({
   await excludeFromGit({ root: repo.root, entry: ".env" });
   const sessionName = `acme-${label}-${Date.now().toString(36)}`;
   const logPath = path.join(repo.root, "..", `${sessionName}.log`);
-  const command =
-    repo.language === "python"
-      ? `uv run uvicorn app.main:app --port ${chosenPort}`
-      : `npm run start`;
+  const start = demoStartCommand({ repo, port: chosenPort });
+  const command = [start.command, ...start.args].join(" ");
   const script = path.join(repo.root, "..", `${sessionName}.sh`);
   await fs.writeFile(
     script,
@@ -1603,6 +2419,147 @@ export async function startDemoApp({
       spawnSync("tmux", ["kill-session", "-t", sessionName]);
     },
   };
+}
+
+/** What the demo's own HTTP route answered, on the branch Langy left behind. */
+export interface DemoRouteAnswer {
+  status: number;
+  /** The `output` field of the reply, empty when there was none. */
+  output: string;
+  /** Empty when the route answered, otherwise why it could not be reached. */
+  unreachable: string;
+  /** The last lines the application printed, which name the exception. */
+  lines: string;
+}
+
+/**
+ * Ask the demo application's own endpoint for one turn, from the branch that
+ * is checked out.
+ *
+ * The scenarios reach the agent through the connection the SDK opens, which
+ * says nothing about the HTTP endpoint the repository already had. A run
+ * decorated the entry point in place and changed its return from the
+ * dictionary the route reads to a string; the connection worked, every
+ * scenario passed, and `POST /chat` raised on the first request.
+ *
+ * The application is started here rather than reused from Langy's own start:
+ * what Langy starts is its choice, and a start such as `python -m app.main`
+ * serves no HTTP at all, so there is no port to find. This starts it the way
+ * the repository documents, on a free port, and stops it again.
+ */
+export async function callDemoChatRoute({
+  repo,
+  message = "where is my order 10042?",
+  startTimeoutMs = 240_000,
+  replyTimeoutMs = 180_000,
+}: {
+  repo: DemoRepo;
+  message?: string;
+  startTimeoutMs?: number;
+  replyTimeoutMs?: number;
+}): Promise<DemoRouteAnswer> {
+  const port = await freePort();
+  const logPath = path.join(
+    repo.root,
+    "..",
+    `chat-route-${Date.now().toString(36)}.log`,
+  );
+  const log = openSync(logPath, "w");
+  const start = demoStartCommand({ repo, port });
+  const child = spawn(start.command, start.args, {
+    cwd: repo.root,
+    detached: true,
+    stdio: ["ignore", log, log],
+    env: { ...process.env, PORT: String(port) },
+  });
+  let spawnFailure = "";
+  child.on("error", (error) => {
+    spawnFailure = String(error);
+  });
+  const base = `http://127.0.0.1:${port}`;
+  const tail = (): string => {
+    const text = existsSync(logPath) ? readFileSync(logPath, "utf8") : "";
+    return text.split("\n").slice(-12).join("\n").trim();
+  };
+  const stop = (): void => {
+    try {
+      if (child.pid) process.kill(-child.pid, "SIGTERM");
+    } catch {
+      // The process group is already gone, which is the state this wants.
+    }
+  };
+
+  try {
+    const deadline = Date.now() + startTimeoutMs;
+    let healthy = false;
+    while (!healthy && Date.now() < deadline) {
+      if (spawnFailure !== "") {
+        return {
+          status: 0,
+          output: "",
+          unreachable: `it could not be started: ${spawnFailure}`,
+          lines: tail(),
+        };
+      }
+      if (child.exitCode !== null) {
+        return {
+          status: 0,
+          output: "",
+          unreachable: `it exited with code ${child.exitCode} before it listened`,
+          lines: tail(),
+        };
+      }
+      try {
+        healthy = (await fetch(`${base}/health`)).ok;
+      } catch {
+        // Not listening yet.
+      }
+      if (!healthy) await sleep(2_000);
+    }
+    if (!healthy) {
+      return {
+        status: 0,
+        output: "",
+        unreachable: `it never answered on ${base}/health within ${Math.round(startTimeoutMs / 1000)}s`,
+        lines: tail(),
+      };
+    }
+    let reply: Response;
+    try {
+      reply = await fetch(`${base}/chat`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: message }],
+        }),
+        signal: AbortSignal.timeout(replyTimeoutMs),
+      });
+    } catch (error) {
+      return {
+        status: 0,
+        output: "",
+        unreachable: `it did not answer the request within ${Math.round(replyTimeoutMs / 1000)}s: ${String(error)}`,
+        lines: tail(),
+      };
+    }
+    const text = await reply.text();
+    let output = "";
+    try {
+      output = String((JSON.parse(text) as { output?: unknown }).output ?? "");
+    } catch {
+      // A failed request answers with the server's own text, which the caller
+      // reads out of the log rather than out of a field that is not there.
+    }
+    return {
+      status: reply.status,
+      output,
+      unreachable: "",
+      lines: tail(),
+    };
+  } finally {
+    stop();
+    closeSync(log);
+  }
 }
 
 /** The agents this project has registered, read back over the public API. */
@@ -1759,7 +2716,7 @@ export async function teardown({
   terminal?: CliTerminal;
   watcher?: ConversationWatcher;
   app?: DemoApp;
-  repo?: DemoRepo;
+  repo?: Pick<DemoRepo, "root">;
 }): Promise<void> {
   app?.stop();
   watcher?.stop();

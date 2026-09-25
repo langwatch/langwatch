@@ -12,6 +12,7 @@ import {
 } from "@react-email/components";
 import { render } from "@react-email/render";
 import { createHash } from "crypto";
+import { tracePlatformUrl } from "~/app/api/shared/trace-platform-url";
 import type { AlertType } from "~/generated/prisma/client";
 import type { TriggerData } from "~/server/app-layer/automations/trigger.types";
 import { toDispatchError } from "~/server/event-sourcing/queues/dispatchError";
@@ -339,7 +340,11 @@ const TriggerTable = ({
     }
     // Regular trace link
     if (data.traceId) {
-      return `${env.BASE_HOST}/${projectSlug}/traces/${data.traceId}`;
+      return tracePlatformUrl({
+        projectSlug,
+        traceId: data.traceId,
+        occurredAtMs: data.fullTrace?.timestamps?.started_at,
+      });
     }
     return "#";
   };

@@ -15,12 +15,16 @@
 
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { HandledError } from "@langwatch/handled-error";
-import { CONNECTED_INPUT_FIELD } from "~/experiments-v3/utils/connectedAgentTarget";
+import {
+  CONNECTED_ATTACHMENT_FIELD,
+  CONNECTED_INPUT_FIELD,
+} from "~/experiments-v3/utils/connectedAgentTarget";
 import type {
   CallOutput,
   ProtocolMessage,
 } from "~/server/connected-agents/protocol";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
+import { attachmentContentPart } from "./attachmentParts";
 import { UNNAMED_FAILURE } from "./types";
 
 /**
@@ -44,10 +48,19 @@ export type ConnectedTargetCall = {
  * The conversation for one row.
  *
  * A string input is the customer's own question and becomes one user message.
+ * An attachment mapped beside it rides in that message as a content part, so
+ * the agent reads the picture or the document with the question.
+ *
  * A dataset column of chat messages is already a conversation and travels as
  * it is, so a multi-turn dataset can be replayed against the agent.
  */
-const messagesOf = (value: unknown): ProtocolMessage[] => {
+const messagesOf = ({
+  value,
+  attachment,
+}: {
+  value: unknown;
+  attachment: unknown;
+}): ProtocolMessage[] => {
   if (Array.isArray(value)) {
     const messages = value.filter(
       (entry): entry is ProtocolMessage =>
@@ -57,13 +70,29 @@ const messagesOf = (value: unknown): ProtocolMessage[] => {
     );
     if (messages.length > 0) return messages;
   }
-  const content =
+  const text =
     typeof value === "string"
       ? value
       : value === undefined
         ? ""
         : String(value);
-  return [{ role: "user", content }];
+
+  const part =
+    typeof attachment === "string" && attachment !== ""
+      ? attachmentContentPart(attachment)
+      : null;
+  if (!part) return [{ role: "user", content: text }];
+
+  // A turn with a picture or a document is a list of parts, which is how an
+  // OpenAI style message carries both. The text part is left out when the row
+  // maps no text, so the agent reads the attachment alone rather than an empty
+  // question in front of it.
+  return [
+    {
+      role: "user",
+      content: text ? [{ type: "text", text }, part] : [part],
+    },
+  ];
 };
 
 /** A mapped cell that holds a number, or nothing when it holds no number. */
@@ -127,7 +156,13 @@ export const buildConnectedCall = ({
     // nothing is sent for it.
     if (value !== undefined) params[definition.name] = value;
   }
-  return { messages: messagesOf(inputs[CONNECTED_INPUT_FIELD]), params };
+  return {
+    messages: messagesOf({
+      value: inputs[CONNECTED_INPUT_FIELD],
+      attachment: inputs[CONNECTED_ATTACHMENT_FIELD],
+    }),
+    params,
+  };
 };
 
 /** The text of one message, whatever shape its content has. */

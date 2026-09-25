@@ -9,6 +9,10 @@ The function declares two run parameters: `model` (`gpt-5-mini` or `gpt-5`)
 and `plan` (`free` or `pro`). The system prompt changes with the plan, so the
 agent answers a pro customer differently from a free one.
 
+It has one tool, `lookup_colleague(email)`, which finds a colleague of the
+customer in a small directory so a request can be handed to them. A handoff
+scenario has to name one of those emails exactly.
+
 ## Run
 
 ```bash

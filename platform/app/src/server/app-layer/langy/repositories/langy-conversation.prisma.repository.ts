@@ -178,6 +178,22 @@ export class PrismaLangyConversationRepository
     return row?.RunToken ?? null;
   }
 
+  async hasAdmittedTurn({
+    projectId,
+    conversationId,
+    userId,
+  }: {
+    projectId: string;
+    conversationId: string;
+    userId: string;
+  }): Promise<boolean> {
+    const row = await this.prisma.langyTurnRequest.findFirst({
+      where: { projectId, conversationId, userId },
+      select: { id: true },
+    });
+    return row !== null;
+  }
+
   async turnExists({
     projectId,
     conversationId: ConversationId,

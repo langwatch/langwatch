@@ -20,10 +20,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { LangWatchQLViewDefinition } from "../catalog/types";
-import {
-  dropLangWatchQLRowPolicyStatement,
-  lwqlRowPolicyStatement,
-} from "../provisioning/accessModel";
+import { dropLangWatchQLRowPolicyStatement } from "../provisioning/accessModel";
 import {
   LWQL_SOURCE_ALIAS,
   lwqlViewSetupStatements,
@@ -159,6 +156,13 @@ describe("given a catalog view that joins two tenant-policed tables (#8085)", ()
         dedup: SHIPPED_LWQL_DEDUP,
       }),
     );
+    // The grants and both sides' row policies come from the single access-model
+    // emitter over the registered join view (#8258); the view statements are
+    // structural only.
+    await harness.applyAccessModel({
+      extraViews: [JOIN_VIEW],
+      sourceDatabase: facts,
+    });
 
     tenantA = await harness.restrictedClient({
       keyHash: harness.tenantA.keyHash,
@@ -213,17 +217,11 @@ describe("given a catalog view that joins two tenant-policed tables (#8085)", ()
         );
         leakedTenants = rows.map((row) => row.RightTenant);
       } finally {
-        await harness.applyAsAdmin([
-          lwqlRowPolicyStatement({
-            names: harness.names,
-            lwqlTable: {
-              table: "join_right",
-              tenantColumn: "TenantId",
-              database: facts,
-            },
-            sourceDatabase: facts,
-          }),
-        ]);
+        // Reconverge from the definition — restores the join_right policy.
+        await harness.applyAccessModel({
+          extraViews: [JOIN_VIEW],
+          sourceDatabase: facts,
+        });
       }
 
       // Without the joined-side policy the join reaches the other tenant's rows.

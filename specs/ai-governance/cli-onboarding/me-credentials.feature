@@ -92,6 +92,48 @@ Feature: /me credentials just work - CLI credential resolution after device logi
     Then the resolved API key is the explicit argument
     And the environment value is not used
 
+  # LANGWATCH_ENDPOINT decides which LangWatch a command talks to, and a
+  # folder's .env can set it. A cloned folder could otherwise point every
+  # command at an address of its author's choosing and receive the key of
+  # whoever ran a command there.
+  @bdd @cli-onboarding @credentials @unit
+  Scenario: the device session's key is never sent to another address than the one that issued it
+    Given ~/.langwatch/config.json holds a device session made against one LangWatch address
+    And LANGWATCH_ENDPOINT, in the shell or in the folder's .env, names another address
+    And no API key is given by flag or in LANGWATCH_API_KEY
+    When any API-calling command resolves credentials
+    Then no key of the session is resolved, neither the login key nor the personal project's
+    And the session endpoint is not called
+    And the command ends naming both addresses
+    And it says to run `langwatch login --device` against the other address, or to unset LANGWATCH_ENDPOINT
+
+  @bdd @cli-onboarding @credentials @unit
+  Scenario: machine callers get a structured login_endpoint_mismatch document
+    Given a device session made against one address and LANGWATCH_ENDPOINT naming another
+    When a command resolves credentials with --format json
+    Then stdout carries one error document of kind "login_endpoint_mismatch"
+    And its meta names the login's address and the address the command targets
+
+  @bdd @cli-onboarding @credentials @unit
+  Scenario: an API key given for the other address is used as given
+    Given a device session made against one address and LANGWATCH_ENDPOINT naming another
+    And LANGWATCH_API_KEY, or an explicit api key argument, is set
+    When a command resolves credentials
+    Then the resolved API key is the given one, paired with the address LANGWATCH_ENDPOINT names
+    And no key of the session is read
+
+  @bdd @cli-onboarding @credentials @unit
+  Scenario: two spellings of one address are one address
+    Given a device session made against "https://app.acme.test"
+    When LANGWATCH_ENDPOINT is "https://APP.acme.test/" or "https://app.acme.test:443"
+    Then the session's key is resolved as usual
+
+  @bdd @cli-onboarding @credentials @unit
+  Scenario: localhost and 127.0.0.1 are two addresses
+    Given a device session made against "http://localhost:5560"
+    When LANGWATCH_ENDPOINT is "http://127.0.0.1:5560"
+    Then the command ends naming both addresses
+
   @bdd @cli-onboarding @credentials @unit
   Scenario: the caller's .env still contributes only LANGWATCH_* keys (daemon constraint)
     Given the caller's .env contains LANGWATCH_API_KEY and an unrelated secret like DATABASE_URL

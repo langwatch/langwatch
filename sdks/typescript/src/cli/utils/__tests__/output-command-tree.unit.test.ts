@@ -9,7 +9,14 @@
  */
 import { describe, it, expect } from "vitest";
 import { Command } from "commander";
-import { isOutputAware } from "../output";
+import {
+  assertFormatIsSupported,
+  isOutputAware,
+  resolveActionOutputOptions,
+} from "../output";
+import { installOutputHarness } from "./output-harness";
+
+const { warned } = installOutputHarness();
 
 describe("the real command tree", () => {
   // buildProgram() reads the tsup-injected __CLI_VERSION__ build constant,
@@ -53,6 +60,12 @@ describe("the real command tree", () => {
       ["gateway-budgets", "archive"],
       ["virtual-keys", "rotate"],
       ["analytics", "query"],
+      ["query", "run"],
+      ["query", "schema"],
+      ["query", "reference"],
+      ["query", "examples"],
+      ["trace", "facets"],
+      ["trace", "fields"],
       ["trigger", "delete"],
       ["secret", "update"],
       ["run-plan", "run"],
@@ -98,6 +111,28 @@ describe("the real command tree", () => {
 
       expect(command).toBeDefined();
       expect(isOutputAware(command!)).toBe(true);
+    });
+  });
+
+  describe("when a tool wrapper runs inside a coding agent", () => {
+    /** @scenario "A wrapper run inside a coding agent prints no table note" */
+    it("prints no note about a table for any wrapper", async () => {
+      const { buildProgram, TOOL_WRAPPER_COMMANDS } = await import(
+        "../../program.js"
+      );
+      const root = buildProgram();
+      process.env.CLAUDECODE = "1";
+
+      for (const tool of TOOL_WRAPPER_COMMANDS) {
+        const wrapper = findCommand(root, [tool]);
+        expect(wrapper, tool).toBeDefined();
+        await assertFormatIsSupported(
+          wrapper!,
+          resolveActionOutputOptions(wrapper!),
+        );
+      }
+
+      expect(warned.join("")).not.toContain("not machine-readable");
     });
   });
 
@@ -156,10 +191,8 @@ describe("the real command tree", () => {
       // Hidden compatibility name for `agent tunnel`, same wiring.
       ["agent dev", "live tunnel session until Ctrl-C, no result document"],
 
-      // Launchers and passthroughs: they exec another tool and own its stdio.
-      ...(
-        ["claude", "codex", "cursor", "gemini", "opencode", "copilot", "code", "open"] as const
-      ).map((n) => [n, "launches another tool and owns its stdio"] as const),
+      // Opens the browser and owns no result document.
+      ["open", "launches another tool and owns its stdio"],
       // Local machine setup: mints a key and installs an OS login agent;
       // progress prose, no structured result document.
       ["copilot-app connect", "interactive install flow: writes an OS login agent"],

@@ -1,6 +1,6 @@
 import { classify } from "@langwatch/ssrf";
 import { lookup } from "dns/promises";
-import { Agent } from "undici";
+import { Agent, fetch as undiciFetch } from "undici";
 
 /**
  * Making a request to an address a customer typed, without making it to
@@ -96,9 +96,14 @@ export const isPublicAddress = (address: string): boolean =>
 export async function publicHopFor({
   url,
   resolveHost,
+  dialableInternalOrigins = [],
 }: {
   url: string;
   resolveHost: HostResolver;
+  /** Origins somebody named in advance, which may answer privately. Checked
+   *  per hop, so vouching for one never vouches for where it redirects.
+   *  See `dialable-internal-origins.ts` for who fills this and why. */
+  dialableInternalOrigins?: string[];
 }): Promise<PublicHop> {
   let parsed: URL;
   try {
@@ -110,9 +115,14 @@ export async function publicHopFor({
     return { ok: false, refusal: "not_https" };
   }
 
+  // Vouched BEFORE the address is judged, not after: the whole point of the
+  // list is an origin whose address would not pass, and a check that ran
+  // afterwards would only ever confirm what already succeeded.
+  const vouchedFor = dialableInternalOrigins.includes(parsed.origin);
+
   const literal = stripBrackets(parsed.hostname);
   if (isIpLiteral(literal)) {
-    return isPublicAddress(literal)
+    return vouchedFor || isPublicAddress(literal)
       ? { ok: true, url: parsed, addresses: [literal] }
       : { ok: false, refusal: "host_not_public" };
   }
@@ -127,7 +137,10 @@ export async function publicHopFor({
     return { ok: false, refusal: "unresolvable" };
   }
   if (answers.length === 0) return { ok: false, refusal: "unresolvable" };
-  if (!answers.every(isPublicAddress)) {
+  // An unresolvable name is still refused for a vouched origin: failing
+  // closed is what stops the guard being skippable by making it throw, and a
+  // vouched name that answers nothing is not evidence of anything either.
+  if (!vouchedFor && !answers.every(isPublicAddress)) {
     return { ok: false, refusal: "host_not_public" };
   }
   return { ok: true, url: parsed, addresses: answers };
@@ -178,8 +191,82 @@ export function pinnedTo(addresses: string[]): Agent {
   });
 }
 
+/**
+ * The fetch a pinned dispatcher may be handed to, and the only one.
+ *
+ * `pinnedTo` builds its agent out of THIS package's undici, and a dispatcher
+ * is only ever valid to the undici that made it. The global `fetch` is Node's
+ * own bundled copy — a different one — so it rejected the agent outright with
+ * `UND_ERR_INVALID_ARG: invalid onRequestStart method`, which reaches the
+ * caller as a bare `TypeError: fetch failed`.
+ *
+ * That is indistinguishable from the host being down, and it is how the two
+ * ceremonies came to blame the customer for our own mismatched import: every
+ * issuer was reported unreachable and every domain file missing, on every
+ * environment, for as long as the guard has had callers. Nothing caught it
+ * because both seams are injected — the tests supply a fake fetch, so the one
+ * pairing that matters is the one nothing exercised.
+ *
+ * The agent and the fetch therefore ship together, from one module. A caller
+ * that takes the default cannot get the combination wrong, and a caller that
+ * passes its own is a test.
+ */
+export const pinnedFetch: EgressFetch = undiciFetch;
+
+/**
+ * What a guarded hop reads off a response, and nothing else.
+ *
+ * Deliberately NOT the global `Response`. The two fetches disagree about
+ * types the guard never touches — undici's `Request` carries `duplex` and
+ * `textStream` and the DOM's does not — so annotating either one as the other
+ * is a claim about members nothing here reads. Naming the four that ARE read
+ * lets both be true at once and costs no safety: a response missing any of
+ * them would not compile.
+ */
+export interface EgressResponse {
+  ok: boolean;
+  status: number;
+  headers: { get(name: string): string | null };
+  json(): Promise<unknown>;
+  text(): Promise<string>;
+  /**
+   * The stream, when there is one. A caller that caps a download reads it
+   * rather than trusting a `content-length` a stranger supplied.
+   *
+   * Spelled as the reader rather than as `ReadableStream`: the two fetches
+   * type the stream's payload differently (`any` against `Uint8Array`) and
+   * reconciling that generic is a fight about a parameter neither caller
+   * names. The two members a bounded read uses are the same in both.
+   */
+  body: {
+    getReader(): {
+      read(): Promise<
+        { done: false; value: Uint8Array } | { done: true; value?: undefined }
+      >;
+      cancel(): Promise<void>;
+    };
+  } | null;
+}
+
+/**
+ * A fetch that accepts a dispatcher — which is the whole point, and which
+ * `typeof fetch` cannot say: `dispatcher` is not a member of the DOM's
+ * `RequestInit`. That is why the call below used to end `} as RequestInit)`,
+ * a cast whose only job was to smuggle the agent past a type that denied it
+ * existed. Saying it in the type instead retires the cast.
+ */
+export type EgressFetch = (
+  url: string,
+  init: {
+    signal: AbortSignal;
+    redirect: "manual";
+    headers?: Record<string, string>;
+    dispatcher: Agent;
+  },
+) => Promise<EgressResponse>;
+
 export type PublicFetchOutcome =
-  | { ok: true; response: Response; finalUrl: string }
+  | { ok: true; response: EgressResponse; finalUrl: string }
   | { ok: false; refusal: EgressRefusal };
 
 /**
@@ -193,22 +280,32 @@ export type PublicFetchOutcome =
  */
 export async function fetchFollowingPublicHosts({
   url,
-  fetchImpl,
+  fetchImpl = pinnedFetch,
   resolveHost,
   signal,
   headers,
   maxRedirects,
+  dialableInternalOrigins = [],
 }: {
   url: string;
-  fetchImpl: typeof fetch;
+  /** Defaults to `pinnedFetch`, which is the only fetch the dispatcher below
+   *  is valid for. A caller passes its own only in a test. */
+  fetchImpl?: EgressFetch;
   resolveHost: HostResolver;
   signal: AbortSignal;
   headers?: Record<string, string>;
   maxRedirects: number;
+  /** Passed to every hop rather than consulted once, so a vouched origin
+   *  that redirects elsewhere is judged on the address it redirects TO. */
+  dialableInternalOrigins?: string[];
 }): Promise<PublicFetchOutcome> {
   let next = url;
   for (let hop = 0; hop <= maxRedirects; hop++) {
-    const judged = await publicHopFor({ url: next, resolveHost });
+    const judged = await publicHopFor({
+      url: next,
+      resolveHost,
+      dialableInternalOrigins,
+    });
     if (!judged.ok) return { ok: false, refusal: judged.refusal };
 
     const response = await fetchImpl(next, {
@@ -217,7 +314,7 @@ export async function fetchFollowingPublicHosts({
       ...(headers === undefined ? {} : { headers }),
       // Only the addresses judged above, and only for this request.
       dispatcher: pinnedTo(judged.addresses),
-    } as RequestInit);
+    });
 
     const location = response.headers.get("location");
     if (!isRedirectStatus(response.status) || !location) {

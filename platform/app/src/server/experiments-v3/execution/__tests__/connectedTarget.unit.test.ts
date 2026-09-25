@@ -50,6 +50,85 @@ describe("given a connected agent column", () => {
     });
   });
 
+  describe("when an attachment is mapped beside the text", () => {
+    const png = `data:image/png;base64,${Buffer.from("png").toString("base64")}`;
+    const pdf = `data:application/pdf;name=quarter.pdf;base64,${Buffer.from(
+      "pdf",
+    ).toString("base64")}`;
+    const wav = `data:audio/wav;name=call.wav;base64,${Buffer.from(
+      "wav",
+    ).toString("base64")}`;
+
+    /** @scenario "A connected agent receives the attachment beside the text" */
+    it("sends a text part and an image part", () => {
+      const { messages } = buildConnectedCall({
+        inputs: { input: "what is on this screen?", attachment: png },
+        definitions,
+      });
+
+      expect(messages).toEqual([
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "what is on this screen?" },
+            { type: "image_url", image_url: { url: png } },
+          ],
+        },
+      ]);
+    });
+
+    /** @scenario "An attachment travels with the message" */
+    it("sends a document as a file part that carries its name", () => {
+      const { messages } = buildConnectedCall({
+        inputs: { input: "summarize", attachment: pdf },
+        definitions,
+      });
+
+      expect(messages[0]?.content).toEqual([
+        { type: "text", text: "summarize" },
+        {
+          type: "file",
+          file: { filename: "quarter.pdf", file_data: pdf },
+        },
+      ]);
+    });
+
+    it("sends a recording as an audio part in its own format", () => {
+      const { messages } = buildConnectedCall({
+        inputs: { input: "", attachment: wav },
+        definitions,
+      });
+
+      expect(messages[0]?.content).toEqual([
+        {
+          type: "input_audio",
+          input_audio: {
+            data: Buffer.from("wav").toString("base64"),
+            format: "wav",
+          },
+        },
+      ]);
+    });
+
+    it("keeps one text message when nothing is attached", () => {
+      const { messages } = buildConnectedCall({
+        inputs: { input: "hello", attachment: "" },
+        definitions,
+      });
+
+      expect(messages).toEqual([{ role: "user", content: "hello" }]);
+    });
+
+    it("sends no parameter named after the attachment field", () => {
+      const { params } = buildConnectedCall({
+        inputs: { input: "hello", attachment: png },
+        definitions,
+      });
+
+      expect(params).not.toHaveProperty("attachment");
+    });
+  });
+
   describe("when parameter values are mapped", () => {
     /** @scenario "A parameter value reaches the agent as its declared type" */
     it("sends each value as the type the agent declared", () => {

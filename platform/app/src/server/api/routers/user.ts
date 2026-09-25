@@ -39,6 +39,7 @@ import { Auth0ApiError } from "~/server/auth0/passwordService";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
 import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRequestEmail";
+import { isEmailUnconfigured } from "~/server/mailer/providers";
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 import { rateLimit } from "~/server/rateLimit";
@@ -185,6 +186,26 @@ const DAY_MS = 24 * 60 * 60_000;
  */
 export const PROFILE_NAME_SCHEMA = z.string().trim().min(1).max(120);
 
+/**
+ * Spends the sign-up proof and answers whether it confirmed the address. An
+ * unconfirmed proof is accepted only while the installation cannot send email
+ * (ADR-117, revision 2026-09-25); anything else is refused as expired.
+ */
+async function claimSignUpProof(proof: {
+  token: string;
+  email: string;
+}): Promise<boolean> {
+  const verification = signUpVerification();
+  if (await verification.claimAddressProof(proof)) return true;
+  if (
+    isEmailUnconfigured() &&
+    (await verification.claimUnconfirmedAddressProof(proof))
+  ) {
+    return false;
+  }
+  throw new IdentityVerificationExpiredError();
+}
+
 export const userRouter = createTRPCRouter({
   getTraceExplorerTourPreference: protectedProcedure
     .input(z.object({}))
@@ -321,14 +342,10 @@ export const userRouter = createTRPCRouter({
       // The mailbox proof is the authority to enrol a credential. It is spent
       // before hashing or writing anything, and is bound to this exact
       // normalised address by the token repository's conditional delete.
-      const verification = signUpVerification();
-      const proofClaimed = await verification.claimAddressProof({
+      const addressConfirmed = await claimSignUpProof({
         token: input.addressProof,
         email,
       });
-      if (!proofClaimed) {
-        throw new IdentityVerificationExpiredError();
-      }
 
       // Refuses an address somebody already holds, hashes the password and
       // states the credential identifier the front door routes on — all of it
@@ -338,6 +355,7 @@ export const userRouter = createTRPCRouter({
         name: name ?? null,
         email,
         password,
+        addressConfirmed,
       });
 
       return { id: newUser.id };
@@ -1200,6 +1218,7 @@ export const userRouter = createTRPCRouter({
       return await service.overviewForUser({
         organizationId: input.organizationId,
         userId: ctx.session.user.id,
+        userEmail: ctx.session.user.email,
         includeTopModels: input.includeTopModels,
       });
     }),

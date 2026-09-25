@@ -17,17 +17,28 @@ import {
   WithdrawJoinCommand,
 } from "./commands/joinRequestCommands";
 import {
+  attachMembershipGrantIntentSchema,
   expireRequestIntentSchema,
   JOIN_REQUEST_LIFECYCLE_INITIAL_STATE,
   JOIN_REQUEST_LIFECYCLE_PROCESS_NAME,
   type JoinRequestLifecyclePort,
   type JoinRequestLifecycleState,
   joinRequestLifecycleWake,
+  joinRequestNotificationDeliverySchema,
+  joinRequestNotificationFanoutSchema,
+  joinRequestNotificationIntentSchema,
+  onJoinApproved,
+  onJoinExpired,
+  onJoinRejected,
   onJoinRequested,
   onJoinResolved,
   remindAdminsIntentSchema,
+  runAttachMembershipGrant,
   runExpireRequest,
+  runFanoutNotification,
+  runPrepareNotification,
   runRemindAdmins,
+  runSendNotification,
 } from "./process-manager/joinRequestLifecycle.process";
 import {
   JOIN_REQUEST_PROJECTION_NAME,
@@ -70,9 +81,10 @@ export interface JoinRequestPipelineDeps {
  * organization is the tenant. Commands append (waited) and the operational
  * projection folds into the Postgres `JoinRequest` head in per-request FIFO.
  *
- * Ships DARK: `JOIN_REQUESTS` defaults off, so nothing dispatches these
- * commands, no interstitial renders and no panel appears — a deploy changes
- * nothing on its own, and rollback is the flag.
+ * The `JOIN_REQUESTS` flag that kept this dark is retired. What gates a
+ * command now is what always did the work: a verified address, a company
+ * domain, and an organization whose administrator opted in. Rollback is that
+ * setting, on the customer's own Access page.
  *
  * Lanes: the commands keep the default per-aggregate group key — one request
  * is one lane, which is already the narrowest useful shard, and a request
@@ -118,8 +130,8 @@ export function createJoinRequestPipeline(deps: JoinRequestPipelineDeps) {
  * Every ending disarms it, which is what makes "no reminder and no expiry
  * wake follows" true for a withdrawal rather than merely likely.
  *
- * The process holds two timestamps and a flag, and the events it reads are
- * ids, a domain and enums, so no content boundary is needed on the payload.
+ * The process holds two timestamps and a flag; rendered notification content
+ * is persisted by its intent executor rather than in this process state.
  */
 function mountRequestLifecycle(
   pm: ProcessManagerInitialStage<JoinRequestEvent>,
@@ -127,6 +139,11 @@ function mountRequestLifecycle(
 ) {
   return pm
     .state<JoinRequestLifecycleState>(JOIN_REQUEST_LIFECYCLE_INITIAL_STATE)
+    .intent(
+      "attachMembershipGrant",
+      attachMembershipGrantIntentSchema,
+      runAttachMembershipGrant({ port: lifecycle }),
+    )
     .intent(
       "remindAdmins",
       remindAdminsIntentSchema,
@@ -137,10 +154,25 @@ function mountRequestLifecycle(
       expireRequestIntentSchema,
       runExpireRequest({ port: lifecycle }),
     )
+    .intent(
+      "prepareNotification",
+      joinRequestNotificationIntentSchema,
+      runPrepareNotification({ port: lifecycle }),
+    )
+    .intent(
+      "fanoutNotification",
+      joinRequestNotificationFanoutSchema,
+      runFanoutNotification({ port: lifecycle }),
+    )
+    .intent(
+      "sendNotification",
+      joinRequestNotificationDeliverySchema,
+      runSendNotification({ port: lifecycle }),
+    )
     .on(JOIN_REQUESTED_EVENT_TYPE, onJoinRequested)
-    .on(JOIN_APPROVED_EVENT_TYPE, onJoinResolved)
-    .on(JOIN_REJECTED_EVENT_TYPE, onJoinResolved)
+    .on(JOIN_APPROVED_EVENT_TYPE, onJoinApproved)
+    .on(JOIN_REJECTED_EVENT_TYPE, onJoinRejected)
     .on(JOIN_WITHDRAWN_EVENT_TYPE, onJoinResolved)
-    .on(JOIN_EXPIRED_EVENT_TYPE, onJoinResolved)
+    .on(JOIN_EXPIRED_EVENT_TYPE, onJoinExpired)
     .onWake(joinRequestLifecycleWake);
 }

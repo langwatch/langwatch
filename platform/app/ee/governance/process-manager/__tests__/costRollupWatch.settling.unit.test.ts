@@ -143,6 +143,7 @@ function handlerFor(compareDay: (params: unknown) => Promise<unknown>) {
         },
         sourceEventId: null,
         attempt,
+        leaseExpiresAt: Date.now() + 30_000,
       },
     });
 }

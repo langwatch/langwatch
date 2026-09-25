@@ -20,7 +20,7 @@ This covers common multimodal use cases:
 - **Category**: classification evaluation (e.g. "Classify the image as: excellent, good, poor")
 
 **See also:**
-- [Dataset Images](/datasets/dataset-images): Setting up image columns in datasets
+- [Images and files in datasets](/datasets/dataset-images): Setting up image and file columns in datasets
 - [Saved Evaluators](/evaluations/evaluators/saved-evaluators): Reuse evaluators via API
 </Info>
 
@@ -32,9 +32,12 @@ Images can be provided in any of these formats:
 |--------|---------|
 | **Image URL** | `https://example.com/photo.png` |
 | **Base64 data URI** | `data:image/png;base64,iVBORw0KGgo...` |
+| **Uploaded file** | `/api/files/{projectId}/{objectId}/{fileName}` |
 | **Markdown image** | `![alt text](https://example.com/photo.png)` |
 
-Supported extensions: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.svg`, `.bmp`, `.tiff`
+Supported extensions: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.bmp`, `.tiff`
+
+SVG is not accepted for an uploaded file: an SVG runs script in the browser, so the upload refuses `image/svg+xml`. A legacy `svg` URL a row already holds is still read as an image address.
 
 <Note>
 Image detection is strict by design, a field is treated as an image only when the **entire value** is an image URL or base64 string. Mixed text-and-image content is sent as plain text. This prevents unintended multipart content when a field happens to contain an image URL as part of a longer string.
@@ -46,8 +49,8 @@ Image detection is strict by design, a field is treated as an image only when th
 
 1. Go to **Experiments**, click **New Experiment**, then **Create Experiment**
 2. Under **Datasets**, click **Add**, then **Create new**
-3. Add columns and set their type to **image (URL)** in the column type select
-4. Paste image URLs or base64 data URIs into the cells. The grid renders them as thumbnails you can click to expand.
+3. Add columns and set their type to **image** in the column type select
+4. Click **Upload** in a cell to send a picture from disk, or click **or enter URL** to type an image URL or a base64 data URI. The grid renders them as thumbnails you can click to expand.
 
 <Frame caption="A dataset with an image column rendered as thumbnails">
   <img src="/images/datasets/dataset-image-column.png" alt="A dataset grid with an image column showing thumbnails" />

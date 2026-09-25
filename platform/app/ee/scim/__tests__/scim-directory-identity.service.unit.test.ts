@@ -8,12 +8,19 @@
  * uniqueness itself is the database's, declared on the model.
  */
 import { beforeEach, describe, expect, it } from "vitest";
+
 import { ScimDirectoryIdentityService } from "../scim-directory-identity.service";
 
 const OKTA = "conn_okta_primary";
+const ORG = "org_acme";
 const ENTRA = "conn_entra_contractors";
 
-type Row = { connectionId: string; externalId: string; userId: string };
+type Row = {
+  organizationId: string;
+  connectionId: string;
+  externalId: string;
+  userId: string;
+};
 
 /** The `ScimExternalId` table, keyed the way the model's unique index is.
  *
@@ -23,12 +30,103 @@ type Row = { connectionId: string; externalId: string; userId: string };
  *  stop rendering as text and which `noBinarySourceFiles` fails on. */
 function createStore() {
   const rows: Row[] = [];
+  const owners: {
+    organizationId: string;
+    connectionId: string;
+    userId: string;
+  }[] = [];
+  const connections: {
+    id: string;
+    organizationId: string;
+    state: string;
+    replacesConnectionId: string | null;
+    migrationPhase: string | null;
+  }[] = [OKTA, ENTRA].map((id) => ({
+    id,
+    organizationId: ORG,
+    state: "ACTIVE",
+    replacesConnectionId: null,
+    migrationPhase: null,
+  }));
   const keyOf = (row: { connectionId: string; externalId: string }) =>
     `${row.connectionId}\u0000${row.externalId}`;
 
   return {
     rows,
+    owners,
+    connections,
     prisma: {
+      $transaction: async (operations: Promise<unknown>[]) =>
+        Promise.all(operations),
+      ssoConnection: {
+        findFirst: async ({
+          where,
+        }: {
+          where: { id: string; organizationId: string };
+        }) =>
+          connections.find(
+            (row) =>
+              row.id === where.id &&
+              row.organizationId === where.organizationId,
+          ) ?? null,
+        findMany: async ({
+          where,
+        }: {
+          where: {
+            organizationId: string;
+            id: { in: string[] };
+            state: { notIn: string[] };
+          };
+        }) =>
+          connections.filter(
+            (row) =>
+              row.organizationId === where.organizationId &&
+              where.id.in.includes(row.id) &&
+              !where.state.notIn.includes(row.state),
+          ),
+      },
+      scimDirectoryUser: {
+        findMany: async ({
+          where,
+        }: {
+          where: { organizationId: string; userId: string };
+        }) =>
+          owners.filter(
+            (owner) =>
+              owner.userId === where.userId &&
+              owner.organizationId === where.organizationId,
+          ),
+        upsert: async ({
+          create,
+        }: {
+          create: {
+            organizationId: string;
+            connectionId: string;
+            userId: string;
+          };
+        }) => {
+          const existing = owners.find(
+            (owner) =>
+              owner.connectionId === create.connectionId &&
+              owner.userId === create.userId,
+          );
+          if (!existing) owners.push({ ...create });
+          return existing ?? create;
+        },
+        deleteMany: async ({
+          where,
+        }: {
+          where: { connectionId: string; userId: string };
+        }) => {
+          const index = owners.findIndex(
+            (owner) =>
+              owner.connectionId === where.connectionId &&
+              owner.userId === where.userId,
+          );
+          if (index >= 0) owners.splice(index, 1);
+          return { count: index >= 0 ? 1 : 0 };
+        },
+      },
       scimExternalId: {
         findUnique: async ({
           where,
@@ -72,12 +170,12 @@ function createStore() {
         deleteMany: async ({
           where,
         }: {
-          where: { connectionId: string; externalId: string };
+          where: { connectionId: string; userId: string };
         }) => {
           const index = rows.findIndex(
             (row) =>
               row.connectionId === where.connectionId &&
-              row.externalId === where.externalId,
+              row.userId === where.userId,
           );
           if (index >= 0) rows.splice(index, 1);
           return { count: index >= 0 ? 1 : 0 };
@@ -100,6 +198,7 @@ describe("ScimDirectoryIdentityService", () => {
     /** @scenario A person keeps their place when their address changes */
     it("resolves them to the same account, because the identifier is the key", async () => {
       await service.remember({
+        organizationId: ORG,
         connectionId: OKTA,
         externalId: "u-1",
         userId: "user_sam",
@@ -121,11 +220,13 @@ describe("ScimDirectoryIdentityService", () => {
     /** @scenario The same person on two connections is two directory identities, one account */
     it("keeps both identities, neither overwriting the other", async () => {
       await service.remember({
+        organizationId: ORG,
         connectionId: OKTA,
         externalId: "u-1",
         userId: "user_sam",
       });
       await service.remember({
+        organizationId: ORG,
         connectionId: ENTRA,
         externalId: "c-99",
         userId: "user_sam",
@@ -145,11 +246,13 @@ describe("ScimDirectoryIdentityService", () => {
     /** @scenario The same directory identifier on two connections is two different people */
     it("resolves each within its own connection and never to the other's person", async () => {
       await service.remember({
+        organizationId: ORG,
         connectionId: OKTA,
         externalId: "u-1",
         userId: "user_sam",
       });
       await service.remember({
+        organizationId: ORG,
         connectionId: ENTRA,
         externalId: "u-1",
         userId: "user_kim",
@@ -168,6 +271,7 @@ describe("ScimDirectoryIdentityService", () => {
     /** @scenario A push naming a person no connection knows provisions within that connection only */
     it("records them under that connection alone", async () => {
       await service.remember({
+        organizationId: ORG,
         connectionId: OKTA,
         externalId: "u-new",
         userId: "user_new",
@@ -182,13 +286,18 @@ describe("ScimDirectoryIdentityService", () => {
   describe("when a push aims at somebody another connection provisioned", () => {
     it("refuses with scim_write_outside_connection", async () => {
       await service.remember({
+        organizationId: ORG,
         connectionId: ENTRA,
         externalId: "c-99",
         userId: "user_kim",
       });
 
       await expect(
-        service.assertWritable({ connectionId: OKTA, userId: "user_kim" }),
+        service.assertWritable({
+          organizationId: ORG,
+          connectionId: OKTA,
+          userId: "user_kim",
+        }),
       ).rejects.toMatchObject({
         code: "scim_write_outside_connection",
         httpStatus: 403,
@@ -197,13 +306,18 @@ describe("ScimDirectoryIdentityService", () => {
 
     it("names only the person the caller already sent", async () => {
       await service.remember({
+        organizationId: ORG,
         connectionId: ENTRA,
         externalId: "c-99",
         userId: "user_kim",
       });
 
       const refusal = await service
-        .assertWritable({ connectionId: OKTA, userId: "user_kim" })
+        .assertWritable({
+          organizationId: ORG,
+          connectionId: OKTA,
+          userId: "user_kim",
+        })
         .catch((error: unknown) => error);
 
       expect((refusal as { meta: Record<string, unknown> }).meta).toEqual({
@@ -215,13 +329,18 @@ describe("ScimDirectoryIdentityService", () => {
   describe("when a push aims at somebody its own connection provisioned", () => {
     it("allows it", async () => {
       await service.remember({
+        organizationId: ORG,
         connectionId: OKTA,
         externalId: "u-1",
         userId: "user_sam",
       });
 
       await expect(
-        service.assertWritable({ connectionId: OKTA, userId: "user_sam" }),
+        service.assertWritable({
+          organizationId: ORG,
+          connectionId: OKTA,
+          userId: "user_sam",
+        }),
       ).resolves.toBeUndefined();
     });
   });
@@ -229,7 +348,11 @@ describe("ScimDirectoryIdentityService", () => {
   describe("when a push aims at somebody no connection has claimed", () => {
     it("allows it, so a directory can adopt a hand-invited member", async () => {
       await expect(
-        service.assertWritable({ connectionId: OKTA, userId: "user_invited" }),
+        service.assertWritable({
+          organizationId: ORG,
+          connectionId: OKTA,
+          userId: "user_invited",
+        }),
       ).resolves.toBeUndefined();
     });
   });
@@ -237,13 +360,18 @@ describe("ScimDirectoryIdentityService", () => {
   describe("given a token that predates connection scoping", () => {
     it("checks nothing, keeping the organization-wide authority it was sold with", async () => {
       await service.remember({
+        organizationId: ORG,
         connectionId: ENTRA,
         externalId: "c-99",
         userId: "user_kim",
       });
 
       await expect(
-        service.assertWritable({ connectionId: null, userId: "user_kim" }),
+        service.assertWritable({
+          organizationId: ORG,
+          connectionId: null,
+          userId: "user_kim",
+        }),
       ).resolves.toBeUndefined();
     });
   });
@@ -251,17 +379,19 @@ describe("ScimDirectoryIdentityService", () => {
   describe("when a person leaves a directory", () => {
     it("forgets that connection's identity and no other's", async () => {
       await service.remember({
+        organizationId: ORG,
         connectionId: OKTA,
         externalId: "u-1",
         userId: "user_sam",
       });
       await service.remember({
+        organizationId: ORG,
         connectionId: ENTRA,
         externalId: "c-99",
         userId: "user_sam",
       });
 
-      await service.forget({ connectionId: OKTA, externalId: "u-1" });
+      await service.forget({ connectionId: OKTA, userId: "user_sam" });
 
       await expect(
         service.getUserId({ connectionId: OKTA, externalId: "u-1" }),
@@ -270,5 +400,115 @@ describe("ScimDirectoryIdentityService", () => {
         service.getUserId({ connectionId: ENTRA, externalId: "c-99" }),
       ).resolves.toBe("user_sam");
     });
+  });
+  /** @scenario "Directory ownership is isolated by organization and follows connection retirement" */
+  it("lets two organizations provision the same account without granting a sibling directory access", async () => {
+    const otherOrg = "org_other";
+    store.connections.push({
+      id: "other",
+      organizationId: otherOrg,
+      state: "ACTIVE",
+      replacesConnectionId: null,
+      migrationPhase: null,
+    });
+    await service.remember({
+      organizationId: ORG,
+      connectionId: OKTA,
+      userId: "shared",
+      externalId: "a",
+    });
+    await expect(
+      service.assertWritable({
+        organizationId: otherOrg,
+        connectionId: "other",
+        userId: "shared",
+      }),
+    ).resolves.toBeUndefined();
+    await service.remember({
+      organizationId: otherOrg,
+      connectionId: "other",
+      userId: "shared",
+      externalId: "b",
+    });
+    await expect(
+      service.assertWritable({
+        organizationId: ORG,
+        connectionId: ENTRA,
+        userId: "shared",
+      }),
+    ).rejects.toMatchObject({ code: "scim_write_outside_connection" });
+    await expect(
+      service.assertWritable({
+        organizationId: ORG,
+        connectionId: "other",
+        userId: "shared",
+      }),
+    ).rejects.toMatchObject({ code: "scim_connection_not_found" });
+    expect(store.owners.map((owner) => owner.organizationId).sort()).toEqual(
+      [ORG, otherOrg].sort(),
+    );
+  });
+
+  it.each([
+    "TEARDOWN_PENDING",
+    "TORN_DOWN",
+    "DISCARDED",
+  ])("ignores a %s owner's claim", async (state) => {
+    await service.remember({
+      organizationId: ORG,
+      connectionId: OKTA,
+      userId: "shared",
+      externalId: null,
+    });
+    const owner = store.connections.find((row) => row.id === OKTA);
+    if (!owner) throw new Error("owner missing");
+    owner.state = state;
+    await expect(
+      service.assertWritable({
+        organizationId: ORG,
+        connectionId: ENTRA,
+        userId: "shared",
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("transfers predecessor ownership only when the replacement finalizes", async () => {
+    await service.remember({
+      organizationId: ORG,
+      connectionId: OKTA,
+      userId: "shared",
+      externalId: "old",
+    });
+    const successor = store.connections.find((row) => row.id === ENTRA);
+    if (!successor) throw new Error("successor missing");
+    successor.replacesConnectionId = OKTA;
+    successor.migrationPhase = "GRACE_DIRECT";
+    await expect(
+      service.assertWritable({
+        organizationId: ORG,
+        connectionId: ENTRA,
+        userId: "shared",
+      }),
+    ).rejects.toMatchObject({ code: "scim_write_outside_connection" });
+    successor.migrationPhase = "FINALIZING";
+    await expect(
+      service.assertWritable({
+        organizationId: ORG,
+        connectionId: ENTRA,
+        userId: "shared",
+      }),
+    ).resolves.toBeUndefined();
+    await service.remember({
+      organizationId: ORG,
+      connectionId: ENTRA,
+      userId: "shared",
+      externalId: "new",
+    });
+    expect(store.owners).toEqual([
+      { organizationId: ORG, connectionId: ENTRA, userId: "shared" },
+    ]);
+    expect(
+      await service.getUserId({ connectionId: OKTA, externalId: "old" }),
+    ).toBeNull();
   });
 });

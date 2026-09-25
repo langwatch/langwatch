@@ -56,6 +56,9 @@ import type { GithubInstallationsService } from "./github/github-installations.s
 import type { GithubPullRequestMappingService } from "./github/github-pull-request-mapping.service";
 import type { GithubPullRequestStatusService } from "./github/github-pull-request-status.service";
 import type { GithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
+import type { InstantEvalSpendRecorder } from "./instant-evals/instant-eval-spend.recorder";
+import type { InstantEvalJudgmentsRepository } from "./instant-evals/run/instant-eval-judgments.repository";
+import type { InstantEvalRunRepository } from "./instant-evals/run/instant-eval-run.repository";
 import type { LangyCredentialService } from "./langy/LangyCredentialService";
 import type { LangyConversationService } from "./langy/langy-conversation.service";
 import type { LangyFeedbackPromptService } from "./langy/langy-feedback-prompt.service";
@@ -204,6 +207,17 @@ export interface AppDependencies {
       searchAfter?: [number, string];
       runContext?: ClusteringRunContext;
     }) => Promise<ClusteringPageOutcome>;
+  };
+  /**
+   * ADR-137: the Instant Eval stores, already bound to the composition root's
+   * ClickHouse resolver, and where a query's or a run's spend is reported.
+   * The run surface reads and writes runs and verdicts through these instead
+   * of resolving a client of its own.
+   */
+  instantEvals: {
+    runs: InstantEvalRunRepository;
+    judgments: InstantEvalJudgmentsRepository;
+    spend: InstantEvalSpendRecorder;
   };
   /**
    * The gateway's ClickHouse-backed repositories. Undefined on a deployment

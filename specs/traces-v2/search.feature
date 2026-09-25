@@ -70,10 +70,12 @@ Rule: Search bar layout and behavior
     Given the user is authenticated with "traces:view" permission
     And the project has traces
 
+  @integration
   Scenario: Search bar renders with placeholder text
     When the Observe page loads
     Then the search bar spans the full width below the nav bar
-    And the placeholder text reads "Search filters, free text, or Ask AI…"
+    And the placeholder text reads "Search filters or type what you are looking for"
+    And the placeholder is the same whether or not Langy is available
 
   Scenario: Search bar shows the current active query
     Given the search bar contains "@status:error AND @model:gpt-4o"
@@ -85,15 +87,24 @@ Rule: Search bar layout and behavior
     Then the search bar is empty
     And all filter sidebar controls are reset to neutral
 
+  @integration
   Scenario: Pressing Enter applies the query
     When the user types "@status:error" in the search bar
     And presses Enter
     Then the trace table filters to show only error traces
+    And no request went out before Enter
 
+  @integration
   Scenario: Typing does not trigger live search
     When the user types "@status:err" without pressing Enter
     Then the trace table does not update
-    And only autocomplete suggestions update live
+    And the filter store does not change
+    And only autocomplete suggestions and chip highlighting update live
+
+  Scenario: The inline hint names Enter
+    Given the search bar is focused with text in it
+    Then the hint after the text reads "⏎ Enter to search"
+    And no other key submits the search
 
   # Pasting a multi-line error message used to create one Paragraph node
   # per line, growing the editor vertically until it pushed the rest of
@@ -995,23 +1006,128 @@ Rule: Two-way sync edge cases
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Facet count updates
-  Facet counts reflect the currently filtered dataset.
+  Facet counts reflect the currently filtered dataset: the active query, the
+  exact time window the table reads, and the same hidden origins. Each facet
+  is counted with its own field left out of the query, so it keeps listing
+  its other values and each value's count is what the table would show with
+  that value selected.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the project has traces
 
+  @integration
   Scenario: Facet counts update when a filter is applied
     When the user checks "Error" under Status
     Then the count badges on all other facets update to reflect the filtered dataset
 
+  @integration
   Scenario: Facet counts show how many results another filter would yield
     Given the user has "Error" checked under Status
     Then the Model facet counts show how many error traces each model has
+    And the Status facet still lists "Ok" with its own count, because the facet's own field is left out
 
+  # A rolling "to" is the instant the request was built, and the table read
+  # drops it for that reason. A facet read on another table has to agree.
+  @unit
+  Scenario: A live window leaves the facet membership uncapped
+    Given the window is a rolling preset
+    When a facet on another table is counted under the active filter
+    Then the membership test carries no upper bound on the window
+    And an absolute window still carries both bounds
+
+  @unit
+  Scenario: A facet term under a NOT is removed with the rest
+    Given the query reads "NOT (status:error OR service:api)"
+    When the Status facet is counted
+    Then the term it is counted under no longer names status
+    And the rest of the negated group still applies
+
+  @unit
   Scenario: Facet counts are fetched in a single batched query
     When the user applies a filter
     Then all facet counts are fetched in one query, not one per facet
+
+  @integration
+  Scenario: A facet value's count equals the table count after selecting it
+    Given the user has "Error" checked under Status
+    And the Service facet shows "api" with a count
+    When the user checks "api" under Service
+    Then the table's total is that count
+
+  @integration
+  Scenario: Facets show nothing under a query the table answers with zero traces
+    Given the user applied a query that matches no trace
+    Then the table shows no traces
+    And no facet the query does not name shows a nonzero count
+
+  @integration
+  Scenario: Facet counts leave out the hidden origin and the traces outside the window
+    Given the project has a trace from Langy's own origin in the window
+    And a trace outside the selected window
+    Then neither trace is counted in any facet but Origin
+    And the Origin facet still offers Langy with its count
+    And the counts read the window the table reads, never a rounded one
+
+  @unit
+  Scenario: A facet on spans or evaluations reads the listed traces once any filter is active
+    Given the query names only an evaluator facet
+    Then that facet counts the evaluations of the traces in the window, its own field left out
+    And Langy's own traces and traces outside the window are not counted
+
+  @unit
+  Scenario: Span and evaluation facets count the whole window while no filter is active
+    Given no query is active
+    Then the span and evaluation facets count every row in the window
+    And they are counted again through the listed traces as soon as a filter is applied
+
+  @integration
+  Scenario: Facet counts are cached only per query and window
+    When the user changes the query or the time window
+    Then the counts are requested again for the new input
+    And a count kept for a previous input is never shown as the current one
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# NUMBERS THAT AGREE
+# ─────────────────────────────────────────────────────────────────────────────
+
+Rule: Numbers that agree
+  Every count on the Explorer reads the total the list already returned for
+  the active filter and window, so no two surfaces can disagree.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces
+
+  # The selection header, the pagination line and the sidebar total all render
+  # from one selector, so the two scenarios below are the whole rule: the
+  # selector answers one total, and the surfaces print what it answers.
+  @integration
+  Scenario: One selector answers the total, the noun and the page ids
+    Given the list read answered a total for the active filter
+    Then the selector answers that total, the noun for the lens and the ids on the page
+    And on the Conversations lens it answers the sessions read's total, named in conversations
+
+  @integration
+  Scenario: The pagination line and the sidebar total show one number
+    Given the list read answered a total for the active filter
+    Then the pagination line and the sidebar total both show that number
+    And on the Conversations lens the number is the sessions read's total, named in conversations
+
+  @integration
+  Scenario: A total of one is named in the singular
+    Given the list read answered a total of one for the active filter
+    Then the pagination line and the sidebar total both read "1 trace"
+    And on the Conversations lens they both read "1 conversation"
+
+  @integration
+  Scenario: Counts next to values are hidden until the filtered counts land
+    Given the sidebar renders from the previous session's facet shape
+    And the filtered counts for the active query have not arrived
+    Then each facet value shows its name and no count
+    When the filtered counts arrive
+    Then each facet value shows its count for the active query
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1244,6 +1360,279 @@ Rule: Performance
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# ENTER ROUTES A SENTENCE
+# ─────────────────────────────────────────────────────────────────────────────
+
+Rule: Enter routes a sentence
+  Enter is the only way a typed text leaves the search bar. A text made of
+  `field:value` terms is applied as typed, with no request. A text with bare
+  words is a sentence, and `tracesV2.routeSearch` decides what it is: a
+  filter the query language can express, a judgement each trace needs (an
+  Instant Eval), a literal phrase, or a question for Langy. The classifier
+  makes the call in one category question over the sentence and a line of
+  context (lens, window, the filter fields, the evaluators and events the
+  project has); a deployment without the classifier asks the FAST model to
+  decide and build in one call; a deployment with neither searches the
+  phrase and says why. Routing is counted on a metric and never metered.
+  A failure on the way degrades, it is not an error state in the bar: a
+  filter that cannot be written becomes the phrase, and a judge question
+  that cannot be written becomes a judgement of the sentence as typed. The
+  strip under the bar says which, and offers the model settings when a
+  model is what was missing.
+  See dev/docs/adr/139-trace-search-routes-on-enter.md.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces
+
+  @integration
+  Scenario: Enter on a sentence asks the router
+    Given the search bar contains the applied query "model:gpt-4o"
+    When the user types "annoyed users" and presses Enter
+    Then `tracesV2.routeSearch` is called with the text, the visible time range, the applied query and the active lens
+    And nothing changes on screen until it answers
+    And a second Enter before the answer supersedes it
+
+  @unit
+  Scenario: A sentence the filter language can express becomes chips
+    Given the classifier answers "filter" for "errors from gpt-4 service:checkout"
+    When the router runs
+    Then the FAST model builds the filter for "errors from gpt-4" with the live field catalogue
+    And the result is merged with the explicit term: "service:checkout AND status:error"
+    And the bar shows the query as chips
+    And a strip under the bar reads "Searched as: <query>" with "Search the words instead"
+    And "Search the words instead" applies the sentence as one quoted phrase
+
+  @integration
+  Scenario: The routed query replaces the sentence in the bar while the bar keeps focus
+    Given the user typed "annoyed users" and pressed Enter
+    And the bar still has focus
+    When the query the router produced is applied
+    Then the bar shows the applied query as chips, with the caret at its end
+    And a bar the user kept typing in after Enter keeps what they typed
+    And the Enter hint sits after the applied query, not where the sentence ended
+
+  @unit
+  Scenario: Explicit terms typed next to a sentence are kept
+    When the user types "annoyed users status:error asking refunds"
+    Then the sentence is "annoyed users asking refunds"
+    And the explicit query is "status:error"
+    And a quoted phrase or a negated word counts as explicit, not as part of the sentence
+
+  # The two halves are rejoined with AND, so a word the writer put under an OR
+  # would come back meaning something else than they typed.
+  @unit
+  Scenario: A word under an OR stays in the explicit query
+    When the user types "status:error OR refund"
+    Then the sentence is empty
+    And the explicit query is "status:error OR refund"
+    And the query is applied as typed rather than routed
+
+  @unit
+  Scenario: Joining a query that holds a top-level OR groups it first
+    Given a query "(a) OR (b)" and an addition "c"
+    Then the joined query reads "((a) OR (b)) AND c"
+    And a query already wrapped in one pair of parentheses is not wrapped again
+
+  # A rejected key makes the provider's own response body the credential, so
+  # the log line gets the same curation the customer-facing disclosure gets.
+  @unit
+  Scenario: A provider failure is logged curated, never raw
+    Given a provider call fails with its own message
+    When the failure is logged
+    Then the line carries the provider, the model and the status code
+    And none of the provider's own text is in it
+
+  @unit
+  Scenario: A filter the model could not write becomes a phrase search
+    Given the classifier answers "filter"
+    And the FAST model answers an empty query
+    When the router runs
+    Then the sentence is searched as one quoted phrase
+    And the result says it fell back from the filter route
+
+  @unit
+  Scenario: A sentence that needs a judgement becomes an Instant Eval question
+    Given the classifier answers "instant_eval" for "annoyed users status:error" on the Conversations lens
+    When the router runs
+    Then the FAST model rewrites the sentence into a judge question with a yes and a no criterion
+    And the target is "threads" on the Conversations lens and "traces" on every other lens
+    And the result carries the explicit terms as `otherQuery` and the phrase search as `fallbackQuery`
+
+  # A sentence classified as a judgement describes a judgement whether or not
+  # a model is there to sharpen it. Matching the words literally instead is a
+  # different search that answers a question nobody asked.
+  @unit
+  Scenario: A judge question no model could write is judged as typed
+    Given the classifier answers "instant_eval" for "frustrated users status:error"
+    And the FAST model fails to write the judge question
+    When the router runs
+    Then the result is an Instant Eval whose question is "frustrated users"
+    And it carries no criteria, the way a chip typed by hand does
+    And it says the model failed, with the handled code it failed with
+    And the strip under the bar reads both
+    And the log line names the cause: the handled code, the model and the status
+
+  @unit
+  Scenario: A project with no model still judges the sentence
+    Given the classifier answers "instant_eval" for "frustrated users"
+    And the project has no FAST model configured
+    When the router runs
+    Then the result is an Instant Eval whose question is "frustrated users"
+    And it says no model is connected, which the strip under the bar reads
+
+  # One line, because the question is already on screen twice: in the chip
+  # and in the progress bar over the table.
+  @integration
+  Scenario: A search that ran without a model says so
+    Given a judgement ran on the sentence as typed
+    Then a strip under the bar reads "Interpreted as an Instant Eval. The search model failed (ai_query_provider_error), so your words are judged as typed."
+    And it names no code when the failure carried none
+    And it reads "No model is connected for search" when that is the problem instead
+    And it carries a "Configure models" button to the model provider settings
+    And a phrase search another route fell back to gets the same strip, reading "Interpreted as a phrase. No model is connected for search, so your words are matched as typed."
+
+  @integration
+  Scenario: The way to fix it can be dismissed
+    Given the strip under the bar is showing its "Configure models" button
+    When the reader dismisses it
+    Then the button goes and the line saying what the search was read as stays
+    And it stays dismissed for that project on later searches
+
+  @unit
+  Scenario: An existing evaluator answers the judgement as a filter
+    Given the classifier answers "instant_eval" for "hallucinated answers"
+    And the project has results from the evaluator "ragas/faithfulness"
+    When the FAST model prefers the evaluator
+    Then the result is the filter "evaluator:ragas/faithfulness AND evaluatorVerdict:fail"
+    And it carries the reason the evaluator was chosen
+
+  @integration
+  Scenario: An Instant Eval route starts a run
+    Given the router answered "instant_eval"
+    When the Explorer receives the payload through `useInstantEvalRoute`
+    Then an `eval:"<question>"` chip is applied and a run starts under the cost rule
+    # The cost rule, the progress bar and the refusals are specified in
+    # specs/traces-v2/instant-eval-search.feature.
+
+  @unit
+  Scenario: A literal phrase is searched as one phrase
+    Given the classifier answers "free_text" for "cannot connect to database service:api"
+    When the router runs
+    Then the query is `service:api AND "cannot connect to database"`
+    And no model is called
+
+  @unit
+  Scenario: A question for the assistant goes to Langy with the view attached
+    Given the classifier answers "langy" for "why did errors spike this morning"
+    When the router runs
+    Then the whole typed text is handed to Langy as the question
+    And the view and the applied search are attached, as the Ask Langy button attaches them
+    And the option is not offered to the classifier when Langy is not available to the user
+
+  @unit
+  Scenario: Without the classifier the model decides and builds in one call
+    Given the deployment has no classifier configured
+    When the user submits "failing calls model:gpt-4o"
+    Then the FAST model answers a route and, for a filter, the query in the same call
+    And a filter answer is merged with the explicit terms: "model:gpt-4o AND (status:error OR status:warning)"
+
+  @unit
+  Scenario: Without a classifier or a model the words are searched as a phrase
+    Given the deployment has no classifier configured
+    And the project has no FAST model configured
+    When the user submits "annoyed users"
+    Then the query `"annoyed users"` is applied
+    And the result says no model is connected
+    And the strip under the bar says the words were read as one phrase
+    And it links to the model provider settings in a new tab
+
+  @integration
+  Scenario: Back returns to the search before
+    Given the user submitted "status:error" and then "model:gpt-5-mini"
+    When the user presses the browser's Back button
+    Then the Explorer stays open on "status:error", with its window, lens and run keys
+    And Forward returns to "model:gpt-5-mini"
+    # A submitted search (Enter, a facet click, a range or lens pick, a Langy
+    # action) is a history entry. Restoring one is not a new search.
+
+  @integration
+  Scenario: Run progress and run keys never add history entries
+    Given a search whose Instant Eval run is registered a moment after the submit
+    When the run key reaches the URL
+    Then it is written into the entry the submit made
+
+  @unit
+  Scenario: With Instant Evals not released for the project the router does not offer the judgement route
+    Given Instant Evals are not released for the project
+    When the user submits "annoyed users"
+    Then the classifier is asked without the instant_eval option
+    And the model is told the instant_eval route is not available
+    And a judgement answer from either is searched as a filter or as the phrase
+    And no Instant Eval popover or dialog is shown
+
+  @integration
+  Scenario: A model whose provider is disabled counts as no model
+    Given the deployment has no classifier configured
+    And the project's FAST model belongs to a provider that is disabled
+    When the user submits "annoyed users"
+    Then the query `"annoyed users"` is applied
+    And the result says no model is connected
+
+  @unit
+  Scenario: A classified route that finds the provider disabled says a model is unavailable
+    Given the classifier answers "filter"
+    And the project's FAST model belongs to a provider that is disabled
+    When the user submits "failing calls"
+    Then the query `"failing calls"` is applied
+    And the result says no model is connected
+
+  @unit
+  Scenario: A model failure is a phrase search, not an error
+    Given the FAST model fails on every attempt
+    When the user submits "annoyed users"
+    Then the query `"annoyed users"` is applied
+    And no error banner is shown
+    And the result says the model failed rather than that none is connected
+
+  @integration
+  Scenario: A router call that fails says the words were searched instead
+    Given `tracesV2.routeSearch` cannot be reached
+    When the user submits "annoyed users"
+    Then the words are applied as a quoted phrase
+    And a warning toast carries the registry's words for the failure
+    And it adds "The words were searched as a phrase instead."
+
+  @unit
+  Scenario: The client refuses a sentence past the term ceiling before sending it
+    Given the user applies eleven bare words as a filter
+    Then the client's validation refuses it with "Too many separate terms. Put the sentence in quotes to search it as one phrase."
+    And ten bare words pass
+    And the same eleven words in quotes pass as one node
+    # Eleven bare words are twenty-one nodes: the translator's ceiling is twenty.
+
+  @unit
+  Scenario: The server refuses a sentence past the term ceiling with its own code
+    Given a filter with more than twenty nodes reaches the server
+    Then it is refused with the code `filter_too_complex`, a 422 and customer fault
+    And `meta.maxNodes` carries the ceiling
+    And the customer copy reads "Too many separate terms" and "Put the sentence in quotes to search it as one phrase."
+
+  @integration
+  Scenario: A sentence past the term ceiling offers to search it as one phrase
+    Given the table failed with `filter_too_complex`
+    Then the error state offers "Search it as one phrase"
+    And clicking it applies the query with its bare words as one quoted phrase and the explicit terms kept
+
+  @unit
+  Scenario: The fix quotes the sentence as one phrase
+    Given the query "status:error one two three four five six seven eight nine ten eleven"
+    When it is requoted
+    Then it reads `status:error AND "one two three four five six seven eight nine ten eleven"`
+    And a query with no bare words is returned untouched
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # AI QUERY COMPOSER
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -1262,18 +1651,36 @@ Rule: The search bar's ask affordance belongs to Langy when Langy is available
     And the project has traces
     And Langy is available to the user, with permission to start a conversation
 
+  @integration
   Scenario: The ask button reads Ask Langy
     When the Observe page loads
     Then the search bar's ask button reads "Ask Langy"
-    And the placeholder text reads "Search filters, free text, or Ask Langy…"
-    And the inline submit hint reads "Press ⌘ + Enter to Ask Langy"
+    And the placeholder and the inline hint are the same as without Langy
+    # The button is the way to Langy; typed text goes to the search router
+    # on Enter (see "Enter routes a sentence").
 
   Scenario: Clicking Ask Langy floats the ask surface over the search bar
     Given the Langy panel is closed
-    When the user clicks "Ask Langy" (or presses ⌘I / Ctrl+I)
+    When the user clicks "Ask Langy"
     Then a Langy-styled ask surface floats where the search bar was
     And the user can type their question there, next to their traces
     And the inline AI composer does not open
+
+  @integration
+  Scenario: With Langy available the ⌘I shortcut belongs to the Langy panel
+    Given the Langy panel is closed
+    When the user presses ⌘I / Ctrl+I on the Observe page
+    Then the search bar does not answer the shortcut, and no floating surface opens
+    # ⌘I toggles the Langy panel on every page of the product. Two listeners
+    # on one key opened the surface and the panel together, and the panel
+    # opening retired the surface, so the key keeps its one product-wide
+    # meaning. The panel reads the view and the search as page context.
+
+  @integration
+  Scenario: Without Langy the ⌘I shortcut opens the Ask AI bar
+    Given Langy is not available to the user
+    When the user presses ⌘I / Ctrl+I on the Observe page
+    Then the structured bar is replaced by the floating Ask AI bar
 
   Scenario: The floating surface shows what will go with the question
     Given the search bar contains the applied query "status:error"
@@ -1287,6 +1694,15 @@ Rule: The search bar's ask affordance belongs to Langy when Langy is available
     Then the ask surface dissolves
     And the Langy panel opens and asks "why are these failing?"
     And the active search rides along as attached context
+
+  @integration
+  Scenario: Ask Langy sends the whole view with the question
+    Given the search bar contains the applied query "status:error"
+    And the Conversations lens is active over the last 7 days
+    When the user asks "why are these failing?" through Ask Langy
+    Then the view is attached first: data source, time range, lens, grouping, sort and the search
+    And the search is attached second as the filter the agent applies
+    # The explicit route sends at least what the passive page context sends.
 
   Scenario: Escape closes the ask surface without sending anything
     Given the Langy ask surface is open
@@ -1306,16 +1722,20 @@ Rule: The search bar's ask affordance belongs to Langy when Langy is available
     When the Langy panel opens some other way
     Then the ask surface closes — two composers are never on screen
 
-  Scenario: ⌘+Enter hands the typed question straight to Langy
+  @integration
+  Scenario: Cmd+Enter is plain Enter
     Given the user typed "why are checkout traces failing" in the search bar
-    When the user presses ⌘+Enter / Ctrl+Enter
-    Then the Langy panel opens and asks "why are checkout traces failing"
+    When the user presses Cmd+Enter or Ctrl+Enter
+    Then the text is submitted the way plain Enter submits it
+    And the search router decides where it goes
+    # There is one path out of the bar. A sentence that is a question for
+    # the assistant reaches Langy through the router's `langy` route.
 
+  @unit
   Scenario: A question that is just the applied filter is not attached twice
     Given the search bar contains the applied query "status:error"
-    When the user presses ⌘+Enter / Ctrl+Enter on that same text
-    Then Langy is asked "status:error"
-    And no separate search attachment duplicates it
+    When Langy is asked "status:error" through the handoff
+    Then no separate search attachment duplicates it
 
   Scenario: No model provider setup is demanded on the way to Langy
     Given the project has no enabled model provider
@@ -1352,9 +1772,11 @@ Rule: AI query composer (Ask AI)
     And the project has traces
     And Langy is not available to the user
 
-  Scenario: Free-text in the structured bar stays free-text
+  Scenario: Free text in the structured bar goes through the router on Enter
     When the user types "show me all errors" in the structured search bar
-    Then it is treated as a free-text search clause; no NLP parsing runs
+    And presses Enter
+    Then the search router decides what it is (see "Enter routes a sentence")
+    And the inline composer is not opened
 
   Scenario: Ask AI button enters AI mode
     When the user clicks "Ask AI" (or presses ⌘I / Ctrl+I)
@@ -1557,7 +1979,7 @@ Rule: Chip labels are field-qualified and never resize on hover
 # active token of shape @partial, @field:, or @field:partial — meaning no
 # whitespace between the @ and the cursor. Whitespace closes it.
 # Enter is contextual: dropdown open → accept, dropdown closed → submit.
-# Blur always submits.
+# Blur keeps the text and searches nothing; Enter is the one way out.
 
 Rule: Dropdown open and close based on cursor position
   The autocomplete dropdown is bound to cursor context, not focus alone.
@@ -1607,6 +2029,13 @@ Rule: Dropdown open and close based on cursor position
     When the user types "model is broken"
     Then the dropdown stays closed throughout
 
+  @unit
+  Scenario: The field list opens for every clause, not only the first
+    Given the search bar holds a chip and the space after it, which the editor writes as a non-breaking space
+    When the user types the next field name
+    Then the dropdown opens in field-name mode on that name
+    And the same holds for its value, because a non-breaking space ends a token the way a space does
+
 
 Rule: Enter is contextual based on dropdown state
   Enter accepts when the dropdown is open; Enter submits when it is closed.
@@ -1645,11 +2074,14 @@ Rule: Enter is contextual based on dropdown state
     When the user presses Enter, Enter, and Enter in sequence
     Then a query of the form "@<first-field>:<first-value>" is submitted
 
+  @integration
   Scenario: Enter on free text submits
     Given the search bar contains "refund" and the dropdown is closed
     When the user presses Enter
-    Then the query "refund" is submitted
+    Then the text "refund" is submitted to the search router
+    And nothing is applied by the editor itself
 
+  @integration
   Scenario: Enter on empty input clears the AST
     Given the search bar is empty and focused
     When the user presses Enter
@@ -1685,7 +2117,7 @@ Rule: Tab and click mirror Enter for suggestion accept
     Given the search bar contains "status:error" and the dropdown is closed
     When the user presses Tab
     Then handleKey returns noop and the browser's native focus traversal runs
-    And any resulting blur submits via the blur path
+    And the text stays in the bar, unsearched, until Enter
 
 
 Rule: Escape is hierarchical
@@ -1702,11 +2134,11 @@ Rule: Escape is hierarchical
     And the editor is still focused
     And the text remains "@status:err"
 
-  Scenario: Escape with dropdown closed blurs the editor and submits
+  Scenario: Escape with dropdown closed blurs the editor without searching
     Given the search bar contains "@status:error" and the dropdown is closed
     When the user presses Escape
     Then the editor blurs
-    And the query "@status:error" is submitted
+    And the text "@status:error" stays in the bar, unsearched
 
   Scenario: Escape then Enter submits the literal typed text
     Given the search bar contains "@status:err" and the dropdown is open
@@ -1715,41 +2147,56 @@ Rule: Escape is hierarchical
     Then the query "@status:err" is submitted as typed
 
 
-Rule: Blur always submits
-  Any cause of blur — clicking out, tabbing out, programmatic focus change — submits the current text.
+Rule: Leaving the search bar is not a search
+  Blur, whatever caused it (clicking out, tabbing out, a programmatic focus
+  change), keeps the typed text where it is and searches nothing. Enter is
+  the one way out. A store change from outside while the bar is unfocused
+  (a facet click) replaces the unsent text with the applied query.
+  The answer to the user's own Enter is applied to the bar even while it
+  keeps focus, as long as the text is still what was submitted. Clear is the
+  user's own instruction rather than a store change, so it empties the bar
+  whether or not it has focus, and whether or not the text was submitted.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the project has traces
 
-  Scenario: Clicking outside the search bar submits the query
-    Given the search bar contains "@status:error" and is focused
-    When the user clicks outside the search bar
-    Then the query "@status:error" is submitted
-
-  Scenario: Tabbing out of the search bar submits the query
-    Given the search bar contains "@status:error" and is focused
-    When the user presses Tab with the dropdown closed
-    Then the query "@status:error" is submitted
-
-  Scenario: Sidebar checkbox click after typing submits the typed text first
-    Given the search bar contains "@status:error" (unsubmitted) and is focused
-    When the user clicks a sidebar checkbox for "@model:gpt-4o"
-    Then the search bar text is committed first
-    And the resulting query contains both "@status:error" and "@model:gpt-4o"
-
-  Scenario: Blur with invalid syntax shows parse error but preserves text
-    Given the search bar contains "@status:" with no value
+  @integration
+  Scenario: Leaving the search bar keeps the text without searching
+    Given the search bar contains "annoyed users" and is focused
     When the user clicks outside the search bar
     Then the editor blurs
-    And the search bar shows a red outline with the parse error message
+    And the text "annoyed users" stays in the bar
+    And nothing is submitted or applied
+
+  Scenario: Tabbing out of the search bar keeps the text
+    Given the search bar contains "@status:error" and is focused
+    When the user presses Tab with the dropdown closed
+    Then the text stays in the bar, unsearched
+
+  Scenario: A sidebar click after typing applies the sidebar's query
+    Given the search bar contains "@status:error" (unsubmitted) and is focused
+    When the user clicks a sidebar checkbox for "@model:gpt-4o"
+    Then the applied query is "@model:gpt-4o"
+    And the bar shows "@model:gpt-4o": the unsent text is replaced by the applied query
+
+  Scenario: Enter with invalid syntax shows the parse error and preserves the text
+    Given the search bar contains "@status:" with no value
+    When the user presses Enter
+    Then the search bar shows a red outline with the parse error message
     And the text "@status:" is preserved for the user to fix
 
-  Scenario: Submit is idempotent across Enter and blur
+  Scenario: Enter is idempotent
     Given the search bar contains "@status:error" and is focused
-    When the user presses Enter
-    And then clicks outside the search bar
-    Then "applyQueryText" is invoked at most once with the same text
+    When the user presses Enter twice
+    Then the applied query is "@status:error" and the AST identity does not churn
+
+  @integration
+  Scenario: Clear empties the bar even while the bar has focus
+    Given the search bar contains "annoyed users" and is focused
+    When the user clicks Clear
+    Then the bar is empty
+    And text the user never submitted is emptied the same way, though the applied query was already empty
 
 
 Rule: Suggestion accept replaces only the active token

@@ -22,6 +22,10 @@ import {
   LangyUiHandlerFailedError,
   LangyUiNoBrowserError,
 } from "./errors";
+import {
+  executeExplorerBackendAction,
+  isExplorerActionKindOnBackend,
+} from "./explorerBackendExecutor";
 import type { PageActionDefinition } from "./pageManifests";
 
 const logger = createLogger("langwatch:langy:ui-actions:backend");
@@ -54,11 +58,22 @@ export async function executeBackendAction({
   definition: PageActionDefinition;
   payload: unknown;
 }): Promise<unknown> {
+  // The Explorer has no saved document to edit, so its away form is a link
+  // rather than a write, and it needs no experiment named.
+  if (isExplorerActionKindOnBackend(kind)) {
+    return executeExplorerBackendAction({
+      projectSlug: context.projectSlug,
+      kind,
+      payload,
+    });
+  }
+
   // The away fallback only knows the workbench's saved-state seam. A
   // `dashboard.` action (a render receipt) has no saved state to answer from —
   // a receipt is what a widget painted in a tab that has the dashboard open,
   // and there is none when no tab is attached — so it refuses rather than
-  // guessing. Anything outside `workbench.` is in the same position.
+  // guessing. Anything outside `workbench.` (that the Explorer did not already
+  // claim above) is in the same position.
   if (!kind.startsWith("workbench.")) {
     throw new LangyUiNoBrowserError(kind);
   }

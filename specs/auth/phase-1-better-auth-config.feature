@@ -123,13 +123,19 @@ Feature: BetterAuth config (unmounted)
     When an OAuth callback returns a profile with email "b@example.com"
     Then the signin is rejected with a DIFFERENT_EMAIL_NOT_ALLOWED error
 
-  Scenario: New user with matching SSO domain joins the SSO org
-    Given an organization with ssoDomain "acme.com" exists
-    And no user exists with email "new@acme.com"
-    When a new user signs in via a matching SSO provider with email "new@acme.com"
-    Then a new user is created
-    And the user is added to the organization as a MEMBER
-    And an Account row is created for the OAuth account
+  Scenario: Authenticated user on a proved admitting SSO connection joins its organization
+    Given an already-created user with email "ana@acme.com"
+    And an authenticated account callback resolves to an active SSO connection that proved "acme.com" and admits arrivals
+    When the connection arrival is accepted
+    Then the user is added to the connection's organization as a MEMBER
+    And the user receives the MEMBER organization grant
+
+  Scenario: A signed SAML callback creates the federated identity rows
+    Given no user, account, or session exists for "ana@acme.com"
+    And an active SAML connection has proved "acme.com"
+    When a valid assertion signed by that connection's configured identity authenticates "ana@acme.com"
+    Then exactly one user, one account, and one session are created
+    And the account belongs to that user and names that SAML connection as its provider
 
   Scenario: Existing user with correct SSO provider auto-links
     Given an organization with ssoDomain "acme.com" and ssoProvider "google" exists

@@ -82,6 +82,12 @@ const registry = {
       "Check the filter syntax near the indicated position; filters are field:value pairs combined with AND/OR",
     ],
   },
+  filter_too_complex: {
+    tips: [
+      "Wrap a sentence in double quotes so it counts as one phrase instead of one term per word",
+      "Keep the filter under meta.maxNodes nodes in total; every term, operator, negation and pair of parentheses counts as one",
+    ],
+  },
   filter_field_unknown: {
     tips: [
       "Use one of the fields listed in meta.knownFields",
@@ -215,6 +221,105 @@ const registry = {
     tips: [
       "The LangWatchQL analytics SQL API is not provisioned on this deployment; retrying will not help",
       "Contact support to have it enabled for this workspace",
+    ],
+  },
+  instant_eval_questions_too_long: {
+    tips: [
+      "Read `meta.questionTokens` against `meta.stateTokens`; the questions alone fill the judge's state, so no text could be sent beside them",
+      "Shorten the question texts, or split them across several eval calls run as separate queries",
+    ],
+  },
+  instant_eval_query_budget_exceeded: {
+    tips: [
+      "Read `meta.estimatedTokens` against `meta.budget`; that is the text the whole query would send to be judged, summed across its rows",
+      "Lower the query's LIMIT, or extract less text per row by passing a smaller token budget to the extraction function inside the eval call",
+      "To judge the whole selection rather than a sample, run the same statement as a job instead of on this endpoint",
+    ],
+  },
+  instant_eval_classifier_unavailable: {
+    tips: [
+      "The query itself was accepted and ran; judging the text it projected is what failed",
+      "Retry shortly; if it persists, the judgements can be made later by running the same statement as a job",
+    ],
+  },
+  instant_eval_not_enabled: {
+    tips: [
+      "Instant Evals are behind a release flag; ask LangWatch to enable them for this project",
+    ],
+  },
+  instant_eval_not_found: {
+    tips: [
+      "Read `meta.runId`; no run of the authenticated project carries that id",
+      "List the project's runs to find the id you meant",
+    ],
+  },
+  instant_eval_query_invalid: {
+    tips: [
+      "Read `meta.parameters`; those names are set by whichever surface shows a chart, and a job has no surface to fill them",
+      "Write the period into the statement's own WHERE clause instead of declaring the dashboard parameters",
+    ],
+  },
+  instant_eval_query_missing_columns: {
+    tips: [
+      "Read `meta.missing`; a run needs TraceId so every judgement can be tied back to its trace",
+      "Project at least one eval function, such as `eval(conversation_bounded(ConversationId, 8000, ''), '…') AS annoyed`",
+      "ThreadId, SpanId and OccurredAt are optional and are carried onto the judgements when the statement projects them",
+    ],
+  },
+  instant_eval_row_cap_exceeded: {
+    tips: [
+      "Read `meta.cap` against `meta.maxCap`; the first is what this plan judges in one run and the second is the ceiling any plan offers",
+      "Lower the requested limit, or split the selection across more than one run with a keyset predicate on (TraceId, SpanId) where the statement projects SpanId, and on TraceId alone where it does not",
+    ],
+  },
+  instant_eval_free_budget_exhausted: {
+    tips: [
+      "Read `meta.spentUsd` against `meta.budgetUsd`; the organization has spent its free Instant Evals allowance across every project",
+      "Upgrade the organization to a paid plan under Settings, Subscription; judged queries and runs are then billed per input token",
+    ],
+  },
+  instant_eval_already_finished: {
+    tips: [
+      "Read `meta.status`; the run reached that state before the cancel arrived",
+    ],
+  },
+  instant_eval_estimate_unavailable: {
+    tips: [
+      "The statement was accepted; working out how many rows it matches is what failed",
+      "Retry shortly, or start the run without an estimate and read its total once it is planned",
+    ],
+  },
+  instant_eval_stalled: {
+    tips: [
+      "The run went fifteen minutes without a judged page and was stopped",
+      "Run it again; if it stalls repeatedly, narrow the statement so each page reads less",
+    ],
+  },
+  lwql_app_function_key_cap: {
+    tips: [
+      "Read `meta.cap` and `meta.distinct`; the query needs more distinct keys than one run may read",
+      "Lower the query's LIMIT, or group more coarsely so fewer conversations, traces or spans are projected",
+      "To read them all, page with a keyset predicate on the dataset's time column and trace id and run the query once per page",
+      "`meta.keyKind` says which cap it was, and `meta.functions` which calls count against it; the schema endpoint publishes every cap",
+    ],
+  },
+  lwql_app_function_read_budget: {
+    tips: [
+      "Read `meta.budgetBytes` and `meta.readBytes`; the traces the query names weigh more than one run may read",
+      "Lower the query's LIMIT so each run names fewer traces, and page with a keyset predicate on the dataset's time column and trace id",
+      "The budget counts the traces' stored content, so a query over long conversations needs smaller pages than one over short ones",
+    ],
+  },
+  lwql_app_function_hydration_failed: {
+    tips: [
+      "The query itself was accepted and ran; loading the conversation or trace content it projected is what failed",
+      "This is a platform-side failure, not a query to rewrite; retry shortly, and contact support if it persists",
+    ],
+  },
+  lwql_app_function_unavailable: {
+    tips: [
+      "The app functions are not provisioned on this deployment, so retrying the same query will not help",
+      "They are created at deploy time; a redeploy converges them, and the query works unchanged afterwards",
     ],
   },
   lwql_provisioning_incomplete: {
@@ -427,6 +532,7 @@ const registry = {
     tips: [
       "connected:<name> runs the agent in development, or in the one other environment it is online in; when more than one is online, name it as connected:<name>@<environment>",
       "Start the process that runs the decorated function; the agent shows Online in the agents list once it connects",
+      "An agent started in development with a personal key is visible only to its owner, so other keys never find it online; set LANGWATCH_AGENT_ENVIRONMENT to a shared name such as dev-shared and start it again",
     ],
     docsPath: "/agent-testing/connect-your-agent",
   },
@@ -446,6 +552,7 @@ const registry = {
   },
   agent_owner_only: {
     tips: [
+      "Run it with the same key that connected the agent; a project or service key names no person, so it never reaches a personal agent, even the caller's own",
       "A development agent registered with a personal key belongs to that person; connect your own process to get your own copy",
       "To share one development agent with the team, register it with a project key or name its environment, for example dev-shared",
     ],
@@ -704,6 +811,11 @@ const registry = {
       "The page applied the change but could not write it to the server, so the saved evaluation does not have it. Do not build the next step on it: pass --experiment <slug> to apply the change to the saved evaluation instead",
     ],
   },
+  langy_ui_page_not_ready: {
+    tips: [
+      "The page was open but still loading and never became ready; run the same action once more, and if it fails again tell the user the page did not load",
+    ],
+  },
   langy_ui_timeout: {
     tips: [
       "The page may have applied part of the action; read the current state (for example `langwatch workbench get-state`) before retrying",
@@ -816,6 +928,25 @@ const registry = {
   },
   langy_worker_restarting: {
     tips: ["An update interrupted this reply; resend the message"],
+  },
+
+  // ---- guided onboarding ----
+  guided_onboarding_path_unknown: {
+    tips: [
+      "Use one of the paths in meta.knownPaths: llmops, coding, gateway or governance",
+    ],
+  },
+
+  // ---- one-time secret reveal ----
+  secret_already_revealed: {
+    tips: [
+      "The reveal id was already read and the secret is gone; create a new key with `langwatch virtual-keys create --reveal-once` when the value was not saved",
+    ],
+  },
+  secret_reveal_expired: {
+    tips: [
+      "A reveal id serves its secret for 24 hours after the key is created; create a new key with `langwatch virtual-keys create --reveal-once` when the value was not saved",
+    ],
   },
 
   // ---- licensing ----

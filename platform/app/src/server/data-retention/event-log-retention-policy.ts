@@ -44,6 +44,9 @@ const RETENTION_CLASS_BY_AGGREGATE_TYPE = {
   suite_run: "scenarios",
   langy_conversation: "traces",
   topic_clustering: "traces",
+  // An Instant Eval run is a question asked about traces, and its own stream is
+  // counters rather than content, so it ages out with the traces it judged.
+  instant_eval_run: "traces",
   ingestion_pull: "traces",
   pulled_usage: "traces",
   billing_report: "traces",

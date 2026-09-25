@@ -115,6 +115,8 @@ export type PollCallResponse = z.infer<typeof pollCallResponseSchema>;
 export const questionOptionSchema = z.object({
   label: z.string().min(1).max(200),
   description: z.string().max(1000).optional(),
+  /** Rendered as a quiet link under the bordered options; still an answer. */
+  quiet: z.boolean().optional(),
 });
 
 export const questionSchema = z.object({
@@ -124,6 +126,8 @@ export const questionSchema = z.object({
   multiple: z.boolean().optional(),
   /** Offer a free-text answer next to the options. */
   allowOther: z.boolean().optional(),
+  /** Draw the question as reply prose above the options, not as a title. */
+  bare: z.boolean().optional(),
 });
 
 export const startWaitBodySchema = z.object({

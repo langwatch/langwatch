@@ -29,6 +29,7 @@ export function AuthShell({
   headlineAccent,
   tagline,
   trustStrip,
+  fillContainer = false,
   children,
 }: {
   /** Shown beside (or above) the card. */
@@ -40,8 +41,11 @@ export function AuthShell({
   /** Shown under the panel on desktops. Empty until there is something
    *  true to put in it: an invented customer logo is worse than a gap. */
   trustStrip?: ReactNode;
+  /** Fit a signed-in page's content area while keeping its navigation available. */
+  fillContainer?: boolean;
   children: ReactNode;
 }) {
+  const minimumHeight = fillContainer ? 0 : "100vh";
   return (
     <Box
       // The modifier says the value panel is on screen, which is the one thing
@@ -50,7 +54,10 @@ export function AuthShell({
       className={headline ? "lw-auth lw-auth--split" : "lw-auth"}
       position="relative"
       backgroundColor="auth.ground"
-      minHeight="100vh"
+      minHeight={minimumHeight}
+      flex={fillContainer ? 1 : void 0}
+      display="flex"
+      flexDirection="column"
       width="full"
       overflowX="hidden"
     >
@@ -71,7 +78,8 @@ export function AuthShell({
           zIndex={1}
           direction={{ base: "column", md: "row" }}
           align="stretch"
-          minHeight="100vh"
+          minHeight={minimumHeight}
+          flex={1}
           width="full"
           maxWidth="1440px"
           marginX="auto"
@@ -99,8 +107,11 @@ export function AuthShell({
           zIndex={1}
           direction="column"
           align="center"
-          justify={{ base: "flex-start", md: "center" }}
-          minHeight="100vh"
+          justify={
+            fillContainer ? "center" : { base: "flex-start", md: "center" }
+          }
+          minHeight={minimumHeight}
+          flex={1}
           width="full"
           paddingX={{ base: 0, sm: 4 }}
           paddingBottom={10}

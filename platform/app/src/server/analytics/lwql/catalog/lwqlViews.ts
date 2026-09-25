@@ -73,11 +73,29 @@
  * @see specs/lwql/api.feature
  */
 
+import { CLICKHOUSE_OVERRIDES } from "./clickhouseOverrides";
 import { contentFilteredMapSql } from "./contentGating";
-import { LWQL_DERIVED_CATALOG } from "./derivedViews";
+import { defineCatalogTable } from "./defineDatasetFromTable";
 import { CODING_TOOL_RESULTS } from "./overrides/coding";
 import { LWQL_POSTGRES_CATALOG } from "./postgresViews";
 import type { LangWatchQLViewDefinition } from "./types";
+
+/**
+ * One ClickHouse catalog entry, opt-in: the table is queryable because this
+ * call names it. Its refinements come from {@link CLICKHOUSE_OVERRIDES}; its
+ * `joinKeys` — the foreign keys that reach another view — are stated here,
+ * because with no manifest loop there is no cross-table set to derive them from.
+ */
+function clickhouseView(
+  table: string,
+  joinKeys?: readonly string[],
+): LangWatchQLViewDefinition {
+  const override = CLICKHOUSE_OVERRIDES[table] ?? {};
+  return defineCatalogTable(
+    table,
+    joinKeys ? { ...override, joinKeys } : override,
+  );
+}
 
 /**
  * How long after a write a row can be missing from these views.
@@ -729,6 +747,14 @@ const SIMULATIONS: LangWatchQLViewDefinition = {
       description: "Criteria the run failed.",
       gates: [],
       sourceColumns: ["UnmetCriteria"],
+    },
+    {
+      name: "InconclusiveCriteria",
+      type: "Array(String)",
+      description:
+        "Criteria the judge could not decide; each is also in UnmetCriteria.",
+      gates: [],
+      sourceColumns: ["InconclusiveCriteria"],
     },
     {
       name: "TraceIds",
@@ -2733,6 +2759,165 @@ const CODING_AGENT_SESSION_EVENTS: LangWatchQLViewDefinition = {
  * and `traces` rather than resident anywhere of their own, so each needs a
  * derived view over tables already here, not a mapping.
  */
+/**
+ * Judgments: one row per Instant Eval run, trace and question.
+ *
+ * The only dataset in the catalog with no content gate at all, and that is a
+ * property of what it holds rather than an omission: a judgement is a
+ * probability, a score or a label, and the text it was formed from is never
+ * copied here. There is nothing for the input or output permission to withhold,
+ * so declaring one would gate a column that carries no content.
+ *
+ * It is also the only dataset the *caller* caused to exist. Every other one is
+ * a projection of traffic; this one holds the answers to a question the caller
+ * asked, which is why the follow-up is an ordinary join back to `traces` rather
+ * than a second product surface.
+ *
+ * The table's `Error` column is off-catalog, like every other free-text error
+ * carrier here. `Status` says whether a row was judged, and the run's own
+ * results endpoint is where the reason for a skip is read.
+ */
+const JUDGMENTS: LangWatchQLViewDefinition = {
+  name: "judgments",
+  sourceTable: "instant_eval_judgments",
+  description:
+    "One row per Instant Eval run, trace and question, with the verdict the judge gave.",
+  gates: [],
+  grain:
+    "one row per (TenantId, RunId, TraceId, SpanId, QuestionId), latest version only",
+  joinKeys: ["TenantId", "TraceId"],
+  timeColumn: "CreatedAt",
+  freshness: PROJECTION_FRESHNESS,
+  dedup: {
+    keyColumns: ["TenantId", "RunId", "TraceId", "SpanId", "QuestionId"],
+    versionColumn: "UpdatedAt",
+  },
+  columns: [
+    {
+      name: "TenantId",
+      type: "String",
+      description: "Project the judgement belongs to.",
+      gates: [],
+      sourceColumns: ["TenantId"],
+    },
+    {
+      name: "RunId",
+      type: "String",
+      description: "The Instant Eval run that asked the question.",
+      gates: [],
+      sourceColumns: ["RunId"],
+    },
+    {
+      name: "TraceId",
+      type: "String",
+      description: "Trace whose text was judged.",
+      gates: [],
+      sourceColumns: ["TraceId"],
+    },
+    {
+      name: "QuestionId",
+      type: "String",
+      description:
+        "The question, named by the output column the run's statement aliased it to.",
+      gates: [],
+      sourceColumns: ["QuestionId"],
+    },
+    {
+      name: "ThreadId",
+      type: "String",
+      description:
+        "Conversation the judged text came from, empty when the statement judged a trace rather than a thread.",
+      gates: [],
+      sourceColumns: ["ThreadId"],
+    },
+    {
+      name: "SpanId",
+      type: "String",
+      description:
+        "Span the judged text came from, empty unless the statement judged one span.",
+      gates: [],
+      sourceColumns: ["SpanId"],
+    },
+    {
+      name: "Kind",
+      type: "LowCardinality(String)",
+      description: "What was asked: boolean, score or category.",
+      gates: [],
+      sourceColumns: ["Kind"],
+    },
+    {
+      name: "Status",
+      type: "LowCardinality(String)",
+      description:
+        "Whether it was answered: judged, skipped or failed. A skip is an answer of `we did not judge this`.",
+      gates: [],
+      sourceColumns: ["Status"],
+    },
+    {
+      name: "Passed",
+      type: "Nullable(UInt8)",
+      description:
+        "Whether a boolean question's probability cleared its threshold. Null for the other kinds.",
+      gates: [],
+      sourceColumns: ["Passed"],
+    },
+    {
+      name: "Score",
+      type: "Nullable(Float64)",
+      description:
+        "The probability-weighted mean inside the declared range, for a score question.",
+      gates: [],
+      sourceColumns: ["Score"],
+    },
+    {
+      name: "Label",
+      type: "String",
+      description: "The most likely option, for a category question.",
+      gates: [],
+      sourceColumns: ["Label"],
+    },
+    {
+      name: "Probability",
+      type: "Nullable(Float64)",
+      description:
+        "Probability of yes for a boolean question, or of the chosen label for a category one. The judge is calibrated, so 0.9 means nine times in ten.",
+      gates: [],
+      sourceColumns: ["Probability"],
+    },
+    {
+      name: "Probabilities",
+      type: "String",
+      description:
+        "Every option's probability for a category question, as a JSON object of option name to probability. Empty for the other kinds.",
+      gates: [],
+      sourceColumns: ["Probabilities"],
+    },
+    {
+      name: "OccurredAt",
+      type: "DateTime64(3)",
+      description:
+        "When the judged row happened, carried from the statement so a judgement can be joined to a trace inside a bounded period.",
+      gates: [],
+      sourceColumns: ["OccurredAt"],
+    },
+    {
+      name: "CreatedAt",
+      type: "DateTime64(3)",
+      description:
+        "When the judgement was written. Filter on this to prune partitions.",
+      gates: [],
+      sourceColumns: ["CreatedAt"],
+    },
+    {
+      name: "UpdatedAt",
+      type: "DateTime64(3)",
+      description: "When this version of the judgement was written.",
+      gates: [],
+      sourceColumns: ["UpdatedAt"],
+    },
+  ],
+};
+
 export const LWQL_VIEW_CATALOG: readonly LangWatchQLViewDefinition[] = [
   TRACES,
   SPANS,
@@ -2746,7 +2931,144 @@ export const LWQL_VIEW_CATALOG: readonly LangWatchQLViewDefinition[] = [
   CODING_AGENT_SESSIONS,
   CODING_AGENT_SESSION_EVENTS,
   CODING_TOOL_RESULTS,
-  ...LWQL_DERIVED_CATALOG,
+  JUDGMENTS,
+  // ClickHouse derived views — opt-in, one explicit entry per source table.
+  clickhouseView("automation_audit", ["TenantId", "EventId", "TraceId"]),
+  clickhouseView("billable_events", ["TenantId", "OrganizationId", "EventId"]),
+  clickhouseView("coding_agent_trace_sessions", [
+    "TenantId",
+    "TraceId",
+    "SessionId",
+  ]),
+  clickhouseView("dspy_steps", [
+    "TenantId",
+    "ExperimentId",
+    "RunId",
+    "WorkflowVersionId",
+  ]),
+  clickhouseView("experiment_run_items", [
+    "TenantId",
+    "ProjectionId",
+    "RunId",
+    "ExperimentId",
+    "TraceId",
+  ]),
+  clickhouseView("experiment_runs", [
+    "TenantId",
+    "ProjectionId",
+    "RunId",
+    "ExperimentId",
+    "WorkflowVersionId",
+  ]),
+  clickhouseView("gateway_budget_ledger_events", [
+    "TenantId",
+    "BudgetId",
+    "ScopeId",
+    "VirtualKeyId",
+    "GatewayRequestId",
+  ]),
+  clickhouseView("gateway_budget_scope_totals", [
+    "TenantId",
+    "Scope",
+    "ScopeId",
+    "Window",
+    "PeriodStart",
+    "BudgetId",
+  ]),
+  clickhouseView("gateway_spend", [
+    "TenantId",
+    "GatewayRequestId",
+    "OrganizationId",
+    "VirtualKeyId",
+    "TraceId",
+  ]),
+  clickhouseView("governance_cost_rollup_restatement_index", [
+    "TenantId",
+    "IngestionSourceId",
+    "AgentId",
+    "RawActorId",
+  ]),
+  clickhouseView("governance_cost_rollup_1d", [
+    "TenantId",
+    "IngestionSourceId",
+    "AgentId",
+    "RawActorId",
+    "OrganizationId",
+  ]),
+  clickhouseView("governance_kpis", ["TenantId", "SourceId", "TraceId"]),
+  clickhouseView("governance_ocsf_events", [
+    "TenantId",
+    "EventId",
+    "TraceId",
+    "SourceId",
+  ]),
+  clickhouseView("langy_messages", ["TenantId"]),
+  clickhouseView("langy_analytics_events", [
+    "TenantId",
+    "EventId",
+    "AggregateId",
+  ]),
+  clickhouseView("event_log", ["TenantId", "AggregateId", "EventId"]),
+  clickhouseView("stored_log_records", [
+    "TenantId",
+    "ProjectionId",
+    "TraceId",
+    "SpanId",
+  ]),
+  clickhouseView("stored_metric_records", [
+    "TenantId",
+    "ProjectionId",
+    "TraceId",
+    "SpanId",
+  ]),
+  clickhouseView("log_usage_estimates", [
+    "TenantId",
+    "OrganizationId",
+    "RecordId",
+  ]),
+  clickhouseView("log_records", ["TenantId", "TraceId", "SpanId"]),
+  clickhouseView("metric_usage_estimates", [
+    "TenantId",
+    "OrganizationId",
+    "PointId",
+    "SeriesId",
+  ]),
+  clickhouseView("metric_data_points", ["TenantId", "PointId", "SeriesId"]),
+  clickhouseView("metric_time_rollups", ["TenantId", "SeriesId"]),
+  clickhouseView("metric_series", ["TenantId", "SeriesId"]),
+  clickhouseView("stored_objects", ["TenantId"]),
+  clickhouseView("session_metric_series", [
+    "TenantId",
+    "SessionId",
+    "SeriesId",
+  ]),
+  clickhouseView("simulation_run_metrics_rollup", [
+    "TenantId",
+    "ScenarioRunId",
+    "TraceId",
+  ]),
+  clickhouseView("simulation_run_metrics", [
+    "TenantId",
+    "ScenarioRunId",
+    "TraceId",
+    "EventId",
+  ]),
+  clickhouseView("suite_runs", ["TenantId", "ProjectionId"]),
+  // ClickHouse tables deliberately excluded (absent = unqueryable):
+  //   gateway_budget_scope_totals_mv (MaterializedView) — materialised-view
+  //     object; its target table is included
+  //   goose_db_version (MergeTree) — the goose migration-version table, engine-
+  //     internal tooling state — no tenant column at all
+  //   instant_eval_runs (ReplacingMergeTree) — the state of an Instant Eval run
+  //     while it is running: its progress, its spend and the statement it was
+  //     started from. Read through the runs API, which is where a run is started
+  //     and watched; what the run produced is the judgments dataset
+  //   lwql_api_key_tenant_map (MergeTree) — access-control plumbing, not
+  //     customer telemetry — holds key hashes the row policy reads to self-filter;
+  //     the policy already scopes it, so exposing it would leak the isolation
+  //     mechanism for no customer benefit
+  //   simulation_run_metrics_rollup_mv (MaterializedView) — materialised-view
+  //     object; its target table is included
   ...LWQL_POSTGRES_CATALOG,
 ];
 

@@ -8,7 +8,6 @@
  *
  * Spec: specs/ai-governance/cli-onboarding/login-user-scoped-key.feature
  */
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -18,9 +17,12 @@ import {
 } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import { KSUID_RESOURCES } from "~/utils/constants";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { app } from "../[[...route]]/app";
+
+wireDefaultTestApp();
 
 describe("Feature: GET /api/projects honours the credential's reach", () => {
   const ns = `projects-reach-${nanoid(8)}`;
@@ -109,25 +111,19 @@ describe("Feature: GET /api/projects honours the credential's reach", () => {
         { userId: memberId, organizationId, role: OrganizationUserRole.MEMBER },
       ],
     });
-    await prisma.roleBinding.createMany({
-      data: [
-        {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId,
-          userId: adminId,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: organizationId,
-        },
-        {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId,
-          userId: memberId,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: teamAId,
-        },
-      ],
+    await seedRoleBinding(prisma, {
+      organizationId,
+      userId: adminId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
+    });
+    await seedRoleBinding(prisma, {
+      organizationId,
+      userId: memberId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: teamAId,
     });
 
     // Five projects: three in team A, two in team B.
@@ -160,6 +156,7 @@ describe("Feature: GET /api/projects honours the credential's reach", () => {
     if (!organizationId) return;
 
     await cleanupTestRows(prisma, [
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       ["apiKey", { organizationId }],
       ["customRole", { organizationId }],
@@ -221,21 +218,21 @@ describe("Feature: GET /api/projects honours the credential's reach", () => {
       // org-wide only within the OWNER's ceiling — so mint it while the
       // member briefly holds an org-wide binding, then take that binding
       // away, exactly like a demotion after login.
-      const temporary = await prisma.roleBinding.create({
-        data: {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId,
-          userId: memberId,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: organizationId,
-        },
+      const temporary = await seedRoleBinding(prisma, {
+        organizationId,
+        userId: memberId,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: organizationId,
       });
       const token = await mintKey({
         userId: memberId,
         bindings: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
       });
-      await prisma.roleBinding.delete({ where: { id: temporary.id } });
+      await prisma.$transaction([
+        prisma.grant.delete({ where: { id: temporary.id } }),
+        prisma.roleBinding.delete({ where: { id: temporary.id } }),
+      ]);
 
       const { status, json } = await listAs(token);
 

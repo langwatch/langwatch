@@ -177,6 +177,8 @@ type FinalToolCall struct {
 	Input   json.RawMessage `json:"input,omitempty"`
 	Output  *string         `json:"output,omitempty"`
 	IsError *bool           `json:"isError,omitempty"`
+	// Local: the call ran in the developer's shared folder, on their machine.
+	Local bool `json:"local,omitempty"`
 }
 
 // TurnResult is the durable final the agent posts back to the control plane's

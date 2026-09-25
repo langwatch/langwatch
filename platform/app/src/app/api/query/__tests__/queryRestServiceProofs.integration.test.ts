@@ -90,6 +90,7 @@ import {
 } from "~/server/app-layer/subscription/plan-provider";
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
 import { prisma } from "~/server/db";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { pinTimezone } from "~/test-utils/pinTimezone";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
@@ -475,6 +476,31 @@ async function seedTenant({
     ),
   });
 
+  // One judgement per seeded trace: the judgments view reads this table, and
+  // an isolation read over a view whose table is empty proves nothing.
+  await admin.insert({
+    table: `${database}.instant_eval_judgments`,
+    format: "JSONEachRow",
+    values: traceIds.map((traceId, index) => ({
+      TenantId: tenantId,
+      RunId: `${tenantId}-instant-eval-run`,
+      TraceId: traceId,
+      QuestionId: "annoyed",
+      ThreadId: `${tenantId}-thread`,
+      SpanId: "",
+      Kind: "boolean",
+      Status: "judged",
+      Passed: index % 2,
+      Score: null,
+      Label: "",
+      Probability: 0.5 + index / 100,
+      Probabilities: "",
+      Error: "",
+      OccurredAt: SEED_AT,
+      CreatedAt: SEED_AT,
+    })),
+  });
+
   await admin.insert({
     table: `${database}.evaluation_analytics_rollup`,
     format: "JSONEachRow",
@@ -617,6 +643,7 @@ async function seedTenant({
     "experiment_run_items",
     "simulation_run_metrics_rollup",
     "gateway_budget_scope_totals",
+    "instant_eval_judgments",
   ]);
   const remainingSourceTables = new Set(
     LWQL_VIEW_CATALOG.filter((view) => !isPostgresResident(view))
@@ -812,9 +839,17 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
         dedup: SHIPPED_LWQL_DEDUP,
       }),
     );
+    // Grants and source-table policies for the whole catalog, from the single
+    // access-model emitter (#8258) — the view statements are structural only.
+    await harness.applyAccessModel({
+      views: LWQL_VIEW_CATALOG,
+      sourceDatabase: facts,
+    });
 
     await resetApp();
+    const eventSourcing = createAuthzTestEventSourcing(prisma);
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: eventSourcing,
       planProvider: PlanProviderService.create({
         getActivePlan: vi
           .fn()
@@ -1655,6 +1690,13 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
           dedup: SHIPPED_LWQL_DEDUP,
         }),
       );
+      // View creation is structural only (#8258); the reader gets no grant from
+      // it. Re-mint the whole access model over the catalog plus the ad-hoc view
+      // so the permitted caller's read of `transcripts` is granted.
+      await harness.applyAccessModel({
+        views,
+        sourceDatabase: facts,
+      });
       setLangWatchQLService(
         new LangWatchQLService({
           executor: createLangWatchQLExecutor({
@@ -1684,6 +1726,12 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
         await harness.applyAsAdmin([
           `DROP VIEW IF EXISTS ${database}.transcripts`,
         ]);
+        // Re-mint the catalog-only model so the dropped view leaves no lingering
+        // grant for later tests (CREATE USER OR REPLACE re-mints the whole model).
+        await harness.applyAccessModel({
+          views: LWQL_VIEW_CATALOG,
+          sourceDatabase: facts,
+        });
       }
     });
 

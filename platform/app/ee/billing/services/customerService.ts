@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type Stripe from "stripe";
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import {
   CustomerCreationRaceError,
   OrganizationNotFoundError,
@@ -23,7 +23,7 @@ export const createCustomerService = ({
   db,
 }: {
   stripe: Stripe;
-  db: PrismaClient;
+  db: PrismaClient | Prisma.TransactionClient;
 }): CustomerService => {
   return {
     async getOrCreateCustomerId({ user, organizationId }) {
@@ -48,13 +48,24 @@ export const createCustomerService = ({
         name: organization.name,
       });
 
-      const updated = await db.organization.updateMany({
-        where: { id: organizationId, stripeCustomerId: null },
-        data: { stripeCustomerId: customer.id },
-      });
+      // One conditional write decides which customer the organization keeps.
+      // As SQL with the condition against the table: `updateMany` puts it in
+      // a subquery, which a statement that waited on the row lock re-runs on
+      // its own older snapshot, so two checkouts starting together would both
+      // be told they won and the organization would end up with two Stripe
+      // customers, one of them orphaned.
+      const updated = await db.$executeRaw`
+        -- @tenancy: an organization is addressed by its own primary key.
+        UPDATE "Organization"
+           SET "stripeCustomerId" = ${customer.id},
+               "updatedAt" = now()
+         WHERE "id" = ${organizationId}
+           AND "stripeCustomerId" IS NULL
+      `;
 
-      if (updated.count === 0) {
-        // Another request won the race — clean up orphan and use existing
+      if (updated === 0) {
+        // Another request won the race: clean up the orphan and use the
+        // customer that was kept.
         logger.warn(
           {
             organizationId,
