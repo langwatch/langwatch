@@ -269,6 +269,27 @@ describe("CheckupService", () => {
       expect(answering.outcome).toBe("verified");
       expect(silent.outcome).toBe("refused");
     });
+
+    /** @scenario "The Redis address is shown without its password" */
+    it("masks a password that itself contains an @", async () => {
+      const verdict = rowOf(
+        (
+          await new CheckupService(
+            healthyDeps({
+              redis: {
+                target: "redis://:left@right@langwatch-redis-master:6379",
+                ready: async () => undefined,
+              },
+            }),
+          ).cheap()
+        ).rows,
+        "redis",
+      );
+
+      expect(verdict.detail).toContain("//***@langwatch-redis-master:6379");
+      expect(verdict.detail).not.toContain("left");
+      expect(verdict.detail).not.toContain("right");
+    });
   });
 
   describe("when the goose binary is absent", () => {

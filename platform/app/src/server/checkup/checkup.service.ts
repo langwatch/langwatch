@@ -888,7 +888,8 @@ function inDefinitionOrder(rows: CheckRow[]): CheckRow[] {
 
 /** Masks the user and password of every URL in the text before a row shows it. */
 function withoutUserInfo(text: string): string {
-  return text.replace(/(\/\/)[^/@\s]+@/g, "$1***@");
+  // Greedy up to the authority's last "@", so a raw "@" in a password is masked too.
+  return text.replace(/(\/\/)[^/\s]*@/g, "$1***@");
 }
 
 function reasonOf(error: unknown): string {
