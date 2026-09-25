@@ -72,13 +72,13 @@ import {
 } from "@langwatch/gateway-contract";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { TraceApi } from "@langwatch/trace-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { type ProcessMembers } from "@langwatch/process-stores/members";
 import { type ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
 import { gatewayInternalSecret, Secret, virtualKeyPepper } from "@langwatch/secrets";
 import { toDate, type Instant } from "@langwatch/time";
+import { TraceApi } from "@langwatch/trace-contract";
 // The billing envelope and the subscription grammar are the webhook
 // platform's, and a reconciliation pull has to answer the same bytes a push
 // delivers, so both ARRIVE from that module rather than being restated here.

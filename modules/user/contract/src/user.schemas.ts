@@ -59,6 +59,18 @@ export const userApiSetAvatarInputSchema = z.object({
 /** One organization, for the reads scoped to a whole tenant. */
 export const userApiOrganizationInputSchema = z.object({ organizationId: z.string() });
 
+/** Defaults to the start of this month through now unless both ends are given. */
+export const userApiPersonalUsageInputSchema = z.object({
+  organizationId: z.string(),
+  windowStartMs: z.number().optional(),
+  windowEndMs: z.number().optional(),
+});
+
+export const userApiBudgetOverviewInputSchema = z.object({
+  organizationId: z.string(),
+  includeTopModels: z.boolean().optional(),
+});
+
 export const userApiRequestBudgetIncreaseInputSchema = z.object({
   organizationId: z.string(),
   scope: z.string(),
@@ -94,6 +106,8 @@ export type UserApiChangePasswordInput = z.infer<typeof userApiChangePasswordInp
 export type UserApiUserInput = z.infer<typeof userApiUserInputSchema>;
 export type UserApiSetAvatarInput = z.infer<typeof userApiSetAvatarInputSchema>;
 export type UserApiOrganizationInput = z.infer<typeof userApiOrganizationInputSchema>;
+export type UserApiPersonalUsageInput = z.infer<typeof userApiPersonalUsageInputSchema>;
+export type UserApiBudgetOverviewInput = z.infer<typeof userApiBudgetOverviewInputSchema>;
 export type UserApiRequestBudgetIncreaseInput = z.infer<
   typeof userApiRequestBudgetIncreaseInputSchema
 >;

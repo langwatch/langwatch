@@ -8,7 +8,8 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayBudget, GatewayBudgetScopeType } from "@langwatch/gateway-contract";
 import { scopeTargetKey, GatewayWindow } from "@langwatch/gateway-contract";
 import { type OrganizationApi, TeamNotFoundError } from "@langwatch/organization-contract";
-import { nowInstant, toDate } from "@langwatch/time";
+import { nowInstant, Temporal, toDate } from "@langwatch/time";
+import type { TraceApi } from "@langwatch/trace-contract";
 
 import { budgetSpendTargetsFor, type GatewayBudgetSpend } from "../app/gateway.members.ts";
 import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
@@ -88,35 +89,12 @@ type PersonalVirtualKeyReader = {
   }): Promise<{ id: string }[]>;
 };
 
-/**
- * The two shapes the Enterprise personal-usage reader speaks, restated here rather than imported,
- * because governance is Enterprise-only and a core package may not depend on it. Structural, so
- * the Enterprise reader satisfies this without either side naming the other.
- */
-type PersonalUsageQuery = {
-  personalProjectId: string;
-  window?: { startMs: number; endMs: number } | undefined;
-  userId?: string | undefined;
-  ingestionTenantId?: string | undefined;
-};
-
-type PersonalUsageRow = {
-  label: string;
-  spentUsd: number;
-  billedUsd: number;
-  requests: number;
-};
-
-type PersonalUsageReader = {
-  breakdownByModel(input: PersonalUsageQuery, limit?: number): Promise<PersonalUsageRow[]>;
-};
-
 export class BudgetOverviewService {
   private readonly repository: GatewayBudgetOverviewRepository;
   private readonly organizations: Pick<OrganizationApi, "isMember" | "getPersonalWorkspace">;
   private readonly featureFlags: FeatureFlagApi;
   private readonly personalVirtualKeys: PersonalVirtualKeyReader;
-  private readonly personalUsage: PersonalUsageReader | undefined;
+  private readonly modelSpend: Pick<TraceApi, "findModelSpend">;
   private readonly budgetDecisions: GatewayService;
   private readonly providerLabels: GatewayProviderLabelRepository;
   private readonly chRepo?: GatewayBudgetSpend;
@@ -126,7 +104,7 @@ export class BudgetOverviewService {
     organizations,
     featureFlags,
     personalVirtualKeys,
-    personalUsage,
+    modelSpend,
     budgetDecisions,
     providerLabels,
     chRepo,
@@ -135,7 +113,7 @@ export class BudgetOverviewService {
     organizations: Pick<OrganizationApi, "isMember" | "getPersonalWorkspace">;
     featureFlags: FeatureFlagApi;
     personalVirtualKeys: PersonalVirtualKeyReader;
-    personalUsage: PersonalUsageReader | undefined;
+    modelSpend: Pick<TraceApi, "findModelSpend">;
     budgetDecisions: GatewayService;
     providerLabels: GatewayProviderLabelRepository;
     chRepo?: GatewayBudgetSpend;
@@ -144,7 +122,7 @@ export class BudgetOverviewService {
     this.organizations = organizations;
     this.featureFlags = featureFlags;
     this.personalVirtualKeys = personalVirtualKeys;
-    this.personalUsage = personalUsage;
+    this.modelSpend = modelSpend;
     this.budgetDecisions = budgetDecisions;
     this.providerLabels = providerLabels;
     this.chRepo = chRepo;
@@ -164,7 +142,7 @@ export class BudgetOverviewService {
     personalVirtualKeys: PersonalVirtualKeyReader;
     budgetDecisions: GatewayService;
     providerLabels: GatewayProviderLabelRepository;
-    personalUsage?: PersonalUsageReader;
+    modelSpend: Pick<TraceApi, "findModelSpend">;
     budgetRepository?: GatewayBudgetSpend;
   }): BudgetOverviewService {
     return new BudgetOverviewService({
@@ -172,7 +150,7 @@ export class BudgetOverviewService {
       organizations: options.organizations,
       featureFlags: options.featureFlags,
       personalVirtualKeys: options.personalVirtualKeys,
-      personalUsage: options.personalUsage,
+      modelSpend: options.modelSpend,
       budgetDecisions: options.budgetDecisions,
       providerLabels: options.providerLabels,
       chRepo: options.budgetRepository,
@@ -244,10 +222,7 @@ export class BudgetOverviewService {
         this.chRepo,
       ),
       input.includeTopModels
-        ? this.loadTopModels({
-            personalProjectId: workspace?.project.id ?? null,
-            userId: input.userId,
-          })
+        ? this.loadTopModels({ personalProjectId: workspace?.project.id ?? null })
         : Promise.resolve(undefined),
     ]);
 
@@ -351,23 +326,38 @@ export class BudgetOverviewService {
 
   private async loadTopModels(input: {
     personalProjectId: string | null;
-    userId: string;
   }): Promise<{ model: string; spentUsd: number }[]> {
-    if (!input.personalProjectId || !this.personalUsage) {
+    if (!input.personalProjectId) {
       return [];
     }
 
     try {
-      const breakdown = await this.personalUsage.breakdownByModel(
-        { personalProjectId: input.personalProjectId, userId: input.userId },
-        3,
-      );
+      const breakdown = await this.modelSpend.findModelSpend({
+        projectId: input.personalProjectId,
+        window: currentMonthWindow(),
+        limit: TOP_MODELS_LIMIT,
+      });
 
       return breakdown.map((b) => ({ model: b.label, spentUsd: b.spentUsd }));
     } catch {
       return [];
     }
   }
+}
+
+const TOP_MODELS_LIMIT = 3;
+
+/** From the first of this UTC month to now, the window the personal usage page defaults to. */
+function currentMonthWindow(): { startMs: number; endMs: number } {
+  const now = nowInstant();
+  const today = now.toZonedDateTimeISO("UTC");
+  const startMs = Temporal.PlainDateTime.from({
+    year: today.year,
+    month: today.month,
+    day: 1,
+  }).toZonedDateTime("UTC").epochMilliseconds;
+
+  return { startMs, endMs: now.epochMilliseconds + 1 };
 }
 
 /** Last, for a scope kind the rank map has no opinion about. */

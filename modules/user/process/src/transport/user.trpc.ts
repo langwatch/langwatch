@@ -239,6 +239,20 @@ export const userTrpcTransport = defineTrpcRouter(UserApi, userTrpc)
   .handle(({ app, actor, input }) =>
     app.getHomePagePickerState({ userId: actor.id, organizationId: input.organizationId }),
   )
+
+  .procedure("personalUsage")
+  .withPermission("organization:view")
+  .handle(({ app, actor, input }) => app.getPersonalUsageRollup({ ...input, userId: actor.id }))
+
+  .procedure("budgetOverview")
+  .withPermission("organization:view")
+  .handle(({ app, actor, input }) => app.getBudgetOverview({ ...input, userId: actor.id }))
+
+  .procedure("cliBootstrap")
+  .withPermission("organization:view")
+  .handle(({ app, actor, input }) =>
+    app.getCliBootstrap({ userId: actor.id, organizationId: input.organizationId }),
+  )
   .build();
 
 /**

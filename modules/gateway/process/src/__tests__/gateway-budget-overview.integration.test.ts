@@ -1,6 +1,8 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import { type OrganizationService, TeamNotFoundError } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
  * Real Postgres + ClickHouse: what a member sees about budgets binding their key.
@@ -133,6 +135,7 @@ const overviewService = (): BudgetOverviewService =>
     budgetDecisions,
     providerLabels: PrismaGatewayProviderLabelRepository.create(prisma),
     budgetRepository: chRepo,
+    modelSpend: createApiFixture<TraceApi>(),
   });
 
 describe.skipIf(!databaseUrl || !chUrl)("budget overview (real PG + real CH)", () => {

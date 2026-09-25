@@ -33,6 +33,7 @@ import type { ExplorerInstantEvalRunInput } from "./trace-instant-eval.schemas.t
 import type { LangWatchQLTraceFilter } from "./trace-langwatch-ql-filter.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
 import type { DiscoverResult, FacetValuesResult } from "./trace-list-view.ts";
+import type { TraceModelSpend, TraceModelSpendWindow } from "./trace-model-spend.ts";
 import type { AssignTopicCommandData } from "./trace-processing.commands.ts";
 import type { TraceSummaryData } from "./trace-projection.ts";
 import type { TraceQueryEvaluationRun } from "./trace-query-evaluation.types.ts";
@@ -366,6 +367,12 @@ export interface TraceApi extends TraceOtlpIngestApi {
     fromMs: number;
     limit: number;
   }): Promise<ModelUsageStatsRow[]>;
+  /** The project's most-spent models in the window, most spent first, at most `limit`. */
+  findModelSpend(input: {
+    projectId: string;
+    window: TraceModelSpendWindow;
+    limit: number;
+  }): Promise<TraceModelSpend[]>;
   readRecentSpansByModels(input: {
     projectId: string;
     models: string[];

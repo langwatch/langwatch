@@ -152,6 +152,7 @@ async function mountWebhook(): Promise<MountableRestApp> {
       organization: peer("organization"),
       "feature-flag": peer("feature flag"),
       "model-provider": peer("model provider"),
+      trace: peer("trace"),
     })
     .boot();
   const gateway = runtime.module(gatewayServer).provided;

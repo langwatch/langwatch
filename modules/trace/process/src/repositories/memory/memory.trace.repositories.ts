@@ -9,6 +9,7 @@ import { MemoryTraceAnalyticsRepository } from "./memory.trace-analytics.reposit
 import { MemoryTraceDerivationSpanRepository } from "./memory.trace-derivation-span.repository.ts";
 import { MemoryTraceEditOverlayRepository } from "./memory.trace-edit-overlay.repository.ts";
 import { MemoryTraceExistenceRepository } from "./memory.trace-existence.repository.ts";
+import { MemoryTraceModelSpendRepository } from "./memory.trace-model-spend.repository.ts";
 import { MemoryTracePayloadReaderRepository } from "./memory.trace-payload-reader.repository.ts";
 import { MemoryTraceSpanStore } from "./memory.trace-span.store.ts";
 import { MemoryTraceSummaryProjectionRepository } from "./memory.trace-summary-projection.repository.ts";
@@ -46,6 +47,7 @@ export class MemoryTraceRepositories {
       eventPayloads: MemoryTracePayloadReaderRepository.create(),
       clusteringSample: MemoryNullTraceClusteringSampleRepository.create(),
       usageCount: MemoryTraceUsageCountRepository.create(),
+      modelSpend: MemoryTraceModelSpendRepository.create(),
     };
   }
 }

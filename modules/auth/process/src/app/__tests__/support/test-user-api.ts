@@ -180,6 +180,15 @@ export class TestUserApi implements UserApi {
   getHomePagePickerState: UserApi["getHomePagePickerState"] = (input) =>
     this.overrides.getHomePagePickerState?.(input) ?? this.unimplemented("getHomePagePickerState");
 
+  getPersonalUsageRollup: UserApi["getPersonalUsageRollup"] = (input) =>
+    this.overrides.getPersonalUsageRollup?.(input) ?? this.unimplemented("getPersonalUsageRollup");
+
+  getBudgetOverview: UserApi["getBudgetOverview"] = (input) =>
+    this.overrides.getBudgetOverview?.(input) ?? this.unimplemented("getBudgetOverview");
+
+  getCliBootstrap: UserApi["getCliBootstrap"] = (input) =>
+    this.overrides.getCliBootstrap?.(input) ?? this.unimplemented("getCliBootstrap");
+
   completeEmailVerification: UserApi["completeEmailVerification"] = (input) =>
     this.overrides.completeEmailVerification?.(input) ??
     this.unimplemented("completeEmailVerification");

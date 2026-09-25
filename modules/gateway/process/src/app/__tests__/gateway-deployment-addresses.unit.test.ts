@@ -36,6 +36,7 @@ function gatewayApp({
       organizations: createApiFixture({}),
       featureFlags: createApiFixture({}),
       modelProviders: createApiFixture({}),
+      traces: createApiFixture({}),
     },
     members: {
       prisma: createApiFixture<PrismaClient>({}),

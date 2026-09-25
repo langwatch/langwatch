@@ -4,6 +4,11 @@
  * The names are the browser's cache keys, so a rename here is a wire change.
  * @see modules/user/specs/user.feature
  */
+import {
+  cliBootstrapResultSchema,
+  governanceBudgetOverviewForUserSchema,
+  personalUsageRollupSchema,
+} from "@langwatch/enterprise-governance-contract";
 import { userTrpc } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
@@ -19,7 +24,9 @@ describe("the user tRPC surface", () => {
     it("declares every procedure the account and /me screens call", () => {
       expect(Object.keys(userTrpc.members).toSorted()).toEqual([
         "browserSessions",
+        "budgetOverview",
         "changePassword",
+        "cliBootstrap",
         "deactivate",
         "dismissSecureAccountNudge",
         "dismissTraceExplorerTour",
@@ -33,6 +40,7 @@ describe("the user tRPC surface", () => {
         "isAdmin",
         "personalBudget",
         "personalContext",
+        "personalUsage",
         "reactivate",
         "register",
         "removeAvatar",
@@ -74,6 +82,30 @@ describe("the user tRPC surface", () => {
         setPassword: "mutation",
         unlinkAccount: "mutation",
       });
+    });
+
+    it("answers main's governance reads as queries, in governance's own wire shapes", () => {
+      const { personalUsage, budgetOverview, cliBootstrap } = userTrpc.members;
+
+      expect([personalUsage?.kind, budgetOverview?.kind, cliBootstrap?.kind]).toEqual([
+        "query",
+        "query",
+        "query",
+      ]);
+      expect(personalUsage?.output).toBe(personalUsageRollupSchema);
+      expect(budgetOverview?.output).toBe(governanceBudgetOverviewForUserSchema);
+      expect(cliBootstrap?.output).toBe(cliBootstrapResultSchema);
+      expect(
+        personalUsage?.input.validate({
+          organizationId: "org-1",
+          windowStartMs: 1,
+          windowEndMs: 2,
+        }),
+      ).toBe(true);
+      expect(
+        budgetOverview?.input.validate({ organizationId: "org-1", includeTopModels: true }),
+      ).toBe(true);
+      expect(cliBootstrap?.input.validate({ organizationId: "org-1" })).toBe(true);
     });
 
     it("acknowledges the sign-in stamp without a body, as it always has", () => {

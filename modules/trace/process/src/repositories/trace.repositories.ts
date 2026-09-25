@@ -10,6 +10,7 @@ import type { TraceClusteringSampleRepository } from "./trace-clustering-sample.
 import type { TraceDerivationSpanReaderRepository } from "./trace-derivation-span-reader.repository.ts";
 import type { TraceEditOverlayRepository } from "./trace-edit-overlay.repository.ts";
 import type { TraceExistenceRepository } from "./trace-existence.repository.ts";
+import type { TraceModelSpendRepository } from "./trace-model-spend.repository.ts";
 import type { TracePayloadReaderRepository } from "./trace-payload-reader.repository.ts";
 import type { TraceSummaryRepository } from "./trace-summary.repository.ts";
 import type { TraceUsageCountRepository } from "./trace-usage-count.repository.ts";
@@ -35,4 +36,5 @@ export interface TraceRepositories {
   readonly eventPayloads: TracePayloadReaderRepository;
   readonly clusteringSample: TraceClusteringSampleRepository;
   readonly usageCount: TraceUsageCountRepository;
+  readonly modelSpend: TraceModelSpendRepository;
 }

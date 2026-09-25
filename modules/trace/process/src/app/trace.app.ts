@@ -108,6 +108,8 @@ import {
   type LangWatchQLTraceFilter,
   type ResolvedInstantEvalRun,
   type TraceDateField,
+  type TraceModelSpend,
+  type TraceModelSpendWindow,
   type TraceUsageCount,
   type EvaluationTraceEvent,
   type EvaluationTraceSpan,
@@ -143,6 +145,7 @@ import { ClickHouseTraceQueryLangWatchQLRepository } from "../repositories/click
 import { ClickHouseTraceQueryRepository } from "../repositories/clickhouse/clickhouse.trace-query.repository.ts";
 import { RedisTraceSpanDedupRepository } from "../repositories/redis/redis.trace-span-dedup.repository.ts";
 import type { TraceExistenceRepository } from "../repositories/trace-existence.repository.ts";
+import type { TraceModelSpendRepository } from "../repositories/trace-model-spend.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import {
   createFacetFilterResolver,
@@ -179,7 +182,9 @@ import {
 import { TraceExportDownloadService } from "../services/trace-export-download.service.ts";
 import { TraceExportService } from "../services/trace-export.service.ts";
 import type { TraceIngestCredentialService } from "../services/trace-ingest-credential.service.ts";
+import { LogRequestCollectionService } from "../services/log-request-collection.service.ts";
 import type { TraceIngestionService } from "../services/trace-ingestion.service.ts";
+import { TraceLogRecordIOService } from "../services/trace-log-record-io.service.ts";
 import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
 import type { TraceLegacyCredentialService } from "../services/trace-legacy-credential.service.ts";
 import { TraceMetadataWriteService } from "../services/trace-metadata-write.service.ts";
@@ -555,12 +560,8 @@ export interface TraceAppDependencies {
    * data they drop.
    */
   ingestion?: TraceIngestionService;
-  /**
-   * Where an exported OTLP LOG batch goes. Absent on every deployment today
-   * — the Log module owns the collection and this module may not import it.
-   * Absent, the door refuses permanently rather than retrying forever.
-   */
-  logCollection?: TraceOtlpIngestApi["otlpLogs"];
+  /** Where an exported OTLP log batch goes; absent, the door refuses permanently. */
+  logCollection?: LogRequestCollectionService;
   /** The metric signal's twin of {@link logCollection}, absent for the same reason. */
   metricCollection?: TraceOtlpIngestApi["otlpMetrics"];
   /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
@@ -652,8 +653,8 @@ export class TraceApp implements TraceApi, CollectorApp {
         logger: input.members.logger,
       }),
     });
-    const app = new TraceApp(
-      composeTraceAppDependencies({
+    const app = new TraceApp({
+      ...composeTraceAppDependencies({
         ...collaborators,
         ...input.dependencies,
         repositories: input.repositories,
@@ -675,12 +676,19 @@ export class TraceApp implements TraceApi, CollectorApp {
           processName: collaborators.processName,
         },
       }),
-    );
+      logCollection: LogRequestCollectionService.create({
+        logs: input.dependencies.logs,
+        traceCanonicalisation: collaborators.canonicalisation,
+        logRecordIO: TraceLogRecordIOService.create(collaborators.canonicalisation),
+        recordLogContributions: (data) => commands.recordLogContributions(data),
+      }),
+    });
     app.#processingCommands = commands;
     app.#usageCounts = TraceUsageCountService.create({
       projects: input.dependencies.projects,
       usageCount: input.repositories.usageCount,
     });
+    app.#modelSpend = input.repositories.modelSpend;
     app.#preconditionSamples = TracePreconditionSampleService.create({
       traces: app,
       evaluators: input.dependencies.evaluators,
@@ -704,6 +712,7 @@ export class TraceApp implements TraceApi, CollectorApp {
   #processing: TraceProcessingPipelineService | null = null;
   #processingCommands: TraceProcessingCommandsService | null = null;
   #usageCounts: TraceUsageCountService | null = null;
+  #modelSpend: TraceModelSpendRepository | null = null;
   #preconditionSamples: TracePreconditionSampleService | null = null;
 
   readPreconditionSampleTraces(
@@ -1796,6 +1805,21 @@ export class TraceApp implements TraceApi, CollectorApp {
     });
   }
 
+  findModelSpend(input: {
+    projectId: string;
+    window: TraceModelSpendWindow;
+    limit: number;
+  }): Promise<TraceModelSpend[]> {
+    if (!this.#modelSpend) {
+      throw new TraceCapabilityUnavailableError("this process", "the per-model spend read");
+    }
+    return this.#modelSpend.findModelSpend({
+      tenantId: input.projectId,
+      window: input.window,
+      limit: input.limit,
+    });
+  }
+
   readRecentSpansByModels(input: {
     projectId: string;
     models: string[];
@@ -2299,11 +2323,7 @@ export class TraceApp implements TraceApi, CollectorApp {
       .then((result) => result ?? {});
   }
 
-  /**
-   * The log signal: every deployment today answers `not-served` — the Log
-   * module owns the collection and this module may not import it. Said in
-   * the answer, not thrown, so exporters don't retry forever.
-   */
+  /** The log signal; a composition without a collection answers `not-served`, never a retry. */
   otlpLogs(
     input: Parameters<TraceOtlpIngestApi["otlpLogs"]>[0],
   ): Promise<OtlpLogCollectionOutcome> {
@@ -2315,7 +2335,10 @@ export class TraceApp implements TraceApi, CollectorApp {
       });
     }
 
-    return collection(input);
+    return collection.handleOtlpLogRequest({
+      ...input,
+      piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
+    });
   }
 
   /** The metric signal, absent for the reason {@link otlpLogs} gives. */

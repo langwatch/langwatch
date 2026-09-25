@@ -79,3 +79,30 @@ Feature: Canonical user lifecycle
     When they read their personal context in that organization
     Then the personal project's API key is blank
     And the blank key is a valid personal context on the wire
+
+  # main's user.personalUsage, budgetOverview and cliBootstrap, served from
+  # Enterprise governance. personalUsage checked membership before reading.
+  @unit
+  Scenario: A caller outside the organization cannot read a personal usage rollup
+    Given a user who is not a member of the organization
+    When they read their personal usage in that organization
+    Then the read is refused as not a member of the organization
+    And no usage is read
+
+  @unit
+  Scenario: A member's personal usage reads their own rollup over the window they gave
+    Given a member of the organization
+    When they read their personal usage with a window start and end
+    Then governance reads the rollup for that member over that window
+
+  @unit
+  Scenario: A member's budget overview lists their own budgets with top models when asked
+    Given a member of the organization
+    When they read their budget overview asking for top models
+    Then governance reads the overview for that member with top models
+
+  @unit
+  Scenario: The CLI login ceremony reads the caller's own bootstrap
+    Given a member of the organization
+    When the CLI asks for its bootstrap
+    Then governance resolves the bootstrap for that member

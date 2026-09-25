@@ -1,6 +1,12 @@
 /** The User application: one object behind every user door this product opens. */
 import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
+import {
+  type CliBootstrapResult,
+  type GovernanceBudgetOverviewForUser,
+  GovernanceRestApi,
+  type PersonalUsageRollup,
+} from "@langwatch/enterprise-governance-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import {
   IdentityApi,
@@ -70,6 +76,8 @@ import type {
   UserCodeAccessPreference,
   UserVerificationCompleted,
   UpdateUserProfileInput,
+  UserApiBudgetOverviewInput,
+  UserApiPersonalUsageInput,
   UserUsageCount,
 } from "@langwatch/user-contract";
 import {
@@ -133,6 +141,10 @@ const CREDENTIAL_ISSUER = "local:credential";
 interface UserAppDependencies {
   auth: AuthApiContract;
   authz: AuthzApi;
+  governance: Pick<
+    GovernanceRestApi,
+    "personalUsageDashboard" | "personalBudgetOverview" | "cliBootstrap"
+  >;
   identity: IdentityApiContract;
   ops: OpsApi;
   organizations: OrganizationApi;
@@ -161,6 +173,7 @@ export class UserApp implements UserApi {
   static readonly dependencies: {
     auth: typeof AuthApi;
     authz: typeof AuthzApi;
+    governance: typeof GovernanceRestApi;
     identity: typeof IdentityApi;
     organizations: typeof OrganizationApi;
     ops: typeof OpsApi;
@@ -168,6 +181,7 @@ export class UserApp implements UserApi {
   } = {
     auth: AuthApi,
     authz: AuthzApi,
+    governance: GovernanceRestApi,
     identity: IdentityApi,
     organizations: OrganizationApi,
     ops: OpsApi,
@@ -900,6 +914,44 @@ export class UserApp implements UserApi {
     ]);
 
     return { lastHomePath, firstProjectSlug };
+  }
+
+  /**
+   * Main checked membership before reading; the window applies only when both
+   * ends are given, otherwise governance defaults to this month.
+   */
+  async getPersonalUsageRollup({
+    userId,
+    organizationId,
+    windowStartMs,
+    windowEndMs,
+  }: UserApiPersonalUsageInput & { userId: string }): Promise<PersonalUsageRollup> {
+    await this.#assertMember({ userId, organizationId });
+
+    return this.#peers.governance.personalUsageDashboard(
+      windowStartMs && windowEndMs
+        ? { organizationId, window: { startMs: windowStartMs, endMs: windowEndMs } }
+        : { organizationId },
+      { id: userId },
+    );
+  }
+
+  /** Membership is re-checked by the gateway itself, answering `no_membership`. */
+  getBudgetOverview({
+    userId,
+    ...input
+  }: UserApiBudgetOverviewInput & { userId: string }): Promise<GovernanceBudgetOverviewForUser> {
+    return this.#peers.governance.personalBudgetOverview(input, { id: userId });
+  }
+
+  getCliBootstrap({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<CliBootstrapResult> {
+    return this.#peers.governance.cliBootstrap({ organizationId }, { id: userId });
   }
 
   // -- the identity ceremony -------------------------------------------------

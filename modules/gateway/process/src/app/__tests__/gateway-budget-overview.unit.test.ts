@@ -82,6 +82,7 @@ async function gatewayAppStub(): Promise<GatewayApp> {
       organizations: organizationsStub({ isMember, getPersonalWorkspace }),
       featureFlags: featureFlagsStub({ isEnabled }),
       modelProviders: peer("modelProviders"),
+      traces: peer("traces"),
     },
     members: {
       prisma: fakePrisma({

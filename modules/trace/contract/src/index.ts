@@ -186,6 +186,7 @@ export {
 export * from "./trace-edit-overlay-apply.ts";
 export * from "./trace-python-repr.ts";
 export * from "./trace-list-window.ts";
+export * from "./trace-model-spend.ts";
 export * from "./trace-collector-common.ts";
 export * from "./trace-rag-chunks.ts";
 export * from "./trace-rag-extraction.ts";

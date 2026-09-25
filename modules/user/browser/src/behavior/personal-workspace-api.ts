@@ -32,30 +32,6 @@ export type PersonalWorkspaceContext = {
   routingPolicy: { id: string; name: string } | null;
 };
 
-/** What a person spent, over the window the dashboard asks about. */
-export type PersonalUsageRollup = {
-  summary: {
-    spentUsd: number;
-    billedUsd: number;
-    requests: number;
-    promptTokens: number;
-    completionTokens: number;
-    mostUsedModel: { name: string; usagePct: number } | null;
-  };
-  dailyBuckets: {
-    day: string;
-    spentUsd: number;
-    billedUsd: number;
-    requests: number;
-  }[];
-  breakdownByModel: {
-    label: string;
-    spentUsd: number;
-    billedUsd: number;
-    requests: number;
-  }[];
-};
-
 /**
  * The budget that binds this person, as the banners read it. A union, and the narrow arm is a
  * real answer: an organization with no applicable budget collapses to `{ status: "ok" }` with
@@ -72,34 +48,6 @@ export type PersonalBudgetState =
       requestIncreaseUrl?: string | undefined;
       adminEmail: string | null;
     };
-
-/** One budget that applies to this person, most binding first. */
-export type PersonalBudgetOverviewItem = {
-  id: string;
-  name: string;
-  scopeType: string;
-  scopeId: string;
-  scopeLabel: string;
-  window: string;
-  limitUsd: string;
-  spentUsd: string;
-  onBreach: string;
-  timezone: string | null;
-  providerKey: string | null;
-  providerLabel: string | null;
-  isPerMember: boolean;
-  managedByVirtualKeyId: string | null;
-  scopeClass: "organization" | "team" | "project" | "personal" | "key" | "department" | "other";
-  scopePhrase: string;
-  resetsAt: string | null;
-  topModels?: { model: string; spentUsd: number }[];
-};
-
-export type PersonalBudgetOverviewPayload = {
-  gatewayAccess: boolean;
-  reason?: "flag_off" | "no_membership";
-  budgets: PersonalBudgetOverviewItem[];
-};
 
 /**
  * A personal virtual key as this vertical hands it over. DELIBERATELY NOT the gateway's
@@ -218,20 +166,6 @@ export type PersonalApiKeyListEntry = {
 };
 
 type BorrowedProcedures = {
-  user: {
-    personalUsage: {
-      query: {
-        input: { organizationId: string; windowStartMs?: number; windowEndMs?: number };
-        output: PersonalUsageRollup;
-      };
-    };
-    budgetOverview: {
-      query: {
-        input: { organizationId: string; includeTopModels?: boolean };
-        output: PersonalBudgetOverviewPayload;
-      };
-    };
-  };
   license: {
     getSsoGateStatus: {
       query: {

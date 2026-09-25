@@ -1,5 +1,6 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -45,6 +46,7 @@ function process(role: "api" | "worker") {
     .provide({
       auth: createUserTestAuth(),
       authz: createApiFixture<AuthzApi>(),
+      governance: createApiFixture<GovernanceRestApi>(),
       identity: createApiFixture<IdentityApi>(),
       organization: createUserTestOrganizations(),
       ops: createUserTestOps(),

@@ -4,6 +4,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { ClickHouseTraceClusteringSampleRepository } from "../clickhouse/clickhouse.trace-clustering-sample.repository.ts";
 import { MemberTraceClickHouseClientRepository } from "../clickhouse/clickhouse.trace-member-client.repository.ts";
+import { ClickHouseTraceModelSpendRepository } from "../clickhouse/clickhouse.trace-model-spend.repository.ts";
 import { LogRecordStorageClickHouseRepository } from "../clickhouse/log-record-storage.repository.ts";
 import { SessionGroupsClickHouseRepository } from "../clickhouse/session-groups.repository.ts";
 import { SpanStorageClickHouseRepository } from "../clickhouse/span-storage.repository.ts";
@@ -63,6 +64,7 @@ export class PostgresTraceRepositories {
         resolveClient: traceClickHouse,
       }),
       usageCount: TraceUsageCountClickHouseRepository.create(members.clickhouse),
+      modelSpend: ClickHouseTraceModelSpendRepository.create(members.clickhouse),
     };
   }
 }

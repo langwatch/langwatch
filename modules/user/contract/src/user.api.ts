@@ -1,3 +1,8 @@
+import type {
+  CliBootstrapResult,
+  GovernanceBudgetOverviewForUser,
+  PersonalUsageRollup,
+} from "@langwatch/enterprise-governance-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import type {
   EnsuredPersonalWorkspace,
@@ -21,7 +26,11 @@ import type {
   UserPersonalBudget,
   UserPersonalContext,
 } from "./user.responses.ts";
-import type { UserApiRequestBudgetIncreaseInput } from "./user.schemas.ts";
+import type {
+  UserApiBudgetOverviewInput,
+  UserApiPersonalUsageInput,
+  UserApiRequestBudgetIncreaseInput,
+} from "./user.schemas.ts";
 import type {
   ChangeOwnPasswordInput,
   CompleteUserVerificationInput,
@@ -173,6 +182,16 @@ export interface UserApi {
     userId: string;
     organizationId: string;
   }): Promise<UserHomePagePickerState>;
+  /** The caller's own usage rollup; refuses a caller outside the organization. */
+  getPersonalUsageRollup(
+    input: UserApiPersonalUsageInput & { userId: string },
+  ): Promise<PersonalUsageRollup>;
+  /** Every budget binding the caller's own keys, most binding first. */
+  getBudgetOverview(
+    input: UserApiBudgetOverviewInput & { userId: string },
+  ): Promise<GovernanceBudgetOverviewForUser>;
+  /** What the CLI's login ceremony renders: the caller's providers and monthly budget. */
+  getCliBootstrap(input: { userId: string; organizationId: string }): Promise<CliBootstrapResult>;
 
   // -- the identity ceremony -------------------------------------------------
 
