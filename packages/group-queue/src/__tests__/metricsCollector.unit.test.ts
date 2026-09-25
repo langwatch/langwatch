@@ -1,3 +1,4 @@
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { register } from "prom-client";
@@ -12,10 +13,10 @@ import {
 } from "../metrics.ts";
 import { GroupQueueMetricsCollector } from "../metricsCollector.ts";
 import { MIN_PLAUSIBLE_EPOCH_MS } from "../readyScore.ts";
-import type { GroupStagingScripts } from "../scripts.ts";
+import { GroupStagingScripts } from "../scripts.ts";
 
 const QUEUE = "test-queue";
-const PREFIX = "gq:test:";
+const PREFIX = `${QUEUE}:gq:`;
 
 type ReadyEntry = { member: string; score: number };
 
@@ -87,7 +88,30 @@ function makeRedis(
   } = {},
 ) {
   let gateUsed = false;
-  return {
+  const zrangebyscore = vi.fn(async (...args: unknown[]) =>
+    zrangebyscoreModel({
+      entries: opts.readyZset ?? [],
+      min: args[1] as string | number,
+      max: args[2] as string | number,
+      rest: args.slice(3),
+    }),
+  );
+  const sscan = vi.fn(async (...args: unknown[]) => {
+    const readyMembers = (opts.readyZset ?? []).map((e) => e.member);
+    // Answering per key is what makes "swept the wrong index" visible: a
+    // group that is parked, blocked or claimed is in pending-groups and in
+    // no ready set at all.
+    const members = String(args[0]).endsWith("pending-groups")
+      ? (opts.pendingGroups ?? readyMembers)
+      : readyMembers;
+    const cursor = Number(args[1]);
+    const countIdx = args.indexOf("COUNT");
+    const pageSize = opts.scanPageSize ?? (countIdx >= 0 ? Number(args[countIdx + 1]) : 10);
+    const page = members.slice(cursor, cursor + pageSize);
+    const nextCursor = cursor + pageSize >= members.length ? "0" : String(cursor + pageSize);
+    return [nextCursor, page];
+  });
+  const redis = redisDouble({
     zcard: vi.fn(async () => {
       if (opts.gateFirstCall && !gateUsed) {
         gateUsed = true;
@@ -97,32 +121,8 @@ function makeRedis(
     }),
     scard: vi.fn(async () => 0),
     smembers: vi.fn(async () => [] as string[]),
-    zrangebyscore: vi.fn(async (...args: unknown[]) =>
-      zrangebyscoreModel({
-        entries: opts.readyZset ?? [],
-        min: args[1] as string | number,
-        max: args[2] as string | number,
-        rest: args.slice(3),
-      }),
-    ),
-    /**
-     * Paged SSCAN over pending groups; tests can choose where pagination boundaries fall.
-     */
-    sscan: vi.fn(async (...args: unknown[]) => {
-      const readyMembers = (opts.readyZset ?? []).map((e) => e.member);
-      // Answering per key is what makes "swept the wrong index" visible: a
-      // group that is parked, blocked or claimed is in pending-groups and in
-      // no ready set at all.
-      const members = String(args[0]).endsWith("pending-groups")
-        ? (opts.pendingGroups ?? readyMembers)
-        : readyMembers;
-      const cursor = Number(args[1]);
-      const countIdx = args.indexOf("COUNT");
-      const pageSize = opts.scanPageSize ?? (countIdx >= 0 ? Number(args[countIdx + 1]) : 10);
-      const page = members.slice(cursor, cursor + pageSize);
-      const nextCursor = cursor + pageSize >= members.length ? "0" : String(cursor + pageSize);
-      return [nextCursor, page];
-    }),
+    zrangebyscore,
+    sscan,
     pipeline: vi.fn(() => {
       const cmds: { op: "zrange" | "hlen"; key: string }[] = [];
       const chain = {
@@ -148,10 +148,8 @@ function makeRedis(
       };
       return chain;
     }),
-  } as unknown as (IORedis | Cluster) & {
-    zrangebyscore: ReturnType<typeof vi.fn>;
-    sscan: ReturnType<typeof vi.fn>;
-  };
+  });
+  return { redis, zrangebyscore, sscan };
 }
 
 /** A logger stub whose calls a test can read. */
@@ -172,7 +170,7 @@ function makeCollector({
   logger?: ReturnType<typeof makeLogger>;
 }) {
   const collector = new GroupQueueMetricsCollector({
-    scripts: { getKeyPrefix: () => PREFIX } as unknown as GroupStagingScripts,
+    scripts: new GroupStagingScripts(redis, QUEUE),
     processingQueue: { length: () => 0 } as never,
     redisConnection: redis,
     queueName: QUEUE,
@@ -208,7 +206,7 @@ describe("GroupQueueMetricsCollector — oldest pending age", () => {
   });
 
   it("reports the age of the oldest eligible-waiting group", async () => {
-    const redis = makeRedis({
+    const { redis, zrangebyscore } = makeRedis({
       readyZset: [{ member: "group-abc", score: Date.now() - 5_000 }],
     });
 
@@ -220,7 +218,7 @@ describe("GroupQueueMetricsCollector — oldest pending age", () => {
     // unblock sentinel and every mis-scored row alike), cap at "now", and read
     // only the single oldest member. This is the FIRST zrangebyscore call (the
     // eligible probe); the second is the deferred-backlog sample.
-    const args = redis.zrangebyscore.mock.calls[0]!;
+    const args = zrangebyscore.mock.calls[0]!;
     expect(args[0]).toBe(`${PREFIX}ready`);
     expect(args[1]).toBe(MIN_PLAUSIBLE_EPOCH_MS);
     expect(args[2]).toBe(Date.now());
@@ -234,7 +232,7 @@ describe("GroupQueueMetricsCollector — oldest pending age", () => {
    */
   /** @scenario "the unblock sentinel is not read as an age" */
   it("reports 0 when no group is eligible (empty / all in-flight / just unblocked)", async () => {
-    const redis = makeRedis({
+    const { redis } = makeRedis({
       readyZset: [{ member: "just-unblocked", score: 1 }],
     });
     await runCollect(redis);
@@ -242,7 +240,7 @@ describe("GroupQueueMetricsCollector — oldest pending age", () => {
   });
 
   it("never emits a negative age (clock skew / future score)", async () => {
-    const redis = makeRedis({
+    const { redis } = makeRedis({
       readyZset: [{ member: "group-future", score: Date.now() + 1_000 }],
     });
     await runCollect(redis);
@@ -270,7 +268,7 @@ describe("GroupQueueMetricsCollector - scores that are not timestamps", () => {
      */
     /** @scenario "the oldest-pending-age gauge skips a score from just after the Unix epoch" */
     it("does not report its age, and probes from the plausible-epoch floor", async () => {
-      const redis = makeRedis({
+      const { redis, zrangebyscore } = makeRedis({
         readyZset: [{ member: "mis-scored", score: 57_000 }],
       });
 
@@ -278,11 +276,11 @@ describe("GroupQueueMetricsCollector - scores that are not timestamps", () => {
 
       expect(await readGauge()).toBe(0);
       expect(await readBacklogGauge()).toBe(0);
-      expect(redis.zrangebyscore.mock.calls[0]![1]).toBe(MIN_PLAUSIBLE_EPOCH_MS);
+      expect(zrangebyscore.mock.calls[0]![1]).toBe(MIN_PLAUSIBLE_EPOCH_MS);
     });
 
     it("leaves a healthy neighbour driving the gauge", async () => {
-      const redis = makeRedis({
+      const { redis } = makeRedis({
         readyZset: [
           { member: "mis-scored", score: 57_000 },
           { member: "also-mis-scored", score: 0 },
@@ -305,7 +303,7 @@ describe("GroupQueueMetricsCollector - scores that are not timestamps", () => {
      */
     /** @scenario "the backlog gauge drops a head job score that is not a timestamp" */
     it("drops the head from the backlog age", async () => {
-      const redis = makeRedis({
+      const { redis } = makeRedis({
         readyZset: [{ member: "tenant/sub/trace:abc", score: Date.now() + 5_000 }],
         headJobScores: {
           [`${PREFIX}group:tenant/sub/trace:abc:jobs`]: ["job-1", "0"],
@@ -319,7 +317,7 @@ describe("GroupQueueMetricsCollector - scores that are not timestamps", () => {
 
     it("still reports a genuinely old head job, however far past it is", async () => {
       const veryOld = Date.now() - 30 * 24 * 60 * 60 * 1000;
-      const redis = makeRedis({
+      const { redis } = makeRedis({
         readyZset: [{ member: "tenant/sub/trace:old", score: Date.now() + 1 }],
         headJobScores: {
           [`${PREFIX}group:tenant/sub/trace:old:jobs`]: ["job-1", String(veryOld)],
@@ -357,7 +355,7 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
       // by the last failed attempt (a real backoff, not the full incident
       // delay), so the eligible scan sees an empty queue.
       const headDueMs = Date.now() - 60_000;
-      const redis = makeRedis({
+      const { redis } = makeRedis({
         readyZset: [{ member: "tenant/sub/trace:abc", score: Date.now() + 5_000 }],
         headJobScores: {
           [`${PREFIX}group:tenant/sub/trace:abc:jobs`]: ["job-1", String(headDueMs)],
@@ -373,7 +371,7 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
 
   describe("when a deferred group's head job is scheduled in the future", () => {
     it("does not count it as backlog", async () => {
-      const redis = makeRedis({
+      const { redis } = makeRedis({
         readyZset: [{ member: "tenant/sub/trace:delayed", score: Date.now() + 5_000 }],
         headJobScores: {
           [`${PREFIX}group:tenant/sub/trace:delayed:jobs`]: [
@@ -391,7 +389,7 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
 
   describe("when only an eligible group is waiting", () => {
     it("folds the eligible head into the backlog age", async () => {
-      const redis = makeRedis({
+      const { redis } = makeRedis({
         readyZset: [{ member: "group-abc", score: Date.now() - 5_000 }],
       });
 
@@ -425,7 +423,7 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
           String(now - 86_400_000),
         ];
 
-        const redis = makeRedis({ readyZset, headJobScores });
+        const { redis } = makeRedis({ readyZset, headJobScores });
 
         await runCollect(redis);
 
@@ -462,7 +460,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
   describe("given groups of differing depth", () => {
     describe("when a cycle reads them", () => {
       it("reports the deepest group, not the total or the average", async () => {
-        const redis = makeRedis({
+        const { redis } = makeRedis({
           readyZset: ready("shallow", "deep", "middling"),
           stagingDepths: { shallow: 5, deep: 900, middling: 12 },
         });
@@ -473,7 +471,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
       });
 
       it("counts how many are over the reporting threshold", async () => {
-        const redis = makeRedis({
+        const { redis } = makeRedis({
           readyZset: ready("a", "b", "c"),
           stagingDepths: {
             a: STAGING_DEPTH_REPORT_FLOOR,
@@ -497,7 +495,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
   describe("given the deep group is past the first page", () => {
     describe("when the rotation continues across cycles", () => {
       it("reports it, which a fixed sample of the head never would", async () => {
-        const redis = makeRedis({
+        const { redis } = makeRedis({
           readyZset: ready("g1", "g2", "g3", "deep"),
           stagingDepths: { g1: 1, g2: 2, g3: 3, deep: 250_000 },
           scanPageSize: 2,
@@ -517,7 +515,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
     describe("when the next rotation reads it", () => {
       it("stops reporting the old depth instead of pinning the high-water mark", async () => {
         const depths: Record<string, number> = { quiet: 3, deep: 250_000 };
-        const redis = makeRedis({
+        const { redis } = makeRedis({
           readyZset: ready("quiet", "deep"),
           stagingDepths: depths,
         });
@@ -538,7 +536,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
   describe("given a group that disappeared mid-sweep", () => {
     describe("when its depth read fails or finds nothing", () => {
       it("reports no depth for it, because neither reply is evidence of one", async () => {
-        const redis = makeRedis({
+        const { redis } = makeRedis({
           readyZset: ready("gone", "errored", "real"),
           // "gone" drained between the scan and the read: HLEN on a missing
           // key is 0, which the stub returns for any group with no entry.
@@ -561,7 +559,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
         // staging keeps filling the `:data` hash of a group in any of them.
         // Sweeping ready would report zero here, which is healthy-looking
         // precisely while something is stopping the group's drainer.
-        const redis = makeRedis({
+        const { redis } = makeRedis({
           readyZset: ready("draining-normally"),
           pendingGroups: ["draining-normally", "parked-and-growing"],
           stagingDepths: {
@@ -585,7 +583,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
         const gate = new Promise<void>((resolve) => {
           release = resolve;
         });
-        const redis = makeRedis({
+        const { redis, sscan } = makeRedis({
           readyZset: ready("g1", "g2"),
           stagingDepths: { g1: 1, g2: 2 },
           gateFirstCall: gate,
@@ -598,12 +596,12 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
         // The first cycle is held before it reaches the sweep. If the second
         // got past the guard it would reach the sweep on its own, read the
         // same cursor, and advance it a second time.
-        expect(redis.sscan).not.toHaveBeenCalled();
+        expect(sscan).not.toHaveBeenCalled();
 
         release();
         await inFlight;
 
-        expect(redis.sscan).toHaveBeenCalledTimes(1);
+        expect(sscan).toHaveBeenCalledTimes(1);
       });
     });
   });
@@ -612,7 +610,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
     describe("when the rotation counts groups over the threshold", () => {
       it("counts it once, because the scan promises at least once", async () => {
         const deep = STAGING_DEPTH_REPORT_FLOOR * 2;
-        const redis = makeRedis({
+        const { redis } = makeRedis({
           // "seen-twice" spans a page boundary, which is what a rehash part
           // way through a rotation looks like from here.
           readyZset: ready("seen-twice", "other", "seen-twice", "another"),
@@ -638,7 +636,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
     describe("when the sweep publishes", () => {
       it("says how many it dropped, so a healthy zero is not fabricated", async () => {
         const logger = makeLogger();
-        const redis = makeRedis({
+        const { redis } = makeRedis({
           readyZset: ready("a", "b"),
           stagingDepthErrors: ["a", "b"],
         });
@@ -660,7 +658,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
   describe("given an empty pending-groups index", () => {
     describe("when a cycle runs", () => {
       it("reports zero rather than leaving the last value standing", async () => {
-        const redis = makeRedis({ readyZset: [] });
+        const { redis } = makeRedis({ readyZset: [] });
 
         await runCollect(redis);
 

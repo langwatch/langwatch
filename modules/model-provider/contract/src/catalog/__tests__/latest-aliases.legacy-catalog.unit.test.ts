@@ -3,7 +3,10 @@
  * Lives in its own file since the catalog mock is per-file: the sibling
  * `latestAliases.unit.test` pins behaviour against a catalog with GPT-5.6.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
+
+// isolate:false shares the module graph across files: drop any catalog another file loaded.
+vi.hoisted(() => vi.resetModules());
 
 vi.mock("../model-catalog.ts", () => ({
   llmModels: {
@@ -53,4 +56,9 @@ describe("given a catalog with no named-tier generation", () => {
       expect(findAliasTarget("openai/latest")[0]).not.toBe("openai/gpt-5.5-pro");
     });
   });
+});
+
+afterAll(() => {
+  vi.doUnmock("../model-catalog.ts");
+  vi.resetModules();
 });

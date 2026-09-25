@@ -1,4 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
+
+// isolate:false shares the module graph across files: drop any catalog another file loaded.
+vi.hoisted(() => vi.resetModules());
 
 vi.mock("../model-catalog.ts", () => {
   const catalog = (...ids: string[]) =>
@@ -162,4 +165,9 @@ describe("given latest-alias model resolution", () => {
       }
     });
   });
+});
+
+afterAll(() => {
+  vi.doUnmock("../model-catalog.ts");
+  vi.resetModules();
 });

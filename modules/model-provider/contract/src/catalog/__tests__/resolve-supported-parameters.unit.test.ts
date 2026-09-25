@@ -24,7 +24,7 @@ describe("resolveSupportedParameters", () => {
         "bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
         provider,
       );
-      expect(result).toEqual(["temperature"]);
+      expect(result).toEqual({ kind: "known", parameters: ["temperature"] });
     });
 
     it("returns an explicit empty allowlist when set", () => {
@@ -38,17 +38,20 @@ describe("resolveSupportedParameters", () => {
           },
         ] as CustomModelEntry[],
       };
-      expect(resolveSupportedParameters("openai/custom/embed-model", provider)).toEqual([]);
+      expect(resolveSupportedParameters("openai/custom/embed-model", provider)).toEqual({
+        kind: "known",
+        parameters: [],
+      });
     });
   });
 
   describe("when no customModel override exists", () => {
-    it("returns null for an unknown model so legacy behavior is preserved", () => {
+    it("answers unknown for an unknown model so legacy behavior is preserved", () => {
       expect(
         resolveSupportedParameters("bedrock/totally-unknown", {
           customModels: [],
         }),
-      ).toBeNull();
+      ).toEqual({ kind: "unknown" });
     });
   });
 });
@@ -63,7 +66,10 @@ describe("filterUnsupportedSamplingParams", () => {
       top_p: 1,
       top_k: 40,
     };
-    const out = filterUnsupportedSamplingParams(params, ["temperature"]);
+    const out = filterUnsupportedSamplingParams(params, {
+      kind: "known",
+      parameters: ["temperature"],
+    });
     expect(out).toEqual({
       model: "bedrock/haiku",
       temperature: 0.7,
@@ -72,7 +78,10 @@ describe("filterUnsupportedSamplingParams", () => {
   });
 
   it("never strips max_tokens even when not in the allowlist", () => {
-    const out = filterUnsupportedSamplingParams({ model: "x", max_tokens: 2048 }, []);
+    const out = filterUnsupportedSamplingParams(
+      { model: "x", max_tokens: 2048 },
+      { kind: "known", parameters: [] },
+    );
     expect(out).toEqual({ model: "x", max_tokens: 2048 });
   });
 
@@ -84,7 +93,7 @@ describe("filterUnsupportedSamplingParams", () => {
         reasoning_effort: "high",
         thinkingLevel: "high",
       },
-      ["temperature", "reasoning"],
+      { kind: "known", parameters: ["temperature", "reasoning"] },
     );
     expect(out).toEqual({
       model: "openai/o5",
@@ -105,7 +114,7 @@ describe("filterUnsupportedSamplingParams", () => {
         litellm_params: { region: "us-east-1" },
         top_p: 1,
       },
-      ["temperature"],
+      { kind: "known", parameters: ["temperature"] },
     );
     expect(out).toEqual({
       model: "x",
@@ -117,8 +126,8 @@ describe("filterUnsupportedSamplingParams", () => {
     });
   });
 
-  it("returns the input unchanged when allowed is null (unknown model)", () => {
+  it("returns the input unchanged when the model is unknown", () => {
     const params = { model: "x", top_p: 0.9, top_k: 40 };
-    expect(filterUnsupportedSamplingParams(params, null)).toEqual(params);
+    expect(filterUnsupportedSamplingParams(params, { kind: "unknown" })).toEqual(params);
   });
 });

@@ -1,8 +1,12 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("static model cost ordering", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
   afterEach(() => {
-    vi.doUnmock("../model-catalog");
+    vi.doUnmock("../model-catalog.ts");
     vi.resetModules();
   });
 

@@ -14,36 +14,38 @@ const ALWAYS_PASSED_THROUGH_PARAMS = new Set([
   "litellm_params",
 ]);
 
-/**
- * Precedence: operator override on the model, then the registry, then `null` (unknown,
- * do not filter). `[]` is a distinct explicit "no sampling knobs" from `null` (#4429).
- */
+/** `known` with `[]` is an explicit "no sampling knobs", distinct from `unknown` (#4429). */
+export type SupportedParameters =
+  | { kind: "known"; parameters: SupportedParameter[] }
+  | { kind: "unknown" };
+
+/** Precedence: operator override on the model, then the registry, then `unknown` (no filter). */
 export function resolveSupportedParameters(
   modelId: string,
   modelProvider: ProviderWithCustomModels | null | undefined,
-): SupportedParameter[] | null {
+): SupportedParameters {
   const modelName = modelId.split("/").slice(1).join("/");
   const custom = modelProvider?.customModels?.find((entry) => entry.modelId === modelName);
   if (custom?.supportedParameters !== undefined) {
-    return custom.supportedParameters;
+    return { kind: "known", parameters: custom.supportedParameters };
   }
   const meta = pickModelMetadata(modelId);
   if (meta?.supportedParameters && meta.supportedParameters.length > 0) {
-    return meta.supportedParameters as SupportedParameter[];
+    return { kind: "known", parameters: meta.supportedParameters as SupportedParameter[] };
   }
-  return null;
+  return { kind: "unknown" };
 }
 
 /**
  * Drop unsupported keys; `max_tokens` always survives (gateways require it regardless
- * of registry support), and `null` (model unknown) skips filtering entirely.
+ * of registry support), and an `unknown` model skips filtering entirely.
  */
 export function filterUnsupportedSamplingParams<T extends Record<string, unknown>>(
   params: T,
-  allowed: SupportedParameter[] | null,
+  allowed: SupportedParameters,
 ): T {
-  if (allowed === null) return params;
-  const set = new Set<string>(allowed);
+  if (allowed.kind === "unknown") return params;
+  const set = new Set<string>(allowed.parameters);
   // max_tokens is a hard ceiling, not a sampling knob; gateways need it
   // regardless of whether the model "supports" it via this registry.
   set.add("max_tokens");

@@ -248,7 +248,7 @@ describe("jobEnvelope", () => {
 
     describe("when a blob decompresses past the ceiling", () => {
       it("rejects it rather than OOMing (zip-bomb guard)", async () => {
-        const { tieredBlobs } = makeTiered();
+        const { tieredBlobs, redisBlobs } = makeTiered();
         const encoded = await encodeJobEnvelope({
           jobData: { __jobName: "x", bulk: "z".repeat(8 * 1024) },
           tieredBlobs,
@@ -258,11 +258,11 @@ describe("jobEnvelope", () => {
         // decode would SUCCEED (valid JSON), so dropping the cap fails this test
         // instead of false-passing on an unrelated JSON-parse error.
         const oversizedValidJson = `"${"z".repeat(MAX_BLOB_BYTES + 1)}"`;
-        const bombStore = {
-          get: async () => gzipSync(Buffer.from(oversizedValidJson, "utf8")),
-        } as unknown as TieredBlobStore;
+        const bomb = gzipSync(Buffer.from(oversizedValidJson, "utf8"));
+        expect(redisBlobs.store.size).toBe(1);
+        for (const id of redisBlobs.store.keys()) redisBlobs.store.set(id, bomb);
 
-        await expect(decodeJobEnvelope({ value: encoded, tieredBlobs: bombStore })).rejects.toThrow(
+        await expect(decodeJobEnvelope({ value: encoded, tieredBlobs })).rejects.toThrow(
           PayloadTooLargeError,
         );
       });

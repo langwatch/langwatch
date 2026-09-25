@@ -35,13 +35,10 @@ describe("model provider server configuration", () => {
     });
   });
 
-  describe("given a blank engine address or model", () => {
+  describe("given a blank default model", () => {
     /** @scenario "A blank identifier resolves to absent rather than to an empty filter" */
-    it("resolves both to absent so nothing composes an empty address", () => {
-      expect(read({ LANGWATCH_NLP_SERVICE: "  ", LANGWATCH_DEFAULT_MODEL: "" })).toMatchObject({
-        nlpServiceUrl: undefined,
-        defaultModel: undefined,
-      });
+    it("resolves it to absent so nothing composes an empty model id", () => {
+      expect(read({ LANGWATCH_DEFAULT_MODEL: "" }).defaultModel).toBeUndefined();
     });
   });
 });
