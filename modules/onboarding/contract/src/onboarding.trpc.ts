@@ -7,7 +7,11 @@
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
-import { onboardingVariantSchema, guidedOnboardingStateSchema } from "./onboarding-schemas.ts";
+import {
+  onboardingVariantSchema,
+  guidedOnboardingStateSchema,
+  signUpDataSchema,
+} from "./onboarding-schemas.ts";
 import { onboardingWriteAckSchema, organizationInitializedSchema } from "./onboarding.responses.ts";
 
 const organizationIdInputSchema = z.object({ organizationId: z.string() }).strict();
@@ -42,9 +46,6 @@ export const guidedStateWithVariantOutputSchema = z.object({
   variant: onboardingVariantSchema.nullable(),
 });
 
-/** The sign-up questionnaire, forwarded opaque: the questions are the deployment's. */
-const signUpAnswersSchema = z.record(z.string(), z.unknown());
-
 /**
  * The four keys the "pick your flavour" screen offers. The traits they map to
  * are the deployment's marketing vocabulary rather than this feature's, so
@@ -66,8 +67,10 @@ export type OnboardingIntegrationMethod = z.infer<typeof onboardingIntegrationMe
 export const onboardingInitializeOrganizationInputSchema = z.object({
   orgName: z.string().optional(),
   phoneNumber: z.string().optional(),
-  signUpData: signUpAnswersSchema.optional(),
+  signUpData: signUpDataSchema.optional(),
   primaryIntent: z.enum(["AGENT_GOVERNANCE", "LLM_OPS"]).optional(),
+  /** Absent leaves the sign-up data's own variant as it was. */
+  onboardingVariant: onboardingVariantSchema.optional(),
 
   projectName: z.string().optional(),
   language: z.string().default("other"),

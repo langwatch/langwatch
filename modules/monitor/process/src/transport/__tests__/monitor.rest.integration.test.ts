@@ -122,6 +122,20 @@ describe("the monitors REST family", () => {
         level: "trace",
       });
     });
+
+    it("accepts a monitor that names no mappings, as main did", async () => {
+      const api = mountMonitorRest();
+
+      const response = await api.post("/api/monitors", {
+        name: "Unmapped",
+        checkType: "langevals/llm_boolean",
+        evaluatorId: "evaluator-1",
+      });
+
+      expect(response.status).toBe(201);
+      const [written] = await api.repository.findAll({ projectId: TEST_PROJECT.id });
+      expect(written?.mappings).toEqual({ mapping: {}, expansions: [] });
+    });
   });
 
   describe("when the application refuses a write", () => {

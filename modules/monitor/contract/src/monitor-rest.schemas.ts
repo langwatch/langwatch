@@ -1,12 +1,20 @@
 /** Wire shapes for `/api/monitors`, distinct from domain schemas. */
 import { z } from "zod";
 
-import { monitorApiMappingsSchema } from "./monitor-trpc.schemas.ts";
-import { monitorExecutionModeSchema } from "./monitor.ts";
+import { monitorExecutionModeSchema, monitorMappingStateSchema } from "./monitor.ts";
 
 export const monitorRestIdParamsSchema = z.object({
   monitorId: z.string().min(1).describe("The monitor id."),
 });
+
+/** Optional and nullable as on main; a legacy `{}` reads as an empty mapping. */
+export const monitorRestMappingsSchema = z
+  .object({
+    mapping: monitorMappingStateSchema.shape.mapping.optional(),
+    expansions: monitorMappingStateSchema.shape.expansions.optional(),
+  })
+  .nullable()
+  .optional();
 
 export const monitorRestPreconditionsSchema = z.array(
   z.object({
@@ -44,7 +52,7 @@ export const monitorRestCreateInputSchema = z.object({
   executionMode: monitorExecutionModeSchema.default("ON_MESSAGE"),
   preconditions: monitorRestPreconditionsSchema.default([]),
   parameters: z.record(z.string(), z.json()).default({}),
-  mappings: monitorApiMappingsSchema,
+  mappings: monitorRestMappingsSchema,
   sample: z.number().min(0).max(1).default(1.0),
   evaluatorId: z.string().min(1).optional(),
   level: z.enum(["trace", "thread"]).default("trace"),
@@ -58,7 +66,7 @@ export const monitorRestUpdateInputSchema = z.object({
   executionMode: monitorExecutionModeSchema.optional(),
   preconditions: monitorRestPreconditionsSchema.optional(),
   parameters: z.record(z.string(), z.json()).optional(),
-  mappings: monitorApiMappingsSchema,
+  mappings: monitorRestMappingsSchema,
   sample: z.number().min(0).max(1).optional(),
   evaluatorId: z.string().min(1).nullable().optional(),
   level: z.enum(["trace", "thread"]).optional(),

@@ -156,7 +156,14 @@ export class OnboardingApp implements OnboardingApiContract {
     input: OnboardingInitializeOrganizationInput,
     by: OnboardingSignUpCaller,
   ): Promise<OrganizationInitialized> {
-    return this.#organizations.initializeOrganization(input, by);
+    const { onboardingVariant, ...rest } = input;
+    if (onboardingVariant === undefined)
+      return this.#organizations.initializeOrganization(rest, by);
+
+    return this.#organizations.initializeOrganization(
+      { ...rest, signUpData: { ...rest.signUpData, onboardingVariant } },
+      by,
+    );
   }
 
   recordIntegrationMethod(input: { userId: string; selection: string }): void {

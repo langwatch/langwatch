@@ -25,7 +25,10 @@ export const secretPublicSchema = z
   .strict();
 export type SecretPublic = z.infer<typeof secretPublicSchema>;
 
-export const secretPublicListInputSchema = z.object({ projectId: z.string().min(1) }).strict();
+/** Optional as on main, which read the project from the credential alone. */
+export const secretPublicListInputSchema = z
+  .object({ projectId: z.string().min(1).optional() })
+  .strict();
 export type SecretPublicListInput = z.infer<typeof secretPublicListInputSchema>;
 
 export const secretPublicParamsSchema = z.object({ secretId: secretIdSchema }).strict();
@@ -35,7 +38,7 @@ export type SecretPublicParams = z.infer<typeof secretPublicParamsSchema>;
  * The delete body, deliberately not `.strict()`: the id it addresses is in the
  * path, and a released client that also puts it in the body is not refused.
  */
-export const secretPublicDeleteInputSchema = z.object({ projectId: z.string().min(1) });
+export const secretPublicDeleteInputSchema = z.object({ projectId: z.string().min(1).optional() });
 export type SecretPublicDeleteInput = z.infer<typeof secretPublicDeleteInputSchema>;
 
 export const secretPublicCreateInputSchema = z

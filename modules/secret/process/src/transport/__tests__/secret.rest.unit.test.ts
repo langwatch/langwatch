@@ -2,7 +2,7 @@ import type { Actor } from "@langwatch/actor";
 import { createErrorHandler } from "@langwatch/api";
 import { createRestRuntime } from "@langwatch/api/rest";
 import { SecretApi } from "@langwatch/secret-contract";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { createSecretTestApp } from "../../app/__tests__/secret.fixture.ts";
 import { SECRET_REST_VERSION, secretRest, secretsAliasRest } from "../secret.rest.ts";
@@ -131,26 +131,46 @@ describe("the secret REST family", () => {
   });
 
   describe("when a released client calls the plural family", () => {
-    /** @scenario "The modern public API is validated REST" */
-    it("serves the same routes under its own namespace", async () => {
+    let plural: ReturnType<typeof mount>;
+
+    beforeEach(() => {
       const app = createSecretTestApp();
       const runtime = createRestRuntime({
         identity: {
           authenticate: () => ({ actor: USER, scope: { tier: "project", id: PROJECT } }),
         },
       });
-      const plural = runtime.mount(secretsAliasRest.router(), {
+      plural = runtime.mount(secretsAliasRest.router(), {
         app: () => app,
         credential: "project",
         onError: createErrorHandler(),
       });
+    });
 
+    /** @scenario "The modern public API is validated REST" */
+    it("serves the same routes under its own namespace", async () => {
       const listed = await plural.request(`/api/secrets?projectId=${PROJECT}`);
       const versioned = await plural.request(`/api/v1/secrets?projectId=${PROJECT}`);
 
       expect(listed.status).toBe(200);
       expect(versioned.status).toBe(200);
       await expect(listed.json()).resolves.toEqual([]);
+    });
+
+    /** @scenario "The modern public API is validated REST" */
+    it("reads the project from the credential when the request names none", async () => {
+      const created = await plural.request("/api/secrets", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "OPENAI_API_KEY", value: "sk-live" }),
+      });
+      const listed = await plural.request("/api/secrets");
+
+      expect(created.status).toBe(201);
+      expect(listed.status).toBe(200);
+      await expect(listed.json()).resolves.toMatchObject([
+        { projectId: PROJECT, name: "OPENAI_API_KEY" },
+      ]);
     });
   });
 

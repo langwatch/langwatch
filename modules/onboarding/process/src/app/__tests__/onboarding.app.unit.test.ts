@@ -159,6 +159,32 @@ describe("OnboardingApp", () => {
     expect(initialized).toEqual(INITIALIZED);
   });
 
+  it("records the onboarding variant inside the sign-up data, as main did", async () => {
+    const { app, initializeOrganization } = buildApp();
+    const caller = { id: USER_ID, name: "Ada", email: "ada@acme.com" };
+
+    await app.initializeOrganization(
+      {
+        orgName: "ACME",
+        signUpData: { terms: true, utmSource: "newsletter" },
+        onboardingVariant: "guided",
+        language: "other",
+        framework: "other",
+      },
+      caller,
+    );
+
+    expect(initializeOrganization).toHaveBeenCalledWith(
+      {
+        orgName: "ACME",
+        signUpData: { terms: true, utmSource: "newsletter", onboardingVariant: "guided" },
+        language: "other",
+        framework: "other",
+      },
+      caller,
+    );
+  });
+
   it("forwards the picked integration method to the organization module", () => {
     const { app, recordIntegrationMethod } = buildApp();
 
