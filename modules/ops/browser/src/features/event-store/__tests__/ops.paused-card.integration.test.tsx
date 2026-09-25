@@ -115,7 +115,7 @@ describe("PausedCard", () => {
         });
 
         expect(screen.getByText(/at their in-flight capacity limit/)).toBeTruthy();
-        expect(screen.getByText(/nothing has failed/)).toBeTruthy();
+        expect(screen.getByText(/Nothing has failed/)).toBeTruthy();
       });
 
       /** @scenario A mechanism with nothing to report is not drawn at all */

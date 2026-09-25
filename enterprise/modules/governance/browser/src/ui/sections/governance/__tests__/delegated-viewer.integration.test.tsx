@@ -186,7 +186,7 @@ describe("governance pages for a delegated viewer", () => {
       // The page did not collapse into the notice: its own heading and the
       // panels that need no activity-monitor grant are still there.
       expect(screen.getByRole("heading", { name: "AI Governance" })).toBeTruthy();
-      expect(screen.getByText("CLI session policy")).toBeTruthy();
+      expect(screen.queryByText("CLI session policy")).toBeNull();
     });
 
     it("sends no activity-monitor query", () => {
@@ -261,14 +261,14 @@ describe("governance pages for a delegated viewer", () => {
       expect(screen.getByText("Spend by department")).toBeTruthy();
       expect(screen.getByText("Recent anomalies")).toBeTruthy();
       expect(screen.getByText("Ingestion sources")).toBeTruthy();
-      expect(screen.getByText("CLI session policy")).toBeTruthy();
+      expect(screen.queryByText("CLI session policy")).toBeNull();
       expect(screen.getByRole("button", { name: "Save" })).toBeTruthy();
       expect(screen.queryByText(/Ask an organization admin to grant you/)).toBeNull();
 
       // Every panel's read is actually issued for an admin.
       expect(harness.requested).toContain("activityMonitor.summary");
       expect(harness.requested).toContain("ingestionSources.list");
-      expect(harness.requested).toContain("routingPolicy.list");
+      expect(harness.requested).not.toContain("routingPolicy.list");
       expect(harness.requested).toContain("anomalyRules.list");
       expect(harness.requested).toContain("aiTools.adminList");
       expect(harness.requested).toContain("sessionPolicy.get");

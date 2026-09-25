@@ -173,12 +173,14 @@ const ONLINE_AGENT = {
   id: "agent_1",
   name: "prod-agent",
   type: "http" as const,
+  updatedAt: "2026-07-01T12:00:00.000Z",
   config: { devTunnel: { url: "http://localhost:1234" } },
 };
 const OFFLINE_AGENT = {
   id: "agent_2",
   name: "staging-agent",
   type: "http" as const,
+  updatedAt: "2026-07-01T12:00:00.000Z",
   config: {},
 };
 /** A saved voice agent, the only target that offers "Call it myself". */
@@ -186,6 +188,7 @@ const VOICE_AGENT = {
   id: "agent_voice",
   name: "support-line",
   type: "voice" as const,
+  updatedAt: "2026-07-01T12:00:00.000Z",
   config: { transport: "elevenlabs_convai", agentId: "el_agent_1" },
 };
 /** A connected agent whose own function declares two parameters. */
@@ -193,6 +196,7 @@ const CONNECTED_AGENT = {
   id: "agent_connected",
   name: "support-agent",
   type: "connected" as const,
+  updatedAt: "2026-07-01T12:00:00.000Z",
   config: {},
   environment: "production",
   status: "online" as const,
@@ -500,6 +504,7 @@ describe("<RunDialog/>", () => {
       id: "agent_connected",
       name: "support-agent",
       type: "connected" as const,
+      updatedAt: "2026-07-01T12:00:00.000Z",
       config: {},
       environment: "production",
       owner: null,

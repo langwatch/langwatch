@@ -3,6 +3,7 @@ import { configDefaults } from "vitest/config";
 
 export default defineModuleVitestConfig({
   kind: "jsdom",
+  isolate: true,
   test: {
     /**
      * Real-browser lane excluded, as `platform/app` did: the browser

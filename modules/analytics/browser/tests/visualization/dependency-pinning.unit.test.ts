@@ -20,11 +20,24 @@ const manifestSchema = z.object({
 
 const readManifest = (path: string) => manifestSchema.parse(JSON.parse(readFileSync(path, "utf8")));
 
+const WORKSPACE_MANIFEST = join(PACKAGE_ROOT, "../../../pnpm-workspace.yaml");
+
+const resolveDeclared = (name: string, declared: string | undefined) => {
+  if (declared !== "catalog:") return declared;
+  const catalog =
+    readFileSync(WORKSPACE_MANIFEST, "utf8")
+      .split("\ncatalog:\n")[1]
+      ?.split(/\n(?=\S)/)[0] ?? "";
+  const escaped = name.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
+  return new RegExp(`^  ${escaped}: (\\S+)$`, "m").exec(catalog)?.[1];
+};
+
 describe("the analytics web Vega dependency set", () => {
   it("declares the reviewed runtime versions directly and exactly", () => {
     const manifest = readManifest(join(PACKAGE_ROOT, "package.json"));
     for (const [name, version] of Object.entries(PINNED_VEGA_PACKAGES)) {
-      expect(manifest.dependencies?.[name], `${name} must be direct`).toBe(version);
+      const declared = resolveDeclared(name, manifest.dependencies?.[name]);
+      expect(declared, `${name} must be direct`).toBe(version);
       expect(/^[~^><=*]|\s|x/.test(version), `${name} must be exact-pinned`).toBe(false);
     }
   });

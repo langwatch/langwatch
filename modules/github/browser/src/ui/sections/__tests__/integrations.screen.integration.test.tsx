@@ -150,7 +150,7 @@ describe("given an instance with the GitHub App configured", () => {
       expect(calls.refetch).toHaveBeenCalled();
       expect(
         await screen.findByText(
-          "Finish uninstalling on GitHub - this updates once GitHub confirms.",
+          "Finish uninstalling on GitHub: this updates once GitHub confirms.",
         ),
       ).toBeInTheDocument();
     });

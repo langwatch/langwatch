@@ -37,7 +37,7 @@ function renderEditor() {
   return {
     onOverride,
     onSendableChange,
-    start: screen.getByLabelText("period_start"),
+    start: screen.getByLabelText("dashboard_context_period_start"),
   };
 }
 

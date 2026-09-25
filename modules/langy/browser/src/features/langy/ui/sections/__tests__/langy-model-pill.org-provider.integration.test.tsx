@@ -38,6 +38,18 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
 
 import { LangyModelPill } from "../../elements/langy-model-pill.tsx";
 
+if (typeof window !== "undefined" && !window.ResizeObserver) {
+  Object.defineProperty(window, "ResizeObserver", {
+    configurable: true,
+    writable: true,
+    value: class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  });
+}
+
 const OPTIONS = ["anthropic/claude-sonnet-4-5", "anthropic/claude-haiku-4-5", "openai/gpt-5-mini"];
 
 afterEach(() => cleanup());

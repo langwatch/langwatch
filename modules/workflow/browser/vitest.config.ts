@@ -2,6 +2,7 @@ import { defineModuleVitestConfig } from "@langwatch/vitest-config";
 
 export default defineModuleVitestConfig({
   kind: "jsdom",
+  isolate: true,
   test: {
     globals: true,
     environment: "jsdom",
