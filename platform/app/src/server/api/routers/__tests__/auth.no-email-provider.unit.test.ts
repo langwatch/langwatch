@@ -15,12 +15,14 @@ const {
   requestVerification,
   issueUnconfirmedAddressProof,
   hasEmailProvider,
+  isEmailUnconfigured,
 } = vi.hoisted(() => ({
   route: vi.fn(),
   addressState: vi.fn(),
   requestVerification: vi.fn(),
   issueUnconfirmedAddressProof: vi.fn(),
   hasEmailProvider: vi.fn(),
+  isEmailUnconfigured: vi.fn(),
 }));
 
 vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
@@ -38,6 +40,7 @@ vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
 vi.mock("~/server/mailer/providers", async (importOriginal) => ({
   ...(await importOriginal<typeof import("~/server/mailer/providers")>()),
   hasEmailProvider,
+  isEmailUnconfigured,
 }));
 
 vi.mock("@ee/audit-log/auditLog", () => ({
@@ -63,6 +66,7 @@ describe("auth router without an email provider", () => {
     vi.clearAllMocks();
     _resetMemoryRateLimitStore();
     hasEmailProvider.mockReturnValue(false);
+    isEmailUnconfigured.mockReturnValue(true);
     route.mockResolvedValue({
       outcome: "sign_up",
       methodSet: [],
@@ -112,10 +116,27 @@ describe("auth router without an email provider", () => {
 
     it("mails the link as before once a provider is configured", async () => {
       hasEmailProvider.mockReturnValue(true);
+      isEmailUnconfigured.mockReturnValue(false);
 
       await expect(
         signedOut().requestSignUpVerification({ email: "sam@acme.com" }),
       ).resolves.toEqual({ sent: true });
+      expect(requestVerification).toHaveBeenCalledWith({
+        email: "sam@acme.com",
+      });
+      expect(issueUnconfirmedAddressProof).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a provider is named but unusable", () => {
+    /** @scenario "A misconfigured email provider keeps sign-up on the mailed link" */
+    it("tries the mailed link instead of issuing an unconfirmed proof", async () => {
+      isEmailUnconfigured.mockReturnValue(false);
+      requestVerification.mockRejectedValue(new Error("provider unusable"));
+
+      await expect(
+        signedOut().requestSignUpVerification({ email: "sam@acme.com" }),
+      ).rejects.toThrow();
       expect(requestVerification).toHaveBeenCalledWith({
         email: "sam@acme.com",
       });

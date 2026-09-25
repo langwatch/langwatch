@@ -47,6 +47,7 @@ vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
 vi.mock("~/server/mailer/providers", async (importOriginal) => ({
   ...(await importOriginal<typeof import("~/server/mailer/providers")>()),
   hasEmailProvider: () => true,
+  isEmailUnconfigured: () => false,
 }));
 
 /**

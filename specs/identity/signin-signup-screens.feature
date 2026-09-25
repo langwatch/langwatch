@@ -275,7 +275,7 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   # The link proves the address but does not choose or create a credential.
   # Its proof is bound to the address and may be consumed only once by the
   # account-creation boundary.
-  @integration @e2e
+  @integration
   Scenario: Opening the link unlocks credential choice
     Given I asked to sign up and have not opened the confirmation link
     When I open the link
@@ -313,7 +313,7 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   # precedes the account and credential writes; those writes are not one
   # cross-resource transaction. If enrollment then fails, recovery starts
   # with a fresh email proof rather than replaying the claimed one.
-  @unit @e2e
+  @unit
   Scenario: Signing up with a passkey consumes the verified address proof
     Given I returned with a valid proof for an address that has no account
     When I create a passkey instead of choosing a password
@@ -361,7 +361,7 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   # revision 2026-09-25). Sign-up there enrolls a password and leaves the
   # address unconfirmed, so domain join requests and OAuth account linking,
   # which require a confirmed address, stay closed for that account.
-  @unit @integration
+  @unit @integration @e2e
   Scenario: An installation that cannot send email signs up with a password and leaves the address unconfirmed
     Given the installation has no email provider configured
     When I start sign-up with my email
@@ -371,6 +371,16 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     When I choose a password
     Then my account is created with its address unconfirmed
     And I am signed in
+
+  # A provider that is named but unusable (a mistyped EMAIL_PROVIDER, a
+  # missing credential) is a misconfiguration: sign-up keeps asking for the
+  # mailed link and fails loudly rather than skipping address confirmation.
+  @unit
+  Scenario: A misconfigured email provider keeps sign-up on the mailed link
+    Given the installation names an email provider it cannot use
+    When I start sign-up with my email
+    Then no unconfirmed address proof is issued
+    And the confirmation link is attempted through the provider
 
   @unit
   Scenario: An unconfirmed address proof is refused once the installation can send email

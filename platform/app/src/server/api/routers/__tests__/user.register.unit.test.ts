@@ -57,6 +57,7 @@ const { hasEmailProviderMock } = vi.hoisted(() => ({
 vi.mock("~/server/mailer/providers", async (importOriginal) => ({
   ...(await importOriginal<typeof import("~/server/mailer/providers")>()),
   hasEmailProvider: hasEmailProviderMock,
+  isEmailUnconfigured: () => !hasEmailProviderMock(),
 }));
 const { registerMock } = vi.hoisted(() => ({
   registerMock: vi.fn(),

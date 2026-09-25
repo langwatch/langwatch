@@ -2,7 +2,7 @@ import { test as setup, expect } from "@playwright/test";
 import path from "path";
 import fs from "fs";
 import { closeDb, findUserIdByEmail } from "./front-door/db";
-import { requestSignUpAddressProof } from "./front-door/steps";
+import { registerConfirmedAccount } from "./front-door/steps";
 
 const AUTH_DIR = path.join(__dirname, "..", ".auth");
 const AUTH_FILE = path.join(AUTH_DIR, "user.json");
@@ -35,30 +35,7 @@ setup("authenticate", async ({ page, request }) => {
   try {
     const existingUserId = await findUserIdByEmail(TEST_USER.email);
     if (existingUserId === null) {
-      const addressProof = await requestSignUpAddressProof(
-        request,
-        TEST_USER.email,
-      );
-      const registerResponse = await request.post(
-        "/api/trpc/user.register?batch=1",
-        {
-          data: {
-            "0": {
-              json: {
-                name: TEST_USER.name,
-                email: TEST_USER.email,
-                password: TEST_USER.password,
-                addressProof,
-              },
-            },
-          },
-        },
-      );
-      if (!registerResponse.ok()) {
-        throw new Error(
-          `Test user registration failed (${registerResponse.status()}): ${(await registerResponse.text()).slice(0, 500)}`,
-        );
-      }
+      await registerConfirmedAccount(request, TEST_USER);
       console.log("Test user created successfully");
     } else {
       console.log("Test user already exists, proceeding with log in");

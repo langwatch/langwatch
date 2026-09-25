@@ -21,15 +21,13 @@
  */
 import {
   type APIRequestContext,
-  type APIResponse,
   expect,
   type Page,
-  type Response as PlaywrightResponse,
   test,
 } from "@playwright/test";
 import { z } from "zod";
 import { getProjectSlug } from "../helpers";
-import { findSignUpVerificationToken } from "./db";
+import { confirmAddressOf, findSignUpVerificationToken } from "./db";
 
 export const FRONT_DOOR_PASSWORD = "FrontDoorTest123!";
 
@@ -112,11 +110,9 @@ export async function whenIChooseAPasskeyToFinishSigningUp(
 }
 
 /**
- * Reads the confirmation link's token straight out of Postgres — CI has no
- * mail provider, so there is no inbox to read it from (see `db.ts`'s header
- * for the full coupling). Polls briefly: the token row and the response that
- * put "check your email" on screen are two separate things, and the row can
- * lag the render by a beat under load.
+ * Reads the confirmation link's token straight out of Postgres, the way a
+ * person would read it from their inbox. Polls briefly: the token row can lag
+ * the response that issued it by a beat under load.
  */
 export async function findSignUpTokenFor(email: string): Promise<string> {
   const deadline = Date.now() + 10000;
@@ -132,47 +128,18 @@ export async function findSignUpTokenFor(email: string): Promise<string> {
   }
 }
 
-/**
- * Asks production to issue a link, then reads the token CI cannot receive by
- * email. A missing mail provider makes the HTTP call fail after persistence;
- * observing the row distinguishes that expected delivery failure from a
- * failure to issue the link.
- */
-export async function requestSignUpVerificationToken(
-  request: APIRequestContext,
-  email: string,
-): Promise<string> {
-  const response = await request.post(
-    "/api/trpc/auth.requestSignUpVerification?batch=1",
-    { data: { "0": { json: { email } } } },
-  );
-  return await signUpVerificationTokenAfterResponse(response, email);
-}
-
-const emailDeliveryIsUnconfigured = (): boolean =>
-  !process.env.EMAIL_PROVIDER &&
-  !(process.env.USE_AWS_SES === "true" && process.env.AWS_REGION) &&
-  !process.env.SENDGRID_API_KEY &&
-  !process.env.SMTP_URL &&
-  !process.env.SMTP_HOST &&
-  !process.env.RESEND_API_KEY;
-
-/** Validates the request before returning the token it persisted. */
-export async function signUpVerificationTokenAfterResponse(
-  response: APIResponse | PlaywrightResponse,
-  email: string,
-): Promise<string> {
-  const responseBody = response.ok() ? "" : await response.text();
-  const expectedDeliveryFailure =
-    response.status() === 500 && emailDeliveryIsUnconfigured();
-  if (!response.ok() && !expectedDeliveryFailure) {
-    throw new Error(
-      `requestSignUpVerification failed for ${email}: ${response.status()} ${responseBody.slice(0, 300)}`,
-    );
-  }
-
-  return await findSignUpTokenFor(email);
-}
+const signUpVerificationBodySchema = z.array(
+  z.object({
+    result: z.object({
+      data: z.object({
+        json: z.union([
+          z.object({ sent: z.literal(false), addressProof: z.string().min(1) }),
+          z.object({ sent: z.literal(true) }),
+        ]),
+      }),
+    }),
+  }),
+);
 
 const confirmedAddressSchema = z.object({
   addressProof: z.string().min(1),
@@ -180,16 +147,30 @@ const confirmedAddressSchema = z.object({
 });
 
 /**
- * Proves a fresh address through the same public endpoints as the sign-up UI.
- * CI has no inbox, so the token is read through `findSignUpTokenFor`; the
- * token is still minted, spent and exchanged for its single-use address proof
- * by production code.
+ * An address proof for `email` through the same public endpoints as the
+ * sign-up UI. An installation with no email answers with an unconfirmed proof
+ * directly; otherwise the mailed link's token is read from Postgres and
+ * exchanged for its single-use proof.
  */
 export async function requestSignUpAddressProof(
   request: APIRequestContext,
   email: string,
 ): Promise<string> {
-  const token = await requestSignUpVerificationToken(request, email);
+  const response = await request.post(
+    "/api/trpc/auth.requestSignUpVerification?batch=1",
+    { data: { "0": { json: { email } } } },
+  );
+  const body: unknown = await response.json().catch(() => null);
+  const parsed = signUpVerificationBodySchema.safeParse(body);
+  if (!response.ok() || !parsed.success) {
+    throw new Error(
+      `requestSignUpVerification failed for ${email}: ${response.status()} ${JSON.stringify(body).slice(0, 300)}`,
+    );
+  }
+  const answer = parsed.data[0]!.result.data.json;
+  if (!answer.sent) return answer.addressProof;
+
+  const token = await findSignUpTokenFor(email);
   const confirmationResponse = await request.post(
     "/api/auth/sign-up/confirm-address",
     {
@@ -215,40 +196,39 @@ export async function requestSignUpAddressProof(
 }
 
 /**
- * Opens the confirmation link for `email` — read from Postgres, not from an
- * inbox (see `findSignUpTokenFor`) — the way a person clicking it would.
+ * Registers `email` with `password` and leaves its address confirmed. CI has
+ * no inbox, so the confirmation a link would carry is written directly.
  */
-export async function whenIOpenTheConfirmationLinkFor(
-  page: Page,
-  email: string,
+export async function registerConfirmedAccount(
+  request: APIRequestContext,
+  { email, password, name }: { email: string; password: string; name?: string },
 ): Promise<void> {
-  const token = await findSignUpTokenFor(email);
-  await page.goto(`/auth/signup?verify=${encodeURIComponent(token)}`);
+  const addressProof = await requestSignUpAddressProof(request, email);
+  const response = await request.post("/api/trpc/user.register?batch=1", {
+    data: {
+      "0": {
+        json: { addressProof, email, password, ...(name ? { name } : {}) },
+      },
+    },
+  });
+  if (!response.ok()) {
+    throw new Error(
+      `user.register failed for ${email}: ${response.status()} ${(await response.text()).slice(0, 300)}`,
+    );
+  }
+  await confirmAddressOf(email);
 }
 
 /**
- * Bug-bash finding #1 / #11: opening the link signs the person straight in —
- * no passkey error, no second password prompt — and lands them past the
- * sign-up screen. Bound to "Opening the link is what signs me in for the
- * first time" (signin-signup-screens.feature).
- *
- * The screen's "You're in" handoff card (`signed-in-handoff`) is set in the
- * same tick as the `hardRedirect` that leaves the page
- * (`VerificationFirstSignUp.tsx`), so against a local prod build the browser
- * is often already on the next page before the card is ever painted. It is
- * not a dependable observable, and the component test already pins it. What
- * this step asserts instead is what the person actually gets: the browser
- * leaves /auth/signup on its own, the session behind it belongs to `email`,
- * and nothing on the way asked for a password or a passkey.
+ * Finishing sign-up signs the person straight in: the browser leaves
+ * /auth/signup on its own (the "You're in" card is set in the same tick as the
+ * redirect, so it is not a dependable observable), the session belongs to
+ * `email`, and nothing on the way asked for a second credential.
  */
-export async function thenTheLinkSignsMeInWithNoSecondPrompt(
+export async function thenIAmSignedInWithNoSecondPrompt(
   page: Page,
   email: string,
 ): Promise<void> {
-  // The handoff is a real `hardRedirect`, so the browser leaves /auth/signup
-  // entirely rather than the screen quietly re-rendering in place. Had the
-  // link opened no session, the screen would have stayed put and offered a
-  // way in (`AccountIsReady` / `MethodChoice`) — so leaving IS the sign-in.
   await page.waitForURL((url) => !url.pathname.startsWith("/auth/signup"), {
     timeout: 15000,
   });
@@ -468,12 +448,9 @@ function escapeRegExp(value: string): string {
 // =============================================================================
 
 /**
- * Registers a fresh account directly (no UI), after proving its address
- * through the same confirmation endpoint as the sign-up screen.
- * No `name` is sent — `user.register`'s schema treats it as optional rather
- * than nullable (`z.string().min(1).optional()`, so an empty string would be
- * REFUSED, not accepted), and omitting it is exactly the shape a passkey or
- * front-door sign-up leaves behind, which is what finding #6 needs.
+ * Registers a fresh account directly (no UI) with a confirmed address.
+ * No `name` is sent: omitting it is exactly the shape a passkey or front-door
+ * sign-up leaves behind, which is what finding #6 needs.
  */
 export async function givenARegisteredAccount(
   page: Page,
@@ -482,17 +459,7 @@ export async function givenARegisteredAccount(
     password = FRONT_DOOR_PASSWORD,
   }: { email: string; password?: string },
 ): Promise<void> {
-  const addressProof = await requestSignUpAddressProof(page.request, email);
-  const response = await page.request.post("/api/trpc/user.register?batch=1", {
-    data: {
-      "0": { json: { addressProof, email, password } },
-    },
-  });
-  if (!response.ok()) {
-    throw new Error(
-      `user.register failed for ${email}: ${response.status()} ${(await response.text()).slice(0, 300)}`,
-    );
-  }
+  await registerConfirmedAccount(page.request, { email, password });
 }
 
 /** Opens the sign-in screen's address step. */

@@ -39,7 +39,7 @@ import { Auth0ApiError } from "~/server/auth0/passwordService";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
 import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRequestEmail";
-import { hasEmailProvider } from "~/server/mailer/providers";
+import { isEmailUnconfigured } from "~/server/mailer/providers";
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 import { rateLimit } from "~/server/rateLimit";
@@ -198,7 +198,7 @@ async function claimSignUpProof(proof: {
   const verification = signUpVerification();
   if (await verification.claimAddressProof(proof)) return true;
   if (
-    !hasEmailProvider() &&
+    isEmailUnconfigured() &&
     (await verification.claimUnconfirmedAddressProof(proof))
   ) {
     return false;

@@ -99,6 +99,26 @@ export async function findUserIdByEmail(email: string): Promise<string | null> {
   return result.rows[0]?.id ?? null;
 }
 
+/**
+ * Marks the address of the account under `email` confirmed, which is what
+ * opening its confirmation link would do on an installation that sends email.
+ */
+export async function confirmAddressOf(email: string): Promise<void> {
+  await getPool().query(
+    `UPDATE "User" SET "emailVerified" = true WHERE email = $1`,
+    [email],
+  );
+}
+
+/** Whether the account under `email` has a confirmed address. */
+export async function isAddressConfirmed(email: string): Promise<boolean> {
+  const result = await getPool().query<{ emailVerified: boolean }>(
+    `SELECT "emailVerified" FROM "User" WHERE email = $1 LIMIT 1`,
+    [email],
+  );
+  return result.rows[0]?.emailVerified === true;
+}
+
 /** Closes the pool. Call once, from a suite-level `afterAll`. */
 export async function closeDb(): Promise<void> {
   await pool?.end();

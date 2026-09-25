@@ -28,7 +28,10 @@ import {
   resolveInviteDisplayStatus,
 } from "~/server/invites/invite.service";
 import { buildMembersSettingsUrl } from "~/server/invites/invite-link";
-import { hasEmailProvider } from "~/server/mailer/providers";
+import {
+  hasEmailProvider,
+  isEmailUnconfigured,
+} from "~/server/mailer/providers";
 import { rateLimit } from "~/server/rateLimit";
 import { EmailAlreadyRegisteredError } from "~/server/users/errors";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
@@ -84,11 +87,11 @@ export const authRouter = createTRPCRouter({
         return localSignUpDecision(input.email);
       }
 
-      // An unconfirmed proof counts only while the installation still cannot
-      // send email, and it never enrolls a passkey (passkey sign-up requires
-      // a confirmed proof).
+      // An unconfirmed proof counts only while the installation still has no
+      // email configured, and it never enrolls a passkey (passkey sign-up
+      // requires a confirmed proof).
       if (
-        !hasEmailProvider() &&
+        isEmailUnconfigured() &&
         (await verification.validateUnconfirmedAddressProof(proof))
       ) {
         const decision = await localSignUpDecision(input.email);
@@ -240,11 +243,11 @@ export const authRouter = createTRPCRouter({
       }
 
       const verification = signUpVerification();
-      const canSendEmail = hasEmailProvider();
+      const withoutEmail = isEmailUnconfigured();
       const state = await verification.addressState({ email: input.email });
       // Without email there is no link to wait for, so an unconfirmed account
       // is not mid-sign-up: it is an account, and the way on is to log in.
-      if (state === "confirmed" || (!canSendEmail && state !== "unknown")) {
+      if (state === "confirmed" || (withoutEmail && state !== "unknown")) {
         throw new EmailAlreadyRegisteredError();
       }
 
@@ -264,10 +267,10 @@ export const authRouter = createTRPCRouter({
         });
       }
 
-      // Nothing can prove the address on an installation that cannot send
-      // email, so the screen gets an unconfirmed proof and enrolls a password
-      // with the address left unconfirmed (ADR-117, revision 2026-09-25).
-      if (!canSendEmail) {
+      // Nothing can prove the address on an installation with no email
+      // configured, so the screen gets an unconfirmed proof and enrolls a
+      // password with the address left unconfirmed (ADR-117, rev 2026-09-25).
+      if (withoutEmail) {
         return {
           sent: false as const,
           addressProof: await verification.issueUnconfirmedAddressProof({
