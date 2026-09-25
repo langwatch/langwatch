@@ -2,9 +2,9 @@
  * @see specs/features/agents/voice-phone.feature
  */
 
-import type { ChildProcess } from "node:child_process";
+import { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
-import type { Socket } from "node:net";
+import { Socket } from "node:net";
 
 import { describe, expect, it, vi } from "vitest";
 
@@ -78,7 +78,7 @@ describe("createVoiceSocketReceiver", () => {
       const handler = vi.fn();
       receiver.onVoiceSocket(handler);
 
-      const socket = { id: "sock" } as unknown as Socket;
+      const socket = new Socket();
       proc.emit("message", message(), socket);
 
       expect(handler).toHaveBeenCalledTimes(1);
@@ -118,11 +118,11 @@ describe("createVoiceSocketReceiver", () => {
 
 describe("handOffVoiceSocket", () => {
   it("rejects when the child has no IPC channel", async () => {
-    const child = {} as unknown as ChildProcess; // no send
+    const child = new ChildProcess(); // no IPC channel, so no send
     await expect(
       handOffVoiceSocket({
         child,
-        socket: {} as unknown as Socket,
+        socket: new Socket(),
         nonce: "abc",
         url: "/twilio/abc",
         method: "GET",
@@ -137,8 +137,8 @@ describe("handOffVoiceSocket", () => {
       cb(null);
       return true;
     });
-    const child = { send } as unknown as ChildProcess;
-    const socket = { id: "sock" } as unknown as Socket;
+    const child = Object.assign(new ChildProcess(), { send });
+    const socket = new Socket();
 
     await handOffVoiceSocket({
       child,

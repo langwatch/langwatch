@@ -54,15 +54,15 @@ import {
 import type { Instant } from "@langwatch/time";
 import type { Cluster, Redis } from "ioredis";
 
+import {
+  buildSuiteRunProcessingPipeline,
+  type SuiteRunProcessingPipeline,
+} from "../eventing/suite-run-processing.pipeline.ts";
 import { ClickhouseSuiteEventingRepository } from "../repositories/clickhouse/clickhouse.suite-eventing.repository.ts";
 import { RedisSuiteRunProcessingRepository } from "../repositories/redis/redis.suite-run-processing.repository.ts";
 import type { SuiteRepositories } from "../repositories/suite.repositories.ts";
 import { suitePlatformUrl } from "../rules/suite-platform-url.rules.ts";
 import { SuiteRunItemCommandsService } from "../services/suite-run-item-commands.service.ts";
-import {
-  SuiteRunProcessingPipelineAdapter,
-  type SuiteRunProcessingPipeline,
-} from "../services/suite-run-processing.service.ts";
 import { SuiteService } from "../services/suite.service.ts";
 import {
   buildSuiteInfrastructure,
@@ -176,7 +176,7 @@ export class SuiteApp implements SuiteApi {
           SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
         );
 
-    return SuiteRunProcessingPipelineAdapter.create({ suiteRunStateFoldStore });
+    return buildSuiteRunProcessingPipeline({ suiteRunStateFoldStore });
   }
 
   // Test-only construction with overridable collaborators and in-memory run projection.

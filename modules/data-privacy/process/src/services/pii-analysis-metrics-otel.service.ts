@@ -17,9 +17,9 @@ export const PII_ANALYSIS_STATUS_METRIC_NAME = "evaluation_status_counter";
 export const PII_ANALYSIS_EVALUATOR_TYPE = "presidio/pii_detection";
 
 /** External PII analysis counts and durations, pushed over OTLP. */
-export class OtelPiiAnalysisMetricsAdapter implements PiiAnalysisMetrics {
-  static create(): OtelPiiAnalysisMetricsAdapter {
-    return new OtelPiiAnalysisMetricsAdapter(
+export class PiiAnalysisMetricsOtelService implements PiiAnalysisMetrics {
+  static create(): PiiAnalysisMetricsOtelService {
+    return new PiiAnalysisMetricsOtelService(
       counter({
         name: PII_CHECKS_METRIC_NAME,
         description: "Number of PII checks for the given method",

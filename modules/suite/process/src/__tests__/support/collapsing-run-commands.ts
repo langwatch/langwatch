@@ -6,7 +6,7 @@
 import type { StartSuiteRunCommandData } from "@langwatch/suite-contract";
 
 import type { QueueSimulationRunCommandData, SuiteRunCommands } from "../../app/suite.app.ts";
-import { StartSuiteRunCommand } from "../../services/suite-run-commands.service.ts";
+import { StartSuiteRunCommand } from "../../eventing/suite-run.commands.ts";
 
 export class CollapsingRunCommands implements SuiteRunCommands {
   /** The suite runs on record — one per distinct run, however often retried. */

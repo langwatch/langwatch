@@ -11,6 +11,8 @@ export interface CallLimitTimer {
   clear(): void;
 }
 
+type TimerHandle = NodeJS.Timeout;
+
 export function createCallLimitTimer({
   maxCallSeconds,
   onLimit,
@@ -19,8 +21,8 @@ export function createCallLimitTimer({
 }: {
   maxCallSeconds: number;
   onLimit: () => void;
-  setTimer?: typeof setTimeout;
-  clearTimer?: typeof clearTimeout;
+  setTimer?: (callback: () => void, ms: number) => TimerHandle;
+  clearTimer?: (handle: TimerHandle) => void;
 }): CallLimitTimer {
   let cut = false;
   const handle = setTimer(() => {

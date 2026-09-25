@@ -4,6 +4,11 @@ import type { ScheduledJobFire } from "@langwatch/eventing/server";
 import { defineServerModule } from "@langwatch/kernel";
 import type { TraceListItem } from "@langwatch/trace-contract";
 
+import {
+  composeAutomationGraphActivity,
+  composeAutomationGraphDelivery,
+  type AutomationGraphActivityDatabase,
+} from "./app/automation-graph-composition.build.ts";
 import { AutomationApp } from "./app/automation.app.ts";
 import type {
   AutomationClock,
@@ -25,11 +30,6 @@ import type { AutomationSettlementLedgerRepository } from "./repositories/automa
 import type { AutomationTraceTriggerCatalogueRepository } from "./repositories/automation-trace-trigger-catalogue.repository.ts";
 import type { CustomGraphRepository } from "./repositories/custom-graph.repository.ts";
 import type { GraphTriggerSentRepository } from "./repositories/graph-trigger-sent.repository.ts";
-import {
-  PostgresAutomationGraphActivityAdapter,
-  type AutomationGraphActivityDatabase,
-} from "./repositories/prisma/prisma.automation-graph-activity.repository.ts";
-import { PostgresAutomationGraphDeliveryAdapter } from "./repositories/prisma/prisma.automation-graph-delivery.repository.ts";
 import { PrismaAutomationSettlementLedgerRepository } from "./repositories/prisma/prisma.automation-settlement-ledger.repository.ts";
 import type { AutomationTraceTriggerCatalogueDatabase } from "./repositories/prisma/prisma.automation-trace-trigger-catalogue.repository.ts";
 import { PrismaAutomationTraceTriggerCatalogueRepository } from "./repositories/prisma/prisma.automation-trace-trigger-catalogue.repository.ts";
@@ -180,7 +180,7 @@ export function createAutomationGraphActivity(input: {
   emailHourlyCap: number;
   tenantDailyCap: number;
 }): AutomationGraphActivity {
-  return PostgresAutomationGraphActivityAdapter.create(input);
+  return composeAutomationGraphActivity(input);
 }
 
 /**
@@ -252,7 +252,7 @@ export function createAutomationReportCalendar(input: {
   // The SAME suppression read a graph alert filters its recipients through: an
   // unsubscribe one half of this feature honoured and the other ignored is a
   // customer who unsubscribed and still gets mail.
-  const graphDelivery = PostgresAutomationGraphDeliveryAdapter.create({ database, clock });
+  const graphDelivery = composeAutomationGraphDelivery({ database, clock });
 
   const deps: ReportDispatchDeps = {
     findTrigger: ({ projectId, triggerId }) => triggers.findById({ triggerId, projectId }),

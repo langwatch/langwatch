@@ -2,14 +2,14 @@
  * @see specs/features/agents/voice-phone.feature
  */
 
-import type { ChildProcess } from "node:child_process";
+import { ChildProcess } from "node:child_process";
 
 import { describe, expect, it } from "vitest";
 
 import { VoiceNonceRegistry } from "../voice-nonce-registry.ts";
 
 /** A stand-in child; the registry only stores and returns the reference. */
-const fakeChild = { pid: 123 } as unknown as ChildProcess;
+const fakeChild = new ChildProcess();
 
 describe("VoiceNonceRegistry", () => {
   describe("given a registered nonce", () => {

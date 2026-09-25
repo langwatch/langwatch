@@ -4,9 +4,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import { RedisSuiteRunProcessingRepository } from "../../repositories/redis/redis.suite-run-processing.repository.ts";
 import {
-  SuiteRunProcessingPipelineAdapter,
+  buildSuiteRunProcessingPipeline,
   type SuiteRunProcessingPipeline,
-} from "../suite-run-processing.service.ts";
+} from "../suite-run-processing.pipeline.ts";
 
 /**
  * The replication-lag floor `RedisCachedFoldStore` clamps every TTL up to.
@@ -59,7 +59,7 @@ function compose(
       ? {}
       : { foldCacheTtlSeconds: options.foldCacheTtlSeconds }),
   }).buildRunStateFoldStore();
-  const pipeline: SuiteRunProcessingPipeline = SuiteRunProcessingPipelineAdapter.create({
+  const pipeline: SuiteRunProcessingPipeline = buildSuiteRunProcessingPipeline({
     suiteRunStateFoldStore,
   });
 

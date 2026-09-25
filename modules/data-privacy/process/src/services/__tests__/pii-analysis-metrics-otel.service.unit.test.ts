@@ -2,12 +2,12 @@ import { createRecordingMeterProvider } from "@langwatch/observability/metrics/t
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
-  OtelPiiAnalysisMetricsAdapter,
+  PiiAnalysisMetricsOtelService,
   PII_ANALYSIS_DURATION_METRIC_NAME,
   PII_ANALYSIS_EVALUATOR_TYPE,
   PII_ANALYSIS_STATUS_METRIC_NAME,
   PII_CHECKS_METRIC_NAME,
-} from "../otel-pii-analysis-metrics.service.ts";
+} from "../pii-analysis-metrics-otel.service.ts";
 
 /**
  * Spec: modules/data-privacy/specs/span-pii-redaction.feature. Names and
@@ -30,7 +30,7 @@ describe("given the PII analysis metrics pushed over OTLP", () => {
 
   /** @scenario "An operator can see the analysis calls from either process" */
   it("counts one analysis call per method, under the method label", () => {
-    const adapter = OtelPiiAnalysisMetricsAdapter.create();
+    const adapter = PiiAnalysisMetricsOtelService.create();
 
     adapter.analysisCalled("presidio");
     adapter.analysisCalled("presidio");
@@ -42,7 +42,7 @@ describe("given the PII analysis metrics pushed over OTLP", () => {
 
   /** @scenario "An operator can see the analysis calls from either process" */
   it("observes the batch duration under the evaluator label the App uses", () => {
-    OtelPiiAnalysisMetricsAdapter.create().analysisObserved(42);
+    PiiAnalysisMetricsOtelService.create().analysisObserved(42);
 
     expect(
       metrics.valuesOf("evaluation_duration_milliseconds", {
@@ -53,7 +53,7 @@ describe("given the PII analysis metrics pushed over OTLP", () => {
 
   /** @scenario "An operator can see the analysis calls from either process" */
   it("counts each outcome separately, so an all-error batch cannot read as load", () => {
-    const adapter = OtelPiiAnalysisMetricsAdapter.create();
+    const adapter = PiiAnalysisMetricsOtelService.create();
 
     adapter.analysisFinished("processed");
     adapter.analysisFinished("error");

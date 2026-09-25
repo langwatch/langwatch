@@ -80,17 +80,3 @@ export const CompleteSuiteRunItemCommand = defineCommand({
   }),
   makeJobId: (d) => `${d.tenantId}:${d.batchRunId}:${d.scenarioRunId}:itemCompleted`,
 });
-
-/** The suite-run-processing commands, named so a pipeline can hold them. */
-export class SuiteRunCommandsAdapter {
-  static create(): SuiteRunCommandsAdapter {
-    return new SuiteRunCommandsAdapter();
-  }
-
-  readonly startSuiteRun = StartSuiteRunCommand;
-  readonly recordSuiteRunItemStarted = RecordSuiteRunItemStartedCommand;
-  readonly completeSuiteRunItem = CompleteSuiteRunItemCommand;
-  readonly regradeSuiteRunItem = RegradeSuiteRunItemCommand;
-
-  private constructor() {}
-}

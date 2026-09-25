@@ -33,9 +33,9 @@ import { DataPrivacyScopeAuthorizationService } from "../services/data-privacy-s
 import { DataPrivacySnapshotService } from "../services/data-privacy-snapshot.service.ts";
 import { DataPrivacyService } from "../services/data-privacy.service.ts";
 import { GoogleDlpRedactionService } from "../services/google-dlp-redaction.service.ts";
-import { OtelPiiAnalysisMetricsAdapter } from "../services/otel-pii-analysis-metrics.service.ts";
 import { OtlpSpanContentDropService } from "../services/otlp-span-content-drop.service.ts";
 import { OtlpSpanPiiRedactionService } from "../services/otlp-span-pii-redaction.service.ts";
+import { PiiAnalysisMetricsOtelService } from "../services/pii-analysis-metrics-otel.service.ts";
 import { PiiAnalysisService } from "../services/pii-analysis.service.ts";
 import { PresidioRedactionService } from "../services/presidio-redaction.service.ts";
 
@@ -158,7 +158,7 @@ export class DataPrivacyApp implements DataPrivacyApi {
           build(credential),
     );
     const members = supplied.dataPrivacy;
-    const metrics = OtelPiiAnalysisMetricsAdapter.create();
+    const metrics = PiiAnalysisMetricsOtelService.create();
     const presidio = PresidioRedactionService.create({
       evaluation: dependencies.evaluation,
       metrics,

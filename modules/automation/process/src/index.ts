@@ -9,7 +9,6 @@ export {
   createAutomationTriggers,
   createAutomationWebhookDeliveries,
 } from "./automation.server.ts";
-export { PostgresAutomationGraphDeliveryAdapter } from "./repositories/prisma/prisma.automation-graph-delivery.repository.ts";
 export { SlackWebhookDeliveryChannel } from "./channels/slack/slack.webhook-delivery.channel.ts";
 export type {
   RenderedSlackMessageRequest,
@@ -178,9 +177,10 @@ export type {
   AutomationProjectDirectory,
 } from "./app/automation.members.ts";
 export {
-  PostgresAutomationGraphActivityAdapter,
+  composeAutomationGraphActivity,
+  composeAutomationGraphDelivery,
   type AutomationGraphActivityDatabase,
-} from "./repositories/prisma/prisma.automation-graph-activity.repository.ts";
+} from "./app/automation-graph-composition.build.ts";
 export { AutomationTraceTriggerCatalogueRepository } from "./repositories/automation-trace-trigger-catalogue.repository.ts";
 export { type AutomationTraceTriggerCatalogueDatabase } from "./repositories/prisma/prisma.automation-trace-trigger-catalogue.repository.ts";
 export type { UnsubscribeTokenPayload } from "./services/unsubscribe-token.service.ts";
