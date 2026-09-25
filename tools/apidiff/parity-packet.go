@@ -93,7 +93,7 @@ func WriteParityTable(writer io.Writer, report ParityReport) error {
 		total.Extra += row.Extra
 	}
 	fmt.Fprintf(&output, "  %-28s %8d %9d %6d\n", total.Module, total.Missing, total.Breaking, total.Extra)
-	fmt.Fprintf(&output, "  rename candidates %d, namespace-move candidates %d, ruled owner moves %d\n", len(report.Trpc.Renamed), len(report.Trpc.Moved), len(report.Trpc.OwnerMoves))
+	fmt.Fprintf(&output, "  rename candidates %d, namespace-move candidates %d, ruled owner moves %d, ruled retired %d\n", len(report.Trpc.Renamed), len(report.Trpc.Moved), len(report.Trpc.OwnerMoves), len(report.Trpc.Retired))
 	for _, note := range report.Notes {
 		fmt.Fprintf(&output, "  note: %s\n", note)
 	}
@@ -131,6 +131,11 @@ func writeTrpcSections(output *strings.Builder, trpc TrpcParity, module string) 
 	writeSection(output, "Rename candidates", pairLines(trpc.Renamed, module))
 	writeSection(output, "Namespace-move candidates", pairLines(trpc.Moved, module))
 	writeSection(output, "Ruled owner moves, not defects", ownerMoveLines(trpc.OwnerMoves, module))
+	retired := []string{}
+	for _, gap := range filterGaps(trpc.Retired, module) {
+		retired = append(retired, fmt.Sprintf("- `%s` (%s) %s\n", gap.Path, gap.Kind, gap.Source))
+	}
+	writeSection(output, "Ruled retired, not defects", retired)
 	extra := []string{}
 	for _, gap := range filterGaps(trpc.Extra, module) {
 		extra = append(extra, fmt.Sprintf("- `%s` (%s) %s\n", gap.Path, gap.Kind, gap.Source))

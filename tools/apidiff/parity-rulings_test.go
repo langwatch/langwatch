@@ -144,3 +144,24 @@ func TestPacketsCountStatusDiffsWithoutListingThem(t *testing.T) {
 		}
 	}
 }
+
+func TestARuledProcedureMoveMatchesItsNewPath(t *testing.T) {
+	input := objectInput(map[string]any{"sessionId": stringProperty()}, "sessionId")
+	main := []Procedure{{Path: "tracesV2.codingAgentSession", Kind: "query", Input: input, Source: "main"}}
+	branch := []Procedure{{Path: "codingAgents.session", Kind: "query", Input: input, Source: "modules/coding-agent/contract/src/coding-agent.trpc.ts"}}
+	parity := DiffProcedures(main, branch, moduleFromSource)
+	if len(parity.Missing) != 0 || len(parity.Extra) != 0 {
+		t.Fatalf("missing = %+v, extra = %+v, want codingAgents.session matched", parity.Missing, parity.Extra)
+	}
+}
+
+func TestARetiredProcedureIsNotMissing(t *testing.T) {
+	main := []Procedure{{Path: "publicEnv", Kind: "query", Source: "platform/app/src/server/api/routers/publicEnv.ts"}}
+	parity := DiffProcedures(main, nil, moduleFromSource)
+	if len(parity.Missing) != 0 {
+		t.Fatalf("missing = %+v, want publicEnv retired", parity.Missing)
+	}
+	if len(parity.Retired) != 1 || parity.Retired[0].Path != "publicEnv" {
+		t.Errorf("retired = %+v, want publicEnv", parity.Retired)
+	}
+}

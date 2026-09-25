@@ -52,6 +52,7 @@ type TrpcParity struct {
 	Renamed     []ProcedurePair `json:"renameCandidates"`
 	Moved       []ProcedurePair `json:"namespaceMoveCandidates"`
 	OwnerMoves  []ProcedurePair `json:"ruledOwnerMoves"`
+	Retired     []ProcedureGap  `json:"ruledRetired"`
 }
 
 // acceptedNamespaceMoves are the tRPC namespace moves ruled to match main
@@ -59,6 +60,17 @@ type TrpcParity struct {
 // another module's namespace is settled by ownerMoves; a same-module rename
 // stays missing until the branch serves main's name.
 var acceptedNamespaceMoves = map[string]string{"tracesV2": "traces"}
+
+// acceptedProcedureMoves are single procedures ruled onto a new path: record
+// §3 (5bcdf4ee97) moved the coding-agent reads to their owner's namespace.
+var acceptedProcedureMoves = map[string]string{
+	"tracesV2.codingAgentSession":    "codingAgents.session",
+	"tracesV2.codingAgentTranscript": "codingAgents.transcript",
+}
+
+// retiredProcedures are main procedures ruled out of the branch (Alex,
+// 2026-09-25: the browser's public config is injected into the HTML).
+var retiredProcedures = map[string]bool{"publicEnv": true}
 
 // movedPath is where an accepted namespace move put a main procedure path.
 func movedPath(path string) (string, bool) {
@@ -82,21 +94,13 @@ func procedureIndex(procedures []Procedure) map[string]Procedure {
 // DiffProcedures compares the two manifests. moduleOf names the module that
 // owns a procedure path.
 func DiffProcedures(main, branch []Procedure, moduleOf func(Procedure) string) TrpcParity {
-	parity := TrpcParity{MainCount: len(main), BranchCount: len(branch), OwnerMoves: []ProcedurePair{}}
+	parity := TrpcParity{MainCount: len(main), BranchCount: len(branch), OwnerMoves: []ProcedurePair{}, Retired: []ProcedureGap{}}
 	mainIndex, branchIndex := procedureIndex(main), procedureIndex(branch)
 	matched := map[string]bool{}
+	comparison := procedureComparison{branchIndex: branchIndex, moduleOf: moduleOf}
 	for _, procedure := range main {
-		counterpart, ok := counterpartOf(procedure.Path, branchIndex)
-		if !ok {
-			parity.Missing = append(parity.Missing, gapOf(procedure, moduleOf))
-			continue
-		}
-		matched[counterpart.Path] = true
-		if changes := procedureChanges(procedure, counterpart); len(changes) > 0 {
-			parity.Breaking = append(parity.Breaking, ProcedureDiff{
-				Path: procedure.Path, Module: moduleOf(counterpart),
-				MainSource: procedure.Source, BranchSource: counterpart.Source, Changes: changes,
-			})
+		if counterpart, ok := comparison.file(&parity, procedure); ok {
+			matched[counterpart.Path] = true
 		}
 	}
 	for _, procedure := range branch {
@@ -109,6 +113,34 @@ func DiffProcedures(main, branch []Procedure, moduleOf func(Procedure) string) T
 	ownerMoves{mainIndex: mainIndex, branchIndex: branchIndex, moduleOf: moduleOf}.settle(&parity)
 	attributeUnowned(parity.Missing, append(append([]ProcedurePair{}, parity.Renamed...), parity.Moved...))
 	return parity
+}
+
+// procedureComparison files main procedures against the branch's.
+type procedureComparison struct {
+	branchIndex map[string]Procedure
+	moduleOf    func(Procedure) string
+}
+
+// file records one main procedure as retired, missing or breaking, and
+// answers the branch procedure serving it.
+func (comparison procedureComparison) file(parity *TrpcParity, procedure Procedure) (Procedure, bool) {
+	branchIndex, moduleOf := comparison.branchIndex, comparison.moduleOf
+	counterpart, ok := counterpartOf(procedure.Path, branchIndex)
+	switch {
+	case !ok && retiredProcedures[procedure.Path]:
+		parity.Retired = append(parity.Retired, gapOf(procedure, moduleOf))
+		return Procedure{}, false
+	case !ok:
+		parity.Missing = append(parity.Missing, gapOf(procedure, moduleOf))
+		return Procedure{}, false
+	}
+	if changes := procedureChanges(procedure, counterpart); len(changes) > 0 {
+		parity.Breaking = append(parity.Breaking, ProcedureDiff{
+			Path: procedure.Path, Module: moduleOf(counterpart),
+			MainSource: procedure.Source, BranchSource: counterpart.Source, Changes: changes,
+		})
+	}
+	return counterpart, true
 }
 
 // attributeUnowned hands a missing procedure no catalog module claims to the
@@ -135,6 +167,10 @@ func attributeUnowned(missing []ProcedureGap, pairs []ProcedurePair) {
 func counterpartOf(path string, branchIndex map[string]Procedure) (Procedure, bool) {
 	if counterpart, ok := branchIndex[path]; ok {
 		return counterpart, true
+	}
+	if ruled, isRuled := acceptedProcedureMoves[path]; isRuled {
+		counterpart, ok := branchIndex[ruled]
+		return counterpart, ok
 	}
 	moved, isMoved := movedPath(path)
 	if !isMoved {
