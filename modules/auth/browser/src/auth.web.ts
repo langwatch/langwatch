@@ -50,4 +50,8 @@ export const authWeb = defineWebModule("auth")
     /** Auth's half of a peer's host: a sign-in that names a connection, and
      *  one spelling for a sign-in code. */
     signIn: { load: () => import("./behavior/sign-in-capability.ts") },
+    /** The reader's own passkeys, for the personal workspace's security screen. */
+    passkeys: { load: () => import("./behavior/passkey-capability.ts") },
+    /** Setting two-step verification up, and fresh backup codes. */
+    twoStepVerification: { load: () => import("./behavior/two-step-capability.ts") },
   });

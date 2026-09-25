@@ -23,6 +23,8 @@ import {
   type PersonalRouteReading,
   type PersonalScope,
   type PersonalSuccessNotice,
+  type TwoStepAnswer,
+  type TwoStepSetup,
 } from "./model/personal-workspace-host.ts";
 import { CodingAgentHostBridge } from "./ui/sections/coding-agent-host-provider.tsx";
 
@@ -39,6 +41,12 @@ export type PersonalHostRecording = {
   )[];
   /** The providers a screen asked to link an additional sign-in method with. */
   linkedProviders: string[];
+  /** The two-step ceremonies a screen ran, and what it sent with each. */
+  twoStepCeremonies: (
+    | { kind: "start"; password?: string }
+    | { kind: "confirm"; code: string }
+    | { kind: "regenerate"; password?: string }
+  )[];
   /** How many times a screen asked for the signed-in reader to be re-read. */
   sessionRefreshes: number;
   queries: { next: PersonalQuery; replace: boolean }[];
@@ -111,6 +119,18 @@ export type FakePersonalHostOptions = {
   passkeyOutcome?: PasskeyOutcome;
   /** How the next attempt to link a sign-in method ends. */
   linkOutcome?: LinkSignInMethodOutcome;
+  /** How starting a setup ends: a setup link and two codes unless a test says otherwise. */
+  twoStepStart?: TwoStepAnswer<TwoStepSetup>;
+  /** How confirming a two-step setup ends. Confirmed unless a test says otherwise. */
+  twoStepConfirm?: TwoStepAnswer<{ confirmed: true }>;
+  /** How issuing fresh backup codes ends. Two new codes unless a test says otherwise. */
+  backupCodesRegeneration?: TwoStepAnswer<{ backupCodes: readonly string[] }>;
+};
+
+/** The setup a fake host starts, unless a test names another. */
+export const FAKE_TWO_STEP_SETUP: TwoStepSetup = {
+  setupUri: "otpauth://totp/LangWatch:carol@acme.example?secret=JBSWY3DPEHPK3PXP&issuer=LangWatch",
+  backupCodes: ["11111111", "22222222"],
 };
 
 export class FakePersonalWorkspaceHost extends PersonalWorkspaceHostApi {
@@ -121,6 +141,7 @@ export class FakePersonalWorkspaceHost extends PersonalWorkspaceHostApi {
         navigations: [],
         passkeyCeremonies: [],
         linkedProviders: [],
+        twoStepCeremonies: [],
         sessionRefreshes: 0,
         queries: [],
         successes: [],
@@ -260,6 +281,38 @@ export class FakePersonalWorkspaceHost extends PersonalWorkspaceHostApi {
   async linkSignInMethod(provider: string): Promise<LinkSignInMethodOutcome> {
     this.recording.linkedProviders.push(provider);
     return this.options.linkOutcome ?? { ok: true };
+  }
+
+  async startTwoStepSetup({
+    password,
+  }: {
+    password?: string;
+  }): Promise<TwoStepAnswer<TwoStepSetup>> {
+    this.recording.twoStepCeremonies.push({ kind: "start", password });
+    return this.options.twoStepStart ?? { ok: true, value: FAKE_TWO_STEP_SETUP };
+  }
+
+  async confirmTwoStepSetup({
+    code,
+  }: {
+    code: string;
+  }): Promise<TwoStepAnswer<{ confirmed: true }>> {
+    this.recording.twoStepCeremonies.push({ kind: "confirm", code });
+    return this.options.twoStepConfirm ?? { ok: true, value: { confirmed: true } };
+  }
+
+  async regenerateBackupCodes({
+    password,
+  }: {
+    password?: string;
+  }): Promise<TwoStepAnswer<{ backupCodes: readonly string[] }>> {
+    this.recording.twoStepCeremonies.push({ kind: "regenerate", password });
+    return (
+      this.options.backupCodesRegeneration ?? {
+        ok: true,
+        value: { backupCodes: ["33333333", "44444444"] },
+      }
+    );
   }
 
   canAskAssistant(): boolean {

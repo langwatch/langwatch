@@ -7,7 +7,7 @@
  */
 
 import type { TwoStepAccountStanding } from "@langwatch/identity-contract";
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakePersonalWorkspaceHost, renderWithPersonalWorkspaceHost } from "../../../testing.tsx";
@@ -164,11 +164,93 @@ describe("given acme requires two-step verification of sam", () => {
 });
 
 describe("given sam has not set two-step verification up", () => {
-  it("says it is off and offers no control it cannot honour", () => {
-    state.account = { ...state.account, enabled: false };
-    renderSection();
+  describe("when sam sets it up with the password, a code, and saves the codes", () => {
+    it("runs the setup through the lent ceremonies and says it is on", async () => {
+      state.account = { ...state.account, enabled: false };
+      const host = renderSection();
 
-    expect(screen.getByTestId("two-factor-empty")).toBeTruthy();
-    expect(screen.queryByRole("button")).toBeNull();
+      expect(screen.getByTestId("two-factor-empty")).toBeTruthy();
+      fireEvent.click(screen.getByTestId("set-up-two-factor"));
+      fireEvent.change(await screen.findByTestId("two-factor-password"), {
+        target: { value: "hunter2" },
+      });
+      fireEvent.click(screen.getByTestId("start-two-factor"));
+      fireEvent.change(await screen.findByTestId("two-factor-code"), {
+        target: { value: "123456" },
+      });
+      fireEvent.click(screen.getByTestId("confirm-two-factor"));
+      expect(await screen.findAllByTestId("two-factor-backup-code")).toHaveLength(2);
+      fireEvent.click(screen.getByTestId("backup-codes-done"));
+
+      await waitFor(() =>
+        expect(host.recording.successes).toEqual([{ title: "Two-step verification is on" }]),
+      );
+      expect(host.recording.twoStepCeremonies).toEqual([
+        { kind: "start", password: "hunter2" },
+        { kind: "confirm", code: "123456" },
+      ]);
+      expect(calls.invalidate).toHaveBeenCalled();
+    });
+  });
+
+  describe("when sam's account holds no password", () => {
+    it("starts the setup without asking for one", async () => {
+      state.account = { ...state.account, enabled: false };
+      state.hasPassword = false;
+      const host = renderSection();
+
+      fireEvent.click(screen.getByTestId("set-up-two-factor"));
+      fireEvent.click(await screen.findByTestId("start-two-factor"));
+
+      await screen.findByTestId("two-factor-setup");
+      expect(screen.queryByTestId("two-factor-password")).toBeNull();
+      expect(host.recording.twoStepCeremonies).toEqual([{ kind: "start", password: void 0 }]);
+    });
+  });
+
+  describe("when the code does not match", () => {
+    it("hands the refusal to the registry and stays on the scan step", async () => {
+      state.account = { ...state.account, enabled: false };
+      const refusal = { code: "identity_mfa_code_invalid", status: 400 };
+      const host = fakePersonalWorkspaceHost({ twoStepConfirm: { ok: false, error: refusal } });
+      renderWithPersonalWorkspaceHost(<TwoStepVerificationSection />, { host });
+
+      fireEvent.click(screen.getByTestId("set-up-two-factor"));
+      fireEvent.change(await screen.findByTestId("two-factor-password"), {
+        target: { value: "hunter2" },
+      });
+      fireEvent.click(screen.getByTestId("start-two-factor"));
+      fireEvent.change(await screen.findByTestId("two-factor-code"), {
+        target: { value: "000000" },
+      });
+      fireEvent.click(screen.getByTestId("confirm-two-factor"));
+
+      await waitFor(() =>
+        expect(host.recording.failures).toEqual([
+          { error: refusal, fallbackTitle: "That code didn't work" },
+        ]),
+      );
+      expect(screen.getByTestId("two-factor-setup")).toBeTruthy();
+    });
+  });
+});
+
+describe("given sam has two-step verification on", () => {
+  describe("when sam asks for new backup codes", () => {
+    it("confirms the password and shows the new set once", async () => {
+      const host = renderSection();
+
+      fireEvent.click(screen.getByTestId("regenerate-backup-codes"));
+      fireEvent.change(await screen.findByTestId("regenerate-password"), {
+        target: { value: "hunter2" },
+      });
+      fireEvent.click(screen.getByTestId("confirm-regenerate-backup-codes"));
+
+      const codes = await screen.findAllByTestId("two-factor-backup-code");
+      expect(codes.map((code) => code.textContent)).toEqual(["33333333", "44444444"]);
+      expect(host.recording.twoStepCeremonies).toEqual([
+        { kind: "regenerate", password: "hunter2" },
+      ]);
+    });
   });
 });

@@ -128,6 +128,12 @@ export type PasskeyOutcome =
 /** How an attempt to link an additional sign-in method ended. */
 export type LinkSignInMethodOutcome = { ok: true } | { ok: false; reason?: string };
 
+/** A two-step answer: the value, or the refusal `failed` reads by its code. */
+export type TwoStepAnswer<Value> = { ok: true; value: Value } | { ok: false; error: unknown };
+
+/** A started setup: the link the scannable code and the typed key both come from. */
+export type TwoStepSetup = { setupUri: string; backupCodes: readonly string[] };
+
 /**
  * The one thing a screen is handed. Methods rather than an object of loose
  * functions, so the adapter is a class the frontend feature constructs once,
@@ -197,6 +203,19 @@ export abstract class PersonalWorkspaceHostApi {
    * not the request failing — better-auth hands back an error string to show.
    */
   abstract linkSignInMethod(provider: string): Promise<LinkSignInMethodOutcome>;
+
+  // -- two-step verification ceremonies, lent by auth
+  // `password` is absent for an account that holds none; the server waives it.
+
+  abstract startTwoStepSetup(input: { password?: string }): Promise<TwoStepAnswer<TwoStepSetup>>;
+
+  abstract confirmTwoStepSetup(input: {
+    code: string;
+  }): Promise<TwoStepAnswer<{ confirmed: true }>>;
+
+  abstract regenerateBackupCodes(input: {
+    password?: string;
+  }): Promise<TwoStepAnswer<{ backupCodes: readonly string[] }>>;
 
   /**
    * Whether this reader can hand a question to the assistant. The gate is the

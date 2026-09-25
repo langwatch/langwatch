@@ -7,12 +7,26 @@ import { Badge, Box, Button, Card, HStack, Spacer, Spinner, Text, VStack } from 
 import { Smartphone } from "lucide-react";
 import { useState } from "react";
 
+import { useBackupCodesRegeneration } from "../../behavior/use-backup-codes-regeneration.ts";
 import { useTwoStepAccount } from "../../behavior/use-two-step-account.ts";
+import { RegenerateBackupCodesDialog } from "../blocks/regenerate-backup-codes-dialog.tsx";
 import { TurnOffTwoStepDialog } from "../blocks/turn-off-two-step-dialog.tsx";
+import { TwoStepDialogs } from "./two-step-dialogs.tsx";
+
+const NO_CODES: readonly string[] = [];
 
 export function TwoStepVerificationSection() {
   const twoStep = useTwoStepAccount();
   const [isTurningOff, setIsTurningOff] = useState(false);
+  const [isSettingUp, setIsSettingUp] = useState(false);
+  const [isAskingForCodes, setIsAskingForCodes] = useState(false);
+  const [regenerated, setRegenerated] = useState<readonly string[]>(NO_CODES);
+  const regeneration = useBackupCodesRegeneration({
+    onGenerated: (codes) => {
+      setIsAskingForCodes(false);
+      setRegenerated(codes);
+    },
+  });
 
   if (!twoStep.offered) return null;
 
@@ -41,7 +55,25 @@ export function TwoStepVerificationSection() {
       {!twoStep.loading && !twoStep.enabled ? (
         <Card.Root width="full" data-testid="two-factor-empty">
           <Card.Body>
-            <Text fontSize="sm">Two-step verification is off.</Text>
+            <HStack align="center" gap={3}>
+              <VStack align="start" gap={0} minWidth={0}>
+                <Text fontSize="sm" fontWeight={500}>
+                  Two-step verification is off
+                </Text>
+                <Text fontSize="xs" color="fg.muted">
+                  Setting it up takes a minute and an app on your phone that makes sign-in codes.
+                </Text>
+              </VStack>
+              <Spacer />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsSettingUp(true)}
+                data-testid="set-up-two-factor"
+              >
+                Set up two-step verification
+              </Button>
+            </HStack>
           </Card.Body>
         </Card.Root>
       ) : null}
@@ -63,7 +95,15 @@ export function TwoStepVerificationSection() {
                 </Text>
               </VStack>
               <Spacer />
-              <VStack align="end" gap={1}>
+              <HStack align="start" gap={2}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsAskingForCodes(true)}
+                  data-testid="regenerate-backup-codes"
+                >
+                  Get new backup codes
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -74,7 +114,7 @@ export function TwoStepVerificationSection() {
                 >
                   Turn off
                 </Button>
-              </VStack>
+              </HStack>
             </HStack>
             {held ? (
               <Text fontSize="xs" color="fg.muted" paddingTop={2} data-testid="two-factor-held-by">
@@ -93,6 +133,26 @@ export function TwoStepVerificationSection() {
         turningOff={twoStep.turningOff}
         onClose={() => setIsTurningOff(false)}
         onConfirm={twoStep.turnOff}
+      />
+
+      <RegenerateBackupCodesDialog
+        open={isAskingForCodes}
+        holdsPassword={twoStep.holdsPassword}
+        isGenerating={regeneration.isGenerating}
+        onClose={() => setIsAskingForCodes(false)}
+        onConfirm={(password) => void regeneration.regenerate(password)}
+      />
+
+      <TwoStepDialogs
+        isSettingUp={isSettingUp}
+        holdsPassword={twoStep.holdsPassword}
+        regenerated={regenerated}
+        onCloseSetup={() => setIsSettingUp(false)}
+        onFinishedSetup={() => {
+          setIsSettingUp(false);
+          twoStep.setUp();
+        }}
+        onCloseCodes={() => setRegenerated(NO_CODES)}
       />
     </VStack>
   );

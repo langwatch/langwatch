@@ -33,6 +33,12 @@ export function useTwoStepAccount() {
     [disableMutation, holdsPassword, host, utils],
   );
 
+  /** A setup just finished: say so, and read the standing again. */
+  const setUp = useCallback(() => {
+    host.succeeded({ title: "Two-step verification is on" });
+    void utils.twoStepVerification.account.invalidate();
+  }, [host, utils]);
+
   return {
     /** Whether this deployment offers two-step verification at all. */
     offered: account.data?.offered === true,
@@ -42,5 +48,6 @@ export function useTwoStepAccount() {
     holdsPassword,
     turningOff: disableMutation.isPending,
     turnOff,
+    setUp,
   };
 }

@@ -4,6 +4,7 @@
  * to its screens. ARCHITECTURE.md §10.1, "A capability travels by declaration".
  */
 
+import type { TimeInput } from "@langwatch/time";
 import type { ComponentType, ReactNode } from "react";
 
 /** A component a module declares, loaded the first time something draws it. */
@@ -93,6 +94,42 @@ export type UiSetupWithAgentButtonProps = {
   size?: "sm" | "md";
 };
 
+/** Operations a module declares, loaded the first time something calls one. */
+export type UiDeclaredOperations<Operations> = {
+  readonly load: () => Promise<{ readonly default: Operations }>;
+};
+/** How a device ceremony ended: `cancelled` is a dismissed prompt, not a refusal. */
+export type UiCeremonyOutcome =
+  | { ok: true }
+  | { ok: false; cancelled: true }
+  | { ok: false; cancelled: false };
+/** One passkey the reader holds, as auth lends it. */
+export type UiHeldPasskey = {
+  id: string;
+  name?: string | null;
+  createdAt: TimeInput;
+  transports?: string | null;
+};
+/** What auth lends the screen where a reader manages their own passkeys. */
+export type UiPasskeyCeremonies = {
+  list(): Promise<readonly UiHeldPasskey[]>;
+  register(): Promise<UiCeremonyOutcome>;
+  rename(input: { id: string; name: string }): Promise<UiCeremonyOutcome>;
+  remove(input: { id: string }): Promise<UiCeremonyOutcome>;
+};
+/** The value, or the refusal as the endpoint answered it, for the registry to read by code. */
+export type UiTwoStepAnswer<Value> = { ok: true; value: Value } | { ok: false; error: unknown };
+/** What auth lends for setting two-step verification up; no password where the account holds none. */
+export type UiTwoStepCeremonies = {
+  start(input: {
+    password?: string;
+  }): Promise<UiTwoStepAnswer<{ setupUri: string; backupCodes: readonly string[] }>>;
+  confirm(input: { code: string }): Promise<UiTwoStepAnswer<{ confirmed: true }>>;
+  regenerateBackupCodes(input: {
+    password?: string;
+  }): Promise<UiTwoStepAnswer<{ backupCodes: readonly string[] }>>;
+};
+
 /**
  * Each capability a peer reads by name, and the shape a declaration must have
  * to fill it: the CORE side of the contract, as `UiSlotProps` is for slots.
@@ -106,10 +143,12 @@ export type UiDeclaredCapabilities = {
   licenseBillingSection: UiDeclaredComponent<UiLicenseBillingSectionProps>;
   modelDisplay: UiDeclaredComponent<UiModelDisplayProps>;
   modelSelector: UiDeclaredComponent<UiModelSelectorProps>;
+  passkeys: UiDeclaredOperations<UiPasskeyCeremonies>;
   renderInputOutput: UiDeclaredComponent<UiRenderInputOutputProps>;
   setupWithAgentButton: UiDeclaredComponent<UiSetupWithAgentButtonProps>;
   traceIdPeek: UiDeclaredComponent<UiTraceIdPeekProps>;
   tracePreviewHoverCard: UiDeclaredComponent<UiTracePreviewHoverCardProps>;
+  twoStepVerification: UiDeclaredOperations<UiTwoStepCeremonies>;
 };
 
 export type UiDeclaredName = keyof UiDeclaredCapabilities;

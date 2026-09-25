@@ -30,8 +30,17 @@ import {
   type PersonalRouteReading,
   type PersonalScope,
   type PersonalSuccessNotice,
+  type TwoStepAnswer,
+  type TwoStepSetup,
 } from "../model/personal-workspace-host.ts";
+import { useLentAuthCeremonies, type LentAuthCeremonies } from "./lent-auth-ceremonies.ts";
 import { personalWorkspaceApi, type PersonalOrganizationGraph } from "./personal-workspace-api.ts";
+
+/** What a two-step ceremony answers where auth lent none. */
+const NO_TWO_STEP_CEREMONIES: { ok: false; error: unknown } = {
+  ok: false,
+  error: new Error("Two-step verification ceremonies are not installed"),
+};
 
 /** A stable reference, so a query still loading never re-triggers a memo below it. */
 const NO_ORGANIZATIONS: readonly PersonalOrganizationGraph[] = [];
@@ -85,6 +94,7 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
   private readonly deployment_: PersonalDeployment;
   private readonly organization_: PersonalOrganization | undefined;
   private readonly project_: PersonalProject | undefined;
+  private readonly lent: LentAuthCeremonies;
 
   constructor({
     session,
@@ -96,6 +106,7 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
     deployment,
     organization,
     project,
+    lent,
   }: {
     session: UiSession;
     navigationCapability: UiNavigation;
@@ -106,6 +117,7 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
     deployment: PersonalDeployment;
     organization: PersonalOrganization | undefined;
     project: PersonalProject | undefined;
+    lent: LentAuthCeremonies;
   }) {
     super();
     this.session = session;
@@ -117,6 +129,7 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
     this.deployment_ = deployment;
     this.organization_ = organization;
     this.project_ = project;
+    this.lent = lent;
   }
 
   scope(): PersonalScope {
@@ -176,21 +189,49 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
     return void 0;
   }
 
-  /** No passkey ceremony capability exists; empty is the honest reading. */
+  /** Where auth lent no passkey ceremonies, empty is the honest reading. */
   async listPasskeys(): Promise<readonly HeldPasskey[]> {
-    return [];
+    if (!this.lent.passkeys) return [];
+    const { default: ceremonies } = await this.lent.passkeys.load();
+    return ceremonies.list();
   }
 
   async registerPasskey(): Promise<PasskeyOutcome> {
-    return { ok: false, cancelled: false };
+    if (!this.lent.passkeys) return { ok: false, cancelled: false };
+    const { default: ceremonies } = await this.lent.passkeys.load();
+    return ceremonies.register();
   }
 
-  async renamePasskey(): Promise<PasskeyOutcome> {
-    return { ok: false, cancelled: false };
+  async renamePasskey(input: { id: string; name: string }): Promise<PasskeyOutcome> {
+    if (!this.lent.passkeys) return { ok: false, cancelled: false };
+    const { default: ceremonies } = await this.lent.passkeys.load();
+    return ceremonies.rename(input);
   }
 
-  async removePasskey(): Promise<PasskeyOutcome> {
-    return { ok: false, cancelled: false };
+  async removePasskey(input: { id: string }): Promise<PasskeyOutcome> {
+    if (!this.lent.passkeys) return { ok: false, cancelled: false };
+    const { default: ceremonies } = await this.lent.passkeys.load();
+    return ceremonies.remove(input);
+  }
+
+  async startTwoStepSetup(input: { password?: string }): Promise<TwoStepAnswer<TwoStepSetup>> {
+    if (!this.lent.twoStepVerification) return NO_TWO_STEP_CEREMONIES;
+    const { default: ceremonies } = await this.lent.twoStepVerification.load();
+    return ceremonies.start(input);
+  }
+
+  async confirmTwoStepSetup(input: { code: string }): Promise<TwoStepAnswer<{ confirmed: true }>> {
+    if (!this.lent.twoStepVerification) return NO_TWO_STEP_CEREMONIES;
+    const { default: ceremonies } = await this.lent.twoStepVerification.load();
+    return ceremonies.confirm(input);
+  }
+
+  async regenerateBackupCodes(input: {
+    password?: string;
+  }): Promise<TwoStepAnswer<{ backupCodes: readonly string[] }>> {
+    if (!this.lent.twoStepVerification) return NO_TWO_STEP_CEREMONIES;
+    const { default: ceremonies } = await this.lent.twoStepVerification.load();
+    return ceremonies.regenerateBackupCodes(input);
   }
 
   async linkSignInMethod(): Promise<LinkSignInMethodOutcome> {
@@ -226,6 +267,7 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
   const activeScope = scope.activeScope();
   const organizationRole = scope.scopeHost()?.organizationRole();
   const deployment = useUiDeployment();
+  const lent = useLentAuthCeremonies();
 
   // Shares the tRPC cache entry with every other reader of this procedure, so
   // the graph is fetched once per page however many hosts want it.
@@ -262,6 +304,7 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
         },
         organization,
         project,
+        lent,
       }),
     [
       session,
@@ -277,6 +320,7 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
       deployment.authProvider,
       organization,
       project,
+      lent,
     ],
   );
   return <PersonalWorkspaceHostProvider value={host}>{children}</PersonalWorkspaceHostProvider>;
