@@ -154,6 +154,7 @@ import type {
   SetDefaultRoutingPolicyInput,
   UpdateRoutingPolicyInput,
 } from "./routing-policy.ts";
+import type { OrganizationSessionPolicyShape, SessionCeilingApplied } from "./session-policy.ts";
 
 /**
  * The one public Governance capability, with deliberately explicit operation
@@ -540,6 +541,11 @@ export interface GovernanceRestApi {
     userId: string;
     apiKeyId: string;
   }): Promise<void>;
+  sessionPolicyGet(input: { organizationId: string }): Promise<OrganizationSessionPolicyShape>;
+  sessionPolicySetMaxDuration(input: {
+    organizationId: string;
+    maxSessionDurationDays: number;
+  }): Promise<SessionCeilingApplied>;
   cliSessionListForUser(input: CliUserInput): Promise<CliSessionCard[]>;
   cliSessionRevoke(input: RevokeCliSessionInput): Promise<CliSessionRevocation>;
   cliSessionRevokeAll(input: CliUserInput): Promise<CliSessionRevocation>;

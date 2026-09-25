@@ -233,6 +233,27 @@ class MemoryApiKeys extends ApiKeyRepository {
     );
     if (row && row.revokedAt === null) row.expiresAt = toDate(input.expiresAt);
   }
+  findLiveLoginKeys(input: {
+    organizationId: string;
+  }): Promise<{ id: string; createdAt: Instant; expiresAt: Instant }[]> {
+    return Promise.resolve(
+      this.rows.flatMap(({ id, organizationId, revokedAt, createdAt, expiresAt }) =>
+        organizationId === input.organizationId && revokedAt === null && expiresAt
+          ? [{ id, createdAt: fromDate(createdAt), expiresAt: fromDate(expiresAt) }]
+          : [],
+      ),
+    );
+  }
+  async lowerLoginKeyExpiry(input: {
+    id: string;
+    organizationId: string;
+    expiresAt: Instant;
+  }): Promise<void> {
+    const row = this.rows.find(
+      ({ id, organizationId }) => id === input.id && organizationId === input.organizationId,
+    );
+    if (row && row.revokedAt === null) row.expiresAt = toDate(input.expiresAt);
+  }
 }
 
 /**

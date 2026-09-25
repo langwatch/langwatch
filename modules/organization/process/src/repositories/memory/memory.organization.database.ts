@@ -28,6 +28,8 @@ export interface MemoryOrganizationRow {
   /** How colleagues on a matching domain get in; absent reads as asking. */
   domainJoin?: JoinRequestJoining["domainJoin"];
   joinDomains?: string[];
+  /** The CLI/device session ceiling in days; absent reads as unbounded. */
+  maxSessionDurationDays?: number;
   createdAt: Instant;
   updatedAt: Instant;
 }

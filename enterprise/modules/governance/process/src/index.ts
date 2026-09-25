@@ -41,7 +41,6 @@ export type * from "./repositories/ingestion-pull-lifecycle.repository.ts";
 export type * from "./repositories/ingestion-source.repository.ts";
 export type * from "./repositories/ingestion-template.repository.ts";
 export type * from "./repositories/routing-policy.repository.ts";
-export type * from "./repositories/session-policy.repository.ts";
 export type * from "./repositories/spend-spike-anomaly.repository.ts";
 
 export { SEAT_REPORT_ACTION } from "./rules/microsoft-graph-seats.rules.ts";

@@ -35,7 +35,6 @@ import type { IngestionTemplateRepository } from "./ingestion-template.repositor
 import type { OrganizationSupportContactRepository } from "./organization-support-contact.repository.ts";
 import type { RollupErasureRepository } from "./rollup-erasure.repository.ts";
 import type { RoutingPolicyRepository } from "./routing-policy.repository.ts";
-import type { OrganizationSessionPolicyRepository } from "./session-policy.repository.ts";
 import type { SpendSpikeAnomalyRepository } from "./spend-spike-anomaly.repository.ts";
 
 /**
@@ -67,7 +66,6 @@ export interface GovernanceRepositories {
   readonly ocsfExports: GovernanceOcsfExportRepository;
   readonly rollupErasure: RollupErasureRepository;
   readonly routingPolicies: RoutingPolicyRepository;
-  readonly sessionPolicies: OrganizationSessionPolicyRepository;
   readonly setupState: GovernanceSetupStateRepository;
   readonly spendSpikeAnomalies: SpendSpikeAnomalyRepository;
   readonly supportContacts: OrganizationSupportContactRepository;

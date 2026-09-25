@@ -88,19 +88,6 @@ export class RoutingPolicyModelNotConcreteError extends HandledError {
   }
 }
 
-export class SessionPolicyOutOfRangeError extends HandledError {
-  constructor(
-    readonly value: number,
-    readonly maxDays: number,
-  ) {
-    super(
-      "governance:session_policy_out_of_range",
-      `maxSessionDurationDays must be an integer between 0 and ${maxDays} (got ${value})`,
-      { httpStatus: 400, meta: { value, maxDays } },
-    );
-  }
-}
-
 export class GovernanceValidationError extends ValidationError {
   constructor(
     message: string,

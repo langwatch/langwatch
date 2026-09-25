@@ -95,6 +95,14 @@ export abstract class OrganizationRepository {
     organizationId: string;
     setting: JoinRequestJoining;
   }): Promise<void>;
+  /** Main's `?? 0`: an unknown organization reads as unbounded. */
+  abstract getSessionPolicy(input: {
+    organizationId: string;
+  }): Promise<{ maxSessionDurationDays: number }>;
+  abstract saveSessionPolicy(input: {
+    organizationId: string;
+    maxSessionDurationDays: number;
+  }): Promise<void>;
   abstract getOldestTeamId(organizationId: string): Promise<string>;
   abstract getBillingProfile(organizationId: string): Promise<OrganizationBillingProfile>;
   abstract getWithAdministrators(organizationId: string): Promise<OrganizationWithAdministrators>;

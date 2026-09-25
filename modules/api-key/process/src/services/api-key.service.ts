@@ -274,6 +274,13 @@ export class ApiKeyService {
     return this.cli.revokeCliSessionKey(input);
   }
 
+  async applySessionCeiling(input: {
+    organizationId: string;
+    maxSessionDurationDays: number;
+  }): Promise<number> {
+    return this.cli.applySessionCeiling(input);
+  }
+
   async revokeCliLoginKeyForLogout(input: {
     apiKeyId: string;
     userId: string;

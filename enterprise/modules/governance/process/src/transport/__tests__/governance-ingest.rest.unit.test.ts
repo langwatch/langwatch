@@ -135,6 +135,8 @@ function mountIngest(world: World = {}) {
     activityIngestionSourcesHealth: unsupportedRestOperation,
     activityEventsForSource: unsupportedRestOperation,
     activitySourceHealthMetrics: unsupportedRestOperation,
+    sessionPolicyGet: unsupportedRestOperation,
+    sessionPolicySetMaxDuration: unsupportedRestOperation,
     ingestionKeyList: unsupportedRestOperation,
     ingestionKeyInstall: unsupportedRestOperation,
     ingestionKeyRotate: unsupportedRestOperation,

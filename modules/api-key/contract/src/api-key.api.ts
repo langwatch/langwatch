@@ -168,6 +168,15 @@ export interface ApiKeyApi {
     userId: string;
     organizationId: string;
   }): Promise<CliSessionKeyRevocation>;
+  /**
+   * Main's `applySessionCeiling`: one organization's live login keys brought
+   * forward to a new max session duration, then the elapsed ones reaped with
+   * their ingest keys. Answers how many sessions were reaped.
+   */
+  applySessionCeiling(input: {
+    organizationId: string;
+    maxSessionDurationDays: number;
+  }): Promise<number>;
   revokeCliLoginKeyForLogout(input: {
     apiKeyId: string;
     userId: string;

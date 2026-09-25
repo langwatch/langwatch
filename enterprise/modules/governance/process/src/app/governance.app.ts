@@ -139,6 +139,8 @@ import {
   type SetDefaultRoutingPolicyInput,
   type UpdateRoutingPolicyInput,
   governanceSecrets,
+  type OrganizationSessionPolicyShape,
+  type SessionCeilingApplied,
 } from "@langwatch/enterprise-governance-contract";
 import { ScimApi } from "@langwatch/enterprise-scim-contract";
 import {
@@ -241,6 +243,7 @@ import { IngestionTemplateService } from "../services/ingestion-template.service
 import { DefaultGovernanceOcsfExportService } from "../services/ocsf-export.service.ts";
 import { OpenAiAdminPullerAdapter } from "../services/openai-admin-puller.service.ts";
 import { OpenAiComplianceReferencePullerService } from "../services/openai-compliance-puller.service.ts";
+import { OrganizationSessionPolicyService } from "../services/organization-session-policy.service.ts";
 import type { OrganizationSupportContactService } from "../services/organization-support-contact.service.ts";
 import { PersonDiscoveryService } from "../services/person-discovery.service.ts";
 import { PersonListingService } from "../services/person-listing.service.ts";
@@ -361,6 +364,7 @@ export interface GovernanceAppDependencies {
   apiKeys: Pick<
     ApiKeyApi,
     | "revokeCliSessionKey"
+    | "applySessionCeiling"
     | "create"
     | "revoke"
     | "findById"
@@ -404,6 +408,8 @@ export interface GovernanceAppDependencies {
       | "findPrimaryIntent"
       | "getTeam"
       | "getTeamWithMembers"
+      | "getSessionPolicy"
+      | "saveSessionPolicy"
     >;
   /** The SSO directory's external ids, which the identity match reads as proof. */
   scim: Pick<ScimApi, "findDirectoryExternalIds">;
@@ -582,6 +588,10 @@ export class GovernanceApp implements GovernanceRestApi {
       organizations: dependencies.organizations,
       policies: this.routingPolicies,
       gatewayBaseUrl,
+    });
+    this.sessionPolicy = OrganizationSessionPolicyService.create({
+      organizations: dependencies.organizations,
+      loginKeys: dependencies.apiKeys,
     });
     this.cliSessions = DefaultGovernanceCliSessionInventoryService.create({
       auth: dependencies.auth,
@@ -780,6 +790,7 @@ export class GovernanceApp implements GovernanceRestApi {
   private readonly routingPolicies: DefaultGovernanceRoutingPolicyService;
   private readonly personalKeys: DefaultGovernancePersonalVirtualKeyService;
   private readonly cliSessions: DefaultGovernanceCliSessionInventoryService;
+  private readonly sessionPolicy: OrganizationSessionPolicyService;
   private readonly departments: DepartmentService;
   private readonly agentDiscovery: AgentDiscoveryService;
   private readonly personListing: PersonListingService;
@@ -1305,6 +1316,19 @@ export class GovernanceApp implements GovernanceRestApi {
     apiKeyId: string;
   }): Promise<void> {
     return this.ingestionKeys.revoke(input);
+  }
+
+  async sessionPolicyGet(input: {
+    organizationId: string;
+  }): Promise<OrganizationSessionPolicyShape> {
+    return this.sessionPolicy.get(input);
+  }
+
+  async sessionPolicySetMaxDuration(input: {
+    organizationId: string;
+    maxSessionDurationDays: number;
+  }): Promise<SessionCeilingApplied> {
+    return this.sessionPolicy.setMaxDuration(input);
   }
 
   // ── Personal CLI sessions: the caller's own devices, answered for their user id alone ──

@@ -241,6 +241,17 @@ export class OrganizationService extends OrganizationServiceContract {
     return this.repository.saveJoinSetting(input);
   }
 
+  getSessionPolicy(input: { organizationId: string }): Promise<{ maxSessionDurationDays: number }> {
+    return this.repository.getSessionPolicy(input);
+  }
+
+  saveSessionPolicy(input: {
+    organizationId: string;
+    maxSessionDurationDays: number;
+  }): Promise<void> {
+    return this.repository.saveSessionPolicy(input);
+  }
+
   /** The guided-onboarding record, where the organization keeps it. */
   readGuidedOnboardingState(input: { organizationId: string }): Promise<GuidedOnboardingRecord> {
     return this.repository.getGuidedOnboarding(input);

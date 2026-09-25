@@ -604,6 +604,17 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#dependencies.organizations.saveJoinSetting(input);
   }
 
+  getSessionPolicy(input: { organizationId: string }): Promise<{ maxSessionDurationDays: number }> {
+    return this.#dependencies.organizations.getSessionPolicy(input);
+  }
+
+  saveSessionPolicy(input: {
+    organizationId: string;
+    maxSessionDurationDays: number;
+  }): Promise<void> {
+    return this.#dependencies.organizations.saveSessionPolicy(input);
+  }
+
   readGuidedOnboardingState(input: { organizationId: string }): Promise<GuidedOnboardingRecord> {
     return this.#dependencies.organizations.readGuidedOnboardingState(input);
   }

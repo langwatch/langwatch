@@ -201,10 +201,12 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
 
   async findElapsedLoginKeys(input: {
     now: Instant;
+    organizationId?: string;
   }): Promise<{ id: string; userId: string | null; organizationId: string }[]> {
     const now = toDate(input.now);
     return this.#list(
       (key) =>
+        (!input.organizationId || key.organizationId === input.organizationId) &&
         key.name.startsWith(CLI_LOGIN_KEY_NAME_PREFIX) &&
         key.revokedAt === null &&
         key.expiresAt !== null &&
@@ -224,6 +226,29 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
       key.organizationId === input.organizationId && key.userId === input.userId;
     if (!ownedByCaller) return;
     if (!key.name.startsWith(CLI_LOGIN_KEY_NAME_PREFIX) || key.revokedAt !== null) return;
+    this.#database.replaceKey({ ...key, expiresAt: toDate(input.expiresAt) });
+  }
+
+  async findLiveLoginKeys(input: {
+    organizationId: string;
+  }): Promise<{ id: string; createdAt: Instant; expiresAt: Instant }[]> {
+    return this.#list(
+      (key) =>
+        key.organizationId === input.organizationId &&
+        key.name.startsWith(CLI_LOGIN_KEY_NAME_PREFIX) &&
+        key.revokedAt === null,
+    ).flatMap(({ id, createdAt, expiresAt }) =>
+      expiresAt ? [{ id, createdAt: fromDate(createdAt), expiresAt: fromDate(expiresAt) }] : [],
+    );
+  }
+
+  async lowerLoginKeyExpiry(input: {
+    id: string;
+    organizationId: string;
+    expiresAt: Instant;
+  }): Promise<void> {
+    const key = this.#database.keys().find((row) => row.id === input.id);
+    if (!key || key.organizationId !== input.organizationId || key.revokedAt !== null) return;
     this.#database.replaceKey({ ...key, expiresAt: toDate(input.expiresAt) });
   }
 

@@ -1,10 +1,10 @@
 // Hand-written governance procedures (meant to be generated).
 // Segment names load-bearing (mount points, cache keys); only ADR-004 exception.
 
-import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
+import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
 import type {
-  ActivityEventDetailRow,
-  ActivityMonitorSummary,
+  activityMonitorTrpc,
+  sessionPolicyTrpc,
   AgentsListingOutcome,
   AiToolEntry,
   AiToolProviderOption,
@@ -15,21 +15,11 @@ import type {
   AnomalyRuleStatus,
   Department,
   GovernanceIngestionSourceType,
-  GovernanceSortDirection,
-  IngestionSourceHealthRow,
   IngestionTemplate,
   OttlValidationResult,
   QuarantineFillStats,
-  RecentAnomalyRow,
   RoutingPolicy,
   RoutingPolicyScopeType,
-  SourceHealthMetrics,
-  SpendByDepartmentRow,
-  SpendByTeamRow,
-  SpendByUserRow,
-  SpendOverTimeGroupBy,
-  SpendOverTimeResult,
-  SpendSortField,
 } from "@langwatch/enterprise-governance-contract";
 import type * as enterpriseGovernanceContractModule from "@langwatch/enterprise-governance-contract";
 
@@ -155,7 +145,6 @@ export type GovernanceAiToolImportResult = {
 export type GovernanceRoutingPolicyOption = { id: string; name: string };
 
 /** The organization's session-lifetime policy. Zero days means unbounded. */
-export type GovernanceSessionPolicy = { maxSessionDurationDays: number };
 
 /**
  * The plan an organization's usage is measured against. Restated here
@@ -226,515 +215,421 @@ export type GovernanceOrganizationGraph = {
   }[];
 };
 
-export type GovernanceApiMap = {
-  modelProvider: {
-    getResolvedDefault: {
-      query: {
-        input: { projectId: string; featureKey: string };
-        output: { model: string | null };
-      };
-    };
-  };
-  langy: {
-    modelsAllowed: {
-      query: {
-        input: { projectId: string };
-        output: { modelsAllowed: string[] };
-      };
-    };
-  };
-  governanceAgents: {
-    list: { query: { input: { organizationId: string }; output: GovernanceAgentView[] } };
-    syncSources: {
-      query: {
-        input: { organizationId: string };
-        output: {
-          id: string;
-          name: string;
-          sourceType: string;
-          lastListing: AgentsListingOutcome | null;
-        }[];
-      };
-    };
-    requestListing: {
-      mutation: {
-        input: { organizationId: string };
-        output: { requested: number; sources: { id: string; name: string }[] };
-      };
-    };
-  };
-  governancePeople: {
-    list: { query: { input: { organizationId: string }; output: GovernancePersonView[] } };
-    suggestions: {
-      query: {
-        input: { organizationId: string };
-        output: {
-          id: string;
-          personDisplayText: string;
-          personProvider: string;
-          memberName: string | null;
-          userId: string;
-        }[];
-      };
-    };
-    runMatch: {
-      mutation: {
-        input: { organizationId: string };
-        output: { linked: number; unproven: number };
-      };
-    };
-    confirmSuggestion: {
-      mutation: {
-        input: { organizationId: string; suggestionId: string };
-        output: GovernanceAcknowledgement;
-      };
-    };
-  };
-  activityMonitor: {
-    summary: {
-      query: {
-        input: { organizationId: string; windowDays?: number };
-        output: ActivityMonitorSummary;
-      };
-    };
-    spendOverTime: {
-      query: {
-        input: {
-          organizationId: string;
-          windowDays?: number;
-          groupBy?: SpendOverTimeGroupBy;
+export type GovernanceApiMap = ContractApiMap<typeof activityMonitorTrpc> &
+  ContractApiMap<typeof sessionPolicyTrpc> & {
+    modelProvider: {
+      getResolvedDefault: {
+        query: {
+          input: { projectId: string; featureKey: string };
+          output: { model: string | null };
         };
-        output: SpendOverTimeResult;
       };
     };
-    spendByTeam: {
-      query: {
-        input: {
-          organizationId: string;
-          windowDays?: number;
-          limit?: number;
-          offset?: number;
-          sortBy?: SpendSortField;
-          sortDir?: GovernanceSortDirection;
+    langy: {
+      modelsAllowed: {
+        query: {
+          input: { projectId: string };
+          output: { modelsAllowed: string[] };
         };
-        output: SpendByTeamRow[];
       };
     };
-    spendByUser: {
-      query: {
-        input: {
-          organizationId: string;
-          windowDays?: number;
-          limit?: number;
-          offset?: number;
-          sortBy?: SpendSortField;
-          sortDir?: GovernanceSortDirection;
+    governanceAgents: {
+      list: { query: { input: { organizationId: string }; output: GovernanceAgentView[] } };
+      syncSources: {
+        query: {
+          input: { organizationId: string };
+          output: {
+            id: string;
+            name: string;
+            sourceType: string;
+            lastListing: AgentsListingOutcome | null;
+          }[];
         };
-        output: SpendByUserRow[];
       };
-    };
-    spendByDepartment: {
-      query: {
-        input: { organizationId: string; windowDays?: number };
-        output: SpendByDepartmentRow[];
-      };
-    };
-    recentAnomalies: {
-      query: {
-        input: { organizationId: string; limit?: number };
-        output: RecentAnomalyRow[];
-      };
-    };
-    ingestionSourcesHealth: {
-      query: {
-        input: { organizationId: string };
-        output: IngestionSourceHealthRow[];
-      };
-    };
-    sourceHealthMetrics: {
-      query: {
-        input: { organizationId: string; sourceId: string };
-        output: SourceHealthMetrics;
-      };
-    };
-    eventsForSource: {
-      query: {
-        input: {
-          organizationId: string;
-          sourceId: string;
-          limit?: number;
-          beforeIso?: string;
+      requestListing: {
+        mutation: {
+          input: { organizationId: string };
+          output: { requested: number; sources: { id: string; name: string }[] };
         };
-        output: ActivityEventDetailRow[];
       };
     };
-  };
-
-  aiTools: {
-    adminList: {
-      query: { input: { organizationId: string }; output: AiToolEntry[] };
-    };
-    /**
-     * The reader's own catalogue. No hook here calls it; the write paths
-     * invalidate it, and `useUtils()` can only name a procedure this map
-     * declares.
-     */
-    list: {
-      query: { input: { organizationId: string }; output: AiToolEntry[] };
-    };
-    create: {
-      mutation: {
-        input: {
-          organizationId: string;
-          departmentIds?: string[];
-          /**
-           * Widened on purpose: the router builds its enum from
-           * `AI_TOOL_TYPES` via a cast to `[string, ...string[]]`, so the
-           * parsed field is a plain string, and `AiToolType` is assignable to it.
-           */
-          type: string;
-          displayName: string;
-          iconAsset?: string | null;
-          order?: number;
-          config: Record<string, unknown>;
+    governancePeople: {
+      list: { query: { input: { organizationId: string }; output: GovernancePersonView[] } };
+      suggestions: {
+        query: {
+          input: { organizationId: string };
+          output: {
+            id: string;
+            personDisplayText: string;
+            personProvider: string;
+            memberName: string | null;
+            userId: string;
+          }[];
         };
-        output: AiToolEntry;
       };
-    };
-    update: {
-      mutation: {
-        input: {
-          organizationId: string;
-          id: string;
-          displayName?: string;
-          iconAsset?: string | null;
-          /** Pass to overwrite the binding set; empty is org-wide. Omit to leave it. */
-          departmentIds?: string[];
-          order?: number;
-          enabled?: boolean;
-          type?: string;
-          config?: Record<string, unknown>;
+      runMatch: {
+        mutation: {
+          input: { organizationId: string };
+          output: { linked: number; unproven: number };
         };
-        output: AiToolEntry;
       };
-    };
-    remove: {
-      mutation: {
-        input: { organizationId: string; id: string };
-        output: AiToolEntry;
-      };
-    };
-    reorder: {
-      mutation: {
-        input: {
-          organizationId: string;
-          updates: { id: string; order: number }[];
+      confirmSuggestion: {
+        mutation: {
+          input: { organizationId: string; suggestionId: string };
+          output: GovernanceAcknowledgement;
         };
-        output: GovernanceAcknowledgement;
       };
     };
-    setEnabled: {
-      mutation: {
-        input: { organizationId: string; id: string; enabled: boolean };
-        output: AiToolEntry;
+    aiTools: {
+      adminList: {
+        query: { input: { organizationId: string }; output: AiToolEntry[] };
       };
-    };
-    importStarterPack: {
-      mutation: {
-        input: { organizationId: string; slugs?: string[] };
-        output: GovernanceAiToolImportResult;
+      /**
+       * The reader's own catalogue. No hook here calls it; the write paths
+       * invalidate it, and `useUtils()` can only name a procedure this map
+       * declares.
+       */
+      list: {
+        query: { input: { organizationId: string }; output: AiToolEntry[] };
       };
-    };
-    starterPackCatalog: {
-      query: {
-        input: { organizationId: string };
-        output: GovernanceAiToolStarterTile[];
-      };
-    };
-    providerOptions: {
-      query: {
-        input: { organizationId: string };
-        output: AiToolProviderOption[];
-      };
-    };
-    routingPolicyOptions: {
-      query: {
-        input: { organizationId: string };
-        output: GovernanceRoutingPolicyOption[];
-      };
-    };
-  };
-
-  anomalyRules: {
-    list: {
-      query: { input: { organizationId: string }; output: AnomalyRule[] };
-    };
-    create: {
-      mutation: {
-        input: {
-          organizationId: string;
-          name: string;
-          description?: string | null;
-          severity: AnomalyRuleSeverity;
-          ruleType: string;
-          scope: AnomalyRuleScope;
-          scopeId: string;
-          thresholdConfig?: Record<string, unknown>;
-          destinationConfig?: Record<string, unknown>;
-          status?: AnomalyRuleStatus;
-        };
-        output: AnomalyRule;
-      };
-    };
-    update: {
-      mutation: {
-        input: {
-          organizationId: string;
-          id: string;
-          name?: string;
-          description?: string | null;
-          severity?: AnomalyRuleSeverity;
-          ruleType?: string;
-          scope?: AnomalyRuleScope;
-          scopeId?: string;
-          thresholdConfig?: Record<string, unknown>;
-          destinationConfig?: Record<string, unknown>;
-          status?: AnomalyRuleStatus;
-        };
-        output: AnomalyRule;
-      };
-    };
-    archive: {
-      mutation: {
-        input: { organizationId: string; id: string };
-        output: AnomalyRule;
-      };
-    };
-  };
-
-  departments: {
-    list: {
-      query: { input: { organizationId: string }; output: GovernanceDepartmentView[] };
-    };
-    assignments: {
-      query: {
-        input: { organizationId: string };
-        output: enterpriseGovernanceContractModule.DepartmentAssignments;
-      };
-    };
-    create: {
-      mutation: {
-        input: { organizationId: string; name: string };
-        output: Department;
-      };
-    };
-    rename: {
-      mutation: {
-        input: { organizationId: string; id: string; name: string };
-        output: Department;
-      };
-    };
-    archive: {
-      mutation: {
-        input: { organizationId: string; id: string };
-        output: GovernanceAcknowledgement;
-      };
-    };
-    assignUser: {
-      mutation: {
-        input: { organizationId: string; userId: string; departmentId: string | null };
-        output: GovernanceAcknowledgement;
-      };
-    };
-  };
-
-  governance: {
-    quarantineFillStats: {
-      query: {
-        input: {
-          organizationId: string;
-          windowSeconds?: number;
-          threshold?: number;
-        };
-        output: QuarantineFillStats;
-      };
-    };
-    /**
-     * Null covers every miss: the token names nobody, the person it names is
-     * not in this organization, or they have no personal workspace yet. The
-     * three stay indistinguishable so the answer never enumerates who exists.
-     */
-    resolveActorPersonalProject: {
-      query: {
-        input: { organizationId: string; actor: string };
-        output: GovernanceActorWorkspace | null;
-      };
-    };
-  };
-
-  ingestionSources: {
-    list: {
-      query: {
-        input: { organizationId: string };
-        output: GovernanceIngestionSourceView[];
-      };
-    };
-    get: {
-      query: {
-        input: { organizationId: string; id: string };
-        output: GovernanceIngestionSourceView;
-      };
-    };
-    create: {
-      mutation: {
-        input: {
-          organizationId: string;
-          teamId?: string | null;
-          sourceType: GovernanceIngestionSourceType;
-          name: string;
-          description?: string | null;
-          parserConfig?: Record<string, unknown>;
-          pullConfig?: Record<string, unknown> | null;
-          pullSchedule?: string | null;
-          traceProjectId?: string | null;
-        };
-        output: GovernanceIngestionSourceCreated;
-      };
-    };
-    update: {
-      mutation: {
-        input: {
-          organizationId: string;
-          id: string;
-          name?: string;
-          description?: string | null;
-          parserConfig?: Record<string, unknown>;
-          status?: "active" | "disabled" | "awaiting_first_event";
-          teamId?: string | null;
-          pullSchedule?: string | null;
-          traceProjectId?: string | null;
-        };
-        output: GovernanceIngestionSourceView;
-      };
-    };
-    archive: {
-      mutation: {
-        input: { organizationId: string; id: string };
-        output: GovernanceIngestionSourceView;
-      };
-    };
-    rotateSecret: {
-      mutation: {
-        input: { organizationId: string; id: string };
-        output: GovernanceIngestionSourceCreated;
-      };
-    };
-    ottlStarter: {
-      query: {
-        input: { organizationId: string; sourceType: string };
-        output: GovernanceOttlStarter;
-      };
-    };
-    validateOttl: {
-      mutation: {
-        input: { organizationId: string; statements: string[] };
-        output: OttlValidationResult;
-      };
-    };
-  };
-
-  ingestionTemplates: {
-    adminList: {
-      query: { input: { organizationId: string }; output: IngestionTemplate[] };
-    };
-    get: {
-      query: {
-        input: { organizationId: string; id: string };
-        output: IngestionTemplate;
-      };
-    };
-    create: {
-      mutation: {
-        input: {
-          organizationId: string;
-          sourceType: string;
-          displayName: string;
-          description?: string;
-          iconAsset?: string;
-          credentialSchema?: "otlp_token" | "static_api_key" | "agent_id" | null;
-          ottlRules?: string;
-        };
-        output: IngestionTemplate;
-      };
-    };
-    archive: {
-      mutation: {
-        input: { organizationId: string; id: string };
-        output: GovernanceAcknowledgement;
-      };
-    };
-    cloneFromPlatform: {
-      mutation: {
-        input: { organizationId: string; sourceTemplateId: string };
-        output: IngestionTemplate;
-      };
-    };
-    updateOttlRules: {
-      mutation: {
-        input: { organizationId: string; id: string; ottlRules: string };
-        output: IngestionTemplate;
-      };
-    };
-  };
-
-  routingPolicy: {
-    list: {
-      query: {
-        input: {
-          organizationId: string;
-          selectableForScope?: {
-            scopeType: RoutingPolicyScopeType;
-            scopeId: string;
+      create: {
+        mutation: {
+          input: {
+            organizationId: string;
+            departmentIds?: string[];
+            /**
+             * Widened on purpose: the router builds its enum from
+             * `AI_TOOL_TYPES` via a cast to `[string, ...string[]]`, so the
+             * parsed field is a plain string, and `AiToolType` is assignable to it.
+             */
+            type: string;
+            displayName: string;
+            iconAsset?: string | null;
+            order?: number;
+            config: Record<string, unknown>;
           };
+          output: AiToolEntry;
         };
-        output: RoutingPolicy[];
+      };
+      update: {
+        mutation: {
+          input: {
+            organizationId: string;
+            id: string;
+            displayName?: string;
+            iconAsset?: string | null;
+            /** Pass to overwrite the binding set; empty is org-wide. Omit to leave it. */
+            departmentIds?: string[];
+            order?: number;
+            enabled?: boolean;
+            type?: string;
+            config?: Record<string, unknown>;
+          };
+          output: AiToolEntry;
+        };
+      };
+      remove: {
+        mutation: {
+          input: { organizationId: string; id: string };
+          output: AiToolEntry;
+        };
+      };
+      reorder: {
+        mutation: {
+          input: {
+            organizationId: string;
+            updates: { id: string; order: number }[];
+          };
+          output: GovernanceAcknowledgement;
+        };
+      };
+      setEnabled: {
+        mutation: {
+          input: { organizationId: string; id: string; enabled: boolean };
+          output: AiToolEntry;
+        };
+      };
+      importStarterPack: {
+        mutation: {
+          input: { organizationId: string; slugs?: string[] };
+          output: GovernanceAiToolImportResult;
+        };
+      };
+      starterPackCatalog: {
+        query: {
+          input: { organizationId: string };
+          output: GovernanceAiToolStarterTile[];
+        };
+      };
+      providerOptions: {
+        query: {
+          input: { organizationId: string };
+          output: AiToolProviderOption[];
+        };
+      };
+      routingPolicyOptions: {
+        query: {
+          input: { organizationId: string };
+          output: GovernanceRoutingPolicyOption[];
+        };
       };
     };
-  };
 
-  sessionPolicy: {
-    get: {
-      query: {
-        input: { organizationId: string };
-        output: GovernanceSessionPolicy;
+    anomalyRules: {
+      list: {
+        query: { input: { organizationId: string }; output: AnomalyRule[] };
+      };
+      create: {
+        mutation: {
+          input: {
+            organizationId: string;
+            name: string;
+            description?: string | null;
+            severity: AnomalyRuleSeverity;
+            ruleType: string;
+            scope: AnomalyRuleScope;
+            scopeId: string;
+            thresholdConfig?: Record<string, unknown>;
+            destinationConfig?: Record<string, unknown>;
+            status?: AnomalyRuleStatus;
+          };
+          output: AnomalyRule;
+        };
+      };
+      update: {
+        mutation: {
+          input: {
+            organizationId: string;
+            id: string;
+            name?: string;
+            description?: string | null;
+            severity?: AnomalyRuleSeverity;
+            ruleType?: string;
+            scope?: AnomalyRuleScope;
+            scopeId?: string;
+            thresholdConfig?: Record<string, unknown>;
+            destinationConfig?: Record<string, unknown>;
+            status?: AnomalyRuleStatus;
+          };
+          output: AnomalyRule;
+        };
+      };
+      archive: {
+        mutation: {
+          input: { organizationId: string; id: string };
+          output: AnomalyRule;
+        };
       };
     };
-    setMaxDuration: {
-      mutation: {
-        input: { organizationId: string; maxSessionDurationDays: number };
-        output: GovernanceAcknowledgement;
-      };
-    };
-  };
 
-  organization: {
-    getAll: {
-      query: {
-        input: { isDemo?: boolean };
-        output: GovernanceOrganizationGraph[];
+    departments: {
+      list: {
+        query: { input: { organizationId: string }; output: GovernanceDepartmentView[] };
+      };
+      assignments: {
+        query: {
+          input: { organizationId: string };
+          output: enterpriseGovernanceContractModule.DepartmentAssignments;
+        };
+      };
+      create: {
+        mutation: {
+          input: { organizationId: string; name: string };
+          output: Department;
+        };
+      };
+      rename: {
+        mutation: {
+          input: { organizationId: string; id: string; name: string };
+          output: Department;
+        };
+      };
+      archive: {
+        mutation: {
+          input: { organizationId: string; id: string };
+          output: GovernanceAcknowledgement;
+        };
+      };
+      assignUser: {
+        mutation: {
+          input: { organizationId: string; userId: string; departmentId: string | null };
+          output: GovernanceAcknowledgement;
+        };
       };
     };
-  };
 
-  limits: {
-    getUsage: {
-      query: {
-        input: { organizationId: string };
-        output: GovernanceUsageStats;
+    governance: {
+      quarantineFillStats: {
+        query: {
+          input: {
+            organizationId: string;
+            windowSeconds?: number;
+            threshold?: number;
+          };
+          output: QuarantineFillStats;
+        };
+      };
+      /**
+       * Null covers every miss: the token names nobody, the person it names is
+       * not in this organization, or they have no personal workspace yet. The
+       * three stay indistinguishable so the answer never enumerates who exists.
+       */
+      resolveActorPersonalProject: {
+        query: {
+          input: { organizationId: string; actor: string };
+          output: GovernanceActorWorkspace | null;
+        };
+      };
+    };
+
+    ingestionSources: {
+      list: {
+        query: {
+          input: { organizationId: string };
+          output: GovernanceIngestionSourceView[];
+        };
+      };
+      get: {
+        query: {
+          input: { organizationId: string; id: string };
+          output: GovernanceIngestionSourceView;
+        };
+      };
+      create: {
+        mutation: {
+          input: {
+            organizationId: string;
+            teamId?: string | null;
+            sourceType: GovernanceIngestionSourceType;
+            name: string;
+            description?: string | null;
+            parserConfig?: Record<string, unknown>;
+            pullConfig?: Record<string, unknown> | null;
+            pullSchedule?: string | null;
+            traceProjectId?: string | null;
+          };
+          output: GovernanceIngestionSourceCreated;
+        };
+      };
+      update: {
+        mutation: {
+          input: {
+            organizationId: string;
+            id: string;
+            name?: string;
+            description?: string | null;
+            parserConfig?: Record<string, unknown>;
+            status?: "active" | "disabled" | "awaiting_first_event";
+            teamId?: string | null;
+            pullSchedule?: string | null;
+            traceProjectId?: string | null;
+          };
+          output: GovernanceIngestionSourceView;
+        };
+      };
+      archive: {
+        mutation: {
+          input: { organizationId: string; id: string };
+          output: GovernanceIngestionSourceView;
+        };
+      };
+      rotateSecret: {
+        mutation: {
+          input: { organizationId: string; id: string };
+          output: GovernanceIngestionSourceCreated;
+        };
+      };
+      ottlStarter: {
+        query: {
+          input: { organizationId: string; sourceType: string };
+          output: GovernanceOttlStarter;
+        };
+      };
+      validateOttl: {
+        mutation: {
+          input: { organizationId: string; statements: string[] };
+          output: OttlValidationResult;
+        };
+      };
+    };
+
+    ingestionTemplates: {
+      adminList: {
+        query: { input: { organizationId: string }; output: IngestionTemplate[] };
+      };
+      get: {
+        query: {
+          input: { organizationId: string; id: string };
+          output: IngestionTemplate;
+        };
+      };
+      create: {
+        mutation: {
+          input: {
+            organizationId: string;
+            sourceType: string;
+            displayName: string;
+            description?: string;
+            iconAsset?: string;
+            credentialSchema?: "otlp_token" | "static_api_key" | "agent_id" | null;
+            ottlRules?: string;
+          };
+          output: IngestionTemplate;
+        };
+      };
+      archive: {
+        mutation: {
+          input: { organizationId: string; id: string };
+          output: GovernanceAcknowledgement;
+        };
+      };
+      cloneFromPlatform: {
+        mutation: {
+          input: { organizationId: string; sourceTemplateId: string };
+          output: IngestionTemplate;
+        };
+      };
+      updateOttlRules: {
+        mutation: {
+          input: { organizationId: string; id: string; ottlRules: string };
+          output: IngestionTemplate;
+        };
+      };
+    };
+
+    routingPolicy: {
+      list: {
+        query: {
+          input: {
+            organizationId: string;
+            selectableForScope?: {
+              scopeType: RoutingPolicyScopeType;
+              scopeId: string;
+            };
+          };
+          output: RoutingPolicy[];
+        };
+      };
+    };
+
+    organization: {
+      getAll: {
+        query: {
+          input: { isDemo?: boolean };
+          output: GovernanceOrganizationGraph[];
+        };
+      };
+    };
+
+    limits: {
+      getUsage: {
+        query: {
+          input: { organizationId: string };
+          output: GovernanceUsageStats;
+        };
       };
     };
   };
-};
 
 // Governance tRPC hooks (shares cache with app proxy via createModuleApi).
 export const governanceApi = createModuleApi<GovernanceApiMap>();

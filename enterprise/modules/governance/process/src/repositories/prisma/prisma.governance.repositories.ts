@@ -19,7 +19,6 @@ import { PrismaIngestionPullRunProjectionRepository } from "./prisma.ingestion-p
 import { PrismaIngestionSourceRepository } from "./prisma.ingestion-source.repository.ts";
 import { PrismaIngestionTemplateRepository } from "./prisma.ingestion-template.repository.ts";
 import { PrismaGovernanceOcsfExportRepository } from "./prisma.ocsf-export.repository.ts";
-import { PrismaOrganizationSessionPolicyRepository } from "./prisma.organization-session-policy.repository.ts";
 import { PrismaOrganizationSupportContactRepository } from "./prisma.organization-support-contact.repository.ts";
 import { PrismaSpendSpikeAnomalyRepository } from "./prisma.spend-spike-anomaly.repository.ts";
 
@@ -53,7 +52,6 @@ export class PostgresGovernanceRepositories {
       ingestionTemplates: PrismaIngestionTemplateRepository.create(prisma),
       ocsfExports: PrismaGovernanceOcsfExportRepository.create(prisma),
       routingPolicies: PrismaRoutingPolicyRepository.create(prisma),
-      sessionPolicies: PrismaOrganizationSessionPolicyRepository.create(prisma),
       setupState: PrismaGovernanceSetupStateRepository.create(prisma),
       spendSpikeAnomalies: PrismaSpendSpikeAnomalyRepository.create(prisma),
       supportContacts: PrismaOrganizationSupportContactRepository.create({ prisma }),

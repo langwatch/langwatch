@@ -209,9 +209,11 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
   }
   findElapsedLoginKeys(input: {
     now: Instant;
+    organizationId?: string;
   }): Promise<{ id: string; userId: string | null; organizationId: string }[]> {
     return this.database.apiKey.findMany({
       where: {
+        ...(input.organizationId ? { organizationId: input.organizationId } : {}),
         name: { startsWith: CLI_LOGIN_KEY_NAME_PREFIX },
         revokedAt: null,
         expiresAt: { not: null, lte: toDate(input.now) },
@@ -233,6 +235,33 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
         name: { startsWith: CLI_LOGIN_KEY_NAME_PREFIX },
         revokedAt: null,
       },
+      data: { expiresAt: toDate(input.expiresAt) },
+    });
+  }
+
+  async findLiveLoginKeys(input: {
+    organizationId: string;
+  }): Promise<{ id: string; createdAt: Instant; expiresAt: Instant }[]> {
+    const rows = await this.database.apiKey.findMany({
+      where: {
+        organizationId: input.organizationId,
+        name: { startsWith: CLI_LOGIN_KEY_NAME_PREFIX },
+        revokedAt: null,
+        expiresAt: { not: null },
+      },
+      select: { id: true, createdAt: true, expiresAt: true },
+    });
+    return rows.flatMap(({ id, createdAt, expiresAt }) =>
+      expiresAt ? [{ id, createdAt: fromDate(createdAt), expiresAt: fromDate(expiresAt) }] : [],
+    );
+  }
+  async lowerLoginKeyExpiry(input: {
+    id: string;
+    organizationId: string;
+    expiresAt: Instant;
+  }): Promise<void> {
+    await this.database.apiKey.updateMany({
+      where: { id: input.id, organizationId: input.organizationId, revokedAt: null },
       data: { expiresAt: toDate(input.expiresAt) },
     });
   }

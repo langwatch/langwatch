@@ -186,6 +186,8 @@ function mountCli(world: World = {}) {
     activityIngestionSourcesHealth: unavailable,
     activityEventsForSource: unavailable,
     activitySourceHealthMetrics: unavailable,
+    sessionPolicyGet: unavailable,
+    sessionPolicySetMaxDuration: unavailable,
     ingestionKeyList: unavailable,
     ingestionKeyInstall: unavailable,
     ingestionKeyRotate: unavailable,

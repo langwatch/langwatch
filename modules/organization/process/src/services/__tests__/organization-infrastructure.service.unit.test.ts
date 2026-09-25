@@ -58,6 +58,12 @@ class StubRepository extends OrganizationRepository {
 
   async saveJoinSetting(): Promise<void> {}
 
+  async getSessionPolicy(): Promise<{ maxSessionDurationDays: number }> {
+    return { maxSessionDurationDays: 0 };
+  }
+
+  async saveSessionPolicy(): Promise<void> {}
+
   async getGuidedOnboarding(): Promise<GuidedOnboardingRecord> {
     return this.guidedOnboarding;
   }

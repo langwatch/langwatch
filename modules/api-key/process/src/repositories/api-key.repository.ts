@@ -104,7 +104,18 @@ export abstract class ApiKeyRepository {
    */
   abstract findElapsedLoginKeys(input: {
     now: Instant;
+    organizationId?: string;
   }): Promise<{ id: string; userId: string | null; organizationId: string }[]>;
+  /** One organization's unrevoked CLI login keys that carry an expiry. */
+  abstract findLiveLoginKeys(input: {
+    organizationId: string;
+  }): Promise<{ id: string; createdAt: Instant; expiresAt: Instant }[]>;
+  /** Moves an unrevoked key's expiry, whoever owns it: a policy change, not a refresh. */
+  abstract lowerLoginKeyExpiry(input: {
+    id: string;
+    organizationId: string;
+    expiresAt: Instant;
+  }): Promise<void>;
   /**
    * Moves a live CLI login key's expiry with its session, so an inactive
    * session is still retired by the hourly sweep. A key already revoked is

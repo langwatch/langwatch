@@ -5,6 +5,7 @@ const unsupported = <Method>(): Method =>
 
 /** Complete API-key boundary for tests that only exercise a few methods. */
 export class TestApiKeyService implements ApiKeyApi {
+  applySessionCeiling = unsupported<ApiKeyApi["applySessionCeiling"]>();
   assertSelectionWithinCeiling = unsupported<ApiKeyApi["assertSelectionWithinCeiling"]>();
   create = unsupported<ApiKeyApi["create"]>();
   createKey = unsupported<ApiKeyApi["createKey"]>();

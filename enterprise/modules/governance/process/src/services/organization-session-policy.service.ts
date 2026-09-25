@@ -1,43 +1,38 @@
-import { SessionPolicyOutOfRangeError } from "@langwatch/enterprise-governance-contract";
-
-import {
-  type OrganizationSessionPolicyRepository,
-  type OrganizationSessionPolicy,
-} from "../repositories/session-policy.repository.ts";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type {
+  OrganizationSessionPolicyShape,
+  SessionCeilingApplied,
+} from "@langwatch/enterprise-governance-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 
 /**
- * The maximum lifetime an organization admin may enforce on CLI/device sessions. Zero means
- * unbounded; the hard cap of 365 keeps a silent typo of "9999" from making the field
- * effectively meaningless.
+ * Main's `sessionPolicy` router: organization owns the setting, and api-key
+ * owns the login keys it bounds.
  */
-export const SESSION_POLICY_MAX_DAYS = 365;
-
-/** Read and update the organization's session-lifetime policy. */
 export class OrganizationSessionPolicyService {
-  private constructor(private readonly repository: OrganizationSessionPolicyRepository) {}
+  private constructor(
+    private readonly organizations: Pick<OrganizationApi, "getSessionPolicy" | "saveSessionPolicy">,
+    private readonly loginKeys: Pick<ApiKeyApi, "applySessionCeiling">,
+  ) {}
 
-  static create(repository: OrganizationSessionPolicyRepository): OrganizationSessionPolicyService {
-    return new OrganizationSessionPolicyService(repository);
+  static create(options: {
+    organizations: Pick<OrganizationApi, "getSessionPolicy" | "saveSessionPolicy">;
+    loginKeys: Pick<ApiKeyApi, "applySessionCeiling">;
+  }): OrganizationSessionPolicyService {
+    return new OrganizationSessionPolicyService(options.organizations, options.loginKeys);
   }
 
-  async get(organizationId: string): Promise<OrganizationSessionPolicy> {
-    return this.repository.find(organizationId);
+  get(input: { organizationId: string }): Promise<OrganizationSessionPolicyShape> {
+    return this.organizations.getSessionPolicy(input);
   }
 
-  async setMaxDurationDays(
-    organizationId: string,
-    maxSessionDurationDays: number,
-  ): Promise<OrganizationSessionPolicy> {
-    if (
-      !Number.isInteger(maxSessionDurationDays) ||
-      maxSessionDurationDays < 0 ||
-      maxSessionDurationDays > SESSION_POLICY_MAX_DAYS
-    ) {
-      throw new SessionPolicyOutOfRangeError(maxSessionDurationDays, SESSION_POLICY_MAX_DAYS);
-    }
-
-    await this.repository.setMaxDurationDays(organizationId, maxSessionDurationDays);
-
-    return { maxSessionDurationDays };
+  /** The new ceiling applies to open sessions now, not at their next refresh. */
+  async setMaxDuration(input: {
+    organizationId: string;
+    maxSessionDurationDays: number;
+  }): Promise<SessionCeilingApplied> {
+    await this.organizations.saveSessionPolicy(input);
+    const reapedSessions = await this.loginKeys.applySessionCeiling(input);
+    return { ok: true, reapedSessions };
   }
 }

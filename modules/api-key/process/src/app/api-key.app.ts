@@ -43,8 +43,7 @@ import type { Instant } from "@langwatch/time";
 
 import type { ApiKeyRepositories } from "../repositories/api-key.repositories.ts";
 import { ApiKeyTokenAdapter } from "../repositories/memory/memory.api-key-token.repository.ts";
-import { ApiKeyBindingIdAdapter } from "../services/api-key-binding-id.service.ts";
-import { ApiKeyDiagnosticsAdapter } from "../services/api-key-diagnostics.service.ts";
+import { ApiKeyBindingIdService } from "../services/api-key-binding-id.service.ts";
 import { ApiKeyService } from "../services/api-key.service.ts";
 import { LegacyApiKeyGrantService } from "../services/legacy-api-key-grant.service.ts";
 
@@ -127,7 +126,7 @@ export class ApiKeyApp implements ApiKeyApi {
         grants: authorization,
         organizations: setup.dependencies.organizations,
         projects: setup.dependencies.projects,
-        bindingIds: ApiKeyBindingIdAdapter.create(),
+        bindingIds: ApiKeyBindingIdService.create(),
         legacyGrants: LegacyApiKeyGrantService.create({
           authz: authorization,
           grants: authorization,
@@ -135,7 +134,7 @@ export class ApiKeyApp implements ApiKeyApi {
           // second copy that drifted would write bindings the revocation
           // queries never find.
           deriveBindingId: (input) => authorization.deriveGrantId(input),
-          diagnostics: ApiKeyDiagnosticsAdapter.create(createLogger("langwatch:api-key")),
+          diagnostics: createLogger("langwatch:api-key"),
         }),
         // Blank is a configured state, not a refusal: a key hashed with no
         // pepper still authenticates, as the config leaf says.
@@ -325,6 +324,12 @@ export class ApiKeyApp implements ApiKeyApi {
     organizationId: string;
   }): Promise<CliSessionKeyRevocation> {
     return this.#service.revokeCliSessionKey(input);
+  }
+  async applySessionCeiling(input: {
+    organizationId: string;
+    maxSessionDurationDays: number;
+  }): Promise<number> {
+    return this.#service.applySessionCeiling(input);
   }
   async revokeCliLoginKeyForLogout(input: {
     apiKeyId: string;

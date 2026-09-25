@@ -233,6 +233,12 @@ export interface OrganizationApi {
    */
   getJoinSetting(input: { organizationId: string }): Promise<JoinRequestJoining>;
   saveJoinSetting(input: { organizationId: string; setting: JoinRequestJoining }): Promise<void>;
+  /** The CLI/device session ceiling in days; zero or an unknown organization is unbounded. */
+  getSessionPolicy(input: { organizationId: string }): Promise<{ maxSessionDurationDays: number }>;
+  saveSessionPolicy(input: {
+    organizationId: string;
+    maxSessionDurationDays: number;
+  }): Promise<void>;
   /** Replaces the record, leaving every other sign-up answer where it is. */
   writeGuidedOnboardingState(input: {
     organizationId: string;

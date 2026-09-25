@@ -89,6 +89,25 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     };
   }
 
+  async getSessionPolicy({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<{ maxSessionDurationDays: number }> {
+    const organization = this.memory.organizations.get(organizationId);
+    return { maxSessionDurationDays: organization?.maxSessionDurationDays ?? 0 };
+  }
+
+  async saveSessionPolicy({
+    organizationId,
+    maxSessionDurationDays,
+  }: {
+    organizationId: string;
+    maxSessionDurationDays: number;
+  }): Promise<void> {
+    this.requireOrganization(organizationId).maxSessionDurationDays = maxSessionDurationDays;
+  }
+
   async saveJoinSetting({
     organizationId,
     setting,

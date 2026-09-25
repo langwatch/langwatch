@@ -14,12 +14,15 @@ import {
   isRegistryPermission,
   type AuthzPermission,
 } from "@langwatch/authz-contract";
+import { createLogger } from "@langwatch/observability";
 import { Temporal, fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
 import type { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
 import type { ApiKeyLifecycleService } from "./api-key-lifecycle.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
+
+const logger = createLogger("langwatch:api-key:cli-login-key-reaper");
 
 export class ApiKeyCliService {
   static create(
@@ -268,6 +271,72 @@ export class ApiKeyCliService {
     userId: string;
     organizationId: string;
   }): Promise<CliSessionKeyRevocation> {
+    return this.revokeSessionKey({ ...input, cause: "user" });
+  }
+
+  /**
+   * Main's `applySessionCeiling`: brings one organization's live login keys
+   * forward to a new ceiling, then reaps the ones already past it. A ceiling
+   * of zero leaves the refresh windows alone; the next refresh recomputes them.
+   */
+  async applySessionCeiling(input: {
+    organizationId: string;
+    maxSessionDurationDays: number;
+  }): Promise<number> {
+    const { organizationId, maxSessionDurationDays } = input;
+    if (maxSessionDurationDays > 0) {
+      for (const key of await this.repository.findLiveLoginKeys({ organizationId })) {
+        const ceiling = loginKeyExpiresAt({
+          nowMs: key.expiresAt.epochMilliseconds,
+          sessionStartedAtMs: key.createdAt.epochMilliseconds,
+          maxSessionDurationDays,
+          refreshWindowMs: 0,
+        });
+        if (Temporal.Instant.compare(ceiling, key.expiresAt) < 0) {
+          await this.repository.lowerLoginKeyExpiry({
+            id: key.id,
+            organizationId,
+            expiresAt: ceiling,
+          });
+        }
+      }
+    }
+    return this.reapElapsedLoginKeys({ organizationId });
+  }
+
+  private async reapElapsedLoginKeys(input: { organizationId: string }): Promise<number> {
+    const elapsed = await this.repository.findElapsedLoginKeys({
+      now: nowInstant(),
+      organizationId: input.organizationId,
+    });
+    let count = 0;
+    for (const key of elapsed) {
+      if (!key.userId) continue;
+      try {
+        const { loginKeyRevoked } = await this.revokeSessionKey({
+          apiKeyId: key.id,
+          userId: key.userId,
+          organizationId: key.organizationId,
+          cause: "expired",
+        });
+        if (loginKeyRevoked) count += 1;
+      } catch (error) {
+        logger.warn(
+          { error, apiKeyId: key.id, organizationId: key.organizationId },
+          "could not revoke an expired CLI login key",
+        );
+      }
+    }
+    if (count > 0) logger.info({ count, ...input }, "reaped expired CLI login keys");
+    return count;
+  }
+
+  private async revokeSessionKey(input: {
+    apiKeyId: string;
+    userId: string;
+    organizationId: string;
+    cause: "user" | "expired";
+  }): Promise<CliSessionKeyRevocation> {
     let loginKeyRevoked = true;
     try {
       await this.lifecycle.revoke({
@@ -275,7 +344,7 @@ export class ApiKeyCliService {
         callerUserId: input.userId,
         callerIsAdmin: false,
         organizationId: input.organizationId,
-        cause: "user",
+        cause: input.cause,
         cascadeToChildren: false,
       });
     } catch (error) {
@@ -289,7 +358,7 @@ export class ApiKeyCliService {
       parentApiKeyId: input.apiKeyId,
       organizationId: input.organizationId,
       callerUserId: input.userId,
-      cause: "user",
+      cause: input.cause,
     });
     return { loginKeyRevoked, ingestKeysRevoked };
   }
