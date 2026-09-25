@@ -14,6 +14,7 @@ import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
+import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
 import { ModelProviderApp } from "../model-provider.app.ts";
 import { createModelProviderTestDataPrivacy } from "./model-provider.fixture.ts";
 
@@ -100,9 +101,11 @@ function fakeRedis(): RedisConnection {
  * Builds the app exactly the way boot does: through `create`, not test-only
  * `createForTesting`.
  */
-function createRealModelProviderApp(): Promise<ModelProviderApp> {
+function createRealModelProviderApp(
+  repositories: ModelProviderRepositories = MemoryModelProviderRepositories.create(),
+): Promise<ModelProviderApp> {
   return ModelProviderApp.create({
-    repositories: MemoryModelProviderRepositories.create(),
+    repositories,
     dependencies: {
       projects: createFullModelProviderTestProjects(),
       organizations: createFullModelProviderTestOrganizations(),
@@ -153,6 +156,34 @@ describe("ModelProviderApp.create", () => {
           customKeys: { OPENAI_API_KEY: "sk-test" },
         }),
       ).resolves.toBeDefined();
+    });
+  });
+
+  describe("given default-model configs on the organization and on a sibling project", () => {
+    describe("when a credential that names no person reads the snapshot", () => {
+      it("lists no configs, as main's null-session read does, and still resolves the cascade", async () => {
+        const repositories = MemoryModelProviderRepositories.create();
+        await repositories.defaults.save({
+          id: "config-organization",
+          organizationId: "organization-1",
+          config: { DEFAULT: "openai/gpt-5-mini" },
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: "organization-1" }],
+          authorId: null,
+        });
+        await repositories.defaults.save({
+          id: "config-sibling",
+          organizationId: "organization-1",
+          config: { DEFAULT: "openai/gpt-5" },
+          scopes: [{ scopeType: "PROJECT", scopeId: "project-2" }],
+          authorId: null,
+        });
+        const app = await createRealModelProviderApp(repositories);
+
+        const snapshot = await app.getDefaultSnapshotUnattributed({ projectId: "project-1" });
+
+        expect(snapshot.configs).toEqual([]);
+        expect(snapshot.effective.DEFAULT).toMatchObject({ scope: "organization" });
+      });
     });
   });
 });

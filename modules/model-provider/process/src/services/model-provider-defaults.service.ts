@@ -45,14 +45,19 @@ export class ModelProviderDefaultsService {
     const parsed = modelDefaultSnapshotInputSchema.parse(input);
     const context = await this.options.scopes.getProjectContext(parsed.projectId);
     const configs = await this.getConfigs(parsed.projectId, context.organizationId);
-    const visible = await this.visibleConfigs(configs, parsed.actorId);
+    const visible = await this.visibleConfigs({
+      configs,
+      actorId: parsed.actorId,
+      projectId: parsed.projectId,
+      organizationId: context.organizationId,
+    });
     const available = await this.getAvailableScopes({
       projectId: parsed.projectId,
       teamId: context.teamId,
       organizationId: context.organizationId,
     });
     const effective = this.resolveEffective({
-      configs: visible,
+      configs,
       chain: this.projectChain({
         projectId: parsed.projectId,
         teamId: context.teamId,
@@ -161,22 +166,28 @@ export class ModelProviderDefaultsService {
     ]);
   }
 
-  private async visibleConfigs(
-    configs: ModelDefaultConfig[],
-    actorId?: string,
-  ): Promise<ModelDefaultConfig[]> {
-    if (!actorId) {
-      return configs;
-    }
+  /** A reader sees what it may read; no reader sees only its own organization-less project. */
+  private async visibleConfigs({
+    configs,
+    actorId,
+    projectId,
+    organizationId,
+  }: {
+    configs: ModelDefaultConfig[];
+    actorId?: string;
+    projectId: string;
+    organizationId: string | null;
+  }): Promise<ModelDefaultConfig[]> {
+    const canRead = actorId
+      ? (scope: ModelDefaultScope) => this.options.authorization.canRead(actorId, scope)
+      : async (scope: ModelDefaultScope) =>
+          organizationId === null && scope.scopeType === "PROJECT" && scope.scopeId === projectId;
 
     const visible = await Promise.all(
-      configs.map(async (config) => {
-        const scopes = await ModelProviderDefaultsService.filterScopes(config.scopes, (scope) =>
-          this.options.authorization.canRead(actorId, scope),
-        );
-
-        return { ...config, scopes };
-      }),
+      configs.map(async (config) => ({
+        ...config,
+        scopes: await ModelProviderDefaultsService.filterScopes(config.scopes, canRead),
+      })),
     );
 
     return visible.filter((config) => config.scopes.length > 0);
