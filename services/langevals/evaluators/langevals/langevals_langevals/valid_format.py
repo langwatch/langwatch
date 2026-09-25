@@ -102,10 +102,21 @@ class ValidFormatEvaluator(
                 )
         elif self.settings.format == "python":
             try:
-                ast.parse(entry.output)
+                parsed_module = ast.parse(entry.output)
             except Exception as e:
                 return ValidFormatResult(
                     score=0, passed=False, details=f"Invalid Python: {e}"
+                )
+            # ast.parse() accepts whitespace-only and comment-only source as a
+            # valid empty module (comments are not AST nodes), so the leading
+            # empty-string guard misses them. A completion with no statements
+            # is not valid Python output — treat it as a failure, not a pass
+            # (#8283).
+            if not parsed_module.body:
+                return ValidFormatResult(
+                    score=0,
+                    passed=False,
+                    details="Invalid Python: no statements (whitespace- or comment-only output)",
                 )
         elif self.settings.format == "sql":
             try:
