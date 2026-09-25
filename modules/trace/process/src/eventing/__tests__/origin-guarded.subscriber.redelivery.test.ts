@@ -12,10 +12,13 @@ import {
   passesTraceOriginGuards,
 } from "../origin-guarded.subscriber.ts";
 import {
+  OCCURRED_AT,
   createContext,
   createFoldState,
-  createTraceEvent,
-  OCCURRED_AT,
+  createOriginResolvedEvent,
+  createOtlpSpan,
+  createSpanReceivedEvent,
+  createTopicAssignedEvent,
 } from "./trace-subscriber.fixtures.ts";
 
 vi.mock("@langwatch/observability", () => ({
@@ -37,7 +40,7 @@ function makeGuardedSubscriber(options: { isRelevant?: (event: TraceProcessingEv
   return { ran, subscriber };
 }
 
-const event = createTraceEvent("lw.obs.trace.span_received");
+const event = createSpanReceivedEvent(createOtlpSpan());
 const foldState = createFoldState();
 
 function guardedContext(state: TraceSummaryData): TriggerContext<TraceSummaryData> {
@@ -108,7 +111,7 @@ describe("given an origin-guarded subscriber", () => {
      */
     it("declines it however many times it arrives", async () => {
       const { ran, subscriber } = makeGuardedSubscriber({});
-      const derived = createTraceEvent("lw.obs.trace.topic_assigned");
+      const derived = createTopicAssignedEvent();
 
       await subscriber.spec.handler(derived, guardedContext(foldState));
       await subscriber.spec.handler(derived, guardedContext(foldState));
@@ -145,10 +148,7 @@ describe("given an origin-guarded subscriber", () => {
       await subscriber.spec.handler(event, guardedContext(unresolved));
       expect(ran).toEqual([]);
 
-      await subscriber.spec.handler(
-        createTraceEvent("lw.obs.trace.origin_resolved"),
-        guardedContext(foldState),
-      );
+      await subscriber.spec.handler(createOriginResolvedEvent(), guardedContext(foldState));
       expect(ran).toHaveLength(1);
     });
   });

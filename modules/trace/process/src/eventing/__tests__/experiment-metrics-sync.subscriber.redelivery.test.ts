@@ -8,10 +8,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createExperimentMetricsSyncHandler } from "../experiment-metrics-sync.subscriber.ts";
 import {
+  OCCURRED_AT,
   createContext,
   createFoldState,
-  createTraceEvent,
-  OCCURRED_AT,
+  createOtlpSpan,
+  createSpanReceivedEvent,
 } from "./trace-subscriber.fixtures.ts";
 
 vi.mock("@langwatch/observability", () => ({
@@ -42,7 +43,7 @@ const foldState = createFoldState({
   totalCost: 0.42,
 });
 
-const event = createTraceEvent("lw.obs.trace.span_received");
+const event = createSpanReceivedEvent(createOtlpSpan());
 
 describe("given an experiment trace that has stabilised", () => {
   describe("when the same event is handled twice", () => {

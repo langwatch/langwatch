@@ -22,10 +22,11 @@ import {
   type CustomerIoTraceSyncSubscriberDeps,
 } from "../customer-io-trace-sync.subscriber.ts";
 import {
+  TENANT_ID,
   createContext,
   createFoldState,
-  createTraceEvent,
-  TENANT_ID,
+  createOtlpSpan,
+  createSpanReceivedEvent,
 } from "./trace-subscriber.fixtures.ts";
 
 function createAdminResolution(overrides: Partial<OrgAdminResolution> = {}): OrgAdminResolution {
@@ -110,7 +111,7 @@ describe("createCustomerIoTraceSyncHandler()", () => {
           },
         });
 
-        await handler(createTraceEvent("lw.obs.trace.span_received"), createContext(state));
+        await handler(createSpanReceivedEvent(createOtlpSpan()), createContext(state));
 
         expect(deps.traceSync.fireFirstTraceIntegrated).toHaveBeenCalledWith({
           userId: "user-1",
@@ -131,7 +132,7 @@ describe("createCustomerIoTraceSyncHandler()", () => {
       const handler = createCustomerIoTraceSyncHandler(deps);
       const state = createFoldState({ attributes: { "langwatch.origin": "langy" } });
 
-      await handler(createTraceEvent("lw.obs.trace.span_received"), createContext(state));
+      await handler(createSpanReceivedEvent(createOtlpSpan()), createContext(state));
 
       expect(resolveOrgAdmin).not.toHaveBeenCalled();
       expect(deps.traceSync.fireFirstTraceIntegrated).not.toHaveBeenCalled();
@@ -148,7 +149,7 @@ describe("createCustomerIoTraceSyncHandler()", () => {
         const traceTime = new Date("2026-03-15T10:00:00Z").getTime();
         const state = createFoldState({ occurredAt: traceTime });
 
-        await handler(createTraceEvent("lw.obs.trace.span_received"), createContext(state));
+        await handler(createSpanReceivedEvent(createOtlpSpan()), createContext(state));
 
         expect(deps.traceSync.identifySubsequentTrace).toHaveBeenCalledWith({
           userId: "user-1",
@@ -163,11 +164,11 @@ describe("createCustomerIoTraceSyncHandler()", () => {
         const handler = createCustomerIoTraceSyncHandler(deps);
         const state = createFoldState();
 
-        await handler(createTraceEvent("lw.obs.trace.span_received"), createContext(state));
+        await handler(createSpanReceivedEvent(createOtlpSpan()), createContext(state));
         vi.setSystemTime(
           new Date("2026-03-15T12:00:00Z").getTime() + CIO_TRACE_SYNC_DEBOUNCE_MS - 1,
         );
-        await handler(createTraceEvent("lw.obs.trace.span_received"), createContext(state));
+        await handler(createSpanReceivedEvent(createOtlpSpan()), createContext(state));
 
         expect(deps.traceSync.identifySubsequentTrace).toHaveBeenCalledTimes(1);
       });
@@ -177,11 +178,11 @@ describe("createCustomerIoTraceSyncHandler()", () => {
         const handler = createCustomerIoTraceSyncHandler(deps);
         const state = createFoldState();
 
-        await handler(createTraceEvent("lw.obs.trace.span_received"), createContext(state));
+        await handler(createSpanReceivedEvent(createOtlpSpan()), createContext(state));
         vi.setSystemTime(
           new Date("2026-03-15T12:00:00Z").getTime() + CIO_TRACE_SYNC_DEBOUNCE_MS + 1,
         );
-        await handler(createTraceEvent("lw.obs.trace.span_received"), createContext(state));
+        await handler(createSpanReceivedEvent(createOtlpSpan()), createContext(state));
 
         expect(deps.traceSync.identifySubsequentTrace).toHaveBeenCalledTimes(2);
       });
@@ -193,10 +194,7 @@ describe("createCustomerIoTraceSyncHandler()", () => {
       const { deps } = createDeps({ resolution: { userId: null } });
       const handler = createCustomerIoTraceSyncHandler(deps);
 
-      await handler(
-        createTraceEvent("lw.obs.trace.span_received"),
-        createContext(createFoldState()),
-      );
+      await handler(createSpanReceivedEvent(createOtlpSpan()), createContext(createFoldState()));
 
       expect(deps.traceSync.fireFirstTraceIntegrated).not.toHaveBeenCalled();
       expect(deps.traceSync.identifySubsequentTrace).not.toHaveBeenCalled();
@@ -214,7 +212,7 @@ describe("createCustomerIoTraceSyncHandler()", () => {
       const handler = createCustomerIoTraceSyncHandler(deps);
 
       await expect(
-        handler(createTraceEvent("lw.obs.trace.span_received"), createContext(createFoldState())),
+        handler(createSpanReceivedEvent(createOtlpSpan()), createContext(createFoldState())),
       ).resolves.toBeUndefined();
       expect(logger.error).toHaveBeenCalledTimes(1);
     });
@@ -226,10 +224,7 @@ describe("createCustomerIoTraceSyncHandler()", () => {
       const { deps, resolveOrgAdmin } = createDeps();
       const handler = createCustomerIoTraceSyncHandler(deps);
 
-      await handler(
-        createTraceEvent("lw.obs.trace.span_received"),
-        createContext(createFoldState()),
-      );
+      await handler(createSpanReceivedEvent(createOtlpSpan()), createContext(createFoldState()));
 
       expect(resolveOrgAdmin).toHaveBeenCalledWith(TENANT_ID);
     });

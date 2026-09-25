@@ -326,98 +326,28 @@ describe("prefetchWithFixture", () => {
       });
     });
 
-    describe("given a prompt without a model configured", () => {
-      const promptWithoutModel = {
-        id: "prompt_123",
-        prompt: "You are helpful",
-        messages: [],
-        model: null,
-        temperature: 0.7,
-        maxTokens: 1000,
-      };
-
-      describe("when prefetching scenario data", () => {
-        /** @scenario "A prompt without a model resolves the agent-under-test default" */
-        /**
-         * @scenario "A FAST-only-codex project still resolves the DEFAULT-role agent-under-test
-         * key for prompts"
-         */
-        it("resolves the agent-under-test model, not the scenario-generator model", async () => {
-          const mockModelParamsProvider: ModelParamsProvider = {
-            prepare: vi.fn().mockResolvedValue(defaultModelParamsResult),
-          };
-
-          const deps = createMockDeps({
-            promptFetcher: {
-              findByIdOrHandle: vi.fn().mockResolvedValue(promptWithoutModel),
-            },
-            modelParamsProvider: mockModelParamsProvider,
-          });
-
-          const target: TargetConfig = {
-            type: "prompt",
-            referenceId: "prompt_123",
-          };
-
-          await prefetchWithFixture({ context: defaultContext, target, deps });
-
-          expect(deps.modelResolver.resolve).toHaveBeenCalledWith(
-            "scenarios.agent_under_test",
-            "proj_123",
-          );
-          expect(deps.modelResolver.resolve).not.toHaveBeenCalledWith(
-            "scenarios.generator",
-            expect.anything(),
-          );
-          // The mock resolver maps this key to its OWN distinguishable
-          // value ("anthropic/claude-3-sonnet") — the old
-          // "scenarios.generator" key resolves to a different value
-          // ("anthropic/wrong-key-generator"), so this assertion fails if
-          // the wrong key is resolved even though a model does come back.
-          expect(mockModelParamsProvider.prepare).toHaveBeenCalledWith(
-            "proj_123",
-            "anthropic/claude-3-sonnet",
-          );
+    describe("given a prompt target preparing a run", () => {
+      /** @scenario "A worker prepares a run through canonical services" */
+      it("prepares model params exactly three times — agent, simulator, and judge", async () => {
+        const deps = createMockDeps({
+          promptFetcher: {
+            findByIdOrHandle: vi.fn().mockResolvedValue({
+              id: "prompt_123",
+              prompt: "You are helpful",
+              messages: [],
+              model: "openai/gpt-4",
+            }),
+          },
         });
 
-        /** @scenario "A prompt without a model resolves the agent-under-test default" */
-        it("calls the agent-under-test resolver exactly once", async () => {
-          const deps = createMockDeps({
-            promptFetcher: {
-              findByIdOrHandle: vi.fn().mockResolvedValue(promptWithoutModel),
-            },
-          });
-
-          await prefetchWithFixture({
-            context: defaultContext,
-            target: { type: "prompt", referenceId: "prompt_123" },
-            deps,
-          });
-
-          const agentUnderTestCalls = (
-            deps.modelResolver.resolve as ReturnType<typeof vi.fn>
-          ).mock.calls.filter(([featureKey]) => featureKey === "scenarios.agent_under_test");
-          expect(agentUnderTestCalls).toHaveLength(1);
+        const result = await prefetchWithFixture({
+          context: defaultContext,
+          target: { type: "prompt", referenceId: "prompt_123" },
+          deps,
         });
 
-        /** @scenario "A prompt without a model resolves the agent-under-test default" */
-        /** @scenario "A worker prepares a run through canonical services" */
-        it("prepares model params exactly three times — agent, simulator, and judge", async () => {
-          const deps = createMockDeps({
-            promptFetcher: {
-              findByIdOrHandle: vi.fn().mockResolvedValue(promptWithoutModel),
-            },
-          });
-
-          const result = await prefetchWithFixture({
-            context: defaultContext,
-            target: { type: "prompt", referenceId: "prompt_123" },
-            deps,
-          });
-
-          expect(result.success).toBe(true);
-          expect(deps.modelParamsProvider.prepare).toHaveBeenCalledTimes(3);
-        });
+        expect(result.success).toBe(true);
+        expect(deps.modelParamsProvider.prepare).toHaveBeenCalledTimes(3);
       });
     });
 
@@ -1145,16 +1075,17 @@ describe("prefetchWithFixture", () => {
     });
 
     describe("given model resolution throws", () => {
-      const promptWithoutAModel = {
+      const promptWithAModel = {
         id: "prompt_123",
         prompt: "You are helpful",
         messages: [],
+        model: "openai/gpt-4",
       };
 
       const depsWhoseResolverThrows = (error: unknown) =>
         createMockDeps({
           promptFetcher: {
-            findByIdOrHandle: vi.fn().mockResolvedValue(promptWithoutAModel),
+            findByIdOrHandle: vi.fn().mockResolvedValue(promptWithAModel),
           },
           modelResolver: {
             resolve: vi.fn().mockRejectedValue(error),
@@ -2502,6 +2433,7 @@ describe("prefetchWithFixture", () => {
               id: "prompt_123",
               prompt: "You are helpful",
               messages: [],
+              model: "openai/gpt-4",
             }),
           },
         });

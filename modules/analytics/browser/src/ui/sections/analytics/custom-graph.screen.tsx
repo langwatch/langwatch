@@ -906,6 +906,16 @@ function CustomGraphForm({
   );
 }
 
+/** A polarity grouping (sentiment, pass/fail, errors) reads best as positive/negative/neutral. */
+function colorSetForGroupBy(groupBy: string): "positiveNegativeNeutral" | "colors" {
+  const isPolarityGroup =
+    groupBy.startsWith("sentiment") ||
+    groupBy === "evaluations.evaluation_passed" ||
+    groupBy === "evaluations.evaluation_processing_state" ||
+    groupBy.includes("has_error");
+  return isPolarityGroup ? "positiveNegativeNeutral" : "colors";
+}
+
 function SeriesFieldItem({
   form,
   field,
@@ -955,15 +965,7 @@ function SeriesFieldItem({
     }
 
     if (seriesLength === 1 && groupBy) {
-      const isPolarityGroup =
-        groupBy.startsWith("sentiment") ||
-        groupBy === "evaluations.evaluation_passed" ||
-        groupBy === "evaluations.evaluation_processing_state" ||
-        groupBy.includes("has_error");
-      form.setValue(
-        `series.${index}.colorSet`,
-        isPolarityGroup ? "positiveNegativeNeutral" : "colors",
-      );
+      form.setValue(`series.${index}.colorSet`, colorSetForGroupBy(groupBy));
     }
   }, [form, groupBy, index, seriesLength]);
 
@@ -1081,6 +1083,37 @@ function SeriesFieldItem({
   );
 }
 
+/** The name a series reads as, from its pipeline aggregation, metric, aggregation and pipeline. */
+function defaultSeriesName({
+  metricLabel,
+  aggregation,
+  pipelineField,
+  pipelineAggregation,
+}: {
+  metricLabel: string | undefined;
+  aggregation: keyof typeof metricAggregations | undefined;
+  pipelineField: keyof typeof analyticsPipelines | "" | undefined;
+  pipelineAggregation: keyof typeof pipelineAggregations | undefined;
+}): string {
+  const aggregationLabel = aggregation
+    ? (metricAggregations[aggregation] ?? aggregation)
+    : undefined;
+  if (!pipelineField) {
+    return uppercaseFirstLetterLowerCaseRest(
+      [metricLabel, aggregationLabel].filter((x) => x).join(" "),
+    );
+  }
+  const pipelineLabel = analyticsPipelines[pipelineField]?.label ?? pipelineField;
+  const pipelineAggregationLabel = pipelineAggregation
+    ? (pipelineAggregations[pipelineAggregation] ?? pipelineAggregation)
+    : undefined;
+  return uppercaseFirstLetterLowerCaseRest(
+    [pipelineAggregationLabel, metricLabel, aggregationLabel, pipelineLabel]
+      .filter((x) => x)
+      .join(" "),
+  );
+}
+
 function SeriesField({
   form,
   index,
@@ -1135,18 +1168,12 @@ function SeriesField({
   }, [metric]);
 
   useEffect(() => {
-    const aggregation_ = aggregation ? (metricAggregations[aggregation] ?? aggregation) : undefined;
-    const pipeline_ = pipelineField
-      ? (analyticsPipelines[pipelineField]?.label ?? pipelineField)
-      : undefined;
-    const pipelineAggregation_ =
-      pipelineField && pipelineAggregation
-        ? (pipelineAggregations[pipelineAggregation] ?? pipelineAggregation)
-        : undefined;
-
-    const name_ = uppercaseFirstLetterLowerCaseRest(
-      [pipelineAggregation_, metric_?.label, aggregation_, pipeline_].filter((x) => x).join(" "),
-    );
+    const name_ = defaultSeriesName({
+      metricLabel: metric_?.label,
+      aggregation,
+      pipelineField,
+      pipelineAggregation,
+    });
 
     if ((!customId && !form.getFieldState(`series.${index}.name`)?.isTouched) || !name) {
       form.resetField(`series.${index}.name`, { defaultValue: name_ });

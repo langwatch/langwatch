@@ -6,7 +6,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createSpanStorageBroadcastHandler } from "../span-storage-broadcast.subscriber.ts";
-import { createContext, createTraceEvent } from "./trace-subscriber.fixtures.ts";
+import {
+  createContext,
+  createOtlpSpan,
+  createSpanReceivedEvent,
+} from "./trace-subscriber.fixtures.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
@@ -30,7 +34,7 @@ function makeBroadcastSink(fail = false) {
   };
 }
 
-const event = createTraceEvent("lw.obs.trace.span_received");
+const event = createSpanReceivedEvent(createOtlpSpan());
 
 describe("given a stored span", () => {
   describe("when the same event is handled twice", () => {
@@ -92,7 +96,7 @@ describe("given two traces in one tenant", () => {
 
     await handler(event, createContext(undefined));
     await handler(
-      createTraceEvent("lw.obs.trace.span_received", { aggregateId: "trace-2" }),
+      createSpanReceivedEvent(createOtlpSpan(), { aggregateId: "trace-2" }),
       createContext(undefined),
     );
 

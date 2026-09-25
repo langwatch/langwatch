@@ -10,10 +10,11 @@ import {
   ProjectMetadataSync,
 } from "../project-metadata.subscriber.ts";
 import {
+  TENANT_ID,
   createContext,
   createFoldState,
-  createTraceEvent,
-  TENANT_ID,
+  createOtlpSpan,
+  createSpanReceivedEvent,
 } from "./trace-subscriber.fixtures.ts";
 
 vi.mock("@langwatch/observability", () => ({
@@ -42,7 +43,7 @@ function makeProjectStore(initial: { firstMessage: boolean; integrated: boolean 
   };
 }
 
-const event = createTraceEvent("lw.obs.trace.span_received");
+const event = createSpanReceivedEvent(createOtlpSpan());
 const foldState = createFoldState({
   attributes: { "langwatch.origin": "application", "sdk.language": "python" },
 });

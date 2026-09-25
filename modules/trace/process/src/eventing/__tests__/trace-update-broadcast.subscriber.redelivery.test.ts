@@ -6,7 +6,13 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createTraceUpdateBroadcastHandler } from "../trace-update-broadcast.subscriber.ts";
-import { createContext, createFoldState, createTraceEvent } from "./trace-subscriber.fixtures.ts";
+import {
+  createContext,
+  createFoldState,
+  createOtlpSpan,
+  createSpanReceivedEvent,
+  createTopicAssignedEvent,
+} from "./trace-subscriber.fixtures.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
@@ -30,7 +36,7 @@ function makeBroadcastSink(fail = false) {
   };
 }
 
-const event = createTraceEvent("lw.obs.trace.span_received");
+const event = createSpanReceivedEvent(createOtlpSpan());
 
 describe("given an updated trace", () => {
   describe("when the same event is handled twice", () => {
@@ -78,7 +84,7 @@ describe("given an updated trace", () => {
 
       await handler(event, createContext(createFoldState()));
       await handler(
-        createTraceEvent("lw.obs.trace.topic_assigned"),
+        createTopicAssignedEvent(),
         createContext(createFoldState({ topicId: "topic-1" })),
       );
 

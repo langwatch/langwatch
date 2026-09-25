@@ -1,12 +1,17 @@
 import { createTenantId, type TriggerContext } from "@langwatch/eventing";
 import {
+  ORIGIN_RESOLVED_EVENT_TYPE,
+  ORIGIN_RESOLVED_EVENT_VERSION_LATEST,
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
+  TOPIC_ASSIGNED_EVENT_TYPE,
+  TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
 } from "@langwatch/trace-contract";
 import type {
+  OriginResolvedEvent,
   OtlpSpan,
   SpanReceivedEvent,
-  TraceProcessingEvent,
+  TopicAssignedEvent,
   TraceSummaryData,
 } from "@langwatch/trace-contract";
 
@@ -119,23 +124,46 @@ export function createSpanReceivedEvent(
   };
 }
 
-export function createTraceEvent(
-  type: string,
-  overrides: Partial<TraceProcessingEvent> = {},
-): TraceProcessingEvent {
+export function createTopicAssignedEvent(
+  overrides: Partial<TopicAssignedEvent> = {},
+): TopicAssignedEvent {
   return {
     id: "event-1",
     aggregateId: TRACE_ID,
     aggregateType: "trace",
-    tenantId: TENANT_ID,
+    tenantId: createTenantId(TENANT_ID),
     createdAt: OCCURRED_AT,
     occurredAt: OCCURRED_AT,
-    type,
-    version: 1,
-    data: {},
+    type: TOPIC_ASSIGNED_EVENT_TYPE,
+    version: TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
+    data: {
+      topicId: null,
+      topicName: null,
+      subtopicId: null,
+      subtopicName: null,
+      isIncremental: false,
+    },
     metadata: {},
     ...overrides,
-  } as unknown as TraceProcessingEvent;
+  };
+}
+
+export function createOriginResolvedEvent(
+  overrides: Partial<OriginResolvedEvent> = {},
+): OriginResolvedEvent {
+  return {
+    id: "event-1",
+    aggregateId: TRACE_ID,
+    aggregateType: "trace",
+    tenantId: createTenantId(TENANT_ID),
+    createdAt: OCCURRED_AT,
+    occurredAt: OCCURRED_AT,
+    type: ORIGIN_RESOLVED_EVENT_TYPE,
+    version: ORIGIN_RESOLVED_EVENT_VERSION_LATEST,
+    data: { origin: "application", reason: "fixture" },
+    metadata: {},
+    ...overrides,
+  };
 }
 
 export function createContext<TState>(state: TState): TriggerContext<TState> {

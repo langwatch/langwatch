@@ -246,7 +246,6 @@ function promptService(deps: ScenarioPrefetchFixture): PromptApi {
         tags: [],
         parameters: {},
         ...value,
-        model: typeof value.model === "string" ? value.model : "",
       });
     },
   });

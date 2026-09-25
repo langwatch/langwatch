@@ -597,6 +597,94 @@ function getGroupByExpression(groupBy: string, groupByKey?: string): GroupByExpr
 /**
  * Build the complete timeseries query.
  */
+/** One series' metric, through the pipeline translation when the series aggregates a pipeline. */
+function translateSeriesMetric({
+  series,
+  index,
+}: {
+  series: TimeseriesQueryInput["series"][number];
+  index: number;
+}): MetricTranslation {
+  const common = {
+    metric: series.metric,
+    aggregation: series.aggregation,
+    index,
+    key: series.key,
+    subkey: series.subkey,
+  };
+  if (!series.pipeline) return translateMetric(common);
+  return translatePipelineAggregation({
+    ...common,
+    pipelineField: series.pipeline.field,
+    pipelineAggregation: series.pipeline.aggregation,
+  });
+}
+
+/**
+ * The filter conditions appended to every builder path's WHERE. negateFilters inverts the
+ * user's selection (the UI's negate toggle); the trace scope and the caller's origin exclusion
+ * are restrictions outside that selection, so neither is negated. An unstamped origin reads ''.
+ */
+function buildScopedFilterWhere({
+  ts,
+  input,
+  filterWhereClause,
+}: {
+  ts: string;
+  input: TimeseriesQueryInput;
+  filterWhereClause: string;
+}): { filterWhere: string; params: Record<string, unknown> } {
+  const conditions: string[] = [];
+  const params: Record<string, unknown> = {};
+  if (filterWhereClause !== "1=1") {
+    conditions.push(input.negateFilters ? `NOT (${filterWhereClause})` : filterWhereClause);
+  }
+  if (input.traceIds && input.traceIds.length > 0) {
+    conditions.push(`${ts}.TraceId IN ({traceIds:Array(String)})`);
+    params.traceIds = input.traceIds;
+  }
+  if (input.excludeOrigins && input.excludeOrigins.length > 0) {
+    conditions.push(
+      `ifNull(${ts}.Attributes['langwatch.origin'], '') NOT IN ({excludeOrigins:Array(String)})`,
+    );
+    params.excludeOrigins = input.excludeOrigins;
+  }
+  // Its own paren: call sites splice this after a bare single-range WHERE, and a condition can
+  // hold an OR, so nesting one level deeper keeps it outside the tenant guard's reach.
+  const filterWhere = conditions.length > 0 ? `AND (${conditions.join(" AND ")})` : "";
+  return { filterWhere, params };
+}
+
+/** The group-by column a timeseries groups on, and what that grouping demands of the query. */
+function resolveTimeseriesGroupBy(input: TimeseriesQueryInput): {
+  groupByColumn: string | null;
+  usesArrayJoin: boolean;
+  groupByHandlesUnknown: boolean;
+  groupByRequiresSpans: boolean;
+  spanModelPartitioned: boolean;
+  requiredJoins: CHTable[];
+} {
+  if (!input.groupBy) {
+    return {
+      groupByColumn: null,
+      usesArrayJoin: false,
+      groupByHandlesUnknown: false,
+      groupByRequiresSpans: false,
+      spanModelPartitioned: false,
+      requiredJoins: [],
+    };
+  }
+  const groupByExpr = getGroupByExpression(input.groupBy, input.groupByKey);
+  return {
+    groupByColumn: groupByExpr.column,
+    usesArrayJoin: groupByExpr.usesArrayJoin ?? false,
+    groupByHandlesUnknown: groupByExpr.handlesUnknown ?? false,
+    groupByRequiresSpans: groupByExpr.requiredJoins.includes("stored_spans"),
+    spanModelPartitioned: groupByExpr.spanModelPartitioned ?? false,
+    requiredJoins: [...groupByExpr.requiredJoins],
+  };
+}
+
 export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   // ADR-034 Phase 3: routing to `trace_analytics_rollup` /
   // `trace_analytics` read path lives in the Analytics feature now — the
@@ -606,39 +694,12 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   const ts = tableAliases.trace_summaries;
   const timeZone = input.timeZone ?? "UTC";
 
-  // Collect all required JOINs and metric expressions
   const allJoins = new Set<CHTable>();
-  const metricTranslations: MetricTranslation[] = [];
-
-  // Translate each series metric
-  for (let i = 0; i < input.series.length; i++) {
-    const series = input.series[i]!;
-    let translation: MetricTranslation;
-
-    if (series.pipeline) {
-      translation = translatePipelineAggregation({
-        metric: series.metric,
-        aggregation: series.aggregation,
-        pipelineField: series.pipeline.field,
-        pipelineAggregation: series.pipeline.aggregation,
-        index: i,
-        key: series.key,
-        subkey: series.subkey,
-      });
-    } else {
-      translation = translateMetric({
-        metric: series.metric,
-        aggregation: series.aggregation,
-        index: i,
-        key: series.key,
-        subkey: series.subkey,
-      });
-    }
-
-    metricTranslations.push(translation);
-    for (const join of translation.requiredJoins) {
-      allJoins.add(join);
-    }
+  const metricTranslations = input.series.map((series, index) =>
+    translateSeriesMetric({ series, index }),
+  );
+  for (const translation of metricTranslations) {
+    for (const join of translation.requiredJoins) allJoins.add(join);
   }
 
   // Translate filters. Span/event facet filters resolve to stored_spans
@@ -659,23 +720,15 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     ...metricParams,
   };
 
-  // Handle groupBy
-  let groupByColumn: string | null = null;
-  let usesArrayJoin = false;
-  let groupByHandlesUnknown = false;
-  let groupByRequiresSpans = false;
-  let spanModelPartitioned = false;
-  if (input.groupBy) {
-    const groupByExpr = getGroupByExpression(input.groupBy, input.groupByKey);
-    groupByColumn = groupByExpr.column;
-    usesArrayJoin = groupByExpr.usesArrayJoin ?? false;
-    groupByHandlesUnknown = groupByExpr.handlesUnknown ?? false;
-    groupByRequiresSpans = groupByExpr.requiredJoins.includes("stored_spans");
-    spanModelPartitioned = groupByExpr.spanModelPartitioned ?? false;
-    for (const join of groupByExpr.requiredJoins) {
-      allJoins.add(join);
-    }
-  }
+  const {
+    groupByColumn,
+    usesArrayJoin,
+    groupByHandlesUnknown,
+    groupByRequiresSpans,
+    spanModelPartitioned,
+    requiredJoins: groupByJoins,
+  } = resolveTimeseriesGroupBy(input);
+  for (const join of groupByJoins) allJoins.add(join);
 
   // Build JOIN clauses with column pruning.
   // Collect all SQL expressions that reference columns from joined tables
@@ -713,36 +766,13 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     )
   `;
 
-  // Assemble the filter conditions appended to every builder path's WHERE.
-  // negateFilters inverts the user's filter selection (NOT wrap), matching the
-  // UI's negate toggle. traceIds narrows the scan to an explicit trace set —
-  // it is a scope restriction, so it is never negated.
-  const filterConditions: string[] = [];
-  if (filterTranslation.whereClause !== "1=1") {
-    filterConditions.push(
-      input.negateFilters
-        ? `NOT (${filterTranslation.whereClause})`
-        : filterTranslation.whereClause,
-    );
-  }
-  if (input.traceIds && input.traceIds.length > 0) {
-    filterConditions.push(`${ts}.TraceId IN ({traceIds:Array(String)})`);
-    allTranslationParams.traceIds = input.traceIds;
-  }
-  // The caller's own origin exclusion (the home figures leaving out Langy's
-  // turns). Like the trace scope it is not part of the user's selection, so it
-  // sits outside the NOT wrap. An unstamped trace reads as '' and is kept.
-  if (input.excludeOrigins && input.excludeOrigins.length > 0) {
-    filterConditions.push(
-      `ifNull(${ts}.Attributes['langwatch.origin'], '') NOT IN ({excludeOrigins:Array(String)})`,
-    );
-    allTranslationParams.excludeOrigins = input.excludeOrigins;
-  }
-  // Wrapped in its own paren: several call sites splice this straight after a
-  // single-range WHERE with no bracket of their own, and a condition here can
-  // itself contain an OR (e.g. the error/annotation filters) — nesting one
-  // level deeper keeps it out of the tenant guard's reach regardless.
-  const filterWhere = filterConditions.length > 0 ? `AND (${filterConditions.join(" AND ")})` : "";
+  const scope = buildScopedFilterWhere({
+    ts,
+    input,
+    filterWhereClause: filterTranslation.whereClause,
+  });
+  Object.assign(allTranslationParams, scope.params);
+  const filterWhere = scope.filterWhere;
 
   // When using arrayJoin for grouping (like labels), span-level groupBy (like
   // span_type), or the span-partitioned model grouping, we need a CTE approach
@@ -823,6 +853,47 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     });
   }
 
+  return buildStandardTimeseriesQuery({
+    input,
+    ts,
+    simpleMetrics,
+    metricTranslations,
+    groupByColumn,
+    groupByHandlesUnknown,
+    joinClauses,
+    baseWhere,
+    filterWhere,
+    allTranslationParams,
+    timeZone,
+  });
+}
+
+/** Trace-level metrics over the two periods, bucketed by date when the time scale is numeric. */
+function buildStandardTimeseriesQuery({
+  input,
+  ts,
+  simpleMetrics,
+  metricTranslations,
+  groupByColumn,
+  groupByHandlesUnknown,
+  joinClauses,
+  baseWhere,
+  filterWhere,
+  allTranslationParams,
+  timeZone,
+}: {
+  input: TimeseriesQueryInput;
+  ts: string;
+  simpleMetrics: MetricTranslation[];
+  metricTranslations: MetricTranslation[];
+  groupByColumn: string | null;
+  groupByHandlesUnknown: boolean;
+  joinClauses: string;
+  baseWhere: string;
+  filterWhere: string;
+  allTranslationParams: Record<string, unknown>;
+  timeZone: string;
+}): BuiltQuery {
   // Build SELECT expressions for standard query
   const selectExprs: string[] = [];
 
@@ -843,17 +914,8 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   // Add groupBy column if present
   // - If handlesUnknown is true, the column expression already handles NULL/empty -> 'unknown'
   // - Otherwise, exclude empty strings via HAVING (ES terms excludes them)
-  if (groupByColumn) {
-    if (groupByHandlesUnknown) {
-      // Column already handles 'unknown' conversion, just use as group_key
-      selectExprs.push(`${groupByColumn} AS group_key`);
-    } else {
-      // Convert NULL to 'unknown' for ES `missing: "unknown"` behavior
-      selectExprs.push(
-        `if(${groupByColumn} IS NULL, 'unknown', toString(${groupByColumn})) AS group_key`,
-      );
-    }
-  }
+  const groupKeyExpr = buildGroupKeyExpression({ groupByColumn, groupByHandlesUnknown });
+  if (groupKeyExpr) selectExprs.push(groupKeyExpr);
 
   // Add metric expressions
   for (const metric of simpleMetrics) {
@@ -2464,6 +2526,17 @@ function rewriteMetricForDedup(selectExpression: string, alias: string): string 
 /**
  * Build a query for dataForFilter (dropdown data)
  */
+/** Narrows a filter-option listing to the options whose column matches the typed search. */
+function searchNarrowing({
+  column,
+  searchQuery,
+}: {
+  column: string;
+  searchQuery?: string;
+}): string {
+  return searchQuery ? `AND ${column} ILIKE {searchQuery:String}` : "";
+}
+
 export function buildDataForFilterQuery({
   projectId,
   field,
@@ -2528,7 +2601,7 @@ export function buildDataForFilterQuery({
           AND ${ts}.TopicId IS NOT NULL
           AND ${ts}.TopicId != ''
           ${filterWhere}
-          ${searchQuery ? `AND ${ts}.TopicId ILIKE {searchQuery:String}` : ""}
+          ${searchNarrowing({ column: `${ts}.TopicId`, searchQuery })}
         GROUP BY ${ts}.TopicId
         ORDER BY count DESC
         LIMIT ${MAX_FILTER_OPTIONS}
@@ -2549,7 +2622,7 @@ export function buildDataForFilterQuery({
           AND ${ts}.SubTopicId IS NOT NULL
           AND ${ts}.SubTopicId != ''
           ${filterWhere}
-          ${searchQuery ? `AND ${ts}.SubTopicId ILIKE {searchQuery:String}` : ""}
+          ${searchNarrowing({ column: `${ts}.SubTopicId`, searchQuery })}
         GROUP BY ${ts}.SubTopicId
         ORDER BY count DESC
         LIMIT ${MAX_FILTER_OPTIONS}
@@ -2569,7 +2642,7 @@ export function buildDataForFilterQuery({
           AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
           AND ${ts}.Attributes['langwatch.user_id'] != ''
           ${filterWhere}
-          ${searchQuery ? `AND ${ts}.Attributes['langwatch.user_id'] ILIKE {searchQuery:String}` : ""}
+          ${searchNarrowing({ column: `${ts}.Attributes['langwatch.user_id']`, searchQuery })}
         GROUP BY field
         ORDER BY count DESC
         LIMIT ${MAX_FILTER_OPTIONS}
@@ -2589,7 +2662,7 @@ export function buildDataForFilterQuery({
           AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
           AND ${ts}.Attributes['gen_ai.conversation.id'] != ''
           ${filterWhere}
-          ${searchQuery ? `AND ${ts}.Attributes['gen_ai.conversation.id'] ILIKE {searchQuery:String}` : ""}
+          ${searchNarrowing({ column: `${ts}.Attributes['gen_ai.conversation.id']`, searchQuery })}
         GROUP BY field
         ORDER BY count DESC
         LIMIT ${MAX_FILTER_OPTIONS}
@@ -2615,7 +2688,7 @@ export function buildDataForFilterQuery({
           AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
           AND ${ss}.SpanAttributes['gen_ai.request.model'] != ''
           ${filterWhere}
-          ${searchQuery ? `AND ${ss}.SpanAttributes['gen_ai.request.model'] ILIKE {searchQuery:String}` : ""}
+          ${searchNarrowing({ column: `${ss}.SpanAttributes['gen_ai.request.model']`, searchQuery })}
         GROUP BY field
         ORDER BY count DESC
         LIMIT ${MAX_FILTER_OPTIONS}
@@ -2641,7 +2714,7 @@ export function buildDataForFilterQuery({
           AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
           AND ${ss}.SpanAttributes['langwatch.span.type'] != ''
           ${filterWhere}
-          ${searchQuery ? `AND ${ss}.SpanAttributes['langwatch.span.type'] ILIKE {searchQuery:String}` : ""}
+          ${searchNarrowing({ column: `${ss}.SpanAttributes['langwatch.span.type']`, searchQuery })}
         GROUP BY field
         ORDER BY count DESC
         LIMIT ${MAX_FILTER_OPTIONS}
@@ -2667,7 +2740,7 @@ export function buildDataForFilterQuery({
           AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
           ${field === "evaluations.evaluator_id.guardrails_only" ? `AND ${es}.IsGuardrail = 1` : ""}
           ${filterWhere}
-          ${searchQuery ? `AND ${es}.EvaluatorName ILIKE {searchQuery:String}` : ""}
+          ${searchNarrowing({ column: `${es}.EvaluatorName`, searchQuery })}
         GROUP BY ${es}.EvaluatorId, ${es}.EvaluatorName, ${es}.EvaluatorType
         ORDER BY count DESC
         LIMIT ${MAX_FILTER_OPTIONS}

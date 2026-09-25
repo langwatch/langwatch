@@ -374,6 +374,32 @@ export interface AreaTimeseriesProps {
   height?: number;
 }
 
+/**
+ * Two Area layers per series (actual, projected) share a stackId so a stacked chart still
+ * composes; only one of the pair is non-null at any x, except the seam row before the split,
+ * where both carry the value so the line stays continuous across the boundary.
+ */
+function splitActualFromProjected({
+  data,
+  keys,
+  splitAt,
+}: {
+  data: Row[];
+  keys: string[];
+  splitAt: number;
+}): Row[] {
+  return data.map((row, index) => {
+    const isProjected = splitAt !== -1 && index >= splitAt;
+    const isBoundary = splitAt !== -1 && index === splitAt - 1;
+    const out: Row = { ...row };
+    for (const key of keys) {
+      out[`${key}__actual`] = !isProjected || isBoundary ? row[key] : null;
+      out[`${key}__projected`] = isProjected || isBoundary ? row[key] : null;
+    }
+    return out;
+  });
+}
+
 // One component computing series geometry and rendering the SVG chart together.
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: geometry plus render.
 export function AreaTimeseries({
@@ -391,20 +417,7 @@ export function AreaTimeseries({
   const keys = Array.isArray(series) ? series : [series];
   const splitAt = projectionIndex(data, x, projectionFrom);
 
-  // Two Area layers per series (actual, projected) sharing a stackId so a
-  // stacked chart still composes correctly; only one of the pair is
-  // non-null at any given x, so the "seam" at the split point is the only
-  // row where both carry a value (continuity across the boundary).
-  const rows = data.map((row, index) => {
-    const out: Row = { ...row };
-    keys.forEach((key) => {
-      const isProjected = splitAt !== -1 && index >= splitAt;
-      const isBoundary = splitAt !== -1 && index === splitAt - 1;
-      out[`${key}__actual`] = !isProjected || isBoundary ? row[key] : null;
-      out[`${key}__projected`] = isProjected || isBoundary ? row[key] : null;
-    });
-    return out;
-  });
+  const rows = splitActualFromProjected({ data, keys, splitAt });
 
   const areas = keys.flatMap((key, index) => {
     const color = colorAt(palette, index);
