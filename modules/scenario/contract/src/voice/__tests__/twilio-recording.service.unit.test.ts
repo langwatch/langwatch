@@ -39,10 +39,13 @@ describe("getTwilioRecordingWavUrl", () => {
         signal: new AbortController().signal,
       });
 
-      const settled = expect(promise).rejects.toMatchObject({ name: "AbortError" });
+      const rejection = promise.then(
+        () => undefined,
+        (error: unknown) => error,
+      );
       await vi.advanceTimersByTimeAsync(VOICE_HTTP_TIMEOUT_MS);
 
-      await settled;
+      expect(await rejection).toMatchObject({ name: "AbortError" });
     });
   });
 

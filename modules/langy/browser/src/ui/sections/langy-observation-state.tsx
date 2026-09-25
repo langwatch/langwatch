@@ -55,7 +55,7 @@ export function LangyObserverGlyph() {
 
 export function LangyObservationState({ compact = false }: { compact?: boolean }) {
   return (
-    <HStack gap={2} align="center" role="status" aria-live="polite">
+    <HStack gap={2} align="center" as="output" aria-live="polite">
       <LangyObserverGlyph />
       <Text textStyle={compact ? "2xs" : "xs"} color="fg.muted">
         Observing the situation…

@@ -1,7 +1,7 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @see specs/features/agent-testing/results-atoms.feature
  */
-
 import { ScenarioRunStatus, type ResultsFilter } from "@langwatch/scenario-contract";
 import { getSuiteSetId } from "@langwatch/suite-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -36,7 +36,7 @@ interface FakeData {
 }
 
 function makeRepo(data: FakeData) {
-  return {
+  return createApiFixture<ResultAtomsRepository>({
     aggregateTotals: vi.fn().mockResolvedValue(
       data.totals === undefined
         ? {
@@ -57,7 +57,7 @@ function makeRepo(data: FakeData) {
     findRunOrdinals: vi.fn().mockResolvedValue([]),
     findCodeScenarios: vi.fn().mockResolvedValue([]),
     findRunTargets: vi.fn().mockResolvedValue(data.runTargets ?? []),
-  } as unknown as ResultAtomsRepository;
+  });
 }
 
 function makeScenarios({
@@ -77,7 +77,7 @@ function makeScenarios({
     targets: [],
   }));
 
-  return {
+  return createApiFixture<ScenarioRepository>({
     findPlans: vi.fn().mockResolvedValue(plans),
     findIdsByLabelsOrTestSuites: vi
       .fn()
@@ -91,7 +91,7 @@ function makeScenarios({
       .mockImplementation(async ({ ids }: { ids: string[] }) =>
         scenarios.filter((scenario) => ids.includes(scenario.id)),
       ),
-  } as unknown as ScenarioRepository;
+  });
 }
 
 const group = (over: Partial<RawGroupRow> = {}): RawGroupRow => ({

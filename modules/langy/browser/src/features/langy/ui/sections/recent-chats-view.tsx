@@ -362,7 +362,7 @@ function ChatRows({
   return (
     <Box
       ref={scrollRef}
-      role="list"
+      as="ul"
       aria-label="Recent chats"
       flex={1}
       minHeight={0}
@@ -642,7 +642,7 @@ const ChatRow = memo(function ChatRow({
     // actions. Nesting them would be invalid markup and would make the actions
     // unreachable by keyboard.
     <HStack
-      role="listitem"
+      as="li"
       gap={1}
       width="full"
       align="center"

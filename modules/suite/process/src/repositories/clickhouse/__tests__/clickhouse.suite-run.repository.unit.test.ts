@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { createTenantId, SecurityError, StoreError } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
@@ -41,7 +42,7 @@ function setup(rows: unknown[] = [stateReadRow]) {
   const query = vi.fn().mockResolvedValue({ rows });
   const insert = vi.fn().mockResolvedValue(undefined);
   const repository = ClickHouseSuiteRunRepository.create({
-    clickhouse: { query, insert } as unknown as ClickHouseQueryClient,
+    clickhouse: createApiFixture<ClickHouseQueryClient>({ query, insert }),
     defaultRetentionDays: () => 30,
   });
   return { repository, query, insert };
@@ -107,12 +108,12 @@ describe("ClickHouseSuiteRunRepository", () => {
 
   it("wraps ClickHouse failures instead of silently succeeding", async () => {
     const repository = ClickHouseSuiteRunRepository.create({
-      clickhouse: {
+      clickhouse: createApiFixture<ClickHouseQueryClient>({
         query: async () => {
           throw new Error("clickhouse unavailable");
         },
         insert: async () => {},
-      } as unknown as ClickHouseQueryClient,
+      }),
       defaultRetentionDays: () => 30,
     });
     await expect(

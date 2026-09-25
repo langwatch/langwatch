@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -9,7 +10,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { SimulationService } from "@langwatch/scenario-contract";
+import type { SimulationService } from "@langwatch/scenario-contract";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -114,7 +115,7 @@ describe.skipIf(!databaseUrl)("Moving a scenario between test suites", () => {
 
     const options = {
       repository: PrismaScenarioRepository.create(db),
-      simulations: Object.create(SimulationService.prototype) as SimulationService,
+      simulations: createApiFixture<SimulationService>(),
       ids: new ScenarioIds(),
       testSuiteIds: new TestSuiteIds(),
       clock: new TestClock(),

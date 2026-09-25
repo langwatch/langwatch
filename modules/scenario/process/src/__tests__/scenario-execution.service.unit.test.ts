@@ -1,17 +1,18 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   ScenarioExecutionJob,
   ScenarioExecutionPrefetchInput,
   ScenarioExecutionPrefetchResult,
+  SimulationService,
 } from "@langwatch/scenario-contract";
-import { SimulationService } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  type ScenarioExecutionPrefetcherService,
+  type ScenarioFailureHandlerService,
   type CancellationPublisher,
   ScenarioExecutionPoolService,
-  ScenarioExecutionPrefetcherService,
   ScenarioExecutionService,
-  ScenarioFailureHandlerService,
   type ScenarioExecutionRunner,
   UnavailableScenarioExecutionPoolService,
 } from "../index.ts";
@@ -41,17 +42,15 @@ class TestCancellationPublisher implements CancellationPublisher {
 }
 
 function prefetcher(): ScenarioExecutionPrefetcherService {
-  return Object.create(
-    ScenarioExecutionPrefetcherService.prototype,
-  ) as ScenarioExecutionPrefetcherService;
+  return createApiFixture<ScenarioExecutionPrefetcherService>();
 }
 
 function failures(): ScenarioFailureHandlerService {
-  return Object.create(ScenarioFailureHandlerService.prototype) as ScenarioFailureHandlerService;
+  return createApiFixture<ScenarioFailureHandlerService>();
 }
 
 function simulations(): SimulationService {
-  return Object.create(SimulationService.prototype) as SimulationService;
+  return createApiFixture<SimulationService>();
 }
 
 describe("ScenarioExecutionService", () => {

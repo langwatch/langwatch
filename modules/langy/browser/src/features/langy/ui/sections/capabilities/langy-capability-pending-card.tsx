@@ -127,7 +127,7 @@ function PendingTitle({
           lineHeight="1.3"
           color={interrupted ? "fg.muted" : undefined}
           css={interrupted ? undefined : shimmer}
-          role="status"
+          as="output"
           aria-live="polite"
         >
           {interrupted ? headline : `${headline}…`}

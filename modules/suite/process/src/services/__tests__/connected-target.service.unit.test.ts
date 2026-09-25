@@ -119,7 +119,7 @@ function buildService(agents: AgentApi) {
     skippedArchived: input.skippedArchived,
     items: [],
   }));
-  const repository = {
+  const repository = createApiFixture<SuiteRepository>({
     resolveScopeMembership: async () => [],
     findOrCreatePlanByName: async ({
       id,
@@ -137,7 +137,7 @@ function buildService(agents: AgentApi) {
       suite: baseSuite({ id, projectId: pid, name, scope, targets }),
       created: true,
     }),
-  } as unknown as SuiteRepository;
+  });
   const scenarios = {
     resolveRunParametersForScenarios: vi.fn(async () => []),
     getReferenceStates: vi.fn(async ({ ids }: { ids: string[] }) =>
@@ -154,7 +154,7 @@ function buildService(agents: AgentApi) {
       })),
     ),
   } as unknown as SuiteService["options"]["scenarios"];
-  const execution = { execute } as unknown as SuiteExecution;
+  const execution = createApiFixture<SuiteExecution>({ execute });
 
   const service = SuiteService.create({
     repository,

@@ -30,7 +30,7 @@ function PulsingDot({ delay }: { delay: string }) {
 export function ThinkingIndicator() {
   return (
     <HStack
-      role="status"
+      as="output"
       aria-label="Processing"
       gap={1}
       paddingY={2}

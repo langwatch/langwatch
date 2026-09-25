@@ -1,4 +1,3 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import {
   RepositoryFoldStore,
   type AppendStore,

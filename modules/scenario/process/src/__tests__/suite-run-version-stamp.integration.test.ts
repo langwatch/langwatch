@@ -22,7 +22,11 @@ import {
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import { SimulationService, type Scenario, type ScenarioApi } from "@langwatch/scenario-contract";
+import {
+  type SimulationService,
+  type Scenario,
+  type ScenarioApi,
+} from "@langwatch/scenario-contract";
 import type { SuiteApi, StartSuiteRunCommandData } from "@langwatch/suite-contract";
 import {
   type SuiteRunCommands,
@@ -235,7 +239,7 @@ describe.skipIf(!databaseUrl)("the version stamp on suite runs", () => {
     commands = new CapturingCommands();
     scenarios = ScenarioService.create({
       repository: PrismaScenarioRepository.create(db),
-      simulations: Object.create(SimulationService.prototype) as SimulationService,
+      simulations: createApiFixture<SimulationService>(),
       ids: new ScenarioIds(),
       testSuiteIds: new TestSuiteIds(),
       clock: new TestClock(),

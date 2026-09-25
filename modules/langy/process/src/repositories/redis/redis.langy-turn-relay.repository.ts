@@ -856,15 +856,14 @@ export class RedisLangyTurnRelayRepository {
       conversationId: at.conversationId,
       id: invocation.resourceId,
     });
-    const platformUrl =
-      remembered.kind === "hit"
-        ? remembered.href
-        : this.deps.resolveResourceUrl
-          ? await this.deps.resolveResourceUrl({
-              projectId,
-              resourceId: invocation.resourceId,
-            })
-          : null;
+    let platformUrl: string | null = null;
+    if (remembered.kind === "hit") platformUrl = remembered.href;
+    else if (this.deps.resolveResourceUrl) {
+      platformUrl = await this.deps.resolveResourceUrl({
+        projectId,
+        resourceId: invocation.resourceId,
+      });
+    }
     if (!platformUrl) return { status: "applied" }; // not resolvable in this project — drop
 
     const href = toRelativeSameOriginHref({

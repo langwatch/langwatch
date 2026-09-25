@@ -48,6 +48,8 @@ export class LangyCliEnvelopeService {
     return new LangyCliEnvelopeService();
   }
 
+  private constructor() {}
+
   /**
    * Re-type a tool frame that is really a LangWatch CLI call. Everything else — a real shell
    * command, a file edit, a frame whose stdout held no document — is returned unchanged (identity,

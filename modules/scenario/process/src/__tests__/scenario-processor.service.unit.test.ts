@@ -1,14 +1,15 @@
 import { ChildProcess } from "node:child_process";
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
-  ScenarioExecutionService,
+  type ScenarioExecutionService,
   type ScenarioExecutionPrefetchResult,
 } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CancellationSubscriber } from "../app/scenario.app.ts";
 import {
-  NodeScenarioChildProcessAdapter,
+  type NodeScenarioChildProcessAdapter,
   ScenarioExecutionPoolService,
   ScenarioProcessorService,
   buildOtelResourceAttributes,
@@ -71,10 +72,8 @@ class HoldingExecutionRunner implements ScenarioExecutionRunner {
 
 function processorFixture() {
   const pool = ScenarioExecutionPoolService.create({ concurrency: 1 });
-  const execution = Object.create(ScenarioExecutionService.prototype) as ScenarioExecutionService;
-  const childProcesses = Object.create(
-    NodeScenarioChildProcessAdapter.prototype,
-  ) as NodeScenarioChildProcessAdapter;
+  const execution = createApiFixture<ScenarioExecutionService>();
+  const childProcesses = createApiFixture<NodeScenarioChildProcessAdapter>();
   const finishUnsuccessfulRun = vi.fn().mockResolvedValue(undefined);
   const cancellations = new TestCancellationSubscriber();
   execution.finishUnsuccessfulRun = finishUnsuccessfulRun;

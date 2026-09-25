@@ -1,4 +1,6 @@
-import { ScenarioNotFoundError, SimulationService } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { SimulationService } from "@langwatch/scenario-contract";
+import { ScenarioNotFoundError } from "@langwatch/scenario-contract";
 import { fromDate, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
@@ -13,7 +15,7 @@ import { ScenarioService } from "../../services/scenario.service.ts";
 import { MemoryScenarioRepository } from "../memory/memory.scenario.repository.ts";
 import type { ScenarioRepository } from "../scenario.repository.ts";
 
-const simulations = Object.create(SimulationService.prototype) as SimulationService;
+const simulations = createApiFixture<SimulationService>();
 
 class TestScenarioId implements ScenarioId {
   constructor(private readonly value: string) {}

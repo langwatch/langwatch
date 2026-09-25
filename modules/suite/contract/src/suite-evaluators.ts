@@ -19,7 +19,7 @@ import {
   SuiteFieldIdentifierDuplicateError,
   SuiteFieldIdentifierInvalidError,
   SuiteFieldInUseError,
-} from "./errors.ts";
+} from "./suite.errors.ts";
 
 /**
  * The fields a write declares, or the handled refusal. The schema reports

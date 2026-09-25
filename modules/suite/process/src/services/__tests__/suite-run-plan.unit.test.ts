@@ -266,7 +266,7 @@ describe("SuiteService.runPlan", () => {
             created: true,
           }),
         },
-        execution: { execute: executeSpy } as unknown as SuiteExecution,
+        execution: createApiFixture<SuiteExecution>({ execute: executeSpy }),
       });
 
       await service.runPlan({
@@ -307,7 +307,7 @@ describe("given a scenario declaring a secret parameter", () => {
       const executed = vi.fn();
       const { service, findOrCreatePlanByName } = buildService({
         scenarios: declaringSecret,
-        execution: { execute: executed } as unknown as SuiteExecution,
+        execution: createApiFixture<SuiteExecution>({ execute: executed }),
       });
 
       await expect(

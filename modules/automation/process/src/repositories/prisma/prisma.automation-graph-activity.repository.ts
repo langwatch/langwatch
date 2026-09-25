@@ -72,7 +72,7 @@ export class PostgresAutomationGraphActivityAdapter {
       analytics: input.analytics,
       delivery: input.delivery,
       webhooks: AutomationWebhookSecretsService.create(input.crypto),
-      slackTokens: new AutomationSlackBotTokenDecryptorService(
+      slackTokens: AutomationSlackBotTokenDecryptorService.create(
         AutomationSlackSecretsService.create(input.crypto),
       ),
       emailCaps: input.emailCaps,

@@ -1,4 +1,6 @@
-import { SimulationService, ScenarioRunStatus } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { SimulationService } from "@langwatch/scenario-contract";
+import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 /**
  * Cancellation tests: service dispatches cancel_requested event; process manager
@@ -52,7 +54,7 @@ function createMockDeps(): {
   const mockGetRunsForBatch = vi.fn().mockResolvedValue([]);
   const mockDispatchCancelRequested = vi.fn().mockResolvedValue(undefined);
 
-  const deps = Object.assign(Object.create(SimulationService.prototype), {
+  const deps = createApiFixture<SimulationService>({
     getRunDataForBatchRun: async (input: {
       projectId: string;
       scenarioSetId?: string;
@@ -65,7 +67,7 @@ function createMockDeps(): {
     }),
     cancelRun: (input: { tenantId: string; scenarioRunId: string; occurredAt: number }) =>
       mockDispatchCancelRequested(input),
-  }) as SimulationService;
+  });
 
   return {
     deps,

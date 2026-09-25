@@ -126,7 +126,11 @@ export class AutomationSlackSecretsService extends AutomationSlackProvider {
  * class, not a literal, since the interface it satisfies is nominal.
  */
 export class AutomationSlackBotTokenDecryptorService extends AutomationSlackBotTokenDecryptor {
-  constructor(private readonly provider: AutomationSlackSecretsService) {
+  static create(provider: AutomationSlackSecretsService): AutomationSlackBotTokenDecryptorService {
+    return new AutomationSlackBotTokenDecryptorService(provider);
+  }
+
+  private constructor(private readonly provider: AutomationSlackSecretsService) {
     super();
   }
 

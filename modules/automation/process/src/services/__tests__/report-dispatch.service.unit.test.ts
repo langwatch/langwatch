@@ -15,10 +15,10 @@ import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { AutomationNotificationDelivery } from "../../channels/automation-notification-delivery.channel.ts";
+import { toReportTraceRow } from "../../rules/report-trace-row.rules.ts";
 import { AutomationSlackProvider } from "../../services/automation-slack-secrets.service.ts";
 import { ReportChartService } from "../report-chart.service.ts";
 import { ReportDispatchService, type ReportDispatchDeps } from "../report-dispatch.service.ts";
-import { ReportTraceRowService } from "../report-trace-row.service.ts";
 
 const BASE_HOST = "https://app.langwatch.test";
 const PROJECT = { id: "project-1", name: "Checkout", slug: "checkout" };
@@ -216,7 +216,7 @@ describe("ReportDispatchService.dispatchScheduledReport", () => {
     it("sends the top traces matching the author's query over the report's window", async () => {
       const mail = new FakeMailGateway();
       const listReportTraces = vi.fn(async ({ projectSlug }: { projectSlug: string }) => [
-        ReportTraceRowService.toReportTraceRow({
+        toReportTraceRow({
           item: traceListItem() as never,
           projectUrl: `${BASE_HOST}/${projectSlug}`,
         }),
@@ -255,7 +255,7 @@ describe("ReportDispatchService.dispatchScheduledReport", () => {
     it("asks for the whole window when the author wrote no query", async () => {
       const mail = new FakeMailGateway();
       const listReportTraces: ReportDispatchDeps["listReportTraces"] = vi.fn(async () => [
-        ReportTraceRowService.toReportTraceRow({
+        toReportTraceRow({
           item: traceListItem({ traceId: "trace-recent" }) as never,
           projectUrl: `${BASE_HOST}/${PROJECT.slug}`,
         }),

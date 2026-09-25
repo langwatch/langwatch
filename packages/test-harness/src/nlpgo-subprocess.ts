@@ -184,8 +184,8 @@ export async function startNlpgoSubprocess(opts: {
 
 export interface SSEFrame {
   type: string;
-  payload?: Record<string, any>;
-  [k: string]: any;
+  payload?: Record<string, unknown>;
+  [k: string]: unknown;
 }
 
 /**

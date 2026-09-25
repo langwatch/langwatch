@@ -1,9 +1,10 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * What a job that ran to the end records: the connected agent instance that
  * answered it, when one did.
  * @see specs/scenarios/served-agent-instance-on-runs.feature
  */
-import { ScenarioExecutionService } from "@langwatch/scenario-contract";
+import type { ScenarioExecutionService } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -46,7 +47,7 @@ describe("ScenarioProcessorService.handleSucceeded", () => {
     recordAgentInstance = vi
       .fn<ScenarioExecutionService["recordAgentInstance"]>()
       .mockResolvedValue(undefined);
-    const execution = Object.create(ScenarioExecutionService.prototype) as ScenarioExecutionService;
+    const execution = createApiFixture<ScenarioExecutionService>();
     execution.recordAgentInstance = recordAgentInstance;
     processor = ScenarioProcessorService.create({
       execution,

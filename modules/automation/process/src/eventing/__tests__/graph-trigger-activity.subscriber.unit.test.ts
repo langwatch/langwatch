@@ -101,7 +101,7 @@ describe("createGraphTriggerActivityHandler", () => {
           analytics: new BreachingAnalytics() as unknown as AnalyticsService,
           delivery,
           webhooks: AutomationWebhookSecretsService.create(crypto),
-          slackTokens: new AutomationSlackBotTokenDecryptorService(
+          slackTokens: AutomationSlackBotTokenDecryptorService.create(
             AutomationSlackSecretsService.create(crypto),
           ),
           emailCaps: AutomationEmailCapService.create({ store: null }),

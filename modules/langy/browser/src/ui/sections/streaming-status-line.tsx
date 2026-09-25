@@ -241,7 +241,7 @@ export function StreamingStatusLine({
           paddingLeft={STATUS_LINE_ROW.paddingLeft}
         >
           {isObserving ? <LangyObserverGlyph /> : <StatusOrb />}
-          <Text {...STATUS_LINE_TEXT} color="fg.muted" role="status" aria-live="polite">
+          <Text {...STATUS_LINE_TEXT} color="fg.muted" as="output" aria-live="polite">
             {status}
           </Text>
         </HStack>

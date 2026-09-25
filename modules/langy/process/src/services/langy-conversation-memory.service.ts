@@ -22,6 +22,8 @@ export class LangyConversationMemoryService {
     return new LangyConversationMemoryService();
   }
 
+  private constructor() {}
+
   /**
    * The resources this conversation touched, most recent first. Chronological in, MOST RECENT FIRST
    * out.

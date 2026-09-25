@@ -88,9 +88,9 @@ function plan(overrides: Partial<ScenarioPlanRecord> & { id: string }): Scenario
 
 /** The scenario store, answering with exactly the plans a test declared. */
 function scenariosWith(plans: ScenarioPlanRecord[]): ScenarioRepository {
-  return {
+  return createApiFixture<ScenarioRepository>({
     findPlans: async () => plans,
-  } as unknown as ScenarioRepository;
+  });
 }
 
 /**

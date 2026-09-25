@@ -193,14 +193,7 @@ export function MessagePreview({ messages, streamingMessages }: MessagePreviewPr
     >
       {(messages ?? []).slice(-PREVIEW_TAIL_LENGTH).map((message, index) => {
         // Tool call indicators (assistant messages with tool_calls or toolCalls)
-        const toolCalls =
-          "tool_calls" in message && message.tool_calls
-            ? message.tool_calls
-            : "toolCalls" in message && (message as Record<string, unknown>).toolCalls
-              ? ((message as Record<string, unknown>).toolCalls as {
-                  function?: { name?: string };
-                }[])
-              : null;
+        const toolCalls = message.tool_calls ?? message.toolCalls ?? null;
         if (toolCalls) {
           return toolCalls.map((tc: { function?: { name?: string } }, tcIdx: number) => (
             <HStack key={`${message.id ?? index}-tc-${tcIdx}`} alignSelf="flex-start" gap={1}>

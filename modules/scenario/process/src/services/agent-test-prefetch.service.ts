@@ -61,6 +61,8 @@ export class AgentTestPrefetchService {
     return new AgentTestPrefetchService();
   }
 
+  private constructor() {}
+
   async prefetch({
     context,
     target,

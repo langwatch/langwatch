@@ -58,7 +58,7 @@ export function RunHistorySkeleton({ sections = 2 }: { sections?: number }) {
       align="stretch"
       gap={0}
       data-testid="run-history-skeleton"
-      role="status"
+      as="output"
       aria-busy="true"
       aria-label="Loading runs"
     >

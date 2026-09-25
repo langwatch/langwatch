@@ -175,7 +175,7 @@ describe("ReportScheduleField", () => {
       });
 
       expect(screen.getByDisplayValue("*/5 9 * * 1-5")).toBeInTheDocument();
-      expect(() => selectContainingOption(/Weekly/i)).toThrow();
+      expect(() => selectContainingOption(/Weekly/i)).toThrow("No select with option");
     });
   });
 });

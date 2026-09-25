@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -14,7 +15,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
  * Every scenario belongs to exactly one suite: clearing a scenario's suite
  * files it back into Default rather than leaving it loose.
  */
-import { SimulationService } from "@langwatch/scenario-contract";
+import type { SimulationService } from "@langwatch/scenario-contract";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -82,7 +83,7 @@ let teamId = "";
 let projectId = "";
 
 function service(): ScenarioServiceContract {
-  const simulations = Object.create(SimulationService.prototype) as SimulationService;
+  const simulations = createApiFixture<SimulationService>();
   return ScenarioServiceContract.create({
     repository: PrismaScenarioRepository.create(database()),
     simulations,

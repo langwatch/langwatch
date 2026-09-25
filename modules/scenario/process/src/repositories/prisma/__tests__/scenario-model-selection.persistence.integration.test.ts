@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -14,8 +15,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
  * @see specs/scenarios/simulation-run-model-resolution.feature
  * @see specs/suites/suite-model-selection.feature
  */
-import type { Scenario } from "@langwatch/scenario-contract";
-import { SimulationService } from "@langwatch/scenario-contract";
+import type { Scenario, SimulationService } from "@langwatch/scenario-contract";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -121,7 +121,7 @@ describe.skipIf(!databaseUrl)("Scenario and run-plan model persistence", () => {
 
     scenarios = ScenarioService.create({
       repository: PrismaScenarioRepository.create(db),
-      simulations: Object.create(SimulationService.prototype) as SimulationService,
+      simulations: createApiFixture<SimulationService>(),
       ids: new ScenarioIds(),
       testSuiteIds: new TestSuiteIds(),
       clock: new TestClock(),

@@ -41,7 +41,6 @@ import {
   type MonitorSummary,
 } from "@langwatch/monitor-contract";
 import { nowInstant } from "@langwatch/time";
-import { ZodError } from "zod";
 
 import type { MonitorRepositories } from "../repositories/monitor.repositories.ts";
 import { monitorPlatformUrl } from "../rules/monitor-platform-url.rules.ts";
@@ -202,12 +201,9 @@ export class MonitorApp implements MonitorApi {
 
     if (isCustomEvaluator || isWorkflowEvaluator || isCodeEvaluator) return;
 
-    try {
-      evaluatorsSchema.shape[checkType as EvaluatorTypes].shape.settings.parse(parameters);
-    } catch (error) {
-      if (error instanceof ZodError) throw new MonitorCheckSettingsInvalidError(checkType, error);
-      throw error;
-    }
+    const settings =
+      evaluatorsSchema.shape[checkType as EvaluatorTypes].shape.settings.safeParse(parameters);
+    if (!settings.success) throw new MonitorCheckSettingsInvalidError(checkType, settings.error);
   }
 
   create(input: MonitorCreateInput): Promise<Monitor> {

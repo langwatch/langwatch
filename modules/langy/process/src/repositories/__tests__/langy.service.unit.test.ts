@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * What is left of `LangyService`'s own behaviour once the composed services own the rest: the
  * feedback cadence.
@@ -31,10 +32,10 @@ function feedbackPrompt() {
 /** Composed the way production composes it; feedback reaches no collaborator. */
 function service(prompt: LangyFeedbackPromptPolicy) {
   return LangyService.create({
-    conversations: {} as unknown as LangyConversationService,
-    turns: {} as unknown as LangyTurnService,
-    messages: {} as unknown as LangyMessageService,
-    credentials: {} as unknown as LangyCredentialService,
+    conversations: createApiFixture<LangyConversationService>({}),
+    turns: createApiFixture<LangyTurnService>({}),
+    messages: createApiFixture<LangyMessageService>({}),
+    credentials: createApiFixture<LangyCredentialService>({}),
     feedbackPrompt: prompt,
   });
 }

@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /** Spec: specs/suites/test-suites.feature */
 import { describe, expect, it, vi } from "vitest";
 
@@ -9,7 +10,7 @@ describe("ScenarioService.listTestSuites", () => {
     it("hands the project and the archived flag to the repository", async () => {
       const findTestSuites = vi.fn().mockResolvedValue([]);
       const service = ScenarioService.create({
-        repository: { findTestSuites } as unknown as ScenarioServiceOptions["repository"],
+        repository: createApiFixture<ScenarioServiceOptions["repository"]>({ findTestSuites }),
         simulations: {} as ScenarioServiceOptions["simulations"],
         ids: {} as ScenarioServiceOptions["ids"],
         testSuiteIds: {} as ScenarioServiceOptions["testSuiteIds"],

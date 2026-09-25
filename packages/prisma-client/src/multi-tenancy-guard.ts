@@ -327,10 +327,10 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
     validateWhere: (where) => {
       const reason =
         "requires a flagKey and exact subject, or the flagKey_subjectType_subjectId compound key";
-      return featureFlagExperimentWhereSchema.safeParse(where).success ? null : reason;
+      return featureFlagExperimentWhereSchema.validate(where) ? null : reason;
     },
     validateCreateData: (data) => {
-      return featureFlagExperimentCreateDataSchema.safeParse(data).success
+      return featureFlagExperimentCreateDataSchema.validate(data)
         ? null
         : "create requires flagKey, subjectType, and subjectId in the data payload";
     },

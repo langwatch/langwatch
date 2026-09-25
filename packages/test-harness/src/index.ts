@@ -46,7 +46,7 @@ export {
 export {
   hardFloorReport,
   resolveHardFloorMs,
-  setup as armUnitShardHardFloor,
+  armUnitShardHardFloor,
 } from "./unit-shard-hard-floor.ts";
 export { createWeigher, loadDurationManifest, type DurationManifest } from "./shard-weights.ts";
 export { scanTestSourceForUnsafeDeleteMany, type TeardownViolation } from "./teardown-scan.ts";

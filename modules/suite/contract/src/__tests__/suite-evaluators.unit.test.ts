@@ -9,19 +9,19 @@ import { type EvaluatorAttachment, evaluatorInputSpecsOf } from "@langwatch/scen
 import { describe, expect, it } from "vitest";
 
 import {
-  SuiteEvaluatorMappingInvalidError,
-  SuiteEvaluatorNotFoundError,
-  SuiteFieldIdentifierDuplicateError,
-  SuiteFieldIdentifierInvalidError,
-  SuiteFieldInUseError,
-} from "../errors.ts";
-import {
   assertFieldsNotInUse,
   findMissingMappings,
   mergeRunAttachments,
   readEvaluatorAttachments,
   readSuiteFieldDefinitions,
 } from "../suite-evaluators.ts";
+import {
+  SuiteEvaluatorMappingInvalidError,
+  SuiteEvaluatorNotFoundError,
+  SuiteFieldIdentifierDuplicateError,
+  SuiteFieldIdentifierInvalidError,
+  SuiteFieldInUseError,
+} from "../suite.errors.ts";
 
 const attachment = (overrides: Partial<EvaluatorAttachment> = {}): EvaluatorAttachment => ({
   id: "att_1",

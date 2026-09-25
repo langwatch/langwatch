@@ -98,7 +98,7 @@ export const FORM_SERVER_ERROR = "root.serverError";
  * make every caller cast.
  */
 type MinimalForm = {
-  setError: (name: any, error: { type: string; message: string }) => void;
+  setError(name: string, error: { type: string; message: string }): void;
 };
 
 /**

@@ -121,6 +121,8 @@ export class ReportDispatchService {
     return new ReportDispatchService();
   }
 
+  private constructor() {}
+
   /**
    * The span a fire summarises: everything since the report's PREVIOUS scheduled slot, up to
    * the slot being fired.

@@ -487,7 +487,10 @@ export class ScenarioApp implements ScenarioApi {
     return this.#dependencies.scenarios.getRunConfigs(input);
   }
 
-  getModelChoices(input: { ids: string[]; projectId: string }) {
+  getModelChoices(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; simulatorModel: string | null; judgeModel: string | null }[]> {
     return this.#dependencies.scenarios.getModelChoices(input);
   }
 
@@ -498,7 +501,10 @@ export class ScenarioApp implements ScenarioApi {
     return this.#dependencies.scenarios.resolveRunParametersForScenarios(input);
   }
 
-  getNamesByIds(input: { ids: string[]; projectId: string }) {
+  getNamesByIds(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; name: string }[]> {
     return this.#dependencies.scenarios.getNamesByIds(input);
   }
 

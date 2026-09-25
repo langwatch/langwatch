@@ -285,7 +285,7 @@ function PlanStep({
   );
 
   return (
-    <Box role="listitem">
+    <Box as="li">
       <HStack gap={2} align="center">
         {marker}
         {rowText}

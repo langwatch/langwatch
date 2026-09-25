@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { WebhookEgressService } from "@langwatch/egress";
 import { DispatchError } from "@langwatch/eventing";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -8,7 +9,7 @@ import { HttpWebhookDestinationAdapter } from "../http.webhook-destination.servi
 // The SSRF-fenced egress service (which also owns the hourly dispatch cap) is
 // the boundary; the classification under test is the real one.
 const mockedSend = vi.fn<WebhookEgressService["send"]>();
-const egress = { send: mockedSend } as unknown as WebhookEgressService;
+const egress = createApiFixture<WebhookEgressService>({ send: mockedSend });
 
 const URL_UNDER_TEST = "https://receiver.example.com/webhooks/langwatch";
 

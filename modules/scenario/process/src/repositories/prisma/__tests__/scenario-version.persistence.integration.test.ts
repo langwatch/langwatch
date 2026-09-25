@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -10,10 +11,10 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
+  type SimulationService,
   ScenarioStaleVersionError,
   ScenarioVersionNotFoundError,
   type Scenario,
-  SimulationService,
 } from "@langwatch/scenario-contract";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nowInstant, type Instant } from "@langwatch/time";
@@ -151,7 +152,7 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
     otherProjectId = otherProject.id;
     scenarios = ScenarioService.create({
       repository: PrismaScenarioRepository.create(db),
-      simulations: Object.create(SimulationService.prototype) as SimulationService,
+      simulations: createApiFixture<SimulationService>(),
       ids: new ScenarioIds(),
       testSuiteIds: new TestSuiteIds(),
       clock: new TestClock(),

@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * The egress allow-list door, through the composition production uses.
  * @vitest-environment node
@@ -29,9 +30,9 @@ function credentialService(stored: string[] | null) {
 
 function composed(credentials: LangyCredentialService) {
   return LangyService.create({
-    conversations: {} as unknown as LangyConversationService,
-    turns: {} as unknown as LangyTurnService,
-    messages: {} as unknown as LangyMessageService,
+    conversations: createApiFixture<LangyConversationService>({}),
+    turns: createApiFixture<LangyTurnService>({}),
+    messages: createApiFixture<LangyMessageService>({}),
     credentials,
     feedbackPrompt: { shouldPrompt: () => false } as never,
   });

@@ -56,6 +56,7 @@ import {
 } from "./repositories/prisma/prisma.webhook-delivery.repository.ts";
 import type { TriggerRepository } from "./repositories/trigger.repository.ts";
 import type { WebhookDeliveryRepository } from "./repositories/webhook-delivery.repository.ts";
+import { toReportTraceRow } from "./rules/report-trace-row.rules.ts";
 import { AutomationEvaluationSubscriberService } from "./services/automation-evaluation-subscriber.service.ts";
 import { AutomationEvaluationTriggerFilterService } from "./services/automation-evaluation-trigger-filter.service.ts";
 import { AutomationMatchRecordMetricsService } from "./services/automation-match-record-metrics.service.ts";
@@ -70,7 +71,6 @@ import {
   type ReportDispatchDeps,
 } from "./services/report-dispatch.service.ts";
 import { ReportScheduleService } from "./services/report-schedule.service.ts";
-import { ReportTraceRowService } from "./services/report-trace-row.service.ts";
 import {
   TriggerNoReplyService,
   TriggerNoReplyWarning,
@@ -301,7 +301,7 @@ export function createAutomationReportCalendar(input: {
     }),
     dispatchScheduledReport: (fire) =>
       ReportDispatchService.dispatchScheduledReport({ deps, fire }),
-    toReportTraceRow: (row) => ReportTraceRowService.toReportTraceRow(row),
+    toReportTraceRow: (row) => toReportTraceRow(row),
   };
 }
 

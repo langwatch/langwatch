@@ -6,7 +6,7 @@
 import { type AgentApi, type AgentOverview, type HttpAgentConfig } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import {
-  SimulationService,
+  type SimulationService,
   type ScenarioFailureResults,
   ScenarioRunStatus,
   Verdict,
@@ -64,9 +64,9 @@ function testAgentApi(
 }
 
 function testSimulationService(): SimulationService {
-  return Object.assign(Object.create(SimulationService.prototype), {
+  return createApiFixture<SimulationService>({
     finishRun: mockFinishRun,
-  }) as SimulationService;
+  });
 }
 
 function createHandler(

@@ -86,10 +86,10 @@ function fakeAgentApi(agents: Map<string, FakeAgent>): AgentApi {
 }
 
 function fakePromptService(): PromptApi {
-  return {
+  return createApiFixture<PromptApi>({
     getExistingIds: async () => [],
     getNamesByIds: async () => [],
-  } as unknown as PromptApi;
+  });
 }
 
 /** Backed by the same database the repository reads: scope resolution and
@@ -172,7 +172,7 @@ function fakeScenarioService(): ScenarioApi {
 }
 
 function capturingExecution(started: Record<string, unknown>[]): SuiteExecution {
-  return {
+  return createApiFixture<SuiteExecution>({
     execute: vi.fn(async (input): Promise<SuiteRunResult> => {
       started.push(input);
       return {
@@ -183,7 +183,7 @@ function capturingExecution(started: Record<string, unknown>[]): SuiteExecution 
         items: [],
       };
     }),
-  } as unknown as SuiteExecution;
+  });
 }
 
 let agents: Map<string, FakeAgent>;
@@ -333,7 +333,7 @@ describe.skipIf(!databaseUrl)("Run plan identity by name", () => {
     }
   });
 
-  describe("a run of one scenario", () => {
+  describe("given a run of one scenario", () => {
     describe("when the same scenario runs twice against the same agent", () => {
       /** @scenario "Two runs of one scenario against one agent stack on one plan" */
       it("keeps one plan of that name and files both runs under it", async () => {
@@ -391,7 +391,7 @@ describe.skipIf(!databaseUrl)("Run plan identity by name", () => {
     });
   });
 
-  describe("resolving a run plan by name", () => {
+  describe("when resolving a run plan by name", () => {
     describe("when no plan answers to the name", () => {
       /** @scenario "A run whose name matches no plan creates one" */
       it("creates a plan carrying the scope and targets the run was started with", async () => {

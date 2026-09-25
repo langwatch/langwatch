@@ -247,7 +247,7 @@ export {
   type ReportChartDeps,
 } from "./services/report-chart.service.ts";
 export type { ReportGraphInput } from "./rules/report-chart.rules.ts";
-export { ReportTraceRowService } from "./services/report-trace-row.service.ts";
+export { toReportTraceRow } from "./rules/report-trace-row.rules.ts";
 /**
  * The two Postgres reads a scheduled report fires through, published so a background process
  * can compose the handler over its own client.

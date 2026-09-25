@@ -111,7 +111,7 @@ export function hardFloorReport({
  * Arms the floor for a shard, as a vitest `globalSetup`. Unref'd, so a healthy
  * shard exits on its own and the timer only fires on the wedge.
  */
-export async function setup(): Promise<void> {
+export async function armUnitShardHardFloor(): Promise<void> {
   const hardFloorMs = resolveHardFloorMs();
   if (hardFloorMs === null) return;
 

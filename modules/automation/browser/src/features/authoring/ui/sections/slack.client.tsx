@@ -329,11 +329,14 @@ function SlackChannelField({
   }, [fetchKey]);
 
   // Filterable collection, refreshed whenever a fetch lands.
-  const { contains } = useFilter({ sensitivity: "base" });
+  const collator = useFilter({ sensitivity: "base" });
   const { collection, filter, set } = useListCollection<{
     label: string;
     value: string;
-  }>({ initialItems: [], filter: contains });
+  }>({
+    initialItems: [],
+    filter: (itemText: string, filterText: string) => collator.contains(itemText, filterText),
+  });
   // A channel the bot can't list is still a real destination, so it gets its
   // own entry once committed. That entry is what lets it be the combobox's
   // SELECTION: the machine rewrites its input from the selected item's label,

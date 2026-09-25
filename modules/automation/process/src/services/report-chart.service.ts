@@ -96,6 +96,8 @@ export class ReportChartService {
     return new ReportChartService();
   }
 
+  private constructor() {}
+
   static async loadReportCharts({
     deps,
     source,

@@ -102,7 +102,7 @@ export function AppHeaderUserMenu() {
                     {accountMenu.experiments.hasUnseen && (
                       <Box
                         aria-label="New experiments available"
-                        role="status"
+                        as="output"
                         width="6px"
                         height="6px"
                         borderRadius="full"

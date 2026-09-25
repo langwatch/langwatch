@@ -109,7 +109,7 @@ describe.skipIf(!hasGo())(
           es,
           `component_state_change missing execution_state: ${JSON.stringify(ev)}`,
         ).toBeTruthy();
-        expect(es.trace_id).toBe(KNOWN_TRACE_ID);
+        expect(es).toMatchObject({ trace_id: KNOWN_TRACE_ID });
       }
     }, 60_000);
   },

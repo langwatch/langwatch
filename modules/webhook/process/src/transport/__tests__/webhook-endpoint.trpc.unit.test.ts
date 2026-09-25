@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * The `webhookEndpoints` transport over the real runtime and a real endpoint
@@ -114,14 +115,14 @@ function mount(options: { prisma?: ReturnType<typeof buildMockPrisma>; denied?: 
         throw new Error("The test fire is a REST-only path");
       },
     },
-    endpointStream: {
+    endpointStream: createApiFixture<WebhookAppDependencies["endpointStream"]>({
       flush: () => {
         throw new Error("Endpoint stream flush is not exercised by these scenarios");
       },
       appendReplay: () => {
         throw new Error("Replay append is not exercised by these scenarios");
       },
-    } as unknown as WebhookAppDependencies["endpointStream"],
+    }),
   });
 
   const trpc = initTRPC.context<WebhookEndpointTrpcTestContext>().create();

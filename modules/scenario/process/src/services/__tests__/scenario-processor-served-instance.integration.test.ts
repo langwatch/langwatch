@@ -1,9 +1,10 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * Processor path for succeeded job end-to-end: pool spawns child, child writes result
  * line to stdout, parent parses and records it. Child is real node script.
  * @see specs/scenarios/served-agent-instance-on-runs.feature
  */
-import { ScenarioExecutionService } from "@langwatch/scenario-contract";
+import type { ScenarioExecutionService } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const childScript = vi.hoisted(() => ({ current: "" }));
@@ -59,7 +60,7 @@ function childThatReports(result: Record<string, unknown>): string {
 function buildProcessor() {
   const recordAgentInstance = vi.fn().mockResolvedValue(undefined);
   const finishUnsuccessfulRun = vi.fn().mockResolvedValue(undefined);
-  const execution = Object.create(ScenarioExecutionService.prototype) as ScenarioExecutionService;
+  const execution = createApiFixture<ScenarioExecutionService>();
   execution.recordAgentInstance = recordAgentInstance;
   execution.finishUnsuccessfulRun = finishUnsuccessfulRun;
   execution.prepare = () =>

@@ -48,7 +48,7 @@ function LoadingDatasets() {
       borderWidth="1px"
       borderRadius="md"
       color="fg.muted"
-      role="status"
+      as="output"
       aria-label="Loading datasets"
     >
       <Spinner size="xs" />
