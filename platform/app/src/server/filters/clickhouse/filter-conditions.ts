@@ -212,8 +212,20 @@ export const clickHouseFilterConditions: Record<
 
   "evaluations.score": (values, paramId, key) => {
     if (!key || values.length < 2) return { sql: "1=0", params: {} };
-    const minScore = parseFloat(values[0] ?? "");
-    const maxScore = parseFloat(values[1] ?? "");
+    // Parse the bounds exactly as the in-memory matcher does
+    // (triggerFilter.matcher.ts): `Number`, not `parseFloat`, so a bound with
+    // trailing text like "0.6x" is NaN here too instead of parsing to 0.6 —
+    // else this preview and the trigger matcher would disagree on the same
+    // filter (#8170). (A hex literal like "0x1" is a valid 1 to both, which
+    // is the agreement we want.) `Number("")` is 0, so a blank /
+    // whitespace-only bound is rejected explicitly first.
+    const minRaw = values[0] ?? "";
+    const maxRaw = values[1] ?? "";
+    if (minRaw.trim() === "" || maxRaw.trim() === "") {
+      return { sql: "1=0", params: {} };
+    }
+    const minScore = Number(minRaw);
+    const maxScore = Number(maxRaw);
     // Reject invalid ranges: NaN values or min > max
     if (!Number.isFinite(minScore) || !Number.isFinite(maxScore)) {
       return { sql: "1=0", params: {} };
