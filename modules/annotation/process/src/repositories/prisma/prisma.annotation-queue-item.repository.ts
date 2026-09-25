@@ -2,6 +2,7 @@ import {
   AnnotationQueueItemNotFoundError,
   type AnnotationQueueItem,
   type AnnotationQueueListedItem,
+  type AnnotationQueuePageItem,
   type AnnotationQueuePendingCount,
   type AnnotationQueueWithItems,
 } from "@langwatch/annotation-contract";
@@ -14,6 +15,8 @@ import type {
   AnnotationQueueItemOrganizationScope,
   AnnotationQueueItemRepository,
   AnnotationQueueItemsPage,
+  AnnotationQueueWalkPlace,
+  AnnotationQueueWalkScope,
   CreateAnnotationQueueItemsInput,
   DeleteAnnotationQueueItemsInput,
   ListQueueItemsPageInput,
@@ -81,6 +84,62 @@ const queuedAtRange = ({ startDate, endDate }: { startDate?: Instant; endDate?: 
   if (endDate) createdAt.lte = toDate(endDate);
 
   return Object.keys(createdAt).length > 0 ? { createdAt } : {};
+};
+
+const pageItemInclude = ({
+  projectId,
+  organizationId,
+}: {
+  projectId: string;
+  organizationId: string;
+}) => ({
+  user: reviewerSelect,
+  createdByUser: reviewerSelect,
+  annotationQueue: {
+    include: {
+      members: queueMemberInclude(organizationId),
+      AnnotationQueueScores: queueScoreInclude(projectId),
+    },
+  },
+});
+
+/** Newest first; the id breaks ties so a step never oscillates between same-instant items. */
+const walkOrder: Prisma.AnnotationQueueItemOrderByWithRelationInput[] = [
+  { createdAt: "desc" },
+  { id: "desc" },
+];
+const walkOrderReversed: Prisma.AnnotationQueueItemOrderByWithRelationInput[] = [
+  { createdAt: "asc" },
+  { id: "asc" },
+];
+
+const walkWhere = (input: AnnotationQueueWalkScope) => ({
+  ...callerFilter(input),
+  doneAt: null,
+});
+
+/** `projectId` stays at the top so the multitenancy guard still sees it. */
+const narrowWalkWhere = (
+  input: AnnotationQueueWalkScope,
+  clause: Prisma.AnnotationQueueItemWhereInput,
+): Prisma.AnnotationQueueItemWhereInput => ({
+  projectId: input.projectId,
+  AND: [walkWhere(input), clause],
+});
+
+const walkNeighbourhood = (
+  item: Readonly<{ id: string; createdAt: Instant }>,
+  side: "before" | "after",
+): Prisma.AnnotationQueueItemWhereInput => {
+  const createdAt = toDate(item.createdAt);
+
+  return side === "before"
+    ? {
+        OR: [{ createdAt: { gt: createdAt } }, { createdAt, id: { gt: item.id } }],
+      }
+    : {
+        OR: [{ createdAt: { lt: createdAt } }, { createdAt, id: { lt: item.id } }],
+      };
 };
 
 export class PrismaAnnotationQueueItemRepository
@@ -285,16 +344,7 @@ export class PrismaAnnotationQueueItemRepository
       where,
       take: input.allQueueItems ? void 0 : input.pageSize,
       skip: input.allQueueItems ? void 0 : input.pageOffset,
-      include: {
-        user: reviewerSelect,
-        createdByUser: reviewerSelect,
-        annotationQueue: {
-          include: {
-            members: queueMemberInclude(input.organizationId),
-            AnnotationQueueScores: queueScoreInclude(input.projectId),
-          },
-        },
-      },
+      include: pageItemInclude(input),
       orderBy: { createdAt: "desc" },
     });
 
@@ -323,5 +373,69 @@ export class PrismaAnnotationQueueItemRepository
     });
 
     return queues;
+  }
+
+  countQueueWalkItems(input: AnnotationQueueWalkScope): Promise<number> {
+    return this.prisma.annotationQueueItem.count({ where: walkWhere(input) });
+  }
+
+  async findQueueWalkItems(
+    input: AnnotationQueueWalkScope & Readonly<{ queueItemId?: string }>,
+  ): Promise<AnnotationQueuePageItem[]> {
+    const include = pageItemInclude(input);
+
+    const named = input.queueItemId
+      ? await this.prisma.annotationQueueItem.findFirst({
+          where: narrowWalkWhere(input, { id: input.queueItemId }),
+          include,
+        })
+      : null;
+
+    const current =
+      named ??
+      (await this.prisma.annotationQueueItem.findFirst({
+        where: walkWhere(input),
+        orderBy: walkOrder,
+        include,
+      }));
+
+    return current ? [current] : [];
+  }
+
+  async getQueueWalkPlace(
+    input: AnnotationQueueWalkScope &
+      Readonly<{ current: Readonly<{ id: string; createdAt: Instant }> }>,
+  ): Promise<AnnotationQueueWalkPlace> {
+    const before = narrowWalkWhere(input, walkNeighbourhood(input.current, "before"));
+    const after = narrowWalkWhere(input, walkNeighbourhood(input.current, "after"));
+
+    const [ahead, previous, next] = await Promise.all([
+      this.prisma.annotationQueueItem.count({ where: before }),
+      this.prisma.annotationQueueItem.findFirst({
+        where: before,
+        orderBy: walkOrderReversed,
+        select: { id: true },
+      }),
+      this.prisma.annotationQueueItem.findFirst({
+        where: after,
+        orderBy: walkOrder,
+        select: { id: true },
+      }),
+    ]);
+
+    return { ahead, previousItemId: previous?.id ?? null, nextItemId: next?.id ?? null };
+  }
+
+  async findQueueWalkTraceIds(
+    input: AnnotationQueueWalkScope & Readonly<{ take: number }>,
+  ): Promise<string[]> {
+    const items = await this.prisma.annotationQueueItem.findMany({
+      where: walkWhere(input),
+      orderBy: walkOrder,
+      take: input.take,
+      select: { traceId: true },
+    });
+
+    return [...new Set(items.map((item) => item.traceId))];
   }
 }

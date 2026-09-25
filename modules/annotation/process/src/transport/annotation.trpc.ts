@@ -191,4 +191,13 @@ export const annotationTrpcTransport = defineTrpcRouter(AnnotationApi, annotatio
       userId: actor.id,
     }),
   )
+
+  .procedure("getQueueWalkStep")
+  .withPermission("annotations:view")
+  .handle(async ({ app, actor, input }) =>
+    app.getQueueWalkStep({
+      ...input,
+      userId: actor.id,
+    }),
+  )
   .build();

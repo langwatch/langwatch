@@ -17,6 +17,7 @@ import type { CreateUnattributedAnnotationInput } from "./annotation-rest.schema
 import type {
   AnnotationOptimizedQueues,
   AnnotationQueueItemWithTrace,
+  AnnotationQueueWalkStep,
   AnnotationWithFullUser,
   AnnotationWithUserSummary,
 } from "./annotation-review.schemas.ts";
@@ -24,6 +25,7 @@ import type {
   AnnotationReviewCreateInput,
   AnnotationReviewDeleteInput,
   AnnotationReviewOptimizedQueuesInput,
+  AnnotationQueueWalkStepInput,
   AnnotationReviewUpdateInput,
 } from "./annotation-review.types.ts";
 import type {
@@ -76,6 +78,7 @@ export interface AnnotationApi {
   listOptimizedQueues(
     input: AnnotationReviewOptimizedQueuesInput,
   ): Promise<AnnotationOptimizedQueues>;
+  getQueueWalkStep(input: AnnotationQueueWalkStepInput): Promise<AnnotationQueueWalkStep>;
   listForProjection(input: ListProjectionAnnotationsInput): Promise<ProjectionAnnotation[]>;
   listScoreNames(input: ListAnnotationScoreNamesInput): Promise<AnnotationScoreName[]>;
   upsertScore(input: UpsertAnnotationScoreInput): Promise<AnnotationScore>;

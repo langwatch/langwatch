@@ -20,6 +20,7 @@ import {
 import {
   annotationOptimizedQueuesSchema,
   annotationQueueItemWithTraceSchema,
+  annotationQueueWalkStepSchema,
 } from "./annotation-review.schemas.ts";
 import {
   annotationApiAnnotationScopeSchema,
@@ -35,6 +36,7 @@ import {
   annotationApiQueueBySlugOrIdInputSchema,
   annotationApiQueueConfigurationInputSchema,
   annotationApiQueueListInputSchema,
+  annotationApiQueueWalkStepInputSchema,
   annotationApiUpdateInputSchema,
 } from "./annotation-trpc.schemas.ts";
 import { annotationSchema } from "./annotation.schemas.ts";
@@ -125,4 +127,9 @@ export const annotationTrpc = defineTrpcContract("annotation")
   .query("getOptimizedAnnotationQueues")
   .withInput(annotationApiOptimizedQueuesInputSchema)
   .withOutput(annotationOptimizedQueuesSchema)
+
+  /** One step of the caller's pending queue, newest first. */
+  .query("getQueueWalkStep")
+  .withInput(annotationApiQueueWalkStepInputSchema)
+  .withOutput(annotationQueueWalkStepSchema)
   .build();

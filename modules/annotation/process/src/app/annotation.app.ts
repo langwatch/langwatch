@@ -41,6 +41,8 @@ import {
   type AnnotationQueueListedItem,
   type AnnotationQueuePendingCount,
   type AnnotationQueueRecord,
+  type AnnotationQueueWalkStep,
+  type AnnotationQueueWalkStepInput,
   type AnnotationScore,
   type AnnotationScoreName,
   type AnnotationWithFullUser,
@@ -62,6 +64,7 @@ import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi, type UserFullProfile } from "@langwatch/user-contract";
 import { z } from "zod";
 
+import type { AnnotationQueueWalkScope } from "#repositories/annotation-queue-item.repository";
 import type { AnnotationRepositories } from "#repositories/annotation.repositories";
 import { AnnotationQueueService } from "#services/annotation-queue.service";
 import { AnnotationScoreService } from "#services/annotation-score.service";
@@ -636,6 +639,64 @@ export class AnnotationApp implements AnnotationApi {
       queues: processedQueues,
       totalCount: page.totalCount,
     };
+  }
+
+  async getQueueWalkStep(input: AnnotationQueueWalkStepInput): Promise<AnnotationQueueWalkStep> {
+    const { members, ...scope } = await this.#getOrganizationScope(input);
+    const walkScope = { ...scope, projectId: input.projectId, userId: input.userId };
+
+    const step = await this.#queues.getQueueWalkPosition({
+      ...walkScope,
+      ...(input.queueItemId === void 0 ? {} : { queueItemId: input.queueItemId }),
+    });
+
+    if (step.item === void 0) {
+      return {
+        item: null,
+        position: 0,
+        total: step.total,
+        previousItemId: null,
+        nextItemId: null,
+        queueFinished: true,
+      };
+    }
+
+    const withUsers = this.#withQueueItemMemberSummaries(step.item, members);
+    const [item] = await this.#enrichQueueItems(input, [
+      withUsers.annotationQueue === null
+        ? withUsers
+        : {
+            ...withUsers,
+            annotationQueue: this.#withMemberSummaries(withUsers.annotationQueue, members),
+          },
+    ]);
+
+    return {
+      item: item ?? null,
+      position: step.position,
+      total: step.total,
+      previousItemId: step.previousItemId,
+      nextItemId: step.nextItemId,
+      queueFinished: item?.trace ? false : await this.#noReadableWalkItemsLeft(step, walkScope),
+    };
+  }
+
+  /** Only a queue that fits the lookahead window can be judged to hold nothing readable. */
+  async #noReadableWalkItemsLeft(
+    step: Readonly<{ withinLookahead: boolean }>,
+    walkScope: AnnotationQueueWalkScope,
+  ): Promise<boolean> {
+    if (!step.withinLookahead) return false;
+
+    const traceIds = await this.#queues.findQueueWalkLookaheadTraceIds(walkScope);
+    if (traceIds.length === 0) return true;
+
+    const existing = await this.#traces.findExistingTraceIds({
+      projectId: walkScope.projectId,
+      traceIds,
+    });
+
+    return existing.length === 0;
   }
 
   async #enrichQueueItems(

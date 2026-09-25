@@ -32,7 +32,17 @@ export const annotationOptimizedQueuesSchema = z.object({
   queues: annotationReviewQueueSchema.array(),
   totalCount: z.number(),
 });
+/** One step of the reviewer's pending queue: the item, where it sits, and its neighbours. */
+export const annotationQueueWalkStepSchema = z.object({
+  item: annotationReviewQueueItemSchema.nullable(),
+  position: z.number(),
+  total: z.number(),
+  previousItemId: z.string().nullable(),
+  nextItemId: z.string().nullable(),
+  queueFinished: z.boolean(),
+});
 export type AnnotationQueueItemWithTrace = z.infer<typeof annotationQueueItemWithTraceSchema>;
 export type AnnotationReviewQueueItem = z.infer<typeof annotationReviewQueueItemSchema>;
 export type AnnotationReviewQueue = z.infer<typeof annotationReviewQueueSchema>;
 export type AnnotationOptimizedQueues = z.infer<typeof annotationOptimizedQueuesSchema>;
+export type AnnotationQueueWalkStep = z.infer<typeof annotationQueueWalkStepSchema>;

@@ -43,6 +43,15 @@ export type ListQueueItemsByQueueInput = ListQueueItemsPageInput & Readonly<{ qu
 export type ListAnnotationQueuesWithItemsInput = AnnotationQueueItemOrganizationScope &
   Readonly<{ queueIds: readonly string[] }>;
 
+/** The caller's pending queue, which is the only set the walk steps through. */
+export type AnnotationQueueWalkScope = AnnotationQueueItemOrganizationScope &
+  AnnotationQueueItemCaller;
+export type AnnotationQueueWalkPlace = Readonly<{
+  ahead: number;
+  previousItemId: string | null;
+  nextItemId: string | null;
+}>;
+
 export type AnnotationQueueItemsPage = Readonly<{
   totalCount: number;
   items: readonly AnnotationQueuePageItem[];
@@ -66,4 +75,16 @@ export interface AnnotationQueueItemRepository {
   findQueuesWithItems(
     input: ListAnnotationQueuesWithItemsInput,
   ): Promise<readonly AnnotationQueueWithItems[]>;
+  countQueueWalkItems(input: AnnotationQueueWalkScope): Promise<number>;
+  /** The named item when it is still in the walk, else the front of it; at most one. */
+  findQueueWalkItems(
+    input: AnnotationQueueWalkScope & Readonly<{ queueItemId?: string }>,
+  ): Promise<readonly AnnotationQueuePageItem[]>;
+  getQueueWalkPlace(
+    input: AnnotationQueueWalkScope &
+      Readonly<{ current: Readonly<{ id: string; createdAt: Instant }> }>,
+  ): Promise<AnnotationQueueWalkPlace>;
+  findQueueWalkTraceIds(
+    input: AnnotationQueueWalkScope & Readonly<{ take: number }>,
+  ): Promise<readonly string[]>;
 }

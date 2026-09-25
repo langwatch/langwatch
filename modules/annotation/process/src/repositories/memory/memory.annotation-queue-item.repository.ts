@@ -6,10 +6,11 @@ import {
   annotationQueueWithItemsSchema,
   type AnnotationQueueItem,
   type AnnotationQueueListedItem,
+  type AnnotationQueuePageItem,
   type AnnotationQueueWithItems,
 } from "@langwatch/annotation-contract";
 import { generate } from "@langwatch/ksuid";
-import { nowInstant, toDate } from "@langwatch/time";
+import { nowInstant, toDate, type Instant } from "@langwatch/time";
 
 import type {
   AnnotationQueueItemCaller,
@@ -23,6 +24,8 @@ import type {
   ListAnnotationQueuesWithItemsInput,
   MarkAnnotationQueueItemDoneInput,
   AnnotationQueueItemsPage,
+  AnnotationQueueWalkPlace,
+  AnnotationQueueWalkScope,
 } from "../annotation-queue-item.repository.ts";
 import type { MemoryAnnotationQueueDatabase } from "./memory.annotation-queue.database.ts";
 
@@ -322,5 +325,53 @@ export class MemoryAnnotationQueueItemRepository implements AnnotationQueueItemR
           })),
       }))
       .map((queue) => annotationQueueWithItemsSchema.parse(structuredClone(queue)));
+  }
+  async #walkItems(input: AnnotationQueueWalkScope) {
+    const items = await this.findQueueItems(input);
+
+    return items
+      .filter((item) => item.doneAt === null && this.#isReachableByUser(item, input.userId))
+      .toSorted(
+        (a, b) =>
+          b.createdAt.getTime() - a.createdAt.getTime() ||
+          Number(a.id < b.id) - Number(a.id > b.id),
+      );
+  }
+  async countQueueWalkItems(input: AnnotationQueueWalkScope): Promise<number> {
+    return (await this.#walkItems(input)).length;
+  }
+  async findQueueWalkItems(
+    input: AnnotationQueueWalkScope & Readonly<{ queueItemId?: string }>,
+  ): Promise<readonly AnnotationQueuePageItem[]> {
+    const items = await this.#walkItems(input);
+    const current = items.find((item) => item.id === input.queueItemId) ?? items[0];
+
+    return current === undefined ? [] : [this.#pageItem(current, input.organizationMemberIds)];
+  }
+  async getQueueWalkPlace(
+    input: AnnotationQueueWalkScope &
+      Readonly<{ current: Readonly<{ id: string; createdAt: Instant }> }>,
+  ): Promise<AnnotationQueueWalkPlace> {
+    const { current } = input;
+    const currentAt = toDate(current.createdAt).getTime();
+    const items = await this.#walkItems(input);
+    const sortsBefore = (item: AnnotationQueueListedItem) =>
+      item.createdAt.getTime() > currentAt ||
+      (item.createdAt.getTime() === currentAt && item.id > current.id);
+    const before = items.filter(sortsBefore);
+    const after = items.filter((item) => item.id !== current.id && !sortsBefore(item));
+
+    return {
+      ahead: before.length,
+      previousItemId: before.at(-1)?.id ?? null,
+      nextItemId: after[0]?.id ?? null,
+    };
+  }
+  async findQueueWalkTraceIds(
+    input: AnnotationQueueWalkScope & Readonly<{ take: number }>,
+  ): Promise<readonly string[]> {
+    const items = await this.#walkItems(input);
+
+    return [...new Set(items.slice(0, input.take).map((item) => item.traceId))];
   }
 }

@@ -93,6 +93,7 @@ describe("the annotation tRPC declaration", () => {
         ["markQueueItemDone", "mutation", "annotations:update"],
         ["getQueueBySlugOrId", "query", "annotations:view"],
         ["getOptimizedAnnotationQueues", "query", "annotations:view"],
+        ["getQueueWalkStep", "query", "annotations:view"],
       ]);
     });
 

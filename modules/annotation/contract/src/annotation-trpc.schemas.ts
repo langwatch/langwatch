@@ -140,3 +140,10 @@ export const annotationApiOptimizedQueuesInputSchema = z.object({
 export type AnnotationApiOptimizedQueuesInput = z.infer<
   typeof annotationApiOptimizedQueuesInputSchema
 >;
+
+/** Absent `queueItemId` starts the walk at the front of the caller's pending queue. */
+export const annotationApiQueueWalkStepInputSchema = z.object({
+  projectId: z.string(),
+  queueItemId: z.string().optional(),
+});
+export type AnnotationApiQueueWalkStepInput = z.infer<typeof annotationApiQueueWalkStepInputSchema>;

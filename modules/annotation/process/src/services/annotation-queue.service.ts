@@ -14,16 +14,31 @@ import {
   type AnnotationQueueListEntry,
   type AnnotationQueueScope,
 } from "@langwatch/annotation-contract";
+import { fromDate } from "@langwatch/time";
 import { z } from "zod";
 
 import {
   type AnnotationQueueItemRepository,
+  type AnnotationQueueWalkScope,
   type CreateAnnotationQueueItemsInput,
   type ListQueueItemsByUserInput,
 } from "#repositories/annotation-queue-item.repository";
 import type { AnnotationQueueRepository } from "#repositories/annotation-queue.repository";
 
 const RESERVED_QUEUE_SLUGS = new Set(["all", "me", "my-queue"]);
+
+/** How far ahead the walk looks for a readable item before calling the queue finished. */
+const QUEUE_WALK_LOOKAHEAD = 50;
+
+export type AnnotationQueueWalkPosition = Readonly<{
+  item?: AnnotationQueuePageItem;
+  position: number;
+  total: number;
+  previousItemId: string | null;
+  nextItemId: string | null;
+  /** A longer queue is never called finished, since work may wait past the window. */
+  withinLookahead: boolean;
+}>;
 
 const createAnnotationQueueItemsInputSchema = z.strictObject({
   projectId: z.string().min(1),
@@ -189,5 +204,34 @@ export class AnnotationQueueService {
     }>,
   ): Promise<readonly AnnotationQueueWithItems[]> {
     return this.#items.findQueuesWithItems(input);
+  }
+
+  /** Seeks outwards from the current item, so a step costs the same on any queue length. */
+  async getQueueWalkPosition(
+    input: AnnotationQueueWalkScope & Readonly<{ queueItemId?: string }>,
+  ): Promise<AnnotationQueueWalkPosition> {
+    const total = await this.#items.countQueueWalkItems(input);
+    const [item] = await this.#items.findQueueWalkItems(input);
+    if (item === undefined) {
+      return { position: 0, total, previousItemId: null, nextItemId: null, withinLookahead: true };
+    }
+
+    const place = await this.#items.getQueueWalkPlace({
+      ...input,
+      current: { id: item.id, createdAt: fromDate(item.createdAt) },
+    });
+
+    return {
+      item,
+      position: place.ahead + 1,
+      total,
+      previousItemId: place.previousItemId,
+      nextItemId: place.nextItemId,
+      withinLookahead: total <= QUEUE_WALK_LOOKAHEAD,
+    };
+  }
+
+  findQueueWalkLookaheadTraceIds(input: AnnotationQueueWalkScope): Promise<readonly string[]> {
+    return this.#items.findQueueWalkTraceIds({ ...input, take: QUEUE_WALK_LOOKAHEAD });
   }
 }
