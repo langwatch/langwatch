@@ -1,4 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import {
   GOVERNANCE_ATTR,
   GOVERNANCE_ORIGIN_KIND_VALUE,
@@ -16,7 +17,6 @@ import {
 import { DefaultGovernanceSetupStateService } from "../governance-setup-state.service.ts";
 
 const emptyCounts = (): GovernanceSetupCounts => ({
-  routingPolicies: 0,
   ingestionSources: 0,
   anomalyRules: 0,
 });
@@ -39,6 +39,7 @@ const peers = ({
   keys: createApiFixture<GatewayApi>({
     findPersonalVirtualKeys: async () => Array.from({ length: keys }, () => gatewayKey()),
   }),
+  routingPolicies: createApiFixture<EnterpriseGatewayApi>({ countRoutingPolicies: async () => 0 }),
   projects: createApiFixture<ProjectApi>({
     findInternal: async () => (tenant ? governanceProject : null),
     countWithTraces: async () => traced,

@@ -10,6 +10,7 @@ import {
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import {
   InvalidSourceTypeError,
   PlatformTemplateImmutableError,
@@ -140,6 +141,7 @@ async function buildApi(
       traces: createApiFixture<TraceApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
       gateway: createApiFixture<GatewayApi>(),
+      enterpriseGateway: createApiFixture<EnterpriseGatewayApi>(),
       modelProviders: createApiFixture<ModelProviderApi>(),
       users: createApiFixture<UserApi>(),
       auditLog: createApiFixture<AuditLogApi>(),

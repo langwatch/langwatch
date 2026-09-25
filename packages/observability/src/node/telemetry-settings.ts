@@ -68,6 +68,8 @@ export type TelemetrySecrets = Readonly<{
 export type TelemetryContext = Readonly<{
   config: Readonly<{ observability: TelemetrySettings }>;
   secrets: TelemetrySecrets;
+  /** Field paths every log record masks; the boot seam names them, this package holds none. */
+  redactPaths?: readonly string[];
 }>;
 
 /** `key=value,key2=value2` — the OTLP environment encoding for headers. */

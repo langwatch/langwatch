@@ -84,23 +84,11 @@ export class TestGovernanceService implements GovernanceApi {
   personalUsageBreakdownByModel = unsupported<GovernanceApi["personalUsageBreakdownByModel"]>();
   personalUsageDailyBuckets = unsupported<GovernanceApi["personalUsageDailyBuckets"]>();
   personalUsageSummary = unsupported<GovernanceApi["personalUsageSummary"]>();
-  personalVirtualKeyEnsureDefault = unsupported<GovernanceApi["personalVirtualKeyEnsureDefault"]>();
-  personalVirtualKeyIssue = unsupported<GovernanceApi["personalVirtualKeyIssue"]>();
-  personalVirtualKeyList = unsupported<GovernanceApi["personalVirtualKeyList"]>();
-  personalVirtualKeyRevoke = unsupported<GovernanceApi["personalVirtualKeyRevoke"]>();
-  personalVirtualKeyRevokeAllForUser =
-    unsupported<GovernanceApi["personalVirtualKeyRevokeAllForUser"]>();
   quarantineFillEvaluate = unsupported<GovernanceApi["quarantineFillEvaluate"]>();
   resolveSetupState = unsupported<GovernanceApi["resolveSetupState"]>();
   resolveOtlpReceiverPolicies = unsupported<GovernanceApi["resolveOtlpReceiverPolicies"]>();
   resolveSourceNonBillable = unsupported<GovernanceApi["resolveSourceNonBillable"]>();
   resolveTraceDepartment = unsupported<GovernanceApi["resolveTraceDepartment"]>();
-  routingPolicyCreate = unsupported<GovernanceApi["routingPolicyCreate"]>();
-  routingPolicyDelete = unsupported<GovernanceApi["routingPolicyDelete"]>();
-  routingPolicyGetById = unsupported<GovernanceApi["routingPolicyGetById"]>();
-  routingPolicyList = unsupported<GovernanceApi["routingPolicyList"]>();
-  routingPolicySetDefault = unsupported<GovernanceApi["routingPolicySetDefault"]>();
-  routingPolicyUpdate = unsupported<GovernanceApi["routingPolicyUpdate"]>();
   templateArchiveOrg = unsupported<GovernanceApi["templateArchiveOrg"]>();
   templateCloneFromPlatform = unsupported<GovernanceApi["templateCloneFromPlatform"]>();
   templateCreateOrg = unsupported<GovernanceApi["templateCreateOrg"]>();
@@ -114,7 +102,6 @@ export class TestGovernanceService implements GovernanceApi {
   findIngestionSourceById = unsupported<GovernanceApi["findIngestionSourceById"]>();
   findIngestionSourceByIngestSecret =
     unsupported<GovernanceApi["findIngestionSourceByIngestSecret"]>();
-  findRoutingPolicyById = unsupported<GovernanceApi["findRoutingPolicyById"]>();
   findTemplateByIdForOrg = unsupported<GovernanceApi["findTemplateByIdForOrg"]>();
   usageRecord = unsupported<GovernanceApi["usageRecord"]>();
 }

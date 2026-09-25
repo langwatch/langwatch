@@ -105,15 +105,10 @@ export interface AuthApi {
   tryResolveBrowserSession(input: {
     verified: VerifiedBrowserSession | null;
   }): Promise<BrowserSession | null>;
-  /** Resolves an unexpired CLI device-session bearer, or no caller. */
-  findCliAccessSession(input: {
-    authorization: string | null | undefined;
-  }): Promise<CliAccessSession | null>;
-  /** Severs the presented CLI bearer and its owner index entry. */
-  revokeCliAccessToken(input: {
-    authorization: string | null | undefined;
-    userId: string;
-  }): Promise<void>;
+  /** The CLI token door's verifier: the session and its severing key, or `invalid_credentials`. */
+  getCliAccessSession(input: {
+    authorization: string;
+  }): Promise<CliAccessSession & Readonly<{ tokenKey: string }>>;
   /** Every CLI token this person still holds; lapsed and unreadable ones are skipped. */
   findCliTokenRecordsForUser(input: { userId: string }): Promise<CliTokenRecordEntry[]>;
   /**

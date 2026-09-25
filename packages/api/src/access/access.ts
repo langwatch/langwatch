@@ -87,6 +87,7 @@ export type Credential =
   | "internalSecret"
   | "instance-admin"
   | "sessionKey"
+  | "cliToken"
   | "public";
 
 /** An authenticated caller, normalized with a stable identifier for every kind. */
@@ -323,6 +324,8 @@ export function securityRequirement(credential: Credential): readonly Record<str
       return [{ admin_api_key: [] }];
     case "scimToken":
       return [{ scim_bearer: [] }];
+    case "cliToken":
+      return [{ cli_access_token: [] }];
     // A deployment secret is held by an operator's own monitor rather than by
     // us, so it has a scheme for the same reason the SCIM token does.
     case "internalSecret":

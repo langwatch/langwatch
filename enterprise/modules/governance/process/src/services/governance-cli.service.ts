@@ -375,7 +375,7 @@ export class GovernanceCliService {
   }
 }
 
-type GovernanceCliGateRefusal = Extract<GovernanceCliRefusalAnswer, { status: 401 | 402 | 403 }>;
+type GovernanceCliGateRefusal = Extract<GovernanceCliRefusalAnswer, { status: 402 | 403 }>;
 
 function ok<Body>(
   schema: { parse(body: unknown): Body },
@@ -412,14 +412,6 @@ function admissionResult(
   switch (result.outcome) {
     case "admitted":
       return { caller: result.caller };
-    case "unauthorized":
-      return {
-        refusal: refuse(
-          "unauthorized",
-          "Bearer access token is missing, malformed, or expired",
-          401,
-        ),
-      };
     case "membership-ended":
       return {
         refusal: refuse(

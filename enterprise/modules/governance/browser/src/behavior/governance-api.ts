@@ -18,8 +18,6 @@ import type {
   IngestionTemplate,
   OttlValidationResult,
   QuarantineFillStats,
-  RoutingPolicy,
-  RoutingPolicyScopeType,
 } from "@langwatch/enterprise-governance-contract";
 import type * as enterpriseGovernanceContractModule from "@langwatch/enterprise-governance-contract";
 
@@ -400,21 +398,6 @@ export type GovernanceApiMap = ContractApiMap<typeof activityMonitorTrpc> &
         mutation: {
           input: { organizationId: string; id: string; ottlRules: string };
           output: IngestionTemplate;
-        };
-      };
-    };
-
-    routingPolicy: {
-      list: {
-        query: {
-          input: {
-            organizationId: string;
-            selectableForScope?: {
-              scopeType: RoutingPolicyScopeType;
-              scopeId: string;
-            };
-          };
-          output: RoutingPolicy[];
         };
       };
     };

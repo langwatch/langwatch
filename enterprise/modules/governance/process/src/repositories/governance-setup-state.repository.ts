@@ -1,5 +1,4 @@
 export type GovernanceSetupCounts = {
-  routingPolicies: number;
   ingestionSources: number;
   anomalyRules: number;
 };

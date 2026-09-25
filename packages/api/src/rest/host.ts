@@ -12,6 +12,7 @@ import { Hono } from "hono";
 
 import type { RateLimiter } from "../ports.ts";
 import type { MountableRestApp } from "./addressing.ts";
+import { CliTokenIdentity } from "./cli-token-identity.ts";
 import type { RestDoorCredential, RestTransportDeclaration } from "./declaration.ts";
 import type { IdempotentRunner } from "./idempotency.ts";
 import { isRestCredentialBinding, type RestTransportMiddlewareBinding } from "./request.ts";
@@ -19,9 +20,9 @@ import { canonicalErrorResponse } from "./response.ts";
 import { createRestRuntime, type RestAuditSink, type RestIdentity } from "./runtime.ts";
 import { SessionKeyIdentity } from "./session-key-identity.ts";
 
-/** Every credential kind a family may name, except the two a module binds for itself. */
+/** Every credential kind a family may name, except the three a module binds for itself. */
 export type RestIdentities = Readonly<
-  Record<Exclude<RestDoorCredential, "internalSecret" | "sessionKey">, RestIdentity>
+  Record<Exclude<RestDoorCredential, "internalSecret" | "sessionKey" | "cliToken">, RestIdentity>
 >;
 
 /**
@@ -120,6 +121,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
       ...this.options.identities,
       internalSecret: this.options.bearers(declaration.namespace),
       sessionKey: SessionKeyIdentity.unbound(declaration.namespace),
+      cliToken: CliTokenIdentity.unbound(declaration.namespace),
     };
   }
 }

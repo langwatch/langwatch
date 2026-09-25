@@ -1,3 +1,4 @@
+import { OrganizationInvalidCredentialsError } from "@langwatch/api";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 /**
@@ -7,6 +8,7 @@ import { AuditLogApi } from "@langwatch/audit-log-contract";
 import {
   AuthApi,
   assertAuthServerConfig,
+  cliAccessTokenKey,
   authBrowserConfig,
   authServerConfig,
   AuthUnavailableError,
@@ -686,22 +688,24 @@ export class AuthApp implements AuthApiContract {
     return this.#sessions.tryResolveBrowserSession(input);
   }
 
-  async findCliAccessSession(input: {
-    authorization: string | null | undefined;
-  }): Promise<CliAccessSession | null> {
+  async getCliAccessSession(input: {
+    authorization: string;
+  }): Promise<CliAccessSession & Readonly<{ tokenKey: string }>> {
+    const token = CliDeviceSessionService.extractBearerCliAccessToken(input.authorization);
     const record = await this.#cliSessions
       .getAccessToken(input.authorization)
       .catch((error: unknown) => {
         if (HandledError.isHandled(error) && error.code === "cli_session_record_not_found") {
-          return null;
+          throw new OrganizationInvalidCredentialsError();
         }
         throw error;
       });
-    if (!record) return null;
+    if (token === null) throw new OrganizationInvalidCredentialsError();
 
     return {
       userId: record.user_id,
       organizationId: record.organization_id,
+      tokenKey: cliAccessTokenKey(token),
       ...(record.cli_api_key_id ? { cliApiKeyId: record.cli_api_key_id } : {}),
       ...(record.client_info
         ? {
@@ -748,16 +752,6 @@ export class AuthApp implements AuthApiContract {
     const session = await this.tryResolveBrowserSession({ verified });
 
     return session === null ? null : session.user;
-  }
-
-  revokeCliAccessToken(input: {
-    authorization: string | null | undefined;
-    userId: string;
-  }): Promise<void> {
-    return this.#cliSessions.revokeAccessToken({
-      authHeader: input.authorization,
-      userId: input.userId,
-    });
   }
 
   findCliTokenRecordsForUser(input: { userId: string }): Promise<CliTokenRecordEntry[]> {

@@ -11,7 +11,6 @@ import type {
   GovernanceIngestionSource,
   GovernanceOcsfExportRow,
   IngestionSourceHealthRow,
-  PersonalVirtualKey,
   PulledUsageObservedEventData,
   RecentAnomalyRow,
   RecordBudgetCrossingCommandData,
@@ -717,26 +716,6 @@ export interface GovernanceClickHouseClient {
 
 export interface GovernanceClickHouseResolver {
   getClient(organizationId: string): Promise<GovernanceClickHouseClient>;
-}
-
-/**
- * Personal-key/personal-usage domain: the issuer port alone falls under the
- * twenty-line fragment-file floor once its repository sibling moves to
- * repositories/directory/.
- */
-export interface PersonalVirtualKeyIssuer {
-  issue(input: {
-    organizationId: string;
-    userId: string;
-    personalProjectId: string;
-    label: string;
-    routingPolicyId: string | null;
-  }): Promise<{ virtualKey: PersonalVirtualKey; secret: string }>;
-  revoke(input: {
-    id: string;
-    organizationId: string;
-    actorUserId: string;
-  }): Promise<PersonalVirtualKey>;
 }
 
 export type PulledUsageLedgerRow = {

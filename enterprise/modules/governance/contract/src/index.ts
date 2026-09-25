@@ -45,15 +45,11 @@ export * from "./ocsf-export.ts";
 export * from "./persona-home.ts";
 export * from "./personal-usage.ts";
 export * from "./personal-budget-overview.ts";
-export * from "./personal-virtual-key.ts";
-export * from "./personal-virtual-keys.trpc.ts";
 export * from "./platform-tool-policy.ts";
 export * from "./puller.ts";
 export * from "./pulled-usage.commands.ts";
 export * from "./pulled-usage.events.ts";
 export * from "./quarantine-fill.ts";
-export * from "./routing-policy.ts";
-export * from "./routing-policy.trpc.ts";
 
 export type {
   GovernanceOtlpPolicyInput,

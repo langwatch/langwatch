@@ -32,6 +32,12 @@ const SECURITY_SCHEMES = {
     description:
       "SCIM token for one organization's directory connection, created with POST /api/scim-tokens or in Settings > SCIM. It authenticates provisioning calls only, and stops working if the organization's Enterprise plan lapses.",
   },
+  cli_access_token: {
+    type: "http",
+    scheme: "bearer",
+    description:
+      "The device session the LangWatch CLI holds after `langwatch login`. It acts as the person who signed in, in the organization they chose, and expires unless the CLI refreshes it.",
+  },
   instance_admin_key: {
     type: "http",
     scheme: "bearer",

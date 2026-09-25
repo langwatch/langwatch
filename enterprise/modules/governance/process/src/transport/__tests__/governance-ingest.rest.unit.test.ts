@@ -187,18 +187,6 @@ function mountIngest(world: World = {}) {
     personalWebSessionList: unsupportedRestOperation,
     personalWebSessionEnd: unsupportedRestOperation,
     personalWebSessionsEndForIdentifier: unsupportedRestOperation,
-    listPersonalVirtualKeys: unsupportedRestOperation,
-    issuePersonalVirtualKey: unsupportedRestOperation,
-    revokePersonalVirtualKey: unsupportedRestOperation,
-    listRoutingPolicies: unsupportedRestOperation,
-    getRoutingPolicy: unsupportedRestOperation,
-    routingPolicyTierSuggestions: () => {
-      throw new Error("not reachable through the ingest door");
-    },
-    createRoutingPolicy: unsupportedRestOperation,
-    updateRoutingPolicy: unsupportedRestOperation,
-    setDefaultRoutingPolicy: unsupportedRestOperation,
-    deleteRoutingPolicy: unsupportedRestOperation,
     departmentList: unsupportedRestOperation,
     departmentAssignments: unsupportedRestOperation,
     departmentCreate: unsupportedRestOperation,

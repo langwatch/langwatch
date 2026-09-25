@@ -9,6 +9,7 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import { DEFAULT_SPEND_SPIKE_CONFIG } from "@langwatch/enterprise-governance-contract";
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
@@ -65,6 +66,7 @@ async function buildApp(planType: string) {
       traces: createApiFixture<TraceApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
       gateway: createApiFixture<GatewayApi>(),
+      enterpriseGateway: createApiFixture<EnterpriseGatewayApi>(),
       modelProviders: createApiFixture<ModelProviderApi>(),
       users: createApiFixture<UserApi>(),
       auditLog: createApiFixture<AuditLogApi>(),

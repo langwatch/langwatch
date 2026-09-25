@@ -5,6 +5,7 @@
  */
 import process from "node:process";
 
+import { ACTOR_SECRET_LOG_PATHS } from "@langwatch/actor";
 import { parseProcessConfig, type ConfigOwner, type ProcessConfigOf } from "@langwatch/config";
 import {
   refuseDoubleClaims,
@@ -33,6 +34,8 @@ export type Metrics = readonly ServerContribution[];
 type FactoryContext<Owners extends readonly PreambleOwner[]> = Readonly<{
   config: ProcessConfigOf<Owners>;
   secrets: ScopedSecrets;
+  /** What every log record masks: the actor's secret fields. */
+  redactPaths: readonly string[];
 }>;
 
 type ChainBuilder<Owners extends readonly PreambleOwner[]> = (
@@ -108,7 +111,11 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
     await resolver.preflight(declared);
 
     const frameworkSecrets = resolver.scopeTo(this.name, declared);
-    const telemetry = await this.state.telemetry?.({ config, secrets: frameworkSecrets });
+    const telemetry = await this.state.telemetry?.({
+      config,
+      secrets: frameworkSecrets,
+      redactPaths: ACTOR_SECRET_LOG_PATHS,
+    });
 
     const boundary: Parameters<typeof ProcessServer.create>[0] = {
       name: this.name,
@@ -130,6 +137,7 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
       for (const contribution of await this.state.metrics({
         config,
         secrets: frameworkSecrets,
+        redactPaths: ACTOR_SECRET_LOG_PATHS,
       })) {
         server.with(contribution);
       }

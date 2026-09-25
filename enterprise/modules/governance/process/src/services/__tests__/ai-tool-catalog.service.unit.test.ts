@@ -1,4 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import { AI_TOOL_STARTER_TILES } from "@langwatch/enterprise-governance-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -40,7 +41,9 @@ function world(member: { departmentId: string | null } = { departmentId: null })
       }),
     }),
     departments: repositories.departments,
-    routingPolicies: repositories.routingPolicies,
+    routingPolicies: createApiFixture<EnterpriseGatewayApi>({
+      listRoutingPolicies: async () => [],
+    }),
     sources: repositories.ingestionSources,
     members: organizations,
     diagnostics: { warn: () => undefined },

@@ -5,13 +5,11 @@
 
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { CodingAgentUsageTotals } from "@langwatch/coding-agent-contract";
+import type { personalVirtualKeysTrpc } from "@langwatch/enterprise-gateway-contract";
 import type { identityTrpc } from "@langwatch/identity-contract";
 import type { userTrpc } from "@langwatch/user-contract";
 
 import type { AiToolEntry } from "../model/ai-tool-catalog.ts";
-
-/** An acknowledgement, for the writes whose only answer is that they happened. */
-export type PersonalAcknowledgement = { ok: boolean };
 
 /**
  * The workspace a person is given inside an organization. `EnsuredPersonalWorkspace` in
@@ -49,35 +47,6 @@ export type PersonalBudgetState =
       requestIncreaseUrl?: string | undefined;
       adminEmail: string | null;
     };
-
-/**
- * A personal virtual key as this vertical hands it over. DELIBERATELY NOT the gateway's
- * `VirtualKeyView`: that one stringifies every instant and carries a dozen more columns.
- */
-export type PersonalVirtualKeyView = {
-  id: string;
-  organizationId: string;
-  name: string;
-  description: string | null;
-  displayPrefix: string;
-  status: string;
-  principalUserId: string | null;
-  routingPolicyId: string | null;
-  createdAtMs: number;
-  updatedAtMs: number;
-  lastUsedAtMs: number | null;
-  scopes: { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
-};
-
-/** A key together with its secret, which the mutation that mints one returns once. */
-export type PersonalVirtualKeyMinted = {
-  id: string;
-  label: string;
-  secret: string;
-  baseUrl: string;
-  displayPrefix: string;
-  routingPolicyId: string | null;
-};
 
 /** One device the CLI is signed in on. Every instant is EPOCH MILLISECONDS. */
 export type PersonalCliSession = {
@@ -183,26 +152,6 @@ type BorrowedProcedures = {
       };
     };
   };
-  personalVirtualKeys: {
-    list: {
-      query: {
-        input: { organizationId: string; targetUserId?: string };
-        output: PersonalVirtualKeyView[];
-      };
-    };
-    issuePersonal: {
-      mutation: {
-        input: { organizationId: string; label: string; routingPolicyId?: string };
-        output: PersonalVirtualKeyMinted;
-      };
-    };
-    revokePersonal: {
-      mutation: {
-        input: { organizationId: string; id: string };
-        output: PersonalAcknowledgement;
-      };
-    };
-  };
   personalSessions: {
     list: {
       query: { input: { organizationId: string }; output: PersonalCliSession[] };
@@ -302,6 +251,7 @@ type BorrowedProcedures = {
 
 export type PersonalWorkspaceApiMap = ContractApiMap<typeof userTrpc> &
   ContractApiMap<typeof identityTrpc> &
+  ContractApiMap<typeof personalVirtualKeysTrpc> &
   BorrowedProcedures;
 
 /**

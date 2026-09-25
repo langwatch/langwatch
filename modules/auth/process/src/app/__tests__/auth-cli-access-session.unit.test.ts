@@ -8,8 +8,8 @@ import type { SsoApi } from "@langwatch/enterprise-sso-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
-import type { EmailDelivery } from "@langwatch/mail";
 import { ResourceScope } from "@langwatch/kernel";
+import type { EmailDelivery } from "@langwatch/mail";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -70,7 +70,6 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
       identityEmails: void 0,
       mail: createApiFixture<EmailDelivery>(),
       invites: null,
-      authProvider: void 0,
       isSaas: false,
       nodeEnvironment: undefined,
       processName: "langwatch-api",
@@ -97,11 +96,42 @@ describe("the Auth CLI access-session peer", () => {
     });
     const app = await appForCliSessions(repositories);
 
-    await expect(app.findCliAccessSession({ authorization: AUTHORIZATION })).resolves.toEqual({
+    await expect(app.getCliAccessSession({ authorization: AUTHORIZATION })).resolves.toEqual({
       userId: "user-1",
       organizationId: "organization-1",
+      tokenKey: cliAccessTokenKey(ACCESS_TOKEN),
       clientInfo: { deviceLabel: "Work laptop", hostname: "laptop" },
       cliApiKeyId: "cli-login-key-1",
+    });
+  });
+
+  it.each([
+    ["an unknown bearer", AUTHORIZATION],
+    ["a bearer that is not a CLI access token", "Bearer sk-lw-project-key"],
+  ])("refuses %s as invalid credentials", async (_label, authorization) => {
+    const app = await appForCliSessions(MemoryAuthRepositories.create());
+
+    await expect(app.getCliAccessSession({ authorization })).rejects.toMatchObject({
+      code: "invalid_credentials",
+    });
+  });
+
+  it("refuses an expired bearer as invalid credentials and drops its record", async () => {
+    const repositories = MemoryAuthRepositories.create();
+    await repositories.cliSessions.set({
+      key: cliAccessTokenKey(ACCESS_TOKEN),
+      value: JSON.stringify({
+        user_id: "user-1",
+        organization_id: "organization-1",
+        issued_at: 0,
+        expires_at: Date.now() - 1,
+      }),
+      ttlSeconds: 60,
+    });
+    const app = await appForCliSessions(repositories);
+
+    await expect(app.getCliAccessSession({ authorization: AUTHORIZATION })).rejects.toMatchObject({
+      code: "invalid_credentials",
     });
   });
 
@@ -124,7 +154,8 @@ describe("the Auth CLI access-session peer", () => {
     });
     const app = await appForCliSessions(repositories);
 
-    await app.revokeCliAccessToken({ authorization: AUTHORIZATION, userId: "user-1" });
+    const { tokenKey } = await app.getCliAccessSession({ authorization: AUTHORIZATION });
+    await app.revokeCliTokens({ userId: "user-1", tokenKeys: [tokenKey] });
 
     await expect(
       repositories.cliSessions.get(cliAccessTokenKey(ACCESS_TOKEN)),

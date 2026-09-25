@@ -9,7 +9,6 @@ import { PrismaDepartmentRepository } from "./prisma.department.repository.ts";
 import { PrismaDiscoveredAgentRepository } from "./prisma.discovered-agent.repository.ts";
 import { PrismaDiscoveredPersonRepository } from "./prisma.discovered-person.repository.ts";
 import { PrismaErasedIdentifierSuppressionRepository } from "./prisma.erased-identifier-suppression.repository.ts";
-import { PrismaRoutingPolicyRepository } from "./prisma.governance-routing.repository.ts";
 import { PrismaGovernanceSetupStateRepository } from "./prisma.governance-setup-state.repository.ts";
 import { PrismaGovernanceTenantHistoryRepository } from "./prisma.governance-tenant-history.repository.ts";
 import { PrismaIdentityMatchSuggestionRepository } from "./prisma.identity-match-suggestion.repository.ts";
@@ -51,7 +50,6 @@ export class PostgresGovernanceRepositories {
       ingestionSources: PrismaIngestionSourceRepository.create(prisma),
       ingestionTemplates: PrismaIngestionTemplateRepository.create(prisma),
       ocsfExports: PrismaGovernanceOcsfExportRepository.create(prisma),
-      routingPolicies: PrismaRoutingPolicyRepository.create(prisma),
       setupState: PrismaGovernanceSetupStateRepository.create(prisma),
       spendSpikeAnomalies: PrismaSpendSpikeAnomalyRepository.create(prisma),
       supportContacts: PrismaOrganizationSupportContactRepository.create({ prisma }),

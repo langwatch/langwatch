@@ -34,40 +34,6 @@ describe("given the memory-backed governance repositories", () => {
     });
   });
 
-  describe("when a routing policy is made the organization default", () => {
-    it("leaves exactly one default behind", async () => {
-      const repositories = memoryTier();
-      const first = await repositories.routingPolicies.create({
-        organizationId: "org-1",
-        name: "first",
-        modelProviderIds: ["provider-1"],
-        scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
-        isDefault: true,
-        actorUserId: "user-1",
-      });
-      const second = await repositories.routingPolicies.create({
-        organizationId: "org-1",
-        name: "second",
-        modelProviderIds: ["provider-1"],
-        scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
-        actorUserId: "user-1",
-      });
-
-      await repositories.routingPolicies.setDefault({
-        id: second.id,
-        organizationId: "org-1",
-        actorUserId: "user-1",
-      });
-
-      await expect(
-        repositories.routingPolicies.findDefaultForUser({ organizationId: "org-1" }),
-      ).resolves.toMatchObject({ id: second.id });
-      await expect(repositories.routingPolicies.findById(first.id)).resolves.toMatchObject({
-        isDefault: false,
-      });
-    });
-  });
-
   describe("when a spend-spike alert is raised", () => {
     it("reports the rule as already alerted inside the dedup window", async () => {
       const repositories = memoryTier();

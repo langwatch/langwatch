@@ -31,6 +31,7 @@ import {
   type RestAddressing,
   type RestAddressingOptions,
 } from "./addressing.ts";
+import type { CliTokenActor } from "./cli-token-identity.ts";
 import type { RestIdempotency } from "./idempotency.ts";
 import type { RestTransportDocs } from "./openapi.ts";
 import {
@@ -163,6 +164,7 @@ export type RestDoorCredential = Extract<
   | "internalSecret"
   | "instance-admin"
   | "sessionKey"
+  | "cliToken"
   | "browser"
 >;
 
@@ -180,6 +182,7 @@ export const DOOR_SCOPE_TIER = {
   internalSecret: null,
   "instance-admin": null,
   sessionKey: "project",
+  cliToken: "organization",
 } as const satisfies Record<RestDoorCredential, AuthzDeclaredScopeId["tier"] | null>;
 
 /** The scope a handler on `Door` is handed: the tier that door resolves. */
@@ -190,7 +193,11 @@ type ScopedHandlerArguments<Input, App, Door extends RestDoorCredential> = Omit<
   ApiHandlerArguments<Input, App>,
   "scope" | "actor"
 > & {
-  readonly actor: Door extends "browser" ? Extract<Actor, { type: "user" }> : Actor | null;
+  readonly actor: Door extends "browser"
+    ? Extract<Actor, { type: "user" }>
+    : Door extends "cliToken"
+      ? CliTokenActor
+      : Actor | null;
   readonly scope: DoorScope<Door>;
   /**
    * The scope this route's own path named, when its permission was checked

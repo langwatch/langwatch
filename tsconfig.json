@@ -211,6 +211,12 @@
       "path": "enterprise/modules/billing/process/tsconfig.json"
     },
     {
+      "path": "enterprise/modules/enterprise-gateway/contract/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/enterprise-gateway/process/tsconfig.json"
+    },
+    {
       "path": "enterprise/modules/governance/browser/tsconfig.json"
     },
     {

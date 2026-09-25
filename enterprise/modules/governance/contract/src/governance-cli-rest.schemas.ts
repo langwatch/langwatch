@@ -4,6 +4,7 @@
  * builds already send: snake_case bodies, a `1` flag for a boolean query and a
  * bounded page size. The transport declares these; nothing here knows Hono.
  */
+import type { CliTokenActor } from "@langwatch/api/rest";
 import { z } from "zod";
 
 import { cliBootstrapResultSchema } from "./cli-bootstrap.ts";
@@ -263,11 +264,8 @@ export type GovernanceCliIngestionKeyStateAnswer = GovernanceCliAnswerOf<
   typeof governanceCliIngestionKeyStateAnswers
 >;
 
-export const governanceCliHeadersSchema = z.object({
-  authorization: z.string().nullable().default(null),
-});
-
-export type GovernanceCliRequest = Readonly<{ authorization: string | null }>;
+/** The caller the CLI token door let in, and the organization its session is bound to. */
+export type GovernanceCliRequest = Readonly<{ actor: CliTokenActor; organizationId: string }>;
 export type GovernanceCliRawRequest = GovernanceCliRequest & Readonly<{ raw: string }>;
 export type GovernanceCliSourcesRequest = GovernanceCliRequest &
   Readonly<{ includeArchived: boolean }>;

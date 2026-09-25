@@ -41,6 +41,7 @@
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/aws-client": "workspace:*",
     "@langwatch/egress": "workspace:*",
+    "@langwatch/enterprise-gateway-contract": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/enterprise-scim-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",

@@ -4,33 +4,9 @@ import {
   AI_TOOL_STARTER_TILES,
   aiToolConfigEnvelopeSchema,
   cliBootstrapResultSchema,
-  issuedPersonalVirtualKeySchema,
-  routingPolicySchema,
-  toRoutingPolicyScopeType,
 } from "../index.ts";
 
 describe("Governance product contracts", () => {
-  it("keeps routing policies transport-safe", () => {
-    const policy = routingPolicySchema.parse({
-      id: "policy",
-      organizationId: "organization",
-      name: "Default",
-      description: null,
-      modelProviderIds: ["provider"],
-      modelAliases: {},
-      defaultModel: null,
-      policyRules: {},
-      isDefault: true,
-      createdAtMs: 1,
-      updatedAtMs: 2,
-      createdById: "user",
-      updatedById: "user",
-      scopes: [{ scopeType: "ORGANIZATION", scopeId: "organization" }],
-    });
-    expect(JSON.parse(JSON.stringify(policy))).toEqual(policy);
-    expect(toRoutingPolicyScopeType("project")).toBe("PROJECT");
-  });
-
   it("validates tool config against its discriminator", () => {
     expect(
       aiToolConfigEnvelopeSchema.validate({
@@ -47,30 +23,7 @@ describe("Governance product contracts", () => {
     expect(AI_TOOL_STARTER_TILES).toHaveLength(9);
   });
 
-  it("round-trips issued keys and CLI bootstrap output through JSON", () => {
-    const key = issuedPersonalVirtualKeySchema.parse({
-      virtualKey: {
-        id: "key",
-        organizationId: "organization",
-        name: "default",
-        description: "Personal virtual key",
-        displayPrefix: "vk-lw-test",
-        status: "ACTIVE",
-        principalUserId: "user",
-        routingPolicyId: null,
-        createdAtMs: 1,
-        updatedAtMs: 1,
-        lastUsedAtMs: null,
-        scopes: [{ scopeType: "PROJECT", scopeId: "project" }],
-      },
-      secret: "secret",
-      baseUrl: "https://gateway.example.com",
-      routingPolicyId: null,
-      id: "key",
-      label: "default",
-    });
-    expect(JSON.parse(JSON.stringify(key))).toEqual(key);
-
+  it("round-trips CLI bootstrap output through JSON", () => {
     const bootstrap = cliBootstrapResultSchema.parse({
       tools: [],
       providers: [],

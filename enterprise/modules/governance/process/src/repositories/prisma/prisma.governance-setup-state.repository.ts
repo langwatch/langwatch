@@ -9,10 +9,7 @@ import {
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type GovernanceSetupStateDatabase = Pick<
-  PrismaClient,
-  "anomalyRule" | "ingestionSource" | "routingPolicy"
->;
+export type GovernanceSetupStateDatabase = Pick<PrismaClient, "anomalyRule" | "ingestionSource">;
 
 export class PrismaGovernanceSetupStateRepository extends GovernanceSetupStateRepository {
   private constructor(private readonly prisma: GovernanceSetupStateDatabase) {
@@ -24,12 +21,11 @@ export class PrismaGovernanceSetupStateRepository extends GovernanceSetupStateRe
   }
 
   async counts(organizationId: string): Promise<GovernanceSetupCounts> {
-    const [routingPolicies, ingestionSources, anomalyRules] = await Promise.all([
-      this.prisma.routingPolicy.count({ where: { organizationId } }),
+    const [ingestionSources, anomalyRules] = await Promise.all([
       this.prisma.ingestionSource.count({ where: { organizationId, archivedAt: null } }),
       this.prisma.anomalyRule.count({ where: { organizationId, archivedAt: null } }),
     ]);
 
-    return { routingPolicies, ingestionSources, anomalyRules };
+    return { ingestionSources, anomalyRules };
   }
 }

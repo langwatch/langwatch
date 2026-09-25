@@ -1,12 +1,20 @@
+import { OrganizationInvalidCredentialsError } from "@langwatch/api";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * `/api/auth/cli`: who each route admits, in which order, and the
- * `{ error, error_description }` bodies released `langwatch` builds parse.
+ * `{ error, error_description }` bodies released `langwatch` builds parse. The
+ * bearer itself is refused at the CLI token door, in the framework's body.
  * Spec: specs/ai-gateway/cli-token-revoke-on-deactivation.feature
  */
 import { createApiFixture } from "@langwatch/api-fixture";
-import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import {
+  canonicalErrorResponse,
+  CliTokenIdentity,
+  createRestRuntime,
+  type CliTokenHolder,
+} from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import {
   IngestionKeyNotFoundError,
   IngestionKeySourceNotAllowedError,
@@ -26,7 +34,6 @@ import { GovernanceCliActivityService } from "../../services/governance-cli-acti
 import { GovernanceCliCredentialService } from "../../services/governance-cli-credentials.service.ts";
 import type { DefaultGovernanceCliBootstrapService } from "../../services/governance-cli-tool-bootstrap.service.ts";
 import { GovernanceCliService } from "../../services/governance-cli.service.ts";
-import type { DefaultGovernancePersonalVirtualKeyService } from "../../services/governance-personal-key.service.ts";
 import type { DefaultGovernanceSetupStateService } from "../../services/governance-setup-state.service.ts";
 import type { ActivityMonitorService } from "../../services/ingestion-source-activity.service.ts";
 import type { IngestionSourceService } from "../../services/ingestion-source.service.ts";
@@ -38,10 +45,13 @@ const USER_ID = "user_1";
 const ORGANIZATION_ID = "org_1";
 const BEARER = "Bearer lw_at_token";
 
-const CALLER = {
-  user_id: USER_ID,
-  organization_id: ORGANIZATION_ID,
-  client_info: { hostname: "laptop" },
+const TOKEN_KEY = "lwcli:access:lw_at_token";
+
+const HOLDER: CliTokenHolder = {
+  userId: USER_ID,
+  organizationId: ORGANIZATION_ID,
+  tokenKey: TOKEN_KEY,
+  clientInfo: { hostname: "laptop" },
 };
 
 const PROJECT = {
@@ -55,7 +65,10 @@ const PROJECT = {
 
 type World = {
   personalKeys?: Partial<
-    Pick<DefaultGovernancePersonalVirtualKeyService, "list" | "ensureDefault" | "issue">
+    Pick<
+      EnterpriseGatewayApi,
+      "personalVirtualKeyList" | "personalVirtualKeyEnsureDefault" | "personalVirtualKeyIssue"
+    >
   >;
   ingestionKeys?: Partial<
     Pick<PersonalIngestionKeyService, "issueForProject" | "mint" | "list" | "getPersonalKeyState">
@@ -66,7 +79,7 @@ type World = {
   organizations?: Partial<Pick<OrganizationApi, "isMember">>;
   projects?: Partial<Pick<ProjectApi, "findLiveBySlug" | "findLiveByRef">>;
   budgets?: Partial<Pick<GatewayApi, "checkBudget" | "budgetOverviewForUser">>;
-  resolve?: () => Promise<typeof CALLER | null>;
+  verify?: () => Promise<CliTokenHolder>;
   planType?: string;
   permittedOnOrganization?: boolean;
   permittedOnProject?: (input: {
@@ -95,7 +108,7 @@ const BOB = {
 };
 
 function mountCli(world: World = {}) {
-  const revoke = vi.fn().mockResolvedValue(void 0);
+  const revoke = vi.fn().mockResolvedValue({ revokedCount: 1 });
   const permittedOnProject = world.permittedOnProject ?? vi.fn().mockResolvedValue(true);
   const users = createApiFixture<Pick<UserApi, "findById">>({
     findById: vi.fn().mockResolvedValue(BOB),
@@ -115,7 +128,10 @@ function mountCli(world: World = {}) {
     ...world.budgets,
   });
   const personalKeys = createApiFixture<
-    Pick<DefaultGovernancePersonalVirtualKeyService, "list" | "ensureDefault" | "issue">
+    Pick<
+      EnterpriseGatewayApi,
+      "personalVirtualKeyList" | "personalVirtualKeyEnsureDefault" | "personalVirtualKeyIssue"
+    >
   >(world.personalKeys, "personalKeys");
   const ingestionKeys = createApiFixture<
     Pick<PersonalIngestionKeyService, "issueForProject" | "mint" | "list" | "getPersonalKeyState">
@@ -126,7 +142,7 @@ function mountCli(world: World = {}) {
 
   const cli = GovernanceCliService.create({
     access: GovernanceCliAccessService.create({
-      accessTokens: { resolve: world.resolve ?? (() => Promise.resolve(CALLER)), revoke },
+      sessions: { revokeCliTokens: revoke },
       users,
       organizations,
       plans,
@@ -200,15 +216,10 @@ function mountCli(world: World = {}) {
   );
 
   const runtime = createRestRuntime({
-    identity: {
-      authenticate: () => {
-        throw new Error("the CLI governance plane resolves its own credential.");
-      },
-    },
+    identity: CliTokenIdentity.create({ verify: world.verify ?? (() => Promise.resolve(HOLDER)) }),
   });
   const hono = runtime.mount(governanceCliRest.router(), {
     app: () => app,
-    credential: "public",
     onError: canonicalErrorResponse,
   });
   const fetchAt = async (path: string, init?: RequestInit): Promise<Response> =>
@@ -231,21 +242,27 @@ function mountCli(world: World = {}) {
 describe("the CLI governance plane", () => {
   describe("given a bearer the access-token store does not know", () => {
     /** @scenario After deactivation, /budget/status returns 401 for the revoked access_token */
-    it("refuses every route with 401 and reads nothing", async () => {
+    it("refuses at the CLI token door with 401 and reads nothing", async () => {
       const personalVirtualKeyList = vi.fn().mockResolvedValue([]);
       const api = mountCli({
-        resolve: () => Promise.resolve(null),
-        personalKeys: { list: personalVirtualKeyList },
+        verify: () => Promise.reject(new OrganizationInvalidCredentialsError()),
+        personalKeys: { personalVirtualKeyList },
       });
 
       const response = await api.get("/api/auth/cli/budget/status");
 
       expect(response.status).toBe(401);
-      await expect(response.json()).resolves.toEqual({
-        error: "unauthorized",
-        error_description: "Bearer access token is missing, malformed, or expired",
-      });
+      await expect(response.json()).resolves.toMatchObject({ code: "invalid_credentials" });
       expect(personalVirtualKeyList).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given no bearer at all", () => {
+    it("refuses at the CLI token door as missing credentials", async () => {
+      const response = await mountCli().get("/api/auth/cli/budget/status", {});
+
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toMatchObject({ code: "missing_credentials" });
     });
   });
 
@@ -303,7 +320,7 @@ describe("the CLI governance plane", () => {
         error_description:
           "Your access to this organization has ended. Run `langwatch login` to sign in again.",
       });
-      expect(api.revoke).toHaveBeenCalledWith({ authHeader: BEARER, userId: USER_ID });
+      expect(api.revoke).toHaveBeenCalledWith({ userId: USER_ID, tokenKeys: [TOKEN_KEY] });
       expect(ingestionKeyIssueForPersonalProject).not.toHaveBeenCalled();
     });
   });
@@ -458,7 +475,7 @@ describe("the CLI governance plane", () => {
             ],
           }),
         },
-        personalKeys: { list: vi.fn().mockResolvedValue([{ id: "vk_1" }]) },
+        personalKeys: { personalVirtualKeyList: vi.fn().mockResolvedValue([{ id: "vk_1" }]) },
       });
 
       const response = await api.get("/api/auth/cli/budget/status");
@@ -484,7 +501,7 @@ describe("the CLI governance plane", () => {
           team: { id: "team_1" },
           project: { id: "project_personal", slug: "bob", name: "Bob", apiKey: "k" },
         },
-        personalKeys: { list: vi.fn().mockResolvedValue([{ id: "vk_1" }]) },
+        personalKeys: { personalVirtualKeyList: vi.fn().mockResolvedValue([{ id: "vk_1" }]) },
       });
 
       const response = await api.get("/api/auth/cli/budget/status");

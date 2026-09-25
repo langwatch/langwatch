@@ -18,10 +18,13 @@ import {
 type SetupOptions = Omit<SetupObservabilityOptions, "debug" | "serviceName">;
 
 export function processTelemetry(serviceName: string) {
-  return ({ config, secrets }: TelemetryContext) =>
+  return ({ config, secrets, redactPaths }: TelemetryContext) =>
     secrets.into(otlpHeadersSecret, (rawHeaders) => {
       const settings = config.observability;
-      configureLogger(loggerConfiguration(settings, serviceName));
+      configureLogger({
+        ...loggerConfiguration(settings, serviceName),
+        ...(redactPaths ? { redactPaths } : {}),
+      });
       const telemetry = createProcessObservability({
         serviceName,
         setup: telemetrySetup(settings, otlpHeadersFrom(rawHeaders)),

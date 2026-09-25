@@ -306,43 +306,6 @@ export class DefaultGovernanceService implements GovernanceApi {
     ...args
   ) => this.activity.personalBudgetOverviewForUser(...args);
 
-  readonly routingPolicyList: GovernanceApi["routingPolicyList"] = (...args) =>
-    this.lifecycle.routingPolicyList(...args);
-
-  readonly findRoutingPolicyById: GovernanceApi["findRoutingPolicyById"] = (...args) =>
-    this.lifecycle.findRoutingPolicyById(...args);
-
-  readonly routingPolicyGetById: GovernanceApi["routingPolicyGetById"] = (...args) =>
-    this.lifecycle.routingPolicyGetById(...args);
-
-  readonly routingPolicyCreate: GovernanceApi["routingPolicyCreate"] = (...args) =>
-    this.lifecycle.routingPolicyCreate(...args);
-
-  readonly routingPolicyUpdate: GovernanceApi["routingPolicyUpdate"] = (...args) =>
-    this.lifecycle.routingPolicyUpdate(...args);
-
-  readonly routingPolicySetDefault: GovernanceApi["routingPolicySetDefault"] = (...args) =>
-    this.lifecycle.routingPolicySetDefault(...args);
-
-  readonly routingPolicyDelete: GovernanceApi["routingPolicyDelete"] = (...args) =>
-    this.lifecycle.routingPolicyDelete(...args);
-
-  readonly personalVirtualKeyEnsureDefault: GovernanceApi["personalVirtualKeyEnsureDefault"] = (
-    ...args
-  ) => this.lifecycle.personalVirtualKeyEnsureDefault(...args);
-
-  readonly personalVirtualKeyIssue: GovernanceApi["personalVirtualKeyIssue"] = (...args) =>
-    this.lifecycle.personalVirtualKeyIssue(...args);
-
-  readonly personalVirtualKeyList: GovernanceApi["personalVirtualKeyList"] = (...args) =>
-    this.lifecycle.personalVirtualKeyList(...args);
-
-  readonly personalVirtualKeyRevoke: GovernanceApi["personalVirtualKeyRevoke"] = (...args) =>
-    this.lifecycle.personalVirtualKeyRevoke(...args);
-
-  readonly personalVirtualKeyRevokeAllForUser: GovernanceApi["personalVirtualKeyRevokeAllForUser"] =
-    (...args) => this.lifecycle.personalVirtualKeyRevokeAllForUser(...args);
-
   readonly cliBootstrapResolve: GovernanceApi["cliBootstrapResolve"] = (...args) =>
     this.lifecycle.cliBootstrapResolve(...args);
 

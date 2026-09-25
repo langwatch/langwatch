@@ -3,6 +3,7 @@
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
+import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import type {
   GovernanceOttlGateway,
   GovernanceApi,
@@ -19,7 +20,6 @@ import type {
   AiToolSlug,
 } from "../repositories/ai-tool-catalog.repository.ts";
 import { PrismaDepartmentRepository } from "../repositories/prisma/prisma.department.repository.ts";
-import { PrismaRoutingPolicyRepository } from "../repositories/prisma/prisma.governance-routing.repository.ts";
 import { PrismaActivityMonitorRepository } from "../repositories/prisma/prisma.ingestion-source-activity.repository.ts";
 import { CanonicalCostExtractorService } from "../services/canonical-cost-extractor.service.ts";
 import { DefaultGovernanceCliSessionInventoryService } from "../services/cli-session-inventory.service.ts";
@@ -31,8 +31,6 @@ import { DefaultGovernanceCliBootstrapService } from "../services/governance-cli
 import { DefaultGovernanceService } from "../services/governance-facade.service.ts";
 import { GovernanceIngestionOperationsService } from "../services/governance-ingestion-operations.service.ts";
 import { GovernanceLifecycleOperationsService } from "../services/governance-lifecycle-operations.service.ts";
-import { DefaultGovernancePersonalVirtualKeyService } from "../services/governance-personal-key.service.ts";
-import { DefaultGovernanceRoutingPolicyService } from "../services/governance-routing.service.ts";
 import { GovernanceRulesOperationsService } from "../services/governance-rules-operations.service.ts";
 import { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
 import { ActivityMonitorService } from "../services/ingestion-source-activity.service.ts";
@@ -55,7 +53,6 @@ import type {
   GovernanceClickHouseResolver,
   IngestionSourceEntitlements,
   IngestionSourceLifecycleChannel,
-  PersonalVirtualKeyIssuer,
   QuarantineTenantResolver,
 } from "./governance.members.ts";
 
@@ -87,7 +84,6 @@ export type GovernanceInstallationOptions = {
     | "hasTraceWithAttribute"
     | "findTraceCountsByAttribute"
   >;
-  personalVirtualKeyIssuer: PersonalVirtualKeyIssuer;
   budgetOverview: PersonalBudgetOverviewReader;
   aiToolSlugs: AiToolSlug;
   aiToolProviders: AiToolProviderCatalog;
@@ -105,11 +101,11 @@ export type GovernanceInstallationOptions = {
   gateway: Pick<
     GatewayApi,
     | "findPersonalVirtualKeys"
-    | "findVirtualKeyById"
     | "getPrincipalSpendSummary"
     | "findPrincipalDailySpend"
     | "findPrincipalModelSpend"
   >;
+  enterpriseGateway: Pick<EnterpriseGatewayApi, "listRoutingPolicies" | "countRoutingPolicies">;
   modelProviders: Pick<
     ModelProviderApi,
     "countEnabledInScopes" | "findEnabledProviderKeysInScopes" | "countInOrganization"
@@ -163,18 +159,6 @@ export class GovernanceInstallationComposition {
       traces: this.options.traces,
       ledger: this.options.gateway,
     });
-    const routingPolicies = DefaultGovernanceRoutingPolicyService.create({
-      repository: PrismaRoutingPolicyRepository.create(this.options.database),
-      providers: this.options.modelProviders,
-    });
-    const personalVirtualKeys = DefaultGovernancePersonalVirtualKeyService.create({
-      keys: this.options.gateway,
-      providers: this.options.modelProviders,
-      issuer: this.options.personalVirtualKeyIssuer,
-      organizations: this.options.organizations,
-      policies: routingPolicies,
-      gatewayBaseUrl: this.options.gatewayBaseUrl,
-    });
     const aiTools = DefaultGovernanceAiToolCatalogService.create({
       repository: PrismaAiToolCatalogRepository.create(this.options.database),
       slugs: this.options.aiToolSlugs,
@@ -185,7 +169,7 @@ export class GovernanceInstallationComposition {
         modelProviders: this.options.modelProviders,
       }),
       departments: PrismaDepartmentRepository.create(this.options.database),
-      routingPolicies: PrismaRoutingPolicyRepository.create(this.options.database),
+      routingPolicies: this.options.enterpriseGateway,
       sources: PrismaIngestionSourceRepository.create(this.options.database),
       members: this.options.aiToolMembers,
       diagnostics: this.options.ingestionDiagnostics,
@@ -257,6 +241,7 @@ export class GovernanceInstallationComposition {
     const setupState = DefaultGovernanceSetupStateService.create({
       repository: PrismaGovernanceSetupStateRepository.create(this.options.database),
       keys: this.options.gateway,
+      routingPolicies: this.options.enterpriseGateway,
       projects: this.options.projects,
       traces: this.options.traces,
     });
@@ -282,8 +267,6 @@ export class GovernanceInstallationComposition {
       this.options.budgetOverview,
     );
     const lifecycle = GovernanceLifecycleOperationsService.create({
-      routingPolicies,
-      personalVirtualKeys,
       cliBootstrap,
       cliSessions,
       cliTokenRevocation,

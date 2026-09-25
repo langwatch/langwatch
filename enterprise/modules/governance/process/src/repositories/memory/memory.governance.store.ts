@@ -5,7 +5,6 @@ import type {
   AnomalyRule,
   Department,
   IngestionTemplate,
-  RoutingPolicy,
 } from "@langwatch/enterprise-governance-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -22,6 +21,7 @@ export type MemoryGovernancePerson = {
   name: string | null;
   email: string | null;
 };
+
 /** One dated member-to-department link; `validTo` null is the open one. */
 export type MemoryDepartmentMembershipLink = {
   id: string;
@@ -31,7 +31,6 @@ export type MemoryDepartmentMembershipLink = {
   validFrom: Instant;
   validTo: Instant | null;
 };
-
 
 /** An alert the spend-spike evaluator has already raised for a rule. */
 export type MemoryGovernanceAlert = AnomalyAlertDispatchRecord & {
@@ -50,11 +49,10 @@ export class MemoryGovernanceStore {
   readonly supportContacts = new Map<string, string>();
   readonly governanceTenantIds = new Map<string, string>();
   readonly members: MemoryGovernanceMember[] = [];
-  readonly departmentMemberships: MemoryDepartmentMembershipLink[] = [];
   readonly departments: Department[] = [];
+  readonly departmentMemberships: MemoryDepartmentMembershipLink[] = [];
   readonly ingestionTemplates: IngestionTemplate[] = [];
   readonly anomalyRules: AnomalyRule[] = [];
-  readonly routingPolicies: RoutingPolicy[] = [];
   readonly alerts: MemoryGovernanceAlert[] = [];
 
   static create(): MemoryGovernanceStore {

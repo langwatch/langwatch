@@ -1,3 +1,4 @@
+import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import {
   AI_TOOL_STARTER_TILES,
   ASSISTANT_KIND_TO_TOOL_SLUG,
@@ -36,7 +37,6 @@ import type {
 } from "../repositories/ai-tool-catalog.repository.ts";
 import type { DepartmentRepository } from "../repositories/department.repository.ts";
 import type { IngestionSourceRepository } from "../repositories/ingestion-source.repository.ts";
-import type { RoutingPolicyRepository } from "../repositories/routing-policy.repository.ts";
 import {
   selectClaudeCodeOtlpEndpoint,
   selectVisibleAiTools,
@@ -52,7 +52,7 @@ type AiToolCatalogCollaborators = {
     "findConfiguredForMember" | "findConfiguredForOrganization"
   >;
   departments: Pick<DepartmentRepository, "findAll">;
-  routingPolicies: Pick<RoutingPolicyRepository, "findAll">;
+  routingPolicies: Pick<EnterpriseGatewayApi, "listRoutingPolicies">;
   sources: Pick<IngestionSourceRepository, "findAll">;
   members: Pick<OrganizationApi, "findMemberDepartments">;
   diagnostics: { warn(message: string, context: Record<string, unknown>): void };
@@ -219,7 +219,7 @@ export class DefaultGovernanceAiToolCatalogService {
     input: AiToolOrganizationInput,
   ): Promise<{ id: string; name: string }[]> {
     const { organizationId } = aiToolOrganizationInputSchema.parse(input);
-    const policies = await this.collaborators.routingPolicies.findAll({
+    const policies = await this.collaborators.routingPolicies.listRoutingPolicies({
       organizationId,
       selectableForScope: { scopeType: "ORGANIZATION", scopeId: organizationId },
     });

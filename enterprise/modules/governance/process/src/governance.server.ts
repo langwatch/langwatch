@@ -1,4 +1,5 @@
 import {
+  bindRestCredential,
   bindRestHeader,
   bindRestMiddleware,
   projectCredentialOfRequest,
@@ -99,8 +100,6 @@ import { ingestionKeyTrpcTransport } from "./transport/ingestion-key.trpc.ts";
 import { ingestionSourcesTrpcTransport } from "./transport/ingestion-sources.trpc.ts";
 import { ingestionTemplatesTrpcTransport } from "./transport/ingestion-templates.trpc.ts";
 import { personalSessionsTrpcTransport } from "./transport/personal-sessions.trpc.ts";
-import { personalVirtualKeysTrpcTransport } from "./transport/personal-virtual-keys.trpc.ts";
-import { routingPolicyTrpcTransport } from "./transport/routing-policy.trpc.ts";
 import { sessionPolicyTrpcTransport } from "./transport/session-policy.trpc.ts";
 
 /**
@@ -123,23 +122,26 @@ export const governanceServer = defineServerModule("governance")
     activityMonitorTrpcTransport,
     personalSessionsTrpcTransport,
     ingestionKeyTrpcTransport,
-    personalVirtualKeysTrpcTransport,
-    routingPolicyTrpcTransport,
     sessionPolicyTrpcTransport,
     governancePeopleTrpcTransport,
     governanceAgentsTrpcTransport,
     governanceCostTrpcTransport,
   )
-  // The member behind the project credential, and which surface asked. A
+  // The member behind the project credential, which surface asked, and the CLI token door. A
   // legacy project key names no member, which is what the admin routes refuse.
-  .withTransportFacts(() => [
-    bindRestMiddleware(governanceRestCaller, (context) => {
-      const credential = projectCredentialOfRequest(context.req.raw);
+  .withTransportFacts(({ app }) => {
+    if (!(app instanceof GovernanceApp))
+      throw new TypeError("Governance transport requires its constructed application");
+    return [
+      bindRestMiddleware(governanceRestCaller, (context) => {
+        const credential = projectCredentialOfRequest(context.req.raw);
 
-      return { viewerUserId: credential.type === "apiKey" ? credential.userId : null };
-    }),
-    bindRestHeader(governanceRestSurface, "X-LangWatch-Surface"),
-  ])
+        return { viewerUserId: credential.type === "apiKey" ? credential.userId : null };
+      }),
+      bindRestHeader(governanceRestSurface, "X-LangWatch-Surface"),
+      bindRestCredential("cliToken", () => app.cliTokenDoor),
+    ];
+  })
   .withEventing(governanceEventsEventing)
   .withEventing(pulledUsageEventing)
   .withEventing(ingestionPullEventing)

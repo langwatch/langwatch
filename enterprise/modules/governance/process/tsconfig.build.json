@@ -48,6 +48,9 @@
       "path": "../../../../packages/egress/tsconfig.build.json"
     },
     {
+      "path": "../../enterprise-gateway/contract/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {

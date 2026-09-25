@@ -4,6 +4,7 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import type {
   GovernanceCallSurface,
   GovernanceProjectCaller,
@@ -59,6 +60,7 @@ async function buildApp() {
       traces: createApiFixture<TraceApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
       gateway: createApiFixture<GatewayApi>(),
+      enterpriseGateway: createApiFixture<EnterpriseGatewayApi>(),
       modelProviders: createApiFixture<ModelProviderApi>(),
       users: createApiFixture<UserApi>(),
       auditLog: createApiFixture<AuditLogApi>(),
@@ -78,9 +80,10 @@ async function buildApp() {
 async function buildAppWithUnfinishedCapability(planType = "ENTERPRISE") {
   const repositories: GovernanceRepositories = MemoryGovernanceRepositories.create();
   const governance = new TestGovernanceService();
-  const findCliAccessSession = vi.fn<AuthApi["findCliAccessSession"]>(async () => ({
+  const getCliAccessSession = vi.fn<AuthApi["getCliAccessSession"]>(async () => ({
     userId: "user-1",
     organizationId: "organization-1",
+    tokenKey: "lwcli:access:lw_at_token",
     clientInfo: { deviceLabel: "Work laptop", hostname: "laptop" },
   }));
   const getActivePlan = vi.fn<EntitlementApi["getActivePlan"]>(
@@ -96,7 +99,7 @@ async function buildAppWithUnfinishedCapability(planType = "ENTERPRISE") {
     dependencies: {
       agents: createApiFixture<AgentApi>(),
       projects: createApiFixture<ProjectApi>(),
-      auth: createApiFixture<AuthApi>({ findCliAccessSession }),
+      auth: createApiFixture<AuthApi>({ getCliAccessSession }),
       entitlements: createApiFixture<EntitlementApi>({ getActivePlan }),
       organizations: createApiFixture<OrganizationApi>(),
       permissions: createApiFixture<AuthzApi>(),
@@ -105,6 +108,7 @@ async function buildAppWithUnfinishedCapability(planType = "ENTERPRISE") {
       traces: createApiFixture<TraceApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
       gateway: createApiFixture<GatewayApi>(),
+      enterpriseGateway: createApiFixture<EnterpriseGatewayApi>(),
       modelProviders: createApiFixture<ModelProviderApi>(),
       users: createApiFixture<UserApi>(),
       auditLog: createApiFixture<AuditLogApi>(),
@@ -123,7 +127,7 @@ async function buildAppWithUnfinishedCapability(planType = "ENTERPRISE") {
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
 
-  return { app, findCliAccessSession, getActivePlan };
+  return { app, getCliAccessSession, getActivePlan };
 }
 
 describe("GovernanceApp ingestion templates", () => {
@@ -285,10 +289,8 @@ describe("GovernanceApp as the module a process installs", () => {
         "trpc",
         "trpc",
         "trpc",
-        "trpc",
-        "trpc",
       ]);
-      expect(app.cliAccess().findCaller).toBeTypeOf("function");
+      expect("admit" in app.cliAccess()).toBe(true);
       expect(app.cliCredentials().budgetStatus).toBeTypeOf("function");
       expect(app.cliActivity().sources).toBeTypeOf("function");
       expect(app.governance().cliBootstrapResolve).toBeTypeOf("function");
@@ -299,12 +301,21 @@ describe("GovernanceApp as the module a process installs", () => {
     });
 
     it("resolves the CLI caller and Enterprise plan through the named peers", async () => {
-      const { app, findCliAccessSession, getActivePlan } = await buildAppWithUnfinishedCapability();
+      const { app, getCliAccessSession, getActivePlan } = await buildAppWithUnfinishedCapability();
+      const request = new Request("http://api.test/api/auth/cli/bootstrap", {
+        headers: { authorization: "Bearer lw_at_token" },
+      });
 
-      await expect(app.cliAccess().findCaller("Bearer lw_at_token")).resolves.toEqual({
-        user_id: "user-1",
-        organization_id: "organization-1",
-        client_info: { device_label: "Work laptop", hostname: "laptop" },
+      await expect(app.cliTokenDoor.identify({ request })).resolves.toEqual({
+        actor: {
+          type: "user",
+          id: "user-1",
+          cliSession: {
+            tokenKey: "lwcli:access:lw_at_token",
+            clientInfo: { deviceLabel: "Work laptop", hostname: "laptop" },
+          },
+        },
+        scope: { tier: "organization", id: "organization-1" },
       });
       await expect(
         app.cliAccess().planDecision({
@@ -313,7 +324,7 @@ describe("GovernanceApp as the module a process installs", () => {
         }),
       ).resolves.toEqual({ entitled: true });
 
-      expect(findCliAccessSession).toHaveBeenCalledWith({ authorization: "Bearer lw_at_token" });
+      expect(getCliAccessSession).toHaveBeenCalledWith({ authorization: "Bearer lw_at_token" });
       expect(getActivePlan).toHaveBeenCalledWith({ organizationId: "organization-2" });
     });
 

@@ -2,12 +2,9 @@
 
 import { AgentApi } from "@langwatch/agent-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
+import { CliTokenIdentity } from "@langwatch/api/rest";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
-import {
-  AuthApi,
-  type BrowserSessionInventoryEntry,
-  type CliAccessSession,
-} from "@langwatch/auth-contract";
+import { AuthApi, type BrowserSessionInventoryEntry } from "@langwatch/auth-contract";
 /**
  * The governance feature's application: what all three of its doors call.
  *
@@ -26,8 +23,6 @@ import {
  *     times inline;
  *   - attributing a write to its caller, including the `svc_<projectId>`
  *     fallback a legacy project token gets — four copies of one rule;
- *   - the organization-membership gate on every personal-virtual-key call, and
- *     the duplicate-label refusal;
  *   - turning the Governance contract's plain domain errors into handled ones
  *     with stable codes, so no transport constructs a transport error.
  *
@@ -36,27 +31,12 @@ import {
  * CLI without knowing which it is serving.
  */
 import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
-import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import {
-  NoEligibleProvidersError,
-  NoEligibleModelProvidersError,
-  PersonalVirtualKeyLabelTakenError,
-  PersonalVirtualKeyMissingError,
-  PersonalVirtualKeyNotFoundError,
-  RoutingPolicyHasNoProvidersError,
-  RoutingPolicyEmptyError,
-  RoutingPolicyModelNotConcreteError,
-  RoutingPolicyProviderRequiredError,
-  RoutingPolicyScopeRequiredError,
-  RoutingPolicyModelMustBeConcreteError,
-  RoutingPolicyMustHaveProviderError,
-  RoutingPolicyMustHaveScopeError,
   type CliBootstrapResult,
-  type CreateRoutingPolicyInput,
-  type DeleteRoutingPolicyInput,
   type Department,
   type DepartmentAssignments,
-  type FindRoutingPolicyInput,
   type GovernanceBudgetOverviewForUser,
   type GovernanceApi,
   type RecordWorkspaceViewResult,
@@ -117,7 +97,6 @@ import {
   type SeedAiToolStarterPackInput,
   type UpdateAiToolEntryInput,
   type CliSessionCard,
-  type IssuedPersonalVirtualKeyAnswer,
   type GovernanceCaller,
   type GovernanceConfig,
   governanceConfig,
@@ -144,16 +123,10 @@ import {
   type CloneIngestionTemplateInput,
   type CreateIngestionTemplateInput,
   type UpdateIngestionTemplateOttlInput,
-  type ListPersonalVirtualKeysInput,
-  type ListRoutingPoliciesInput,
   type GovernanceActorWorkspace,
-  type PersonalVirtualKey,
   type PersonalUsageQueryInput,
   type PersonalUsageRollup,
   type PersonalUsageWindow,
-  type RoutingPolicy,
-  type SetDefaultRoutingPolicyInput,
-  type UpdateRoutingPolicyInput,
   governanceSecrets,
   AgentListingUnavailableError,
   type AgentListingRequestResult,
@@ -187,12 +160,7 @@ import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
-import {
-  ModelProviderApi,
-  suggestTierTargets,
-  type SuggestTierTargetsInput,
-  type TierTargetSuggestion,
-} from "@langwatch/model-provider-contract";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   OrganizationApi,
@@ -262,8 +230,6 @@ import {
 } from "../services/governance-ingest-receiver.service.ts";
 import { GovernanceIngestService } from "../services/governance-ingest.service.ts";
 import { GovernancePeopleScreenService } from "../services/governance-people-screen.service.ts";
-import { DefaultGovernancePersonalVirtualKeyService } from "../services/governance-personal-key.service.ts";
-import { DefaultGovernanceRoutingPolicyService } from "../services/governance-routing.service.ts";
 import { DefaultGovernanceSetupStateService } from "../services/governance-setup-state.service.ts";
 import { IdentityMatchSuggestionService } from "../services/identity-match-suggestion.service.ts";
 import { IdentityMatchService } from "../services/identity-match.service.ts";
@@ -297,7 +263,6 @@ import { PersonaHomeService } from "../services/persona-home.service.ts";
 import { PersonalIngestionKeyService } from "../services/personal-ingestion-key.service.ts";
 import { PersonalUsageDashboardService } from "../services/personal-usage-dashboard.service.ts";
 import { DefaultGovernancePersonalUsageService } from "../services/personal-usage.service.ts";
-import { GatewayPersonalVirtualKeyIssuerService } from "../services/personal-virtual-key-issuer.service.ts";
 import { PullDestinationService } from "../services/pull-destination.service.ts";
 import {
   PulledUsageEventingAdapter,
@@ -418,16 +383,21 @@ export interface GovernanceAppDependencies {
   >;
   gateway: Pick<
     GatewayApi,
-    | "createVirtualKey"
-    | "revokeVirtualKey"
     | "findPersonalVirtualKeys"
-    | "findVirtualKeyById"
     | "budgetOverviewForUser"
     | "findSpendDaysForOrganizationProjects"
     | "checkBudget"
     | "getPrincipalSpendSummary"
     | "findPrincipalDailySpend"
     | "findPrincipalModelSpend"
+  >;
+  enterpriseGateway: Pick<
+    EnterpriseGatewayApi,
+    | "listRoutingPolicies"
+    | "countRoutingPolicies"
+    | "personalVirtualKeyList"
+    | "personalVirtualKeyEnsureDefault"
+    | "personalVirtualKeyIssue"
   >;
   modelProviders: Pick<
     ModelProviderApi,
@@ -439,8 +409,7 @@ export interface GovernanceAppDependencies {
   /** Auth owns CLI bearer validation and revocation. */
   auth: Pick<
     AuthApi,
-    | "findCliAccessSession"
-    | "revokeCliAccessToken"
+    | "getCliAccessSession"
     | "findCliTokenRecordsForUser"
     | "revokeCliTokens"
     | "listBrowserSessions"
@@ -552,6 +521,7 @@ export class GovernanceApp implements GovernanceRestApi {
     traces: TraceApi,
     apiKeys: ApiKeyApi,
     gateway: GatewayApi,
+    enterpriseGateway: EnterpriseGatewayApi,
     modelProviders: ModelProviderApi,
     users: UserApi,
     auditLog: AuditLogApi,
@@ -602,6 +572,7 @@ export class GovernanceApp implements GovernanceRestApi {
         traces: dependencies.traces,
         apiKeys: dependencies.apiKeys,
         gateway: dependencies.gateway,
+        enterpriseGateway: dependencies.enterpriseGateway,
         modelProviders: dependencies.modelProviders,
         users: dependencies.users,
         auditLog: dependencies.auditLog,
@@ -638,18 +609,6 @@ export class GovernanceApp implements GovernanceRestApi {
     this.encryption = encryption;
     this.anomalyRules = AnomalyRuleService.create({ repository: repositories.anomalyRules });
     this.activityMonitor = ActivityMonitorService.create(repositories.activityMonitor);
-    this.routingPolicies = DefaultGovernanceRoutingPolicyService.create({
-      repository: repositories.routingPolicies,
-      providers: dependencies.modelProviders,
-    });
-    this.personalKeys = DefaultGovernancePersonalVirtualKeyService.create({
-      keys: dependencies.gateway,
-      providers: dependencies.modelProviders,
-      issuer: GatewayPersonalVirtualKeyIssuerService.create(dependencies.gateway),
-      organizations: dependencies.organizations,
-      policies: this.routingPolicies,
-      gatewayBaseUrl,
-    });
     this.sessionPolicy = OrganizationSessionPolicyService.create({
       organizations: dependencies.organizations,
       loginKeys: dependencies.apiKeys,
@@ -728,7 +687,7 @@ export class GovernanceApp implements GovernanceRestApi {
         modelProviders: dependencies.modelProviders,
       }),
       departments: repositories.departments,
-      routingPolicies: repositories.routingPolicies,
+      routingPolicies: dependencies.enterpriseGateway,
       sources: repositories.ingestionSources,
       members: dependencies.organizations,
       diagnostics: { warn: (message, context) => logger.warn(context, message) },
@@ -741,6 +700,7 @@ export class GovernanceApp implements GovernanceRestApi {
     this.setupState = DefaultGovernanceSetupStateService.create({
       repository: repositories.setupState,
       keys: dependencies.gateway,
+      routingPolicies: dependencies.enterpriseGateway,
       projects: dependencies.projects,
       traces: dependencies.traces,
     });
@@ -858,8 +818,11 @@ export class GovernanceApp implements GovernanceRestApi {
       },
       gatewayUrl: gatewayBaseUrl,
     });
+    this.cliTokenDoor = CliTokenIdentity.create({
+      verify: (presented) => dependencies.auth.getCliAccessSession(presented),
+    });
     this.cliAccessService = GovernanceCliAccessService.create({
-      accessTokens: cliAccessTokens(dependencies.auth),
+      sessions: dependencies.auth,
       users: dependencies.users,
       organizations: dependencies.organizations,
       plans: () => dependencies.entitlements,
@@ -868,7 +831,7 @@ export class GovernanceApp implements GovernanceRestApi {
       publicBaseUrl,
     });
     this.cliCredentialService = GovernanceCliCredentialService.create({
-      personalKeys: this.personalKeys,
+      personalKeys: dependencies.enterpriseGateway,
       ingestionKeys: this.ingestionKeys,
       aiTools: this.aiTools,
       users: dependencies.users,
@@ -919,8 +882,6 @@ export class GovernanceApp implements GovernanceRestApi {
   private readonly dependencies: GovernanceAppDependencies;
   private readonly anomalyRules: AnomalyRuleService;
   private readonly activityMonitor: ActivityMonitorService;
-  private readonly routingPolicies: DefaultGovernanceRoutingPolicyService;
-  private readonly personalKeys: DefaultGovernancePersonalVirtualKeyService;
   private readonly cliSessions: DefaultGovernanceCliSessionInventoryService;
   private readonly sessionPolicy: OrganizationSessionPolicyService;
   private readonly people: GovernancePeopleScreenService;
@@ -955,6 +916,8 @@ export class GovernanceApp implements GovernanceRestApi {
   private readonly personalUsageDashboards: PersonalUsageDashboardService;
   private readonly cliBootstraps: DefaultGovernanceCliBootstrapService;
   private readonly cliAccessService: GovernanceCliAccessApi;
+  /** The CLI token door `governanceCliRest` authenticates at; Auth verifies the bearer. */
+  readonly cliTokenDoor: CliTokenIdentity;
   private readonly cliCredentialService: GovernanceCliCredentialApi;
   private readonly cliActivityService: GovernanceCliActivityApi;
   private readonly cliService: GovernanceCliService;
@@ -1956,113 +1919,6 @@ export class GovernanceApp implements GovernanceRestApi {
 
   // ── Personal virtual keys ─────────────────────────────────────────────────
 
-  /**
-   * Personal keys in an organization. Never returns the secret.
-   *
-   * A personal key belongs to its principal, so the caller's own keys need no
-   * permission. `targetUserId` names someone else's, and omitting it asks for
-   * every member's; both widen the result past the caller and so are answered
-   * only for a holder of `virtualKeys:viewOtherPersonal` at this organization.
-   */
-  async listPersonalVirtualKeys(
-    input: { organizationId: string; targetUserId?: string },
-    by: GovernanceCaller,
-  ): Promise<PersonalVirtualKey[]> {
-    await this.assertOrganizationMembership({
-      organizationId: input.organizationId,
-      userId: by.id,
-    });
-
-    const principalUserId = await this.resolvePersonalKeyPrincipal(input, by);
-    const query: ListPersonalVirtualKeysInput = {
-      organizationId: input.organizationId,
-      ...(principalUserId === undefined ? {} : { userId: principalUserId }),
-    };
-    return this.personalKeys.list(query);
-  }
-
-  /**
-   * Issues a personal key under the given label, attributed to its principal.
-   *
-   * Returns the secret exactly once — the caller must persist it immediately.
-   */
-  async issuePersonalVirtualKey(
-    input: { organizationId: string; label: string; routingPolicyId?: string },
-    by: GovernanceCaller,
-  ): Promise<IssuedPersonalVirtualKeyAnswer> {
-    await this.assertOrganizationMembership({
-      organizationId: input.organizationId,
-      userId: by.id,
-    });
-
-    const profile = await this.dependencies.users.findById({ id: by.id });
-    // Lazy backfill for members who joined before personal workspaces shipped.
-    const workspace = await this.dependencies.organizations.ensurePersonalWorkspace({
-      userId: by.id,
-      organizationId: input.organizationId,
-      displayName: by.displayName ?? profile?.name ?? null,
-      displayEmail: by.displayEmail ?? profile?.email ?? null,
-    });
-
-    const duplicate = await this.personalKeys.hasLiveKeyLabelled({
-      organizationId: input.organizationId,
-      userId: by.id,
-      label: input.label,
-    });
-    if (duplicate) throw new PersonalVirtualKeyLabelTakenError(input.label);
-
-    try {
-      const issued = await this.personalKeys.issue({
-        userId: by.id,
-        organizationId: input.organizationId,
-        personalProjectId: workspace.project.id,
-        personalTeamId: workspace.team.id,
-        label: input.label,
-        routingPolicyId: input.routingPolicyId,
-      });
-      return {
-        id: issued.id,
-        label: issued.label,
-        secret: issued.secret,
-        baseUrl: issued.baseUrl,
-        displayPrefix: issued.virtualKey.displayPrefix,
-        routingPolicyId: issued.routingPolicyId,
-      };
-    } catch (error) {
-      if (error instanceof NoEligibleProvidersError) {
-        throw new NoEligibleModelProvidersError(error.organizationId);
-      }
-      if (error instanceof RoutingPolicyHasNoProvidersError) {
-        throw new RoutingPolicyEmptyError(error.routingPolicyId, error.routingPolicyName);
-      }
-      throw error;
-    }
-  }
-
-  /** Revokes one of the caller's own personal keys. Idempotent. */
-  async revokePersonalVirtualKey(
-    input: { organizationId: string; id: string },
-    by: GovernanceCaller,
-  ): Promise<void> {
-    await this.assertOrganizationMembership({
-      organizationId: input.organizationId,
-      userId: by.id,
-    });
-
-    try {
-      await this.personalKeys.revoke({
-        userId: by.id,
-        organizationId: input.organizationId,
-        virtualKeyId: input.id,
-      });
-    } catch (error) {
-      if (error instanceof PersonalVirtualKeyNotFoundError) {
-        throw new PersonalVirtualKeyMissingError(error.virtualKeyId);
-      }
-      throw error;
-    }
-  }
-
   // ── The member's own dashboard ────────────────────────────────────────────
 
   /**
@@ -2181,120 +2037,10 @@ export class GovernanceApp implements GovernanceRestApi {
     };
   }
 
-  // ── Routing policies ──────────────────────────────────────────────────────
-
-  /** Policies in an organization, optionally narrowed to one scope's choices. */
-  listRoutingPolicies(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]> {
-    return this.routingPolicies.list(input);
-  }
-
-  /** One policy by id, including its scope rows. */
-  getRoutingPolicy(input: FindRoutingPolicyInput): Promise<RoutingPolicy> {
-    return this.routingPolicies.getById(input);
-  }
-
-  /** Models worth pointing a tier at, ranked from the catalogue. */
-  routingPolicyTierSuggestions(
-    input: Omit<SuggestTierTargetsInput, "limit">,
-  ): TierTargetSuggestion[] {
-    return suggestTierTargets({
-      tier: input.tier,
-      boundProviderTypes: input.boundProviderTypes,
-    });
-  }
-
-  /** Creates a policy, attributed to the caller who asked for it. */
-  async createRoutingPolicy(
-    input: Omit<CreateRoutingPolicyInput, "actorUserId">,
-    by: GovernanceCaller,
-  ): Promise<RoutingPolicy> {
-    try {
-      return await this.routingPolicies.create({
-        ...input,
-        actorUserId: by.id,
-      });
-    } catch (error) {
-      throw asHandledRoutingPolicyError(error);
-    }
-  }
-
-  /** Updates a policy, attributed to the caller who asked for it. */
-  async updateRoutingPolicy(
-    input: Omit<UpdateRoutingPolicyInput, "actorUserId">,
-    by: GovernanceCaller,
-  ): Promise<RoutingPolicy> {
-    try {
-      return await this.routingPolicies.update({
-        ...input,
-        actorUserId: by.id,
-      });
-    } catch (error) {
-      throw asHandledRoutingPolicyError(error);
-    }
-  }
-
-  /** Makes one policy the organization's default. */
-  setDefaultRoutingPolicy(
-    input: Omit<SetDefaultRoutingPolicyInput, "actorUserId">,
-    by: GovernanceCaller,
-  ): Promise<RoutingPolicy> {
-    return this.routingPolicies.setDefault({
-      ...input,
-      actorUserId: by.id,
-    });
-  }
-
-  /** Removes one policy from the organization. */
-  deleteRoutingPolicy(input: DeleteRoutingPolicyInput): Promise<void> {
-    return this.routingPolicies.delete(input);
-  }
-
   // ── Internals ─────────────────────────────────────────────────────────────
 
   private organizationOf(projectId: string): Promise<string> {
     return this.dependencies.projects.getOrganizationId(projectId);
-  }
-
-  /** Refuses a caller who is not in the organization they named. */
-  private async assertOrganizationMembership(input: {
-    organizationId: string;
-    userId: string;
-  }): Promise<void> {
-    if (await this.dependencies.organizations.isMember(input)) return;
-    throw new PermissionDeniedError({
-      permission: "organization:view",
-      scope: { type: "organization", id: input.organizationId },
-      denialReason: "no-membership",
-    });
-  }
-
-  /**
-   * Which principal's keys the caller may see: their own always, anyone
-   * else's — or the whole organization, when no target is named — only with
-   * `virtualKeys:viewOtherPersonal`. `undefined` means every member's.
-   */
-  private async resolvePersonalKeyPrincipal(
-    input: { organizationId: string; targetUserId?: string },
-    by: GovernanceCaller,
-  ): Promise<string | undefined> {
-    if (input.targetUserId === by.id) return by.id;
-
-    const { permitted: canViewOthers } = await this.dependencies.permissions.getDecision({
-      userId: by.id,
-      permission: "virtualKeys:viewOtherPersonal",
-      scope: { tier: "organization", id: input.organizationId },
-    });
-    if (input.targetUserId !== undefined) {
-      if (!canViewOthers) {
-        throw new PermissionDeniedError({
-          permission: "virtualKeys:viewOtherPersonal",
-          scope: { type: "organization", id: input.organizationId },
-          denialReason: "no-binding",
-        });
-      }
-      return input.targetUserId;
-    }
-    return canViewOthers ? undefined : by.id;
   }
 }
 
@@ -2307,49 +2053,4 @@ export class GovernanceApp implements GovernanceRestApi {
  */
 function attributedUserId(by: GovernanceProjectCaller): string {
   return by.userId ?? `svc_${by.projectId}`;
-}
-
-function cliAccessTokens(auth: Pick<AuthApi, "findCliAccessSession" | "revokeCliAccessToken">) {
-  return {
-    async resolve(authorization: string | null | undefined) {
-      const session = await auth.findCliAccessSession({ authorization });
-      return session ? toGovernanceCliCaller(session) : null;
-    },
-    revoke: ({ authHeader, userId }: { authHeader: string | null | undefined; userId: string }) =>
-      auth.revokeCliAccessToken({ authorization: authHeader, userId }),
-  };
-}
-
-function toGovernanceCliCaller(session: CliAccessSession) {
-  return {
-    user_id: session.userId,
-    organization_id: session.organizationId,
-    ...(session.cliApiKeyId ? { cli_api_key_id: session.cliApiKeyId } : {}),
-    ...(session.clientInfo
-      ? {
-          client_info: {
-            device_label: session.clientInfo.deviceLabel,
-            hostname: session.clientInfo.hostname,
-          },
-        }
-      : {}),
-  };
-}
-
-/**
- * The Governance contract's three routing-policy guards, as handled errors
- * with stable codes. Anything else is returned untouched so it degrades to a
- * generic unknown carrying a trace id, per ADR-045.
- */
-function asHandledRoutingPolicyError(error: unknown): unknown {
-  if (error instanceof RoutingPolicyMustHaveProviderError) {
-    return new RoutingPolicyProviderRequiredError();
-  }
-  if (error instanceof RoutingPolicyMustHaveScopeError) {
-    return new RoutingPolicyScopeRequiredError();
-  }
-  if (error instanceof RoutingPolicyModelMustBeConcreteError) {
-    return new RoutingPolicyModelNotConcreteError(error.field, error.value);
-  }
-  return error;
 }

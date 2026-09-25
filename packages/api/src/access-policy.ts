@@ -51,6 +51,8 @@ export type CredentialClass =
   | "instance_admin_api_key"
   /** SCIM bearer token for provisioning endpoints. */
   | "scim_token"
+  /** A CLI device-session bearer, minted by `langwatch login`. */
+  | "cli_access_token"
   /** Deployment-wide secret presented by an external monitor. */
   | "internal_secret"
   | "session"

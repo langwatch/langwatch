@@ -4,6 +4,7 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -80,6 +81,7 @@ async function buildApp(options: { workspace: PersonalWorkspace | null }) {
       }),
       apiKeys: createApiFixture<ApiKeyApi>(),
       gateway: createApiFixture<GatewayApi>({ budgetOverviewForUser }),
+      enterpriseGateway: createApiFixture<EnterpriseGatewayApi>(),
       modelProviders: createApiFixture<ModelProviderApi>(),
       users: createApiFixture<UserApi>(),
       auditLog: createApiFixture<AuditLogApi>(),

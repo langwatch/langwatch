@@ -50,6 +50,7 @@ export const FEATURE_NAMES = [
   "workflow",
   "billing",
   "enterprise-ops",
+  "enterprise-gateway",
   "governance",
   "licensing",
   "managed-provider",

@@ -615,8 +615,6 @@ type GatewaySetup = FeatureSetup<
   typeof GatewayApp.dependencies,
   Pick<ProcessMembers, "prisma" | "clickhouse" | "encryption"> &
     Readonly<{
-      /** Where a personal key falls back to reaching the gateway when no URL is configured. */
-      isSaas: boolean;
       /** The expected control plane, where the gateway's own setting says nothing. */
       publicBaseUrl?: string | undefined;
       elevenLabsWebhook: ElevenLabsWebhookCollaborators | undefined;
@@ -694,7 +692,6 @@ export class GatewayApp implements GatewayApi {
     "prisma",
     "clickhouse",
     "encryption",
-    "isSaas",
     "elevenLabsWebhook",
     "gatewayInternalProtocol",
     "publicBaseUrl",

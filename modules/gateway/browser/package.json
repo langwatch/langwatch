@@ -29,6 +29,7 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/csv": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/enterprise-gateway-contract": "workspace:*",
     "@langwatch/error-presentation": "workspace:*",
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",

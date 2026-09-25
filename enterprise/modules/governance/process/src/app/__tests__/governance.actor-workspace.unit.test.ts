@@ -4,6 +4,7 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 /**
  * Resolving actor token to the person's workspace (for the bird's-eye /governance/users/[id] page).
  * Test verifies failed lookups return null (no info leak) and short-circuit.
@@ -98,6 +99,7 @@ async function buildApp(options: {
       traces: createApiFixture<TraceApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
       gateway: createApiFixture<GatewayApi>(),
+      enterpriseGateway: createApiFixture<EnterpriseGatewayApi>(),
       modelProviders: createApiFixture<ModelProviderApi>(),
       users: createApiFixture<UserApi>({ findById, findByEmail }),
       auditLog: createApiFixture<AuditLogApi>(),

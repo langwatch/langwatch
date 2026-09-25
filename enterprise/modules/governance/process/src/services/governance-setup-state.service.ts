@@ -1,3 +1,4 @@
+import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import {
   GOVERNANCE_ATTR,
   GOVERNANCE_ORIGIN_KIND_VALUE,
@@ -14,6 +15,7 @@ const RECENT_ACTIVITY_WINDOW_MS = 30 * 24 * 60 * 60 * 1_000;
 type SetupStateOptions = {
   repository: GovernanceSetupStateRepository;
   keys: Pick<GatewayApi, "findPersonalVirtualKeys">;
+  routingPolicies: Pick<EnterpriseGatewayApi, "countRoutingPolicies">;
   projects: Pick<ProjectApi, "findInternal" | "countWithTraces">;
   traces: Pick<TraceApi, "hasTraceWithAttribute">;
   now: () => number;
@@ -29,13 +31,15 @@ export class DefaultGovernanceSetupStateService {
   }
 
   async resolve(organizationId: string): Promise<GovernanceSetupState> {
-    const { repository, keys, projects, traces, now } = this.options;
-    const [counts, personalKeys, governanceProject, projectsWithTraces] = await Promise.all([
-      repository.counts(organizationId),
-      keys.findPersonalVirtualKeys({ organizationId }),
-      projects.findInternal({ organizationId, kind: PROJECT_KIND.INTERNAL_GOVERNANCE }),
-      projects.countWithTraces({ organizationId }),
-    ]);
+    const { repository, keys, routingPolicies: policies, projects, traces, now } = this.options;
+    const [counts, routingPolicies, personalKeys, governanceProject, projectsWithTraces] =
+      await Promise.all([
+        repository.counts(organizationId),
+        policies.countRoutingPolicies({ organizationId }),
+        keys.findPersonalVirtualKeys({ organizationId }),
+        projects.findInternal({ organizationId, kind: PROJECT_KIND.INTERNAL_GOVERNANCE }),
+        projects.countWithTraces({ organizationId }),
+      ]);
     const hasRecentActivity = governanceProject
       ? await traces.hasTraceWithAttribute({
           projectId: governanceProject.id,
@@ -44,7 +48,7 @@ export class DefaultGovernanceSetupStateService {
         })
       : false;
     const hasPersonalVKs = personalKeys.length > 0;
-    const hasRoutingPolicies = counts.routingPolicies > 0;
+    const hasRoutingPolicies = routingPolicies > 0;
     const hasIngestionSources = counts.ingestionSources > 0;
     const hasAnomalyRules = counts.anomalyRules > 0;
     const hasApplicationTraces = projectsWithTraces > 0;

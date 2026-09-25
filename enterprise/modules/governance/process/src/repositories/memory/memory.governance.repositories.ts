@@ -11,7 +11,6 @@ import { MemoryDiscoveredPersonRepository } from "./memory.discovered-person.rep
 import { MemoryErasedIdentifierSuppressionRepository } from "./memory.erased-identifier-suppression.repository.ts";
 import { MemoryGovernanceCostRollupRepository } from "./memory.governance-cost-rollup.repository.ts";
 import { MemoryGovernanceOcsfExportRepository } from "./memory.governance-ocsf-export.repository.ts";
-import { MemoryRoutingPolicyRepository } from "./memory.governance-routing.repository.ts";
 import { MemoryGovernanceSetupStateRepository } from "./memory.governance-setup-state.repository.ts";
 import { MemoryGovernanceTenantHistoryRepository } from "./memory.governance-tenant-history.repository.ts";
 import { MemoryGovernanceStore } from "./memory.governance.store.ts";
@@ -55,7 +54,6 @@ export class MemoryGovernanceRepositories {
       ocsfEvents: MemoryOcsfEventsRepository.create(),
       ocsfExports: MemoryGovernanceOcsfExportRepository.create(store),
       rollupErasure: MemoryRollupErasureRepository.create(),
-      routingPolicies: MemoryRoutingPolicyRepository.create(store),
       setupState: MemoryGovernanceSetupStateRepository.create(),
       spendSpikeAnomalies: MemorySpendSpikeAnomalyRepository.create(store),
       supportContacts: MemoryOrganizationSupportContactRepository.create(store),

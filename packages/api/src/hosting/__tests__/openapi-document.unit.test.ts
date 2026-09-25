@@ -29,7 +29,7 @@ describe("given a REST app with one documented route", () => {
     expect(document.paths["/api/agents"].get.operationId).toBe("listAgents");
   });
 
-  it("declares the same security schemes the frozen document shipped", async () => {
+  it("declares the frozen document's security schemes plus the CLI token door's", async () => {
     const response = await root.request("/api/openapi.json");
     const document = await response.json();
 
@@ -37,6 +37,7 @@ describe("given a REST app with one documented route", () => {
       "project_api_key",
       "admin_api_key",
       "scim_bearer",
+      "cli_access_token",
       "instance_admin_key",
       "internal_secret",
     ]);

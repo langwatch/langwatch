@@ -382,6 +382,7 @@ export const CREDENTIAL_CLASS_BY_DOOR = {
   scimToken: "scim_token",
   "instance-admin": "instance_admin_api_key",
   sessionKey: "project_api_key",
+  cliToken: "cli_access_token",
   browser: "session",
   internalSecret: "internal_secret",
   public: "none",
@@ -397,6 +398,7 @@ const SECURITY_BY_CREDENTIAL_CLASS = {
   organization_api_key: [{ admin_api_key: [] }],
   instance_admin_api_key: [{ instance_admin_key: [] }],
   scim_token: [{ scim_bearer: [] }],
+  cli_access_token: [{ cli_access_token: [] }],
   internal_secret: [{ internal_secret: [] }],
   none: [],
 } as const satisfies Record<

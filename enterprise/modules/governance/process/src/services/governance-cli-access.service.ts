@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * The three gates every `/api/auth/cli` governance route applies before it
- * reads anything: the device bearer, the plan, and the RBAC permission — plus
- * the current-membership boundary the credential routes add on top.
+ * The gates every `/api/auth/cli` governance route applies before it reads
+ * anything, once the CLI token door has admitted the bearer: the plan and the
+ * RBAC permission, plus the current-membership boundary the credential routes add.
  */
+import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { GovernanceCliRequest } from "@langwatch/enterprise-governance-contract";
 import {
   assertEnterprisePlan,
   ENTERPRISE_FEATURE_ERRORS,
@@ -20,29 +22,13 @@ const logger = createLogger("langwatch:governance-cli");
 export type GovernanceCliCaller = Readonly<{
   user_id: string;
   organization_id: string;
+  /** The store key that severs the presented bearer. */
+  token_key: string;
   /** The session's login key, parent of every personal key it mints. */
   cli_api_key_id?: string | undefined;
   client_info?:
     | Readonly<{ device_label?: string | undefined; hostname?: string | undefined }>
     | undefined;
-}>;
-
-/**
- * The device session behind a request, as this process reads it.
- *
- * Declared structurally rather than imported from the package that WRITES the
- * token records: the two halves of `/api/auth/cli` are owned by two features
- * on purpose, and the reader is the only thing this half needs.
- */
-export type GovernanceCliAccessToken = Readonly<{
-  /** The caller behind an `Authorization` header, or nothing. */
-  resolve: (authHeader: string | null | undefined) => Promise<GovernanceCliCaller | null>;
-  /**
-   * Severs the presented token, so an offboarded caller's pre-removal session
-   * stops authenticating the moment it is refused rather than at its next
-   * hourly expiry.
-   */
-  revoke: (input: { authHeader: string | null | undefined; userId: string }) => Promise<void>;
 }>;
 
 /** Which Enterprise surface a route sits behind, for the plan gate's copy. */
@@ -59,7 +45,6 @@ export type GovernanceCliMembershipDecision = Readonly<{ active: boolean }>;
 /** The complete admission result for one CLI governance request. */
 export type GovernanceCliAdmission =
   | Readonly<{ outcome: "admitted"; caller: GovernanceCliCaller }>
-  | Readonly<{ outcome: "unauthorized" }>
   | Readonly<{ outcome: "payment-required"; errorMessage: string; upgradeUrl: string }>
   | Readonly<{ outcome: "forbidden"; permission: AuthzPermission }>
   | Readonly<{ outcome: "membership-ended" }>;
@@ -71,7 +56,8 @@ const ENTERPRISE_MESSAGE: Record<GovernanceCliEnterpriseFeature, string> = {
 
 /** Everything the gates reach that they do not own. */
 export type GovernanceCliAccessMembers = Readonly<{
-  accessTokens: GovernanceCliAccessToken;
+  /** Auth owns CLI sessions; a refused seat severs the presented one there. */
+  sessions: Pick<AuthApi, "revokeCliTokens">;
   users: Pick<UserApi, "findById">;
   /** Active seats only: a disabled seat is not a membership. */
   organizations: Pick<OrganizationApi, "isMember">;
@@ -87,13 +73,13 @@ export type GovernanceCliAccessMembers = Readonly<{
 
 /** What the CLI governance transport asks before it serves a route. */
 export interface GovernanceCliAccessApi {
-  admit(input: {
-    authorization: string | null;
-    feature?: GovernanceCliEnterpriseFeature;
-    permission?: AuthzPermission;
-    requireActiveMembership?: boolean;
-  }): Promise<GovernanceCliAdmission>;
-  findCaller: (authHeader: string | null) => Promise<GovernanceCliCaller | null>;
+  admit(
+    input: GovernanceCliRequest & {
+      feature?: GovernanceCliEnterpriseFeature;
+      permission?: AuthzPermission;
+      requireActiveMembership?: boolean;
+    },
+  ): Promise<GovernanceCliAdmission>;
   planDecision(input: {
     organizationId: string;
     feature: GovernanceCliEnterpriseFeature;
@@ -104,7 +90,6 @@ export interface GovernanceCliAccessApi {
   }): Promise<boolean>;
   activeMembership(input: {
     caller: GovernanceCliCaller;
-    authHeader: string | null;
   }): Promise<GovernanceCliMembershipDecision>;
 }
 
@@ -115,18 +100,14 @@ export class GovernanceCliAccessService implements GovernanceCliAccessApi {
     return new GovernanceCliAccessService(members);
   }
 
-  findCaller(authHeader: string | null): Promise<GovernanceCliCaller | null> {
-    return this.members.accessTokens.resolve(authHeader);
-  }
-
-  async admit(input: {
-    authorization: string | null;
-    feature?: GovernanceCliEnterpriseFeature;
-    permission?: AuthzPermission;
-    requireActiveMembership?: boolean;
-  }): Promise<GovernanceCliAdmission> {
-    const caller = await this.findCaller(input.authorization);
-    if (!caller) return { outcome: "unauthorized" };
+  async admit(
+    input: GovernanceCliRequest & {
+      feature?: GovernanceCliEnterpriseFeature;
+      permission?: AuthzPermission;
+      requireActiveMembership?: boolean;
+    },
+  ): Promise<GovernanceCliAdmission> {
+    const caller = callerOf(input);
 
     if (input.feature) {
       const plan = await this.planDecision({
@@ -150,7 +131,7 @@ export class GovernanceCliAccessService implements GovernanceCliAccessApi {
     }
 
     if (input.requireActiveMembership) {
-      const membership = await this.activeMembership({ caller, authHeader: input.authorization });
+      const membership = await this.activeMembership({ caller });
       if (!membership.active) return { outcome: "membership-ended" };
     }
 
@@ -208,7 +189,6 @@ export class GovernanceCliAccessService implements GovernanceCliAccessApi {
    */
   async activeMembership(input: {
     caller: GovernanceCliCaller;
-    authHeader: string | null;
   }): Promise<GovernanceCliMembershipDecision> {
     const { caller } = input;
     const status = await this.membershipStatus({
@@ -219,9 +199,9 @@ export class GovernanceCliAccessService implements GovernanceCliAccessApi {
     if (status === "active") return { active: true };
 
     try {
-      await this.members.accessTokens.revoke({
-        authHeader: input.authHeader,
+      await this.members.sessions.revokeCliTokens({
         userId: caller.user_id,
+        tokenKeys: [caller.token_key],
       });
     } catch (err) {
       logger.warn(
@@ -256,4 +236,19 @@ export class GovernanceCliAccessService implements GovernanceCliAccessApi {
   private consoleBaseUrl(): string {
     return (this.members.publicBaseUrl ?? "http://localhost:5560").replace(/\/+$/, "");
   }
+}
+
+/** The caller the CLI token door put on the request, in this plane's wire vocabulary. */
+function callerOf({ actor, organizationId }: GovernanceCliRequest): GovernanceCliCaller {
+  const { tokenKey, cliApiKeyId, clientInfo } = actor.cliSession;
+
+  return {
+    user_id: actor.id,
+    organization_id: organizationId,
+    token_key: tokenKey,
+    ...(cliApiKeyId ? { cli_api_key_id: cliApiKeyId } : {}),
+    ...(clientInfo
+      ? { client_info: { device_label: clientInfo.deviceLabel, hostname: clientInfo.hostname } }
+      : {}),
+  };
 }

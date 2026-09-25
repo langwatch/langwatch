@@ -2256,6 +2256,7 @@ const HANDLER_CREDENTIAL = {
   scimToken: "apiKey",
   "instance-admin": "apiKey",
   sessionKey: "apiKey",
+  cliToken: "apiKey",
   browser: "session",
   internalSecret: "internal",
 } as const satisfies Record<Exclude<Credential, "public">, HandlerCredential>;

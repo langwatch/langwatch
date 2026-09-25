@@ -2,13 +2,16 @@ import { randomBytes } from "node:crypto";
 
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
+  type EnterpriseGatewayApi,
   NoEligibleProvidersError,
+  PersonalVirtualKeyAlreadyExistsError,
+  RoutingPolicyHasNoProvidersError,
+} from "@langwatch/enterprise-gateway-contract";
+import {
   IngestionKeySessionRevokedError,
   IngestionKeySourceNotAllowedError,
   IngestionKeyWorkspaceMissingError,
-  PersonalVirtualKeyAlreadyExistsError,
   PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE,
-  RoutingPolicyHasNoProvidersError,
 } from "@langwatch/enterprise-governance-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
@@ -24,7 +27,6 @@ import type { UserApi } from "@langwatch/user-contract";
 
 import type { DefaultGovernanceAiToolCatalogService } from "./ai-tool-catalog.service.ts";
 import type { GovernanceCliCaller } from "./governance-cli-access.service.ts";
-import type { DefaultGovernancePersonalVirtualKeyService } from "./governance-personal-key.service.ts";
 import type { OrganizationSupportContactService } from "./organization-support-contact.service.ts";
 import type { PersonalIngestionKeyService } from "./personal-ingestion-key.service.ts";
 
@@ -85,10 +87,10 @@ export type GovernanceCliIngestionKeyOutcome =
 
 /** Everything the credential operations reach that they do not own. */
 export type GovernanceCliCredentialMembers = Readonly<{
-  /** The SAME services the console's tRPC procedures call. */
+  /** Enterprise gateway owns personal keys; the console's own doors call the same operations. */
   personalKeys: Pick<
-    DefaultGovernancePersonalVirtualKeyService,
-    "list" | "ensureDefault" | "issue"
+    EnterpriseGatewayApi,
+    "personalVirtualKeyList" | "personalVirtualKeyEnsureDefault" | "personalVirtualKeyIssue"
   >;
   ingestionKeys: Pick<PersonalIngestionKeyService, "issueForProject" | "mint">;
   aiTools: Pick<DefaultGovernanceAiToolCatalogService, "resolveToolPolicy">;
@@ -186,7 +188,7 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
 
     if (!workspace) return { outcome: "clear" };
 
-    const keys = await this.members.personalKeys.list({
+    const keys = await this.members.personalKeys.personalVirtualKeyList({
       userId: caller.user_id,
       organizationId: caller.organization_id,
     });
@@ -530,7 +532,7 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
     const { user_id: userId, organization_id: organizationId } = input.caller;
 
     try {
-      return await this.members.personalKeys.ensureDefault({
+      return await this.members.personalKeys.personalVirtualKeyEnsureDefault({
         userId,
         organizationId,
         displayName: input.displayName,
@@ -548,7 +550,7 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
     });
     const suffix = input.deviceLabel ?? randomBytes(3).toString("hex");
 
-    return this.members.personalKeys.issue({
+    return this.members.personalKeys.personalVirtualKeyIssue({
       userId,
       organizationId,
       personalProjectId: workspace.project.id,

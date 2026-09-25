@@ -3,7 +3,8 @@
  * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
  */
 
-import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
+import { type ContractApiMap, createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
+import type { routingPolicyTrpc } from "@langwatch/enterprise-gateway-contract";
 import type {
   GatewayApplicableBudget,
   GatewayBudgetLedgerStatus,
@@ -17,7 +18,6 @@ import type {
   VirtualKeyApiScopeAssignment,
   VirtualKeyConfig,
 } from "@langwatch/gateway-contract";
-import type { TierTargetSuggestion } from "@langwatch/model-provider-contract";
 import type { Instant } from "@langwatch/time";
 
 /** An acknowledgement, for the writes whose only answer is that they happened. */
@@ -278,26 +278,6 @@ export type GatewayVirtualKeyUsageSummary = {
   }[];
 };
 
-export type RoutingPolicyScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";
-
-/** A routing policy. Its instants are epoch milliseconds, not Dates. */
-export type RoutingPolicyView = {
-  id: string;
-  organizationId: string;
-  name: string;
-  description: string | null;
-  modelProviderIds: string[];
-  modelAliases: Record<string, string>;
-  defaultModel: string | null;
-  policyRules: Record<string, unknown>;
-  isDefault: boolean;
-  createdAtMs: number;
-  updatedAtMs: number;
-  createdById: string | null;
-  updatedById: string | null;
-  scopes: { scopeType: RoutingPolicyScopeType; scopeId: string }[];
-};
-
 /**
  * A configured SQS destination as the endpoint list renders it. `region`, `accountId` and
  * `queueName` are parsed out of the queue URL by the server, because every Amazon SQS URL opens
@@ -466,7 +446,7 @@ export type PersonalWorkspaceContext = {
   routingPolicy: { id: string; name: string } | null;
 };
 
-export type GatewayApiMap = {
+export type GatewayApiMap = ContractApiMap<typeof routingPolicyTrpc> & {
   virtualKeys: {
     list: {
       query: { input: { organizationId: string }; output: VirtualKeyView[] };
@@ -743,78 +723,6 @@ export type GatewayApiMap = {
           model?: string;
         };
         output: GatewayVirtualKeyUsageSummary;
-      };
-    };
-  };
-
-  routingPolicy: {
-    list: {
-      query: {
-        input: {
-          organizationId: string;
-          selectableForScope?: { scopeType: RoutingPolicyScopeType; scopeId: string };
-        };
-        output: RoutingPolicyView[];
-      };
-    };
-    get: {
-      query: {
-        input: { organizationId: string; id: string };
-        output: RoutingPolicyView;
-      };
-    };
-    create: {
-      mutation: {
-        input: {
-          organizationId: string;
-          scopes: { scopeType: RoutingPolicyScopeType; scopeId: string }[];
-          name: string;
-          description?: string | null;
-          modelProviderIds: string[];
-          isDefault?: boolean;
-          modelAliases?: Record<string, string>;
-          defaultModel?: string | null;
-          policyRules?: Record<string, unknown>;
-        };
-        output: RoutingPolicyView;
-      };
-    };
-    /** No `scopes`/`isDefault`: both move a policy, and moving one is its own write. */
-    update: {
-      mutation: {
-        input: {
-          organizationId: string;
-          id: string;
-          name?: string;
-          description?: string | null;
-          modelProviderIds?: string[];
-          modelAliases?: Record<string, string>;
-          defaultModel?: string | null;
-          policyRules?: Record<string, unknown>;
-        };
-        output: RoutingPolicyView;
-      };
-    };
-    setDefault: {
-      mutation: {
-        input: { organizationId: string; id: string };
-        output: RoutingPolicyView;
-      };
-    };
-    delete: {
-      mutation: {
-        input: { organizationId: string; id: string };
-        output: GatewayAcknowledgement;
-      };
-    };
-    tierSuggestions: {
-      query: {
-        input: {
-          organizationId: string;
-          tier: "complex" | "reasoning" | "fast";
-          boundProviderTypes?: string[];
-        };
-        output: TierTargetSuggestion[];
       };
     };
   };

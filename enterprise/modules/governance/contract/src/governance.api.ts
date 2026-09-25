@@ -1,10 +1,6 @@
 import type { BrowserSessionInventoryEntry } from "@langwatch/auth-contract";
 import type { EntitlementOperator } from "@langwatch/entitlement-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
-import type {
-  SuggestTierTargetsInput,
-  TierTargetSuggestion,
-} from "@langwatch/model-provider-contract";
 
 import type {
   RecordWorkspaceViewInput,
@@ -157,31 +153,12 @@ import type {
   PersonalUsageWindow,
 } from "./personal-usage.ts";
 import type {
-  EnsureDefaultPersonalVirtualKeyInput,
-  IssuePersonalVirtualKeyInput,
-  IssuedPersonalVirtualKey,
-  IssuedPersonalVirtualKeyAnswer,
-  ListPersonalVirtualKeysInput,
-  PersonalVirtualKey,
-  RevokeAllPersonalVirtualKeysInput,
-  RevokePersonalVirtualKeyInput,
-} from "./personal-virtual-key.ts";
-import type {
   PlatformToolPolicy,
   PlatformToolPolicyMap,
   PlatformToolSlug,
 } from "./platform-tool-policy.ts";
 import type { RecordPulledUsageCommand } from "./pulled-usage.commands.ts";
 import type { QuarantineFillInput, QuarantineFillStats } from "./quarantine-fill.ts";
-import type {
-  CreateRoutingPolicyInput,
-  DeleteRoutingPolicyInput,
-  FindRoutingPolicyInput,
-  ListRoutingPoliciesInput,
-  RoutingPolicy,
-  SetDefaultRoutingPolicyInput,
-  UpdateRoutingPolicyInput,
-} from "./routing-policy.ts";
 import type { OrganizationSessionPolicyShape, SessionCeilingApplied } from "./session-policy.ts";
 
 /**
@@ -339,21 +316,6 @@ export interface GovernanceApi {
   personalBudgetOverviewForUser(
     input: GovernanceBudgetOverviewInput,
   ): Promise<GovernanceBudgetOverviewForUser>;
-  routingPolicyList(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]>;
-  findRoutingPolicyById(input: FindRoutingPolicyInput): Promise<RoutingPolicy | null>;
-  routingPolicyGetById(input: FindRoutingPolicyInput): Promise<RoutingPolicy>;
-  routingPolicyCreate(input: CreateRoutingPolicyInput): Promise<RoutingPolicy>;
-  routingPolicyUpdate(input: UpdateRoutingPolicyInput): Promise<RoutingPolicy>;
-  routingPolicySetDefault(input: SetDefaultRoutingPolicyInput): Promise<RoutingPolicy>;
-  routingPolicyDelete(input: DeleteRoutingPolicyInput): Promise<void>;
-
-  personalVirtualKeyEnsureDefault(
-    input: EnsureDefaultPersonalVirtualKeyInput,
-  ): Promise<IssuedPersonalVirtualKey>;
-  personalVirtualKeyIssue(input: IssuePersonalVirtualKeyInput): Promise<IssuedPersonalVirtualKey>;
-  personalVirtualKeyList(input: ListPersonalVirtualKeysInput): Promise<PersonalVirtualKey[]>;
-  personalVirtualKeyRevoke(input: RevokePersonalVirtualKeyInput): Promise<PersonalVirtualKey>;
-  personalVirtualKeyRevokeAllForUser(input: RevokeAllPersonalVirtualKeysInput): Promise<number>;
 
   aiToolListForUser(input: AiToolMemberInput): Promise<AiToolEntry[]>;
   aiToolListForAdmin(input: AiToolOrganizationInput): Promise<AiToolEntry[]>;
@@ -552,36 +514,6 @@ export interface GovernanceRestApi {
   templateUpdateOttlRules(input: UpdateIngestionTemplateOttlInput): Promise<IngestionTemplate>;
   templateArchiveOrg(input: ArchiveIngestionTemplateInput): Promise<void>;
   templateCloneFromPlatform(input: CloneIngestionTemplateInput): Promise<IngestionTemplate>;
-  listRoutingPolicies(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]>;
-  getRoutingPolicy(input: FindRoutingPolicyInput): Promise<RoutingPolicy>;
-  routingPolicyTierSuggestions(
-    input: Omit<SuggestTierTargetsInput, "limit">,
-  ): TierTargetSuggestion[];
-  createRoutingPolicy(
-    input: Omit<CreateRoutingPolicyInput, "actorUserId">,
-    by: GovernanceCaller,
-  ): Promise<RoutingPolicy>;
-  updateRoutingPolicy(
-    input: Omit<UpdateRoutingPolicyInput, "actorUserId">,
-    by: GovernanceCaller,
-  ): Promise<RoutingPolicy>;
-  setDefaultRoutingPolicy(
-    input: Omit<SetDefaultRoutingPolicyInput, "actorUserId">,
-    by: GovernanceCaller,
-  ): Promise<RoutingPolicy>;
-  deleteRoutingPolicy(input: DeleteRoutingPolicyInput): Promise<void>;
-  listPersonalVirtualKeys(
-    input: { organizationId: string; targetUserId?: string },
-    by: GovernanceCaller,
-  ): Promise<PersonalVirtualKey[]>;
-  issuePersonalVirtualKey(
-    input: { organizationId: string; label: string; routingPolicyId?: string },
-    by: GovernanceCaller,
-  ): Promise<IssuedPersonalVirtualKeyAnswer>;
-  revokePersonalVirtualKey(
-    input: { organizationId: string; id: string },
-    by: GovernanceCaller,
-  ): Promise<void>;
   ingestionKeyList(input: {
     organizationId: string;
     userId: string;

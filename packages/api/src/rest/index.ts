@@ -325,6 +325,12 @@ export {
   type SessionKeyHolder,
   type SessionKeyPresented,
 } from "./session-key-identity.ts";
+export {
+  CliTokenIdentity,
+  type CliTokenActor,
+  type CliTokenHolder,
+  type CliTokenPresented,
+} from "./cli-token-identity.ts";
 
 export type { RestDeclaredResult } from "./declaration.ts";
 
