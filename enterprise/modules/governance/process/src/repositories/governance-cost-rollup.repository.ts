@@ -92,6 +92,46 @@ export type GovernanceCostRollupCellAddress = Pick<
   | "RawActorId"
 >;
 
+/** One currency of one day, in that currency's own nano-minor unit; no rate is ever applied. */
+export interface GovernanceCostDayCurrencyGroup {
+  currencyCode: string;
+  amountNanoMinor: number;
+  /** Null when the currency names no earlier amount. */
+  previousAmountNanoMinor: number | null;
+  cellsWithoutAmount: number;
+  cellsWithoutPreviousAmount: number;
+}
+
+/** One day of one lane, with what it held immediately before its latest revision (ADR-128 §15). */
+export interface GovernanceCostDayLaneGroup {
+  day: string;
+  costSource: string;
+  amountNanoUsd: number | null;
+  cellsWithoutAmount: number;
+  currenciesWithoutUsdAmount: string[];
+  /** Unix seconds of the day's latest revision, or null when never restated. */
+  revisedAt: number | null;
+  previousAmountNanoUsd: number | null;
+  cellsWithoutPreviousAmount: number;
+  /** Unix seconds a pull last touched any cell of the day. */
+  lastObservedAt: number;
+  byCurrency: GovernanceCostDayCurrencyGroup[];
+}
+
+export interface GovernanceCostProviderGroup {
+  provider: string;
+  amountNanoUsd: number | null;
+  cellsWithoutAmount: number;
+  currenciesWithoutUsdAmount: string[];
+}
+
+export interface GovernanceCostCurrencyGroup {
+  currencyCode: string;
+  /** Nano of the currency's own major unit; null when it holds nothing. */
+  amountNanoMinor: number | null;
+  cellsWithoutAmount: number;
+}
+
 export abstract class GovernanceCostRollupRepository {
   /** Appends a cell version and records its restatement keys in the index beside it. */
   abstract upsert(row: GovernanceCostRollupRow): Promise<void>;
@@ -116,4 +156,24 @@ export abstract class GovernanceCostRollupRepository {
 
   /** The pulled lane per model. */
   abstract sumWindowByModel(input: GovernanceCostRollupWindow): Promise<GovernanceCostModelGroup[]>;
+
+  /** One lane per day with its revision markers and per-currency lines; unset `costSource` reads every lane. */
+  abstract sumDaysByLane(
+    input: GovernanceCostRollupWindow & { costSource?: string },
+  ): Promise<GovernanceCostDayLaneGroup[]>;
+
+  /** The pulled lane per provider, including cells without a named actor. */
+  abstract sumWindowByProvider(
+    input: GovernanceCostRollupWindow,
+  ): Promise<GovernanceCostProviderGroup[]>;
+
+  /** One window total per currency the lane was billed in. */
+  abstract sumWindowByCurrency(
+    input: GovernanceCostRollupWindow & { costSource: string },
+  ): Promise<GovernanceCostCurrencyGroup[]>;
+
+  /** Whether any current-version cell of the lane was written under the source. */
+  abstract hasRowsForSource(
+    input: GovernanceCostRollupWindow & { costSource: string; ingestionSourceId: string },
+  ): Promise<boolean>;
 }

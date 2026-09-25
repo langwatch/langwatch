@@ -153,6 +153,7 @@ function mountIngest(world: World = {}) {
     governanceAgentsSyncSources: unsupportedRestOperation,
     governanceAgentsRequestListing: unsupportedRestOperation,
     governanceAgentsList: unsupportedRestOperation,
+    governanceCostSummary: unsupportedRestOperation,
     governanceCostDailyByProvider: unsupportedRestOperation,
     governanceCostSpendByModel: unsupportedRestOperation,
     governanceCostPeriodRecords: unsupportedRestOperation,

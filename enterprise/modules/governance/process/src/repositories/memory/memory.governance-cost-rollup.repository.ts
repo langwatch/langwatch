@@ -1,9 +1,15 @@
+import { Temporal } from "@langwatch/time";
+
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
   GOVERNANCE_COST_CURRENCY_USD,
   GOVERNANCE_COST_SOURCE,
   GovernanceCostRollupRepository,
+  type GovernanceCostCurrencyGroup,
+  type GovernanceCostDayCurrencyGroup,
+  type GovernanceCostDayLaneGroup,
   type GovernanceCostModelGroup,
+  type GovernanceCostProviderGroup,
   type GovernanceCostRollupCellAddress,
   type GovernanceCostRollupRow,
   type GovernanceCostPeriodRecordGroup,
@@ -25,6 +31,13 @@ export interface MemoryGovernanceCostCell {
   rawActorId: string;
   amountNanoUsd: number | null;
   amountNanoMinor: number;
+  /** Unix seconds of the cell's latest revision. */
+  revisedAt?: number | null;
+  previousAmountNanoUsd?: number | null;
+  /** Unix seconds a pull last touched the cell. */
+  lastObservedAt?: number;
+  /** Epoch ms of the cell's earliest version. */
+  createdAt?: number;
 }
 
 const UNPRICED_CURRENCY_SAMPLE_LIMIT = 8;
@@ -94,6 +107,7 @@ function groupBy(
 
 function memoryCellOf(
   row: GovernanceCostRollupCellAddress &
+    Partial<GovernanceCostRollupRow> &
     Pick<GovernanceCostRollupRow, "AmountNanoUsd" | "AmountNanoMinor">,
 ): MemoryGovernanceCostCell {
   return {
@@ -108,6 +122,10 @@ function memoryCellOf(
     rawActorId: row.RawActorId,
     amountNanoUsd: row.AmountNanoUsd,
     amountNanoMinor: row.AmountNanoMinor,
+    revisedAt: row.RevisedAt,
+    previousAmountNanoUsd: row.PreviousAmountNanoUsd,
+    lastObservedAt: row.LastObservedAt,
+    createdAt: row.CreatedAt,
   };
 }
 
@@ -119,6 +137,98 @@ function parsePulledItems(json: string): Record<string, unknown> {
   } catch {
     return {};
   }
+}
+
+const DAY_MS = 86_400_000;
+
+const presentValues = (values: readonly (number | null | undefined)[]): number[] =>
+  values.flatMap((value) => (value === null || value === undefined ? [] : [value]));
+
+/** ClickHouse's `sumOrNull` as none-or-one: empty when every value is absent. */
+function sumsOfPresent(values: readonly (number | null | undefined)[]): number[] {
+  const present = presentValues(values);
+  return present.length === 0 ? [] : [present.reduce((sum, value) => sum + value, 0)];
+}
+
+function maximaOfPresent(values: readonly (number | null | undefined)[]): number[] {
+  const present = presentValues(values);
+  return present.length === 0 ? [] : [Math.max(...present)];
+}
+
+/** The ClickHouse twin's third layer: what one cell contributed before its day's latest revision. */
+function bucketed(cell: MemoryGovernanceCostCell, dayLatestRevisedAt: number | null) {
+  const createdAt = cell.createdAt ?? 0;
+  const dayStart = Temporal.Instant.from(`${cell.day}T00:00:00Z`).epochMilliseconds;
+  const createdByRevision =
+    createdAt >= dayStart &&
+    createdAt < dayStart + DAY_MS &&
+    dayLatestRevisedAt !== null &&
+    createdAt >= dayLatestRevisedAt * 1000;
+  const revisedLatest = (cell.revisedAt ?? null) !== null && cell.revisedAt === dayLatestRevisedAt;
+  const noAmount = holdsNoAmountAtAll(cell);
+  const previousUsd = cell.previousAmountNanoUsd ?? null;
+  let priorUsd: number | null = cell.amountNanoUsd ?? 0;
+  let priorMinor: number | null = cell.amountNanoMinor;
+  if (createdByRevision) {
+    priorUsd = 0;
+    priorMinor = null;
+  } else if (revisedLatest) {
+    priorUsd = previousUsd;
+    priorMinor = cell.currencyCode === GOVERNANCE_COST_CURRENCY_USD ? previousUsd : null;
+  } else if (noAmount) {
+    priorUsd = null;
+  }
+  return { cell, createdByRevision, noAmount, priorUsd, priorMinor };
+}
+
+function currencyLineOf(buckets: readonly ReturnType<typeof bucketed>[]) {
+  const line: GovernanceCostDayCurrencyGroup = {
+    currencyCode: buckets[0]?.cell.currencyCode ?? "",
+    amountNanoMinor: buckets.reduce((sum, bucket) => sum + bucket.cell.amountNanoMinor, 0),
+    previousAmountNanoMinor: sumsOfPresent(buckets.map((bucket) => bucket.priorMinor))[0] ?? null,
+    cellsWithoutAmount: buckets.filter((bucket) => bucket.noAmount).length,
+    cellsWithoutPreviousAmount: buckets.filter(
+      (bucket) => bucket.priorMinor === null && !bucket.createdByRevision,
+    ).length,
+  };
+  return {
+    line,
+    amountNanoUsd: sumsOfPresent(buckets.map((bucket) => bucket.cell.amountNanoUsd))[0] ?? null,
+    cellsWithoutUsdFigure: buckets.filter((bucket) => bucket.cell.amountNanoUsd === null).length,
+    priorUsd: sumsOfPresent(buckets.map((bucket) => bucket.priorUsd))[0] ?? null,
+    cellsWithoutPreviousUsd: buckets.filter((bucket) => bucket.priorUsd === null).length,
+  };
+}
+
+function dayLaneOf(day: string, costSource: string, cells: MemoryGovernanceCostCell[]) {
+  const dayLatestRevisedAt = maximaOfPresent(cells.map((cell) => cell.revisedAt))[0] ?? null;
+  const buckets = cells.map((cell) => bucketed(cell, dayLatestRevisedAt));
+  const currencies = groupBy(cells, (cell) => [cell.currencyCode]).map(({ key }) =>
+    currencyLineOf(buckets.filter((bucket) => bucket.cell.currencyCode === key[0])),
+  );
+  const group: GovernanceCostDayLaneGroup = {
+    day,
+    costSource,
+    amountNanoUsd: sumsOfPresent(currencies.map((currency) => currency.amountNanoUsd))[0] ?? null,
+    cellsWithoutAmount: currencies.reduce(
+      (sum, currency) => sum + currency.line.cellsWithoutAmount,
+      0,
+    ),
+    currenciesWithoutUsdAmount: currencies
+      .filter(
+        (c) => c.cellsWithoutUsdFigure > 0 && c.line.currencyCode !== GOVERNANCE_COST_CURRENCY_USD,
+      )
+      .map((c) => c.line.currencyCode)
+      .slice(0, UNPRICED_CURRENCY_SAMPLE_LIMIT)
+      .toSorted(),
+    revisedAt: dayLatestRevisedAt,
+    previousAmountNanoUsd:
+      sumsOfPresent(currencies.map((currency) => currency.priorUsd))[0] ?? null,
+    cellsWithoutPreviousAmount: currencies.reduce((sum, c) => sum + c.cellsWithoutPreviousUsd, 0),
+    lastObservedAt: maximaOfPresent(cells.map((cell) => cell.lastObservedAt))[0] ?? 0,
+    byCurrency: currencies.map((currency) => currency.line),
+  };
+  return group;
 }
 
 export class MemoryGovernanceCostRollupRepository extends GovernanceCostRollupRepository {
@@ -205,13 +315,58 @@ export class MemoryGovernanceCostRollupRepository extends GovernanceCostRollupRe
     }));
   }
 
+  async sumDaysByLane(
+    input: GovernanceCostRollupWindow & { costSource?: string },
+  ): Promise<GovernanceCostDayLaneGroup[]> {
+    return groupBy(this.inWindow(input, input.costSource), (cell) => [
+      cell.day,
+      cell.costSource,
+    ]).map(({ key, cells }) => dayLaneOf(key[0] ?? "", key[1] ?? "", cells));
+  }
+
+  async sumWindowByProvider(
+    input: GovernanceCostRollupWindow,
+  ): Promise<GovernanceCostProviderGroup[]> {
+    return groupBy(this.pulled(input), (cell) => [cell.provider]).map(({ key, cells }) => ({
+      provider: key[0] ?? "",
+      ...figureOf(cells, holdsNoAmountAtAll),
+      currenciesWithoutUsdAmount: currenciesWithoutUsd(cells),
+    }));
+  }
+
+  async sumWindowByCurrency(
+    input: GovernanceCostRollupWindow & { costSource: string },
+  ): Promise<GovernanceCostCurrencyGroup[]> {
+    const cells = this.inWindow(input, input.costSource);
+    return groupBy(cells, (cell) => [cell.currencyCode]).map(({ key, cells: group }) => ({
+      currencyCode: key[0] ?? "",
+      amountNanoMinor: sumsOfPresent(group.map((cell) => cell.amountNanoMinor))[0] ?? null,
+      cellsWithoutAmount: group.filter(holdsNoAmountAtAll).length,
+    }));
+  }
+
+  async hasRowsForSource(
+    input: GovernanceCostRollupWindow & { costSource: string; ingestionSourceId: string },
+  ): Promise<boolean> {
+    return this.inWindow(input, input.costSource).some(
+      (cell) => cell.ingestionSourceId === input.ingestionSourceId,
+    );
+  }
+
   private pulled(window: GovernanceCostRollupWindow): MemoryGovernanceCostCell[] {
+    return this.inWindow(window, GOVERNANCE_COST_SOURCE.PULLED);
+  }
+
+  private inWindow(
+    window: GovernanceCostRollupWindow,
+    costSource: string | undefined,
+  ): MemoryGovernanceCostCell[] {
     return [...this.cells.values()].filter(
       (cell) =>
         cell.tenantId === window.tenantId &&
         cell.day >= window.fromDay &&
         cell.day <= window.toDay &&
-        cell.costSource === GOVERNANCE_COST_SOURCE.PULLED,
+        (costSource === undefined || cell.costSource === costSource),
     );
   }
 }

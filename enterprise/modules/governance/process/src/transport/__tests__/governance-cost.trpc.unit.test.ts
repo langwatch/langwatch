@@ -17,10 +17,32 @@ import {
 
 const FIGURE = { amountUsd: 12.5, cellsWithoutAmount: 0, currenciesWithoutUsdAmount: [] };
 
+const LANE = { ...FIGURE, currencyTotals: [] };
+const SUMMARY = {
+  unavailableReason: null,
+  billed: LANE,
+  providers: [{ provider: "openai", ...FIGURE }],
+  gateway: { ...LANE, requestsWithoutAmount: 2 },
+  azureBilling: "no_spend_recorded" as const,
+  seats: { status: "read_failed" as const },
+  series: [],
+  windowDays: 30,
+  staleSources: null,
+  unpricedWindow: {
+    sinceIso: "2026-09-01T00:00:00.000Z",
+    throughIso: "2026-09-02T00:00:00.000Z",
+    sourceNames: ["a"],
+  },
+};
+
 function mount(options: { permits?: (permission: string) => boolean } = {}) {
   const asked: string[] = [];
   const calls: unknown[] = [];
   const app = createApiFixture<GovernanceRestApi>({
+    governanceCostSummary: async (input) => {
+      calls.push(input);
+      return { ...SUMMARY, windowDays: input.windowDays };
+    },
     governanceCostDailyByProvider: async (input) => {
       calls.push(input);
       const rows = [{ day: "2026-09-01", provider: "openai", ...FIGURE }];
@@ -49,8 +71,19 @@ function mount(options: { permits?: (permission: string) => boolean } = {}) {
 }
 
 describe("the governanceCost tRPC namespace", () => {
+  it("serves main's summary under governanceCost:view, every lane and caveat intact", async () => {
+    const { caller, asked, calls } = mount();
+
+    const answer = await caller.summary({ organizationId: "org_1" });
+
+    expect(answer).toEqual(SUMMARY);
+    expect(asked).toEqual(["governanceCost:view"]);
+    expect(calls).toEqual([{ organizationId: "org_1", windowDays: 30 }]);
+  });
+
   it("serves main's breakdown queries", () => {
     expect(procedureKinds(mount().router._def.procedures)).toEqual({
+      summary: "query",
       dailyByProvider: "query",
       spendByModel: "query",
       periodRecords: "query",

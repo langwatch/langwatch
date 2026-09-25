@@ -102,3 +102,90 @@ export const governanceSpenderBreakdownSchema = z.object({
   windowDays: z.number().int(),
 });
 export type GovernanceSpenderBreakdown = z.infer<typeof governanceSpenderBreakdownSchema>;
+
+export const governanceCostCurrencyTotalSchema = z.object({
+  currencyCode: z.string(),
+  amount: z.number().nullable(),
+  cellsWithoutAmount: z.number().int(),
+});
+export type GovernanceCostCurrencyTotal = z.infer<typeof governanceCostCurrencyTotalSchema>;
+
+/** One lane's figure; `requestsWithoutAmount` is the metered lane's alone and never withholds. */
+export const governanceCostLaneSchema = z.object({
+  ...figure,
+  currencyTotals: z.array(governanceCostCurrencyTotalSchema),
+  requestsWithoutAmount: z.number().int().optional(),
+});
+export type GovernanceCostLane = z.infer<typeof governanceCostLaneSchema>;
+
+/** Counts only: the seat lane carries no amount field at all (ADR-128). */
+export const governanceSeatPoolSchema = z.object({
+  skuPartNumber: z.string(),
+  day: z.string(),
+  seatsBought: z.number().int(),
+  seatsAssigned: z.number().int(),
+});
+export type GovernanceSeatPool = z.infer<typeof governanceSeatPoolSchema>;
+
+export const governanceSeatLaneSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("awaiting_data") }),
+  z.object({ status: z.literal("read_failed") }),
+  z.object({ status: z.literal("reported"), pools: z.array(governanceSeatPoolSchema) }),
+]);
+export type GovernanceSeatLane = z.infer<typeof governanceSeatLaneSchema>;
+
+export const governanceCostDayCurrencyLineSchema = z.object({
+  currencyCode: z.string(),
+  amount: z.number().nullable(),
+  previousAmount: z.number().nullable(),
+});
+export type GovernanceCostDayCurrencyLine = z.infer<typeof governanceCostDayCurrencyLineSchema>;
+
+export const governanceCostDaySchema = z.object({
+  day: z.string(),
+  billedUsd: z.number().nullable(),
+  gatewayUsd: z.number().nullable(),
+  billedCellsWithoutAmount: z.number().int(),
+  gatewayCellsWithoutAmount: z.number().int(),
+  billedRevisedAt: z.number().nullable(),
+  billedByCurrency: z.array(governanceCostDayCurrencyLineSchema),
+  billedCurrenciesWithoutUsdAmount: z.array(z.string()),
+  billedProvisional: z.boolean(),
+});
+export type GovernanceCostDay = z.infer<typeof governanceCostDaySchema>;
+
+export const governanceCostStaleSourcesSchema = z.object({
+  oldestLastSuccessIso: z.string(),
+  sourceNames: z.array(z.string()),
+});
+export type GovernanceCostStaleSources = z.infer<typeof governanceCostStaleSourcesSchema>;
+
+export const governanceCostUnpricedWindowSchema = z.object({
+  sinceIso: z.string(),
+  throughIso: z.string(),
+  sourceNames: z.array(z.string()),
+});
+export type GovernanceCostUnpricedWindow = z.infer<typeof governanceCostUnpricedWindowSchema>;
+
+/** Why a claimed Azure bill shows nothing; main's `azureBillingNote.ts` closed list. */
+export const governanceAzureBillingNoteSchema = z.enum([
+  "billing_read_failed",
+  "prepaid_declared",
+  "no_spend_recorded",
+]);
+export type GovernanceAzureBillingNote = z.infer<typeof governanceAzureBillingNoteSchema>;
+
+/** The three lanes side by side, never summed into one figure. @see specs/governance/governance-cost-screen.feature */
+export const governanceCostSummarySchema = z.object({
+  unavailableReason: governanceCostUnavailableReasonSchema.nullable(),
+  billed: governanceCostLaneSchema,
+  providers: z.array(z.object({ provider: z.string(), ...figure })),
+  gateway: governanceCostLaneSchema,
+  azureBilling: governanceAzureBillingNoteSchema.nullable(),
+  seats: governanceSeatLaneSchema,
+  series: z.array(governanceCostDaySchema),
+  windowDays: z.number().int(),
+  staleSources: governanceCostStaleSourcesSchema.nullable(),
+  unpricedWindow: governanceCostUnpricedWindowSchema.nullable(),
+});
+export type GovernanceCostSummary = z.infer<typeof governanceCostSummarySchema>;

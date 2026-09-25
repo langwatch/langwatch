@@ -7,11 +7,16 @@ import {
   governanceCostModelBreakdownSchema,
   governanceCostPeriodRecordsInputSchema,
   governanceCostProviderDayBreakdownSchema,
+  governanceCostSummarySchema,
   governanceCostWindowInputSchema,
   governanceSpenderBreakdownSchema,
 } from "./governance-cost.ts";
 
 export const governanceCostTrpc = defineTrpcContract("governanceCost")
+  .query("summary")
+  .withInput(governanceCostWindowInputSchema)
+  .withOutput(governanceCostSummarySchema)
+
   .query("dailyByProvider")
   .withInput(governanceCostWindowInputSchema)
   .withOutput(governanceCostProviderDayBreakdownSchema)

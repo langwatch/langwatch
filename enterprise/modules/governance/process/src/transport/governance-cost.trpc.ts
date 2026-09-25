@@ -8,6 +8,10 @@ import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { GovernanceRestApi, governanceCostTrpc } from "@langwatch/enterprise-governance-contract";
 
 export const governanceCostTrpcTransport = defineTrpcRouter(GovernanceRestApi, governanceCostTrpc)
+  .procedure("summary")
+  .withPermission("governanceCost:view")
+  .handle(({ app, input, actor }) => app.governanceCostSummary(input, actor))
+
   .procedure("dailyByProvider")
   .withPermission("governanceCost:view")
   .handle(({ app, input, actor }) => app.governanceCostDailyByProvider(input, actor))

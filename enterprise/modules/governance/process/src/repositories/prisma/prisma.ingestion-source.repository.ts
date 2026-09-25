@@ -11,6 +11,7 @@ import {
   type CreateIngestionSourceRecord,
   type CursorPinnedUpdate,
   type IngestionSourceClaim,
+  type UnpricedUsageSourceWindow,
   type UnpricedUsageWindow,
   type UpdateIngestionSourceRecord,
 } from "../ingestion-source.repository.ts";
@@ -176,6 +177,24 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
         unpricedUsageThrough: window.through ? toDate(window.through) : null,
       },
     });
+  }
+
+  async findUnpricedUsageWindows(organizationId: string): Promise<UnpricedUsageSourceWindow[]> {
+    const rows = await this.database.ingestionSource.findMany({
+      where: { organizationId, archivedAt: null, unpricedUsageSince: { not: null } },
+      select: { name: true, unpricedUsageSince: true, unpricedUsageThrough: true },
+    });
+    return rows.flatMap((row) =>
+      row.unpricedUsageSince
+        ? [
+            {
+              name: row.name,
+              since: fromDate(row.unpricedUsageSince),
+              through: row.unpricedUsageThrough ? fromDate(row.unpricedUsageThrough) : null,
+            },
+          ]
+        : [],
+    );
   }
 
   async updateIfCursorUnchanged(input: {

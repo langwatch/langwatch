@@ -8,6 +8,7 @@ import {
   type CreateIngestionSourceRecord,
   type CursorPinnedUpdate,
   type IngestionSourceClaim,
+  type UnpricedUsageSourceWindow,
   type UnpricedUsageWindow,
   type UpdateIngestionSourceRecord,
 } from "../ingestion-source.repository.ts";
@@ -122,6 +123,15 @@ export class MemoryIngestionSourceRepository extends IngestionSourceRepository {
   async getUnpricedUsageWindow(id: string): Promise<UnpricedUsageWindow> {
     if (!this.rows.some((row) => row.id === id)) throw new Error(`no ingestion source ${id}`);
     return this.unpricedWindows.get(id) ?? { since: null, through: null };
+  }
+
+  async findUnpricedUsageWindows(organizationId: string): Promise<UnpricedUsageSourceWindow[]> {
+    return this.live(organizationId).flatMap((row) => {
+      const window = this.unpricedWindows.get(row.id);
+      return window?.since
+        ? [{ name: row.name, since: window.since, through: window.through }]
+        : [];
+    });
   }
 
   async updateUnpricedUsageWindow(id: string, window: UnpricedUsageWindow): Promise<void> {

@@ -5,7 +5,11 @@ import {
   GOVERNANCE_COST_SOURCE,
   GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
   GovernanceCostRollupRepository,
+  type GovernanceCostCurrencyGroup,
+  type GovernanceCostDayCurrencyGroup,
+  type GovernanceCostDayLaneGroup,
   type GovernanceCostModelGroup,
+  type GovernanceCostProviderGroup,
   type GovernanceCostRollupCellAddress,
   type GovernanceCostRollupRow,
   type GovernanceCostPeriodRecordGroup,
@@ -77,6 +81,23 @@ const str = (value: unknown): string =>
   typeof value === "string" || typeof value === "number" ? String(value) : "";
 const strArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.map((entry) => str(entry)) : [];
+
+function currencyLines(value: unknown): GovernanceCostDayCurrencyGroup[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((line: unknown) => {
+    if (!Array.isArray(line)) return [];
+    const [code, amount, previous, withoutAmount, withoutPrevious]: unknown[] = line;
+    return [
+      {
+        currencyCode: str(code),
+        amountNanoMinor: int(amount),
+        previousAmountNanoMinor: previous == null ? null : Number(previous),
+        cellsWithoutAmount: int(withoutAmount),
+        cellsWithoutPreviousAmount: int(withoutPrevious),
+      },
+    ];
+  });
+}
 
 const CELL_PREDICATE = KEY_COLUMNS.map(
   (column) => `${column} = {${column.toLowerCase()}:String}`,
@@ -150,6 +171,120 @@ function decodeRow(row: Record<string, unknown>): GovernanceCostRollupRow {
     LastEventOccurredAt: int(row.LastEventOccurredAt),
     EventTimestamp: int(row.LatestEventTimestamp),
   };
+}
+
+/** Main's four-layer day read: collapse, carry the day's latest revision, bucket each cell, fold per currency. */
+function daysByLaneQuery(costSourcePredicate: string): string {
+  return `
+        SELECT
+          Day                                   AS Day,
+          CostSource                            AS CostSource,
+          sumOrNull(CurrencyAmountNanoUsd)      AS AmountNanoUsd,
+          sum(CurrencyCellsWithoutAmount)       AS CellsWithoutAmount,
+          arraySort(
+            groupUniqArrayIf(${UNPRICED_CURRENCY_SAMPLE_LIMIT})(
+              CurrencyCode,
+              CurrencyCellsWithoutUsdFigure > 0 AND CurrencyCode != {usd:String}
+            )
+          ) AS CurrenciesWithoutUsdAmount,
+          max(RevisedAt)                        AS RevisedAt,
+          sumOrNull(CurrencyPriorAmountNanoUsd) AS PreviousAmountNanoUsd,
+          sum(CellsWithoutPreviousAmount)       AS CellsWithoutPreviousAmount,
+          max(LastObservedAt)                   AS LastObservedAt,
+          groupArray(
+            tuple(
+              CurrencyCode,
+              CurrencyAmountNanoMinor,
+              CurrencyPriorAmountNanoMinor,
+              CurrencyCellsWithoutAmount,
+              CurrencyCellsWithoutPreviousMinor
+            )
+          ) AS ByCurrency
+        FROM (
+          SELECT
+            Day,
+            CostSource,
+            CurrencyCode,
+            sumOrNull(LatestAmountNanoUsd)        AS CurrencyAmountNanoUsd,
+            sum(LatestAmountNanoMinor)            AS CurrencyAmountNanoMinor,
+            countIf(HoldsNoAmountAtAll)           AS CurrencyCellsWithoutAmount,
+            countIf(LatestAmountNanoUsd IS NULL)  AS CurrencyCellsWithoutUsdFigure,
+            max(LatestRevisedAt)                  AS RevisedAt,
+            sumOrNull(PriorAmountNanoUsd)         AS CurrencyPriorAmountNanoUsd,
+            countIf(PriorAmountNanoUsd IS NULL) AS CellsWithoutPreviousAmount,
+            sumOrNull(PriorAmountNanoMinor)       AS CurrencyPriorAmountNanoMinor,
+            countIf(PriorAmountNanoMinor IS NULL AND NOT CreatedByRevision)
+              AS CurrencyCellsWithoutPreviousMinor,
+            max(LatestLastObservedAt)             AS LastObservedAt
+          FROM (
+            SELECT
+              Day,
+              CostSource,
+              CurrencyCode,
+              LatestAmountNanoUsd,
+              LatestAmountNanoMinor,
+              LatestRevisedAt,
+              LatestLastObservedAt,
+              (${HOLDS_NO_AMOUNT_IN_ANY_CURRENCY_SQL}
+              ) AS HoldsNoAmountAtAll,
+              (CellCreatedAt >= toUnixTimestamp(Day) * 1000)
+                AND (CellCreatedAt < (toUnixTimestamp(Day) + 86400) * 1000)
+                AND ifNull(CellCreatedAt >= DayLatestRevisedAt * 1000, 0)
+                AS CreatedByRevision,
+              if(
+                CreatedByRevision,
+                toNullable(toInt64(0)),
+                if(
+                  ifNull(LatestRevisedAt = DayLatestRevisedAt, 0),
+                  LatestPreviousAmountNanoUsd,
+                  if(
+                    HoldsNoAmountAtAll,
+                    CAST(NULL AS Nullable(Int64)),
+                    ifNull(LatestAmountNanoUsd, toInt64(0))
+                  )
+                )
+              ) AS PriorAmountNanoUsd,
+              if(
+                CreatedByRevision,
+                CAST(NULL AS Nullable(Int64)),
+                if(
+                  ifNull(LatestRevisedAt = DayLatestRevisedAt, 0),
+                  if(
+                    CurrencyCode = {usd:String},
+                    LatestPreviousAmountNanoUsd,
+                    CAST(NULL AS Nullable(Int64))
+                  ),
+                  toNullable(LatestAmountNanoMinor)
+                )
+              ) AS PriorAmountNanoMinor
+            FROM (
+              SELECT
+                *,
+                max(LatestRevisedAt) OVER (PARTITION BY Day, CostSource)
+                  AS DayLatestRevisedAt
+              FROM (
+                SELECT
+                  ${KEY_COLUMNS.join(",\n                  ")},
+                  argMax(tuple(AmountNanoUsd), EventTimestamp).1 AS LatestAmountNanoUsd,
+                  argMax(AmountNanoMinor, EventTimestamp) AS LatestAmountNanoMinor,
+                  argMax(tuple(PreviousAmountNanoUsd), EventTimestamp).1 AS LatestPreviousAmountNanoUsd,
+                  argMax(tuple(toUnixTimestamp(RevisedAt)), EventTimestamp).1 AS LatestRevisedAt,
+                  toUnixTimestamp(argMax(LastObservedAt, EventTimestamp)) AS LatestLastObservedAt,
+                  min(CreatedAt) AS CellCreatedAt
+                FROM ${TABLE}
+                WHERE TenantId = {tenantid:String}
+                  AND Day >= {fromday:Date}
+                  AND Day <= {today:Date}
+                  AND Version = {version:String}
+                  ${costSourcePredicate}
+                GROUP BY ${KEY_COLUMNS.join(", ")}
+              )
+            )
+          )
+          GROUP BY Day, CostSource, CurrencyCode
+        )
+        GROUP BY Day, CostSource
+        ORDER BY Day, CostSource`;
 }
 
 export class ClickHouseGovernanceCostRollupRepository extends GovernanceCostRollupRepository {
@@ -258,6 +393,95 @@ export class ClickHouseGovernanceCostRollupRepository extends GovernanceCostRoll
       amountNanoUsd: row.AmountNanoUsd == null ? null : Number(row.AmountNanoUsd),
       cellsWithoutAmount: int(row.CellsWithoutAmount),
     }));
+  }
+
+  async sumDaysByLane(
+    input: GovernanceCostRollupWindow & { costSource?: string },
+  ): Promise<GovernanceCostDayLaneGroup[]> {
+    const rows = await this.read(input, {
+      query: daysByLaneQuery(input.costSource ? "AND CostSource = {costsource:String}" : ""),
+      params: input.costSource ? { costsource: input.costSource } : {},
+    });
+    return rows.map((row) => ({
+      day: str(row.Day),
+      costSource: str(row.CostSource),
+      amountNanoUsd: row.AmountNanoUsd == null ? null : Number(row.AmountNanoUsd),
+      cellsWithoutAmount: int(row.CellsWithoutAmount),
+      currenciesWithoutUsdAmount: strArray(row.CurrenciesWithoutUsdAmount),
+      revisedAt: row.RevisedAt == null ? null : Number(row.RevisedAt),
+      previousAmountNanoUsd:
+        row.PreviousAmountNanoUsd == null ? null : Number(row.PreviousAmountNanoUsd),
+      cellsWithoutPreviousAmount: int(row.CellsWithoutPreviousAmount),
+      lastObservedAt: int(row.LastObservedAt),
+      byCurrency: currencyLines(row.ByCurrency),
+    }));
+  }
+
+  async sumWindowByProvider(
+    input: GovernanceCostRollupWindow,
+  ): Promise<GovernanceCostProviderGroup[]> {
+    const rows = await this.read(input, {
+      query: `
+        SELECT
+          Provider,
+          sumOrNull(LatestAmountNanoUsd) AS AmountNanoUsd,
+          countIf(${HOLDS_NO_AMOUNT_IN_ANY_CURRENCY_SQL}
+          ) AS CellsWithoutAmount,
+          ${CURRENCIES_WITHOUT_USD_SQL} AS CurrenciesWithoutUsdAmount
+        FROM (${latestPulledCells()}
+        )
+        GROUP BY Provider
+        ORDER BY Provider`,
+    });
+    return rows.map((row) => ({
+      provider: str(row.Provider),
+      amountNanoUsd: row.AmountNanoUsd == null ? null : Number(row.AmountNanoUsd),
+      cellsWithoutAmount: int(row.CellsWithoutAmount),
+      currenciesWithoutUsdAmount: strArray(row.CurrenciesWithoutUsdAmount),
+    }));
+  }
+
+  async sumWindowByCurrency(
+    input: GovernanceCostRollupWindow & { costSource: string },
+  ): Promise<GovernanceCostCurrencyGroup[]> {
+    const rows = await this.read(input, {
+      query: `
+        SELECT
+          CurrencyCode                     AS CurrencyCode,
+          sumOrNull(LatestAmountNanoMinor) AS AmountNanoMinor,
+          countIf(${HOLDS_NO_AMOUNT_IN_ANY_CURRENCY_SQL}
+          ) AS CellsWithoutAmount
+        FROM (${latestPulledCells()}
+        )
+        GROUP BY CurrencyCode
+        ORDER BY CurrencyCode`,
+      params: { costsource: input.costSource },
+    });
+    return rows.map((row) => ({
+      currencyCode: str(row.CurrencyCode),
+      amountNanoMinor: row.AmountNanoMinor == null ? null : Number(row.AmountNanoMinor),
+      cellsWithoutAmount: int(row.CellsWithoutAmount),
+    }));
+  }
+
+  /** Existence needs no dedup pass: any current-version row proves the cell exists. */
+  async hasRowsForSource(
+    input: GovernanceCostRollupWindow & { costSource: string; ingestionSourceId: string },
+  ): Promise<boolean> {
+    const rows = await this.read(input, {
+      query: `
+        SELECT 1 AS RowExists
+        FROM ${TABLE}
+        WHERE TenantId = {tenantid:String}
+          AND Day >= {fromday:Date}
+          AND Day <= {today:Date}
+          AND CostSource = {costsource:String}
+          AND IngestionSourceId = {ingestionsourceid:String}
+          AND Version = {version:String}
+        LIMIT 1`,
+      params: { costsource: input.costSource, ingestionsourceid: input.ingestionSourceId },
+    });
+    return rows.length > 0;
   }
 
   async upsert(row: GovernanceCostRollupRow): Promise<void> {

@@ -166,6 +166,7 @@ import {
   type GovernanceCostModelBreakdown,
   type GovernanceCostPeriodRecordsInput,
   type GovernanceCostProviderDayBreakdown,
+  type GovernanceCostSummary,
   type GovernanceCostWindowInput,
   type GovernanceSpenderBreakdown,
   type PeopleScreenPerson,
@@ -250,6 +251,8 @@ import {
 import { DefaultGovernanceCliBootstrapService } from "../services/governance-cli-tool-bootstrap.service.ts";
 import { GovernanceCliService } from "../services/governance-cli.service.ts";
 import { GovernanceCostBreakdownService } from "../services/governance-cost-breakdown.service.ts";
+import { GovernanceCostNoticesService } from "../services/governance-cost-notices.service.ts";
+import { GovernanceCostSummaryService } from "../services/governance-cost-summary.service.ts";
 import { GovernanceIngestAccessService } from "../services/governance-ingest-access.service.ts";
 import type { GovernanceIngestRateLimiter } from "../services/governance-ingest-rate-limit.service.ts";
 import {
@@ -431,6 +434,7 @@ export interface GovernanceAppDependencies {
     | "findPersonalVirtualKeys"
     | "findVirtualKeyById"
     | "budgetOverviewForUser"
+    | "findSpendDaysForOrganizationProjects"
   >;
   modelProviders: Pick<
     ModelProviderApi,
@@ -692,6 +696,16 @@ export class GovernanceApp implements GovernanceRestApi {
       organizations: dependencies.organizations,
       discoveredAgents: repositories.discoveredAgents,
     });
+    this.costSummary = GovernanceCostSummaryService.create({
+      costRollup: repositories.costRollup,
+      projects: dependencies.projects,
+      gateway: dependencies.gateway,
+      seats: repositories.ocsfEvents,
+      notices: GovernanceCostNoticesService.create({
+        sources: repositories.ingestionSources,
+        costRollup: repositories.costRollup,
+      }),
+    });
     this.costBreakdown = GovernanceCostBreakdownService.create({
       costRollup: repositories.costRollup,
       projects: dependencies.projects,
@@ -910,6 +924,7 @@ export class GovernanceApp implements GovernanceRestApi {
   private readonly people: GovernancePeopleScreenService;
   private readonly agentsScreen: GovernanceAgentsScreenService;
   private readonly costBreakdown: GovernanceCostBreakdownService;
+  private readonly costSummary: GovernanceCostSummaryService;
   private readonly aiTools: DefaultGovernanceAiToolCatalogService;
   private readonly agentSync: GovernanceAgentSyncService;
   private readonly departments: DepartmentService;
@@ -1500,6 +1515,14 @@ export class GovernanceApp implements GovernanceRestApi {
   }
 
   // ── Governance cost (main's governanceCost router, Enterprise-gated per organization) ──
+
+  async governanceCostSummary(
+    input: GovernanceCostWindowInput,
+    by: EntitlementOperator,
+  ): Promise<GovernanceCostSummary> {
+    await this.assertGovernanceCost(input.organizationId, by);
+    return this.costSummary.summary(input);
+  }
 
   async governanceCostDailyByProvider(
     input: GovernanceCostWindowInput,
@@ -2092,6 +2115,7 @@ export class GovernanceApp implements GovernanceRestApi {
     return this.dependencies.gateway.budgetOverviewForUser({
       organizationId: input.organizationId,
       userId: by.id,
+      includeTopModels: input.includeTopModels,
     });
   }
 

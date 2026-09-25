@@ -71,6 +71,7 @@ import type {
   GovernanceCostModelBreakdown,
   GovernanceCostPeriodRecordsInput,
   GovernanceCostProviderDayBreakdown,
+  GovernanceCostSummary,
   GovernanceCostWindowInput,
   GovernanceSpenderBreakdown,
 } from "./governance-cost.ts";
@@ -602,6 +603,10 @@ export interface GovernanceRestApi {
     organizationId: string;
   }): Promise<AgentListingRequestResult>;
   governanceAgentsList(input: { organizationId: string }): Promise<GovernanceAgentRow[]>;
+  governanceCostSummary(
+    input: GovernanceCostWindowInput,
+    by: EntitlementOperator,
+  ): Promise<GovernanceCostSummary>;
   governanceCostDailyByProvider(
     input: GovernanceCostWindowInput,
     by: EntitlementOperator,

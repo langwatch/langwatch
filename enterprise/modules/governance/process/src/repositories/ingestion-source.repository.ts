@@ -48,6 +48,13 @@ export type UnpricedUsageWindow = {
   through: Instant | null;
 };
 
+/** One unarchived source's window pulled while cost recording was off (ADR-088). */
+export type UnpricedUsageSourceWindow = {
+  name: string;
+  since: Instant;
+  through: Instant | null;
+};
+
 export type CursorPinnedUpdate =
   | { outcome: "updated"; source: GovernanceIngestionSource }
   | { outcome: "cursor_moved" };
@@ -71,6 +78,8 @@ export abstract class IngestionSourceRepository {
   ): Promise<GovernanceIngestionSource>;
   abstract getUnpricedUsageWindow(id: string): Promise<UnpricedUsageWindow>;
   abstract updateUnpricedUsageWindow(id: string, window: UnpricedUsageWindow): Promise<void>;
+  /** The organisation's unarchived sources that read a window they could not price. */
+  abstract findUnpricedUsageWindows(organizationId: string): Promise<UnpricedUsageSourceWindow[]>;
   abstract updateIfCursorUnchanged(input: {
     id: string;
     cursor: unknown;

@@ -204,6 +204,7 @@ function mountCli(world: World = {}) {
     governanceAgentsSyncSources: unavailable,
     governanceAgentsRequestListing: unavailable,
     governanceAgentsList: unavailable,
+    governanceCostSummary: unavailable,
     governanceCostDailyByProvider: unavailable,
     governanceCostSpendByModel: unavailable,
     governanceCostPeriodRecords: unavailable,

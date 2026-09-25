@@ -86,6 +86,7 @@ class FakeSourceRepository extends IngestionSourceRepository {
   });
   getUnpricedUsageWindow = vi.fn(async () => ({ since: null, through: null }));
   updateUnpricedUsageWindow = vi.fn(async () => undefined);
+  findUnpricedUsageWindows = vi.fn(async () => []);
   updateIfCursorUnchanged = vi.fn(
     async (input: { update: UpdateIngestionSourceRecord }): Promise<CursorPinnedUpdate> => {
       this.updateInput = input.update;
