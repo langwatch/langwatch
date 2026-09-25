@@ -72,6 +72,189 @@ function hasNumericStatus(error: unknown): error is { status: number } {
   return "status" in error && typeof error.status === "number";
 }
 
+type RunStatus = ReturnType<typeof deriveRunStatus>;
+type ResultRow = { entry: DatasetEntry; evaluations: EvaluationItem[] };
+type EvaluatorStats = {
+  sum: number;
+  count: number;
+  passed: number;
+  failed: number;
+  errored: number;
+};
+
+function isNotFoundError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  let status: number | undefined;
+  if (error instanceof LangWatchApiError) status = error.status;
+  else if (hasNumericStatus(error)) status = error.status;
+  return status === 404 || (status === undefined && /404|not found/i.test(message));
+}
+
+async function fetchRunResults(params: {
+  runId: string;
+  experimentSlug?: string;
+}): Promise<EvaluationRunResults | null> {
+  const search = new URLSearchParams();
+  if (params.experimentSlug) search.set("experimentSlug", params.experimentSlug);
+  const qs = search.toString() ? `?${search.toString()}` : "";
+  return (await makeRequest(
+    "GET",
+    `/api/v1/experiments/runs/${encodeURIComponent(params.runId)}/results${qs}`,
+  )) as EvaluationRunResults;
+}
+
+/** Evaluations grouped by target-scoped row key, keeping only the filtered evaluator. */
+function groupEvaluationsByRow({
+  evaluations,
+  evaluatorFilter,
+}: {
+  evaluations: EvaluationItem[];
+  evaluatorFilter: string | undefined;
+}): Map<string, EvaluationItem[]> {
+  const byRow = new Map<string, EvaluationItem[]>();
+  for (const evaluation of evaluations) {
+    if (evaluatorFilter && evaluation.evaluator !== evaluatorFilter) continue;
+    const key = rowKey(evaluation.index, evaluation.targetId);
+    const list = byRow.get(key) ?? [];
+    list.push(evaluation);
+    byRow.set(key, list);
+  }
+  return byRow;
+}
+
+function tallyEvaluatorStats(rows: ResultRow[]): Map<string, EvaluatorStats> {
+  const averages = new Map<string, EvaluatorStats>();
+  for (const r of rows) {
+    for (const e of r.evaluations) {
+      const stats = averages.get(e.evaluator) ?? {
+        sum: 0,
+        count: 0,
+        passed: 0,
+        failed: 0,
+        errored: 0,
+      };
+      if (typeof e.score === "number") {
+        stats.sum += e.score;
+        stats.count += 1;
+      }
+      if (e.status === "error") stats.errored += 1;
+      else if (e.passed === true) stats.passed += 1;
+      else if (e.passed === false) stats.failed += 1;
+      averages.set(e.evaluator, stats);
+    }
+  }
+  return averages;
+}
+
+function headerLines({
+  results,
+  runStatus,
+  filter,
+  evaluatorFilter,
+}: {
+  results: EvaluationRunResults;
+  runStatus: RunStatus;
+  filter: "all" | "failed";
+  evaluatorFilter: string | undefined;
+}): string[] {
+  const lines: string[] = [];
+  lines.push(`# Evaluation Results: ${results.runId}`);
+  lines.push("");
+  lines.push(`**Experiment**: ${results.experimentId}`);
+  lines.push(`**Status**: ${runStatus}`);
+  if (typeof results.total === "number" && results.total > 0) {
+    lines.push(`**Progress**: ${results.progress ?? results.dataset.length}/${results.total} rows`);
+  }
+  lines.push(`**Total rows**: ${results.dataset.length}`);
+  lines.push(`**Total evaluations**: ${results.evaluations.length}`);
+  if (filter === "failed") lines.push(`**Filter**: failed only`);
+  if (evaluatorFilter) lines.push(`**Evaluator filter**: ${evaluatorFilter}`);
+  if (!isTerminalStatus(runStatus)) {
+    lines.push("");
+    lines.push(
+      runStatus === "interrupted"
+        ? "> These are partial results. The run never sent a finished/stopped marker and has had no updates recently, so it likely was interrupted before completing. The rows below are everything recorded so far."
+        : "> These are partial results. The run is still in progress, so more rows may appear on a later call.",
+    );
+  }
+  lines.push("");
+  return lines;
+}
+
+function evaluatorSummaryLines(averages: Map<string, EvaluatorStats>): string[] {
+  if (averages.size === 0) return [];
+  const lines = [
+    "## Evaluator Summary",
+    "",
+    "| Evaluator | Avg Score | Passed | Failed | Errored |",
+    "| --- | --- | --- | --- | --- |",
+  ];
+  for (const [name, stats] of averages) {
+    const avg = stats.count > 0 ? (stats.sum / stats.count).toFixed(3) : "—";
+    lines.push(`| ${name} | ${avg} | ${stats.passed} | ${stats.failed} | ${stats.errored} |`);
+  }
+  lines.push("");
+  return lines;
+}
+
+function noRowsLine({ filter, runStatus }: { filter: "all" | "failed"; runStatus: RunStatus }) {
+  if (filter === "failed") return "_No rows matched the filter._";
+  if (runStatus === "running")
+    return "_No rows recorded yet. The run is still in progress; call again shortly._";
+  if (runStatus === "interrupted") return "_No rows were recorded before the run was interrupted._";
+  return "_No rows recorded for this run._";
+}
+
+function evaluationLines(e: EvaluationItem): string[] {
+  const parts: string[] = [`**${e.evaluator}**`];
+  if (e.status === "error") parts.push("status=error");
+  else if (typeof e.score === "number") parts.push(`score=${e.score.toFixed(3)}`);
+  if (typeof e.passed === "boolean") parts.push(`passed=${e.passed ? "yes" : "no"}`);
+  if (e.label) parts.push(`label=${e.label}`);
+  const lines = [`- ${parts.join(" · ")}`];
+  if (e.details) lines.push(`  - details: ${e.details}`);
+  return lines;
+}
+
+function rowLines({
+  row: { entry, evaluations },
+  anyEvaluators,
+}: {
+  row: ResultRow;
+  anyEvaluators: boolean;
+}): string[] {
+  const summary = summarizeEntry(entry.entry);
+  const lines = [`### Row #${entry.index}${summary ? ` — ${summary}` : ""}`];
+  if (entry.error) lines.push(`- **Error**: ${entry.error}`);
+  if (entry.traceId) lines.push(`- **Trace ID**: \`${entry.traceId}\``);
+  if (evaluations.length === 0) {
+    lines.push(
+      anyEvaluators ? "- _No evaluations recorded for this row_" : "- _No evaluations recorded_",
+    );
+  }
+  for (const e of evaluations) lines.push(...evaluationLines(e));
+  lines.push("");
+  return lines;
+}
+
+function notFoundReport({ runId, expired }: { runId: string; expired: boolean }): string {
+  const lines = [`# Evaluation Results: ${runId}`, "", "**Status**: not found", ""];
+  if (expired) {
+    lines.push(
+      `Could not load results for run \`${runId}\`. The run id may be incorrect, or its run state may have expired (Redis keeps it for 24h).`,
+      "",
+      "> Pass `experimentSlug` to load results for runs older than 24h. Discover the slug with `platform_experiment_list`, then `platform_experiment_list_runs` for the run ids.",
+    );
+  } else {
+    lines.push(
+      `Could not load results for run \`${runId}\`.`,
+      "",
+      "> Pass `experimentSlug` if the run is older than 24h. Discover the slug with `platform_experiment_list`, then `platform_experiment_list_runs` to confirm the run id.",
+    );
+  }
+  return lines.join("\n");
+}
+
 export async function handleExperimentResults(params: {
   runId: string;
   experimentSlug?: string;
@@ -86,205 +269,55 @@ export async function handleExperimentResults(params: {
       ? Math.min(params.limit, DEFAULT_ROW_CAP)
       : DEFAULT_ROW_CAP;
 
-  const search = new URLSearchParams();
-  if (params.experimentSlug) search.set("experimentSlug", params.experimentSlug);
-  const qs = search.toString() ? `?${search.toString()}` : "";
-
   let results: EvaluationRunResults | null;
   try {
-    results = (await makeRequest(
-      "GET",
-      `/api/v1/experiments/runs/${encodeURIComponent(params.runId)}/results${qs}`,
-    )) as EvaluationRunResults;
+    results = await fetchRunResults(params);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    let status: number | undefined;
-    if (error instanceof LangWatchApiError) status = error.status;
-    else if (hasNumericStatus(error)) status = error.status;
-    if (status === 404 || (status === undefined && /404|not found/i.test(message))) {
-      return [
-        `# Evaluation Results: ${params.runId}`,
-        "",
-        "**Status**: not found",
-        "",
-        `Could not load results for run \`${params.runId}\`. The run id may be incorrect, or its run state may have expired (Redis keeps it for 24h).`,
-        "",
-        "> Pass `experimentSlug` to load results for runs older than 24h. Discover the slug with `platform_experiment_list`, then `platform_experiment_list_runs` for the run ids.",
-      ].join("\n");
-    }
+    if (isNotFoundError(error)) return notFoundReport({ runId: params.runId, expired: true });
     throw error;
   }
+  if (!results) return notFoundReport({ runId: params.runId, expired: false });
 
-  if (!results) {
-    return [
-      `# Evaluation Results: ${params.runId}`,
-      "",
-      "**Status**: not found",
-      "",
-      `Could not load results for run \`${params.runId}\`.`,
-      "",
-      "> Pass `experimentSlug` if the run is older than 24h. Discover the slug with `platform_experiment_list`, then `platform_experiment_list_runs` to confirm the run id.",
-    ].join("\n");
-  }
-
-  // Partial results are served even while the run is still in progress.
-  // Rows land in ClickHouse incrementally, so a "running" or "interrupted"
-  // run can still expose every row recorded so far. A run only fails to set
-  // finished_at/stopped_at when the SDK process dies before flushing, but the
-  // rows it did log are still useful, so we never gate on a terminal status.
+  // Partial results are served while the run is in progress: rows land
+  // incrementally, and a run whose SDK died before flushing still has useful
+  // rows, so we never gate on a terminal status.
   const runStatus = deriveRunStatus(results.timestamps);
-  const partial = !isTerminalStatus(runStatus);
-
-  // Group evaluations by target-scoped row key, applying evaluator filter.
-  const evaluationsByRow = new Map<string, EvaluationItem[]>();
-  for (const evaluation of results.evaluations) {
-    if (evaluatorFilter && evaluation.evaluator !== evaluatorFilter) continue;
-    const key = rowKey(evaluation.index, evaluation.targetId);
-    const list = evaluationsByRow.get(key) ?? [];
-    list.push(evaluation);
-    evaluationsByRow.set(key, list);
-  }
-
-  const evaluatorNames = Array.from(
-    new Set(
-      (evaluatorFilter
-        ? results.evaluations.filter((e) => e.evaluator === evaluatorFilter)
-        : results.evaluations
-      ).map((e) => e.evaluator),
-    ),
+  const evaluationsByRow = groupEvaluationsByRow({
+    evaluations: results.evaluations,
+    evaluatorFilter,
+  });
+  const evaluatorNames = new Set(
+    (evaluatorFilter
+      ? results.evaluations.filter((e) => e.evaluator === evaluatorFilter)
+      : results.evaluations
+    ).map((e) => e.evaluator),
   );
 
-  let rows = results.dataset.map((entry) => ({
+  const allRows: ResultRow[] = results.dataset.map((entry) => ({
     entry,
     evaluations: evaluationsByRow.get(rowKey(entry.index, entry.targetId)) ?? [],
   }));
+  // The summary covers the filtered rows before truncation.
+  const matching = filter === "failed" ? allRows.filter((r) => isFailedRow(r)) : allRows;
+  const truncated = matching.length > limit;
+  const rows = matching.slice(0, limit);
 
-  if (filter === "failed") {
-    rows = rows.filter((r) => isFailedRow({ entry: r.entry, evaluations: r.evaluations }));
-  }
-
-  const totalMatching = rows.length;
-  const rowsForSummary = rows;
-  const truncated = rows.length > limit;
-  rows = rows.slice(0, limit);
-
-  // Per-evaluator stats across the filtered rows (before truncation),
-  // so the summary matches the displayed subset when filter="failed".
-  const evaluatorAverages = new Map<
-    string,
-    { sum: number; count: number; passed: number; failed: number; errored: number }
-  >();
-  for (const r of rowsForSummary) {
-    for (const e of r.evaluations) {
-      const stats = evaluatorAverages.get(e.evaluator) ?? {
-        sum: 0,
-        count: 0,
-        passed: 0,
-        failed: 0,
-        errored: 0,
-      };
-      if (typeof e.score === "number") {
-        stats.sum += e.score;
-        stats.count += 1;
-      }
-      if (e.status === "error") stats.errored += 1;
-      else if (e.passed === true) stats.passed += 1;
-      else if (e.passed === false) stats.failed += 1;
-      evaluatorAverages.set(e.evaluator, stats);
-    }
-  }
-
-  const lines: string[] = [];
-  lines.push(`# Evaluation Results: ${results.runId}`);
-  lines.push("");
-  lines.push(`**Experiment**: ${results.experimentId}`);
-  lines.push(`**Status**: ${runStatus}`);
-  if (typeof results.total === "number" && results.total > 0) {
-    lines.push(`**Progress**: ${results.progress ?? results.dataset.length}/${results.total} rows`);
-  }
-  lines.push(`**Total rows**: ${results.dataset.length}`);
-  lines.push(`**Total evaluations**: ${results.evaluations.length}`);
-  if (filter === "failed") {
-    lines.push(`**Filter**: failed only`);
-  }
-  if (evaluatorFilter) {
-    lines.push(`**Evaluator filter**: ${evaluatorFilter}`);
-  }
-  if (partial) {
-    lines.push("");
-    lines.push(
-      runStatus === "interrupted"
-        ? "> These are partial results. The run never sent a finished/stopped marker and has had no updates recently, so it likely was interrupted before completing. The rows below are everything recorded so far."
-        : "> These are partial results. The run is still in progress, so more rows may appear on a later call.",
-    );
-  }
-  lines.push("");
-
-  if (evaluatorAverages.size > 0) {
-    lines.push("## Evaluator Summary");
-    lines.push("");
-    lines.push("| Evaluator | Avg Score | Passed | Failed | Errored |");
-    lines.push("| --- | --- | --- | --- | --- |");
-    for (const [name, stats] of evaluatorAverages) {
-      const avg = stats.count > 0 ? (stats.sum / stats.count).toFixed(3) : "—";
-      lines.push(`| ${name} | ${avg} | ${stats.passed} | ${stats.failed} | ${stats.errored} |`);
-    }
-    lines.push("");
-  }
-
+  const lines = [
+    ...headerLines({ results, runStatus, filter, evaluatorFilter }),
+    ...evaluatorSummaryLines(tallyEvaluatorStats(matching)),
+  ];
   if (rows.length === 0) {
-    if (filter === "failed") {
-      lines.push("_No rows matched the filter._");
-    } else if (runStatus === "running") {
-      lines.push("_No rows recorded yet. The run is still in progress; call again shortly._");
-    } else if (runStatus === "interrupted") {
-      lines.push("_No rows were recorded before the run was interrupted._");
-    } else {
-      lines.push("_No rows recorded for this run._");
-    }
+    lines.push(noRowsLine({ filter, runStatus }));
     return lines.join("\n");
   }
 
-  lines.push(`## Rows (${rows.length}${truncated ? ` of ${totalMatching}` : ""})`);
+  lines.push(`## Rows (${rows.length}${truncated ? ` of ${matching.length}` : ""})`);
   lines.push("");
-
-  for (const { entry, evaluations } of rows) {
-    const summary = summarizeEntry(entry.entry);
-    lines.push(`### Row #${entry.index}${summary ? ` — ${summary}` : ""}`);
-    if (entry.error) {
-      lines.push(`- **Error**: ${entry.error}`);
-    }
-    if (entry.traceId) {
-      lines.push(`- **Trace ID**: \`${entry.traceId}\``);
-    }
-    if (evaluations.length === 0) {
-      lines.push(
-        evaluatorNames.length === 0
-          ? "- _No evaluations recorded_"
-          : "- _No evaluations recorded for this row_",
-      );
-    }
-    for (const e of evaluations) {
-      const parts: string[] = [`**${e.evaluator}**`];
-      if (e.status === "error") parts.push("status=error");
-      else if (typeof e.score === "number") parts.push(`score=${e.score.toFixed(3)}`);
-      if (typeof e.passed === "boolean") {
-        parts.push(`passed=${e.passed ? "yes" : "no"}`);
-      }
-      if (e.label) parts.push(`label=${e.label}`);
-      lines.push(`- ${parts.join(" · ")}`);
-      if (e.details) {
-        lines.push(`  - details: ${e.details}`);
-      }
-    }
-    lines.push("");
-  }
-
+  for (const row of rows) lines.push(...rowLines({ row, anyEvaluators: evaluatorNames.size > 0 }));
   if (truncated) {
     lines.push(
-      `> Output truncated to ${limit} rows of ${totalMatching} matching to protect the agent's context window. Pass \`limit\` to expand or filter further.`,
+      `> Output truncated to ${limit} rows of ${matching.length} matching to protect the agent's context window. Pass \`limit\` to expand or filter further.`,
     );
   }
-
   return lines.join("\n");
 }

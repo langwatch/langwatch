@@ -280,6 +280,48 @@ const slugToSchemaName = (slug: string): string => {
   return slug.replace(/\//g, "_");
 };
 
+type BraceScan = { inString: boolean; stringChar: string; escaped: boolean };
+
+/** Steps over one character of string or escape syntax; true when the character was one. */
+const skipsStringChar = (scan: BraceScan, char: string): boolean => {
+  if (scan.escaped) {
+    scan.escaped = false;
+    return true;
+  }
+  if (char === "\\") {
+    scan.escaped = true;
+    return true;
+  }
+  if (!scan.inString && (char === '"' || char === "'" || char === "`")) {
+    scan.inString = true;
+    scan.stringChar = char;
+    return true;
+  }
+  if (!scan.inString) return false;
+  if (char === scan.stringChar) scan.inString = false;
+  return true;
+};
+
+/** The index just past the brace that closes the one at `startIndex`, skipping string contents. */
+const closingBraceEnd = ({
+  content,
+  startIndex,
+}: {
+  content: string;
+  startIndex: number;
+}): number => {
+  const scan: BraceScan = { inString: false, stringChar: "", escaped: false };
+  let braceCount = 0;
+  for (let i = startIndex; i < content.length; i++) {
+    const char = content[i];
+    if (skipsStringChar(scan, char)) continue;
+    if (char === "{") braceCount++;
+    if (char === "}") braceCount--;
+    if (braceCount === 0) return i + 1;
+  }
+  return startIndex;
+};
+
 const generateOpenAPISpec = async (): Promise<void> => {
   console.log(`Fetching evaluators from ${EVALUATORS_URL}...`);
 
@@ -297,49 +339,9 @@ const generateOpenAPISpec = async (): Promise<void> => {
     throw new Error("Could not find AVAILABLE_EVALUATORS in the file");
   }
 
-  // Find the matching closing brace by counting braces
-  let braceCount = 0;
-  let startIndex = startMatch.index + startMatch[0].length - 1; // Position of opening brace
-  let endIndex = startIndex;
-  let inString = false;
-  let stringChar = "";
-  let escaped = false;
-
-  for (let i = startIndex; i < content.length; i++) {
-    const char = content[i];
-
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-
-    if (char === "\\") {
-      escaped = true;
-      continue;
-    }
-
-    if (!inString && (char === '"' || char === "'" || char === "`")) {
-      inString = true;
-      stringChar = char;
-      continue;
-    }
-
-    if (inString && char === stringChar) {
-      inString = false;
-      continue;
-    }
-
-    if (!inString) {
-      if (char === "{") braceCount++;
-      if (char === "}") braceCount--;
-
-      if (braceCount === 0) {
-        endIndex = i + 1;
-        break;
-      }
-    }
-  }
-
+  // Position of the opening brace
+  const startIndex = startMatch.index + startMatch[0].length - 1;
+  const endIndex = closingBraceEnd({ content, startIndex });
   const objectStr = content.slice(startIndex, endIndex);
 
   // Convert the TypeScript object literal to JSON-compatible format

@@ -111,6 +111,28 @@ function firstString(raw, keys) {
   return [void 0, void 0];
 }
 
+/** The first time key holding a valid time, as [date, key]; [undefined, undefined] when none. */
+function readTime(raw) {
+  for (const key of TIME_KEYS) {
+    const value = raw[key];
+    if (typeof value === "number") return [epochToDate(value), key];
+    if (typeof value !== "string") continue;
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return [parsed, key];
+  }
+  return [void 0, void 0];
+}
+
+/** The first level key holding a known level, as [level, key]; ["", undefined] when none. */
+function readLevel(raw) {
+  for (const key of LEVEL_KEYS) {
+    const value = raw[key];
+    if (typeof value === "string" && normalizeLevel(value)) return [normalizeLevel(value), key];
+    if (typeof value === "number" && NUMERIC_LEVELS[value]) return [NUMERIC_LEVELS[value], key];
+  }
+  return ["", void 0];
+}
+
 /** Reads one line as the shared structured format; null for anything else. */
 export function parse(line) {
   const trimmed = line.trim();
@@ -125,38 +147,10 @@ export function parse(line) {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return null;
 
   const used = new Set();
-  let at;
-  for (const key of TIME_KEYS) {
-    const value = raw[key];
-    if (typeof value === "string") {
-      const parsed = new Date(value);
-      const timestamp = parsed.getTime();
-      if (!Number.isNaN(timestamp)) {
-        at = parsed;
-        used.add(key);
-        break;
-      }
-    } else if (typeof value === "number") {
-      at = epochToDate(value);
-      used.add(key);
-      break;
-    }
-  }
-
-  let level = "";
-  for (const key of LEVEL_KEYS) {
-    const value = raw[key];
-    if (typeof value === "string" && normalizeLevel(value)) {
-      level = normalizeLevel(value);
-      used.add(key);
-      break;
-    }
-    if (typeof value === "number" && NUMERIC_LEVELS[value]) {
-      level = NUMERIC_LEVELS[value];
-      used.add(key);
-      break;
-    }
-  }
+  const [at, timeKey] = readTime(raw);
+  if (timeKey) used.add(timeKey);
+  const [level, levelKey] = readLevel(raw);
+  if (levelKey) used.add(levelKey);
 
   const [message, messageKey] = firstString(raw, MESSAGE_KEYS);
   if (messageKey) used.add(messageKey);

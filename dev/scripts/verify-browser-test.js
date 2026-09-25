@@ -43,6 +43,69 @@ function getAppPort() {
   return 5560;
 }
 
+/** Fills the onboarding form and clicks through to its end. */
+async function completeOnboarding(page) {
+  console.log("Step 4: Completing onboarding...");
+  await page.getByPlaceholder("Company Name").fill("Browser Test Org");
+  await page.getByText("I agree to the LangWatch").click();
+  await page.screenshot({
+    path: path.join(SCREENSHOT_DIR, "04-onboarding-filled.png"),
+    fullPage: true,
+  });
+  console.log("  -> Screenshot: 04-onboarding-filled.png");
+
+  const nextBtn = page.getByRole("button", { name: "Next" });
+  const finishBtn = page.getByRole("button", { name: "Finish" });
+  const nextVisible = await nextBtn.isVisible().catch(() => false);
+  if (nextVisible) {
+    await nextBtn.click();
+    await page.waitForTimeout(2000);
+    await stepThroughOnboarding(page);
+  } else {
+    const finishVisible = await finishBtn.isVisible().catch(() => false);
+    if (finishVisible) {
+      await finishBtn.click();
+    }
+  }
+  await page.waitForTimeout(3000);
+}
+
+/** Clicks Finish when it is enabled, else Skip or Next, for at most five steps. */
+async function stepThroughOnboarding(page) {
+  for (let i = 0; i < 5; i++) {
+    const finishVisible = await page
+      .getByRole("button", { name: "Finish" })
+      .isVisible()
+      .catch(() => false);
+    if (finishVisible) {
+      const finishDisabled = await page.getByRole("button", { name: "Finish" }).isDisabled();
+      if (!finishDisabled) {
+        await page.getByRole("button", { name: "Finish" }).click();
+        return;
+      }
+    }
+    const skipVisible = await page
+      .getByRole("button", { name: "Skip" })
+      .isVisible()
+      .catch(() => false);
+    if (skipVisible) {
+      await page.getByRole("button", { name: "Skip" }).click();
+      await page.waitForTimeout(2000);
+      continue;
+    }
+    const nextStepVisible = await page
+      .getByRole("button", { name: "Next" })
+      .isVisible()
+      .catch(() => false);
+    if (nextStepVisible) {
+      await page.getByRole("button", { name: "Next" }).click();
+      await page.waitForTimeout(2000);
+      continue;
+    }
+    return;
+  }
+}
+
 async function main() {
   const port = getAppPort();
   const baseUrl = `http://localhost:${port}`;
@@ -129,61 +192,7 @@ async function main() {
       .isVisible()
       .catch(() => false);
     if (isOnboarding) {
-      console.log("Step 4: Completing onboarding...");
-      await page.getByPlaceholder("Company Name").fill("Browser Test Org");
-      await page.getByText("I agree to the LangWatch").click();
-      await page.screenshot({
-        path: path.join(SCREENSHOT_DIR, "04-onboarding-filled.png"),
-        fullPage: true,
-      });
-      console.log("  -> Screenshot: 04-onboarding-filled.png");
-
-      const nextBtn = page.getByRole("button", { name: "Next" });
-      const finishBtn = page.getByRole("button", { name: "Finish" });
-      const nextVisible = await nextBtn.isVisible().catch(() => false);
-      if (nextVisible) {
-        await nextBtn.click();
-        await page.waitForTimeout(2000);
-        // Try to finish or skip remaining steps
-        for (let i = 0; i < 5; i++) {
-          const finishVisible = await page
-            .getByRole("button", { name: "Finish" })
-            .isVisible()
-            .catch(() => false);
-          if (finishVisible) {
-            const finishDisabled = await page.getByRole("button", { name: "Finish" }).isDisabled();
-            if (!finishDisabled) {
-              await page.getByRole("button", { name: "Finish" }).click();
-              break;
-            }
-          }
-          const skipVisible = await page
-            .getByRole("button", { name: "Skip" })
-            .isVisible()
-            .catch(() => false);
-          if (skipVisible) {
-            await page.getByRole("button", { name: "Skip" }).click();
-            await page.waitForTimeout(2000);
-            continue;
-          }
-          const nextStepVisible = await page
-            .getByRole("button", { name: "Next" })
-            .isVisible()
-            .catch(() => false);
-          if (nextStepVisible) {
-            await page.getByRole("button", { name: "Next" }).click();
-            await page.waitForTimeout(2000);
-            continue;
-          }
-          break;
-        }
-      } else {
-        const finishVisible = await finishBtn.isVisible().catch(() => false);
-        if (finishVisible) {
-          await finishBtn.click();
-        }
-      }
-      await page.waitForTimeout(3000);
+      await completeOnboarding(page);
     } else {
       console.log("Step 4: No onboarding (user already set up)");
     }

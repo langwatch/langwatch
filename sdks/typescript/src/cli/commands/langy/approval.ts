@@ -367,81 +367,118 @@ export function askBox<TValue, TAnswer = TValue>({
   /** What Escape answers with. Left out, Escape does nothing. */
   escape?: { answer: TAnswer };
 }): OpenBox<TAnswer> {
-  let selected = 0;
-  let settled = false;
-  let stopKeys: () => void = () => undefined;
   let deliver: (value: TAnswer | null) => void = () => undefined;
   const answer = new Promise<TAnswer | null>((resolve) => {
     deliver = resolve;
   });
+  const box = new BoxSession<TValue, TAnswer>({ card, writer, width, settle, escape, deliver });
+  box.stopKeys = keys.listen((key) => box.onKey(key));
 
-  const paint = (): void => {
-    writer.draw?.(renderBox({ card, selected, width: width() }), "box");
-  };
-
-  /** Takes the box off the screen, so what follows is typed on a clean line. */
-  const closeScreen = (): boolean => {
-    if (settled) return false;
-    settled = true;
-    stopKeys();
-    writer.erase?.("box");
-    return true;
-  };
-
-  const confirm = (): void => {
-    const option = card.options[selected];
-    if (!option || !closeScreen()) return;
-    if (!settle) {
-      deliver(option.value as unknown as TAnswer);
-      return;
-    }
-    void Promise.resolve(settle(option.value)).then(deliver);
-  };
-
-  const move = (step: number): void => {
-    selected = (selected + step + card.options.length) % card.options.length;
-    paint();
-  };
-
-  stopKeys = keys.listen((key) => {
-    if (settled) return;
-    if (key.ctrl === true && key.name === "c") return;
-    switch (key.name) {
-      case "up":
-      case "k":
-        move(-1);
-        return;
-      case "down":
-      case "j":
-        move(1);
-        return;
-      case "escape":
-        if (escape && closeScreen()) deliver(escape.answer);
-        return;
-      case "return":
-      case "enter":
-        confirm();
-        return;
-      default:
-        break;
-    }
-    // A number answers on its own, the way a coding agent's own permission
-    // dialog does: the option it names is the option that is taken.
-    const digit = Number(key.name ?? key.sequence ?? "");
-    if (Number.isInteger(digit) && digit >= 1 && digit <= card.options.length) {
-      selected = digit - 1;
-      paint();
-      confirm();
-    }
-  });
-
-  paint();
+  box.paint();
   return {
     answer,
     close: () => {
-      if (closeScreen()) deliver(null);
+      if (box.closeScreen()) deliver(null);
     },
   };
+}
+
+/** One open box: which option is selected, and whether it has been answered. */
+class BoxSession<TValue, TAnswer> {
+  private selected = 0;
+  private settled = false;
+  stopKeys: () => void = () => undefined;
+  private readonly card: BoxCard<TValue>;
+  private readonly writer: UiWriter;
+  private readonly width: () => number;
+  private readonly settle?: (value: TValue) => TAnswer | Promise<TAnswer>;
+  private readonly escape?: { answer: TAnswer };
+  private readonly deliver: (value: TAnswer | null) => void;
+
+  constructor(args: {
+    card: BoxCard<TValue>;
+    writer: UiWriter;
+    width: () => number;
+    settle?: (value: TValue) => TAnswer | Promise<TAnswer>;
+    escape?: { answer: TAnswer };
+    deliver: (value: TAnswer | null) => void;
+  }) {
+    this.card = args.card;
+    this.writer = args.writer;
+    this.width = args.width;
+    this.settle = args.settle;
+    this.escape = args.escape;
+    this.deliver = args.deliver;
+  }
+
+  paint(): void {
+    this.writer.draw?.(
+      renderBox({ card: this.card, selected: this.selected, width: this.width() }),
+      "box",
+    );
+  }
+
+  /** Takes the box off the screen, so what follows is typed on a clean line. */
+  closeScreen(): boolean {
+    if (this.settled) return false;
+    this.settled = true;
+    this.stopKeys();
+    this.writer.erase?.("box");
+    return true;
+  }
+
+  onKey(key: KeyEvent): void {
+    if (this.settled) return;
+    if (key.ctrl === true && key.name === "c") return;
+    if (this.onNamedKey(key.name)) return;
+    // A number answers on its own, the way a coding agent's own permission
+    // dialog does: the option it names is the option that is taken.
+    const digit = Number(key.name ?? key.sequence ?? "");
+    if (Number.isInteger(digit) && digit >= 1 && digit <= this.card.options.length) {
+      this.selected = digit - 1;
+      this.paint();
+      this.confirm();
+    }
+  }
+
+  /** Handles a movement, escape or confirm key; false for any other. */
+  private onNamedKey(name: KeyEvent["name"]): boolean {
+    switch (name) {
+      case "up":
+      case "k":
+        this.move(-1);
+        return true;
+      case "down":
+      case "j":
+        this.move(1);
+        return true;
+      case "escape":
+        if (this.escape && this.closeScreen()) this.deliver(this.escape.answer);
+        return true;
+      case "return":
+      case "enter":
+        this.confirm();
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  private confirm(): void {
+    const option = this.card.options[this.selected];
+    if (!option || !this.closeScreen()) return;
+    if (!this.settle) {
+      this.deliver(option.value as unknown as TAnswer);
+      return;
+    }
+    void Promise.resolve(this.settle(option.value)).then(this.deliver);
+  }
+
+  private move(step: number): void {
+    const count = this.card.options.length;
+    this.selected = (this.selected + step + count) % count;
+    this.paint();
+  }
 }
 
 /** Draws one permission ask and reads the answer. Exported so a test can drive it. */

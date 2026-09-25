@@ -245,34 +245,49 @@ const importKind = (name, declared) => {
   return declared.type.has(name) ? "TYPE-ONLY" : "ABSENT";
 };
 
+/** Value names in one import list that nothing declares as a value, or the entry does not export. */
+const findUnresolvedNames = ({ specifiers, declared, surface }) => {
+  const names = [];
+  for (const part of specifiers.split(",")) {
+    const raw = part.trim();
+    if (!raw || /^type\s/.test(raw)) continue;
+    const name = raw.split(/\s+as\s+/)[0].trim();
+    const exported = surface ? surface.has(name) : true;
+    if (!(declared.value.has(name) && exported)) names.push(name);
+  }
+  return names;
+};
+
+/** The unresolvable named imports one source file makes from workspace packages. */
+const findFileUnresolvable = ({ file, src, declared, workspace, surfaces }) => {
+  const rows = [];
+  for (const m of src.matchAll(/import\s+\{([^}]*)\}\s*from\s*["'](@langwatch\/[^"']+)["']/g)) {
+    if (isGeneratedPackage(m[2])) continue;
+    const pkg = packageOf(m[2]);
+    if (workspace && !workspace.has(pkg)) continue;
+    // A subpath carries its own export map, which this does not read, so only
+    // the bare entry can be judged for NOT-EXPORTED.
+    const surface = m[2] === pkg ? surfaces?.get(pkg) : undefined;
+    const line = src.slice(0, m.index).split("\n").length;
+    for (const name of findUnresolvedNames({ specifiers: m[1], declared, surface })) {
+      rows.push({
+        file,
+        name,
+        from: m[2],
+        line,
+        kind: importKind(name, declared),
+        candidates: proposals(name, declared),
+      });
+    }
+  }
+  return rows;
+};
+
 export const findUnresolvable = (sources, workspace, surfaces) => {
   const declared = collectDeclarations(sources);
   const rows = [];
   for (const [file, src] of sources) {
-    for (const m of src.matchAll(/import\s+\{([^}]*)\}\s*from\s*["'](@langwatch\/[^"']+)["']/g)) {
-      if (isGeneratedPackage(m[2])) continue;
-      const pkg = packageOf(m[2]);
-      if (workspace && !workspace.has(pkg)) continue;
-      // A subpath carries its own export map, which this does not read, so only
-      // the bare entry can be judged for NOT-EXPORTED.
-      const surface = m[2] === pkg ? surfaces?.get(pkg) : undefined;
-      for (const part of m[1].split(",")) {
-        const raw = part.trim();
-        if (!raw || /^type\s/.test(raw)) continue;
-        const name = raw.split(/\s+as\s+/)[0].trim();
-        const declaredAsValue = declared.value.has(name);
-        const exported = surface ? surface.has(name) : true;
-        if (declaredAsValue && exported) continue;
-        rows.push({
-          file,
-          name,
-          from: m[2],
-          line: src.slice(0, m.index).split("\n").length,
-          kind: importKind(name, declared),
-          candidates: proposals(name, declared),
-        });
-      }
-    }
+    rows.push(...findFileUnresolvable({ file, src, declared, workspace, surfaces }));
   }
   return rows;
 };

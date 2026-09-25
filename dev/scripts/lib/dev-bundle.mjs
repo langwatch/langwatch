@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { builtinModules, createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { OPTIONAL_EXTERNALS } from "@langwatch/scenario-child/bundle-optional-externals";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -114,18 +115,20 @@ function findUndeclaredExternals({ appDir, metafile, workspaceBundled, builtins 
   for (const output of Object.values(metafile.outputs)) {
     for (const imported of output.imports) {
       if (!imported.external) continue;
-      const id = imported.path;
-      const base = basePackage(id);
-      if (id.startsWith("node:")) continue;
-      if (builtins.has(base)) continue;
-      if (id === ".prisma" || id.startsWith(".prisma/")) continue;
-      if (declared.has(base)) continue;
-      if (workspaceBundled.has(base)) continue;
-      if (optional.has(base)) continue;
-      undeclared.add(base);
+      const known = [builtins, declared, workspaceBundled, optional];
+      if (isProvided({ id: imported.path, known })) continue;
+      undeclared.add(basePackage(imported.path));
     }
   }
   return undeclared;
+}
+
+/** True when an external id is a node builtin, the Prisma client, or a package already known. */
+function isProvided({ id, known }) {
+  if (id.startsWith("node:")) return true;
+  if (id === ".prisma" || id.startsWith(".prisma/")) return true;
+  const base = basePackage(id);
+  return known.some((names) => names.has(base));
 }
 
 function readAppPkg(appDir) {

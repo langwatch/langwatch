@@ -105,86 +105,21 @@ export const exportTracesCommand = async (options: {
   try {
     events.started(`Exporting traces as ${format}…`);
 
-    const traces: ExportedTrace[] = [];
-    let matched = 0;
-    let scrollId: string | undefined;
-
-    // Page until the requested limit is met or the result set is exhausted.
-    // The cursor is authoritative for "there may be more"; a page shorter than
-    // requested only ends the walk when the shortfall is not accounted for by
-    // server-side `skipped` rows (traces dropped because they failed to
-    // serialize), since the cursor advances past those.
-    for (;;) {
-      const pageSize = Math.min(
-        limit - traces.length,
-        options.includeSpans ? SPANS_PAGE_CAP : SERVER_PAGE_CAP,
-      );
-
-      const response = await langwatchFetch(`${endpoint}/api/v1/traces/search`, {
-        method: "POST",
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-        headers: {
-          "Content-Type": "application/json",
-          ...cliAuthHeaders({ apiKey }),
-        },
-        body: JSON.stringify({
-          query: options.query,
-          startDate,
-          endDate,
-          pageSize,
-          format: "json",
-          ...(options.includeSpans ? { includeSpans: true } : {}),
-          ...(scrollId ? { scrollId } : {}),
-          ...(Object.keys(filters).length > 0 ? { filters } : {}),
-        }),
-      });
-
-      if (!response.ok) {
-        // Read the body off a CLONE before `formatFetchError` consumes it, so the
-        // event keeps the platform's real error kind instead of degrading to one
-        // guessed from the status.
-        const body: unknown = await response
-          .clone()
-          .json()
-          .catch(() => undefined);
-
-        const message = await formatFetchError(response);
-        events.failed({
-          error: Object.assign(new Error(message), {
-            status: response.status,
-            originalError: body,
-          }),
-          message: "Trace export failed",
-        });
-        await events.flush();
-
-        failSpinner({ spinner, error: new Error(message), action: "export traces" });
-        process.exit(1);
-      }
-
-      const data = (await response.json()) as SearchPage;
-      const pageTraces = data.traces;
-      // Truncate on write so no page, whatever its size, can push the output
-      // past the caller's --limit.
-      traces.push(...pageTraces.slice(0, limit - traces.length));
-      matched = data.pagination?.totalHits ?? traces.length;
-
-      if (traces.length === pageTraces.length) {
-        // First page: report the match count the moment it is known.
-        events.count({
-          count: matched,
-          total: matched,
-          message: `${matched.toLocaleString()} trace${matched === 1 ? "" : "s"} to export`,
-        });
-      }
-
-      spinner.text = `Exporting traces (${format})... ${traces.length.toLocaleString()} fetched`;
-
-      scrollId = data.pagination?.scrollId;
-      const consumed = pageTraces.length + (data.pagination?.skipped ?? 0);
-      const exhausted = pageTraces.length === 0 || consumed < pageSize;
-      if (!scrollId || exhausted || traces.length >= limit) break;
-    }
+    const { traces, matched } = await fetchExportPages({
+      search: {
+        endpoint,
+        apiKey,
+        query: options.query,
+        startDate,
+        endDate,
+        filters,
+        includeSpans: options.includeSpans === true,
+      },
+      limit,
+      format,
+      events,
+      spinner,
+    });
 
     spinner.succeed(
       `Exported ${traces.length} trace${traces.length !== 1 ? "s" : ""}${matched > traces.length ? ` (${matched} total)` : ""}`,
@@ -218,6 +153,139 @@ export const exportTracesCommand = async (options: {
     await events.flush();
   }
 };
+
+type ExportSpinner = ReturnType<typeof createSpinner>;
+
+type TraceSearch = {
+  endpoint: string;
+  apiKey: string;
+  query: string | undefined;
+  startDate: number;
+  endDate: number;
+  filters: Record<string, string[]>;
+  includeSpans: boolean;
+};
+
+/** Pages through the search until the limit is met or the result set runs out. */
+async function fetchExportPages({
+  search,
+  limit,
+  format,
+  events,
+  spinner,
+}: {
+  search: TraceSearch;
+  limit: number;
+  format: string;
+  events: CommandEvents;
+  spinner: ExportSpinner;
+}): Promise<{ traces: ExportedTrace[]; matched: number }> {
+  const traces: ExportedTrace[] = [];
+  let matched = 0;
+  let scrollId: string | undefined;
+
+  // Page until the requested limit is met or the result set is exhausted.
+  // The cursor is authoritative for "there may be more"; a page shorter than
+  // requested only ends the walk when the shortfall is not accounted for by
+  // server-side `skipped` rows (traces dropped because they failed to
+  // serialize), since the cursor advances past those.
+  for (;;) {
+    const pageSize = Math.min(
+      limit - traces.length,
+      search.includeSpans ? SPANS_PAGE_CAP : SERVER_PAGE_CAP,
+    );
+
+    const response = await requestSearchPage({ search, pageSize, scrollId });
+
+    if (!response.ok) await failExport({ response, events, spinner });
+
+    const data = (await response.json()) as SearchPage;
+    const pageTraces = data.traces;
+    // Truncate on write so no page, whatever its size, can push the output
+    // past the caller's --limit.
+    traces.push(...pageTraces.slice(0, limit - traces.length));
+    matched = data.pagination?.totalHits ?? traces.length;
+
+    if (traces.length === pageTraces.length) {
+      // First page: report the match count the moment it is known.
+      events.count({
+        count: matched,
+        total: matched,
+        message: `${matched.toLocaleString()} trace${matched === 1 ? "" : "s"} to export`,
+      });
+    }
+
+    spinner.text = `Exporting traces (${format})... ${traces.length.toLocaleString()} fetched`;
+
+    scrollId = data.pagination?.scrollId;
+    const consumed = pageTraces.length + (data.pagination?.skipped ?? 0);
+    const exhausted = pageTraces.length === 0 || consumed < pageSize;
+    if (!scrollId || exhausted || traces.length >= limit) break;
+  }
+
+  return { traces, matched };
+}
+
+function requestSearchPage({
+  search,
+  pageSize,
+  scrollId,
+}: {
+  search: TraceSearch;
+  pageSize: number;
+  scrollId: string | undefined;
+}): Promise<Response> {
+  return langwatchFetch(`${search.endpoint}/api/v1/traces/search`, {
+    method: "POST",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    headers: {
+      "Content-Type": "application/json",
+      ...cliAuthHeaders({ apiKey: search.apiKey }),
+    },
+    body: JSON.stringify({
+      query: search.query,
+      startDate: search.startDate,
+      endDate: search.endDate,
+      pageSize,
+      format: "json",
+      ...(search.includeSpans ? { includeSpans: true } : {}),
+      ...(scrollId ? { scrollId } : {}),
+      ...(Object.keys(search.filters).length > 0 ? { filters: search.filters } : {}),
+    }),
+  });
+}
+
+/** Reports a refused page on the event stream and the spinner, then exits. */
+async function failExport({
+  response,
+  events,
+  spinner,
+}: {
+  response: Response;
+  events: CommandEvents;
+  spinner: ExportSpinner;
+}): Promise<void> {
+  // Read the body off a CLONE before `formatFetchError` consumes it, so the
+  // event keeps the platform's real error kind instead of degrading to one
+  // guessed from the status.
+  const body: unknown = await response
+    .clone()
+    .json()
+    .catch(() => undefined);
+
+  const message = await formatFetchError(response);
+  events.failed({
+    error: Object.assign(new Error(message), {
+      status: response.status,
+      originalError: body,
+    }),
+    message: "Trace export failed",
+  });
+  await events.flush();
+
+  failSpinner({ spinner, error: new Error(message), action: "export traces" });
+  process.exit(1);
+}
 
 /**
  * CSV columns. The first five are the original export shape and their order is

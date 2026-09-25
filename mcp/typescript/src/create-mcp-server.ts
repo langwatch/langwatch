@@ -4,6 +4,7 @@ import { z } from "zod";
 import packageJson from "../package.json" with { type: "json" };
 import { requireApiKey } from "./config.js";
 import { fetchDocumentation } from "./documentation-fetch.js";
+import type { TriggerSummary } from "./langwatch-api-triggers.js";
 import { createDatasetSchema, datasetColumnDefinitionSchema } from "./schemas/create-dataset.js";
 import {
   runParametersSchema,
@@ -68,6 +69,29 @@ function withToolLogging<T extends unknown[], R>(
 }
 
 function registerTools(server: McpServer): void {
+  registerDocsTools(server);
+  registerObservabilityTools(server);
+  registerPromptTools(server);
+  registerScenarioTools(server);
+  registerRunPlanTools(server);
+  registerTestSuiteTools(server);
+  registerSimulationRunTools(server);
+  registerEvaluatorTools(server);
+  registerModelProviderTools(server);
+  registerAgentTools(server);
+  registerDashboardTools(server);
+  registerWorkflowTools(server);
+  registerAnnotationTools(server);
+  registerTriggerTools(server);
+  registerMonitorTools(server);
+  registerSecretTools(server);
+  registerExperimentTools(server);
+  registerDatasetTools(server);
+  registerProjectTools(server);
+  registerApiKeyTools(server);
+}
+
+function registerDocsTools(server: McpServer): void {
   server.tool(
     "fetch_langwatch_docs",
     "Fetches the LangWatch docs for understanding how to implement LangWatch in your codebase. Always use this tool when the user asks for help with LangWatch. Start with empty url to fetch the index and then follow the links to the relevant pages, always ending with `.md` extension",
@@ -137,9 +161,10 @@ function registerTools(server: McpServer): void {
       return { content: [{ type: "text", text }] };
     }),
   );
+}
 
-  // --- Observability Tools (require API key) ---
-
+// --- Observability Tools (require API key) ---
+function registerObservabilityTools(server: McpServer): void {
   server.tool(
     "discover_schema",
     "Discover what LangWatch can be queried with: the trace filter fields and syntax, the analytics SQL views and columns, the analytics metrics, aggregation types, group-by options, scenario schema and evaluator types. Call this before using search_traces, run_query, get_analytics, scenario tools or evaluator tools, so you never guess a field, a column or a value.",
@@ -311,11 +336,12 @@ function registerTools(server: McpServer): void {
       };
     }),
   );
+}
 
-  // --- Platform Prompt Tools (require API key) ---
-  // These tools manage prompts on the LangWatch platform via API.
-  // For code-based prompt management, see `fetch_langwatch_docs` for the CLI/SDK approach.
-
+// --- Platform Prompt Tools (require API key) ---
+// These tools manage prompts on the LangWatch platform via API.
+// For code-based prompt management, see `fetch_langwatch_docs` for the CLI/SDK approach.
+function registerPromptTools(server: McpServer): void {
   server.tool(
     "platform_create_prompt",
     `Create a new prompt on the LangWatch platform.
@@ -512,11 +538,12 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
       };
     }),
   );
+}
 
-  // --- Platform Scenario Tools (require API key) ---
-  // These tools manage scenarios on the LangWatch platform via API.
-  // For code-based scenario testing, see `fetch_scenario_docs` for the SDK approach.
-
+// --- Platform Scenario Tools (require API key) ---
+// These tools manage scenarios on the LangWatch platform via API.
+// For code-based scenario testing, see `fetch_scenario_docs` for the SDK approach.
+function registerScenarioTools(server: McpServer): void {
   server.tool(
     "platform_create_scenario",
     `Create a new scenario on the LangWatch platform. Call discover_schema({ category: 'scenarios' }) first to learn how to write effective situations and criteria.
@@ -635,13 +662,14 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       };
     }),
   );
+}
 
-  // --- Platform Run Plan Tools (require API key) ---
-  // A run plan is what you run, and its NAME identifies it: running a name
-  // that exists replaces that plan's configuration, running a new name
-  // creates the plan. A test suite groups scenarios; running one is
-  // sugar that creates or joins the plan "<suite name> <target name>".
-
+// --- Platform Run Plan Tools (require API key) ---
+// A run plan is what you run, and its NAME identifies it: running a name
+// that exists replaces that plan's configuration, running a new name
+// creates the plan. A test suite groups scenarios; running one is
+// sugar that creates or joins the plan "<suite name> <target name>".
+function registerRunPlanTools(server: McpServer): void {
   server.tool(
     "platform_run_plan",
     "Run scenarios against targets. The plan name identifies the run plan: an existing name is re-run with the configuration you send here, a new name creates the plan. Configuration is the scope, the targets, the repeat count and the models; parameters, the note and the idempotency key belong to this run alone. Send more than one target to compare them in the same run, and give a target its own parameters to compare one agent on two models.",
@@ -785,10 +813,11 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       };
     }),
   );
+}
 
-  // --- Platform Test Suite Tools (require API key) ---
-  // A test suite groups scenarios: a name and the scenarios filed in it.
-
+// --- Platform Test Suite Tools (require API key) ---
+// A test suite groups scenarios: a name and the scenarios filed in it.
+function registerTestSuiteTools(server: McpServer): void {
   server.tool(
     "platform_list_test_suites",
     "List the test suites of the project. A test suite groups scenarios.",
@@ -949,10 +978,11 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       };
     }),
   );
+}
 
-  // --- Platform Simulation Run Tools (require API key) ---
-  // These tools query simulation run results from the LangWatch platform.
-
+// --- Platform Simulation Run Tools (require API key) ---
+// These tools query simulation run results from the LangWatch platform.
+function registerSimulationRunTools(server: McpServer): void {
   server.tool(
     "platform_list_simulation_runs",
     "List simulation run results. Filter by scenario set or batch run ID to see specific results.",
@@ -986,10 +1016,11 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       };
     }),
   );
+}
 
-  // --- Platform Evaluator Tools (require API key) ---
-  // These tools manage evaluators on the LangWatch platform via API.
-
+// --- Platform Evaluator Tools (require API key) ---
+// These tools manage evaluators on the LangWatch platform via API.
+function registerEvaluatorTools(server: McpServer): void {
   server.tool(
     "platform_create_evaluator",
     `Create an evaluator on the LangWatch platform. Useful for setting up LLM-as-judge and other evaluators to use in evaluation notebooks. Call discover_schema({ category: 'evaluators' }) first to see available evaluator types and their settings.`,
@@ -1072,10 +1103,11 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       };
     }),
   );
+}
 
-  // --- Platform Model Provider Tools (require API key) ---
-  // These tools manage model provider API keys on the LangWatch platform.
-
+// --- Platform Model Provider Tools (require API key) ---
+// These tools manage model provider API keys on the LangWatch platform.
+function registerModelProviderTools(server: McpServer): void {
   server.tool(
     "platform_set_model_provider",
     `Set or update a model provider on the LangWatch platform. Use this to configure API keys (e.g. OPENAI_API_KEY) needed to run evaluators. The API key is stored securely and never returned in responses. Omit customKeys to update other settings without changing existing keys.`,
@@ -1113,9 +1145,10 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       };
     }),
   );
+}
 
-  // --- Platform Agent Tools (require API key) ---
-
+// --- Platform Agent Tools (require API key) ---
+function registerAgentTools(server: McpServer): void {
   server.tool(
     "platform_list_agents",
     "List all agents in the LangWatch project with their names, types and IDs. A connected agent (one that registered itself from code with connectAgent or connect_agent) also shows its environment, whether it is online, how many instances are connected, and its owner.",
@@ -1250,9 +1283,10 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       };
     }),
   );
+}
 
-  // --- Platform Dashboard Tools (require API key) ---
-
+// --- Platform Dashboard Tools (require API key) ---
+function registerDashboardTools(server: McpServer): void {
   server.tool(
     "platform_list_dashboards",
     "List all analytics dashboards in the LangWatch project.",
@@ -1332,9 +1366,10 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       };
     }),
   );
+}
 
-  // --- Platform Workflow Tools (require API key) ---
-
+// --- Platform Workflow Tools (require API key) ---
+function registerWorkflowTools(server: McpServer): void {
   server.tool(
     "platform_list_workflows",
     "List all workflows in the LangWatch project.",
@@ -1393,9 +1428,10 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       };
     }),
   );
+}
 
-  // --- Platform Annotation Tools (require API key) ---
-
+// --- Platform Annotation Tools (require API key) ---
+function registerAnnotationTools(server: McpServer): void {
   server.tool(
     "platform_list_annotations",
     "List all annotations for the project, optionally filtered by trace ID.",
@@ -1466,9 +1502,23 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       };
     }),
   );
+}
 
-  // --- Platform Trigger/Automation Tools (require API key) ---
+function formatTriggerList(triggers: TriggerSummary[]): string {
+  const lines = [`# Triggers (${triggers.length} total)\n`];
+  for (const t of triggers) {
+    lines.push(`## ${t.name}`);
+    lines.push(`**ID**: ${t.id}`);
+    lines.push(`**Action**: ${t.action}`);
+    lines.push(`**Status**: ${t.active ? "active" : "inactive"}`);
+    if (t.alertType) lines.push(`**Alert**: ${t.alertType}`);
+    lines.push("");
+  }
+  return lines.join("\n");
+}
 
+// --- Platform Trigger/Automation Tools (require API key) ---
+function registerTriggerTools(server: McpServer): void {
   server.tool(
     "platform_list_triggers",
     "List all triggers (automations) in the project. Triggers automate actions like sending emails, Slack messages, or adding to datasets when conditions are met.",
@@ -1492,16 +1542,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           ],
         };
       }
-      const lines = [`# Triggers (${triggers.length} total)\n`];
-      for (const t of triggers) {
-        lines.push(`## ${t.name}`);
-        lines.push(`**ID**: ${t.id}`);
-        lines.push(`**Action**: ${t.action}`);
-        lines.push(`**Status**: ${t.active ? "active" : "inactive"}`);
-        if (t.alertType) lines.push(`**Alert**: ${t.alertType}`);
-        lines.push("");
-      }
-      return { content: [{ type: "text", text: lines.join("\n") }] };
+      return { content: [{ type: "text", text: formatTriggerList(triggers) }] };
     }),
   );
 
@@ -1581,9 +1622,10 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return { content: [{ type: "text", text: `Trigger ${result.id} deleted.` }] };
     }),
   );
+}
 
-  // --- Platform Monitor Tools (require API key) ---
-
+// --- Platform Monitor Tools (require API key) ---
+function registerMonitorTools(server: McpServer): void {
   server.tool(
     "platform_list_monitors",
     "List all online evaluation monitors for the project.",
@@ -1705,9 +1747,10 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       };
     }),
   );
+}
 
-  // --- Platform Secret Tools (require API key) ---
-
+// --- Platform Secret Tools (require API key) ---
+function registerSecretTools(server: McpServer): void {
   server.tool(
     "platform_list_secrets",
     "List all project secrets (values are never returned, only metadata).",
@@ -1788,9 +1831,10 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return { content: [{ type: "text", text: `Secret ${result.id} deleted.` }] };
     }),
   );
+}
 
-  // --- Platform Experiment Execution Tools (require API key) ---
-
+// --- Platform Experiment Execution Tools (require API key) ---
+function registerExperimentTools(server: McpServer): void {
   server.tool(
     "platform_run_experiment",
     "Start an experiment run by slug. Returns a run ID for polling status.",
@@ -1906,10 +1950,11 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       };
     }),
   );
+}
 
-  // --- Platform Dataset Tools (require API key) ---
-  // These tools manage datasets on the LangWatch platform via API.
-
+// --- Platform Dataset Tools (require API key) ---
+// These tools manage datasets on the LangWatch platform via API.
+function registerDatasetTools(server: McpServer): void {
   server.tool(
     "platform_list_datasets",
     "List all datasets on the LangWatch platform with their names, slugs, columns, and record counts. Returns AI-readable digest by default.",
@@ -2083,11 +2128,12 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       };
     },
   );
+}
 
-  // --- Platform Project Tools ---
-  // These tools manage projects on the LangWatch platform via the REST API.
-  // They require an API key with org-level permissions.
-
+// --- Platform Project Tools ---
+// These tools manage projects on the LangWatch platform via the REST API.
+// They require an API key with org-level permissions.
+function registerProjectTools(server: McpServer): void {
   server.tool(
     "platform_list_projects",
     "List all projects in your LangWatch organization. Requires an org-level API key.",
@@ -2182,10 +2228,11 @@ You must provide either teamId (to add the project to an existing team) or newTe
       };
     }),
   );
+}
 
-  // --- Platform API Key Tools (require org-level API key) ---
-  // These tools manage API keys on the LangWatch platform via the REST API.
-
+// --- Platform API Key Tools (require org-level API key) ---
+// These tools manage API keys on the LangWatch platform via the REST API.
+function registerApiKeyTools(server: McpServer): void {
   server.tool(
     "platform_list_api_keys",
     "List all API keys in your LangWatch organization. Shows key metadata, status (active/revoked/expired), and role bindings. API key tokens are never returned.",

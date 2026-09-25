@@ -129,35 +129,45 @@ async function rasterize(svgPath, height) {
   return { width: meta.width, height: meta.height, data: rgba };
 }
 
+/** One box pass along each row of `src` into `dst`. */
+function boxBlurRows({ src, dst, w, h, radius }) {
+  const norm = 1 / (radius * 2 + 1);
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    let sum = 0;
+    for (let x = -radius; x <= radius; x++) sum += src[row + clamp(x, 0, w - 1)];
+    for (let x = 0; x < w; x++) {
+      dst[row + x] = sum * norm;
+      sum += src[row + clamp(x + radius + 1, 0, w - 1)];
+      sum -= src[row + clamp(x - radius, 0, w - 1)];
+    }
+  }
+}
+
+/** One box pass down each column of `src` into `dst`. */
+function boxBlurColumns({ src, dst, w, h, radius }) {
+  const norm = 1 / (radius * 2 + 1);
+  for (let x = 0; x < w; x++) {
+    let sum = 0;
+    for (let y = -radius; y <= radius; y++) sum += src[clamp(y, 0, h - 1) * w + x];
+    for (let y = 0; y < h; y++) {
+      dst[y * w + x] = sum * norm;
+      sum += src[clamp(y + radius + 1, 0, h - 1) * w + x];
+      sum -= src[clamp(y - radius, 0, h - 1) * w + x];
+    }
+  }
+}
+
 /** Three box passes approximate a Gaussian closely enough for a drop shadow. */
 function blurAlpha(src, w, h, radius) {
   if (radius < 1) return src;
   let a = src;
   let b = new Float32Array(w * h);
   for (let pass = 0; pass < 3; pass++) {
-    for (let y = 0; y < h; y++) {
-      const row = y * w;
-      let sum = 0;
-      for (let x = -radius; x <= radius; x++) sum += a[row + clamp(x, 0, w - 1)];
-      const norm = 1 / (radius * 2 + 1);
-      for (let x = 0; x < w; x++) {
-        b[row + x] = sum * norm;
-        sum += a[row + clamp(x + radius + 1, 0, w - 1)];
-        sum -= a[row + clamp(x - radius, 0, w - 1)];
-      }
-    }
+    boxBlurRows({ src: a, dst: b, w, h, radius });
     const t = a;
     a = new Float32Array(w * h);
-    for (let x = 0; x < w; x++) {
-      let sum = 0;
-      for (let y = -radius; y <= radius; y++) sum += b[clamp(y, 0, h - 1) * w + x];
-      const norm = 1 / (radius * 2 + 1);
-      for (let y = 0; y < h; y++) {
-        a[y * w + x] = sum * norm;
-        sum += b[clamp(y + radius + 1, 0, h - 1) * w + x];
-        sum -= b[clamp(y - radius, 0, h - 1) * w + x];
-      }
-    }
+    boxBlurColumns({ src: b, dst: a, w, h, radius });
     b = t;
   }
   return a;
@@ -337,27 +347,31 @@ function drawShadow(dst, dw, dh, win, cfg) {
   const x1 = Math.min(dw, Math.ceil(cx + hw + reach));
   const inv = 1 / (2 * cfg.blur);
 
-  for (let y = y0; y < y1; y++) {
-    const py = y + 0.5;
-    const skip = opaqueSpan(py, win.cy, win.cx, win.hw, win.hh, win.r);
-    const sk0 = skip ? Math.ceil(skip[0]) + 1 : Infinity;
-    const sk1 = skip ? Math.floor(skip[1]) - 1 : -Infinity;
-    for (let x = x0; x < x1; x++) {
-      if (x >= sk0 && x <= sk1) {
-        x = sk1;
-        continue;
-      }
-      const sd = sdRoundRect(x + 0.5, py, cx, cy, hw, hh, r);
-      if (sd >= cfg.blur) continue;
-      const u = sd <= -cfg.blur ? 1 : smooth(clamp((cfg.blur - sd) * inv, 0, 1));
-      const a = cfg.opacity * u;
-      if (a <= 0.002) continue;
-      const d = (y * dw + x) * 4;
-      const keep = 1 - a;
-      dst[d + 0] *= keep;
-      dst[d + 1] *= keep;
-      dst[d + 2] *= keep;
+  const shape = { cx, cy, hw, hh, r };
+  for (let y = y0; y < y1; y++) shadeShadowRow({ dst, dw, y, x0, x1, win, shape, cfg, inv });
+}
+
+/** Darkens one row of the shadow, skipping the span the opaque window covers anyway. */
+function shadeShadowRow({ dst, dw, y, x0, x1, win, shape: { cx, cy, hw, hh, r }, cfg, inv }) {
+  const py = y + 0.5;
+  const skip = opaqueSpan(py, win.cy, win.cx, win.hw, win.hh, win.r);
+  const sk0 = skip ? Math.ceil(skip[0]) + 1 : Infinity;
+  const sk1 = skip ? Math.floor(skip[1]) - 1 : -Infinity;
+  for (let x = x0; x < x1; x++) {
+    if (x >= sk0 && x <= sk1) {
+      x = sk1;
+      continue;
     }
+    const sd = sdRoundRect(x + 0.5, py, cx, cy, hw, hh, r);
+    if (sd >= cfg.blur) continue;
+    const u = sd <= -cfg.blur ? 1 : smooth(clamp((cfg.blur - sd) * inv, 0, 1));
+    const a = cfg.opacity * u;
+    if (a <= 0.002) continue;
+    const d = (y * dw + x) * 4;
+    const keep = 1 - a;
+    dst[d + 0] *= keep;
+    dst[d + 1] *= keep;
+    dst[d + 2] *= keep;
   }
 }
 

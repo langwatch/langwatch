@@ -18,6 +18,21 @@ const REQUEST_TIMEOUT_MS = 120000;
 
 // ---------- args ----------
 
+/** What each value flag sets on the options; `next` reads the flag's argument. */
+const FLAG_SETTERS = {
+  "--rules": (opts, next) => (opts.rules = next()),
+  "--section-level": (opts, next) => (opts.sectionLevel = Number(next())),
+  "--json": (opts) => (opts.json = true),
+  "--threshold": (opts, next, a) => (opts.threshold = probability(a, next())),
+  "--min": (opts, next, a) => (opts.min = probability(a, next())),
+  "--locate": (opts, next, a) => (opts.locate = probability(a, next())),
+  "--no-locate": (opts) => (opts.noLocate = true),
+  "--context": (opts) => (opts.context = true),
+  "--concurrency": (opts, next, a) => (opts.concurrency = positiveInteger(a, next())),
+  "--only": (opts, next) => (opts.only = new Set(next().split(","))),
+  "--skip": (opts, next) => (opts.skip = new Set(next().split(","))),
+};
+
 function parseArgs(argv) {
   const opts = {
     files: [],
@@ -36,17 +51,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => argv[++i];
-    if (a === "--rules") opts.rules = next();
-    else if (a === "--section-level") opts.sectionLevel = Number(next());
-    else if (a === "--json") opts.json = true;
-    else if (a === "--threshold") opts.threshold = probability(a, next());
-    else if (a === "--min") opts.min = probability(a, next());
-    else if (a === "--locate") opts.locate = probability(a, next());
-    else if (a === "--no-locate") opts.noLocate = true;
-    else if (a === "--context") opts.context = true;
-    else if (a === "--concurrency") opts.concurrency = positiveInteger(a, next());
-    else if (a === "--only") opts.only = new Set(next().split(","));
-    else if (a === "--skip") opts.skip = new Set(next().split(","));
+    if (Object.hasOwn(FLAG_SETTERS, a)) FLAG_SETTERS[a](opts, next, a);
     else if (a === "-h" || a === "--help") {
       usage();
       process.exit(0);
@@ -361,35 +366,50 @@ function stripInlineCode(s) {
 
 // ---------- regex and local rules ----------
 
+function findHeadingHits({ re, section }) {
+  const heads = [section.heading ? `${"#".repeat(section.level)} ${section.heading}` : ""].concat(
+    section.paragraphs.filter((p) => p.kind === "heading").map((p) => p.text.trim()),
+  );
+  const hits = [];
+  for (const h of heads) {
+    // The pattern carries the g flag, so test() would resume from where
+    // the previous heading matched and skip a hit at the start of this one.
+    re.lastIndex = 0;
+    if (h && re.test(h)) hits.push({ sentence: h, match: h });
+  }
+  return hits;
+}
+
+function findProseHits({ re, section }) {
+  const hits = [];
+  for (const p of section.paragraphs) {
+    if (p.kind === "code" || p.kind === "tag" || p.exempt) continue;
+    for (const u of p.units) {
+      const m = stripInlineCode(u).match(re);
+      if (m) hits.push({ sentence: u, match: m[0] });
+    }
+  }
+  return hits;
+}
+
+/** Where a regex rule matches in one section, by the text it targets. */
+function findRegexHits({ re, target, section }) {
+  if (target === "raw") {
+    return [...section.text.matchAll(re)].map((m) => ({
+      sentence: m[0].slice(0, 200),
+      match: m[0],
+    }));
+  }
+  if (target === "headings") return findHeadingHits({ re, section });
+  return findProseHits({ re, section });
+}
+
 function runRegexRules(rules, section, doc, docCounts) {
   const findings = [];
   for (const r of rules) {
     if (r.kind !== "regex") continue;
     const re = new RegExp(r.pattern, r.flags ?? "gi");
-    let hits = [];
-    if (r.target === "raw") {
-      for (const m of section.text.matchAll(re))
-        hits.push({ sentence: m[0].slice(0, 200), match: m[0] });
-    } else if (r.target === "headings") {
-      const heads = [
-        section.heading ? `${"#".repeat(section.level)} ${section.heading}` : "",
-      ].concat(section.paragraphs.filter((p) => p.kind === "heading").map((p) => p.text.trim()));
-      for (const h of heads) {
-        // The pattern carries the g flag, so test() would resume from where
-        // the previous heading matched and skip a hit at the start of this one.
-        re.lastIndex = 0;
-        if (h && re.test(h)) hits.push({ sentence: h, match: h });
-      }
-    } else {
-      for (const p of section.paragraphs) {
-        if (p.kind === "code" || p.kind === "tag" || p.exempt) continue;
-        for (const u of p.units) {
-          const probe = stripInlineCode(u);
-          const m = probe.match(re);
-          if (m) hits.push({ sentence: u, match: m[0] });
-        }
-      }
-    }
+    const hits = findRegexHits({ re, target: r.target, section });
     if (r.documentMax != null) {
       // count across the whole document, fire only past the cap
       docCounts[r.key] = (docCounts[r.key] ?? 0) + hits.length;
@@ -418,56 +438,77 @@ function runRegexRules(rules, section, doc, docCounts) {
   return findings;
 }
 
+function paragraphWordsFindings({ rule, section }) {
+  const over = section.paragraphs.filter(
+    (p) => (p.kind === "prose" || p.kind === "list") && !p.exempt && countWords(p) > rule.max,
+  );
+  if (over.length === 0) return [];
+  const p = over[0];
+  return [
+    {
+      rule,
+      probability: 1,
+      sentence: `${countWords(p)} words: ${p.units[0] ?? p.text.slice(0, 120)}`,
+      count: over.length,
+    },
+  ];
+}
+
+function oneSentenceRunFindings({ rule, section }) {
+  let run = 0;
+  let best = 0;
+  let at = null;
+  for (const p of section.paragraphs) {
+    run = p.kind === "prose" && p.units.length === 1 ? run + 1 : 0;
+    if (run > best) {
+      best = run;
+      at = p;
+    }
+  }
+  if (best <= rule.max) return [];
+  return [
+    {
+      rule,
+      probability: 1,
+      sentence: `${best} one-sentence paragraphs in a row, ending: ${at.units[0]}`,
+    },
+  ];
+}
+
+function titleRepeatedFindings({ rule, section, doc }) {
+  if (section.index !== 0) return [];
+  const title = (doc.frontmatter.title ?? "").toLowerCase();
+  const first = doc.firstHeading?.toLowerCase();
+  if (!title || !first || title !== first) return [];
+  return [
+    {
+      rule,
+      probability: 1,
+      sentence: `title and first heading are both "${doc.frontmatter.title}"`,
+    },
+  ];
+}
+
+function titleHowToFindings({ rule, section, doc }) {
+  if (section.index !== 0) return [];
+  const title = doc.frontmatter.title ?? "";
+  if (!/^how to\b/i.test(title)) return [];
+  return [{ rule, probability: 1, sentence: `title: ${title}` }];
+}
+
+/** The local checks by name; each returns the findings it raises for one section. */
+const LOCAL_CHECKS = {
+  "paragraph-words": paragraphWordsFindings,
+  "one-sentence-paragraph-run": oneSentenceRunFindings,
+  "title-repeated-as-heading": titleRepeatedFindings,
+  "title-how-to": titleHowToFindings,
+};
+
 function runLocalRules(rules, section, doc) {
   const findings = [];
-  for (const r of rules) {
-    if (r.kind !== "local") continue;
-    if (r.check === "paragraph-words") {
-      const over = section.paragraphs.filter(
-        (p) => (p.kind === "prose" || p.kind === "list") && !p.exempt && countWords(p) > r.max,
-      );
-      if (over.length) {
-        const p = over[0];
-        findings.push({
-          rule: r,
-          probability: 1,
-          sentence: `${countWords(p)} words: ${p.units[0] ?? p.text.slice(0, 120)}`,
-          count: over.length,
-        });
-      }
-    } else if (r.check === "one-sentence-paragraph-run") {
-      let run = 0;
-      let best = 0;
-      let at = null;
-      for (const p of section.paragraphs) {
-        if (p.kind === "prose" && p.units.length === 1) {
-          run++;
-          if (run > best) {
-            best = run;
-            at = p;
-          }
-        } else run = 0;
-      }
-      if (best > r.max)
-        findings.push({
-          rule: r,
-          probability: 1,
-          sentence: `${best} one-sentence paragraphs in a row, ending: ${at.units[0]}`,
-        });
-    } else if (r.check === "title-repeated-as-heading" && section.index === 0) {
-      const title = (doc.frontmatter.title ?? "").toLowerCase();
-      const first = doc.firstHeading?.toLowerCase();
-      if (title && first && title === first)
-        findings.push({
-          rule: r,
-          probability: 1,
-          sentence: `title and first heading are both "${doc.frontmatter.title}"`,
-        });
-    } else if (r.check === "title-how-to" && section.index === 0) {
-      const title = doc.frontmatter.title ?? "";
-      if (/^how to\b/i.test(title))
-        findings.push({ rule: r, probability: 1, sentence: `title: ${title}` });
-    }
+  for (const rule of rules) {
+    if (rule.kind !== "local" || !Object.hasOwn(LOCAL_CHECKS, rule.check)) continue;
+    findings.push(...LOCAL_CHECKS[rule.check]({ rule, section, doc }));
   }
   return findings;
 }

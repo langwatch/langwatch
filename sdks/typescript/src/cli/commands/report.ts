@@ -61,25 +61,8 @@ export const detectAgent = (env: NodeJS.ProcessEnv = process.env): string | unde
   return undefined;
 };
 
-export const reportCommand = async (
-  options: ReportCommandOptions,
-): Promise<CommandResult | void> => {
-  // A dry run never sends anything, so it needs no approval: it exists
-  // precisely so the agent can show the user the payload BEFORE asking.
-  if (!options.userApproved && !options.dryRun) {
-    throw new Error(
-      [
-        "This sends a report to the LangWatch team, so the user must approve it first.",
-        "",
-        'Ask the user: "Can I send this issue report (and optionally the session',
-        'transcript) to LangWatch to help them fix it?" If they agree, re-run with',
-        "--user-approved. API keys, secrets, emails and phone numbers are redacted",
-        `locally before anything is sent; audit the exact rules at ${REDACTION_AUDIT_URL}`,
-        "Preview the exact redacted payload first with --dry-run (no approval needed).",
-      ].join("\n"),
-    );
-  }
-
+/** The summary from the flag or its file, cut to the length the platform keeps. */
+function readSummary(options: ReportCommandOptions): string | undefined {
   if (options.summary && options.summaryFile) {
     throw new Error("Pass either --summary or --summary-file, not both.");
   }
@@ -96,102 +79,68 @@ export const reportCommand = async (
     summary = summary.slice(0, MAX_SUMMARY_CHARS);
   }
 
-  let rawSession: string | undefined;
-  if (options.session) {
-    let size: number;
-    try {
-      size = statSync(options.session).size;
-    } catch {
-      throw new Error(
-        `Session file not found: ${options.session}\n` +
-          "Claude Code transcripts live under ~/.claude/projects/<project>/*.jsonl,\n" +
-          "Codex transcripts under ~/.codex/sessions/<year>/<month>/<day>/*.jsonl.",
-      );
-    }
-    if (size > MAX_RAW_SESSION_BYTES) {
-      throw new Error(
-        `Session file is ${Math.round(size / 1024 / 1024)}MB; the limit is ${Math.round(MAX_RAW_SESSION_BYTES / 1024 / 1024)}MB.`,
-      );
-    }
-    rawSession = readFileSync(options.session, "utf8");
+  return summary;
+}
+
+/** The transcript file's text, refused by name when missing or over the raw size limit. */
+function readRawSession(session: string): string {
+  let size: number;
+  try {
+    size = statSync(session).size;
+  } catch {
+    throw new Error(
+      `Session file not found: ${session}\n` +
+        "Claude Code transcripts live under ~/.claude/projects/<project>/*.jsonl,\n" +
+        "Codex transcripts under ~/.codex/sessions/<year>/<month>/<day>/*.jsonl.",
+    );
   }
-
-  if (!summary?.trim()) {
-    if (!rawSession?.trim()) {
-      throw new Error(
-        [
-          "Nothing to report: pass --summary/--summary-file, --session <transcript.jsonl>, or both.",
-          "",
-          "A good report includes what you were trying to do, what went wrong (verbatim",
-          "errors), and what you had to figure out the hard way. The full session",
-          "transcript is the most useful thing you can send.",
-        ].join("\n"),
-      );
-    }
+  if (size > MAX_RAW_SESSION_BYTES) {
+    throw new Error(
+      `Session file is ${Math.round(size / 1024 / 1024)}MB; the limit is ${Math.round(MAX_RAW_SESSION_BYTES / 1024 / 1024)}MB.`,
+    );
   }
+  return readFileSync(session, "utf8");
+}
 
-  const events = createCommandEvents({ resource: "report", verb: "send" });
-  events.started("Preparing report…");
-
-  // Redaction runs locally, before anything leaves this machine.
-  const envValues = collectSensitiveEnvValues(process.env);
-  let redactedCount = 0;
-
-  if (summary) {
-    const result = redactReportText({ text: summary, envValues });
-    summary = result.text;
-    redactedCount += result.redactedCount;
-  }
-
-  let sessionData: string | undefined;
-  let sessionTruncated = false;
-  if (rawSession) {
-    const redacted = redactSessionJsonl({ jsonl: rawSession, envValues });
-    redactedCount += redacted.redactedCount;
-    const truncated = truncateJsonlToByteBudget({
-      jsonl: redacted.text,
-      maxBytes: MAX_SESSION_BYTES,
-    });
-    sessionData = truncated.text;
-    sessionTruncated = truncated.truncated;
-  }
-
-  const rawTitle =
-    nonEmptyTrimmed(options.title) ??
-    nonEmptyTrimmed(summary?.trim().split("\n")[0]?.slice(0, 200)) ??
-    "Session report";
-  const titleResult = redactReportText({ text: rawTitle, envValues });
-  redactedCount += titleResult.redactedCount;
-  const title = titleResult.text;
-
-  const payload = {
-    source: "cli" as const,
-    kind: sessionData ? ("full_session" as const) : ("summary" as const),
-    title,
-    ...(summary ? { summary } : {}),
-    ...(sessionData ? { sessionData, sessionTruncated } : {}),
-    agent: options.agent ?? detectAgent(),
-    ...(options.email ? { contactEmail: options.email } : {}),
-    cliVersion: cliVersion(),
+/** Redacts the transcript locally, then truncates it to the byte budget. */
+function prepareSession({
+  rawSession,
+  envValues,
+}: {
+  rawSession: string;
+  envValues: ReturnType<typeof collectSensitiveEnvValues>;
+}): { sessionData: string; sessionTruncated: boolean; redactedCount: number } {
+  const redacted = redactSessionJsonl({ jsonl: rawSession, envValues });
+  const truncated = truncateJsonlToByteBudget({
+    jsonl: redacted.text,
+    maxBytes: MAX_SESSION_BYTES,
+  });
+  return {
+    sessionData: truncated.text,
+    sessionTruncated: truncated.truncated,
+    redactedCount: redacted.redactedCount,
   };
+}
 
-  if (options.dryRun) {
-    events.completed({ message: "Dry run: nothing sent" });
-    return {
-      data: { dryRun: true, redactedCount, payload },
-      table: () => {
-        console.log(chalk.blue("Dry run: this is what would be sent (nothing was sent)"));
-        console.log(
-          chalk.gray(
-            `Redacted ${redactedCount} sensitive value${redactedCount === 1 ? "" : "s"} locally. Audit the rules: ${REDACTION_AUDIT_URL}`,
-          ),
-        );
-        console.log(JSON.stringify(payload, null, 2));
-      },
-    };
-  }
+/** The given title, else the summary's first line, else a generic one. */
+function reportTitle({ title, summary }: { title?: string; summary?: string }): string {
+  return (
+    nonEmptyTrimmed(title) ??
+    nonEmptyTrimmed(summary?.trim().split("\n")[0]?.slice(0, 200)) ??
+    "Session report"
+  );
+}
 
-  const endpoint = normalizeEndpoint(options.endpoint ?? getEndpoint());
+/** Posts the report and returns its id; a failure to reach or a refusal is thrown by name. */
+async function sendReport({
+  endpoint,
+  payload,
+  events,
+}: {
+  endpoint: string;
+  payload: unknown;
+  events: ReturnType<typeof createCommandEvents>;
+}): Promise<string> {
   const apiKey = process.env.LANGWATCH_API_KEY?.trim();
 
   let response: Response;
@@ -226,6 +175,87 @@ export const reportCommand = async (
   }
 
   const { id } = (await response.json()) as { id: string };
+  return id;
+}
+
+export const reportCommand = async (
+  options: ReportCommandOptions,
+): Promise<CommandResult | void> => {
+  // A dry run never sends anything, so it needs no approval: it exists
+  // precisely so the agent can show the user the payload BEFORE asking.
+  if (!options.userApproved && !options.dryRun) {
+    throw new Error(
+      [
+        "This sends a report to the LangWatch team, so the user must approve it first.",
+        "",
+        'Ask the user: "Can I send this issue report (and optionally the session',
+        'transcript) to LangWatch to help them fix it?" If they agree, re-run with',
+        "--user-approved. API keys, secrets, emails and phone numbers are redacted",
+        `locally before anything is sent; audit the exact rules at ${REDACTION_AUDIT_URL}`,
+        "Preview the exact redacted payload first with --dry-run (no approval needed).",
+      ].join("\n"),
+    );
+  }
+
+  let summary = readSummary(options);
+  const rawSession = options.session ? readRawSession(options.session) : undefined;
+
+  if (!summary?.trim() && !rawSession?.trim()) {
+    throw new Error(
+      [
+        "Nothing to report: pass --summary/--summary-file, --session <transcript.jsonl>, or both.",
+        "",
+        "A good report includes what you were trying to do, what went wrong (verbatim",
+        "errors), and what you had to figure out the hard way. The full session",
+        "transcript is the most useful thing you can send.",
+      ].join("\n"),
+    );
+  }
+
+  const events = createCommandEvents({ resource: "report", verb: "send" });
+  events.started("Preparing report…");
+
+  // Redaction runs locally, before anything leaves this machine.
+  const envValues = collectSensitiveEnvValues(process.env);
+  let redactedCount = 0;
+
+  if (summary) {
+    const result = redactReportText({ text: summary, envValues });
+    summary = result.text;
+    redactedCount += result.redactedCount;
+  }
+
+  const session = rawSession ? prepareSession({ rawSession, envValues }) : undefined;
+  redactedCount += session?.redactedCount ?? 0;
+  const sessionData = session?.sessionData;
+  const sessionTruncated = session?.sessionTruncated ?? false;
+
+  const rawTitle = reportTitle({ title: options.title, summary });
+  const titleResult = redactReportText({ text: rawTitle, envValues });
+  redactedCount += titleResult.redactedCount;
+  const title = titleResult.text;
+
+  const payload = {
+    source: "cli" as const,
+    kind: sessionData ? ("full_session" as const) : ("summary" as const),
+    title,
+    ...(summary ? { summary } : {}),
+    ...(sessionData ? { sessionData, sessionTruncated } : {}),
+    agent: options.agent ?? detectAgent(),
+    ...(options.email ? { contactEmail: options.email } : {}),
+    cliVersion: cliVersion(),
+  };
+
+  if (options.dryRun) {
+    events.completed({ message: "Dry run: nothing sent" });
+    return {
+      data: { dryRun: true, redactedCount, payload },
+      table: () => printDryRun({ redactedCount, payload }),
+    };
+  }
+
+  const endpoint = normalizeEndpoint(options.endpoint ?? getEndpoint());
+  const id = await sendReport({ endpoint, payload, events });
   events.completed({ message: "Report sent" });
 
   return {
@@ -235,23 +265,47 @@ export const reportCommand = async (
       redactedCount,
       sessionTruncated,
     },
-    table: () => {
-      console.log(chalk.green(`✓ Report sent to the LangWatch team (${id})`));
-      console.log(
-        chalk.gray(
-          `  Redacted ${redactedCount} sensitive value${redactedCount === 1 ? "" : "s"} locally before sending.`,
-        ),
-      );
-      if (sessionTruncated) {
-        console.log(
-          chalk.gray(
-            "  The transcript was truncated to the most recent activity to fit the upload limit.",
-          ),
-        );
-      }
-      console.log(
-        chalk.gray("  Thank you! Reports like this directly shape what gets fixed next."),
-      );
-    },
+    table: () => printReportSent({ id, redactedCount, sessionTruncated }),
   };
 };
+
+function printDryRun({
+  redactedCount,
+  payload,
+}: {
+  redactedCount: number;
+  payload: unknown;
+}): void {
+  console.log(chalk.blue("Dry run: this is what would be sent (nothing was sent)"));
+  console.log(
+    chalk.gray(
+      `Redacted ${redactedCount} sensitive value${redactedCount === 1 ? "" : "s"} locally. Audit the rules: ${REDACTION_AUDIT_URL}`,
+    ),
+  );
+  console.log(JSON.stringify(payload, null, 2));
+}
+
+function printReportSent({
+  id,
+  redactedCount,
+  sessionTruncated,
+}: {
+  id: string;
+  redactedCount: number;
+  sessionTruncated: boolean;
+}): void {
+  console.log(chalk.green(`✓ Report sent to the LangWatch team (${id})`));
+  console.log(
+    chalk.gray(
+      `  Redacted ${redactedCount} sensitive value${redactedCount === 1 ? "" : "s"} locally before sending.`,
+    ),
+  );
+  if (sessionTruncated) {
+    console.log(
+      chalk.gray(
+        "  The transcript was truncated to the most recent activity to fit the upload limit.",
+      ),
+    );
+  }
+  console.log(chalk.gray("  Thank you! Reports like this directly shape what gets fixed next."));
+}

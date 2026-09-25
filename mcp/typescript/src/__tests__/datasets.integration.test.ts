@@ -1,5 +1,7 @@
 import { createServer, type Server } from "http";
+
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
 import { initConfig } from "../config.js";
 
 // --- Canned responses for dataset API endpoints ---
@@ -119,6 +121,112 @@ const CANNED_RECORDS_DELETED = {
 
 let emptyListMode = false;
 
+const NOT_FOUND = { message: "Dataset not found" };
+
+/** A canned answer: the first route whose method and pattern match the request answers it. */
+type MockRoute = {
+  method: string;
+  pattern: RegExp;
+  status: number;
+  answer: (body: string) => unknown;
+};
+
+const hasColumnTypes = (body: string): boolean => {
+  const parsed = JSON.parse(body);
+  return Boolean(
+    parsed.columnTypes && Array.isArray(parsed.columnTypes) && parsed.columnTypes.length > 0,
+  );
+};
+
+const MOCK_ROUTES: MockRoute[] = [
+  {
+    method: "GET",
+    pattern: /^\/api\/v1\/dataset(\?|$)/,
+    status: 200,
+    answer: () => (emptyListMode ? CANNED_DATASETS_EMPTY : CANNED_DATASETS_LIST),
+  },
+  {
+    method: "GET",
+    pattern: /^\/api\/v1\/dataset\/my-dataset(\?|$)/,
+    status: 200,
+    answer: () => CANNED_DATASET_DETAIL,
+  },
+  {
+    method: "GET",
+    pattern: /^\/api\/v1\/dataset\/does-not-exist(\?|$)/,
+    status: 404,
+    answer: () => NOT_FOUND,
+  },
+  {
+    method: "POST",
+    pattern: /^\/api\/v1\/dataset$/,
+    status: 201,
+    answer: (body) =>
+      hasColumnTypes(body) ? CANNED_DATASET_CREATED : CANNED_DATASET_CREATED_EMPTY,
+  },
+  {
+    method: "PATCH",
+    pattern: /^\/api\/v1\/dataset\/old-name$/,
+    status: 200,
+    answer: () => CANNED_DATASET_UPDATED,
+  },
+  {
+    method: "PATCH",
+    pattern: /^\/api\/v1\/dataset\/my-dataset$/,
+    status: 200,
+    answer: () => CANNED_DATASET_UPDATED_COLUMNS,
+  },
+  { method: "PATCH", pattern: /^\/api\/v1\/dataset\/ghost$/, status: 404, answer: () => NOT_FOUND },
+  {
+    method: "DELETE",
+    pattern: /^\/api\/v1\/dataset\/to-delete$/,
+    status: 200,
+    answer: () => CANNED_DATASET_ARCHIVED,
+  },
+  {
+    method: "DELETE",
+    pattern: /^\/api\/v1\/dataset\/ghost$/,
+    status: 404,
+    answer: () => NOT_FOUND,
+  },
+  {
+    method: "POST",
+    pattern: /^\/api\/v1\/dataset\/my-dataset\/records$/,
+    status: 201,
+    answer: () => CANNED_RECORDS_CREATED,
+  },
+  {
+    method: "POST",
+    pattern: /^\/api\/v1\/dataset\/ghost\/records$/,
+    status: 404,
+    answer: () => NOT_FOUND,
+  },
+  {
+    method: "PATCH",
+    pattern: /^\/api\/v1\/dataset\/my-dataset\/records\/rec-123$/,
+    status: 200,
+    answer: () => CANNED_RECORD_UPDATED,
+  },
+  {
+    method: "PATCH",
+    pattern: /^\/api\/v1\/dataset\/ghost\/records\//,
+    status: 404,
+    answer: () => NOT_FOUND,
+  },
+  {
+    method: "DELETE",
+    pattern: /^\/api\/v1\/dataset\/my-dataset\/records$/,
+    status: 200,
+    answer: () => CANNED_RECORDS_DELETED,
+  },
+  {
+    method: "DELETE",
+    pattern: /^\/api\/v1\/dataset\/ghost\/records$/,
+    status: 404,
+    answer: () => NOT_FOUND,
+  },
+];
+
 function createMockServer(): Server {
   return createServer((req, res) => {
     const authToken = req.headers["x-auth-token"];
@@ -133,103 +241,16 @@ function createMockServer(): Server {
     req.on("end", () => {
       const url = req.url ?? "";
       res.setHeader("Content-Type", "application/json");
-
-      // GET /api/v1/dataset - list datasets
-      if (url.match(/^\/api\/v1\/dataset(\?|$)/) && req.method === "GET") {
-        if (emptyListMode) {
-          res.writeHead(200);
-          res.end(JSON.stringify(CANNED_DATASETS_EMPTY));
-        } else {
-          res.writeHead(200);
-          res.end(JSON.stringify(CANNED_DATASETS_LIST));
-        }
-      }
-      // GET /api/v1/dataset/my-dataset - get dataset detail
-      else if (url.match(/^\/api\/v1\/dataset\/my-dataset(\?|$)/) && req.method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_DATASET_DETAIL));
-      }
-      // GET /api/v1/dataset/does-not-exist - not found
-      else if (url.match(/^\/api\/v1\/dataset\/does-not-exist(\?|$)/) && req.method === "GET") {
-        res.writeHead(404);
-        res.end(JSON.stringify({ message: "Dataset not found" }));
-      }
-      // POST /api/v1/dataset - create dataset
-      else if (url === "/api/v1/dataset" && req.method === "POST") {
-        const parsed = JSON.parse(body);
-        if (
-          parsed.columnTypes &&
-          Array.isArray(parsed.columnTypes) &&
-          parsed.columnTypes.length > 0
-        ) {
-          res.writeHead(201);
-          res.end(JSON.stringify(CANNED_DATASET_CREATED));
-        } else {
-          res.writeHead(201);
-          res.end(JSON.stringify(CANNED_DATASET_CREATED_EMPTY));
-        }
-      }
-      // PATCH /api/v1/dataset/old-name - update dataset name
-      else if (url.match(/^\/api\/v1\/dataset\/old-name$/) && req.method === "PATCH") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_DATASET_UPDATED));
-      }
-      // PATCH /api/v1/dataset/my-dataset - update dataset columns
-      else if (url.match(/^\/api\/v1\/dataset\/my-dataset$/) && req.method === "PATCH") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_DATASET_UPDATED_COLUMNS));
-      }
-      // PATCH /api/v1/dataset/ghost - not found
-      else if (url.match(/^\/api\/v1\/dataset\/ghost$/) && req.method === "PATCH") {
-        res.writeHead(404);
-        res.end(JSON.stringify({ message: "Dataset not found" }));
-      }
-      // DELETE /api/v1/dataset/to-delete - archive dataset
-      else if (url.match(/^\/api\/v1\/dataset\/to-delete$/) && req.method === "DELETE") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_DATASET_ARCHIVED));
-      }
-      // DELETE /api/v1/dataset/ghost - not found
-      else if (url.match(/^\/api\/v1\/dataset\/ghost$/) && req.method === "DELETE") {
-        res.writeHead(404);
-        res.end(JSON.stringify({ message: "Dataset not found" }));
-      }
-      // POST /api/v1/dataset/my-dataset/records - create records
-      else if (url.match(/^\/api\/v1\/dataset\/my-dataset\/records$/) && req.method === "POST") {
-        res.writeHead(201);
-        res.end(JSON.stringify(CANNED_RECORDS_CREATED));
-      }
-      // POST /api/v1/dataset/ghost/records - not found
-      else if (url.match(/^\/api\/v1\/dataset\/ghost\/records$/) && req.method === "POST") {
-        res.writeHead(404);
-        res.end(JSON.stringify({ message: "Dataset not found" }));
-      }
-      // PATCH /api/v1/dataset/my-dataset/records/rec-123 - update record
-      else if (
-        url.match(/^\/api\/v1\/dataset\/my-dataset\/records\/rec-123$/) &&
-        req.method === "PATCH"
-      ) {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_RECORD_UPDATED));
-      }
-      // PATCH /api/v1/dataset/ghost/records/rec-1 - not found
-      else if (url.match(/^\/api\/v1\/dataset\/ghost\/records\//) && req.method === "PATCH") {
-        res.writeHead(404);
-        res.end(JSON.stringify({ message: "Dataset not found" }));
-      }
-      // DELETE /api/v1/dataset/my-dataset/records - delete records
-      else if (url.match(/^\/api\/v1\/dataset\/my-dataset\/records$/) && req.method === "DELETE") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_RECORDS_DELETED));
-      }
-      // DELETE /api/v1/dataset/ghost/records - not found
-      else if (url.match(/^\/api\/v1\/dataset\/ghost\/records$/) && req.method === "DELETE") {
-        res.writeHead(404);
-        res.end(JSON.stringify({ message: "Dataset not found" }));
-      } else {
+      const route = MOCK_ROUTES.find(
+        (candidate) => candidate.method === req.method && candidate.pattern.test(url),
+      );
+      if (!route) {
         res.writeHead(404);
         res.end(JSON.stringify({ message: `Not found: ${req.method} ${url}` }));
+        return;
       }
+      res.writeHead(route.status);
+      res.end(JSON.stringify(route.answer(body)));
     });
   });
 }

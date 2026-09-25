@@ -433,24 +433,29 @@ const forwardedNames = (clause) =>
  */
 export const readPublicSurface = ({ roots, known, readFile = read }) => {
   const surface = new Map();
-  const record = (file, name) => {
-    if (!surface.has(file)) surface.set(file, new Set());
-    surface.get(file).add(name);
-  };
-
   for (const barrel of roots) {
     const text = stripComments(readFile(join(ROOT, barrel)));
-    for (const match of text.matchAll(NAMED_FORWARD)) {
-      const target = forwardTarget({ specifier: match[2], barrel, known });
-      if (target) for (const name of forwardedNames(match[1])) record(target, name);
-    }
-    for (const match of text.matchAll(STAR_FORWARD)) {
-      const target = forwardTarget({ specifier: match[1], barrel, known });
-      if (target) record(target, "*");
-    }
+    recordForwards({ surface, text, barrel, known });
   }
-
   return surface;
+};
+
+const recordPublished = ({ surface, file, name }) => {
+  if (!surface.has(file)) surface.set(file, new Set());
+  surface.get(file).add(name);
+};
+
+/** Records every name one barrel forwards, against the file it forwards from. */
+const recordForwards = ({ surface, text, barrel, known }) => {
+  for (const match of text.matchAll(NAMED_FORWARD)) {
+    const file = forwardTarget({ specifier: match[2], barrel, known });
+    if (!file) continue;
+    for (const name of forwardedNames(match[1])) recordPublished({ surface, file, name });
+  }
+  for (const match of text.matchAll(STAR_FORWARD)) {
+    const file = forwardTarget({ specifier: match[1], barrel, known });
+    if (file) recordPublished({ surface, file, name: "*" });
+  }
 };
 
 const publishes = ({ surface, file, name }) => {

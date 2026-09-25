@@ -688,6 +688,35 @@ function hangUp() {
   }
 }
 
+/** The exit code a child settles with: 127 when it could not start. */
+function settlementOf({ child, command }) {
+  return new Promise((resolve) => {
+    child.on("error", (err) => {
+      stderr(`${PREFIX} could not start ${command} (${err.message})\n`);
+      resolve(127);
+    });
+    child.on("close", (status, signal) => resolve(exitCodeFor({ code: status, signal })));
+  });
+}
+
+/** Tells the launcher the stack's exit code and hangs up, at most once. */
+function createExitReport() {
+  let reported = false;
+  return {
+    get reported() {
+      return reported;
+    },
+    send(code) {
+      if (reported) return;
+      reported = true;
+      tell(code ?? exitCodeFor(null));
+      hangUp();
+    },
+  };
+}
+
+const isWatched = (pid) => Number.isInteger(pid) && pid > 1 && alive(pid);
+
 /**
  * The sentinel: the stack's parent, in a session of its own, so no teardown
  * of the launching group can reach it. Idles while the supervisor or
@@ -709,13 +738,7 @@ async function runSentinel(args, env) {
   }
 
   let code = null;
-  const settled = new Promise((resolve) => {
-    child.on("error", (err) => {
-      stderr(`${PREFIX} could not start ${argv[0]} (${err.message})\n`);
-      resolve(127);
-    });
-    child.on("close", (status, signal) => resolve(exitCodeFor({ code: status, signal })));
-  });
+  const settled = settlementOf({ child, command: argv[0] });
   void settled.then((value) => {
     code = value;
   });
@@ -725,24 +748,14 @@ async function runSentinel(args, env) {
     graceMs: positiveInt(env.LANGWATCH_DEV_GRACE_MS, DEFAULT_GRACE_MS),
   });
   const everyMs = positiveInt(env.LANGWATCH_DEV_WATCH_MS, WATCH_INTERVAL_MS);
-  const watched = (pid) => Number.isInteger(pid) && pid > 1 && alive(pid);
-  const neitherWatched = () => {
-    if (watched(supervisorPid)) return false;
-    return !watched(leaderPid);
-  };
-  let reported = false;
-  const report = () => {
-    if (reported) return;
-    reported = true;
-    tell(code ?? exitCodeFor(null));
-    hangUp();
-  };
+  const neitherWatched = () => !isWatched(supervisorPid) && !isWatched(leaderPid);
+  const exit = createExitReport();
 
   for (;;) {
-    if (code !== null) report();
+    if (code !== null) exit.send(code);
     // Only once the stack has been seen to settle: a group that has not been
     // observed yet reads as "quiet" while the command is still being exec'd.
-    if (reported && !stack.anyAlive()) break;
+    if (exit.reported && !stack.anyAlive()) break;
     if (neitherWatched()) {
       await stack.takeDown();
       break;
@@ -751,7 +764,7 @@ async function runSentinel(args, env) {
     else await sleep(everyMs);
   }
 
-  report();
+  exit.send(code);
   return code ?? exitCodeFor(null);
 }
 
@@ -912,6 +925,18 @@ async function startRun(argv, env, { detached, leader }) {
   return startDirect(argv, env, detached);
 }
 
+async function takeDownRun({ run, env }) {
+  const target = await run.target();
+  if (target === null) return;
+  const stack = stackControls({
+    target,
+    graceMs: positiveInt(env.LANGWATCH_DEV_GRACE_MS, DEFAULT_GRACE_MS),
+  });
+  if (!(await stack.takeDown())) {
+    stderr(`${PREFIX} some of the dev stack outlived SIGKILL, giving up.\n`);
+  }
+}
+
 /**
  * Runs the command and returns its exit code. With `detached`, the stack leads
  * a process group of its own and every takedown targets that group.
@@ -939,16 +964,7 @@ async function passThrough(argv, env, { detached, leader = null }) {
       takingDown = true;
       clearInterval(watch);
       if (why !== null) stderr(`${PREFIX} ${why}, stopping the dev stack.\n`);
-      const target = await run.target();
-      if (target !== null) {
-        const stack = stackControls({
-          target,
-          graceMs: positiveInt(env.LANGWATCH_DEV_GRACE_MS, DEFAULT_GRACE_MS),
-        });
-        if (!(await stack.takeDown())) {
-          stderr(`${PREFIX} some of the dev stack outlived SIGKILL, giving up.\n`);
-        }
-      }
+      await takeDownRun({ run, env });
       finish(stackCode ?? exitCodeFor(null));
     };
 

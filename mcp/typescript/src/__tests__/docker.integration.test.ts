@@ -1,5 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { execSync } from "child_process";
+
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const IMAGE_NAME = "langwatch-mcp-server-test";
 const CONTAINER_NAME = "langwatch-mcp-server-test-container";
@@ -21,58 +22,63 @@ const MCP_POST_HEADERS = {
   Accept: "application/json, text/event-stream",
 };
 
+const removeContainer = (): void => {
+  execSync(`docker rm -f ${CONTAINER_NAME} 2>/dev/null || true`, {
+    stdio: "pipe",
+  });
+};
+
+async function waitForHealth(): Promise<boolean> {
+  for (let retries = 0; retries < 20; retries++) {
+    try {
+      const res = await fetch(`http://localhost:${HOST_PORT}/health`);
+      if (res.ok) return true;
+    } catch {
+      // not ready yet
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return false;
+}
+
+/** Builds and starts the image; false, with the container removed, when it never came up. */
+async function startContainer(): Promise<boolean> {
+  try {
+    // Build from repo root (mcp-server needs langevals/ for build)
+    const repoRoot = process.cwd().replace(/\/mcp-server.*$/, "");
+    execSync(`docker build -t ${IMAGE_NAME} -f mcp/typescript/Dockerfile .`, {
+      cwd: repoRoot,
+      stdio: "pipe",
+      timeout: 180_000,
+    });
+
+    // Stop any previous container
+    removeContainer();
+
+    // Start the container WITHOUT LANGWATCH_API_KEY -- clients bring their own
+    execSync(`docker run -d --name ${CONTAINER_NAME} -p ${HOST_PORT}:3000 ${IMAGE_NAME}`, {
+      stdio: "pipe",
+    });
+
+    if (!(await waitForHealth())) {
+      const logs = execSync(`docker logs ${CONTAINER_NAME}`, {
+        encoding: "utf8",
+      });
+      throw new Error(`Container failed to start. Logs:\n${logs}`);
+    }
+    return true;
+  } catch (error) {
+    console.error("Docker setup failed:", error);
+    removeContainer();
+    return false;
+  }
+}
+
 describe("Docker container", () => {
   let containerRunning = false;
 
   beforeAll(async () => {
-    try {
-      // Build from repo root (mcp-server needs langevals/ for build)
-      const repoRoot = process.cwd().replace(/\/mcp-server.*$/, "");
-      execSync(`docker build -t ${IMAGE_NAME} -f mcp/typescript/Dockerfile .`, {
-        cwd: repoRoot,
-        stdio: "pipe",
-        timeout: 180_000,
-      });
-
-      // Stop any previous container
-      execSync(`docker rm -f ${CONTAINER_NAME} 2>/dev/null || true`, {
-        stdio: "pipe",
-      });
-
-      // Start the container WITHOUT LANGWATCH_API_KEY -- clients bring their own
-      execSync(`docker run -d --name ${CONTAINER_NAME} -p ${HOST_PORT}:3000 ${IMAGE_NAME}`, {
-        stdio: "pipe",
-      });
-
-      // Wait for the server to be ready
-      let retries = 0;
-      while (retries < 20) {
-        try {
-          const res = await fetch(`http://localhost:${HOST_PORT}/health`);
-          if (res.ok) {
-            containerRunning = true;
-            break;
-          }
-        } catch {
-          // not ready yet
-        }
-        await new Promise((r) => setTimeout(r, 500));
-        retries++;
-      }
-
-      if (!containerRunning) {
-        const logs = execSync(`docker logs ${CONTAINER_NAME}`, {
-          encoding: "utf8",
-        });
-        throw new Error(`Container failed to start. Logs:\n${logs}`);
-      }
-    } catch (error) {
-      console.error("Docker setup failed:", error);
-      // Clean up on failure
-      execSync(`docker rm -f ${CONTAINER_NAME} 2>/dev/null || true`, {
-        stdio: "pipe",
-      });
-    }
+    containerRunning = await startContainer();
   }, 180_000); // 3 min for build + start
 
   afterAll(() => {

@@ -190,6 +190,75 @@ export interface ApiKeyVerifier {
   clear(): void;
 }
 
+type VerdictCache = Map<string, { valid: boolean; expiresAt: number }>;
+
+function sweepVerdicts(cache: VerdictCache): void {
+  const now = Date.now();
+  for (const [key, entry] of cache) {
+    if (now >= entry.expiresAt) cache.delete(key);
+  }
+}
+
+function rememberVerdict({
+  cache,
+  hashed,
+  valid,
+  maxEntries,
+  ttlMs,
+}: {
+  cache: VerdictCache;
+  hashed: string;
+  valid: boolean;
+  maxEntries: number;
+  ttlMs: number;
+}): void {
+  if (cache.size >= maxEntries) {
+    sweepVerdicts(cache);
+    // Map iteration is insertion ordered, so the first key is the oldest.
+    while (cache.size >= maxEntries) {
+      const oldest = cache.keys().next();
+      if (oldest.done) break;
+      cache.delete(oldest.value);
+    }
+  }
+  cache.set(hashed, { valid, expiresAt: Date.now() + ttlMs });
+}
+
+/** The API's verdict on a key: true, false on 401/403, null when it could not answer. */
+async function askVerifyEndpoint({
+  endpoint,
+  apiKey,
+  fetchImpl,
+  requestTimeoutMs,
+}: {
+  endpoint: string;
+  apiKey: string;
+  fetchImpl: typeof fetch;
+  requestTimeoutMs: number;
+}): Promise<boolean | null> {
+  let response: Response;
+  try {
+    response = await fetchImpl(`${endpoint}${VERIFY_PATH}`, {
+      method: "GET",
+      headers: { "X-Auth-Token": apiKey },
+      // An upstream that accepts the connection and never answers would
+      // otherwise leave the in-flight promise unsettled, parking every
+      // request for this key behind it until the socket dies.
+      signal: AbortSignal.timeout(requestTimeoutMs),
+    });
+  } catch {
+    return null;
+  }
+
+  // Only the status matters. Releasing the body returns the socket to the
+  // pool instead of holding it until garbage collection.
+  await response.body?.cancel().catch(() => undefined);
+
+  if (response.ok) return true;
+  if (response.status === 401 || response.status === 403) return false;
+  return null;
+}
+
 export function createApiKeyVerifier({
   endpoint,
   positiveTtlMs = 60_000,
@@ -205,55 +274,20 @@ export function createApiKeyVerifier({
   requestTimeoutMs?: number;
   fetchImpl?: typeof fetch;
 }): ApiKeyVerifier {
-  const cache = new Map<string, { valid: boolean; expiresAt: number }>();
+  const cache: VerdictCache = new Map();
   const inFlight = new Map<string, Promise<boolean>>();
 
-  function sweep(): void {
-    const now = Date.now();
-    for (const [key, entry] of cache) {
-      if (now >= entry.expiresAt) cache.delete(key);
-    }
-  }
-
-  function remember(hashed: string, valid: boolean): void {
-    if (cache.size >= maxEntries) {
-      sweep();
-      // Map iteration is insertion ordered, so the first key is the oldest.
-      while (cache.size >= maxEntries) {
-        const oldest = cache.keys().next();
-        if (oldest.done) break;
-        cache.delete(oldest.value);
-      }
-    }
-    cache.set(hashed, {
+  const sweep = (): void => sweepVerdicts(cache);
+  const remember = (hashed: string, valid: boolean): void =>
+    rememberVerdict({
+      cache,
+      hashed,
       valid,
-      expiresAt: Date.now() + (valid ? positiveTtlMs : negativeTtlMs),
+      maxEntries,
+      ttlMs: valid ? positiveTtlMs : negativeTtlMs,
     });
-  }
-
-  async function askApi(apiKey: string): Promise<boolean | null> {
-    let response: Response;
-    try {
-      response = await fetchImpl(`${endpoint}${VERIFY_PATH}`, {
-        method: "GET",
-        headers: { "X-Auth-Token": apiKey },
-        // An upstream that accepts the connection and never answers would
-        // otherwise leave the in-flight promise unsettled, parking every
-        // request for this key behind it until the socket dies.
-        signal: AbortSignal.timeout(requestTimeoutMs),
-      });
-    } catch {
-      return null;
-    }
-
-    // Only the status matters. Releasing the body returns the socket to the
-    // pool instead of holding it until garbage collection.
-    await response.body?.cancel().catch(() => undefined);
-
-    if (response.ok) return true;
-    if (response.status === 401 || response.status === 403) return false;
-    return null;
-  }
+  const askApi = (apiKey: string) =>
+    askVerifyEndpoint({ endpoint, apiKey, fetchImpl, requestTimeoutMs });
 
   return {
     async verify(apiKey) {
@@ -331,6 +365,67 @@ export interface SessionStore<TTransport> {
   readonly size: number;
 }
 
+/** What a session store holds: the live sessions and how many each hashed key owns. */
+interface SessionTable<TTransport> {
+  sessions: Map<string, SessionRecord<TTransport>>;
+  countByKey: Map<string, number>;
+}
+
+function releaseSlot({ countByKey }: { countByKey: Map<string, number> }, apiKey: string): void {
+  const hashed = hashApiKey(apiKey);
+  const next = (countByKey.get(hashed) ?? 1) - 1;
+  if (next <= 0) countByKey.delete(hashed);
+  else countByKey.set(hashed, next);
+}
+
+function dropSession<TTransport>({
+  table,
+  sessionId,
+  record,
+}: {
+  table: SessionTable<TTransport>;
+  sessionId: string;
+  record: SessionRecord<TTransport>;
+}): void {
+  table.sessions.delete(sessionId);
+  releaseSlot(table, record.apiKey);
+}
+
+/** Counts a slot for the key now; the session lands on commit, or the slot is given back. */
+function reserveSlot<TTransport>({
+  table,
+  apiKey,
+}: {
+  table: SessionTable<TTransport>;
+  apiKey: string;
+}): SessionReservation<TTransport> {
+  const hashed = hashApiKey(apiKey);
+  table.countByKey.set(hashed, (table.countByKey.get(hashed) ?? 0) + 1);
+  let settled = false;
+
+  return {
+    commit({ sessionId, transport }) {
+      if (settled) return;
+      settled = true;
+
+      const existing = table.sessions.get(sessionId);
+      if (existing) dropSession({ table, sessionId, record: existing });
+
+      // The count already carries this slot from the reservation.
+      table.sessions.set(sessionId, {
+        transport,
+        apiKey,
+        lastActivityAt: Date.now(),
+      });
+    },
+    release() {
+      if (settled) return;
+      settled = true;
+      releaseSlot(table, apiKey);
+    },
+  };
+}
+
 export function createSessionStore<TTransport>({
   maxAgeMs,
   closeTransport,
@@ -343,45 +438,10 @@ export function createSessionStore<TTransport>({
   const sessions = new Map<string, SessionRecord<TTransport>>();
   const countByKey = new Map<string, number>();
 
-  function decrement(apiKey: string): void {
-    const hashed = hashApiKey(apiKey);
-    const next = (countByKey.get(hashed) ?? 1) - 1;
-    if (next <= 0) countByKey.delete(hashed);
-    else countByKey.set(hashed, next);
-  }
-
-  function drop(sessionId: string, record: SessionRecord<TTransport>): void {
-    sessions.delete(sessionId);
-    decrement(record.apiKey);
-  }
-
-  function reserve(apiKey: string): SessionReservation<TTransport> {
-    const hashed = hashApiKey(apiKey);
-    countByKey.set(hashed, (countByKey.get(hashed) ?? 0) + 1);
-    let settled = false;
-
-    return {
-      commit({ sessionId, transport }) {
-        if (settled) return;
-        settled = true;
-
-        const existing = sessions.get(sessionId);
-        if (existing) drop(sessionId, existing);
-
-        // The count already carries this slot from the reservation.
-        sessions.set(sessionId, {
-          transport,
-          apiKey,
-          lastActivityAt: Date.now(),
-        });
-      },
-      release() {
-        if (settled) return;
-        settled = true;
-        decrement(apiKey);
-      },
-    };
-  }
+  const table: SessionTable<TTransport> = { sessions, countByKey };
+  const reserve = (apiKey: string) => reserveSlot({ table, apiKey });
+  const drop = (sessionId: string, record: SessionRecord<TTransport>) =>
+    dropSession({ table, sessionId, record });
 
   return {
     get(sessionId) {

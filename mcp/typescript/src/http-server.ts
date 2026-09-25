@@ -1,10 +1,11 @@
-import express from "express";
-import type { Request, RequestHandler, Response, NextFunction } from "express";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
-import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { randomUUID, createHash } from "node:crypto";
 import type { Server } from "node:http";
+
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
+import express from "express";
+import type { Request, RequestHandler, Response, NextFunction } from "express";
 
 import { getConfig, runWithConfig } from "./config.js";
 import { createMcpServer } from "./create-mcp-server.js";
@@ -323,128 +324,145 @@ function registerStreamableHttpRoutes({
   runtime: ServerRuntime;
   authenticate: Authenticate;
 }): void {
-  const { sessions, sseSessions } = runtime;
+  const route = { runtime, authenticate };
+  app.post("/mcp", (req: Request, res: Response) => handleMcpPost({ req, res, ...route }));
+  app.get("/mcp", (req: Request, res: Response) => handleMcpGet({ req, res, ...route }));
+  app.delete("/mcp", (req: Request, res: Response) => handleMcpDelete({ req, res, ...route }));
+}
 
-  const sessionIdOf = (req: Request): string | undefined =>
-    req.headers["mcp-session-id"] as string | undefined;
+type McpRoute = {
+  req: Request;
+  res: Response;
+  runtime: ServerRuntime;
+  authenticate: Authenticate;
+};
 
-  app.post("/mcp", async (req: Request, res: Response) => {
-    const sessionId = sessionIdOf(req);
-    const session = sessionId ? sessions.get(sessionId) : undefined;
+const sessionIdOf = (req: Request): string | undefined =>
+  req.headers["mcp-session-id"] as string | undefined;
 
-    if (sessionId && session) {
-      const apiKey = await authenticate({
-        req,
-        res,
-        expectedApiKey: session.apiKey,
-      });
-      if (!apiKey) return;
+async function handleMcpPost({ req, res, runtime, authenticate }: McpRoute): Promise<void> {
+  const { sessions } = runtime;
+  const sessionId = sessionIdOf(req);
+  const session = sessionId ? sessions.get(sessionId) : undefined;
 
-      sessions.touch(sessionId);
-      await handleWithSessionConfig(session.apiKey, () =>
-        session.transport.handleRequest(req, res, req.body),
-      );
-      return;
-    }
-
-    if (!sessionId && isInitializeRequest(req.body)) {
-      const apiKey = await authenticate({ req, res });
-      if (!apiKey) return;
-
-      if (overSessionLimit({ apiKey, sessions, sseSessions })) {
-        sendSessionLimitReached(res);
-        return;
-      }
-
-      // Claimed before the first await. The session id only exists once
-      // initialize completes, so without holding the slot from here concurrent
-      // requests for one key would all pass the check above at a count of zero.
-      const reservation = sessions.reserve(apiKey);
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
-        onsessioninitialized: (id) => {
-          reservation.commit({ sessionId: id, transport });
-        },
-      });
-      transport.onclose = () => {
-        if (transport.sessionId) sessions.remove(transport.sessionId);
-      };
-
-      const sessionServer = createMcpServer();
-      try {
-        await handleWithSessionConfig(apiKey, () => sessionServer.connect(transport));
-        await handleWithSessionConfig(apiKey, () => transport.handleRequest(req, res, req.body));
-      } catch (error) {
-        if (transport.sessionId) sessions.remove(transport.sessionId);
-        await transport.close().catch(() => undefined);
-        throw error;
-      } finally {
-        // A no-op once the session took the slot, so this only returns it when
-        // initialization never produced one.
-        reservation.release();
-      }
-      return;
-    }
-
-    // An unknown session id gets the same answer as a missing token, so the
-    // response does not reveal whether the session exists.
-    if (sessionId) {
-      sendUnauthorized({ res, error: "Session expired or not found" });
-      return;
-    }
-
-    res.status(400).json({
-      error: "Invalid request, no session ID or not an initialize request",
+  if (sessionId && session) {
+    const apiKey = await authenticate({
+      req,
+      res,
+      expectedApiKey: session.apiKey,
     });
-  });
-
-  app.get("/mcp", async (req: Request, res: Response) => {
-    const sessionId = sessionIdOf(req);
-    const session = sessionId ? sessions.get(sessionId) : undefined;
-
-    if (sessionId && session) {
-      const apiKey = await authenticate({
-        req,
-        res,
-        expectedApiKey: session.apiKey,
-      });
-      if (!apiKey) return;
-
-      sessions.touch(sessionId);
-      await handleWithSessionConfig(session.apiKey, () =>
-        session.transport.handleRequest(req, res),
-      );
-      return;
-    }
-
-    if (sessionId) {
-      sendUnauthorized({ res, error: "Session expired or not found" });
-      return;
-    }
-
-    res.status(400).json({ error: "Invalid request, no valid session ID" });
-  });
-
-  app.delete("/mcp", async (req: Request, res: Response) => {
-    // Authenticate before looking the session up, so that a session the caller
-    // does not own is indistinguishable from one that does not exist.
-    const apiKey = await authenticate({ req, res });
     if (!apiKey) return;
 
-    const sessionId = sessionIdOf(req);
-    const session = sessionId ? sessions.get(sessionId) : undefined;
-    const owned =
-      session !== undefined && apiKeysMatch({ presentedKey: apiKey, expectedKey: session.apiKey });
+    sessions.touch(sessionId);
+    await handleWithSessionConfig(session.apiKey, () =>
+      session.transport.handleRequest(req, res, req.body),
+    );
+    return;
+  }
 
-    if (!sessionId || !session || !owned) {
-      res.status(404).json({ error: "Session not found" });
-      return;
-    }
+  if (!sessionId && isInitializeRequest(req.body)) {
+    await initializeSession({ req, res, runtime, authenticate });
+    return;
+  }
 
-    sessions.remove(sessionId);
-    await session.transport.close();
-    res.status(200).json({ status: "session closed" });
+  // An unknown session id gets the same answer as a missing token, so the
+  // response does not reveal whether the session exists.
+  if (sessionId) {
+    sendUnauthorized({ res, error: "Session expired or not found" });
+    return;
+  }
+
+  res.status(400).json({
+    error: "Invalid request, no session ID or not an initialize request",
   });
+}
+
+/** Opens a session for an initialize request, holding the key's slot until it exists. */
+async function initializeSession({ req, res, runtime, authenticate }: McpRoute): Promise<void> {
+  const { sessions, sseSessions } = runtime;
+  const apiKey = await authenticate({ req, res });
+  if (!apiKey) return;
+
+  if (overSessionLimit({ apiKey, sessions, sseSessions })) {
+    sendSessionLimitReached(res);
+    return;
+  }
+
+  // Claimed before the first await. The session id only exists once
+  // initialize completes, so without holding the slot from here concurrent
+  // requests for one key would all pass the check above at a count of zero.
+  const reservation = sessions.reserve(apiKey);
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: () => randomUUID(),
+    onsessioninitialized: (id) => {
+      reservation.commit({ sessionId: id, transport });
+    },
+  });
+  transport.onclose = () => {
+    if (transport.sessionId) sessions.remove(transport.sessionId);
+  };
+
+  const sessionServer = createMcpServer();
+  try {
+    await handleWithSessionConfig(apiKey, () => sessionServer.connect(transport));
+    await handleWithSessionConfig(apiKey, () => transport.handleRequest(req, res, req.body));
+  } catch (error) {
+    if (transport.sessionId) sessions.remove(transport.sessionId);
+    await transport.close().catch(() => undefined);
+    throw error;
+  } finally {
+    // A no-op once the session took the slot, so this only returns it when
+    // initialization never produced one.
+    reservation.release();
+  }
+}
+
+async function handleMcpGet({ req, res, runtime, authenticate }: McpRoute): Promise<void> {
+  const { sessions } = runtime;
+  const sessionId = sessionIdOf(req);
+  const session = sessionId ? sessions.get(sessionId) : undefined;
+
+  if (sessionId && session) {
+    const apiKey = await authenticate({
+      req,
+      res,
+      expectedApiKey: session.apiKey,
+    });
+    if (!apiKey) return;
+
+    sessions.touch(sessionId);
+    await handleWithSessionConfig(session.apiKey, () => session.transport.handleRequest(req, res));
+    return;
+  }
+
+  if (sessionId) {
+    sendUnauthorized({ res, error: "Session expired or not found" });
+    return;
+  }
+
+  res.status(400).json({ error: "Invalid request, no valid session ID" });
+}
+
+async function handleMcpDelete({ req, res, runtime, authenticate }: McpRoute): Promise<void> {
+  const { sessions } = runtime;
+  // Authenticate before looking the session up, so that a session the caller
+  // does not own is indistinguishable from one that does not exist.
+  const apiKey = await authenticate({ req, res });
+  if (!apiKey) return;
+
+  const sessionId = sessionIdOf(req);
+  const session = sessionId ? sessions.get(sessionId) : undefined;
+  const owned =
+    session !== undefined && apiKeysMatch({ presentedKey: apiKey, expectedKey: session.apiKey });
+
+  if (!sessionId || !session || !owned) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  sessions.remove(sessionId);
+  await session.transport.close();
+  res.status(200).json({ status: "session closed" });
 }
 
 /** Legacy SSE transport, kept for backwards compatibility. */
@@ -498,7 +516,20 @@ function registerSseRoutes({
   // The session id in the query string only identifies the session; it's
   // how the SSE transport hands the client its POST endpoint as a URI.
   // The Bearer token is what authorizes the request.
-  const handleSseMessage = async (req: Request, res: Response) => {
+  const handleSseMessage = createSseMessageHandler({ authenticate, sseSessions });
+
+  app.post("/messages", handleSseMessage);
+  app.post("/sse/messages", handleSseMessage);
+}
+
+function createSseMessageHandler({
+  authenticate,
+  sseSessions,
+}: {
+  authenticate: Authenticate;
+  sseSessions: ServerRuntime["sseSessions"];
+}) {
+  return async (req: Request, res: Response) => {
     const apiKey = await authenticate({ req, res });
     if (!apiKey) return;
 
@@ -517,9 +548,6 @@ function registerSseRoutes({
       session.transport.handlePostMessage(req, res, req.body),
     );
   };
-
-  app.post("/messages", handleSseMessage);
-  app.post("/sse/messages", handleSseMessage);
 }
 
 /** Sweeps idle sessions, expired tokens, and stale rate limiter entries. */
