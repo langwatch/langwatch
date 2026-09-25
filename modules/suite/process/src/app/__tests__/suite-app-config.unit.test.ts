@@ -5,6 +5,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * @vitest-environment node
  */
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
@@ -29,6 +30,7 @@ function buildProductionApp(
       projects: createApiFixture<ProjectApi>({
         findOrganizationId: async () => "organization-1",
       }),
+      evaluators: createApiFixture<EvaluatorApi>({}),
       retention,
     },
     members: { clickhouse: clickHouseQueryClientDouble(), publicBaseUrl, redis: null },

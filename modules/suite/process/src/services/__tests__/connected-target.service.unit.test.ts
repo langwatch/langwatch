@@ -1,6 +1,7 @@
 import { agentSchema, connectedAgentSelectability } from "@langwatch/agent-contract";
 import type { Agent, AgentReferenceState, AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { RunActor, ScenarioApi } from "@langwatch/scenario-contract";
 import {
@@ -165,6 +166,7 @@ function buildService(agents: AgentApi) {
     scenarios,
     agents,
     prompts: createApiFixture<PromptApi>({}),
+    evaluators: createApiFixture<EvaluatorApi>({}),
     execution,
     generateId: () => "suite_generated",
   });

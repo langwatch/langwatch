@@ -43,7 +43,10 @@ export abstract class SuiteRepository {
     scenarioIds: string[];
     config: RunPlanConfigInput;
   }): Promise<{ suite: Suite; created: boolean }>;
-  abstract update: (input: UpdateSuiteCommand & { slug?: string }) => Promise<Suite>;
+  /** A run plan's own evaluators are written with it; a plan carries no fields. */
+  abstract update: (
+    input: Omit<UpdateSuiteCommand, "fields"> & { slug?: string },
+  ) => Promise<Suite>;
   abstract archive: (
     input: SuiteIdInput & { archivedAt: Date; archivedSlug: string },
   ) => Promise<Suite>;

@@ -73,6 +73,10 @@ export const updateSuiteTrpcInputSchema = z.object({
   targets: z.array(suiteTargetSchema).optional(),
   repeatCount: z.number().int().min(1).max(100).optional(),
   labels: z.array(z.string()).optional(),
+  // The fields a test suite declares. Refused on a run plan.
+  fields: suiteFieldDefinitionsSchema.optional(),
+  // The evaluators attached to the suite or the plan, the full list.
+  evaluators: evaluatorAttachmentsSchema.optional(),
 });
 
 /**

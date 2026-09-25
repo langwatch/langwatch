@@ -30,12 +30,20 @@ const monitorPreconditionSchema = z
   })
   .strict();
 /**
- * Exported to support wire parsing in browser packages that can't import the
- * trace-filter registry.
+ * The preconditions the monitor editors write: rule objects, or the legacy
+ * `{}` some monitors persisted. Exported for browser wire parsing.
+ */
+export const structuredMonitorPreconditionsSchema = z.union([
+  z.array(monitorPreconditionSchema),
+  z.record(z.string(), z.unknown()),
+]);
+
+/**
+ * What a monitor stores: any JSON list, as main's `/api/monitors` accepted, or
+ * the legacy `{}`. The evaluation reads the rule objects it understands.
  */
 export const monitorPreconditionsSchema = z.union([
-  z.array(monitorPreconditionSchema),
-  // Some legacy monitors persisted `{}` rather than the newer array form.
+  z.array(z.unknown()),
   z.record(z.string(), z.unknown()),
 ]);
 

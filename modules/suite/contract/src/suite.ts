@@ -1,4 +1,5 @@
 import {
+  evaluatorAttachmentsSchema,
   MAX_PARAMETER_NAME_LENGTH,
   MAX_RUN_PARAMETER_KEYS,
   runActorSchema,
@@ -166,6 +167,8 @@ export const runPlanConfigSchema = z
     judgeModel: z.string().nullish(),
     /** The scenarios a hand-picked scope covers; ignored by every other. */
     scenarioIds: z.array(z.string()).optional(),
+    /** The plan's own evaluators, beside the suites'. Absent keeps what the plan holds. */
+    evaluators: evaluatorAttachmentsSchema.optional(),
   })
   .strict();
 export type RunPlanConfigInput = z.infer<typeof runPlanConfigSchema>;

@@ -1,5 +1,6 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi, ScenarioTestSuite } from "@langwatch/scenario-contract";
@@ -141,7 +142,13 @@ function buildApp(overrides: { scenarios?: Partial<ScenarioApi> } = {}) {
 
   const app = SuiteApp.createForTesting({
     repositories: createSuiteTestRepositories(),
-    dependencies: { scenarios, agents: agentApi, prompts: promptApi, projects: projectApi },
+    dependencies: {
+      scenarios,
+      agents: agentApi,
+      prompts: promptApi,
+      projects: projectApi,
+      evaluators: createApiFixture<EvaluatorApi>({}),
+    },
   });
   return { app, updateTestSuite };
 }
@@ -169,6 +176,22 @@ describe("SuiteApp.update", () => {
       ).rejects.toMatchObject({ code: "validation_error" });
 
       expect(updateTestSuite).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a test suite the editor saves fields and evaluators onto", () => {
+    it("forwards both to the test suite's own update", async () => {
+      const { app, updateTestSuite } = buildApp();
+      const fields = [{ identifier: "golden", type: "text" as const }];
+      const evaluators = [
+        { id: "attachment-1", evaluatorId: "evaluator-1", required: true, mappings: {} },
+      ];
+
+      await app.update({ id: "test_suite_1", projectId: "project_1", fields, evaluators });
+
+      expect(updateTestSuite).toHaveBeenCalledWith(
+        expect.objectContaining({ testSuiteId: "test_suite_1", fields, evaluators }),
+      );
     });
   });
 

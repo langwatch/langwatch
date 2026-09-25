@@ -199,6 +199,7 @@ export class PrismaSuiteRepository extends SuiteRepository {
       simulatorModel: input.config.simulatorModel ?? null,
       judgeModel: input.config.judgeModel ?? null,
       scenarioIds: input.scenarioIds,
+      ...(input.config.evaluators === undefined ? {} : { evaluators: input.config.evaluators }),
     };
     const baseSlug = slugify(input.name) || "run-plan";
 
@@ -360,8 +361,10 @@ SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
     return mapSuite(row);
   }
 
-  update = async (input: UpdateSuiteCommand & { slug?: string }): Promise<Suite> => {
-    const { id, projectId, slug, scope, targets, ...data } = input;
+  update = async (
+    input: Omit<UpdateSuiteCommand, "fields"> & { slug?: string },
+  ): Promise<Suite> => {
+    const { id, projectId, slug, scope, targets, evaluators, ...data } = input;
     const row = await this.database.simulationSuite.update({
       where: { id, projectId, kind: "run_plan", archivedAt: null },
       data: {
@@ -369,6 +372,7 @@ SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
         ...(slug === void 0 ? {} : { slug }),
         ...(scope === void 0 ? {} : { scope: scope as Prisma.InputJsonValue }),
         ...(targets === void 0 ? {} : { targets: targets as Prisma.InputJsonValue }),
+        ...(evaluators === void 0 ? {} : { evaluators }),
       },
     });
     return mapSuite(row);

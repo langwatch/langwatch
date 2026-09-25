@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -221,6 +222,7 @@ function buildService() {
     scenarios: fakeScenarioService(),
     agents: fakeAgentApi(agents),
     prompts: fakePromptService(),
+    evaluators: createApiFixture<EvaluatorApi>({}),
     execution: capturingExecution(startedRuns),
   });
 }

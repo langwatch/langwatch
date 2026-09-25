@@ -1,3 +1,4 @@
+import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
 import type { Suite } from "@langwatch/suite-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -18,6 +19,8 @@ export type MemoryScenarioRow = Readonly<{
 export class MemorySuiteDatabase {
   readonly plans = new Map<string, Suite>();
   readonly scenarios = new Map<string, MemoryScenarioRow>();
+  /** A plan's own `evaluators` column, by plan id; the domain row does not carry it. */
+  readonly planEvaluators = new Map<string, EvaluatorAttachment[]>();
 
   private constructor() {}
 

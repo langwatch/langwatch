@@ -16,15 +16,8 @@ export const monitorRestMappingsSchema = z
   .nullable()
   .optional();
 
-export const monitorRestPreconditionsSchema = z.array(
-  z.object({
-    field: z.string().min(1),
-    rule: z.string().min(1),
-    value: z.string().min(1),
-    key: z.string().optional(),
-    subkey: z.string().optional(),
-  }),
-);
+/** Any JSON list, as main accepted and stored. */
+export const monitorRestPreconditionsSchema = z.array(z.unknown());
 
 export const monitorRestResponseSchema = z.object({
   id: z.string(),

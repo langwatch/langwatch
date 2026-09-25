@@ -4,6 +4,7 @@ import { AgentApi, type AgentApi as AgentApiType } from "@langwatch/agent-contra
  */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { EvaluatorApi, type EvaluatorApi as EvaluatorApiType } from "@langwatch/evaluator-contract";
 import {
   RepositoryFoldStore,
   type EventingCommands,
@@ -83,6 +84,7 @@ export interface SuiteAppDependencies {
   agents: AgentApiType;
   prompts: PromptApiType;
   projects: ProjectApiType;
+  evaluators: EvaluatorApiType;
 }
 
 /**
@@ -116,6 +118,7 @@ export class SuiteApp implements SuiteApi {
     agents: AgentApi,
     prompts: PromptApi,
     projects: ProjectApi,
+    evaluators: EvaluatorApi,
     /** Owns `LANGWATCH_DEFAULT_RETENTION_DAYS`; a suite run is stamped with its default. */
     retention: DataRetentionApi,
   };
@@ -135,6 +138,7 @@ export class SuiteApp implements SuiteApi {
       scenarios: dependencies.scenarios,
       agents: dependencies.agents,
       prompts: dependencies.prompts,
+      evaluators: dependencies.evaluators,
       execution: infrastructure.execution,
       connectedPresence: infrastructure.connectedPresence,
     });
@@ -199,6 +203,7 @@ export class SuiteApp implements SuiteApi {
       scenarios: setup.dependencies.scenarios,
       agents: setup.dependencies.agents,
       prompts: setup.dependencies.prompts,
+      evaluators: setup.dependencies.evaluators,
       execution: infrastructure.execution,
       connectedPresence: infrastructure.connectedPresence,
       ...(setup.generateId ? { generateId: setup.generateId } : {}),
@@ -396,6 +401,8 @@ export class SuiteApp implements SuiteApi {
       ...(input.name === undefined ? {} : { name: input.name }),
       ...(input.description === undefined ? {} : { description: input.description }),
       ...(input.labels === undefined ? {} : { labels: input.labels }),
+      ...(input.fields === undefined ? {} : { fields: input.fields }),
+      ...(input.evaluators === undefined ? {} : { evaluators: input.evaluators }),
     });
     return { kind: "test_suite", testSuite: updated };
   }

@@ -136,6 +136,24 @@ describe("the monitors REST family", () => {
       const [written] = await api.repository.findAll({ projectId: TEST_PROJECT.id });
       expect(written?.mappings).toEqual({ mapping: {}, expansions: [] });
     });
+
+    it("stores preconditions of any JSON shape as main did, and lists them back", async () => {
+      const api = mountMonitorRest();
+      const preconditions = [{ field: "input", rule: "contains", value: "hi" }, "legacy", 3];
+
+      const response = await api.post("/api/monitors", {
+        name: "Loose",
+        checkType: "langevals/llm_boolean",
+        evaluatorId: "evaluator-1",
+        preconditions,
+      });
+
+      expect(response.status).toBe(201);
+      const listed = await api.get("/api/monitors");
+      expect(listed.status).toBe(200);
+      const [written] = await api.repository.findAll({ projectId: TEST_PROJECT.id });
+      expect(written?.preconditions).toEqual(preconditions);
+    });
   });
 
   describe("when the application refuses a write", () => {

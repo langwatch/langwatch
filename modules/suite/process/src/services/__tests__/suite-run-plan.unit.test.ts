@@ -1,5 +1,6 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import {
@@ -103,6 +104,7 @@ function buildService(overrides: {
     scenarios,
     agents,
     prompts: {} as PromptApi,
+    evaluators: createApiFixture<EvaluatorApi>({}),
     execution,
     generateId: () => "suite-generated-1",
   });

@@ -7,8 +7,8 @@ import { z } from "zod";
 
 import {
   monitorExecutionModeSchema,
-  monitorPreconditionsSchema,
   monitorSettingsSchema,
+  structuredMonitorPreconditionsSchema,
 } from "./monitor.ts";
 
 /** One project. Every project-scoped procedure on the surface takes it. */
@@ -56,7 +56,7 @@ export const monitorApiCreateInputSchema = z.object({
   projectId: z.string(),
   name: z.string(),
   checkType: z.string(),
-  preconditions: monitorPreconditionsSchema,
+  preconditions: structuredMonitorPreconditionsSchema,
   settings: monitorSettingsSchema,
   mappings: monitorApiMappingsSchema.optional(),
   sample: z.number().min(0).max(1),
@@ -72,7 +72,7 @@ export const monitorApiUpdateInputSchema = z.object({
   projectId: z.string(),
   name: z.string(),
   checkType: z.string(),
-  preconditions: monitorPreconditionsSchema,
+  preconditions: structuredMonitorPreconditionsSchema,
   settings: monitorSettingsSchema,
   mappings: monitorApiMappingsSchema,
   sample: z.number().min(0).max(1),

@@ -1,6 +1,7 @@
 import { ValidationError } from "@langwatch/handled-error";
 import {
   parseScenarioParameterDefinitions,
+  type EvaluatorAttachment,
   type ScenarioTestSuite,
 } from "@langwatch/scenario-contract";
 /**
@@ -51,6 +52,11 @@ type SuiteRunServiceOptions = {
   options: SuiteServiceOptions;
   /** The owning service's own read, so a run refuses a missing suite the same way. */
   get: (input: SuiteIdInput) => Promise<Suite>;
+  /** The owning service's check of a plan's own evaluators. */
+  readPlanEvaluators: (input: {
+    projectId: string;
+    attachments: EvaluatorAttachment[];
+  }) => Promise<EvaluatorAttachment[]>;
   testSuiteToSuite: (testSuite: ScenarioTestSuite) => Suite;
 };
 
@@ -179,6 +185,14 @@ export class SuiteRunService {
         targets,
       }));
 
+    const evaluators =
+      parsed.config.evaluators === undefined
+        ? undefined
+        : await this.deps.readPlanEvaluators({
+            projectId: parsed.projectId,
+            attachments: parsed.config.evaluators,
+          });
+
     const { suite, created } = await repository.findOrCreatePlanByName({
       id: (this.options.generateId ?? defaultSuiteId)(),
       projectId: parsed.projectId,
@@ -186,7 +200,7 @@ export class SuiteRunService {
       scope,
       targets,
       scenarioIds,
-      config: parsed.config,
+      config: { ...parsed.config, ...(evaluators === undefined ? {} : { evaluators }) },
     });
 
     const result = await this.execute({

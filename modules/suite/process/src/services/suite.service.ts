@@ -1,13 +1,17 @@
 import type { AgentApi } from "@langwatch/agent-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { ValidationError } from "@langwatch/handled-error";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import {
   jsonValueSchema,
   ScenarioTestSuiteNotFoundError,
+  type EvaluatorAttachment,
   type ScenarioTestSuite,
   type ScenarioApi,
 } from "@langwatch/scenario-contract";
 import {
   createSuiteCommandSchema,
+  readEvaluatorAttachments,
   suiteArchivedNamesInputSchema,
   suiteIdInputSchema,
   suiteSchema,
@@ -38,11 +42,14 @@ import { SuiteRunService } from "./suite-run.service.ts";
 
 const archivedSlugSuffix = "--archived";
 
+const PLAN_FIELDS_REFUSAL = "A run plan takes no fields. Fields are declared on a test suite.";
+
 export type SuiteServiceOptions = {
   repository: SuiteRepository;
   scenarios: ScenarioApi;
   agents: AgentApi;
   prompts: PromptApi;
+  evaluators: EvaluatorApi;
   execution: SuiteExecution;
   /**
    * Which connected agents have a process attached, so a target naming an
@@ -65,6 +72,7 @@ export class SuiteService {
     this.runs = SuiteRunService.create({
       options,
       get: (input) => this.get(input),
+      readPlanEvaluators: (input) => this.readPlanEvaluators(input),
       testSuiteToSuite: (testSuite) => SuiteService.testSuiteToSuite(testSuite),
     });
   }
@@ -124,18 +132,48 @@ export class SuiteService {
       return this.updateTestSuite(parsed);
     }
 
-    const slug = parsed.name === undefined ? undefined : suiteSlugOf(parsed.name);
-    if (slug !== undefined) {
-      await this.assertSlugAvailable({
-        projectId: parsed.projectId,
-        slug,
-        excludeId: parsed.id,
+    const { fields, evaluators, ...columns } = parsed;
+    if (fields !== undefined) {
+      throw new ValidationError(PLAN_FIELDS_REFUSAL, {
+        meta: { fieldErrors: { fields: [PLAN_FIELDS_REFUSAL] } },
       });
     }
 
+    const slug = columns.name === undefined ? undefined : suiteSlugOf(columns.name);
+    if (slug !== undefined) {
+      await this.assertSlugAvailable({
+        projectId: columns.projectId,
+        slug,
+        excludeId: columns.id,
+      });
+    }
+
+    const checked =
+      evaluators === undefined
+        ? undefined
+        : await this.readPlanEvaluators({ projectId: columns.projectId, attachments: evaluators });
+
     return this.options.repository.update({
-      ...parsed,
+      ...columns,
       ...(slug === undefined ? {} : { slug }),
+      ...(checked === undefined ? {} : { evaluators: checked }),
+    });
+  }
+
+  /**
+   * A run plan's own evaluators, checked against the project: each must name
+   * a saved evaluator, and none may read a scenario field.
+   */
+  async readPlanEvaluators(input: {
+    projectId: string;
+    attachments: EvaluatorAttachment[];
+  }): Promise<EvaluatorAttachment[]> {
+    const saved = await this.options.evaluators.getAllWithFields({ projectId: input.projectId });
+    return readEvaluatorAttachments({
+      attachments: input.attachments,
+      fields: [],
+      isPlanLevel: true,
+      evaluatorsById: new Map(saved.map((evaluator) => [evaluator.id, evaluator])),
     });
   }
 
@@ -240,6 +278,8 @@ export class SuiteService {
         labels: input.labels,
         simulatorModel: input.simulatorModel,
         judgeModel: input.judgeModel,
+        fields: input.fields,
+        evaluators: input.evaluators,
       });
 
       return SuiteService.testSuiteToSuite(testSuite);

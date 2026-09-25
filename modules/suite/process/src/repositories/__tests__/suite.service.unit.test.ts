@@ -1,5 +1,6 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import {
   ScenarioTestSuiteNotFoundError,
@@ -110,6 +111,7 @@ function serviceOptions(
     scenarios: mockScenarioService({ findTestSuite: vi.fn().mockResolvedValue(null) }),
     agents: createApiFixture<AgentApi>(),
     prompts: createApiFixture<PromptApi>(),
+    evaluators: createApiFixture<EvaluatorApi>({}),
     execution: new UnusedExecution(),
     ...overrides,
   };
@@ -264,6 +266,7 @@ describe("SuiteService", () => {
         getExistingIds: vi.fn().mockResolvedValue(["prompt_active"]),
         getNamesByIds: vi.fn(),
       }),
+      evaluators: createApiFixture<EvaluatorApi>({}),
       execution: new Execution(),
     });
 
@@ -304,6 +307,7 @@ describe("SuiteService", () => {
       }),
       agents: mockAgentService({ getReferenceStates: vi.fn(), getNamesByIds: vi.fn() }),
       prompts: mockPromptService({ getExistingIds: vi.fn(), getNamesByIds: vi.fn() }),
+      evaluators: createApiFixture<EvaluatorApi>({}),
       execution: new Execution(),
     });
 
@@ -499,6 +503,7 @@ describe("SuiteService", () => {
     const getExistingIds = vi.fn().mockResolvedValue(["prompt_active"]);
     const prompts = mockPromptService({ getExistingIds, getNamesByIds: vi.fn() });
     const service = SuiteService.create({
+      evaluators: createApiFixture<EvaluatorApi>({}),
       repository: repository({
         findById: vi.fn().mockResolvedValue(
           suite({
@@ -586,6 +591,7 @@ describe("SuiteService", () => {
       getNamesByIds: vi.fn(),
     });
     const service = SuiteService.create({
+      evaluators: createApiFixture<EvaluatorApi>({}),
       repository: repository({
         findById: vi.fn().mockResolvedValue(
           suite({
@@ -625,6 +631,7 @@ describe("SuiteService", () => {
       getNamesByIds: vi.fn(),
     });
     const service = SuiteService.create({
+      evaluators: createApiFixture<EvaluatorApi>({}),
       repository: repository({ findById: vi.fn().mockResolvedValue(suite()) }),
       scenarios,
       agents: mockAgentService({ getReferenceStates: vi.fn(), getNamesByIds: vi.fn() }),
@@ -661,6 +668,7 @@ describe("SuiteService", () => {
         getNamesByIds: vi.fn(),
       }),
       prompts: mockPromptService({ getExistingIds: vi.fn(), getNamesByIds: vi.fn() }),
+      evaluators: createApiFixture<EvaluatorApi>({}),
       execution: targetExecution,
     });
 
@@ -681,6 +689,7 @@ describe("SuiteService", () => {
   it("rejects a prompt target the project's own prompt lookup does not resolve", async () => {
     const execution = new CapturingExecution();
     const service = SuiteService.create({
+      evaluators: createApiFixture<EvaluatorApi>({}),
       repository: repository({
         findById: vi.fn().mockResolvedValue(
           suite({
@@ -718,6 +727,7 @@ describe("SuiteService", () => {
   it("rejects when every target is archived", async () => {
     const execution = new CapturingExecution();
     const service = SuiteService.create({
+      evaluators: createApiFixture<EvaluatorApi>({}),
       repository: repository({
         findById: vi.fn().mockResolvedValue(
           suite({
@@ -1155,6 +1165,7 @@ describe("SuiteService", () => {
       const execution = new CapturingExecution();
       const resolveDynamicRunMembership = vi.fn();
       const service = SuiteService.create({
+        evaluators: createApiFixture<EvaluatorApi>({}),
         repository: repository({
           findById: vi.fn().mockResolvedValue(
             suite({
@@ -1212,6 +1223,7 @@ describe("SuiteService", () => {
       const buildService = () => {
         const execution = new CapturingExecution();
         const service = SuiteService.create({
+          evaluators: createApiFixture<EvaluatorApi>({}),
           repository: repository({
             findById: vi.fn().mockResolvedValue(
               suite({
@@ -1270,6 +1282,7 @@ describe("SuiteService", () => {
       const buildService = () => {
         const execution = new CapturingExecution();
         const service = SuiteService.create({
+          evaluators: createApiFixture<EvaluatorApi>({}),
           repository: repository({
             findById: vi.fn().mockResolvedValue(
               suite({
@@ -1315,6 +1328,7 @@ describe("SuiteService", () => {
     it("excludes an archived scenario the dynamic scope still names", async () => {
       const execution = new CapturingExecution();
       const service = SuiteService.create({
+        evaluators: createApiFixture<EvaluatorApi>({}),
         repository: repository({
           findById: vi.fn().mockResolvedValue(
             suite({

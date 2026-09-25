@@ -13,6 +13,7 @@ import {
   type RestErrorHandler,
   type RestMountOptions,
 } from "@langwatch/api/rest";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
@@ -421,6 +422,7 @@ export function mountSuiteFamilies(options: { caller?: RestFamilyCaller | undefi
       projects: createApiFixture<ProjectApi>({
         findOrganizationId: async () => TEST_PROJECT.organizationId,
       }),
+      evaluators: createApiFixture<EvaluatorApi>({}),
     },
     infrastructure: {
       execution: SuiteExecutionService.create({ commands, scenarios }),

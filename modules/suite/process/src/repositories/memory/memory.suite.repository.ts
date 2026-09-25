@@ -1,3 +1,4 @@
+import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
 import {
   CLI_EPHEMERAL_LABEL,
   planNameKey,
@@ -15,8 +16,8 @@ import { nowInstant, toDate } from "@langwatch/time";
 import { SuiteRepository } from "../suite.repository.ts";
 import { MemorySuiteDatabase } from "./memory.suite.database.ts";
 
-/** What addresses the row rather than describing it, so an update never writes it. */
-const ADDRESS_FIELDS = ["id", "projectId", "slug"];
+/** What addresses the row, or is not a domain column, so an update never writes it onto the row. */
+const ADDRESS_FIELDS = ["id", "projectId", "slug", "evaluators"];
 
 /** A run plan of this project that is still listed. */
 function isActivePlanOf(plan: Suite, projectId: string): boolean {
@@ -222,6 +223,7 @@ export class MemorySuiteRepository extends SuiteRepository {
     if (existing) {
       const updated = suiteSchema.parse({ ...existing, ...stored, updatedAt: now });
       this.database.plans.set(updated.id, updated);
+      this.writeEvaluators(updated.id, input.config.evaluators);
 
       return { suite: updated, created: false };
     }
@@ -240,11 +242,18 @@ export class MemorySuiteRepository extends SuiteRepository {
       ...stored,
     });
     this.database.plans.set(created.id, created);
+    this.writeEvaluators(created.id, input.config.evaluators);
 
     return { suite: created, created: true };
   }
 
-  update = async (input: UpdateSuiteCommand & { slug?: string }): Promise<Suite> => {
+  private writeEvaluators(planId: string, evaluators: EvaluatorAttachment[] | undefined): void {
+    if (evaluators !== undefined) this.database.planEvaluators.set(planId, evaluators);
+  }
+
+  update = async (
+    input: Omit<UpdateSuiteCommand, "fields"> & { slug?: string },
+  ): Promise<Suite> => {
     const existing = this.database.plans.get(input.id);
     if (!existing || !isActivePlanOf(existing, input.projectId)) {
       throw new SuiteNotFoundError(input.id);
@@ -260,6 +269,7 @@ export class MemorySuiteRepository extends SuiteRepository {
       updatedAt: toDate(nowInstant()),
     });
     this.database.plans.set(updated.id, updated);
+    this.writeEvaluators(updated.id, input.evaluators);
 
     return updated;
   };

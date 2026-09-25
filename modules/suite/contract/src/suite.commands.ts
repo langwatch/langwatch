@@ -1,3 +1,7 @@
+import {
+  evaluatorAttachmentsSchema,
+  suiteFieldDefinitionsSchema,
+} from "@langwatch/scenario-contract";
 import { z } from "zod";
 
 import { suiteScopeSchema } from "./suite.scope.ts";
@@ -30,7 +34,14 @@ export type CreateSuiteCommand = z.input<typeof createSuiteCommandSchema>;
 export const updateSuiteCommandSchema = suiteDefinitionFieldsSchema
   .omit({ projectId: true })
   .partial()
-  .safeExtend({ id: z.string().min(1), projectId: z.string().min(1) })
+  .safeExtend({
+    id: z.string().min(1),
+    projectId: z.string().min(1),
+    /** The fields a test suite declares; refused on a run plan. */
+    fields: suiteFieldDefinitionsSchema.optional(),
+    /** The evaluators the suite or plan attaches, the full list. */
+    evaluators: evaluatorAttachmentsSchema.optional(),
+  })
   .strict();
 export type UpdateSuiteCommand = z.input<typeof updateSuiteCommandSchema>;
 
