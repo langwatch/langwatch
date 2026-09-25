@@ -1,6 +1,8 @@
 // Written into a branch worktree's packages/api by apidiff and deleted after
 // it runs: imports every contract that calls defineTrpcContract and prints the
-// built declarations as a procedure manifest.
+// built declarations as a procedure manifest. A declaration a contract cannot
+// hold (authz: @langwatch/api depends on its contract) is read from the
+// process transport, after every contract.
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -31,7 +33,14 @@ function contractFiles() {
       files.push(...moduleContractFiles(join(repoRoot, parent, module, "contract/src")));
     }
   }
-  return files.toSorted((left, right) => left.localeCompare(right));
+  const transports = [];
+  for (const parent of ["modules", "enterprise/modules"]) {
+    for (const module of listDir(join(repoRoot, parent))) {
+      transports.push(...moduleContractFiles(join(repoRoot, parent, module, "process/src/transport")));
+    }
+  }
+  const byPath = (left, right) => left.localeCompare(right);
+  return [...files.toSorted(byPath), ...transports.toSorted(byPath)];
 }
 
 function toJsonSchema(schema, io) {
