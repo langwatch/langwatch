@@ -57,7 +57,7 @@ On Kubernetes, add the same variables to the proxy's `env` (or its secret) in yo
 ```bash
 curl http://0.0.0.0:4000/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer sk-your-litellm-key" \
+  -H "Authorization: Bearer $LITELLM_API_KEY" \
   -d '{
     "model": "gpt-5-mini",
     "messages": [{ "role": "user", "content": "Hello from the LiteLLM Proxy" }]
