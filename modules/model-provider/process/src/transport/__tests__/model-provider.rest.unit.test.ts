@@ -11,6 +11,7 @@ import {
   ModelProviderNotFoundError,
   ModelProviderRoutingHandleTakenError,
   type ModelProviderApi,
+  type ModelProviderSummary,
 } from "@langwatch/model-provider-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -64,6 +65,32 @@ function storedProviders() {
       },
     ]),
   );
+}
+
+function summary(
+  overrides: Partial<ModelProviderSummary> & Pick<ModelProviderSummary, "id" | "provider">,
+): ModelProviderSummary {
+  return {
+    organizationId: "organization-1",
+    name: overrides.provider,
+    enabled: true,
+    routingHandle: null,
+    scopes: [],
+    customKeys: null,
+    customModels: [],
+    customEmbeddingsModels: [],
+    extraHeaders: [],
+    rateLimitRpm: null,
+    rateLimitTpm: null,
+    rateLimitRpd: null,
+    fallbackPriorityGlobal: null,
+    providerConfig: null,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    isSystem: false,
+    embeddingsUnsupported: false,
+    ...overrides,
+  };
 }
 
 function mount(modelProviders: Partial<ModelProviderApi>) {
@@ -124,6 +151,44 @@ describe("the model-providers read route", () => {
         expect(typeof entry.disabledByDefault, name).toBe("boolean");
         expect(Array.isArray(entry.extraHeaders), name).toBe(true);
       }
+    });
+
+    it("answers a registry default without an id or custom models, and an empty stored list as null", async () => {
+      const { get } = mount({
+        getForProject: async () => ({
+          openai: summary({ id: "mp_openai", provider: "openai" }),
+          anthropic: summary({
+            id: "system_anthropic",
+            provider: "anthropic",
+            enabled: false,
+            models: ["anthropic/claude"],
+            embeddingsModels: [],
+            disabledByDefault: true,
+            isSystem: true,
+          }),
+        }),
+      });
+
+      const body = (await (await get("/api/model-providers")).json()) as Record<
+        string,
+        Record<string, unknown>
+      >;
+
+      expect(body.anthropic).toEqual({
+        provider: "anthropic",
+        enabled: false,
+        customKeys: null,
+        deploymentMapping: null,
+        models: ["anthropic/claude"],
+        embeddingsModels: [],
+        disabledByDefault: true,
+        extraHeaders: [],
+      });
+      expect(body.openai).toMatchObject({
+        id: "mp_openai",
+        customModels: null,
+        customEmbeddingsModels: null,
+      });
     });
 
     /** @scenario "GET /api/model-providers returns no credential value for any provider" */

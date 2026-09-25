@@ -297,11 +297,19 @@ export const teamsRest: Readonly<{
       organizationId: scope.id,
     });
 
+    const projects = await app.listProjectsByTeam({
+      organizationId: scope.id,
+      teamId: input.teamId,
+    });
+
     return {
-      data: await app.listProjectsByTeam({
-        organizationId: scope.id,
-        teamId: input.teamId,
-      }),
+      data: projects.map(({ id, name, slug, createdAt, updatedAt }) => ({
+        id,
+        name,
+        slug,
+        createdAt,
+        updatedAt,
+      })),
     };
   })
 

@@ -5,7 +5,7 @@ import { SecretApi, secretPublicSchema } from "@langwatch/secret-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { createSecretTestApp } from "../../app/__tests__/secret.fixture.ts";
-import { SECRET_REST_VERSION, secretRest, secretsAliasRest } from "../secret.rest.ts";
+import { SECRET_REST_VERSION, secretRest } from "../secret.rest.ts";
 
 const PROJECT = "project-1";
 const USER: Actor = { type: "user", id: "user-1" };
@@ -29,7 +29,7 @@ function mount(options: { project?: string; actor?: Actor | null } = {}) {
 }
 
 async function create(app: ReturnType<typeof mount>, body: Record<string, unknown>) {
-  return app.request("/api/secret", {
+  return app.request("/api/secrets", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -46,10 +46,10 @@ describe("the secret REST family", () => {
       // A collection's path is the family root, so it contributes nothing to
       // the dated and `latest` addresses: they end at the version segment.
       const paths = [
-        `/api/secret?projectId=${PROJECT}`,
-        `/api/secret/latest?projectId=${PROJECT}`,
-        `/api/secret/${SECRET_REST_VERSION}?projectId=${PROJECT}`,
-        `/api/v1/secret?projectId=${PROJECT}`,
+        `/api/secrets?projectId=${PROJECT}`,
+        `/api/secrets/latest?projectId=${PROJECT}`,
+        `/api/secrets/${SECRET_REST_VERSION}?projectId=${PROJECT}`,
+        `/api/v1/secrets?projectId=${PROJECT}`,
       ];
       const answers = await Promise.all(
         paths.map(async (path) => {
@@ -110,7 +110,7 @@ describe("the secret REST family", () => {
       const app = mount();
       await create(app, { projectId: PROJECT, name: "OPENAI_API_KEY", value: "sk-live" });
 
-      const response = await app.request("/api/secret?projectId=project-2");
+      const response = await app.request("/api/secrets?projectId=project-2");
 
       expect(response.status).toBeGreaterThanOrEqual(400);
       expect(await response.text()).not.toContain("OPENAI_API_KEY");
@@ -130,31 +130,18 @@ describe("the secret REST family", () => {
     });
   });
 
-  describe("when a released client calls the plural family", () => {
+  describe("when a released client calls the family", () => {
     let plural: ReturnType<typeof mount>;
 
     beforeEach(() => {
-      const app = createSecretTestApp();
-      const runtime = createRestRuntime({
-        identity: {
-          authenticate: () => ({ actor: USER, scope: { tier: "project", id: PROJECT } }),
-        },
-      });
-      plural = runtime.mount(secretsAliasRest.router(), {
-        app: () => app,
-        credential: "project",
-        onError: createErrorHandler(),
-      });
+      plural = mount();
     });
 
     /** @scenario "The modern public API is validated REST" */
-    it("serves the same routes under its own namespace", async () => {
-      const listed = await plural.request(`/api/secrets?projectId=${PROJECT}`);
-      const versioned = await plural.request(`/api/v1/secrets?projectId=${PROJECT}`);
+    it("serves no singular `/api/secret` address, which main never published", async () => {
+      const response = await plural.request(`/api/secret?projectId=${PROJECT}`);
 
-      expect(listed.status).toBe(200);
-      expect(versioned.status).toBe(200);
-      await expect(listed.json()).resolves.toEqual([]);
+      expect(response.status).toBe(404);
     });
 
     /** @scenario "The modern public API is validated REST" */
@@ -196,15 +183,8 @@ describe("the secret REST family", () => {
     });
   });
 
-  it("declares the same five operations under both namespaces", () => {
+  it("declares main's five operations", () => {
     expect(secretRest.router().routes.map((route) => route.operation)).toEqual([
-      "listSecrets",
-      "getSecret",
-      "createSecret",
-      "updateSecret",
-      "deleteSecret",
-    ]);
-    expect(secretsAliasRest.router().routes.map((route) => route.operation)).toEqual([
       "getApiSecrets",
       "getApiSecretsById",
       "postApiSecrets",

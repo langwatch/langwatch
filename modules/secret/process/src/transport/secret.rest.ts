@@ -1,5 +1,5 @@
 /**
- * Publishes both `/api/secret` and `/api/secrets`; responses use strict,
+ * Publishes `/api/secrets`, the family main served; responses use strict,
  * value-free `secretPublicSchema`.
  */
 
@@ -17,7 +17,6 @@ import {
   secretPublicDeleteOutputSchema,
   secretPublicAliasParamsSchema,
   secretPublicListInputSchema,
-  secretPublicParamsSchema,
   secretPublicSchema,
   secretPublicUpdateInputSchema,
   toSecretPublic,
@@ -65,76 +64,8 @@ const UPDATE_DOCS = {
 
 const DELETE_DOCS = { summary: "Delete a project secret" };
 
-/** The branch's own family, addressing a secret as `:secretId`. */
-export const secretRest = defineRestRouter(SecretApi)
-  .withNamespace("secret")
-  .withVersion(SECRET_REST_VERSION)
-
-  .get("/", "listSecrets")
-  .withQuery(secretPublicListInputSchema)
-  .withPermission("secrets:view")
-  .withOutput(secretPublicSchema.array())
-  .withDocs(LIST_DOCS)
-  .handle(async ({ app, scope }) => (await app.list({ projectId: scope.id })).map(toSecretPublic))
-
-  .get("/:secretId", "getSecret")
-  .withParams(secretPublicParamsSchema)
-  .withQuery(secretPublicListInputSchema)
-  .withPermission("secrets:view")
-  .withOutput(secretPublicSchema)
-  .withDocs(GET_DOCS)
-  .handle(async ({ app, input, scope }) =>
-    toSecretPublic(await app.get({ projectId: scope.id, id: input.secretId })),
-  )
-
-  .post("/", "createSecret")
-  .withInput(secretPublicCreateInputSchema)
-  .withPermission("secrets:manage")
-  .withOutput(secretPublicSchema)
-  .withStatus(201)
-  .withDocs(CREATE_DOCS)
-  .withBodyLimit(secretBodyLimit)
-  .handle(async ({ app, input, scope, actor }) =>
-    toSecretPublic(
-      await app.create(
-        { projectId: scope.id, name: input.name, value: input.value },
-        callerOf(actor),
-      ),
-    ),
-  )
-
-  .put("/:secretId", "updateSecret")
-  .withParams(secretPublicParamsSchema)
-  .withInput(secretPublicUpdateInputSchema)
-  .withPermission("secrets:manage")
-  .withOutput(secretPublicSchema)
-  .withDocs(UPDATE_DOCS)
-  .withBodyLimit(secretBodyLimit)
-  .handle(async ({ app, input, scope, actor }) =>
-    toSecretPublic(
-      await app.update(
-        { projectId: scope.id, id: input.secretId, value: input.value },
-        callerOf(actor),
-      ),
-    ),
-  )
-
-  .delete("/:secretId", "deleteSecret")
-  .withParams(secretPublicParamsSchema)
-  .withInput(secretPublicDeleteInputSchema)
-  .withPermission("secrets:manage")
-  .withOutput(secretPublicDeleteOutputSchema)
-  .withDocs(DELETE_DOCS)
-  .withBodyLimit(secretBodyLimit)
-  .handle(async ({ app, input, scope }) => {
-    await app.delete({ projectId: scope.id, id: input.secretId });
-
-    return { id: input.secretId, deleted: true as const };
-  })
-  .build();
-
 /** The family main published, addressing a secret as `{id}` as main did. */
-export const secretsAliasRest = defineRestRouter(SecretApi)
+export const secretRest = defineRestRouter(SecretApi)
   .withNamespace("secrets")
   .withVersion(SECRET_REST_VERSION)
 

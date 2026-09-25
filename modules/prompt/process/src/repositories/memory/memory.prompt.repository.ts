@@ -1,3 +1,4 @@
+import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import {
   LATEST_SCHEMA_VERSION,
   NotFoundError,
@@ -312,7 +313,7 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
       outputs: [{ identifier: "output", type: "str" }],
       demonstrations: { inline: { records: {}, columnTypes: [] } },
       response_format: { type: "json_schema", json_schema: { name: "response", schema: {} } },
-      model: "openai/gpt-5",
+      model: DEFAULT_MODEL,
     };
     const input = versionData ?? {
       configData: defaultData,
@@ -321,7 +322,7 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
     };
     const configDataForVersion = input.configData.model
       ? input.configData
-      : { ...input.configData, model: "openai/gpt-5" };
+      : { ...input.configData, model: DEFAULT_MODEL };
     this.#state.configs.set(config.id, config);
     const version = this.appendVersion({
       configId: config.id,

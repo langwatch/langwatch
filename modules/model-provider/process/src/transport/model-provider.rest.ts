@@ -10,8 +10,13 @@ import {
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
 import {
+  type ApiResponseModelProvider,
   apiResponseModelProvidersSchema,
+  type CustomModelEntry,
+  customModelEntrySchema,
+  type Model,
   ModelProviderApi,
+  type ModelProviderSummary,
   modelProviderRestParamsSchema,
   updateModelProviderInputSchema,
 } from "@langwatch/model-provider-contract";
@@ -20,20 +25,6 @@ import { createLogger } from "@langwatch/observability";
 import { toCanonicalCustomModelList } from "../rules/custom-model-list.rules.ts";
 
 const logger = createLogger("langwatch:api:model-providers");
-
-/** One provider row, as this family has always published it. */
-type PublishedProvider = {
-  id: string;
-  provider: string;
-  enabled: boolean;
-  customKeys: Record<string, unknown> | null;
-  customModels: { id: string; label: string; type: string }[];
-  customEmbeddingsModels: { id: string; label: string; type: string }[];
-  models?: string[] | null;
-  embeddingsModels?: string[] | null;
-  disabledByDefault?: boolean;
-  extraHeaders?: { key: string; value: string }[] | null;
-};
 
 export const modelProviderRest = defineRestRouter(ModelProviderApi)
   .withNamespace("model-providers")
@@ -109,49 +100,53 @@ function deriveQualifiedDefaultModel({
   return `${provider}/${model}`;
 }
 
-/** The stored rows in the wire shape this family has always answered with. */
-function published(providers: Record<string, PublishedProvider>): Record<
-  string,
-  {
-    id: string;
-    provider: string;
-    enabled: boolean;
-    customKeys: PublishedProvider["customKeys"];
-    deploymentMapping: null;
-    models: string[] | null;
-    embeddingsModels: string[] | null;
-    customModels: { modelId: string; displayName: string; mode: "chat" }[];
-    customEmbeddingsModels: { modelId: string; displayName: string; mode: "embedding" }[];
-    disabledByDefault: boolean;
-    extraHeaders: { key: string; value: string }[];
-  }
-> {
+/** Main's `apiResponseModelProvidersSchema.parse` over the project's provider map. */
+function published(
+  providers: Record<string, ModelProviderSummary>,
+): Record<string, ApiResponseModelProvider> {
   return Object.fromEntries(
-    Object.entries(providers).map(([key, provider]) => [
-      key,
-      {
-        id: provider.id,
-        provider: provider.provider,
-        enabled: provider.enabled,
-        customKeys: provider.customKeys,
-        deploymentMapping: null,
-        models: provider.models ?? null,
-        embeddingsModels: provider.embeddingsModels ?? null,
-        customModels: provider.customModels.map((model) => ({
-          modelId: model.id,
-          displayName: model.label,
-          mode: "chat" as const,
-        })),
-        customEmbeddingsModels: provider.customEmbeddingsModels.map((model) => ({
-          modelId: model.id,
-          displayName: model.label,
-          mode: "embedding" as const,
-        })),
-        // Always present, though the schema allows their absence: a caller that
-        // has to presence-check every field cannot read the entry at all.
-        disabledByDefault: provider.disabledByDefault ?? false,
-        extraHeaders: provider.extraHeaders ?? [],
-      },
-    ]),
+    Object.entries(providers).map(([key, provider]) => [key, publishedProvider(provider)]),
+  );
+}
+
+/**
+ * A registry default carries no id or custom models; a stored row's empty custom list reads null.
+ */
+function publishedProvider(provider: ModelProviderSummary): ApiResponseModelProvider {
+  const shared = {
+    provider: provider.provider,
+    enabled: provider.enabled,
+    customKeys: provider.customKeys,
+    deploymentMapping: provider.deploymentMapping ?? null,
+    models: provider.models ?? null,
+    embeddingsModels: provider.embeddingsModels ?? null,
+    // Always present: a caller that has to presence-check every field cannot read the entry.
+    disabledByDefault: provider.disabledByDefault ?? false,
+    extraHeaders: provider.extraHeaders ?? [],
+  };
+  if (provider.isSystem) return shared;
+
+  return {
+    id: provider.id,
+    ...shared,
+    customModels:
+      provider.customModels.length > 0 ? toCustomModelEntries(provider.customModels, "chat") : null,
+    customEmbeddingsModels:
+      provider.customEmbeddingsModels.length > 0
+        ? toCustomModelEntries(provider.customEmbeddingsModels, "embedding")
+        : null,
+  };
+}
+
+function toCustomModelEntries(models: Model[], mode: CustomModelEntry["mode"]): CustomModelEntry[] {
+  return models.map((model) =>
+    customModelEntrySchema.parse({
+      modelId: model.id,
+      displayName: model.label,
+      mode,
+      maxTokens: model.maxTokens,
+      supportedParameters: model.supportedParameters,
+      multimodalInputs: model.multimodalInputs,
+    }),
   );
 }

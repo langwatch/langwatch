@@ -17,6 +17,16 @@ interface CatalogueEntry {
 }
 
 describe("the built-in evaluator catalogue", () => {
+  describe("given any evaluator's settings", () => {
+    it("publishes draft-07 with closed objects, as main's catalogue did", () => {
+      expect(evaluatorSettingsJsonSchema("azure/content_safety")).toMatchObject({
+        $schema: "http://json-schema.org/draft-07/schema#",
+        type: "object",
+        additionalProperties: false,
+      });
+    });
+  });
+
   describe("given an evaluator whose settings carry a default and a description", () => {
     /** @scenario "An evaluator's settings are described field by field" */
     it("names the object's type and every setting, with its default and prose", () => {

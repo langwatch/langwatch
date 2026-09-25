@@ -138,3 +138,5 @@ domain invariants behind them.
   resolved by this change.
 
 Executable behaviour: [secret.feature](../specs/secret.feature).
+
+**Amended 2026-09-25 (apidiff parity, behaviour from main):** only `/api/secrets` is served. The branch-only singular `/api/secret` family is removed; main never served it.

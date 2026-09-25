@@ -33,8 +33,25 @@ export function evaluatorSettingsJsonSchema(key: string): Record<string, unknown
     // runtime but TypeScript cannot narrow.
     evaluatorsSchema.shape[key]?.shape.settings as z.ZodType | undefined;
   if (!settings) return {};
-  const schema = z.toJSONSchema(settings, { io: "input", unrepresentable: "any" });
+  const schema = z.toJSONSchema(settings, {
+    io: "input",
+    unrepresentable: "any",
+    target: "draft-07",
+    override: asPublishedDraft07,
+  });
   return withEnumerations(schema) as Record<string, unknown>;
+}
+
+/** Closed objects and bare-keyed records, as this endpoint has always published them. */
+function asPublishedDraft07({
+  zodSchema,
+  jsonSchema,
+}: {
+  zodSchema: z.core.$ZodTypes;
+  jsonSchema: z.core.JSONSchema.BaseSchema;
+}): void {
+  if (zodSchema._zod.def.type === "object") jsonSchema.additionalProperties ??= false;
+  if (zodSchema._zod.def.type === "record") delete jsonSchema.propertyNames;
 }
 
 /**

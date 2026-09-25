@@ -80,5 +80,16 @@ export const organizationTeamRestMemberParamsSchema = z.object({
 /** What a route answers when the whole of its answer is that it worked. */
 export const organizationTeamRestSuccessSchema = z.object({ success: z.boolean() });
 
+/** One project of a team: its name and stamps, never its keys. */
+const organizationTeamRestProjectSchema = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  slug: z.string(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
 /** The projects of one team, as the door lists them. */
-export const organizationTeamRestProjectListSchema = z.object({ data: z.array(z.unknown()) });
+export const organizationTeamRestProjectListSchema = z.object({
+  data: z.array(organizationTeamRestProjectSchema),
+});

@@ -758,6 +758,24 @@ describe("given the teams REST family over the application the composition build
       expect(body.data.map((project) => project.id)).toEqual(["project_1"]);
     });
 
+    it("answers each project's name and stamps only, never its keys", async () => {
+      const { send } = mountTeamsRestApplication(application().app);
+
+      const response = await send(`/api/teams/${SHARED_TEAM_ID}/projects`);
+
+      expect(await response.json()).toEqual({
+        data: [
+          {
+            id: "project_1",
+            name: "First Project",
+            slug: "first-project",
+            createdAt: expect.any(String),
+            updatedAt: expect.any(String),
+          },
+        ],
+      });
+    });
+
     /** The same pre-flight read: a foreign team is absent, not empty. */
     it("answers 404 for a team in another organization rather than an empty list", async () => {
       const { send } = mountTeamsRestApplication(application().app);

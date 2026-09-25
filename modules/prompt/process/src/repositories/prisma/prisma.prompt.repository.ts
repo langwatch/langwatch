@@ -1,4 +1,4 @@
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { DEFAULT_MODEL, type ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { uniqueConstraintTargets } from "@langwatch/prisma-client/errors";
 import type {
@@ -718,14 +718,16 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
       // Resolve the project's DEFAULT model via the cascade, but only on the paths that actually
       // need one: no version data at all, or a version without a model. A prompt that ships its
       // own model, like every prompt pushed by the CLI's sync, must not require the project to
-      // have a default model configured.
+      // have a default model configured. Nothing configured refuses as model_not_configured.
       const resolveDefaultModel = async (): Promise<string> =>
-        (
-          await this.modelProvider?.findResolvedDefault({
-            projectId: configData.projectId,
-            featureKey: "DEFAULT",
-          })
-        )?.model ?? "openai/gpt-5";
+        this.modelProvider
+          ? (
+              await this.modelProvider.resolveModelForFeature({
+                projectId: configData.projectId,
+                featureKey: "prompt.create_default",
+              })
+            ).model
+          : DEFAULT_MODEL;
 
       // Set version data to provided value or undefined if not provided.
       let newVersionData: Partial<CreateLlmConfigVersionParams> | undefined = versionData;
