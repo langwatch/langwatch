@@ -71,7 +71,11 @@ const ROUTING_LABELS = {
 
 const FAKE_SPAN = { addEvent: () => {}, setAttribute: () => {} } as never;
 
-describe("GroupQueueProcessor — batch bisection", () => {
+/**
+ * The suite's Redis connection and queues, with their lifecycle registered in
+ * the calling describe: queues close and this suite's keys go after each test.
+ */
+function bisectionHarness() {
   let redis: Redis;
   let queues: GroupQueueProcessor<TestPayload>[];
 
@@ -150,12 +154,18 @@ describe("GroupQueueProcessor — batch bisection", () => {
     return consumer;
   }
 
-  const orderedPayloads = (count: number): TestPayload[] =>
-    Array.from({ length: count }, (_, i) => ({
-      id: `j${i}`,
-      groupId: "group-a",
-      value: String(orderedScore(i) / 1000),
-    }));
+  return { createQueue, stageThenConsume };
+}
+
+const orderedPayloads = (count: number): TestPayload[] =>
+  Array.from({ length: count }, (_, i) => ({
+    id: `j${i}`,
+    groupId: "group-a",
+    value: String(orderedScore(i) / 1000),
+  }));
+
+describe("GroupQueueProcessor — batch bisection", () => {
+  const { stageThenConsume } = bisectionHarness();
 
   describe("when one payload in a coalesced batch is unprocessable", () => {
     /** @scenario Payloads ahead of an unprocessable one still commit */
@@ -305,6 +315,10 @@ describe("GroupQueueProcessor — batch bisection", () => {
       expect(processedInOrder).toEqual(sendOrder);
     });
   });
+});
+
+describe("GroupQueueProcessor — batch bisection", () => {
+  const { stageThenConsume } = bisectionHarness();
 
   describe("when a coalesced batch fails only because it is too large", () => {
     /** @scenario A batch too large for the handler converges by halving */
@@ -435,6 +449,10 @@ describe("GroupQueueProcessor — batch bisection", () => {
       expect(Math.min(...sizes)).toBeGreaterThan(1);
     });
   });
+});
+
+describe("GroupQueueProcessor — batch bisection", () => {
+  const { createQueue } = bisectionHarness();
 
   describe("when the root of a bisected batch commits and then fails", () => {
     // Driven through the bisector directly: this is about which delivery flags

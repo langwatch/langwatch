@@ -277,6 +277,30 @@ function countStagedPerGroup<Payload>({
   return perGroup;
 }
 
+/** One claimed job, decoded, with the batch it coalesced. */
+type ClaimedJob<Payload> = {
+  groupId: string;
+  stagedJobId: string;
+  jobDataJson: string;
+  originalScore: number;
+  payload: Payload;
+  contextMetadata: GroupQueueContextMetadata | undefined;
+  attempt: number;
+  jobAttempt: number;
+  jobName: string;
+  routingLabels: { queue_name: string; pipeline_name: string; job_type: string; job_name: string };
+  batchPayloads: Payload[] | null;
+  batchJobIds: string[];
+  drainedSiblings: DrainedJob[];
+};
+
+type CoalescedBatch<Payload> =
+  | { kind: "handled" }
+  | {
+      kind: "batch";
+      batch: Pick<ClaimedJob<Payload>, "batchPayloads" | "batchJobIds" | "drainedSiblings">;
+    };
+
 /**
  * Per-group FIFO with cross-group parallelism: send() stages into Redis,
  * dispatch() hands work to fastq, which runs it with concurrency-limited
@@ -951,15 +975,53 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
    * error handling.
    */
   private async processClaimedJob(dispatched: DispatchResult): Promise<void> {
-    const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
+    const [jobData] = await this.decodeClaimedJob(dispatched);
+    if (!jobData) return;
+    const [job] = await this.claimedJobFrom({ dispatched, jobData });
+    if (!job) return;
 
-    // Parse the stored job data
-    let jobData: Record<string, unknown>;
+    const { groupId, stagedJobId, jobDataJson, drainedSiblings, routingLabels } = job;
+    const jobStartTime = performance.now();
+    // Idempotent so an outcome path can stop the beat at the moment it decides
+    // (see the retry path) while the `finally` still guarantees it is stopped.
+    let heartbeatStopped = false;
+    const heartbeat = this.startActiveKeyHeartbeat({
+      groupId,
+      stagedJobId,
+      jobDataValues: [jobDataJson, ...drainedSiblings.map((sibling) => sibling.jobDataJson)],
+      isCancelled: () => heartbeatStopped,
+    });
+    const stopHeartbeat = (): void => {
+      if (heartbeatStopped) return;
+      heartbeatStopped = true;
+      clearInterval(heartbeat);
+    };
+    this.activeJobCount++;
+
     try {
-      jobData = await this.blobLifecycle.decode({
-        value: jobDataJson,
-        groupId,
-      });
+      // A job is its own trace, linked to its producer and never parented by it:
+      // parentage would let one trace id propagate across tenants via the queue.
+      await otelContext.with(ROOT_CONTEXT, () => this.runClaimedJobSpan({ job, stopHeartbeat }));
+    } finally {
+      stopHeartbeat();
+      this.activeJobCount--;
+      const jobDurationMs = performance.now() - jobStartTime;
+      gqJobDurationMilliseconds.observe(routingLabels, jobDurationMs);
+      this.recordJobLatency(jobDurationMs);
+    }
+  }
+
+  /** The stored job data, or none when the value was retried, parked or dropped instead. */
+  private async decodeClaimedJob(dispatched: DispatchResult): Promise<Record<string, unknown>[]> {
+    const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
+    // Parse the stored job data
+    try {
+      return [
+        await this.blobLifecycle.decode({
+          value: jobDataJson,
+          groupId,
+        }),
+      ];
     } catch (err) {
       if (err instanceof TransientBlobStoreError) {
         // The body is temporarily unreachable, not gone — retry, don't drop.
@@ -969,7 +1031,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
           jobDataJson,
           err,
         });
-        return;
+        return [];
       }
       if (err instanceof PayloadTooLargeError) {
         // Over the decode cap: parsing it would seize the event loop. Park the
@@ -983,7 +1045,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
           reason: "oversized_payload",
           errorMessage: `Poison guard: ${err.message}. The staged value was parked unparsed.`,
         });
-        return;
+        return [];
       }
       // Not transient (retry) and not oversized (park): we cannot process this
       // job, now or ever, on this worker. Complete the slot so the group stays
@@ -996,9 +1058,19 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
         reason: dropReasonOf(err),
         message: "Failed to parse staged job data",
       });
-      return;
+      return [];
     }
+  }
 
+  /** The claimed job with its coalesced batch; none when a sibling forced a retry or park. */
+  private async claimedJobFrom({
+    dispatched,
+    jobData,
+  }: {
+    dispatched: DispatchResult;
+    jobData: Record<string, unknown>;
+  }): Promise<ClaimedJob<Payload>[]> {
+    const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
     const contextMetadata = jobData.__context as GroupQueueContextMetadata | undefined;
     const jobAttempt = typeof jobData.__attempt === "number" ? jobData.__attempt : 1;
     // A re-staged sibling carries no __attempt of its own, so fall back to the
@@ -1024,573 +1096,720 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     const maxBatch = contextMetadata?.queueDispatchScopeKey
       ? 1
       : (this.coalesceMaxBatch?.(payload) ?? 1);
-    let batchPayloads: Payload[] | null = null;
-    // Staged-job id per batch member, index-aligned with batchPayloads, so a
-    // bisected failure can name the payload it narrowed to.
-    let batchJobIds: string[] = [];
-    let drainedSiblings: DrainedJob[] = [];
-    if (maxBatch > 1 && this.processBatch) {
-      // Byte bound (ADR-066 pillar 2): the drain stops before a job that would
-      // push the batch past maxBytes, counting the dispatched job's own
-      // payload size as the start. Measures payload size, not
-      // `jobDataJson.length` — an offloaded body leaves a small reference in
-      // the stored value, which would let oversized records through untouched.
-      const maxBytes = this.coalesceMaxBytes?.(payload) ?? DEFAULT_COALESCE_MAX_BYTES;
-      const initialBytes = readJobPayloadBytes(jobDataJson);
-      try {
-        drainedSiblings = await this.scripts.drainGroupReady({
-          groupId,
-          nowMs: nowInstant().epochMilliseconds,
-          maxJobs: maxBatch - 1,
-          maxBytes,
-          initialBytes,
-        });
-      } catch (err) {
-        this.logger.warn(
-          {
-            queueName: this.queueName,
-            groupId,
-            error: err instanceof Error ? err.message : String(err),
-          },
-          "Failed to drain group siblings for coalescing — processing single job",
-        );
-        drainedSiblings = [];
-      }
-      // Mixed-command groups (ADR-066 pillar 2): a drained sibling can belong to a
-      // different job than the dispatched one, so only coalesce siblings whose
-      // `__jobName` matches; restage the rest. Read names via `readJobRoutingMeta`
-      // (null when absent), not the `jobName` local, which defaults to "unknown"
-      // and would wrongly match a sibling's null.
-      if (drainedSiblings.length > 0) {
-        const dispatchedJobName = readJobRoutingMeta(jobDataJson).jobName;
-        const matchingSiblings: DrainedJob[] = [];
-        const foreignSiblings: DrainedJob[] = [];
-        for (const sibling of drainedSiblings) {
-          const siblingJobName = readJobRoutingMeta(sibling.jobDataJson).jobName;
-          if (siblingJobName === dispatchedJobName) {
-            matchingSiblings.push(sibling);
-          } else {
-            foreignSiblings.push(sibling);
-          }
-        }
-        if (foreignSiblings.length > 0) {
-          gqForeignSiblingsRestagedTotal.inc(
-            { queue_name: this.queueName },
-            foreignSiblings.length,
-          );
-          await this.restageDrainedSiblings(groupId, foreignSiblings);
-        }
-        drainedSiblings = matchingSiblings;
-      }
-      if (drainedSiblings.length > 0) {
-        try {
-          const parsedSiblings = await Promise.all(
-            drainedSiblings.map((sibling) => this.parseDrainedPayload({ sibling, groupId })),
-          );
-          const liveSiblings: DrainedJob[] = [];
-          const siblingPayloads: Payload[] = [];
-          const differentlyScoped: DrainedJob[] = [];
-          for (const [index, parsed] of parsedSiblings.entries()) {
-            if (!parsed) continue;
-            const sibling = drainedSiblings[index]!;
-            if (parsed.queueDispatchScopeKey !== contextMetadata?.queueDispatchScopeKey) {
-              differentlyScoped.push(sibling);
-              continue;
-            }
-            liveSiblings.push(sibling);
-            siblingPayloads.push(parsed.payload);
-          }
-          if (differentlyScoped.length > 0) {
-            await this.restageDrainedSiblings(groupId, differentlyScoped);
-          }
-          drainedSiblings = liveSiblings;
-          if (siblingPayloads.length > 0) {
-            batchPayloads = [payload, ...siblingPayloads];
-            batchJobIds = [stagedJobId, ...liveSiblings.map((sibling) => sibling.stagedJobId)];
-          }
-        } catch (err) {
-          if (err instanceof TransientBlobStoreError) {
-            // A transient blob-store failure on any drained sibling MUST
-            // re-stage the whole batch, not silently drop the siblings. Re-stage
-            // the siblings via the normal path and route the dispatched job
-            // through the same handleTransientDecode as the direct decode
-            // failure — the body is unreachable, not gone (ADR-029).
-            await this.restageDrainedSiblings(groupId, drainedSiblings);
-            await this.handleTransientDecode({
-              groupId,
-              stagedJobId,
-              jobDataJson,
-              err,
-            });
-            return;
-          }
-          if (err instanceof PayloadTooLargeError) {
-            // An oversized drained sibling can't be parsed without seizing the event
-            // loop, and re-dispatch would only re-drain it — so mirror the oversized
-            // path: park the group and re-stage the drained siblings first, preserving
-            // them (and the oversized value) for inspection rather than losing them to
-            // replay. The dispatched job's value carries the park.
-            await this.restageDrainedSiblings(groupId, drainedSiblings);
-            await this.parkPoisonGroup({
-              groupId,
-              stagedJobId,
-              jobDataJson,
-              originalScore,
-              reason: "oversized_payload",
-              errorMessage: `Poison guard: a coalesced sibling of this group is oversized (${err.message}). The batch was parked unparsed.`,
-            });
-            return;
-          }
-          throw err;
-        }
-      }
-    }
-
-    const jobStartTime = performance.now();
-    // Idempotent so an outcome path can stop the beat at the moment it decides
-    // (see the retry path) while the `finally` still guarantees it is stopped
-    // on every other exit.
-    let heartbeatStopped = false;
-    const heartbeat = this.startActiveKeyHeartbeat({
+    const base = {
       groupId,
       stagedJobId,
-      jobDataValues: [jobDataJson, ...drainedSiblings.map((sibling) => sibling.jobDataJson)],
-      isCancelled: () => heartbeatStopped,
-    });
-    const stopHeartbeat = (): void => {
-      if (heartbeatStopped) return;
-      heartbeatStopped = true;
-      clearInterval(heartbeat);
+      jobDataJson,
+      originalScore,
+      payload,
+      contextMetadata,
+      attempt,
+      jobAttempt,
+      jobName,
+      routingLabels,
     };
-    this.activeJobCount++;
-
-    try {
-      // Restore OTEL trace context and wrap in a span
-      const spanName = `${this.queueName}/${this.jobName}`;
-      const spanAttributes: Record<string, string | number | boolean> = {
-        "queue.name": this.queueName,
-        "queue.job_name": this.jobName,
-        "queue.group_id": groupId,
-        "queue.staged_job_id": stagedJobId,
-        "queue.attempt": attempt,
-        // Which source won `Math.max(jobAttempt, groupAttempt)`. Distinguishes
-        // a genuine first delivery from a chain whose counter was lost.
-        "queue.attempt_source": attemptSource({ attempt, jobAttempt }),
-      };
-
-      Object.assign(spanAttributes, this.customSpanAttributes(payload));
-
-      const executeWithSpan = async () => {
-        await withActiveSpan(
-          spanName,
-          {
-            kind: SpanKind.CONSUMER,
-            attributes: spanAttributes,
-          },
-          async (span) => {
-            // Link to original request span
-            if (contextMetadata?.traceId && contextMetadata?.parentSpanId) {
-              span.addLink({
-                context: {
-                  traceId: contextMetadata.traceId,
-                  spanId: contextMetadata.parentSpanId,
-                  traceFlags: TraceFlags.SAMPLED,
-                },
-              });
-            }
-
-            // Add business context attributes
-            if (contextMetadata?.organizationId) {
-              span.setAttribute("organization.id", contextMetadata.organizationId);
-            }
-            if (contextMetadata?.projectId) {
-              span.setAttribute("tenant.id", contextMetadata.projectId);
-            }
-            if (contextMetadata?.userId) {
-              span.setAttribute("user.id", contextMetadata.userId);
-            }
-
-            try {
-              // Audit hook: onLeased fires once per leased payload (including each
-              // drained sibling in a coalesced batch); best-effort, so a PG outage
-              // logs and continues. `leasedUntil` is a soft projection of when the
-              // retry layer would reschedule a stalled job (now + maxBackoffMs),
-              // for stuck-state dashboards.
-              const leasedUntil = nowInstant().add({
-                milliseconds: JOB_RETRY_CONFIG.maxBackoffMs,
-              });
-              await this.runAuditAll(
-                (batchPayloads ?? [payload]).map(
-                  (p) => () =>
-                    this.auditAdapter?.onLeased({
-                      payload: p,
-                      attempt,
-                      leasedUntil,
-                    }),
-                ),
-              );
-
-              // Run the actual handler with request context propagation
-              await this.runInContext(contextMetadata, async () => {
-                if (batchPayloads && this.processBatch) {
-                  span.setAttribute("queue.coalesced_batch_size", batchPayloads.length);
-                  await this.processBatchBisecting({
-                    entries: batchPayloads.map((batchPayload, index) => ({
-                      payload: batchPayload,
-                      stagedJobId: batchJobIds[index] ?? stagedJobId,
-                    })),
-                    attempt,
-                    routingLabels,
-                    span,
-                  });
-                } else {
-                  await this.process(payload, { attempt });
-                }
-              });
-
-              // Success — complete the group slot. Drained siblings were
-              // removed from staging during the drain, so completing the
-              // dispatched job is enough to free the group.
-              await this.scripts.complete({ groupId, stagedJobId, jobName });
-
-              // PAST THE POINT OF NO RETURN: the slot is completed, so this needs its own
-              // catch — the outer one treats a throw as a FAILED job and would re-stage the
-              // drained siblings and retry a job whose slot is already completed,
-              // delivering the whole batch a second time.
-              try {
-                // Recorded BEFORE the lease release: the job is already done, so a Redis
-                // blip releasing the lease must not cost the completion counter or the
-                // dispatch audit — that would report a completed job as never dispatched,
-                // violating "audit lags but never blocks". An unreleased blob just waits
-                // for its backstop TTL (the lazy-reclaim design).
-                gqJobsCompletedTotal.inc(routingLabels);
-
-                // Audit hook: onDispatched fires once per dispatched payload
-                // (dispatched + every drained sibling on success).
-                const dispatchedAt = nowInstant();
-                await this.runAuditAll(
-                  (batchPayloads ?? [payload]).map(
-                    (p) => () =>
-                      this.auditAdapter?.onDispatched({
-                        payload: p,
-                        at: dispatchedAt,
-                        attempt,
-                      }),
-                  ),
-                );
-
-                this.logger.debug(
-                  {
-                    queueName: this.queueName,
-                    groupId,
-                    stagedJobId,
-                    attempt,
-                  },
-                  "Group job completed, slot freed",
-                );
-
-                // A success means the group is draining, so it must not carry a stale failure
-                // streak toward the quarantine threshold. Ordered after the counter and audit
-                // deliberately: this write can blip without costing that bookkeeping, only the
-                // streak reset (bounded by its own TTL).
-                if (this.quarantineFailStreakThreshold > 0) {
-                  await this.scripts.clearGroupFailures(groupId);
-                }
-
-                // The chain is over: anything it recorded is no longer live.
-                await this.clearGroupAttempt(groupId);
-
-                await this.blobLifecycle.releaseLease({
-                  values: [jobDataJson, ...drainedSiblings.map((sibling) => sibling.jobDataJson)],
-                  groupId,
-                });
-              } catch (cleanupErr) {
-                // Worth knowing about — an unreleased blob lingers until its
-                // backstop TTL — but never worth re-running the job for.
-                this.logger.error(
-                  {
-                    queueName: this.queueName,
-                    groupId,
-                    stagedJobId,
-                    attempt,
-                    err: cleanupErr,
-                  },
-                  "Post-completion cleanup failed; the job itself completed and is NOT retried",
-                );
-              }
-            } catch (err) {
-              const error = err instanceof Error ? err : new Error(String(err));
-              const decision = this.failureDecision(err);
-              const isRetryable = decision.retryable;
-
-              // The batch stores its fold state only once, at the very end, so a
-              // failure means nothing was persisted for the drained siblings.
-              // Re-stage them so they are re-dispatched (and re-coalesced) on the
-              // dispatched job's retry, rather than lost until an event replay.
-              if (drainedSiblings.length > 0) {
-                await this.restageDrainedSiblings(groupId, drainedSiblings);
-              }
-
-              // Group-quarantine circuit breaker: a producer minting fresh jobs faster than
-              // they drain never trips the per-job `maxAttempts` cap (every failure is a new
-              // attempt-1 job), so the group could churn forever. Count consecutive
-              // retryable failures across the group instead; past the threshold, route
-              // through the same exhausted-retry path so an operator can inspect and drain it.
-              let quarantined = false;
-              let quarantineError: Error | undefined;
-              if (isRetryable && this.quarantineFailStreakThreshold > 0) {
-                const failStreak = await this.scripts.recordGroupFailure(groupId);
-                if (failStreak > this.quarantineFailStreakThreshold) {
-                  quarantined = true;
-                  // Clear the streak as we park: every ops recovery path resets the poison
-                  // guard's claim strikes for a fresh run, so the failure streak must not
-                  // outlive the park either, or an unblocked group would re-quarantine on its
-                  // very next failure. Best-effort — already on the failure path, so a blip
-                  // here must not derail parking the group.
-                  await this.scripts.clearGroupFailures(groupId).catch(() => {});
-                  // Carried into handleExhaustedRetries as the group's stored error so /ops
-                  // shows WHY it was blocked (a run of failures), not just the last job's
-                  // error. The handler error rides along as `cause` so the blocked record can
-                  // persist the throwing location — the quarantine wrapper's own stack names
-                  // nothing an investigator can use.
-                  quarantineError = new Error(
-                    `Poison guard: group quarantined after ${failStreak} consecutive failures (threshold ${this.quarantineFailStreakThreshold}) with no success. Last error: ${error.message}. Inspect the staged jobs, then unblock the group.`,
-                    { cause: error },
-                  );
-                  gqGroupsPoisonParkedTotal.inc({
-                    queue_name: this.queueName,
-                    reason: "failure_streak",
-                  });
-                  this.logger.error(
-                    {
-                      queueName: this.queueName,
-                      projectId: tenantIdFromGroupId(groupId),
-                      groupId,
-                      stagedJobId,
-                      failStreak,
-                      threshold: this.quarantineFailStreakThreshold,
-                      error,
-                    },
-                    "Group quarantined after a run of failures with no success; blocking it to protect the shared queue",
-                  );
-                }
-              }
-
-              if (isRetryable && attempt < JOB_RETRY_CONFIG.maxAttempts && !quarantined) {
-                // Re-stage with backoff — frees the worker slot immediately
-                gqJobsRetriedTotal.inc(routingLabels);
-
-                // Honor the failure classifier's retry delay as a FLOOR over
-                // exponential backoff. A caller can lengthen but never shorten
-                // the wait, so its policy cannot cause a retry storm.
-                const backoffMs = Math.max(getBackoffMs(attempt), decision.retryAfterMs ?? 0);
-                gqRetryAttempt.observe(routingLabels, attempt);
-                gqRetryBackoffMilliseconds.observe(routingLabels, backoffMs);
-                // The job keeps the id it was dispatched under (ADR-080). Its
-                // staging member was removed at claim time, so re-staging under
-                // the same id inserts one that is genuinely absent.
-                const newStagedJobId = stagedJobId;
-                // If the retry re-encode fails (blob-store down, payload-too-large from a
-                // state-bloat regression), the job is DISCARDED and the old lease retired
-                // explicitly — the body was already read, so keeping a liveness claim buys a
-                // later worker nothing. Blob bytes remain for lazy reclaim.
-                let retryJobData: string;
-                try {
-                  retryJobData = await this.blobLifecycle.encode({
-                    jobData: {
-                      ...(payload as Record<string, unknown>),
-                      __context: contextMetadata,
-                      __attempt: attempt + 1,
-                    },
-                    groupId,
-                  });
-                } catch (encodeErr) {
-                  this.recordDrop({
-                    groupId,
-                    stagedJobId,
-                    jobDataJson,
-                    err: encodeErr,
-                    reason: "retry_encode_failed",
-                    message: "Retry re-encode failed; releasing old lease and discarding job",
-                    // Released below, deliberately: the body was already read, so
-                    // keeping it buys a later worker nothing.
-                    bodyPreserved: false,
-                  });
-                  await this.blobLifecycle.releaseLease({
-                    values: [jobDataJson],
-                    groupId,
-                  });
-                  await this.scripts.complete({
-                    groupId,
-                    stagedJobId,
-                    jobName,
-                    dropped: true,
-                  });
-                  // Kept alongside gq_jobs_dropped_total: this counter is the
-                  // specific "a retry-encode blip lost it" diagnostic, not a
-                  // genuine non-retryable process() error. Oncall triaging a
-                  // gq_jobs_non_retryable_total spike shouldn't have to grep
-                  // logs to figure out which class of failure they're seeing.
-                  gqRetryEncodeFailuresTotal.inc(routingLabels);
-                  return;
-                }
-
-                // STOP THE HEARTBEAT BEFORE THE RE-STAGE IS ISSUED, not after (ADR-080): a
-                // refresh would overwrite the re-stage's backoff TTL, stretching a sub-second
-                // backoff into a multi-minute stall. Both ordering (the tick's synchronous
-                // EVALSHA beats the re-stage) and cancellation (`runCancellable` withdraws the
-                // NOSCRIPT fallback hop) are needed to close that window.
-                stopHeartbeat();
-                const restaged = await this.scripts.retryRestage({
-                  groupId,
-                  stagedJobId,
-                  newStagedJobId,
-                  dispatchAfterMs: nowInstant().epochMilliseconds + backoffMs,
-                  jobDataJson: retryJobData,
-                  backoffMs,
-                  // Written inside the same script as the re-stage: the chain is the only
-                  // attempt carrier a re-staged SIBLING has (it comes back with no `__attempt`
-                  // and no id marker), so a separate write that failed while this succeeded
-                  // would hand the next sibling-led claim a fresh budget.
-                  attempt: attempt + 1,
-                  attemptTtlSec: GROUP_ATTEMPT_TTL_SECONDS,
-                });
-                // Only transfer once the replacement is staged: retryRestage returns false
-                // when the active key is stale and nothing was written, so transferring
-                // anyway would release the live owner's protection for an unreferenced
-                // value. A crash in between is survivable — the retry re-encodes to the SAME
-                // content hash, so the old lease keeps the blob alive until decode renews.
-                if (restaged) {
-                  // For GQ2 the retry re-encodes to the SAME content hash, so one
-                  // deadline replaces another in the lease set (the blob stays);
-                  // A replacement keeps the content hash and transfers its lease.
-                  await this.blobLifecycle.transferLease({
-                    newValue: retryJobData,
-                    oldValue: jobDataJson,
-                    groupId,
-                  });
-                }
-
-                // Audit hook: willRetry=true. Fires for the dispatched
-                // payload + every drained sibling (they all get re-staged).
-                const nextAttemptAt = nowInstant().add({ milliseconds: backoffMs });
-                await this.runAuditAll(
-                  (batchPayloads ?? [payload]).map(
-                    (p) => () =>
-                      this.auditAdapter?.onFailed({
-                        payload: p,
-                        error: error.message,
-                        willRetry: true,
-                        nextAttemptAt,
-                        attempt,
-                      }),
-                  ),
-                );
-
-                this.logger.warn(
-                  {
-                    queueName: this.queueName,
-                    groupId,
-                    stagedJobId,
-                    attempt,
-                    maxAttempts: JOB_RETRY_CONFIG.maxAttempts,
-                    backoffMs,
-                    // The whole Error, not `error.message`: the serializer emits
-                    // the stack, and for a handler crash the stack IS the
-                    // diagnosis — a bare "undefined is not a function" names no
-                    // file and no line, and the queue is the only place that
-                    // ever sees the throw.
-                    error,
-                  },
-                  "Job attempt failed, re-staged with backoff",
-                );
-              } else {
-                span.setAttribute("error", true);
-                span.setAttribute("error.message", error.message);
-
-                if (!isRetryable) {
-                  gqJobsNonRetryableTotal.inc(routingLabels);
-                  this.logger.error(
-                    {
-                      queueName: this.queueName,
-                      groupId,
-                      stagedJobId,
-                      attempt,
-                      errorCategory: "non_retryable",
-                      error,
-                    },
-                    "Job failed with non-retryable error, skipping retries",
-                  );
-                }
-
-                await this.handleExhaustedRetries({
-                  groupId,
-                  stagedJobId,
-                  payload,
-                  originalScore,
-                  // When the group tripped the quarantine breaker, block it with
-                  // the descriptive quarantine error rather than the raw job
-                  // error, so /ops shows why the group is blocked.
-                  lastError: quarantineError ?? error,
-                  contextMetadata,
-                  routingLabels,
-                });
-
-                // Audit hook: terminal — onDead fires for the dispatched
-                // payload + every drained sibling.
-                await this.runAuditAll(
-                  (batchPayloads ?? [payload]).map(
-                    (p) => () =>
-                      this.auditAdapter?.onDead({
-                        payload: p,
-                        lastError: error.message,
-                        attempt,
-                      }),
-                  ),
-                );
-                await this.blobLifecycle.releaseLease({
-                  values: [jobDataJson],
-                  groupId,
-                });
-              }
-            }
-          },
-        );
-      };
-
-      // A job is its own trace, associated with its producer by the span link added
-      // in `executeWithSpan` — never by parentage: restoring the producer's span as
-      // the parent would make every job a child of whatever enqueued it, and
-      // handlers enqueuing further jobs from inside that context would let the same
-      // trace id propagate transitively across tenants via the shared queue.
-      await otelContext.with(ROOT_CONTEXT, executeWithSpan);
-    } finally {
-      stopHeartbeat();
-      this.activeJobCount--;
-      const jobDurationMs = performance.now() - jobStartTime;
-      gqJobDurationMilliseconds.observe(routingLabels, jobDurationMs);
-      // Feed the ops dashboard latency figures: one write covers both the capped
-      // circular buffer behind the live P50/P99 tiles and the time-bucketed
-      // histograms behind the hour/day/week/all-time windows. Fire-and-forget so an
-      // instrumentation hiccup never bubbles into the worker pipeline.
-      const completedAtMs = nowInstant().epochMilliseconds;
-      const bucketField = latencyBucketField(jobDurationMs);
-      const minuteKey = latencyMinuteBucketKey(this.queueName, completedAtMs);
-      const hourKey = latencyHourBucketKey(this.queueName, completedAtMs);
-      this.redisConnection
-        .multi()
-        .lpush(`${this.queueName}:gq:stats:latencies-ms`, String(Math.round(jobDurationMs)))
-        .ltrim(`${this.queueName}:gq:stats:latencies-ms`, 0, LATENCY_SAMPLE_SIZE - 1)
-        .hincrby(minuteKey, bucketField, 1)
-        .expire(minuteKey, LATENCY_MINUTE_BUCKET_TTL_SECONDS)
-        .hincrby(hourKey, bucketField, 1)
-        .expire(hourKey, LATENCY_HOUR_BUCKET_TTL_SECONDS)
-        .hincrby(latencyAllTimeKey(this.queueName), bucketField, 1)
-        .exec()
-        .catch(() => {
-          // best-effort stats write; failures are non-fatal
-        });
+    if (maxBatch <= 1 || !this.processBatch) {
+      return [{ ...base, batchPayloads: null, batchJobIds: [], drainedSiblings: [] }];
     }
+    const drained = await this.drainMatchingSiblings({ dispatched, payload, maxBatch });
+    const batch = await this.coalescedBatch({ dispatched, payload, contextMetadata, drained });
+    return batch.kind === "handled" ? [] : [{ ...base, ...batch.batch }];
+  }
+
+  /**
+   * Drains due siblings of the same job into the batch. Byte bound (ADR-066
+   * pillar 2): the drain stops before a job that would push the batch past
+   * maxBytes; siblings of another job are restaged, not coalesced.
+   */
+  private async drainMatchingSiblings({
+    dispatched,
+    payload,
+    maxBatch,
+  }: {
+    dispatched: DispatchResult;
+    payload: Payload;
+    maxBatch: number;
+  }): Promise<DrainedJob[]> {
+    const { groupId, jobDataJson } = dispatched;
+    let drainedSiblings: DrainedJob[] = [];
+    const maxBytes = this.coalesceMaxBytes?.(payload) ?? DEFAULT_COALESCE_MAX_BYTES;
+    const initialBytes = readJobPayloadBytes(jobDataJson);
+    try {
+      drainedSiblings = await this.scripts.drainGroupReady({
+        groupId,
+        nowMs: nowInstant().epochMilliseconds,
+        maxJobs: maxBatch - 1,
+        maxBytes,
+        initialBytes,
+      });
+    } catch (err) {
+      this.logger.warn(
+        {
+          queueName: this.queueName,
+          groupId,
+          error: err instanceof Error ? err.message : String(err),
+        },
+        "Failed to drain group siblings for coalescing — processing single job",
+      );
+      drainedSiblings = [];
+    }
+    // Mixed-command groups (ADR-066 pillar 2): a drained sibling can belong to a
+    // different job than the dispatched one, so only coalesce siblings whose
+    // `__jobName` matches; restage the rest. Read names via `readJobRoutingMeta`
+    // (null when absent), not the `jobName` local, which defaults to "unknown"
+    // and would wrongly match a sibling's null.
+    if (drainedSiblings.length > 0) {
+      const dispatchedJobName = readJobRoutingMeta(jobDataJson).jobName;
+      const matchingSiblings: DrainedJob[] = [];
+      const foreignSiblings: DrainedJob[] = [];
+      for (const sibling of drainedSiblings) {
+        const siblingJobName = readJobRoutingMeta(sibling.jobDataJson).jobName;
+        if (siblingJobName === dispatchedJobName) {
+          matchingSiblings.push(sibling);
+        } else {
+          foreignSiblings.push(sibling);
+        }
+      }
+      if (foreignSiblings.length > 0) {
+        gqForeignSiblingsRestagedTotal.inc({ queue_name: this.queueName }, foreignSiblings.length);
+        await this.restageDrainedSiblings(groupId, foreignSiblings);
+      }
+      drainedSiblings = matchingSiblings;
+    }
+    return drainedSiblings;
+  }
+
+  /** Parses drained siblings into the batch; a transient or oversized one retries or parks. */
+  private async coalescedBatch({
+    dispatched,
+    payload,
+    contextMetadata,
+    drained,
+  }: {
+    dispatched: DispatchResult;
+    payload: Payload;
+    contextMetadata: GroupQueueContextMetadata | undefined;
+    drained: DrainedJob[];
+  }): Promise<CoalescedBatch<Payload>> {
+    const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
+    const drainedSiblings = drained;
+    if (drainedSiblings.length === 0) {
+      return { kind: "batch", batch: { batchPayloads: null, batchJobIds: [], drainedSiblings } };
+    }
+    try {
+      const parsedSiblings = await Promise.all(
+        drainedSiblings.map((sibling) => this.parseDrainedPayload({ sibling, groupId })),
+      );
+      const liveSiblings: DrainedJob[] = [];
+      const siblingPayloads: Payload[] = [];
+      const differentlyScoped: DrainedJob[] = [];
+      for (const [index, parsed] of parsedSiblings.entries()) {
+        if (!parsed) continue;
+        const sibling = drainedSiblings[index]!;
+        if (parsed.queueDispatchScopeKey !== contextMetadata?.queueDispatchScopeKey) {
+          differentlyScoped.push(sibling);
+          continue;
+        }
+        liveSiblings.push(sibling);
+        siblingPayloads.push(parsed.payload);
+      }
+      if (differentlyScoped.length > 0) {
+        await this.restageDrainedSiblings(groupId, differentlyScoped);
+      }
+      if (siblingPayloads.length === 0) {
+        return {
+          kind: "batch",
+          batch: { batchPayloads: null, batchJobIds: [], drainedSiblings: liveSiblings },
+        };
+      }
+      return {
+        kind: "batch",
+        batch: {
+          batchPayloads: [payload, ...siblingPayloads],
+          batchJobIds: [stagedJobId, ...liveSiblings.map((sibling) => sibling.stagedJobId)],
+          drainedSiblings: liveSiblings,
+        },
+      };
+    } catch (err) {
+      if (err instanceof TransientBlobStoreError) {
+        // A transient blob-store failure on any drained sibling MUST
+        // re-stage the whole batch, not silently drop the siblings. Re-stage
+        // the siblings via the normal path and route the dispatched job
+        // through the same handleTransientDecode as the direct decode
+        // failure — the body is unreachable, not gone (ADR-029).
+        await this.restageDrainedSiblings(groupId, drainedSiblings);
+        await this.handleTransientDecode({
+          groupId,
+          stagedJobId,
+          jobDataJson,
+          err,
+        });
+        return { kind: "handled" };
+      }
+      if (err instanceof PayloadTooLargeError) {
+        // An oversized drained sibling can't be parsed without seizing the event
+        // loop, and re-dispatch would only re-drain it — so mirror the oversized
+        // path: park the group and re-stage the drained siblings first, preserving
+        // them (and the oversized value) for inspection rather than losing them to
+        // replay. The dispatched job's value carries the park.
+        await this.restageDrainedSiblings(groupId, drainedSiblings);
+        await this.parkPoisonGroup({
+          groupId,
+          stagedJobId,
+          jobDataJson,
+          originalScore,
+          reason: "oversized_payload",
+          errorMessage: `Poison guard: a coalesced sibling of this group is oversized (${err.message}). The batch was parked unparsed.`,
+        });
+        return { kind: "handled" };
+      }
+      throw err;
+    }
+  }
+
+  /** The job's consumer span: lease audit, the handler run, then its outcome. */
+  private async runClaimedJobSpan({
+    job,
+    stopHeartbeat,
+  }: {
+    job: ClaimedJob<Payload>;
+    stopHeartbeat: () => void;
+  }): Promise<void> {
+    const {
+      groupId,
+      stagedJobId,
+      payload,
+      contextMetadata,
+      attempt,
+      jobAttempt,
+      routingLabels,
+      batchPayloads,
+      batchJobIds,
+    } = job;
+    // Restore OTEL trace context and wrap in a span
+    const spanName = `${this.queueName}/${this.jobName}`;
+    const spanAttributes: Record<string, string | number | boolean> = {
+      "queue.name": this.queueName,
+      "queue.job_name": this.jobName,
+      "queue.group_id": groupId,
+      "queue.staged_job_id": stagedJobId,
+      "queue.attempt": attempt,
+      // Which source won `Math.max(jobAttempt, groupAttempt)`. Distinguishes
+      // a genuine first delivery from a chain whose counter was lost.
+      "queue.attempt_source": attemptSource({ attempt, jobAttempt }),
+    };
+
+    Object.assign(spanAttributes, this.customSpanAttributes(payload));
+
+    await withActiveSpan(
+      spanName,
+      {
+        kind: SpanKind.CONSUMER,
+        attributes: spanAttributes,
+      },
+      async (span) => {
+        this.linkProducerSpan(span, contextMetadata);
+        try {
+          // Audit hook: onLeased fires once per leased payload (including each
+          // drained sibling in a coalesced batch); best-effort, so a PG outage
+          // logs and continues. `leasedUntil` is a soft projection of when the
+          // retry layer would reschedule a stalled job (now + maxBackoffMs),
+          // for stuck-state dashboards.
+          const leasedUntil = nowInstant().add({
+            milliseconds: JOB_RETRY_CONFIG.maxBackoffMs,
+          });
+          await this.runAuditAll(
+            (batchPayloads ?? [payload]).map(
+              (p) => () =>
+                this.auditAdapter?.onLeased({
+                  payload: p,
+                  attempt,
+                  leasedUntil,
+                }),
+            ),
+          );
+
+          // Run the actual handler with request context propagation
+          await this.runInContext(contextMetadata, async () => {
+            if (batchPayloads && this.processBatch) {
+              span.setAttribute("queue.coalesced_batch_size", batchPayloads.length);
+              await this.processBatchBisecting({
+                entries: batchPayloads.map((batchPayload, index) => ({
+                  payload: batchPayload,
+                  stagedJobId: batchJobIds[index] ?? stagedJobId,
+                })),
+                attempt,
+                routingLabels,
+                span,
+              });
+            } else {
+              await this.process(payload, { attempt });
+            }
+          });
+
+          await this.completeClaimedJob(job);
+        } catch (err) {
+          await this.failClaimedJob({ job, err, span, stopHeartbeat });
+        }
+      },
+    );
+  }
+
+  /** Links the job's span to the request that produced it, with its business context. */
+  private linkProducerSpan(
+    span: Span,
+    contextMetadata: GroupQueueContextMetadata | undefined,
+  ): void {
+    // Link to original request span
+    if (contextMetadata?.traceId && contextMetadata?.parentSpanId) {
+      span.addLink({
+        context: {
+          traceId: contextMetadata.traceId,
+          spanId: contextMetadata.parentSpanId,
+          traceFlags: TraceFlags.SAMPLED,
+        },
+      });
+    }
+
+    // Add business context attributes
+    if (contextMetadata?.organizationId) {
+      span.setAttribute("organization.id", contextMetadata.organizationId);
+    }
+    if (contextMetadata?.projectId) {
+      span.setAttribute("tenant.id", contextMetadata.projectId);
+    }
+    if (contextMetadata?.userId) {
+      span.setAttribute("user.id", contextMetadata.userId);
+    }
+  }
+
+  /** Completes the group slot, then does the bookkeeping that must never re-run the job. */
+  private async completeClaimedJob(job: ClaimedJob<Payload>): Promise<void> {
+    const {
+      groupId,
+      stagedJobId,
+      jobDataJson,
+      payload,
+      attempt,
+      jobName,
+      routingLabels,
+      batchPayloads,
+      drainedSiblings,
+    } = job;
+    // Success — complete the group slot. Drained siblings were
+    // removed from staging during the drain, so completing the
+    // dispatched job is enough to free the group.
+    await this.scripts.complete({ groupId, stagedJobId, jobName });
+
+    // PAST THE POINT OF NO RETURN: the slot is completed, so this needs its own
+    // catch — the outer one treats a throw as a FAILED job and would re-stage the
+    // drained siblings and retry a job whose slot is already completed,
+    // delivering the whole batch a second time.
+    try {
+      // Recorded BEFORE the lease release: the job is already done, so a Redis
+      // blip releasing the lease must not cost the completion counter or the
+      // dispatch audit — that would report a completed job as never dispatched,
+      // violating "audit lags but never blocks". An unreleased blob just waits
+      // for its backstop TTL (the lazy-reclaim design).
+      gqJobsCompletedTotal.inc(routingLabels);
+
+      // Audit hook: onDispatched fires once per dispatched payload
+      // (dispatched + every drained sibling on success).
+      const dispatchedAt = nowInstant();
+      await this.runAuditAll(
+        (batchPayloads ?? [payload]).map(
+          (p) => () =>
+            this.auditAdapter?.onDispatched({
+              payload: p,
+              at: dispatchedAt,
+              attempt,
+            }),
+        ),
+      );
+
+      this.logger.debug(
+        {
+          queueName: this.queueName,
+          groupId,
+          stagedJobId,
+          attempt,
+        },
+        "Group job completed, slot freed",
+      );
+
+      // A success means the group is draining, so it must not carry a stale failure
+      // streak toward the quarantine threshold. Ordered after the counter and audit
+      // deliberately: this write can blip without costing that bookkeeping, only the
+      // streak reset (bounded by its own TTL).
+      if (this.quarantineFailStreakThreshold > 0) {
+        await this.scripts.clearGroupFailures(groupId);
+      }
+
+      // The chain is over: anything it recorded is no longer live.
+      await this.clearGroupAttempt(groupId);
+
+      await this.blobLifecycle.releaseLease({
+        values: [jobDataJson, ...drainedSiblings.map((sibling) => sibling.jobDataJson)],
+        groupId,
+      });
+    } catch (cleanupErr) {
+      // Worth knowing about — an unreleased blob lingers until its
+      // backstop TTL — but never worth re-running the job for.
+      this.logger.error(
+        {
+          queueName: this.queueName,
+          groupId,
+          stagedJobId,
+          attempt,
+          err: cleanupErr,
+        },
+        "Post-completion cleanup failed; the job itself completed and is NOT retried",
+      );
+    }
+  }
+
+  /** A handler failure: restage the drained siblings, then retry, quarantine or block. */
+  private async failClaimedJob({
+    job,
+    err,
+    span,
+    stopHeartbeat,
+  }: {
+    job: ClaimedJob<Payload>;
+    err: unknown;
+    span: Span;
+    stopHeartbeat: () => void;
+  }): Promise<void> {
+    const { groupId, attempt, drainedSiblings } = job;
+    const error = err instanceof Error ? err : new Error(String(err));
+    const decision = this.failureDecision(err);
+    const isRetryable = decision.retryable;
+
+    // The batch stores its fold state only once, at the very end, so a
+    // failure means nothing was persisted for the drained siblings.
+    // Re-stage them so they are re-dispatched (and re-coalesced) on the
+    // dispatched job's retry, rather than lost until an event replay.
+    if (drainedSiblings.length > 0) {
+      await this.restageDrainedSiblings(groupId, drainedSiblings);
+    }
+
+    const [quarantineError] = await this.quarantineErrors({ job, error, isRetryable });
+    if (isRetryable && attempt < JOB_RETRY_CONFIG.maxAttempts && !quarantineError) {
+      await this.retryClaimedJob({ job, error, decision, stopHeartbeat });
+      return;
+    }
+    await this.exhaustClaimedJob({ job, error, isRetryable, quarantineError, span });
+  }
+
+  /**
+   * Group-quarantine circuit breaker: a producer minting fresh jobs faster than
+   * they drain never trips `maxAttempts`, so consecutive retryable failures are
+   * counted across the group. Answers the quarantine error once past the threshold.
+   */
+  private async quarantineErrors({
+    job,
+    error,
+    isRetryable,
+  }: {
+    job: ClaimedJob<Payload>;
+    error: Error;
+    isRetryable: boolean;
+  }): Promise<Error[]> {
+    const { groupId, stagedJobId } = job;
+    // Group-quarantine circuit breaker: a producer minting fresh jobs faster than
+    // they drain never trips the per-job `maxAttempts` cap (every failure is a new
+    // attempt-1 job), so the group could churn forever. Count consecutive
+    // retryable failures across the group instead; past the threshold, route
+    // through the same exhausted-retry path so an operator can inspect and drain it.
+    if (!isRetryable || this.quarantineFailStreakThreshold <= 0) return [];
+    {
+      const failStreak = await this.scripts.recordGroupFailure(groupId);
+      if (failStreak > this.quarantineFailStreakThreshold) {
+        // Clear the streak as we park: every ops recovery path resets the poison
+        // guard's claim strikes for a fresh run, so the failure streak must not
+        // outlive the park either, or an unblocked group would re-quarantine on its
+        // very next failure. Best-effort — already on the failure path, so a blip
+        // here must not derail parking the group.
+        await this.scripts.clearGroupFailures(groupId).catch(() => {});
+        // Carried into handleExhaustedRetries as the group's stored error so /ops
+        // shows WHY it was blocked (a run of failures), not just the last job's
+        // error. The handler error rides along as `cause` so the blocked record can
+        // persist the throwing location — the quarantine wrapper's own stack names
+        // nothing an investigator can use.
+        const quarantineError = new Error(
+          `Poison guard: group quarantined after ${failStreak} consecutive failures (threshold ${this.quarantineFailStreakThreshold}) with no success. Last error: ${error.message}. Inspect the staged jobs, then unblock the group.`,
+          { cause: error },
+        );
+        gqGroupsPoisonParkedTotal.inc({
+          queue_name: this.queueName,
+          reason: "failure_streak",
+        });
+        this.logger.error(
+          {
+            queueName: this.queueName,
+            projectId: tenantIdFromGroupId(groupId),
+            groupId,
+            stagedJobId,
+            failStreak,
+            threshold: this.quarantineFailStreakThreshold,
+            error,
+          },
+          "Group quarantined after a run of failures with no success; blocking it to protect the shared queue",
+        );
+        return [quarantineError];
+      }
+    }
+    return [];
+  }
+
+  /** Re-stage with backoff, which frees the worker slot immediately. */
+  private async retryClaimedJob({
+    job,
+    error,
+    decision,
+    stopHeartbeat,
+  }: {
+    job: ClaimedJob<Payload>;
+    error: Error;
+    decision: { retryable: boolean; retryAfterMs?: number };
+    stopHeartbeat: () => void;
+  }): Promise<void> {
+    const {
+      groupId,
+      stagedJobId,
+      jobDataJson,
+      payload,
+      contextMetadata,
+      attempt,
+      jobName,
+      routingLabels,
+      batchPayloads,
+    } = job;
+    // Re-stage with backoff — frees the worker slot immediately
+    gqJobsRetriedTotal.inc(routingLabels);
+
+    // Honor the failure classifier's retry delay as a FLOOR over
+    // exponential backoff. A caller can lengthen but never shorten
+    // the wait, so its policy cannot cause a retry storm.
+    const backoffMs = Math.max(getBackoffMs(attempt), decision.retryAfterMs ?? 0);
+    gqRetryAttempt.observe(routingLabels, attempt);
+    gqRetryBackoffMilliseconds.observe(routingLabels, backoffMs);
+    // The job keeps the id it was dispatched under (ADR-080). Its
+    // staging member was removed at claim time, so re-staging under
+    // the same id inserts one that is genuinely absent.
+    const newStagedJobId = stagedJobId;
+    // If the retry re-encode fails (blob-store down, payload-too-large from a
+    // state-bloat regression), the job is DISCARDED and the old lease retired
+    // explicitly — the body was already read, so keeping a liveness claim buys a
+    // later worker nothing. Blob bytes remain for lazy reclaim.
+    let retryJobData: string;
+    try {
+      retryJobData = await this.blobLifecycle.encode({
+        jobData: {
+          ...(payload as Record<string, unknown>),
+          __context: contextMetadata,
+          __attempt: attempt + 1,
+        },
+        groupId,
+      });
+    } catch (encodeErr) {
+      this.recordDrop({
+        groupId,
+        stagedJobId,
+        jobDataJson,
+        err: encodeErr,
+        reason: "retry_encode_failed",
+        message: "Retry re-encode failed; releasing old lease and discarding job",
+        // Released below, deliberately: the body was already read, so
+        // keeping it buys a later worker nothing.
+        bodyPreserved: false,
+      });
+      await this.blobLifecycle.releaseLease({
+        values: [jobDataJson],
+        groupId,
+      });
+      await this.scripts.complete({
+        groupId,
+        stagedJobId,
+        jobName,
+        dropped: true,
+      });
+      // Kept alongside gq_jobs_dropped_total: this counter is the
+      // specific "a retry-encode blip lost it" diagnostic, not a
+      // genuine non-retryable process() error. Oncall triaging a
+      // gq_jobs_non_retryable_total spike shouldn't have to grep
+      // logs to figure out which class of failure they're seeing.
+      gqRetryEncodeFailuresTotal.inc(routingLabels);
+      return;
+    }
+
+    // STOP THE HEARTBEAT BEFORE THE RE-STAGE IS ISSUED, not after (ADR-080): a
+    // refresh would overwrite the re-stage's backoff TTL, stretching a sub-second
+    // backoff into a multi-minute stall. Both ordering (the tick's synchronous
+    // EVALSHA beats the re-stage) and cancellation (`runCancellable` withdraws the
+    // NOSCRIPT fallback hop) are needed to close that window.
+    stopHeartbeat();
+    const restaged = await this.scripts.retryRestage({
+      groupId,
+      stagedJobId,
+      newStagedJobId,
+      dispatchAfterMs: nowInstant().epochMilliseconds + backoffMs,
+      jobDataJson: retryJobData,
+      backoffMs,
+      // Written inside the same script as the re-stage: the chain is the only
+      // attempt carrier a re-staged SIBLING has (it comes back with no `__attempt`
+      // and no id marker), so a separate write that failed while this succeeded
+      // would hand the next sibling-led claim a fresh budget.
+      attempt: attempt + 1,
+      attemptTtlSec: GROUP_ATTEMPT_TTL_SECONDS,
+    });
+    // Only transfer once the replacement is staged: retryRestage returns false
+    // when the active key is stale and nothing was written, so transferring
+    // anyway would release the live owner's protection for an unreferenced
+    // value. A crash in between is survivable — the retry re-encodes to the SAME
+    // content hash, so the old lease keeps the blob alive until decode renews.
+    if (restaged) {
+      // For GQ2 the retry re-encodes to the SAME content hash, so one
+      // deadline replaces another in the lease set (the blob stays);
+      // A replacement keeps the content hash and transfers its lease.
+      await this.blobLifecycle.transferLease({
+        newValue: retryJobData,
+        oldValue: jobDataJson,
+        groupId,
+      });
+    }
+
+    // Audit hook: willRetry=true. Fires for the dispatched
+    // payload + every drained sibling (they all get re-staged).
+    const nextAttemptAt = nowInstant().add({ milliseconds: backoffMs });
+    await this.runAuditAll(
+      (batchPayloads ?? [payload]).map(
+        (p) => () =>
+          this.auditAdapter?.onFailed({
+            payload: p,
+            error: error.message,
+            willRetry: true,
+            nextAttemptAt,
+            attempt,
+          }),
+      ),
+    );
+
+    this.logger.warn(
+      {
+        queueName: this.queueName,
+        groupId,
+        stagedJobId,
+        attempt,
+        maxAttempts: JOB_RETRY_CONFIG.maxAttempts,
+        backoffMs,
+        // The whole Error, not `error.message`: the serializer emits
+        // the stack, and for a handler crash the stack IS the
+        // diagnosis — a bare "undefined is not a function" names no
+        // file and no line, and the queue is the only place that
+        // ever sees the throw.
+        error,
+      },
+      "Job attempt failed, re-staged with backoff",
+    );
+  }
+
+  /** Out of retries, non-retryable, or quarantined: block the group and audit the death. */
+  private async exhaustClaimedJob({
+    job,
+    error,
+    isRetryable,
+    quarantineError,
+    span,
+  }: {
+    job: ClaimedJob<Payload>;
+    error: Error;
+    isRetryable: boolean;
+    quarantineError: Error | undefined;
+    span: Span;
+  }): Promise<void> {
+    const {
+      groupId,
+      stagedJobId,
+      jobDataJson,
+      originalScore,
+      payload,
+      contextMetadata,
+      attempt,
+      routingLabels,
+      batchPayloads,
+    } = job;
+    span.setAttribute("error", true);
+    span.setAttribute("error.message", error.message);
+
+    if (!isRetryable) {
+      gqJobsNonRetryableTotal.inc(routingLabels);
+      this.logger.error(
+        {
+          queueName: this.queueName,
+          groupId,
+          stagedJobId,
+          attempt,
+          errorCategory: "non_retryable",
+          error,
+        },
+        "Job failed with non-retryable error, skipping retries",
+      );
+    }
+
+    await this.handleExhaustedRetries({
+      groupId,
+      stagedJobId,
+      payload,
+      originalScore,
+      // When the group tripped the quarantine breaker, block it with
+      // the descriptive quarantine error rather than the raw job
+      // error, so /ops shows why the group is blocked.
+      lastError: quarantineError ?? error,
+      contextMetadata,
+      routingLabels,
+    });
+
+    // Audit hook: terminal — onDead fires for the dispatched
+    // payload + every drained sibling.
+    await this.runAuditAll(
+      (batchPayloads ?? [payload]).map(
+        (p) => () =>
+          this.auditAdapter?.onDead({
+            payload: p,
+            lastError: error.message,
+            attempt,
+          }),
+      ),
+    );
+    await this.blobLifecycle.releaseLease({
+      values: [jobDataJson],
+      groupId,
+    });
+  }
+
+  /**
+   * Feeds the ops dashboard latency figures: the capped buffer behind the live
+   * P50/P99 tiles and the time-bucketed histograms. Fire-and-forget.
+   */
+  private recordJobLatency(jobDurationMs: number): void {
+    const completedAtMs = nowInstant().epochMilliseconds;
+    const bucketField = latencyBucketField(jobDurationMs);
+    const minuteKey = latencyMinuteBucketKey(this.queueName, completedAtMs);
+    const hourKey = latencyHourBucketKey(this.queueName, completedAtMs);
+    this.redisConnection
+      .multi()
+      .lpush(`${this.queueName}:gq:stats:latencies-ms`, String(Math.round(jobDurationMs)))
+      .ltrim(`${this.queueName}:gq:stats:latencies-ms`, 0, LATENCY_SAMPLE_SIZE - 1)
+      .hincrby(minuteKey, bucketField, 1)
+      .expire(minuteKey, LATENCY_MINUTE_BUCKET_TTL_SECONDS)
+      .hincrby(hourKey, bucketField, 1)
+      .expire(hourKey, LATENCY_HOUR_BUCKET_TTL_SECONDS)
+      .hincrby(latencyAllTimeKey(this.queueName), bucketField, 1)
+      .exec()
+      .catch(() => {
+        // best-effort stats write; failures are non-fatal
+      });
   }
 
   /**
