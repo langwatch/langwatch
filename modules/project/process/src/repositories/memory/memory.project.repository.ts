@@ -252,7 +252,7 @@ export class MemoryProjectRepository implements ProjectRepository {
     return this.#database.putProject({ ...project, archivedAt: toDate(nowInstant()) });
   }
 
-  async findAllByOrganization(input: {
+  async listAllByOrganization(input: {
     organizationId: string;
     page: number;
     limit: number;
@@ -324,6 +324,18 @@ export class MemoryProjectRepository implements ProjectRepository {
       updatedProjects: projects.filter((project) => after(project.updatedAt.getTime())).length,
       ...(made.length === 0 ? {} : { firstProjectAt: Math.min(...made) }),
     };
+  }
+
+  async countWithTraces({ organizationId }: { organizationId: string }): Promise<number> {
+    return this.#database
+      .projects()
+      .filter(
+        (project) =>
+          this.#database.isInOrganization(project, organizationId) &&
+          project.archivedAt === null &&
+          project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE &&
+          project.firstMessage,
+      ).length;
   }
 
   async findIdsByOrganization(organizationId: string): Promise<string[]> {

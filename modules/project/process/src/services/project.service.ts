@@ -437,7 +437,7 @@ export class ProjectService {
     limit: number;
     projectIds?: string[];
   }): Promise<PaginatedProjects> {
-    return this.repository.findAllByOrganization(projectPaginationSchema.parse(input));
+    return this.repository.listAllByOrganization(projectPaginationSchema.parse(input));
   }
 
   listByTeam(input: { organizationId: string; teamId: string }): Promise<Project[]> {
@@ -455,6 +455,10 @@ export class ProjectService {
     since?: number;
   }): Promise<ProjectUsageCount> {
     return this.repository.countUsage(input);
+  }
+
+  countWithTraces(input: { organizationId: string }): Promise<number> {
+    return this.repository.countWithTraces(input);
   }
 
   listIdsByOrganization(input: { organizationId: string }): Promise<string[]> {

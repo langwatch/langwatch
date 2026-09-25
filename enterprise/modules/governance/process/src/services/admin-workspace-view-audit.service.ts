@@ -1,3 +1,4 @@
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import {
   ADMIN_WORKSPACE_VIEW_ACTION,
   ADMIN_WORKSPACE_VIEW_DEDUP_MS,
@@ -17,9 +18,9 @@ import {
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
 } from "../app/governance.members.ts";
-import type { AdminWorkspaceViewAuditRepository } from "../repositories/admin-workspace-view-audit.repository.ts";
 
 type WorkspaceTeams = Pick<OrganizationApi, "getTeam" | "getTeamWithMembers">;
+type WorkspaceAuditLog = Pick<AuditLogApi, "record" | "hasRecordedSince">;
 
 const skipped = (): RecordWorkspaceViewResult => ({
   recorded: false,
@@ -28,8 +29,8 @@ const skipped = (): RecordWorkspaceViewResult => ({
 
 export class DefaultGovernanceAdminWorkspaceViewAuditService {
   private constructor(
-    private readonly repository: AdminWorkspaceViewAuditRepository,
     private readonly options: {
+      auditLog: WorkspaceAuditLog;
       teams: WorkspaceTeams;
       projects?: Pick<ProjectApi, "ensureInternal">;
       events?: GovernanceOcsfEventWriter;
@@ -39,14 +40,14 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
   ) {}
 
   static create(options: {
-    repository: AdminWorkspaceViewAuditRepository;
+    auditLog: WorkspaceAuditLog;
     teams: WorkspaceTeams;
     projects?: Pick<ProjectApi, "ensureInternal">;
     events?: GovernanceOcsfEventWriter;
     diagnostics?: GovernanceDiagnosticsSink;
     clock?: () => number;
   }): DefaultGovernanceAdminWorkspaceViewAuditService {
-    return new DefaultGovernanceAdminWorkspaceViewAuditService(options.repository, {
+    return new DefaultGovernanceAdminWorkspaceViewAuditService({
       ...options,
       clock: options.clock ?? Date.now,
     });
@@ -67,8 +68,9 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
     }
 
     const targetKind = this.targetKind(parsed.kind);
-    const recent = await this.repository.findRecent({
-      actorUserId: parsed.actorUserId,
+    const recent = await this.options.auditLog.hasRecordedSince({
+      userId: parsed.actorUserId,
+      action: ADMIN_WORKSPACE_VIEW_ACTION,
       targetKind,
       targetId: parsed.targetTeamId,
       sinceMs: this.options.clock() - ADMIN_WORKSPACE_VIEW_DEDUP_MS,
@@ -78,9 +80,10 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
     }
 
     const label = (parsed.workspaceLabel ?? team.name).slice(0, 256);
-    const row = await this.repository.create({
-      actorUserId: parsed.actorUserId,
+    const row = await this.options.auditLog.record({
+      userId: parsed.actorUserId,
       organizationId: parsed.organizationId,
+      action: ADMIN_WORKSPACE_VIEW_ACTION,
       targetKind,
       targetId: parsed.targetTeamId,
       metadata: { kind: parsed.kind, workspaceLabel: label },
@@ -114,7 +117,7 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
   private async mirrorBestEffort(
     input: RecordWorkspaceViewInput,
     label: string,
-    row: { id: string; createdAtMs: number },
+    row: { id: string; occurredAt: number },
   ): Promise<void> {
     if (!this.options.events || !this.options.projects) {
       return;
@@ -133,7 +136,7 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
         sourceType: this.targetKind(input.kind),
         activityId: OCSF_ACTIVITY.READ,
         severityId: OCSF_SEVERITY.INFO,
-        eventTime: Temporal.Instant.fromEpochMilliseconds(row.createdAtMs),
+        eventTime: Temporal.Instant.fromEpochMilliseconds(row.occurredAt),
         actorUserId: input.actorUserId,
         actorEmail: "",
         actorEnduserId: "",

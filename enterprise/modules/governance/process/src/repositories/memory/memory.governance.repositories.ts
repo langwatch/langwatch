@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { GovernanceRepositories } from "../governance.repositories.ts";
-import { MemoryAdminWorkspaceViewAuditRepository } from "./memory.admin-workspace-view-audit.repository.ts";
 import { MemoryAnomalyRuleRepository } from "./memory.anomaly-rule.repository.ts";
 import { MemoryDepartmentRepository } from "./memory.department.repository.ts";
 import { MemoryDiscoveredAgentRepository } from "./memory.discovered-agent.repository.ts";
@@ -39,7 +38,6 @@ export class MemoryGovernanceRepositories {
     const people = MemoryDiscoveredPeopleStore.create();
 
     return {
-      adminWorkspaceViewAudit: MemoryAdminWorkspaceViewAuditRepository.create(),
       anomalyRules: MemoryAnomalyRuleRepository.create(store),
       departments: MemoryDepartmentRepository.create(store),
       directory: MemoryGovernanceDirectoryRepository.create(store),

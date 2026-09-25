@@ -33,7 +33,6 @@ export type { GovernanceAppDependencies, GovernanceBespokeMembers } from "./app/
 // installation adapter and are never application capabilities.
 export { GovernanceEventsAdapter } from "./services/governance-events.service.ts";
 export type * from "./app/governance.members.ts";
-export type * from "./repositories/admin-workspace-view-audit.repository.ts";
 export type * from "./repositories/ai-tool-catalog.repository.ts";
 export type * from "./repositories/anomaly-rule.repository.ts";
 export type * from "./repositories/department.repository.ts";

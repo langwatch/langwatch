@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type {
   GovernanceOttlGateway,
@@ -68,6 +69,7 @@ import type {
 export type GovernanceInstallationOptions = {
   database: ProcessMembers["prisma"];
   organizations: OrganizationService;
+  auditLog: Pick<AuditLogApi, "record" | "hasRecordedSince">;
   memberDepartments: DepartmentOrganizations;
   projects: ProjectApi;
   gatewayBaseUrl: string;
@@ -107,7 +109,6 @@ export type GovernanceInstallationOptions = {
 };
 
 import { HttpProviderAccountChannel } from "../channels/http/http.provider-account.channel.ts";
-import { PrismaAdminWorkspaceViewAuditRepository } from "../repositories/prisma/prisma.admin-workspace-view-audit.repository.ts";
 import { PrismaAiToolCatalogRepository } from "../repositories/prisma/prisma.ai-tool-catalog.repository.ts";
 import { PrismaAnomalyRuleRepository } from "../repositories/prisma/prisma.anomaly-rule.repository.ts";
 import { PrismaGovernanceSetupStateRepository } from "../repositories/prisma/prisma.governance-setup-state.repository.ts";
@@ -212,7 +213,7 @@ export class GovernanceInstallationComposition {
       auth: this.options.auth,
     });
     const adminWorkspaceViewAudit = DefaultGovernanceAdminWorkspaceViewAuditService.create({
-      repository: PrismaAdminWorkspaceViewAuditRepository.create(this.options.database),
+      auditLog: this.options.auditLog,
       teams: this.options.organizations,
       projects: this.options.projects,
       diagnostics: this.options.adminWorkspaceDiagnostics,

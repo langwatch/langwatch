@@ -18,6 +18,10 @@ export class TestProjectApi implements ProjectApi {
     throw new Error("TestProjectApi.assignProjectDepartment is not configured");
   }
 
+  countWithTraces(): Promise<number> {
+    return Promise.resolve(0);
+  }
+
   countUsage(): Promise<{ projects: number; teams: number; updatedProjects: number }> {
     return Promise.resolve({ projects: 0, teams: 0, updatedProjects: 0 });
   }

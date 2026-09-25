@@ -71,7 +71,7 @@ import { MonitorApi } from "@langwatch/monitor-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { type ProcessMembers } from "@langwatch/process-stores/members";
 import { type ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
-import { Secret } from "@langwatch/secrets";
+import { Secret, virtualKeyPepper } from "@langwatch/secrets";
 import { toDate, type Instant } from "@langwatch/time";
 // The billing envelope and the subscription grammar are the webhook
 // platform's, and a reconciliation pull has to answer the same bytes a push
@@ -657,7 +657,7 @@ export class GatewayApp implements GatewayApi {
   static readonly secrets = {
     internalSecret: Secret.load("LW_GATEWAY_INTERNAL_SECRET", { optional: true }),
     jwtSecret: Secret.load("LW_GATEWAY_JWT_SECRET", { optional: true }),
-    virtualKeyPepper: Secret.load("LW_VIRTUAL_KEY_PEPPER", { optional: true }),
+    virtualKeyPepper,
   } as const;
   /**
    * `prisma` is the one guarded connection every gateway row read runs on.

@@ -73,7 +73,7 @@ export interface ProjectRepository {
   create(input: CreateProjectInput): Promise<Project>;
   update(input: { id: string; organizationId: string; data: UpdateProjectInput }): Promise<Project>;
   archive(input: { id: string; organizationId: string }): Promise<Project>;
-  findAllByOrganization(input: {
+  listAllByOrganization(input: {
     organizationId: string;
     page: number;
     limit: number;
@@ -109,4 +109,5 @@ export interface ProjectRepository {
     organizationIds: readonly string[];
     since?: number;
   }): Promise<ProjectUsageCount>;
+  countWithTraces(input: { organizationId: string }): Promise<number>;
 }

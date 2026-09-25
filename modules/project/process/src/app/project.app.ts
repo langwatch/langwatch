@@ -400,6 +400,10 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     return this.#projectService.countUsage(input);
   }
 
+  countWithTraces(input: { organizationId: string }): Promise<number> {
+    return this.#projectService.countWithTraces(input);
+  }
+
   listIdsByOrganization(
     input: projectContractModule.ProjectIdsByOrganizationInput,
   ): Promise<string[]> {

@@ -116,6 +116,17 @@ export class PrismaProjectRepository
     };
   }
 
+  async countWithTraces({ organizationId }: { organizationId: string }): Promise<number> {
+    return this.prisma.project.count({
+      where: {
+        team: { organizationId },
+        archivedAt: null,
+        kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
+        firstMessage: true,
+      },
+    });
+  }
+
   async findInternalByOrganization(organizationId: string): Promise<InternalProject | null> {
     return this.mapInternal(
       await this.prisma.project.findFirst({
@@ -349,7 +360,7 @@ export class PrismaProjectRepository
     );
   }
 
-  async findAllByOrganization(input: {
+  async listAllByOrganization(input: {
     organizationId: string;
     page: number;
     limit: number;

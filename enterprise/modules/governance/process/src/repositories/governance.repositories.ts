@@ -9,7 +9,6 @@ import type {
   PersonalUsageReader,
   QuarantineTraceActivityReader,
 } from "../app/governance.members.ts";
-import type { AdminWorkspaceViewAuditRepository } from "./admin-workspace-view-audit.repository.ts";
 import type { AnomalyRuleRepository } from "./anomaly-rule.repository.ts";
 import type {
   OcsfEventBatchWriter,
@@ -50,7 +49,6 @@ import type { SpendSpikeAnomalyRepository } from "./spend-spike-anomaly.reposito
  * seven template operations no longer need the ~100-operation facade.
  */
 export interface GovernanceRepositories {
-  readonly adminWorkspaceViewAudit: AdminWorkspaceViewAuditRepository;
   readonly anomalyRules: AnomalyRuleRepository;
   readonly departments: DepartmentRepository;
   readonly directory: GovernanceDirectoryRepository;

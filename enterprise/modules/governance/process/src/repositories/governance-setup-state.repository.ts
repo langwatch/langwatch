@@ -2,7 +2,6 @@ export type GovernanceSetupCounts = {
   routingPolicies: number;
   ingestionSources: number;
   anomalyRules: number;
-  applicationProjectsWithTraces: number;
 };
 
 export abstract class GovernanceSetupStateRepository {

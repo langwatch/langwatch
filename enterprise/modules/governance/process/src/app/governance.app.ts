@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { ApiKeyApi } from "@langwatch/api-key-contract";
+import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi, type CliAccessSession } from "@langwatch/auth-contract";
 /**
  * The governance feature's application: what all three of its doors call.
@@ -120,6 +121,7 @@ import {
 import { ScimApi } from "@langwatch/enterprise-scim-contract";
 import {
   assertEnterprisePlanType,
+  isEnterpriseTier,
   EntitlementApi,
   type EntitlementOperator,
   type EnterpriseFeature,
@@ -146,10 +148,12 @@ import { ClaudeComplianceReferencePullerAdapter } from "../channels/http/http.cl
 import { HttpCopilotStudioDataverseChannel } from "../channels/http/http.copilot-studio-dataverse.channel.ts";
 import { HttpCopilotStudioChannel } from "../channels/http/http.copilot-studio.channel.ts";
 import { HttpPollingPullerAdapter } from "../channels/http/http.polling.channel.ts";
+import { HttpProviderAccountChannel } from "../channels/http/http.provider-account.channel.ts";
 import { IngestionPullProcess } from "../eventing/ingestion-pull.process.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import { anomalyRuleConfigComplaint } from "../rules/anomaly-rule-config-error.rules.ts";
 import { nextIngestionPullRunAt } from "../rules/ingestion-pull-schedule.rules.ts";
+import { toPullLifecycleSource } from "../rules/pull-schedule.rules.ts";
 import { ratePulledUsage } from "../rules/pulled-usage-rate.rules.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";
 import { AgentDiscoveryService } from "../services/agent-discovery.service.ts";
@@ -203,6 +207,11 @@ import { IngestionPullLogService } from "../services/ingestion-pull-log.service.
 import { IngestionPullMetricsService } from "../services/ingestion-pull-metrics.service.ts";
 import { IngestionPullWorkerService } from "../services/ingestion-pull-worker.service.ts";
 import { IngestionPullService } from "../services/ingestion-pull.service.ts";
+import {
+  IngestionSecretConfiguration,
+  IngestionSecretService,
+} from "../services/ingestion-source-secret.service.ts";
+import { IngestionSourceService } from "../services/ingestion-source.service.ts";
 import { IngestionTemplateService } from "../services/ingestion-template.service.ts";
 import { DefaultGovernanceOcsfExportService } from "../services/ocsf-export.service.ts";
 import { OpenAiAdminPullerAdapter } from "../services/openai-admin-puller.service.ts";
@@ -216,6 +225,7 @@ import {
   type PersonalUsageRollup,
 } from "../services/personal-usage-dashboard.service.ts";
 import { GatewayPersonalVirtualKeyIssuerService } from "../services/personal-virtual-key-issuer.service.ts";
+import { PullDestinationService } from "../services/pull-destination.service.ts";
 import { PulledUsagePricingService } from "../services/pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../services/pulled-usage-record.service.ts";
 import { PullerRegistryService } from "../services/puller-registry.service.ts";
@@ -309,6 +319,8 @@ export interface GovernanceAppDependencies {
     ProjectApi,
     | "getOrganizationId"
     | "findInternal"
+    | "countWithTraces"
+    | "listActiveByScopes"
     | "findWithTeam"
     | "ensureInternal"
     | "findInternalIds"
@@ -334,6 +346,8 @@ export interface GovernanceAppDependencies {
   >;
   modelProviders: Pick<ModelProviderApi, "countEnabledInScopes">;
   users: Pick<UserApi, "findById" | "findByEmail">;
+  /** Audit-log owns the AuditLog table: workspace-view rows are written and deduped there. */
+  auditLog: Pick<AuditLogApi, "record" | "hasRecordedSince">;
   /** Auth owns CLI bearer validation and revocation. */
   auth: Pick<
     AuthApi,
@@ -449,6 +463,7 @@ export class GovernanceApp implements GovernanceRestApi {
     gateway: GatewayApi,
     modelProviders: ModelProviderApi,
     users: UserApi,
+    auditLog: AuditLogApi,
   };
   static readonly config = governanceConfig;
   static readonly secrets = governanceSecrets;
@@ -469,7 +484,11 @@ export class GovernanceApp implements GovernanceRestApi {
           erasureSecret,
         }),
     );
+    const ingestionSecrets = await secrets.into(governanceSecrets.ingestionSecretPepper, (pepper) =>
+      IngestionSecretService.create(IngestionSecretConfiguration.create({ pepper: pepper ?? "" })),
+    );
     return new GovernanceApp({
+      ingestionSecrets,
       dependencies: {
         governance: members.governance,
         cli: members.cli,
@@ -486,6 +505,7 @@ export class GovernanceApp implements GovernanceRestApi {
         gateway: dependencies.gateway,
         modelProviders: dependencies.modelProviders,
         users: dependencies.users,
+        auditLog: dependencies.auditLog,
       },
       repositories,
       erasureSuppression,
@@ -495,12 +515,14 @@ export class GovernanceApp implements GovernanceRestApi {
   }
 
   private constructor({
+    ingestionSecrets,
     dependencies,
     repositories,
     erasureSuppression,
     encryption,
     gatewayBaseUrl,
   }: {
+    ingestionSecrets: IngestionSecretService;
     dependencies: GovernanceAppDependencies;
     repositories: GovernanceRepositories;
     erasureSuppression: ErasureSuppressionService;
@@ -564,7 +586,7 @@ export class GovernanceApp implements GovernanceRestApi {
       activity: repositories.traceActivity,
     });
     this.workspaceViews = DefaultGovernanceAdminWorkspaceViewAuditService.create({
-      repository: repositories.adminWorkspaceViewAudit,
+      auditLog: dependencies.auditLog,
       teams: dependencies.organizations,
       projects: dependencies.projects,
       events: repositories.ocsfEvents,
@@ -577,6 +599,40 @@ export class GovernanceApp implements GovernanceRestApi {
     this.quarantineFill = QuarantineFillEvaluatorService.create({
       tenant: ProjectQuarantineTenantResolverService.create(dependencies.projects),
       traceActivity: repositories.traceActivity,
+    });
+    this.pullLifecycle = IngestionPullLifecycleService.create({
+      repository: repositories.ingestionPullLifecycle,
+      projects: dependencies.projects,
+      tenant: {
+        resolveTenantId: async (organizationId) =>
+          (
+            await dependencies.projects.ensureInternal({
+              organizationId,
+              kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+            })
+          ).id,
+      },
+      commands: {
+        configure: (input) => this.ingestionPullSender("configure").send(input),
+        disable: (input) => this.ingestionPullSender("disable").send(input),
+      },
+    });
+    const ingestionCredentials = IngestionCredentialsService.create(encryption);
+    this.ingestionSources = IngestionSourceService.create({
+      repository: repositories.ingestionSources,
+      projects: dependencies.projects,
+      entitlements: {
+        hasEnterprisePlan: async (organizationId) =>
+          isEnterpriseTier(
+            (await dependencies.entitlements.getActivePlan({ organizationId })).type,
+          ),
+      },
+      lifecycle: { sync: (source) => this.pullLifecycle.sync(toPullLifecycleSource(source)) },
+      credentials: ingestionCredentials,
+      secrets: ingestionSecrets,
+      destinations: PullDestinationService.create(),
+      providerAccounts: HttpProviderAccountChannel.create({ credentials: ingestionCredentials }),
+      diagnostics: { warn: (message, context) => logger.warn(context, message) },
     });
     // Stored credentials seal under the process's CREDENTIALS_SECRET, the key main sealed them with.
     const sourceCredentials = SourceCredentialAccessService.create({
@@ -676,6 +732,8 @@ export class GovernanceApp implements GovernanceRestApi {
   private readonly ingestionKeys: PersonalIngestionKeyService;
   private readonly setupState: DefaultGovernanceSetupStateService;
   private readonly workspaceViews: DefaultGovernanceAdminWorkspaceViewAuditService;
+  private readonly pullLifecycle: IngestionPullLifecycleService;
+  private readonly ingestionSources: IngestionSourceService;
   private readonly ocsfExport: DefaultGovernanceOcsfExportService;
   private readonly quarantineFill: QuarantineFillEvaluatorService;
   private readonly erasureSuppression: ErasureSuppressionService;
@@ -760,24 +818,7 @@ export class GovernanceApp implements GovernanceRestApi {
   }: {
     findPullProcessKeys: (input: { projectIds: string[] }) => Promise<string[]>;
   }): Promise<{ reconciled: number; failed: number }> {
-    const { projects } = this.dependencies;
-    return IngestionPullLifecycleService.create({
-      repository: this.repositories.ingestionPullLifecycle,
-      projects,
-      tenant: {
-        resolveTenantId: async (organizationId) =>
-          (
-            await projects.ensureInternal({
-              organizationId,
-              kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
-            })
-          ).id,
-      },
-      commands: {
-        configure: (input) => this.ingestionPullSender("configure").send(input),
-        disable: (input) => this.ingestionPullSender("disable").send(input),
-      },
-    }).reconcile({ findPullProcessKeys });
+    return this.pullLifecycle.reconcile({ findPullProcessKeys });
   }
 
   connectPulledUsage(commands: EventingSenders): void {

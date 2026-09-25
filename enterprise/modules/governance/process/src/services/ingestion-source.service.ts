@@ -51,9 +51,14 @@ import type { PullDestinationService } from "./pull-destination.service.ts";
 
 const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
 
+type IngestionSourceProjects = Pick<
+  ProjectApi,
+  "ensureInternal" | "listActiveByScopes" | "findWithTeam"
+>;
+
 export class IngestionSourceService {
   private readonly repository: IngestionSourceRepository;
-  private readonly projects: ProjectApi;
+  private readonly projects: IngestionSourceProjects;
   private readonly entitlements: IngestionSourceEntitlements;
   private readonly lifecycle: IngestionSourceLifecycleChannel;
   private readonly credentials: IngestionCredentialsService;
@@ -78,7 +83,7 @@ export class IngestionSourceService {
     validation,
   }: {
     repository: IngestionSourceRepository;
-    projects: ProjectApi;
+    projects: IngestionSourceProjects;
     entitlements: IngestionSourceEntitlements;
     lifecycle: IngestionSourceLifecycleChannel;
     credentials: IngestionCredentialsService;
@@ -104,7 +109,7 @@ export class IngestionSourceService {
 
   static create(options: {
     repository: IngestionSourceRepository;
-    projects: ProjectApi;
+    projects: IngestionSourceProjects;
     entitlements: IngestionSourceEntitlements;
     lifecycle: IngestionSourceLifecycleChannel;
     credentials: IngestionCredentialsService;

@@ -6,6 +6,7 @@ import {
   createRestRuntime,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
@@ -139,6 +140,7 @@ async function buildApi(
       gateway: createApiFixture<GatewayApi>(),
       modelProviders: createApiFixture<ModelProviderApi>(),
       users: createApiFixture<UserApi>(),
+      auditLog: createApiFixture<AuditLogApi>(),
     },
     members: {
       encryption: createApiFixture<GovernanceEncryptor>(),

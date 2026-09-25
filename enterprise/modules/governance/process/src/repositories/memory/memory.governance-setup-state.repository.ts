@@ -9,7 +9,6 @@ const NOTHING_SET_UP: GovernanceSetupCounts = {
   routingPolicies: 0,
   ingestionSources: 0,
   anomalyRules: 0,
-  applicationProjectsWithTraces: 0,
 };
 
 /**

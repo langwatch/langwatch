@@ -142,6 +142,8 @@ export interface ProjectApi {
     organizationIds: readonly string[];
     since?: number;
   }): Promise<ProjectUsageCount>;
+  /** Live application projects that have received a trace; internal projects excluded. */
+  countWithTraces(input: { organizationId: string }): Promise<number>;
 }
 
 export const ProjectApi = moduleApi<ProjectApi>()("project");

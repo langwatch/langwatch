@@ -1,4 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { ADMIN_WORKSPACE_VIEW_ACTION } from "@langwatch/enterprise-governance-contract";
 import { type OrganizationApi, TeamNotFoundError } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -12,7 +13,6 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
 import type { GovernanceOcsfEventWriter } from "../app/governance.members.ts";
-import { PrismaAdminWorkspaceViewAuditRepository } from "../repositories/prisma/prisma.admin-workspace-view-audit.repository.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
@@ -49,6 +49,22 @@ const projects = createApiFixture<ProjectApi>({
   }),
 });
 
+/** Audit-log's write and dedup, answered over the same table this suite asserts on. */
+const auditLog = createApiFixture<AuditLogApi>({
+  record: async ({ metadata, args: _args, ...entry }) => {
+    const row = await prisma.auditLog.create({
+      data: { ...entry, metadata: metadata ?? undefined },
+      select: { id: true, createdAt: true },
+    });
+    return { id: row.id, occurredAt: row.createdAt.getTime() };
+  },
+  hasRecordedSince: async ({ sinceMs, ...where }) =>
+    (await prisma.auditLog.findFirst({
+      where: { ...where, createdAt: { gte: new Date(sinceMs) } },
+      select: { id: true },
+    })) !== null,
+});
+
 /** Organization's team reads, answered from the rows this suite seeds. */
 const teams = createApiFixture<OrganizationApi>({
   getTeam: async ({ organizationId, teamId }) => {
@@ -80,7 +96,7 @@ const teams = createApiFixture<OrganizationApi>({
 describe.skipIf(!databaseUrl)("AdminWorkspaceViewAuditService", () => {
   const service = () =>
     DefaultGovernanceAdminWorkspaceViewAuditService.create({
-      repository: PrismaAdminWorkspaceViewAuditRepository.create(prisma),
+      auditLog,
       teams,
       projects,
       events: new SpyOcsf(),

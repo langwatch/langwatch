@@ -1,4 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import {
   type OrganizationApi,
   type OrganizationTeam,
@@ -9,13 +10,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
 import type { GovernanceOcsfEventWriter } from "../../app/governance.members.ts";
-import { AdminWorkspaceViewAuditRepository } from "../../repositories/admin-workspace-view-audit.repository.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../admin-workspace-view-audit.service.ts";
 
-class MemoryAuditRepository extends AdminWorkspaceViewAuditRepository {
+class RecordingAuditLog implements Pick<AuditLogApi, "record" | "hasRecordedSince"> {
   recent = false;
-  findRecent = vi.fn(async () => this.recent);
-  create = vi.fn(async () => ({ id: "audit", createdAtMs: 1_700_000_000_000 }));
+  hasRecordedSince = vi.fn(async () => this.recent);
+  record = vi.fn(async () => ({ id: "audit", occurredAt: 1_700_000_000_000 }));
 }
 
 class StubProjects extends TestProjectApi {
@@ -94,11 +94,11 @@ const input = {
 
 describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
   it("records the scoped view and mirrors it under the audit identifier", async () => {
-    const repository = new MemoryAuditRepository();
+    const repository = new RecordingAuditLog();
     const teams = new StubTeams();
     const ocsf = new StubOcsf();
     const service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
-      repository,
+      auditLog: repository,
       teams: teams.api(),
       projects: new StubProjects(),
       events: ocsf,
@@ -108,9 +108,10 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
       recorded: true,
       auditLogId: "audit",
     });
-    expect(repository.create).toHaveBeenCalledWith({
-      actorUserId: "admin",
+    expect(repository.record).toHaveBeenCalledWith({
+      userId: "admin",
       organizationId: "org",
+      action: "governance.viewWorkspaceAs",
       targetKind: "personal_workspace",
       targetId: "team",
       metadata: { kind: "personal", workspaceLabel: "Owner workspace" },
@@ -128,11 +129,11 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
   });
 
   it("silently collapses cross-tenant and self-view probes", async () => {
-    const repository = new MemoryAuditRepository();
+    const repository = new RecordingAuditLog();
     const teams = new StubTeams();
     teams.target = null;
     const service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
-      repository,
+      auditLog: repository,
       teams: teams.api(),
     });
     await expect(service.recordView(input)).resolves.toEqual({
@@ -154,11 +155,11 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
   });
 
   it("records a team workspace using the team audit target", async () => {
-    const repository = new MemoryAuditRepository();
+    const repository = new RecordingAuditLog();
     const teams = new StubTeams();
     teams.target = { ...ownerWorkspace, isPersonal: false, name: "Shared workspace" };
     const service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
-      repository,
+      auditLog: repository,
       teams: teams.api(),
     });
 
@@ -166,7 +167,7 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
       recorded: true,
       auditLogId: "audit",
     });
-    expect(repository.create).toHaveBeenCalledWith(
+    expect(repository.record).toHaveBeenCalledWith(
       expect.objectContaining({
         targetKind: "team_workspace",
         metadata: { kind: "team", workspaceLabel: "Shared workspace" },
@@ -175,11 +176,11 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
   });
 
   it("deduplicates the same privileged view within five minutes", async () => {
-    const repository = new MemoryAuditRepository();
+    const repository = new RecordingAuditLog();
     const teams = new StubTeams();
     repository.recent = true;
     const service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
-      repository,
+      auditLog: repository,
       teams: teams.api(),
       clock: () => 1_700_000_000_000,
     });
@@ -187,19 +188,19 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
       recorded: false,
       auditLogId: null,
     });
-    expect(repository.findRecent).toHaveBeenCalledWith(
+    expect(repository.hasRecordedSince).toHaveBeenCalledWith(
       expect.objectContaining({ sinceMs: 1_699_999_700_000 }),
     );
   });
 
   it("keeps the authoritative audit when the OCSF mirror fails", async () => {
-    const repository = new MemoryAuditRepository();
+    const repository = new RecordingAuditLog();
     const teams = new StubTeams();
     const ocsf = new StubOcsf();
     ocsf.insertEvent.mockRejectedValueOnce(new Error("ClickHouse unavailable"));
     const diagnostics = { warn: vi.fn() };
     const service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
-      repository,
+      auditLog: repository,
       teams: teams.api(),
       projects: new StubProjects(),
       events: ocsf,

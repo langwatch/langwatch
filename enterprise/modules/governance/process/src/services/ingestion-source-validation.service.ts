@@ -12,9 +12,13 @@ import {
 import type { ProjectApi } from "@langwatch/project-contract";
 
 export class IngestionSourceValidationService {
-  private constructor(private readonly projects: ProjectApi) {}
+  private constructor(private readonly projects: Pick<ProjectApi, "findWithTeam">) {}
 
-  static create({ projects }: { projects: ProjectApi }): IngestionSourceValidationService {
+  static create({
+    projects,
+  }: {
+    projects: Pick<ProjectApi, "findWithTeam">;
+  }): IngestionSourceValidationService {
     return new IngestionSourceValidationService(projects);
   }
 

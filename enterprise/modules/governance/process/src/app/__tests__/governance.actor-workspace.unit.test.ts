@@ -1,5 +1,6 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 /**
@@ -97,6 +98,7 @@ async function buildApp(options: {
       gateway: createApiFixture<GatewayApi>(),
       modelProviders: createApiFixture<ModelProviderApi>(),
       users: createApiFixture<UserApi>({ findById, findByEmail }),
+      auditLog: createApiFixture<AuditLogApi>(),
     },
     members: { encryption: createApiFixture<GovernanceEncryptor>(), isSaas: false },
     resources: new ResourceScope(),

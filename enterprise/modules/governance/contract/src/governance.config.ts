@@ -7,6 +7,7 @@
  */
 import { Config, gatewayLegacyUrl, gatewayPublicUrl, type ConfigOf } from "@langwatch/config";
 import { resolveGatewayBaseUrl } from "@langwatch/config/public-app-config/projection";
+import { virtualKeyPepper } from "@langwatch/secrets";
 import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
 
@@ -23,21 +24,12 @@ const governanceOttlConfigSchema = z
   })
   .default({ baseUrl: null, secret: null });
 
-/**
- * The governance module's configuration slice.
- *
- * `ingestionSecretPepper` defaults to the empty string because that is what
- * the served behaviour is today — an unset pepper hashes an ingestion secret
- * unpeppered rather than refusing to boot. Requiring it is a deliberate
- * hardening, not a conversion, and belongs in its own change.
- */
+/** The governance module's configuration slice. */
 export const governanceAppConfigSchema = z.object({
   /** Where an issued personal virtual key tells its holder to send traffic. */
   gatewayBaseUrl: z.string().min(1),
   /** This deployment's public origin; the CLI family's links are built on it. */
   publicBaseUrl: z.string().min(1),
-  /** Prefixed into an ingestion secret's hash, so a database-only leak is inert. */
-  ingestionSecretPepper: z.string().default(""),
   ottl: governanceOttlConfigSchema,
 });
 
@@ -46,6 +38,8 @@ export type GovernanceAppConfig = z.infer<typeof governanceAppConfigSchema>;
 /** Every stored erasure digest is a function of this value: set it once, never change it. */
 export const governanceSecrets = {
   erasurePseudonymSecret: Secret.load("GOVERNANCE_ERASURE_PSEUDONYM_SECRET", { optional: true }),
+  /** Prefixed into an ingestion secret's hash, so a database-only leak is inert. */
+  ingestionSecretPepper: virtualKeyPepper,
 } as const;
 
 /** The deployment facts governance reads: where issued personal keys send traffic. */

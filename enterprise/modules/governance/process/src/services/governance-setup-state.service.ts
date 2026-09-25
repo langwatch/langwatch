@@ -10,7 +10,7 @@ const RECENT_ACTIVITY_WINDOW_MS = 30 * 24 * 60 * 60 * 1_000;
 type SetupStateOptions = {
   repository: GovernanceSetupStateRepository;
   keys: Pick<GatewayApi, "findPersonalVirtualKeys">;
-  projects: Pick<ProjectApi, "findInternal">;
+  projects: Pick<ProjectApi, "findInternal" | "countWithTraces">;
   activity?: GovernanceSetupActivityReader;
   now: () => number;
 };
@@ -26,10 +26,11 @@ export class DefaultGovernanceSetupStateService {
 
   async resolve(organizationId: string): Promise<GovernanceSetupState> {
     const { repository, keys, projects, activity, now } = this.options;
-    const [counts, personalKeys, governanceProject] = await Promise.all([
+    const [counts, personalKeys, governanceProject, projectsWithTraces] = await Promise.all([
       repository.counts(organizationId),
       keys.findPersonalVirtualKeys({ organizationId }),
       projects.findInternal({ organizationId, kind: PROJECT_KIND.INTERNAL_GOVERNANCE }),
+      projects.countWithTraces({ organizationId }),
     ]);
     const hasRecentActivity =
       governanceProject && activity
@@ -42,7 +43,7 @@ export class DefaultGovernanceSetupStateService {
     const hasRoutingPolicies = counts.routingPolicies > 0;
     const hasIngestionSources = counts.ingestionSources > 0;
     const hasAnomalyRules = counts.anomalyRules > 0;
-    const hasApplicationTraces = counts.applicationProjectsWithTraces > 0;
+    const hasApplicationTraces = projectsWithTraces > 0;
 
     return {
       hasPersonalVKs,

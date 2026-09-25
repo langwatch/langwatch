@@ -15,7 +15,6 @@ const emptyCounts = (): GovernanceSetupCounts => ({
   routingPolicies: 0,
   ingestionSources: 0,
   anomalyRules: 0,
-  applicationProjectsWithTraces: 0,
 });
 
 const governanceProject: InternalProject = {
@@ -28,12 +27,17 @@ const governanceProject: InternalProject = {
   traceSharingEnabled: false,
 };
 
-const peers = ({ keys = 0, tenant = false }: { keys?: number; tenant?: boolean } = {}) => ({
+const peers = ({
+  keys = 0,
+  tenant = false,
+  traced = 0,
+}: { keys?: number; tenant?: boolean; traced?: number } = {}) => ({
   keys: createApiFixture<GatewayApi>({
     findPersonalVirtualKeys: async () => Array.from({ length: keys }, () => gatewayKey()),
   }),
   projects: createApiFixture<ProjectApi>({
     findInternal: async () => (tenant ? governanceProject : null),
+    countWithTraces: async () => traced,
   }),
 });
 
@@ -104,11 +108,8 @@ describe("DefaultGovernanceSetupStateService", () => {
 
   it("reports application traces without treating them as governance state", async () => {
     const state = await DefaultGovernanceSetupStateService.create({
-      repository: new FixedSetupRepository({
-        ...emptyCounts(),
-        applicationProjectsWithTraces: 1,
-      }),
-      ...peers(),
+      repository: new FixedSetupRepository(emptyCounts()),
+      ...peers({ traced: 1 }),
     }).resolve("organization");
 
     expect(state.hasApplicationTraces).toBe(true);
