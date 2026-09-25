@@ -1,0 +1,330 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`AdminBackofficeService user update > changes the email and revokes sessions 1`] = `
+{
+  "log": [
+    [
+      "users.findById",
+      "user-1",
+    ],
+    [
+      "users.updateProfile",
+      "user-1",
+      "new@example.com",
+    ],
+    [
+      "auth.revokeAllBrowserSessions",
+      "user-1",
+    ],
+    [
+      "audit.record",
+      "admin/update/user",
+      {
+        "email": "new@example.com",
+        "id": "user-1",
+      },
+    ],
+    [
+      "repository.findUserById",
+      "user-1",
+    ],
+  ],
+  "result": {
+    "data": {
+      "id": "user-1",
+    },
+  },
+}
+`;
+
+exports[`AdminBackofficeService user update > combines every side effect 1`] = `
+{
+  "log": [
+    [
+      "users.reactivate",
+      "user-1",
+    ],
+    [
+      "users.findById",
+      "user-1",
+    ],
+    [
+      "users.updateProfile",
+      "user-1",
+      "a@b.c",
+    ],
+    [
+      "auth.revokeAllBrowserSessions",
+      "user-1",
+    ],
+    [
+      "audit.record",
+      "admin/update/user",
+      {
+        "id": "user-1",
+        "reactivate": true,
+      },
+    ],
+    [
+      "audit.record",
+      "admin/update/user",
+      {
+        "email": "a@b.c",
+        "id": "user-1",
+      },
+    ],
+    [
+      "repository.execute",
+      {
+        "data": {
+          "name": "N",
+        },
+        "id": "user-1",
+      },
+    ],
+    [
+      "audit.record",
+      "admin/update/user",
+      {
+        "data": {
+          "name": "N",
+        },
+        "id": "user-1",
+      },
+    ],
+  ],
+  "result": {
+    "data": {
+      "id": "user-1",
+    },
+  },
+}
+`;
+
+exports[`AdminBackofficeService user update > deactivates at a picked date 1`] = `
+{
+  "log": [
+    [
+      "users.deactivate",
+      "user-1",
+    ],
+    [
+      "repository.setUserDeactivatedAt",
+      "user-1",
+      "2026-01-02T03:04:05Z",
+    ],
+    [
+      "audit.record",
+      "admin/update/user",
+      {
+        "deactivate": true,
+        "id": "user-1",
+        "pickedDate": "2026-01-02T03:04:05.000Z",
+      },
+    ],
+    [
+      "repository.findUserById",
+      "user-1",
+    ],
+  ],
+  "result": {
+    "data": {
+      "id": "user-1",
+    },
+  },
+}
+`;
+
+exports[`AdminBackofficeService user update > deactivates without an unreadable picked date 1`] = `
+{
+  "log": [
+    [
+      "users.deactivate",
+      "user-1",
+    ],
+    [
+      "audit.record",
+      "admin/update/user",
+      {
+        "deactivate": true,
+        "id": "user-1",
+      },
+    ],
+    [
+      "repository.findUserById",
+      "user-1",
+    ],
+  ],
+  "result": {
+    "data": {
+      "id": "user-1",
+    },
+  },
+}
+`;
+
+exports[`AdminBackofficeService user update > keeps sessions when the email is unchanged 1`] = `
+{
+  "log": [
+    [
+      "users.findById",
+      "user-1",
+    ],
+    [
+      "users.updateProfile",
+      "user-1",
+      "same@example.com",
+    ],
+    [
+      "audit.record",
+      "admin/update/user",
+      {
+        "email": "same@example.com",
+        "id": "user-1",
+      },
+    ],
+    [
+      "repository.findUserById",
+      "user-1",
+    ],
+  ],
+  "result": {
+    "data": {
+      "id": "user-1",
+    },
+  },
+}
+`;
+
+exports[`AdminBackofficeService user update > passes an unrecognised deactivation value through 1`] = `
+{
+  "log": [
+    [
+      "repository.execute",
+      {
+        "data": {
+          "deactivatedAt": 5,
+        },
+        "id": "user-1",
+      },
+    ],
+    [
+      "audit.record",
+      "admin/update/user",
+      {
+        "data": {
+          "deactivatedAt": 5,
+        },
+        "id": "user-1",
+      },
+    ],
+  ],
+  "result": {
+    "data": {
+      "id": "user-1",
+    },
+  },
+}
+`;
+
+exports[`AdminBackofficeService user update > reactivates on a blank deactivation and saves the rest 1`] = `
+{
+  "log": [
+    [
+      "users.reactivate",
+      "user-1",
+    ],
+    [
+      "audit.record",
+      "admin/update/user",
+      {
+        "id": "user-1",
+        "reactivate": true,
+      },
+    ],
+    [
+      "repository.execute",
+      {
+        "data": {
+          "name": "X",
+        },
+        "id": "user-1",
+      },
+    ],
+    [
+      "audit.record",
+      "admin/update/user",
+      {
+        "data": {
+          "name": "X",
+        },
+        "id": "user-1",
+      },
+    ],
+  ],
+  "result": {
+    "data": {
+      "id": "user-1",
+    },
+  },
+}
+`;
+
+exports[`AdminBackofficeService user update > reactivates on a null deactivation 1`] = `
+{
+  "log": [
+    [
+      "users.reactivate",
+      "user-1",
+    ],
+    [
+      "audit.record",
+      "admin/update/user",
+      {
+        "id": "user-1",
+        "reactivate": true,
+      },
+    ],
+    [
+      "repository.findUserById",
+      "user-1",
+    ],
+  ],
+  "result": {
+    "data": {
+      "id": "user-1",
+    },
+  },
+}
+`;
+
+exports[`AdminBackofficeService user update > saves plain fields only 1`] = `
+{
+  "log": [
+    [
+      "repository.execute",
+      {
+        "data": {
+          "name": "Only",
+        },
+        "id": "user-1",
+      },
+    ],
+    [
+      "audit.record",
+      "admin/update/user",
+      {
+        "data": {
+          "name": "Only",
+        },
+        "id": "user-1",
+      },
+    ],
+  ],
+  "result": {
+    "data": {
+      "id": "user-1",
+    },
+  },
+}
+`;

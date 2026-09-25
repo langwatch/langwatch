@@ -67,9 +67,10 @@ describe("QueueRedisRepository bulk operator filters", () => {
       [{ pipelineFilter: "trace", errorFilter: "boom" }, ["g-trace-boom"]],
       [{ pipelineFilter: "eval", errorFilter: "boom" }, []],
     ])("with filters %j it acts on exactly the matching groups", async (filters, expected) => {
-      await run(filters);
+      const result = await run(filters);
 
       expect(touchedGroups()).toEqual(expected);
+      expect(result).toMatchSnapshot();
     });
   });
 });

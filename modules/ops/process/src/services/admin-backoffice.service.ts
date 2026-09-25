@@ -42,6 +42,8 @@ const STRINGS_STILL_DECIDE: OrganizationSsoRouting = {
 };
 
 /** Ops-owned application service for the legacy react-admin wire surface. */
+type UserSideEffectAudit = { action: string; payload: Record<string, unknown> };
+
 export class AdminBackofficeService {
   private readonly repository: AdminBackofficeRepository;
   private readonly users: UserApi;
@@ -93,68 +95,18 @@ export class AdminBackofficeService {
 
   private async updateUser(input: AdminOperationInput): Promise<AdminOperationResult> {
     const data = { ...input.params.data };
-    let handledSideEffect = false;
-    const sideEffectAudits: {
-      action: string;
-      payload: Record<string, unknown>;
-    }[] = [];
+    const userId = String(input.params.id ?? "");
+    const sideEffectAudits: UserSideEffectAudit[] = [];
 
     if ("deactivatedAt" in data) {
-      const value = data.deactivatedAt;
-      if (value === null || value === "") {
-        await this.users.reactivate({ id: String(input.params.id ?? "") });
-        delete data.deactivatedAt;
-        handledSideEffect = true;
-        sideEffectAudits.push({
-          action: "update/user",
-          payload: { id: String(input.params.id ?? ""), reactivate: true },
-        });
-      } else if (typeof value === "string" || value instanceof Date) {
-        const userId = String(input.params.id ?? "");
-        await this.users.deactivate({ id: userId });
-        delete data.deactivatedAt;
-        handledSideEffect = true;
-        const pickedMs = toEpochMs(value);
-        const isValidPickedDate = !Number.isNaN(pickedMs);
-        if (isValidPickedDate) {
-          await this.repository.setUserDeactivatedAt(
-            userId,
-            Temporal.Instant.fromEpochMilliseconds(pickedMs),
-          );
-        }
-
-        sideEffectAudits.push({
-          action: "update/user",
-          payload: {
-            id: userId,
-            deactivate: true,
-            ...(isValidPickedDate
-              ? {
-                  pickedDate: Temporal.Instant.fromEpochMilliseconds(pickedMs).toString({
-                    fractionalSecondDigits: 3,
-                  }),
-                }
-              : {}),
-          },
-        });
-      }
+      const audits = await this.applyDeactivation({ userId, value: data.deactivatedAt });
+      if (audits.length > 0) delete data.deactivatedAt;
+      sideEffectAudits.push(...audits);
     }
 
     if ("email" in data && typeof data.email === "string") {
-      const userId = String(input.params.id ?? "");
-      const email = data.email.trim().toLowerCase();
-      const previous = await this.users.findById({ id: userId });
-      const updated = await this.users.updateProfile({ id: userId, email });
-      if (previous && (previous.email ?? "").toLowerCase() !== updated.email) {
-        await this.auth.revokeAllBrowserSessions({ userId });
-      }
-
+      sideEffectAudits.push(await this.applyEmailChange({ userId, email: data.email }));
       delete data.email;
-      handledSideEffect = true;
-      sideEffectAudits.push({
-        action: "update/user",
-        payload: { id: userId, email },
-      });
     }
 
     for (const entry of sideEffectAudits) {
@@ -166,8 +118,8 @@ export class AdminBackofficeService {
       });
     }
 
-    if (handledSideEffect && Object.keys(data).length === 0) {
-      return this.repository.findUserById(String(input.params.id ?? ""));
+    if (sideEffectAudits.length > 0 && Object.keys(data).length === 0) {
+      return this.repository.findUserById(userId);
     }
 
     const normalized: AdminOperationInput = {
@@ -178,6 +130,56 @@ export class AdminBackofficeService {
     await this.auditMutation(normalized, result);
 
     return result;
+  }
+
+  /** Reactivates on a blank value, deactivates on a date; any other value is left to the save. */
+  private async applyDeactivation({
+    userId,
+    value,
+  }: {
+    userId: string;
+    value: unknown;
+  }): Promise<UserSideEffectAudit[]> {
+    if (value === null || value === "") {
+      await this.users.reactivate({ id: userId });
+      return [{ action: "update/user", payload: { id: userId, reactivate: true } }];
+    }
+    if (typeof value !== "string" && !(value instanceof Date)) return [];
+
+    await this.users.deactivate({ id: userId });
+    const pickedMs = toEpochMs(value);
+    if (Number.isNaN(pickedMs)) {
+      return [{ action: "update/user", payload: { id: userId, deactivate: true } }];
+    }
+    const picked = Temporal.Instant.fromEpochMilliseconds(pickedMs);
+    await this.repository.setUserDeactivatedAt(userId, picked);
+    return [
+      {
+        action: "update/user",
+        payload: {
+          id: userId,
+          deactivate: true,
+          pickedDate: picked.toString({ fractionalSecondDigits: 3 }),
+        },
+      },
+    ];
+  }
+
+  /** Saves the normalised email; a real change signs the user out of every browser. */
+  private async applyEmailChange({
+    userId,
+    email: rawEmail,
+  }: {
+    userId: string;
+    email: string;
+  }): Promise<UserSideEffectAudit> {
+    const email = rawEmail.trim().toLowerCase();
+    const previous = await this.users.findById({ id: userId });
+    const updated = await this.users.updateProfile({ id: userId, email });
+    if (previous && (previous.email ?? "").toLowerCase() !== updated.email) {
+      await this.auth.revokeAllBrowserSessions({ userId });
+    }
+    return { action: "update/user", payload: { id: userId, email } };
   }
 
   private async normalizeOrganizationDomain(

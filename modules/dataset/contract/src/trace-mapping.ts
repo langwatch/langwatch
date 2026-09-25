@@ -1147,7 +1147,8 @@ export const convertTo = <T extends keyof StringTypeToType>(
     typeof subject === "string" && (type === "object" || type === "string[]" || type === "array");
 
   if (isEncodedStringToStructuredType) {
-    return decodeEncodedStructure(subject, type);
+    const decoded = decodeEncodedStructure(subject, type);
+    if (decoded.kind === "decoded") return decoded.value;
   }
   return subject as unknown as StringTypeToType[T];
 };
@@ -1156,27 +1157,31 @@ export const convertTo = <T extends keyof StringTypeToType>(
 const decodeEncodedStructure = <T extends keyof StringTypeToType>(
   subject: string,
   type: T,
-): StringTypeToType[T] => {
+): { kind: "decoded"; value: StringTypeToType[T] } | { kind: "undecodable" } => {
   try {
     const parsed = JSON.parse(subject);
     if (!Array.isArray(parsed) && typeof parsed === "object") {
-      return parsed as unknown as StringTypeToType[T];
+      return { kind: "decoded", value: parsed as unknown as StringTypeToType[T] };
     }
     if (Array.isArray(parsed)) {
-      if (type === "string[]") {
-        return parsed.map((v) => convertTo(v, "string")) as unknown as StringTypeToType[T];
-      }
-      return parsed as unknown as StringTypeToType[T];
+      const value = type === "string[]" ? parsed.map((v) => convertTo(v, "string")) : parsed;
+      return { kind: "decoded", value: value as unknown as StringTypeToType[T] };
     }
     throw new Error("Failed to parse to a valid type, falling back");
   } catch {
     if (type === "string[]") {
-      return [convertTo(subject, "string")] as unknown as StringTypeToType[T];
+      return {
+        kind: "decoded",
+        value: [convertTo(subject, "string")] as unknown as StringTypeToType[T],
+      };
     }
     if (type === "array") {
-      return [subject] as unknown as StringTypeToType[T];
+      return { kind: "decoded", value: [subject] as unknown as StringTypeToType[T] };
     }
-    return { _json: subject } as unknown as StringTypeToType[T];
+    if (type === "object") {
+      return { kind: "decoded", value: { _json: subject } as unknown as StringTypeToType[T] };
+    }
+    return { kind: "undecodable" };
   }
 };
 

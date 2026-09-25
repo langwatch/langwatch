@@ -305,6 +305,62 @@ const streamCsvRecords = ({
     });
   });
 
+// Rename confirmed keys to their new names and convert their values to the
+// confirmed types; drop excluded file headers; keep stray keys untouched.
+// Identity when nothing was confirmed (or on a mismatch) — preserving the
+// pre-v19 all-`string` pass-through. Streaming: one record at a time.
+const applyTargetBinding = (
+  record: Record<string, unknown>,
+  binding: TargetBinding,
+): Record<string, unknown> => {
+  if (binding.kind !== "bound") return record;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    const target = binding.byCanonical.get(key);
+    if (target) {
+      // Kept column: rename + type-convert.
+      out[target.name] = convertValueToColumnType(value, target.type);
+      continue;
+    }
+    // An excluded file header is dropped; a stray key (not a file header) is kept as-is.
+    if (binding.canonicalSet?.has(key)) continue;
+    out[key] = value;
+  }
+  return out;
+};
+
+// I-MEM: bound a pathological no-newline / giant-line file. `readline`
+// already buffers a line at a time; this caps that buffer's size.
+const parseJsonlLine = (
+  rawLine: string,
+): { kind: "record"; record: Record<string, unknown> } | { kind: "blank" } => {
+  if (Buffer.byteLength(rawLine, "utf8") > MAX_JSONL_LINE_BYTES) {
+    throw new Error("JSONL line exceeds max size — malformed file");
+  }
+  const line = scrubNullBytes(rawLine).trim();
+  if (line.length === 0) return { kind: "blank" };
+  return { kind: "record", record: JSON.parse(line) as Record<string, unknown> };
+};
+
+/** A JSON-array source, size-guarded and buffered whole; it must be an array of records. */
+const readJsonArray = async ({
+  stream,
+  sizeBytes,
+}: {
+  stream: Readable;
+  sizeBytes?: number;
+}): Promise<Record<string, unknown>[]> => {
+  if (sizeBytes !== undefined && sizeBytes > LARGE_JSON_MAX_BYTES) {
+    throw new LargeJsonUnsupportedError();
+  }
+  const content = scrubNullBytes(await streamToString(stream, LARGE_JSON_MAX_BYTES)).trim();
+  const parsed = JSON.parse(content);
+  if (!Array.isArray(parsed)) {
+    throw new Error("JSON content must be an array of objects");
+  }
+  return parsed as Record<string, unknown>[];
+};
+
 /**
  * Stream-parse a staged source into the chunk writer and capture the (already reserved-renamed)
  * column headers from the first record / CSV fields. Each record's keys are rewritten through
@@ -327,49 +383,18 @@ const parseInto = async (params: {
   const { stream, format, writer, sizeBytes, targetColumns } = params;
   let headers: string[] = [];
   let renameMap = new Map<string, string>();
-  // canonicalHeader → confirmed { name, type }; built once headers are known and
-  // only when the confirmed columns bind cleanly (else stays null →
-  // derive-all-string). With the confirm shape this may cover a SUBSET of the
-  // file headers — the omitted ones are columns the user excluded.
-  let targetByCanonical: Map<string, DatasetColumns[number]> | null = null;
-  // The full set of file headers, set alongside a sourceHeader-bound map. Lets
-  // `applyTarget` tell an EXCLUDED header (in the file, not confirmed → drop)
-  // apart from a STRAY key (not a file header at all, e.g. a JSONL record with
-  // extra keys → keep). Null on the legacy positional path (no exclusion).
-  let canonicalSet: Set<string> | null = null;
+  // Confirmed columns bound to the file headers once known; unbound (derive-all-string)
+  // until then, or when the confirmed columns do not bind cleanly.
+  let binding: TargetBinding = { kind: "unbound" };
   const buildTargetMap = (canonical: string[]): void => {
-    const binding = bindTargetColumns({ targetColumns, canonical });
-    if (binding.kind !== "bound") return;
-    targetByCanonical = binding.byCanonical;
-    canonicalSet = binding.canonicalSet;
-  };
-  // Rename confirmed keys to their new names and convert their values to the
-  // confirmed types; drop excluded file headers; keep stray keys untouched.
-  // Identity when nothing was confirmed (or on a mismatch) — preserving the
-  // pre-v19 all-`string` pass-through. Streaming: one record at a time.
-  const applyTarget = (record: Record<string, unknown>): Record<string, unknown> => {
-    if (!targetByCanonical) return record;
-    const out: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(record)) {
-      const target = targetByCanonical.get(key);
-      if (target) {
-        // Kept column: rename + type-convert.
-        out[target.name] = convertValueToColumnType(value, target.type);
-      } else if (canonicalSet?.has(key)) {
-        // Excluded file header: the user dropped this column — omit its value.
-        continue;
-      } else {
-        // Stray key (not a confirmed file header): preserve as-is.
-        out[key] = value;
-      }
-    }
-    return out;
+    const next = bindTargetColumns({ targetColumns, canonical });
+    if (next.kind === "bound") binding = next;
   };
   // The persisted columnTypes are the confirmed columns in the user's chosen
   // (drag) order, with the transient `sourceHeader` stripped — null when nothing
   // bound (the handler then derives all-`string`).
   const appliedColumnTypes = (): DatasetColumns | null =>
-    targetByCanonical ? targetColumns!.map(({ name, type }) => ({ name, type })) : null;
+    binding.kind === "bound" ? targetColumns!.map(({ name, type }) => ({ name, type })) : null;
   // Capture headers the first time we see them, derive the rename map, and
   // expose headers in their safe (renamed) form so columnTypes matches the
   // rewritten row keys.
@@ -379,20 +404,17 @@ const parseInto = async (params: {
     headers = renameReservedColumns(rawKeys);
     buildTargetMap(headers);
   };
+  const pushRecord = async (record: Record<string, unknown>): Promise<void> => {
+    captureHeaders(Object.keys(record));
+    await writer.push(applyTargetBinding(applyRename(record, renameMap), binding));
+  };
 
   if (format === "jsonl") {
     const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
     for await (const rawLine of rl) {
-      // I-MEM: bound a pathological no-newline / giant-line file. `readline`
-      // already buffers a line at a time; this caps that buffer's size.
-      if (Buffer.byteLength(rawLine, "utf8") > MAX_JSONL_LINE_BYTES) {
-        throw new Error("JSONL line exceeds max size — malformed file");
-      }
-      const line = scrubNullBytes(rawLine).trim();
-      if (line.length === 0) continue;
-      const record = JSON.parse(line) as Record<string, unknown>;
-      captureHeaders(Object.keys(record));
-      await writer.push(applyTarget(applyRename(record, renameMap)));
+      const line = parseJsonlLine(rawLine);
+      if (line.kind === "blank") continue;
+      await pushRecord(line.record);
     }
     return {
       headers,
@@ -407,7 +429,7 @@ const parseInto = async (params: {
         headers = csvHeaders;
         buildTargetMap(headers);
       },
-      onRecord: (record) => writer.push(applyTarget(record)),
+      onRecord: (record) => writer.push(applyTargetBinding(record, binding)),
     });
     return {
       headers,
@@ -416,17 +438,8 @@ const parseInto = async (params: {
   }
 
   // format === "json": a single array — guard the size, then buffer + parse.
-  if (sizeBytes !== undefined && sizeBytes > LARGE_JSON_MAX_BYTES) {
-    throw new LargeJsonUnsupportedError();
-  }
-  const content = scrubNullBytes(await streamToString(stream, LARGE_JSON_MAX_BYTES)).trim();
-  const parsed = JSON.parse(content);
-  if (!Array.isArray(parsed)) {
-    throw new Error("JSON content must be an array of objects");
-  }
-  for (const record of parsed as Record<string, unknown>[]) {
-    captureHeaders(Object.keys(record));
-    await writer.push(applyTarget(applyRename(record, renameMap)));
+  for (const record of await readJsonArray({ stream, sizeBytes })) {
+    await pushRecord(record);
   }
   return {
     headers,
