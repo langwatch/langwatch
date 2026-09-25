@@ -205,18 +205,18 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
         }));
       })
 
-      .get("/:workflowId", "getApiWorkflowsById")
+      .get("/:id", "getApiWorkflowsById")
       .withParams(workflowRestParamsSchema)
       .withPermission("workflows:view")
       .responds({ 200: workflowRestDetailSchema, 404: workflowRestRefusalSchema })
       .withDocs({ description: "Get a workflow by its ID" })
       .withMiddleware(projectRestFacts)
       .handle(({ app, input, scope }, project) => {
-        logger.info({ projectId: scope.id, workflowId: input.workflowId }, "Getting workflow");
+        logger.info({ projectId: scope.id, workflowId: input.id }, "Getting workflow");
 
         return readWorkflow({
           app,
-          id: input.workflowId,
+          id: input.id,
           projectId: scope.id,
           projectSlug: project.projectSlug,
         });
@@ -224,7 +224,7 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
 
       // Editing metadata on a workflow that already exists is an `:update`.
       // `:manage` still implies it, so no existing caller changes.
-      .patch("/:workflowId", "patchApiWorkflowsById")
+      .patch("/:id", "patchApiWorkflowsById")
       .withParams(workflowRestParamsSchema)
       .withInput(workflowRestUpdateSchema)
       .withPermission("workflows:update")
@@ -232,7 +232,7 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
       .withDocs({ description: "Update a workflow's metadata (name, icon, description)" })
       .withMiddleware(projectRestFacts)
       .handle(({ app, input, scope }, project) => {
-        const { workflowId: id, ...changes } = input;
+        const { id, ...changes } = input;
         logger.info({ projectId: scope.id, workflowId: id }, "Updating workflow");
 
         return writeWorkflow({
@@ -245,15 +245,15 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
       })
 
       // Archiving deliberately stays at `:manage`.
-      .delete("/:workflowId", "deleteApiWorkflowsById")
+      .delete("/:id", "deleteApiWorkflowsById")
       .withParams(workflowRestParamsSchema)
       .withPermission("workflows:manage")
       .responds({ 200: workflowRestArchivedSchema, 404: workflowRestRefusalSchema })
       .withDocs({ description: "Archive (soft-delete) a workflow" })
       .handle(({ app, input, scope }) => {
-        logger.info({ projectId: scope.id, workflowId: input.workflowId }, "Archiving workflow");
+        logger.info({ projectId: scope.id, workflowId: input.id }, "Archiving workflow");
 
-        return archiveWorkflow({ app, id: input.workflowId, projectId: scope.id });
+        return archiveWorkflow({ app, id: input.id, projectId: scope.id });
       })
 
       // Running a workflow is not administering it: the committed version, its
@@ -261,7 +261,7 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
       // asks for `workflows:create`, the same grain as the suite run. The
       // second gate is the ceiling fact above: the caller must also be able to
       // READ the run it starts.
-      .post("/:workflowId/evaluate", "postApiWorkflowsByIdEvaluate")
+      .post("/:id/evaluate", "postApiWorkflowsByIdEvaluate")
       .withParams(workflowRestParamsSchema)
       .withInput(workflowRestEvaluateSchema)
       .withPermission("workflows:create")
@@ -286,7 +286,7 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
         }
 
         logger.info(
-          { projectId: scope.id, workflowId: input.workflowId },
+          { projectId: scope.id, workflowId: input.id },
           "Triggering workflow evaluation via API",
         );
 
@@ -295,7 +295,7 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
           request: {
             projectId: scope.id,
             projectSlug: project.projectSlug,
-            workflowId: input.workflowId,
+            workflowId: input.id,
             versionId: input.version_id,
             data: input.data,
             datasetId: input.dataset_id,

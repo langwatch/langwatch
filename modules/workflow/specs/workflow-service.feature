@@ -199,3 +199,9 @@ Feature: Workflow service boundary
     Given no workflow version with the requested id in the project
     When the caller restores it
     Then workflow_version_not_found is reported with status 404
+
+  @unit
+  Scenario: A Studio graph saved without execution state is accepted as main accepted it
+    Given a Studio workflow DSL that carries no state field
+    When the Studio schema parses it
+    Then the graph parses with an empty state

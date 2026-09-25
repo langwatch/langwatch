@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 
-import { LlmModelNotSetError, workflowDslSchema } from "../index.ts";
+import { LlmModelNotSetError, studioWorkflowSchema, workflowDslSchema } from "../index.ts";
 
 describe("Workflow contract", () => {
   it("accepts the portable graph envelope and preserves node values", () => {
@@ -21,6 +21,21 @@ describe("Workflow contract", () => {
     expect(() => workflowDslSchema.parse({ name: "Incomplete", nodes: [], edges: [] })).toThrow(
       ZodError,
     );
+  });
+
+  /** @scenario "A Studio graph saved without execution state is accepted as main accepted it" */
+  it("parses a Studio graph that carries no state, with an empty state", () => {
+    const result = studioWorkflowSchema.parse({
+      spec_version: "1.5",
+      name: "Support triage",
+      icon: "puzzle",
+      description: "",
+      version: "1.0",
+      nodes: [],
+      edges: [],
+    });
+
+    expect(result.state).toEqual({});
   });
 
   it("describes a missing LLM model as a handled 422", () => {

@@ -31,7 +31,7 @@ export const workflowRestDetailSchema = z.object({
 export const workflowRestRefusalSchema = z.object({ error: z.string() });
 
 /** The one path parameter every item address of this family names. */
-export const workflowRestParamsSchema = z.object({ workflowId: z.string().min(1) });
+export const workflowRestParamsSchema = z.object({ id: z.string().min(1) });
 
 /** A partial change to a workflow's own metadata. */
 export const workflowRestUpdateSchema = z.object({

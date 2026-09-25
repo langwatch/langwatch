@@ -532,7 +532,8 @@ export const studioWorkflowWireSchema = workflowDslSchema
           })
           .optional(),
       })
-      .passthrough(),
+      .passthrough()
+      .default({}),
   })
   .passthrough();
 
