@@ -1,4 +1,4 @@
-import type { ProcessStore } from "@langwatch/eventing";
+import { InMemoryProcessStore, type ProcessStore } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { OpsEventingIntrospection, OpsProcessManagerMetadata } from "../../app/ops.app.ts";
@@ -68,6 +68,7 @@ const otherAggregate = {
   hasWake: false,
 };
 
+/** The eventing memory twin, with the reads a test scripts laid over it. */
 function fakeStore(
   overrides: {
     findByRef?: () => Promise<unknown>;
@@ -75,19 +76,7 @@ function fakeStore(
     requeueDeadMessages?: () => Promise<unknown>;
   } = {},
 ): ProcessStore {
-  return {
-    findByRef: vi.fn(async () => null),
-    hasConsumedSource: vi.fn(async () => false),
-    findMessagesByRef: vi.fn(async () => []),
-    commit: vi.fn(),
-    leaseDueMessages: vi.fn(),
-    markDispatched: vi.fn(),
-    markFailed: vi.fn(),
-    findDueWakes: vi.fn(),
-    deleteDispatchedBefore: vi.fn(),
-    requeueDeadMessages: vi.fn().mockResolvedValue(3),
-    ...overrides,
-  } as unknown as ProcessStore;
+  return Object.assign(InMemoryProcessStore.createForTesting(), overrides);
 }
 
 describe("ManagerExplorerService", () => {
@@ -222,7 +211,7 @@ describe("given dead outbox messages for one endpoint stream", () => {
       // the findByRef test above for why.
       const requeueDeadMessages = vi.fn().mockResolvedValue(3);
       const store = fakeStore({ requeueDeadMessages });
-      const service = makeService(store as never);
+      const service = makeService(store);
       const result = await service.requeueDeadMessages({
         processName: "webhookDelivery",
         projectId: "project-1",

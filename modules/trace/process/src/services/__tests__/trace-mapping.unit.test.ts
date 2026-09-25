@@ -10,7 +10,7 @@ import {
   SPAN_SUBFIELDS,
   THREAD_MAPPINGS,
   TRACE_MAPPINGS,
-  tryAndConvertTo,
+  convertTo,
 } from "@langwatch/dataset-contract";
 import { describe, expect, it } from "vitest";
 
@@ -1154,23 +1154,23 @@ describe("mappingStateSchema", () => {
   });
 });
 
-describe("tryAndConvertTo", () => {
+describe("convertTo", () => {
   describe("when given an OTel typed-object wrapper", () => {
     it("returns the bare value when the wrapper type is 'text'", () => {
       // Bug: currently returns '{"type":"text","value":"stockout"}' instead of "stockout"
-      expect(tryAndConvertTo({ type: "text", value: "stockout" }, "string")).toBe("stockout");
+      expect(convertTo({ type: "text", value: "stockout" }, "string")).toBe("stockout");
     });
 
     it("returns the bare value stringified when the wrapper type is 'json' and value is a number", () => {
       // Any `type` discriminator should trigger unwrap
-      expect(tryAndConvertTo({ type: "json", value: 42 }, "string")).toBe("42");
+      expect(convertTo({ type: "json", value: 42 }, "string")).toBe("42");
     });
   });
 
   describe("when given an array of OTel typed-object wrappers", () => {
     it("unwraps each element and returns a string array", () => {
       expect(
-        tryAndConvertTo(
+        convertTo(
           [
             { type: "text", value: "a" },
             { type: "text", value: "b" },
@@ -1184,25 +1184,25 @@ describe("tryAndConvertTo", () => {
   describe("when given a plain object that is not a typed-object wrapper", () => {
     it("stringifies the object as JSON", () => {
       // Guard: non-wrapper objects must NOT be unwrapped
-      expect(tryAndConvertTo({ foo: "bar" }, "string")).toBe('{"foo":"bar"}');
+      expect(convertTo({ foo: "bar" }, "string")).toBe('{"foo":"bar"}');
     });
   });
 
   describe("when given a bare string", () => {
     it("returns the string unchanged", () => {
-      expect(tryAndConvertTo("stockout", "string")).toBe("stockout");
+      expect(convertTo("stockout", "string")).toBe("stockout");
     });
   });
 
   describe("when given null", () => {
     it("returns undefined", () => {
-      expect(tryAndConvertTo(null, "string")).toBeUndefined();
+      expect(convertTo(null, "string")).toBeUndefined();
     });
   });
 
   describe("when given undefined", () => {
     it("returns undefined", () => {
-      expect(tryAndConvertTo(undefined, "string")).toBeUndefined();
+      expect(convertTo(undefined, "string")).toBeUndefined();
     });
   });
 });

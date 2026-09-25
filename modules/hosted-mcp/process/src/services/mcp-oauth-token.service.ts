@@ -35,6 +35,11 @@ export type McpOAuthTokenExchange =
     }>
   | Readonly<{ status: 400 | 401 | 500; body: OAuthError }>;
 
+/** A bearer read: the session it opens, or an expired or unreadable token the caller refuses. */
+export type McpOAuthSessionLookup =
+  | { kind: "session"; context: McpOAuthSessionContext }
+  | { kind: "refused" };
+
 export type McpOAuthSessionContext = Readonly<{
   apiKey: string;
   userId: string | undefined;
@@ -122,39 +127,40 @@ export class McpOAuthTokenService {
     };
   }
 
-  async resolve(token: string): Promise<McpOAuthSessionContext | null> {
+  async resolve(token: string): Promise<McpOAuthSessionLookup> {
     const cached = this.#tokens.get(token);
     if (cached) {
       if (nowInstant().epochMilliseconds < cached.expiresAt) {
-        return { apiKey: cached.apiKey, userId: cached.userId };
+        return { kind: "session", context: { apiKey: cached.apiKey, userId: cached.userId } };
       }
       this.#tokens.delete(token);
-      return null;
+      return { kind: "refused" };
     }
 
     try {
       const found = await this.#repository.findBearer({ token });
-      if (found.kind === "missing") return { apiKey: token, userId: void 0 };
+      if (found.kind === "missing")
+        return { kind: "session", context: { apiKey: token, userId: void 0 } };
       if (found.kind === "corrupted") {
         await this.#repository.removeBearer({ token });
-        return null;
+        return { kind: "refused" };
       }
 
       const { record: stored } = found;
       if (nowInstant().epochMilliseconds < stored.expiresAt) {
         const apiKey = this.#cipher.decrypt(stored.encryptedApiKey);
         this.#tokens.set(token, { apiKey, userId: stored.userId, expiresAt: stored.expiresAt });
-        return { apiKey, userId: stored.userId };
+        return { kind: "session", context: { apiKey, userId: stored.userId } };
       }
       await this.#repository.removeBearer({ token });
-      return null;
+      return { kind: "refused" };
     } catch (error) {
       // Validation of the direct API key still follows this lookup, so a
       // Redis failure cannot admit a credential on its own.
       logger.error({ error }, "Redis token lookup failed");
     }
 
-    return { apiKey: token, userId: void 0 };
+    return { kind: "session", context: { apiKey: token, userId: void 0 } };
   }
 
   clearCache(): void {

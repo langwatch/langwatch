@@ -264,7 +264,10 @@ describe("RedisOpsSnapshotRepository", () => {
         });
 
         expect(published).toBe(false);
-        expect((await repo.tryReadLive())?.computedAt).toBe(1_000);
+        expect(await repo.readLive()).toMatchObject({
+          kind: "hit",
+          snapshot: { computedAt: 1_000 },
+        });
       });
     });
   });
@@ -294,7 +297,10 @@ describe("RedisOpsSnapshotRepository", () => {
         });
 
         expect(published).toBe(false);
-        expect((await repo.tryReadLive())?.computedAt).toBe(1_000);
+        expect(await repo.readLive()).toMatchObject({
+          kind: "hit",
+          snapshot: { computedAt: 1_000 },
+        });
       });
     });
   });
@@ -317,7 +323,10 @@ describe("RedisOpsSnapshotRepository", () => {
         });
 
         expect(published).toBe(false);
-        expect((await repo.tryReadLive())?.computedAt).toBe(5_000);
+        expect(await repo.readLive()).toMatchObject({
+          kind: "hit",
+          snapshot: { computedAt: 5_000 },
+        });
       });
     });
   });

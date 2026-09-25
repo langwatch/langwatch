@@ -226,12 +226,12 @@ export class OpsMetricsWindowService {
 
   async restore(metrics: OpsMetricsRepository): Promise<void> {
     try {
-      const raw = await metrics.tryReadPersistedState();
-      if (!raw) {
+      const persisted = await metrics.readPersistedState();
+      if (persisted.kind === "miss") {
         return;
       }
 
-      const state: PersistedMetricsState = JSON.parse(raw);
+      const state: PersistedMetricsState = JSON.parse(persisted.raw);
       if (state.version !== 3) {
         return;
       }

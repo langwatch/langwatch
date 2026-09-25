@@ -14,6 +14,9 @@ export type OpsLatencyHistograms = {
 
 export type OpsQueueTotals = { completed: number; failed: number };
 
+/** The persisted metrics window as stored, or none to restore from. */
+export type OpsPersistedStateRead = { kind: "hit"; raw: string } | { kind: "miss" };
+
 export abstract class OpsMetricsRepository {
   abstract readLatencyHistograms(input: {
     queueNames: string[];
@@ -29,7 +32,7 @@ export abstract class OpsMetricsRepository {
     jobNames: string[];
   }): Promise<Map<string, OpsQueueTotals>>;
   abstract readPausedJobKeys(input: { queueNames: string[] }): Promise<string[]>;
-  abstract tryReadPersistedState(): Promise<string | null>;
+  abstract readPersistedState(): Promise<OpsPersistedStateRead>;
   abstract writePersistedState(input: { state: string; ttlSeconds: number }): Promise<void>;
   /** The server's own INFO text, parsed by the caller. */
   abstract readServerInfo(): Promise<string>;

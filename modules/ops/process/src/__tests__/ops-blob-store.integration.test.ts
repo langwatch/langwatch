@@ -15,7 +15,7 @@ import Redis, { type Redis as RedisClient } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { OpsOperations } from "../app/ops-operations.ts";
-import type { QueuePayloadDecoder } from "../app/ops.app.ts";
+import type { QueuePayloadDecoder, QueuePayloadDecoding } from "../app/ops.app.ts";
 import type { SchedulerOpsRepository } from "../repositories/scheduler-ops.repository.ts";
 import type { OpsService } from "../services/ops.service.ts";
 import { NoopSchedulerWakeService } from "../services/scheduler-wake.service.ts";
@@ -39,8 +39,8 @@ const schedulerRepository: SchedulerOpsRepository = {
 const projects = createApiFixture<ProjectApi>({ listNamesByIds: async () => [] });
 
 class NoopQueuePayloadDecoder implements QueuePayloadDecoder {
-  async tryDecode(): Promise<Record<string, unknown> | null> {
-    return null;
+  async decode(): Promise<QueuePayloadDecoding> {
+    return { kind: "undecodable" };
   }
 }
 

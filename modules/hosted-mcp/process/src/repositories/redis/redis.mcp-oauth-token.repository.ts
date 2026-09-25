@@ -53,8 +53,8 @@ export class RedisMcpOAuthTokenRepository extends McpOAuthTokenRepository {
   }
 
   async hasRegisteredClient({ clientId }: { clientId: string }): Promise<boolean> {
-    const client = await McpOAuthClientRegistryService.get({ redis: this.#redis, clientId });
-    return client !== null;
+    const lookup = await McpOAuthClientRegistryService.get({ redis: this.#redis, clientId });
+    return lookup.kind === "registered";
   }
 
   async findBearer({ token }: { token: string }): Promise<McpOAuthBearerLookup> {

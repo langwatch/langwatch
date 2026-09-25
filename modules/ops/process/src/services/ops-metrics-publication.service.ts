@@ -17,6 +17,7 @@ import type {
 import { nowInstant } from "@langwatch/time";
 
 import type { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metrics-source.repository.ts";
+import type { OpsSnapshotRead } from "../repositories/ops-snapshot.repository.ts";
 import { OpsDashboardViewService } from "./ops-dashboard-view.service.ts";
 import type { OpsMetricsSamplingService } from "./ops-metrics-sampling.service.ts";
 import type { OpsMetricsWindowService } from "./ops-metrics-window.service.ts";
@@ -234,7 +235,7 @@ export class OpsMetricsPublicationService {
 
       // Only adopt the artifact the fence ACCEPTED. A rejected write means the lease
       // turned over mid-scan, so this payload was never published; keeping it would
-      // have `tryGetLatestDetail()` report a detail artifact no reader can see. Leaving
+      // have `readLatestDetail()` report a detail artifact no reader can see. Leaving
       // `lastDetailAt` alone is deliberate too — a pod that regains the lease should
       // rescan rather than sit out a cadence it never completed.
       const published = await snapshots.writeDetail({
@@ -257,7 +258,7 @@ export class OpsMetricsPublicationService {
   }
 
   /** The detail artifact this writer most recently produced, if any. */
-  tryGetLatestDetail(): DetailSnapshot | null {
-    return this.latestDetail;
+  readLatestDetail(): OpsSnapshotRead<DetailSnapshot> {
+    return this.latestDetail ? { kind: "hit", snapshot: this.latestDetail } : { kind: "miss" };
   }
 }

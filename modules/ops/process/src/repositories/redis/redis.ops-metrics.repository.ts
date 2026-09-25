@@ -12,6 +12,7 @@ import {
   OpsMetricsRepository,
   type OpsLatencyHistograms,
   type OpsQueueTotals,
+  type OpsPersistedStateRead,
 } from "../ops-metrics.repository.ts";
 
 const REDIS_STATE_KEY = "ops:metrics:state";
@@ -180,8 +181,9 @@ export class RedisOpsMetricsRepository extends OpsMetricsRepository {
     return Array.from(keys);
   }
 
-  tryReadPersistedState(): Promise<string | null> {
-    return this.redis.get(REDIS_STATE_KEY);
+  async readPersistedState(): Promise<OpsPersistedStateRead> {
+    const raw = await this.redis.get(REDIS_STATE_KEY);
+    return raw ? { kind: "hit", raw } : { kind: "miss" };
   }
 
   async writePersistedState({

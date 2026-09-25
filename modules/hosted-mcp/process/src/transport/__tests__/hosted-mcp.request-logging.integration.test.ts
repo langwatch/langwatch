@@ -36,6 +36,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   return { ...actual, createLogger: () => loggerStub };
 });
 
+import type { McpLiveProjectLookup } from "../../app/hosted-mcp-members.ts";
 import {
   createMcpHandler,
   McpApiKeyCipher,
@@ -46,13 +47,11 @@ import {
 } from "../../index.ts";
 
 class LoggingProjectLookup extends McpProjectLookup {
-  tryFindLiveProjectByApiKey({
-    apiKey,
-  }: {
-    apiKey: string;
-  }): Promise<{ id: string; teamId: string } | null> {
+  resolveLiveProjectByApiKey({ apiKey }: { apiKey: string }): Promise<McpLiveProjectLookup> {
     return Promise.resolve(
-      apiKey === VALID_API_KEY ? { id: "logging-project", teamId: "team-1" } : null,
+      apiKey === VALID_API_KEY
+        ? { kind: "live", project: { id: "logging-project", teamId: "team-1" } }
+        : { kind: "unknown" },
     );
   }
 }

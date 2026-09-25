@@ -19,6 +19,11 @@ export interface RegisteredOAuthClient {
   clientName: string;
 }
 
+/** A registry read: the client's registration, or none this server can honour. */
+export type RegisteredOAuthClientLookup =
+  | { kind: "registered"; client: RegisteredOAuthClient }
+  | { kind: "unregistered" };
+
 /**
  * Static members: a registration is addressed by the Redis handle the caller
  * already holds, so there is no per-instance state.
@@ -57,15 +62,15 @@ export class McpOAuthClientRegistryService {
   }: {
     redis: HostedMcpRedis | null;
     clientId: string;
-  }): Promise<RegisteredOAuthClient | null> {
+  }): Promise<RegisteredOAuthClientLookup> {
     if (!redis) {
-      return null;
+      return { kind: "unregistered" };
     }
 
     const raw = await redis.get(`${REDIS_CLIENT_PREFIX}${clientId}`);
 
     if (!raw) {
-      return null;
+      return { kind: "unregistered" };
     }
 
     // A registration we wrote that no longer decodes should be named, not
@@ -77,12 +82,12 @@ export class McpOAuthClientRegistryService {
       const parsed = JSON.parse(raw) as RegisteredOAuthClient;
 
       if (!Array.isArray(parsed.redirectUris)) {
-        return null;
+        return { kind: "unregistered" };
       }
 
-      return parsed;
+      return { kind: "registered", client: parsed };
     } catch {
-      return null;
+      return { kind: "unregistered" };
     }
   }
 }

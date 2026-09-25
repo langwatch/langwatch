@@ -6,7 +6,10 @@ import {
 } from "@langwatch/ops-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { OpsSnapshotRepository } from "../../repositories/ops-snapshot.repository.ts";
+import {
+  type OpsSnapshotRead,
+  OpsSnapshotRepository,
+} from "../../repositories/ops-snapshot.repository.ts";
 import { DefaultOpsSnapshotService } from "../ops-snapshot-reader.service.ts";
 
 const live = (over: Partial<LiveSnapshot> = {}): LiveSnapshot => ({
@@ -139,12 +142,12 @@ class SnapshotRepositoryStub extends OpsSnapshotRepository {
     return false;
   }
 
-  async tryReadLive(): Promise<LiveSnapshot | null> {
-    return this.liveSnapshot;
+  async readLive(): Promise<OpsSnapshotRead<LiveSnapshot>> {
+    return this.liveSnapshot ? { kind: "hit", snapshot: this.liveSnapshot } : { kind: "miss" };
   }
 
-  async tryReadDetail(): Promise<DetailSnapshot | null> {
-    return this.detailSnapshot;
+  async readDetail(): Promise<OpsSnapshotRead<DetailSnapshot>> {
+    return this.detailSnapshot ? { kind: "hit", snapshot: this.detailSnapshot } : { kind: "miss" };
   }
 }
 
@@ -265,7 +268,7 @@ describe("snapshot merging", () => {
     it("installs no poll, so a released reader stops touching its connection", async () => {
       vi.useFakeTimers();
       const repository = new SnapshotRepositoryStub(live(), detail());
-      const reads = vi.spyOn(repository, "tryReadLive");
+      const reads = vi.spyOn(repository, "readLive");
       const service = DefaultOpsSnapshotService.create(repository);
 
       // Started without awaiting, the way a composition root starts it.

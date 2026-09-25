@@ -8,7 +8,7 @@ import {
 } from "@langwatch/ops-contract";
 
 import { type OpsSnapshotRedis } from "../../app/ops.app.ts";
-import { OpsSnapshotRepository } from "../ops-snapshot.repository.ts";
+import { type OpsSnapshotRead, OpsSnapshotRepository } from "../ops-snapshot.repository.ts";
 
 /**
  * The `{snapshot}` hash tag is load-bearing: the fenced write below reads
@@ -181,11 +181,13 @@ export class RedisOpsSnapshotRepository extends OpsSnapshotRepository {
     return Number(written) === 1;
   }
 
-  async tryReadLive(): Promise<LiveSnapshot | null> {
-    return tryParseLiveSnapshot(await this.redis.tryGet(SNAPSHOT_LIVE_KEY));
+  async readLive(): Promise<OpsSnapshotRead<LiveSnapshot>> {
+    const snapshot = tryParseLiveSnapshot(await this.redis.tryGet(SNAPSHOT_LIVE_KEY));
+    return snapshot ? { kind: "hit", snapshot } : { kind: "miss" };
   }
 
-  async tryReadDetail(): Promise<DetailSnapshot | null> {
-    return tryParseDetailSnapshot(await this.redis.tryGet(SNAPSHOT_DETAIL_KEY));
+  async readDetail(): Promise<OpsSnapshotRead<DetailSnapshot>> {
+    const snapshot = tryParseDetailSnapshot(await this.redis.tryGet(SNAPSHOT_DETAIL_KEY));
+    return snapshot ? { kind: "hit", snapshot } : { kind: "miss" };
   }
 }

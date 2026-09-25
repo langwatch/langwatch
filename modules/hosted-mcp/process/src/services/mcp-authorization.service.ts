@@ -104,8 +104,8 @@ export class McpAuthorizationService {
       clientId: request.clientId,
     });
 
-    if (!registered) return { kind: "unregistered-client" };
-    if (!registered.redirectUris.includes(request.redirectUri)) {
+    if (registered.kind === "unregistered") return { kind: "unregistered-client" };
+    if (!registered.client.redirectUris.includes(request.redirectUri)) {
       return { kind: "unregistered-redirect" };
     }
 

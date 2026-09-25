@@ -4,6 +4,7 @@
 import { getRoutePolicy } from "@langwatch/api/rest";
 import { describe, expect, it } from "vitest";
 
+import type { McpLiveProjectLookup } from "../../app/hosted-mcp-members.ts";
 import {
   createMcpHandler,
   HeaderMcpClientAddressService,
@@ -15,8 +16,8 @@ import {
 } from "../../index.ts";
 
 class NoProjects extends McpProjectLookup {
-  tryFindLiveProjectByApiKey(): Promise<{ id: string; teamId: string } | null> {
-    return Promise.resolve(null);
+  resolveLiveProjectByApiKey(): Promise<McpLiveProjectLookup> {
+    return Promise.resolve({ kind: "unknown" });
   }
 }
 

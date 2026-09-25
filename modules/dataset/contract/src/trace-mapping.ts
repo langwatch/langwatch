@@ -1122,7 +1122,7 @@ const unwrapTypedObject = (v: unknown): unknown => {
   return obj.value;
 };
 
-export const tryAndConvertTo = <T extends keyof StringTypeToType>(
+export const convertTo = <T extends keyof StringTypeToType>(
   value: unknown,
   type: T,
 ): StringTypeToType[T] | undefined => {
@@ -1141,7 +1141,7 @@ export const tryAndConvertTo = <T extends keyof StringTypeToType>(
     return Number(subject) as StringTypeToType[T];
   }
   if (Array.isArray(subject) && type === "string[]") {
-    return subject.map((v) => tryAndConvertTo(v, "string")) as unknown as StringTypeToType[T];
+    return subject.map((v) => convertTo(v, "string")) as unknown as StringTypeToType[T];
   }
   const isEncodedStringToStructuredType =
     typeof subject === "string" && (type === "object" || type === "string[]" || type === "array");
@@ -1154,14 +1154,14 @@ export const tryAndConvertTo = <T extends keyof StringTypeToType>(
       }
       if (Array.isArray(parsed)) {
         if (type === "string[]") {
-          return parsed.map((v) => tryAndConvertTo(v, "string")) as unknown as StringTypeToType[T];
+          return parsed.map((v) => convertTo(v, "string")) as unknown as StringTypeToType[T];
         }
         return parsed as unknown as StringTypeToType[T];
       }
       throw new Error("Failed to parse to a valid type, falling back");
     } catch {
       if (type === "string[]") {
-        return [tryAndConvertTo(subject, "string")] as unknown as StringTypeToType[T];
+        return [convertTo(subject, "string")] as unknown as StringTypeToType[T];
       }
       if (type === "array") {
         return [subject] as unknown as StringTypeToType[T];

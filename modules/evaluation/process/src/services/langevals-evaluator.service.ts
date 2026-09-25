@@ -1,4 +1,4 @@
-import { tryAndConvertTo } from "@langwatch/dataset-contract";
+import { convertTo } from "@langwatch/dataset-contract";
 import {
   EvaluatorExecutionError,
   EvaluatorInputTooLargeError,
@@ -107,12 +107,12 @@ export class LangevalsEvaluatorService implements EvaluationLangevals {
         body: {
           data: [
             {
-              input: tryAndConvertTo(data.input, "string"),
-              output: tryAndConvertTo(data.output, "string"),
-              contexts: tryAndConvertTo(data.contexts, "string[]"),
-              expected_contexts: tryAndConvertTo(data.expected_contexts, "string[]"),
-              expected_output: tryAndConvertTo(data.expected_output, "string"),
-              conversation: tryAndConvertTo(data.conversation, "array"),
+              input: convertTo(data.input, "string"),
+              output: convertTo(data.output, "string"),
+              contexts: convertTo(data.contexts, "string[]"),
+              expected_contexts: convertTo(data.expected_contexts, "string[]"),
+              expected_output: convertTo(data.expected_output, "string"),
+              conversation: convertTo(data.conversation, "array"),
             },
           ],
           settings: settings ?? {},

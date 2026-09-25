@@ -126,11 +126,12 @@ describe.skipIf(!hasRedis)("Ops dashboard latency tiles", () => {
           // cycle; poll until the artifact lands.
           await collector.collect();
           const start = Date.now();
-          while (!collector.tryGetLatestDetail() && Date.now() - start < 5000) {
+          while (collector.readLatestDetail().kind === "miss" && Date.now() - start < 5000) {
             await new Promise((r) => setTimeout(r, 50));
           }
 
-          const windows = collector.tryGetLatestDetail()?.latencyWindows;
+          const latest = collector.readLatestDetail();
+          const windows = latest.kind === "hit" ? latest.snapshot.latencyWindows : undefined;
           expect(windows?.hour?.count).toBeGreaterThanOrEqual(5);
           expect(windows?.hour?.p50Ms).toBeGreaterThan(0);
           expect(windows?.day?.count).toBe(windows?.hour?.count);
@@ -139,8 +140,10 @@ describe.skipIf(!hasRedis)("Ops dashboard latency tiles", () => {
 
           // The reader path: the persisted artifact round-trips through the
           // wire schema with the windows intact — what any pod would serve.
-          const served = await snapshotRepository.tryReadDetail();
-          expect(served?.latencyWindows?.hour?.p50Ms).toBe(windows?.hour?.p50Ms);
+          const served = await snapshotRepository.readDetail();
+          expect(served.kind === "hit" ? served.snapshot.latencyWindows?.hour?.p50Ms : null).toBe(
+            windows?.hour?.p50Ms,
+          );
         } finally {
           await collector.stop();
         }

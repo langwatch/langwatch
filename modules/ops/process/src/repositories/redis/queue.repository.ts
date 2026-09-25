@@ -25,7 +25,7 @@ import { nowInstant } from "@langwatch/time";
 import type IORedis from "ioredis";
 import type { ChainableCommander, Cluster } from "ioredis";
 
-import { type QueuePayloadDecoder } from "../../app/ops.app.ts";
+import { type QueuePayloadDecoder, type QueuePayloadDecoding } from "../../app/ops.app.ts";
 import { normalizeErrorMessage } from "../../rules/ops-error-normalizer.rules.ts";
 import { QueueRepository } from "../queue.repository.ts";
 import type {
@@ -40,8 +40,8 @@ import type {
 const logger = createLogger("langwatch:ops:queue-redis-repository");
 
 class NullQueuePayloadDecoder implements QueuePayloadDecoder {
-  async tryDecode(): Promise<Record<string, unknown> | null> {
-    return null;
+  async decode(): Promise<QueuePayloadDecoding> {
+    return { kind: "undecodable" };
   }
 }
 
@@ -816,7 +816,8 @@ export class QueueRedisRepository extends QueueRepository {
       // (2026-06-24 review). A repeatedly-viewed blocked group would
       // otherwise keep its orphan blobs alive indefinitely. readMode
       // "peek" routes tiered blob reads to their non-refreshing variant.
-      job.data = await this.payloads.tryDecode({ value: raw, queueName });
+      const decoded = await this.payloads.decode({ value: raw, queueName });
+      job.data = decoded.kind === "decoded" ? decoded.data : null;
     } catch {
       // ignore undecodable values
     }

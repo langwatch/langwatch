@@ -1,6 +1,6 @@
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import { McpProjectLookup } from "../app/hosted-mcp-members.ts";
+import { type McpLiveProjectLookup, McpProjectLookup } from "../app/hosted-mcp-members.ts";
 
 /**
  * The project an MCP bearer token belongs to, read through the project
@@ -18,13 +18,13 @@ export class ProjectMcpProjectLookupService extends McpProjectLookup {
     return new ProjectMcpProjectLookupService(projects);
   }
 
-  async tryFindLiveProjectByApiKey(input: {
-    apiKey: string;
-  }): Promise<{ id: string; teamId: string } | null> {
+  async resolveLiveProjectByApiKey(input: { apiKey: string }): Promise<McpLiveProjectLookup> {
     const projectId = await this.#projects.findIdByLegacyApiKey({ token: input.apiKey });
-    if (!projectId) return null;
+    if (!projectId) return { kind: "unknown" };
 
     const identity = await this.#projects.findIdentity(projectId);
-    return identity ? { id: identity.id, teamId: identity.teamId } : null;
+    return identity
+      ? { kind: "live", project: { id: identity.id, teamId: identity.teamId } }
+      : { kind: "unknown" };
   }
 }

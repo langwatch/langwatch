@@ -20,6 +20,7 @@ import { nowInstant } from "@langwatch/time";
 import type { AnomalyRateTrackerRepository } from "../repositories/anomaly.repository.ts";
 import type { OpsMetricsRepository } from "../repositories/ops-metrics.repository.ts";
 import type { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metrics-source.repository.ts";
+import type { OpsSnapshotRead } from "../repositories/ops-snapshot.repository.ts";
 import { totalInFlight as computeTotalInFlight } from "../rules/ops-in-flight.rules.ts";
 import { computeEngineCpuPercent } from "../rules/ops-redis-engine-cpu.rules.ts";
 import { countWaitingJobsByTenant } from "../rules/ops-tenant-backlog.rules.ts";
@@ -248,8 +249,8 @@ export class OpsMetricsCollectorService {
   }
 
   /** The detail artifact this writer most recently produced, if any. */
-  tryGetLatestDetail(): DetailSnapshot | null {
-    return this.publication.tryGetLatestDetail();
+  readLatestDetail(): OpsSnapshotRead<DetailSnapshot> {
+    return this.publication.readLatestDetail();
   }
 
   /**

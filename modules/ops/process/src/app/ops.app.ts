@@ -2054,8 +2054,13 @@ export interface OrganizationDataplaneResolver {
   dataplaneFor(organizationId: string): OrganizationDataplane;
 }
 
+/** A queued payload read back for display, or one this decoder cannot read. */
+export type QueuePayloadDecoding =
+  | { kind: "decoded"; data: Record<string, unknown> }
+  | { kind: "undecodable" };
+
 export interface QueuePayloadDecoder {
-  tryDecode(input: { queueName: string; value: string }): Promise<Record<string, unknown> | null>;
+  decode(input: { queueName: string; value: string }): Promise<QueuePayloadDecoding>;
 }
 
 /**

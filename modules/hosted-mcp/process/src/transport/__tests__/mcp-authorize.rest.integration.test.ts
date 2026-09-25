@@ -4,9 +4,9 @@
  * `POST /api/mcp/authorize` over the real declaration and approval service.
  */
 import { createRestRuntime } from "@langwatch/api/rest";
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import type { HostedMcpRedis } from "../../app/hosted-mcp-members.ts";
 import {
   McpAuthorizationService,
   MCP_AUTHORIZE_PERMISSION,
@@ -30,13 +30,13 @@ function fakeRedis() {
 
   return {
     stored,
-    redis: {
-      get: (key: string) => Promise.resolve(stored.get(key) ?? null),
-      set: (key: string, value: string) => {
-        stored.set(key, value);
-        return Promise.resolve("OK");
+    redis: redisDouble({
+      get: async (...args: unknown[]) => stored.get(String(args[0])) ?? null,
+      set: async (...args: unknown[]) => {
+        stored.set(String(args[0]), String(args[1]));
+        return "OK";
       },
-    } as unknown as HostedMcpRedis,
+    }),
   };
 }
 

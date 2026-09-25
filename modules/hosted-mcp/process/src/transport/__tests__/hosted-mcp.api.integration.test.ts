@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { join, resolve } from "node:path";
 
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import {
   afterAll,
   afterEach,
@@ -18,13 +19,13 @@ import {
   vi,
 } from "vitest";
 
+import type { McpLiveProjectLookup } from "../../app/hosted-mcp-members.ts";
 import {
   createMcpHandler,
   HeaderMcpClientAddressService,
   McpApiKeyCipher,
   McpProjectLookup,
   McpSessionGrant,
-  type HostedMcpRedis,
   type McpHandler,
 } from "../../index.ts";
 
@@ -63,11 +64,11 @@ const mockRedis = {
  * handler instead of intercepting what the handler reached for.
  */
 class FakeProjectLookup extends McpProjectLookup {
-  tryFindLiveProjectByApiKey({ apiKey }: { apiKey: string }) {
-    return mockPrisma.project.findUnique({ where: { apiKey, archivedAt: null } }) as Promise<{
-      id: string;
-      teamId: string;
-    } | null>;
+  async resolveLiveProjectByApiKey({ apiKey }: { apiKey: string }): Promise<McpLiveProjectLookup> {
+    const project: { id: string; teamId: string } | null = await mockPrisma.project.findUnique({
+      where: { apiKey, archivedAt: null },
+    });
+    return project ? { kind: "live", project } : { kind: "unknown" };
   }
 }
 
@@ -338,7 +339,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
   beforeAll(async () => {
     handler = createMcpHandler({
-      redis: mockRedis as unknown as HostedMcpRedis,
+      redis: redisDouble(mockRedis),
       projects: new FakeProjectLookup(),
       grants: sessionGrant,
       cipher: new ReversibleTestCipher(),
@@ -1465,7 +1466,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       // from the main app (~/server/db, ~/server/app-layer, etc.)
       const mcpServerDir = resolve(
         import.meta.dirname,
-        "../../../../../../..",
+        "../../../../../..",
         "mcp/typescript/src",
       );
       const createMcpServerSrc = readFileSync(join(mcpServerDir, "create-mcp-server.ts"), "utf-8");

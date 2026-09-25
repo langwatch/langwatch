@@ -168,10 +168,13 @@ export class DefaultOpsSnapshotService extends OpsSnapshotServiceContract {
   private async read(): Promise<void> {
     try {
       const [live, detail] = await Promise.all([
-        this.repository.tryReadLive(),
-        this.repository.tryReadDetail(),
+        this.repository.readLive(),
+        this.repository.readDetail(),
       ]);
-      const merged = this.tryMergeSnapshots({ live, detail });
+      const merged = this.tryMergeSnapshots({
+        live: live.kind === "hit" ? live.snapshot : null,
+        detail: detail.kind === "hit" ? detail.snapshot : null,
+      });
       if (!merged) {
         return;
       }

@@ -29,7 +29,7 @@ export {
 } from "./services/admin-access.service.ts";
 export type { RedisCpuSample } from "./rules/ops-redis-engine-cpu.rules.ts";
 export type { AnomalyHardTierAlert } from "./app/ops.app.ts";
-export type { QueuePayloadDecoder } from "./app/ops.app.ts";
+export type { QueuePayloadDecoder, QueuePayloadDecoding } from "./app/ops.app.ts";
 
 /** The operations explorers and the replay runner, moved off the application. */
 export type {

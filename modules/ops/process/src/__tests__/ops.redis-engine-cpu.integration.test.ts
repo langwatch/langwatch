@@ -9,6 +9,7 @@ import { MemoryAnomalyRateTrackerRepository } from "../repositories/memory/memor
 import { MemoryOpsStore } from "../repositories/memory/memory.ops.store.ts";
 import type {
   OpsLatencyHistograms,
+  OpsPersistedStateRead,
   OpsQueueTotals,
 } from "../repositories/ops-metrics.repository.ts";
 import { OpsMetricsRepository } from "../repositories/ops-metrics.repository.ts";
@@ -48,8 +49,8 @@ class ScriptedMetricsRepository extends OpsMetricsRepository {
     return Promise.resolve([]);
   }
 
-  tryReadPersistedState(): Promise<string | null> {
-    return Promise.resolve(null);
+  readPersistedState(): Promise<OpsPersistedStateRead> {
+    return Promise.resolve({ kind: "miss" });
   }
 
   writePersistedState(): Promise<void> {

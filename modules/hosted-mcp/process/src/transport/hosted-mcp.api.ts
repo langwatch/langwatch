@@ -26,7 +26,11 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 
-import type { HostedMcpRedis, HostedMcpDependencies } from "../app/hosted-mcp-members.ts";
+import type {
+  HostedMcpDependencies,
+  HostedMcpRedis,
+  McpLiveProjectLookup,
+} from "../app/hosted-mcp-members.ts";
 import { RedisMcpOAuthTokenRepository } from "../repositories/redis/redis.mcp-oauth-token.repository.ts";
 import { McpOAuthClientRegistryService } from "../services/mcp-oauth-client-registry.service.ts";
 import { McpOAuthTokenService } from "../services/mcp-oauth-token.service.ts";
@@ -541,8 +545,9 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   async function resolveSessionContext(
     token: string,
   ): Promise<{ apiKey: string; userId?: string } | null> {
-    const context = await oauthTokens.resolve(token);
-    if (!context) return null;
+    const lookup = await oauthTokens.resolve(token);
+    if (lookup.kind === "refused") return null;
+    const { context } = lookup;
     // A token minted by the OAuth flow carries the person who approved it, and
     // that approval is what this endpoint runs on. A direct project key carries
     // nobody, so there is no grant to re-prove and the key check is the check.
@@ -568,11 +573,12 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     if (cached && nowInstant().epochMilliseconds - cached.checkedAt < GRANT_RECHECK_INTERVAL_MS) {
       return cached.granted;
     }
-    const project = await validateApiKey(input.apiKey);
-    if (!project) {
+    const lookup = await validateApiKey(input.apiKey);
+    if (lookup.kind === "unknown") {
       grantChecks.delete(input.token);
       return false;
     }
+    const project = lookup.project;
     let granted: boolean;
     try {
       granted = await grants.stillGranted({ userId: input.userId, projectId: project.id });
@@ -594,12 +600,12 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
    * Validates an API key against the database.
    * Returns the project if valid, null otherwise.
    */
-  async function validateApiKey(apiKey: string): Promise<{ id: string; teamId: string } | null> {
+  async function validateApiKey(apiKey: string): Promise<McpLiveProjectLookup> {
     try {
-      return await projects.tryFindLiveProjectByApiKey({ apiKey });
+      return await projects.resolveLiveProjectByApiKey({ apiKey });
     } catch (err) {
       logger.error({ error: err }, "Database API key validation failed");
-      return null;
+      return { kind: "unknown" };
     }
   }
 
@@ -633,8 +639,8 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
       return null;
     }
 
-    const project = await validateApiKey(apiKey);
-    if (!project) {
+    const lookup = await validateApiKey(apiKey);
+    if (lookup.kind === "unknown") {
       authFailRateLimiter.track(getClientIp(req));
       send401(res, "Invalid API key");
       return null;

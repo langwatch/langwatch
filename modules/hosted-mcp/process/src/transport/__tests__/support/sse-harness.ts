@@ -8,6 +8,7 @@ import { createServer, type Server, type IncomingMessage } from "node:http";
 
 import { Redis } from "ioredis";
 
+import type { McpLiveProjectLookup } from "../../../app/hosted-mcp-members.ts";
 import {
   createMcpHandler,
   McpApiKeyCipher,
@@ -73,13 +74,11 @@ class HarnessProjectLookup extends McpProjectLookup {
   constructor(private readonly apiKeys: readonly string[]) {
     super();
   }
-  tryFindLiveProjectByApiKey({
-    apiKey,
-  }: {
-    apiKey: string;
-  }): Promise<{ id: string; teamId: string } | null> {
+  resolveLiveProjectByApiKey({ apiKey }: { apiKey: string }): Promise<McpLiveProjectLookup> {
     return Promise.resolve(
-      this.apiKeys.includes(apiKey) ? { id: `project-for-${apiKey}`, teamId: "team-1" } : null,
+      this.apiKeys.includes(apiKey)
+        ? { kind: "live", project: { id: `project-for-${apiKey}`, teamId: "team-1" } }
+        : { kind: "unknown" },
     );
   }
 }

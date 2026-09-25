@@ -12,10 +12,13 @@ export type HostedMcpRedis = Redis | Cluster;
  * The project an MCP caller's API key belongs to.
  */
 export abstract class McpProjectLookup {
-  abstract tryFindLiveProjectByApiKey(input: {
-    apiKey: string;
-  }): Promise<{ id: string; teamId: string } | null>;
+  abstract resolveLiveProjectByApiKey(input: { apiKey: string }): Promise<McpLiveProjectLookup>;
 }
+
+/** A key read: the live project it belongs to, or an unknown key the caller refuses. */
+export type McpLiveProjectLookup =
+  | { kind: "live"; project: { id: string; teamId: string } }
+  | { kind: "unknown" };
 
 /**
  * Reversible encryption for the API key an OAuth session was minted from. The key is stored,

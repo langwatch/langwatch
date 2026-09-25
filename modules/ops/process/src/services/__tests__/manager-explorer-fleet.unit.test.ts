@@ -1,5 +1,5 @@
-import type { ProcessStore } from "@langwatch/eventing";
-import { describe, expect, it, vi } from "vitest";
+import { InMemoryProcessStore, type ProcessStore } from "@langwatch/eventing";
+import { describe, expect, it } from "vitest";
 
 import type { OpsEventingIntrospection, OpsProcessManagerMetadata } from "../../app/ops.app.ts";
 import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
@@ -9,13 +9,7 @@ import type { ProcessNameCounts } from "../../repositories/process-ops.repositor
 import { ManagerExplorerService } from "../manager-explorer.service.ts";
 
 function fakeStore(): ProcessStore {
-  return {
-    findByRef: vi.fn(async () => null),
-    hasConsumedSource: vi.fn(async () => false),
-    findMessagesByRef: vi.fn(async () => []),
-    commit: vi.fn(),
-    requeueDeadMessages: vi.fn(async () => 0),
-  } as unknown as ProcessStore;
+  return InMemoryProcessStore.createForTesting();
 }
 
 function counts(
