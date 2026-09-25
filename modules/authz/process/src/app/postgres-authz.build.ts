@@ -31,6 +31,7 @@ import {
   type AuthzCutoverDatabase,
   PrismaAuthzCutoverRepository,
 } from "../repositories/prisma/prisma.authz-cutover.repository.ts";
+import type { PrismaAuthzGrantDatabase } from "../repositories/prisma/prisma.authz-grant.repository.ts";
 import {
   type AuthzMembershipStampDatabase,
   PrismaAuthzMembershipStampRepository,
@@ -42,7 +43,6 @@ import {
   PrismaAuthzProjectionRepository,
 } from "../repositories/prisma/prisma.authz-projection.repository.ts";
 import { PrismaAuthzRevocationRepository } from "../repositories/prisma/prisma.authz-revocation.repository.ts";
-import type { PostgresAuthzDatabase } from "../repositories/prisma/prisma.authz.database.ts";
 import type { AuthzEpochRedis } from "../repositories/redis/redis.authz-epoch.repository.ts";
 import { RedisAuthzEpochRepository } from "../repositories/redis/redis.authz-epoch.repository.ts";
 import { AuthzCutoverGateService } from "../services/authz-cutover-gate.service.ts";
@@ -58,8 +58,9 @@ import { AuthzService, type AuthzServiceOptions } from "../services/authz.servic
  * may adapt a generated client to this type once at its composition boundary;
  * no generated database type crosses into the feature.
  */
-type InternalPostgresAuthzDatabase = AuthzLedgerDatabase &
+export type PostgresAuthzDatabase = AuthzLedgerDatabase &
   AuthzGrantWriteDatabase &
+  PrismaAuthzGrantDatabase &
   AuthzMigrationDatabase &
   AuthzCutoverDatabase &
   AuthzAuditDatabase &
@@ -176,14 +177,14 @@ export class PostgresAuthzAdapter {
    * see what the engine sees. Every decision reads the grants projection, so
    * this is that head; the repository stays private behind this one door.
    */
-  static createReader({ database }: { database: PostgresAuthzDatabase }): AuthzReadRepository {
-    return EventingAuthzReadRepository.create(database as unknown as AuthzDatabase);
+  static createReader({ database }: { database: AuthzDatabase }): AuthzReadRepository {
+    return EventingAuthzReadRepository.create(database);
   }
 
   private constructor(private readonly options: PostgresAuthzAdapterOptions) {}
 
   build(): PostgresAuthzBuild {
-    const database = this.options.database as unknown as InternalPostgresAuthzDatabase;
+    const { database } = this.options;
     const epoch = RedisAuthzEpochRepository.create({ redis: this.options.redis });
     const cutover = AuthzCutoverGateService.create({
       repository:

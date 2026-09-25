@@ -1,6 +1,6 @@
 // Guarded upserts in raw SQL; one statement per event; guard in WHERE for atomicity.
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { toDate } from "@langwatch/time";
 
 import { isMigrationOwnedSource } from "../../rules/authz-migration-ownership.rules.ts";
@@ -11,6 +11,7 @@ import {
 import {
   compatBindingFromGrantFact,
   compatShareLinkFromGrantFact,
+  grantRowFromStored,
   grantRowToFact,
 } from "./prisma.authz-grant.mapper.ts";
 
@@ -18,23 +19,6 @@ const logger = createLogger("langwatch:authz:projection-compat");
 
 type GrantRow = Extract<GrantProjectionWrite, { kind: "grant.upsert" }>["row"];
 type RoleRow = Extract<GrantProjectionWrite, { kind: "role.upsert" }>["row"];
-
-type ProjectionDelegate = {
-  findUnique(args: unknown): Promise<any>;
-  updateMany(args: unknown): Promise<any>;
-  deleteMany(args: unknown): Promise<any>;
-  upsert(args: unknown): Promise<any>;
-};
-
-type ProjectionDatabase = {
-  grant: ProjectionDelegate;
-  role: ProjectionDelegate;
-  roleBinding: ProjectionDelegate;
-  customRole: ProjectionDelegate;
-  shareLink: ProjectionDelegate;
-  $transaction(writes: Promise<unknown>[]): Promise<unknown[]>;
-  $executeRaw(strings: TemplateStringsArray, ...values: unknown[]): Promise<number>;
-};
 
 /** Exactly the columns `grantRowToFact` reads, so the re-read a compat write
  *  needs cannot drift from the mapper it feeds. */
@@ -92,10 +76,10 @@ export type AuthzProjectionDatabase = Pick<
 
 export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionRepository {
   static create(database: AuthzProjectionDatabase): PrismaAuthzProjectionRepository {
-    return new PrismaAuthzProjectionRepository(database as unknown as ProjectionDatabase);
+    return new PrismaAuthzProjectionRepository(database);
   }
 
-  private constructor(private readonly prisma: ProjectionDatabase) {
+  private constructor(private readonly prisma: AuthzProjectionDatabase) {
     super();
   }
 
@@ -189,7 +173,7 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
         return;
       }
       const { revokedAt: _revokedAt, ...factRow } = authoritative;
-      return this.upsertCompatForGrant(grantRowToFact(factRow), organizationId);
+      return this.upsertCompatForGrant(grantRowToFact(grantRowFromStored(factRow)), organizationId);
     }
 
     return this.upsertCompatForGrant(grantRowToFact(row), organizationId);
@@ -258,7 +242,7 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
     });
     if (!row) return;
     const compat = compatBindingFromGrantFact({
-      grant: grantRowToFact(row),
+      grant: grantRowToFact(grantRowFromStored(row)),
       organizationId: row.organizationId,
     });
     if (compat.kind === "noCompatForm") return;
@@ -299,7 +283,7 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
     });
   }
 
-  private statementFor(write: GrantProjectionWrite): Promise<unknown> {
+  private statementFor(write: GrantProjectionWrite): Prisma.PrismaPromise<unknown> {
     switch (write.kind) {
       case "grant.upsert":
         return this.upsertGrant(write.row, write.membershipStamp, write.membershipBootstrap);
@@ -366,7 +350,7 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
     row: GrantRow,
     membershipStamp: string | undefined,
     membershipBootstrap: boolean | undefined,
-  ): Promise<number> {
+  ): Prisma.PrismaPromise<number> {
     const stamp = membershipStamp ?? null;
     const bootstrapScopeIsAllowed =
       row.scopeType === "TEAM" ||
@@ -429,7 +413,7 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
 
   /** The same rule for roles. `deletedAt` is left alone for the reason
    *  `revokedAt` is on the grant side. */
-  private upsertRole(row: RoleRow): Promise<number> {
+  private upsertRole(row: RoleRow): Prisma.PrismaPromise<number> {
     return this.prisma.$executeRaw`
       INSERT INTO "Role" (
         "id", "organizationId", "name", "description", "permissions",

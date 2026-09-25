@@ -23,7 +23,7 @@ export {
   type AuthzGrantsCommandSenders,
 } from "./services/authz-grants-command-dispatcher.service.ts";
 export { AuthzBindingIdService } from "./services/authz-binding-id.service.ts";
-export type { PostgresAuthzDatabase } from "./repositories/prisma/prisma.authz.database.ts";
+export type { PostgresAuthzDatabase } from "./app/postgres-authz.build.ts";
 export type { AuthzRepositories } from "./repositories/authz.repositories.ts";
 export { authzServer, type AuthzInfrastructure } from "./authz.server.ts";
 export { authzRoleBindingRest, roleBindingRestFacts } from "./transport/authz-role-binding.rest.ts";

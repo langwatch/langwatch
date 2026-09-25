@@ -43,12 +43,21 @@ function grantRow(overrides: Record<string, unknown> = {}) {
   } as never;
 }
 
+/** The same grant as Postgres hands it back: Dates, not Instants. */
+function storedGrantRow(overrides: Record<string, unknown> = {}) {
+  return {
+    ...(grantRow() as Record<string, unknown>),
+    occurredAt: new Date(1_700_000_000_000),
+    ...overrides,
+  };
+}
+
 function build() {
   const executeRaw = vi.fn<ExecuteRaw>().mockResolvedValue(1);
   const mocks = {
     grant: {
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
-      findUnique: vi.fn().mockResolvedValue(grantRow()),
+      findUnique: vi.fn().mockResolvedValue(storedGrantRow()),
     },
     role: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
     roleBinding: {
@@ -239,12 +248,7 @@ describe("PrismaAuthzProjectionRepository", () => {
       // The guard matched no row (0): this older attach lost to a newer state.
       executeRaw.mockResolvedValue(0);
       // The authoritative row it lost to is revoked.
-      // `grantRow()` is typed `never` for the mock signatures it feeds, which
-      // is not spreadable; widen it here where the spread needs an object.
-      prisma.grant.findUnique.mockResolvedValue({
-        ...(grantRow() as Record<string, unknown>),
-        revokedAt: new Date(5),
-      });
+      prisma.grant.findUnique.mockResolvedValue(storedGrantRow({ revokedAt: new Date(5) }));
 
       await repository.append({
         kind: "grant.upsert",

@@ -119,7 +119,7 @@ import {
   GatewayGuardrailEvaluationService,
   type EvaluatorRunner,
 } from "../services/gateway-guardrail-evaluation.service.ts";
-import { GatewayInternalIdentity } from "../services/gateway-internal-identity.service.ts";
+import { GatewayInternalIdentityService } from "../services/gateway-internal-identity.service.ts";
 import { GatewayInternalProtocolService } from "../services/gateway-internal-protocol.service.ts";
 import type {
   GatewayCodexRefresh,
@@ -755,7 +755,7 @@ export class GatewayApp implements GatewayApi {
           : {}),
       },
       internalProtocol,
-      internalDoor: GatewayInternalIdentity.create(secrets.internalSecret),
+      internalDoor: GatewayInternalIdentityService.create({ secret: secrets.internalSecret }),
       spendPipeline: {
         ledger: controlPlane.spendLedger,
         commands: spendCommands,

@@ -46,7 +46,7 @@ export type ApiKeyDependencies = {
   organizations: OrganizationApi;
   projects: ProjectApi;
   bindingIds: ApiKeyBindingId;
-  legacyGrants: LegacyApiKeyGrantService;
+  legacyGrants: Pick<LegacyApiKeyGrantService, "mint">;
   tokens: ApiKeyTokenService;
 };
 

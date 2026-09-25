@@ -22,6 +22,7 @@ export default defineConfig({
   },
   test: moduleVitestTestOptions({
     kind: "jsdom",
+    isolate: true,
     test: {
       setupFiles: ["./vitest.setup.ts"],
       // Drawer suites drive real user events through Chakra overlays; under a

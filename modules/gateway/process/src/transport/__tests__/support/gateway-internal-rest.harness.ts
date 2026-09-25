@@ -13,8 +13,8 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import {
   buildGatewayCanonicalString,
   computeGatewaySignature,
-  GatewayInternalIdentity,
-} from "../../../services/gateway-internal-identity.service.ts";
+} from "../../../rules/gateway-internal-identity.rules.ts";
+import { GatewayInternalIdentityService } from "../../../services/gateway-internal-identity.service.ts";
 import {
   GatewayInternalProtocolService,
   type GatewayInternalProtocolMembers,
@@ -95,7 +95,7 @@ export function mountGatewayInternalRest(
     "GatewayApi",
   );
   const runtime = createRestRuntime({
-    identity: GatewayInternalIdentity.create(secret),
+    identity: GatewayInternalIdentityService.create({ secret }),
   });
 
   return runtime.mount(gatewayInternalRest.router(), {

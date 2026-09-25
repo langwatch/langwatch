@@ -1,6 +1,6 @@
 /**
  * `/api/internal/gateway`: control plane between the two halves of one
- * deployment. Every route answers behind {@link GatewayInternalIdentity}'s
+ * deployment. Every route answers behind {@link GatewayInternalIdentityService}'s
  * HMAC gate; each capability is OPTIONAL, refusing (503) rather than silent.
  */
 import { anyAuthenticated } from "@langwatch/api/access";
@@ -39,13 +39,14 @@ import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
 import { nowInstant, type Instant } from "@langwatch/time";
 
-import { logAuthDecision } from "../services/gateway-internal-identity.service.ts";
+import { GatewayAuthDecisionService } from "../services/gateway-auth-decision.service.ts";
 import {
   VirtualKeyCryptoService,
   VirtualKeyCryptoError,
 } from "../services/virtual-key-crypto.service.ts";
 
 const logger = createLogger("langwatch:gateway-internal");
+const authDecisions = GatewayAuthDecisionService.create({ logger });
 
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
@@ -251,7 +252,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
       });
       if (!resolution.ok) {
         const refusal = LICENSE_TOKEN_REFUSALS[resolution.code];
-        logAuthDecision({
+        authDecisions.record({
           request: headers["x-langwatch-gateway-node"],
           code: resolution.code,
           status: refusal.status,
@@ -275,7 +276,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
 
     const parseRejection = detectVirtualKeyParseRejection(presented.data.key_presented);
     if (parseRejection) {
-      logAuthDecision({
+      authDecisions.record({
         request: headers["x-langwatch-gateway-node"],
         code: parseRejection.code,
         status: parseRejection.status,
@@ -286,7 +287,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
 
     const vk = await app.findVirtualKeyBySecret(presented.data.key_presented);
     if (!vk) {
-      logAuthDecision({
+      authDecisions.record({
         request: headers["x-langwatch-gateway-node"],
         code: "virtual_key_not_found",
         status: 401,
@@ -305,7 +306,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
       now: nowInstant(),
     });
     if (statusRejection) {
-      logAuthDecision({
+      authDecisions.record({
         request: headers["x-langwatch-gateway-node"],
         code: statusRejection.code,
         status: statusRejection.status,

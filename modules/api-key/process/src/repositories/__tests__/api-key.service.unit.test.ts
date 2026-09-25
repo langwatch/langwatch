@@ -377,9 +377,7 @@ function dependencies(overrides: Partial<ApiKeyDependencies> = {}): ApiKeyDepend
     }),
     projects: projectPeer(new MemoryProjects()),
     bindingIds: TestApiKeyBindingId.create(),
-    legacyGrants: {
-      mint: vi.fn(),
-    } as unknown as ApiKeyDependencies["legacyGrants"],
+    legacyGrants: { mint: vi.fn() },
     tokens: ApiKeyTokenService.create("test-pepper"),
     ...overrides,
   };
@@ -854,7 +852,7 @@ describe("API key verification", () => {
     /** @scenario "A legacy service key states its access the first time it is used" */
     it("mints its grant on the resolution path", async () => {
       const mint = vi.fn();
-      const legacyGrants = { mint } as unknown as ApiKeyDependencies["legacyGrants"];
+      const legacyGrants = { mint };
       const service = createService(new MemoryApiKeys(), dependencies({ legacyGrants }));
       const created = await service.create({
         name: "legacy",
@@ -873,7 +871,7 @@ describe("API key verification", () => {
   describe("when the credential does not resolve", () => {
     it("mints nothing", async () => {
       const mint = vi.fn();
-      const legacyGrants = { mint } as unknown as ApiKeyDependencies["legacyGrants"];
+      const legacyGrants = { mint };
       const service = createService(new MemoryApiKeys(), dependencies({ legacyGrants }));
 
       expect(await service.findVerifiedToken({ token: "sk-lw-x_y" })).toBeNull();
@@ -884,7 +882,7 @@ describe("API key verification", () => {
   describe("when a revoked key is presented", () => {
     it("mints nothing", async () => {
       const mint = vi.fn();
-      const legacyGrants = { mint } as unknown as ApiKeyDependencies["legacyGrants"];
+      const legacyGrants = { mint };
       const service = createService(new MemoryApiKeys(), dependencies({ legacyGrants }));
       const created = await service.create({
         name: "revoked",

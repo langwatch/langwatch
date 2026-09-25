@@ -19,11 +19,11 @@ import {
   type GatewayGuardrailCheckRow,
 } from "../../repositories/gateway-guardrail.repository.ts";
 import type { GatewayInternalStoreRepository } from "../../repositories/gateway-internal-store.repository.ts";
-import { GatewayGuardrailEvaluationService } from "../../services/gateway-guardrail-evaluation.service.ts";
 import {
   buildGatewayCanonicalString,
   computeGatewaySignature,
-} from "../../services/gateway-internal-identity.service.ts";
+} from "../../rules/gateway-internal-identity.rules.ts";
+import { GatewayGuardrailEvaluationService } from "../../services/gateway-guardrail-evaluation.service.ts";
 import type { GatewaySpendCommandSender } from "../../services/gateway-internal-protocol.service.ts";
 import { ModelCatalogGatewaySpendRatingService } from "../../services/model-catalog-gateway-spend-rating.service.ts";
 import { gatewayInternalRest } from "../gateway-internal.rest.ts";

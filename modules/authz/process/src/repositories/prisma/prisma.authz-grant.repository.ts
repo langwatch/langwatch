@@ -1,10 +1,11 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type { AuthzGrantRepository } from "../authz-grant.repository.ts";
 /**
  * ADR-092 — the Prisma implementation of AuthzGrantsRepository's READ half:
  * the tenancy lookups every write path validates with.
  * `EventingAuthzGrantRepository` composes this for reads and owns every write itself.
  */
-import type { AuthzDatabase } from "../authz-read.repository.ts";
 
 /** The subset of the write port this repository actually implements. */
 export type AuthzGrantsReadRepository = Pick<
@@ -17,30 +18,14 @@ export type AuthzGrantsReadRepository = Pick<
   | "findPersonalTeams"
 >;
 
-type PrismaAuthzGrantDatabase = {
-  roleBinding: {
-    findUnique(args: unknown): Promise<{ id: string; organizationId: string } | null>;
-  };
-  customRole: {
-    findUnique(args: unknown): Promise<{ organizationId: string; permissions: unknown } | null>;
-  };
-  team: {
-    findUnique(args: unknown): Promise<{ organizationId: string } | null>;
-    findMany(args: unknown): Promise<{ id: string; name: string }[]>;
-  };
-  project: {
-    findUnique(args: unknown): Promise<{
-      team: { id: string; organizationId: string } | null;
-    } | null>;
-  };
-  apiKey: {
-    findMany(args: unknown): Promise<{ id: string; name: string }[]>;
-  };
-};
+export type PrismaAuthzGrantDatabase = Pick<
+  PrismaClient,
+  "roleBinding" | "customRole" | "team" | "project" | "apiKey"
+>;
 
 export class PrismaAuthzGrantRepository implements AuthzGrantsReadRepository {
-  static create(database: AuthzDatabase): PrismaAuthzGrantRepository {
-    return new PrismaAuthzGrantRepository(database as unknown as PrismaAuthzGrantDatabase);
+  static create(database: PrismaAuthzGrantDatabase): PrismaAuthzGrantRepository {
+    return new PrismaAuthzGrantRepository(database);
   }
 
   private constructor(private readonly prisma: PrismaAuthzGrantDatabase) {}

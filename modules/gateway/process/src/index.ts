@@ -25,9 +25,9 @@ export {
 export {
   buildGatewayCanonicalString,
   computeGatewaySignature,
-  GatewayInternalIdentity,
   GATEWAY_SIGNATURE_WINDOW_SECONDS,
-} from "./services/gateway-internal-identity.service.ts";
+} from "./rules/gateway-internal-identity.rules.ts";
+export { GatewayInternalIdentityService } from "./services/gateway-internal-identity.service.ts";
 export { gatewayInternalRest } from "./transport/gateway-internal.rest.ts";
 export { elevenLabsSignature, elevenLabsWebhookRest } from "./transport/elevenlabs-webhook.rest.ts";
 export { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";

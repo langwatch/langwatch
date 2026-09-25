@@ -14,7 +14,7 @@ import { gatewayServer } from "../../gateway.server.ts";
 import {
   buildGatewayCanonicalString,
   computeGatewaySignature,
-} from "../../services/gateway-internal-identity.service.ts";
+} from "../../rules/gateway-internal-identity.rules.ts";
 import { gatewayInternalRest } from "../../transport/gateway-internal.rest.ts";
 import type { GatewaySpendApp } from "../../transport/gateway-spend.rest.ts";
 import { GatewayApp } from "../gateway.app.ts";

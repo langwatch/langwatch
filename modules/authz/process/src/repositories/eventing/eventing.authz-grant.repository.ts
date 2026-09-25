@@ -28,7 +28,10 @@ import {
   grantRowToFact,
   PRINCIPAL_TO_DB,
 } from "../prisma/prisma.authz-grant.mapper.ts";
-import { PrismaAuthzGrantRepository } from "../prisma/prisma.authz-grant.repository.ts";
+import {
+  PrismaAuthzGrantRepository,
+  type PrismaAuthzGrantDatabase,
+} from "../prisma/prisma.authz-grant.repository.ts";
 import {
   isRecordNotFound,
   isUniqueViolation,
@@ -97,7 +100,7 @@ export type AuthzGrantWriteDatabase = Omit<
 };
 
 export type EventingAuthzGrantRepositoryOptions = {
-  database: AuthzGrantWriteDatabase;
+  database: AuthzGrantWriteDatabase & PrismaAuthzGrantDatabase;
   writer: Pick<
     EventingAuthzLedgerAdapter,
     | "attachBindings"
