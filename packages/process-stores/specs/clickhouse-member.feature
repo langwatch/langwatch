@@ -17,3 +17,10 @@ Feature: The ClickHouse member bounds what it sends to the server
     Given a process that bounds its statements at 3 in flight
     When a module sends 12 statements at once
     Then at most 3 statements reach the server at the same time
+
+  @integration
+  Scenario: A statement the server refused as too many simultaneous queries is retried
+    Given a server that refuses statements over 25 at once and a process that does not state that cap
+    When a module sends 40 statements at once
+    Then the refused statements are retried with backoff, as main's resilient client did
+    And every statement is answered

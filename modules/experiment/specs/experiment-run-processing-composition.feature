@@ -112,3 +112,9 @@ Feature: Composing durable experiment-run processing
     Given a worker whose ClickHouse holds no run for the id
     When the experiment a run was recorded against is looked up
     Then the answer is that no experiment recorded it
+
+  @integration
+  Scenario: The optimizer log prices against the project's cost rules and the static catalogue
+    Given a worker whose model-provider peer holds one custom cost rule for the project
+    When the experiment module lists the project's model costs
+    Then the custom rule comes first, followed by the static catalogue's rates

@@ -1,4 +1,8 @@
-import type { CancellationPublisher, CancellationSubscriber } from "../app/scenario.app.ts";
+import type {
+  CancellationPublisher,
+  CancellationSubscriber,
+  ScenarioTabStore,
+} from "../app/scenario.app.ts";
 import type { ScenarioRepository } from "./scenario.repository.ts";
 import type { SimulationRunProcessingRepository } from "./simulation-run-processing.repository.ts";
 import type { StalledSimulationRunRepository } from "./stalled-simulation-run.repository.ts";
@@ -16,4 +20,6 @@ export interface ScenarioRepositories {
   readonly cancellationSubscriptions: CancellationSubscriber;
   /** The install-wide stalled-run sweep only the stalled-runs-backfill task reads. */
   readonly stalledRuns: StalledSimulationRunRepository;
+  /** Which browser tabs are open on a project's simulations, and the run parked for each. */
+  readonly tabs: ScenarioTabStore;
 }

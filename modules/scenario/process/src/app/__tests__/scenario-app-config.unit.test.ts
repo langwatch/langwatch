@@ -11,6 +11,7 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ResourceOwnership } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -19,7 +20,6 @@ import type { Encryption } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
   type ScenarioExecutionService,
-  type ScenarioTabRegistry,
   type SimulationService,
 } from "@langwatch/scenario-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
@@ -43,6 +43,7 @@ function buildProductionApp(publicBaseUrl: string | undefined, emitter = new Eve
     repositories: MemoryScenarioRepositories.create(),
     dependencies: {
       agents: createApiFixture<AgentApi>(),
+      evaluations: createApiFixture<EvaluationApi>(),
       users: createApiFixture<UserApi>(),
       projects: createApiFixture<ProjectApi>(),
       plans: createApiFixture<EntitlementApi>(),
@@ -70,7 +71,6 @@ function buildProductionApp(publicBaseUrl: string | undefined, emitter = new Eve
       agentTesting: createApiFixture<AgentTestService>(),
       simulations: createApiFixture<SimulationService>(),
       scenarioExecution: createApiFixture<ScenarioExecutionService>(),
-      scenarioTabs: createApiFixture<ScenarioTabRegistry>(),
       broadcast: {
         getTenantEmitter: () => emitter,
         broadcastToTenant: async () => {},
@@ -99,6 +99,23 @@ describe("ScenarioApp built the way production composes it", () => {
       ).resolves.toBe(
         "https://app.langwatch.test/acme/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=scenario_1",
       );
+    });
+  });
+
+  describe("given no browser tab is open on the project's simulations", () => {
+    /** @scenario "A browser-tab offer with no open tab answers undelivered with the run's link" */
+    it("answers undelivered with the batch run's link", async () => {
+      const app = buildProductionApp("https://app.langwatch.test");
+
+      const offer = await app.offerScenarioBrowserTab({
+        projectId: "project_1",
+        projectSlug: "acme",
+        tabKey: "tab_1",
+        batchRunId: "batch_1",
+      });
+
+      expect(offer.delivered).toBe(false);
+      expect(offer.url).toContain("batch_1");
     });
   });
 

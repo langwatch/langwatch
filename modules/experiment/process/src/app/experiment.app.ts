@@ -78,7 +78,7 @@ import {
   type ExperimentWizardSaveInput,
 } from "@langwatch/experiment-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import type { ModelCostRate } from "@langwatch/model-provider-contract";
+import { ModelProviderApi, type ModelCostRate } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -245,6 +245,8 @@ export class ExperimentApp implements ExperimentApi {
     entitlement: EntitlementApi,
     /** Owns the platform default retention a run's rows are stamped with, read lazily. */
     retention: DataRetentionApi,
+    /** Owns the project's custom model cost rules the optimizer log prices against. */
+    modelProviders: ModelProviderApi,
   };
   static readonly reads = reads("prisma", "clickhouse", "redis", "logger");
 

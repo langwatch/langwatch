@@ -13,6 +13,11 @@ import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { generate } from "@langwatch/ksuid";
+import {
+  getStaticModelCostRates,
+  type ModelCostRate,
+  type ModelProviderApi,
+} from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { Logger } from "@langwatch/observability";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
@@ -223,6 +228,25 @@ function authzPermissions(authz: AuthzApi): ExperimentPermissions {
   };
 }
 
+/** The project's custom cost rules ahead of the static catalogue, as main's getLLMModelCosts. */
+function modelCostCatalogue(modelProviders: ModelProviderApi): ExperimentModelCosts {
+  return {
+    listFor: async ({ projectId }) => {
+      const custom = await modelProviders.listCosts({ projectId });
+      const customRates: ModelCostRate[] = custom.map((cost) => ({
+        model: cost.model,
+        regex: cost.regex,
+        inputCostPerToken: cost.inputCostPerToken ?? undefined,
+        outputCostPerToken: cost.outputCostPerToken ?? undefined,
+        cacheReadCostPerToken: cost.cacheReadCostPerToken ?? undefined,
+        cacheCreationCostPerToken: cost.cacheCreationCostPerToken ?? undefined,
+        cacheCreation1hCostPerToken: cost.cacheCreation1hCostPerToken ?? undefined,
+      }));
+      return [...customRates, ...getStaticModelCostRates()];
+    },
+  };
+}
+
 /**
  * The monitor cascade an experiment drives, over the SAME monitor
  * application `monitors.*` answers from.
@@ -306,6 +330,8 @@ export function buildExperimentInfrastructure(input: {
     projects: ProjectApi;
     /** The tier-effective row bound an execution's dataset must fit under. */
     entitlement: EntitlementApi;
+    /** The project's custom model cost rules. */
+    modelProviders: ModelProviderApi;
   };
 }): Omit<ExperimentAppDependencies, "runLookup"> {
   const { prisma, clickhouse, redis, logger, execution, dependencies } = input;
@@ -372,7 +398,7 @@ export function buildExperimentInfrastructure(input: {
     broadcast: inProcessBroadcast(),
     permissions: authz,
     people: PrismaExperimentPeopleRepository.create(prisma),
-    modelCosts: refusing<ExperimentModelCosts>("model cost catalogue"),
+    modelCosts: modelCostCatalogue(dependencies.modelProviders),
     workflowAuthoring: refusing<ExperimentWorkflowAuthoring>("wizard workflow authoring"),
     runLoop,
     workbenchObserver: loggedObserver(logger),

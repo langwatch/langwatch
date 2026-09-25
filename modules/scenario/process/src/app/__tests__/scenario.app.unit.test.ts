@@ -4,6 +4,7 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ResourceOwnership } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -18,7 +19,6 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type {
   QueueSimulationRunInput,
   ScenarioExecutionService,
-  ScenarioTabRegistry,
   SimulationQueueRun,
   SimulationService,
 } from "@langwatch/scenario-contract";
@@ -53,6 +53,7 @@ function harness() {
     repositories: MemoryScenarioRepositories.create(),
     dependencies: {
       agents: createApiFixture<AgentApi>(),
+      evaluations: createApiFixture<EvaluationApi>(),
       users: {} as UserApi,
       projects: {} as ProjectApi,
       plans: {} as EntitlementApi,
@@ -79,7 +80,6 @@ function harness() {
       agentTesting: createApiFixture<AgentTestService>(),
       simulations: simulations as SimulationService,
       scenarioExecution: {} as ScenarioExecutionService,
-      scenarioTabs: {} as ScenarioTabRegistry,
       resultAtoms: {} as ResultAtomsService,
       runConfigurations: {} as RunConfigurationsService,
       encryption: createApiFixture<Encryption>(),
@@ -357,6 +357,7 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
         },
         dependencies: {
           agents: createApiFixture<AgentApi>(),
+          evaluations: createApiFixture<EvaluationApi>(),
           users: createApiFixture<UserApi>(),
           projects: createApiFixture<ProjectApi>(),
           plans: createApiFixture<EntitlementApi>(),
@@ -382,7 +383,6 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
           agentTesting: createApiFixture<AgentTestService>(),
           simulations: undefined as never,
           scenarioExecution: {} as ScenarioExecutionService,
-          scenarioTabs: {} as ScenarioTabRegistry,
           resultAtoms: {} as ResultAtomsService,
           runConfigurations: {} as RunConfigurationsService,
           encryption: createApiFixture<Encryption>(),
@@ -413,6 +413,7 @@ describe("given a process that supplies no simulations member but does read Clic
       repositories: MemoryScenarioRepositories.create(),
       dependencies: {
         agents: createApiFixture<AgentApi>(),
+        evaluations: createApiFixture<EvaluationApi>(),
         users: createApiFixture<UserApi>(),
         projects: createApiFixture<ProjectApi>(),
         plans: createApiFixture<EntitlementApi>(),
@@ -442,7 +443,6 @@ describe("given a process that supplies no simulations member but does read Clic
         agentTesting: createApiFixture<AgentTestService>(),
         simulations: undefined as never,
         scenarioExecution: {} as ScenarioExecutionService,
-        scenarioTabs: {} as ScenarioTabRegistry,
         resultAtoms: {} as ResultAtomsService,
         runConfigurations: {} as RunConfigurationsService,
         encryption: createApiFixture<Encryption>(),

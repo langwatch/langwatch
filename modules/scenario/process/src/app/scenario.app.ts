@@ -141,6 +141,7 @@ import { ScenarioPlatformLinkService } from "../services/scenario-platform-link.
 import { ScenarioRunExportDownloadService } from "../services/scenario-run-export-download.service.ts";
 import { ScenarioRunExportService } from "../services/scenario-run-export.service.ts";
 import { ScenarioRunLaunchService } from "../services/scenario-run-launch.service.ts";
+import { ScenarioTabRegistryService } from "../services/scenario-tab-registry.service.ts";
 import { ScenarioService } from "../services/scenario.service.ts";
 import { SimulationCommandDispatcherService } from "../services/simulation-command-dispatcher.service.ts";
 import {
@@ -266,7 +267,10 @@ type ScenarioProcessMembers = Readonly<{
  * the deleted `scenario.composition.ts` (scenario-composition-green handover).
  */
 type ScenarioAppMembers = ScenarioProcessMembers &
-  Omit<ScenarioAppInfrastructure, "ids" | "testSuiteIds" | "clock" | "secretCipher">;
+  Omit<
+    ScenarioAppInfrastructure,
+    "ids" | "testSuiteIds" | "clock" | "secretCipher" | "scenarioTabs"
+  >;
 
 export class ScenarioApp implements ScenarioApi {
   static readonly contract = ScenarioApi;
@@ -316,6 +320,10 @@ export class ScenarioApp implements ScenarioApi {
       rateLimiter: setup.members.rateLimiter,
     });
     const exports = ScenarioRunExportService.create(simulations);
+    const scenarioTabs = ScenarioTabRegistryService.create({
+      store: setup.repositories.tabs,
+      clock,
+    });
 
     return new ScenarioApp({
       agentTesting: setup.members.agentTesting,
@@ -323,7 +331,7 @@ export class ScenarioApp implements ScenarioApi {
       scenarios,
       simulations,
       scenarioExecution: setup.members.scenarioExecution,
-      scenarioTabs: setup.members.scenarioTabs,
+      scenarioTabs,
       users: setup.dependencies.users,
       broadcast: setup.members.broadcast,
       resultAtoms: setup.members.resultAtoms,
@@ -340,7 +348,7 @@ export class ScenarioApp implements ScenarioApi {
       }),
       events: ScenarioEventService.create({
         simulations,
-        scenarioTabs: setup.members.scenarioTabs,
+        scenarioTabs,
         broadcast: setup.members.broadcast,
         traces: setup.dependencies.traces,
         entitlement: setup.dependencies.plans,

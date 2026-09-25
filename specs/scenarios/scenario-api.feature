@@ -114,3 +114,10 @@ Feature: Scenario API
     Given a deployment that named no public base URL for the scenario module
     When a scenario resource asks for its platform link
     Then it refuses by name instead of crashing
+
+  @unit
+  Scenario: A browser-tab offer with no open tab answers undelivered with the run's link
+    Given the scenario module composed the way production composes it
+    And no browser tab is open on the project's simulations
+    When a batch run is offered to a browser tab
+    Then it answers undelivered with the batch run's link

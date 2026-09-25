@@ -3,11 +3,7 @@ import { PlanLimitExceededError } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type * as observability from "@langwatch/observability";
 import { SimulationRunStatus } from "@langwatch/scenario-contract";
-import type {
-  ScenarioTabRegistry,
-  SimulationRunData,
-  SimulationService,
-} from "@langwatch/scenario-contract";
+import type { SimulationRunData, SimulationService } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 
 const logInfo = vi.hoisted(() => vi.fn());
@@ -17,7 +13,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   createLogger: () => ({ info: logInfo, warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }));
 
-import type { ScenarioBroadcast } from "../../app/scenario.app.ts";
+import type { ScenarioBroadcast, ScenarioTabStore } from "../../app/scenario.app.ts";
 import { scenarioEventsRest } from "../scenario-event.rest.ts";
 import {
   createScenarioRestTestApp,
@@ -30,7 +26,7 @@ import {
 function buildEventFamily(
   options: {
     simulations?: Partial<SimulationService>;
-    scenarioTabs?: Partial<ScenarioTabRegistry>;
+    tabs?: Partial<ScenarioTabStore>;
     broadcast?: Partial<ScenarioBroadcast>;
     extractInlineMedia?: (input: {
       event: unknown;
@@ -46,7 +42,7 @@ function buildEventFamily(
 ) {
   const world = createScenarioRestTestApp({
     simulations: options.simulations,
-    scenarioTabs: options.scenarioTabs,
+    tabs: options.tabs,
     broadcast: options.broadcast,
     plans: options.plans,
     featureFlags: options.featureFlags,
@@ -297,10 +293,10 @@ describe("the scenario-events REST declaration", () => {
     /** @scenario "The handoff is not delivered when no tab is listening" */
     /** @scenario "Nothing is parked when no tab was listening" */
     it("reports undelivered without parking or broadcasting", async () => {
-      const setPendingNavigate = vi.fn();
+      const setPending = vi.fn();
       const broadcastToTenant = vi.fn();
       const family = buildEventFamily({
-        scenarioTabs: { hasLiveTab: async () => false, setPendingNavigate },
+        tabs: { countAfter: async () => 0, setPending },
         broadcast: { broadcastToTenant },
       });
 
@@ -309,21 +305,21 @@ describe("the scenario-events REST declaration", () => {
         batchRunId: "batch-a",
       });
       await expect(response.json()).resolves.toMatchObject({ delivered: false });
-      expect(setPendingNavigate).not.toHaveBeenCalled();
+      expect(setPending).not.toHaveBeenCalled();
       expect(broadcastToTenant).not.toHaveBeenCalled();
     });
 
     /** @scenario "The handoff is delivered when a tab is listening" */
     it("parks and broadcasts this instance's run URL", async () => {
       const calls: string[] = [];
-      const setPendingNavigate = vi.fn(async () => {
+      const setPending = vi.fn(async () => {
         calls.push("park");
       });
       const broadcastToTenant = vi.fn(async () => {
         calls.push("broadcast");
       });
       const family = buildEventFamily({
-        scenarioTabs: { hasLiveTab: async () => true, setPendingNavigate },
+        tabs: { countAfter: async () => 1, setPending },
         broadcast: { broadcastToTenant },
       });
 
@@ -337,29 +333,31 @@ describe("the scenario-events REST declaration", () => {
         delivered: true,
         url: "https://app.langwatch.test/scenario-rest-project/simulations/checkout/batch-a",
       });
-      expect(setPendingNavigate).toHaveBeenCalledTimes(1);
+      expect(setPending).toHaveBeenCalledTimes(1);
       expect(broadcastToTenant).toHaveBeenCalledTimes(1);
       expect(calls).toEqual(["park", "broadcast"]);
     });
 
     /** @scenario "A handoff never crosses projects" */
     it("uses the authenticated project when checking presence", async () => {
-      const hasLiveTab = vi.fn(async () => false);
-      const family = buildEventFamily({ scenarioTabs: { hasLiveTab } });
+      const countAfter = vi.fn(async () => 0);
+      const family = buildEventFamily({ tabs: { countAfter } });
 
       await postJson(family, "/api/scenario-events/browser-tab", {
         tabKey: "tab-a",
         batchRunId: "batch-a",
       });
-      expect(hasLiveTab).toHaveBeenCalledWith({ projectId: PROJECT_ID, tabKey: "tab-a" });
+      expect(countAfter).toHaveBeenCalledWith(
+        expect.objectContaining({ key: `scenario_tab:v1:${PROJECT_ID}:tab-a` }),
+      );
     });
 
     /** @scenario "The handoff endpoint refuses an unauthenticated caller" */
     it("answers 401 before checking the tab", async () => {
-      const hasLiveTab = vi.fn();
+      const countAfter = vi.fn();
       const family = buildEventFamily({
         authenticated: false,
-        scenarioTabs: { hasLiveTab },
+        tabs: { countAfter },
       });
 
       const response = await postJson(family, "/api/scenario-events/browser-tab", {
@@ -367,15 +365,15 @@ describe("the scenario-events REST declaration", () => {
         batchRunId: "batch-a",
       });
       expect(response.status).toBe(401);
-      expect(hasLiveTab).not.toHaveBeenCalled();
+      expect(countAfter).not.toHaveBeenCalled();
     });
 
     /** @scenario "The handoff URL must belong to this LangWatch instance" */
     it("ignores a caller-supplied URL and broadcasts this instance's URL", async () => {
-      const setPendingNavigate = vi.fn(async () => {});
+      const setPending = vi.fn(async () => {});
       const broadcastToTenant = vi.fn(async () => {});
       const family = buildEventFamily({
-        scenarioTabs: { hasLiveTab: async () => true, setPendingNavigate },
+        tabs: { countAfter: async () => 1, setPending },
         broadcast: { broadcastToTenant },
       });
 
@@ -389,7 +387,7 @@ describe("the scenario-events REST declaration", () => {
         delivered: true,
         url: "https://app.langwatch.test/scenario-rest-project/simulations/default/batch-a",
       });
-      expect(setPendingNavigate).toHaveBeenCalledWith(
+      expect(setPending).toHaveBeenCalledWith(
         expect.objectContaining({
           url: "https://app.langwatch.test/scenario-rest-project/simulations/default/batch-a",
         }),
@@ -512,7 +510,7 @@ describe("the scenario-events links", () => {
     /** @scenario "A browser-tab handoff links to its batch in the interface the project reads" */
     it("hands the batch over under /agent-testing/results", async () => {
       const family = buildEventFamily({
-        scenarioTabs: { hasLiveTab: async () => false },
+        tabs: { countAfter: async () => 0 },
         featureFlags: { isEnabled: async () => true },
       });
 

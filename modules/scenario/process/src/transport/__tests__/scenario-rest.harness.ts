@@ -12,6 +12,7 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { ResourceOwnership } from "@langwatch/kernel";
@@ -21,7 +22,6 @@ import type { Encryption } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
   type ScenarioExecutionService,
-  type ScenarioTabRegistry,
   type SimulationService,
 } from "@langwatch/scenario-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
@@ -35,7 +35,11 @@ import {
   scenarioHostMembers,
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
-import type { ScenarioBroadcast, ScenarioReadOnlyClickHouse } from "../../app/scenario.app.ts";
+import type {
+  ScenarioBroadcast,
+  ScenarioReadOnlyClickHouse,
+  ScenarioTabStore,
+} from "../../app/scenario.app.ts";
 import { ScenarioApp } from "../../app/scenario.app.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 import type { AgentTestService } from "../../services/agent-test.service.ts";
@@ -49,7 +53,7 @@ export const ORGANIZATION_ID = "organization_scenario_rest";
 export function createScenarioRestTestApp(
   options: {
     simulations?: Partial<SimulationService>;
-    scenarioTabs?: Partial<ScenarioTabRegistry>;
+    tabs?: Partial<ScenarioTabStore>;
     broadcast?: Partial<ScenarioBroadcast>;
     traces?: Partial<TraceApi>;
     billing?: Partial<BillingApi>;
@@ -62,10 +66,6 @@ export function createScenarioRestTestApp(
     options.simulations ?? {},
     "Simulation service",
   );
-  const scenarioTabs = createApiFixture<ScenarioTabRegistry>(
-    options.scenarioTabs ?? {},
-    "Scenario tab registry",
-  );
   const broadcast = createApiFixture<ScenarioBroadcast>(
     {
       getTenantEmitter: () => new EventEmitter(),
@@ -75,9 +75,15 @@ export function createScenarioRestTestApp(
   );
 
   const app = ScenarioApp.create({
-    repositories: MemoryScenarioRepositories.create(),
+    repositories: {
+      ...MemoryScenarioRepositories.create(),
+      ...(options.tabs
+        ? { tabs: createApiFixture<ScenarioTabStore>(options.tabs, "Tab store") }
+        : {}),
+    },
     dependencies: {
       agents: createApiFixture<AgentApi>(),
+      evaluations: createApiFixture<EvaluationApi>(),
       users: createApiFixture<UserApi>(),
       projects: createApiFixture<ProjectApi>(
         options.projects ?? { getOrganizationId: async () => ORGANIZATION_ID },
@@ -106,7 +112,6 @@ export function createScenarioRestTestApp(
       agentTesting: createApiFixture<AgentTestService>(),
       simulations,
       scenarioExecution: createApiFixture<ScenarioExecutionService>(),
-      scenarioTabs,
       broadcast,
       resultAtoms: createApiFixture<ResultAtomsService>(),
       runConfigurations: createApiFixture<RunConfigurationsService>(),
@@ -120,7 +125,7 @@ export function createScenarioRestTestApp(
     secrets: {} as never,
   });
 
-  return { app, simulations, scenarioTabs, broadcast };
+  return { app, simulations, broadcast };
 }
 
 export function createScenarioRestTestRuntime(

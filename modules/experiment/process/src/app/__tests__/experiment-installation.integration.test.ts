@@ -19,6 +19,7 @@ import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
 import { createApp } from "@langwatch/kernel";
+import type { ModelCost, ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
@@ -45,6 +46,23 @@ class EmptyDriver implements QueryDriver {
   }
 }
 
+const customCost: ModelCost = {
+  id: "cost_1",
+  organizationId: "organization_1",
+  projectId: "project_1",
+  scopeType: "PROJECT",
+  scopeId: "project_1",
+  model: "my-fine-tune",
+  regex: "^my-fine-tune$",
+  inputCostPerToken: 0.001,
+  outputCostPerToken: 0.002,
+  cacheReadCostPerToken: null,
+  cacheCreationCostPerToken: null,
+  cacheCreation1hCostPerToken: null,
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+};
+
 async function bootWorker() {
   let retentionReads = 0;
   const eventing = new EventSourcing({
@@ -61,6 +79,7 @@ async function bootWorker() {
     .withKeyvalue(
       createApiFixture<NonNullable<ProcessMembers["redis"]>>({}, "redis (unused at boot)"),
     )
+    .withMember("publicBaseUrl", undefined)
     .withObservability((observability) => observability.withLogging(createTestLogger().logger))
     .provide({
       workflow: createApiFixture<WorkflowApi>({}),
@@ -72,6 +91,9 @@ async function bootWorker() {
       authz: createApiFixture<AuthzApi>({}),
       project: createApiFixture<ProjectApi>({}),
       entitlement: createApiFixture<EntitlementApi>({}),
+      "model-provider": createApiFixture<ModelProviderApi>({
+        listCosts: () => Promise.resolve([customCost]),
+      }),
       "data-retention": createApiFixture<DataRetentionApi>({
         getPlatformDefaultRetentionDays: () => {
           retentionReads += 1;
@@ -117,6 +139,28 @@ describe("experiment installed in the worker", () => {
           .service(ExperimentApi)
           .lookupExperimentId({ tenantId: "project_1", runId: "run_1" }),
       ).resolves.toEqual({ kind: "not_recorded" });
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "The optimizer log prices against the project's cost rules and the static catalogue" */
+  it("lists the project's custom cost rules ahead of the static catalogue", async () => {
+    const { runtime } = await bootWorker();
+
+    try {
+      const rates = await runtime.service(ExperimentApi).listModelCosts({ projectId: "project_1" });
+
+      expect(rates[0]).toEqual({
+        model: "my-fine-tune",
+        regex: "^my-fine-tune$",
+        inputCostPerToken: 0.001,
+        outputCostPerToken: 0.002,
+        cacheReadCostPerToken: undefined,
+        cacheCreationCostPerToken: undefined,
+        cacheCreation1hCostPerToken: undefined,
+      });
+      expect(rates.length).toBeGreaterThan(1);
     } finally {
       await runtime.stop();
     }

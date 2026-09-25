@@ -14,6 +14,7 @@ import {
   type ClickHouseClientCreationInput,
   type TenantDirectory,
 } from "@langwatch/clickhouse-client";
+import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "@langwatch/eventing";
 
 import type { ClickHouseConfig } from "./config.ts";
 import type { BuiltMember } from "./datastore-members.ts";
@@ -72,7 +73,7 @@ export function buildClickHouse(options: {
   const client = new ClickHouseQueryClient({
     driver: routingDriver(connection),
     tenantGuard: new TenantGuard(),
-    retries: new RetryPolicy(),
+    retries: new RetryPolicy({ transientMessageFragments: CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS }),
     limiter: new ConcurrencyLimiter({
       maxConcurrent: config.maxConcurrentStatements ?? configuration.poolSizing.size,
     }),

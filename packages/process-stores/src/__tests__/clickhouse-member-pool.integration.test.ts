@@ -18,13 +18,26 @@ describe("given the ClickHouse member in front of a server", () => {
   let url: string;
   let inFlight: number;
   let peak: number;
+  let serverCap: number | undefined;
+  let refused: number;
 
   beforeEach(async () => {
     inFlight = 0;
     peak = 0;
+    serverCap = undefined;
+    refused = 0;
     server = createServer((request, response) => {
       request.resume();
       request.on("end", () => {
+        if (serverCap !== undefined && inFlight >= serverCap) {
+          refused += 1;
+          response.statusCode = 500;
+          response.setHeader("X-ClickHouse-Exception-Code", "202");
+          response.end(
+            `Code: 202. DB::Exception: Too many simultaneous queries. Maximum: ${serverCap}. (TOO_MANY_SIMULTANEOUS_QUERIES)`,
+          );
+          return;
+        }
         inFlight += 1;
         peak = Math.max(peak, inFlight);
         setTimeout(() => {
@@ -83,6 +96,18 @@ describe("given the ClickHouse member in front of a server", () => {
       });
 
       expect(peak).toBeLessThanOrEqual(3);
+    });
+  });
+
+  describe("when the server's cap is not stated and a burst exceeds it", () => {
+    /** @scenario "A statement the server refused as too many simultaneous queries is retried" */
+    it("retries the refused statements until every one is answered", async () => {
+      serverCap = 25;
+
+      const results = await burst({ config: { url }, count: 40 });
+
+      expect(refused).toBeGreaterThan(0);
+      expect(results).toHaveLength(40);
     });
   });
 });

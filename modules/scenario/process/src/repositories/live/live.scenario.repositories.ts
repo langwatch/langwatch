@@ -7,6 +7,7 @@ import {
   RedisCancellationPublisherAdapter,
   RedisCancellationSubscriberAdapter,
 } from "../redis/redis.cancellation-channel.repository.ts";
+import { RedisScenarioTabStoreRepository } from "../redis/redis.scenario-tab-store.repository.ts";
 import { RedisSimulationRunProcessingRepository } from "../redis/redis.simulation-run-processing.repository.ts";
 import type { ScenarioRepositories } from "../scenario.repositories.ts";
 
@@ -27,6 +28,7 @@ export class LiveScenarioRepositories {
         DuplicatedCancellationConnection.over(redis),
       ),
       stalledRuns: ClickHouseStalledSimulationRunRepository.create(clickhouse),
+      tabs: RedisScenarioTabStoreRepository.create(redis),
     };
   }
 }
