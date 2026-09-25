@@ -24,6 +24,7 @@ describe("parseProcessConfig", () => {
     expect(config.github.apiUrl).toBe("https://api.github.com");
   });
 
+  /** @scenario "A missing required value refuses naming its root, its field and its variable" */
   it("refuses naming owner.path and the env var, every miss at once", () => {
     const strict = {
       name: "strict",
@@ -47,6 +48,7 @@ describe("parseProcessConfig", () => {
     expect(refusals.some((line) => line.startsWith("strict.nested.two ← STRICT_TWO"))).toBe(true);
   });
 
+  /** @scenario "Two meanings for one variable still refuse" */
   it("refuses two owners claiming one variable, however they spell it", () => {
     const a = {
       name: "a",
@@ -66,6 +68,7 @@ describe("parseProcessConfig", () => {
 
   describe("given two owners holding the one exported deployment-fact leaf", () => {
     /** @scenario "Owners sharing one deployment-fact leaf both parse it" */
+    /** @scenario "One shared deployment fact may be claimed by several modules" */
     it("admits both claims and hands each owner the same parsed value", () => {
       const evaluation = {
         name: "evaluation",
@@ -96,12 +99,14 @@ describe("parseProcessConfig", () => {
     });
   });
 
+  /** @scenario "The parsed configuration cannot be mutated" */
   it("returns frozen slices — the parse's answer is what the process holds", () => {
     const config = parseProcessConfig({ owners: [github], environment: {} });
     expect(Object.isFrozen(config)).toBe(true);
     expect(Object.isFrozen(config.github)).toBe(true);
   });
 
+  /** @scenario "A module that declares no config schema contributes nothing" */
   it("owns no slice for an owner that declares none", () => {
     const config = parseProcessConfig({ owners: [{ name: "bare" }], environment: {} });
     expect("bare" in config).toBe(false);
@@ -109,6 +114,7 @@ describe("parseProcessConfig", () => {
 });
 
 describe("config and secrets stay separate", () => {
+  /** @scenario "A module config schema may not declare a credential" */
   it("refuses a config leaf claiming an env name any owner declared as a secret", () => {
     const security = {
       name: "security",

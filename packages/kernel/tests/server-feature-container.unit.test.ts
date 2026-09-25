@@ -334,6 +334,7 @@ describe("the server feature container", () => {
 });
 
 describe("runtime failure ownership", () => {
+  /** @scenario "A role reads only the declarations addressed to it" */
   it("constructs a worker contribution once and rejects unavailable transports", async () => {
     const worker = vi.fn(() => ({ consumer: {} }));
     const feature = serverFeature<object>("jobs")

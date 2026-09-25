@@ -276,7 +276,7 @@ func TestRenderModeRawPrintsThePayloadUntouched(t *testing.T) {
 	}
 }
 
-// @scenario "The two applications the backend lane hosts are addressable by name"
+// @scenario "The two applications the api lane hosts are addressable by name"
 func TestSelectLogServicesSplitsTheAPILaneByHalf(t *testing.T) {
 	dir := t.TempDir()
 	base := time.Date(2026, 9, 18, 10, 0, 0, 0, time.UTC)
@@ -331,7 +331,7 @@ func TestSelectLogServicesSplitsTheAPILaneByHalf(t *testing.T) {
 	})
 }
 
-// @scenario "The backend lane is still readable whole"
+// @scenario "The api lane is still readable whole"
 func TestUnfilteredLogsKeepTheAPILaneWhole(t *testing.T) {
 	dir := t.TempDir()
 	base := time.Date(2026, 9, 18, 10, 0, 0, 0, time.UTC)

@@ -2,7 +2,7 @@ package viewer
 
 import "testing"
 
-// @scenario "The two applications the backend lane hosts are addressable by name"
+// @scenario "The two applications the api lane hosts are addressable by name"
 func TestRouteLineSplitsTheBackendLaneByTheHalfThatWrote(t *testing.T) {
 	// A half that dies before its first log line has no logger to name, so its
 	// failure record names the process instead. Routing that by the lane's

@@ -69,7 +69,7 @@ const projects: ProjectApi = { name: () => "project" };
 
 describe("given a process whose modules declare what they read", () => {
   describe("when it boots", () => {
-    /** @scenario "Boot builds exactly the members the installed modules declared" */
+    /** @scenario "A module names the pool members it reads" */
     it("builds only the declared union and asks for nothing else", async () => {
       const asked: string[] = [];
       const runtime = await createApp({
@@ -85,6 +85,7 @@ describe("given a process whose modules declare what they read", () => {
       await runtime.stop();
     });
 
+    /** @scenario "A module names the pool members it reads" */
     it("hands one module the members it named and nothing else", async () => {
       const runtime = await createApp({
         role: "api",
@@ -100,7 +101,7 @@ describe("given a process whose modules declare what they read", () => {
   });
 
   describe("when this process cannot supply a member a module declared", () => {
-    /** @scenario "A member an installed module names that this process cannot supply" */
+    /** @scenario "A pool member the module named is absent at boot" */
     it("refuses before serving, naming the module and the member", async () => {
       const create = vi.spyOn(AnnotationApp, "create");
       const booting = createApp({ role: "api", members: recordingSource({}, []) })

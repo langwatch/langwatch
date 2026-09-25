@@ -340,7 +340,7 @@ describe("defineServerModule compiler diagnostics", () => {
     );
   });
 
-  /** @scenario "A member an installed module names that this process cannot supply" */
+  /** @scenario "A pool that lacks a member an installed module names" */
   it("rejects a module list whose members lack one a module names", () => {
     expectOnlyDiagnostic(
       `

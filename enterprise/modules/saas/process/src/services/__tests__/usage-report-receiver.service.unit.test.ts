@@ -85,6 +85,7 @@ describe("UsageReportReceiverService", () => {
     });
 
     /** @scenario "A report the registry cannot store is still accepted" */
+    /** @scenario "Storage failing never refuses the report" */
     it("answers the report and logs when the registry fails", async () => {
       const { receiver, analytics, lines } = setup({
         recordUsageReport: () => Promise.reject(new Error("registry down")),

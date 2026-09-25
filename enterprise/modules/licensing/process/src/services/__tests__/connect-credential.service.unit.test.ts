@@ -312,6 +312,7 @@ describe("a license sync", () => {
     ).rejects.toMatchObject({ code: "connect_license_token_malformed", httpStatus: 401 });
   });
 
+  /** @scenario "The replaced license is retired once the new one is in use" */
   it("delivers a reissued license until the install presents it", async () => {
     const replacement = rowFor({
       id: "license-2",

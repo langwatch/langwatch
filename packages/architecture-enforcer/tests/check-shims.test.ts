@@ -94,6 +94,7 @@ function removeShims() {
 }
 
 describe("retiring automatic check shims", () => {
+  /** @scenario "Installing dependencies retires automatic bin shims" */
   it("restores the original executable and can run twice", () => {
     writeLauncher("tsc");
     install();
@@ -109,6 +110,7 @@ describe("retiring automatic check shims", () => {
     expect(readFileSync(path.join(binDir, "tsc"), "utf8")).toBe(LAUNCHER);
   });
 
+  /** @scenario "Cleanup preserves a newly generated launcher" */
   it("keeps a regenerated pnpm launcher even with a stale backup", () => {
     writeLauncher("tsc");
     install();
@@ -119,6 +121,7 @@ describe("retiring automatic check shims", () => {
     expect(readFileSync(path.join(binDir, "tsc"), "utf8")).toBe(regenerated);
   });
 
+  /** @scenario "Cleanup reports an incomplete legacy installation" */
   it("reports a missing backup without removing the current entry", () => {
     writeLauncher("tsc");
     install();

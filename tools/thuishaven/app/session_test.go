@@ -146,6 +146,7 @@ func TestSessionSnapshotReportsTheWorkerHalfOnItsOwn(t *testing.T) {
 }
 
 // @scenario "The dashboard reports every service and shared server"
+// @scenario "One list, and everything in it can be selected"
 func TestSessionSnapshotListsSharedMachineryOnceAndSelectably(t *testing.T) {
 	st := domain.Stack{
 		Slug: "feat-x", Branch: "feat/x", LauncherPID: 42,
@@ -188,6 +189,7 @@ func TestSessionSnapshotListsSharedMachineryOnceAndSelectably(t *testing.T) {
 }
 
 // @scenario "The dashboard reports every service and shared server"
+// @scenario "One list, and everything in it can be selected"
 func TestSessionSnapshotLeadsWithTheTwoNodeLanes(t *testing.T) {
 	// The browser application and the API are what a person came to look at,
 	// and the worker is the half whose silence is hardest to notice. They lead

@@ -199,6 +199,7 @@ describe("a replacement license the answer carried", () => {
     expect(host.syncs.at(-1)?.token).toBe(cryptography.getLicenseToken(replacement));
   });
 
+  /** @scenario "A delivered license that does not verify is not applied" */
   it("does not apply a delivered license that does not verify", async () => {
     const { service, organizations, stored } = refresher({
       license: licenseNaming({ services: ["instant_evals"] }),

@@ -206,8 +206,7 @@ describe("GracefulShutdown", () => {
 
   describe("given a drain phase that never finishes", () => {
     describe("when the process is terminating", () => {
-      // The scenario itself is bound by the worker process test; this pins the
-      // class option that implements it.
+      /** @scenario "A hung drain cannot hold the process open forever" */
       it("gives up on the drain and leaves the later releases alone", async () => {
         vi.useFakeTimers();
         try {
@@ -233,6 +232,7 @@ describe("GracefulShutdown", () => {
     });
 
     describe("when the process is staying up", () => {
+      /** @scenario "A hung drain in a process that is not terminating still releases its handles" */
       it("releases the handles anyway", async () => {
         vi.useFakeTimers();
         try {
