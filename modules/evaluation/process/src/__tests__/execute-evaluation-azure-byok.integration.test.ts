@@ -55,7 +55,9 @@ function buildCommandWithMocks({
   return {
     command,
     evaluations: deps.evaluations,
-    azureSafetyCredentials: deps.azureSafetyCredentials.resolveForTenant,
+    azureSafetyCredentials: (
+      ...args: Parameters<typeof deps.azureSafetyCredentials.resolveForTenant>
+    ) => deps.azureSafetyCredentials.resolveForTenant(...args),
   };
 }
 

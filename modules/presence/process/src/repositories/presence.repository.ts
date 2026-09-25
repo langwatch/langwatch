@@ -4,7 +4,7 @@ import type { PresenceSession } from "@langwatch/presence-contract";
 export abstract class PresenceRepository {
   abstract upsert(session: PresenceSession, ttlSeconds: number): Promise<void>;
   abstract remove(input: { projectId: string; sessionId: string }): Promise<boolean>;
-  abstract listByProject(projectId: string): Promise<PresenceSession[]>;
+  abstract findByProject(projectId: string): Promise<PresenceSession[]>;
   /** A session that has expired or was never published is a normal absence. */
   abstract findSession(input: {
     projectId: string;

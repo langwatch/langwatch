@@ -2,7 +2,6 @@ import {
   PresenceSessionNotOwnedError,
   presenceCursorInputSchema,
   presenceLeaveInputSchema,
-  presenceProjectInputSchema,
   presenceUpdateInputSchema,
   type PresenceCursorInput,
   type PresenceEvent,
@@ -74,9 +73,7 @@ export class PresenceService {
   }
 
   isEnabledForProject(input: PresenceProjectInput): Promise<boolean> {
-    const parsed = presenceProjectInputSchema.parse(input);
-
-    return this.projects.isPresenceEnabled(parsed);
+    return this.projects.isPresenceEnabled(input);
   }
 
   async update(input: PresenceUpdateInput): Promise<PresenceSession> {
@@ -126,9 +123,7 @@ export class PresenceService {
   }
 
   list(input: PresenceProjectInput): Promise<PresenceSession[]> {
-    const parsed = presenceProjectInputSchema.parse(input);
-
-    return this.repository.listByProject(parsed.projectId);
+    return this.repository.findByProject(input.projectId);
   }
 
   async broadcastCursor(input: PresenceCursorInput): Promise<void> {

@@ -32,7 +32,7 @@ const schedulerRepository: SchedulerOpsRepository = {
   setActiveForOps: async () => false,
   releaseSlotForOps: async () => false,
   requestImmediateRunForOps: async () => false,
-  listForOps: async () => [],
+  findForOps: async () => [],
   listPausedForOps: async () => ({ rows: [], total: 0 }),
 };
 

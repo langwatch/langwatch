@@ -1087,7 +1087,7 @@ export const ComparisonCharts = ({
                               toggleMetric(metric.id);
                             }
                           }}
-                          role="menuitem"
+                          role="menuitemcheckbox"
                           tabIndex={0}
                           aria-checked={visibleMetrics.has(metric.id)}
                         >

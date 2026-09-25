@@ -57,7 +57,7 @@ export class SchedulerOpsService {
   }
 
   async listScheduledJobs({ limit = 200 }: { limit?: number }): Promise<OpsScheduledJob[]> {
-    const rows = await this.repository.listForOps({
+    const rows = await this.repository.findForOps({
       limit: Math.min(Math.max(limit, 1), 500),
     });
 

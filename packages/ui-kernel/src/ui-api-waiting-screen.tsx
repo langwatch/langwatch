@@ -27,7 +27,7 @@ export function UiApiWaitingScreen({
   explaining,
 }: UiApiWaitingScreenProps) {
   return (
-    <div className="lw-api-waiting" role="status" aria-live="polite" data-testid="api-waiting">
+    <output className="lw-api-waiting" aria-live="polite" data-testid="api-waiting">
       <div className="lw-api-waiting-mesh" aria-hidden="true" />
       <div className="lw-api-waiting-body">
         <h1 className="lw-api-waiting-heading">
@@ -43,6 +43,6 @@ export function UiApiWaitingScreen({
           </p>
         ) : null}
       </div>
-    </div>
+    </output>
   );
 }

@@ -9,7 +9,7 @@ import { vi } from "vitest";
 // ---------------------------------------------------------------------------
 // Mutable mock organisation (reset per-test via resetMocks)
 // ---------------------------------------------------------------------------
-export let mockOrganization: {
+export const mockOrganization: {
   id: string;
   name: string;
   pricingModel?: string;
@@ -21,7 +21,9 @@ export let mockOrganization: {
 };
 
 export function setMockOrganization(value: typeof mockOrganization) {
-  mockOrganization = value;
+  delete mockOrganization.pricingModel;
+  delete mockOrganization.currency;
+  Object.assign(mockOrganization, value);
 }
 
 // ---------------------------------------------------------------------------
@@ -160,11 +162,7 @@ export const mockOpenSeats = vi.fn();
 // ---------------------------------------------------------------------------
 export function resetMocks() {
   vi.clearAllMocks();
-  mockOrganization = {
-    id: "test-org-id",
-    name: "Test Org",
-    currency: "EUR",
-  };
+  setMockOrganization({ id: "test-org-id", name: "Test Org", currency: "EUR" });
   mockGetActivePlan.mockReturnValue({
     data: createMockPlan(),
     isLoading: false,

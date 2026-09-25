@@ -134,7 +134,7 @@ export interface ScheduledJobStore {
   /**
    * Every schedule a project owns for one consumer, so a product surface can
    * answer "when does this run next/last?" Project-scoped (unlike `findDue` /
-   * `listForOps`), so it is safe under a customer-facing permission.
+   * `findForOps`), so it is safe under a customer-facing permission.
    */
   findAllForProject(params: {
     projectId: string;
@@ -183,11 +183,11 @@ export interface ScheduledJobStore {
    * (active first, soonest `nextRunAt` first), bounded by `limit`. Read-only
    * operator visibility — never a firing path.
    */
-  listForOps(params: { limit: number }): Promise<ScheduledJobRecord[]>;
+  findForOps(params: { limit: number }): Promise<ScheduledJobRecord[]>;
 
   /**
    * Cross-tenant read of paused schedules with total for bounded pages.
-   * Separate from listForOps to avoid sorting inactive rows to the end.
+   * Separate from findForOps to avoid sorting inactive rows to the end.
    */
   listPausedForOps(params: {
     limit: number;

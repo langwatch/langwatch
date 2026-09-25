@@ -1995,7 +1995,11 @@ export function EvaluationsV3Table({
               ) : (
                 <>
                   {/* Filler column - absorbs remaining space */}
-                  <th colSpan={2} style={{ width: "auto", minWidth: DRAWER_WIDTH }}></th>
+                  <th
+                    aria-hidden="true"
+                    colSpan={2}
+                    style={{ width: "auto", minWidth: DRAWER_WIDTH }}
+                  ></th>
                 </>
               )}
             </tr>

@@ -32,7 +32,7 @@ const SkeletonTable = ({ rows = 5, columns = 3 }: Omit<TableSkeletonProps, "with
     <table>
       <thead>
         <tr>
-          <th style={{ width: "32px" }} />
+          <th aria-hidden="true" style={{ width: "32px" }} />
           {Array.from({ length: columns }).map((_, colIdx) => (
             <th key={colIdx}>
               <Skeleton height="16px" width={`${60 + colIdx * 20}px`} />

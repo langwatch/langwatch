@@ -408,6 +408,7 @@ export function BatchEvaluationV2EvaluationResult({
             {paddingTop > 0 && (
               <tr>
                 <td
+                  aria-hidden="true"
                   colSpan={columns.length}
                   style={{ height: paddingTop, padding: 0, border: "none" }}
                 />
@@ -441,6 +442,7 @@ export function BatchEvaluationV2EvaluationResult({
             {paddingBottom > 0 && (
               <tr>
                 <td
+                  aria-hidden="true"
                   colSpan={columns.length}
                   style={{
                     height: paddingBottom,

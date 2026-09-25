@@ -14,7 +14,7 @@ export abstract class ExperimentRunRepository {
   abstract findAggregates(
     input: ExperimentRunListInput,
   ): Promise<Record<string, ExperimentRunAggregate>>;
-  abstract findPage(
+  abstract listPage(
     input: ExperimentRunPageInput,
   ): Promise<{ runs: ExperimentRun[]; totalHits: number }>;
   /** Polling semantics: absence and an unavailable analytical store are null. */

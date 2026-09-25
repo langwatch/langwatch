@@ -82,8 +82,9 @@ function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
             {trailingSpacerWidth ? (
               <>
                 {/* Filler column - absorbs remaining space */}
-                <td style={{ width: "auto" }} />
+                <td aria-hidden="true" style={{ width: "auto" }} />
                 <td
+                  aria-hidden="true"
                   style={{
                     width: trailingSpacerWidth,
                     minWidth: trailingSpacerWidth,
@@ -110,7 +111,11 @@ function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
       {/* Top padding row */}
       {paddingTop > 0 && (
         <tr>
-          <td style={{ height: `${paddingTop}px`, padding: 0 }} colSpan={columnCount} />
+          <td
+            aria-hidden="true"
+            style={{ height: `${paddingTop}px`, padding: 0 }}
+            colSpan={columnCount}
+          />
         </tr>
       )}
       {/* Render only virtualized rows */}
@@ -135,7 +140,11 @@ function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
             ))}
             {trailingSpacerWidth ? (
               /* Filler column - absorbs remaining space (+ drawer spacer) */
-              <td colSpan={2} style={{ width: "auto", minWidth: trailingSpacerWidth }} />
+              <td
+                aria-hidden="true"
+                colSpan={2}
+                style={{ width: "auto", minWidth: trailingSpacerWidth }}
+              />
             ) : null}
           </tr>
         );
@@ -143,7 +152,11 @@ function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
       {/* Bottom padding row */}
       {paddingBottom > 0 && (
         <tr>
-          <td style={{ height: `${paddingBottom}px`, padding: 0 }} colSpan={columnCount} />
+          <td
+            aria-hidden="true"
+            style={{ height: `${paddingBottom}px`, padding: 0 }}
+            colSpan={columnCount}
+          />
         </tr>
       )}
     </>

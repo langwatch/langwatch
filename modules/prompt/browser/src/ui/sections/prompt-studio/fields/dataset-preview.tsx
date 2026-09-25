@@ -36,9 +36,7 @@ export function DatasetPreview({
     >
       {onClick && (
         <Center
-          role="button"
-          aria-label="Edit dataset"
-          onClick={onClick}
+          asChild
           position="absolute"
           top={0}
           left={0}
@@ -53,19 +51,21 @@ export function DatasetPreview({
             opacity: 1,
           }}
         >
-          <HStack
-            gap={2}
-            fontSize="18px"
-            fontWeight="bold"
-            color="white"
-            background="rgba(0, 0, 0, .5)"
-            paddingY={2}
-            paddingX={4}
-            borderRadius="6px"
-          >
-            <Pencil size={20} />
-            <Text>Edit</Text>
-          </HStack>
+          <button type="button" aria-label="Edit dataset" onClick={onClick}>
+            <HStack
+              gap={2}
+              fontSize="18px"
+              fontWeight="bold"
+              color="white"
+              background="rgba(0, 0, 0, .5)"
+              paddingY={2}
+              paddingX={4}
+              borderRadius="6px"
+            >
+              <Pencil size={20} />
+              <Text>Edit</Text>
+            </HStack>
+          </button>
         </Center>
       )}
       <DatasetPreviewTable rows={rows} columns={columns} />

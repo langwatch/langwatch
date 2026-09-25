@@ -1195,27 +1195,22 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
             {promptId && promptQuery.data?.handle ? (
               <>
                 <HStack
+                  asChild
                   gap={1}
                   cursor="pointer"
-                  onClick={() => setChangeHandleDialogOpen(true)}
                   _hover={{ "& .edit-icon": { display: "block" } }}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      setChangeHandleDialogOpen(true);
-                    }
-                  }}
                 >
-                  <Heading>{promptQuery.data.handle}</Heading>
-                  <Box
-                    className="edit-icon"
-                    display="none"
-                    transition="opacity 0.2s"
-                    color="fg.muted"
-                  >
-                    <LuPencil size={16} />
-                  </Box>
+                  <button type="button" onClick={() => setChangeHandleDialogOpen(true)}>
+                    <Heading>{promptQuery.data.handle}</Heading>
+                    <Box
+                      className="edit-icon"
+                      display="none"
+                      transition="opacity 0.2s"
+                      color="fg.muted"
+                    >
+                      <LuPencil size={16} />
+                    </Box>
+                  </button>
                 </HStack>
                 {showVersionBadge && (
                   <VersionBadge

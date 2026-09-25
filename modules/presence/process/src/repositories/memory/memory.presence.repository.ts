@@ -53,7 +53,7 @@ export class MemoryPresenceRepository extends PresenceRepository {
     return entry.session;
   }
 
-  async listByProject(projectId: string): Promise<PresenceSession[]> {
+  async findByProject(projectId: string): Promise<PresenceSession[]> {
     const prefix = `${projectId}::`;
     const now = this.now();
     const sessions: PresenceSession[] = [];

@@ -70,7 +70,7 @@ const notReached = (): never => {
 const unusedRunRepository: ExperimentRunRepository = {
   findAll: notReached,
   findAggregates: notReached,
-  findPage: notReached,
+  listPage: notReached,
   findRun: notReached,
   findWorkflowVersions: notReached,
 };

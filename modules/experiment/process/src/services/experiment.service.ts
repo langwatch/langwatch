@@ -474,7 +474,7 @@ export class ExperimentService {
   getRunsPage(
     input: ExperimentRunPageInput,
   ): Promise<{ runs: ExperimentRun[]; totalHits: number }> {
-    return this.options.runRepository.findPage(experimentRunPageInputSchema.parse(input));
+    return this.options.runRepository.listPage(experimentRunPageInputSchema.parse(input));
   }
 
   findRun(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null> {

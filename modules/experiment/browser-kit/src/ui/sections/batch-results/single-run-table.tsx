@@ -493,7 +493,11 @@ export function SingleRunTable({
               {/* Top padding row to maintain scroll position */}
               {paddingTop > 0 && (
                 <tr>
-                  <td style={{ height: `${paddingTop}px`, padding: 0 }} colSpan={columnCount} />
+                  <td
+                    aria-hidden="true"
+                    style={{ height: `${paddingTop}px`, padding: 0 }}
+                    colSpan={columnCount}
+                  />
                 </tr>
               )}
               {/* Render only virtualized rows - empty until container is measured */}
@@ -517,7 +521,11 @@ export function SingleRunTable({
               {/* Bottom padding row to maintain scroll position */}
               {paddingBottom > 0 && (
                 <tr>
-                  <td style={{ height: `${paddingBottom}px`, padding: 0 }} colSpan={columnCount} />
+                  <td
+                    aria-hidden="true"
+                    style={{ height: `${paddingBottom}px`, padding: 0 }}
+                    colSpan={columnCount}
+                  />
                 </tr>
               )}
             </>

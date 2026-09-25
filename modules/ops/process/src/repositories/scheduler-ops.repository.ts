@@ -18,7 +18,7 @@ export abstract class SchedulerOpsRepository {
     expectedNextRunAt: Date;
     now: Date;
   }): Promise<boolean>;
-  abstract listForOps(params: { limit: number }): Promise<ScheduledJobRecord[]>;
+  abstract findForOps(params: { limit: number }): Promise<ScheduledJobRecord[]>;
   abstract listPausedForOps(params: {
     limit: number;
   }): Promise<{ rows: ScheduledJobRecord[]; total: number }>;

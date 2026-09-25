@@ -113,7 +113,7 @@ export class RedisBroadcastRepository implements PresenceBroadcast, PresenceEmit
         this.logger.debug({ tenantId, event, eventType }, "Received SSE broadcast via Redis");
 
         const tier = this.classifyEventTier(event);
-        if (!this.subscriberRateLimiter.tryConsume(tenantId, tier)) return;
+        if (!this.subscriberRateLimiter.consume(tenantId, tier)) return;
 
         this.broadcastToTenantLocally(tenantId, event, eventType);
       } catch (error) {
@@ -234,7 +234,7 @@ export class RedisBroadcastRepository implements PresenceBroadcast, PresenceEmit
     tier: "structural" | "delta" = "structural",
   ): Promise<boolean> {
     if (!this.active) throw new BroadcasterNotActiveError();
-    if (!this.senderRateLimiter.tryConsume(tenantId, tier)) {
+    if (!this.senderRateLimiter.consume(tenantId, tier)) {
       return false;
     }
     await this.broadcastToTenant(tenantId, event, eventType);

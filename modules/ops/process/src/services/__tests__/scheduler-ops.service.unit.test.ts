@@ -55,7 +55,7 @@ class SchedulerRepositoryStub implements SchedulerOpsRepository {
         now: Date;
       }) => Promise<boolean>
     >();
-  readonly listForOps = vi.fn<(params: { limit: number }) => Promise<ScheduledJobRecord[]>>();
+  readonly findForOps = vi.fn<(params: { limit: number }) => Promise<ScheduledJobRecord[]>>();
   readonly listPausedForOps =
     vi.fn<(params: { limit: number }) => Promise<{ rows: ScheduledJobRecord[]; total: number }>>();
 }
@@ -71,7 +71,7 @@ const makeService = (row: ScheduledJobRecord | null) => {
   repo.setActiveForOps.mockResolvedValue(true);
   repo.releaseSlotForOps.mockResolvedValue(true);
   repo.requestImmediateRunForOps.mockResolvedValue(true);
-  repo.listForOps.mockResolvedValue([]);
+  repo.findForOps.mockResolvedValue([]);
   repo.listPausedForOps.mockResolvedValue({ rows: [], total: 0 });
   const audit = new SchedulerAuditRepositoryStub();
   const wake = NoopSchedulerWakeService.create();

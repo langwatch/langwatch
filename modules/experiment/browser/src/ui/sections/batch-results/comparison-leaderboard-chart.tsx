@@ -297,7 +297,7 @@ export function ComparisonLeaderboardChart({
       padding={3}
       paddingBottom={1}
       data-testid={`chart-leaderboard-${column.evaluatorId}`}
-      role="group"
+      className="group"
     >
       <LeaderboardCardHeader
         title={`${column.name}: leaderboard`}

@@ -190,7 +190,7 @@ export class PrismaScheduledJobStore implements ScheduledJobStore {
     });
   }
 
-  async listForOps({ limit }: { limit: number }): Promise<ScheduledJobRecord[]> {
+  async findForOps({ limit }: { limit: number }): Promise<ScheduledJobRecord[]> {
     // Cross-tenant operator read (all projects): active jobs first, then by
     // soonest next fire. The `-- @tenancy:` marker is the guard's sanctioned
     // opt-out for a system-owned cross-tenant view (read-only, never fires).
@@ -210,7 +210,7 @@ export class PrismaScheduledJobStore implements ScheduledJobStore {
   }: {
     limit: number;
   }): Promise<{ rows: ScheduledJobRecord[]; total: number }> {
-    // Its own query rather than a filter over `listForOps`: that one orders
+    // Its own query rather than a filter over `findForOps`: that one orders
     // `active DESC`, and in Postgres `true > false`, so the inactive rows sort
     // to the very end — precisely what its LIMIT drops. A caller filtering
     // that page finds nothing the moment the fleet outgrows the page.
@@ -348,7 +348,7 @@ export class NullScheduledJobStore implements ScheduledJobStore {
   async findAllForProject(): Promise<ScheduledJobRecord[]> {
     return [];
   }
-  async listForOps(): Promise<ScheduledJobRecord[]> {
+  async findForOps(): Promise<ScheduledJobRecord[]> {
     return [];
   }
   async listPausedForOps(): Promise<{

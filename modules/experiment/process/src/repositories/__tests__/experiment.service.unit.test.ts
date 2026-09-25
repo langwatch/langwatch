@@ -284,7 +284,7 @@ class MemoryExperimentRunRepository extends ExperimentRunRepository {
   async findAggregates() {
     return {};
   }
-  async findPage(input: { experimentId: string }) {
+  async listPage(input: { experimentId: string }) {
     const runs = this.values[input.experimentId] ?? [];
     return { runs, totalHits: runs.length };
   }

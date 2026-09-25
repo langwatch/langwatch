@@ -54,7 +54,7 @@ export class BroadcastTenantRateLimiterAdapter {
    *
    * @returns `true` if the event is allowed, `false` if rate-limited.
    */
-  tryConsume(tenantId: string, tier: "structural" | "delta"): boolean {
+  consume(tenantId: string, tier: "structural" | "delta"): boolean {
     const bucketConfig = this.config[tier];
     const key = `${tenantId}:${tier}`;
     const now = nowInstant().epochMilliseconds;

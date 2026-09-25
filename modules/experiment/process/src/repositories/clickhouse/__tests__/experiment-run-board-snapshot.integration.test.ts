@@ -262,7 +262,7 @@ describe("given a run that carries one column and runs another", () => {
 
 describe("given a run whose items include carried rows and rows it produced", () => {
   const summaryOfTheRun = async () => {
-    const { runs } = await repository.findPage({
+    const { runs } = await repository.listPage({
       projectId: tenantId,
       experimentId,
       page: 1,

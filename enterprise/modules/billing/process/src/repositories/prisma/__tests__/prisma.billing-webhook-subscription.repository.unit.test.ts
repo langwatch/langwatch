@@ -80,14 +80,18 @@ describe("PrismaBillingWebhookBillingSubscription", () => {
   describe("when a payment activates the subscription", () => {
     /** @scenario "An activation carries the organization's trial licence to the webhook" */
     it("carries the organization's trial licence beside the activated row", async () => {
-      const { adapter, subscriptions } = compose({ license: "trial-key" });
+      const activate = vi.fn(() => Promise.resolve(WITH_ORGANIZATION));
+      const { adapter } = compose({
+        license: "trial-key",
+        repository: repositoryDouble({ activate }),
+      });
 
       const result = await adapter.activate({
         id: "subscription-1",
         previousStatus: "PENDING",
       });
 
-      expect(subscriptions.activate).toHaveBeenCalledWith({
+      expect(activate).toHaveBeenCalledWith({
         id: "subscription-1",
         previousStatus: "PENDING",
       });
@@ -108,7 +112,8 @@ describe("PrismaBillingWebhookBillingSubscription", () => {
   describe("when a subscription update raises the priced quantities", () => {
     /** @scenario "An activation carries the organization's trial licence to the webhook" */
     it("writes both quantities and reports no trial licence where there is none", async () => {
-      const { adapter, subscriptions } = compose();
+      const updateQuantities = vi.fn(() => Promise.resolve(WITH_ORGANIZATION));
+      const { adapter } = compose({ repository: repositoryDouble({ updateQuantities }) });
 
       const result = await adapter.updateQuantities({
         id: "subscription-1",
@@ -116,7 +121,7 @@ describe("PrismaBillingWebhookBillingSubscription", () => {
         maxMessagesPerMonth: 100_000,
       });
 
-      expect(subscriptions.updateQuantities).toHaveBeenCalledWith({
+      expect(updateQuantities).toHaveBeenCalledWith({
         id: "subscription-1",
         maxMembers: 12,
         maxMessagesPerMonth: 100_000,
@@ -159,20 +164,31 @@ describe("PrismaBillingWebhookBillingSubscription", () => {
   describe("when the webhook reads or cancels without renaming anything", () => {
     /** @scenario "The webhook's unrenamed subscription writes reach the repository unchanged" */
     it("passes each call through to the repository unchanged", async () => {
-      const { adapter, subscriptions } = compose();
+      const cancel = vi.fn(() => Promise.resolve());
+      const cancelTrialSubscriptions = vi.fn(() => Promise.resolve());
+      const recordPaymentFailure = vi.fn(() => Promise.resolve());
+      const linkStripeId = vi.fn(() => Promise.resolve({ count: 1 }));
+      const { adapter } = compose({
+        repository: repositoryDouble({
+          cancel,
+          cancelTrialSubscriptions,
+          recordPaymentFailure,
+          linkStripeId,
+        }),
+      });
 
       await adapter.cancel({ id: "subscription-1" });
       await adapter.cancelTrialSubscriptions("organization-1");
       await adapter.recordPaymentFailure({ id: "subscription-1", currentStatus: "ACTIVE" });
       await adapter.linkStripeId({ id: "subscription-1", stripeSubscriptionId: "sub_1" });
 
-      expect(subscriptions.cancel).toHaveBeenCalledWith({ id: "subscription-1" });
-      expect(subscriptions.cancelTrialSubscriptions).toHaveBeenCalledWith("organization-1");
-      expect(subscriptions.recordPaymentFailure).toHaveBeenCalledWith({
+      expect(cancel).toHaveBeenCalledWith({ id: "subscription-1" });
+      expect(cancelTrialSubscriptions).toHaveBeenCalledWith("organization-1");
+      expect(recordPaymentFailure).toHaveBeenCalledWith({
         id: "subscription-1",
         currentStatus: "ACTIVE",
       });
-      expect(subscriptions.linkStripeId).toHaveBeenCalledWith({
+      expect(linkStripeId).toHaveBeenCalledWith({
         id: "subscription-1",
         stripeSubscriptionId: "sub_1",
       });

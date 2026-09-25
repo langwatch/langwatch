@@ -246,17 +246,8 @@ function SortableHeader({
         cursor="pointer"
         onClick={() => onSort(col)}
         userSelect="none"
-        role="button"
-        tabIndex={0}
+        as="button"
         aria-label={`Sort by ${label}`}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            // Space scrolls the page by default; a control that responds to it
-            // has to say so.
-            e.preventDefault();
-            onSort(col);
-          }
-        }}
         _focusVisible={{ outline: "2px solid", outlineColor: "blue.focusRing" }}
       >
         <Text>{label}</Text>

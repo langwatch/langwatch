@@ -259,7 +259,7 @@ export function BatchEvaluationV2RunList({
               paddingY={size === "sm" ? 2 : 3}
               width="100%"
               cursor="pointer"
-              role="button"
+              as="button"
               background="gray.200"
               _hover={{
                 background: "gray.100",
@@ -290,7 +290,7 @@ export function BatchEvaluationV2RunList({
                 paddingY={size === "sm" ? 2 : 3}
                 width="100%"
                 cursor="pointer"
-                role="button"
+                as="button"
                 background={selectedRun?.runId === run.runId ? "gray.200" : "none"}
                 _hover={{
                   background: selectedRun?.runId === run.runId ? "gray.200" : "gray.100",

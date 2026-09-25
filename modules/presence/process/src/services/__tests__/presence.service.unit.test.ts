@@ -21,7 +21,7 @@ class StubRepository extends PresenceRepository {
   current: PresenceSession | undefined;
   upsert = vi.fn(async () => undefined);
   remove = vi.fn(async () => true);
-  listByProject = vi.fn(async () => (this.current ? [this.current] : []));
+  findByProject = vi.fn(async () => (this.current ? [this.current] : []));
   findSession = vi.fn(async () => this.current);
 }
 

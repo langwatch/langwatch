@@ -239,7 +239,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
     );
   }
 
-  async findPage(
+  async listPage(
     input: ExperimentRunPageInput,
   ): Promise<{ runs: ExperimentRun[]; totalHits: number }> {
     return this.options.telemetry.trace(

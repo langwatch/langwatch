@@ -77,7 +77,7 @@ describe("given the memory-backed presence repositories", () => {
         300,
       );
 
-      const sessions = await repositories.sessions.listByProject(PROJECT_ID);
+      const sessions = await repositories.sessions.findByProject(PROJECT_ID);
 
       expect(sessions).toHaveLength(2);
       expect(sessions.map((s) => s.sessionId)).toEqual(

@@ -46,7 +46,7 @@ export class RedisPresenceRepository extends PresenceRepository {
     return raw ? this.parse(raw) : undefined;
   }
 
-  async listByProject(projectId: string): Promise<PresenceSession[]> {
+  async findByProject(projectId: string): Promise<PresenceSession[]> {
     const keys = await this.scanProjectKeys(projectId);
     if (keys.length === 0) return [];
     const values = await this.redis.mget(...keys);

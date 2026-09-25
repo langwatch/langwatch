@@ -116,13 +116,8 @@ class RedisReplayAdapter implements ReplayRedis {
     if (args.length === 0) return this.redis.scan(cursor);
     const pattern = args[1];
     const count = args[3];
-    if (
-      args.length === 4 &&
-      args[0] === "MATCH" &&
-      args[2] === "COUNT" &&
-      typeof pattern === "string" &&
-      typeof count === "number"
-    ) {
+    const isMatchCount = args.length === 4 && args[0] === "MATCH" && args[2] === "COUNT";
+    if (isMatchCount && typeof pattern === "string" && typeof count === "number") {
       return this.redis.scan(cursor, "MATCH", pattern, "COUNT", count);
     }
     throw new Error("unsupported replay scan");

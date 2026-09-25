@@ -15,17 +15,12 @@ describe("dataset attachment upload policy", () => {
     describe("when the size is checked", () => {
       /** @scenario "A file over the size limit is refused with a clear error" */
       it("refuses it and names the largest size accepted", () => {
-        try {
-          assertDatasetAttachmentWithinLimit(DATASET_ATTACHMENT_MAX_BYTES + 1);
-          expect.unreachable("the oversized file was accepted");
-        } catch (error) {
-          const handled = error as {
-            code: string;
-            meta: Record<string, unknown>;
-          };
-          expect(handled.code).toBe("dataset_attachment_too_large");
-          expect(handled.meta.maxBytes).toBe(DATASET_ATTACHMENT_MAX_BYTES);
-        }
+        expect(() => assertDatasetAttachmentWithinLimit(DATASET_ATTACHMENT_MAX_BYTES + 1)).toThrow(
+          expect.objectContaining({
+            code: "dataset_attachment_too_large",
+            meta: expect.objectContaining({ maxBytes: DATASET_ATTACHMENT_MAX_BYTES }),
+          }),
+        );
       });
     });
   });
@@ -50,12 +45,9 @@ describe("dataset attachment upload policy", () => {
         "text/javascript",
       ])("refuses %s", (mediaType) => {
         expect(isRefusedAttachmentMediaType(mediaType)).toBe(true);
-        try {
-          assertDatasetAttachmentMediaTypeAllowed(mediaType);
-          expect.unreachable("the refused media type was accepted");
-        } catch (error) {
-          expect((error as { code: string }).code).toBe("dataset_attachment_type_refused");
-        }
+        expect(() => assertDatasetAttachmentMediaTypeAllowed(mediaType)).toThrow(
+          expect.objectContaining({ code: "dataset_attachment_type_refused" }),
+        );
       });
     });
 

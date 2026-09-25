@@ -33,7 +33,7 @@ function SpanTreeNode({ span, depth }: { span: SpanConfig; depth: number }) {
         color={isSelected ? "orange.400" : "fg.default"}
         _hover={{ bg: isSelected ? "orange.500/10" : "bg.subtle" }}
         onClick={() => selectSpan(span.id)}
-        role="group"
+        className="group"
       >
         <Text as="span" flexShrink={0} fontSize="sm">
           {SPAN_TYPE_ICONS[span.type]}

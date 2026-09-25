@@ -55,7 +55,7 @@ export function EditingModeTitle({
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
-        <HStack gap={1} cursor="pointer" role="button" _hover={{ opacity: 0.8 }}>
+        <HStack as="button" gap={1} cursor="pointer" _hover={{ opacity: 0.8 }}>
           <PropertySectionTitle padding={0} paddingY={1}>
             {mode === "prompt" ? "Prompt" : "Messages"}
           </PropertySectionTitle>

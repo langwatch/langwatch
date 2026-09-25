@@ -1852,8 +1852,8 @@ export class QueueRedisRepository extends QueueRepository {
         const msg = errorHash?.message ?? "Unknown error";
         const pName = groupPipelines.get(groupId) ?? "unknown";
 
-        if (params.errorFilter && !msg.toLowerCase().includes(params.errorFilter.toLowerCase()))
-          continue;
+        const errorNeedle = params.errorFilter?.toLowerCase();
+        if (errorNeedle && !msg.toLowerCase().includes(errorNeedle)) continue;
         if (params.pipelineFilter && pName !== params.pipelineFilter) continue;
 
         totalAffected++;
@@ -2384,8 +2384,8 @@ export class QueueRedisRepository extends QueueRepository {
     return params.members.filter((groupId, i) => {
       if (params.errorFilter) {
         const errorHash = filterResults?.[i * 2]?.[1] as Record<string, string> | null;
-        const msg = errorHash?.message ?? "";
-        if (!msg.toLowerCase().includes(params.errorFilter.toLowerCase())) return false;
+        const msg = (errorHash?.message ?? "").toLowerCase();
+        if (!msg.includes(params.errorFilter.toLowerCase())) return false;
       }
       if (params.pipelineFilter) {
         const fetchIdx = jobDataMap.get(groupId);
@@ -2428,8 +2428,8 @@ export class QueueRedisRepository extends QueueRepository {
     return params.members.filter((groupId, i) => {
       if (params.errorFilter) {
         const errorHash = filterResults?.[i * 2]?.[1] as Record<string, string> | null;
-        const msg = errorHash?.message ?? "";
-        if (!msg.toLowerCase().includes(params.errorFilter.toLowerCase())) return false;
+        const msg = (errorHash?.message ?? "").toLowerCase();
+        if (!msg.includes(params.errorFilter.toLowerCase())) return false;
       }
       if (params.pipelineFilter) {
         const fetchIdx = jobDataMap.get(groupId);

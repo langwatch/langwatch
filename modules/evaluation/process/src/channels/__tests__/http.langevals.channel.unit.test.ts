@@ -91,7 +91,7 @@ describe("given a deployment that parks payloads over a threshold", () => {
       expect(fetchCalls).toHaveLength(1);
       const init = fetchCalls[0]!.init!;
       expect(init.method).toBe("POST");
-      expect(String(init.body)).toBe(JSON.stringify({ small: "payload" }));
+      expect(init.body).toEqual(Buffer.from(JSON.stringify({ small: "payload" })));
       expect(headersOf(0)["content-type"]).toBe("application/json");
       expect(headersOf(0)[STAGED_PAYLOAD_HEADER.toLowerCase()]).toBeUndefined();
     });

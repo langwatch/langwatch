@@ -445,7 +445,7 @@ export function DSPyExperimentRunList({
               paddingY={size === "sm" ? 2 : 4}
               width="100%"
               cursor="pointer"
-              role="button"
+              as="button"
               opacity={!selectedRuns || selectedRuns.includes(run.runId) ? 1 : 0.5}
               background={selectedRuns?.includes(run.runId) ? "gray.200" : "none"}
               _hover={{

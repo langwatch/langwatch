@@ -7,10 +7,7 @@ import { ApiKeyApi, type ApiKeyApi as ApiKeyApiContract } from "@langwatch/api-k
  * Operator back office application: holds every capability the feature api reaches, and centralizes
  * rules the transport was deciding separately.
  */
-import {
-  AuditLogApi,
-  type RecordAuditLogCommand,
-} from "@langwatch/audit-log-contract";
+import { AuditLogApi, type RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contract";
 import { AutomationApi } from "@langwatch/automation-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
@@ -1924,7 +1921,8 @@ export class OpsApp implements OpsApi {
    */
   private requireRegisteredFlag(key: string): void {
     if (listFeatureFlags().some((flag) => flag.key === key)) return;
-    if (this.#dependencies.eventingIntrospection.killSwitches().some((d) => d.key === key)) return;
+    const killSwitches = this.#dependencies.eventingIntrospection.killSwitches();
+    if (killSwitches.some((d) => d.key === key)) return;
     throw new OpsUnknownFeatureFlagError(key);
   }
 }
