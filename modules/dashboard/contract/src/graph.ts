@@ -55,7 +55,7 @@ export type GraphLayout = z.infer<typeof graphLayoutSchema>;
 
 export const graphRestListQuerySchema = z.object({ dashboardId: z.string().optional() });
 
-export const graphRestParamsSchema = z.object({ graphId: z.string().min(1) });
+export const graphRestParamsSchema = z.object({ id: z.string().min(1) });
 
 export const graphRestCreateSchema = z.object({
   name: z.string().min(1, "name is required"),

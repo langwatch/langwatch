@@ -84,7 +84,7 @@ export const dashboardRest: Readonly<{
     app.reorder({ projectId: scope.id, dashboardIds: input.dashboardIds }),
   )
 
-  .get("/:dashboardId", "getApiDashboardsById")
+  .get("/:id", "getApiDashboardsById")
   .withParams(dashboardRestParamsSchema)
   .withPermission("analytics:view")
   .withOutput(dashboardDetailResponseSchema)
@@ -93,12 +93,12 @@ export const dashboardRest: Readonly<{
     description: "Get a dashboard by its id, including its graphs",
   })
   .handle(async ({ app, input, scope }) => {
-    const found = await app.getById({ projectId: scope.id, dashboardId: input.dashboardId });
+    const found = await app.getById({ projectId: scope.id, dashboardId: input.id });
 
     return { ...(await withLink(app, scope.id, found)), graphs: found.graphs };
   })
 
-  .patch("/:dashboardId", "patchApiDashboardsById")
+  .patch("/:id", "patchApiDashboardsById")
   .withParams(dashboardRestParamsSchema)
   .withInput(dashboardRestNameSchema)
   .withPermission("analytics:update")
@@ -107,7 +107,7 @@ export const dashboardRest: Readonly<{
   .handle(async ({ app, input, scope }) => {
     const renamed = await app.rename({
       projectId: scope.id,
-      dashboardId: input.dashboardId,
+      dashboardId: input.id,
       name: input.name,
     });
 
@@ -115,7 +115,7 @@ export const dashboardRest: Readonly<{
   })
 
   // Hard delete with cascade — deliberately stays at `:manage`.
-  .delete("/:dashboardId", "deleteApiDashboardsById")
+  .delete("/:id", "deleteApiDashboardsById")
   .withParams(dashboardRestParamsSchema)
   .withPermission("analytics:manage")
   .withOutput(dashboardDeletedResponseSchema)
@@ -124,7 +124,7 @@ export const dashboardRest: Readonly<{
     description: "Delete a dashboard and its graphs (hard delete, cascade)",
   })
   .handle(async ({ app, input, scope }) => {
-    const deleted = await app.delete({ projectId: scope.id, dashboardId: input.dashboardId });
+    const deleted = await app.delete({ projectId: scope.id, dashboardId: input.id });
 
     return { id: deleted.id, name: deleted.name };
   })

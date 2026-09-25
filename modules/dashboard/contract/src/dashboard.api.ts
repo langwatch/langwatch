@@ -109,6 +109,17 @@ export interface DashboardApi {
     dashboardId: string;
   }): Promise<DashboardWidget>;
   deleteDashboardWidget(input: { projectId: string; id: string }): Promise<void>;
+  /** Moves or resizes one widget; an id naming no widget here changes nothing. */
+  updateDashboardWidgetLayout(input: {
+    projectId: string;
+    graphId: string;
+    layout: GraphLayout;
+  }): Promise<{ success: true }>;
+  /** Moves or resizes several widgets together; ids naming no widget here change nothing. */
+  batchUpdateDashboardWidgetLayouts(input: {
+    projectId: string;
+    layouts: { graphId: string; layout: GraphLayout }[];
+  }): Promise<{ success: true }>;
   /** The deep link back to the dashboards list for a playground widget. */
   dashboardWidgetPlatformUrl(input: { projectSlug: string }): string;
 

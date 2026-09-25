@@ -14,6 +14,7 @@ import type {
   CreateDashboardWidgetInput,
   UpdateDashboardWidgetInput,
   AssignDashboardWidgetInput,
+  DashboardWidgetLayoutsInput,
 } from "#repositories/dashboard-widget.repository";
 
 /** Every widget operation first asks analytics whether the project may use the playground. */
@@ -67,6 +68,11 @@ export class DashboardWidgetService {
   async deleteWidget(input: DashboardWidgetScope): Promise<void> {
     await this.#assertEnabled(input);
     return this.#repository.deleteWidget(input);
+  }
+
+  async updateLayouts(input: DashboardWidgetLayoutsInput): Promise<void> {
+    await this.#assertEnabled(input);
+    await this.#repository.updateLayouts(input);
   }
 
   #assertEnabled({ projectId }: { projectId: string }): Promise<void> {

@@ -58,13 +58,13 @@ export const graphRest: Readonly<{
     return graphs.map((graph) => graphResponse(graph));
   })
 
-  .get("/:graphId", "getApiGraphsById")
+  .get("/:id", "getApiGraphsById")
   .withParams(graphRestParamsSchema)
   .withPermission("analytics:view")
   .withOutput(graphRestResponseSchema)
   .withDocs({ tags: ["Graphs"], description: "Get a custom graph by its ID" })
   .handle(async ({ app, input, scope }) =>
-    graphResponse(await app.getGraph({ projectId: scope.id, graphId: input.graphId })),
+    graphResponse(await app.getGraph({ projectId: scope.id, graphId: input.id })),
   )
 
   // Creating asks for `analytics:create`; `:manage` still implies it.
@@ -92,7 +92,7 @@ export const graphRest: Readonly<{
     ),
   )
 
-  .patch("/:graphId", "patchApiGraphsById")
+  .patch("/:id", "patchApiGraphsById")
   .withParams(graphRestParamsSchema)
   .withInput(graphRestUpdateSchema)
   .withPermission("analytics:update")
@@ -105,7 +105,7 @@ export const graphRest: Readonly<{
     graphResponse(
       await app.updateGraph({
         projectId: scope.id,
-        graphId: input.graphId,
+        graphId: input.id,
         ...(input.name === undefined ? {} : { name: input.name }),
         ...(input.graph === undefined ? {} : { graph: input.graph }),
         ...(input.filters === undefined ? {} : { filters: input.filters }),
@@ -114,14 +114,14 @@ export const graphRest: Readonly<{
   )
 
   // Destruction deliberately stays at `:manage`.
-  .delete("/:graphId", "deleteApiGraphsById")
+  .delete("/:id", "deleteApiGraphsById")
   .withParams(graphRestParamsSchema)
   .withPermission("analytics:manage")
   .withOutput(graphDeletedResponseSchema)
   .withDocs({ tags: ["Graphs"], description: "Delete a custom graph" })
   .handle(async ({ app, input, scope }) => {
-    await app.deleteGraph({ projectId: scope.id, graphId: input.graphId });
+    await app.deleteGraph({ projectId: scope.id, graphId: input.id });
 
-    return { id: input.graphId, deleted: true };
+    return { id: input.id, deleted: true };
   })
   .build();

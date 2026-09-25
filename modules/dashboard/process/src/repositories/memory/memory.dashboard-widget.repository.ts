@@ -16,6 +16,7 @@ import { nowInstant } from "@langwatch/time";
 import type {
   AssignDashboardWidgetInput,
   CreateDashboardWidgetInput,
+  DashboardWidgetLayoutsInput,
   DashboardWidgetRepository,
   DashboardWidgetRow,
   DashboardWidgetScope,
@@ -112,6 +113,21 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
     this.#replace(updated);
 
     return this.#copy(updated);
+  }
+
+  async updateLayouts({ projectId, layouts }: DashboardWidgetLayoutsInput): Promise<void> {
+    for (const { graphId, layout } of layouts) {
+      const current = this.#rows.find((row) => row.id === graphId && row.projectId === projectId);
+      if (current === undefined) continue;
+      this.#replace({
+        ...current,
+        gridColumn: layout.gridColumn,
+        gridRow: layout.gridRow,
+        colSpan: layout.colSpan,
+        rowSpan: layout.rowSpan,
+        updatedAt: nowInstant(),
+      });
+    }
   }
 
   #require(input: DashboardWidgetScope): DashboardWidgetRow {

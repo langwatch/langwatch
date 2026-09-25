@@ -24,6 +24,7 @@ import type { CustomGraph, Prisma } from "@langwatch/prisma-client/generated";
 import { fromDate } from "@langwatch/time";
 
 import type {
+  DashboardWidgetLayoutsInput,
   DashboardWidgetRepository,
   DashboardWidgetRow,
 } from "../dashboard-widget.repository.ts";
@@ -241,6 +242,23 @@ export class PrismaDashboardWidgetRepository
       if (result.count === 0) throw new DashboardWidgetNotFoundError();
     });
     return this.getById({ id, projectId });
+  }
+
+  /** Kind-scoped `updateMany` per widget in one transaction; a miss updates nothing. */
+  async updateLayouts({ projectId, layouts }: DashboardWidgetLayoutsInput): Promise<void> {
+    await this.transaction(async (tx) => {
+      for (const { graphId, layout } of layouts) {
+        await tx.customGraph.updateMany({
+          where: { id: graphId, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
+          data: {
+            gridColumn: layout.gridColumn,
+            gridRow: layout.gridRow,
+            colSpan: layout.colSpan,
+            rowSpan: layout.rowSpan,
+          },
+        });
+      }
+    });
   }
 
   #present(row: CustomGraph): DashboardWidgetRow {

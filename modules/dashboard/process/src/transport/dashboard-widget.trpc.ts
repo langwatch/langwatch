@@ -62,6 +62,28 @@ export const dashboardWidgetTrpcTransport = defineTrpcRouter(DashboardApi, dashb
     return { success: true as const };
   })
 
+  .procedure("updateLayout")
+  .withPermission("analytics:update")
+  .handle(async ({ app, input: { projectId, graphId, gridColumn, gridRow, colSpan, rowSpan } }) =>
+    app.updateDashboardWidgetLayout({
+      projectId,
+      graphId,
+      layout: { gridColumn, gridRow, colSpan, rowSpan },
+    }),
+  )
+
+  .procedure("batchUpdateLayouts")
+  .withPermission("analytics:update")
+  .handle(async ({ app, input }) =>
+    app.batchUpdateDashboardWidgetLayouts({
+      projectId: input.projectId,
+      layouts: input.layouts.map(({ graphId, gridColumn, gridRow, colSpan, rowSpan }) => ({
+        graphId,
+        layout: { gridColumn, gridRow, colSpan, rowSpan },
+      })),
+    }),
+  )
+
   .procedure("assignDashboard")
   .withPermission("analytics:update")
   .handle(async ({ app, input }) => {

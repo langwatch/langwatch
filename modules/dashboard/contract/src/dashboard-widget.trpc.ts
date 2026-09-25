@@ -5,6 +5,10 @@
  */
 import { DASHBOARD_SRCDOC_CHART_KIND } from "@langwatch/analytics-contract";
 import {
+  chartGridPlacementSchema,
+  fitsChartGridWidth,
+} from "@langwatch/analytics-contract/chart-grid";
+import {
   dashboardWidgetCodeSchema,
   dashboardWidgetDefinitionSchema,
   dashboardWidgetNameSchema,
@@ -14,6 +18,16 @@ import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
 const projectScopeSchema = z.object({ projectId: z.string() });
+
+const fitsGridWidth = {
+  message: "gridColumn + colSpan must not exceed the grid's columns",
+  path: ["colSpan"],
+};
+
+const dashboardWidgetLayoutSchema = chartGridPlacementSchema.refine(
+  fitsChartGridWidth,
+  fitsGridWidth,
+);
 
 const placementShape = {
   dashboardId: z.string().nullable(),
@@ -74,6 +88,27 @@ export const dashboardWidgetTrpc = defineTrpcContract("dashboardWidgets")
       name: dashboardWidgetNameSchema.optional(),
       code: dashboardWidgetCodeSchema,
       queries: dashboardWidgetQueriesSchema,
+    }),
+  )
+  .withOutput(dashboardWidgetTrpcSuccessSchema)
+
+  .mutation("updateLayout")
+  .withInput(
+    z
+      .object({
+        ...chartGridPlacementSchema.shape,
+        ...projectScopeSchema.shape,
+        graphId: z.string(),
+      })
+      .refine(fitsChartGridWidth, fitsGridWidth),
+  )
+  .withOutput(dashboardWidgetTrpcSuccessSchema)
+
+  .mutation("batchUpdateLayouts")
+  .withInput(
+    z.object({
+      ...projectScopeSchema.shape,
+      layouts: z.array(z.object({ graphId: z.string() }).and(dashboardWidgetLayoutSchema)),
     }),
   )
   .withOutput(dashboardWidgetTrpcSuccessSchema)

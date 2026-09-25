@@ -71,7 +71,7 @@ function mounted(app: DashboardApi) {
 
 describe("the dashboard widgets tRPC namespace", () => {
   describe("when the process root composes it", () => {
-    it("serves list, create, update, assignDashboard and delete under dashboardWidgets with main's permissions", () => {
+    it("serves list, create, update, updateLayout, batchUpdateLayouts, assignDashboard and delete under dashboardWidgets with main's permissions", () => {
       const { requests } = mounted(createDashboardTestApp());
 
       expect(
@@ -84,6 +84,8 @@ describe("the dashboard widgets tRPC namespace", () => {
         ["dashboardWidgets.list", "query", "analytics:view"],
         ["dashboardWidgets.create", "mutation", "analytics:create"],
         ["dashboardWidgets.update", "mutation", "analytics:update"],
+        ["dashboardWidgets.updateLayout", "mutation", "analytics:update"],
+        ["dashboardWidgets.batchUpdateLayouts", "mutation", "analytics:update"],
         ["dashboardWidgets.assignDashboard", "mutation", "analytics:update"],
         ["dashboardWidgets.delete", "mutation", "analytics:delete"],
       ]);
@@ -142,6 +144,60 @@ describe("the dashboard widgets tRPC namespace", () => {
     });
   });
 
+  describe("when the grid moves or resizes widgets", () => {
+    const LAYOUT = { gridColumn: 2, gridRow: 5, colSpan: 3, rowSpan: 4 };
+
+    it("stores one widget's new placement and answers success, as main did", async () => {
+      const { call } = mounted(createDashboardTestApp());
+      const created = dashboardWidgetTrpcSchema.parse(await call("create", WIDGET));
+
+      await expect(
+        call("updateLayout", { projectId: PROJECT_ID, graphId: created.id, ...LAYOUT }),
+      ).resolves.toEqual({ success: true });
+      await expect(call("list", { projectId: PROJECT_ID })).resolves.toEqual([
+        expect.objectContaining({ id: created.id, ...LAYOUT }),
+      ]);
+    });
+
+    it("stores every placement in a batch and answers success, as main did", async () => {
+      const { call } = mounted(createDashboardTestApp());
+      const first = dashboardWidgetTrpcSchema.parse(await call("create", WIDGET));
+      const second = dashboardWidgetTrpcSchema.parse(await call("create", WIDGET));
+
+      await expect(
+        call("batchUpdateLayouts", {
+          projectId: PROJECT_ID,
+          layouts: [
+            { graphId: first.id, ...LAYOUT, gridRow: 10 },
+            { graphId: second.id, ...LAYOUT, gridRow: 0 },
+          ],
+        }),
+      ).resolves.toEqual({ success: true });
+      await expect(call("list", { projectId: PROJECT_ID })).resolves.toEqual([
+        expect.objectContaining({ id: second.id, ...LAYOUT, gridRow: 0 }),
+        expect.objectContaining({ id: first.id, ...LAYOUT, gridRow: 10 }),
+      ]);
+    });
+
+    it("answers success for an id naming no widget and changes nothing, as main did", async () => {
+      const { call } = mounted(createDashboardTestApp());
+      const created = dashboardWidgetTrpcSchema.parse(await call("create", WIDGET));
+
+      await expect(
+        call("updateLayout", { projectId: PROJECT_ID, graphId: "widget-missing", ...LAYOUT }),
+      ).resolves.toEqual({ success: true });
+      await expect(
+        call("batchUpdateLayouts", {
+          projectId: PROJECT_ID,
+          layouts: [{ graphId: "widget-missing", ...LAYOUT }],
+        }),
+      ).resolves.toEqual({ success: true });
+      await expect(call("list", { projectId: PROJECT_ID })).resolves.toEqual([
+        expect.objectContaining({ id: created.id, gridColumn: created.gridColumn }),
+      ]);
+    });
+  });
+
   describe("when the delete mutation removes a widget", () => {
     it("answers success, as main did, and the widget is gone from the list", async () => {
       const { call } = mounted(createDashboardTestApp());
@@ -168,6 +224,12 @@ describe("the dashboard widgets tRPC namespace", () => {
       await expect(call("list", { projectId: PROJECT_ID })).rejects.toMatchObject({ code });
       await expect(call("create", WIDGET)).rejects.toMatchObject({ code });
       await expect(call("update", { ...WIDGET, id: "widget-1" })).rejects.toMatchObject({ code });
+      await expect(
+        call("updateLayout", { projectId: PROJECT_ID, graphId: "widget-1", gridColumn: 0 }),
+      ).rejects.toMatchObject({ code });
+      await expect(
+        call("batchUpdateLayouts", { projectId: PROJECT_ID, layouts: [] }),
+      ).rejects.toMatchObject({ code });
       await expect(
         call("assignDashboard", { projectId: PROJECT_ID, id: "widget-1", dashboardId: "d" }),
       ).rejects.toMatchObject({ code });

@@ -371,6 +371,28 @@ export class DashboardApp implements DashboardApi {
     return this.#widgets.deleteWidget(input);
   }
 
+  /** Moves or resizes one widget; an id naming no widget here changes nothing. */
+  async updateDashboardWidgetLayout(input: {
+    projectId: string;
+    graphId: string;
+    layout: GraphLayout;
+  }): Promise<{ success: true }> {
+    await this.#widgets.updateLayouts({
+      projectId: input.projectId,
+      layouts: [{ graphId: input.graphId, layout: input.layout }],
+    });
+    return { success: true };
+  }
+
+  /** Moves or resizes several widgets together; ids naming no widget here change nothing. */
+  async batchUpdateDashboardWidgetLayouts(input: {
+    projectId: string;
+    layouts: { graphId: string; layout: GraphLayout }[];
+  }): Promise<{ success: true }> {
+    await this.#widgets.updateLayouts(input);
+    return { success: true };
+  }
+
   /** Where a reader opens the dashboards list a widget lands on. */
   dashboardWidgetPlatformUrl(input: { projectSlug: string }): string {
     return dashboardPlatformUrl({
