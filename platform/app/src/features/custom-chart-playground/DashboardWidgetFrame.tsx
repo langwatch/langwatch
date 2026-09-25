@@ -48,6 +48,14 @@ export interface DashboardWidgetFrameProps {
   readonly widgetName?: string;
 }
 
+function WidgetDefinitionUnreadableNotice() {
+  return (
+    <Text fontSize="13px" color="fg.muted" padding={4}>
+      This widget&apos;s definition could not be read.
+    </Text>
+  );
+}
+
 export function DashboardWidgetFrame({
   id,
   graph,
@@ -126,11 +134,7 @@ export function DashboardWidgetFrame({
   });
 
   if (!parsed.success) {
-    return (
-      <Text fontSize="13px" color="fg.muted" padding={4}>
-        This widget&apos;s definition could not be read.
-      </Text>
-    );
+    return <WidgetDefinitionUnreadableNotice />;
   }
 
   return (
