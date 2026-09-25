@@ -4,7 +4,6 @@ export { automationServer } from "./automation.server.ts";
 export {
   createAutomationCustomGraphs,
   createAutomationGraphTriggerSent,
-  createAutomationSettlementLedger,
   createAutomationTraceTriggerCatalogue,
   createAutomationTriggers,
   createAutomationWebhookDeliveries,
@@ -161,7 +160,6 @@ export {
   AutomationSettlementBreach,
   type AutomationSettlementPersistCap,
 } from "./repositories/automation-settlement-ledger.repository.ts";
-export { type AutomationSettlementLedgerDatabase } from "./repositories/prisma/prisma.automation-settlement-ledger.repository.ts";
 export { AutomationSettlementDispatchService } from "./services/trigger-settlement-dispatch.service.ts";
 export {
   GraphTriggerHeartbeatService,
@@ -280,7 +278,7 @@ export {
   type AutomationReportCalendarDatabase,
   type AutomationRunawayCollaborator,
   type AutomationSettlement,
-  type AutomationSettlementDatabase,
+  type AutomationSettlementRepositories,
 } from "./automation.server.ts";
 /** The ledger a late-built containment collaborator filters its notice through. */
 export type { AutomationSettlementLedgerService } from "./services/automation-settlement-ledger.service.ts";

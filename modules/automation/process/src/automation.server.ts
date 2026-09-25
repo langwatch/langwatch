@@ -26,11 +26,9 @@ import { automationsEventing } from "./eventing/automations.pipeline.ts";
 import type { AutomationEmailCapRepository } from "./repositories/automation-email-cap.repository.ts";
 import { automationRepositories } from "./repositories/automation-repositories.registry.ts";
 import type { AutomationScheduledJobRepository } from "./repositories/automation-scheduled-job.repository.ts";
-import type { AutomationSettlementLedgerRepository } from "./repositories/automation-settlement-ledger.repository.ts";
 import type { AutomationTraceTriggerCatalogueRepository } from "./repositories/automation-trace-trigger-catalogue.repository.ts";
 import type { CustomGraphRepository } from "./repositories/custom-graph.repository.ts";
 import type { GraphTriggerSentRepository } from "./repositories/graph-trigger-sent.repository.ts";
-import { PrismaAutomationSettlementLedgerRepository } from "./repositories/prisma/prisma.automation-settlement-ledger.repository.ts";
 import type { AutomationTraceTriggerCatalogueDatabase } from "./repositories/prisma/prisma.automation-trace-trigger-catalogue.repository.ts";
 import { PrismaAutomationTraceTriggerCatalogueRepository } from "./repositories/prisma/prisma.automation-trace-trigger-catalogue.repository.ts";
 import {
@@ -310,7 +308,7 @@ export {
   type AutomationPersistCeiling,
   type AutomationRunawayCollaborator,
   type AutomationSettlement,
-  type AutomationSettlementDatabase,
+  type AutomationSettlementRepositories,
 } from "./app/automation-composition.build.ts";
 
 /**
@@ -342,13 +340,6 @@ export function createAutomationWebhookDeliveries(
 /** The custom graphs a report schedule renders from. */
 export function createAutomationCustomGraphs(database: CustomGraphDatabase): CustomGraphRepository {
   return PrismaCustomGraphRepository.create(database);
-}
-
-/** The settlement ledger, over the daily ceiling this deployment enforces. */
-export function createAutomationSettlementLedger(
-  options: Parameters<typeof PrismaAutomationSettlementLedgerRepository.create>[0],
-): AutomationSettlementLedgerRepository {
-  return PrismaAutomationSettlementLedgerRepository.create(options);
 }
 
 /** The trace triggers an ingested trace is matched against. */

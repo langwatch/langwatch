@@ -57,28 +57,12 @@ import type {
   AutomationSettlementTraceRepository,
 } from "../repositories/automation-settlement-read.repository.ts";
 import type { AutomationRepositories } from "../repositories/automation.repositories.ts";
-import {
-  PrismaAutomationSettlementLedgerRepository,
-  type AutomationSettlementLedgerDatabase,
-} from "../repositories/prisma/prisma.automation-settlement-ledger.repository.ts";
-import {
-  PrismaGraphTriggerSentRepository,
-  type GraphTriggerSentDatabase,
-} from "../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
-import {
-  PrismaTriggerRepository,
-  type TriggerDatabase,
-} from "../repositories/prisma/prisma.trigger.repository.ts";
-import {
-  PrismaWebhookDeliveryRepository,
-  type WebhookDeliveryDatabase,
-} from "../repositories/prisma/prisma.webhook-delivery.repository.ts";
 import { RedisAutomationEmailCapRepository } from "../repositories/redis/redis.automation-email-cap.repository.ts";
 import { RedisAutomationPersistCapRepository } from "../repositories/redis/redis.automation-persist-cap.repository.ts";
 import { AutomationGraphDeliveryService } from "../services/automation-graph-delivery.service.ts";
 import { AutomationNotificationDeliveryService } from "../services/automation-notification-delivery.service.ts";
 import { AutomationProviderRegistryService } from "../services/automation-provider-registry.service.ts";
-import type { AutomationSettlementLedgerService } from "../services/automation-settlement-ledger.service.ts";
+import { AutomationSettlementLedgerService } from "../services/automation-settlement-ledger.service.ts";
 import {
   AutomationSettlementMatchConfirmationService,
   type AutomationSettlementEvaluationFilters,
@@ -612,11 +596,11 @@ class AuditLogAutomationAuditSink implements AutomationAuditSink {
   }
 }
 
-/** Every table this feature's settlement half reads or writes. */
-export type AutomationSettlementDatabase = AutomationSettlementLedgerDatabase &
-  TriggerDatabase &
-  GraphTriggerSentDatabase &
-  WebhookDeliveryDatabase;
+/** Every repository this feature's settlement half reads or writes, from the module's registry. */
+export type AutomationSettlementRepositories = Pick<
+  AutomationRepositories,
+  "triggers" | "suppressions" | "webhookDeliveries" | "graphTriggerSent"
+>;
 
 /**
  * Where the daily persist ceiling comes from: a number this deployment stated,
@@ -654,8 +638,7 @@ export type AutomationSettlement = Readonly<{
  * collaborator arrives as a callback, keeping that table to one reader.
  */
 export function createAutomationSettlement(input: {
-  /** The one database client the composing process opened. */
-  prisma: AutomationSettlementDatabase;
+  repositories: AutomationSettlementRepositories;
   clock: AutomationClock;
   /** Where the daily ceiling counts: a Redis one counts fleet-wide. */
   persistCapSlots: AutomationPersistCapRepository;
@@ -700,7 +683,7 @@ export function createAutomationSettlement(input: {
     | ((suppression: AutomationSettlementLedgerService) => AutomationRunawayCollaborator)
     | undefined;
 }): AutomationSettlement {
-  const { prisma, clock } = input;
+  const { repositories, clock } = input;
   // The ceiling's tier, resolved through this feature's own cap service so that
   // the hop from project to organization, the contract override and the
   // ten-minute cache are the ones the interactive process uses. Only the
@@ -721,8 +704,10 @@ export function createAutomationSettlement(input: {
       : undefined;
 
   let containment: RunawayContainmentService | undefined;
-  const ledger = PrismaAutomationSettlementLedgerRepository.create({
-    prisma,
+  const ledger = AutomationSettlementLedgerService.create({
+    triggers: repositories.triggers,
+    suppressions: repositories.suppressions,
+    webhookDeliveries: repositories.webhookDeliveries,
     clock,
     persistCaps: input.persistCapSlots,
     persistCap: persistCaps
@@ -735,7 +720,7 @@ export function createAutomationSettlement(input: {
   if (createRunaway) {
     containment = RunawayContainmentService.create({
       runaway: createRunaway(ledger),
-      triggers: PrismaTriggerRepository.create(prisma, clock),
+      triggers: repositories.triggers,
       clock,
     });
   }
@@ -770,12 +755,12 @@ export function createAutomationSettlement(input: {
     }),
     scheduledIntents: new ComposedScheduledIntents(
       GraphTriggerHeartbeatService.create({
-        triggers: PrismaTriggerRepository.create(prisma, clock),
-        triggerSent: PrismaGraphTriggerSentRepository.create(prisma),
+        triggers: repositories.triggers,
+        triggerSent: repositories.graphTriggerSent,
         analytics: input.analytics,
         logger: input.logger,
       }),
-      PrismaWebhookDeliveryRepository.create(prisma),
+      repositories.webhookDeliveries,
       input.graphActivity,
     ),
   };

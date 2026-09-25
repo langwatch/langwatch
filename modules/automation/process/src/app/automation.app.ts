@@ -344,7 +344,7 @@ export class AutomationApp implements AutomationApi {
     const { members, dependencies, config } = setup;
     const logger = infrastructure.logger;
     return createAutomationSettlement({
-      prisma: members.prisma,
+      repositories: setup.repositories,
       clock: infrastructure.clock,
       persistCapSlots: infrastructure.persistCaps,
       projects: dependencies.projects,
