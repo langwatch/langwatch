@@ -35,13 +35,13 @@ import (
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/services/aigateway/dispatcher"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/dispatcheradapter"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/engineexec"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/llmexecutor"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
-	"github.com/langwatch/langwatch/services/nlpgo/app/engine/dsl"
 )
 
 func setupStackWithLLM_bedrockCustomerRepro(t *testing.T) *stack {
@@ -57,7 +57,7 @@ func setupStackWithLLM_bedrockCustomerRepro(t *testing.T) *stack {
 	codeExec, err := codeblock.New(codeblock.Options{})
 	require.NoError(t, err)
 	eng := engine.New(engine.Options{HTTP: httpExec, Code: codeExec, LLM: llm})
-	executor := liveBedrockStructuredExecutorAdapter{eng: eng}
+	executor := engineexec.New(eng)
 	application := app.New(app.WithWorkflowExecutor(executor))
 	probes := health.New("test")
 	probes.MarkStarted()
@@ -279,8 +279,3 @@ func TestSync_RealWorkflowEndToEnd_BedrockCustomerReproVerbatim(t *testing.T) {
 		t.Logf("output as string (UNEXPECTED — should be bool): %q", s)
 	}
 }
-
-// Ensure dsl import is used (we don't directly construct DSL types here,
-// the worker parses our JSON envelope; keeping the import for parity
-// with the sibling _test.go file's adapter).
-var _ = dsl.ParseWorkflow
