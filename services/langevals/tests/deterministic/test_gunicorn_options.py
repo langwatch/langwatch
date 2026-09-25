@@ -17,18 +17,21 @@ def apply(options: dict) -> Config:
     return config
 
 
+# @scenario "The server's gunicorn settings keep the control socket off"
 def test_every_option_is_a_gunicorn_setting():
     options = gunicorn_options("0.0.0.0", 5562, 2)
 
     assert set(options) <= set(Config().settings)
 
 
+# @scenario "The server's gunicorn settings keep the control socket off"
 def test_the_control_socket_is_disabled():
     config = apply(gunicorn_options("0.0.0.0", 5562, 2))
 
     assert config.control_socket_disable is True
 
 
+# @scenario "The server's bind address and worker count follow its arguments"
 def test_bind_and_workers_follow_the_arguments():
     config = apply(gunicorn_options("0.0.0.0", 5562, 3))
 
