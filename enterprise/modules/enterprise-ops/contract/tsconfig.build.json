@@ -1,0 +1,37 @@
+{
+  "extends": ["./tsconfig.json", "../../../../tsconfig.emit.json"],
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
+    "paths": {
+      "@langwatch/enterprise-ops-contract": ["./src/index.ts"]
+    }
+  },
+  "files": ["./src/index.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
+  "exclude": [
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/tests/**",
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/*.stories.*",
+    "**/*.bench.*",
+    "**/__bench__/**"
+  ],
+  "references": [
+    {
+      "path": "../../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../licensing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/kernel/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/ops/contract/tsconfig.build.json"
+    }
+  ]
+}

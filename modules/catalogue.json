@@ -310,6 +310,12 @@
       "subjects": ["billing"]
     },
     {
+      "id": "enterprise-ops",
+      "root": "enterprise/modules/enterprise-ops",
+      "classification": "enterprise",
+      "subjects": ["enterprise-ops"]
+    },
+    {
       "id": "governance",
       "root": "enterprise/modules/governance",
       "classification": "enterprise",

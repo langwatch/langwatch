@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The backoffice license registry: every read and command lands on the audit
  * log, a refusal included, and no entry ever carries a license key.
@@ -12,24 +13,41 @@ import type {
   LicenseTermsInput,
   SeatChangeResult,
   SignedIssuedLicense,
-} from "@langwatch/ops-contract";
-
-import type { OpsLicenseRegistry } from "../app/ops.app.ts";
+  LicensingApi,
+} from "@langwatch/enterprise-licensing-contract";
 
 type AuditArgs = Readonly<Record<string, AuditLogJsonValue>>;
 type TargetKind = "issuedLicense" | "activationCode";
 type Staff = Readonly<{ operatorId: string }>;
 
+/** The registry operations an operator reaches, as licensing serves them. */
+export type LicenseRegistry = Pick<
+  LicensingApi,
+  | "listIssuedLicenses"
+  | "getIssuedLicense"
+  | "issueLicense"
+  | "registerLegacyLicense"
+  | "revokeIssuedLicense"
+  | "reissueLicense"
+  | "changeLicenseSeats"
+  | "resetLicenseInstanceBinding"
+  | "updateLicenseTerms"
+  | "linkLicenseToOrganization"
+  | "listActivationCodes"
+  | "issueActivationCode"
+  | "revokeActivationCode"
+>;
+
 export class LicenseRegistryAuditService {
   static create(deps: {
-    registry: OpsLicenseRegistry;
+    registry: LicenseRegistry;
     auditLog: Pick<AuditLogApi, "record">;
   }): LicenseRegistryAuditService {
     return new LicenseRegistryAuditService(deps.registry, deps.auditLog);
   }
 
   private constructor(
-    private readonly registry: OpsLicenseRegistry,
+    private readonly registry: LicenseRegistry,
     private readonly auditLog: Pick<AuditLogApi, "record">,
   ) {}
 
@@ -40,15 +58,15 @@ export class LicenseRegistryAuditService {
     await this.record(operatorId, "getAll", {
       args: { page: query.page, pageSize: query.pageSize, hasSearch: Boolean(query.search) },
     });
-    return this.registry.list(query);
+    return this.registry.listIssuedLicenses(query);
   }
 
   async getById(input: Staff & { id: string }): Promise<IssuedLicenseView> {
     await this.record(input.operatorId, "getById", { args: { id: input.id }, targetId: input.id });
-    return this.registry.getById({ id: input.id });
+    return this.registry.getIssuedLicense({ id: input.id });
   }
 
-  async issue(input: Parameters<OpsLicenseRegistry["issue"]>[0]): Promise<SignedIssuedLicense> {
+  async issue(input: Parameters<LicenseRegistry["issueLicense"]>[0]): Promise<SignedIssuedLicense> {
     const asked = {
       planType: input.planType,
       maxMembers: input.maxMembers,
@@ -58,7 +76,7 @@ export class LicenseRegistryAuditService {
       operatorId: input.operatorId,
       action: "issue",
       entry: { args: asked },
-      run: () => this.registry.issue(input),
+      run: () => this.registry.issueLicense(input),
     });
     await this.record(input.operatorId, "issue", {
       args: { organizationId: result.license.organizationId, ...asked },
@@ -68,38 +86,42 @@ export class LicenseRegistryAuditService {
   }
 
   async registerLegacy(
-    input: Parameters<OpsLicenseRegistry["registerLegacy"]>[0],
+    input: Parameters<LicenseRegistry["registerLegacyLicense"]>[0],
   ): Promise<IssuedLicenseView> {
     const args = { organizationId: input.organizationId };
     const license = await this.audited({
       operatorId: input.operatorId,
       action: "registerLegacy",
       entry: { args },
-      run: () => this.registry.registerLegacy(input),
+      run: () => this.registry.registerLegacyLicense(input),
     });
     await this.record(input.operatorId, "registerLegacy", { args, targetId: license.id });
     return license;
   }
 
-  async revoke(input: Parameters<OpsLicenseRegistry["revoke"]>[0]): Promise<IssuedLicenseView> {
+  async revoke(
+    input: Parameters<LicenseRegistry["revokeIssuedLicense"]>[0],
+  ): Promise<IssuedLicenseView> {
     const entry = { args: { id: input.id, reason: input.reason }, targetId: input.id };
     const license = await this.audited({
       operatorId: input.operatorId,
       action: "revoke",
       entry: entry,
-      run: () => this.registry.revoke(input),
+      run: () => this.registry.revokeIssuedLicense(input),
     });
     await this.record(input.operatorId, "revoke", entry);
     return license;
   }
 
-  async reissue(input: Parameters<OpsLicenseRegistry["reissue"]>[0]): Promise<SignedIssuedLicense> {
+  async reissue(
+    input: Parameters<LicenseRegistry["reissueLicense"]>[0],
+  ): Promise<SignedIssuedLicense> {
     const asked = { args: { replaces: input.id, expiresAt: input.expiresAt }, targetId: input.id };
     const result = await this.audited({
       operatorId: input.operatorId,
       action: "reissue",
       entry: asked,
-      run: () => this.registry.reissue(input),
+      run: () => this.registry.reissueLicense(input),
     });
     await this.record(input.operatorId, "reissue", {
       args: {
@@ -113,7 +135,7 @@ export class LicenseRegistryAuditService {
   }
 
   async changeSeats(
-    input: Parameters<OpsLicenseRegistry["changeSeats"]>[0],
+    input: Parameters<LicenseRegistry["changeLicenseSeats"]>[0],
   ): Promise<SeatChangeResult> {
     const asked = {
       args: { replaces: input.id, maxMembers: input.maxMembers },
@@ -123,7 +145,7 @@ export class LicenseRegistryAuditService {
       operatorId: input.operatorId,
       action: "changeSeats",
       entry: asked,
-      run: () => this.registry.changeSeats(input),
+      run: () => this.registry.changeLicenseSeats(input),
     });
     await this.record(input.operatorId, "changeSeats", {
       args: {
@@ -143,7 +165,7 @@ export class LicenseRegistryAuditService {
       operatorId: input.operatorId,
       action: "resetInstanceBinding",
       entry: entry,
-      run: () => this.registry.resetInstanceBinding({ id: input.id }),
+      run: () => this.registry.resetLicenseInstanceBinding({ id: input.id }),
     });
     await this.record(input.operatorId, "resetInstanceBinding", entry);
     return license;
@@ -155,7 +177,7 @@ export class LicenseRegistryAuditService {
       operatorId: operatorId,
       action: "updateTerms",
       entry: { args: { id }, targetId: id },
-      run: () => this.registry.updateTerms(input),
+      run: () => this.registry.updateLicenseTerms(input),
     });
     await this.record(operatorId, "updateTerms", {
       args: { id, ...definedTerms(terms) },
@@ -165,7 +187,7 @@ export class LicenseRegistryAuditService {
   }
 
   async linkToOrganization(
-    input: Parameters<OpsLicenseRegistry["linkToOrganization"]>[0],
+    input: Parameters<LicenseRegistry["linkLicenseToOrganization"]>[0],
   ): Promise<IssuedLicenseView> {
     const entry = {
       args: { id: input.id, organizationId: input.organizationId },
@@ -175,7 +197,7 @@ export class LicenseRegistryAuditService {
       operatorId: input.operatorId,
       action: "linkToOrganization",
       entry: entry,
-      run: () => this.registry.linkToOrganization(input),
+      run: () => this.registry.linkLicenseToOrganization(input),
     });
     await this.record(input.operatorId, "linkToOrganization", entry);
     return license;
@@ -189,11 +211,11 @@ export class LicenseRegistryAuditService {
       args: { page: query.page, pageSize: query.pageSize },
       targetKind: "activationCode",
     });
-    return this.registry.activationCodes(query);
+    return this.registry.listActivationCodes(query);
   }
 
   async issueActivationCode(
-    input: Parameters<OpsLicenseRegistry["issueActivationCode"]>[0],
+    input: Parameters<LicenseRegistry["issueActivationCode"]>[0],
   ): Promise<IssuedActivationCode> {
     const asked = {
       organizationId: input.organizationId,
@@ -219,7 +241,7 @@ export class LicenseRegistryAuditService {
   }
 
   async revokeActivationCode(
-    input: Parameters<OpsLicenseRegistry["revokeActivationCode"]>[0],
+    input: Parameters<LicenseRegistry["revokeActivationCode"]>[0],
   ): Promise<ActivationCodeView> {
     const row = await this.audited({
       operatorId: input.operatorId,

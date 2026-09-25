@@ -29,12 +29,13 @@ import type {
   IssuedLicensePage,
   IssuedLicenseSource,
   IssuedLicenseView,
-  LicenseCustomer,
   LicenseTermsInput,
-  SeatChangeBillingOutcome,
+  SeatChangeResult,
+  SignedIssuedLicense,
 } from "./issued-license.ts";
 import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
 import type { PlanInfo } from "./license-plan.ts";
+import type { IssueLicenseInput } from "./license-registry.ts";
 import type {
   ConnectCredentialResolution,
   ConnectPresentedCredential,
@@ -288,32 +289,6 @@ export interface LicensingApi {
     search?: string;
   }): Promise<SelfHostedInstancePage>;
   getSelfHostedInstance(input: { id: string }): Promise<SelfHostedInstanceDetail>;
-}
-
-/** What an operator supplies when issuing a license from the backoffice. */
-export interface IssueLicenseInput {
-  customer: LicenseCustomer;
-  email: string;
-  planType: string;
-  maxMembers: number;
-  maxMembersLite?: number;
-  maxMessagesPerMonth?: number;
-  /** ISO 8601. The instant the term ends. */
-  expiresAt: string;
-  terms?: LicenseTermsInput;
-  operatorId: string;
-}
-
-/** A signed license and the row that records it. The key is handed over once. */
-export interface SignedIssuedLicense {
-  licenseKey: string;
-  license: IssuedLicenseView;
-}
-
-/** A mid-term seat change: the replacement, and what it owed. */
-export interface SeatChangeResult extends SignedIssuedLicense {
-  previousMaxMembers: number;
-  billing: SeatChangeBillingOutcome;
 }
 
 /** Re-exported so a peer naming a service does not reach past the api file. */

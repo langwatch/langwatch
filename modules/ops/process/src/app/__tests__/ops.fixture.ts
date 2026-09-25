@@ -76,8 +76,6 @@ export function createOpsTestInfrastructure(
       withdraw: async () => {},
       startPass: () => {},
     }),
-    licenseRegistry: createApiFixture<OpsAppInfrastructure["licenseRegistry"]>({}),
-    selfHostedInstances: createApiFixture<OpsAppInfrastructure["selfHostedInstances"]>({}),
     bugReportRateLimiter: { consume: async () => ({ allowed: true }) },
     bugReportNotifier: { notify: async () => {} },
     explainClients: { findClient: () => null },

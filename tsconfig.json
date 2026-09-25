@@ -238,6 +238,12 @@
       "path": "enterprise/modules/managed-provider/process/tsconfig.json"
     },
     {
+      "path": "enterprise/modules/enterprise-ops/contract/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/enterprise-ops/process/tsconfig.json"
+    },
+    {
       "path": "enterprise/modules/saas/browser/tsconfig.json"
     },
     {

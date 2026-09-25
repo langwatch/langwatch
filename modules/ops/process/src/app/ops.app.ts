@@ -51,8 +51,6 @@ import {
   type StartupNoticeState,
   type UsageReportAnswer,
   opsConfig,
-  type ActivationCodePage,
-  type ActivationCodeView,
   type AdminIdentity,
   type AggregateDiscovery,
   type AggregateEventView,
@@ -66,11 +64,6 @@ import {
   type DeadLetterCount,
   type DeadOutboxMessageView,
   type GroupInfo,
-  type IssuedActivationCode,
-  type IssuedLicensePage,
-  type IssuedLicenseView,
-  type LicenseCustomer,
-  type LicenseTermsInput,
   type ListBugReportsInput,
   type OpsApiGetBadgeCountsOutput,
   type OpsEventLogSearchWindow,
@@ -104,10 +97,6 @@ import {
   type ReplayHistoryEntry,
   type ReplayStatus,
   type RunAdminOperationInput,
-  type SeatChangeResult,
-  type SelfHostedInstanceDetail,
-  type SelfHostedInstancePage,
-  type SignedIssuedLicense,
   type StartAdminImpersonationInput,
   type StopAdminImpersonationInput,
   type OpsServerConfig,
@@ -243,7 +232,6 @@ import type { OpsExplainClients } from "#repositories/ops-explain.repository";
 import type { OpsRepositories } from "#repositories/ops.repositories";
 import { BugReportInboxService } from "#services/bug-report-inbox.service";
 import { BugReportIntakeService } from "#services/bug-report-intake.service";
-import { LicenseRegistryAuditService } from "#services/license-registry-audit.service";
 import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
 
 import { HttpCheckupProbeChannel } from "../channels/http/http.checkup-probe.channel.ts";
@@ -492,84 +480,6 @@ export interface OpsSystemMigrationRunner {
   rollBack(input: { migrationName: string; tenantId: string; actorUserId: string }): Promise<void>;
 }
 
-/**
- * The license registry (ADR-156), an availability decision: `licensing` is enterprise-only, so the
- * real one is supplied by composition when installed.
- */
-export interface OpsLicenseRegistry {
-  list(input: { page: number; pageSize: number; search?: string }): Promise<IssuedLicensePage>;
-  getById(input: { id: string }): Promise<IssuedLicenseView>;
-  issue(input: {
-    customer: LicenseCustomer;
-    email: string;
-    planType: string;
-    maxMembers: number;
-    maxMembersLite?: number;
-    maxMessagesPerMonth?: number;
-    expiresAt: string;
-    terms?: LicenseTermsInput;
-    operatorId: string;
-  }): Promise<SignedIssuedLicense>;
-  registerLegacy(input: {
-    licenseKey: string;
-    organizationId: string;
-    operatorId: string;
-  }): Promise<IssuedLicenseView>;
-  revoke(input: { id: string; reason: string; operatorId: string }): Promise<IssuedLicenseView>;
-  reissue(input: {
-    id: string;
-    maxMembers?: number;
-    maxMembersLite?: number;
-    maxMessagesPerMonth?: number;
-    expiresAt: string;
-    operatorId: string;
-  }): Promise<SignedIssuedLicense>;
-  changeSeats(input: {
-    id: string;
-    maxMembers: number;
-    operatorId: string;
-  }): Promise<SeatChangeResult>;
-  resetInstanceBinding(input: { id: string }): Promise<IssuedLicenseView>;
-  updateTerms(
-    input: { id: string; operatorId: string } & LicenseTermsInput,
-  ): Promise<IssuedLicenseView>;
-  linkToOrganization(input: {
-    id: string;
-    organizationId: string;
-    operatorId: string;
-  }): Promise<IssuedLicenseView>;
-  /** Minting and revoking are the backoffice's; redeeming is a public route. */
-  activationCodes(input: {
-    page: number;
-    pageSize: number;
-    organizationId?: string;
-  }): Promise<ActivationCodePage>;
-  issueActivationCode(input: {
-    organizationId: string;
-    organizationName: string;
-    email: string;
-    planType: string;
-    maxMembers: number;
-    maxMembersLite?: number;
-    licenseTermDays: number;
-    services?: string[];
-    expiresAt: string;
-    reusable?: boolean;
-    operatorId: string;
-  }): Promise<IssuedActivationCode>;
-  revokeActivationCode(input: { id: string; operatorId: string }): Promise<ActivationCodeView>;
-}
-
-/**
- * The registry of self-hosted installs (ADR-156, section 10), an
- * availability decision like {@link OpsLicenseRegistry}: read only, because
- * every number was reported by an install and never edited by an operator.
- */
-export interface OpsSelfHostedInstances {
-  list(input: { page: number; pageSize: number; search?: string }): Promise<SelfHostedInstancePage>;
-  getById(input: { id: string }): Promise<SelfHostedInstanceDetail>;
-}
-
 /** Team alert for a filed report. Best-effort: intake already succeeded. */
 /** Audit sink for GroupQueue operator actions (specs/ops/dead-letter-recovery.feature). */
 export type QueueControlAction =
@@ -634,8 +544,6 @@ export interface OpsAppInfrastructure {
   eventLogWindow: OpsEventLogWindowReader;
   grafana: OpsGrafanaLinks;
   systemMigrations: OpsSystemMigrationRunner;
-  licenseRegistry: OpsLicenseRegistry;
-  selfHostedInstances: OpsSelfHostedInstances;
   bugReportRateLimiter: BugReportRateLimiter;
   bugReportNotifier: BugReportNotifier;
   /** The ClickHouse account an operator EXPLAIN runs as. */
@@ -666,8 +574,6 @@ type OpsRuntimeDependencies = Readonly<{
   eventLogWindow: OpsEventLogWindowReader;
   grafana: OpsGrafanaLinks;
   systemMigrations: OpsSystemMigrationRunner;
-  licenseRegistry: LicenseRegistryAuditService;
-  selfHostedInstances: OpsSelfHostedInstances;
   inbox: BugReportInboxService;
   intake: BugReportIntakeService;
   explain: OpsExplainService;
@@ -855,11 +761,6 @@ export class OpsApp implements OpsApi {
       pipelines: members.pipelines,
       eventLogWindow: members.eventLogWindow,
       grafana: members.grafana,
-      licenseRegistry: LicenseRegistryAuditService.create({
-        registry: members.licenseRegistry,
-        auditLog: dependencies.auditLog,
-      }),
-      selfHostedInstances: members.selfHostedInstances,
       systemMigrations: members.systemMigrations,
       explain: OpsExplainService.create({
         repository: OpsExplainClickHouseRepository.create({
@@ -1649,191 +1550,6 @@ export class OpsApp implements OpsApi {
       targetKind: BUG_REPORT_TARGET_KIND,
       ...(entry.targetId === undefined ? {} : { targetId: entry.targetId }),
     });
-  }
-
-  // -- the license registry (ADR-156), an availability-decided capability ---
-
-  listIssuedLicenses(input: {
-    page: number;
-    pageSize: number;
-    search?: string;
-    operator: OpsOperator | null;
-  }): Promise<IssuedLicensePage> {
-    const staff = this.admitBackOfficeStaff(input.operator);
-    const { operator: _operator, ...rest } = input;
-    return this.#dependencies.licenseRegistry.list({ ...rest, operatorId: staff.id });
-  }
-
-  getIssuedLicense(input: {
-    id: string;
-    operator: OpsOperator | null;
-  }): Promise<IssuedLicenseView> {
-    const staff = this.admitBackOfficeStaff(input.operator);
-    return this.#dependencies.licenseRegistry.getById({ id: input.id, operatorId: staff.id });
-  }
-
-  issueLicense(input: {
-    customer: LicenseCustomer;
-    email: string;
-    planType: string;
-    maxMembers: number;
-    maxMembersLite?: number;
-    maxMessagesPerMonth?: number;
-    expiresAt: string;
-    terms?: LicenseTermsInput;
-    operator: OpsOperator | null;
-  }): Promise<SignedIssuedLicense> {
-    const staff = this.admitBackOfficeStaff(input.operator);
-    const { operator: _operator, ...rest } = input;
-    return this.#dependencies.licenseRegistry.issue({ ...rest, operatorId: staff.id });
-  }
-
-  registerLegacyLicense(input: {
-    licenseKey: string;
-    organizationId: string;
-    operator: OpsOperator | null;
-  }): Promise<IssuedLicenseView> {
-    const staff = this.admitBackOfficeStaff(input.operator);
-    return this.#dependencies.licenseRegistry.registerLegacy({
-      licenseKey: input.licenseKey,
-      organizationId: input.organizationId,
-      operatorId: staff.id,
-    });
-  }
-
-  revokeIssuedLicense(input: {
-    id: string;
-    reason: string;
-    operator: OpsOperator | null;
-  }): Promise<IssuedLicenseView> {
-    const staff = this.admitBackOfficeStaff(input.operator);
-    return this.#dependencies.licenseRegistry.revoke({
-      id: input.id,
-      reason: input.reason,
-      operatorId: staff.id,
-    });
-  }
-
-  reissueLicense(input: {
-    id: string;
-    maxMembers?: number;
-    maxMembersLite?: number;
-    maxMessagesPerMonth?: number;
-    expiresAt: string;
-    operator: OpsOperator | null;
-  }): Promise<SignedIssuedLicense> {
-    const staff = this.admitBackOfficeStaff(input.operator);
-    const { operator: _operator, ...rest } = input;
-    return this.#dependencies.licenseRegistry.reissue({ ...rest, operatorId: staff.id });
-  }
-
-  changeLicenseSeats(input: {
-    id: string;
-    maxMembers: number;
-    operator: OpsOperator | null;
-  }): Promise<SeatChangeResult> {
-    const staff = this.admitBackOfficeStaff(input.operator);
-    return this.#dependencies.licenseRegistry.changeSeats({
-      id: input.id,
-      maxMembers: input.maxMembers,
-      operatorId: staff.id,
-    });
-  }
-
-  resetLicenseInstanceBinding(input: {
-    id: string;
-    operator: OpsOperator | null;
-  }): Promise<IssuedLicenseView> {
-    const staff = this.admitBackOfficeStaff(input.operator);
-    return this.#dependencies.licenseRegistry.resetInstanceBinding({
-      id: input.id,
-      operatorId: staff.id,
-    });
-  }
-
-  updateLicenseTerms(
-    input: { id: string; operator: OpsOperator | null } & LicenseTermsInput,
-  ): Promise<IssuedLicenseView> {
-    const staff = this.admitBackOfficeStaff(input.operator);
-    const { operator: _operator, id, ...terms } = input;
-    return this.#dependencies.licenseRegistry.updateTerms({ id, operatorId: staff.id, ...terms });
-  }
-
-  linkLicenseToOrganization(input: {
-    id: string;
-    organizationId: string;
-    operator: OpsOperator | null;
-  }): Promise<IssuedLicenseView> {
-    const staff = this.admitBackOfficeStaff(input.operator);
-    return this.#dependencies.licenseRegistry.linkToOrganization({
-      id: input.id,
-      organizationId: input.organizationId,
-      operatorId: staff.id,
-    });
-  }
-
-  listActivationCodes(input: {
-    page: number;
-    pageSize: number;
-    organizationId?: string;
-    operator: OpsOperator | null;
-  }): Promise<ActivationCodePage> {
-    const staff = this.admitBackOfficeStaff(input.operator);
-    const { operator: _operator, ...rest } = input;
-    return this.#dependencies.licenseRegistry.activationCodes({ ...rest, operatorId: staff.id });
-  }
-
-  issueActivationCode(input: {
-    organizationId: string;
-    organizationName: string;
-    email: string;
-    planType: string;
-    maxMembers: number;
-    maxMembersLite?: number;
-    licenseTermDays: number;
-    services?: string[];
-    expiresAt: string;
-    reusable?: boolean;
-    operator: OpsOperator | null;
-  }): Promise<IssuedActivationCode> {
-    const staff = this.admitBackOfficeStaff(input.operator);
-    const { operator: _operator, ...rest } = input;
-    return this.#dependencies.licenseRegistry.issueActivationCode({
-      ...rest,
-      operatorId: staff.id,
-    });
-  }
-
-  revokeActivationCode(input: {
-    id: string;
-    operator: OpsOperator | null;
-  }): Promise<ActivationCodeView> {
-    const staff = this.admitBackOfficeStaff(input.operator);
-    return this.#dependencies.licenseRegistry.revokeActivationCode({
-      id: input.id,
-      operatorId: staff.id,
-    });
-  }
-
-  // -- the registry of self-hosted installs (ADR-156, section 10) -----------
-
-  listSelfHostedInstances(input: {
-    page: number;
-    pageSize: number;
-    search?: string;
-    operator: OpsOperator | null;
-  }): Promise<SelfHostedInstancePage> {
-    this.admitBackOfficeStaff(input.operator);
-    const { operator: _operator, ...rest } = input;
-    return this.#dependencies.selfHostedInstances.list(rest);
-  }
-
-  getSelfHostedInstance(input: {
-    id: string;
-    operator: OpsOperator | null;
-  }): Promise<SelfHostedInstanceDetail> {
-    this.admitBackOfficeStaff(input.operator);
-    return this.#dependencies.selfHostedInstances.getById({ id: input.id });
   }
 
   // -- Settings, Checkup and the usage report (specs/self-hosting/checkup) --

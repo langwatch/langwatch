@@ -6,11 +6,6 @@ import { moduleApi } from "@langwatch/kernel/module-api";
 import type { SearchProjectsResult } from "@langwatch/project-contract";
 
 import type {
-  ActivationCodePage,
-  ActivationCodeView,
-  IssuedActivationCode,
-} from "./activation-code.ts";
-import type {
   AdminImpersonationStarted,
   AdminImpersonationStopped,
   AdminOperationInput,
@@ -34,14 +29,6 @@ import type {
 import type { StartupNoticeState } from "./checkup-usage-report.ts";
 import type { CheckupAnswer, UsageReportAnswer } from "./checkup.trpc.ts";
 import type { CheckupResult, ExplicitCheckInput, ProjectCheckupReport } from "./checkup.ts";
-import type {
-  IssuedLicensePage,
-  IssuedLicenseView,
-  LicenseCustomer,
-  LicenseTermsInput,
-  SeatChangeResult,
-  SignedIssuedLicense,
-} from "./license-registry.ts";
 import type { Anomaly, AnomalyKind } from "./ops-anomaly.ts";
 import type {
   BugReport,
@@ -110,7 +97,6 @@ import type {
   OpsPipelineRegistrations,
   OpsScope,
 } from "./ops.responses.ts";
-import type { SelfHostedInstanceDetail, SelfHostedInstancePage } from "./self-hosted-instance.ts";
 
 export type DiscoverAggregatesInput = {
   projectionNames: string[];
@@ -630,105 +616,6 @@ export interface OpsApi {
   cancelReplay(): Promise<CancelReplayResult>;
   listAnomalies(): Promise<Anomaly[]>;
   dismissAnomaly(input: { tenantId: string; kind: AnomalyKind }): Promise<boolean>;
-
-  // -- the license registry (ADR-156), forwarded to LicensingApi ------------
-
-  listIssuedLicenses(input: {
-    page: number;
-    pageSize: number;
-    search?: string;
-    operator: OpsOperator | null;
-  }): Promise<IssuedLicensePage>;
-  getIssuedLicense(input: { id: string; operator: OpsOperator | null }): Promise<IssuedLicenseView>;
-  issueLicense(input: {
-    customer: LicenseCustomer;
-    email: string;
-    planType: string;
-    maxMembers: number;
-    maxMembersLite?: number;
-    maxMessagesPerMonth?: number;
-    /** ISO 8601. The instant the term ends. */
-    expiresAt: string;
-    terms?: LicenseTermsInput;
-    operator: OpsOperator | null;
-  }): Promise<SignedIssuedLicense>;
-  registerLegacyLicense(input: {
-    licenseKey: string;
-    organizationId: string;
-    operator: OpsOperator | null;
-  }): Promise<IssuedLicenseView>;
-  revokeIssuedLicense(input: {
-    id: string;
-    reason: string;
-    operator: OpsOperator | null;
-  }): Promise<IssuedLicenseView>;
-  reissueLicense(input: {
-    id: string;
-    maxMembers?: number;
-    maxMembersLite?: number;
-    maxMessagesPerMonth?: number;
-    /** ISO 8601. The instant the new term ends. */
-    expiresAt: string;
-    operator: OpsOperator | null;
-  }): Promise<SignedIssuedLicense>;
-  changeLicenseSeats(input: {
-    id: string;
-    maxMembers: number;
-    operator: OpsOperator | null;
-  }): Promise<SeatChangeResult>;
-  resetLicenseInstanceBinding(input: {
-    id: string;
-    operator: OpsOperator | null;
-  }): Promise<IssuedLicenseView>;
-  updateLicenseTerms(
-    input: { id: string; operator: OpsOperator | null } & LicenseTermsInput,
-  ): Promise<IssuedLicenseView>;
-  linkLicenseToOrganization(input: {
-    id: string;
-    organizationId: string;
-    operator: OpsOperator | null;
-  }): Promise<IssuedLicenseView>;
-
-  // -- activation codes (ADR-156, section 5), forwarded to LicensingApi -----
-
-  listActivationCodes(input: {
-    page: number;
-    pageSize: number;
-    organizationId?: string;
-    operator: OpsOperator | null;
-  }): Promise<ActivationCodePage>;
-  issueActivationCode(input: {
-    organizationId: string;
-    organizationName: string;
-    email: string;
-    planType: string;
-    maxMembers: number;
-    maxMembersLite?: number;
-    licenseTermDays: number;
-    services?: string[];
-    /** ISO 8601. The instant the code stops working. */
-    expiresAt: string;
-    reusable?: boolean;
-    operator: OpsOperator | null;
-  }): Promise<IssuedActivationCode>;
-  revokeActivationCode(input: {
-    id: string;
-    operator: OpsOperator | null;
-  }): Promise<ActivationCodeView>;
-
-  // -- the registry of self-hosted installs (ADR-156, section 10), forwarded
-  // to LicensingApi; read only ----------------------------------------------
-
-  listSelfHostedInstances(input: {
-    page: number;
-    pageSize: number;
-    search?: string;
-    operator: OpsOperator | null;
-  }): Promise<SelfHostedInstancePage>;
-  getSelfHostedInstance(input: {
-    id: string;
-    operator: OpsOperator | null;
-  }): Promise<SelfHostedInstanceDetail>;
 
   // -- Settings, Checkup of a self-hosted install; LangWatch Cloud answers
   // `{ deployment: "saas" }` (specs/self-hosting/checkup/checkup.feature) ---

@@ -32,6 +32,7 @@ export * from "./connect.trpc.ts";
 export * from "./connect.errors.ts";
 export * from "./license-sync.errors.ts";
 export * from "./issued-license.ts";
+export * from "./license-registry.ts";
 export * from "./license-registry.errors.ts";
 export * from "./license-sync.ts";
 export * from "./self-hosted-instance.ts";

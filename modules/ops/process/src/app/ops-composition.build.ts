@@ -45,10 +45,8 @@ import type {
   OpsAppInfrastructure,
   OpsCapability,
   OpsEventExplorer,
-  OpsLicenseRegistry,
   OpsProcessExplorer,
   OpsReplayRunner,
-  OpsSelfHostedInstances,
   OpsSnapshotRedis,
   OpsSystemMigrationRunner,
 } from "./ops.app.ts";
@@ -311,12 +309,6 @@ export function buildOpsInfrastructure(input: {
     grafana: { findLinkConfig: () => null },
     systemMigrations: unavailableOperatorRuntime<OpsSystemMigrationRunner>(
       "the system migration runner",
-    ),
-    // Real when the enterprise licensing module is installed and its
-    // composition overrides this member; refused by name otherwise (§10).
-    licenseRegistry: unavailableOperatorRuntime<OpsLicenseRegistry>("the license registry"),
-    selfHostedInstances: unavailableOperatorRuntime<OpsSelfHostedInstances>(
-      "the self-hosted instance registry",
     ),
     // The bug-report intake's own flood bound and best-effort alert. This
     // process has neither a dedicated limiter nor a notifier of its own for

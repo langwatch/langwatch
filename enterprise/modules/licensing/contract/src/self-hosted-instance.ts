@@ -5,12 +5,14 @@
  *
  * @see specs/self-hosting/connected-services/instance-registry.feature
  */
+import { z } from "zod";
 
 /** Every field the usage report receiver accepted, minus the instance id. */
 export type SelfHostedReportProperties = Record<string, unknown>;
 
 /** Reporting within two days, silent under a fortnight, or turned off. */
-export type SelfHostedInstanceActivity = "reporting" | "quiet" | "gone";
+export const selfHostedInstanceActivitySchema = z.enum(["reporting", "quiet", "gone"]);
+export type SelfHostedInstanceActivity = z.infer<typeof selfHostedInstanceActivitySchema>;
 
 /** The handful of things an install can do that a person should hear about. */
 export const SELF_HOSTED_SIGNALS = [
@@ -25,49 +27,61 @@ export const SELF_HOSTED_SIGNALS = [
 export type SelfHostedSignal = (typeof SELF_HOSTED_SIGNALS)[number];
 
 /** One install as the backoffice reads it. */
-export interface SelfHostedInstanceView {
-  id: string;
-  instanceId: string;
-  firstSeenAt: string;
-  lastSeenAt: string;
-  version: string | null;
-  installMethod: string | null;
-  chartVersion: string | null;
-  hostname: string | null;
-  environment: string | null;
-  installedAt: string | null;
-  reportSchemaVersion: number | null;
-  organizationId: string | null;
-  issuedLicenseId: string | null;
-  userEmailDomains: Record<string, number> | null;
-  latestReport: SelfHostedReportProperties | null;
-  optionalMetricsReported: boolean;
-  hostnameReported: boolean;
-  reportCount: number;
-  lastUnknownFields: number;
-  raisedSignals: string[];
+export const selfHostedInstanceViewSchema = z.object({
+  id: z.string(),
+  instanceId: z.string(),
+  firstSeenAt: z.string(),
+  lastSeenAt: z.string(),
+  version: z.string().nullable(),
+  installMethod: z.string().nullable(),
+  chartVersion: z.string().nullable(),
+  hostname: z.string().nullable(),
+  environment: z.string().nullable(),
+  installedAt: z.string().nullable(),
+  reportSchemaVersion: z.number().nullable(),
+  organizationId: z.string().nullable(),
+  issuedLicenseId: z.string().nullable(),
+  userEmailDomains: z.record(z.string(), z.number()).nullable(),
+  latestReport: z.record(z.string(), z.unknown()).nullable(),
+  optionalMetricsReported: z.boolean(),
+  hostnameReported: z.boolean(),
+  reportCount: z.number(),
+  lastUnknownFields: z.number(),
+  raisedSignals: z.array(z.string()),
   /** The customer's name, when the license bound this install to one. */
-  organizationName: string | null;
-  activity: SelfHostedInstanceActivity;
-}
+  organizationName: z.string().nullable(),
+  activity: selfHostedInstanceActivitySchema,
+});
+export type SelfHostedInstanceView = z.infer<typeof selfHostedInstanceViewSchema>;
 
-export interface SelfHostedInstancePage {
-  instances: SelfHostedInstanceView[];
-  total: number;
-}
+export const selfHostedInstancePageSchema = z.object({
+  instances: z.array(selfHostedInstanceViewSchema),
+  total: z.number(),
+});
+export type SelfHostedInstancePage = z.infer<typeof selfHostedInstancePageSchema>;
+
+export const listSelfHostedInstancesInputSchema = z.object({
+  page: z.number().int().min(0).default(0),
+  pageSize: z.number().int().min(1).max(100).default(25),
+  search: z.string().max(200).optional(),
+});
+
+export const selfHostedInstanceIdInputSchema = z.object({ id: z.string().min(1) });
 
 /** One row of an install's report history. */
-export interface SelfHostedReportSummary {
-  id: string;
-  receivedAt: string;
-  version: string | null;
-  unknownFields: number;
-}
+export const selfHostedReportSummarySchema = z.object({
+  id: z.string(),
+  receivedAt: z.string(),
+  version: z.string().nullable(),
+  unknownFields: z.number(),
+});
+export type SelfHostedReportSummary = z.infer<typeof selfHostedReportSummarySchema>;
 
-export interface SelfHostedInstanceDetail {
-  instance: SelfHostedInstanceView;
-  reports: SelfHostedReportSummary[];
-}
+export const selfHostedInstanceDetailSchema = z.object({
+  instance: selfHostedInstanceViewSchema,
+  reports: z.array(selfHostedReportSummarySchema),
+});
+export type SelfHostedInstanceDetail = z.infer<typeof selfHostedInstanceDetailSchema>;
 
 /** One report, as the receiver hands it over. */
 export interface IncomingUsageReport {

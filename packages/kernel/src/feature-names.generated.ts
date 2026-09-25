@@ -49,6 +49,7 @@ export const FEATURE_NAMES = [
   "webhook",
   "workflow",
   "billing",
+  "enterprise-ops",
   "governance",
   "licensing",
   "managed-provider",

@@ -34,6 +34,7 @@
     "@langwatch/enterprise-governance-process": "workspace:*",
     "@langwatch/enterprise-licensing-process": "workspace:*",
     "@langwatch/enterprise-managed-provider-process": "workspace:*",
+    "@langwatch/enterprise-ops-process": "workspace:*",
     "@langwatch/enterprise-saas-process": "workspace:*",
     "@langwatch/enterprise-scim-process": "workspace:*",
     "@langwatch/enterprise-seed-demo-process": "workspace:*",

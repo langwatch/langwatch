@@ -1,0 +1,49 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "lib": ["es2023"],
+    "types": ["node"],
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/audit-log/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../licensing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/kernel/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/ops/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/api-fixture/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/process-stores/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/test-harness/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/vitest-config/tsconfig.build.json"
+    }
+  ]
+}

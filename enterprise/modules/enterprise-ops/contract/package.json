@@ -1,0 +1,34 @@
+{
+  "name": "@langwatch/enterprise-ops-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable contracts of the LangWatch Enterprise operator views.",
+  "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/ops-contract": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

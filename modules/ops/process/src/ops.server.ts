@@ -10,12 +10,10 @@ import { ProcessManagerPurgeTask } from "#tasks/process-manager-purge.task";
 import { adminRest } from "#transport/admin.rest";
 import { checkupRest } from "#transport/checkup.rest";
 import { checkupTrpcTransport } from "#transport/checkup.trpc";
-import { licenseRegistryTrpcTransport } from "#transport/license-registry.trpc";
 import { bugReportCredential, opsBugReportRest } from "#transport/ops-bug-report.rest";
 import { opsBugReportTrpcTransport } from "#transport/ops-bug-report.trpc";
 import { opsClickHouseExplainRest } from "#transport/ops-clickhouse-explain.rest";
 import { opsTrpcTransport } from "#transport/ops.trpc";
-import { selfHostedInstancesTrpcTransport } from "#transport/self-hosted-instance.trpc";
 
 export const opsServer = defineServerModule("ops")
   .withRepositories(opsRepositories)
@@ -26,8 +24,6 @@ export const opsServer = defineServerModule("ops")
     opsClickHouseExplainRest,
     opsTrpcTransport,
     opsBugReportTrpcTransport,
-    licenseRegistryTrpcTransport,
-    selfHostedInstancesTrpcTransport,
     checkupTrpcTransport,
     checkupRest,
   )

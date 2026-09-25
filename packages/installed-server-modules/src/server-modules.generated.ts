@@ -18,6 +18,7 @@ import { billingServer } from "@langwatch/enterprise-billing-process";
 import { governanceServer } from "@langwatch/enterprise-governance-process";
 import { licensingServer } from "@langwatch/enterprise-licensing-process";
 import { managedProviderServer } from "@langwatch/enterprise-managed-provider-process";
+import { enterpriseOpsServer } from "@langwatch/enterprise-ops-process";
 import { saasServer } from "@langwatch/enterprise-saas-process";
 import { scimServer } from "@langwatch/enterprise-scim-process";
 import { seedDemoServer } from "@langwatch/enterprise-seed-demo-process";
@@ -73,6 +74,7 @@ export const serverModules = [
   dataPrivacyServer,
   dataRetentionServer,
   datasetServer,
+  enterpriseOpsServer,
   entitlementServer,
   evaluationServer,
   evaluatorServer,

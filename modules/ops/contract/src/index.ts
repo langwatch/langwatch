@@ -101,10 +101,8 @@ export * from "./ops-snapshot.ts";
 export * from "./ops-snapshot.service.ts";
 export * from "./ops-system-migration.errors.ts";
 export * from "./ops-bug-report.ts";
-export * from "./license-registry.ts";
-export * from "./activation-code.ts";
-export * from "./self-hosted-instance.ts";
 export { opsBugReportTrpc } from "./ops-bug-report.trpc.ts";
+// Browser types only until the screens move to enterprise-ops (.claude/handoffs/boundary-b2a.md).
 export { licenseRegistryTrpc } from "./license-registry.trpc.ts";
 export { selfHostedInstancesTrpc } from "./self-hosted-instance.trpc.ts";
 export { opsDashboardTrpc } from "./ops-dashboard.trpc.ts";

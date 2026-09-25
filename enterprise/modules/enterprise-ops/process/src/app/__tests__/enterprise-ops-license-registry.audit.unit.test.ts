@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The backoffice license registry: a non-operator is answered with a
  * not-found and commands nothing; an operator's reads and commands are
@@ -9,15 +10,28 @@ import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-co
 import {
   type IssuedLicenseView,
   issueLicenseInputSchema,
+  type LicensingApi,
   listActivationCodesInputSchema,
-  type OpsOperator,
-} from "@langwatch/ops-contract";
+} from "@langwatch/enterprise-licensing-contract";
+import { EnterpriseOpsApi } from "@langwatch/enterprise-ops-contract";
+import { createApp } from "@langwatch/kernel";
+import { AdminSurfaceHiddenError, type OpsApi, type OpsOperator } from "@langwatch/ops-contract";
+import { memoryStores } from "@langwatch/process-stores";
 import { describe, expect, it } from "vitest";
 
-import type { OpsAppInfrastructure } from "../ops.app.ts";
-import { createOpsTestApp, OPS_STAFF_ADDRESS } from "./ops.fixture.ts";
+import { enterpriseOpsServer } from "../../enterprise-ops.server.ts";
 
-type Registry = OpsAppInfrastructure["licenseRegistry"];
+type Registry = LicensingApi;
+
+const OPS_STAFF_ADDRESS = "olive@langwatch.test";
+
+/** OpsApi's back-office gate over a one-address staff list. */
+const ops = createApiFixture<OpsApi>({
+  admitBackOfficeStaff: (operator) => {
+    if (!operator || operator.email !== OPS_STAFF_ADDRESS) throw new AdminSurfaceHiddenError();
+    return operator;
+  },
+});
 
 const operator: OpsOperator = { id: "user_olive", email: OPS_STAFF_ADDRESS };
 const customerAdmin: OpsOperator = { id: "user_mallory", email: "admin@customer.test" };
@@ -60,38 +74,40 @@ const license: IssuedLicenseView = {
   hasPendingDelivery: false,
 };
 
-function build(registry: Partial<Registry> = {}) {
+async function build(registry: Partial<Registry> = {}) {
   const entries: RecordAuditLogCommand[] = [];
   const commanded: string[] = [];
-  const { app } = createOpsTestApp({
-    auditLog: createApiFixture<AuditLogApi>({
-      record: async (entry) => {
-        entries.push(entry);
-        return { id: "audit", occurredAt: 0 };
-      },
-    }),
-    members: {
-      licenseRegistry: createApiFixture<Registry>({
-        list: async () => {
-          commanded.push("list");
-          return { licenses: [], total: 0 };
-        },
-        issue: async () => {
-          commanded.push("issue");
-          return { licenseKey: "signed-license", license };
-        },
-        registerLegacy: async () => {
-          commanded.push("registerLegacy");
-          return license;
-        },
-        revoke: async () => {
-          commanded.push("revoke");
-          return license;
-        },
-        ...registry,
-      }),
+  const auditLog = createApiFixture<AuditLogApi>({
+    record: async (entry) => {
+      entries.push(entry);
+      return { id: "audit", occurredAt: 0 };
     },
   });
+  const licensing = createApiFixture<Registry>({
+    listIssuedLicenses: async () => {
+      commanded.push("list");
+      return { licenses: [], total: 0 };
+    },
+    issueLicense: async () => {
+      commanded.push("issue");
+      return { licenseKey: "signed-license", license };
+    },
+    registerLegacyLicense: async () => {
+      commanded.push("registerLegacy");
+      return license;
+    },
+    revokeIssuedLicense: async () => {
+      commanded.push("revoke");
+      return license;
+    },
+    ...registry,
+  });
+  const runtime = await createApp({ role: "api" })
+    .withModules([enterpriseOpsServer])
+    .withStores(memoryStores())
+    .provide({ ops, licensing, "audit-log": auditLog })
+    .boot();
+  const app = runtime.service(EnterpriseOpsApi);
   return { app, entries, commanded };
 }
 
@@ -107,7 +123,7 @@ describe("the backoffice license registry", () => {
   describe("given an organization admin who is not a LangWatch operator", () => {
     /** @scenario "Only a LangWatch operator can issue or manage licenses" */
     it("answers every call with a not-found and commands nothing", async () => {
-      const { app, entries, commanded } = build();
+      const { app, entries, commanded } = await build();
 
       const calls = [
         async () => app.listIssuedLicenses({ page: 0, pageSize: 25, operator: customerAdmin }),
@@ -132,7 +148,7 @@ describe("the backoffice license registry", () => {
 
   describe("given a LangWatch operator", () => {
     it("lists licenses and records the read", async () => {
-      const { app, entries } = build();
+      const { app, entries } = await build();
 
       await app.listIssuedLicenses({ page: 0, pageSize: 25, search: "acme", operator });
 
@@ -148,8 +164,8 @@ describe("the backoffice license registry", () => {
 
     it("issues with the operator recorded against the license it produced", async () => {
       let sent: unknown;
-      const { app, entries } = build({
-        issue: async (input) => {
+      const { app, entries } = await build({
+        issueLicense: async (input) => {
           sent = input;
           return { licenseKey: "signed-license", license };
         },
@@ -174,8 +190,8 @@ describe("the backoffice license registry", () => {
 
     it("forwards a monthly message cap to the registry on issue", async () => {
       let sent: unknown;
-      const { app } = build({
-        issue: async (input) => {
+      const { app } = await build({
+        issueLicense: async (input) => {
           sent = input;
           return { licenseKey: "signed-license", license };
         },
@@ -191,8 +207,8 @@ describe("the backoffice license registry", () => {
 
     it("filters activation codes by organization", async () => {
       let sent: unknown;
-      const { app } = build({
-        activationCodes: async (input) => {
+      const { app } = await build({
+        listActivationCodes: async (input) => {
           sent = input;
           return { codes: [], total: 0 };
         },
@@ -215,8 +231,8 @@ describe("the backoffice license registry", () => {
     describe("when the registry refuses a command", () => {
       /** @scenario "A refused license command is still recorded" */
       it("records the attempt with the refusal and lets it reach the operator", async () => {
-        const { app, entries } = build({
-          revoke: async () => {
+        const { app, entries } = await build({
+          revokeIssuedLicense: async () => {
             throw new Error("already revoked");
           },
         });
@@ -236,8 +252,8 @@ describe("the backoffice license registry", () => {
       });
 
       it("keeps a pasted license out of the failure entry too", async () => {
-        const { app, entries } = build({
-          registerLegacy: async () => {
+        const { app, entries } = await build({
+          registerLegacyLicense: async () => {
             throw new Error("not a license this registry can read");
           },
         });
@@ -257,7 +273,7 @@ describe("the backoffice license registry", () => {
 
     /** @scenario "A license key is never kept in the audit trail" */
     it("never writes a license key to the audit log", async () => {
-      const { app, entries } = build();
+      const { app, entries } = await build();
 
       await app.issueLicense({ ...issueInput, operator });
       await app.registerLegacyLicense({
