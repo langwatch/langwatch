@@ -70,6 +70,43 @@ function sourceLine(starts: readonly number[], offset: number): number {
   return low;
 }
 
+type ImportScan = { mode: "export" | "import" | "require" | null; acceptsString: boolean };
+
+const IMPORT_TERMINATORS: ReadonlySet<ts.SyntaxKind> = new Set([
+  ts.SyntaxKind.SemicolonToken,
+  ts.SyntaxKind.FunctionKeyword,
+  ts.SyntaxKind.ClassKeyword,
+]);
+
+/**
+ * The scanner state after one non-specifier token: `import`, `export` and
+ * `require` open a statement, `from` re-opens the specifier slot, and a
+ * semicolon, function or class closes it.
+ */
+function scanAfterToken({
+  scan,
+  token,
+  text,
+}: {
+  scan: ImportScan;
+  token: ts.SyntaxKind;
+  text: string;
+}): ImportScan {
+  if (token === ts.SyntaxKind.ImportKeyword) return { mode: "import", acceptsString: true };
+  if (token === ts.SyntaxKind.ExportKeyword) return { mode: "export", acceptsString: false };
+  if (token === ts.SyntaxKind.Identifier && text === "require") {
+    return { mode: "require", acceptsString: true };
+  }
+  if (token === ts.SyntaxKind.FromKeyword && scan.mode !== null) {
+    return { ...scan, acceptsString: true };
+  }
+  if (IMPORT_TERMINATORS.has(token)) return { mode: null, acceptsString: false };
+  const keepsImportSlot =
+    token === ts.SyntaxKind.OpenParenToken || token === ts.SyntaxKind.TypeKeyword;
+  if (scan.mode === "import" && !keepsImportSlot) return { ...scan, acceptsString: false };
+  return scan;
+}
+
 function importsIn(file: string): SourceImport[] {
   const source = sourceText({ file });
   const lineStarts = sourceLineStarts(source);
@@ -82,61 +119,20 @@ function importsIn(file: string): SourceImport[] {
   );
 
   const found: SourceImport[] = [];
-  let mode: "export" | "import" | "require" | null = null;
-  let acceptsString = false;
+  let scan: ImportScan = { mode: null, acceptsString: false };
 
   for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
-    if (token === ts.SyntaxKind.ImportKeyword) {
-      mode = "import";
-      acceptsString = true;
-      continue;
-    }
-
-    if (token === ts.SyntaxKind.ExportKeyword) {
-      mode = "export";
-      acceptsString = false;
-      continue;
-    }
-
-    if (token === ts.SyntaxKind.Identifier && scanner.getTokenText() === "require") {
-      mode = "require";
-      acceptsString = true;
-      continue;
-    }
-
-    if (token === ts.SyntaxKind.FromKeyword && mode !== null) {
-      acceptsString = true;
-      continue;
-    }
-
-    if (token === ts.SyntaxKind.StringLiteral && mode && acceptsString) {
+    if (token === ts.SyntaxKind.StringLiteral && scan.mode && scan.acceptsString) {
       found.push({
         file,
         line: sourceLine(lineStarts, scanner.getTokenPos()),
         specifier: scanner.getTokenValue(),
       });
-
-      mode = null;
-      acceptsString = false;
+      scan = { mode: null, acceptsString: false };
       continue;
     }
-
-    if (
-      mode === "import" &&
-      token !== ts.SyntaxKind.OpenParenToken &&
-      token !== ts.SyntaxKind.TypeKeyword
-    ) {
-      acceptsString = false;
-    }
-
-    if (
-      token === ts.SyntaxKind.SemicolonToken ||
-      token === ts.SyntaxKind.FunctionKeyword ||
-      token === ts.SyntaxKind.ClassKeyword
-    ) {
-      mode = null;
-      acceptsString = false;
-    }
+    const text = token === ts.SyntaxKind.Identifier ? scanner.getTokenText() : "";
+    scan = scanAfterToken({ scan, token, text });
   }
 
   return found.toSorted(
@@ -217,95 +213,122 @@ function matchingEnterpriseComposition(
   return importer.applicationRole === target.enterpriseCompositionRole;
 }
 
+type SourceImportRule = (input: {
+  pkg: ClassifiedPackage;
+  target: ClassifiedPackage | undefined;
+  sourceImport: SourceImport;
+}) => ArchitectureViolation[];
+
+const applicationImportsApplication: SourceImportRule = ({ pkg, target, sourceImport }) => {
+  if (pkg.kind === "application" && target?.kind === "application") {
+    return [
+      {
+        policy: "application-boundary",
+        file: sourceImport.file,
+        line: sourceImport.line,
+        specifier: sourceImport.specifier,
+        message: `Application ${pkg.applicationRole} cannot import application ${target.applicationRole} source.`,
+        allowed: "Move reusable behaviour to its owning feature or infrastructure package.",
+      },
+    ];
+  }
+  return [];
+};
+
+const mismatchedEnterpriseComposition: SourceImportRule = ({ pkg, target, sourceImport }) => {
+  if (target?.kind === "enterprise-composition" && !matchingEnterpriseComposition(pkg, target)) {
+    return [
+      {
+        policy: "enterprise-composition",
+        file: sourceImport.file,
+        line: sourceImport.line,
+        specifier: sourceImport.specifier,
+        message: `${pkg.name} cannot import the ${target.enterpriseCompositionRole} Enterprise composition.`,
+        allowed:
+          pkg.kind === "application"
+            ? `Use only the Enterprise composition matching apps/${pkg.applicationRole}.`
+            : "Only the matching application composition root may consume this package.",
+      },
+    ];
+  }
+  return [];
+};
+
+const crossedEnterpriseComposition: SourceImportRule = ({ pkg, target, sourceImport }) => {
+  if (pkg.kind === "enterprise-composition" && target?.kind === "enterprise-composition") {
+    return [
+      {
+        policy: "enterprise-composition",
+        file: sourceImport.file,
+        line: sourceImport.line,
+        specifier: sourceImport.specifier,
+        message: "Enterprise API and worker composition packages cannot import one another.",
+      },
+    ];
+  } else if (
+    pkg.kind === "enterprise-composition" &&
+    target?.feature &&
+    !compatibleEnterpriseTarget(target)
+  ) {
+    return [
+      {
+        policy: "enterprise-composition",
+        file: sourceImport.file,
+        line: sourceImport.line,
+        specifier: sourceImport.specifier,
+        message: `The ${pkg.enterpriseCompositionRole} Enterprise composition cannot import ${target.kind} surface ${target.name}.`,
+        allowed: `Depend only on portable contracts and Enterprise ${pkg.enterpriseCompositionRole} or server installers.`,
+      },
+    ];
+  }
+  return [];
+};
+
+const enterpriseRootImportsRuntime: SourceImportRule = ({ pkg, target, sourceImport }) => {
+  const hasImplementationTarget = target !== void 0 && target.kind !== "contract";
+
+  const hasForbiddenRuntimeImport = ENTERPRISE_ROOT_RUNTIME_IMPORT.some((pattern) =>
+    pattern.test(sourceImport.specifier),
+  );
+
+  if (pkg.kind === "enterprise-root" && (hasImplementationTarget || hasForbiddenRuntimeImport)) {
+    return [
+      {
+        policy: "enterprise-composition",
+        file: sourceImport.file,
+        line: sourceImport.line,
+        specifier: sourceImport.specifier,
+        message:
+          "The portable Enterprise catalogue cannot import runtime, transport, persistence, UI, or feature implementation source.",
+        allowed: "Depend only on portable feature contracts.",
+      },
+    ];
+  }
+  return [];
+};
+
+/** Every rule a classified package's source import answers to, in reporting order. */
+const SOURCE_IMPORT_RULES: readonly SourceImportRule[] = [
+  applicationImportsApplication,
+  mismatchedEnterpriseComposition,
+  crossedEnterpriseComposition,
+  enterpriseRootImportsRuntime,
+];
+
 function lintClassifiedSourceImports(
   packages: readonly ClassifiedPackage[],
 ): ArchitectureViolation[] {
-  const violations: ArchitectureViolation[] = [];
-
   const sourcePackages = packages.filter((pkg) =>
     ["application", "dev-runtime", "enterprise-root", "enterprise-composition"].includes(pkg.kind),
   );
 
-  for (const pkg of sourcePackages) {
-    for (const sourceImport of sourceImports(join(pkg.root, "src"))) {
+  return sourcePackages.flatMap((pkg) =>
+    sourceImports(join(pkg.root, "src")).flatMap((sourceImport) => {
       const resolvedTarget = targetPackage(packages, sourceImport);
       const target = resolvedTarget === pkg ? void 0 : resolvedTarget;
-
-      if (pkg.kind === "application" && target?.kind === "application") {
-        violations.push({
-          policy: "application-boundary",
-          file: sourceImport.file,
-          line: sourceImport.line,
-          specifier: sourceImport.specifier,
-          message: `Application ${pkg.applicationRole} cannot import application ${target.applicationRole} source.`,
-          allowed: "Move reusable behaviour to its owning feature or infrastructure package.",
-        });
-      }
-
-      if (
-        target?.kind === "enterprise-composition" &&
-        !matchingEnterpriseComposition(pkg, target)
-      ) {
-        violations.push({
-          policy: "enterprise-composition",
-          file: sourceImport.file,
-          line: sourceImport.line,
-          specifier: sourceImport.specifier,
-          message: `${pkg.name} cannot import the ${target.enterpriseCompositionRole} Enterprise composition.`,
-          allowed:
-            pkg.kind === "application"
-              ? `Use only the Enterprise composition matching apps/${pkg.applicationRole}.`
-              : "Only the matching application composition root may consume this package.",
-        });
-      }
-
-      if (pkg.kind === "enterprise-composition" && target?.kind === "enterprise-composition") {
-        violations.push({
-          policy: "enterprise-composition",
-          file: sourceImport.file,
-          line: sourceImport.line,
-          specifier: sourceImport.specifier,
-          message: "Enterprise API and worker composition packages cannot import one another.",
-        });
-      } else if (
-        pkg.kind === "enterprise-composition" &&
-        target?.feature &&
-        !compatibleEnterpriseTarget(target)
-      ) {
-        violations.push({
-          policy: "enterprise-composition",
-          file: sourceImport.file,
-          line: sourceImport.line,
-          specifier: sourceImport.specifier,
-          message: `The ${pkg.enterpriseCompositionRole} Enterprise composition cannot import ${target.kind} surface ${target.name}.`,
-          allowed: `Depend only on portable contracts and Enterprise ${pkg.enterpriseCompositionRole} or server installers.`,
-        });
-      }
-
-      const hasImplementationTarget = target !== void 0 && target.kind !== "contract";
-
-      const hasForbiddenRuntimeImport = ENTERPRISE_ROOT_RUNTIME_IMPORT.some((pattern) =>
-        pattern.test(sourceImport.specifier),
-      );
-
-      if (
-        pkg.kind === "enterprise-root" &&
-        (hasImplementationTarget || hasForbiddenRuntimeImport)
-      ) {
-        violations.push({
-          policy: "enterprise-composition",
-          file: sourceImport.file,
-          line: sourceImport.line,
-          specifier: sourceImport.specifier,
-          message:
-            "The portable Enterprise catalogue cannot import runtime, transport, persistence, UI, or feature implementation source.",
-          allowed: "Depend only on portable feature contracts.",
-        });
-      }
-    }
-  }
-
-  return violations;
+      return SOURCE_IMPORT_RULES.flatMap((rule) => rule({ pkg, target, sourceImport }));
+    }),
+  );
 }
 
 function productImplementationViolations({

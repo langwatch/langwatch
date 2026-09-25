@@ -149,14 +149,16 @@ function isMigrationFactoryCreateCall(params: {
   );
 }
 
-function constructsOnlyMigration(
-  source: ts.SourceFile,
-  repositoryFile: string,
-  resolver: WorkspaceModuleResolver,
-): boolean {
-  const migrations = migrationClasses(source);
-  if (!migrations.size) return false;
-
+/** The value names imported from the repository, or none when an import is not a named list. */
+function repositoryBindings({
+  source,
+  repositoryFile,
+  resolver,
+}: {
+  source: ts.SourceFile;
+  repositoryFile: string;
+  resolver: WorkspaceModuleResolver;
+}): { supported: boolean; bindings: Set<string> } {
   const bindings = new Set<string>();
 
   for (const statement of source.statements) {
@@ -169,12 +171,24 @@ function constructsOnlyMigration(
       continue;
 
     const imported = statement.importClause?.namedBindings;
-    if (!imported || !ts.isNamedImports(imported)) return false;
+    if (!imported || !ts.isNamedImports(imported)) return { supported: false, bindings };
 
     for (const binding of imported.elements)
       if (!binding.isTypeOnly) bindings.add(binding.name.text);
   }
+  return { supported: true, bindings };
+}
 
+/** Every reference to a binding is a migration's factory `create` call, and there is one. */
+function onlyConstructedByMigrations({
+  source,
+  bindings,
+  migrations,
+}: {
+  source: ts.SourceFile;
+  bindings: Set<string>;
+  migrations: Set<string>;
+}): boolean {
   let valid = bindings.size > 0;
   let constructionCount = 0;
 
@@ -203,8 +217,19 @@ function constructsOnlyMigration(
   };
 
   visit(source);
-
   return valid && constructionCount > 0;
+}
+
+function constructsOnlyMigration(
+  source: ts.SourceFile,
+  repositoryFile: string,
+  resolver: WorkspaceModuleResolver,
+): boolean {
+  const migrations = migrationClasses(source);
+  if (!migrations.size) return false;
+  const { supported, bindings } = repositoryBindings({ source, repositoryFile, resolver });
+  if (!supported) return false;
+  return onlyConstructedByMigrations({ source, bindings, migrations });
 }
 
 function exportedTargets(value: unknown): string[] {
@@ -244,6 +269,160 @@ function isValidLiteralModelArray(params: {
   return new Set(literals).size === literals.length && literals.every((model) => models.has(model));
 }
 
+/** The literal models a `ScopedPrismaClient<[...]>` reference declares as a tuple. */
+function scopeTupleModels(node: ts.TypeReferenceNode): string[][] {
+  const tuple = node.typeArguments?.[0];
+  if (!tuple || !ts.isTupleTypeNode(tuple)) return [];
+  return [
+    tuple.elements.flatMap((element) =>
+      isStringLiteralTypeElement(element) ? [element.literal.text] : [],
+    ),
+  ];
+}
+
+/** How a source uses scopedPrismaClient: direct calls, declared scope tuples, stray references. */
+function scopedClientUse(source: ts.SourceFile): {
+  calls: ts.CallExpression[];
+  scopedTypes: string[][];
+  invalidReference: boolean;
+} {
+  const factories = namedImports(source, OWNERSHIP, "scopedPrismaClient");
+  const scopes = namedImports(source, OWNERSHIP, "ScopedPrismaClient");
+  const scopedTypes: string[][] = [];
+  const calls: ts.CallExpression[] = [];
+  let invalidReference = false;
+
+  const visit = (node: ts.Node): void => {
+    const isFactoryBindingReference =
+      ts.isIdentifier(node) && factories.has(node.text) && !ts.isImportSpecifier(node.parent);
+
+    if (isFactoryBindingReference) {
+      if (ts.isCallExpression(node.parent) && node.parent.expression === node)
+        calls.push(node.parent);
+      else invalidReference = true;
+    }
+
+    if (isScopedTypeReference(node, scopes)) scopedTypes.push(...scopeTupleModels(node));
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(source);
+  return { calls, scopedTypes, invalidReference };
+}
+
+function callMatchesDeclaredScope({
+  call,
+  scopedTypes,
+  models,
+}: {
+  call: ts.CallExpression;
+  scopedTypes: string[][];
+  models: ReadonlySet<string>;
+}): boolean {
+  const argument = call.arguments[1];
+
+  const literals =
+    argument && ts.isArrayLiteralExpression(argument)
+      ? argument.elements.flatMap((element) => (ts.isStringLiteral(element) ? [element.text] : []))
+      : [];
+
+  const validLiteralModels = isValidLiteralModelArray({ argument, literals, models });
+
+  const modelsMismatchDeclaredScope =
+    !validLiteralModels ||
+    !scopedTypes.some(
+      (declared) =>
+        declared.length === literals.length &&
+        declared.every((model, index) => model === literals[index]),
+    );
+  return !modelsMismatchDeclaredScope;
+}
+
+function lintScopedRepository({
+  source,
+  root,
+  feature,
+  resolver,
+  callerFiles,
+  models,
+}: {
+  source: ts.SourceFile;
+  root: string;
+  feature: FeatureCatalogueEntry;
+  resolver: WorkspaceModuleResolver;
+  callerFiles: string[];
+  models: ReadonlySet<string>;
+}): ArchitectureViolation[] {
+  const violations: ArchitectureViolation[] = [];
+  if (!source.text.includes("scopedPrismaClient") || !source.text.includes(OWNERSHIP))
+    return violations;
+
+  const { calls, scopedTypes, invalidReference } = scopedClientUse(source);
+
+  if (!calls.length || invalidReference) {
+    violations.push(
+      violation(
+        source.fileName,
+        "Do not alias, dynamically access or re-export scopedPrismaClient; call its named import directly inside a private migration repository.",
+      ),
+    );
+
+    return violations;
+  }
+
+  const validLocation =
+    /\/process\/src\/repositories\/prisma\/prisma\.[^/]+-migration\.repository\.ts$/.test(
+      source.fileName,
+    );
+
+  const consumers = callerFiles
+    .filter((file) =>
+      moduleImports({ file }).some((imported) => resolver.resolve(imported) === source.fileName),
+    )
+    .map((file) => sourceFile({ file }));
+
+  const owner = resolver.owningPackage({ file: source.fileName });
+
+  const publicEntry =
+    owner &&
+    exportedTargets(owner.exports).some(
+      (target) =>
+        resolver.resolve({ file: owner.manifestPath, specifier: target }) === source.fileName,
+    );
+
+  const isMisplacedOrPublic = !validLocation || publicEntry;
+
+  const hasNoCompliantConsumer =
+    !consumers.length ||
+    consumers.some(
+      (consumer) =>
+        !consumer.fileName.startsWith(join(root, feature.root, "process/src/migrations/")) ||
+        !constructsOnlyMigration(consumer, source.fileName, resolver),
+    );
+
+  if (isMisplacedOrPublic || hasNoCompliantConsumer) {
+    violations.push(
+      violation(
+        source.fileName,
+        "A scoped Prisma repository must be private and constructed only by the owning feature's imported SystemMigration implementation; filenames and decoy migration classes do not grant access.",
+      ),
+    );
+  }
+
+  for (const call of calls) {
+    if (!callMatchesDeclaredScope({ call, scopedTypes, models })) {
+      violations.push(
+        violation(
+          source.fileName,
+          "Migration access needs nonempty literal Prisma models matching its ScopedPrismaClient tuple exactly; computed, duplicate and unknown models are forbidden.",
+        ),
+      );
+    }
+  }
+  return violations;
+}
+
 export function lintPrismaMigrationAccess(
   root: string,
   catalogue: readonly FeatureCatalogueEntry[],
@@ -272,121 +451,9 @@ export function lintPrismaMigrationAccess(
     });
 
     for (const source of sources) {
-      if (!source.text.includes("scopedPrismaClient") || !source.text.includes(OWNERSHIP)) continue;
-
-      const factories = namedImports(source, OWNERSHIP, "scopedPrismaClient");
-      const scopes = namedImports(source, OWNERSHIP, "ScopedPrismaClient");
-      const scopedTypes: string[][] = [];
-      const calls: ts.CallExpression[] = [];
-      let invalidReference = false;
-
-      const visit = (node: ts.Node): void => {
-        const isFactoryBindingReference =
-          ts.isIdentifier(node) && factories.has(node.text) && !ts.isImportSpecifier(node.parent);
-
-        if (isFactoryBindingReference) {
-          if (ts.isCallExpression(node.parent) && node.parent.expression === node)
-            calls.push(node.parent);
-          else invalidReference = true;
-        }
-
-        if (isScopedTypeReference(node, scopes)) {
-          const tuple = node.typeArguments?.[0];
-
-          if (tuple && ts.isTupleTypeNode(tuple))
-            scopedTypes.push(
-              tuple.elements.flatMap((element) =>
-                isStringLiteralTypeElement(element) ? [element.literal.text] : [],
-              ),
-            );
-        }
-
-        ts.forEachChild(node, visit);
-      };
-
-      visit(source);
-
-      if (!calls.length || invalidReference) {
-        violations.push(
-          violation(
-            source.fileName,
-            "Do not alias, dynamically access or re-export scopedPrismaClient; call its named import directly inside a private migration repository.",
-          ),
-        );
-
-        continue;
-      }
-
-      const validLocation =
-        /\/process\/src\/repositories\/prisma\/prisma\.[^/]+-migration\.repository\.ts$/.test(
-          source.fileName,
-        );
-
-      const consumers = callerFiles
-        .filter((file) =>
-          moduleImports({ file }).some(
-            (imported) => resolver.resolve(imported) === source.fileName,
-          ),
-        )
-        .map((file) => sourceFile({ file }));
-
-      const owner = resolver.owningPackage({ file: source.fileName });
-
-      const publicEntry =
-        owner &&
-        exportedTargets(owner.exports).some(
-          (target) =>
-            resolver.resolve({ file: owner.manifestPath, specifier: target }) === source.fileName,
-        );
-
-      const isMisplacedOrPublic = !validLocation || publicEntry;
-
-      const hasNoCompliantConsumer =
-        !consumers.length ||
-        consumers.some(
-          (consumer) =>
-            !consumer.fileName.startsWith(join(root, feature.root, "process/src/migrations/")) ||
-            !constructsOnlyMigration(consumer, source.fileName, resolver),
-        );
-
-      if (isMisplacedOrPublic || hasNoCompliantConsumer) {
-        violations.push(
-          violation(
-            source.fileName,
-            "A scoped Prisma repository must be private and constructed only by the owning feature's imported SystemMigration implementation; filenames and decoy migration classes do not grant access.",
-          ),
-        );
-      }
-
-      for (const call of calls) {
-        const argument = call.arguments[1];
-
-        const literals =
-          argument && ts.isArrayLiteralExpression(argument)
-            ? argument.elements.flatMap((element) =>
-                ts.isStringLiteral(element) ? [element.text] : [],
-              )
-            : [];
-
-        const validLiteralModels = isValidLiteralModelArray({ argument, literals, models });
-
-        const modelsMismatchDeclaredScope =
-          !validLiteralModels ||
-          !scopedTypes.some(
-            (declared) =>
-              declared.length === literals.length &&
-              declared.every((model, index) => model === literals[index]),
-          );
-
-        if (modelsMismatchDeclaredScope) {
-          violations.push(
-            violation(
-              source.fileName,
-              "Migration access needs nonempty literal Prisma models matching its ScopedPrismaClient tuple exactly; computed, duplicate and unknown models are forbidden.",
-            ),
-          );
-        }
-      }
+      violations.push(
+        ...lintScopedRepository({ source, root, feature, resolver, callerFiles, models }),
+      );
     }
   }
 

@@ -73,16 +73,14 @@ function compositionBindingsBeyondFeatureApi(statement: ts.ImportDeclaration): s
     .filter((name) => !FEATURE_API_VOCABULARY.has(name));
 }
 
-function lintContract(
-  snapshot: WorkspaceSnapshot,
-  pkg: ClassifiedPackage,
-): ArchitectureViolation[] {
+/** The contract's service artifacts and feature API files, tests excluded. */
+function contractArtifacts(snapshot: WorkspaceSnapshot, pkg: ClassifiedPackage): string[] {
   const files = snapshot.files({
     directory: `${pkg.root}/src`,
     accept: (path) => /\.[cm]?[jt]sx?$/.test(path),
   });
 
-  const services = files.filter((file) => {
+  return files.filter((file) => {
     const path = workspacePath(`${pkg.root}/src`, file);
     if (TEST_DIRECTORY.test(path)) return false;
 
@@ -90,43 +88,45 @@ function lintContract(
 
     return CONTRACT_ARTIFACT.test(filename) || isFeatureApiContract(path, pkg.feature);
   });
+}
 
+/** A portable feature API may bind only the feature-API vocabulary from @langwatch/kernel. */
+function kernelBindingViolations(api: string): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
+  for (const statement of sourceFile({ file: api }).statements) {
+    if (!ts.isImportDeclaration(statement)) continue;
+    if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
+    if (statement.moduleSpecifier.text !== "@langwatch/kernel") continue;
 
-  if (services.length > 0) {
-    const api = `${pkg.root}/src/${pkg.feature}.api.ts`;
+    const bound = compositionBindingsBeyondFeatureApi(statement);
+    if (bound.length === 0) continue;
 
-    if (existsSync(api)) {
-      for (const statement of sourceFile({ file: api }).statements) {
-        if (!ts.isImportDeclaration(statement)) continue;
-
-        if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
-
-        if (statement.moduleSpecifier.text !== "@langwatch/kernel") continue;
-
-        const bound = compositionBindingsBeyondFeatureApi(statement);
-        if (bound.length === 0) continue;
-
-        violations.push(
-          violation(
-            api,
-            `A portable feature API may bind only the feature-API vocabulary from @langwatch/kernel; it binds ${bound.join(", ")}.`,
-            "Import moduleApi, ModuleApiToken or ModuleName and nothing else; the rest of the runtime root is a composition boundary.",
-          ),
-        );
-      }
-    }
-
-    return violations;
+    violations.push(
+      violation(
+        api,
+        `A portable feature API may bind only the feature-API vocabulary from @langwatch/kernel; it binds ${bound.join(", ")}.`,
+        "Import moduleApi, ModuleApiToken or ModuleName and nothing else; the rest of the runtime root is a composition boundary.",
+      ),
+    );
   }
+  return violations;
+}
 
-  return [
-    violation(
-      `${pkg.root}/src`,
-      "A strict contract package must declare its callable feature API.",
-      "Add src/<feature>.api.ts exporting the <Feature>Api interface and its moduleApi token, and export it from src/index.ts.",
-    ),
-  ];
+function lintContract(
+  snapshot: WorkspaceSnapshot,
+  pkg: ClassifiedPackage,
+): ArchitectureViolation[] {
+  if (contractArtifacts(snapshot, pkg).length === 0) {
+    return [
+      violation(
+        `${pkg.root}/src`,
+        "A strict contract package must declare its callable feature API.",
+        "Add src/<feature>.api.ts exporting the <Feature>Api interface and its moduleApi token, and export it from src/index.ts.",
+      ),
+    ];
+  }
+  const api = `${pkg.root}/src/${pkg.feature}.api.ts`;
+  return existsSync(api) ? kernelBindingViolations(api) : [];
 }
 
 /** The implementation directory a resolved file lives under, package-relative. */
@@ -487,6 +487,84 @@ function parseModule(file: string): ts.SourceFile {
   return sourceFile({ file, kind: ts.ScriptKind.TS });
 }
 
+type BindingOrigin = { file: string; name: string; via: "import" | "export" };
+
+function namedImportOrigins({
+  elements,
+  name,
+  target,
+}: {
+  elements: readonly ts.ImportSpecifier[];
+  name: string;
+  target: string | undefined;
+}): BindingOrigin[] {
+  if (!target) return [];
+  return elements
+    .filter((element) => !element.isTypeOnly && element.name.text === name)
+    .map((element) => ({
+      file: target,
+      name: element.propertyName?.text ?? element.name.text,
+      via: "import" as const,
+    }));
+}
+
+/** Where a value import of `name` in `file` points: its default and named bindings, in order. */
+function importedOrigins({
+  statement,
+  file,
+  name,
+  pkg,
+}: {
+  statement: ts.Statement;
+  file: string;
+  name: string;
+  pkg: ClassifiedPackage;
+}): BindingOrigin[] {
+  if (!ts.isImportDeclaration(statement) || statement.importClause?.isTypeOnly) return [];
+  if (!ts.isStringLiteral(statement.moduleSpecifier)) return [];
+  const clause = statement.importClause;
+  if (!clause) return [];
+  const specifier = statement.moduleSpecifier.text;
+  const origins: BindingOrigin[] = [];
+
+  if (clause.name?.text === name) {
+    const target = resolveSpecifier(file, specifier, pkg);
+    if (target) origins.push({ file: target, name: "default", via: "import" });
+  }
+  if (clause.namedBindings && !ts.isNamespaceImport(clause.namedBindings)) {
+    const target = resolveSpecifier(file, specifier, pkg);
+    origins.push(...namedImportOrigins({ elements: clause.namedBindings.elements, name, target }));
+  }
+  return origins;
+}
+
+/**
+ * Where a value re-export of `name` from `file` points. `export * from` may
+ * forward the name, so it is probed best-effort.
+ */
+function reExportedOrigins({
+  statement,
+  file,
+  name,
+  pkg,
+}: {
+  statement: ts.Statement;
+  file: string;
+  name: string;
+  pkg: ClassifiedPackage;
+}): BindingOrigin[] {
+  if (!ts.isExportDeclaration(statement) || statement.isTypeOnly) return [];
+  if (!statement.moduleSpecifier || !ts.isStringLiteral(statement.moduleSpecifier)) return [];
+  const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
+  if (!target) return [];
+
+  if (!statement.exportClause) return [{ file: target, name, via: "export" }];
+  if (!ts.isNamedExports(statement.exportClause)) return [];
+  return statement.exportClause.elements
+    .filter((element) => !element.isTypeOnly && element.name.text === name)
+    .map((element) => ({ file: target, name: exportName(element), via: "export" as const }));
+}
+
 /**
  * Follows one binding (`name`, exported by `file`) back to the file that
  * actually declares it — through local declarations and
@@ -519,71 +597,22 @@ function resolveBindingOrigin({
     }
   }
 
-  for (const statement of sourceFile.statements) {
-    if (!ts.isImportDeclaration(statement)) continue;
+  const followed = sourceFile.statements.flatMap((statement) => [
+    ...importedOrigins({ statement, file, name, pkg }),
+    ...reExportedOrigins({ statement, file, name, pkg }),
+  ]);
+  const imports = followed.filter((origin) => origin.via === "import");
+  const exports = followed.filter((origin) => origin.via === "export");
 
-    if (statement.importClause?.isTypeOnly) continue;
-
-    if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
-
-    const clause = statement.importClause;
-    if (!clause) continue;
-
-    if (clause.name?.text === name) {
-      const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
-
-      if (
-        target &&
-        resolveBindingOrigin({ file: target, name: "default", pkg, visited, allowTestingDoubles })
-      )
-        return true;
-    }
-
-    if (clause.namedBindings && !ts.isNamespaceImport(clause.namedBindings)) {
-      for (const element of clause.namedBindings.elements) {
-        if (element.isTypeOnly || element.name.text !== name) continue;
-
-        const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
-        const imported = element.propertyName?.text ?? element.name.text;
-
-        if (
-          target &&
-          resolveBindingOrigin({ file: target, name: imported, pkg, visited, allowTestingDoubles })
-        )
-          return true;
-      }
-    }
-  }
-
-  for (const statement of sourceFile.statements) {
-    if (!ts.isExportDeclaration(statement) || statement.isTypeOnly) continue;
-
-    if (!statement.moduleSpecifier || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
-
-    const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
-    if (!target) continue;
-
-    if (statement.exportClause && ts.isNamedExports(statement.exportClause)) {
-      for (const element of statement.exportClause.elements) {
-        if (element.isTypeOnly || element.name.text !== name) continue;
-
-        const boundName = exportName(element);
-
-        if (
-          resolveBindingOrigin({ file: target, name: boundName, pkg, visited, allowTestingDoubles })
-        )
-          return true;
-      }
-      // `export * from "./elsewhere"` may forward the name; best-effort probe.
-    } else if (
-      !statement.exportClause &&
-      resolveBindingOrigin({ file: target, name, pkg, visited, allowTestingDoubles })
-    ) {
-      return true;
-    }
-  }
-
-  return false;
+  return [...imports, ...exports].some((origin) =>
+    resolveBindingOrigin({
+      file: origin.file,
+      name: origin.name,
+      pkg,
+      visited,
+      allowTestingDoubles,
+    }),
+  );
 }
 
 /**
@@ -681,6 +710,75 @@ function fileExposesPrivateValue({
   );
 }
 
+type PrivateExport = { node: ts.Node; specifier: string | undefined };
+
+/**
+ * A re-export from another module. Tested against the resolved file (which
+ * carries its .ts extension, so `fake.<x>.repository.ts` allowances match),
+ * else against the raw specifier, so an unresolvable private path is caught.
+ */
+function privateReExports({
+  statement,
+  specifierText,
+  file,
+  pkg,
+  allowTestingDoubles,
+}: {
+  statement: ts.ExportDeclaration;
+  specifierText: string;
+  file: string;
+  pkg: ClassifiedPackage;
+  allowTestingDoubles: boolean;
+}): PrivateExport[] {
+  const target = resolveSpecifier(file, specifierText, pkg);
+  const originPath = target ? workspacePath(`${pkg.root}/src`, target) : specifierText;
+  const isDouble = allowTestingDoubles && TESTING_ENTRY_DOUBLE.test(originPath);
+  if (PRIVATE_SERVER_EXPORT.test(originPath) && !isDouble) {
+    return [{ node: statement, specifier: specifierText }];
+  }
+  if (!target) return [];
+
+  if (!statement.exportClause || ts.isNamespaceExport(statement.exportClause)) {
+    const exposes = fileExposesPrivateValue({
+      file: target,
+      pkg,
+      visited: new Set(),
+      allowTestingDoubles,
+    });
+    return exposes ? [{ node: statement, specifier: specifierText }] : [];
+  }
+  return privateNamedExports({
+    origin: target,
+    clause: statement.exportClause,
+    pkg,
+    allowTestingDoubles,
+  }).map((element) => ({ node: element, specifier: specifierText }));
+}
+
+function privateExports({
+  statement,
+  file,
+  pkg,
+  allowTestingDoubles,
+}: {
+  statement: ts.ExportDeclaration;
+  file: string;
+  pkg: ClassifiedPackage;
+  allowTestingDoubles: boolean;
+}): PrivateExport[] {
+  if (statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
+    const specifierText = statement.moduleSpecifier.text;
+    return privateReExports({ statement, specifierText, file, pkg, allowTestingDoubles });
+  }
+  if (!statement.exportClause || !ts.isNamedExports(statement.exportClause)) return [];
+  return privateNamedExports({
+    origin: file,
+    clause: statement.exportClause,
+    pkg,
+    allowTestingDoubles,
+  }).map((element) => ({ node: element, specifier: exportName(element) }));
+}
+
 function lintPrivateServerExportsForEntry(
   pkg: ClassifiedPackage,
   file: string,
@@ -710,60 +808,8 @@ function lintPrivateServerExportsForEntry(
 
   for (const statement of sourceFile.statements) {
     if (!ts.isExportDeclaration(statement) || statement.isTypeOnly) continue;
-
-    if (statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
-      const specifierText = statement.moduleSpecifier.text;
-      const target = resolveSpecifier(file, specifierText, pkg);
-      // Test against the resolved file (which carries its .ts extension) when
-      // it resolves; a filename-shaped allowance like `fake.<x>.repository.ts`
-      // only matches with the extension present. Fall back to the raw
-      // specifier when resolution fails, so an unresolvable import naming a
-      // private directory is still caught.
-      const originPath = target ? workspacePath(`${pkg.root}/src`, target) : specifierText;
-
-      if (PRIVATE_SERVER_EXPORT.test(originPath)) {
-        if (!allowTestingDoubles) {
-          add(statement, specifierText);
-          continue;
-        }
-
-        if (!TESTING_ENTRY_DOUBLE.test(originPath)) {
-          add(statement, specifierText);
-          continue;
-        }
-      }
-
-      if (!target) continue;
-
-      if (!statement.exportClause || ts.isNamespaceExport(statement.exportClause)) {
-        if (
-          fileExposesPrivateValue({ file: target, pkg, visited: new Set(), allowTestingDoubles })
-        ) {
-          add(statement, specifierText);
-        }
-      } else if (ts.isNamedExports(statement.exportClause)) {
-        for (const element of privateNamedExports({
-          origin: target,
-          clause: statement.exportClause,
-          pkg,
-          allowTestingDoubles,
-        })) {
-          add(element, specifierText);
-        }
-      }
-
-      continue;
-    }
-
-    if (statement.exportClause && ts.isNamedExports(statement.exportClause)) {
-      for (const element of privateNamedExports({
-        origin: file,
-        clause: statement.exportClause,
-        pkg,
-        allowTestingDoubles,
-      })) {
-        add(element, exportName(element));
-      }
+    for (const exposed of privateExports({ statement, file, pkg, allowTestingDoubles })) {
+      add(exposed.node, exposed.specifier);
     }
   }
 

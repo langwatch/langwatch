@@ -13,6 +13,7 @@ import { nowInstant } from "@langwatch/time";
 import {
   context as otContext,
   propagation,
+  type Span,
   SpanKind,
   SpanStatusCode,
   trace,
@@ -687,6 +688,80 @@ function injectTraceHeaders(c: Context): void {
   }
 }
 
+/** Tags the span with who made the request, records any failure, and ends it. */
+function closeRequestSpan({ c, span, error }: { c: Context; span: Span; error: unknown }): void {
+  const attributes: [string, string | undefined][] = [
+    ["organization.id", c.get("organization")?.id],
+    ["tenant.id", c.get("project")?.id],
+    ["user.id", c.get("user")?.id],
+  ];
+  for (const [key, value] of attributes) {
+    if (value) span.setAttribute(key, value);
+  }
+  if (error) {
+    span.recordException(error as Error);
+    span.setStatus({ code: SpanStatusCode.ERROR });
+  }
+  span.end();
+}
+
+/** Writes the one log record for a finished request. */
+function logRequestOutcome({
+  logger,
+  c,
+  error,
+  start,
+  name,
+}: {
+  logger: ReturnType<typeof createLogger>;
+  c: Context;
+  error: unknown;
+  start: number;
+  name: string | undefined;
+}): void {
+  const duration = nowInstant().epochMilliseconds - start;
+  // Prefer what the error handler resolved. Re-deriving the error and
+  // its status here disagrees with the response whenever the handler
+  // promoted the throw -- a ZodError has no `httpStatus`, so we derived
+  // 500 for an error the caller received as a 422 ValidationError.
+  const resolved = c.get(RESOLVED_ERROR) as ResolvedError | undefined;
+  const requestError = resolved ? resolved.error : error || c.error;
+
+  const statusCode =
+    resolved?.status ?? (requestError ? getStatusCodeFromError(requestError) : c.res.status);
+
+  // The only error record written per failed request - the error handler deliberately
+  // does not log its own copy. `route` is the matched endpoint (`GET /things/:id`), what
+  // you group by when asking which endpoint is failing; absent for a 404 or version guard.
+  const route = c.get(ENDPOINT_ROUTE) as string | undefined;
+  // The family that resolved the route, which is not the family whose
+  // logger claimed the record when several share a base path.
+  const family = (c.get(REQUEST_FAMILY) as string | undefined) ?? name;
+
+  const record: RequestLogData = {
+    method: c.req.method,
+    url: c.req.path,
+    statusCode,
+    duration,
+    userAgent: c.req.header("user-agent") ?? null,
+    error: requestError,
+    extra: {
+      ...(route ? { route } : {}),
+      ...(family ? { family } : {}),
+      ...(resolved?.traceId ? { traceId: resolved.traceId } : {}),
+    },
+  };
+
+  // A status the route DECLARED is an answer, not a fault.
+  if (!requestError && c.get(DECLARED_ANSWER) === true) {
+    logDeclaredAnswer(logger, record);
+
+    return;
+  }
+
+  logHttpRequest(logger, record);
+}
+
 /** Creates a Hono middleware that wraps each request in an OTel span. */
 export function tracerMiddleware(options?: { name?: string }) {
   return async (c: Context, next: Next): Promise<void> => {
@@ -714,30 +789,7 @@ export function tracerMiddleware(options?: { name?: string }) {
 
             isFinished = true;
 
-            const organizationId = c.get("organization")?.id;
-            const projectId = c.get("project")?.id;
-            const userId = c.get("user")?.id;
-
-            if (organizationId) {
-              span.setAttribute("organization.id", organizationId);
-            }
-
-            if (projectId) {
-              span.setAttribute("tenant.id", projectId);
-            }
-
-            if (userId) {
-              span.setAttribute("user.id", userId);
-            }
-
-            const error = requestError ?? c.error;
-
-            if (error) {
-              span.recordException(error as Error);
-              span.setStatus({ code: SpanStatusCode.ERROR });
-            }
-
-            span.end();
+            closeRequestSpan({ c, span, error: requestError ?? c.error });
           };
 
           try {
@@ -803,50 +855,8 @@ export function loggerMiddleware(options?: { name?: string }) {
 
         throw err;
       } finally {
-        const logRequest = () => {
-          const duration = nowInstant().epochMilliseconds - start;
-          // Prefer what the error handler resolved. Re-deriving the error and
-          // its status here disagrees with the response whenever the handler
-          // promoted the throw -- a ZodError has no `httpStatus`, so we derived
-          // 500 for an error the caller received as a 422 ValidationError.
-          const resolved = c.get(RESOLVED_ERROR) as ResolvedError | undefined;
-          const requestError = resolved ? resolved.error : error || c.error;
-
-          const statusCode =
-            resolved?.status ??
-            (requestError ? getStatusCodeFromError(requestError) : c.res.status);
-
-          // The only error record written per failed request - the error handler deliberately
-          // does not log its own copy. `route` is the matched endpoint (`GET /things/:id`), what
-          // you group by when asking which endpoint is failing; absent for a 404 or version guard.
-          const route = c.get(ENDPOINT_ROUTE) as string | undefined;
-          // The family that resolved the route, which is not the family whose
-          // logger claimed the record when several share a base path.
-          const family = (c.get(REQUEST_FAMILY) as string | undefined) ?? options?.name;
-
-          const record: RequestLogData = {
-            method: c.req.method,
-            url: c.req.path,
-            statusCode,
-            duration,
-            userAgent: c.req.header("user-agent") ?? null,
-            error: requestError,
-            extra: {
-              ...(route ? { route } : {}),
-              ...(family ? { family } : {}),
-              ...(resolved?.traceId ? { traceId: resolved.traceId } : {}),
-            },
-          };
-
-          // A status the route DECLARED is an answer, not a fault.
-          if (!requestError && c.get(DECLARED_ANSWER) === true) {
-            logDeclaredAnswer(logger, record);
-
-            return;
-          }
-
-          logHttpRequest(logger, record);
-        };
+        const logRequest = () =>
+          logRequestOutcome({ logger, c, error, start, name: options?.name });
 
         runAfterSSECompletion({
           c,

@@ -153,6 +153,22 @@ function applyUnseenEvents<State, E extends Event>({
 
 // Incremental fold execution: load state, re-fold on miss/out-of-order,
 // apply event, store result. See ADR-066 for store-miss and re-fold logic.
+/** Whether a batch's earliest event lands before what the persisted state already folded. */
+function startsBeforeCheckpoint({
+  earliestOccurredAt,
+  prevLastOccurred,
+}: {
+  earliestOccurredAt: unknown;
+  prevLastOccurred: unknown;
+}): boolean {
+  return (
+    typeof earliestOccurredAt === "number" &&
+    earliestOccurredAt > 0 &&
+    typeof prevLastOccurred === "number" &&
+    earliestOccurredAt < prevLastOccurred
+  );
+}
+
 export class FoldProjectionExecutor {
   /**
    * Events per page for the streaming store-miss re-fold. Bounds the working set —
@@ -519,6 +535,59 @@ export class FoldProjectionExecutor {
   }
 
   /**
+   * A batch whose state could not be loaded: refolds from the history when the
+   * projection asks for it. Answers the refolded state, or none to fold on top.
+   */
+  private async refoldBatchAfterMiss<State, E extends Event>({
+    projection,
+    ordered,
+    context,
+    loaded,
+    miss,
+    appliedEventIds,
+  }: {
+    projection: FoldProjectionDefinition<State, E>;
+    ordered: E[];
+    context: ProjectionStoreContext;
+    loaded: State | null;
+    miss: Parameters<FoldProjectionExecutor["assertUndecodableWasRebuilt"]>[1];
+    appliedEventIds: Parameters<
+      FoldProjectionExecutor["appliedIdsForCommit"]
+    >[0]["loadedAppliedIds"];
+  }): Promise<State[]> {
+    if (loaded !== null) return [];
+    this.assertUndecodableIsRecoverable(projection, miss);
+
+    // Same trusted-absent shortcut as the single-event path above.
+    const absentTrusted = miss === "absent" && this.trustsAbsentMiss(projection);
+    if (absentTrusted && this.shouldRefoldOnMiss(projection)) {
+      incrementEsFoldAbsentMissTrustedTotal(projection.name, "refold");
+    }
+
+    if (!absentTrusted && this.shouldRefoldOnMiss(projection)) {
+      const refolded = await this.refoldUpToDelivered(projection, ordered, context);
+      // Counted as on the single-event path above.
+      incrementEsFoldRefoldOnMissTotal(projection.name, refolded === null ? "absent" : "performed");
+      if (refolded !== null) {
+        await projection.store.store(
+          refolded,
+          withAppliedEventIds(
+            context,
+            this.appliedIdsForCommit({
+              context,
+              loadedAppliedIds: appliedEventIds,
+              deliveredIds: ordered.map((event) => event.id),
+            }),
+          ),
+        );
+        return [refolded];
+      }
+      this.assertUndecodableWasRebuilt(projection, miss);
+    }
+    return [];
+  }
+
+  /**
    * Applies a batch of events in one load/store cycle (O(n) vs O(n²)).
    * Re-folds from scratch if the earliest event is out-of-order.
    */
@@ -559,34 +628,15 @@ export class FoldProjectionExecutor {
       key,
       context: loadContext,
     });
-    if (loaded === null) this.assertUndecodableIsRecoverable(projection, miss);
-
-    // Same trusted-absent shortcut as the single-event path above.
-    const absentTrusted = loaded === null && miss === "absent" && this.trustsAbsentMiss(projection);
-    if (absentTrusted && this.shouldRefoldOnMiss(projection)) {
-      incrementEsFoldAbsentMissTrustedTotal(projection.name, "refold");
-    }
-
-    if (loaded === null && !absentTrusted && this.shouldRefoldOnMiss(projection)) {
-      const refolded = await this.refoldUpToDelivered(projection, ordered, context);
-      // Counted as on the single-event path above.
-      incrementEsFoldRefoldOnMissTotal(projection.name, refolded === null ? "absent" : "performed");
-      if (refolded !== null) {
-        await projection.store.store(
-          refolded,
-          withAppliedEventIds(
-            context,
-            this.appliedIdsForCommit({
-              context,
-              loadedAppliedIds: appliedEventIds,
-              deliveredIds: ordered.map((event) => event.id),
-            }),
-          ),
-        );
-        return refolded;
-      }
-      this.assertUndecodableWasRebuilt(projection, miss);
-    }
+    const refoldedOnMiss = await this.refoldBatchAfterMiss({
+      projection,
+      ordered,
+      context,
+      loaded,
+      miss,
+      appliedEventIds,
+    });
+    if (refoldedOnMiss.length > 0) return refoldedOnMiss[0]!;
 
     const fresh = this.dropAlreadyApplied({
       projectionName: projection.name,
@@ -596,11 +646,8 @@ export class FoldProjectionExecutor {
     });
     // Every event in the batch was a redelivery — the loaded state already
     // reflects them all, so re-storing it would only churn the durable row.
-    if (fresh.length === 0) {
-      return loaded ?? projection.init();
-    }
-
     const loadedState = loaded ?? projection.init();
+    if (fresh.length === 0) return loadedState;
 
     const prevLastOccurred =
       (loadedState as Record<string, unknown>)[projection.LastEventOccurredAtKey] ?? 0;
@@ -613,14 +660,11 @@ export class FoldProjectionExecutor {
     // degraded behavior when no eventLoader exists).
     const isOutOfOrder =
       projection.options?.eventOrdering !== "acceptedAt" &&
-      typeof earliestOccurredAt === "number" &&
-      earliestOccurredAt > 0 &&
-      typeof prevLastOccurred === "number" &&
-      earliestOccurredAt < prevLastOccurred;
+      startsBeforeCheckpoint({ earliestOccurredAt, prevLastOccurred });
 
     let state = loadedState;
     let refolded: State | null = null;
-    if (isOutOfOrder && canRefold(projection, context)) {
+    if (isOutOfOrder && typeof earliestOccurredAt === "number" && canRefold(projection, context)) {
       // CanRefold returns false without an eventLoader.
       // `ordered`, not `fresh`: the replay discards the loaded state, so a
       // redelivered event the history read misses has to be folded in too.

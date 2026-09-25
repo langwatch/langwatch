@@ -188,6 +188,21 @@ export interface SSEFrame {
   [k: string]: unknown;
 }
 
+/** The JSON `data:` frames among complete SSE chunks; a frame that does not parse is skipped. */
+function sseDataFrames(chunks: string[]): SSEFrame[] {
+  const frames: SSEFrame[] = [];
+  for (const chunk of chunks) {
+    const line = chunk.split("\n").find((l) => l.startsWith("data: "));
+    if (!line) continue;
+    try {
+      frames.push(JSON.parse(line.slice("data: ".length)));
+    } catch {
+      continue;
+    }
+  }
+  return frames;
+}
+
 /**
  * Consumes an SSE response body from nlpgo's /go/studio/execute, returning
  * every `data:` frame (nlpgo's writeSSE writes `data: {json}\n\n`, blank-line
@@ -215,18 +230,9 @@ export async function collectSSE(
       buf += decoder.decode(value, { stream: true });
       const chunks = buf.split("\n\n");
       buf = chunks.pop() ?? "";
-      for (const chunk of chunks) {
-        const line = chunk.split("\n").find((l) => l.startsWith("data: "));
-        if (!line) continue;
-        let parsed: SSEFrame;
-        try {
-          parsed = JSON.parse(line.slice("data: ".length));
-        } catch {
-          continue;
-        }
-        frames.push(parsed);
-        if (terminal.has(parsed.type)) sawTerminal = true;
-      }
+      const parsed = sseDataFrames(chunks);
+      frames.push(...parsed);
+      if (parsed.some((frame) => terminal.has(frame.type))) sawTerminal = true;
     }
   } finally {
     try {
