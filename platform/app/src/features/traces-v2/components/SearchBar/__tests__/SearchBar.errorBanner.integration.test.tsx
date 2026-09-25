@@ -19,7 +19,7 @@ import "@testing-library/jest-dom/vitest";
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: undefined,
-    organization: undefined,
+    organization: { id: "org-1" },
     team: undefined,
     isFetching: false,
   }),
@@ -59,6 +59,13 @@ vi.mock("~/utils/api", () => ({
         start: {
           useMutation: () => ({ mutate: vi.fn(), isPending: false }),
         },
+      },
+    },
+    // The Instant Evals gate reads this flag; stub it enabled so nothing
+    // in this suite's crash-path renders the unreleased popover instead.
+    featureFlag: {
+      isEnabled: {
+        useQuery: () => ({ data: { enabled: true }, isLoading: false }),
       },
     },
   },

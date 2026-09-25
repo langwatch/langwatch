@@ -373,10 +373,27 @@ Feature: Instant Evals inside the Trace Explorer
 
     @integration
     Scenario: A missing classifier opens the model popover and the phrase search runs
-      Given the deployment has no classifier
+      Given the deployment has no classifier, or the server refuses the run as not enabled for a released project
       When the Explorer receives an Instant Eval payload
       Then a closable popover says to configure a model
       And closing it applies the phrase search
+
+    @integration
+    Scenario: Instant Evals switched off open the contact-us popover and nothing is searched
+      Given the Instant Evals flag is off for the project
+      When the reader submits an eval chip
+      Then a closable popover anchored under the search bar says Instant Evals aren't enabled for this project and offers to contact us
+      And no estimate is requested and the typed query stays in the bar
+      And closing it, by Escape or a click outside, keeps the typed query and searches nothing
+      And a chip typed alongside other words is refused the same way, before any request
+
+    @integration
+    Scenario: A flag read still in flight lets the submit reach the estimate
+      Given the flag read has not answered yet
+      When the user submits an eval chip
+      Then the estimate is requested
+      And no popover opens before the estimate responds
+      And a server refusal of not_enabled then opens the model popover, never the contact-us one
 
     @integration
     Scenario: Any other refusal falls back to the phrase search

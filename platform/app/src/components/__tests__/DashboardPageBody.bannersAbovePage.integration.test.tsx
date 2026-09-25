@@ -71,9 +71,6 @@ vi.mock("../../hooks/useSavedViews", () => ({
 
 vi.mock("../../utils/api", () => ({
   api: {
-    checkup: {
-      startupNotice: { useQuery: () => ({ data: undefined }) },
-    },
     limits: {
       getUsage: {
         useQuery: () => ({

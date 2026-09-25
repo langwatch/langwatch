@@ -56,7 +56,16 @@ export interface InstantEvalRoutePayload {
  */
 export const INSTANT_EVAL_AUTO_RUN_USD = 0.5;
 
-/** The refusal codes that get a popover of their own, rather than the registry's copy. */
+/**
+ * The refusal codes that get a popover of their own, rather than the
+ * registry's copy.
+ *
+ * The client-side bail in {@link bailUnreleased} catches the flag-off case
+ * only once the flag read has answered. A submit made while that read is
+ * still in flight goes to the server instead, and can come back as this same
+ * `not_enabled` code — so an arriving `not_enabled` is not always a released
+ * project the deployment cannot judge yet, and either case gets this popover.
+ */
 function refusalOf({ error }: { error: unknown }): InstantEvalRefusal | null {
   const handled = readHandledError(error);
   if (!handled) return null;
@@ -309,6 +318,91 @@ function useInstantEvalStarter({
 }
 
 /**
+ * The refusal for a project the flag has not been turned on for: shown
+ * straight away, before any estimate goes out over a run it could never
+ * start. Pending is left null, so dismissing this popover just closes it
+ * rather than applying a fallback query.
+ */
+function bailUnreleased(
+  outcome: Pick<
+    ReturnType<typeof useInstantEvalOutcome>,
+    "pendingRef" | "setConfirmation" | "setRefusal"
+  >,
+) {
+  outcome.pendingRef.current = null;
+  outcome.setConfirmation(null);
+  outcome.setRefusal({ kind: "unreleased" });
+}
+
+/** Confirms or abandons the run sitting in the dialog. */
+function useInstantEvalPendingActions({
+  outcome,
+  seqRef,
+  startRun,
+}: {
+  outcome: ReturnType<typeof useInstantEvalOutcome>;
+  seqRef: MutableRefObject<number>;
+  startRun: (args: PendingRoute & { seq: number }) => void;
+}): {
+  confirmRun: () => void;
+  abandonPendingRun: () => void;
+} {
+  const { pendingRef, setConfirmation, setRefusal } = outcome;
+
+  const confirmRun = useCallback(() => {
+    const pending = pendingRef.current;
+    if (!pending) return;
+    startRun({ ...pending, seq: seqRef.current });
+  }, [pendingRef, seqRef, startRun]);
+
+  const abandonPendingRun = useCallback(() => {
+    seqRef.current += 1;
+    pendingRef.current = null;
+    setConfirmation(null);
+    setRefusal(null);
+  }, [pendingRef, seqRef, setConfirmation, setRefusal]);
+
+  return { confirmRun, abandonPendingRun };
+}
+
+/**
+ * Fires the estimate and, once it lands, either starts the run under the
+ * cost rule or shows the confirmation dialog; a failed estimate is a
+ * refusal like any other.
+ */
+function estimateThenRoute({
+  estimate,
+  route,
+  seqRef,
+  startRun,
+  setConfirmation,
+  refuse,
+}: {
+  estimate: ReturnType<typeof api.tracesV2.instantEval.estimate.useMutation>;
+  route: PendingRoute & { seq: number };
+  seqRef: MutableRefObject<number>;
+  startRun: (args: PendingRoute & { seq: number }) => void;
+  setConfirmation: (value: InstantEvalConfirmation | null) => void;
+  refuse: (args: { error: unknown; payload: InstantEvalRoutePayload }) => void;
+}) {
+  const { payload, key, seq } = route;
+  estimate.mutate(runInput(payload), {
+    onSuccess: (result) => {
+      if (seq !== seqRef.current) return;
+      if (result.priceUsd < INSTANT_EVAL_AUTO_RUN_USD) {
+        startRun({ payload, key, seq });
+        return;
+      }
+      setConfirmation(confirmationOf({ payload, estimate: result }));
+    },
+    onError: (error) => {
+      if (seq !== seqRef.current) return;
+      refuse({ error, payload });
+    },
+  });
+}
+
+/**
  * The Explorer's handler for the `instant_eval` route: the cost rule, the
  * chip and the refusals.
  *
@@ -319,10 +413,19 @@ function useInstantEvalStarter({
  * budget or a missing judge is a popover, and every refusal ends in the
  * phrase search the router built.
  *
+ * A project the flag has not been turned on for never reaches the estimate:
+ * the popover shows straight away, and nothing is sent.
+ *
  * Spec: specs/traces-v2/instant-eval-search.feature ("A run starts under
- * the cost rule", "A refusal is a popover, never an error state").
+ * the cost rule", "A refusal is a popover, never an error state",
+ * "Instant Evals switched off open the contact-us popover and nothing is
+ * searched").
  */
-export function useInstantEvalRoute(): InstantEvalRouteState {
+export function useInstantEvalRoute({
+  isInstantEvalAvailable,
+}: {
+  isInstantEvalAvailable: boolean;
+}): InstantEvalRouteState {
   const estimate = api.tracesV2.instantEval.estimate.useMutation();
   const outcome = useInstantEvalOutcome();
   const { pendingRef, setConfirmation, setRefusal, refuse } = outcome;
@@ -331,23 +434,20 @@ export function useInstantEvalRoute(): InstantEvalRouteState {
     outcome,
     seqRef,
   });
-
-  const confirmRun = useCallback(() => {
-    const pending = pendingRef.current;
-    if (!pending) return;
-    startRun({ ...pending, seq: seqRef.current });
-  }, [pendingRef, startRun]);
-
-  const abandonPendingRun = useCallback(() => {
-    seqRef.current += 1;
-    pendingRef.current = null;
-    setConfirmation(null);
-    setRefusal(null);
-  }, [pendingRef, setConfirmation, setRefusal]);
+  const { confirmRun, abandonPendingRun } = useInstantEvalPendingActions({
+    outcome,
+    seqRef,
+    startRun,
+  });
 
   const onInstantEvalRoute = useCallback(
     (payload: InstantEvalRoutePayload) => {
-      const seq = ++seqRef.current;
+      ++seqRef.current;
+      if (!isInstantEvalAvailable) {
+        bailUnreleased(outcome);
+        return;
+      }
+      const seq = seqRef.current;
       const { timeRange, evalRuns } = useExplorerStore.getState();
       const key = routeRunKey({ payload, presetId: timeRange.presetId });
       pendingRef.current = { payload, key };
@@ -362,24 +462,19 @@ export function useInstantEvalRoute(): InstantEvalRouteState {
         return;
       }
 
-      estimate.mutate(runInput(payload), {
-        onSuccess: (result) => {
-          if (seq !== seqRef.current) return;
-          if (result.priceUsd < INSTANT_EVAL_AUTO_RUN_USD) {
-            startRun({ payload, key, seq });
-            return;
-          }
-          setConfirmation(confirmationOf({ payload, estimate: result }));
-        },
-        onError: (error) => {
-          if (seq !== seqRef.current) return;
-          refuse({ error, payload });
-        },
+      estimateThenRoute({
+        estimate,
+        route: { payload, key, seq },
+        seqRef,
+        startRun,
+        setConfirmation,
+        refuse,
       });
     },
     [
       applyChip,
       estimate,
+      isInstantEvalAvailable,
       pendingRef,
       refuse,
       setConfirmation,

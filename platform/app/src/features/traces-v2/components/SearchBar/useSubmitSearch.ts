@@ -23,6 +23,12 @@ import type { InstantEvalRoutePayload } from "../TracesPage/useInstantEvalRoute"
 interface UseSubmitSearchOptions {
   /** Whether the Langy route is open to this user. */
   isLangyAvailable: boolean;
+  /**
+   * Whether Instant Evals are open to this project. Off, a typed `eval` chip
+   * still shows up in the bar but starts no run — {@link onInstantEval} gets
+   * called with it purely so the refusal popover can be shown.
+   */
+  isInstantEvalAvailable: boolean;
   /** Sample data is client fixtures; a routed search has nothing to run on. */
   isSamplePreview: boolean;
   /** Hands the sentence to Langy as a question. */
@@ -264,6 +270,41 @@ function useRouteSubmit({
   return { route, isRouting: routeSearch.isPending };
 }
 
+/** Where a submit goes, once the typed-eval run and the sentence are known. */
+type SubmitPath =
+  | { kind: "refuse"; run: InstantEvalRoutePayload }
+  | { kind: "filter"; run: InstantEvalRoutePayload | null }
+  | { kind: "requote" }
+  | { kind: "route"; projectId: string };
+
+/**
+ * The routing decision for a non-empty submit, as a pure function of its
+ * inputs.
+ *
+ * Order matters and mirrors the checks a reader would make by hand: a typed
+ * chip the deployment cannot run is refused before anything else is read out
+ * of the text; a text with no bare words is a filter and needs no project or
+ * router; a bare-word text with no project has nothing to route to and is
+ * requoted instead; anything left routes.
+ */
+function submitPathOf({
+  trimmed,
+  projectId,
+  run,
+  isInstantEvalAvailable,
+}: {
+  trimmed: string;
+  projectId: string | null;
+  run: InstantEvalRoutePayload | null;
+  isInstantEvalAvailable: boolean;
+}): SubmitPath {
+  if (run && !isInstantEvalAvailable) return { kind: "refuse", run };
+  const { sentence } = splitBareWords(trimmed);
+  if (!sentence) return { kind: "filter", run };
+  if (!projectId) return { kind: "requote" };
+  return { kind: "route", projectId };
+}
+
 /**
  * What Enter does with the text in the search bar.
  *
@@ -277,6 +318,7 @@ function useRouteSubmit({
  */
 export function useSubmitSearch({
   isLangyAvailable,
+  isInstantEvalAvailable,
   isSamplePreview,
   onLangy,
   onInstantEval,
@@ -305,14 +347,12 @@ export function useSubmitSearch({
   const applyFilter = useCallback(
     ({
       queryText,
-      projectId,
+      run,
     }: {
       queryText: string;
-      projectId: string | null;
+      run: InstantEvalRoutePayload | null;
     }) => {
       applyQueryText(queryText);
-      if (!projectId) return;
-      const run = typedEvalRunOf({ queryText, projectId });
       if (run) onInstantEval(run);
     },
     [applyQueryText, onInstantEval],
@@ -331,21 +371,38 @@ export function useSubmitSearch({
       }
       // The sample preview has no project to search or judge in.
       const projectId = isSamplePreview ? null : (project?.id ?? null);
-      const { sentence } = splitBareWords(trimmed);
-      if (!sentence) {
-        applyFilter({ queryText: trimmed, projectId });
-        return;
+      const run = projectId
+        ? typedEvalRunOf({ queryText: trimmed, projectId })
+        : null;
+      const path = submitPathOf({
+        trimmed,
+        projectId,
+        run,
+        isInstantEvalAvailable,
+      });
+      switch (path.kind) {
+        case "refuse":
+          // Nothing is searched: the typed chip stays in the bar under the
+          // popover that says why the run did not start.
+          onInstantEval(path.run);
+          return;
+        case "filter":
+          applyFilter({ queryText: trimmed, run: path.run });
+          return;
+        case "requote":
+          applyQueryText(requoteBareTerms(trimmed));
+          return;
+        case "route":
+          route({ text: trimmed, seq, projectId: path.projectId });
+          return;
       }
-      if (!projectId) {
-        applyQueryText(requoteBareTerms(trimmed));
-        return;
-      }
-      route({ text: trimmed, seq, projectId });
     },
     [
       applyFilter,
       applyQueryText,
+      isInstantEvalAvailable,
       isSamplePreview,
+      onInstantEval,
       onSupersede,
       project?.id,
       route,
