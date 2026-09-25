@@ -11,6 +11,7 @@ import type { UserApi } from "@langwatch/user-contract";
 
 import type { EntitlementRepositories } from "../../repositories/entitlement.repositories.ts";
 import { MemoryEntitlementRepositories } from "../../repositories/memory/memory.entitlement.repositories.ts";
+import type { UsageLimitResult } from "../../services/usage-enforcement.service.ts";
 import { EntitlementApp } from "../entitlement.app.ts";
 import type { EntitlementInfrastructure } from "../entitlement.app.ts";
 import {
@@ -37,7 +38,17 @@ export class TestUsageCounter implements UsageCounter {
   private constructor(
     private readonly count: UsageCount,
     private readonly usageUnit: UsageUnit,
+    private readonly limit: UsageLimitResult = { exceeded: false },
   ) {}
+
+  /** The same counter, answering `limit` to every enforcement read. */
+  withLimit(limit: UsageLimitResult): TestUsageCounter {
+    return new TestUsageCounter(this.count, this.usageUnit, limit);
+  }
+
+  async checkLimitForOrganization(): Promise<UsageLimitResult> {
+    return this.limit;
+  }
 
   async getCurrentMonthCountForDisplay(): Promise<UsageCount> {
     return this.count;

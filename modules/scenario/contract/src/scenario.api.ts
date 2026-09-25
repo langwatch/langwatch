@@ -377,9 +377,12 @@ export interface ScenarioApi {
   }): Promise<RunConfigurationEntryResponse[]>;
 
   // -- the platform's own links ----------------------------------------------
-  /** The platform's own address for one scenario resource, built from the
-   * project's slug and the path the caller already resolved. */
-  platformUrl(input: { projectSlug: string; path: string }): string;
+  /** The platform's own address for one scenario or run, in the interface the project reads. */
+  platformUrl(input: {
+    projectId: string;
+    projectSlug: string;
+    resource: { scenarioId: string } | { scenarioRunId: string };
+  }): Promise<string>;
   /** The pass/fail counts of one batch run, or null when the project holds none. */
   findBatchSummary(input: {
     projectId: string;

@@ -80,6 +80,14 @@ export class UsageService {
   async checkLimit({ teamId }: { teamId: string }): Promise<UsageLimitResult> {
     const organizationId = await this.organizations.getOrganizationIdByTeamId({ teamId });
 
+    return this.checkLimitForOrganization({ organizationId });
+  }
+
+  async checkLimitForOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<UsageLimitResult> {
     const plan = await this.planResolver(organizationId);
     const count = await this.getCurrentMonthCount({ organizationId, plan });
 

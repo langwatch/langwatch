@@ -89,11 +89,6 @@ function toScenarioResponse(scenario: Scenario): {
   };
 }
 
-/** Where a scenario opens in the platform: its own editor drawer. */
-function scenarioEditorPath(scenarioId: string): string {
-  return `/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${scenarioId}`;
-}
-
 const scenarioNotFoundResponse = {
   404: {
     description: "Scenario not found",
@@ -110,9 +105,19 @@ export function createScenarioRest(): Readonly<{
   namespace: string;
   router: () => RestTransportDeclaration<ScenarioApi>;
 }> {
-  const withPlatformUrl = (app: ScenarioApi, scenario: Scenario, projectSlug: string) => ({
-    ...toScenarioResponse(scenario),
-    platformUrl: app.platformUrl({ projectSlug, path: scenarioEditorPath(scenario.id) }),
+  /** Where a scenario opens: its editor drawer, in the interface the project reads. */
+  const withPlatformUrl = async (input: {
+    app: ScenarioApi;
+    scenario: Scenario;
+    projectId: string;
+    projectSlug: string;
+  }) => ({
+    ...toScenarioResponse(input.scenario),
+    platformUrl: await input.app.platformUrl({
+      projectId: input.projectId,
+      projectSlug: input.projectSlug,
+      resource: { scenarioId: input.scenario.id },
+    }),
   });
 
   return (
@@ -129,11 +134,20 @@ export function createScenarioRest(): Readonly<{
       .handle(async ({ app, scope }, project) => {
         logger.info({ projectId: scope.id }, "Listing scenarios");
         const listed = await app.list({ projectId: scope.id });
-        return listed.map((s) => withPlatformUrl(app, s, project.projectSlug));
+        return Promise.all(
+          listed.map((scenario) =>
+            withPlatformUrl({
+              app,
+              scenario,
+              projectId: scope.id,
+              projectSlug: project.projectSlug,
+            }),
+          ),
+        );
       })
 
       /** Read one scenario by id. */
-      .get("/:scenarioId", "getApiScenariosById")
+      .get("/:id", "getApiScenariosById")
       .withParams(scenarioRestIdParamsSchema)
       .withPermission("scenarios:view")
       .withOutput(scenarioRestResponseWithPlatformUrlSchema)
@@ -143,9 +157,14 @@ export function createScenarioRest(): Readonly<{
       })
       .withMiddleware(projectRestFacts)
       .handle(async ({ app, input, scope }, project) => {
-        logger.info({ projectId: scope.id, scenarioId: input.scenarioId }, "Getting scenario");
-        const scenario = await app.getById({ id: input.scenarioId, projectId: scope.id });
-        return withPlatformUrl(app, scenario, project.projectSlug);
+        logger.info({ projectId: scope.id, scenarioId: input.id }, "Getting scenario");
+        const scenario = await app.getById({ id: input.id, projectId: scope.id });
+        return withPlatformUrl({
+          app,
+          scenario,
+          projectId: scope.id,
+          projectSlug: project.projectSlug,
+        });
       })
 
       // Creating asks for `scenarios:create`, not `scenarios:manage`. Nobody
@@ -185,7 +204,12 @@ export function createScenarioRest(): Readonly<{
           },
           { id: project.actorId, label },
         );
-        return withPlatformUrl(app, scenario, project.projectSlug);
+        return withPlatformUrl({
+          app,
+          scenario,
+          projectId: scope.id,
+          projectSlug: project.projectSlug,
+        });
       })
 
       /**
@@ -193,7 +217,7 @@ export function createScenarioRest(): Readonly<{
        * both apply a partial update, so a client using either verb gets the
        * same behavior instead of a 404 on one of them.
        */
-      .put("/:scenarioId", "putApiScenariosById")
+      .put("/:id", "putApiScenariosById")
       .withParams(scenarioRestIdParamsSchema)
       .withInput(scenarioRestUpdateSchema)
       .withPermission("scenarios:update")
@@ -201,7 +225,7 @@ export function createScenarioRest(): Readonly<{
       .withDocs({ description: "Update an existing scenario", responses: scenarioNotFoundResponse })
       .withMiddleware(projectRestFacts, scenarioRestSurface)
       .handle(async ({ app, input, scope }, project, surface) => {
-        const { scenarioId: id, ...body } = input;
+        const { id, ...body } = input;
         logger.info({ projectId: scope.id, scenarioId: id }, "Updating scenario");
 
         await app.getById({ id, projectId: scope.id });
@@ -210,10 +234,15 @@ export function createScenarioRest(): Readonly<{
           { id, projectId: scope.id, ...scenarioUpdateData(body) },
           { id: project.actorId, label: scenarioAuthorLabel(surface) },
         );
-        return withPlatformUrl(app, scenario, project.projectSlug);
+        return withPlatformUrl({
+          app,
+          scenario,
+          projectId: scope.id,
+          projectSlug: project.projectSlug,
+        });
       })
 
-      .patch("/:scenarioId", "patchApiScenariosById")
+      .patch("/:id", "patchApiScenariosById")
       .withParams(scenarioRestIdParamsSchema)
       .withInput(scenarioRestUpdateSchema)
       .withPermission("scenarios:update")
@@ -221,7 +250,7 @@ export function createScenarioRest(): Readonly<{
       .withDocs({ description: "Update an existing scenario", responses: scenarioNotFoundResponse })
       .withMiddleware(projectRestFacts, scenarioRestSurface)
       .handle(async ({ app, input, scope }, project, surface) => {
-        const { scenarioId: id, ...body } = input;
+        const { id, ...body } = input;
         logger.info({ projectId: scope.id, scenarioId: id }, "Updating scenario");
 
         await app.getById({ id, projectId: scope.id });
@@ -230,13 +259,18 @@ export function createScenarioRest(): Readonly<{
           { id, projectId: scope.id, ...scenarioUpdateData(body) },
           { id: project.actorId, label: scenarioAuthorLabel(surface) },
         );
-        return withPlatformUrl(app, scenario, project.projectSlug);
+        return withPlatformUrl({
+          app,
+          scenario,
+          projectId: scope.id,
+          projectSlug: project.projectSlug,
+        });
       })
 
       // Archiving deliberately still asks for `:manage`. Create and update were
       // refined because access issued at that grain was being refused; nothing
       // is asking to destroy scenarios at a finer grain.
-      .delete("/:scenarioId", "deleteApiScenariosById")
+      .delete("/:id", "deleteApiScenariosById")
       .withParams(scenarioRestIdParamsSchema)
       .withPermission("scenarios:manage")
       .withOutput(scenarioRestArchivedSchema)
@@ -245,14 +279,14 @@ export function createScenarioRest(): Readonly<{
         responses: scenarioNotFoundResponse,
       })
       .handle(async ({ app, input, scope }) => {
-        const { scenarioId: id } = input;
+        const { id } = input;
         logger.info({ projectId: scope.id, scenarioId: id }, "Archiving scenario");
         await app.archive({ id, projectId: scope.id });
         return { id, archived: true };
       })
 
       /** The version history of a scenario, newest first. */
-      .get("/:scenarioId/versions", "getApiScenariosByIdVersions")
+      .get("/:id/versions", "getApiScenariosByIdVersions")
       .withParams(scenarioRestIdParamsSchema)
       .withQuery(scenarioRestListVersionsQuerySchema)
       .withPermission("scenarios:view")
@@ -263,7 +297,7 @@ export function createScenarioRest(): Readonly<{
         responses: scenarioNotFoundResponse,
       })
       .handle(async ({ app, input, scope }) => {
-        const { scenarioId: id, limit, cursor } = input;
+        const { id, limit, cursor } = input;
         logger.info({ projectId: scope.id, scenarioId: id }, "Listing scenario versions");
         const page = await app.listVersions({
           projectId: scope.id,
@@ -290,7 +324,7 @@ export function createScenarioRest(): Readonly<{
        * that names nothing refuses `scenario_version_not_found`, the same
        * code the synthesized Created entry answers: it has no stored snapshot.
        */
-      .get("/:scenarioId/versions/:version", "getApiScenariosByIdVersionsByVersion")
+      .get("/:id/versions/:version", "getApiScenariosByIdVersionsByVersion")
       .withParams(scenarioRestIdVersionParamsSchema)
       .withPermission("scenarios:view")
       .withOutput(scenarioRestVersionDetailResponseSchema)
@@ -305,7 +339,7 @@ export function createScenarioRest(): Readonly<{
         },
       })
       .handle(async ({ app, input, scope }) => {
-        const { scenarioId: id, version } = input;
+        const { id, version } = input;
         logger.info({ projectId: scope.id, scenarioId: id, version }, "Getting scenario version");
         const detail = await app.getVersion({ projectId: scope.id, scenarioId: id, version });
         return {

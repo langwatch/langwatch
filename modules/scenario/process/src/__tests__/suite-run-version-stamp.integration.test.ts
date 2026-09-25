@@ -48,6 +48,10 @@ import type {
 import { PrismaScenarioRepository } from "../repositories/prisma/scenario.repository.ts";
 import { ScenarioService } from "../services/scenario.service.ts";
 
+type SuiteEvaluatorApi = Parameters<
+  typeof SuiteApp.createForTesting
+>[0]["dependencies"]["evaluators"];
+
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
     return next(context.args);
@@ -252,6 +256,7 @@ describe.skipIf(!databaseUrl)("the version stamp on suite runs", () => {
         scenarios: scenarioApi,
         agents: fakeAgentApi(agents),
         prompts: fakePromptApi(),
+        evaluators: createApiFixture<SuiteEvaluatorApi>({}),
         projects: createApiFixture<ProjectApi>({
           findWithTeam: async (id: string) => (id === projectId ? project : null),
         }),

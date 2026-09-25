@@ -5,6 +5,8 @@ import type {
   UsageUnit,
 } from "@langwatch/entitlement-contract";
 
+import type { UsageLimitResult } from "../services/usage-enforcement.service.ts";
+
 /**
  * Sentinel when a counter cannot count, to distinguish from zero usage.
  * An outage must not silently disable metering.
@@ -24,6 +26,9 @@ export interface UsageCounter {
 
   /** Whether this organization is metered in traces or in events. */
   getResolvedUsageUnit(input: Readonly<{ organizationId: string }>): Promise<UsageUnit>;
+
+  /** Main's enforcement read: whether the organization spent its monthly allowance. */
+  checkLimitForOrganization(input: Readonly<{ organizationId: string }>): Promise<UsageLimitResult>;
 }
 
 /**

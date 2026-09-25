@@ -49,6 +49,9 @@ class StubCounter implements UsageCounter {
   async getResolvedUsageUnit(): Promise<"traces" | "events"> {
     return "traces";
   }
+  async checkLimitForOrganization(): Promise<{ exceeded: false }> {
+    return { exceeded: false };
+  }
 }
 
 function serviceOn(plan: Plan, count: UsageCount = 4_200): UsageStatsService {

@@ -4,6 +4,7 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ResourceOwnership } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
@@ -63,6 +64,7 @@ function harness() {
       retention: createApiFixture<DataRetentionApi>(),
       suites: createApiFixture<SuiteApi>(),
       ...scenarioExecutorPeers(),
+      featureFlags: createApiFixture<FeatureFlagApi>(),
     },
     config: scenarioTestConfig,
     resources: {} as ResourceOwnership,
@@ -366,6 +368,7 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
           retention: createApiFixture<DataRetentionApi>(),
           suites: createApiFixture<SuiteApi>(),
           ...scenarioExecutorPeers(),
+          featureFlags: createApiFixture<FeatureFlagApi>(),
         },
         config: scenarioTestConfig,
         resources: {} as ResourceOwnership,
@@ -421,6 +424,7 @@ describe("given a process that supplies no simulations member but does read Clic
         retention: createApiFixture<DataRetentionApi>(),
         suites: createApiFixture<SuiteApi>(),
         ...scenarioExecutorPeers(),
+        featureFlags: createApiFixture<FeatureFlagApi>(),
       },
       config: scenarioTestConfig,
       resources: {} as ResourceOwnership,

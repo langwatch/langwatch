@@ -1,4 +1,6 @@
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { createLogger } from "@langwatch/observability";
+import type { ProjectApi } from "@langwatch/project-contract";
 import {
   DEFAULT_SET_ID,
   encodeContent,
@@ -32,6 +34,8 @@ export class ScenarioEventService {
     scenarioTabs: ScenarioTabRegistry;
     broadcast: ScenarioEventBroadcast;
     traces: TraceApi;
+    entitlement: Pick<EntitlementApi, "assertWithinUsageLimit">;
+    projects: Pick<ProjectApi, "getOrganizationId">;
   }): ScenarioEventService {
     return new ScenarioEventService(input);
   }
@@ -40,22 +44,30 @@ export class ScenarioEventService {
   #scenarioTabs: ScenarioTabRegistry;
   #broadcast: ScenarioEventBroadcast;
   #traces: TraceApi;
+  #entitlement: Pick<EntitlementApi, "assertWithinUsageLimit">;
+  #projects: Pick<ProjectApi, "getOrganizationId">;
 
   private constructor(input: {
     simulations: SimulationService;
     scenarioTabs: ScenarioTabRegistry;
     broadcast: ScenarioEventBroadcast;
     traces: TraceApi;
+    entitlement: Pick<EntitlementApi, "assertWithinUsageLimit">;
+    projects: Pick<ProjectApi, "getOrganizationId">;
   }) {
     this.#simulations = input.simulations;
     this.#scenarioTabs = input.scenarioTabs;
     this.#broadcast = input.broadcast;
     this.#traces = input.traces;
+    this.#entitlement = input.entitlement;
+    this.#projects = input.projects;
   }
 
   async report(input: Pick<ScenarioEventReportInput, "projectId" | "event">): Promise<{
     scenarioSetId: string | null;
   }> {
+    await this.#assertWithinUsageLimit(input.projectId);
+
     logger.info(
       {
         projectId: input.projectId,
@@ -141,6 +153,8 @@ export class ScenarioEventService {
   }
 
   async archive(input: ScenarioEventArchiveInput): Promise<ScenarioEventArchiveResult> {
+    await this.#assertWithinUsageLimit(input.projectId);
+
     const scenarioRunId = input.scenarioRunId;
     const scenarioSetId = input.scenarioSetId;
     if ((scenarioRunId === void 0) === (scenarioSetId === void 0)) {
@@ -199,6 +213,12 @@ export class ScenarioEventService {
       scenarioSetId,
       hasMore: reachedCap,
     };
+  }
+
+  /** Main's `blockTraceUsageExceededMiddleware`: refused with ERR_PLAN_LIMIT past the allowance. */
+  async #assertWithinUsageLimit(projectId: string): Promise<void> {
+    const organizationId = await this.#projects.getOrganizationId(projectId);
+    await this.#entitlement.assertWithinUsageLimit({ organizationId });
   }
 
   async #dispatch(projectId: string, event: ScenarioEvent): Promise<void> {

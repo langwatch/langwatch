@@ -21,9 +21,11 @@ import {
   type UsageLimitWarning,
   type UsageStats,
   type PricingModel,
+  PlanLimitExceededError,
 } from "@langwatch/entitlement-contract";
 import type { Event, StaticPipelineDefinition } from "@langwatch/eventing";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import {
   resolveRequestBound,
@@ -92,6 +94,8 @@ export type EntitlementInfrastructure = Readonly<{
   warnings: UsageWarning;
 }>;
 
+const logger = createLogger("langwatch:usage");
+
 /** How recent an end date has to be for the rollup to read it as "up to now". */
 const RECENT_SPEND_WINDOW_MS = 1000 * 60 * 60;
 
@@ -135,6 +139,7 @@ export class EntitlementApp implements EntitlementApiContract {
 
   #plans: EntitlementService;
   #usage: UsageStatsService;
+  #counter: UsageCounter;
   #nextStep: PlanNextStepService;
   #warnings: UsageWarning;
   #spend: EntitlementRepositories["spend"];
@@ -158,6 +163,7 @@ export class EntitlementApp implements EntitlementApiContract {
       counter: members.counter,
       plans: this.#plans,
     });
+    this.#counter = members.counter;
     this.#nextStep = PlanNextStepService.create({
       catalogue: SelfServePlanCatalogueService.create(),
     });
@@ -234,6 +240,27 @@ export class EntitlementApp implements EntitlementApiContract {
 
   sendUsageLimitWarning(input: SendUsageLimitWarningInput): Promise<UsageLimitWarning> {
     return this.#warnings.sendWarning(input);
+  }
+
+  async assertWithinUsageLimit(input: { organizationId: string }): Promise<void> {
+    const result = await this.#counter.checkLimitForOrganization(input);
+    if (!result.exceeded) return;
+
+    logger.info(
+      {
+        organizationId: input.organizationId,
+        currentMonthMessagesCount: result.count,
+        activePlanName: result.planName,
+        maxMessagesPerMonth: result.maxMessagesPerMonth,
+      },
+      "Organization has reached plan limit",
+    );
+
+    throw new PlanLimitExceededError(result.message, {
+      currentMonthMessagesCount: result.count,
+      maxMessagesPerMonth: result.maxMessagesPerMonth,
+      activePlanName: result.planName,
+    });
   }
 
   /** The daily warning sweep this module's worker hosts, over the warning it composed. */

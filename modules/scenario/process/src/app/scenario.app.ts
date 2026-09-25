@@ -10,6 +10,7 @@ import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommands } from "@langwatch/eventing";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -127,7 +128,6 @@ import {
 } from "../eventing/scenario-lifecycle.pipeline.ts";
 import type { SimulationProcessingPipelineDefinition } from "../eventing/simulation-processing.pipeline.ts";
 import type { ScenarioRepositories } from "../repositories/scenario.repositories.ts";
-import { scenarioPlatformUrl } from "../rules/scenario-platform-url.rules.ts";
 import type { AgentTestService } from "../services/agent-test.service.ts";
 import { ConnectedTargetService } from "../services/connected-target.service.ts";
 import type { ResultAtomsService } from "../services/result-atoms.service.ts";
@@ -137,6 +137,7 @@ import type { ExecutionJobData } from "../services/scenario-execution-pool.servi
 import { ScenarioExecutorService } from "../services/scenario-executor.service.ts";
 import { ScenarioGenerateBoundsService } from "../services/scenario-generate-bounds.service.ts";
 import { ScenarioGenerationService } from "../services/scenario-generation.service.ts";
+import { ScenarioPlatformLinkService } from "../services/scenario-platform-link.service.ts";
 import { ScenarioRunExportDownloadService } from "../services/scenario-run-export-download.service.ts";
 import { ScenarioRunExportService } from "../services/scenario-run-export.service.ts";
 import { ScenarioRunLaunchService } from "../services/scenario-run-launch.service.ts";
@@ -182,6 +183,8 @@ export interface ScenarioAppDependencies {
   runExportDownloads: ScenarioRunExportDownloadService;
   events: ScenarioEventService;
   connectedTargets: ConnectedTargetService;
+  /** The platform's own links, in the interface the project's release flag names. */
+  platformLinks: ScenarioPlatformLinkService;
 }
 
 /**
@@ -224,6 +227,8 @@ export const scenarioAppDependencyTokens = {
   prompts: PromptApi,
   secrets: SecretApi,
   workflows: WorkflowApi,
+  /** Which testing interface a project reads, for the links this module hands out. */
+  featureFlags: FeatureFlagApi,
 };
 
 /**
@@ -338,8 +343,14 @@ export class ScenarioApp implements ScenarioApi {
         scenarioTabs: setup.members.scenarioTabs,
         broadcast: setup.members.broadcast,
         traces: setup.dependencies.traces,
+        entitlement: setup.dependencies.plans,
+        projects: setup.dependencies.projects,
       }),
-      publicBaseUrl: setup.members.publicBaseUrl,
+      platformLinks: ScenarioPlatformLinkService.create({
+        featureFlags: setup.dependencies.featureFlags,
+        projects: setup.dependencies.projects,
+        publicBaseUrl: setup.members.publicBaseUrl,
+      }),
       lifecycle: buildScenarioLifecyclePipeline({
         announce: (signal) => setup.dependencies.billing.recordScenarioCreated(signal),
         claim: (key, ttlSeconds) => setup.members.idempotency.claim(key, ttlSeconds),
@@ -379,7 +390,6 @@ export class ScenarioApp implements ScenarioApi {
   }
 
   #dependencies: ScenarioAppDependencies;
-  readonly #publicBaseUrl: string | undefined;
   readonly #lifecycle: ScenarioLifecyclePipeline;
   #lifecycleCommands: EventingCommands<ScenarioLifecyclePipeline> | undefined;
   readonly #simulationCommands: SimulationCommandDispatcherService;
@@ -388,15 +398,12 @@ export class ScenarioApp implements ScenarioApi {
 
   private constructor(
     dependencies: ScenarioAppDependencies & {
-      publicBaseUrl: string | undefined;
       lifecycle: ScenarioLifecyclePipeline;
       simulationCommands: SimulationCommandDispatcherService;
       simulationProcessing: SimulationProcessingService;
     },
   ) {
-    const { publicBaseUrl, lifecycle, simulationCommands, simulationProcessing, ...rest } =
-      dependencies;
-    this.#publicBaseUrl = publicBaseUrl;
+    const { lifecycle, simulationCommands, simulationProcessing, ...rest } = dependencies;
     this.#lifecycle = lifecycle;
     this.#simulationCommands = simulationCommands;
     this.#simulationProcessing = simulationProcessing;
@@ -424,23 +431,24 @@ export class ScenarioApp implements ScenarioApi {
 
     return {
       success: true,
-      url: this.platformUrl({
+      url: await this.#dependencies.platformLinks.scenarioSetUrl({
+        projectId: input.projectId,
         projectSlug: input.projectSlug,
-        path: `/simulations/${reported.scenarioSetId}`,
+        scenarioSetId: reported.scenarioSetId,
       }),
     };
   }
 
-  offerScenarioBrowserTab(
+  async offerScenarioBrowserTab(
     input: ScenarioEventBrowserTabOfferInput,
   ): Promise<ScenarioEventBrowserTabOfferResult> {
     return this.#dependencies.events.offerBrowserTab({
       ...input,
-      url: this.platformUrl({
+      url: await this.#dependencies.platformLinks.batchRunUrl({
+        projectId: input.projectId,
         projectSlug: input.projectSlug,
-        path: `/simulations/${encodeURIComponent(
-          input.scenarioSetId || DEFAULT_SET_ID,
-        )}/${encodeURIComponent(input.batchRunId)}`,
+        scenarioSetId: input.scenarioSetId || DEFAULT_SET_ID,
+        batchRunId: input.batchRunId,
       }),
     });
   }
@@ -992,18 +1000,13 @@ export class ScenarioApp implements ScenarioApi {
 
   // -- the platform's own links ------------------------------------------
 
-  /**
-   * The platform's own address for one scenario resource. A deployment that
-   * serves these families but named no public origin refuses by name.
-   */
-  platformUrl(input: { projectSlug: string; path: string }): string {
-    if (this.#publicBaseUrl === undefined) {
-      throw new Error(
-        "The scenario REST families were asked for a platform link, but this deployment named no public base URL",
-      );
-    }
-
-    return scenarioPlatformUrl({ publicBaseUrl: this.#publicBaseUrl, ...input });
+  /** A deployment that serves these families but named no public origin refuses by name. */
+  platformUrl(input: {
+    projectId: string;
+    projectSlug: string;
+    resource: { scenarioId: string } | { scenarioRunId: string };
+  }): Promise<string> {
+    return this.#dependencies.platformLinks.resourceUrl(input);
   }
 
   /** The pass/fail counts of one batch run, or null when the project holds none. */

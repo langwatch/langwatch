@@ -12,6 +12,7 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { ResourceOwnership } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -43,6 +44,7 @@ import type { RunConfigurationsService } from "../../services/run-configurations
 
 export const PROJECT_ID = "project_scenario_rest";
 export const PROJECT_SLUG = "scenario-rest-project";
+export const ORGANIZATION_ID = "organization_scenario_rest";
 
 export function createScenarioRestTestApp(
   options: {
@@ -51,6 +53,9 @@ export function createScenarioRestTestApp(
     broadcast?: Partial<ScenarioBroadcast>;
     traces?: Partial<TraceApi>;
     billing?: Partial<BillingApi>;
+    plans?: Partial<EntitlementApi>;
+    featureFlags?: Partial<FeatureFlagApi>;
+    projects?: Partial<ProjectApi>;
   } = {},
 ) {
   const simulations = createApiFixture<SimulationService>(
@@ -74,8 +79,14 @@ export function createScenarioRestTestApp(
     dependencies: {
       agents: createApiFixture<AgentApi>(),
       users: createApiFixture<UserApi>(),
-      projects: createApiFixture<ProjectApi>(),
-      plans: createApiFixture<EntitlementApi>(),
+      projects: createApiFixture<ProjectApi>(
+        options.projects ?? { getOrganizationId: async () => ORGANIZATION_ID },
+        "Project API",
+      ),
+      plans: createApiFixture<EntitlementApi>(
+        options.plans ?? { assertWithinUsageLimit: async () => {} },
+        "Entitlement API",
+      ),
       modelProviders: createApiFixture<ModelProviderApi>(),
       presence: createApiFixture<PresenceApi>(),
       auditLog: createApiFixture<AuditLogApi>(),
@@ -84,6 +95,10 @@ export function createScenarioRestTestApp(
       retention: createApiFixture<DataRetentionApi>(),
       suites: createApiFixture<SuiteApi>(),
       ...scenarioExecutorPeers(),
+      featureFlags: createApiFixture<FeatureFlagApi>(
+        options.featureFlags ?? { isEnabled: async () => false },
+        "Feature flag API",
+      ),
     },
     members: {
       ...scenarioHostMembers,

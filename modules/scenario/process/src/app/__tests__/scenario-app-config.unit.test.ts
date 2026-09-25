@@ -11,6 +11,7 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ResourceOwnership } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
@@ -53,6 +54,7 @@ function buildProductionApp(publicBaseUrl: string | undefined, emitter = new Eve
       retention: createApiFixture<DataRetentionApi>(),
       suites: createApiFixture<SuiteApi>(),
       ...scenarioExecutorPeers(),
+      featureFlags: createApiFixture<FeatureFlagApi>(),
     },
     config: scenarioTestConfig,
     resources: createApiFixture<ResourceOwnership>(),
@@ -85,23 +87,33 @@ function buildProductionApp(publicBaseUrl: string | undefined, emitter = new Eve
 describe("ScenarioApp built the way production composes it", () => {
   describe("given a deployment that configured a public base URL", () => {
     /** @scenario "A scenario's platform link answers when a public base URL is configured" */
-    it("answers a platform link instead of refusing by name", () => {
+    it("answers a platform link instead of refusing by name", async () => {
       const app = buildProductionApp("https://app.langwatch.test");
 
-      expect(app.platformUrl({ projectSlug: "acme", path: "/scenarios/scenario_1" })).toBe(
-        "https://app.langwatch.test/acme/scenarios/scenario_1",
+      await expect(
+        app.platformUrl({
+          projectId: "project_1",
+          projectSlug: "acme",
+          resource: { scenarioId: "scenario_1" },
+        }),
+      ).resolves.toBe(
+        "https://app.langwatch.test/acme/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=scenario_1",
       );
     });
   });
 
   describe("given a deployment that named no public base URL", () => {
     /** @scenario "A scenario's platform link refuses by name without a public base URL" */
-    it("still refuses by name, as it did before this deployment had a config seam", () => {
+    it("still refuses by name, as it did before this deployment had a config seam", async () => {
       const app = buildProductionApp(undefined);
 
-      expect(() => app.platformUrl({ projectSlug: "acme", path: "/scenarios/scenario_1" })).toThrow(
-        /named no public base URL/,
-      );
+      await expect(
+        app.platformUrl({
+          projectId: "project_1",
+          projectSlug: "acme",
+          resource: { scenarioId: "scenario_1" },
+        }),
+      ).rejects.toThrow(/named no public base URL/);
     });
   });
 });

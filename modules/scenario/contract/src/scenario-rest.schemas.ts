@@ -182,7 +182,7 @@ export const scenarioRestUpdateSchema = z.object({
     ),
 });
 
-export const scenarioRestIdParamsSchema = z.object({ scenarioId: z.string().min(1) });
+export const scenarioRestIdParamsSchema = z.object({ id: z.string().min(1) });
 export const scenarioRestIdVersionParamsSchema = z.object({
   ...scenarioRestIdParamsSchema.shape,
   version: z.coerce.number().int().min(1),

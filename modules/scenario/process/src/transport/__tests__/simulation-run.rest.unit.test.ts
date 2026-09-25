@@ -1,3 +1,4 @@
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { SimulationRunStatus, SimulationVerdict } from "@langwatch/scenario-contract";
 import type { SimulationRunData, SimulationService } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -6,6 +7,7 @@ import { createSimulationRunsRest } from "../simulation-run.rest.ts";
 import {
   createScenarioRestTestApp,
   createScenarioRestTestRuntime,
+  ORGANIZATION_ID,
   PROJECT_ID,
   scenarioRestTestErrors,
 } from "./scenario-rest.harness.ts";
@@ -15,6 +17,7 @@ function buildSimulationRunsFamily(
     findBatchSummary?: SimulationService["findBatchSummary"];
     getRunDataForBatchRun?: SimulationService["getRunDataForBatchRun"];
     getRunDataForScenarioSet?: SimulationService["getRunDataForScenarioSet"];
+    featureFlags?: Partial<FeatureFlagApi>;
   } = {},
 ) {
   const findBatchSummary =
@@ -25,6 +28,7 @@ function buildSimulationRunsFamily(
     options.getRunDataForScenarioSet ?? vi.fn<SimulationService["getRunDataForScenarioSet"]>();
   const world = createScenarioRestTestApp({
     simulations: { findBatchSummary, getRunDataForBatchRun, getRunDataForScenarioSet },
+    featureFlags: options.featureFlags,
   });
   const { runtime, projectFacts } = createScenarioRestTestRuntime();
   const declaration = createSimulationRunsRest();
@@ -158,7 +162,8 @@ describe("the simulation-runs REST declaration", () => {
             totalCost: 0.01,
             note: "nightly",
             scenarioVersion: 4,
-            platformUrl: "https://app.langwatch.test/scenario-rest-project/simulations/run-a",
+            platformUrl:
+              "https://app.langwatch.test/scenario-rest-project/simulations?drawer.open=scenarioRunDetail&drawer.scenarioRunId=run-a",
           },
         ],
         hasMore: false,
@@ -167,6 +172,34 @@ describe("the simulation-runs REST declaration", () => {
         projectId: PROJECT_ID,
         scenarioSetId: void 0,
         batchRunId: "batch-a",
+      });
+    });
+  });
+
+  describe("when the project reads Agent Testing", () => {
+    /** @scenario "A simulation run links to its run drawer in the interface the project reads" */
+    it("links every listed run under /agent-testing, reading the flag once", async () => {
+      const isEnabled = vi.fn(async () => true);
+      const family = buildSimulationRunsFamily({
+        featureFlags: { isEnabled },
+        getRunDataForBatchRun: async () => ({
+          changed: true as const,
+          lastUpdatedAt: 2,
+          runs: [run("run-a", "batch-a"), run("run-b", "batch-a")],
+        }),
+      });
+
+      const response = await family.request("/api/simulation-runs?batchRunId=batch-a");
+      const body = await response.json();
+      expect(body.runs.map((listed: { platformUrl: string }) => listed.platformUrl)).toEqual([
+        "https://app.langwatch.test/scenario-rest-project/agent-testing/results?drawer.open=scenarioRunDetail&drawer.scenarioRunId=run-a",
+        "https://app.langwatch.test/scenario-rest-project/agent-testing/results?drawer.open=scenarioRunDetail&drawer.scenarioRunId=run-b",
+      ]);
+      expect(isEnabled).toHaveBeenCalledTimes(1);
+      expect(isEnabled).toHaveBeenCalledWith("release_ui_agent_testing_v2_enabled", {
+        kind: "project",
+        projectId: PROJECT_ID,
+        organizationId: ORGANIZATION_ID,
       });
     });
   });

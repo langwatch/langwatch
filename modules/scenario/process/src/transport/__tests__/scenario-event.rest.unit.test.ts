@@ -1,3 +1,6 @@
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import { PlanLimitExceededError } from "@langwatch/entitlement-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type * as observability from "@langwatch/observability";
 import { SimulationRunStatus } from "@langwatch/scenario-contract";
 import type {
@@ -19,6 +22,7 @@ import { scenarioEventsRest } from "../scenario-event.rest.ts";
 import {
   createScenarioRestTestApp,
   createScenarioRestTestRuntime,
+  ORGANIZATION_ID,
   PROJECT_ID,
   scenarioRestTestErrors,
 } from "./scenario-rest.harness.ts";
@@ -36,12 +40,16 @@ function buildEventFamily(
       purpose: string;
     }) => Promise<{ rewrittenEvent: unknown; refs: readonly { id: string }[] }>;
     authenticated?: boolean;
+    plans?: Partial<EntitlementApi>;
+    featureFlags?: Partial<FeatureFlagApi>;
   } = {},
 ) {
   const world = createScenarioRestTestApp({
     simulations: options.simulations,
     scenarioTabs: options.scenarioTabs,
     broadcast: options.broadcast,
+    plans: options.plans,
+    featureFlags: options.featureFlags,
     traces: {
       extractInlineMediaFromEvent:
         options.extractInlineMedia ??
@@ -423,6 +431,120 @@ describe("the scenario-events REST declaration", () => {
         Array.isArray((context as { stored_object_ids?: unknown }).stored_object_ids),
       );
       expect(entry?.[0]).toMatchObject({ stored_object_ids: ["stored-a", "stored-b"] });
+    });
+  });
+});
+
+describe("the scenario-events usage gate", () => {
+  const planLimitReached = {
+    assertWithinUsageLimit: async () => {
+      throw new PlanLimitExceededError("You reached the limit of 1000 traces for this month", {
+        currentMonthMessagesCount: 1_000,
+        maxMessagesPerMonth: 1_000,
+        activePlanName: "Free",
+      });
+    },
+  };
+
+  describe("when the organization spent its monthly allowance", () => {
+    /** @scenario "A scenario event past the monthly usage limit is refused" */
+    it("refuses the event with the plan limit and dispatches nothing", async () => {
+      const messageSnapshot = vi.fn();
+      const family = buildEventFamily({
+        simulations: { messageSnapshot },
+        plans: planLimitReached,
+      });
+
+      const response = await postJson(family, "/api/scenario-events", messageSnapshotEvent());
+      expect(response.status).toBe(402);
+      await expect(response.json()).resolves.toMatchObject({ error: "ERR_PLAN_LIMIT" });
+      expect(messageSnapshot).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Archiving scenario runs past the monthly usage limit is refused" */
+    it("refuses the archive with the plan limit and deletes nothing", async () => {
+      const deleteRun = vi.fn();
+      const family = buildEventFamily({
+        simulations: { findScenarioRunData: async () => simulationRun("run-a"), deleteRun },
+        plans: planLimitReached,
+      });
+
+      const response = await deleteEvents(family, "?scenarioRunId=run-a");
+      expect(response.status).toBe(402);
+      expect(deleteRun).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the organization is within its allowance", () => {
+    it("asks for the organization the project belongs to", async () => {
+      const assertWithinUsageLimit = vi.fn(async () => {});
+      const family = buildEventFamily({
+        simulations: { messageSnapshot: async () => {} },
+        plans: { assertWithinUsageLimit },
+      });
+
+      const response = await postJson(family, "/api/scenario-events", messageSnapshotEvent());
+      expect(response.status).toBe(201);
+      expect(assertWithinUsageLimit).toHaveBeenCalledWith({ organizationId: ORGANIZATION_ID });
+    });
+  });
+});
+
+describe("the scenario-events links", () => {
+  describe("when the project reads Agent Testing", () => {
+    /** @scenario "A reported event links to its run set in the interface the project reads" */
+    it("answers the external run set under /agent-testing/results", async () => {
+      const family = buildEventFamily({
+        simulations: { messageSnapshot: async () => {} },
+        featureFlags: { isEnabled: async () => true },
+      });
+
+      const response = await postJson(family, "/api/scenario-events", {
+        ...messageSnapshotEvent(),
+        scenarioSetId: "checkout",
+      });
+      await expect(response.json()).resolves.toEqual({
+        success: true,
+        url: "https://app.langwatch.test/scenario-rest-project/agent-testing/results/external:checkout",
+      });
+    });
+
+    /** @scenario "A browser-tab handoff links to its batch in the interface the project reads" */
+    it("hands the batch over under /agent-testing/results", async () => {
+      const family = buildEventFamily({
+        scenarioTabs: { hasLiveTab: async () => false },
+        featureFlags: { isEnabled: async () => true },
+      });
+
+      const response = await postJson(family, "/api/scenario-events/browser-tab", {
+        tabKey: "tab-a",
+        batchRunId: "batch-a",
+        scenarioSetId: "checkout",
+      });
+      await expect(response.json()).resolves.toEqual({
+        delivered: false,
+        url: "https://app.langwatch.test/scenario-rest-project/agent-testing/results/external:checkout/batch-a",
+      });
+    });
+  });
+
+  describe("when the flag cannot be read", () => {
+    /** @scenario "A flag read that fails links to the Simulations pages" */
+    it("answers the Simulations address", async () => {
+      const family = buildEventFamily({
+        simulations: { messageSnapshot: async () => {} },
+        featureFlags: {
+          isEnabled: async () => {
+            throw new Error("flag store unavailable");
+          },
+        },
+      });
+
+      const response = await postJson(family, "/api/scenario-events", messageSnapshotEvent());
+      await expect(response.json()).resolves.toEqual({
+        success: true,
+        url: "https://app.langwatch.test/scenario-rest-project/simulations/default",
+      });
     });
   });
 });

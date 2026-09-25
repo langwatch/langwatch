@@ -21,6 +21,8 @@ import type { UsageStats } from "./usage.ts";
 export interface EntitlementApi {
   getActivePlan(input: ResolvePlanInput): Promise<Plan>;
   getUsage(input: GetUsageInput): Promise<UsageStats>;
+  /** Throws `ERR_PLAN_LIMIT` (402) once the organization spent its monthly allowance. */
+  assertWithinUsageLimit(input: { organizationId: string }): Promise<void>;
   sendUsageLimitWarning(input: SendUsageLimitWarningInput): Promise<UsageLimitWarning>;
   listOrganizationSpend(input: ListOrganizationSpendInput): Promise<ProjectSpendRollup[]>;
   /**

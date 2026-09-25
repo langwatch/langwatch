@@ -161,7 +161,12 @@ export function createSimulationRunsRest(): Readonly<{
         });
 
         return {
-          runs: result.runs.map((r) => withPlatformUrl(app, r, project.projectSlug)),
+          runs: await withPlatformUrls({
+            app,
+            runs: result.runs,
+            projectId,
+            projectSlug: project.projectSlug,
+          }),
           hasMore: result.hasMore,
           nextCursor: result.nextCursor ?? undefined,
         };
@@ -177,7 +182,12 @@ export function createSimulationRunsRest(): Readonly<{
       if (!result.changed) return { runs: [], hasMore: false };
 
       return {
-        runs: result.runs.map((r) => withPlatformUrl(app, r, project.projectSlug)),
+        runs: await withPlatformUrls({
+          app,
+          runs: result.runs,
+          projectId,
+          projectSlug: project.projectSlug,
+        }),
         hasMore: result.hasMore,
         nextCursor: result.nextCursor,
       };
@@ -202,7 +212,7 @@ export function createSimulationRunsRest(): Readonly<{
       });
       if (!run) throw new SimulationRunNotFoundError(input.scenarioRunId);
 
-      return withPlatformUrl(app, run, project.projectSlug);
+      return withPlatformUrl({ app, run, projectId, projectSlug: project.projectSlug });
     })
 
     .get("/batches/list", "getApiSimulationRunsBatchesList")
@@ -278,16 +288,31 @@ async function batchRunsWithPlatformUrls({
   }
 
   const runs = "runs" in result ? result.runs : [];
-  return { runs: runs.map((r) => withPlatformUrl(app, r, projectSlug)), hasMore: false };
+  return { runs: await withPlatformUrls({ app, runs, projectId, projectSlug }), hasMore: false };
 }
 
-function withPlatformUrl(
-  app: ScenarioApi,
-  run: ScenarioRunData,
-  projectSlug: string,
-): z.infer<typeof scenarioRunRestResponseWithPlatformUrlSchema> {
+function withPlatformUrls(input: {
+  app: ScenarioApi;
+  runs: readonly ScenarioRunData[];
+  projectId: string;
+  projectSlug: string;
+}): Promise<z.infer<typeof scenarioRunRestResponseWithPlatformUrlSchema>[]> {
+  return Promise.all(input.runs.map((run) => withPlatformUrl({ ...input, run })));
+}
+
+/** Main's `scenarioRunPlatformUrl`: the run detail drawer, in the interface the project reads. */
+async function withPlatformUrl(input: {
+  app: ScenarioApi;
+  run: ScenarioRunData;
+  projectId: string;
+  projectSlug: string;
+}): Promise<z.infer<typeof scenarioRunRestResponseWithPlatformUrlSchema>> {
   return {
-    ...toRunResponse(run),
-    platformUrl: app.platformUrl({ projectSlug, path: `/simulations/${run.scenarioRunId}` }),
+    ...toRunResponse(input.run),
+    platformUrl: await input.app.platformUrl({
+      projectId: input.projectId,
+      projectSlug: input.projectSlug,
+      resource: { scenarioRunId: input.run.scenarioRunId },
+    }),
   };
 }
