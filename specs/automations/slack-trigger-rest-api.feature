@@ -9,8 +9,7 @@ Feature: The Slack alert trigger door refuses a bad body the way it always has
   caller the server broke and invites a retry of a body that will never be
   accepted, and it hides which field was wrong.
 
-  The route also answers at its bare path, its `/api/v1` alias and each dated
-  version namespace. Those are spellings of one route, so they authenticate
+  The route also answers at its bare path and its `/api/v1` alias. Those are spellings of one route, so they authenticate
   alike; an alias that let a caller in where the canonical path refuses would
   be a way around the credential.
 
@@ -38,5 +37,5 @@ Feature: The Slack alert trigger door refuses a bad body the way it always has
   @integration
   Scenario: Every spelling of the route demands the same credential
     Given a caller the credential chain does not authenticate
-    When it creates a Slack trigger at the bare path, the versioned alias and each dated namespace
+    When it creates a Slack trigger at the bare path and the versioned alias
     Then every one of them is refused
