@@ -23,7 +23,8 @@ export const WEBHOOK_EVENT_TYPES = [
     family: "gateway",
     schemaVersion: "1",
     isEmitting: true,
-    description: "An admitted request settled with unknown cost and flagged for reconciliation.",
+    description:
+      "An admitted request whose confirmation never arrived, settled with unknown cost and flagged for reconciliation. A later gateway.request.completed for the same gateway_request_id supersedes it.",
   },
   {
     type: "gateway.budget.threshold_crossed",
@@ -37,7 +38,7 @@ export const WEBHOOK_EVENT_TYPES = [
     family: "gateway",
     schemaVersion: "1",
     isEmitting: true,
-    description: "A budget reached its cap.",
+    description: "A budget reached its cap; BLOCK budgets now reject requests.",
   },
   {
     type: "gateway.virtual_key.created",
@@ -51,28 +52,29 @@ export const WEBHOOK_EVENT_TYPES = [
     family: "gateway",
     schemaVersion: "1",
     isEmitting: true,
-    description: "A virtual key secret was rotated.",
+    description:
+      "A virtual key's secret was rotated; the previous secret stays valid for its grace window.",
   },
   {
     type: "gateway.virtual_key.disabled",
     family: "gateway",
     schemaVersion: "1",
     isEmitting: true,
-    description: "A virtual key was disabled.",
+    description: "A virtual key was disabled (reversible).",
   },
   {
     type: "gateway.virtual_key.enabled",
     family: "gateway",
     schemaVersion: "1",
     isEmitting: true,
-    description: "A virtual key was enabled.",
+    description: "A previously disabled virtual key was re-enabled.",
   },
   {
     type: "gateway.virtual_key.revoked",
     family: "gateway",
     schemaVersion: "1",
     isEmitting: true,
-    description: "A virtual key was revoked.",
+    description: "A virtual key was revoked (terminal).",
   },
 ] as const satisfies readonly WebhookEventType[];
 

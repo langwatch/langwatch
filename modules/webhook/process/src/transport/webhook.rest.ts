@@ -13,18 +13,19 @@ import {
   type SqsDestinationInput,
   type WebhookEndpointView,
   deliveryListResponseSchema,
-  endpointDtoSchema,
+  endpointArchivedResponseSchema,
   endpointListResponseSchema,
-  endpointWithSecretDtoSchema,
+  endpointResponseSchema,
+  endpointWithSecretResponseSchema,
   eventTypeListResponseSchema,
-  webhookEventEnvelopeSchema,
+  webhookEventResponseSchema,
   webhookEventListResponseSchema,
   createEndpointSchema,
   updateEndpointSchema,
   deliveriesQuerySchema,
   eventsQuerySchema,
-  healthDtoSchema,
-  testFireResultSchema,
+  healthResponseSchema,
+  testFireResponseSchema,
   rollEndpointSecretBodySchema,
   testEndpointBodySchema,
 } from "@langwatch/webhook-contract";
@@ -160,7 +161,7 @@ export const webhookRest: Readonly<{
   .post("/endpoints", "postApiWebhooksV1Endpoints")
   .withInput(createEndpointSchema)
   .withPermission("webhookEndpoints:manage")
-  .withOutput(endpointWithSecretDtoSchema)
+  .withOutput(endpointWithSecretResponseSchema)
   .withStatus(201)
   // Scoped to the organization, not a project: this family authenticates at
   // the org, so that is the tenancy a key is unique within. A replay of a
@@ -184,7 +185,7 @@ export const webhookRest: Readonly<{
       maxInFlight: input.max_in_flight,
     });
 
-    return { ...endpointResponse(endpoint), secret };
+    return { data: { ...endpointResponse(endpoint), secret } };
   })
 
   .get("/endpoints", "getApiWebhooksV1Endpoints")
@@ -205,7 +206,7 @@ export const webhookRest: Readonly<{
   .get("/endpoints/:id", "getApiWebhooksV1EndpointsById")
   .withParams(endpointIdParams)
   .withPermission("webhookEndpoints:view")
-  .withOutput(endpointDtoSchema)
+  .withOutput(endpointResponseSchema)
   .withDocs({
     tags: ["Webhooks"],
     summary: "Get a webhook endpoint",
@@ -215,14 +216,14 @@ export const webhookRest: Readonly<{
     await app.assertEndpointsEntitled(scope.id);
 
     const endpoint = await app.getById({ organizationId: scope.id, endpointId: input.id });
-    return endpointResponse(endpoint);
+    return { data: endpointResponse(endpoint) };
   })
 
   .patch("/endpoints/:id", "patchApiWebhooksV1EndpointsById")
   .withParams(endpointIdParams)
   .withInput(updateEndpointSchema)
   .withPermission("webhookEndpoints:manage")
-  .withOutput(endpointDtoSchema)
+  .withOutput(endpointResponseSchema)
   .withDocs({
     tags: ["Webhooks"],
     summary: "Update a webhook endpoint",
@@ -263,13 +264,13 @@ export const webhookRest: Readonly<{
       endpoint = await app.enable({ organizationId: scope.id, endpointId });
     }
 
-    return endpointResponse(endpoint);
+    return { data: endpointResponse(endpoint) };
   })
 
   .delete("/endpoints/:id", "deleteApiWebhooksV1EndpointsById")
   .withParams(endpointIdParams)
   .withPermission("webhookEndpoints:manage")
-  .withOutput(z.object({ archived: z.literal(true) }))
+  .withOutput(endpointArchivedResponseSchema)
   .withDocs({
     tags: ["Webhooks"],
     summary: "Archive a webhook endpoint",
@@ -279,14 +280,14 @@ export const webhookRest: Readonly<{
     await app.assertEndpointsEntitled(scope.id);
 
     await app.archive({ organizationId: scope.id, endpointId: input.id });
-    return { archived: true as const };
+    return { data: { archived: true as const } };
   })
 
   .post("/endpoints/:id/roll-secret", "postApiWebhooksV1EndpointsByIdRollSecret")
   .withParams(endpointIdParams)
   .withInput(rollEndpointSecretBodySchema)
   .withPermission("webhookEndpoints:manage")
-  .withOutput(endpointWithSecretDtoSchema)
+  .withOutput(endpointWithSecretResponseSchema)
   .withDocs({
     tags: ["Webhooks"],
     summary: "Roll an endpoint's signing secret",
@@ -300,32 +301,34 @@ export const webhookRest: Readonly<{
       organizationId: scope.id,
       endpointId: input.id,
     });
-    return { ...endpointResponse(endpoint), secret };
+    return { data: { ...endpointResponse(endpoint), secret } };
   })
 
   .post("/endpoints/:id/test", "postApiWebhooksV1EndpointsByIdTest")
   .withParams(endpointIdParams)
   .withInput(testEndpointBodySchema)
   .withPermission("webhookEndpoints:manage")
-  .withOutput(testFireResultSchema)
+  .withOutput(testFireResponseSchema)
   .withDocs({
     tags: ["Webhooks"],
     summary: "Send a test event to an endpoint",
     description:
-      "Send a signed test event through the full delivery path. Contract: the route answers 200 whenever the test itself ran; delivered says whether the receiver accepted it, so clients must read the body, not the status code.",
+      "Send a signed test event through the full delivery path. Contract: the route answers 200 whenever the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the body, not the status code.",
   })
   .handle(async ({ app, input, scope }) => {
     await app.assertEndpointsEntitled(scope.id);
 
     const result = await app.testFire({ organizationId: scope.id, endpointId: input.id });
 
-    return result.delivered
-      ? {
-          delivered: true,
-          response_status: result.responseStatus,
-          response_body: result.responseBody,
-        }
-      : { delivered: false, response_status: result.responseStatus, error: result.error };
+    return {
+      data: result.delivered
+        ? {
+            delivered: true,
+            response_status: result.responseStatus,
+            response_body: result.responseBody,
+          }
+        : { delivered: false, response_status: result.responseStatus, error: result.error },
+    };
   })
 
   .get("/endpoints/:id/deliveries", "getApiWebhooksV1EndpointsByIdDeliveries")
@@ -370,7 +373,7 @@ export const webhookRest: Readonly<{
   .get("/endpoints/:id/health", "getApiWebhooksV1EndpointsByIdHealth")
   .withParams(endpointIdParams)
   .withPermission("webhookEndpoints:view")
-  .withOutput(healthDtoSchema)
+  .withOutput(healthResponseSchema)
   .withDocs({
     tags: ["Webhooks"],
     summary: "Read an endpoint's delivery health",
@@ -382,16 +385,18 @@ export const webhookRest: Readonly<{
 
     const report = await app.getHealth({ organizationId: scope.id, endpointId: input.id });
     return {
-      status: toWireEnum(report.status),
-      disabled_reason: report.disabledReason,
-      failing_since: report.failingSince?.toISOString() ?? null,
-      last_success_at: report.lastSuccessAt?.toISOString() ?? null,
-      last_failure_at: report.lastFailureAt?.toISOString() ?? null,
-      oldest_undelivered_age_ms: report.oldestUndeliveredAgeMs,
-      dlq_depth: report.dlqDepth,
-      sends_per_minute: report.sendsPerMinute,
-      success_rate: report.successRate,
-      p95_latency_ms: report.p95LatencyMs,
+      data: {
+        status: toWireEnum(report.status),
+        disabled_reason: report.disabledReason,
+        failing_since: report.failingSince?.toISOString() ?? null,
+        last_success_at: report.lastSuccessAt?.toISOString() ?? null,
+        last_failure_at: report.lastFailureAt?.toISOString() ?? null,
+        oldest_undelivered_age_ms: report.oldestUndeliveredAgeMs,
+        dlq_depth: report.dlqDepth,
+        sends_per_minute: report.sendsPerMinute,
+        success_rate: report.successRate,
+        p95_latency_ms: report.p95LatencyMs,
+      },
     };
   })
 
@@ -449,7 +454,7 @@ export const webhookRest: Readonly<{
   .get("/events/:id", "getApiWebhooksV1EventsById")
   .withParams(endpointIdParams)
   .withPermission("webhookEndpoints:view")
-  .withOutput(webhookEventEnvelopeSchema)
+  .withOutput(webhookEventResponseSchema)
   .withDocs({
     tags: ["Webhooks"],
     summary: "Get one emitted event",
@@ -461,7 +466,7 @@ export const webhookRest: Readonly<{
 
     const event = await app.findEmittedEventById({ organizationId: scope.id, id: input.id });
     if (!event) throw new WebhookEventNotFoundError();
-    return event;
+    return { data: event };
   })
 
   .build();

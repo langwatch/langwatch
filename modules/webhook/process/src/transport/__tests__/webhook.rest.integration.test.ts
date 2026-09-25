@@ -9,7 +9,13 @@
  */
 import { createApiFixture } from "@langwatch/api-fixture";
 import { Temporal } from "@langwatch/time";
-import { WebhookEndpointsNotEntitledError } from "@langwatch/webhook-contract";
+import {
+  endpointArchivedResponseSchema,
+  endpointResponseSchema,
+  endpointWithSecretResponseSchema,
+  webhookEventResponseSchema,
+  WebhookEndpointsNotEntitledError,
+} from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
 import type { WebhookAppDependencies } from "../../app/webhook.app.ts";
@@ -209,9 +215,59 @@ describe("the /api/webhooks/v1 door", () => {
       });
 
       expect(response.status).toBe(201);
-      const body = (await response.json()) as { secret: string; destination_kind: string };
-      expect(body.secret).toBe("whsec_test");
-      expect(body.destination_kind).toBe("http");
+      const body = endpointWithSecretResponseSchema.parse(await response.json());
+      expect(body.data.secret).toBe("whsec_test");
+      expect(body.data.destination_kind).toBe("http");
+    });
+
+    it("answers a single endpoint under `data`, its queue URL included", async () => {
+      const sqsEndpoint = {
+        id: "endpoint-sqs",
+        organizationId: ORGANIZATION_ID,
+        destinationKind: "sqs" as const,
+        url: null,
+        sqs: {
+          queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/spend",
+          region: "us-east-1",
+          accountId: "123456789012",
+          queueName: "spend",
+          credentialMode: "assume_role" as const,
+          roleArn: "arn:aws:iam::123456789012:role/lw",
+          externalId: "ext-1",
+          accessKeyId: null,
+        },
+        enabledEvents: ["gateway.request.completed"],
+        status: "ACTIVE" as const,
+        disabledReason: null,
+        disabledAt: null,
+        failingSince: null,
+        lastSuccessAt: null,
+        lastFailureAt: null,
+        maxBatchSize: 50,
+        maxBatchDelayMs: 5000,
+        maxInFlight: 4,
+        createdAt: new Date("2026-07-20T00:00:00.000Z"),
+        updatedAt: new Date("2026-07-20T00:00:00.000Z"),
+      };
+      const { request } = mountWebhookRest({
+        endpoints: createApiFixture<WebhookAppDependencies["endpoints"]>({
+          getById: async () => sqsEndpoint,
+          archive: async () => undefined,
+        }),
+      });
+
+      const read = await request("/api/webhooks/v1/endpoints/endpoint-sqs");
+      expect(read.status).toBe(200);
+      const body = endpointResponseSchema.parse(await read.json());
+      expect(body.data.sqs?.queue_url).toBe(sqsEndpoint.sqs.queueUrl);
+
+      const archived = await request("/api/webhooks/v1/endpoints/endpoint-sqs", {
+        method: "DELETE",
+      });
+      expect(archived.status).toBe(200);
+      expect(endpointArchivedResponseSchema.parse(await archived.json())).toEqual({
+        data: { archived: true },
+      });
     });
 
     it("refuses a create naming both a http and an sqs destination", async () => {
@@ -266,6 +322,12 @@ describe("the /api/webhooks/v1 door", () => {
       expect(listed.status).toBe(200);
       const body = (await listed.json()) as { data: { id: string }[] };
       expect(body.data.map((event) => event.id)).toEqual(["req-mine:completed"]);
+
+      const mine = await request("/api/webhooks/v1/events/req-mine:completed");
+      expect(mine.status).toBe(200);
+      expect(webhookEventResponseSchema.parse(await mine.json()).data.id).toBe(
+        "req-mine:completed",
+      );
 
       const theirs = await request("/api/webhooks/v1/events/req-theirs:completed");
       expect(theirs.status).toBe(404);

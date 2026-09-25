@@ -10,6 +10,7 @@ import { webhookDestinationKindSchema } from "./webhook.ts";
 export const endpointStatusSchema = z.enum(["active", "disabled"]);
 
 const sqsDestinationDtoSchema = z.object({
+  queue_url: z.string(),
   region: z.string(),
   account_id: z.string(),
   queue_name: z.string(),
@@ -115,6 +116,18 @@ export const webhookEventListResponseSchema = z.object({
   data: z.array(webhookEventEnvelopeSchema),
   next_cursor: nextCursorSchema,
 });
+
+// Every single-resource answer is enveloped under `data` too, as main serves it.
+
+export const endpointResponseSchema = z.object({ data: endpointDtoSchema });
+
+export const endpointWithSecretResponseSchema = z.object({ data: endpointWithSecretDtoSchema });
+
+export const endpointArchivedResponseSchema = z.object({
+  data: z.object({ archived: z.literal(true) }),
+});
+
+export const webhookEventResponseSchema = z.object({ data: webhookEventEnvelopeSchema });
 
 const deliveryControlsSchema = {
   max_batch_size: z.number().int().optional(),
@@ -251,6 +264,10 @@ export const testFireResultSchema = z.object({
   response_body: z.string().optional(),
   error: z.string().optional(),
 });
+
+export const healthResponseSchema = z.object({ data: healthDtoSchema });
+
+export const testFireResponseSchema = z.object({ data: testFireResultSchema });
 
 /** A secret roll takes no body: the endpoint travels in the path. */
 export const rollEndpointSecretBodySchema = z.object({});
