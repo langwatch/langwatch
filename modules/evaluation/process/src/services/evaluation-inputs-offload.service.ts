@@ -126,14 +126,11 @@ export class EvaluationInputsOffloadService {
     }
   }
 
-  async tryResolve(input: {
+  async resolveInputs(input: {
     tenantId: string;
-    inputs: Record<string, unknown> | null;
-  }): Promise<Record<string, unknown> | null> {
-    if (
-      input.inputs === null ||
-      !EvaluationInputsOffloadService.isStoredObjectMarker(input.inputs)
-    ) {
+    inputs: Record<string, unknown>;
+  }): Promise<Record<string, unknown>> {
+    if (!EvaluationInputsOffloadService.isStoredObjectMarker(input.inputs)) {
       return input.inputs;
     }
 

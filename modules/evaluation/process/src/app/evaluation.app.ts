@@ -135,7 +135,7 @@ function createUnavailableEvaluationInfrastructure(processName: string): Evaluat
   return {
     retentionFloor: { getFloorMs: async () => 0 },
     execution: { execute: async () => unavailable("evaluation executor") },
-    inputResolution: { tryResolve: async (input) => input.inputs },
+    inputResolution: { resolveInputs: async (input) => input.inputs },
     environment: { read: () => ({}) },
     customEvaluators: { findAll: async () => [] },
     rescore: { runForTrace: async () => unavailable("trace evaluation runtime") },

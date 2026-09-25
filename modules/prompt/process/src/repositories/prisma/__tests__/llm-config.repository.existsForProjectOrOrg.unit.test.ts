@@ -1,18 +1,16 @@
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  PrismaLlmConfigRepository,
-  type PromptConfigDatabase,
-} from "../prisma.prompt.repository.ts";
+import { PrismaLlmConfigRepository } from "../prisma.prompt.repository.ts";
 
 function makeMockPrisma(findFirstResult: unknown = null) {
   // `findFirst` is kept apart from the typed `prisma` value so assertions
   // inspect the mock's own call history rather than extracting the generated
   // Prisma client's `findFirst` as an unbound method.
   const findFirst = vi.fn(() => Promise.resolve(findFirstResult));
-  const prisma = {
+  const prisma = prismaDouble({
     llmPromptConfig: { findFirst },
-  } as unknown as PromptConfigDatabase;
+  });
   return { prisma, findFirst };
 }
 

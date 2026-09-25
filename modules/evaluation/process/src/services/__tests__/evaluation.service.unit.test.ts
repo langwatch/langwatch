@@ -70,8 +70,8 @@ class FakeExecution implements EvaluationExecution {
 }
 
 class FakeInputsResolution implements EvaluationInputsResolution {
-  tryResolve = vi.fn(
-    async (input: { tenantId: string; inputs: Record<string, unknown> | null }) => input.inputs,
+  resolveInputs = vi.fn(
+    async (input: { tenantId: string; inputs: Record<string, unknown> }) => input.inputs,
   );
 }
 
@@ -187,7 +187,7 @@ describe("EvaluationService", () => {
     const repository = new FakeRepository();
     repository.findInputs = vi.fn(async () => ({ marker: "object_1" }));
     const inputResolution = new FakeInputsResolution();
-    inputResolution.tryResolve.mockResolvedValue({ question: "whole input" });
+    inputResolution.resolveInputs.mockResolvedValue({ question: "whole input" });
     const evaluation = EvaluationService.create({
       repository,
       execution: new FakeExecution(),
@@ -203,7 +203,7 @@ describe("EvaluationService", () => {
         evaluationId: "evaluation_1",
       }),
     ).resolves.toEqual({ question: "whole input" });
-    expect(inputResolution.tryResolve).toHaveBeenCalledWith({
+    expect(inputResolution.resolveInputs).toHaveBeenCalledWith({
       tenantId: "project_1",
       inputs: { marker: "object_1" },
     });

@@ -11,6 +11,7 @@ import { createTenantId } from "@langwatch/eventing";
 import {
   METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
   type MetricProcessingEvent,
+  type CanonicalMetricDataPoint,
 } from "@langwatch/metric-contract";
 import { describe, expect, it } from "vitest";
 
@@ -41,6 +42,54 @@ function encodeAttributes(attributes: Record<string, unknown>): string {
   );
 }
 
+const BASE_DATA_POINT: CanonicalMetricDataPoint = {
+  tenantId: "tenant-1",
+  organizationId: "org-1",
+  pointId: POINT_ID,
+  seriesId: SERIES_ID,
+  resourceSchemaUrl: "",
+  resourceAttributesJson: "[]",
+  resourceAttributeKeys: [],
+  scopeSchemaUrl: "",
+  scopeName: "",
+  scopeVersion: "",
+  scopeAttributesJson: "[]",
+  scopeAttributeKeys: [],
+  metricName: "",
+  metricDescription: "",
+  metricUnit: "",
+  metricKind: "sum",
+  aggregationTemporality: "cumulative",
+  isMonotonic: true,
+  pointAttributesJson: "[]",
+  pointAttributeKeys: [],
+  startTimeUnixNano: "0",
+  timeUnixNano: "1500000000",
+  timeUnixMs: 1_500,
+  flags: 0,
+  valueType: "none",
+  valueInt: null,
+  valueDouble: null,
+  count: null,
+  sum: null,
+  min: null,
+  max: null,
+  explicitBounds: [],
+  bucketCounts: [],
+  exponentialScale: null,
+  exponentialZeroThreshold: null,
+  zeroCount: null,
+  positiveOffset: null,
+  positiveBucketCounts: [],
+  negativeOffset: null,
+  negativeBucketCounts: [],
+  summaryQuantilesJson: "[]",
+  canonicalPayload: "",
+  canonicalSizeBytes: 0,
+  occurredAt: 1_500,
+  acceptedAt: 1_500,
+};
+
 function dataPointEvent({
   metricName,
   attributes = {},
@@ -61,11 +110,16 @@ function dataPointEvent({
   resourceAttributes?: Record<string, unknown>;
 }): MetricProcessingEvent {
   return {
+    id: "event-1",
+    aggregateId: seriesId,
+    aggregateType: "metric_series",
+    createdAt: 1_500,
+    version: "2025-01-01",
     tenantId: createTenantId("tenant-1"),
     type: METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
     occurredAt: 1_500,
     data: {
-      tenantId: "tenant-1",
+      ...BASE_DATA_POINT,
       pointId,
       seriesId,
       metricName,
@@ -80,7 +134,7 @@ function dataPointEvent({
       valueDouble,
       valueInt,
     },
-  } as unknown as MetricProcessingEvent;
+  };
 }
 
 function makeSubscriber() {

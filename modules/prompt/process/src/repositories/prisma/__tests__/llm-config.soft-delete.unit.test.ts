@@ -1,13 +1,11 @@
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import type { LlmConfigWithLatestVersion } from "../../prompt.repository.ts";
-import {
-  PrismaLlmConfigRepository,
-  type PromptConfigDatabase,
-} from "../prisma.prompt.repository.ts";
+import { PrismaLlmConfigRepository } from "../prisma.prompt.repository.ts";
 
 function makeMockPrisma(overrides: Record<string, unknown> = {}) {
-  return {
+  return prismaDouble({
     llmPromptConfig: {
       findFirst: vi.fn(() => Promise.resolve(null)),
       findMany: vi.fn(() => Promise.resolve([])),
@@ -23,7 +21,7 @@ function makeMockPrisma(overrides: Record<string, unknown> = {}) {
         }),
       ),
     },
-  } as unknown as PromptConfigDatabase;
+  });
 }
 
 describe("PrismaLlmConfigRepository", () => {

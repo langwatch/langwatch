@@ -4,6 +4,7 @@ import {
   findExperimentDefinitionViolations,
   type FeatureFlagExperiment,
 } from "./feature-flag-experiment.ts";
+import { UnknownFeatureFlagError } from "./feature-flag.errors.ts";
 import {
   FEATURE_FLAG_FAMILIES,
   FEATURE_FLAGS,
@@ -38,7 +39,7 @@ export interface FeatureFlagRegistry {
    */
   readonly frontendMapSchema: z.ZodType<Record<FrontendFeatureFlag, boolean>>;
   readonly publicAnonymousMapSchema: z.ZodType<PublicAnonymousFlagMap>;
-  resolve(key: string): FeatureFlagDefinition | undefined;
+  getDefinition(key: string): FeatureFlagDefinition;
   experiments(): readonly RegisteredExperiment[];
 }
 
@@ -74,12 +75,8 @@ export function createFeatureFlagRegistry({
     return definition.experiment && key ? [{ key, experiment: definition.experiment }] : [];
   });
 
-  const frontendMapSchema = z
-    .object(Object.fromEntries(browserVisibleKeys.map((key) => [key, z.boolean()])))
-    .strict();
-  const publicAnonymousMapSchema = z
-    .object(Object.fromEntries(publicAnonymousKeys.map((key) => [key, z.boolean()])))
-    .strict();
+  const frontendMapSchema = z.record(z.enum(browserVisibleKeys), z.boolean());
+  const publicAnonymousMapSchema = z.record(z.enum(publicAnonymousKeys), z.boolean());
 
   return {
     definitions,
@@ -88,7 +85,7 @@ export function createFeatureFlagRegistry({
     publicAnonymousKeys,
     frontendMapSchema,
     publicAnonymousMapSchema,
-    resolve(key: string): FeatureFlagDefinition | undefined {
+    getDefinition(key: string): FeatureFlagDefinition {
       const explicit = byKey.get(key);
       if (explicit) return explicit;
 
@@ -105,7 +102,7 @@ export function createFeatureFlagRegistry({
         };
       }
 
-      return undefined;
+      throw new UnknownFeatureFlagError(key);
     },
     experiments: () => experiments,
   };

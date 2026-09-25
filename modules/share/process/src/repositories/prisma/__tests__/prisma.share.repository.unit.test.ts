@@ -1,8 +1,7 @@
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaShareRepository } from "../prisma.share.repository.ts";
-
-type ShareDatabase = Parameters<typeof PrismaShareRepository.create>[0]["prisma"];
 
 /**
  * Tenant-isolation guard: resource-addressed queries must include projectId.
@@ -11,7 +10,7 @@ type ShareDatabase = Parameters<typeof PrismaShareRepository.create>[0]["prisma"
 describe("PrismaShareRepository tenant scoping", () => {
   const buildRepository = (shareLink: Record<string, unknown>) =>
     PrismaShareRepository.create({
-      prisma: { shareLink } as unknown as ShareDatabase,
+      prisma: prismaDouble({ shareLink }),
     });
 
   describe("when looking a link up by id", () => {

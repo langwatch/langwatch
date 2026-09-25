@@ -1,9 +1,7 @@
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  PrismaPromptTagAssignmentRepository,
-  type PromptTagAssignmentDatabase,
-} from "../prisma.prompt-tag-assignment.repository.ts";
+import { PrismaPromptTagAssignmentRepository } from "../prisma.prompt-tag-assignment.repository.ts";
 
 /**
  * The individual mocks are returned alongside the typed `prisma` value so
@@ -15,11 +13,11 @@ function makeMockPrisma(overrides: Record<string, unknown> = {}) {
   const findFirst = vi.fn();
   const findMany = vi.fn();
   const versionFindFirst = vi.fn();
-  const prisma = {
+  const prisma = prismaDouble({
     promptTagAssignment: { upsert, findFirst, findMany },
     llmPromptConfigVersion: { findFirst: versionFindFirst },
     ...overrides,
-  } as unknown as PromptTagAssignmentDatabase;
+  });
   return { prisma, upsert, findFirst, findMany, versionFindFirst };
 }
 

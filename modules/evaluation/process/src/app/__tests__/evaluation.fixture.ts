@@ -119,10 +119,10 @@ class UnreachableRetentionFloor implements EvaluationRetentionFloor {
 }
 
 class PassThroughInputsResolution implements EvaluationInputsResolution {
-  async tryResolve(input: {
+  async resolveInputs(input: {
     tenantId: string;
-    inputs: Record<string, unknown> | null;
-  }): Promise<Record<string, unknown> | null> {
+    inputs: Record<string, unknown>;
+  }): Promise<Record<string, unknown>> {
     return input.inputs;
   }
 }

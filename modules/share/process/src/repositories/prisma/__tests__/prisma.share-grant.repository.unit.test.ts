@@ -1,3 +1,4 @@
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaShareGrantRepository } from "../prisma.share-grant.repository.ts";
@@ -10,8 +11,6 @@ import { PrismaShareGrantRepository } from "../prisma.share-grant.repository.ts"
 
 const ORGANIZATION_ID = "organization_share_1";
 const PROJECT_ID = "project_share_1";
-
-type GrantDatabase = Parameters<typeof PrismaShareGrantRepository.create>[0]["prisma"];
 
 /** What a conditioned `update` raises when its filter matches no row. */
 const recordNotFound = () => Object.assign(new Error("record not found"), { code: "P2025" });
@@ -38,10 +37,11 @@ function buildRepository(usage: {
     findMany: vi.fn().mockResolvedValue([]),
     update: vi.fn().mockResolvedValue(void 0),
   };
-  const transaction = vi.fn(async (run: (tx: unknown) => Promise<unknown>) =>
-    run({ grantUsage, shareLink: { update: compatMirror } }),
-  );
-  const prisma = {
+  const transaction = vi.fn(async (run: unknown) => {
+    if (typeof run !== "function") throw new Error("expected an interactive transaction");
+    return run({ grantUsage, shareLink: { update: compatMirror } });
+  });
+  const prisma = prismaDouble({
     project: {
       findUnique: vi.fn().mockResolvedValue({ team: { organizationId: ORGANIZATION_ID } }),
     },
@@ -49,7 +49,7 @@ function buildRepository(usage: {
     grantUsage: rootGrantUsage,
     shareLink,
     $transaction: transaction,
-  } as unknown as GrantDatabase;
+  });
 
   return {
     grantUsage,
@@ -224,13 +224,13 @@ describe("PrismaShareGrantRepository", () => {
 
 function buildGrantReader() {
   const grant = { findMany: vi.fn().mockResolvedValue([]) };
-  const prisma = {
+  const prisma = prismaDouble({
     project: { findUnique: vi.fn().mockResolvedValue(null) },
     grant,
     grantUsage: { update: vi.fn(), create: vi.fn() },
     shareLink: { findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn() },
     $transaction: vi.fn(),
-  } as unknown as GrantDatabase;
+  });
 
   return { prismaGrant: grant, repository: PrismaShareGrantRepository.create({ prisma }) };
 }

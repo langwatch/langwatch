@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import {
   PrismaLlmConfigRepository,
@@ -9,15 +10,15 @@ describe("PrismaLlmConfigRepository", () => {
   // Held apart from `prisma` so assertions inspect the mock's own call
   // history rather than extracting the generated Prisma client's `update`
   // as an unbound method.
-  let update: ReturnType<typeof vi.fn>;
+  let update: Mock<(...args: unknown[]) => Promise<unknown>>;
   let prisma: PromptConfigDatabase;
   let repository: PrismaLlmConfigRepository;
 
   beforeEach(() => {
-    update = vi.fn().mockResolvedValue(undefined);
-    prisma = {
+    update = vi.fn<(...args: unknown[]) => Promise<unknown>>().mockResolvedValue(undefined);
+    prisma = prismaDouble({
       llmPromptConfig: { update },
-    } as unknown as PromptConfigDatabase;
+    });
     repository = PrismaLlmConfigRepository.create({ prisma });
   });
 

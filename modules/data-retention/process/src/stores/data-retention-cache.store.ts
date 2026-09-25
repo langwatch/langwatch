@@ -3,9 +3,12 @@ import {
   type ResolvedRetention,
 } from "@langwatch/data-retention-contract";
 
+/** A cache read: the retention held under the key, or a miss the caller resolves. */
+export type CachedRetentionLookup = { kind: "hit"; value: ResolvedRetention } | { kind: "miss" };
+
 /** Internal cache port; cache implementation and wiring stay server-owned. */
 export abstract class DataRetentionCacheStore {
-  abstract get(key: string): Promise<ResolvedRetention | undefined>;
+  abstract get(key: string): Promise<CachedRetentionLookup>;
   abstract set(key: string, value: ResolvedRetention): Promise<void>;
   abstract delete(key: string): Promise<void>;
 }
@@ -67,15 +70,15 @@ export class RedisDataRetentionCacheStore extends DataRetentionCacheStore {
     this.ttlSeconds = Math.ceil(ttlMs / 1_000);
   }
 
-  async get(key: string): Promise<ResolvedRetention | undefined> {
+  async get(key: string): Promise<CachedRetentionLookup> {
     if (this.redis) {
       try {
         const encoded = await this.redis.get(this.redisKey(key));
         if (encoded !== null) {
-          return resolvedRetentionSchema.parse(JSON.parse(encoded));
+          return { kind: "hit", value: resolvedRetentionSchema.parse(JSON.parse(encoded)) };
         }
 
-        return void 0;
+        return { kind: "miss" };
       } catch {
         // Redis is an acceleration path. The warm process-local shadow remains
         // authoritative for this process while Redis is unavailable.
@@ -114,19 +117,19 @@ export class RedisDataRetentionCacheStore extends DataRetentionCacheStore {
     }
   }
 
-  private getFromMemory(key: string): ResolvedRetention | undefined {
+  private getFromMemory(key: string): CachedRetentionLookup {
     const entry = this.memory.get(key);
     if (!entry) {
-      return void 0;
+      return { kind: "miss" };
     }
 
     if (this.now() > entry.expiresAt) {
       this.memory.delete(key);
 
-      return void 0;
+      return { kind: "miss" };
     }
 
-    return entry.value;
+    return { kind: "hit", value: entry.value };
   }
 
   private redisKey(key: string): string {

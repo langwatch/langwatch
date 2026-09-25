@@ -162,10 +162,10 @@ export interface ExecuteEvaluationCommandDeps {
 
 /** Resolves Evaluation-owned durable input markers at the read boundary. */
 export interface EvaluationInputsResolution {
-  tryResolve(input: {
+  resolveInputs(input: {
     tenantId: string;
-    inputs: Record<string, unknown> | null;
-  }): Promise<Record<string, unknown> | null>;
+    inputs: Record<string, unknown>;
+  }): Promise<Record<string, unknown>>;
 }
 
 /** Persists the billable cost of a completed Evaluation execution. */

@@ -13,7 +13,10 @@ import {
 import { MemoryDataRetentionRepository } from "../../repositories/memory/memory.data-retention.repository.ts";
 import { MemoryPinnedTraceRepository } from "../../repositories/memory/memory.pinned-trace.repository.ts";
 import { MemoryRetroactiveRetentionRepository } from "../../repositories/memory/memory.retroactive-retention.repository.ts";
-import { DataRetentionCacheStore } from "../../stores/data-retention-cache.store.ts";
+import {
+  type CachedRetentionLookup,
+  DataRetentionCacheStore,
+} from "../../stores/data-retention-cache.store.ts";
 import { DataRetentionService } from "../data-retention.service.ts";
 import { StorageMeterService } from "../storage-meter.service.ts";
 
@@ -35,8 +38,9 @@ class RecordingCache extends DataRetentionCacheStore {
   readonly values = new Map<string, ResolvedRetention>();
   readonly deleted: string[] = [];
 
-  async get(key: string): Promise<ResolvedRetention | undefined> {
-    return this.values.get(key);
+  async get(key: string): Promise<CachedRetentionLookup> {
+    const value = this.values.get(key);
+    return value === undefined ? { kind: "miss" } : { kind: "hit", value };
   }
 
   async set(key: string, value: ResolvedRetention): Promise<void> {

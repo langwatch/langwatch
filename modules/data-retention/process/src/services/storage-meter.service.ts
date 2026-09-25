@@ -29,6 +29,8 @@ const storageMeterRowSchema = z
   .object({ total: z.union([z.string(), z.number()]).nullable().optional() })
   .strict();
 
+const storageMeterRowsSchema = z.array(storageMeterRowSchema);
+
 const storageBreakdownSchema = z
   .object({
     totalBytes: z.number().finite().nonnegative(),
@@ -78,8 +80,9 @@ export class StorageMeterService {
 
   async getTotalStorageBytes(input: { tenantId: string }): Promise<number> {
     const { tenantId } = storageMeterTenantInputSchema.parse(input);
-    const entry = await this.cache.get(tenantId);
-    if (entry !== void 0) {
+    const cached = await this.cache.get(tenantId);
+    if (cached.kind === "hit") {
+      const entry = cached.value;
       if (this.now() - entry.computedAt >= STORAGE_FRESH_MS) {
         void this.refreshInBackground(tenantId);
       }
@@ -224,7 +227,7 @@ export class StorageMeterService {
   }
 
   private parseTotal(rows: unknown): number {
-    const parsed = z.array(storageMeterRowSchema).parse(rows);
+    const parsed = storageMeterRowsSchema.parse(rows);
     const value = parsed[0]?.total ?? 0;
     const total = typeof value === "number" ? value : Number(value);
 

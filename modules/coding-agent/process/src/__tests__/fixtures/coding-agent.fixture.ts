@@ -698,6 +698,40 @@ export class TestGithubService implements GithubApi {
   }
 }
 
+function projectRow(id: string): PaginatedProjects["data"][number] {
+  const at = new Date(0);
+  return {
+    id,
+    name: id,
+    slug: id,
+    apiKey: "",
+    lwqlKey: "",
+    teamId: "team-1",
+    language: "other",
+    framework: "other",
+    kind: "application",
+    firstMessage: false,
+    integrated: false,
+    createdAt: at,
+    updatedAt: at,
+    userLinkTemplate: null,
+    traceSharingEnabled: false,
+    presenceEnabled: false,
+    s3Endpoint: null,
+    s3AccessKeyId: null,
+    s3SecretAccessKey: null,
+    s3Bucket: null,
+    archivedAt: null,
+    isPersonal: false,
+    ownerUserId: null,
+    personalFeatures: null,
+    departmentId: null,
+    langyEgressAllowlist: null,
+    lastCodingAgentSessionAt: null,
+    lastCodingAgentPullRequestAt: null,
+  };
+}
+
 export class TestProjectService extends TestProjectApi {
   projects: { id: string }[] = [];
   sessionActivity: { projectId: string; at: Instant }[] = [];
@@ -753,7 +787,7 @@ export class TestProjectService extends TestProjectApi {
   /** The contract's shape, not a convenient subset. */
   override async listByOrganization(): Promise<PaginatedProjects> {
     return {
-      data: this.projects as unknown as PaginatedProjects["data"],
+      data: this.projects.map(({ id }) => projectRow(id)),
       pagination: { page: 1, limit: this.projects.length, total: this.projects.length },
     };
   }

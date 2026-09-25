@@ -26,10 +26,10 @@ describe("RedisStorageMeterCacheStore", () => {
     await cache.set("project", value);
     now += 29_999;
 
-    await expect(cache.get("project")).resolves.toEqual(value);
+    await expect(cache.get("project")).resolves.toEqual({ kind: "hit", value: value });
 
     now += 2;
-    await expect(cache.get("project")).resolves.toBeUndefined();
+    await expect(cache.get("project")).resolves.toEqual({ kind: "miss" });
   });
 
   it("keeps a successful distributed claim locally locked during Redis failure", async () => {

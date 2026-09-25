@@ -15,6 +15,7 @@ import { createTenantId } from "@langwatch/eventing";
 import {
   CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,
   type LogProcessingEvent,
+  type CanonicalLogRecord,
 } from "@langwatch/log-contract";
 import { TraceCanonicalisationService } from "@langwatch/trace-process/testing";
 import { describe, expect, it } from "vitest";
@@ -23,6 +24,53 @@ import { createCodingAgentLogFactsDispatchSubscriber } from "../coding-agent-log
 
 const WIRE_TRACE = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
 const traceCanonicalisation = TraceCanonicalisationService.create();
+
+const BASE_LOG_RECORD: CanonicalLogRecord = {
+  tenantId: "tenant-1",
+  organizationId: "org-1",
+  recordId: "rec-1",
+  resourceSchemaUrl: "",
+  resourceAttributesJson: "[]",
+  resourceAttributesFlatJson: "{}",
+  resourceAttributeKeys: [],
+  resourceDroppedAttributesCount: 0,
+  scopeSchemaUrl: "",
+  scopeName: "",
+  scopeVersion: "",
+  scopeAttributesJson: "[]",
+  scopeAttributeKeys: [],
+  scopeDroppedAttributesCount: 0,
+  wireTraceId: "",
+  wireSpanId: "",
+  correlationTraceId: "",
+  correlationSpanId: "",
+  correlationSource: "none",
+  timeUnixNano: "1500000000",
+  observedTimeUnixNano: "1500000000",
+  timeUnixMs: 1_500,
+  severityNumber: 9,
+  severityText: "INFO",
+  bodyType: "empty",
+  bodyJson: "null",
+  bodyText: null,
+  attributesJson: "[]",
+  attributesFlatJson: "{}",
+  attributeKeys: [],
+  droppedAttributesCount: 0,
+  flags: 0,
+  eventName: "",
+  providerKind: "claude_code",
+  providerEventKind: "",
+  providerEventSequence: "",
+  providerSessionId: "",
+  providerConversationId: "",
+  providerPromptId: "",
+  piiRedactionLevel: "DISABLED",
+  canonicalPayload: "",
+  canonicalSizeBytes: 0,
+  occurredAt: 1_500,
+  acceptedAt: 1_500,
+};
 
 function canonicalLogEvent({
   attributes,
@@ -38,17 +86,22 @@ function canonicalLogEvent({
   scopeName?: string;
   eventName?: string;
   correlationTraceId?: string;
-  correlationSource?: string;
+  correlationSource?: CanonicalLogRecord["correlationSource"];
   providerSessionId?: string;
   recordId?: string;
   resourceAttributes?: Record<string, unknown>;
 }): LogProcessingEvent {
   return {
+    id: "event-1",
+    aggregateId: recordId,
+    aggregateType: "log_record",
+    createdAt: 1_500,
+    version: "2025-01-01",
     tenantId: createTenantId("tenant-1"),
     type: CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,
     occurredAt: 1_500,
     data: {
-      tenantId: "tenant-1",
+      ...BASE_LOG_RECORD,
       recordId,
       scopeName,
       eventName,
@@ -63,7 +116,7 @@ function canonicalLogEvent({
       severityNumber: 9,
       occurredAt: 1_500,
     },
-  } as unknown as LogProcessingEvent;
+  };
 }
 
 function makeSubscriber() {

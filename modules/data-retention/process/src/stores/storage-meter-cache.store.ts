@@ -9,6 +9,11 @@ const cachedStorageBytesSchema = z
 
 export type CachedStorageBytes = z.infer<typeof cachedStorageBytesSchema>;
 
+/** A cache read: the bytes held under the key, or a miss the caller computes. */
+export type CachedStorageBytesLookup =
+  | { kind: "hit"; value: CachedStorageBytes }
+  | { kind: "miss" };
+
 type MemoryEntry = {
   value: CachedStorageBytes;
   expiresAt: number;
@@ -27,7 +32,7 @@ export interface StorageMeterRedis {
 }
 
 export abstract class StorageMeterCacheStore {
-  abstract get(key: string): Promise<CachedStorageBytes | undefined>;
+  abstract get(key: string): Promise<CachedStorageBytesLookup>;
   abstract set(key: string, value: CachedStorageBytes): Promise<void>;
   abstract claim(key: string, value: number): Promise<boolean>;
 }
@@ -81,15 +86,15 @@ export class RedisStorageMeterCacheStore extends StorageMeterCacheStore {
     this.ttlSeconds = Math.ceil(ttlMs / 1_000);
   }
 
-  async get(key: string): Promise<CachedStorageBytes | undefined> {
+  async get(key: string): Promise<CachedStorageBytesLookup> {
     if (this.redis) {
       try {
         const encoded = await this.redis.get(this.redisKey(key));
         if (encoded !== null) {
-          return cachedStorageBytesSchema.parse(JSON.parse(encoded));
+          return { kind: "hit", value: cachedStorageBytesSchema.parse(JSON.parse(encoded)) };
         }
 
-        return void 0;
+        return { kind: "miss" };
       } catch {
         // Redis is an acceleration path; the warm process-local value remains available.
       }
@@ -98,10 +103,10 @@ export class RedisStorageMeterCacheStore extends StorageMeterCacheStore {
     const entry = this.memory.get(key);
     if (!entry || entry.expiresAt < this.now()) {
       this.memory.delete(key);
-      return void 0;
+      return { kind: "miss" };
     }
 
-    return entry.value;
+    return { kind: "hit", value: entry.value };
   }
 
   async set(key: string, value: CachedStorageBytes): Promise<void> {

@@ -86,10 +86,7 @@ export class FeatureFlagService {
   }
 
   async isEnabled(flagKey: FeatureFlagKey, target: FeatureFlagTarget): Promise<boolean> {
-    const definition = this.registry.resolve(flagKey);
-    if (!definition) {
-      throw new UnknownFeatureFlagError(flagKey);
-    }
+    const definition = this.registry.getDefinition(flagKey);
 
     const override = this.config.overrides.get(flagKey);
     if (override !== undefined) {
@@ -249,9 +246,12 @@ export class FeatureFlagService {
   }
 
   private assertExperiment(flagKey: string): void {
-    if (!this.registry.resolve(flagKey)?.experiment) {
-      throw new UnknownFeatureFlagExperimentError();
+    try {
+      if (this.registry.getDefinition(flagKey).experiment) return;
+    } catch (error) {
+      if (!(error instanceof UnknownFeatureFlagError)) throw error;
     }
+    throw new UnknownFeatureFlagExperimentError();
   }
 
   async setExperimentTenantPolicy({
@@ -478,9 +478,7 @@ export class FeatureFlagService {
     enabled,
     lastEditedBy,
   }: FeatureFlagWrite & { enabled: boolean }): Promise<void> {
-    if (!this.registry.resolve(key)) {
-      throw new UnknownFeatureFlagError(key);
-    }
+    this.registry.getDefinition(key);
 
     await this.repository.upsertEnabled({ key, enabled, lastEditedBy });
     await this.rows.invalidate(key);
@@ -491,14 +489,12 @@ export class FeatureFlagService {
     rules,
     lastEditedBy,
   }: FeatureFlagWrite & { rules: FeatureFlagRules }): Promise<void> {
-    if (!this.registry.resolve(key)) {
-      throw new UnknownFeatureFlagError(key);
-    }
+    const definition = this.registry.getDefinition(key);
 
     await this.repository.upsertRules({
       key,
       rules,
-      seedEnabled: this.registry.resolve(key)?.defaultValue ?? false,
+      seedEnabled: definition.defaultValue ?? false,
       lastEditedBy,
     });
     await this.rows.invalidate(key);

@@ -65,8 +65,8 @@ export class DataRetentionService {
 
   async getResolvedForProject(input: { projectId: string }): Promise<ResolvedRetention> {
     const cached = await this.options.cache.get(input.projectId);
-    if (cached !== void 0) {
-      return cached;
+    if (cached.kind === "hit") {
+      return cached.value;
     }
 
     const project = await this.options.projects.findWithTeam(input.projectId);

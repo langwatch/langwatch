@@ -100,7 +100,7 @@ describe("EvaluationInputsOffloadService", () => {
       EVAL_INPUTS_PREVIEW_BYTES,
     );
 
-    await expect(service.tryResolve({ tenantId: "project-1", inputs: result })).resolves.toEqual(
+    await expect(service.resolveInputs({ tenantId: "project-1", inputs: result })).resolves.toEqual(
       inputs,
     );
   });
@@ -157,7 +157,7 @@ describe("EvaluationInputsOffloadService", () => {
     expect(Buffer.byteLength(JSON.stringify(result), "utf8")).toBeLessThan(
       EVAL_INPUTS_INLINE_MAX_BYTES,
     );
-    await expect(service.tryResolve({ tenantId: "project-1", inputs: result })).resolves.toBe(
+    await expect(service.resolveInputs({ tenantId: "project-1", inputs: result })).resolves.toBe(
       result,
     );
   });
@@ -197,8 +197,8 @@ describe("EvaluationInputsOffloadService", () => {
       },
     };
 
-    await expect(service.tryResolve({ tenantId: "project-1", inputs })).resolves.toBe(inputs);
-    await expect(service.tryResolve({ tenantId: "project-1", inputs: marker })).resolves.toBe(
+    await expect(service.resolveInputs({ tenantId: "project-1", inputs })).resolves.toBe(inputs);
+    await expect(service.resolveInputs({ tenantId: "project-1", inputs: marker })).resolves.toBe(
       marker,
     );
   });
@@ -217,7 +217,7 @@ describe("EvaluationInputsOffloadService", () => {
       },
     };
 
-    await expect(service.tryResolve({ tenantId: "project-1", inputs: marker })).resolves.toBe(
+    await expect(service.resolveInputs({ tenantId: "project-1", inputs: marker })).resolves.toBe(
       marker,
     );
     expect(readSpy).not.toHaveBeenCalled();
