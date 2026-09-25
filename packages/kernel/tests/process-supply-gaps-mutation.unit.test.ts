@@ -34,11 +34,8 @@ const mutations = {
     file: "src/process-supply.ts",
     mutate(source: string) {
       return source
-        .replace(
-          "const Name extends keyof RequiredMembers<Modules> & string",
-          "const Name extends string",
-        )
-        .replace("Value extends MemberValue<Modules, Name>", "Value");
+        .replace("const Name extends keyof RequiredMemberSet & string", "const Name extends string")
+        .replace("Value extends MemberValueFrom<RequiredMemberSet, Name>", "Value");
     },
     diagnostic: "Unused '@ts-expect-error' directive",
   },
@@ -46,8 +43,8 @@ const mutations = {
     file: "src/index.ts",
     mutate(source: string) {
       return source.replace(
-        'export { createApp, ProcessSupply } from "./process-supply.ts";',
-        'export { ProcessSupply } from "./process-supply.ts";',
+        'export { createApp, ProcessSupply, type ExposedSurface } from "./process-supply.ts";',
+        'export { ProcessSupply, type ExposedSurface } from "./process-supply.ts";',
       );
     },
     diagnostic: "createApp",

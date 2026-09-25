@@ -41,11 +41,20 @@ export const VEGA_LITE_AJV_OPTIONS = {
  * Each appears exactly once, as `const funcN = require("…").default;`.
  */
 const AJV_RUNTIME_IMPORTS: readonly {
+  readonly required: string;
   readonly specifier: string;
   readonly binding: string;
 }[] = [
-  { specifier: "ajv/dist/runtime/equal.js", binding: "ajvRuntimeEqual" },
-  { specifier: "ajv/dist/runtime/ucs2length.js", binding: "ajvRuntimeUcs2Length" },
+  {
+    required: "ajv/dist/runtime/equal",
+    specifier: "ajv/dist/runtime/equal.js",
+    binding: "ajvRuntimeEqual",
+  },
+  {
+    required: "ajv/dist/runtime/ucs2length",
+    specifier: "ajv/dist/runtime/ucs2length.js",
+    binding: "ajvRuntimeUcs2Length",
+  },
 ];
 
 /** Reads the schema through the package's own `exports` map. */
@@ -102,8 +111,8 @@ function runtimeImports(): string {
 }
 
 function rewriteRuntimeRequires(source: string): string {
-  return AJV_RUNTIME_IMPORTS.reduce((current, { specifier, binding }) => {
-    const call = `require("${specifier}").default`;
+  return AJV_RUNTIME_IMPORTS.reduce((current, { required, binding }) => {
+    const call = `require("${required}").default`;
     if (!current.includes(call)) {
       throw new Error(
         `generate-vega-lite-validator: expected ${call} in the generated source. Ajv's output shape changed; the rewrite has to be revisited.`,

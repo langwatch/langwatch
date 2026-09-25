@@ -37,17 +37,19 @@ type MissingFrom<
   Members,
   Config,
   Peers,
-> = keyof MissingSupplyFieldsFrom<
-  RequiredMemberSet,
-  RequiredConfigSet,
-  RequiredPeerSet,
-  InstalledPeerSet,
-  InstalledPeerSetInAnyBranch,
-  Members,
-  Config,
-  Peers
-> &
-  string;
+> =
+  MissingSupplyFieldsFrom<
+    RequiredMemberSet,
+    RequiredConfigSet,
+    RequiredPeerSet,
+    InstalledPeerSet,
+    InstalledPeerSetInAnyBranch,
+    Members,
+    Config,
+    Peers
+  > extends infer Fields
+    ? Extract<keyof Fields, string>
+    : never;
 /**
  * What a process exposes: the hosts every declared transport mounts on, and the one handler it
  * serves once they have. Both come from ONE call, at the one moment either can be built — every

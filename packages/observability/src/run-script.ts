@@ -110,7 +110,9 @@ export function processFailureLine({
 }): string {
   const failure = error instanceof Error ? error : void 0;
   const code = failure === void 0 ? void 0 : (failure as { code?: unknown }).code;
-  const message = failure?.message ?? (error === void 0 ? void 0 : JSON.stringify(error));
+  const message =
+    failure?.message ??
+    (typeof error === "string" || error === void 0 ? error : JSON.stringify(error));
   return `${JSON.stringify({
     level: "fatal",
     time: new Date().toISOString(),

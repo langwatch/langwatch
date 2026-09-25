@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { defineModuleVitestConfig, moduleVitestTestOptions } from "../vitest-config.ts";
+import {
+  BROWSER_TEST_GLOB,
+  defineModuleVitestConfig,
+  moduleVitestTestOptions,
+} from "../vitest-config.ts";
 
 describe("moduleVitestTestOptions", () => {
   describe("given the node kind", () => {
@@ -27,6 +31,7 @@ describe("moduleVitestTestOptions", () => {
       expect(moduleVitestTestOptions({ kind: "node" })?.exclude).toEqual([
         "**/node_modules/**",
         "**/dist/**",
+        BROWSER_TEST_GLOB,
       ]);
     });
 
@@ -81,7 +86,7 @@ describe("moduleVitestTestOptions", () => {
       });
 
       expect(test?.include).toEqual(["tests/**/*.test.ts"]);
-      expect(test?.exclude).toEqual(["**/fixtures/**"]);
+      expect(test?.exclude).toEqual(["**/fixtures/**", BROWSER_TEST_GLOB]);
       expect(test?.setupFiles).toEqual(["./vitest.setup.ts"]);
       expect(test?.testTimeout).toBe(30_000);
       expect(test?.dir).toBe("src");

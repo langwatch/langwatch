@@ -3,8 +3,6 @@
  * A missing module deep in that graph fails at ESM link time, before any
  * entry code runs — so the handlers below can't depend on it resolving first.
  */
-import process from "node:process";
-
 import { processFailureLine } from "./run-script.ts";
 
 /** Fatal handlers a process must have before its real entry point loads. */

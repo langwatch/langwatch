@@ -13,7 +13,7 @@ const getSpy = vi.hoisted(() => {
     testSuiteId: null,
   };
   return vi.fn(async (path: string) => ({
-    data: path === "/api/scenarios" ? [scenario] : scenario,
+    data: path === "/api/v1/scenarios" ? [scenario] : scenario,
   }));
 });
 

@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import {
   configPath,
@@ -280,7 +280,13 @@ describe("governance config persistence", () => {
 
     /** @scenario "The login names the config file it writes" */
     it("is shown by its own path, not as the home's default", () => {
-      expect(displayConfigPath()).toBe(p);
+      // os.tmpdir() can sit under $HOME (agent shells), which would read as ~/…
+      vi.stubEnv("HOME", path.join(path.dirname(p), "home"));
+      try {
+        expect(displayConfigPath()).toBe(p);
+      } finally {
+        vi.unstubAllEnvs();
+      }
     });
   });
 

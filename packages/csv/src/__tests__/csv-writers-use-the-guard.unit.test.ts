@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 const REPO_ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 
 /** Both trees that ship code able to produce a file a person opens. */
-const ROOTS = ["packages", "apps"];
+const ROOTS = ["packages", "apps", "modules", "enterprise"];
 
 const SKIPPED_DIRECTORIES = new Set(["node_modules", "dist", "build", ".claude", ".turbo"]);
 
@@ -25,7 +25,7 @@ const UNPARSE_CALL = /\bunparse\b/;
  * An import of the guard package, by either entry point. Deliberately weaker than "the guard is
  * applied to the right arguments": a regex cannot tell those apart.
  */
-const GUARD_IMPORT = /from\s+["'](?:@langwatch\/csv(?:\/download)?|\.\/formula-guard)["']/;
+const GUARD_IMPORT = /from\s+["'](?:@langwatch\/csv(?:\/download)?|\.\/formula-guard(?:\.ts)?)["']/;
 
 /**
  * The writers allowed to call the raw serializer, and what each one does about
@@ -40,9 +40,9 @@ const GUARDED_WRITERS: Record<string, string> = {
     "server-side; headers and rows both go through neutralizeFormula",
   "modules/experiment/browser/src/ui/sections/batch-evaluation-results.csv.ts":
     "generateCsvContent applies neutralizeFormula before serializing",
-  "modules/gateway/browser/src/screens/gateway/gateway-usage.screen.tsx":
+  "modules/gateway/browser/src/ui/sections/gateway/gateway-usage.screen.tsx":
     "sectioned rows with no separate header row, so it guards each row in place",
-  "modules/organization/browser/src/screens/organization/audit-log.screen.tsx":
+  "modules/organization/browser/src/ui/sections/organization/audit-log.screen.tsx":
     "hands the file to the host rather than the DOM, so it guards fields and rows in place",
 };
 

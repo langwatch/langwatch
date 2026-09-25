@@ -99,7 +99,7 @@ describe("given a shard the finalize wedge is holding open", () => {
       );
       expect(lines[2]).toContain("never completed");
       expect(lines[3]).toBe("[unit globalSetup]   src/hangs.unit.test.tsx");
-      expect(lines[4]).toContain("pnpm test:unit run <file>");
+      expect(lines[4]).toContain("pnpm test <file>");
     });
 
     it("counts every such file when more than one hangs", () => {

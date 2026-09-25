@@ -100,7 +100,7 @@ export function hardFloorReport({
     lines.push(
       "[unit globalSetup] these test files never completed, so the tests in them did not run and this shard is red rather than green:",
       ...unreportedFiles.map((file) => `[unit globalSetup]   ${file}`),
-      "[unit globalSetup] a file that starves the event loop, an infinite render loop or a synchronous spin, never trips vitest's own testTimeout, so it leaves no failed test behind. Run each file on its own with `pnpm test run <file>` to see where it hangs.",
+      "[unit globalSetup] a file that starves the event loop, an infinite render loop or a synchronous spin, never trips vitest's own testTimeout, so it leaves no failed test behind. Run each file on its own with `pnpm test <file>` to see where it hangs.",
     );
   }
 

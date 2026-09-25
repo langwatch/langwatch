@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-const REPO_ROOT = fileURLToPath(new URL("../../../../../../", import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL("../../../../../", import.meta.url));
 const CONTRACT_SRC = fileURLToPath(new URL("../", import.meta.url));
 
 const SCHEMA_NAMES = readFileSync(join(CONTRACT_SRC, "scenario-execution-data.ts"), "utf8")
@@ -22,7 +22,9 @@ const ALLOWED_ROOTS = [
   join(REPO_ROOT, "packages/scenario-child/src/scenario-child.entrypoint.ts"),
 ];
 
-const SCAN_ROOTS = [join(REPO_ROOT, "apps"), join(REPO_ROOT, "packages")];
+const SCAN_ROOTS = ["apps", "packages", "modules", "enterprise"].map((root) =>
+  join(REPO_ROOT, root),
+);
 
 const SKIP_DIR_NAMES = new Set([
   "node_modules",
@@ -54,7 +56,7 @@ function isAllowed(file: string): boolean {
 }
 
 describe("the child execution contract's schemas", () => {
-  describe("given every TypeScript source file in apps and packages", () => {
+  describe("given every TypeScript source file in apps, packages and modules", () => {
     describe("when a file outside the child's own tree names one of the schemas", () => {
       /** @scenario "Nothing outside the child's own tree imports the execution contract" */
       it("finds no such usage", () => {

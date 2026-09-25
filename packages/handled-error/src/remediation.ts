@@ -633,7 +633,7 @@ const registry = {
       "List what this project has: langwatch monitor list",
       "The identifier in meta.monitorId names no online evaluation here; it may have been deleted, or it may belong to another project",
     ],
-    docsPath: "/evaluations/real-time-evaluation",
+    docsPath: "/evaluations/online-evaluation/overview",
   },
   monitor_check_type_unknown: {
     tips: [
@@ -654,7 +654,7 @@ const registry = {
       "Copying an online evaluation needs permission to manage evaluations in the project named by meta.sourceProjectId",
       "Ask an administrator of that project for access, then try the copy again",
     ],
-    docsPath: "/platform/permissions",
+    docsPath: "/platform/rbac",
   },
 
   // ---- default models ----
