@@ -64,8 +64,10 @@ describe("trace dedup OOM safety", () => {
   // ---------------------------------------------------------------------------
   describe("fetchTracesWithPagination()", () => {
     const paginationBody = extractMethodBody(traceServiceSource, "fetchTracesWithPagination");
+    const pageQueriesBody = extractFunctionBody(traceServiceSource, "buildPageQueries");
+    const latestVersionBody = extractFunctionBody(traceServiceSource, "buildLatestVersionOnly");
     const summaryBody = extractMethodBody(traceServiceSource, "fetchTraceSummaryRows");
-    const body = paginationBody + summaryBody;
+    const body = paginationBody + pageQueriesBody + latestVersionBody + summaryBody;
 
     describe("when the pagination query SQL is inspected", () => {
       it("does not use LIMIT 1 BY for deduplication", () => {
@@ -87,7 +89,13 @@ describe("trace dedup OOM safety", () => {
   // clickhouse-trace.service.ts: fetchTracesWithSpansJoined
   // ---------------------------------------------------------------------------
   describe("fetchTracesWithSpansJoined()", () => {
-    const body = extractMethodBody(traceServiceSource, "fetchTracesWithSpansJoined");
+    const summaryReadBody = extractMethodBody(traceServiceSource, "readJoinedSummaryRows");
+    const spanReadBody = extractMethodBody(traceServiceSource, "readJoinedSpanRows");
+    const body =
+      extractMethodBody(traceServiceSource, "fetchTracesWithSpansJoined") +
+      extractMethodBody(traceServiceSource, "readJoinedTraceBatch") +
+      summaryReadBody +
+      spanReadBody;
 
     describe("when the trace summary query SQL is inspected", () => {
       it("does not use LIMIT 1 BY for trace_summaries dedup", () => {
@@ -97,8 +105,8 @@ describe("trace dedup OOM safety", () => {
       });
 
       it("uses max(UpdatedAt) GROUP BY for trace dedup", () => {
-        expect(body).toContain("max(UpdatedAt)");
-        expect(body).toMatch(/GROUP BY\s+TenantId,\s*TraceId/);
+        expect(summaryReadBody).toContain("max(UpdatedAt)");
+        expect(summaryReadBody).toMatch(/GROUP BY\s+TenantId,\s*TraceId/);
       });
     });
 
@@ -109,7 +117,7 @@ describe("trace dedup OOM safety", () => {
 
       it("uses max(UpdatedAt) GROUP BY for span dedup", () => {
         expect(body).toContain("max(UpdatedAt)");
-        expect(body).toMatch(/GROUP BY\s+TenantId,\s*TraceId,\s*SpanId/);
+        expect(spanReadBody).toMatch(/GROUP BY\s+TenantId,\s*TraceId,\s*SpanId/);
       });
     });
   });
