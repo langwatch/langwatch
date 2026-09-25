@@ -62675,7 +62675,7 @@ gateway:
   chartManaged: false
 ```
 
-The defaults are 2 replicas, a ClusterIP service and no ingress. For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
+The defaults are 2 replicas, a ClusterIP service and an ingress for the placeholder host `gateway.langwatch.ai`. Set `gateway.ingress.host` to your own hostname, or `gateway.ingress.enabled: false` to reach the gateway only from inside the cluster. For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
 
 Three things to know when running it:
 
@@ -62737,6 +62737,8 @@ prometheus:
   server:
     clusterRoleNameOverride: langwatch-staging-prometheus-server
 ```
+
+The ingress controller routes a host to only one install, so each install also needs its own ingress hosts: set `ingress.hosts` and `gateway.ingress.host` per install, or disable an ingress that install does not need.
 
 ### Custom StorageClass
 

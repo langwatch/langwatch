@@ -177,7 +177,8 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
   # ===========================================================================
   # gateway.publicUrl is what a browser or SDK uses. It can be a localhost
   # port-forward or a hostname that does not resolve inside the cluster, so
-  # in-cluster callers never dial it.
+  # in-cluster callers dial the internal address first and fall back to the
+  # public one only when no internal address is set.
 
   @unit
   Scenario: The chart hands the app and workers the in-cluster gateway address
