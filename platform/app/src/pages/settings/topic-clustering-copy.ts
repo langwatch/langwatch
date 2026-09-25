@@ -18,6 +18,9 @@ import type {
 /** The top-level route to the model-providers settings page (Vite app). */
 export const MODEL_PROVIDERS_HREF = "/settings/model-providers";
 
+/** The label on the "open model providers" link shown for an actionable failure. */
+export const MODEL_PROVIDERS_LINK_LABEL = "Open Model Providers";
+
 /**
  * The server sends bare strings for codes/reasons/modes; these lookups narrow
  * them back onto the canonical unions so an unknown value falls through to
@@ -43,7 +46,7 @@ export const CLUSTERING_FAILURE_GUIDANCE: Partial<
   model_restricted: {
     title: "The topic clustering model is not allowed for this feature",
     description:
-      "Your default model is a Codex model, which only serves coding assistants. Choose a different model for topic clustering in Settings → Model Providers → Default Models, then run it again.",
+      "A Codex model cannot be used for topic clustering. Check the topic clustering model and embeddings in Settings → Model Providers → Default Models, then run it again.",
   },
   model_provider_auth: {
     title: "Your model provider rejected the credentials",

@@ -94,7 +94,7 @@ Feature: Codex, the sign-in-with-OpenAI model provider
     Given Codex is connected
     Then codex models are offered in Langy's model picker
     And in the default-model slots of the fast assists (search, titles, autocomplete, translations, generators)
-    But not topic clustering, which runs outside the gateway
+    But not topic clustering, which cannot use Codex models
     But not in the prompt playground, evaluations, workflows or any other model picker
 
   Scenario: The server refuses Codex outside the allowed surfaces

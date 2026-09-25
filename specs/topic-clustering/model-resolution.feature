@@ -48,10 +48,10 @@ Feature: Topic clustering model resolution skips Codex models
   @unit
   Scenario: A restricted model failure is the customer's to fix
     Given a topic clustering run failed because only a Codex model was configured
-    When the failure is classified
-    Then it is reported as a user-actionable restricted-model failure
+    When the customer views the failed topic clustering run
+    Then the customer sees a user-actionable restricted-model failure
 
-  @unit
+  @integration
   Scenario: The settings page shows guidance and a link for a restricted model failure
     Given a topic clustering run failed with a restricted-model error
     When the customer opens the topic clustering settings page

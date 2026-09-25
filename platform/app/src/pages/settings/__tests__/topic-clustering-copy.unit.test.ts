@@ -14,7 +14,7 @@ import {
  */
 describe("topic-clustering-copy", () => {
   describe("given a restricted-model failure", () => {
-    /** @scenario "The settings page shows guidance and a link for a restricted model failure" */
+    /** @scenario "A restricted model failure is the customer's to fix" */
     it("has named guidance for model_restricted", () => {
       const guidance = CLUSTERING_FAILURE_GUIDANCE.model_restricted;
       expect(guidance?.title).toBe(
@@ -23,7 +23,7 @@ describe("topic-clustering-copy", () => {
       expect(guidance?.description).toContain("Codex");
     });
 
-    /** @scenario "The settings page shows guidance and a link for a restricted model failure" */
+    /** @scenario "A restricted model failure is the customer's to fix" */
     it("shows the restricted guidance title for a failed user-actionable model_restricted run", () => {
       const run = {
         outcome: "failed",

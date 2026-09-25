@@ -335,6 +335,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
+          # HEAD is the PR merge commit; depth 2 gives it both parents so the
+          # `--changed origin/main` three-dot diff has a merge base without
+          # relying on the later deepen fetch. See CodeRabbit on PR #8291.
+          fetch-depth: 2
           # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
           sparse-checkout: |
             /*
@@ -605,6 +609,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
+          # HEAD is the PR merge commit; depth 2 gives it both parents so the
+          # `--changed origin/main` three-dot diff has a merge base without
+          # relying on the later deepen fetch. See CodeRabbit on PR #8291.
+          fetch-depth: 2
           # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
           sparse-checkout: |
             /*
@@ -791,6 +799,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
+          # HEAD is the PR merge commit; depth 2 gives it both parents so the
+          # `--changed origin/main` three-dot diff has a merge base without
+          # relying on the later deepen fetch. See CodeRabbit on PR #8291.
+          fetch-depth: 2
           # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
           sparse-checkout: |
             /*

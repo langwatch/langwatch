@@ -23,6 +23,7 @@ import {
   copyFor,
   failureGuidance,
   MODEL_PROVIDERS_HREF,
+  MODEL_PROVIDERS_LINK_LABEL,
   RUN_MODE_COPY,
   runDetail,
   SKIP_REASON_COPY,
@@ -168,7 +169,7 @@ function outcomeBadge(outcome: string | null, isRunInFlight: boolean) {
   }
 }
 
-function ClusteringStatusCard({
+export function ClusteringStatusCard({
   projectId,
   lastTriggeredAt,
 }: {
@@ -263,7 +264,7 @@ function ClusteringStatusCard({
                         fontSize="sm"
                         fontWeight="medium"
                       >
-                        Open Model Providers
+                        {MODEL_PROVIDERS_LINK_LABEL}
                       </Link>
                     </Alert.Content>
                   </Alert.Root>
@@ -291,7 +292,7 @@ function ClusteringStatusCard({
   );
 }
 
-function RunHistoryCard({ projectId }: { projectId: string }) {
+export function RunHistoryCard({ projectId }: { projectId: string }) {
   const history = api.topics.getClusteringRunHistory.useQuery(
     { projectId },
     {
@@ -345,7 +346,7 @@ function RunHistoryCard({ projectId }: { projectId: string }) {
                           fontSize="sm"
                           fontWeight="medium"
                         >
-                          Open Model Providers
+                          {MODEL_PROVIDERS_LINK_LABEL}
                         </Link>
                       )}
                     </VStack>
