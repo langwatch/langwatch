@@ -201,27 +201,37 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0
         hasMoreDatasets = page.length > 0;
         if (!hasMoreDatasets) continue;
 
-        for (const dataset of page) {
-          try {
-            const outcome = await this.migrateDataset(
-              { datasetId: dataset.id, projectId: project.id },
-              input,
-            );
-            increment(summary, outcome);
-          } catch (error) {
-            summary.failed += 1;
-            logger.warn(
-              { error, datasetId: dataset.id, projectId: project.id },
-              "Dataset migration failed; a later run can retry it",
-            );
-          }
-        }
-
+        await this.migratePage({ projectId: project.id, page, input, summary });
         cursor = page.at(-1)?.id;
       }
     }
 
     return summary;
+  }
+
+  /** Migrates one page of datasets, counting each outcome; a failed one waits for a later run. */
+  private async migratePage({
+    projectId,
+    page,
+    input,
+    summary,
+  }: {
+    projectId: string;
+    page: { id: string }[];
+    input: { dryRun?: boolean };
+    summary: DatasetMigrationSummary;
+  }): Promise<void> {
+    for (const dataset of page) {
+      try {
+        increment(summary, await this.migrateDataset({ datasetId: dataset.id, projectId }, input));
+      } catch (error) {
+        summary.failed += 1;
+        logger.warn(
+          { error, datasetId: dataset.id, projectId },
+          "Dataset migration failed; a later run can retry it",
+        );
+      }
+    }
   }
 
   private async readFingerprint(

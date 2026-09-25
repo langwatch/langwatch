@@ -108,42 +108,76 @@ export class ExperimentComparisonPlanService {
       });
       const anchorVariant = resolvedVariants[0]!;
 
-      for (const rowIndex of rowsInScope) {
-        const datasetEntry = datasetRows[rowIndex];
-        if (!datasetEntry) {
-          continue;
-        }
-
-        const built = this.variants.buildCandidates({
+      this.planChipRows({
+        evaluator,
+        anchorVariant,
+        candidates: {
           cfg,
           variantIds,
           variantDisplayNames,
-          rowIndex,
           completedTargetOutputs,
           completedTargetEvaluatorScores,
-        });
-        if (built.missing || built.empty) {
-          skipReasons.push({
-            rowIndex,
-            targetId: anchorVariant.id,
-            evaluatorId: evaluator.id,
-            kind: built.missing ? "missing-output" : "empty-output",
-            variantNames: built.missing ?? built.empty,
-          });
-          continue;
-        }
+        },
+        datasetRows,
+        rowsInScope,
+        datasetId,
+        cells,
+        skipReasons,
+      });
+    }
+  }
 
-        cells.push({
+  /** One chip comparison's rows: a cell per row whose candidates all answered, else a skip. */
+  private planChipRows({
+    evaluator,
+    anchorVariant,
+    candidates,
+    datasetRows,
+    rowsInScope,
+    datasetId,
+    cells,
+    skipReasons,
+  }: {
+    evaluator: EvaluationsV3State["evaluators"][number];
+    anchorVariant: ExecutionCell["targetConfig"];
+    candidates: Omit<
+      Parameters<ExperimentComparisonVariantService["buildCandidates"]>[0],
+      "rowIndex"
+    >;
+    datasetRows: Record<string, unknown>[];
+    rowsInScope: number[];
+    datasetId: string;
+    cells: ExecutionCell[];
+    skipReasons: ComparisonSkipReason[];
+  }): void {
+    for (const rowIndex of rowsInScope) {
+      const datasetEntry = datasetRows[rowIndex];
+      if (!datasetEntry) {
+        continue;
+      }
+
+      const built = this.variants.buildCandidates({ ...candidates, rowIndex });
+      if (built.missing || built.empty) {
+        skipReasons.push({
           rowIndex,
           targetId: anchorVariant.id,
-          targetConfig: anchorVariant,
-          evaluatorConfigs: [evaluator],
-          datasetEntry: { _datasetId: datasetId, ...datasetEntry },
-          skipTarget: true,
-          precomputedTargetOutput: built.candidates!.candidates[0]!.output,
-          comparison: built.candidates,
+          evaluatorId: evaluator.id,
+          kind: built.missing ? "missing-output" : "empty-output",
+          variantNames: built.missing ?? built.empty,
         });
+        continue;
       }
+
+      cells.push({
+        rowIndex,
+        targetId: anchorVariant.id,
+        targetConfig: anchorVariant,
+        evaluatorConfigs: [evaluator],
+        datasetEntry: { _datasetId: datasetId, ...datasetEntry },
+        skipTarget: true,
+        precomputedTargetOutput: built.candidates!.candidates[0]!.output,
+        comparison: built.candidates,
+      });
     }
   }
 

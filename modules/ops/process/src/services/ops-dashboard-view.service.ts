@@ -20,6 +20,11 @@ import { normalizeErrorMessage } from "../rules/ops-error-normalizer.rules.ts";
 import { OpsMetricsSamplingService } from "./ops-metrics-sampling.service.ts";
 import type { OpsMetricsWindowService } from "./ops-metrics-window.service.ts";
 
+type PipelineCounts = Map<
+  string,
+  Map<string, Map<string, { pending: number; active: number; blocked: number }>>
+>;
+
 export class OpsDashboardViewService {
   private constructor() {}
 
@@ -34,31 +39,9 @@ export class OpsDashboardViewService {
     queues: QueueInfo[];
     seedKeys?: string[];
   }): PipelineNode[] {
-    const pipelineMap = new Map<
-      string,
-      Map<string, Map<string, { pending: number; active: number; blocked: number }>>
-    >();
-
-    const ensurePath = (pName: string, jType?: string, jName?: string) => {
-      if (!pipelineMap.has(pName)) {
-        pipelineMap.set(pName, new Map());
-      }
-
-      if (jType) {
-        const normalized = OpsMetricsSamplingService.normalizeJobType(jType);
-        const typeMap = pipelineMap.get(pName)!;
-        if (!typeMap.has(normalized)) {
-          typeMap.set(normalized, new Map());
-        }
-
-        if (jName) {
-          const nameMap = typeMap.get(normalized)!;
-          if (!nameMap.has(jName)) {
-            nameMap.set(jName, { pending: 0, active: 0, blocked: 0 });
-          }
-        }
-      }
-    };
+    const pipelineMap: PipelineCounts = new Map();
+    const ensurePath = (pName: string, jType?: string, jName?: string) =>
+      OpsDashboardViewService.ensurePath({ pipelineMap, pName, jType, jName });
 
     for (const key of seedKeys) {
       const parts = key.split("/");
@@ -86,6 +69,30 @@ export class OpsDashboardViewService {
     tree.sort((a, b) => a.name.localeCompare(b.name));
 
     return tree;
+  }
+
+  /** Creates the pipeline, job-type and job-name levels a path names, keeping existing counts. */
+  private static ensurePath({
+    pipelineMap,
+    pName,
+    jType,
+    jName,
+  }: {
+    pipelineMap: PipelineCounts;
+    pName: string;
+    jType?: string;
+    jName?: string;
+  }): void {
+    const typeMap = pipelineMap.get(pName) ?? new Map();
+    pipelineMap.set(pName, typeMap);
+    if (!jType) return;
+
+    const normalized = OpsMetricsSamplingService.normalizeJobType(jType);
+    const nameMap = typeMap.get(normalized) ?? new Map();
+    typeMap.set(normalized, nameMap);
+    if (!jName || nameMap.has(jName)) return;
+
+    nameMap.set(jName, { pending: 0, active: 0, blocked: 0 });
   }
 
   /** Rolls the per-path counts up into the tree the sidebar renders, totals at every level. */

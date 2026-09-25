@@ -700,46 +700,6 @@ function mapRun({
 }
 
 function mapRunWithItems(run: RunRow, items: ItemRow[], projectId: string): ExperimentRunWithItems {
-  const dataset: ExperimentRunWithItems["dataset"] = [];
-  const evaluations: ExperimentRunWithItems["evaluations"] = [];
-  for (const item of items) {
-    const targetId = item.TargetId && item.TargetId !== "default" ? item.TargetId : null;
-    if (item.ResultType === "target") {
-      const domainError = serializedHandledErrorSchema.safeParse(
-        parseRecord(item.TargetDomainError),
-      );
-      const predicted = parseRecord(item.Predicted);
-      dataset.push({
-        index: item.RowIndex,
-        targetId,
-        entry: parseRecord(item.DatasetEntry) ?? {},
-        ...(predicted ? { predicted } : {}),
-        cost: item.TargetCost,
-        duration: item.TargetDurationMs,
-        error: item.TargetError,
-        ...(domainError.success ? { domainError: domainError.data } : {}),
-        traceId: item.TraceId,
-      });
-    } else {
-      evaluations.push({
-        evaluator: item.EvaluatorId ?? "",
-        name: item.EvaluatorName,
-        targetId,
-        status:
-          item.EvaluationStatus === "processed" || item.EvaluationStatus === "skipped"
-            ? item.EvaluationStatus
-            : "error",
-        index: item.RowIndex,
-        score: item.Score,
-        label: item.Label,
-        passed: item.Passed === null ? null : item.Passed === 1,
-        details: item.EvaluationDetails,
-        cost: item.EvaluationCost,
-        inputs: parseRecord(item.EvaluationInputs) ?? null,
-        duration: item.EvaluationDurationMs ?? null,
-      });
-    }
-  }
   const targets = parseTargets(run.Targets);
   return experimentRunWithItemsSchema.parse({
     experimentId: run.ExperimentId,
@@ -749,10 +709,46 @@ function mapRunWithItems(run: RunRow, items: ItemRow[], projectId: string): Expe
     progress: run.Progress,
     total: run.Total,
     targets,
-    dataset,
-    evaluations,
+    dataset: items.filter((item) => item.ResultType === "target").map(datasetEntryOf),
+    evaluations: items.filter((item) => item.ResultType !== "target").map(evaluationOf),
     timestamps: timestamps(run),
   });
+}
+
+function datasetEntryOf(item: ItemRow): ExperimentRunWithItems["dataset"][number] {
+  const domainError = serializedHandledErrorSchema.safeParse(parseRecord(item.TargetDomainError));
+  const predicted = parseRecord(item.Predicted);
+  return {
+    index: item.RowIndex,
+    targetId: item.TargetId && item.TargetId !== "default" ? item.TargetId : null,
+    entry: parseRecord(item.DatasetEntry) ?? {},
+    ...(predicted ? { predicted } : {}),
+    cost: item.TargetCost,
+    duration: item.TargetDurationMs,
+    error: item.TargetError,
+    ...(domainError.success ? { domainError: domainError.data } : {}),
+    traceId: item.TraceId,
+  };
+}
+
+function evaluationOf(item: ItemRow): ExperimentRunWithItems["evaluations"][number] {
+  return {
+    evaluator: item.EvaluatorId ?? "",
+    name: item.EvaluatorName,
+    targetId: item.TargetId && item.TargetId !== "default" ? item.TargetId : null,
+    status:
+      item.EvaluationStatus === "processed" || item.EvaluationStatus === "skipped"
+        ? item.EvaluationStatus
+        : "error",
+    index: item.RowIndex,
+    score: item.Score,
+    label: item.Label,
+    passed: item.Passed === null ? null : item.Passed === 1,
+    details: item.EvaluationDetails,
+    cost: item.EvaluationCost,
+    inputs: parseRecord(item.EvaluationInputs) ?? null,
+    duration: item.EvaluationDurationMs ?? null,
+  };
 }
 
 function parseTargets(value: string): z.infer<typeof experimentRunTargetSchema>[] | null {

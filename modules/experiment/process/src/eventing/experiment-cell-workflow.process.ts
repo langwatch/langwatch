@@ -1097,33 +1097,64 @@ const buildEdges = ({
       : {};
 
     for (const [inputField, mapping] of Object.entries(evaluatorMappings)) {
-      if (mapping.type === "source") {
-        if (mapping.source === "dataset") {
-          edges.push(
-            datasetEdge({
-              entryNodeId,
-              nodeId: evaluatorNodeId,
-              inputField,
-              columnName: mapping.sourceField,
-              datasetColumns,
-            }),
-          );
-        } else if (mapping.source === "target" && mapping.sourceId === targetConfig.id) {
-          // From target output
-          edges.push({
-            id: `${targetNodeId}->${evaluatorNodeId}.${inputField}`,
-            source: targetNodeId,
-            sourceHandle: `outputs.${mapping.sourceField}`,
-            target: evaluatorNodeId,
-            targetHandle: `inputs.${inputField}`,
-            type: "default",
-          });
-        }
-      }
+      edges.push(
+        ...evaluatorInputEdges({
+          entryNodeId,
+          targetNodeId,
+          targetId: targetConfig.id,
+          evaluatorNodeId,
+          inputField,
+          mapping,
+          datasetColumns,
+        }),
+      );
     }
   }
 
   return edges;
+};
+
+/** The edge feeding one evaluator input: a dataset column, or this cell's target output. */
+const evaluatorInputEdges = ({
+  entryNodeId,
+  targetNodeId,
+  targetId,
+  evaluatorNodeId,
+  inputField,
+  mapping,
+  datasetColumns,
+}: {
+  entryNodeId: string;
+  targetNodeId: string;
+  targetId: string;
+  evaluatorNodeId: string;
+  inputField: string;
+  mapping: EvaluatorConfig["mappings"][string][string][string];
+  datasetColumns: { id: string; name: string; type: string }[];
+}): StudioEdge[] => {
+  if (mapping.type !== "source") return [];
+  if (mapping.source === "dataset") {
+    return [
+      datasetEdge({
+        entryNodeId,
+        nodeId: evaluatorNodeId,
+        inputField,
+        columnName: mapping.sourceField,
+        datasetColumns,
+      }),
+    ];
+  }
+  if (mapping.source !== "target" || mapping.sourceId !== targetId) return [];
+  return [
+    {
+      id: `${targetNodeId}->${evaluatorNodeId}.${inputField}`,
+      source: targetNodeId,
+      sourceHandle: `outputs.${mapping.sourceField}`,
+      target: evaluatorNodeId,
+      targetHandle: `inputs.${inputField}`,
+      type: "default",
+    },
+  ];
 };
 
 // ============================================================================

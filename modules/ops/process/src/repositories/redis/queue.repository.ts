@@ -2363,42 +2363,7 @@ export class QueueRedisRepository extends QueueRepository {
     pipelineFilter?: string;
     errorFilter?: string;
   }): Promise<string[]> {
-    const filterPipeline = this.redis.pipeline();
-    for (const groupId of params.members) {
-      filterPipeline.hgetall(`${params.prefix}group:${groupId}:error`);
-      filterPipeline.zrange(`${params.prefix}group:${groupId}:jobs`, 0, 0);
-    }
-    const filterResults = await filterPipeline.exec();
-
-    const jobDataPipeline = this.redis.pipeline();
-    const jobDataMap = new Map<string, number>();
-    let jobFetchIdx = 0;
-    for (let i = 0; i < params.members.length; i++) {
-      const jobArr = (filterResults?.[i * 2 + 1]?.[1] as string[]) ?? [];
-      if (jobArr[0]) {
-        jobDataPipeline.hget(`${params.prefix}group:${params.members[i]!}:data`, jobArr[0]);
-        jobDataMap.set(params.members[i]!, jobFetchIdx++);
-      }
-    }
-    const jobDataResults = jobFetchIdx > 0 ? await jobDataPipeline.exec() : [];
-
-    return params.members.filter((groupId, i) => {
-      if (params.errorFilter) {
-        const errorHash = filterResults?.[i * 2]?.[1] as Record<string, string> | null;
-        const msg = (errorHash?.message ?? "").toLowerCase();
-        if (!msg.includes(params.errorFilter.toLowerCase())) return false;
-      }
-      if (params.pipelineFilter) {
-        const fetchIdx = jobDataMap.get(groupId);
-        if (fetchIdx !== void 0) {
-          const raw = jobDataResults?.[fetchIdx]?.[1] as string | null;
-          if (raw) {
-            if (readJobRoutingMeta(raw).pipelineName !== params.pipelineFilter) return false;
-          } else return false;
-        } else return false;
-      }
-      return true;
-    });
+    return this.filterGroupsIn({ ...params, segment: "group" });
   }
 
   private async filterDlqGroups(params: {
@@ -2407,10 +2372,23 @@ export class QueueRedisRepository extends QueueRepository {
     pipelineFilter?: string;
     errorFilter?: string;
   }): Promise<string[]> {
+    return this.filterGroupsIn({ ...params, segment: "dlq" });
+  }
+
+  /** The members whose error message and head job's pipeline match the operator's filters. */
+  private async filterGroupsIn(params: {
+    prefix: string;
+    segment: "group" | "dlq";
+    members: string[];
+    pipelineFilter?: string;
+    errorFilter?: string;
+  }): Promise<string[]> {
+    const keyOf = (groupId: string, suffix: string) =>
+      `${params.prefix}${params.segment}:${groupId}:${suffix}`;
     const filterPipeline = this.redis.pipeline();
     for (const groupId of params.members) {
-      filterPipeline.hgetall(`${params.prefix}dlq:${groupId}:error`);
-      filterPipeline.zrange(`${params.prefix}dlq:${groupId}:jobs`, 0, 0);
+      filterPipeline.hgetall(keyOf(groupId, "error"));
+      filterPipeline.zrange(keyOf(groupId, "jobs"), 0, 0);
     }
     const filterResults = await filterPipeline.exec();
 
@@ -2420,28 +2398,37 @@ export class QueueRedisRepository extends QueueRepository {
     for (let i = 0; i < params.members.length; i++) {
       const jobArr = (filterResults?.[i * 2 + 1]?.[1] as string[]) ?? [];
       if (jobArr[0]) {
-        jobDataPipeline.hget(`${params.prefix}dlq:${params.members[i]!}:data`, jobArr[0]);
+        jobDataPipeline.hget(keyOf(params.members[i]!, "data"), jobArr[0]);
         jobDataMap.set(params.members[i]!, jobFetchIdx++);
       }
     }
     const jobDataResults = jobFetchIdx > 0 ? await jobDataPipeline.exec() : [];
 
     return params.members.filter((groupId, i) => {
-      if (params.errorFilter) {
-        const errorHash = filterResults?.[i * 2]?.[1] as Record<string, string> | null;
-        const msg = (errorHash?.message ?? "").toLowerCase();
-        if (!msg.includes(params.errorFilter.toLowerCase())) return false;
-      }
-      if (params.pipelineFilter) {
-        const fetchIdx = jobDataMap.get(groupId);
-        if (fetchIdx !== void 0) {
-          const raw = jobDataResults?.[fetchIdx]?.[1] as string | null;
-          if (raw) {
-            if (readJobRoutingMeta(raw).pipelineName !== params.pipelineFilter) return false;
-          } else return false;
-        } else return false;
-      }
-      return true;
+      const fetchIdx = jobDataMap.get(groupId);
+      return QueueRedisRepository.matchesGroupFilters({
+        errorMessage: (filterResults?.[i * 2]?.[1] as Record<string, string> | null)?.message,
+        rawJob: fetchIdx === void 0 ? null : (jobDataResults?.[fetchIdx]?.[1] as string | null),
+        pipelineFilter: params.pipelineFilter,
+        errorFilter: params.errorFilter,
+      });
     });
+  }
+
+  private static matchesGroupFilters({
+    errorMessage,
+    rawJob,
+    pipelineFilter,
+    errorFilter,
+  }: {
+    errorMessage: string | undefined;
+    rawJob: string | null;
+    pipelineFilter?: string;
+    errorFilter?: string;
+  }): boolean {
+    const message = (errorMessage ?? "").toLowerCase();
+    if (errorFilter && !message.includes(errorFilter.toLowerCase())) return false;
+    if (!pipelineFilter) return true;
+    return !!rawJob && readJobRoutingMeta(rawJob).pipelineName === pipelineFilter;
   }
 }

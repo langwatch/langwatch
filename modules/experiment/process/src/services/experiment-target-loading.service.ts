@@ -141,12 +141,11 @@ export class ExperimentTargetLoadingService {
     loadedAgents: Map<string, Agent>;
   }): Promise<Map<string, LoadedWorkflow> | LoadFailure> {
     const loaded = new Map<string, LoadedWorkflow>();
-    for (const target of targets) {
-      if (target.type !== "workflow" || !target.workflowId) {
-        continue;
-      }
-
-      const key = ExperimentExecutionDataService.workflowLoadKey(target);
+    for (const request of ExperimentTargetLoadingService.workflowRequests({
+      targets,
+      loadedAgents,
+    })) {
+      const key = ExperimentExecutionDataService.workflowLoadKey(request);
       if (loaded.has(key)) {
         continue;
       }
@@ -154,41 +153,7 @@ export class ExperimentTargetLoadingService {
       const result = await ExperimentTargetLoadingService.loadPublishedWorkflow({
         projectId,
         services,
-        workflowId: target.workflowId,
-        workflowVersionId: target.workflowVersionId,
-      });
-      if ("error" in result) {
-        return result;
-      }
-
-      loaded.set(key, result);
-    }
-
-    for (const target of targets) {
-      if (target.type !== "agent" || !target.dbAgentId) {
-        continue;
-      }
-
-      const agent = loadedAgents.get(target.dbAgentId);
-      if (agent?.type !== "workflow") {
-        continue;
-      }
-
-      const linkedWorkflowId =
-        agent.workflowId ?? (agent.config as { workflow_id?: string }).workflow_id;
-      if (!linkedWorkflowId) {
-        continue;
-      }
-
-      const key = ExperimentExecutionDataService.workflowLoadKey({ workflowId: linkedWorkflowId });
-      if (loaded.has(key)) {
-        continue;
-      }
-
-      const result = await ExperimentTargetLoadingService.loadPublishedWorkflow({
-        projectId,
-        services,
-        workflowId: linkedWorkflowId,
+        ...request,
       });
       if ("error" in result) {
         return result;
@@ -198,6 +163,39 @@ export class ExperimentTargetLoadingService {
     }
 
     return loaded;
+  }
+
+  /** Direct workflow targets in order, then the workflow each workflow-typed agent links to. */
+  private static workflowRequests({
+    targets,
+    loadedAgents,
+  }: {
+    targets: TargetForLoading[];
+    loadedAgents: Map<string, Agent>;
+  }): { workflowId: string; workflowVersionId?: string }[] {
+    const direct = targets.flatMap((target) =>
+      target.type === "workflow" && target.workflowId
+        ? [
+            {
+              workflowId: target.workflowId,
+              ...(target.workflowVersionId ? { workflowVersionId: target.workflowVersionId } : {}),
+            },
+          ]
+        : [],
+    );
+    const linked = targets.flatMap((target) => {
+      const agent =
+        target.type === "agent" && target.dbAgentId
+          ? loadedAgents.get(target.dbAgentId)
+          : undefined;
+      if (agent?.type !== "workflow") {
+        return [];
+      }
+
+      const workflowId = agent.workflowId ?? agent.config.workflow_id;
+      return workflowId ? [{ workflowId }] : [];
+    });
+    return [...direct, ...linked];
   }
 
   /** The evaluators both the evaluator configs and the evaluator targets name. */
