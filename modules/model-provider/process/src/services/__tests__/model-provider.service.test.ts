@@ -1,6 +1,7 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import { AuthzService, type AuthzApi } from "@langwatch/authz-contract";
 import {
+  ModelCostNotFoundError,
   type ModelCost,
   type ModelDefaultConfig,
   type ModelDefaultFeature,
@@ -596,8 +597,10 @@ class Costs implements ModelCostRepository {
   findForProject(): Promise<ModelCost[]> {
     return Promise.resolve(this.rows);
   }
-  tryFindById(id: string): Promise<ModelCost | null> {
-    return Promise.resolve(this.rows.find((row) => row.id === id) ?? null);
+  getById(id: string): Promise<ModelCost> {
+    const row = this.rows.find((candidate) => candidate.id === id);
+    if (!row) return Promise.reject(new ModelCostNotFoundError());
+    return Promise.resolve(row);
   }
   save(input: ModelCost): Promise<ModelCost> {
     this.rows.push(input);
@@ -631,7 +634,7 @@ class Catalog extends ModelProviderCatalog {
     this.connectionChecks.push({ provider: providerId, customKeys });
     return Promise.resolve({ outcome: "verified", valid: true });
   }
-  tryGetExecutionValue(input: {
+  pickExecutionValue(input: {
     customKeys: Record<string, unknown> | null;
     key: string;
   }): string | null {
@@ -691,7 +694,7 @@ class ExecutionCatalog extends Catalog {
     super();
   }
 
-  tryGetExecutionValue(input: {
+  pickExecutionValue(input: {
     customKeys: Record<string, unknown> | null;
     key: string;
   }): string | null {
@@ -738,7 +741,7 @@ class Translator extends ModelTranslation {
   }
 }
 class CredentialPolicy extends ModelProviderCredentialPolicy {
-  tryNormalize(_provider: string, value: Record<string, unknown> | null) {
+  normalizeKeys(_provider: string, value: Record<string, unknown> | null) {
     return value;
   }
   merge(input: {
@@ -757,7 +760,7 @@ class CredentialPolicy extends ModelProviderCredentialPolicy {
 
     return { ...edited, ...Object.fromEntries(preserved) };
   }
-  tryMask(value: Record<string, unknown> | null) {
+  toMaskedKeys(value: Record<string, unknown> | null) {
     return value ? { ...value, apiKey: "••••" } : null;
   }
   hasUsableReplacement(value: Record<string, unknown> | null): boolean {

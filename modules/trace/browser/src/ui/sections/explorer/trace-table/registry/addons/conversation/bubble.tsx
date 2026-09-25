@@ -124,11 +124,11 @@ export const Bubble: React.FC<BubbleProps> = ({
       flexDirection={side === "right" ? "row-reverse" : "row"}
       width="full"
       // `className="group"` is what the comment cluster's `_groupHover`
-      // resolves against; the role is what tells a reader the message and its
+      // resolves against; the fieldset is what tells a reader the message and its
       // actions are one thing. The turn separator's own group sits on a
       // sibling, so the two scopes never nest.
       className="group"
-      role="group"
+      as="fieldset"
     >
       <Circle
         size={compact ? "22px" : "26px"}

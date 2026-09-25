@@ -72,19 +72,19 @@ export class MemoryUserRepository implements UserRepository {
   }
 
   async findById(id: string): Promise<UserProfile | null> {
-    const row = this.#database.user(id);
+    const [row] = this.#database.usersById([id]);
 
     return row ? userProfileSchema.parse(profileOf(row)) : null;
   }
 
   async findByEmail(email: string): Promise<UserProfile | null> {
-    const row = this.#database.userByEmail(email);
+    const [row] = this.#database.usersWithEmail(email);
 
     return row ? userProfileSchema.parse(profileOf(row)) : null;
   }
 
   async findByEmailInsensitive(email: string): Promise<UserProfile | null> {
-    const row = this.#database.userByEmailInsensitive(email);
+    const [row] = this.#database.usersWithEmailInsensitive(email);
 
     return row ? userProfileSchema.parse(profileOf(row)) : null;
   }
@@ -139,7 +139,7 @@ export class MemoryUserRepository implements UserRepository {
   }
 
   async findPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus> {
-    const user = this.#database.user(id);
+    const [user] = this.#database.usersById([id]);
     const dismissedAt = user?.passkeyNudgeDismissedAt ?? null;
 
     return userPasskeyNudgeStatusSchema.parse({
@@ -155,7 +155,7 @@ export class MemoryUserRepository implements UserRepository {
   }
 
   async findJoinOfferDismissedDomains(id: string): Promise<string[]> {
-    return [...(this.#database.user(id)?.joinOfferDismissedDomains ?? [])];
+    return [...(this.#database.usersById([id])[0]?.joinOfferDismissedDomains ?? [])];
   }
 
   async addJoinOfferDismissedDomain(input: { id: string; domain: string }): Promise<void> {
@@ -180,7 +180,7 @@ export class MemoryUserRepository implements UserRepository {
   }
 
   async findAccountInfo(id: string): Promise<UserAccountInfo | null> {
-    const row = this.#database.user(id);
+    const [row] = this.#database.usersById([id]);
 
     return row ? userAccountInfoSchema.parse({ createdAt: toDate(row.createdAt) }) : null;
   }
@@ -224,7 +224,7 @@ export class MemoryUserRepository implements UserRepository {
   }
 
   async findLastHomePath(id: string): Promise<string | null> {
-    return this.#database.user(id)?.lastHomePath ?? null;
+    return this.#database.usersById([id])[0]?.lastHomePath ?? null;
   }
 
   async setLastHomePath(input: { id: string; path: string | null }): Promise<void> {
@@ -252,7 +252,7 @@ export class MemoryUserRepository implements UserRepository {
   }
 
   #require(id: string): MemoryUserRow {
-    const row = this.#database.user(id);
+    const [row] = this.#database.usersById([id]);
     if (!row) throw new UserNotFoundError(id);
 
     return row;

@@ -1,4 +1,4 @@
-import { Box, type IconProps, Text, VStack } from "@chakra-ui/react";
+import { chakra, Box, type IconProps, Text, VStack } from "@chakra-ui/react";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
@@ -162,21 +162,14 @@ export function SelectableIconCard(props: SelectableIconCardProps): React.ReactE
 
   return (
     <Tooltip content={label} positioning={{ placement: "bottom" }} showArrow openDelay={0}>
-      <Box
-        role="button"
-        tabIndex={0}
+      <chakra.button
+        type="button"
         // Fold the badge into the accessible name — aria-label overrides the
         // subtree, so the "Recommended" chip is otherwise invisible to
         // assistive tech that sighted users can see.
         aria-label={badge ? `${ariaLabel}, ${badge}` : ariaLabel}
         aria-pressed={selected}
         onClick={onClick}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onClick();
-          }
-        }}
         cursor="pointer"
         position="relative"
         w={cardSize}
@@ -220,7 +213,7 @@ export function SelectableIconCard(props: SelectableIconCardProps): React.ReactE
             label={label}
           />
         </VStack>
-      </Box>
+      </chakra.button>
     </Tooltip>
   );
 }

@@ -105,7 +105,6 @@ export const NewTracesScrollUpIndicator: React.FC<NewTracesScrollUpIndicatorProp
         borderRadius="full"
         cursor="pointer"
         pointerEvents="auto"
-        role="status"
         aria-live="polite"
         aria-label={ariaLabel}
         // Solid blue pill with a thin lifted shadow — reads as "actionable

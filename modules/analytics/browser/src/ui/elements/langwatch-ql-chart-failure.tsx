@@ -99,7 +99,7 @@ export function LangWatchQLChartFailure({ errors }: LangWatchQLChartFailureProps
       borderWidth="1px"
       borderColor="border"
       borderRadius="8px"
-      role="status"
+      as="output"
       data-testid="lwql-chart-failure"
       data-failure-code={leading.code}
     >

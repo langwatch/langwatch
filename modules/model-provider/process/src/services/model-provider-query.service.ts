@@ -225,7 +225,7 @@ export class ModelProviderQueryService {
     return {
       ...provider,
       ...metadata,
-      customKeys: this.options.credentialPolicy.tryMask(provider.customKeys),
+      customKeys: this.options.credentialPolicy.toMaskedKeys(provider.customKeys),
       extraHeaders: this.options.credentialPolicy.maskHeaders(provider.extraHeaders),
       isSystem: false,
       embeddingsUnsupported:

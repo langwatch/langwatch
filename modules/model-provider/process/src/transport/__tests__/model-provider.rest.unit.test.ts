@@ -56,7 +56,7 @@ function storedProviders() {
         id: `mp_${provider}`,
         provider,
         enabled: true,
-        customKeys: policy.tryMask(keys),
+        customKeys: policy.toMaskedKeys(keys),
         customModels: [],
         customEmbeddingsModels: [],
         models: null,

@@ -82,7 +82,7 @@ describe.skipIf(databaseUrl === null)("evaluation_analytics ClickHouse contract"
 
     await repo.upsertBatch([{ row, retentionDays: 30, appliedEventIds: ["event-1", "event-2"] }]);
 
-    const result = await repo.tryFind({
+    const [result] = await repo.findLatest({
       tenantId,
       evaluationId: row.evaluationId,
       window,
@@ -113,7 +113,7 @@ describe.skipIf(databaseUrl === null)("evaluation_analytics ClickHouse contract"
       },
     ]);
 
-    const result = await repo.tryFind({
+    const [result] = await repo.findLatest({
       tenantId,
       evaluationId: row.evaluationId,
       window,
@@ -153,7 +153,7 @@ describe.skipIf(databaseUrl === null)("evaluation_analytics ClickHouse contract"
       },
     ]);
 
-    const result = await repo.tryFind({ tenantId, evaluationId, window });
+    const [result] = await repo.findLatest({ tenantId, evaluationId, window });
 
     expect(result?.row.score).toBeCloseTo(0.22);
     expect(result?.row.occurredAtMs).toBe(baseMs + 101);
@@ -187,7 +187,7 @@ describe.skipIf(databaseUrl === null)("evaluation_analytics ClickHouse contract"
       },
     ]);
 
-    const result = await repo.tryFind({ tenantId, evaluationId, window });
+    const [result] = await repo.findLatest({ tenantId, evaluationId, window });
 
     expect(result?.row.score).toBeCloseTo(0.32);
     expect(result?.row.completedAtMs).toBe(baseMs + 21);
@@ -223,7 +223,7 @@ describe.skipIf(databaseUrl === null)("evaluation_analytics ClickHouse contract"
       },
     ]);
 
-    const result = await repo.tryFind({ tenantId, evaluationId, window });
+    const [result] = await repo.findLatest({ tenantId, evaluationId, window });
 
     expect(result?.row.score).toBeCloseTo(0.42);
     expect(result?.row.startedAtMs).toBe(baseMs + 11);
@@ -264,7 +264,7 @@ describe.skipIf(databaseUrl === null)("evaluation_analytics ClickHouse contract"
       },
     ]);
 
-    const result = await repo.tryFind({ tenantId, evaluationId, window });
+    const [result] = await repo.findLatest({ tenantId, evaluationId, window });
 
     expect(result?.row.score).toBeCloseTo(0.62);
     expect(result?.appliedEventIds).toEqual(["event-1", "event-2"]);
@@ -309,16 +309,16 @@ describe.skipIf(databaseUrl === null)("evaluation_analytics ClickHouse contract"
     ]);
 
     const window_ = { fromMs, toMs };
-    const [before, inside, after] = await Promise.all([
-      repo.tryFind({ tenantId, evaluationId: beforeWindowId, window: window_ }),
-      repo.tryFind({ tenantId, evaluationId: insideWindowId, window: window_ }),
-      repo.tryFind({ tenantId, evaluationId: afterWindowId, window: window_ }),
+    const [[before], [inside], [after]] = await Promise.all([
+      repo.findLatest({ tenantId, evaluationId: beforeWindowId, window: window_ }),
+      repo.findLatest({ tenantId, evaluationId: insideWindowId, window: window_ }),
+      repo.findLatest({ tenantId, evaluationId: afterWindowId, window: window_ }),
     ]);
 
-    expect(before).toBeNull();
+    expect(before).toBeUndefined();
     expect(inside?.row.score).toBeCloseTo(0.51);
     expect(inside?.row.occurredAtMs).toBe(fromMs + 3);
-    expect(after).toBeNull();
+    expect(after).toBeUndefined();
   });
 
   it("reads a pre-read-back row with null lifecycle operands", async () => {
@@ -342,7 +342,7 @@ describe.skipIf(databaseUrl === null)("evaluation_analytics ClickHouse contract"
       clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
     });
 
-    const result = await repo.tryFind({ tenantId, evaluationId, window });
+    const [result] = await repo.findLatest({ tenantId, evaluationId, window });
 
     expect(result?.row.status).toBe("processed");
     expect(result?.row.startedAtMs).toBeNull();

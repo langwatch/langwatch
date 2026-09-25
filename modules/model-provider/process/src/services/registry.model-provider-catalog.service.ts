@@ -134,7 +134,7 @@ export class RegistryModelProviderCatalogAdapter extends ModelProviderCatalog {
     });
   }
 
-  tryGetExecutionValue(input: {
+  pickExecutionValue(input: {
     customKeys: Record<string, unknown> | null;
     key: string;
   }): string | null {

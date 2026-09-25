@@ -24,7 +24,7 @@ export class ModelProviderKeysService extends ModelProviderCredentialPolicy {
     return new ModelProviderKeysService();
   }
 
-  tryNormalize(
+  normalizeKeys(
     provider: string,
     value: Record<string, unknown> | null,
   ): Record<string, unknown> | null {
@@ -57,7 +57,7 @@ export class ModelProviderKeysService extends ModelProviderCredentialPolicy {
     return { ...edited, ...Object.fromEntries(preserved) };
   }
 
-  tryMask(value: Record<string, unknown> | null): Record<string, unknown> | null {
+  toMaskedKeys(value: Record<string, unknown> | null): Record<string, unknown> | null {
     if (value === null) {
       return null;
     }

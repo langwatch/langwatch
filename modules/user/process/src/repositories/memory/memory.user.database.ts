@@ -56,18 +56,14 @@ export class MemoryUserDatabase {
     return [...this.#users.values()];
   }
 
-  user(id: string): MemoryUserRow | undefined {
-    return this.#users.get(id);
+  usersWithEmail(email: string): MemoryUserRow[] {
+    return [...this.#users.values()].filter((row) => row.email === email);
   }
 
-  userByEmail(email: string): MemoryUserRow | undefined {
-    return [...this.#users.values()].find((row) => row.email === email);
-  }
-
-  userByEmailInsensitive(email: string): MemoryUserRow | undefined {
+  usersWithEmailInsensitive(email: string): MemoryUserRow[] {
     const wanted = email.toLowerCase();
 
-    return [...this.#users.values()].find((row) => row.email?.toLowerCase() === wanted);
+    return [...this.#users.values()].filter((row) => row.email?.toLowerCase() === wanted);
   }
 
   usersById(ids: readonly string[]): MemoryUserRow[] {
@@ -86,8 +82,12 @@ export class MemoryUserDatabase {
     return [...this.#accounts.values()].filter((row) => row.userId === userId);
   }
 
-  account(id: string): MemoryUserAccountRow | undefined {
-    return this.#accounts.get(id);
+  accountsById(ids: readonly string[]): MemoryUserAccountRow[] {
+    return ids.flatMap((id) => {
+      const row = this.#accounts.get(id);
+
+      return row ? [row] : [];
+    });
   }
 
   writeAccount(row: MemoryUserAccountRow): void {

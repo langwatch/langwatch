@@ -517,7 +517,6 @@ function SortableHeaderButton({
       _hover={{ color: "fg", bg: "transparent" }}
       _active={{ bg: "transparent" }}
       _focusVisible={{ bg: "transparent" }}
-      role="group"
     >
       <HStack gap={1} minWidth={0} flex={1}>
         <Box

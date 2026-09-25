@@ -25,7 +25,7 @@ function executionWith(providers: Record<string, unknown>, rowById?: unknown) {
       prepareExecution: async ({ parameters }: { parameters: Record<string, unknown> }) =>
         parameters,
       pickExecutionDefinition: () => null,
-      tryGetExecutionValue: () => null,
+      pickExecutionValue: () => null,
       pickStoredExecutionValue: () => null,
     },
   } as never);

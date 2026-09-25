@@ -223,7 +223,7 @@ export function AddCustomModelDialog({
             </HorizontalFormControl>
 
             <Box
-              role="group"
+              as="fieldset"
               aria-label="Supported Parameters"
               borderBottomWidth="1px"
               paddingY={5}
@@ -253,7 +253,7 @@ export function AddCustomModelDialog({
               </HStack>
             </Box>
 
-            <Box role="group" aria-label="Multimodal Support" paddingY={5}>
+            <Box as="fieldset" aria-label="Multimodal Support" paddingY={5}>
               <HStack width="full" flexDirection={["column", "column", "row"]} gap={4}>
                 <VStack align="start" gap={1} width="full">
                   <Text fontWeight="medium">Multimodal Support</Text>

@@ -37,7 +37,7 @@ async function offerFor({
     issuer: "local:credential",
     passwordHash: "hashed",
   });
-  const row = database.user(id);
+  const [row] = database.usersById([id]);
   if (!row) throw new Error("the user was not stored");
   database.writeUser({
     ...row,

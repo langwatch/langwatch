@@ -151,11 +151,11 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
     }
   }
 
-  async tryFind(
+  async findLatest(
     input: AnalyticsEvaluationReadInput,
-  ): Promise<{ row: AnalyticsEvaluationRow; appliedEventIds: string[] } | null> {
+  ): Promise<{ row: AnalyticsEvaluationRow; appliedEventIds: string[] }[]> {
     const parsed = analyticsEvaluationReadInputSchema.parse(input);
-    this.validateTenant(parsed.tenantId, "tryFind");
+    this.validateTenant(parsed.tenantId, "findLatest");
     try {
       const client = await this.clientFor(parsed.tenantId);
       const range = parsed.window
@@ -191,7 +191,7 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
         table: "evaluation_analytics",
         outcome: readOutcome({ hasRecord: Boolean(record), isWindowed: Boolean(parsed.window) }),
       });
-      return record ? fromSlimRecord(record) : null;
+      return rows.map((row) => fromSlimRecord(row));
     } catch (error) {
       this.readMetrics?.record({ table: "evaluation_analytics", outcome: "error" });
       logger.warn(

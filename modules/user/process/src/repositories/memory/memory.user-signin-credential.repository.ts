@@ -45,7 +45,7 @@ export class MemoryUserCredentialRepository implements UserCredentialRepository 
   }
 
   async writePasswordHash(input: { accountId: string; passwordHash: string }): Promise<void> {
-    const account = this.#database.account(input.accountId);
+    const [account] = this.#database.accountsById([input.accountId]);
     if (!account) return;
 
     this.#database.writeAccount({ ...account, password: input.passwordHash });

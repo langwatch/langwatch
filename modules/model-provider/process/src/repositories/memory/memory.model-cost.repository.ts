@@ -1,4 +1,5 @@
 import {
+  ModelCostNotFoundError,
   modelCostSchema,
   type ModelCost,
   type ModelDefaultScope,
@@ -29,8 +30,10 @@ export class MemoryModelCostRepository implements ModelCostRepository {
     return Promise.resolve(byScopePrecedence(rows));
   }
 
-  tryFindById(id: string): Promise<ModelCost | null> {
-    return Promise.resolve(this.database.costs.get(id) ?? null);
+  getById(id: string): Promise<ModelCost> {
+    const row = this.database.costs.get(id);
+    if (!row) return Promise.reject(new ModelCostNotFoundError());
+    return Promise.resolve(row);
   }
 
   save(input: ModelCostRecord): Promise<ModelCost> {

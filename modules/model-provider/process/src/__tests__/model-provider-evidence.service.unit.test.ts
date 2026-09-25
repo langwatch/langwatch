@@ -1,4 +1,8 @@
-import { ProjectNotFoundError, type ProjectWithTeam } from "@langwatch/project-contract";
+import {
+  ProjectNotFoundError,
+  projectWithTeamSchema,
+  type ProjectWithTeam,
+} from "@langwatch/project-contract";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 /**
  * The setup checklist's provider step, read through this feature's own
@@ -32,11 +36,48 @@ class TestProjects extends ModelCostProject {
   }
 }
 
-const project = {
+const project = projectWithTeamSchema.parse({
   id: PROJECT_ID,
+  name: "Project",
+  slug: "project",
+  apiKey: "api-key",
+  lwqlKey: "lwql-key",
   teamId: TEAM_ID,
-  team: { organizationId: ORGANIZATION_ID },
-} as unknown as ProjectWithTeam;
+  language: "typescript",
+  framework: "langchain",
+  kind: "application",
+  firstMessage: false,
+  integrated: true,
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+  userLinkTemplate: null,
+  traceSharingEnabled: false,
+  presenceEnabled: false,
+  s3Endpoint: null,
+  s3AccessKeyId: null,
+  s3SecretAccessKey: null,
+  s3Bucket: null,
+  archivedAt: null,
+  isPersonal: false,
+  ownerUserId: null,
+  personalFeatures: {},
+  departmentId: null,
+  langyEgressAllowlist: null,
+  lastCodingAgentSessionAt: null,
+  lastCodingAgentPullRequestAt: null,
+  team: {
+    id: TEAM_ID,
+    name: "Team",
+    slug: "team",
+    organizationId: ORGANIZATION_ID,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    archivedAt: null,
+    isPersonal: false,
+    ownerUserId: null,
+    departmentId: null,
+  },
+});
 
 function testDatabase(row: { id: string } | null) {
   const findFirst = vi.fn(async () => row);

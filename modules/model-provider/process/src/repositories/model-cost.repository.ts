@@ -10,7 +10,7 @@ export type ModelCostRecord = ModelCost;
  */
 export interface ModelCostRepository {
   findForProject(projectScopes: ModelDefaultScope[]): Promise<ModelCost[]>;
-  tryFindById(id: string): Promise<ModelCost | null>;
+  getById(id: string): Promise<ModelCost>;
   save(input: ModelCostRecord): Promise<ModelCost>;
   delete(id: string): Promise<void>;
 }

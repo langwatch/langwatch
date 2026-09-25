@@ -16,7 +16,7 @@
  * than permanent on-card text.
  */
 
-import { Box, HStack, Input, Text } from "@chakra-ui/react";
+import { chakra, Box, Input, Text } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Edit2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -91,25 +91,17 @@ function EditableWidgetNameDisplay({
       positioning={{ placement: "top" }}
       showArrow
     >
-      <HStack
-        role="button"
-        tabIndex={0}
+      <chakra.button
+        display="flex"
+        alignItems="center"
+        gap="2"
+        type="button"
         aria-label={`Rename ${name}`}
         cursor="pointer"
         minWidth={0}
         onClick={(e) => {
           e.stopPropagation();
           startEdit();
-        }}
-        onKeyDown={(e) => {
-          // A focusable div is not a real button, so Enter/Space do not fire
-          // click on their own — activate them by hand to keep the rename
-          // reachable without a pointer (WCAG 2.1.1).
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            e.stopPropagation();
-            startEdit();
-          }
         }}
         _hover={{ "& .edit-icon": { opacity: 1 } }}
         _focusVisible={{ "& .edit-icon": { opacity: 1 } }}
@@ -130,7 +122,7 @@ function EditableWidgetNameDisplay({
         >
           <Edit2 size={14} />
         </Box>
-      </HStack>
+      </chakra.button>
     </Tooltip>
   );
 }

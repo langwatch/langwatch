@@ -160,7 +160,7 @@ describe("AnalyticsEvaluationRepository", () => {
       record: ({ outcome }) => metrics.push({ outcome }),
     });
 
-    const result = await analytics.tryFind({
+    const [result] = await analytics.findLatest({
       tenantId: row.tenantId,
       evaluationId: row.evaluationId,
       window: { fromMs: row.occurredAtMs - 1000, toMs: row.occurredAtMs + 1000 },
@@ -195,7 +195,7 @@ describe("AnalyticsEvaluationRepository", () => {
       },
     ]);
 
-    const result = await repository(client).tryFind({
+    const [result] = await repository(client).findLatest({
       tenantId: row.tenantId,
       evaluationId: row.evaluationId,
     });
@@ -207,7 +207,7 @@ describe("AnalyticsEvaluationRepository", () => {
 
   it("breaks tied UpdatedAt versions by folded lifecycle progress", async () => {
     const client = clientReturning([]);
-    await repository(client).tryFind({
+    await repository(client).findLatest({
       tenantId: row.tenantId,
       evaluationId: row.evaluationId,
     });
@@ -227,19 +227,19 @@ describe("AnalyticsEvaluationRepository", () => {
       record: ({ outcome }) => outcomes.push(outcome),
     });
 
-    await analytics.tryFind({
+    await analytics.findLatest({
       tenantId: row.tenantId,
       evaluationId: row.evaluationId,
       window: { fromMs: row.occurredAtMs - 1, toMs: row.occurredAtMs + 1 },
     });
-    await analytics.tryFind({ tenantId: row.tenantId, evaluationId: row.evaluationId });
+    await analytics.findLatest({ tenantId: row.tenantId, evaluationId: row.evaluationId });
 
     expect(outcomes).toEqual(["windowed_empty", "unwindowed"]);
   });
 
   it("applies an evaluation window only to the outer latest-version read", async () => {
     const client = clientReturning([]);
-    await repository(client).tryFind({
+    await repository(client).findLatest({
       tenantId: row.tenantId,
       evaluationId: row.evaluationId,
       window: { fromMs: row.occurredAtMs - 1, toMs: row.occurredAtMs + 1 },
@@ -291,7 +291,7 @@ describe("AnalyticsEvaluationRepository", () => {
     loggerSpies.warn.mockClear();
 
     await expect(
-      repository(client, { record: ({ outcome }) => outcomes.push(outcome) }).tryFind({
+      repository(client, { record: ({ outcome }) => outcomes.push(outcome) }).findLatest({
         tenantId: row.tenantId,
         evaluationId: row.evaluationId,
       }),

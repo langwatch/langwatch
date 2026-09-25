@@ -1,4 +1,4 @@
-import { Box, HStack, IconButton, Input, Text, VStack } from "@chakra-ui/react";
+import { chakra, Box, HStack, IconButton, Input, Text, VStack } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TRACE_NAME_MAX_LENGTH } from "@langwatch/trace-contract";
 import { useEffect, useId, useRef, useState } from "react";
@@ -108,7 +108,7 @@ export function EditableTraceName({
         positioning={{ placement: "bottom-start" }}
         openDelay={400}
       >
-        <Text
+        <chakra.button
           fontWeight="semibold"
           textStyle="md"
           truncate
@@ -118,17 +118,11 @@ export function EditableTraceName({
           cursor="help"
           onClick={startEditing}
           onDoubleClick={startEditing}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              startEditing();
-            }
-          }}
+          type="button"
+          textAlign="start"
         >
           {titleText}
-        </Text>
+        </chakra.button>
       </Tooltip>
     );
   }

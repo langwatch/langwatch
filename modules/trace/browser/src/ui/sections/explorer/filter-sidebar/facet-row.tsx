@@ -91,11 +91,11 @@ export const FacetRow = memo(function FacetRow({
   const handleMouseLeave = useCallback(() => clearHover(), [clearHover]);
 
   return (
-    // `role="group"` + `data-group` lets the trailing exclude reveal itself on
+    // `fieldset` + `data-group` lets the trailing exclude reveal itself on
     // hover of the whole row. The exclude is its own flex element AFTER the
     // count (a separate-but-joined slot), not an overlay on the count.
     <Box
-      role="group"
+      as="fieldset"
       data-group
       position="relative"
       width="full"

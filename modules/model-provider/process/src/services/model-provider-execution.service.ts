@@ -241,7 +241,7 @@ export class ModelProviderExecutionService {
       return null;
     }
 
-    return this.options.catalog.tryGetExecutionValue({
+    return this.options.catalog.pickExecutionValue({
       customKeys: provider.customKeys,
       key,
     });

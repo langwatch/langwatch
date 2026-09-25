@@ -108,7 +108,11 @@ const editTrace = () => screen.getByRole("button", { name: "Edit trace" });
 const turnActions = () => screen.getByRole("group", { name: "Turn actions" });
 
 /** The separator the actions belong to, and the hover group they answer. */
-const separator = () => screen.getByText("Turn 1").closest('[role="group"]') as HTMLElement;
+function separator(): HTMLElement {
+  const row = screen.getByText("Turn 1").closest("fieldset");
+  if (!row) throw new Error("the separator did not render");
+  return row;
+}
 
 const sessionCheckbox = () =>
   screen.getByRole("checkbox", {

@@ -119,7 +119,8 @@ function WidgetBody({
     <VStack align="stretch" gap={2} height="full" minWidth={0}>
       {coarsenedFrom !== undefined && result.granularitySeconds !== undefined && (
         <Box
-          role="status"
+          as="output"
+          display="block"
           data-testid="lwql-widget-coarsened-notice"
           fontSize="12px"
           color="fg.muted"

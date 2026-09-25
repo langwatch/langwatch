@@ -273,7 +273,7 @@ describe("ModelProviderKeysService merge", () => {
 describe("ModelProviderKeysService maskApiKeys", () => {
   /** @scenario "API key masking when editing existing provider" */
   it("masks the API key and leaves the base URL visible", () => {
-    const result = policy.tryMask({
+    const result = policy.toMaskedKeys({
       OPENAI_API_KEY: "sk-actual-key",
       OPENAI_BASE_URL: "https://api.openai.com",
     });
@@ -284,7 +284,7 @@ describe("ModelProviderKeysService maskApiKeys", () => {
 });
 
 // The read side of the same policy: every tRPC/REST response carrying a provider row goes
-// through `tryMask`/`maskHeaders` first — the guarantee a credential never reaches a browser.
+// through `toMaskedKeys`/`maskHeaders` first — the guarantee a credential never reaches a browser.
 describe("ModelProviderKeysService read masking", () => {
   const storedCredentials: Record<string, Record<string, string>> = {
     openai: {
@@ -309,7 +309,7 @@ describe("ModelProviderKeysService read masking", () => {
   describe("when a stored credential set is read back", () => {
     /** @scenario "Credential fields are secret unless the registry declares them public" */
     it("replaces every secret field with the placeholder", () => {
-      const masked = Object.values(storedCredentials).map((keys) => policy.tryMask(keys));
+      const masked = Object.values(storedCredentials).map((keys) => policy.toMaskedKeys(keys));
 
       expect(masked).toEqual([
         {
@@ -334,7 +334,7 @@ describe("ModelProviderKeysService read masking", () => {
 
     it("leaves no plaintext secret anywhere in the masked output", () => {
       const serialized = JSON.stringify(
-        Object.values(storedCredentials).map((keys) => policy.tryMask(keys)),
+        Object.values(storedCredentials).map((keys) => policy.toMaskedKeys(keys)),
       );
 
       for (const secret of [
@@ -348,7 +348,7 @@ describe("ModelProviderKeysService read masking", () => {
     });
 
     it("answers null for a row that stores no credentials rather than an empty set", () => {
-      expect(policy.tryMask(null)).toBeNull();
+      expect(policy.toMaskedKeys(null)).toBeNull();
     });
   });
 

@@ -132,9 +132,11 @@ function renderRow({
   );
 }
 
-/** The separator row is the group wrapping the "Turn N" label. */
+/** The separator row is the fieldset wrapping the "Turn N" label. */
 function separatorRow(): HTMLElement {
-  return screen.getByText("Turn 3").closest('[role="group"]') as HTMLElement;
+  const row = screen.getByText("Turn 3").closest("fieldset");
+  if (!row) throw new Error("the separator row did not render");
+  return row;
 }
 
 function separatorText(): string {

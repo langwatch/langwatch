@@ -84,9 +84,9 @@ export function TurnAnnotationRail({
       align="stretch"
       gap={2}
       // `className="group"` is what the button's `_groupHover` resolves
-      // against; the role is what tells a reader the column is one thing.
+      // against; the fieldset is what tells a reader the column is one thing.
       className="group"
-      role="group"
+      as="fieldset"
       onClick={startAnnotation}
       cursor={canManage && !turnDraft ? "pointer" : "default"}
       minHeight="40px"

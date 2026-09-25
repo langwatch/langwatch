@@ -818,10 +818,16 @@ function ReplacedConfigsNote({
   const isSingle = replacedNames.length === 1;
   return (
     // The note appears only after a scope is picked, and it is the one
-    // warning that saving overwrites another config. `role="status"`
+    // warning that saving overwrites another config. `<output>`
     // makes the insertion announced, so it reaches a screen reader user
     // before they save rather than not at all.
-    <Text fontSize="xs" color="fg.muted" role="status" data-testid="replaced-configs-note">
+    <Text
+      fontSize="xs"
+      color="fg.muted"
+      as="output"
+      display="block"
+      data-testid="replaced-configs-note"
+    >
       {replacedNames.join(", ")} already {isSingle ? "has" : "have"} default models. Saving replaces{" "}
       {isSingle ? "that config" : "those configs"}.
     </Text>

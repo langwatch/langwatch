@@ -10,10 +10,9 @@ import type {
 export abstract class AnalyticsEvaluationRepository {
   abstract upsert(input: AnalyticsEvaluationUpsertInput): Promise<void>;
   abstract upsertBatch(input: AnalyticsEvaluationUpsertInput[]): Promise<void>;
-  abstract tryFind(input: AnalyticsEvaluationReadInput): Promise<{
-    row: AnalyticsEvaluationRow;
-    appliedEventIds: string[];
-  } | null>;
+  abstract findLatest(
+    input: AnalyticsEvaluationReadInput,
+  ): Promise<{ row: AnalyticsEvaluationRow; appliedEventIds: string[] }[]>;
   abstract appendRollup(input: AnalyticsEvaluationRollupAppendInput): Promise<void>;
   abstract appendRollupBatch(input: AnalyticsEvaluationRollupAppendBatchInput): Promise<void>;
 }
@@ -32,10 +31,10 @@ export class NullAnalyticsEvaluationRepository extends AnalyticsEvaluationReposi
 
   async upsertBatch(_input: AnalyticsEvaluationUpsertInput[]): Promise<void> {}
 
-  async tryFind(
+  async findLatest(
     _input: AnalyticsEvaluationReadInput,
-  ): Promise<{ row: AnalyticsEvaluationRow; appliedEventIds: string[] } | null> {
-    return null;
+  ): Promise<{ row: AnalyticsEvaluationRow; appliedEventIds: string[] }[]> {
+    return [];
   }
 
   async appendRollup(_input: AnalyticsEvaluationRollupAppendInput): Promise<void> {}

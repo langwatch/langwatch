@@ -17,7 +17,7 @@ export const HoverActionCluster = forwardRef<
   return (
     <HStack
       ref={ref}
-      role="group"
+      as="fieldset"
       aria-label={label}
       gap={0.5}
       flexShrink={0}

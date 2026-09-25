@@ -1,4 +1,8 @@
-import { type ModelCost, type ModelDefaultScope } from "@langwatch/model-provider-contract";
+import {
+  ModelCostNotFoundError,
+  type ModelCost,
+  type ModelDefaultScope,
+} from "@langwatch/model-provider-contract";
 import { type PrismaClient, type CustomLLMModelCost } from "@langwatch/prisma-client/generated";
 
 import { byScopePrecedence } from "../../rules/model-cost-scope-precedence.rules.ts";
@@ -27,10 +31,10 @@ export class PrismaModelCostRepository implements ModelCostRepository {
     return byScopePrecedence(rows.map(toCost));
   }
 
-  async tryFindById(id: string): Promise<ModelCost | null> {
+  async getById(id: string): Promise<ModelCost> {
     const row = await this.database.customLLMModelCost.findUnique({ where: { id } });
-
-    return row ? toCost(row) : null;
+    if (!row) throw new ModelCostNotFoundError();
+    return toCost(row);
   }
 
   async save(input: ModelCost): Promise<ModelCost> {

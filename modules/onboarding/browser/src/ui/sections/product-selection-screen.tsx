@@ -76,8 +76,6 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
           px={6}
           py={5}
           cursor="pointer"
-          role="button"
-          tabIndex={0}
           onClick={() => {
             setIntegrationMethod.mutate({ integrationMethod: opt.key });
             onSelectProduct(opt.key);

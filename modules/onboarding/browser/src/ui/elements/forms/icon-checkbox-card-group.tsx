@@ -28,7 +28,7 @@ export const IconCheckboxCardGroup = <T extends string = string>({
   };
 
   return (
-    <VStack role="group" aria-label={ariaLabel ?? label} gap="2" w="full" p="1" m="-1">
+    <VStack as="fieldset" aria-label={ariaLabel ?? label} gap="2" w="full" p="1" m="-1">
       {label && (
         <Text textStyle="sm" fontWeight="medium">
           {label}

@@ -359,7 +359,7 @@ const ExampleRow: React.FC<{
     paddingX={2}
     paddingY={1.5}
     borderRadius="sm"
-    role="group"
+    as="fieldset"
     transition="background 100ms ease"
     _hover={{ bg: `${accent}.subtle` }}
   >
@@ -437,7 +437,7 @@ const SyntaxTable: React.FC<{
     </Table.Header>
     <Table.Body>
       {rows.map((row) => (
-        <Table.Row key={row.key} role="group">
+        <Table.Row key={row.key}>
           {row.cells.map((cell, idx) => (
             <Table.Cell key={idx}>{cell}</Table.Cell>
           ))}
@@ -451,7 +451,7 @@ const CopyableQuery: React.FC<{
   query: string;
   onApply: (query: string) => void;
 }> = ({ query, onApply }) => (
-  <HStack gap={1.5} role="group">
+  <HStack gap={1.5} as="fieldset">
     <chakra.button
       type="button"
       onClick={() => onApply(query)}
@@ -509,7 +509,7 @@ const FieldRow: React.FC<{
 }> = ({ name, meta, onApply }) => {
   const example = exampleFor(name, meta);
   return (
-    <Table.Row role="group">
+    <Table.Row>
       <Table.Cell>
         <Code size="sm" variant="surface">
           {name}

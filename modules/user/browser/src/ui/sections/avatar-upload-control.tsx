@@ -1,4 +1,4 @@
-import { Box, Button, Center, HStack } from "@chakra-ui/react";
+import { chakra, Box, Button, Center, HStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Info, Pencil } from "lucide-react";
@@ -31,22 +31,16 @@ function AvatarEditButton({
   onOpen: () => void;
 }) {
   return (
-    <Box
+    <chakra.button
       position="relative"
-      role="button"
-      tabIndex={isDisabled ? -1 : 0}
+      type="button"
+      disabled={isDisabled}
       aria-label={label}
       aria-disabled={isDisabled}
       cursor={isDisabled ? "default" : "pointer"}
       transition="opacity 0.15s"
       _hover={isDisabled ? undefined : { opacity: 0.85 }}
       onClick={isDisabled ? undefined : onOpen}
-      onKeyDown={(e) => {
-        if (!isDisabled && (e.key === "Enter" || e.key === " ")) {
-          e.preventDefault();
-          onOpen();
-        }
-      }}
     >
       <UserAvatar
         name={name}
@@ -72,7 +66,7 @@ function AvatarEditButton({
       >
         <Pencil size={9} />
       </Box>
-    </Box>
+    </chakra.button>
   );
 }
 

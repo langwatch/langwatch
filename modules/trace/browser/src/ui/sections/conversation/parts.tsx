@@ -99,7 +99,7 @@ export function TextPart({
   const label = labels?.[sourceRole] ?? visuals.bubbleLabel;
 
   return (
-    <VStack align={align} data-align={align} gap={0} width="100%" className="group" role="group">
+    <VStack align={align} data-align={align} gap={0} width="100%" className="group" as="fieldset">
       <Bubble
         side={visuals.displayRole === "user" ? "left" : "right"}
         tone={visuals.displayRole}

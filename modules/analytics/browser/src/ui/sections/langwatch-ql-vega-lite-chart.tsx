@@ -121,7 +121,7 @@ function LangWatchQLChartWarnings({ warnings }: { warnings: readonly VegaValidat
       borderWidth="1px"
       borderColor="border"
       borderRadius="8px"
-      role="status"
+      as="output"
       data-testid="lwql-chart-warnings"
     >
       {warnings.map((warning, index) => (

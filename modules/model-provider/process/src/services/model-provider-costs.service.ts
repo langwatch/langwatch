@@ -52,10 +52,7 @@ export class ModelProviderCostsService {
 
   async upsert(input: ModelCostWriteInput): Promise<ModelCost> {
     const parsed = modelCostWriteInputSchema.parse(input);
-    const existing = parsed.id ? await this.options.costs.tryFindById(parsed.id) : null;
-    if (parsed.id && !existing) {
-      throw new ModelCostNotFoundError();
-    }
+    const existing = parsed.id ? await this.options.costs.getById(parsed.id) : undefined;
 
     const targetScope = {
       scopeType: parsed.scopeType ?? "PROJECT",
@@ -93,10 +90,7 @@ export class ModelProviderCostsService {
 
   async delete(input: ModelCostDeleteInput): Promise<void> {
     const parsed = modelCostDeleteInputSchema.parse(input);
-    const existing = await this.options.costs.tryFindById(parsed.id);
-    if (!existing) {
-      throw new ModelCostNotFoundError();
-    }
+    const existing = await this.options.costs.getById(parsed.id);
 
     const organizationId = await this.options.scopes
       .getAnchorOrganizationId({ projectId: parsed.projectId })

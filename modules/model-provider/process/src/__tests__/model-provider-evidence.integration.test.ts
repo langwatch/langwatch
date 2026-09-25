@@ -15,7 +15,11 @@ import {
   type PrismaConnection,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { ProjectNotFoundError, type ProjectWithTeam } from "@langwatch/project-contract";
+import {
+  ProjectNotFoundError,
+  projectWithTeamSchema,
+  type ProjectWithTeam,
+} from "@langwatch/project-contract";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -39,7 +43,7 @@ class PrismaProjects extends ModelCostProject {
       where: { id },
       include: { team: true },
     });
-    return project as unknown as ProjectWithTeam | null;
+    return projectWithTeamSchema.nullable().parse(project);
   }
 
   async getWithTeam(id: string): Promise<ProjectWithTeam> {

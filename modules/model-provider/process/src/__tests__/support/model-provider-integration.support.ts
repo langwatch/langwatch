@@ -20,8 +20,9 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   ProjectNotFoundError,
+  projectSchema,
+  projectWithTeamSchema,
   type PaginatedProjects,
-  type Project,
   type ProjectIdentity,
   type ProjectIdsByOrganizationInput,
   type ProjectNamesByIdsInput,
@@ -68,7 +69,7 @@ export class PrismaProjects extends TestProjectApi {
       where: { id },
       include: { team: true },
     });
-    return project as unknown as ProjectWithTeam | null;
+    return projectWithTeamSchema.nullable().parse(project);
   }
 
   override async getWithTeam(id: string): Promise<ProjectWithTeam> {
@@ -96,7 +97,7 @@ export class PrismaProjects extends TestProjectApi {
       this.prisma.project.count({ where }),
     ]);
     return {
-      data: data as unknown as Project[],
+      data: projectSchema.array().parse(data),
       pagination: { page: input.page, limit: input.limit, total },
     };
   }
@@ -270,7 +271,7 @@ export class TestModelProviderCatalog extends ModelProviderCatalog {
     return Promise.resolve(this.verdict);
   }
 
-  tryGetExecutionValue(input: {
+  pickExecutionValue(input: {
     customKeys: Record<string, unknown> | null;
     key: string;
   }): string | null {

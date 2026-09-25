@@ -45,7 +45,7 @@ export abstract class ModelProviderCredentialCodec {
  * this policy validates writes, preserves masked values, and redacts reads.
  */
 export abstract class ModelProviderCredentialPolicy {
-  abstract tryNormalize(
+  abstract normalizeKeys(
     provider: string,
     value: Record<string, unknown> | null,
   ): Record<string, unknown> | null;
@@ -53,7 +53,7 @@ export abstract class ModelProviderCredentialPolicy {
     incoming: Record<string, unknown> | null;
     stored: Record<string, unknown> | null;
   }): Record<string, unknown>;
-  abstract tryMask(value: Record<string, unknown> | null): Record<string, unknown> | null;
+  abstract toMaskedKeys(value: Record<string, unknown> | null): Record<string, unknown> | null;
   abstract hasUsableReplacement(value: Record<string, unknown> | null): boolean;
   abstract assertCredentialsCanBeSaved(input: {
     provider: string;
@@ -206,7 +206,7 @@ export abstract class ModelProviderCatalog {
    * Reads a provider execution value from its stored credentials or injected
    * process configuration. The package never reaches into environment state.
    */
-  abstract tryGetExecutionValue(input: {
+  abstract pickExecutionValue(input: {
     customKeys: Record<string, unknown> | null;
     key: string;
   }): string | null;

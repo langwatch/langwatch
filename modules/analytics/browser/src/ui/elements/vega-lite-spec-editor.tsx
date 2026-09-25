@@ -65,7 +65,8 @@ export function VegaLiteSpecEditor({
       <Text
         fontSize="12px"
         color="fg.muted"
-        role="status"
+        as="output"
+        display="block"
         paddingX={errors.length > 0 ? 4 : 0}
         paddingY={errors.length > 0 ? 1 : 0}
         borderTopWidth={errors.length > 0 ? "1px" : "0"}

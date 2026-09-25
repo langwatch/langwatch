@@ -116,7 +116,7 @@ const SidebarSectionInner: React.FC<SidebarSectionProps> = ({
 
   return (
     <Collapsible.Root open={effectiveOpen} onOpenChange={(e) => handleOpenChange(e.open)}>
-      <VStack align="stretch" paddingX={2} paddingY={2} gap={1} role="group" data-group>
+      <VStack align="stretch" paddingX={2} paddingY={2} gap={1} as="fieldset" data-group>
         {/* position:relative anchors the absolute grip below to the header
             row (so it stays vertically centred on the title, not the whole
             expanded section). The grip is pulled into the left gutter so the

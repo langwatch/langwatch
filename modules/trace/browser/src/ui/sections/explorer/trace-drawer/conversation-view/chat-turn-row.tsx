@@ -527,11 +527,11 @@ function ThreadMessage({
       transition="background 0.15s ease"
       _hover={onClick ? { bg: "bg.subtle" } : undefined}
       // `className="group"` is what the comment cluster's `_groupHover`
-      // resolves against; the role is what tells a reader the message and its
+      // resolves against; the fieldset is what tells a reader the message and its
       // actions are one thing. The turn separator's own group sits on a
       // sibling, so the two scopes never nest.
       className="group"
-      role="group"
+      as="fieldset"
       onClick={(e: React.MouseEvent) => {
         if (!onClick) return;
         e.stopPropagation();
@@ -776,10 +776,10 @@ const TurnSeparator: React.FC<{
       cursor="pointer"
       onClick={onSelect}
       // `className="group"` is what `_groupHover` on the action row resolves
-      // against; the role is what tells a reader the separator and its actions
+      // against; the fieldset is what tells a reader the separator and its actions
       // are one thing.
       className="group"
-      role="group"
+      as="fieldset"
       // Says in one place what the lines and the ledger read from: the turn
       // under review, or one the sitting counts.
       data-highlighted={readsSelected ? "true" : "false"}

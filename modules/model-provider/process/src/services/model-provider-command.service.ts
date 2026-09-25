@@ -404,7 +404,10 @@ export class ModelProviderCommandService {
       return existing?.customKeys ?? null;
     }
 
-    const normalized = this.options.credentialPolicy.tryNormalize(input.provider, input.customKeys);
+    const normalized = this.options.credentialPolicy.normalizeKeys(
+      input.provider,
+      input.customKeys,
+    );
     const storedCredentialsAreUnreadable =
       existing &&
       existing.customKeys === null &&

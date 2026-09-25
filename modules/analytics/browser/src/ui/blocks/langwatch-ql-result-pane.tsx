@@ -135,7 +135,13 @@ function ViolationList({ failure }: { failure: LangWatchQLFailure }) {
 
 function StaleNotice({ onRun }: { onRun: () => void }) {
   return (
-    <Text fontSize="12.5px" color="fg.muted" data-testid="lwql-stale-notice" role="status">
+    <Text
+      fontSize="12.5px"
+      color="fg.muted"
+      data-testid="lwql-stale-notice"
+      as="output"
+      display="block"
+    >
       The statement changed after this ran:{" "}
       <Button
         variant="plain"

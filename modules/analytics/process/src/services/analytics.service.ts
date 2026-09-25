@@ -293,10 +293,11 @@ export class AnalyticsService extends AnalyticsServiceContract {
     await this.evaluationRepository.upsertBatch(input);
   }
 
-  findEvaluationAnalytics(
+  async findEvaluationAnalytics(
     input: AnalyticsEvaluationReadInput,
   ): Promise<{ row: AnalyticsEvaluationRow; appliedEventIds: string[] } | null> {
-    return this.evaluationRepository.tryFind(input);
+    const [latest] = await this.evaluationRepository.findLatest(input);
+    return latest ?? null;
   }
 
   async appendEvaluationAnalyticsRollup(

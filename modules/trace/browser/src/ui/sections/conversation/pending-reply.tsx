@@ -71,7 +71,7 @@ export function PendingReply({
       flexDirection={side === "right" ? "row-reverse" : "row"}
       // Named for the reader, not for the shape: assistive technology should
       // announce that a reply is coming, not describe an animation.
-      role="status"
+      as="output"
       aria-live="polite"
     >
       <Circle size={compact ? "22px" : "26px"} bg="purple.muted" color="purple.fg" flexShrink={0}>
