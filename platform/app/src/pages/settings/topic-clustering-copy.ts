@@ -101,9 +101,7 @@ export function runDetail(run: ClusteringRunDetail): string {
     case "skipped":
       return `${copyFor(SKIP_REASON_COPY, run.skippedReason) ?? "Skipped"}.`;
     case "failed": {
-      const guidance = run.isErrorUserActionable
-        ? copyFor(CLUSTERING_FAILURE_GUIDANCE, run.errorCode)
-        : undefined;
+      const guidance = failureGuidance(run);
       return guidance
         ? guidance.title
         : "Failed on our side. It retries automatically at the next scheduled run.";
