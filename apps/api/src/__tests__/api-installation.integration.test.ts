@@ -4,7 +4,9 @@
  * @see specs/platform/process-installation.feature
  */
 import { createApiFixture } from "@langwatch/api-fixture";
+import { RestHost } from "@langwatch/api/rest";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
+import { AuthApi } from "@langwatch/auth-contract";
 import { parseProcessConfig } from "@langwatch/config";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { serverModules } from "@langwatch/installed-server-modules";
@@ -156,6 +158,73 @@ describe("the api process installation", () => {
       ).resolves.toEqual([]);
     } finally {
       await Promise.all([first.runtime.stop(), second.runtime.stop()]);
+    }
+  });
+
+  /** @scenario "The api answers the CLI device flow routes main serves" */
+  it("answers every CLI device-flow route from the installed auth module", async () => {
+    const { runtime } = await bootApi();
+
+    try {
+      const closed = {
+        authenticate: () => {
+          throw new Error("the device flow authenticates its caller itself.");
+        },
+      };
+      const host = RestHost.create({
+        identities: {
+          project: closed,
+          organization: closed,
+          apiKey: closed,
+          scimToken: closed,
+          "instance-admin": closed,
+          browser: closed,
+        },
+        bearers: () => closed,
+        audit: { record: async () => {} },
+      });
+      const hono = host.app;
+      const deviceFlow = serverModules
+        .filter((module) => module.apiContract === AuthApi)
+        .flatMap((module) => module.transports ?? [])
+        .find((transport) => transport.protocol === "rest" && transport.namespace === "auth-cli");
+      if (!deviceFlow) throw new Error("no installed module declares the auth-cli family");
+      host.mount(deviceFlow.router(), () => runtime.service(AuthApi));
+      const post = (path: string, body: object) =>
+        new Request(`http://api.test${path}`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      const started = await hono.fetch(post("/api/auth/cli/device-code", {}));
+      const statuses = await Promise.all(
+        [
+          post("/api/auth/cli/exchange", { device_code: "never-minted" }),
+          post("/api/auth/cli/refresh", { refresh_token: "never-minted" }),
+          new Request("http://api.test/api/auth/cli/lookup?user_code=NOPE-NOPE"),
+          post("/api/auth/cli/approve", { user_code: "NOPE-NOPE", organization_id: "org-1" }),
+          post("/api/auth/cli/deny", { user_code: "NOPE-NOPE" }),
+          post("/api/auth/cli/logout", { refresh_token: "never-minted" }),
+        ].map(async (request) => [
+          new URL(request.url).pathname,
+          (await hono.fetch(request)).status,
+        ]),
+      );
+
+      expect({ status: started.status, body: await started.json() }).toMatchObject({
+        status: 200,
+        body: { verification_uri: "http://langwatch.test/cli/auth" },
+      });
+      expect(Object.fromEntries(statuses)).toEqual({
+        "/api/auth/cli/exchange": 408,
+        "/api/auth/cli/refresh": 401,
+        "/api/auth/cli/lookup": 401,
+        "/api/auth/cli/approve": 401,
+        "/api/auth/cli/deny": 401,
+        "/api/auth/cli/logout": 200,
+      });
+    } finally {
+      await runtime.stop();
     }
   });
 

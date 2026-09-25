@@ -29,6 +29,7 @@ import {
   type VerifiedBrowserSession,
   type AuthUsageCount,
 } from "@langwatch/auth-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { SsoApi } from "@langwatch/enterprise-sso-contract";
 import {
@@ -64,6 +65,13 @@ import { RedisAuthSessionCacheRepository } from "../repositories/redis/redis.aut
 import { keyedIdentifierHasher } from "../rules/sign-in-identifier-hash.rules.ts";
 import { resolveDialableIdentityProviderOrigins } from "../rules/trusted-origins.rules.ts";
 import { BrowserSessionService } from "../services/browser-session.service.ts";
+import {
+  CliDeviceFlowService,
+  type CliBrowserSession,
+  type CliDeviceCodeLookup,
+  type CliDeviceFlowAnswer,
+  type CliDeviceFlowCollaborators,
+} from "../services/cli-device-flow.service.ts";
 import { CliDeviceSessionService } from "../services/cli-device-session.service.ts";
 import { FederatedAccountReadsService } from "../services/federated-account-reads.service.ts";
 import {
@@ -206,6 +214,8 @@ export class AuthApp implements AuthApiContract {
     licensing: LicensingApi,
     /** The sign-in providers, shaped for Better Auth by enterprise SSO. */
     sso: SsoApi,
+    /** Whether a CLI approver may still hand out a shared project's key (`project:manage`). */
+    authz: AuthzApi,
   };
   static readonly config = authServerConfig;
   /** `secrets` resolves NEXTAUTH_SECRET (ADR-132); `publicBaseUrl` is the
@@ -224,6 +234,7 @@ export class AuthApp implements AuthApiContract {
 
   readonly #sessions: BrowserSessionService;
   readonly #cliSessions: CliDeviceSessionService;
+  readonly #cliDeviceFlow: CliDeviceFlowService;
   readonly #signUp: SignUpVerificationService | null;
   readonly #members: AuthInfrastructure;
   readonly #dependencies: { apiKeys: ApiKeyApi; featureFlags: FeatureFlagApi };
@@ -279,6 +290,7 @@ export class AuthApp implements AuthApiContract {
   private constructor({
     sessions,
     cliSessions,
+    cliDeviceFlow,
     signUp,
     members,
     dependencies,
@@ -288,6 +300,7 @@ export class AuthApp implements AuthApiContract {
   }: {
     sessions: BrowserSessionService;
     cliSessions: CliDeviceSessionService;
+    cliDeviceFlow: Omit<CliDeviceFlowCollaborators, "session">;
     signUp: SignUpVerificationService | null;
     members: AuthInfrastructure;
     dependencies: { apiKeys: ApiKeyApi; featureFlags: FeatureFlagApi };
@@ -297,6 +310,9 @@ export class AuthApp implements AuthApiContract {
   }) {
     this.#sessions = sessions;
     this.#cliSessions = cliSessions;
+    this.#cliDeviceFlow = CliDeviceFlowService.create({
+      collaborators: { ...cliDeviceFlow, session: (headers) => this.#cliBrowserSession(headers) },
+    });
     this.#signUp = signUp;
     this.#members = members;
     this.#dependencies = dependencies;
@@ -325,11 +341,25 @@ export class AuthApp implements AuthApiContract {
       now,
     });
 
+    const cliSessions = CliDeviceSessionService.create({ store: repositories.cliSessions });
+
     const app = new AuthApp({
       sessions,
-      cliSessions: CliDeviceSessionService.create({
-        store: repositories.cliSessions,
-      }),
+      cliSessions,
+      cliDeviceFlow: {
+        sessions: () => cliSessions,
+        directory: () => PrismaAuthDirectoryRepository.create(members.prisma),
+        apiKeys: () => dependencies.apiKeys,
+        ensurePersonalWorkspace: (input) => dependencies.users.ensurePersonalWorkspace(input),
+        canManageProject: ({ userId, projectId }) =>
+          dependencies.authz.hasProjectPermission({
+            userId,
+            projectId,
+            permission: "project:manage",
+          }),
+        featureFlags: () => dependencies.featureFlags,
+        publicBaseUrl: () => members.publicBaseUrl,
+      },
       signUp: buildSignUpVerification({ members, repositories, now, users: dependencies.users }),
       members,
       dependencies: { apiKeys: dependencies.apiKeys, featureFlags: dependencies.featureFlags },
@@ -602,6 +632,42 @@ export class AuthApp implements AuthApiContract {
           }
         : {}),
     };
+  }
+
+  startCliDeviceCode(input: { raw: string }): Promise<CliDeviceFlowAnswer> {
+    return this.#cliDeviceFlow.startDeviceCode(input);
+  }
+
+  exchangeCliDeviceCode(input: { raw: string }): Promise<CliDeviceFlowAnswer> {
+    return this.#cliDeviceFlow.exchangeDeviceCode(input);
+  }
+
+  refreshCliDeviceSession(input: { raw: string }): Promise<CliDeviceFlowAnswer> {
+    return this.#cliDeviceFlow.refreshSession(input);
+  }
+
+  lookupCliDeviceCode(input: CliDeviceCodeLookup): Promise<CliDeviceFlowAnswer> {
+    return this.#cliDeviceFlow.lookupDeviceCode(input);
+  }
+
+  approveCliDeviceCode(input: { raw: string; headers: Headers }): Promise<CliDeviceFlowAnswer> {
+    return this.#cliDeviceFlow.approveDeviceCode(input);
+  }
+
+  denyCliDeviceCode(input: { raw: string; headers: Headers }): Promise<CliDeviceFlowAnswer> {
+    return this.#cliDeviceFlow.denyDeviceCode(input);
+  }
+
+  endCliDeviceSession(input: { raw: string }): Promise<CliDeviceFlowAnswer> {
+    return this.#cliDeviceFlow.endSession(input);
+  }
+
+  /** The person a browser cookie names, for the approval page's three routes. */
+  async #cliBrowserSession(headers: Headers): Promise<CliBrowserSession | null> {
+    const verified = await this.tryVerifyBrowserSession({ headers });
+    const session = await this.tryResolveBrowserSession({ verified });
+
+    return session === null ? null : session.user;
   }
 
   revokeCliAccessToken(input: {

@@ -2,6 +2,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { VerifiedBrowserSession } from "@langwatch/auth-contract";
 import { AuthUnavailableError } from "@langwatch/auth-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { SignInProviderMounts, SsoApi } from "@langwatch/enterprise-sso-contract";
 /**
@@ -78,6 +79,7 @@ async function appFor(
           return providers.mounts ?? NO_MOUNTS;
         },
       }),
+      authz: createApiFixture<AuthzApi>({}),
       auditLog: createApiFixture<AuditLogApi>({
         record: async () => ({ id: "audit", occurredAt: 0 }),
       }),

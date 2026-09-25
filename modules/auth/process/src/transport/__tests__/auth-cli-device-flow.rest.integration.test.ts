@@ -13,6 +13,10 @@ import { describe, expect, it } from "vitest";
 
 import type { AuthDirectory } from "../../app/auth.members.ts";
 import type { CliDeviceSessionRepository } from "../../repositories/cli-device-session.repository.ts";
+import {
+  CliDeviceFlowService,
+  type CliDeviceFlowCollaborators,
+} from "../../services/cli-device-flow.service.ts";
 import { CliDeviceSessionService } from "../../services/cli-device-session.service.ts";
 import { authCliDeviceFlowRest, type AuthCliDeviceFlowApi } from "../auth-cli-device-flow.rest.ts";
 
@@ -600,7 +604,7 @@ function deviceFlowWorld(
 
   const sessions = CliDeviceSessionService.create({ store });
 
-  const door: AuthCliDeviceFlowApi = {
+  const collaborators: CliDeviceFlowCollaborators = {
     sessions: () => sessions,
     directory: () => directory,
     session: () =>
@@ -650,6 +654,16 @@ function deviceFlowWorld(
     featureFlags: () => ({ isEnabled: () => Promise.resolve(true) }) as never,
     publicBaseUrl: () =>
       "publicBaseUrl" in overrides ? overrides.publicBaseUrl : "https://app.test",
+  };
+  const flow = CliDeviceFlowService.create({ collaborators });
+  const door: AuthCliDeviceFlowApi = {
+    startCliDeviceCode: (input) => flow.startDeviceCode(input),
+    exchangeCliDeviceCode: (input) => flow.exchangeDeviceCode(input),
+    refreshCliDeviceSession: (input) => flow.refreshSession(input),
+    lookupCliDeviceCode: (input) => flow.lookupDeviceCode(input),
+    approveCliDeviceCode: (input) => flow.approveDeviceCode(input),
+    denyCliDeviceCode: (input) => flow.denyDeviceCode(input),
+    endCliDeviceSession: (input) => flow.endSession(input),
   };
 
   return Object.assign(world, { door });
