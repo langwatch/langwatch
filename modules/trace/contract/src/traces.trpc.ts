@@ -12,6 +12,7 @@ import { aiActionResultSchema, aiQueryResultSchema } from "./trace-ai-query.ts";
 import { evaluationSchema, traceSchema } from "./trace-format.schemas.ts";
 import { explorerInstantEvalRunsSchema } from "./trace-instant-eval.schemas.ts";
 import { discoverResultSchema, facetValuesResultSchema } from "./trace-list-view.ts";
+import { checkPreconditionsSchema } from "./trace-precondition.schemas.ts";
 import {
   customersAndLabelsResultSchema,
   distinctFieldNamesResultSchema,
@@ -208,7 +209,6 @@ export const tracesTrpc = defineTrpcContract("traces")
   .withInput(z.object({ ...traceFilterInputSchema.shape, ...sampleExtrasSchema.shape }))
   .withOutput(traceSchema.array())
 
-  // Loose where main named evaluator's schemas: evaluator-contract depends on this package.
   .query("getSampleTraces")
   .withInput(
     z.object({
@@ -216,7 +216,7 @@ export const tracesTrpc = defineTrpcContract("traces")
       ...sampleExtrasSchema.shape,
       query: z.string().optional(),
       evaluatorType: z.string(),
-      preconditions: z.array(z.unknown()),
+      preconditions: checkPreconditionsSchema,
       expectedResults: z.number(),
     }),
   )

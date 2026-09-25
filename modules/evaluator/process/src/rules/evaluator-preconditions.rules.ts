@@ -4,11 +4,12 @@ import {
   type PreconditionTraceData,
 } from "@langwatch/analytics-contract";
 import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
-import type {
-  CheckPreconditionRule,
-  CheckPreconditions,
-} from "@langwatch/evaluator-contract/evaluation-types";
-import { extractRAGTextualContext, type Span } from "@langwatch/trace-contract";
+import {
+  extractRAGTextualContext,
+  type CheckPreconditionRule,
+  type CheckPreconditions,
+  type Span,
+} from "@langwatch/trace-contract";
 import safe from "safe-regex2";
 
 type FieldValue = string | string[] | null | undefined;

@@ -47,6 +47,7 @@ import type {
   TraceModelSpendWindow,
   TraceSpendSummary,
 } from "./trace-model-spend.ts";
+import type { CheckPreconditions } from "./trace-precondition.schemas.ts";
 import type {
   AssignTopicCommandData,
   RecordMetricCorrelationCommandData,
@@ -714,12 +715,11 @@ export interface TraceApi extends TraceOtlpIngestApi {
   }): Promise<{ value: string; count: number }[]>;
 }
 
-/** `preconditions` is evaluator's to parse; this contract cannot name its schema. */
 export type TracePreconditionSampleInput = {
   query: TraceLegacyListInput;
   viewerUserId: string;
   evaluatorType: string;
-  preconditions: unknown;
+  preconditions: CheckPreconditions;
   expectedResults: number;
 };
 

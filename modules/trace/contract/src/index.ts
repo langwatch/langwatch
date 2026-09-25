@@ -78,6 +78,7 @@ export * from "./trace-read.contract.ts";
 export * from "./trace.responses.ts";
 export * from "./trace-session-group.ts";
 export * from "./trace-share.schemas.ts";
+export * from "./trace-precondition.schemas.ts";
 export * from "./trace-span-io.ts";
 export * from "./trace-span-read-model.ts";
 export * from "./trace-time-format.ts";

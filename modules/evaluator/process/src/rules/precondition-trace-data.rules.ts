@@ -1,6 +1,5 @@
 import type { PreconditionTraceData } from "@langwatch/analytics-contract";
-import type { CheckPreconditions } from "@langwatch/evaluator-contract/evaluation-types";
-import type { Span, Trace } from "@langwatch/trace-contract";
+import type { CheckPreconditions, Span, Trace } from "@langwatch/trace-contract";
 
 import {
   checkEvaluatorRequiredFields,

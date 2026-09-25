@@ -3952,12 +3952,12 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
-      '@langwatch/evaluator-contract':
-        specifier: workspace:*
-        version: link:../../evaluator/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
       numeral:
         specifier: 'catalog:'
         version: 2.0.6
