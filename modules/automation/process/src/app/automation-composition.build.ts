@@ -82,7 +82,7 @@ import type {
   AutomationHeartbeat,
   AutomationLogger,
 } from "../services/automation-graph-runtime.service.ts";
-import { AutomationNotificationDeliveryAdapter } from "../services/automation-notification-delivery.service.ts";
+import { AutomationNotificationDeliveryService } from "../services/automation-notification-delivery.service.ts";
 import { AutomationProviderRegistryService } from "../services/automation-provider-registry.service.ts";
 import type { AutomationRunawaySignals } from "../services/automation-runaway-signals.service.ts";
 import { AutomationScheduledIntent } from "../services/automation-scheduled-intent.service.ts";
@@ -291,7 +291,7 @@ function buildNotificationDelivery(
     rateLimiter: new RedisWebhookDispatchRateLimiter(members.redis),
     tls: { rejectUnauthorized: members.isSaas },
   });
-  return AutomationNotificationDeliveryAdapter.create({
+  return AutomationNotificationDeliveryService.create({
     mailer: members.mail,
     renderer: ReactEmailMailRenderer.create(),
     baseHost: members.publicBaseUrl,

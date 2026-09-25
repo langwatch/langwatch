@@ -1,24 +1,22 @@
 import { createLogger } from "@langwatch/observability";
 import sgMail from "@sendgrid/mail";
 
+import { normalizeHeaders } from "../../rules/email-mime.rules.ts";
 import {
   type EmailContent,
   EmailGateway,
   type MailerConfiguration,
-} from "../channels/email-delivery.channel.ts";
-import { EmailMimeService } from "./email-mime.service.ts";
+} from "../email-delivery.channel.ts";
 
 const logger = createLogger("langwatch:mailer:sendgrid");
 
 /** SendGrid's module client has no transport lifecycle, only one process configuration. */
-export class SendgridEmailGatewayAdapter extends EmailGateway {
-  static create(configuration: MailerConfiguration["sendgrid"]): SendgridEmailGatewayAdapter {
-    return new SendgridEmailGatewayAdapter(configuration);
+export class SendgridEmailGatewayChannel extends EmailGateway {
+  static create(configuration: MailerConfiguration["sendgrid"]): SendgridEmailGatewayChannel {
+    return new SendgridEmailGatewayChannel(configuration);
   }
 
   readonly name = "sendgrid" as const;
-
-  private readonly mime = EmailMimeService.create();
 
   private closed = false;
 
@@ -50,7 +48,7 @@ export class SendgridEmailGatewayAdapter extends EmailGateway {
     // Same CRLF/header-injection hardening as the SES raw-MIME path: strip
     // line breaks from custom header names and values before they reach the
     // provider.
-    const sanitizedHeaders = this.mime.normalizeHeaders(content.headers);
+    const sanitizedHeaders = normalizeHeaders(content.headers);
 
     const message = {
       to: content.to,

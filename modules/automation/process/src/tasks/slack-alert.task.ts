@@ -1,7 +1,7 @@
 import { Task } from "@langwatch/task";
 
-import { SlackWebhookClientAdapter } from "#channels/slack/slack.webhook-client.channel";
-import { SlackWebhookDeliveryAdapter } from "#channels/slack/slack.webhook-delivery.channel";
+import { SlackWebhookClientChannel } from "#channels/slack/slack.webhook-client.channel";
+import { SlackWebhookDeliveryChannel } from "#channels/slack/slack.webhook-delivery.channel";
 
 /** Manual smoke test of the automation delivery path: sends one sample alert to the webhook URL
  * given as the first argument.
@@ -27,8 +27,8 @@ export class SlackAlertTask extends Task {
     // deployment with no public base host, which is fine for a manual send.
     const baseHost = args[1] ?? this.baseHost;
 
-    const slackClient = SlackWebhookClientAdapter.create();
-    const adapter = SlackWebhookDeliveryAdapter.create((url) => ({
+    const slackClient = SlackWebhookClientChannel.create();
+    const adapter = SlackWebhookDeliveryChannel.create((url) => ({
       send: (payload) => slackClient.send({ webhook: url, payload }),
     }));
 

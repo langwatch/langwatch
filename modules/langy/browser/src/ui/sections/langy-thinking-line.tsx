@@ -162,7 +162,7 @@ function ThinkingLineText({
       <AnimatePresence mode="wait" initial={false}>
         <MotionText
           key={text}
-          role="status"
+          as="output"
           aria-live="polite"
           fontSize="13px"
           fontWeight="500"

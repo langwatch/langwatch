@@ -31,7 +31,7 @@ import {
   type LocalConnectTurnPresence,
 } from "../../eventing/langy-local-connect-turn.subscriber.ts";
 import type { ControlTurnStarter } from "../../rules/langy-local-session-contract.rules.ts";
-import { LangyConversationPipelineAdapter } from "../../services/langy-conversation-pipeline.service.ts";
+import { LangyConversationPipelineService } from "../../services/langy-conversation-pipeline.service.ts";
 import type { LangySessionKeyService } from "../../services/langy-session-key.service.ts";
 import { RedisLangyEffectRepository } from "./redis.langy-effect.repository.ts";
 import type { LangyTokenBufferRedisRepository } from "./redis.langy-token-buffer.repository.ts";
@@ -113,7 +113,7 @@ export class EventingLangyConversationAdapter {
 
   private constructor(private readonly options: EventingLangyConversationAdapterOptions) {}
 
-  buildProcessing(): ReturnType<LangyConversationPipelineAdapter["build"]> {
+  buildProcessing(): ReturnType<LangyConversationPipelineService["build"]> {
     const options = this.options;
     const conversationStore = options.langyConversationProjectionStore;
 
@@ -186,7 +186,7 @@ export class EventingLangyConversationAdapter {
       turns: options.localConnectTurn.turns,
     });
 
-    return LangyConversationPipelineAdapter.create({
+    return LangyConversationPipelineService.create({
       langyConversationProjectionStore: conversationStore,
       langyConversationTurnProjectionStore: options.langyConversationTurnProjectionStore,
       langyMessageProjectionStore: options.langyMessageProjectionStore,

@@ -8,8 +8,8 @@ const { close, createTransport, sendMail } = vi.hoisted(() => ({
 
 vi.mock("nodemailer", () => ({ default: { createTransport } }));
 
-import { EmailProviderConfigurationError } from "../../channels/email-delivery.channel.ts";
-import { SmtpEmailGatewayAdapter } from "../smtp.email-gateway.service.ts";
+import { EmailProviderConfigurationError } from "../../email-delivery.channel.ts";
+import { SmtpEmailGatewayChannel } from "../smtp.email-gateway.channel.ts";
 
 /**
  * Spec: modules/notification/specs/packaged-mail-delivery.feature
@@ -25,7 +25,7 @@ describe("given an SMTP deployment", () => {
     /** @scenario "The gateway named by the deployment is the one that sends" */
     it("prefers a connection URL over the discrete settings", () => {
       expect(
-        SmtpEmailGatewayAdapter.buildTransportOptions({
+        SmtpEmailGatewayChannel.buildTransportOptions({
           url: "smtp://localhost:1025",
           host: "ignored.example",
         }),
@@ -35,13 +35,13 @@ describe("given an SMTP deployment", () => {
     /** @scenario "The gateway named by the deployment is the one that sends" */
     it("uses the documented port, TLS and credential defaults", () => {
       expect(
-        SmtpEmailGatewayAdapter.buildTransportOptions({ host: "relay.example" }),
+        SmtpEmailGatewayChannel.buildTransportOptions({ host: "relay.example" }),
       ).toMatchObject({ port: 587, secure: false });
       expect(
-        SmtpEmailGatewayAdapter.buildTransportOptions({ host: "relay.example", port: "465" }),
+        SmtpEmailGatewayChannel.buildTransportOptions({ host: "relay.example", port: "465" }),
       ).toMatchObject({ port: 465, secure: true });
       expect(
-        SmtpEmailGatewayAdapter.buildTransportOptions({
+        SmtpEmailGatewayChannel.buildTransportOptions({
           host: "relay.example",
           port: "465",
           secure: "false",
@@ -53,11 +53,11 @@ describe("given an SMTP deployment", () => {
 
     /** @scenario "A named but unusable gateway refuses instead of falling back" */
     it("refuses a relay it cannot address", () => {
-      expect(() => SmtpEmailGatewayAdapter.buildTransportOptions({})).toThrow(
+      expect(() => SmtpEmailGatewayChannel.buildTransportOptions({})).toThrow(
         EmailProviderConfigurationError,
       );
       expect(() =>
-        SmtpEmailGatewayAdapter.buildTransportOptions({ host: "relay.example", port: "bad" }),
+        SmtpEmailGatewayChannel.buildTransportOptions({ host: "relay.example", port: "bad" }),
       ).toThrow(/SMTP_PORT/);
     });
   });
@@ -66,7 +66,7 @@ describe("given an SMTP deployment", () => {
     /** @scenario "Blind recipients never reach the rendered headers" */
     /** @scenario "A crafted header cannot inject another one" */
     it("keeps the blind addresses in the envelope only, over one pooled transport", async () => {
-      const gateway = SmtpEmailGatewayAdapter.create({ url: "smtp://localhost:1025" });
+      const gateway = SmtpEmailGatewayChannel.create({ url: "smtp://localhost:1025" });
       await gateway.send({
         content: {
           to: ["public@acme.example"],
@@ -99,7 +99,7 @@ describe("given an SMTP deployment", () => {
   describe("when the gateway is closed", () => {
     /** @scenario "Closing the capability releases the transport once" */
     it("refuses a later send", async () => {
-      const gateway = SmtpEmailGatewayAdapter.create({ url: "smtp://localhost:1025" });
+      const gateway = SmtpEmailGatewayChannel.create({ url: "smtp://localhost:1025" });
       await gateway.send({
         content: { to: "public@acme.example", subject: "Alert", html: "<p>Alert</p>" },
         defaultFrom: "noreply@acme.example",

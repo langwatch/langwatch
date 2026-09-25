@@ -2,13 +2,13 @@ import { createLogger } from "@langwatch/observability";
 import nodemailer from "nodemailer";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
 
+import { normalizeHeaders } from "../../rules/email-mime.rules.ts";
 import {
   type EmailContent,
   EmailGateway,
   EmailProviderConfigurationError,
   type MailerConfiguration,
-} from "../channels/email-delivery.channel.ts";
-import { EmailMimeService } from "./email-mime.service.ts";
+} from "../email-delivery.channel.ts";
 
 const logger = createLogger("langwatch:mailer:smtp");
 
@@ -24,9 +24,9 @@ const SMTP_TIMEOUTS = {
 } as const;
 
 /** A process-owned SMTP connection pool, reused across notification deliveries. */
-export class SmtpEmailGatewayAdapter extends EmailGateway {
-  static create(configuration: MailerConfiguration["smtp"]): SmtpEmailGatewayAdapter {
-    return new SmtpEmailGatewayAdapter(configuration);
+export class SmtpEmailGatewayChannel extends EmailGateway {
+  static create(configuration: MailerConfiguration["smtp"]): SmtpEmailGatewayChannel {
+    return new SmtpEmailGatewayChannel(configuration);
   }
 
   /**
@@ -73,8 +73,6 @@ export class SmtpEmailGatewayAdapter extends EmailGateway {
 
   readonly name = "smtp" as const;
 
-  private readonly mime = EmailMimeService.create();
-
   private transporter: ReturnType<typeof nodemailer.createTransport> | undefined;
 
   private closed = false;
@@ -93,11 +91,11 @@ export class SmtpEmailGatewayAdapter extends EmailGateway {
     if (this.closed) throw new Error("SMTP email provider is closed.");
     logger.info("Sending email using SMTP");
     const transporter = (this.transporter ??= nodemailer.createTransport(
-      SmtpEmailGatewayAdapter.buildTransportOptions(this.configuration),
+      SmtpEmailGatewayChannel.buildTransportOptions(this.configuration),
     ));
 
     const bccAddresses = EmailGateway.recipients(content.bcc);
-    const sanitizedHeaders = this.mime.normalizeHeaders(content.headers);
+    const sanitizedHeaders = normalizeHeaders(content.headers);
     const from = content.from ?? defaultFrom;
     const toAddresses = EmailGateway.recipients(content.to);
 
@@ -143,7 +141,7 @@ export class SmtpEmailGatewayAdapter extends EmailGateway {
   async verify(): Promise<void> {
     if (this.closed) throw new Error("SMTP email provider is closed.");
     const transporter = (this.transporter ??= nodemailer.createTransport(
-      SmtpEmailGatewayAdapter.buildTransportOptions(this.configuration),
+      SmtpEmailGatewayChannel.buildTransportOptions(this.configuration),
     ));
     await transporter.verify();
   }

@@ -1,14 +1,14 @@
 import { createLogger } from "@langwatch/observability";
 import { EnvHttpProxyAgent, fetch as undiciFetch } from "undici";
 
+import { normalizeHeaders } from "../../rules/email-mime.rules.ts";
 import {
   type EmailContent,
   EmailGateway,
   type EmailOutboundProxyConfig,
   EmailProviderConfigurationError,
   type MailerConfiguration,
-} from "../channels/email-delivery.channel.ts";
-import { EmailMimeService } from "./email-mime.service.ts";
+} from "../email-delivery.channel.ts";
 
 const logger = createLogger("langwatch:mailer:resend");
 
@@ -68,9 +68,9 @@ const encodeAttachments = (attachments: EmailContent["attachments"]) => {
  * Resend delivers `bcc` via the envelope, so blind recipients stay hidden from
  * the rendered headers, matching the other gateways.
  */
-const buildPayload = (content: EmailContent, defaultFrom: string, mime: EmailMimeService) => {
+const buildPayload = (content: EmailContent, defaultFrom: string) => {
   const bccAddresses = EmailGateway.recipients(content.bcc);
-  const headers = mime.normalizeHeaders(content.headers);
+  const headers = normalizeHeaders(content.headers);
   const attachments = encodeAttachments(content.attachments);
 
   return {
@@ -85,17 +85,15 @@ const buildPayload = (content: EmailContent, defaultFrom: string, mime: EmailMim
   };
 };
 
-export class ResendEmailGatewayAdapter extends EmailGateway {
+export class ResendEmailGatewayChannel extends EmailGateway {
   static create(input: {
     configuration: MailerConfiguration["resend"];
     outboundProxy: EmailOutboundProxyConfig;
-  }): ResendEmailGatewayAdapter {
-    return new ResendEmailGatewayAdapter(input.configuration, input.outboundProxy);
+  }): ResendEmailGatewayChannel {
+    return new ResendEmailGatewayChannel(input.configuration, input.outboundProxy);
   }
 
   readonly name = "resend" as const;
-
-  private readonly mime = EmailMimeService.create();
 
   private dispatcher: EnvHttpProxyAgent | undefined;
 
@@ -125,7 +123,7 @@ export class ResendEmailGatewayAdapter extends EmailGateway {
 
     logger.info("Sending email using Resend");
     const bccAddresses = EmailGateway.recipients(content.bcc);
-    const payload = buildPayload(content, defaultFrom, this.mime);
+    const payload = buildPayload(content, defaultFrom);
     this.dispatcher ??= buildProxyDispatcher(this.outboundProxy);
     const dispatcher = this.dispatcher;
 

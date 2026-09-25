@@ -210,13 +210,13 @@ async function deliverRenderedSlackMessage(
 /** Process-owned Slack webhook adapter. The host supplies the destination
  * transport factory once at composition time; delivery policy remains in the
  * Automation package. */
-export class SlackWebhookDeliveryAdapter {
+export class SlackWebhookDeliveryChannel {
   private constructor(private readonly transportFor: (webhook: string) => SlackWebhookTransport) {}
 
   static create(
     transportFor: (webhook: string) => SlackWebhookTransport,
-  ): SlackWebhookDeliveryAdapter {
-    return new SlackWebhookDeliveryAdapter(transportFor);
+  ): SlackWebhookDeliveryChannel {
+    return new SlackWebhookDeliveryChannel(transportFor);
   }
 
   deliver(input: SlackWebhookRequest): Promise<void> {

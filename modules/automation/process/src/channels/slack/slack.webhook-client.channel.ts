@@ -9,9 +9,9 @@ const slackBlockSchema = z.looseObject({
 
 // Slack incoming-webhook sender, created per send because webhook URLs are
 // tenant-owned credentials that cannot be cached across tenants.
-export class SlackWebhookClientAdapter {
-  static create(): SlackWebhookClientAdapter {
-    return new SlackWebhookClientAdapter();
+export class SlackWebhookClientChannel {
+  static create(): SlackWebhookClientChannel {
+    return new SlackWebhookClientChannel();
   }
 
   private constructor() {}

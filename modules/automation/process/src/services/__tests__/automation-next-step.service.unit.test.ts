@@ -4,7 +4,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
 import {
-  AutomationNextStepAdapter,
+  AutomationNextStepService,
   AutomationOrganizationPricing,
 } from "../automation-next-step.service.ts";
 
@@ -38,7 +38,7 @@ class TieredEuroPricing extends AutomationOrganizationPricing {
   }
 }
 
-describe("AutomationNextStepAdapter", () => {
+describe("AutomationNextStepService", () => {
   /** @scenario "A ceiling notice quotes the rung entitlement names next" */
   it("links the checkout of the rung the entitlement capability names", async () => {
     const asked: Parameters<EntitlementApi["resolvePlanNextStep"]>[0][] = [];
@@ -49,7 +49,7 @@ describe("AutomationNextStepAdapter", () => {
         return Promise.resolve(launch);
       },
     });
-    const adapter = AutomationNextStepAdapter.create({
+    const adapter = AutomationNextStepService.create({
       projects: createApiFixture<ProjectApi>({
         getOrganizationId: () => Promise.resolve("organization-1"),
       }),

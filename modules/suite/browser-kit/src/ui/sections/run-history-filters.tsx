@@ -121,7 +121,7 @@ export function RunHistoryFilters({
           </Button>
         )}
         {onViewModeChange && (
-          <HStack gap={1} role="group" aria-label="View mode">
+          <HStack gap={1} as="fieldset" aria-label="View mode">
             <IconButton
               aria-label="List view"
               aria-pressed={viewMode === "list"}

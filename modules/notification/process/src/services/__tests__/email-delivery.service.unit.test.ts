@@ -1,38 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  EmailGateway,
-  type EmailContent,
-  type EmailProviderName,
-  type MailerConfiguration,
+import type {
+  EmailContent,
+  EmailGatewayOpener,
+  EmailProviderName,
+  MailerConfiguration,
 } from "../../channels/email-delivery.channel.ts";
-import { EmailDeliveryAdapter } from "../email-delivery.service.ts";
-import { ResendEmailGatewayAdapter } from "../resend.email-gateway.service.ts";
-import { SendgridEmailGatewayAdapter } from "../sendgrid.email-gateway.service.ts";
-import { SesEmailGatewayAdapter } from "../ses.email-gateway.service.ts";
-import { SmtpEmailGatewayAdapter } from "../smtp.email-gateway.service.ts";
+import { emailGatewayOpener } from "../../channels/email-gateway-channels.registry.ts";
+import { MemoryEmailGatewayChannel } from "../../channels/memory/memory.email-gateway.channel.ts";
+import { EmailDeliveryService } from "../email-delivery.service.ts";
 
 /**
  * Spec: modules/notification/specs/packaged-mail-delivery.feature
  */
-class RecordingGateway extends EmailGateway {
-  readonly sent: EmailContent[] = [];
-  closeCalls = 0;
-
-  constructor(readonly name: EmailProviderName) {
-    super();
-  }
-
-  async send({ content }: { content: EmailContent; defaultFrom: string }) {
-    this.sent.push(content);
-    return { accepted: true };
-  }
-
-  async close(): Promise<void> {
-    this.closeCalls += 1;
-  }
-}
-
 const configuration = (overrides: Partial<MailerConfiguration> = {}): MailerConfiguration => ({
   defaultFrom: "LangWatch <contact@langwatch.ai>",
   ses: { enabled: false },
@@ -42,12 +22,19 @@ const configuration = (overrides: Partial<MailerConfiguration> = {}): MailerConf
   ...overrides,
 });
 
-const compose = (mailer: MailerConfiguration) =>
-  EmailDeliveryAdapter.create({
+const productionGateways = (mailer: MailerConfiguration) =>
+  emailGatewayOpener({
     configuration: mailer,
     aws: { build: () => ({ requestHandler: {} }) },
     outboundProxy: {},
   });
+
+const compose = (
+  mailer: MailerConfiguration,
+  openGateway: EmailGatewayOpener = () => {
+    throw new Error("no gateway scripted");
+  },
+) => EmailDeliveryService.create({ configuration: mailer, openGateway });
 
 const message = (): EmailContent => ({
   to: "admin@acme.example",
@@ -64,34 +51,26 @@ describe("given a mailer configuration naming one provider", () => {
       [
         "ses" as const,
         configuration({ provider: "ses", ses: { enabled: true, region: "eu-central-1" } }),
-        SesEmailGatewayAdapter,
       ],
       [
         "sendgrid" as const,
         configuration({ provider: "sendgrid", sendgrid: { apiKey: "SG.test" } }),
-        SendgridEmailGatewayAdapter,
       ],
       [
         "smtp" as const,
         configuration({ provider: "smtp", smtp: { url: "smtp://localhost:1025" } }),
-        SmtpEmailGatewayAdapter,
       ],
-      [
-        "resend" as const,
-        configuration({ provider: "resend", resend: { apiKey: "re_test" } }),
-        ResendEmailGatewayAdapter,
-      ],
-    ])("sends both through one %s transport", async (name, mailer, adapter) => {
-      const gateway = new RecordingGateway(name);
-      const create = vi
-        .spyOn(adapter as unknown as { create: () => EmailGateway }, "create")
-        .mockReturnValue(gateway);
+      ["resend" as const, configuration({ provider: "resend", resend: { apiKey: "re_test" } })],
+    ])("sends both through one %s transport", async (name, mailer) => {
+      const gateway = MemoryEmailGatewayChannel.create(name);
+      const create = vi.fn((_name: EmailProviderName) => gateway);
 
-      const delivery = compose(mailer);
+      const delivery = compose(mailer, create);
       await delivery.send(message());
       await delivery.send(message());
 
       expect(create).toHaveBeenCalledOnce();
+      expect(create).toHaveBeenCalledWith(name);
       expect(gateway.sent).toHaveLength(2);
       expect(delivery.defaultFrom()).toBe("LangWatch <contact@langwatch.ai>");
     });
@@ -102,12 +81,15 @@ describe("given a mailer configuration naming a provider whose credentials are a
   describe("when the delivery capability sends", () => {
     /** @scenario "A named but unusable gateway refuses instead of falling back" */
     it("refuses without reaching another configured gateway", async () => {
-      const sendgrid = vi.spyOn(SendgridEmailGatewayAdapter, "create");
-      const delivery = compose(
-        configuration({ provider: "resend", sendgrid: { apiKey: "SG.test" } }),
-      );
+      const mailer = configuration({ provider: "resend", sendgrid: { apiKey: "SG.test" } });
+      const production = productionGateways(mailer);
+      const opened: EmailProviderName[] = [];
+      const delivery = compose(mailer, (name) => {
+        opened.push(name);
+        return production(name);
+      });
       await expect(delivery.send(message())).rejects.toThrow(/RESEND_API_KEY/);
-      expect(sendgrid).not.toHaveBeenCalled();
+      expect(opened).toEqual([]);
     });
   });
 });
@@ -129,14 +111,10 @@ describe("given a delivery capability that has sent a message", () => {
   describe("when it is closed twice", () => {
     /** @scenario "Closing the capability releases the transport once" */
     it("releases the gateway once and refuses a later send", async () => {
-      const gateway = new RecordingGateway("smtp");
-      vi.spyOn(
-        SmtpEmailGatewayAdapter as unknown as { create: () => EmailGateway },
-        "create",
-      ).mockReturnValue(gateway);
-
+      const gateway = MemoryEmailGatewayChannel.create("smtp");
       const delivery = compose(
         configuration({ provider: "smtp", smtp: { url: "smtp://localhost:1025" } }),
+        () => gateway,
       );
       await delivery.send(message());
       await delivery.close();

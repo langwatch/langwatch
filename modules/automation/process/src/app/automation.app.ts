@@ -91,7 +91,7 @@ import {
   type AutomationProjectIdentity,
 } from "../services/automation-rules.service.ts";
 import type { AutomationRunawaySignals } from "../services/automation-runaway-signals.service.ts";
-import { OtelAutomationSettlementObservabilityAdapter } from "../services/automation-settlement-observability.service.ts";
+import { AutomationSettlementObservabilityService } from "../services/automation-settlement-observability.service.ts";
 import type { AutomationSlackBotTokenDecryptor } from "../services/automation-slack-secrets.service.ts";
 import { AutomationTemplateService } from "../services/automation-template.service.ts";
 import { AutomationTraceTriggerCatalogueService } from "../services/automation-trace-trigger-catalogue.service.ts";
@@ -359,7 +359,7 @@ export class AutomationApp implements AutomationApi {
       emailCaps: infrastructure.emailCaps,
       crypto: members.encryption,
       baseHost: members.publicBaseUrl ?? "",
-      observability: OtelAutomationSettlementObservabilityAdapter.create({
+      observability: AutomationSettlementObservabilityService.create({
         capture: (error, extra) =>
           logger.error({ ...extra, error: error.message }, "Automation settlement dispatch failed"),
       }),

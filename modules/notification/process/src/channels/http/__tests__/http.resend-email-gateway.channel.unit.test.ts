@@ -7,7 +7,7 @@ const { EnvHttpProxyAgent, fetch } = vi.hoisted(() => ({
 
 vi.mock("undici", () => ({ EnvHttpProxyAgent, fetch }));
 
-import { ResendEmailGatewayAdapter } from "../resend.email-gateway.service.ts";
+import { ResendEmailGatewayChannel } from "../http.resend-email-gateway.channel.ts";
 
 /**
  * Spec: modules/notification/specs/packaged-mail-delivery.feature
@@ -27,7 +27,7 @@ describe("given a Resend deployment behind an outbound proxy", () => {
       EnvHttpProxyAgent.mockImplementation(function (this: { close: () => Promise<void> }) {
         this.close = close;
       });
-      const gateway = ResendEmailGatewayAdapter.create({
+      const gateway = ResendEmailGatewayChannel.create({
         configuration: { apiKey: "re_test" },
         outboundProxy: { httpsProxy: "http://proxy.acme.example:8080" },
       });
@@ -69,7 +69,7 @@ describe("given a Resend deployment behind an outbound proxy", () => {
   describe("when the proxy excludes the vendor host", () => {
     /** @scenario "The gateway named by the deployment is the one that sends" */
     it("sends without a dispatcher", async () => {
-      const gateway = ResendEmailGatewayAdapter.create({
+      const gateway = ResendEmailGatewayChannel.create({
         configuration: { apiKey: "re_test" },
         outboundProxy: {
           httpsProxy: "http://proxy.acme.example:8080",
@@ -91,7 +91,7 @@ describe("given a Resend deployment with no API key", () => {
   describe("when a message is sent", () => {
     /** @scenario "A named but unusable gateway refuses instead of falling back" */
     it("refuses naming the setting rather than calling the vendor", async () => {
-      const gateway = ResendEmailGatewayAdapter.create({
+      const gateway = ResendEmailGatewayChannel.create({
         configuration: {},
         outboundProxy: {},
       });
@@ -120,7 +120,7 @@ describe("given the vendor rejects a send", () => {
         body: { cancel },
         json,
       });
-      const gateway = ResendEmailGatewayAdapter.create({
+      const gateway = ResendEmailGatewayChannel.create({
         configuration: { apiKey: "re_test" },
         outboundProxy: {},
       });

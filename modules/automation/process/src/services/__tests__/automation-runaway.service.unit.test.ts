@@ -2,7 +2,7 @@ import { EmailDelivery } from "@langwatch/notification-process";
 import { describe, expect, it, vi } from "vitest";
 
 import { NoopAutomationRunawayMetrics } from "../automation-runaway-metrics.service.ts";
-import { AutomationRunawayAdapter } from "../automation-runaway.service.ts";
+import { AutomationRunawayService } from "../automation-runaway.service.ts";
 
 class NoopMailer extends EmailDelivery {
   defaultFrom(): string {
@@ -20,7 +20,7 @@ function adapter(
     emails: string[];
   }) => Promise<string[]>,
 ) {
-  return AutomationRunawayAdapter.create({
+  return AutomationRunawayService.create({
     redis: null,
     directories: {
       projects: {
@@ -95,7 +95,7 @@ describe("given a worker holding an automation containment claim", () => {
       vi.useFakeTimers();
       try {
         vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
-        const worker1 = AutomationRunawayAdapter.create({
+        const worker1 = AutomationRunawayService.create({
           redis: null,
           directories: {
             projects: { getOrganizationId: vi.fn(), findById: vi.fn() },

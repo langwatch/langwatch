@@ -77,7 +77,7 @@ export {
 export { LANGY_AGENT_DISPATCH_TIMEOUT_MS } from "./eventing/langy-conversation-process.schemas.ts";
 export {
   AGENT_DISPATCH_TIMEOUT_MS,
-  HttpLangyWorkerAdapter,
+  HttpLangyWorkerChannel,
 } from "./channels/http/http.langy-worker.channel.ts";
 export type {
   LangyDispatchOutcome,
@@ -86,7 +86,7 @@ export type {
 } from "./channels/http/http.langy-worker.channel.ts";
 export { LangyWorkerMetricsNullService } from "./services/langy-worker-metrics-null.service.ts";
 export { LangyBlockMetricsNullService } from "./services/langy-block-metrics-null.service.ts";
-export { UnavailableLangyWorkerAdapter } from "./services/langy-worker-unavailable.service.ts";
+export { UnavailableLangyWorkerChannel } from "./channels/unavailable.langy-worker.channel.ts";
 export {
   LANGY_UI_ACTIONS_FLAG,
   LangyBlockMetrics,
@@ -101,8 +101,8 @@ export type {
   LangyWorkerProbeInput,
   LangyWorkerWarmInput,
 } from "./app/langy.members.ts";
-export { FeatureFlagLangyUiActionSurfaceAdapter } from "./services/langy-ui-action-surface.service.ts";
-export { LangyConversationPipelineAdapter } from "./services/langy-conversation-pipeline.service.ts";
+export { LangyUiActionSurfaceService } from "./services/langy-ui-action-surface.service.ts";
+export { LangyConversationPipelineService } from "./services/langy-conversation-pipeline.service.ts";
 export type { LangyConversationProcessingPipelineDeps } from "./services/langy-conversation-pipeline.service.ts";
 export {
   EventingLangyConversationAdapter,
@@ -110,7 +110,7 @@ export {
   type RedisLangyConversationRuntimeRepository,
 } from "./repositories/redis/redis.langy-conversation-runtime.repository.ts";
 export {
-  EventingLangyMaintenanceAdapter,
+  LangyMaintenanceService,
   type LangyMaintenancePipelineDeps,
 } from "./services/langy-maintenance.service.ts";
 // The seam for the conversation-runtime's five process-graph rows above: a composing worker
@@ -135,7 +135,7 @@ export {
   type LangySessionKeyReapDeps,
 } from "./eventing/langy-session-key-reap.intent.ts";
 export type { LangyAnalyticsEventProjectionRecord } from "./eventing/langy-analytics-event.projection.ts";
-export { LangyAnalyticsEventStorageAdapter } from "./services/langy-analytics-event-storage.service.ts";
+export { LangyAnalyticsEventStorageService } from "./services/langy-analytics-event-storage.service.ts";
 export type { LangyRepositories } from "./repositories/langy-repositories.registry.ts";
 export type {
   LangyAnalyticsClickHouseClientResolver,

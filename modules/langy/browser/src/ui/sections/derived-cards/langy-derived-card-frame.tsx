@@ -49,7 +49,7 @@ export function LangyDerivedCardFrame({
       paddingX="12px"
       paddingY="11px"
       opacity={superseded ? 0.65 : 1}
-      role="group"
+      as="fieldset"
       // The provenance hooks. Tests (and any future styling) key off these
       // rather than the chrome's wording — the wording is copy and copy moves.
       data-derived-by-langy

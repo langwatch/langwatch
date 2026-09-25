@@ -6,7 +6,7 @@ import type { SlackPayload } from "@langwatch/automation-contract";
 import type { TraceRecord } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { SlackWebhookDeliveryAdapter } from "../slack.webhook-delivery.channel.ts";
+import { SlackWebhookDeliveryChannel } from "../slack.webhook-delivery.channel.ts";
 
 const WEBHOOK = "https://hooks.slack.com/services/T000/B000/XXXX";
 const STARTED_AT = 1714476000000;
@@ -24,13 +24,13 @@ function traceRecord(): TraceRecord {
 
 function capturingAdapter() {
   const sent: SlackPayload[] = [];
-  const adapter = SlackWebhookDeliveryAdapter.create(() => ({
+  const adapter = SlackWebhookDeliveryChannel.create(() => ({
     send: async (payload: SlackPayload) => void sent.push(payload),
   }));
   return { adapter, sent };
 }
 
-describe("SlackWebhookDeliveryAdapter.deliver", () => {
+describe("SlackWebhookDeliveryChannel.deliver", () => {
   describe("when the trigger matches a trace with a known start time", () => {
     /** @scenario "Notification links carry the timestamp" */
     it("links the trace with its start time, so the drawer opens in one pruned read", async () => {

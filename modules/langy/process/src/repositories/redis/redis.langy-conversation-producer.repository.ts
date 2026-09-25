@@ -11,11 +11,11 @@ import type {
 } from "@langwatch/langy-contract";
 
 import type { LangyTitleGenerator } from "../../app/langy.members.ts";
+import { UnavailableLangyWorkerChannel } from "../../channels/unavailable.langy-worker.channel.ts";
 import type { LangyAnalyticsEventProjectionRecord } from "../../eventing/langy-analytics-event.projection.ts";
 import type { LangyConversationUpdateChannel } from "../../eventing/langy-conversation.subscriber.ts";
 import type { LangySessionKeyService } from "../../services/langy-session-key.service.ts";
 import { LangyWorkerMetricsNullService } from "../../services/langy-worker-metrics-null.service.ts";
-import { UnavailableLangyWorkerAdapter } from "../../services/langy-worker-unavailable.service.ts";
 import { EventingLangyConversationAdapter } from "./redis.langy-conversation-runtime.repository.ts";
 import type { LangyTokenBufferRedisRepository } from "./redis.langy-token-buffer.repository.ts";
 import type { LangyTurnHandoffRedisRepository } from "./redis.langy-turn-handoff.repository.ts";
@@ -134,7 +134,7 @@ function buildLangyConversationProducerPipeline(input: {
     // liveness subscriber, both of which are the consumer's. The feature's own
     // unavailable adapter is the honest seat: it answers "not reachable"
     // rather than inventing a dispatch outcome.
-    worker: UnavailableLangyWorkerAdapter.create(LangyWorkerMetricsNullService.create()),
+    worker: UnavailableLangyWorkerChannel.create(LangyWorkerMetricsNullService.create()),
     titleGenerator,
     sessionKeys,
     localConnectTurn,

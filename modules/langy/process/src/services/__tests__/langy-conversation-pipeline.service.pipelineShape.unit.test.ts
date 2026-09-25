@@ -21,7 +21,7 @@ import type { LangyAnalyticsEventProjectionRecord } from "../../eventing/langy-a
 import { LANGY_CONVERSATION_PROCESS_NAME } from "../../eventing/langy-conversation-process.schemas.ts";
 import type { LangyConversationProcessingEvent } from "../../eventing/langy-conversation-state.projection.ts";
 import {
-  LangyConversationPipelineAdapter,
+  LangyConversationPipelineService,
   type LangyConversationProcessingPipelineDeps,
 } from "../langy-conversation-pipeline.service.ts";
 
@@ -69,7 +69,7 @@ function buildPipeline(overrides: Partial<LangyConversationProcessingPipelineDep
     ...overrides,
   };
   return {
-    pipeline: LangyConversationPipelineAdapter.create(deps).build(),
+    pipeline: LangyConversationPipelineService.create(deps).build(),
     analyticsAppend,
     subscribers,
   };

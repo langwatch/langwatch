@@ -15,7 +15,7 @@ vi.mock("@aws-sdk/client-ses", () => ({
   },
 }));
 
-import { SesEmailGatewayAdapter } from "../ses.email-gateway.service.ts";
+import { SesEmailGatewayChannel } from "../ses.email-gateway.channel.ts";
 
 /**
  * Spec: modules/notification/specs/packaged-mail-delivery.feature
@@ -30,7 +30,7 @@ describe("given an SES deployment", () => {
     /** @scenario "The gateway named by the deployment is the one that sends" */
     it("names the partition's own host so the proxy decision matches", () => {
       const aws = { build: vi.fn(() => ({ requestHandler: {} })) };
-      SesEmailGatewayAdapter.buildClientConfig({
+      SesEmailGatewayChannel.buildClientConfig({
         configuration: { enabled: true, region: "cn-north-1" },
         aws,
       });
@@ -44,7 +44,7 @@ describe("given an SES deployment", () => {
     /** @scenario "The gateway named by the deployment is the one that sends" */
     it("lets an endpoint override decide both the SDK target and the proxy", () => {
       const aws = { build: vi.fn(() => ({ requestHandler: {} })) };
-      SesEmailGatewayAdapter.buildClientConfig({
+      SesEmailGatewayChannel.buildClientConfig({
         configuration: {
           enabled: true,
           region: "eu-central-1",
@@ -64,7 +64,7 @@ describe("given an SES deployment", () => {
     /** @scenario "Closing the capability releases the transport once" */
     it("builds one client and releases it once", async () => {
       const aws = { build: vi.fn(() => ({ requestHandler: {} })) };
-      const gateway = SesEmailGatewayAdapter.create({
+      const gateway = SesEmailGatewayChannel.create({
         configuration: { enabled: true, region: "eu-central-1" },
         aws,
       });
@@ -87,7 +87,7 @@ describe("given an SES deployment", () => {
     /** @scenario "Blind recipients never reach the rendered headers" */
     it("delivers them as BCC destinations rather than rendering them", async () => {
       const aws = { build: vi.fn(() => ({ requestHandler: {} })) };
-      const gateway = SesEmailGatewayAdapter.create({
+      const gateway = SesEmailGatewayChannel.create({
         configuration: { enabled: true, region: "eu-central-1" },
         aws,
       });
@@ -110,7 +110,7 @@ describe("given an SES deployment", () => {
     /** @scenario "A crafted header cannot inject another one" */
     it("takes the raw-MIME path whenever custom headers are present", async () => {
       const aws = { build: vi.fn(() => ({ requestHandler: {} })) };
-      const gateway = SesEmailGatewayAdapter.create({
+      const gateway = SesEmailGatewayChannel.create({
         configuration: { enabled: true, region: "eu-central-1" },
         aws,
       });

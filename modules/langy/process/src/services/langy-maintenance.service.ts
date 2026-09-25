@@ -24,9 +24,9 @@ export interface LangyMaintenancePipelineDeps {
 /** Langy credential maintenance in its own pipeline (like blob_maintenance): reaping orphaned
  * session keys is neither a conversation nor queue concern. No events, no commands—costs only the
  * scheduled wake. Exactly-once per tick inherited: wake commits at scheduled revision. */
-export class EventingLangyMaintenanceAdapter {
-  static create(deps: LangyMaintenancePipelineDeps): EventingLangyMaintenanceAdapter {
-    return new EventingLangyMaintenanceAdapter(deps);
+export class LangyMaintenanceService {
+  static create(deps: LangyMaintenancePipelineDeps): LangyMaintenanceService {
+    return new LangyMaintenanceService(deps);
   }
 
   private constructor(private readonly deps: LangyMaintenancePipelineDeps) {}

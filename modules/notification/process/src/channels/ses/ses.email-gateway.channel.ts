@@ -6,13 +6,14 @@ import {
   SendRawEmailCommand,
 } from "@aws-sdk/client-ses";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 
+import { buildRawMessage } from "../../rules/email-mime.rules.ts";
 import {
   type EmailContent,
   EmailGateway,
   type MailerConfiguration,
-} from "../channels/email-delivery.channel.ts";
-import { EmailMimeService } from "./email-mime.service.ts";
+} from "../email-delivery.channel.ts";
 
 const logger = createLogger("langwatch:mailer:ses");
 
@@ -30,12 +31,12 @@ const defaultSesHost = (region: string) =>
   `email.${region}.amazonaws.com${region.startsWith("cn-") ? ".cn" : ""}`;
 
 /** One lazy SES client per mailer process. Its borrowed handler is released by AWS shutdown. */
-export class SesEmailGatewayAdapter extends EmailGateway {
+export class SesEmailGatewayChannel extends EmailGateway {
   static create(input: {
     configuration: MailerConfiguration["ses"];
     aws: SesAwsClientConfiguration;
-  }): SesEmailGatewayAdapter {
-    return new SesEmailGatewayAdapter(input.configuration, input.aws);
+  }): SesEmailGatewayChannel {
+    return new SesEmailGatewayChannel(input.configuration, input.aws);
   }
 
   static buildClientConfig({
@@ -59,8 +60,6 @@ export class SesEmailGatewayAdapter extends EmailGateway {
 
   readonly name = "ses" as const;
 
-  private readonly mime = EmailMimeService.create();
-
   private client: SESClient | undefined;
 
   private closed = false;
@@ -82,7 +81,7 @@ export class SesEmailGatewayAdapter extends EmailGateway {
     if (this.closed) throw new Error("SES email provider is closed.");
     logger.info("Sending email using AWS SES");
     const sesClient = (this.client ??= new SESClient(
-      SesEmailGatewayAdapter.buildClientConfig({
+      SesEmailGatewayChannel.buildClientConfig({
         configuration: this.configuration,
         aws: this.aws,
       }),
@@ -118,7 +117,7 @@ export class SesEmailGatewayAdapter extends EmailGateway {
     const from = content.from ?? defaultFrom;
     const toAddresses = EmailGateway.recipients(content.to);
     const allDestinations = [...toAddresses, ...EmailGateway.recipients(content.bcc)];
-    const rawMessage = this.mime.buildRawMessage({
+    const rawMessage = buildRawMessage({
       from,
       to: toAddresses,
       replyTo: content.replyTo,
@@ -126,6 +125,7 @@ export class SesEmailGatewayAdapter extends EmailGateway {
       html: content.html,
       headers: content.headers,
       attachments: content.attachments ?? [],
+      boundary: `----=_Part_${nowInstant().epochMilliseconds}_${Math.random().toString(36).slice(2)}`,
     });
     const data = await client.send(
       new SendRawEmailCommand({

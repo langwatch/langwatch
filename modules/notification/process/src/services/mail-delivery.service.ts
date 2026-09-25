@@ -5,8 +5,8 @@ import {
   type EmailProviderName,
   type MailGatewaySettings,
 } from "../channels/email-delivery.channel.ts";
+import { emailGatewayChannels } from "../channels/email-gateway-channels.registry.ts";
 import { EmailProviderService } from "./email-provider.service.ts";
-import { SmtpEmailGatewayAdapter } from "./smtp.email-gateway.service.ts";
 
 /**
  * How mail leaves this install, for the checkup: the gateway named, and
@@ -34,7 +34,7 @@ export class MailDeliveryService {
   }
 
   async verifySmtp(): Promise<void> {
-    const gateway = SmtpEmailGatewayAdapter.create((await this.settings()).smtp);
+    const gateway = emailGatewayChannels.smtp.create((await this.settings()).smtp);
     try {
       await gateway.verify();
     } finally {

@@ -3,7 +3,7 @@ import type { BulkAppendContext, ProjectionStoreContext } from "@langwatch/event
 import type { LangyAnalyticsEventProjectionRecord } from "../eventing/langy-analytics-event.projection.ts";
 import type { LangyAnalyticsEventSink } from "../repositories/langy-analytics-event.repository.ts";
 
-export class LangyAnalyticsEventStorageAdapter {
+export class LangyAnalyticsEventStorageService {
   private constructor(
     private readonly sink: LangyAnalyticsEventSink,
     private readonly defaultRetentionDays: number,
@@ -12,8 +12,8 @@ export class LangyAnalyticsEventStorageAdapter {
   static create(input: {
     sink: LangyAnalyticsEventSink;
     defaultRetentionDays: number;
-  }): LangyAnalyticsEventStorageAdapter {
-    return new LangyAnalyticsEventStorageAdapter(input.sink, input.defaultRetentionDays);
+  }): LangyAnalyticsEventStorageService {
+    return new LangyAnalyticsEventStorageService(input.sink, input.defaultRetentionDays);
   }
 
   async append(

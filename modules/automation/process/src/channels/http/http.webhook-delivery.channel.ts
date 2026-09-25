@@ -137,11 +137,11 @@ async function deliverWebhook({
 /** Process-owned webhook delivery adapter. The host binds its outbound HTTP
  * transport once; this class retains delivery-log and error semantics for all
  * callers, including workers and test-fire composition. */
-export class WebhookDeliveryAdapter {
+export class HttpWebhookDeliveryChannel {
   private constructor(private readonly transport: WebhookDeliveryTransport) {}
 
-  static create(transport: WebhookDeliveryTransport): WebhookDeliveryAdapter {
-    return new WebhookDeliveryAdapter(transport);
+  static create(transport: WebhookDeliveryTransport): HttpWebhookDeliveryChannel {
+    return new HttpWebhookDeliveryChannel(transport);
   }
 
   deliver(request: WebhookDeliveryRequest): Promise<WebhookSendResult> {

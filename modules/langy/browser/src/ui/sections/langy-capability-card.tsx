@@ -144,7 +144,7 @@ export function LangyCapabilityCard({
       boxShadow="langyCard"
       paddingX="12px"
       paddingY="11px"
-      role="group"
+      as="fieldset"
     >
       {/* The site's overline is `text-[10px] uppercase tracking-[0.03em]` at
           `text-paper/40` — MEDIUM weight and loose-ish tracking, not a bold

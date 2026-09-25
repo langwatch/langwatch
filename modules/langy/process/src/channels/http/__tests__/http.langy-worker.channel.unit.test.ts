@@ -2,9 +2,9 @@ import { propagation } from "@opentelemetry/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  HttpLangyWorkerAdapter,
-  NullLangyWorkerMetricsAdapter,
-  UnavailableLangyWorkerAdapter,
+  HttpLangyWorkerChannel,
+  LangyWorkerMetricsNullService,
+  UnavailableLangyWorkerChannel,
 } from "../../../index.ts";
 
 const tracing = vi.hoisted(() => {
@@ -40,15 +40,15 @@ const dispatchInput = {
   credentials: { llmVirtualKey: "key" },
 };
 
-function createWorker(metrics = NullLangyWorkerMetricsAdapter.create()) {
-  return HttpLangyWorkerAdapter.create({
+function createWorker(metrics = LangyWorkerMetricsNullService.create()) {
+  return HttpLangyWorkerChannel.create({
     agentUrl: "http://agent",
     internalSecret: "secret",
     metrics,
   });
 }
 
-describe("HttpLangyWorkerAdapter", () => {
+describe("HttpLangyWorkerChannel", () => {
   beforeEach(() => {
     tracing.span.setAttribute.mockClear();
     tracing.withActiveSpan.mockClear();
@@ -306,10 +306,10 @@ describe("HttpLangyWorkerAdapter", () => {
   });
 });
 
-describe("UnavailableLangyWorkerAdapter", () => {
+describe("UnavailableLangyWorkerChannel", () => {
   it("implements the complete port without making network requests", async () => {
     const metrics = { recordDispatch: vi.fn() };
-    const worker = UnavailableLangyWorkerAdapter.create(metrics);
+    const worker = UnavailableLangyWorkerChannel.create(metrics);
 
     await expect(
       worker.probe({

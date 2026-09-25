@@ -94,6 +94,9 @@ export abstract class EmailGateway {
 }
 
 /** A composed mail delivery capability, injected into application adapters. */
+/** Opens the gateway a provider name selects; the registry offers the production one. */
+export type EmailGatewayOpener = (name: EmailProviderName) => EmailGateway;
+
 export abstract class EmailDelivery {
   abstract defaultFrom(): string;
 

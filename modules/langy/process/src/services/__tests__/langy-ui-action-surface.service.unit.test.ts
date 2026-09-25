@@ -1,9 +1,6 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import {
-  FeatureFlagLangyUiActionSurfaceAdapter,
-  LANGY_UI_ACTIONS_FLAG,
-} from "@langwatch/langy-process";
+import { LangyUiActionSurfaceService, LANGY_UI_ACTIONS_FLAG } from "@langwatch/langy-process";
 import { describe, expect, it, vi } from "vitest";
 
 const INPUT = { userId: "user-1", projectId: "project-1", organizationId: "org-1" };
@@ -12,11 +9,11 @@ function makeFlags(isEnabled: FeatureFlagApi["isEnabled"]): FeatureFlagApi {
   return createApiFixture<FeatureFlagApi>({ isEnabled });
 }
 
-describe("FeatureFlagLangyUiActionSurfaceAdapter", () => {
+describe("LangyUiActionSurfaceService", () => {
   describe("given the flag store answers", () => {
     it("resolves the flag's answer for the project target", async () => {
       const isEnabled = vi.fn(async () => true);
-      const adapter = FeatureFlagLangyUiActionSurfaceAdapter.create(makeFlags(isEnabled));
+      const adapter = LangyUiActionSurfaceService.create(makeFlags(isEnabled));
 
       await expect(adapter.resolve(INPUT)).resolves.toBe(true);
 
@@ -35,7 +32,7 @@ describe("FeatureFlagLangyUiActionSurfaceAdapter", () => {
       const isEnabled = vi.fn(async () => {
         throw new Error("flag store unavailable");
       });
-      const adapter = FeatureFlagLangyUiActionSurfaceAdapter.create(makeFlags(isEnabled));
+      const adapter = LangyUiActionSurfaceService.create(makeFlags(isEnabled));
 
       await expect(adapter.resolve(INPUT)).resolves.toBe(false);
     });

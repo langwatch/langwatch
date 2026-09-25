@@ -192,9 +192,9 @@ function buildLangyConversationPipeline(
 }
 
 /** Deliberate process-facing adapter for the Langy conversation pipeline. */
-export class LangyConversationPipelineAdapter {
-  static create(deps: LangyConversationProcessingPipelineDeps): LangyConversationPipelineAdapter {
-    return new LangyConversationPipelineAdapter(deps);
+export class LangyConversationPipelineService {
+  static create(deps: LangyConversationProcessingPipelineDeps): LangyConversationPipelineService {
+    return new LangyConversationPipelineService(deps);
   }
 
   private constructor(private readonly deps: LangyConversationProcessingPipelineDeps) {}

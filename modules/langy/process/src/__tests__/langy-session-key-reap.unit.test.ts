@@ -1,5 +1,5 @@
 import {
-  EventingLangyMaintenanceAdapter,
+  LangyMaintenanceService,
   LANGY_SESSION_KEYS_METRIC_NAME,
   LANGY_SESSION_KEY_REAP_PROCESS_NAME,
   langySessionKeyReapWake,
@@ -88,7 +88,7 @@ describe("langySessionKeyReap process", () => {
   describe("given the pipeline is built", () => {
     describe("when its shape is inspected", () => {
       it("registers the reap as a scheduled process and appends no events", () => {
-        const pipeline = EventingLangyMaintenanceAdapter.create({
+        const pipeline = LangyMaintenanceService.create({
           sessionKeyReap: {
             reap: async () => 0,
             deleteDispatchedBefore: async () => 0,
@@ -115,7 +115,7 @@ describe("the Langy maintenance pipeline's frozen twin", () => {
     describe("when either graph registers it", () => {
       /** @scenario "The session-key sweep keeps one set of routing keys across both graphs" */
       it("names the pipeline the twin names", () => {
-        const pipeline = EventingLangyMaintenanceAdapter.create({
+        const pipeline = LangyMaintenanceService.create({
           sessionKeyReap: {
             reap: async () => 0,
             deleteDispatchedBefore: async () => 0,

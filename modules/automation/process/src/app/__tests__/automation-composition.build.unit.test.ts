@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import type { GraphAlertDispatchInput } from "../../channels/automation-graph-alert.channel.ts";
 import { settlementTrigger } from "../../fixtures/settlement.fixtures.ts";
 import { MemoryAutomationRepositories } from "../../repositories/memory/memory.automation.repositories.ts";
-import { AutomationNotificationDeliveryAdapter } from "../../services/automation-notification-delivery.service.ts";
+import { AutomationNotificationDeliveryService } from "../../services/automation-notification-delivery.service.ts";
 import { AutomationProviderRegistryService } from "../../services/automation-provider-registry.service.ts";
 import { AutomationEmailCapService } from "../../services/email-cap.service.ts";
 import { buildGraphAlertNotifier } from "../automation-composition.build.ts";
@@ -26,7 +26,7 @@ function composeNotifier(publicBaseUrl: string | undefined) {
       decrypt: (value) => value,
     }),
     clock: frozenAt(),
-    delivery: AutomationNotificationDeliveryAdapter.create({
+    delivery: AutomationNotificationDeliveryService.create({
       mailer: mail,
       renderer: ReactEmailMailRenderer.create(),
       baseHost: BASE_HOST,

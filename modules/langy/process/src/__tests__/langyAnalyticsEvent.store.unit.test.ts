@@ -1,6 +1,6 @@
 import { createTenantId } from "@langwatch/eventing";
 import {
-  LangyAnalyticsEventStorageAdapter,
+  LangyAnalyticsEventStorageService,
   type LangyAnalyticsEventProjectionRecord,
 } from "@langwatch/langy-process";
 import { describe, expect, it, vi } from "vitest";
@@ -31,7 +31,7 @@ class FakeLangyAnalyticsEventSink extends LangyAnalyticsEventSink {
 describe("LangyAnalyticsEventAppendStore", () => {
   it("injects the tenant and resolved trace retention into a single append", async () => {
     const sink = new FakeLangyAnalyticsEventSink();
-    const store = LangyAnalyticsEventStorageAdapter.create({
+    const store = LangyAnalyticsEventStorageService.create({
       sink,
       defaultRetentionDays: 49,
     });
@@ -51,7 +51,7 @@ describe("LangyAnalyticsEventAppendStore", () => {
 
   it("uses one tenant-scoped batch insert during replay", async () => {
     const sink = new FakeLangyAnalyticsEventSink();
-    const store = LangyAnalyticsEventStorageAdapter.create({
+    const store = LangyAnalyticsEventStorageService.create({
       sink,
       defaultRetentionDays: 49,
     });
@@ -81,7 +81,7 @@ describe("LangyAnalyticsEventAppendStore", () => {
 
   it("does not call the repository for an empty replay batch", async () => {
     const sink = new FakeLangyAnalyticsEventSink();
-    const store = LangyAnalyticsEventStorageAdapter.create({
+    const store = LangyAnalyticsEventStorageService.create({
       sink,
       defaultRetentionDays: 49,
     });

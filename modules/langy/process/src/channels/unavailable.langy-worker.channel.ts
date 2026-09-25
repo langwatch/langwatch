@@ -8,13 +8,13 @@ import {
   type LangyWorkerWarmInput,
 } from "../app/langy.members.ts";
 
-export class UnavailableLangyWorkerAdapter extends LangyWorker {
+export class UnavailableLangyWorkerChannel extends LangyWorker {
   private constructor(private readonly metrics: LangyWorkerMetrics) {
     super();
   }
 
-  static create(metrics: LangyWorkerMetrics): UnavailableLangyWorkerAdapter {
-    return new UnavailableLangyWorkerAdapter(metrics);
+  static create(metrics: LangyWorkerMetrics): UnavailableLangyWorkerChannel {
+    return new UnavailableLangyWorkerChannel(metrics);
   }
 
   probe(_input: LangyWorkerProbeInput): Promise<boolean> {

@@ -53,7 +53,7 @@ export type AutomationNextStepResolver = Readonly<{
  * Infrastructure for Automation's runaway containment, in this process. Owns the
  * substrates that policy names (trace counts, admin roll, mailer, etc.).
  */
-export class AutomationRunawayAdapter extends AutomationRunaway {
+export class AutomationRunawayService extends AutomationRunaway {
   static create(input: {
     redis: RedisConnection | null;
     directories: AutomationRunawayDirectories;
@@ -65,8 +65,8 @@ export class AutomationRunawayAdapter extends AutomationRunaway {
     /** Absent on a deployment that composed no self-serve plan catalogue. */
     nextStep?: AutomationNextStepResolver | null;
     logger?: Logger;
-  }): AutomationRunawayAdapter {
-    return new AutomationRunawayAdapter(
+  }): AutomationRunawayService {
+    return new AutomationRunawayService(
       input,
       input.logger ?? createLogger("langwatch:automation:runaway-containment"),
     );

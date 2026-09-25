@@ -3,7 +3,7 @@ import { recordingMail } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
 import type { WebhookDeliveryTransport } from "../../channels/http/http.webhook-delivery.channel.ts";
-import { AutomationNotificationDeliveryAdapter } from "../automation-notification-delivery.service.ts";
+import { AutomationNotificationDeliveryService } from "../automation-notification-delivery.service.ts";
 
 /**
  * The expected envelope was recorded from the application's own sender. It is a
@@ -41,7 +41,7 @@ function composeDelivery(
 ) {
   const mailer = recordingMail();
   const logger = over.logger ?? new RecordingLogger();
-  const adapter = AutomationNotificationDeliveryAdapter.create({
+  const adapter = AutomationNotificationDeliveryService.create({
     mailer,
     renderer: ReactEmailMailRenderer.create(),
     baseHost: BASE_HOST,
@@ -54,7 +54,7 @@ function composeDelivery(
 }
 
 function alert(
-  over: Partial<Parameters<AutomationNotificationDeliveryAdapter["sendEmail"]>[0]> = {},
+  over: Partial<Parameters<AutomationNotificationDeliveryService["sendEmail"]>[0]> = {},
 ) {
   const claimed = new Set<string>();
 
@@ -70,7 +70,7 @@ function alert(
   };
 }
 
-describe("AutomationNotificationDeliveryAdapter", () => {
+describe("AutomationNotificationDeliveryService", () => {
   describe("given a composed alert delivery adapter", () => {
     /** @scenario "Recipients ride in BCC behind a no-reply" */
     it("addresses the no-reply and delivers the recipient as BCC", async () => {

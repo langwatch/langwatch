@@ -260,11 +260,11 @@ async function listSlackChannels(
 
 /** Process-owned Slack Web API adapter. The host supplies the pinned HTTP
  * transport once at composition time; request methods remain stateless. */
-export class SlackWebApiDeliveryAdapter {
+export class SlackWebApiDeliveryChannel {
   private constructor(private readonly transport: SlackApiTransport) {}
 
-  static create(transport: SlackApiTransport): SlackWebApiDeliveryAdapter {
-    return new SlackWebApiDeliveryAdapter(transport);
+  static create(transport: SlackApiTransport): SlackWebApiDeliveryChannel {
+    return new SlackWebApiDeliveryChannel(transport);
   }
 
   post(input: {

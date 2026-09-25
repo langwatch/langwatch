@@ -10,13 +10,13 @@ export {
   createAutomationWebhookDeliveries,
 } from "./automation.server.ts";
 export { PostgresAutomationGraphDeliveryAdapter } from "./repositories/prisma/prisma.automation-graph-delivery.repository.ts";
-export { SlackWebhookDeliveryAdapter } from "./channels/slack/slack.webhook-delivery.channel.ts";
+export { SlackWebhookDeliveryChannel } from "./channels/slack/slack.webhook-delivery.channel.ts";
 export type {
   RenderedSlackMessageRequest,
   SlackWebhookRequest,
   SlackWebhookTransport,
 } from "./channels/slack/slack.webhook-delivery.channel.ts";
-export { SlackWebhookClientAdapter } from "./channels/slack/slack.webhook-client.channel.ts";
+export { SlackWebhookClientChannel } from "./channels/slack/slack.webhook-client.channel.ts";
 export {
   AutomationSlackProvider,
   AutomationSlackSecretsService,
@@ -33,7 +33,7 @@ export type {
   AutomationWebhookStoredParams,
   WebhookStoredActionParams,
 } from "./services/automation-webhook-secrets.service.ts";
-export { WebhookDeliveryAdapter } from "./channels/http/http.webhook-delivery.channel.ts";
+export { HttpWebhookDeliveryChannel } from "./channels/http/http.webhook-delivery.channel.ts";
 export { AutomationProviderRegistryService } from "./services/automation-provider-registry.service.ts";
 export type {
   PersistActionParamsArgs,
@@ -54,7 +54,7 @@ export type {
   WebhookDeliveryTransport,
   WebhookSendResult,
 } from "./channels/http/http.webhook-delivery.channel.ts";
-export { SlackWebApiDeliveryAdapter } from "./channels/slack/slack.web-api-delivery.channel.ts";
+export { SlackWebApiDeliveryChannel } from "./channels/slack/slack.web-api-delivery.channel.ts";
 export type { SlackApiTransport } from "./channels/slack/slack.web-api-delivery.channel.ts";
 export {
   createAutomationsPipeline,
@@ -122,14 +122,14 @@ export {
 export { AutomationRunawayNotice } from "./channels/automation-runaway-notice.channel.ts";
 export { AutomationRunawaySignals } from "./services/automation-runaway-signals.service.ts";
 export {
-  AutomationRunawayAdapter,
+  AutomationRunawayService,
   type AutomationRunawayDirectories,
   type RunawayClickHouseResolver,
   type AutomationRunawaySuppression,
   type AutomationNextStepResolver,
 } from "./services/automation-runaway.service.ts";
 export {
-  AutomationNextStepAdapter,
+  AutomationNextStepService,
   AutomationOrganizationPricing,
 } from "./services/automation-next-step.service.ts";
 /**
@@ -143,13 +143,13 @@ export {
   RunawayContainmentService,
 } from "./services/runaway-containment.service.ts";
 export { AutomationNotificationDelivery } from "./channels/automation-notification-delivery.channel.ts";
-export { AutomationNotificationDeliveryAdapter } from "./services/automation-notification-delivery.service.ts";
+export { AutomationNotificationDeliveryService } from "./services/automation-notification-delivery.service.ts";
 export type { AutomationSettlementMatchConfirmation } from "./services/automation-settlement-match-confirmation.service.ts";
 export { AutomationSettlementExecutor } from "./services/automation-settlement-executor.service.ts";
 export {
   AutomationSettlementObservability,
   AUTOMATION_OVERFLOW_FLUSH_METRIC_NAME,
-  OtelAutomationSettlementObservabilityAdapter,
+  AutomationSettlementObservabilityService,
 } from "./services/automation-settlement-observability.service.ts";
 export { AutomationSettlementLedger } from "./repositories/automation-settlement-ledger.repository.ts";
 export {

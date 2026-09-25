@@ -4,18 +4,10 @@ import {
   type EmailContent,
   EmailDelivery,
   type EmailGateway,
-  type EmailOutboundProxyConfig,
-  type EmailProviderName,
+  type EmailGatewayOpener,
   type MailerConfiguration,
 } from "../channels/email-delivery.channel.ts";
 import { EmailProviderService } from "./email-provider.service.ts";
-import { ResendEmailGatewayAdapter } from "./resend.email-gateway.service.ts";
-import { SendgridEmailGatewayAdapter } from "./sendgrid.email-gateway.service.ts";
-import {
-  SesEmailGatewayAdapter,
-  type SesAwsClientConfiguration,
-} from "./ses.email-gateway.service.ts";
-import { SmtpEmailGatewayAdapter } from "./smtp.email-gateway.service.ts";
 
 const logger = createLogger("langwatch:mailer:runtime");
 
@@ -23,13 +15,12 @@ const logger = createLogger("langwatch:mailer:runtime");
  * Per-executable mail delivery; gateway resolved on first send (not construction)
  * to allow deployments without email provider. Send failures must be survived.
  */
-export class EmailDeliveryAdapter extends EmailDelivery {
+export class EmailDeliveryService extends EmailDelivery {
   static create(input: {
     configuration: MailerConfiguration;
-    aws: SesAwsClientConfiguration;
-    outboundProxy: EmailOutboundProxyConfig;
-  }): EmailDeliveryAdapter {
-    return new EmailDeliveryAdapter(input.configuration, input.aws, input.outboundProxy);
+    openGateway: EmailGatewayOpener;
+  }): EmailDeliveryService {
+    return new EmailDeliveryService(input.configuration, input.openGateway);
   }
 
   private gateway: EmailGateway | undefined;
@@ -38,8 +29,7 @@ export class EmailDeliveryAdapter extends EmailDelivery {
 
   private constructor(
     private readonly configuration: MailerConfiguration,
-    private readonly aws: SesAwsClientConfiguration,
-    private readonly outboundProxy: EmailOutboundProxyConfig,
+    private readonly openGateway: EmailGatewayOpener,
   ) {
     super();
   }
@@ -69,27 +59,8 @@ export class EmailDeliveryAdapter extends EmailDelivery {
     const providerName = EmailProviderService.create(this.configuration).pickProviderName();
     if (!providerName) return undefined;
 
-    this.gateway = this.createGateway(providerName);
+    this.gateway = this.openGateway(providerName);
     return this.gateway;
-  }
-
-  private createGateway(name: EmailProviderName): EmailGateway {
-    switch (name) {
-      case "ses":
-        return SesEmailGatewayAdapter.create({
-          configuration: this.configuration.ses,
-          aws: this.aws,
-        });
-      case "sendgrid":
-        return SendgridEmailGatewayAdapter.create(this.configuration.sendgrid);
-      case "smtp":
-        return SmtpEmailGatewayAdapter.create(this.configuration.smtp);
-      case "resend":
-        return ResendEmailGatewayAdapter.create({
-          configuration: this.configuration.resend,
-          outboundProxy: this.outboundProxy,
-        });
-    }
   }
 
   private async closeOnce(): Promise<void> {

@@ -13,11 +13,11 @@ export abstract class AutomationSettlementObservability {
  * OTLP overflow metric with error capture delegated, since error handling is
  * process-specific (e.g., app logs vs. worker logging strategy).
  */
-export class OtelAutomationSettlementObservabilityAdapter extends AutomationSettlementObservability {
+export class AutomationSettlementObservabilityService extends AutomationSettlementObservability {
   static create(options: {
     capture: (error: Error, extra: Record<string, unknown>) => void;
-  }): OtelAutomationSettlementObservabilityAdapter {
-    return new OtelAutomationSettlementObservabilityAdapter(
+  }): AutomationSettlementObservabilityService {
+    return new AutomationSettlementObservabilityService(
       counter({
         name: AUTOMATION_OVERFLOW_FLUSH_METRIC_NAME,
         description: "Matches flushed early because a settlement process hit its pending bound",

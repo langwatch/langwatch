@@ -7,12 +7,13 @@ import type {
   EmailOutboundProxyConfig,
   MailerConfiguration,
 } from "./channels/email-delivery.channel.ts";
+import { emailGatewayOpener } from "./channels/email-gateway-channels.registry.ts";
 import { RedisTenantBroadcastChannel } from "./channels/redis/redis.tenant-broadcast.channel.ts";
+import type { SesAwsClientConfiguration } from "./channels/ses/ses.email-gateway.channel.ts";
 import type { TenantBroadcast } from "./channels/tenant-broadcast.channel.ts";
 import { TenantBroadcastPublisher } from "./channels/tenant-broadcast.channel.ts";
 import { notificationRepositories } from "./repositories/notification-repositories.registry.ts";
-import { EmailDeliveryAdapter } from "./services/email-delivery.service.ts";
-import type { SesAwsClientConfiguration } from "./services/ses.email-gateway.service.ts";
+import { EmailDeliveryService } from "./services/email-delivery.service.ts";
 
 export const notificationServer = defineServerModule("notification")
   .withRepositories(notificationRepositories)
@@ -42,7 +43,10 @@ export function createEmailDelivery(input: {
   /** The egress this deployment requires of every outbound provider call. */
   outboundProxy: EmailOutboundProxyConfig;
 }): ClosableEmailDelivery {
-  return EmailDeliveryAdapter.create(input);
+  return EmailDeliveryService.create({
+    configuration: input.configuration,
+    openGateway: emailGatewayOpener(input),
+  });
 }
 
 /**

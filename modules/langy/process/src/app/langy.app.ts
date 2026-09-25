@@ -58,7 +58,8 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { UserApi } from "@langwatch/user-contract";
 import type { Redis } from "ioredis";
 
-import { HttpLangyWorkerAdapter } from "../channels/http/http.langy-worker.channel.ts";
+import { HttpLangyWorkerChannel } from "../channels/http/http.langy-worker.channel.ts";
+import { UnavailableLangyWorkerChannel } from "../channels/unavailable.langy-worker.channel.ts";
 import type { LangySessionKeyReapDeps } from "../eventing/langy-session-key-reap.intent.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
 import type {
@@ -78,7 +79,7 @@ import { LangyLocalControlTerminalService } from "../services/langy-local-contro
 import { LocalControlSessionCoreService } from "../services/langy-local-session.service.ts";
 import { LangyLocalWorkerService } from "../services/langy-local-worker.service.ts";
 import { LangyLocalWorkspaceService } from "../services/langy-local-workspace.service.ts";
-import { EventingLangyMaintenanceAdapter } from "../services/langy-maintenance.service.ts";
+import { LangyMaintenanceService } from "../services/langy-maintenance.service.ts";
 import { PostgresLangyAdapter } from "../services/langy-postgres.service.ts";
 import { LangyRestCallerService } from "../services/langy-rest-caller.service.ts";
 import { LangySessionKeyMetricsOtelService } from "../services/langy-session-key-metrics-otel.service.ts";
@@ -88,7 +89,6 @@ import type { LangyChatMessageInput } from "../services/langy-turn-shared.servic
 import { LangyTurnsBoundsService } from "../services/langy-turns-bounds.service.ts";
 import { LangyVirtualKeyProvisioningService } from "../services/langy-virtual-key-provisioning.service.ts";
 import { LangyWorkerMetricsOtelService } from "../services/langy-worker-metrics-otel.service.ts";
-import { UnavailableLangyWorkerAdapter } from "../services/langy-worker-unavailable.service.ts";
 import type { LangyService } from "../services/langy.service.ts";
 import { langyRestPrometheusMetrics } from "../services/prometheus.langy-rest-metrics.service.ts";
 import { SetupSkillsService } from "../services/setup-skills.service.ts";
@@ -210,12 +210,12 @@ export class LangyApp implements LangyApiContract {
       const metrics = LangyWorkerMetricsOtelService.create();
       const channel =
         setup.config.agentUrl && internalSecret
-          ? HttpLangyWorkerAdapter.create({
+          ? HttpLangyWorkerChannel.create({
               agentUrl: setup.config.agentUrl,
               internalSecret,
               metrics,
             })
-          : UnavailableLangyWorkerAdapter.create(metrics);
+          : UnavailableLangyWorkerChannel.create(metrics);
       const door = BearerIdentity.create({ name: "langy-internal", token: internalSecret });
       return { channel, door };
     });
@@ -335,7 +335,7 @@ export class LangyApp implements LangyApiContract {
   maintenanceEventingPipeline(
     deps: Pick<LangySessionKeyReapDeps, "deleteDispatchedBefore">,
   ): StaticPipelineDefinition<Event> {
-    return EventingLangyMaintenanceAdapter.create({
+    return LangyMaintenanceService.create({
       sessionKeyReap: {
         reap: () => this.dependencies.sessionKeyReap.reap(),
         deleteDispatchedBefore: deps.deleteDispatchedBefore,

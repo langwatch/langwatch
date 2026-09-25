@@ -11,9 +11,9 @@ const DEFAULT_MAX_RESPONSE_BYTES = 64 * 1024;
  * The HTTPS call behind a Slack bot delivery. Uses constant endpoints (not
  * customer-supplied) and bounds response size to prevent memory exhaustion.
  */
-export class SlackWebApiTransportAdapter implements SlackApiTransport {
-  static create(options: { fetch?: typeof globalThis.fetch } = {}): SlackWebApiTransportAdapter {
-    return new SlackWebApiTransportAdapter(options.fetch ?? globalThis.fetch);
+export class SlackWebApiTransportChannel implements SlackApiTransport {
+  static create(options: { fetch?: typeof globalThis.fetch } = {}): SlackWebApiTransportChannel {
+    return new SlackWebApiTransportChannel(options.fetch ?? globalThis.fetch);
   }
 
   private constructor(private readonly fetchImpl: typeof globalThis.fetch) {}

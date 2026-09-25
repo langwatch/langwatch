@@ -238,7 +238,7 @@ function buildLangyWorker(config: LangyWorkerAdapterConfig): LangyWorker {
 }
 
 /** HTTP adapter for the process-owned Langy worker manager. */
-export class HttpLangyWorkerAdapter {
+export class HttpLangyWorkerChannel {
   static create(config: LangyWorkerAdapterConfig): LangyWorker {
     return buildLangyWorker(config);
   }

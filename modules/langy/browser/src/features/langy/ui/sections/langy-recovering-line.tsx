@@ -27,7 +27,7 @@ export function LangyRecoveringLine({ message }: { message: string }) {
         <AnimatePresence mode="wait" initial={false}>
           <MotionText
             key={message}
-            role="status"
+            as="output"
             aria-live="polite"
             fontSize="sm"
             fontWeight="500"

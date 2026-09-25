@@ -8,21 +8,19 @@ import type { Mail } from "@langwatch/process-stores/members";
 import { Temporal } from "@langwatch/time";
 import type { TraceRecord } from "@langwatch/trace-contract";
 
-import { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
-import { TEST_FIRE_TRIGGER_ID_SENTINEL } from "../channels/automation-test-fire.channel.ts";
 import {
-  WebhookDeliveryAdapter,
+  automationNotificationChannels,
+  type HttpWebhookDeliveryChannel,
+  type SlackApiTransport,
+  type SlackWebApiDeliveryChannel,
+  type SlackWebhookClientChannel,
+  type SlackWebhookDeliveryChannel,
   type WebhookDeliveryRequest,
   type WebhookDeliveryTransport,
   type WebhookSendResult,
-} from "../channels/http/http.webhook-delivery.channel.ts";
-import { SlackWebApiTransportAdapter } from "../channels/slack/slack-web-api-transport.channel.ts";
-import {
-  SlackWebApiDeliveryAdapter,
-  type SlackApiTransport,
-} from "../channels/slack/slack.web-api-delivery.channel.ts";
-import { SlackWebhookClientAdapter } from "../channels/slack/slack.webhook-client.channel.ts";
-import { SlackWebhookDeliveryAdapter } from "../channels/slack/slack.webhook-delivery.channel.ts";
+} from "../channels/automation-notification-channels.registry.ts";
+import { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
+import { TEST_FIRE_TRIGGER_ID_SENTINEL } from "../channels/automation-test-fire.channel.ts";
 import { injectFooterIntoBody } from "../rules/automation-notification-footer.rules.ts";
 import { TriggerNoReplyService, TriggerNoReplyWarning } from "./trigger-no-reply.service.ts";
 import { UnsubscribeTokenService } from "./unsubscribe-token.service.ts";
@@ -66,7 +64,7 @@ function toDigestEntry(entry: SettlementDigestEntry): TriggerDigestEntry {
  * alerts. The webhook transport is SSRF-fenced and injected (not every process
  * has one).
  */
-export class AutomationNotificationDeliveryAdapter extends AutomationNotificationDelivery {
+export class AutomationNotificationDeliveryService extends AutomationNotificationDelivery {
   static create(options: {
     mailer: Mail;
     /**
@@ -80,14 +78,15 @@ export class AutomationNotificationDeliveryAdapter extends AutomationNotificatio
     unsubscribeSigningSecret?: string;
     /** Supplied once an SSRF-fenced outbound sender is composable here. */
     webhookTransport?: WebhookDeliveryTransport;
-    slackWebhookClient?: SlackWebhookClientAdapter;
+    slackWebhookClient?: SlackWebhookClientChannel;
     slackApiTransport?: SlackApiTransport;
     logger?: Logger;
-  }): AutomationNotificationDeliveryAdapter {
+  }): AutomationNotificationDeliveryService {
     const logger = options.logger ?? createLogger("langwatch:automations:delivery");
-    const slackClient = options.slackWebhookClient ?? SlackWebhookClientAdapter.create();
+    const slackClient =
+      options.slackWebhookClient ?? automationNotificationChannels.slackWebhookClient.create();
 
-    return new AutomationNotificationDeliveryAdapter({
+    return new AutomationNotificationDeliveryService({
       mailer: options.mailer,
       renderer: options.renderer,
       baseHost: options.baseHost,
@@ -98,14 +97,14 @@ export class AutomationNotificationDeliveryAdapter extends AutomationNotificatio
         secret: options.unsubscribeSigningSecret,
         warnings: new LoggedNoReplyWarning(logger),
       }),
-      slackWebhooks: SlackWebhookDeliveryAdapter.create((webhook) => ({
+      slackWebhooks: automationNotificationChannels.slackWebhook.create((webhook) => ({
         send: (payload) => slackClient.send({ webhook, payload }),
       })),
-      slackApi: SlackWebApiDeliveryAdapter.create(
-        options.slackApiTransport ?? SlackWebApiTransportAdapter.create(),
+      slackApi: automationNotificationChannels.slackApi.create(
+        options.slackApiTransport ?? automationNotificationChannels.slackApiTransport.create(),
       ),
       webhooks: options.webhookTransport
-        ? WebhookDeliveryAdapter.create(options.webhookTransport)
+        ? automationNotificationChannels.webhook.create(options.webhookTransport)
         : undefined,
       logger,
     });
@@ -121,11 +120,11 @@ export class AutomationNotificationDeliveryAdapter extends AutomationNotificatio
 
   private readonly noReply: TriggerNoReplyService;
 
-  private readonly slackWebhooks: SlackWebhookDeliveryAdapter;
+  private readonly slackWebhooks: SlackWebhookDeliveryChannel;
 
-  private readonly slackApi: SlackWebApiDeliveryAdapter;
+  private readonly slackApi: SlackWebApiDeliveryChannel;
 
-  private readonly webhooks: WebhookDeliveryAdapter | undefined;
+  private readonly webhooks: HttpWebhookDeliveryChannel | undefined;
 
   private readonly logger: Logger;
 
@@ -145,9 +144,9 @@ export class AutomationNotificationDeliveryAdapter extends AutomationNotificatio
     baseHost: string;
     unsubscribeTokens: UnsubscribeTokenService;
     noReply: TriggerNoReplyService;
-    slackWebhooks: SlackWebhookDeliveryAdapter;
-    slackApi: SlackWebApiDeliveryAdapter;
-    webhooks: WebhookDeliveryAdapter | undefined;
+    slackWebhooks: SlackWebhookDeliveryChannel;
+    slackApi: SlackWebApiDeliveryChannel;
+    webhooks: HttpWebhookDeliveryChannel | undefined;
     logger: Logger;
   }) {
     super();

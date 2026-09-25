@@ -8,7 +8,7 @@ import { DispatchError } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import {
-  SlackWebApiDeliveryAdapter,
+  SlackWebApiDeliveryChannel,
   type SlackApiTransport,
 } from "../slack.web-api-delivery.channel.ts";
 
@@ -36,7 +36,7 @@ function transportAnswering(
 }
 
 function post(transport: SlackApiTransport): Promise<void> {
-  return SlackWebApiDeliveryAdapter.create(transport).post({
+  return SlackWebApiDeliveryChannel.create(transport).post({
     token: "xoxb-secret",
     channel: "C123",
     payload: PAYLOAD,
@@ -44,7 +44,7 @@ function post(transport: SlackApiTransport): Promise<void> {
   });
 }
 
-describe("SlackWebApiDeliveryAdapter.post", () => {
+describe("SlackWebApiDeliveryChannel.post", () => {
   describe("given a Slack automation configured with a bot token and a channel", () => {
     describe("when it fires", () => {
       /** @scenario "An automation delivers through a Slack bot connection" */

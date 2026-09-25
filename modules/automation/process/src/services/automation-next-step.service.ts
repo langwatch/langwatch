@@ -22,7 +22,7 @@ export abstract class AutomationOrganizationPricing {
   } | null>;
 }
 
-export class AutomationNextStepAdapter {
+export class AutomationNextStepService {
   static create(options: {
     projects: Pick<ProjectApi, "getOrganizationId">;
     plans: Pick<PlanProvider, "getActivePlan">;
@@ -30,8 +30,8 @@ export class AutomationNextStepAdapter {
     nextStep: Pick<EntitlementApi, "resolvePlanNextStep">;
     baseHost: string;
     logger?: Logger;
-  }): AutomationNextStepAdapter {
-    return new AutomationNextStepAdapter(
+  }): AutomationNextStepService {
+    return new AutomationNextStepService(
       options,
       options.logger ?? createLogger("langwatch:automation:next-step"),
     );

@@ -10,9 +10,9 @@ const logger = createLogger("langwatch:langy:ui-action-surface");
  * Never throws: a flag-store blip must not stop the turn, nor advertise a
  * surface dispatch may 404 - a failed read holds the channel closed.
  */
-export class FeatureFlagLangyUiActionSurfaceAdapter extends LangyUiActionSurface {
-  static create(featureFlags: FeatureFlagApi): FeatureFlagLangyUiActionSurfaceAdapter {
-    return new FeatureFlagLangyUiActionSurfaceAdapter(featureFlags);
+export class LangyUiActionSurfaceService extends LangyUiActionSurface {
+  static create(featureFlags: FeatureFlagApi): LangyUiActionSurfaceService {
+    return new LangyUiActionSurfaceService(featureFlags);
   }
 
   private constructor(private readonly featureFlags: FeatureFlagApi) {
