@@ -25,20 +25,20 @@ This page is for the LiteLLM **Proxy** (the gateway server). If you call LiteLLM
 
 ```bash
 # Turn on LiteLLM's OpenTelemetry v2 tracing
-LITELLM_OTEL_V2=true
+export LITELLM_OTEL_V2=true
 
 # Send it to LangWatch over OTLP/HTTP
-OTEL_EXPORTER="otlp_http"
-OTEL_ENDPOINT="https://app.langwatch.ai/api/otel"
-OTEL_HEADERS="Authorization=Bearer ${LANGWATCH_API_KEY}"
+export OTEL_EXPORTER="otlp_http"
+export OTEL_ENDPOINT="https://app.langwatch.ai/api/otel"
+export OTEL_HEADERS="Authorization=Bearer ${LANGWATCH_API_KEY}"
 
 # Optional: also capture prompts and responses (off by default in LiteLLM)
-OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT="span_only"
+export OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT="span_only"
 ```
 
 LiteLLM appends `/v1/traces` to `OTEL_ENDPOINT`, so the spans land on `https://app.langwatch.ai/api/otel/v1/traces`.
 
-**Self-hosted LangWatch:** replace `https://app.langwatch.ai` with the URL of your own instance, for example `OTEL_ENDPOINT="https://langwatch.internal.example.com/api/otel"`. The proxy only needs network access to your LangWatch instance, so this works for proxies that are only reachable inside your VPC.
+**Self-hosted LangWatch:** replace `https://app.langwatch.ai` with the URL of your own instance, for example `export OTEL_ENDPOINT="https://langwatch.internal.example.com/api/otel"`. The proxy only needs network access to your LangWatch instance, so this works for proxies that are only reachable inside your VPC.
 
 </Step>
 <Step title="Start the proxy">
@@ -74,10 +74,10 @@ The trace appears in your LangWatch project within a few seconds, with the model
 By default LiteLLM only exports metadata (model, tokens, cost, timing) and never the message content. To see the conversations in LangWatch, and to run evaluations on them, set:
 
 ```bash
-OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT="span_only"
+export OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT="span_only"
 ```
 
-Once the content reaches LangWatch, your [Data Privacy](/platform/data-privacy) rules still apply: PII and secrets are redacted before storage, and you can drop or restrict input and output per organization, team or project. A common setup is to capture everything at the proxy and decide in LangWatch who can read what.
+Once the content reaches LangWatch, your [Data Privacy](/platform/data-privacy) rules apply: PII and secrets are redacted before storage, and you can drop or restrict input and output per organization, team or project. The default Essential PII redaction does not catch everything (names and locations, for example, need the Strict level), and captured content is readable by everyone with access to the project. Check your privacy settings before turning capture on. A common setup is to capture at the proxy, restrict input and output in LangWatch, and decide there who can read what.
 
 ## Linking proxy calls to your application traces
 
@@ -97,9 +97,9 @@ litellm_settings:
 ```
 
 ```bash
-OTEL_EXPORTER="otlp_http"
-OTEL_ENDPOINT="https://app.langwatch.ai/api/otel/v1/traces"
-OTEL_HEADERS="Authorization=Bearer ${LANGWATCH_API_KEY}"
+export OTEL_EXPORTER="otlp_http"
+export OTEL_ENDPOINT="https://app.langwatch.ai/api/otel/v1/traces"
+export OTEL_HEADERS="Authorization=Bearer ${LANGWATCH_API_KEY}"
 ```
 
 Upgrading to a version with OpenTelemetry v2 is recommended: it produces one clean trace per request and follows the OpenTelemetry GenAI semantic conventions.
