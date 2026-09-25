@@ -279,6 +279,9 @@ to the no-bytes rule**.
 - Amended 2026-09-24 (Alex: "skip 410, just remove if they were web only"): only main's in-app upload
   drove the `/direct-upload*` routes, so all five are removed rather than refused. Nothing answers
   `dataset_upload_route_retired`, and the code goes.
+- Amended 2026-09-25 (Alex, apidiff parity): scenario events keep main's server-side extraction of
+  inline media into stored objects before dispatch — an explicit exception to "no module parses upload
+  bytes", scoped to `/api/scenario-events`; every other upload stays presigned.
 
 ### 9. Operation changes (approved by Alex, 2026-09-24)
 

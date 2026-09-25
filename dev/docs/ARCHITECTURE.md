@@ -1031,7 +1031,8 @@ never thinks about resolution at all. The per-module resolver adapters
   sanctioned exception: the `moduleApi<X>()` app-port interface a door
   declares for its own implementation.
 - A path parameter is named for what it identifies (`:virtualKeyId`, never `:id`). A route main already
-  publishes in `docs/api-reference/openapiLangWatch.json` keeps the names it published (Alex, 2026-09-23).
+  publishes in `docs/api-reference/openapiLangWatch.json` keeps the names it published (Alex, 2026-09-23),
+  `{id}` included: a semantic rename of a main route is drift and is reverted (Alex, 2026-09-25).
 - A handler never sets a header to refuse: a `HandledError` carrying `meta.retryAfterMs` is rendered by
   the REST runtime with `Retry-After` (2026-09-23).
 - An action that takes no body declares an empty input schema from its contract; the runtime reads an
