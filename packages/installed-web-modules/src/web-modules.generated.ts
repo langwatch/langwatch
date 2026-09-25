@@ -140,6 +140,7 @@ type ServerHalfOnDisk =
   | "data-privacy"
   | "data-retention"
   | "dataset"
+  | "enterprise-gateway"
   | "enterprise-ops"
   | "entitlement"
   | "evaluation"

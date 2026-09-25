@@ -15,6 +15,7 @@ import { dataPrivacyServer } from "@langwatch/data-privacy-process";
 import { dataRetentionServer } from "@langwatch/data-retention-process";
 import { datasetServer } from "@langwatch/dataset-process";
 import { billingServer } from "@langwatch/enterprise-billing-process";
+import { enterpriseGatewayServer } from "@langwatch/enterprise-gateway-process";
 import { governanceServer } from "@langwatch/enterprise-governance-process";
 import { licensingServer } from "@langwatch/enterprise-licensing-process";
 import { managedProviderServer } from "@langwatch/enterprise-managed-provider-process";
@@ -74,6 +75,7 @@ export const serverModules = [
   dataPrivacyServer,
   dataRetentionServer,
   datasetServer,
+  enterpriseGatewayServer,
   enterpriseOpsServer,
   entitlementServer,
   evaluationServer,

@@ -31,6 +31,7 @@
     "@langwatch/data-retention-process": "workspace:*",
     "@langwatch/dataset-process": "workspace:*",
     "@langwatch/enterprise-billing-process": "workspace:*",
+    "@langwatch/enterprise-gateway-process": "workspace:*",
     "@langwatch/enterprise-governance-process": "workspace:*",
     "@langwatch/enterprise-licensing-process": "workspace:*",
     "@langwatch/enterprise-managed-provider-process": "workspace:*",
