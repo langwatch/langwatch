@@ -39,8 +39,7 @@ Feature: Experiment service boundary
     And the app keeps routing, polling, feature gates, drawers, and named rendering actions
 
   # ── The SDK's create-or-take door: POST /api/experiment/init ─────────
-  # Every refusal below is a body an SDK parses, so the shape is the
-  # contract, not only the status.
+  # Every refusal below is a handled error in the canonical envelope.
 
   @unimplemented
   # The credential port is the process's, and the composition that binds it is
@@ -63,13 +62,13 @@ Feature: Experiment service boundary
   Scenario: A body that is not valid JSON gets the door's own bare sentence
     Given a request carrying a body that is not valid JSON
     When the experiment create-or-take door answers
-    Then it refuses at 400 with a message field and no validation report
+    Then it refuses at 400 with code "malformed_request"
 
   @unit
   Scenario: A body naming neither identifier is refused with the validation sentence
     Given a request naming neither an experiment slug nor an experiment id
     When the experiment create-or-take door answers
-    Then it refuses at 400 with an error field carrying the schema's own sentence
+    Then it refuses at 422 with code "validation_error"
     And nothing is created
 
   @unit
@@ -77,7 +76,7 @@ Feature: Experiment service boundary
     Given a project whose plan already holds its maximum experiments
     When it calls the experiment create-or-take door with a free slug
     Then it refuses at 403
-    And the body carries the error code, the limit type, the current count and the maximum
+    And the body carries code "resource_limit_exceeded" with limitType, current and max in meta
 
   @unit
   Scenario: A free slug creates the experiment and answers the app path

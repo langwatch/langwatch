@@ -120,6 +120,51 @@ describe("given the DSPy optimizer's step log door", () => {
     });
   });
 
+  describe("when the body is not valid JSON", () => {
+    it("refuses at 422 with the validation code and stores nothing", async () => {
+      const listModelCosts = vi.fn();
+      const send = mountLogSteps({ stubs: { listModelCosts } });
+
+      const response = await send("[not json");
+
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ code: "validation_error" });
+      expect(listModelCosts).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the body is not a batch of steps", () => {
+    it("refuses at 422 with the validation code and stores nothing", async () => {
+      const listModelCosts = vi.fn();
+      const send = mountLogSteps({ stubs: { listModelCosts } });
+
+      const response = await send(JSON.stringify({ steps: [] }));
+
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ code: "validation_error" });
+      expect(listModelCosts).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when storing a step fails for a reason nobody handled", () => {
+    it("answers the generic unknown error, never the underlying detail", async () => {
+      const send = mountLogSteps({
+        stubs: {
+          listModelCosts: async () => {
+            throw new Error("connection to db-7.internal refused");
+          },
+        },
+      });
+
+      const response = await send("[]");
+      const body = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(body).toMatchObject({ code: "internal_error" });
+      expect(JSON.stringify(body)).not.toContain("db-7.internal");
+    });
+  });
+
   describe("when a key that may manage experiments sends a batch", () => {
     it("stores it under the key's own project and answers ok", async () => {
       const listModelCosts = vi.fn(async () => []);

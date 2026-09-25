@@ -81,15 +81,6 @@ export const slackAutomationRestInputSchema = z.object({
 /** The one sentence `/api/trigger/slack` answers a successful create with. */
 export const slackAutomationRestCreatedSchema = z.object({ message: z.string() });
 
-/** The refusals `/api/trigger/slack` publishes, in the shape its callers parse. */
-export const slackAutomationRestRefusalSchema = z.object({
-  message: z.string(),
-  errors: z
-    .array(z.record(z.string(), z.unknown()))
-    .optional()
-    .describe("The individual validation failures, when present"),
-});
-
 /** What the mail client reads back from `/api/unsubscribe`. */
 export const unsubscribeRestAcknowledgedSchema = z.object({ ok: z.boolean() });
 

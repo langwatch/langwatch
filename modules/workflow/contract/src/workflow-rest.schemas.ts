@@ -27,8 +27,6 @@ export const workflowRestDetailSchema = z.object({
   platformUrl: z.string().url(),
 });
 
-/** The bare `{ error }` body this family's refusals have always carried. */
-export const workflowRestRefusalSchema = z.object({ error: z.string() });
 
 /** The one path parameter every item address of this family names. */
 export const workflowRestParamsSchema = z.object({ id: z.string().min(1) });

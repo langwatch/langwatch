@@ -170,9 +170,9 @@ describe("POST /api/workflows/:id/evaluate", () => {
         dataset_id: "dataset_123",
       });
 
-      // The body fails the request schema's mutual-exclusion refine: a
-      // canonical 422, not the handler's own 400 refusal (asserted below).
+      // The body fails the request schema's mutual-exclusion refine.
       expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ code: "validation_error" });
       expect(triggerEvaluation).not.toHaveBeenCalled();
     });
   });
@@ -189,6 +189,7 @@ describe("POST /api/workflows/:id/evaluate", () => {
       );
 
       expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ code: "forbidden" });
       expect(triggerEvaluation).not.toHaveBeenCalled();
     });
   });
@@ -206,6 +207,7 @@ describe("POST /api/workflows/:id/evaluate", () => {
       );
 
       expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ code: "workflow_not_found" });
     });
   });
 

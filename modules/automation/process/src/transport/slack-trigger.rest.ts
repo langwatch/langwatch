@@ -3,12 +3,11 @@
  * `/api/triggers`, kept at its own path and body shape since callers
  * were written against them. Both dispatch through the SAME {@link AutomationApi}.
  */
-import { defineRestRouter, documentedResponses, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import {
   AutomationApi,
   slackAutomationRestCreatedSchema,
   slackAutomationRestInputSchema,
-  slackAutomationRestRefusalSchema,
 } from "@langwatch/automation-contract";
 
 /**
@@ -32,10 +31,12 @@ export const slackAutomationRest = defineRestRouter(AutomationApi)
       "The `/api/triggers` family supersedes this narrower form, which stays for callers " +
       "written against it.",
     tags: ["Triggers"],
-    responses: documentedResponses({
-      400: slackAutomationRestRefusalSchema,
-      401: slackAutomationRestRefusalSchema,
-    }),
+    errors: [
+      { status: 400, description: "The body was not valid JSON" },
+      { status: 401, description: "Missing or invalid API key" },
+      { status: 403, description: "The API key lacks triggers:manage" },
+      { status: 422, description: "The body failed validation" },
+    ],
   })
   .handle(async ({ app, input, scope }) => {
     await app.create({

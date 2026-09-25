@@ -1,6 +1,6 @@
 /**
  * Tests POST /api/experiment/init behind the project door: credential refusals as handled
- * errors in the canonical envelope, the door's own sentences, and success.
+ * errors in the canonical envelope, body and plan refusals the same way, and success.
  * @vitest-environment node
  */
 import { ProjectInvalidCredentialsError, ProjectMissingCredentialsError } from "@langwatch/api";
@@ -200,28 +200,28 @@ describe("given the SDK's experiment create-or-take door", () => {
 
   describe("when the body is not valid JSON", () => {
     /** @scenario "A body that is not valid JSON gets the door's own bare sentence" */
-    it("refuses at 400 with a message field and no validation report", async () => {
+    it("refuses at 400 with the malformed-request code", async () => {
       const findOrCreateForRun = vi.fn();
       const send = mountInit({ stubs: { findOrCreateForRun } });
 
       const response = await send("{not json");
 
       expect(response.status).toBe(400);
-      expect(await response.json()).toEqual({ message: "Bad request" });
+      expect(await response.json()).toMatchObject({ code: "malformed_request" });
       expect(findOrCreateForRun).not.toHaveBeenCalled();
     });
   });
 
   describe("when the body names neither identifier", () => {
     /** @scenario "A body naming neither identifier is refused with the validation sentence" */
-    it("refuses at 400 with an error field carrying the schema's own sentence", async () => {
+    it("refuses at 422 with the validation code", async () => {
       const findOrCreateForRun = vi.fn();
       const send = mountInit({ stubs: { findOrCreateForRun } });
 
       const response = await send(JSON.stringify({ experiment_type: "DSPY" }));
 
-      expect(response.status).toBe(400);
-      expect(await response.json()).toMatchObject({ error: expect.any(String) });
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ code: "validation_error" });
       expect(findOrCreateForRun).not.toHaveBeenCalled();
     });
   });
@@ -240,12 +240,9 @@ describe("given the SDK's experiment create-or-take door", () => {
       const response = await send(FREE_SLUG);
 
       expect(response.status).toBe(403);
-      expect(await response.json()).toEqual({
-        error: "resource_limit_exceeded",
-        message: "Experiment limit reached",
-        limitType: "experiments",
-        current: 10,
-        max: 10,
+      expect(await response.json()).toMatchObject({
+        code: "resource_limit_exceeded",
+        meta: { limitType: "experiments", current: 10, max: 10 },
       });
     });
   });

@@ -7,26 +7,21 @@ import {
   defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
+  ForbiddenError,
   projectRestFacts,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
-import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import {
   WorkflowApi,
-  WorkflowNotFoundError,
-  WorkflowVersionRequiredError,
   workflowRestArchivedSchema,
   workflowRestDetailSchema,
   workflowRestEvaluateSchema,
   workflowRestEvaluationStartedSchema,
   workflowRestParamsSchema,
-  workflowRestRefusalSchema,
   workflowRestUpdateSchema,
   type Workflow,
-  type WorkflowEvaluationRequest,
   type WorkflowRestDetail,
-  type WorkflowRestUpdate,
 } from "@langwatch/workflow-contract";
 import { z } from "zod";
 
@@ -55,117 +50,9 @@ function toWorkflowResponse(workflow: Workflow): Omit<WorkflowRestDetail, "platf
   };
 }
 
-/** The 404 body a workflow this project does not hold has always answered. */
-const NOT_FOUND = { status: 404, body: { error: "Workflow not found" } } as const;
-
-/**
- * The refusals the evaluations pipeline names for itself, each a handled error
- * carrying the status it is owed, published in the bare `{ error }` body.
- */
-function findEvaluationRefusal(
-  error: unknown,
-): Readonly<{ status: 400 | 404; body: { error: string } }> | null {
-  if (!HandledError.isHandled(error)) return null;
-
-  if (error.httpStatus === 404) return { status: 404, body: { error: error.message } };
-  if (error.httpStatus === 400) return { status: 400, body: { error: error.message } };
-
-  return null;
-}
-
 /** Where one workflow opens in the Studio. */
 function studioUrl(app: WorkflowApi, projectSlug: string, workflowId: string): string {
   return app.platformUrl({ projectSlug, path: `/studio/${workflowId}` });
-}
-
-/** The row this address names, or the 404 a project that does not hold it answers. */
-async function readWorkflow(params: {
-  app: WorkflowApi;
-  id: string;
-  projectId: string;
-  projectSlug: string;
-}): Promise<Readonly<{ status: 200; body: WorkflowRestDetail }> | typeof NOT_FOUND> {
-  try {
-    const workflow = await params.app.getById({ id: params.id, projectId: params.projectId });
-
-    return { status: 200, body: wireOf({ workflow, ...params }) };
-  } catch (error) {
-    return notFoundOr(error);
-  }
-}
-
-/** A partial change to a workflow's own metadata, applied in its project. */
-async function writeWorkflow(params: {
-  app: WorkflowApi;
-  id: string;
-  projectId: string;
-  projectSlug: string;
-  changes: WorkflowRestUpdate;
-}): Promise<Readonly<{ status: 200; body: WorkflowRestDetail }> | typeof NOT_FOUND> {
-  const { app, id, projectId } = params;
-
-  try {
-    await app.assertInProject({ workflowId: id, projectId });
-
-    const workflow = await app.update({ id, projectId, ...params.changes });
-
-    return { status: 200, body: wireOf({ workflow, ...params }) };
-  } catch (error) {
-    return notFoundOr(error);
-  }
-}
-
-/** The soft delete, answered with the id it archived. */
-async function archiveWorkflow(params: {
-  app: WorkflowApi;
-  id: string;
-  projectId: string;
-}): Promise<Readonly<{ status: 200; body: { id: string; archived: boolean } }> | typeof NOT_FOUND> {
-  try {
-    await params.app.archive({ id: params.id, projectId: params.projectId });
-
-    return { status: 200, body: { id: params.id, archived: true } };
-  } catch (error) {
-    return notFoundOr(error);
-  }
-}
-
-/** One evaluation run started, or the refusal the pipeline named for it. */
-async function startEvaluation(params: {
-  app: WorkflowApi;
-  request: WorkflowEvaluationRequest;
-}): Promise<
-  | Readonly<{ status: 200; body: z.infer<typeof workflowRestEvaluationStartedSchema> }>
-  | Readonly<{ status: 400 | 404; body: { error: string } }>
-> {
-  try {
-    const started = await params.app.triggerEvaluation(params.request);
-
-    return {
-      status: 200,
-      body: {
-        run_id: started.runId,
-        run_url: started.runUrl,
-        workflow_version_id: started.workflowVersionId,
-        version: started.version,
-      },
-    };
-  } catch (error) {
-    if (error instanceof WorkflowVersionRequiredError) throw error;
-
-    const refusal = findEvaluationRefusal(error);
-
-    if (refusal) return refusal;
-
-    return notFoundOr(error);
-  }
-}
-
-/** A workflow the project does not hold reads as a 404; anything else is a fault. */
-function notFoundOr(error: unknown): typeof NOT_FOUND {
-  if (error instanceof WorkflowNotFoundError) return NOT_FOUND;
-
-  throw error;
 }
 
 function wireOf(params: {
@@ -211,18 +98,17 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
       .get("/:id", "getApiWorkflowsById")
       .withParams(workflowRestParamsSchema)
       .withPermission("workflows:view")
-      .responds({ 200: workflowRestDetailSchema, 404: workflowRestRefusalSchema })
-      .withDocs({ description: "Get a workflow by its ID" })
+      .withOutput(workflowRestDetailSchema)
+      .withDocs({
+        description: "Get a workflow by its ID",
+        errors: [{ status: 404, description: "The project holds no workflow with this id" }],
+      })
       .withMiddleware(projectRestFacts)
-      .handle(({ app, input, scope }, project) => {
+      .handle(async ({ app, input, scope }, project) => {
         logger.info({ projectId: scope.id, workflowId: input.id }, "Getting workflow");
+        const workflow = await app.getById({ id: input.id, projectId: scope.id });
 
-        return readWorkflow({
-          app,
-          id: input.id,
-          projectId: scope.id,
-          projectSlug: project.projectSlug,
-        });
+        return wireOf({ app, workflow, projectSlug: project.projectSlug });
       })
 
       // Editing metadata on a workflow that already exists is an `:update`.
@@ -231,32 +117,35 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
       .withParams(workflowRestParamsSchema)
       .withInput(workflowRestUpdateSchema)
       .withPermission("workflows:update")
-      .responds({ 200: workflowRestDetailSchema, 404: workflowRestRefusalSchema })
-      .withDocs({ description: "Update a workflow's metadata (name, icon, description)" })
+      .withOutput(workflowRestDetailSchema)
+      .withDocs({
+        description: "Update a workflow's metadata (name, icon, description)",
+        errors: [{ status: 404, description: "The project holds no workflow with this id" }],
+      })
       .withMiddleware(projectRestFacts)
-      .handle(({ app, input, scope }, project) => {
+      .handle(async ({ app, input, scope }, project) => {
         const { id, ...changes } = input;
         logger.info({ projectId: scope.id, workflowId: id }, "Updating workflow");
+        await app.assertInProject({ workflowId: id, projectId: scope.id });
+        const workflow = await app.update({ id, projectId: scope.id, ...changes });
 
-        return writeWorkflow({
-          app,
-          id,
-          projectId: scope.id,
-          projectSlug: project.projectSlug,
-          changes,
-        });
+        return wireOf({ app, workflow, projectSlug: project.projectSlug });
       })
 
       // Archiving deliberately stays at `:manage`.
       .delete("/:id", "deleteApiWorkflowsById")
       .withParams(workflowRestParamsSchema)
       .withPermission("workflows:manage")
-      .responds({ 200: workflowRestArchivedSchema, 404: workflowRestRefusalSchema })
-      .withDocs({ description: "Archive (soft-delete) a workflow" })
-      .handle(({ app, input, scope }) => {
+      .withOutput(workflowRestArchivedSchema)
+      .withDocs({
+        description: "Archive (soft-delete) a workflow",
+        errors: [{ status: 404, description: "The project holds no workflow with this id" }],
+      })
+      .handle(async ({ app, input, scope }) => {
         logger.info({ projectId: scope.id, workflowId: input.id }, "Archiving workflow");
+        await app.archive({ id: input.id, projectId: scope.id });
 
-        return archiveWorkflow({ app, id: input.id, projectId: scope.id });
+        return { id: input.id, archived: true };
       })
 
       // Running a workflow is not administering it: the committed version, its
@@ -268,12 +157,7 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
       .withParams(workflowRestParamsSchema)
       .withInput(workflowRestEvaluateSchema)
       .withPermission("workflows:create")
-      .responds({
-        200: workflowRestEvaluationStartedSchema,
-        400: workflowRestRefusalSchema,
-        403: workflowRestRefusalSchema,
-        404: workflowRestRefusalSchema,
-      })
+      .withOutput(workflowRestEvaluationStartedSchema)
       .withDocs({
         description:
           "Trigger an evaluation run of a workflow's committed version through " +
@@ -281,31 +165,42 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
           "inline data, or a platform dataset id; parameters bind as constant " +
           "entry inputs on every row. Returns a run id and a results URL to poll " +
           "or open in the browser.",
+        errors: [
+          {
+            status: 400,
+            description: "The workflow has no committed version, or the run could not start",
+          },
+          { status: 403, description: "The API key cannot read the evaluation run it would start" },
+          { status: 404, description: "The project holds no such workflow or dataset" },
+          { status: 422, description: "The body failed validation" },
+        ],
       })
       .withMiddleware(projectRestFacts, workflowEvaluationRunCeiling)
-      .handle(({ app, input, scope }, project, mayReadRuns) => {
-        if (!mayReadRuns) {
-          return { status: 403, body: { error: "This key cannot read evaluation runs" } } as const;
-        }
+      .handle(async ({ app, input, scope }, project, mayReadRuns) => {
+        if (!mayReadRuns) throw new ForbiddenError("This key cannot read evaluation runs");
 
         logger.info(
           { projectId: scope.id, workflowId: input.id },
           "Triggering workflow evaluation via API",
         );
 
-        return startEvaluation({
-          app,
-          request: {
-            projectId: scope.id,
-            projectSlug: project.projectSlug,
-            workflowId: input.id,
-            versionId: input.version_id,
-            data: input.data,
-            datasetId: input.dataset_id,
-            parameters: input.parameters,
-            rowIndices: input.row_indices,
-          },
+        const started = await app.triggerEvaluation({
+          projectId: scope.id,
+          projectSlug: project.projectSlug,
+          workflowId: input.id,
+          versionId: input.version_id,
+          data: input.data,
+          datasetId: input.dataset_id,
+          parameters: input.parameters,
+          rowIndices: input.row_indices,
         });
+
+        return {
+          run_id: started.runId,
+          run_url: started.runUrl,
+          workflow_version_id: started.workflowVersionId,
+          version: started.version,
+        };
       })
       .build()
   );
