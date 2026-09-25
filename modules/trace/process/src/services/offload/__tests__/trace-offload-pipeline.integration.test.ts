@@ -192,9 +192,7 @@ describe("given a span field value exceeds the offload threshold (IO_PREVIEW_BYT
   });
 
   describe("when TraceProjectionLeanService.leanForProjection is applied (simulating dispatch interposition)", () => {
-    /**
-     * @scenario event_log carries full content; projection queue carries the lean shape
-     */
+    /** @scenario "event_log carries the full event content; projection queue carries the lean shape" */
     it("the lean event carries a preview within the IO_PREVIEW_BYTES budget for langwatch.output", () => {
       const previewValue = leanAttrs["langwatch.output"] ?? "";
       expect(Buffer.byteLength(previewValue, "utf-8")).toBeLessThanOrEqual(

@@ -673,8 +673,7 @@ describe("buildCodingAgentTranscript for codex 0.146 sessions", () => {
     );
 
   describe("given tool_result log events carrying arguments and output", () => {
-    /** @scenario "A codex session shows its prompt and tool calls with real
-     * input and output" */
+    /** @scenario "A codex session shows its prompt and its tool calls with real input and output" */
     it("renders each tool call with its name, input, and output", () => {
       const transcript = buildCodingAgentTranscript({
         spans: [],
@@ -1287,8 +1286,7 @@ describe("given a codex trace whose recovered conversation and prompt event desc
     );
 
   describe("when the session transcript is derived", () => {
-    /** @scenario "A prompt recovered from transcript is not shown again as its
-     * redacted event" */
+    /** @scenario "A prompt recovered from the transcript is not shown again as its redacted event" */
     it("shows the prompt once, with its text", () => {
       const transcript = buildCodingAgentTranscript({
         spans: [
@@ -1311,8 +1309,7 @@ describe("given a codex trace whose recovered conversation and prompt event desc
       });
     });
 
-    /** @scenario "A prompt recovered from transcript is not shown again as its
-     * redacted event" */
+    /** @scenario "A prompt recovered from the transcript is not shown again as its redacted event" */
     it("keeps the redacted event when no conversation was recovered", () => {
       const transcript = buildCodingAgentTranscript({
         spans: [],

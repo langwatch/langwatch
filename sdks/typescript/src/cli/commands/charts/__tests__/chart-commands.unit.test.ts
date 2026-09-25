@@ -362,10 +362,7 @@ describe("the chart family's machine output", () => {
 
 describe("the chart family while the workbench switch is off", () => {
   describe("when the platform answers every verb with lwql_not_enabled", () => {
-    /**
-     * @scenario "Every CLI verb this slice adds refuses while the workbench
-     * switch is off, and writes nothing"
-     */
+    /** @scenario "Every CLI verb this slice adds refuses while the workbench switch is off, and writes nothing" */
     it("every verb exits non-zero, surfacing the refusal instead of swallowing it", async () => {
       const flagOff = new ChartsApiError("Failed: lwql_not_enabled", "workbench switch off");
       mocks.list.mockRejectedValue(flagOff);

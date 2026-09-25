@@ -653,10 +653,7 @@ describe("prefetchWithFixture", () => {
         return concrete;
       };
 
-      /**
-       * @scenario "A latest alias on the scenario simulator model expands to a concrete model at
-       * run time"
-       */
+      /** @scenario "A latest alias on the scenario simulator model expands to a concrete model at run time" */
       it("expands a scenario simulator alias before preparing params", async () => {
         const deps = createMockDeps({
           scenarioFetcher: {
@@ -683,10 +680,7 @@ describe("prefetchWithFixture", () => {
         expect(result.data.simulatorModelParams?.model).toBe(concreteFor("openai/latest"));
       });
 
-      /**
-       * @scenario "A latest alias on the scenario judge model expands to a concrete model at run
-       * time"
-       */
+      /** @scenario "A latest alias on the scenario judge model expands to a concrete model at run time" */
       it("expands a scenario judge alias before preparing params", async () => {
         const deps = createMockDeps({
           scenarioFetcher: {
@@ -713,10 +707,7 @@ describe("prefetchWithFixture", () => {
         expect(result.data.judgeModelParams?.model).toBe(concreteFor("anthropic/latest-mini"));
       });
 
-      /**
-       * @scenario "A latest alias on the run plan simulator model expands to a concrete model at
-       * run time"
-       */
+      /** @scenario "A latest alias on the run plan simulator model expands to a concrete model at run time" */
       it("expands a run plan simulator alias before preparing params", async () => {
         const deps = createMockDeps({
           suiteConfigFetcher: {
@@ -743,10 +734,7 @@ describe("prefetchWithFixture", () => {
         expect(result.data.simulatorModelParams?.model).toBe(concreteFor("openai/latest-mini"));
       });
 
-      /**
-       * @scenario "A latest alias on the run plan judge model expands to a concrete model at run
-       * time"
-       */
+      /** @scenario "A latest alias on the run plan judge model expands to a concrete model at run time" */
       it("expands a run plan judge alias before preparing params", async () => {
         const deps = createMockDeps({
           suiteConfigFetcher: {
@@ -776,10 +764,7 @@ describe("prefetchWithFixture", () => {
 
     describe("given a run plan with no model override", () => {
       describe("when prefetching a scenario in that plan with no override", () => {
-        /**
-         * @scenario "A run plan with no model override falls back to the scenario or project
-         * default"
-         */
+        /** @scenario "A run plan with no model override falls back to the scenario or project default" */
         it("falls back to the default simulator and judge models", async () => {
           const deps = createMockDeps({
             suiteConfigFetcher: {
@@ -2133,10 +2118,7 @@ describe("prefetchWithFixture", () => {
         ],
       };
 
-      /**
-       * @scenario "Situation and criteria render params references before the simulated user and
-       * judge see them"
-       */
+      /** @scenario "Situation and criteria render params references before the simulated user and judge see them" */
       it("hands on a situation and criteria already rendered against the run's values", async () => {
         const deps = depsForScenario(parameterisedScenario);
 
@@ -2155,10 +2137,7 @@ describe("prefetchWithFixture", () => {
         expect(result.data.scenario.criteria).toEqual(["Offers the platinum refund window"]);
       });
 
-      /**
-       * @scenario "Situation and criteria render params references before the simulated user and
-       * judge see them"
-       */
+      /** @scenario "Situation and criteria render params references before the simulated user and judge see them" */
       it("carries the resolved values on the job", async () => {
         const deps = depsForScenario(parameterisedScenario);
 

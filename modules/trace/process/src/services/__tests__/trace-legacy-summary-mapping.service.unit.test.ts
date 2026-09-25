@@ -294,8 +294,7 @@ describe("mapTraceSummaryToTrace — the trace's reported start", () => {
   });
 
   describe("when the trace's only signal is a log record", () => {
-    /** @scenario "A trace with no spans reports the time its first signal
-     * arrived rather than 1970" */
+    /** @scenario "A trace with no spans reports the time its first signal arrived rather than 1970" */
     it("reports the time its first signal was accepted", () => {
       // No span ever seeded the timing baseline, so before the storage anchor
       // existed this rendered as 1970 in the list and the drawer.
@@ -471,8 +470,7 @@ describe("mapTraceSummaryToTrace — reserved token metrics", () => {
 
 describe("mapAttributesToMetadata — otel_log_record_count sibling", () => {
   describe("when the fold stamped a log record count", () => {
-    /** @scenario existing metadata keys flow untouched and
-     * otel_log_record_count is added as a sibling */
+    /** @scenario "existing metadata keys flow untouched and otel_log_record_count is added as a sibling" */
     it("keeps the raw reserved key untouched and adds the clearly named sibling", () => {
       const summary = makeSummary({
         attributes: { "langwatch.reserved.log_record_count": "56353" },

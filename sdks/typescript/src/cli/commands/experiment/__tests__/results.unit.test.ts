@@ -414,7 +414,7 @@ describe("experimentResultsCommand()", () => {
         });
       });
 
-      /** @scenario "Comparison verdict reaches CLI despite no single target" */
+      /** @scenario "A comparison verdict reaches the CLI even though it belongs to no single target" */
       it("keeps the verdicts that belong to no single target", () => {
         const evaluations = (result as any).data.evaluations;
         const verdicts = evaluations.filter((e: any) => e.evaluator === "target_comparison");

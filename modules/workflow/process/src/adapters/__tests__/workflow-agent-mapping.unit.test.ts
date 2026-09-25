@@ -531,7 +531,7 @@ describe("WorkflowAgentMappingService", () => {
   });
 
   describe("when the entry node declares a field with no downstream edge (unwired)", () => {
-    /** @scenario Auto-compute includes unwired entry fields */
+    /** @scenario "Auto-compute on workflow save includes an unwired entry field in scenarioMappings" */
     it("includes the unwired field in the auto-computed scenarioMappings", async () => {
       // Entry node declares "new_field" but no downstream edge exists for it.
       const dsl = buildUnwiredDSL({

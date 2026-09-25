@@ -48,7 +48,7 @@ describe("shouldFilterCodingAgentSpan", () => {
         ).toBe(false);
       });
 
-      /** @scenario "Codex members spans are filtered out at ingestion" */
+      /** @scenario "Codex infrastructure spans are filtered out at ingestion" */
       it("drops infra spans (session init, app server, websocket, plugins)", () => {
         for (const name of [
           "session_init.state_db",
@@ -85,7 +85,7 @@ describe("shouldFilterCodingAgentSpan", () => {
         }
       });
 
-      /** @scenario "Opencode members spans are filtered out at ingestion" */
+      /** @scenario "Opencode infrastructure spans are filtered out at ingestion" */
       it("drops infra spans (sql, config, filesystem, auth, session)", () => {
         for (const name of [
           "sql.execute",

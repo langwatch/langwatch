@@ -77,7 +77,6 @@ beforeEach(() => {
 describe("saving a workbench chart", () => {
   describe("given no chart is open", () => {
     describe("when the member saves", () => {
-      /** @scenario "Save stores what is on screen, and saves again into the same chart" */
       it("creates one under the name they gave", async () => {
         const { result, onError } = mountHook();
 
@@ -103,7 +102,6 @@ describe("saving a workbench chart", () => {
 
   describe("given that chart is now the open one", () => {
     describe("when the member edits and saves again", () => {
-      /** @scenario "Save stores what is on screen, and saves again into the same chart" */
       it("writes back to it rather than creating a second", async () => {
         const { result } = mountHook();
         await act(async () => {
@@ -129,7 +127,6 @@ describe("saving a workbench chart", () => {
     });
 
     describe("when the member asks to save it as a new chart", () => {
-      /** @scenario "Save as a new chart leaves the one that was open alone" */
       it("creates a second one and works on that from then on", async () => {
         const { result } = mountHook();
         await act(async () => {

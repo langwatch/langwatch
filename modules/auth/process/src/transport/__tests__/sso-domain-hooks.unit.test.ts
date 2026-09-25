@@ -270,7 +270,7 @@ describe("signing in through a domain-matched organization's identity provider",
   });
 
   describe("given an existing user signs in through a provider the organization does not use", () => {
-    /** @scenario Existing user with wrong SSO provider gets pending flag */
+    /** @scenario "Existing user with wrong brokered SSO provider gets pending flag" */
     it("lets them in, and flags the account for setup", async () => {
       const { double: repo, mocks } = accountRepo({
         organization: { ...ACME, ssoProvider: "okta" },

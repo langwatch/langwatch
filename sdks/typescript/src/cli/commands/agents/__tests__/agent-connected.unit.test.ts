@@ -176,10 +176,7 @@ describe("listAgentsCommand()", () => {
       }
     });
 
-    /**
-     * @scenario "The owner column reads the owner of a personal agent or the
-     * host of a machine-scoped one"
-     */
+    /** @scenario "The owner column reads the owner of a personal agent or the host of a machine-scoped one" */
     it("reads the owner name, else the host label", () => {
       expect(agentOwnerLabel(connectedAgent({ owner: { userId: "u1", name: "Ada" } }))).toBe("Ada");
       expect(agentOwnerLabel(connectedAgent({ hostLabel: "ada-laptop" }))).toBe("ada-laptop");

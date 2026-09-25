@@ -99,10 +99,7 @@ describe("loginCommand", () => {
     beforeEach(() => setTTY(false));
 
     describe("when the command is invoked with no flags", () => {
-      /**
-       * @scenario `langwatch login` (no flags, NON-TTY) defaults to project
-       * login, never AI-tools
-       */
+      /** @scenario "`langwatch login` (no flags, NON-TTY) defaults to project login, never AI-tools" */
       it("keeps the project-login default but fails fast instead of polling a browser", async () => {
         await expect(loginCommand({})).rejects.toThrow("process.exit(1)");
 
@@ -155,10 +152,7 @@ describe("loginCommand", () => {
         });
       });
 
-      /**
-       * @scenario `langwatch login --project <slug>` resolves the key through
-       * the device session, no browser
-       */
+      /** @scenario "`langwatch login --project <slug>` resolves the key through the device session, no browser" */
       it("resolves the key through the session, writes .env, never opens a browser", async () => {
         // The slug path writes LANGWATCH_API_KEY into $CWD/.env; run it in a
         // scratch directory so the repo's own .env is never touched.

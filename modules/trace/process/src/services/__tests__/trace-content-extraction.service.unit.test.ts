@@ -358,8 +358,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
   });
 
   describe("when a content part has an unrecognised shape", () => {
-    /** @scenario "Content parts with an unrecognised shape cause the message to
-     * pass through unchanged" */
+    /** @scenario "Content parts with an unrecognised shape cause the message to pass through unchanged" */
     it("returns the event unchanged and no refs", async () => {
       const service = makeService();
 
@@ -465,10 +464,8 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
   });
 
   describe("when an event has an AI-SDK file+audio part (typescript scenario SDK shape)", () => {
-    /** @scenario "Raw realtime audio is wrapped into a playable container at
-     * store time" */
-    /** @scenario "Voice MESSAGE_SNAPSHOT with input_audio is accepted (201) and
-     * the audio is externalized" */
+    /** @scenario "Raw realtime audio is wrapped into a playable container at store time" */
+    /** @scenario "Voice MESSAGE_SNAPSHOT with input_audio is accepted (201) and the audio is externalized" */
     it("calls storeFromBytes with the audio mediaType and rewrites the part to {type:'input_audio', input_audio:{url, mimeType}}", async () => {
       const base64Payload = makeBase64Payload("PCM16_AUDIO_BYTES");
       const mimeType = "audio/pcm16";
@@ -675,8 +672,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
   });
 
   describe("when the event is a MESSAGE_SNAPSHOT with messages[] containing inline media", () => {
-    /** @scenario "Extractor handles MESSAGE_SNAPSHOT events with messages[] in
-     * addition to TEXT_MESSAGE_END events with single message" */
+    /** @scenario "Extractor handles MESSAGE_SNAPSHOT events with messages[] in addition to TEXT_MESSAGE_END events with single message" */
     it("walks every message in the messages array and rewrites inline parts", async () => {
       const base64 = makeBase64Payload("snapshot-payload");
       const service = makeService();
@@ -865,8 +861,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
   });
 
   describe("when an event has an AI-SDK image part with a base64 data URI (typescript scenario SDK shape)", () => {
-    /** @scenario "A simulated user message with an image attachment shows the
-     * image in the run conversation" */
+    /** @scenario "A simulated user message with an image attachment shows the image in the run conversation" */
     it("extracts the bytes and rewrites image to /api/files/<projectId>/<id>", async () => {
       const base64Payload = makeBase64Payload("WEBP_BYTES");
       const storedId = "stored-image-id";
@@ -934,8 +929,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
   });
 
   describe("when an event has an OpenAI file part with a data URI file_data (multimodal-files docs shape)", () => {
-    /** @scenario "A simulated user message with a document attachment stays
-     * available under its original filename" */
+    /** @scenario "A simulated user message with a document attachment stays available under its original filename" */
     it("extracts the bytes and rewrites the part to a binary reference preserving the filename", async () => {
       const base64Payload = makeBase64Payload("%PDF-1.4 fake pdf bytes");
       const storedId = "stored-openai-file-id";
@@ -1057,8 +1051,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
   });
 
   describe("when an event has an OpenAI file part with raw base64 audio file_data", () => {
-    /** @scenario "Raw-base64 audio file payloads resolve a playable audio type
-     * from the filename" */
+    /** @scenario "Raw-base64 audio file payloads resolve a playable audio type from the filename" */
     it("infers the audio mime type from the filename and routes through input_audio so the rewrite stays playable", async () => {
       const base64Payload = makeBase64Payload("RAW_WAV_BYTES");
       const storedId = "stored-raw-audio-id";

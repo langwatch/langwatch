@@ -50,8 +50,7 @@ const BATCH_PARAMS = {
 describe("trace-level derivations", () => {
   describe("given several subscriber invocations derive trace data for the same trace at one fold version", () => {
     describe("when they run within one coalesced batch", () => {
-      /** @scenario Repeated trace-level derivations within one fold version
-       * read stored spans once */
+      /** @scenario "Repeated trace-level derivations within one fold version read stored spans once" */
       it("reads the stored events once, not once per invocation", async () => {
         const reader = new CountingReader();
         const service = TraceEventDerivationService.create({ spans: reader });
@@ -61,8 +60,7 @@ describe("trace-level derivations", () => {
         expect(reader.eventReads).toBe(1);
       });
 
-      /** @scenario Repeated trace-level derivations within one fold version
-       * read stored spans once */
+      /** @scenario "Repeated trace-level derivations within one fold version read stored spans once" */
       it("shares the scenario-role-metrics read across invocations", async () => {
         const reader = new CountingReader();
         const service = ScenarioRoleMetricsDerivationService.create({

@@ -143,7 +143,7 @@ describe("writeVoiceCallRun", () => {
     });
 
     describe("when the turns carry per-exchange trace ids", () => {
-      /** @scenario "Browser call writes one trace per exchange; messages link to trace" */
+      /** @scenario "A finished browser call writes one trace per exchange and every message links to its exchange's trace" */
       it("sets trace_id on each message and lists the ids on the snapshot", async () => {
         const record = fakeRecord({
           turns: [

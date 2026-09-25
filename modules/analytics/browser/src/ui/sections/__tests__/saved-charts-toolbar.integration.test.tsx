@@ -46,7 +46,6 @@ function mount(overrides: Partial<Parameters<typeof SavedChartsToolbar>[0]> = {}
 describe("the saved chart toolbar", () => {
   describe("given nothing is open yet", () => {
     describe("when the member saves", () => {
-      /** @scenario "Save stores what is on screen, and saves again into the same chart" */
       it("asks for a name and creates a chart under it", async () => {
         const user = userEvent.setup();
         const handlers = mount();
@@ -90,7 +89,6 @@ describe("the saved chart toolbar", () => {
 
   describe("given a chart is open", () => {
     describe("when the member saves again", () => {
-      /** @scenario "Save stores what is on screen, and saves again into the same chart" */
       it("writes back to that chart without asking for a name again", async () => {
         const user = userEvent.setup();
         const handlers = mount({
@@ -112,7 +110,6 @@ describe("the saved chart toolbar", () => {
     });
 
     describe("when the member renames or deletes it", () => {
-      /** @scenario "A saved chart can be renamed or deleted from the list" */
       it("renames through the chart's own menu, starting from the name it has", async () => {
         const user = userEvent.setup();
         const handlers = mount({
@@ -138,14 +135,10 @@ describe("the saved chart toolbar", () => {
         });
       });
 
-      /**
-       * The menu that opens this dialog is only rendered while a chart is
+      /** The menu that opens this dialog is only rendered while a chart is
        * open, but the parent's state can change under the open dialog. Falling
        * through to Save would answer "rename this chart" by creating a second
-       * one — the exact outcome the rest of this file exists to prevent.
-       *
-       * @scenario "A saved chart can be renamed or deleted from the list"
-       */
+       * one — the exact outcome the rest of this file exists to prevent. */
       it("refuses the rename, rather than saving a new chart, when the chart closes under the dialog", async () => {
         const user = userEvent.setup();
         const handlers = {
@@ -185,7 +178,6 @@ describe("the saved chart toolbar", () => {
         expect(handlers.onSave).not.toHaveBeenCalled();
       });
 
-      /** @scenario "A saved chart can be renamed or deleted from the list" */
       it("deletes through the same menu, once the member confirms", async () => {
         const user = userEvent.setup();
         const handlers = mount({
@@ -204,7 +196,6 @@ describe("the saved chart toolbar", () => {
         expect(handlers.onDelete).toHaveBeenCalledWith("chart-1");
       });
 
-      /** @scenario "Save as a new chart leaves the one that was open alone" */
       it("detaches the open chart when they ask for a new one", async () => {
         const user = userEvent.setup();
         const handlers = mount({
@@ -239,7 +230,6 @@ describe("the saved chart toolbar", () => {
 
   describe("given the project has saved charts", () => {
     describe("when the member opens the list", () => {
-      /** @scenario "Open restores a saved chart's query, parameters and specification" */
       it("lists them and opens the one that is picked", async () => {
         const user = userEvent.setup();
         const handlers = mount();

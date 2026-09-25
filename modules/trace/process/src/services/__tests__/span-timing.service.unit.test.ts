@@ -218,8 +218,7 @@ describe("SpanTimingService", () => {
     });
 
     describe("when a span ends before it starts", () => {
-      /** @scenario "A span that ends before it starts does not give the trace
-       * a negative duration" */
+      /** @scenario "A span that ends before it starts does not give the trace a negative duration" */
       it("reports no duration rather than a negative one", () => {
         const result = service.accumulateTiming({
           state: makeState(),
@@ -230,8 +229,7 @@ describe("SpanTimingService", () => {
         expect(result.totalDurationMs).toBe(0);
       });
 
-      /** @scenario "A span that ends before it starts does not give the trace
-       * a negative duration" */
+      /** @scenario "A span that ends before it starts does not give the trace a negative duration" */
       it("does not shorten a trace a real span had already timed", () => {
         const state = makeState({ occurredAt: 1000, totalDurationMs: 4000 });
 

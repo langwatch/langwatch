@@ -773,10 +773,7 @@ describe("SerializedHttpAgentAdapter", () => {
     };
 
     describe("when the response carries a value at the session path", () => {
-      /**
-       * @scenario "An HTTP agent receives the session it returned in the url, the headers and the
-       * body"
-       */
+      /** @scenario "An HTTP agent receives the session it returned in the url, the headers and the body" */
       /** @scenario "An HTTP agent renders an empty session on the first turn" */
       /** @scenario "Two threads of one HTTP agent run do not share a session" */
       it("renders it empty on the first turn, then in the url, a header and the body, and not for another thread", async () => {

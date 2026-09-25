@@ -138,10 +138,7 @@ describe("CLI surfaces meaningful error messages from the API", () => {
   });
 
   describe("when prompt sync hits a 409 conflict for an active handle", () => {
-    /**
-     * @scenario Sync surfaces a specific conflict message when a handle is
-     * already in use by an active prompt
-     */
+    /** @scenario "Sync surfaces a specific conflict message when a handle is already in use by an active prompt" */
     it("shows the descriptive conflict message, not 'Internal server error'", async () => {
       await runCli(["prompt", "init"], testDir);
       await runCli(["prompt", "create", "my-prompt"], testDir);
@@ -171,10 +168,7 @@ describe("CLI surfaces meaningful error messages from the API", () => {
   });
 
   describe("when the API returns a 500 with a non-generic message field", () => {
-    /**
-     * @scenario API errors surface a meaningful message, not the bare "Internal
-     * server error" label
-     */
+    /** @scenario 'API errors surface a meaningful message, not the bare "Internal server error" label' */
     it("propagates the descriptive message instead of just the kind label", async () => {
       await runCli(["prompt", "init"], testDir);
       await runCli(["prompt", "create", "my-prompt"], testDir);

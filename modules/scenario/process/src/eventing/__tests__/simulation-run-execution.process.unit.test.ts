@@ -396,7 +396,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
       return { evolution, payload };
     }
 
-    /** @scenario "Resolved parameter values recorded on run and shown in detail drawer" */
+    /** @scenario "Resolved parameter values are recorded on the run and shown in the run detail drawer" */
     it("forwards them onto the execute intent", () => {
       const { evolution, payload } = executeIntentFor({
         langwatch: { targetReferenceId: "agent_1" },

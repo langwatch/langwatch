@@ -161,8 +161,7 @@ describe("StrandsCanonicaliserService", () => {
       ]);
     });
 
-    /** @scenario 'A system-role event is promoted to the system instruction
-     * and dropped from input' */
+    /** @scenario "A system-role event is promoted to the system instruction and dropped from input" */
     it.each([
       [
         "the system event is first",

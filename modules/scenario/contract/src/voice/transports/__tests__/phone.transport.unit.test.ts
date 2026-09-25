@@ -574,10 +574,7 @@ describe("phoneTransport", () => {
         expect(call).not.toHaveProperty("shouldRecord");
       });
 
-      /**
-       * @scenario "The default phone factory still delegates connect and disconnect to the SDK
-       * adapter"
-       */
+      /** @scenario "The default phone factory still delegates connect and disconnect to the SDK adapter" */
       it("still delegates connect and disconnect to the SDK adapter", async () => {
         const connect = vi.fn(async () => {});
         const disconnect = vi.fn(async () => {});

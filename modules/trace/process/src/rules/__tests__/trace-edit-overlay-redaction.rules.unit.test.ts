@@ -148,8 +148,7 @@ describe("redacting a correction for its reader", () => {
       expect(redacted.trace).toBeUndefined();
     });
 
-    /** @scenario "A viewer who may not read captured content is handed only
-     * the structural edits" */
+    /** @scenario "A viewer who may not read captured content is handed only the structural edits" */
     it("hands over the structural edits and none of the corrected content", () => {
       const redacted = redactPatchForViewer({
         patch: contentAndStructurePatch,

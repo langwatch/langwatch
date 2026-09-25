@@ -189,7 +189,6 @@ describe("governance pages for a delegated viewer", () => {
       expect(screen.getByText("CLI session policy")).toBeTruthy();
     });
 
-    /** @scenario "A panel query is not sent when the viewer cannot read it" */
     it("sends no activity-monitor query", () => {
       renderPage({ Page: GovernanceOverviewPage, permissions: DELEGATED_VIEWER });
 

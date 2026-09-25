@@ -253,10 +253,7 @@ describe("the agent client, given a fake platform", () => {
   });
 
   describe("when an agent is defined before the register is answered", () => {
-    /**
-     * @scenario "An agent defined before the registration is answered still
-     * reaches the platform"
-     */
+    /** @scenario "An agent defined before the registration is answered still reaches the platform" */
     it("opens a new socket whose register lists both agents", async () => {
       define(async () => "a", { name: "alpha" });
       const first = await platform.nextConnection();
@@ -271,10 +268,7 @@ describe("the agent client, given a fake platform", () => {
   });
 
   describe("when an agent is defined after the register is answered", () => {
-    /**
-     * @scenario "An agent defined after the registration is answered still
-     * reaches the platform"
-     */
+    /** @scenario "An agent defined after the registration is answered still reaches the platform" */
     it("opens a new socket whose register lists both agents", async () => {
       define(async () => "a", { name: "alpha" });
       const first = await platform.nextConnection();
@@ -865,15 +859,9 @@ describe("the agent client, given a fake platform", () => {
       expect(warnings[0]).toContain("LANGWATCH_PROJECT_ID");
     });
 
-    /**
-     * @scenario "A key type that cannot connect agents is one warning that names
-     * the key types that can"
-     */
+    /** @scenario "A key type that cannot connect agents is one warning that names the key types that can" */
     /** @scenario "A missing permission is one warning that names the permission" */
-    /**
-     * @scenario "A refused registration for parameters or environment prints the
-     * server message"
-     */
+    /** @scenario "A refused registration for parameters or environment prints the server message" */
     it("names the fix for every refusal code", () => {
       const advice = (code: string, message = "server says so") =>
         refusalAdvice({ type: "refused", protocol: 1, code, message });

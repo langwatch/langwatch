@@ -245,10 +245,7 @@ describe("evaluator attachments", () => {
     const inputs = [input("input"), input("output")];
 
     describe("when it is attached", () => {
-      /**
-       * @scenario "An attachment with every required input mapped and no expected-like input
-       * closes on attach"
-       */
+      /** @scenario "An attachment with every required input mapped and no expected-like input closes on attach" */
       it("lists no missing input and does not open the drawer", () => {
         const attachment = {
           mappings: inferScenarioMappings({ inputs, ctx }),

@@ -145,7 +145,7 @@ describe("scenario evaluations subscriber", () => {
       );
     });
 
-    /** @scenario "Evaluation job queued with field values and definitions the run carries" */
+    /** @scenario "The evaluation job is queued with the field values and the definitions the run carries" */
     it("queues the field values and the evaluator definitions the event carries", async () => {
       const deps = makeDeps();
       const definition = {

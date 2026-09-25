@@ -244,7 +244,7 @@ describe("resolveWorkbenchRunCaller", () => {
 
 describe("resolveApiKeyProtections", () => {
   describe("given a legacy project key", () => {
-    /** @scenario "A legacy project key sees costs without an authz lookup, predating RBAC" */
+    /** @scenario "A legacy project key still reads costs without a grant lookup" */
     it("sees costs without asking authz, by credential class alone", async () => {
       const { authz, hasApiKeyPermission } = authzApiKeyAnswering(false);
       const { dataPrivacy } = dataPrivacyResolving(async () => PLATFORM_DEFAULT_DATA_PRIVACY);

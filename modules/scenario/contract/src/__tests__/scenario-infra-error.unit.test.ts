@@ -670,7 +670,7 @@ describe("resolveScenarioError", () => {
       );
     });
 
-    /** @scenario Adapter without response is execution timeout not generic error */
+    /** @scenario "An adapter that never got a response is an execution timeout, not a generic failure" */
     it("still classifies a genuine infra timeout as an execution timeout", () => {
       // The guard must not swallow the real thing it sits in front of.
       const result = classifyScenarioInfraError(

@@ -287,7 +287,7 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
     expect(history.versions.map((version) => version.version)).toEqual([6, 5, 4, 3, 2, 1]);
   });
 
-  /** @scenario "Saving over a replaced version is refused with scenario_stale_version" */
+  /** @scenario "Saving over a version somebody else already replaced is refused with scenario_stale_version" */
   it("refuses a stale expected version without changing the row or history", async () => {
     const scenario = await createScenario();
     await scenarios.update({ id: scenario.id, projectId, situation: "current" });
@@ -509,7 +509,7 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
     });
   });
 
-  /** @scenario "Restoring missing version is refused with scenario_version_not_found" */
+  /** @scenario "Restoring a version that does not exist is refused with scenario_version_not_found" */
   /** @scenario "Restoring an archived scenario is refused" */
   it("refuses missing-version and archived restores without mutating the scenario", async () => {
     const missingVersionScenario = await createScenarioAtVersionFive();

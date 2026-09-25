@@ -221,7 +221,7 @@ describe.skipIf(!databaseUrl)("the Default test suite on the write path", () => 
     expect([...suites[0]!.scenarioIds].toSorted()).toEqual([first!.id, second!.id].toSorted());
   });
 
-  /** @scenario "Removing scenario from suite files it into Default, not leaving it loose" */
+  /** @scenario "Removing a scenario from its suite files it into Default instead of leaving it loose" */
   /** @scenario "Taking a scenario out of its test suite files it into Default" */
   /** @scenario "Taking a scenario out of its suite moves it to Default" */
   it("files a scenario cleared out of its suite into Default and drops it from the old one", async () => {

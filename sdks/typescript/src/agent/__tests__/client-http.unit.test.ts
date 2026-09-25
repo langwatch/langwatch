@@ -390,10 +390,7 @@ describe("the agent client over HTTP long polling, given a fake platform", () =>
   });
 
   describe("when a poll is answered with a status and a frame that is not a refusal", () => {
-    /**
-     * @scenario "A poll answered with a status and a frame that is not a refusal
-     * ends the connection"
-     */
+    /** @scenario "A poll answered with a status and a frame that is not a refusal ends the connection" */
     it("ends the connection so the client registers again", async () => {
       platform.pollStatus = 500;
       platform.pollStatusFrame = {

@@ -9,10 +9,7 @@ import { deriveRunActor, withActor } from "../run-actor.ts";
 
 describe("the actor of a REST run", () => {
   describe("when the key belongs to a person", () => {
-    /**
-     * @scenario "A user-bound key records the person it belongs to, through the surface it
-     * declared"
-     */
+    /** @scenario "A user-bound key records the person it belongs to, through the surface it declared" */
     it("records that person, through the surface the request declared", () => {
       expect(
         deriveRunActor({
@@ -35,10 +32,7 @@ describe("the actor of a REST run", () => {
   });
 
   describe("when the key belongs to no person", () => {
-    /**
-     * @scenario "A user-bound key records the person it belongs to, through the surface it
-     * declared"
-     */
+    /** @scenario "A user-bound key records the person it belongs to, through the surface it declared" */
     /** @scenario "A REST run with a key that belongs to no person records no actor" */
     it("names no actor, whatever surface the request declares", () => {
       expect(deriveRunActor({ userId: null, surfaceHeader: "cli" })).toBeUndefined();

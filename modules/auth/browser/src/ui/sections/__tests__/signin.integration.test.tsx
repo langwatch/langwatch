@@ -78,7 +78,6 @@ describe("SignIn forgot-password entry point", () => {
   });
 
   describe("when the deployment uses credential (email) mode", () => {
-    /** @scenario The credential sign-in form shows a Forgot password link */
     /** @scenario Self-hosted that never had a license hides SSO and offers email sign-in */
     it("renders the email/password form with a link to forgot-password", () => {
       const { container } = renderPage();
@@ -91,7 +90,6 @@ describe("SignIn forgot-password entry point", () => {
   });
 
   describe("when the deployment uses an SSO identity provider", () => {
-    /** @scenario SSO sign-in renders no credential form and no Forgot password link */
     it("renders no credential form and no forgot-password link", () => {
       publicEnvRef.current = { NEXTAUTH_PROVIDER: "auth0" };
       const { container } = renderPage();

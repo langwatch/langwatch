@@ -176,10 +176,7 @@ describe("the evaluators a run is graded with", () => {
       expect(events[0]?.data).toMatchObject({ evaluators: queued });
     });
 
-    /**
-     * @scenario "The finished event carries the field values and the definitions the run was
-     * queued with"
-     */
+    /** @scenario "The finished event carries the field values and the definitions the run was queued with" */
     it("carries the field values and the definitions the run was queued with, not the edited ones", async () => {
       const queued = evaluators();
       const deps: FinishRunDeps = {

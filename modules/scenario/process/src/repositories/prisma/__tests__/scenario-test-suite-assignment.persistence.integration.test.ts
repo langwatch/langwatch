@@ -150,7 +150,7 @@ describe.skipIf(!databaseUrl)("Moving a scenario between test suites", () => {
     }
   });
 
-  /** @scenario "Filing to other project suite is refused with scenario_test_suite_not_found" */
+  /** @scenario "Filing a scenario into a suite of another project is refused with scenario_test_suite_not_found" */
   it("refuses when the named test suite belongs to another project", async () => {
     const otherSuite = await otherScenarios.createTestSuite({
       projectId: otherProjectId,

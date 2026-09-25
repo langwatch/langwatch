@@ -219,10 +219,7 @@ afterEach(() => {
 });
 
 describe("device session powers data commands with zero env vars", () => {
-  /**
-   * @scenario a session created before this change lazily exchanges once and
-   * rewrites the session file
-   */
+  /** @scenario "a session created before this change lazily exchanges once and rewrites the session file" */
   it("lazily exchanges the personal key once, rewrites config.json, then stays off the network", async () => {
     writeSession(); // no personal_project: a pre-change session
 

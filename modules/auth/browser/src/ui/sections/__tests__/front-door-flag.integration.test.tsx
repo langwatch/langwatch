@@ -206,7 +206,7 @@ describe("given the identifier-first front door is enforced", () => {
 
   describe("when somebody who holds a password asks to reset it", () => {
     /** @scenario Reset follows the identifier, not the deployment mode */
-    /** @scenario Password reset follows the identifier once the front door is enforced */
+    /** @scenario "Password reset follows the identifier" */
     it("offers the reset on a deployment that signs in through a provider", async () => {
       publicEnvRef.current = {
         ...publicEnvRef.current,

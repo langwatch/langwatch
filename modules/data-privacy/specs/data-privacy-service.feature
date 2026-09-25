@@ -1,5 +1,6 @@
 Feature: Data Privacy service
 
+  @unit
   Scenario: The service resolves the platform default
     Given a project with no data privacy rules
     When the data privacy service resolves the project policy

@@ -79,7 +79,6 @@ describe("the identity router's shadow comparison", () => {
       mode = "off";
     });
 
-    /** @scenario "The flag off restores the legacy path entirely" */
     it("computes nothing, reads nothing and logs nothing", async () => {
       await expect(run()).resolves.toEqual({ ran: false });
 
@@ -88,7 +87,6 @@ describe("the identity router's shadow comparison", () => {
       expect(loggerMock.warn).not.toHaveBeenCalled();
     });
 
-    /** @scenario "The flag off restores the legacy path entirely" */
     it("stays inert after the flag has been enforced and turned back off", async () => {
       mode = "enforce";
       await run();
@@ -101,7 +99,6 @@ describe("the identity router's shadow comparison", () => {
   });
 
   describe("given the flag is in shadow", () => {
-    /** @scenario "Shadow mode compares every login and changes nothing" */
     it("computes the router's decision and compares it against the legacy outcome", async () => {
       const result = await run();
 
@@ -118,7 +115,6 @@ describe("the identity router's shadow comparison", () => {
       });
     });
 
-    /** @scenario "Shadow mode compares every login and changes nothing" */
     it("logs a mismatch with both decisions and the reason code", async () => {
       routeMock.mockResolvedValue(redirect);
       resolveAuthProviderMock.mockResolvedValue("auth0");
@@ -141,7 +137,6 @@ describe("the identity router's shadow comparison", () => {
       );
     });
 
-    /** @scenario "Shadow mode compares every login and changes nothing" */
     it("never throws, whatever the router does", async () => {
       routeMock.mockRejectedValue(new Error("the connection store is down"));
 

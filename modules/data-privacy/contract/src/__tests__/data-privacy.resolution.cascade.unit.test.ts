@@ -27,7 +27,10 @@ function rule(
 
 describe("resolveDataPrivacy", () => {
   describe("given no rule anywhere in the chain", () => {
-    /** @scenario A project with no rule resolves to the platform defaults */
+    /**
+     * @scenario A project with no rule resolves to the platform defaults
+     * @scenario "The service resolves the platform default"
+     */
     it("resolves to captured content, essential PII, and secrets on", () => {
       const resolved = resolveDataPrivacy({ rows: [], facts: teamProject });
 

@@ -101,7 +101,7 @@ function fold(events: SimulationProcessingEvent[]): SimulationRunStateData {
 
 describe("SimulationRunStateFoldProjection.withAgentInstance", () => {
   describe("when the metadata already holds the reserved namespace", () => {
-    /** @scenario "Instance written into run metadata beside what run already carries" */
+    /** @scenario "The instance is written into the run metadata beside what the run already carries" */
     it("adds the instance and keeps everything else", () => {
       const metadata = JSON.stringify({
         parameters: { model: "gpt-5-mini" },

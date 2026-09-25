@@ -8,7 +8,7 @@ import { readVoiceWorkerEnv, VOICE_WS_PORT_DEFAULT } from "../voice-worker-env.t
 
 describe("readVoiceWorkerEnv", () => {
   describe("given no variables set", () => {
-    /** @scenario "The voice worker reads its three infrastructure environment variables" */
+    /** @scenario "The voice worker reads its infrastructure environment variables" */
     it("leaves voice worker only off and defaults the websocket port", () => {
       const env = readVoiceWorkerEnv({});
 
@@ -20,14 +20,14 @@ describe("readVoiceWorkerEnv", () => {
   });
 
   describe("given VOICE_WORKER_ONLY values", () => {
-    /** @scenario "The voice worker reads its three infrastructure environment variables" */
+    /** @scenario "The voice worker reads its infrastructure environment variables" */
     it("stays off for anything that is not the literal true", () => {
       expect(readVoiceWorkerEnv({ VOICE_WORKER_ONLY: "false" }).voiceWorkerOnly).toBe(false);
       expect(readVoiceWorkerEnv({ VOICE_WORKER_ONLY: "1" }).voiceWorkerOnly).toBe(false);
       expect(readVoiceWorkerEnv({ VOICE_WORKER_ONLY: "yes" }).voiceWorkerOnly).toBe(false);
     });
 
-    /** @scenario "The voice worker reads its three infrastructure environment variables" */
+    /** @scenario "The voice worker reads its infrastructure environment variables" */
     it("turns on for the literal true, case-insensitively, given a public base URL", () => {
       expect(
         readVoiceWorkerEnv({
@@ -39,7 +39,7 @@ describe("readVoiceWorkerEnv", () => {
   });
 
   describe("given a websocket port", () => {
-    /** @scenario "The voice worker reads its three infrastructure environment variables" */
+    /** @scenario "The voice worker reads its infrastructure environment variables" */
     it("parses a valid port and defaults a blank one", () => {
       expect(readVoiceWorkerEnv({ VOICE_WS_PORT: "4400" }).voiceWsPort).toBe(4400);
       expect(readVoiceWorkerEnv({ VOICE_WS_PORT: "" }).voiceWsPort).toBe(VOICE_WS_PORT_DEFAULT);

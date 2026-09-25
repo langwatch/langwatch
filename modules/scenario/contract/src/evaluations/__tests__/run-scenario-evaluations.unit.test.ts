@@ -678,10 +678,7 @@ describe("the values and the definitions a job grades with", () => {
   const queuedDefinition = runEvaluatorDefinitionOf(evaluator());
 
   describe("given a payload that carries the field values the run was queued with", () => {
-    /**
-     * @scenario "A scenario field edited while the batch executes does not change what a queued
-     * run is graded against"
-     */
+    /** @scenario "A scenario field edited while the batch executes does not change what a queued run is graded against" */
     it("reads the field off the payload, not the scenario as it stands now", async () => {
       const deps = makeDeps({ fields: { golden_sql: "SELECT 2" } });
 
@@ -709,10 +706,7 @@ describe("the values and the definitions a job grades with", () => {
   });
 
   describe("given a payload that carries the evaluator definitions the run was queued with", () => {
-    /**
-     * @scenario "An evaluator edited while the batch executes does not change what a queued run is
-     * graded against"
-     */
+    /** @scenario "An evaluator edited while the batch executes does not change what a queued run is graded against" */
     it("runs the evaluator as it was saved then and never reads the saved evaluator", async () => {
       const deps = makeDeps({
         evaluators: [

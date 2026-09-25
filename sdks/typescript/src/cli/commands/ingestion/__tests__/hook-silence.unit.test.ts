@@ -22,10 +22,7 @@ const oversizedWrite = () => {
 
 describe("the session context hook's silence", () => {
   describe("given a directory that is not a git repository", () => {
-    /**
-     * @scenario "Outside a git repository with nothing to declare, the hook
-     * sends nothing and exits zero"
-     */
+    /** @scenario "Outside a git repository with nothing to declare the hook sends nothing and exits zero" */
     it("posts nothing, records nothing and exits zero", async () => {
       await hook.runHook({ git: {} });
 
@@ -125,10 +122,7 @@ describe("the session context hook's silence", () => {
   });
 
   describe("given a seam writing far more than a payload holds", () => {
-    /**
-     * @scenario "An oversized payload sends no session context and leaves the
-     * session undisturbed"
-     */
+    /** @scenario "An oversized payload sends no session context and leaves the session undisturbed" */
     it("posts nothing, writes nothing and exits zero", async () => {
       await hook.runHook({
         readInput: () => readStdin({ stream: oversizedWrite(), timeoutMs: 5_000 }),

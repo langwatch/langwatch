@@ -507,7 +507,7 @@ describe("given a key is being created", () => {
   });
 
   describe("when the mint answers", () => {
-    /** @scenario Copy this token now - the reveal is one-time */
+    /** @scenario "Copy this token now — the reveal is one-time" */
     it("reveals the token once and cannot show it again after the dialog closes", async () => {
       const user = userEvent.setup();
       renderWithApiKeyHost(<ApiKeysScreen />);

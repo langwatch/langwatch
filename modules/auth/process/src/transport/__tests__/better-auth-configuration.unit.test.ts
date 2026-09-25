@@ -29,8 +29,7 @@ describe("the process's Better Auth transport", () => {
     });
 
     /** Impersonation lives in the session row, not in a plugin that would also
-     *  bring a whole user-administration surface with it.
-     *  @scenario The BetterAuth admin plugin is intentionally omitted */
+     *  bring a whole user-administration surface with it. */
     it("mounts no administration plugin", () => {
       const ids = (optionsOf().plugins ?? []).map((plugin) => plugin.id ?? "");
 

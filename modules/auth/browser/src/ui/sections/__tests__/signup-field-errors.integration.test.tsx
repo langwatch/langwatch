@@ -105,7 +105,6 @@ describe("SignUp field errors", () => {
    * all four.
    */
   describe("when a required field is left empty", () => {
-    /** @scenario "A missing name says so" */
     it("says the name is required", async () => {
       const { container } = renderPage();
 
