@@ -158,7 +158,7 @@ export function defaultBackfillStart(sourceType: GovernanceSourceType): string |
   const now = Temporal.Now.instant().toZonedDateTimeISO("UTC");
   const targetMonth = now.subtract({ months }).with({ day: 1 });
   const day = Math.min(now.day, targetMonth.daysInMonth);
-  return targetMonth.with({ day }).toInstant().toString();
+  return targetMonth.with({ day }).startOfDay().toInstant().toString({ fractionalSecondDigits: 3 });
 }
 
 /** Parse one plain integer cron field, or null for anything with an

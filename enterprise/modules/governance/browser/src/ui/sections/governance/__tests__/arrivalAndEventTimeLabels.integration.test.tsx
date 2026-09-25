@@ -16,12 +16,12 @@
  *
  * Spec: specs/ai-gateway/governance/ingestion-sources.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("~/utils/api", () => ({
+vi.mock("../../../../behavior/governance-api.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof governanceApiModule>()),
   api: {
     ingestionSources: {
       ottlStarter: {
@@ -41,13 +41,13 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-vi.mock("~/components/ui/toaster", () => ({
-  toaster: { create: vi.fn() },
-}));
-
+import type * as governanceApiModule from "../../../../behavior/governance-api.ts";
 import { IngestionSourcesTable } from "../../../../features/ingestion-sources/ingestion-sources-table.tsx";
+import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
 import { SourceHealthCards } from "../governance-ingestion-source.screen.tsx";
 import type { Source } from "../ingestion-source-forms.ts";
+
+afterEach(cleanup);
 
 /**
  * A source whose last pull landed twenty-three minutes ago and whose newest
@@ -101,26 +101,24 @@ const newestEventStampedAtMidnight = {
 };
 
 function renderRow() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <IngestionSourcesTable
-        sources={[sourceThatJustDelivered]}
-        canManage={false}
-        rotatingId={null}
-        archivingId={null}
-        onEdit={vi.fn()}
-        onRotate={vi.fn()}
-        onArchive={vi.fn()}
-      />
-    </ChakraProvider>,
+  return renderWithGovernanceHost(
+    <IngestionSourcesTable
+      sources={[sourceThatJustDelivered]}
+      canManage={false}
+      rotatingId={null}
+      archivingId={null}
+      onEdit={vi.fn()}
+      onRotate={vi.fn()}
+      onArchive={vi.fn()}
+    />,
+    { host: fakeGovernanceHost() },
   );
 }
 
 function renderHealthCards() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <SourceHealthCards health={newestEventStampedAtMidnight} error={null} isLoading={false} />
-    </ChakraProvider>,
+  return renderWithGovernanceHost(
+    <SourceHealthCards health={newestEventStampedAtMidnight} error={null} isLoading={false} />,
+    { host: fakeGovernanceHost() },
   );
 }
 

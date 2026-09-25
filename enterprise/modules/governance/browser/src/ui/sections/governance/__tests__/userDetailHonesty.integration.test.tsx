@@ -2,8 +2,7 @@
  * @vitest-environment jsdom
  * User detail page: claims about unavailable breakdowns (same rule as team detail page).
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -13,29 +12,6 @@ const harness = vi.hoisted(() => ({
   rows: [] as unknown[],
 }));
 
-vi.mock("~/utils/compat/next-router", () => ({
-  useRouter: () => ({ query: { id: "ada@acme.test" } }),
-}));
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({
-    isLoading: false,
-    organization: { id: "org-1", slug: "acme", name: "ACME", teams: [] },
-    organizations: [],
-    project: undefined,
-    hasPermission: () => true,
-    hasOrgPermission: () => true,
-    hasAnyPermission: () => true,
-  }),
-}));
-vi.mock("~/hooks/useFeatureFlag", () => ({
-  useFeatureFlag: () => ({ enabled: true, isLoading: false }),
-}));
-vi.mock("~/hooks/useActivePlan", () => ({
-  useActivePlan: () => ({ isEnterprise: true, activePlan: undefined }),
-}));
-vi.mock("~/components/governance/GovernanceLayout", () => ({
-  default: ({ children }: { children: React.ReactNode }) => children,
-}));
 vi.mock("../../../../behavior/governance-api.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof governanceApiModule>()),
   api: {
@@ -57,14 +33,16 @@ vi.mock("../../../../behavior/governance-api.ts", async (importOriginal) => ({
 }));
 
 import type * as governanceApiModule from "../../../../behavior/governance-api.ts";
+import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
 import UserDetailPage from "../governance-user.screen.tsx";
 
 const renderPage = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <UserDetailPage />
-    </ChakraProvider>,
-  );
+  renderWithGovernanceHost(<UserDetailPage />, {
+    host: fakeGovernanceHost({
+      params: { id: ACTOR },
+      permissions: ["activityMonitor:view"],
+    }),
+  });
 
 beforeEach(() => {
   harness.rows = [

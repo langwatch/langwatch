@@ -157,7 +157,7 @@ export const SOURCE_TYPE_OPTIONS = [
     label: "Microsoft Copilot Studio",
     mode: "pull",
     blurb:
-      "Reads Copilot Studio conversations from a Power Platform environment using an application secret and Dataverse role.",
+      "Reads Copilot Studio conversations from your Power Platform environment. Needs an app registration with a client secret and a Dataverse role that can read the conversation transcript and bot tables — no directory permission of any kind.",
     routesConversations: true,
   },
   {

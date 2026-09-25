@@ -130,8 +130,7 @@ function GovernanceTeamDetailPage() {
                 Detail metrics
               </Text>
               <Text fontSize="xs" color="fg.muted" marginBottom={3}>
-                Per-day spend, per-user breakdown, and model mix for this team will land here in a
-                follow-up.
+                Per-day spend, per-user breakdown and model mix for this team are not available yet.
               </Text>
               {teamProjectSlug && (
                 <>
@@ -152,8 +151,7 @@ function GovernanceTeamDetailPage() {
                 See this team in the bird's-eye chart →
               </Link>
               <Text fontSize="xs" color="fg.subtle" marginTop={1}>
-                The chart's {`'By Team'`} toggle exercises the same data through one orthogonal lens
-                until the dedicated drilldown ships.
+                The chart's {`'By team'`} view shows this team's spend next to every other team's.
               </Text>
             </Box>
           </>

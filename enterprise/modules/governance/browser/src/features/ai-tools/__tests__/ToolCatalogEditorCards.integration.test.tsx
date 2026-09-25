@@ -2,8 +2,7 @@
  * @vitest-environment jsdom
  * Tile cards display stored fields only (name, icon, type, scope, CLI path/link).
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -58,7 +57,8 @@ const entriesFixture = [
   },
 ];
 
-vi.mock("~/utils/api", () => ({
+vi.mock("../../../behavior/governance-api.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof governanceApiModule>()),
   api: {
     useUtils: () => ({
       aiTools: {
@@ -91,14 +91,15 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
+import type * as governanceApiModule from "../../../behavior/governance-api.ts";
+import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../testing.tsx";
 import { cliPathsLine, ToolCatalogEditor } from "../ui/sections/tool-catalog-editor.tsx";
 
 function renderEditor() {
   const onEditTile = vi.fn();
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <ToolCatalogEditor organizationId="org-1" onAddTile={vi.fn()} onEditTile={onEditTile} />
-    </ChakraProvider>,
+  renderWithGovernanceHost(
+    <ToolCatalogEditor organizationId="org-1" onAddTile={vi.fn()} onEditTile={onEditTile} />,
+    { host: fakeGovernanceHost() },
   );
   return { onEditTile };
 }

@@ -17,20 +17,20 @@
  * present, so the popover test looks up the identical strings after opening
  * the (i).
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 // Chakra's Popover keeps its content MOUNTED and hidden while closed, so
 // `queryByText` finds it either way. Only a visibility matcher can tell the
 // two states apart, which is the whole point of these assertions.
 import "@testing-library/jest-dom/vitest";
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
+import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../testing.tsx";
 import { EmptyEventsState, EventsSetupPopover, ingestEndpointFor } from "../source-events-setup";
 
 function renderUi(ui: ReactNode) {
-  return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
+  return renderWithGovernanceHost(<>{ui}</>, { host: fakeGovernanceHost() });
 }
 
 const OTEL_SOURCE = { id: "src_1", sourceType: "otel_generic" };

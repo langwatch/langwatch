@@ -6,8 +6,7 @@ import "@testing-library/jest-dom/vitest";
  * @vitest-environment jsdom
  * Team detail page: names missing breakdowns, no inert controls, reader's own link text.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const TEAM_ID = "team-1";
@@ -18,33 +17,6 @@ const harness = vi.hoisted(() => ({
   rows: [] as unknown[],
 }));
 
-vi.mock("~/utils/compat/next-router", () => ({
-  useRouter: () => ({ query: { id: "team-1" } }),
-}));
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({
-    isLoading: false,
-    organization: { id: "org-1", slug: "acme", name: "ACME", teams: [] },
-    organizations: [
-      {
-        teams: [{ id: "team-1", projects: [{ slug: "platform-project" }] }],
-      },
-    ],
-    project: undefined,
-    hasPermission: () => true,
-    hasOrgPermission: () => true,
-    hasAnyPermission: () => true,
-  }),
-}));
-vi.mock("~/hooks/useFeatureFlag", () => ({
-  useFeatureFlag: () => ({ enabled: true, isLoading: false }),
-}));
-vi.mock("~/hooks/useActivePlan", () => ({
-  useActivePlan: () => ({ isEnterprise: true, activePlan: undefined }),
-}));
-vi.mock("~/components/governance/GovernanceLayout", () => ({
-  default: ({ children }: { children: React.ReactNode }) => children,
-}));
 vi.mock("../../../../behavior/governance-api.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof governanceApiModule>()),
   api: {
@@ -61,14 +33,32 @@ vi.mock("../../../../behavior/governance-api.ts", async (importOriginal) => ({
 }));
 
 import type * as governanceApiModule from "../../../../behavior/governance-api.ts";
+import {
+  FAKE_ORGANIZATION,
+  fakeGovernanceHost,
+  renderWithGovernanceHost,
+} from "../../../../testing.tsx";
 import TeamDetailPage from "../governance-team.screen.tsx";
 
 const renderPage = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <TeamDetailPage />
-    </ChakraProvider>,
-  );
+  renderWithGovernanceHost(<TeamDetailPage />, {
+    host: fakeGovernanceHost({
+      params: { id: TEAM_ID },
+      permissions: ["activityMonitor:view"],
+      organizations: [
+        {
+          ...FAKE_ORGANIZATION,
+          teams: [
+            {
+              id: TEAM_ID,
+              name: TEAM_NAME,
+              projects: [{ id: "project-1", name: "Platform", slug: PROJECT_SLUG }],
+            },
+          ],
+        },
+      ],
+    }),
+  });
 
 beforeEach(() => {
   harness.rows = [
@@ -154,7 +144,7 @@ describe("given a team with spend in the window", () => {
   /** @scenario "Every control on the page navigates somewhere real" */
   it("offers no control without a handler in the source", () => {
     const source = readFileSync(
-      join(process.cwd(), "src/pages/governance/teams/[id].tsx"),
+      join(process.cwd(), "src/ui/sections/governance/governance-team.screen.tsx"),
       "utf-8",
     );
     // Read from the source for the same reason the Platform screens are:

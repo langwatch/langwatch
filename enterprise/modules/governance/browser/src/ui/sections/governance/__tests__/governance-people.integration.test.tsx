@@ -3,64 +3,81 @@
  * Tests departments and assignment surfaces (not member list with dropdowns).
  */
 
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const departments = {
-  current: [
-    {
-      id: "dept_mkt",
-      name: "Marketing",
-      organizationId: "org-1",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-  ],
-};
-
-vi.mock("../../../../behavior/governance-api.ts", () => ({
-  api: {
-    useUtils: () => ({ departments: { list: { invalidate: vi.fn() } } }),
-    departments: {
-      list: { useQuery: () => ({ data: departments.current, isLoading: false, error: null }) },
-      create: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
-      rename: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
-      archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
-    },
-  },
-}));
+vi.mock("../../../../behavior/governance-api.ts", () => {
+  const dataFor = (path: string): unknown => {
+    if (path === "departments.list") return [{ id: "dept_mkt", name: "Marketing" }];
+    if (path === "departments.assignments") return { users: [], teams: [], projects: [] };
+    if (path === "governancePeople.list" || path === "governancePeople.suggestions") return [];
+    return undefined;
+  };
+  const node = (path: string[]): unknown =>
+    new Proxy(
+      {},
+      {
+        get(_target, property) {
+          if (typeof property !== "string") return undefined;
+          if (property === "useQuery") {
+            return () => ({
+              data: dataFor(path.join(".")),
+              isLoading: false,
+              isFetching: false,
+              isError: false,
+              error: null,
+              refetch: vi.fn(),
+            });
+          }
+          if (property === "useMutation") {
+            return () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false });
+          }
+          if (property === "invalidate") return vi.fn();
+          if (property === "useUtils") return () => node([]);
+          return node([...path, property]);
+        },
+      },
+    );
+  return { api: node([]) };
+});
 
 const { fakeGovernanceHost, renderWithGovernanceHost } = await import("../../../../testing.tsx");
 const PeoplePage = (await import("../governance-people.screen.tsx")).default;
 
 afterEach(cleanup);
 
-function renderPeople() {
+function renderDepartmentsTab() {
   return renderWithGovernanceHost(<PeoplePage />, {
-    host: fakeGovernanceHost({ permissions: ["governance:manage"] }),
+    host: fakeGovernanceHost({
+      permissions: ["governance:manage"],
+      query: { tab: "departments" },
+    }),
   });
 }
 
 describe("given the departments page", () => {
   describe("when an admin opens it", () => {
     /** @scenario The departments page manages departments and links out to assign them */
-    it("manages departments and links to the members and teams pages instead of listing every person", () => {
-      renderPeople();
+    it("manages departments and links to the members and teams pages instead of listing every person", async () => {
+      renderDepartmentsTab();
 
-      // Scoped to the page's own column: the section rail beside it also links
-      // to a destination called People, and it is not the one under test.
-      const page = within(screen.getByTestId("section-navigation-content"));
+      expect(screen.getByText("Add department")).toBeDefined();
 
-      expect(page.getByText("Create a department")).toBeDefined();
-      expect(page.getByRole("link", { name: /People/i }).getAttribute("href")).toBe(
+      // The three assignment links sit behind a disclosure rather than
+      // filling the tab; they still point at the settings pages that assign.
+      await userEvent.click(screen.getByRole("button", { name: /How departments are assigned/i }));
+      await waitFor(() => {
+        expect(screen.getByRole("link", { name: /^People/i })).toBeDefined();
+      });
+
+      expect(screen.getByRole("link", { name: /People/i }).getAttribute("href")).toBe(
         "/settings/members",
       );
-      // Anchored to the link title: the Projects link also mentions the teams
-      // page in its description and points at /settings/teams too.
-      expect(page.getByRole("link", { name: /^Teams/i }).getAttribute("href")).toBe(
+      expect(screen.getByRole("link", { name: /^Teams/i }).getAttribute("href")).toBe(
         "/settings/teams",
       );
-      expect(page.getByRole("link", { name: /^Projects/i }).getAttribute("href")).toBe(
+      expect(screen.getByRole("link", { name: /^Projects/i }).getAttribute("href")).toBe(
         "/settings/teams",
       );
       // The per-person assignment list is gone: no <select> on the page.

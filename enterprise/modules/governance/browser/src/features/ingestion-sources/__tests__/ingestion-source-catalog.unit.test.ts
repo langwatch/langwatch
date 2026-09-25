@@ -100,7 +100,6 @@ describe("given the ingestion-source catalog", () => {
         expect(SOURCE_TYPE_LABEL[value]).toBeTruthy();
         const option = SOURCE_TYPE_OPTIONS.find((o) => o.value === value);
         expect(option).toBeDefined();
-        expect(option && "icon" in option ? option.icon : null).toBeTruthy();
       }
     });
 

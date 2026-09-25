@@ -45,6 +45,18 @@ const harness = vi.hoisted(() => ({
   requested: [] as string[],
 }));
 
+// The overview's hero mounts the inline command palette, which reaches a
+// provider this test does not stand up; main mocks the same seam, and the
+// shader behind the hero, which jsdom has no canvas for.
+vi.mock("@langwatch/navigation-browser/surfaces/command-bar", () => ({
+  CommandPalette: ({ placeholder }: { placeholder: string }) => <input placeholder={placeholder} />,
+  useCommandBar: () => ({ registerInlinePalette: () => () => undefined }),
+}));
+vi.mock("@paper-design/shaders-react", () => ({ MeshGradient: () => null }));
+vi.mock("../../../../features/overview/ui/sections/quarantine-fill-panel.tsx", () => ({
+  QuarantineFillAlert: () => null,
+}));
+
 vi.mock("../../../../behavior/governance-api.ts", () => {
   const queryResult = () => ({
     data: undefined,
@@ -178,32 +190,35 @@ describe("governance pages for a delegated viewer", () => {
       expect(screen.getByTestId("section-navigation-layout")).toBeTruthy();
     });
 
-    /** @scenario "The overview names the grant a refused panel needs" */
-    it("names activityMonitor:view on the overview and still renders the rest", () => {
+    /** @scenario "The overview holds nothing a delegated viewer is refused" */
+    it("names no missing grant on the overview and renders its heading and hero", () => {
       renderPage({ Page: GovernanceOverviewPage, permissions: DELEGATED_VIEWER });
 
-      expect(screen.getByText(/activityMonitor:view/)).toBeTruthy();
-      // The page did not collapse into the notice: its own heading and the
-      // panels that need no activity-monitor grant are still there.
+      expect(screen.queryByText(/activityMonitor:view/)).toBeNull();
+      expect(screen.queryByText(/Ask an organization admin to grant you/)).toBeNull();
       expect(screen.getByRole("heading", { name: "AI Governance" })).toBeTruthy();
-      expect(screen.queryByText("CLI session policy")).toBeNull();
+      expect(screen.getByText("Insights")).toBeTruthy();
+      // No `ingestionSources:manage`, so the hero draws no add-source pill.
+      expect(screen.queryByText("Add source")).toBeNull();
     });
 
-    it("sends no activity-monitor query", () => {
+    /** @scenario "The overview holds nothing a delegated viewer is refused" */
+    it("sends no panel query at all", () => {
       renderPage({ Page: GovernanceOverviewPage, permissions: DELEGATED_VIEWER });
 
-      expect(harness.requested.filter((path) => path.startsWith("activityMonitor."))).toEqual([]);
-      // The grants it DOES hold are still read, so the page is not simply
-      // querying nothing.
-      expect(harness.requested).toContain("sessionPolicy.get");
+      expect(harness.requested).toEqual([]);
     });
 
     /** @scenario "Departments offers no controls a viewer cannot use" */
     it("offers no department controls without governance:manage", () => {
-      renderPage({ Page: PeoplePage, permissions: DELEGATED_VIEWER });
+      renderPage({
+        Page: PeoplePage,
+        permissions: DELEGATED_VIEWER,
+        query: { tab: "departments" },
+      });
 
-      expect(screen.queryByText("Create a department")).toBeNull();
-      expect(screen.queryByRole("button", { name: "Actions" })).toBeNull();
+      expect(screen.queryByRole("button", { name: /Add department/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: /Actions for/ })).toBeNull();
       expect(screen.getByText(/governance:manage/)).toBeTruthy();
     });
 
@@ -252,33 +267,33 @@ describe("governance pages for a delegated viewer", () => {
     // The admin path is what every existing customer sees, and the panels
     // were re-grouped to make the delegated path work. This is what says the
     // regrouping did not take anything away from the admin.
-    /** @scenario "An org admin still sees every panel on the overview" */
-    it("renders every panel and names no missing grant", () => {
+    /** @scenario "An org admin meets the same overview a delegated viewer does" */
+    it("meets the same hero and sections, with no panel and no read", () => {
       renderPage({ Page: GovernanceOverviewPage, permissions: ORGANIZATION_ADMIN });
 
-      expect(screen.getByText("Top teams by spend")).toBeTruthy();
-      expect(screen.getByText("Top users by spend")).toBeTruthy();
-      expect(screen.getByText("Spend by department")).toBeTruthy();
-      expect(screen.getByText("Recent anomalies")).toBeTruthy();
-      expect(screen.getByText("Ingestion sources")).toBeTruthy();
-      expect(screen.queryByText("CLI session policy")).toBeNull();
-      expect(screen.getByRole("button", { name: "Save" })).toBeTruthy();
+      expect(screen.getByRole("link", { name: "Add department" })).toBeVisible();
+      expect(screen.getByText("Insights")).toBeTruthy();
+      expect(screen.getByText("Recent activity")).toBeTruthy();
+      // The admin can add a source, so the admin is the one offered the pill.
+      expect(screen.getByText("Add source")).toBeTruthy();
       expect(screen.queryByText(/Ask an organization admin to grant you/)).toBeNull();
 
-      // Every panel's read is actually issued for an admin.
-      expect(harness.requested).toContain("activityMonitor.summary");
-      expect(harness.requested).toContain("ingestionSources.list");
-      expect(harness.requested).not.toContain("routingPolicy.list");
-      expect(harness.requested).toContain("anomalyRules.list");
-      expect(harness.requested).toContain("aiTools.adminList");
-      expect(harness.requested).toContain("sessionPolicy.get");
+      // The panels moved to the pages that own them: the overview reads nothing.
+      expect(screen.queryByText("Recent anomalies")).toBeNull();
+      expect(screen.queryByText("Ingestion sources")).toBeNull();
+      expect(screen.queryByText("CLI session policy")).toBeNull();
+      expect(harness.requested).toEqual([]);
     });
 
     /** @scenario "An org admin still sees the department write controls" */
     it("offers the department write controls", () => {
-      renderPage({ Page: PeoplePage, permissions: ORGANIZATION_ADMIN });
+      renderPage({
+        Page: PeoplePage,
+        permissions: ORGANIZATION_ADMIN,
+        query: { tab: "departments" },
+      });
 
-      expect(screen.getByText("Create a department")).toBeTruthy();
+      expect(screen.getByRole("button", { name: /Add department/ })).toBeTruthy();
       expect(screen.queryByText(/Ask an organization admin to grant you/)).toBeNull();
     });
   });

@@ -3290,7 +3290,7 @@ function normalizeStartingAt(raw: string): string | null | undefined {
     const instant = Temporal.Instant.from(
       /^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T00:00:00Z` : raw,
     );
-    return instant.toString();
+    return instant.toString({ fractionalSecondDigits: 3 });
   } catch {
     return null;
   }
