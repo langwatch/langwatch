@@ -3,7 +3,10 @@
  * the reach of the login key: `projects list` and `whoami`.
  * Feature: specs/typescript-sdk/cli-cross-project-access.feature
  */
-import { readCliErrorDocument } from "@langwatch/langy-contract/cards/handled-error";
+import {
+  type CliHandledError,
+  readCliErrorDocument,
+} from "@langwatch/langy-contract/cards/handled-error";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -14,6 +17,13 @@ import {
   PERSONAL_PROJECT,
   PERSONAL_PROJECT_ROW,
 } from "./crossProjectAccessHarness";
+
+/** The CLI error document stdout carried; these cases all expect one. */
+function cliErrorDocument(output: unknown): CliHandledError {
+  const read = readCliErrorDocument(output);
+  if (read.kind !== "error") throw new Error("stdout held no CLI error document");
+  return read.error;
+}
 
 const { writeSession, run, recorded } = installCrossProjectHarness();
 
@@ -40,7 +50,7 @@ describe("given a login that minted a user-scoped CLI key", () => {
       });
 
       expect(result.exitCode).not.toBe(0);
-      const document = readCliErrorDocument(result.stdout);
+      const document = cliErrorDocument(result.stdout);
       expect(document?.code).toBe("project_not_accessible");
       expect(document?.meta?.project).toBe("someone-elses");
       expect(result.stderr).toContain("someone-elses");

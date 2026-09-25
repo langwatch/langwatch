@@ -61,13 +61,12 @@ function defaultModelForDsl(
   };
 }
 
-function parameterModel(value: unknown, defaultModel?: string): string | undefined {
+/** The models an LLM parameter needs: its own, else the workflow default; none otherwise. */
+function parameterModels(value: unknown, defaultModel?: string): string[] {
   const parsed = workflowParameterSchema.safeParse(value);
-  if (!parsed.success || parsed.data.type !== "llm") {
-    return void 0;
-  }
-
-  return parsed.data.value?.model ?? defaultModel;
+  if (!parsed.success || parsed.data.type !== "llm") return [];
+  const model = parsed.data.value?.model ?? defaultModel;
+  return model ? [model] : [];
 }
 
 export class ScenarioWorkflowHydratorService {
@@ -102,10 +101,7 @@ export class ScenarioWorkflowHydratorService {
       }
 
       for (const parameter of parsedNode.data.data.parameters ?? []) {
-        const model = parameterModel(parameter, defaultModel);
-        if (model) {
-          modelsNeeded.add(model);
-        }
+        for (const model of parameterModels(parameter, defaultModel)) modelsNeeded.add(model);
       }
     }
 

@@ -562,7 +562,7 @@ describe("the JSON error document round-trip", () => {
 
     const read = readCliErrorDocument(JSON.stringify(toCliErrorDocument(parsed)));
 
-    expect(read).toEqual(parsed);
+    expect(read).toEqual({ kind: "error", error: parsed });
   });
 
   it("still reads a document written before `code` existed (kind only)", () => {
@@ -578,14 +578,14 @@ describe("the JSON error document round-trip", () => {
     });
 
     expect(read).toMatchObject({
-      code: "dataset_not_found",
-      kind: "dataset_not_found",
+      kind: "error",
+      error: { code: "dataset_not_found", kind: "dataset_not_found" },
     });
   });
 
-  it("answers null for output that is not an error document", () => {
-    expect(readCliErrorDocument("not json")).toBeNull();
-    expect(readCliErrorDocument({ ok: true })).toBeNull();
+  it("answers other for output that is not an error document", () => {
+    expect(readCliErrorDocument("not json")).toEqual({ kind: "other" });
+    expect(readCliErrorDocument({ ok: true })).toEqual({ kind: "other" });
   });
 });
 

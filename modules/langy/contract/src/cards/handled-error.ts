@@ -432,35 +432,41 @@ export const toCliErrorDocument = (error: CliHandledError): CliErrorDocument => 
 });
 
 /**
- * Read a CLI failure document back, or null when the output is not one. Null-on-miss rather
- * than throw: stdout may hold a card, a human table, or nothing at all, and none of those is an
- * error document.
+ * Read a CLI failure document back; `other` when the output is not one, rather than a throw:
+ * stdout may hold a card, a human table, or nothing at all, and none of those is an error document.
  */
-export const readCliErrorDocument = (output: unknown): CliHandledError | null => {
+export type CliErrorDocumentRead = { kind: "error"; error: CliHandledError } | { kind: "other" };
+
+export const readCliErrorDocument = (output: unknown): CliErrorDocumentRead => {
   const document = typeof output === "string" ? safeParseJson(output) : asRecord(output);
 
   const record = asRecord(document);
-  if (!record || record.ok !== false) return null;
+  if (!record || record.ok !== false) return { kind: "other" };
 
   const error = asRecord(record.error);
   const code = [error?.code, error?.kind].find(isString) ?? null;
-  if (!error || code === null) return null;
+  if (!error || code === null) return { kind: "other" };
 
   return {
-    code,
-    // Deprecated back-compat alias — see CliHandledError.kind.
-    kind: code,
-    message: typeof error.message === "string" ? error.message : code,
-    httpStatus: typeof error.httpStatus === "number" ? error.httpStatus : 0,
-    meta: asRecord(error.meta) ?? {},
-    isHandled: error.isHandled === true,
-    retryable: error.retryable === true,
-    ...(typeof error.traceId === "string" ? { traceId: error.traceId } : {}),
-    ...(typeof error.traceUrl === "string" ? { traceUrl: error.traceUrl } : {}),
-    ...(typeof error.logsUrl === "string" ? { logsUrl: error.logsUrl } : {}),
-    ...(asReasons(error.reasons) ? { reasons: asReasons(error.reasons) } : {}),
-    ...(asSuggestions(error.suggestions) ? { suggestions: asSuggestions(error.suggestions) } : {}),
-    ...(typeof error.docUrl === "string" ? { docUrl: error.docUrl } : {}),
+    kind: "error",
+    error: {
+      code,
+      // Deprecated back-compat alias — see CliHandledError.kind.
+      kind: code,
+      message: typeof error.message === "string" ? error.message : code,
+      httpStatus: typeof error.httpStatus === "number" ? error.httpStatus : 0,
+      meta: asRecord(error.meta) ?? {},
+      isHandled: error.isHandled === true,
+      retryable: error.retryable === true,
+      ...(typeof error.traceId === "string" ? { traceId: error.traceId } : {}),
+      ...(typeof error.traceUrl === "string" ? { traceUrl: error.traceUrl } : {}),
+      ...(typeof error.logsUrl === "string" ? { logsUrl: error.logsUrl } : {}),
+      ...(asReasons(error.reasons) ? { reasons: asReasons(error.reasons) } : {}),
+      ...(asSuggestions(error.suggestions)
+        ? { suggestions: asSuggestions(error.suggestions) }
+        : {}),
+      ...(typeof error.docUrl === "string" ? { docUrl: error.docUrl } : {}),
+    },
   };
 };
 

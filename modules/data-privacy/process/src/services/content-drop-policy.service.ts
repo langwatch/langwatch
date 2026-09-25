@@ -5,6 +5,7 @@ import {
   compileAttributePatterns,
   matchesAnyAttributePattern,
   stripRolesFromChatArrayJson,
+  type ChatArrayRoleStrip,
   type CompiledAttributeMatcher,
   type ContentCategory,
   type ResolvedDataPrivacy,
@@ -59,14 +60,14 @@ export class ContentDropPolicyService {
 
   /**
    * Removes given message roles (and optional assistant `tool_calls`) from
-   * a serialized conversation (LangWatch wrapper or bare array). Returns
-   * `null`, untouched, when the value isn't a conversation — never thrown.
+   * a serialized conversation (LangWatch wrapper or bare array). `unchanged`
+   * when the value isn't a conversation or keeps every turn — never thrown.
    */
   deriveRoleStrippedChatArrayJson(
     json: string,
     roles: ReadonlySet<string>,
     stripToolCalls: boolean,
-  ): { json: string; removed: number } | null {
+  ): ChatArrayRoleStrip {
     return stripRolesFromChatArrayJson(json, roles, stripToolCalls);
   }
 

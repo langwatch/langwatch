@@ -203,7 +203,7 @@ function renderedToolFailure(part: ToolPartLike): boolean {
   const raw = part.output;
   const text = outputText(raw);
   const document = text !== undefined ? parseCliJson(text) : raw;
-  if (readCliErrorDocument(document)) return true;
+  if (readCliErrorDocument(document).kind === "error") return true;
 
   // ONE parse, read twice. An output that IS the JSON string has already been
   // parsed into `document`, and that parse is the envelope the console read

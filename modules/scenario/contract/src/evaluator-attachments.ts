@@ -458,12 +458,8 @@ function describeTracePathIssue(path: readonly string[]): string | null {
   return isToolCall ? null : `The trace has no ${pathText(path)}`;
 }
 
-/**
- * Why a mapping path cannot be read, or null when it can. Checked when an
- * attachment is saved, so a run never meets an unknown path — a scenario
- * path's field must be one the suite declares; a plan-level names none.
- */
-export function scenarioMappingPathIssue({
+/** Why a mapping path cannot be read, or null when it can. */
+function describeMappingPathIssue({
   mapping,
   ctx,
   isPlanLevel,
@@ -485,6 +481,27 @@ export function scenarioMappingPathIssue({
     case "trace":
       return describeTracePathIssue(mapping.path);
   }
+}
+
+export type ScenarioMappingPathCheck =
+  | { kind: "readable" }
+  | { kind: "unreadable"; reason: string };
+
+/**
+ * Whether a mapping path can be read. Checked when an attachment is saved, so a run never
+ * meets an unknown path: a scenario path's field must be one the suite declares.
+ */
+export function scenarioMappingPathIssue({
+  mapping,
+  ctx,
+  isPlanLevel,
+}: {
+  mapping: ScenarioMapping;
+  ctx: Pick<ScenarioMappingContext, "fields">;
+  isPlanLevel?: boolean;
+}): ScenarioMappingPathCheck {
+  const reason = describeMappingPathIssue({ mapping, ctx, isPlanLevel });
+  return reason === null ? { kind: "readable" } : { kind: "unreadable", reason };
 }
 
 /** The field identifiers the attachments read through scenario mappings. */

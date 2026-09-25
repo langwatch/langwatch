@@ -65,12 +65,13 @@ export function readEvaluatorAttachments({
       });
     }
     for (const [input, mapping] of Object.entries(attachment.mappings)) {
-      const reason = scenarioMappingPathIssue({
+      const check = scenarioMappingPathIssue({
         mapping,
         ctx: { fields },
         isPlanLevel,
       });
-      if (reason !== null) {
+      if (check.kind === "unreadable") {
+        const { reason } = check;
         throw new SuiteEvaluatorMappingInvalidError({
           evaluatorId: attachment.evaluatorId,
           input,

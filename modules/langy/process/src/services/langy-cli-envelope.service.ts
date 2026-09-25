@@ -101,8 +101,8 @@ export class LangyCliEnvelopeService {
   }): LangyToolFrame {
     const reported = readCliErrorDocument(parseCliJson(frame.output ?? "") ?? frame.output);
 
-    return reported
-      ? { ...frame, name, output: JSON.stringify(toCliErrorDocument(reported)) }
+    return reported.kind === "error"
+      ? { ...frame, name, output: JSON.stringify(toCliErrorDocument(reported.error)) }
       : { ...frame, name };
   }
 
@@ -152,14 +152,14 @@ export class LangyCliEnvelopeService {
   }): LangyToolFrame {
     const document = parseCliJson(output);
     const reported = readCliErrorDocument(document ?? output);
-    if (reported) {
+    if (reported.kind === "error") {
       // The failure document, whole: the card renders its sentence and next steps structurally,
       // and keeping only the message discarded the code, meta and tips sent for that consumer.
       return {
         ...frame,
         name,
         isError: true,
-        output: JSON.stringify(toCliErrorDocument(reported)),
+        output: JSON.stringify(toCliErrorDocument(reported.error)),
       };
     }
 

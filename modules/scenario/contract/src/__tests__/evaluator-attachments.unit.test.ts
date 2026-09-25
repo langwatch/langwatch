@@ -170,7 +170,7 @@ describe("evaluator attachments", () => {
             mapping: { type: "source", sourceId: "trace", path: ["spans"] },
             ctx,
           }),
-        ).toBeNull();
+        ).toEqual({ kind: "readable" });
       });
     });
 
@@ -302,7 +302,7 @@ describe("evaluator attachments", () => {
             },
             ctx,
           }),
-        ).toMatch(/table_schema/);
+        ).toMatchObject({ kind: "unreadable", reason: expect.stringMatching(/table_schema/) });
       });
     });
 
@@ -318,7 +318,7 @@ describe("evaluator attachments", () => {
             },
             ctx,
           }),
-        ).toMatch(/final_answer/);
+        ).toMatchObject({ kind: "unreadable", reason: expect.stringMatching(/final_answer/) });
         expect(
           scenarioMappingPathIssue({
             mapping: {
@@ -328,7 +328,7 @@ describe("evaluator attachments", () => {
             },
             ctx,
           }),
-        ).not.toBeNull();
+        ).toMatchObject({ kind: "unreadable" });
       });
     });
 
@@ -345,7 +345,7 @@ describe("evaluator attachments", () => {
             ctx,
             isPlanLevel: true,
           }),
-        ).not.toBeNull();
+        ).toMatchObject({ kind: "unreadable" });
       });
     });
 
@@ -369,14 +369,14 @@ describe("evaluator attachments", () => {
               },
               ctx,
             }),
-          ).toBeNull();
+          ).toEqual({ kind: "readable" });
         }
         expect(
           scenarioMappingPathIssue({
             mapping: { type: "value", value: "literal" },
             ctx,
           }),
-        ).toBeNull();
+        ).toEqual({ kind: "readable" });
       });
     });
 

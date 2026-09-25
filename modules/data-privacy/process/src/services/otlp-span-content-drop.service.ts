@@ -173,7 +173,7 @@ export class OtlpSpanContentDropService {
         roleStrip.roles,
         roleStrip.stripToolCalls,
       );
-      if (!result) {
+      if (result.kind === "unchanged") {
         return attr;
       }
 

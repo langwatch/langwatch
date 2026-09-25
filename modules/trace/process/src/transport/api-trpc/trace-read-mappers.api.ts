@@ -4,7 +4,11 @@ import type { CodingAgentApi, LogContentCategory } from "@langwatch/coding-agent
  * and anonymous). Single implementation ensures a redaction cannot drift between
  * surfaces. Three capabilities injected to avoid cross-feature dependencies.
  */
-import { CONTENT_CATEGORIES, type ContentCategory } from "@langwatch/data-privacy-contract";
+import {
+  type ChatArrayRoleStrip,
+  CONTENT_CATEGORIES,
+  type ContentCategory,
+} from "@langwatch/data-privacy-contract";
 import type {
   CategoryVisibility,
   Protections,
@@ -73,7 +77,7 @@ export type TraceContentPrivacy = Readonly<{
     json: string,
     roles: ReadonlySet<string>,
     stripToolCalls: boolean,
-  ): { json: string; removed: number } | null;
+  ): ChatArrayRoleStrip;
   /**
    * The project's resolved data-privacy policy, for the trace-level DROP
    * banner. Only the four categories' dispositions are read.
@@ -468,7 +472,7 @@ function stripHiddenChatTurnsDeep({
   }
   if (typeof node === "string") {
     const result = contentPrivacy.stripRolesFromChatArrayJson(node, roles, stripToolCalls);
-    return result ? result.json : node;
+    return result.kind === "stripped" ? result.json : node;
   }
 
   return node;
@@ -601,7 +605,7 @@ export function redactV2Content<T extends RedactableV2Dto>(
   const stripTurns = (json: string | null): string | null => {
     if (json == null || (roles.size === 0 && !stripToolCalls)) return json;
     const result = contentPrivacy.stripRolesFromChatArrayJson(json, roles, stripToolCalls);
-    return result ? result.json : json;
+    return result.kind === "stripped" ? result.json : json;
   };
   const visibleInput = protections.canSeeCapturedInput === true ? (dto.input ?? null) : null;
   const visibleOutput = protections.canSeeCapturedOutput === true ? (dto.output ?? null) : null;

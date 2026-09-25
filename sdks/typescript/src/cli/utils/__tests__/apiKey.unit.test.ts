@@ -1,4 +1,15 @@
-import { readCliErrorDocument } from "@langwatch/langy-contract/cards/handled-error";
+import {
+  type CliHandledError,
+  readCliErrorDocument,
+} from "@langwatch/langy-contract/cards/handled-error";
+
+/** The CLI error document stdout carried; these cases all expect one. */
+function cliErrorDocument(output: unknown): CliHandledError {
+  const read = readCliErrorDocument(output);
+  if (read.kind !== "error") throw new Error("stdout held no CLI error document");
+  return read.error;
+}
+
 /**
  * Credential resolution is the first thing every API-calling command does:
  * priority order, session-liveness gate, daemon discipline, both failures.
@@ -424,7 +435,7 @@ describe("resolveCredentials()", () => {
         await expect(resolveCredentials()).rejects.toThrow("process.exit called");
 
         const stdout = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
-        const domain = readCliErrorDocument(stdout);
+        const domain = cliErrorDocument(stdout);
 
         expect(domain).not.toBeNull();
         expect(domain?.kind).toBe("missing_api_key");
@@ -499,7 +510,7 @@ describe("resolveCredentials()", () => {
         await expect(resolveCredentials()).rejects.toThrow("process.exit called");
 
         const stdout = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
-        expect(readCliErrorDocument(stdout)?.kind).toBe("missing_api_key");
+        expect(cliErrorDocument(stdout)?.kind).toBe("missing_api_key");
       });
     });
   });
@@ -559,7 +570,7 @@ describe("resolveCredentials()", () => {
       await expect(resolveCredentials()).rejects.toThrow("process.exit called");
 
       const stdout = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
-      const domain = readCliErrorDocument(stdout);
+      const domain = cliErrorDocument(stdout);
       expect(domain?.kind).toBe("login_endpoint_mismatch");
       expect(domain?.isHandled).toBe(true);
       expect(domain?.meta).toMatchObject({

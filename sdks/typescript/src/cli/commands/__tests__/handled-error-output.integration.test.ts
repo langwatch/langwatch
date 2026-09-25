@@ -1,4 +1,15 @@
-import { readCliErrorDocument } from "@langwatch/langy-contract/cards/handled-error";
+import {
+  type CliHandledError,
+  readCliErrorDocument,
+} from "@langwatch/langy-contract/cards/handled-error";
+
+/** The CLI error document stdout carried; these cases all expect one. */
+function cliErrorDocument(output: unknown): CliHandledError {
+  const read = readCliErrorDocument(output);
+  if (read.kind !== "error") throw new Error("stdout held no CLI error document");
+  return read.error;
+}
+
 /**
  * Failing command output contract: failure must land on stdout in machine
  * parseable format (Langy cannot distinguish transient from terminal failures).
@@ -96,14 +107,14 @@ describe("given a command fails with a domain error", () => {
     it("prints a structured document on stdout", async () => {
       await run({ format: "json" });
 
-      const parsed = readCliErrorDocument(stdout.join("\n"));
+      const parsed = cliErrorDocument(stdout.join("\n"));
       expect(parsed).not.toBeNull();
     });
 
     it("gives the machine the kind, the meta and the trace id", async () => {
       await run({ format: "json" });
 
-      expect(readCliErrorDocument(stdout.join("\n"))).toMatchObject({
+      expect(cliErrorDocument(stdout.join("\n"))).toMatchObject({
         kind: "trace_not_found",
         httpStatus: 404,
         meta: { id: "trace-abc" },

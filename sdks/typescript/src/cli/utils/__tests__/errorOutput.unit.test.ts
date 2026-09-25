@@ -1,5 +1,16 @@
-import { readCliErrorDocument } from "@langwatch/langy-contract/cards/handled-error";
+import {
+  type CliHandledError,
+  readCliErrorDocument,
+} from "@langwatch/langy-contract/cards/handled-error";
 import chalk from "chalk";
+
+/** The CLI error document stdout carried; these cases all expect one. */
+function cliErrorDocument(output: unknown): CliHandledError {
+  const read = readCliErrorDocument(output);
+  if (read.kind !== "error") throw new Error("stdout held no CLI error document");
+  return read.error;
+}
+
 /**
  * How a failure is rendered, in each of the two shapes a caller can ask for.
  */
@@ -105,7 +116,7 @@ describe("given a failure the platform named", () => {
   describe("when rendering it for a machine", () => {
     it("emits a document a parser can read the code, meta and trace id out of", () => {
       const json = renderErrorAsJson(readCommandError(handledError()));
-      const parsed = readCliErrorDocument(json);
+      const parsed = cliErrorDocument(json);
 
       expect(parsed).toMatchObject({
         code: "dataset_not_found",
@@ -152,7 +163,7 @@ describe("given an infrastructure failure the platform did NOT name", () => {
 
   describe("when rendering it for a machine", () => {
     it("says plainly that this was not the caller's fault", () => {
-      const parsed = readCliErrorDocument(
+      const parsed = cliErrorDocument(
         renderErrorAsJson(readCommandError(new Error("fetch failed"))),
       );
 
@@ -220,7 +231,7 @@ describe("given a domain error whose meta holds an actionable identifier", () =>
 
   describe("when rendering it for a machine", () => {
     it("hands the identifier through so the agent can act on it", () => {
-      const parsed = readCliErrorDocument(renderErrorAsJson(readCommandError(withKeyLikeIds())));
+      const parsed = cliErrorDocument(renderErrorAsJson(readCommandError(withKeyLikeIds())));
 
       expect(parsed?.meta).toEqual({
         virtualKeyId: "vk-abc123def456",
@@ -276,7 +287,7 @@ describe("given a failure on a command path that has no spinner", () => {
       reportCommandError({ error: handledError(), format: "json" });
 
       const stdout = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
-      const parsed = readCliErrorDocument(stdout);
+      const parsed = cliErrorDocument(stdout);
 
       expect(parsed?.kind).toBe("dataset_not_found");
       expect(errorSpy).toHaveBeenCalled();
@@ -302,7 +313,7 @@ describe("given a failure on a command path that has no spinner", () => {
       });
 
       const stdout = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
-      const parsed = readCliErrorDocument(stdout);
+      const parsed = cliErrorDocument(stdout);
 
       expect(parsed?.kind).toBe("validation_error");
       expect(parsed?.isHandled).toBe(true);
@@ -334,7 +345,7 @@ describe("given a failure the platform sent advice with", () => {
 
   describe("when rendering it for a machine", () => {
     it("carries the advice in the document", () => {
-      const parsed = readCliErrorDocument(renderErrorAsJson(readCommandError(advised())));
+      const parsed = cliErrorDocument(renderErrorAsJson(readCommandError(advised())));
 
       expect(parsed).toMatchObject({
         code: "budget_exceeded",
@@ -358,7 +369,7 @@ describe("given a failure the platform sent NO advice with", () => {
     });
 
     it("fills the JSON document from the same table", () => {
-      const parsed = readCliErrorDocument(
+      const parsed = cliErrorDocument(
         renderErrorAsJson(readCommandError(handledError({ code: "missing_api_key" }))),
       );
 

@@ -34,23 +34,27 @@ function stripMessages({
 
 /**
  * Remove message roles (and optionally assistant tool_calls) from JSON chat
- * conversations. Returns rewritten JSON and removal count, or null if not a
- * conversation. Pure contract function used by ingestion and read paths.
+ * conversations. `unchanged` when it is not a conversation or nothing was removed.
+ * Pure contract function used by ingestion and read paths.
  */
+export type ChatArrayRoleStrip =
+  | { kind: "stripped"; json: string; removed: number }
+  | { kind: "unchanged" };
+
 export function stripRolesFromChatArrayJson(
   json: string,
   roles: ReadonlySet<string>,
   stripToolCalls: boolean,
-): { json: string; removed: number } | null {
+): ChatArrayRoleStrip {
   if (roles.size === 0 && !stripToolCalls) {
-    return null;
+    return { kind: "unchanged" };
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
   } catch {
-    return null;
+    return { kind: "unchanged" };
   }
 
   let messages: unknown[];
@@ -62,13 +66,13 @@ export function stripRolesFromChatArrayJson(
     messages = (parsed as { value: unknown[] }).value;
     rewrap = (next) => ({ ...parsed, value: next });
   } else {
-    return null;
+    return { kind: "unchanged" };
   }
 
   const { next, removed } = stripMessages({ messages, roles, stripToolCalls });
   if (removed === 0) {
-    return null;
+    return { kind: "unchanged" };
   }
 
-  return { json: JSON.stringify(rewrap(next)), removed };
+  return { kind: "stripped", json: JSON.stringify(rewrap(next)), removed };
 }

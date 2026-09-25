@@ -5,6 +5,7 @@ import { explainHandledError } from "@langwatch/error-presentation/presentation"
  *      "A failure keeps its structure all the way to the card"
  */
 import {
+  type CliErrorDocumentRead,
   type CliHandledError,
   isTerminalFailure,
   parseCliJson,
@@ -76,7 +77,7 @@ function safeHttpUrl(value: unknown): string | undefined {
   }
 }
 
-function readStructuredError(errorText: unknown): CliHandledError | null {
+function readStructuredError(errorText: unknown): CliErrorDocumentRead {
   if (typeof errorText === "string") {
     // Shell tools merge stderr with stdout. parseCliJson extracts the first
     // balanced JSON document, so a CLI error remains readable even when a
@@ -371,7 +372,8 @@ export function presentLangyToolError({
   toolName?: string;
 }): LangyToolErrorPresentation {
   const raw = rawFailureText(errorText);
-  const domain = readStructuredError(errorText);
+  const structured = readStructuredError(errorText);
+  const domain = structured.kind === "error" ? structured.error : null;
 
   const notInstalled = githubAppNotInstalled({ toolName, raw });
   if (notInstalled) return notInstalled;

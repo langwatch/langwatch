@@ -8,9 +8,19 @@ vi.mock("../../../utils/apiKey", () => ({
   })),
 }));
 
-import { readCliErrorDocument } from "@langwatch/langy-contract/cards/handled-error";
+import {
+  type CliHandledError,
+  readCliErrorDocument,
+} from "@langwatch/langy-contract/cards/handled-error";
 
 import { REQUEST_TIMEOUT_MS, uiCallCommand } from "../call";
+
+/** The CLI error document stdout carried; these cases all expect one. */
+function cliErrorDocument(output: unknown): CliHandledError {
+  const read = readCliErrorDocument(output);
+  if (read.kind !== "error") throw new Error("stdout held no CLI error document");
+  return read.error;
+}
 
 /**
  * The dispatch body is always a JSON string. Reading it back is how these tests
@@ -221,7 +231,7 @@ describe("the ui call command", () => {
       });
 
       expect(process.exitCode).toBe(1);
-      const document = readCliErrorDocument(stdout.join("\n"));
+      const document = cliErrorDocument(stdout.join("\n"));
       expect(document).toMatchObject({
         code: "langy_ui_payload_invalid",
         message: 'The payload for "workbench.setTargetPrompt" does not match the action\'s schema.',

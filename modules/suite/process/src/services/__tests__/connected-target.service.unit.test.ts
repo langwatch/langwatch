@@ -1,8 +1,8 @@
-import { connectedAgentSelectability } from "@langwatch/agent-contract";
+import { agentSchema, connectedAgentSelectability } from "@langwatch/agent-contract";
 import type { Agent, AgentReferenceState, AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import type { RunActor } from "@langwatch/scenario-contract";
+import type { RunActor, ScenarioApi } from "@langwatch/scenario-contract";
 import {
   InvalidTargetReferencesError,
   type RunPlanConfigInput,
@@ -52,6 +52,29 @@ function baseSuite(overrides: Partial<Suite> = {}): Suite {
   };
 }
 
+/** A connected agent as the agent contract reads it back. */
+function connectedAgent(agent: {
+  id: string;
+  name: string;
+  environment: string | null;
+  ownerUserId: string | null;
+}): Agent {
+  return agentSchema.parse({
+    id: agent.id,
+    projectId,
+    name: agent.name,
+    type: "connected",
+    workflowId: null,
+    copiedFromAgentId: null,
+    archivedAt: null,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    environment: agent.environment,
+    ownerUserId: agent.ownerUserId,
+    config: { sdk: { name: "langwatch", version: "1.0.0", language: "python" } },
+  });
+}
+
 /** An AgentApi fixture backed by a small registry of connected agents. */
 function connectedAgentApi(agents: ConnectedAgentFixture[]): AgentApi {
   const byId = new Map(agents.map((agent) => [agent.id, agent]));
@@ -72,32 +95,13 @@ function connectedAgentApi(agents: ConnectedAgentFixture[]): AgentApi {
     getConnectedByName: vi.fn(async (input: { name: string }): Promise<Agent[]> =>
       agents
         .filter((agent) => agent.name === input.name)
-        .map(
-          (agent) =>
-            ({
-              id: agent.id,
-              projectId,
-              name: agent.name,
-              type: "connected",
-              environment: agent.environment,
-              ownerUserId: agent.ownerUserId,
-            }) as unknown as Agent,
-        ),
+        .map((agent) => connectedAgent({ ...agent, environment: agent.environment })),
     ),
     getConnectedByNameAndEnvironment: vi.fn(
       async (input: { name: string; environment: string }): Promise<Agent[]> =>
         agents
           .filter((agent) => agent.name === input.name && agent.environment === input.environment)
-          .map(
-            (agent) =>
-              ({
-                id: agent.id,
-                projectId,
-                name: agent.name,
-                type: "connected",
-                ownerUserId: agent.ownerUserId,
-              }) as unknown as Agent,
-          ),
+          .map((agent) => connectedAgent({ ...agent, environment: null })),
     ),
     ownersOf: vi.fn(async (subjects: readonly { ownerUserId: string | null }[]) => {
       const owners = new Map<string, { userId: string; name: string | null }>();
@@ -138,7 +142,7 @@ function buildService(agents: AgentApi) {
       created: true,
     }),
   });
-  const scenarios = {
+  const scenarios = createApiFixture<ScenarioApi>({
     resolveRunParametersForScenarios: vi.fn(async () => []),
     getReferenceStates: vi.fn(async ({ ids }: { ids: string[] }) =>
       ids.map((id) => ({ id, archivedAt: null })),
@@ -153,14 +157,14 @@ function buildService(agents: AgentApi) {
         parameters: null,
       })),
     ),
-  } as unknown as SuiteService["options"]["scenarios"];
+  });
   const execution = createApiFixture<SuiteExecution>({ execute });
 
   const service = SuiteService.create({
     repository,
     scenarios,
     agents,
-    prompts: {} as PromptApi,
+    prompts: createApiFixture<PromptApi>({}),
     execution,
     generateId: () => "suite_generated",
   });
@@ -302,10 +306,8 @@ describe("addressing a connected agent by name and environment", () => {
       await runAgainst({ service, referenceId: "support-agent@production", actor: teammate });
 
       expect(execute).toHaveBeenCalledTimes(1);
-      const call = execute.mock.calls[0]?.[0] as {
-        activeTargets: { type: string; referenceId: string }[];
-      };
-      expect(call.activeTargets).toEqual([{ type: "connected", referenceId: "agent_prod" }]);
+      const call = execute.mock.calls[0]?.[0];
+      expect(call?.activeTargets).toEqual([{ type: "connected", referenceId: "agent_prod" }]);
     });
   });
 
