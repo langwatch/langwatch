@@ -883,6 +883,10 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
         page: "pages/ops/backoffice/self-hosted-instances",
       },
       {
+        path: "/ops/backoffice/identity-lookup",
+        page: "pages/ops/backoffice/identity-lookup",
+      },
+      {
         path: "/ops/backoffice/users",
         page: "pages/ops/backoffice/users",
       },

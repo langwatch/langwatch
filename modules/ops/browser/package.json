@@ -44,6 +44,7 @@
     "@langwatch/enterprise-sso-contract": "workspace:*",
     "@langwatch/feature-flag-browser": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/time": "workspace:*",

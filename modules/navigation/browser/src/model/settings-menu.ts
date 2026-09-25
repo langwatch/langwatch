@@ -37,6 +37,7 @@ import {
   Users,
   UsersRound,
   Workflow,
+  UserSearch,
 } from "lucide-react";
 
 import { isPathUnder } from "./products.ts";
@@ -355,6 +356,11 @@ export function backofficeGroup(): SettingsMenuGroup {
         label: "Single Sign-On",
         href: "/ops/backoffice/sso-connections",
         icon: ShieldCheck,
+      },
+      {
+        label: "Identity Lookup",
+        href: "/ops/backoffice/identity-lookup",
+        icon: UserSearch,
       },
       {
         label: "Directory Sync",

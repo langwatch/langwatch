@@ -12,7 +12,8 @@
     "types": ["vitest/globals"],
     "paths": {
       "@langwatch/ops-contract": ["../contract/src/index.ts"],
-      "@langwatch/feature-flag-contract": ["../../feature-flag/contract/src/index.ts"]
+      "@langwatch/feature-flag-contract": ["../../feature-flag/contract/src/index.ts"],
+      "@langwatch/identity-contract": ["../../identity/contract/src/index.ts"]
     },
 
   },
@@ -38,6 +39,9 @@
     },
     {
       "path": "../../feature-flag/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../identity/contract/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"

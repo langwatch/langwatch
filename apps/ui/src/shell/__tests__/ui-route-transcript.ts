@@ -167,6 +167,7 @@ export const expectedUiRouteTranscript: readonly string[] = [
   "  route /ops/backoffice/bug-reports -> pages/ops/backoffice/bug-reports",
   "  route /ops/backoffice/licenses -> pages/ops/backoffice/licenses",
   "  route /ops/backoffice/self-hosted-instances -> pages/ops/backoffice/self-hosted-instances",
+  "  route /ops/backoffice/identity-lookup -> pages/ops/backoffice/identity-lookup",
   "  route /ops/backoffice/users -> pages/ops/backoffice/users",
   "  route /ops/backoffice/organizations -> pages/ops/backoffice/organizations",
   "  route /ops/backoffice/projects -> pages/ops/backoffice/projects",

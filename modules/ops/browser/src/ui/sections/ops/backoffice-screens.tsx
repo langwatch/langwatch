@@ -37,3 +37,7 @@ export function BackofficeLicensesScreen() {
 export function BackofficeSelfHostedInstancesScreen() {
   return <OpsBackofficeScreen resource="self-hosted-instances" />;
 }
+
+export function BackofficeIdentityLookupScreen() {
+  return <OpsBackofficeScreen resource="identity-lookup" />;
+}

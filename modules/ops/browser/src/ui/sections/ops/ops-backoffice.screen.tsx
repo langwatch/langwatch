@@ -1,8 +1,9 @@
-/** Backoffice over six addresses: one screen with resource as a prop. */
+/** Backoffice over its addresses: one screen with resource as a prop. */
 
 import type { ComponentType } from "react";
 
 import BugReportsView from "../../../features/backoffice/ui/sections/bug-reports-view.tsx";
+import IdentityLookupView from "../../../features/backoffice/ui/sections/identity-lookup-view.tsx";
 import LicensesView from "../../../features/backoffice/ui/sections/licenses-view.tsx";
 import OrganizationsView from "../../../features/backoffice/ui/sections/organizations-view.tsx";
 import ProjectsView from "../../../features/backoffice/ui/sections/projects-view.tsx";
@@ -21,6 +22,7 @@ const VIEWS: Record<BackofficeResource, ComponentType> = {
   "bug-reports": BugReportsView,
   licenses: LicensesView,
   "self-hosted-instances": SelfHostedInstancesView,
+  "identity-lookup": IdentityLookupView,
 };
 
 export default function OpsBackofficeScreen({

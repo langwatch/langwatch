@@ -13,6 +13,10 @@ import {
 } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Menu } from "@langwatch/design-system/menu";
+import type {
+  BackofficeSsoConnection,
+  SsoSetupMigration,
+} from "@langwatch/enterprise-sso-contract";
 import { MoreVertical } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useDebounce } from "use-debounce";
@@ -100,31 +104,14 @@ const METHOD_LABEL: Record<string, string> = {
   "legacy-configuration": "Earlier configuration",
 };
 
-interface ConnectionRow {
-  connectionId: string;
-  organizationId: string;
-  organizationName: string | null;
-  state: string;
-  verifiedDomains: string[];
-  claimedDomains: string[];
-  approvedDomains: string[];
-  domainVerifications: {
-    domain: string;
-    method: string;
-    actorId: string | null;
-    verifiedAtMs: number;
-  }[];
-  providerId: string;
-  issuer: string | null;
-  type: string;
-  source: string;
-  allowsJit: boolean;
-  testLoginAccountId: string | null;
-  rejection: { domain: string; note: string } | null;
-  pendingVerificationDomain: string | null;
-  createdAtMs: number;
-  updatedAtMs: number;
-}
+type ConnectionRow = BackofficeSsoConnection;
+
+/** The three answers in the words the customer's own screen uses. */
+const ARRIVAL_LABELS = {
+  admit: "Joins the organization",
+  request: "Asks to join, and waits for an administrator",
+  refuse: "Is turned away",
+} as const;
 
 function ConnectionsTable({
   connections,
@@ -591,6 +578,10 @@ function ConnectionDrawer({
     { connectionId: connectionId ?? "" },
     { enabled: !!connectionId, retry: false },
   );
+  const migration = api.ssoConnections.getMigrationProgress.useQuery(
+    { connectionId: connectionId ?? "", cursor: null, limit: 50 },
+    { enabled: !!connectionId, retry: false },
+  );
   const held = connection.data;
 
   return (
@@ -611,12 +602,86 @@ function ConnectionDrawer({
             <VStack align="stretch" gap={6}>
               <ConnectionFacts connection={held} />
               <ConnectionDomains connection={held} />
+              {held.source === "legacy-grandfathered" && (
+                <MigrationInventory migration={migration.data ?? null} />
+              )}
               {held.state === "VERIFIED" && <ActivationPanel connection={held} />}
+              <ConnectionHistory connectionId={held.connectionId} />
             </VStack>
           )}
         </Drawer.Body>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+/** A carried-over connection's replacement, and how far the cutover has come. */
+function MigrationInventory({ migration }: { migration: SsoSetupMigration | null }) {
+  return (
+    <Box>
+      <Text fontWeight="semibold" marginBottom={2}>
+        Migration inventory
+      </Text>
+      <VStack align="stretch" gap={2}>
+        {migration ? (
+          <>
+            <Text fontSize="sm">
+              Replacement is in {migration.phase.toLowerCase()} with {migration.members.linkedCount}{" "}
+              of {migration.members.activeCount} active members linked.
+            </Text>
+            <Text fontSize="sm" color="fg.muted">
+              Route: {migration.selectedRoute}; SCIM: {migration.scim.status}.
+            </Text>
+            {migration.blockers.length > 0 && (
+              <Text fontSize="sm" color="fg.muted">
+                Waiting on: {migration.blockers.map((blocker) => blocker.message).join("; ")}
+              </Text>
+            )}
+          </>
+        ) : (
+          <Text fontSize="sm" color="fg.muted">
+            No replacement is registered. Import the customer's supplied OIDC or SAML configuration
+            to begin the guarded migration.
+          </Text>
+        )}
+      </VStack>
+    </Box>
+  );
+}
+
+/** What happened to this connection, newest first, in the words the organization's
+ *  own page uses. */
+function ConnectionHistory({ connectionId }: { connectionId: string }) {
+  const history = api.ssoConnections.getHistory.useQuery({ connectionId });
+  const rows = history.data ?? [];
+
+  return (
+    <Box>
+      <Text fontWeight="semibold" marginBottom={2}>
+        History
+      </Text>
+      {history.isLoading && (
+        <Text color="fg.muted" fontSize="sm">
+          Loading…
+        </Text>
+      )}
+      {!history.isLoading && rows.length === 0 && (
+        <Text color="fg.muted" fontSize="sm">
+          Nothing has happened to this connection yet.
+        </Text>
+      )}
+      <VStack align="stretch" gap={1}>
+        {rows.map((entry) => (
+          <HStack key={entry.eventId} gap={3} fontSize="sm">
+            <Text color="fg.muted" minWidth="18ch" flexShrink={0}>
+              {formatDateTime(entry.occurredAtMs)}
+            </Text>
+            <Text>{entry.summary}</Text>
+            {entry.carriedOver && <Badge colorPalette="gray">carried over</Badge>}
+          </HStack>
+        ))}
+      </VStack>
+    </Box>
   );
 }
 
@@ -632,8 +697,8 @@ function ConnectionFacts({ connection }: { connection: ConnectionRow }) {
           ? "Carried over from an earlier configuration"
           : "In the back office"}
       </Fact>
-      <Fact label="New people provisioned on first sign-in">
-        {connection.allowsJit ? "Yes" : "No"}
+      <Fact label="Somebody signing in who is not a member yet">
+        {ARRIVAL_LABELS[connection.arrivalPolicy]}
       </Fact>
     </SimpleGrid>
   );
@@ -669,7 +734,7 @@ function ConnectionDomains({ connection }: { connection: ConnectionRow }) {
       </VStack>
       {connection.claimedDomains.length > 0 && (
         <Text fontSize="sm" color="fg.muted" marginTop={2}>
-          Waiting for a decision: {connection.claimedDomains.join(", ")}
+          Claimed, not yet proved: {connection.claimedDomains.join(", ")}
         </Text>
       )}
       {connection.approvedDomains.length > 0 && (

@@ -20,6 +20,12 @@ const listState = vi.hoisted(() => ({
 const byIdState = vi.hoisted(() => ({
   current: { data: undefined as unknown, error: null as Error | null },
 }));
+const historyState = vi.hoisted(() => ({
+  current: { data: [] as unknown[], isLoading: false, error: null as Error | null },
+}));
+const migrationState = vi.hoisted(() => ({
+  current: { data: null as unknown, error: null as Error | null },
+}));
 const routerState = vi.hoisted(() => ({
   query: {} as Record<string, string>,
   replace: vi.fn(),
@@ -46,6 +52,11 @@ vi.mock("../../../behavior/ops-api.ts", () => {
         getById: {
           useQuery: (_input: unknown, opts?: { enabled?: boolean }) =>
             opts?.enabled ? byIdState.current : { data: undefined, error: null },
+        },
+        getHistory: { useQuery: () => historyState.current },
+        getMigrationProgress: {
+          useQuery: (_input: unknown, opts?: { enabled?: boolean }) =>
+            opts?.enabled ? migrationState.current : { data: null, error: null },
         },
         approveDomainClaim: mutation("approveDomainClaim"),
         rejectDomainClaim: mutation("rejectDomainClaim"),
@@ -88,6 +99,7 @@ const ATTESTED = {
   providerId: "okta",
   issuer: "https://login.acme.okta.com",
   allowsJit: true,
+  arrivalPolicy: "request",
   source: "self-serve",
   testLoginAccountId: "acc_test",
   rejection: null,
@@ -113,6 +125,8 @@ function renderView() {
 beforeEach(() => {
   vi.clearAllMocks();
   routerState.query = {};
+  historyState.current = { data: [], isLoading: false, error: null };
+  migrationState.current = { data: null, error: null };
   listState.current = {
     data: { connections: [ATTESTED], total: 1 },
     isLoading: false,
@@ -338,6 +352,79 @@ describe("the back-office single sign-on list", () => {
       });
       expect(routerState.replace).toHaveBeenCalledWith({ query: { q: "acme" } }, undefined, {
         shallow: true,
+      });
+    });
+  });
+
+  describe("when an operator reads a connection's detail", () => {
+    beforeEach(() => {
+      routerState.query = { connection: "ssoc_1" };
+    });
+
+    it("says who a newcomer signing in becomes, in the customer's own words", async () => {
+      renderView();
+
+      await waitFor(() => {
+        expect(screen.getByText("Asks to join, and waits for an administrator")).toBeTruthy();
+      });
+    });
+
+    it("lists what happened to the connection, marking what the migration carried over", async () => {
+      historyState.current = {
+        data: [
+          { eventId: "evt_2", occurredAtMs: 2, summary: "Sign-in turned on", carriedOver: false },
+          {
+            eventId: "evt_1",
+            occurredAtMs: 1,
+            summary: "Domain acme.com proved",
+            carriedOver: true,
+          },
+        ],
+        isLoading: false,
+        error: null,
+      };
+      renderView();
+
+      await waitFor(() => {
+        expect(screen.getByText("Sign-in turned on")).toBeTruthy();
+      });
+      expect(screen.getByText("Domain acme.com proved")).toBeTruthy();
+      expect(screen.getByText("carried over")).toBeTruthy();
+    });
+
+    it("shows a carried-over connection's cutover progress and what it waits on", async () => {
+      byIdState.current = {
+        data: { ...ATTESTED, source: "legacy-grandfathered" },
+        error: null,
+      };
+      migrationState.current = {
+        data: {
+          phase: "GRACE_LEGACY",
+          selectedRoute: "legacy",
+          members: { activeCount: 12, linkedCount: 5 },
+          scim: { status: "needs-repointing" },
+          blockers: [{ code: "members_unlinked", message: "Seven members have not signed in" }],
+        },
+        error: null,
+      };
+      renderView();
+
+      await waitFor(() => {
+        expect(screen.getByText("Migration inventory")).toBeTruthy();
+      });
+      expect(screen.getByText(/5\s+of 12 active members linked/)).toBeTruthy();
+      expect(screen.getByText(/Seven members have not signed in/)).toBeTruthy();
+    });
+
+    it("says no replacement is registered when a carried-over connection has none", async () => {
+      byIdState.current = {
+        data: { ...ATTESTED, source: "legacy-grandfathered" },
+        error: null,
+      };
+      renderView();
+
+      await waitFor(() => {
+        expect(screen.getByText(/No replacement is registered/)).toBeTruthy();
       });
     });
   });

@@ -5,7 +5,8 @@
     "rootDir": "src",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
-      "@langwatch/ops-browser": ["./src/index.ts"]
+      "@langwatch/ops-browser": ["./src/index.ts"],
+      "@langwatch/identity-contract": ["../../identity/contract/src/index.ts"]
     },
   },
   "files": [
@@ -45,6 +46,9 @@
     },
     {
       "path": "../../feature-flag/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../identity/contract/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"

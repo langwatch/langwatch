@@ -4,6 +4,8 @@
  */
 
 import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
+import type { ssoConnectionTrpc } from "@langwatch/enterprise-sso-contract";
+import type { identityLookupTrpc } from "@langwatch/identity-contract";
 import type {
   licenseRegistryTrpc,
   opsDashboardTrpc,
@@ -29,10 +31,6 @@ export type OpsOrganizationGraph = {
   }[];
 };
 
-/**
- * Procedures other features own. Organization belongs to a separate feature,
- * not yet split. SSO connections are enterprise-only, imported through composition.
- */
 /** One report in the issue inbox's listing. */
 export type BugReportListingRow = {
   id: string;
@@ -53,35 +51,7 @@ export type BugReportDetail = BugReportListingRow & {
   sessionTruncated: boolean;
 };
 
-/**
- * One SSO connection as the back office reads it.
- */
-export type BackofficeSsoConnection = Readonly<{
-  connectionId: string;
-  organizationId: string;
-  organizationName: string | null;
-  type: string;
-  state: string;
-  claimedDomains: string[];
-  approvedDomains: string[];
-  verifiedDomains: string[];
-  domainVerifications: {
-    domain: string;
-    method: string;
-    actorId: string | null;
-    verifiedAtMs: number;
-  }[];
-  providerId: string;
-  issuer: string | null;
-  allowsJit: boolean;
-  source: string;
-  testLoginAccountId: string | null;
-  rejection: { domain: string; note: string } | null;
-  pendingVerificationDomain: string | null;
-  createdAtMs: number;
-  updatedAtMs: number;
-}>;
-
+/** Procedures whose owners declare no contract yet: organization and bug reports. */
 type BorrowedProcedures = {
   organization: {
     /**
@@ -99,67 +69,11 @@ type BorrowedProcedures = {
     };
     getById: { query: { input: { id: string }; output: BugReportDetail } };
   };
-  ssoConnections: {
-    getAll: {
-      query: {
-        input: { page: number; pageSize: number; search?: string };
-        output: { connections: BackofficeSsoConnection[]; total: number };
-      };
-    };
-    getById: {
-      query: { input: { connectionId: string }; output: BackofficeSsoConnection | null };
-    };
-    approveDomainClaim: {
-      mutation: {
-        input: { organizationId: string; connectionId: string; domain: string };
-        output: undefined;
-      };
-    };
-    rejectDomainClaim: {
-      mutation: {
-        input: { organizationId: string; connectionId: string; domain: string; note: string };
-        output: undefined;
-      };
-    };
-    attestDomain: {
-      mutation: {
-        input: {
-          organizationId: string;
-          connectionId: string;
-          domain: string;
-          evidenceRef: string;
-          note: string;
-        };
-        output: undefined;
-      };
-    };
-    activate: {
-      mutation: {
-        input: { organizationId: string; connectionId: string; testLoginAccountId: string };
-        output: undefined;
-      };
-    };
-    suspend: {
-      mutation: {
-        input: { organizationId: string; connectionId: string; reason: string | null };
-        output: undefined;
-      };
-    };
-    resume: {
-      mutation: { input: { organizationId: string; connectionId: string }; output: undefined };
-    };
-    requestTeardown: {
-      mutation: {
-        input: { organizationId: string; connectionId: string; reason: string | null };
-        output: undefined;
-      };
-    };
-  };
 };
 
 /**
- * The whole `ops.*`, `bugReports.*`, `prompts.*`, `ssoConnections.*` and
- * `organization.*` surface this package calls.
+ * The whole `ops.*`, `bugReports.*`, `prompts.*`, `ssoConnections.*`,
+ * `identityLookup.*` and `organization.*` surface this package calls.
  */
 export type OpsApiMap = ContractApiMap<typeof opsDashboardTrpc> &
   ContractApiMap<typeof opsEventLogTrpc> &
@@ -169,6 +83,8 @@ export type OpsApiMap = ContractApiMap<typeof opsDashboardTrpc> &
   ContractApiMap<typeof licenseRegistryTrpc> &
   ContractApiMap<typeof selfHostedInstancesTrpc> &
   ContractApiMap<typeof promptTrpc> &
+  ContractApiMap<typeof ssoConnectionTrpc> &
+  ContractApiMap<typeof identityLookupTrpc> &
   BorrowedProcedures;
 
 /**

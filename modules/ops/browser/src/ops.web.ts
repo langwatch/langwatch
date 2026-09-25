@@ -114,6 +114,12 @@ export const opsWeb = defineWebModule("ops")
           .BackofficeSelfHostedInstancesScreen,
       }),
     },
+    "pages/ops/backoffice/identity-lookup": {
+      load: async () => ({
+        default: (await import("./ui/sections/ops/backoffice-screens.tsx"))
+          .BackofficeIdentityLookupScreen,
+      }),
+    },
   })
   .withDrawers({
     opsGroupDetail: {
