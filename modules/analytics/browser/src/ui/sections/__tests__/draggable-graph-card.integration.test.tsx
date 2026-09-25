@@ -132,6 +132,7 @@ describe("a dashboard grid card", () => {
       expect(screen.queryByTestId("workbench-widget")).not.toBeInTheDocument();
     });
 
+    /** @scenario "A builder card keeps the builder renderer and its alert bell" */
     it("offers the alert bell", () => {
       renderCard({ kind: "builder" });
 

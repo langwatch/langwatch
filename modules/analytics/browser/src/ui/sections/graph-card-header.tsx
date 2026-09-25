@@ -1,13 +1,63 @@
-import { Heading, HStack, Spacer } from "@chakra-ui/react";
+import { Button, Heading, HStack, IconButton, Spacer } from "@chakra-ui/react";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
-import { BarChart2 } from "lucide-react";
-import { useMemo } from "react";
+import { findSeriesIdentifier } from "@langwatch/automation-contract";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { BarChart2, Bell } from "lucide-react";
+import { useMemo, type MouseEvent } from "react";
 
 import type { FilterField } from "../../model/analytics-filter-definition.ts";
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { GraphFilterIndicator } from "../elements/graph-filter-indicator.tsx";
 import type { CustomGraphInput } from "./custom-graph.tsx";
 import { GraphCardMenu } from "./graph-card-menu.tsx";
+
+type GraphCardTrigger = { id: string; active: boolean; alertType: string | null };
+
+/** Main's add/edit alert entry points; both open automation's drawer through the host. */
+function GraphCardAlertButton({
+  graphId,
+  graph,
+  trigger,
+}: {
+  graphId: string;
+  graph: unknown;
+  trigger?: GraphCardTrigger | null;
+}) {
+  const host = useAnalyticsHost();
+  const openAlert = (event: MouseEvent) => {
+    event.stopPropagation();
+    const seriesName = findSeriesIdentifier(graph, 0);
+    host.openAutomationDrawer({
+      graphId,
+      ...(trigger?.active ? { automationId: trigger.id } : {}),
+      ...(seriesName === undefined ? {} : { seriesName }),
+    });
+  };
+
+  if (trigger?.active) {
+    return (
+      <Tooltip content="Edit alert" positioning={{ placement: "top" }} showArrow>
+        <IconButton
+          aria-label="Edit alert"
+          variant="ghost"
+          size="sm"
+          color="fg"
+          onClick={openAlert}
+        >
+          <Bell width={18} />
+        </IconButton>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <Button variant="outline" colorPalette="gray" size="sm" onClick={openAlert}>
+      <Bell width={16} />
+      Add alert
+    </Button>
+  );
+}
 
 interface GraphCardHeaderProps {
   graphId: string;
@@ -17,8 +67,12 @@ interface GraphCardHeaderProps {
   projectSlug: string;
   dashboardId?: string;
   filters: unknown;
+  /** The alert already authored on this graph, if any. */
+  trigger?: GraphCardTrigger | null;
   /** Whether this card is a saved LangWatchQL chart rather than a builder graph. */
   isWorkbenchChart?: boolean;
+  /** Whether this card is a dashboard widget, which has no `series` to alert on either. */
+  isDashboardWidget?: boolean;
   /** The datapoint step a workbench card runs at, when it has one stored. */
   granularitySeconds?: number;
   /** Optional drag affordances for sortable lists; the dashboard grid supplies its own handle. */
@@ -38,7 +92,9 @@ export function GraphCardHeader({
   projectSlug,
   dashboardId,
   filters,
+  trigger,
   isWorkbenchChart = false,
+  isDashboardWidget = false,
   granularitySeconds,
   isDragging,
   dragAttributes,
@@ -75,11 +131,9 @@ export function GraphCardHeader({
     [filters],
   );
 
-  /**
-   * THE ALERT BELL DID NOT TRAVEL, and this is the second of the two places it stopped being a
-   * compile break. Both entry points — "Add alert" and the bell that edits an existing one —
-   * called `openDrawer("automation", …)`.
-   */
+  // Neither a workbench chart nor a dashboard widget has a builder `series` to threshold.
+  const isSavedGraph =
+    !isWorkbenchChart && !isDashboardWidget && !!(graphId && graphId !== "custom" && graph);
 
   return (
     <HStack
@@ -94,6 +148,8 @@ export function GraphCardHeader({
         {displayName}
       </Heading>
       <Spacer />
+
+      {isSavedGraph && <GraphCardAlertButton graphId={graphId} graph={graph} trigger={trigger} />}
 
       {hasFilters && (
         <GraphFilterIndicator

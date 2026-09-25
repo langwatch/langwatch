@@ -1,4 +1,4 @@
-import { DlpServiceClient } from "@google-cloud/dlp";
+import type { DlpServiceClient } from "@google-cloud/dlp";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
@@ -36,13 +36,19 @@ function parseCredentials(credential: string | undefined): GoogleDlpCredentials 
   return parsed.data;
 }
 
+/** Loads the SDK on first inspection only; see specs/setup/memory-footprint.feature. */
+async function openClient(credentials: GoogleDlpCredentials): Promise<DlpServiceClient> {
+  const { DlpServiceClient } = await import("@google-cloud/dlp");
+  return new DlpServiceClient({ credentials });
+}
+
 /** A port of main's `WorkerPiiAnalysisAdapter` DLP half; the client opens on first inspection. */
 export class HttpGoogleDlpChannel implements GoogleDlpChannel {
   static create(input: { credential: string | undefined }): HttpGoogleDlpChannel {
     return new HttpGoogleDlpChannel(parseCredentials(input.credential));
   }
 
-  #client: DlpServiceClient | undefined;
+  #client: Promise<DlpServiceClient> | undefined;
 
   private constructor(private readonly credentials: GoogleDlpCredentials | undefined) {}
 
@@ -56,8 +62,8 @@ export class HttpGoogleDlpChannel implements GoogleDlpChannel {
         "Google DLP redaction requested but GOOGLE_APPLICATION_CREDENTIALS is not configured. Configure the credentials or lower the data-privacy PII level for this scope.",
       );
     }
-    this.#client ??= new DlpServiceClient({ credentials });
-    const [response] = await this.#client.inspectContent({
+    const client = await this.#open(credentials);
+    const [response] = await client.inspectContent({
       parent: `projects/${credentials.project_id}/locations/global`,
       inspectConfig: {
         infoTypes: input.infoTypes.map((name) => ({ name })),
@@ -76,7 +82,16 @@ export class HttpGoogleDlpChannel implements GoogleDlpChannel {
     });
   }
 
+  #open(credentials: GoogleDlpCredentials): Promise<DlpServiceClient> {
+    this.#client ??= openClient(credentials).catch((error: unknown) => {
+      this.#client = undefined;
+      throw error;
+    });
+    return this.#client;
+  }
+
   async close(): Promise<void> {
-    await this.#client?.close();
+    const client = await this.#client?.catch(() => undefined);
+    await client?.close();
   }
 }

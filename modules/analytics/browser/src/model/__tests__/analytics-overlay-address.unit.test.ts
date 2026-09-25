@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { traceDetailsAddress } from "../analytics-overlay-address.ts";
+import { automationDrawerAddress, traceDetailsAddress } from "../analytics-overlay-address.ts";
 
 describe("the trace overlay address", () => {
   describe("given a page with a range and a filter on the address", () => {
@@ -55,6 +55,27 @@ describe("the trace overlay address", () => {
         expect(next["drawer.open"]).toBe("traceV2Details");
         expect(next["drawer.selectedTraceIds"]).toBeUndefined();
         expect(next.period).toBe("7d");
+      });
+    });
+  });
+});
+
+describe("the automation drawer address", () => {
+  describe("given a graph's alert is being authored over a stale overlay", () => {
+    it("names automation's drawer with the graph and alert, and clears the old keys", () => {
+      const next = automationDrawerAddress({
+        current: { "drawer.open": "traceV2Details", "drawer.traceId": "trace-9", period: "7d" },
+        graphId: "graph_1",
+        automationId: "trigger_1",
+      });
+
+      expect(next).toEqual({
+        "drawer.open": "automation",
+        "drawer.traceId": undefined,
+        "drawer.automationId": "trigger_1",
+        "drawer.prefilledGraphId": "graph_1",
+        "drawer.prefilledSeriesName": undefined,
+        period: "7d",
       });
     });
   });

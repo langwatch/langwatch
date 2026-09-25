@@ -1,9 +1,8 @@
 /**
  * @vitest-environment jsdom
- * What a dashboard card's header offers. Used to pin the alert-button
- * wiring (ADR-034 Phase 5.2), removed here — see the note inside.
+ * What a dashboard card's header offers: the alert entry points (ADR-034 Phase 5.2).
  */
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -23,12 +22,14 @@ vi.mock("../../../behavior/analytics-api.ts", () => ({
 
 import { GraphCardHeader } from "../graph-card-header.tsx";
 
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <AnalyticsTestHarness host={new StubAnalyticsHost()}>{children}</AnalyticsTestHarness>
-);
+type Trigger = { id: string; active: boolean; alertType: string | null };
 
-function renderHeader() {
-  return render(
+function renderHeader({ trigger = null }: { trigger?: Trigger | null } = {}) {
+  const host = new StubAnalyticsHost();
+  const Wrapper = ({ children }: { children: ReactNode }) => (
+    <AnalyticsTestHarness host={host}>{children}</AnalyticsTestHarness>
+  );
+  render(
     <GraphCardHeader
       graphId="graph_123"
       name="p95 latency"
@@ -44,6 +45,7 @@ function renderHeader() {
       projectId="project_1"
       projectSlug="proj"
       filters={{}}
+      trigger={trigger}
       isDragging={false}
       dragListeners={undefined}
       onDelete={vi.fn()}
@@ -51,6 +53,7 @@ function renderHeader() {
     />,
     { wrapper: Wrapper },
   );
+  return host;
 }
 
 describe("GraphCardHeader", () => {
@@ -58,17 +61,32 @@ describe("GraphCardHeader", () => {
     cleanup();
   });
 
-  /**
-   * THE ALERT ENTRY POINTS ARE GONE, along with the tests that pinned them —
-   * deleted, not rewritten into an absence assertion, since such a test
-   * can't fail honestly. Revisit when a cross-feature overlay capability lands.
-   */
-  describe("given a saved builder graph", () => {
-    describe("when its header renders", () => {
-      it("offers no way to author an alert from the chart", () => {
-        renderHeader();
+  describe("given no trigger is configured", () => {
+    describe("when the Add alert button is clicked", () => {
+      it("opens automation's drawer prefilled with this graph and its first series", () => {
+        const host = renderHeader();
 
-        expect(screen.queryByRole("button", { name: /alert/i })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: /Add alert/ }));
+
+        expect(host.alertAuthorings).toEqual([
+          { graphId: "graph_123", seriesName: "0/latency/p95" },
+        ]);
+      });
+    });
+  });
+
+  describe("given an active trigger is configured for this graph", () => {
+    describe("when the bell icon is clicked", () => {
+      it("opens automation's drawer in edit mode for that trigger and its first series", () => {
+        const host = renderHeader({
+          trigger: { id: "trigger_1", active: true, alertType: "WARNING" },
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: "Edit alert" }));
+
+        expect(host.alertAuthorings).toEqual([
+          { graphId: "graph_123", automationId: "trigger_1", seriesName: "0/latency/p95" },
+        ]);
       });
     });
   });

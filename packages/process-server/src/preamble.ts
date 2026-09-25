@@ -13,6 +13,7 @@ import {
   SecretsResolver,
   type ScopedSecrets,
   type SecretHandle,
+  secretLogRedactPaths,
 } from "@langwatch/secrets";
 
 import { ProcessServer } from "./process-server.ts";
@@ -34,7 +35,7 @@ export type Metrics = readonly ServerContribution[];
 type FactoryContext<Owners extends readonly PreambleOwner[]> = Readonly<{
   config: ProcessConfigOf<Owners>;
   secrets: ScopedSecrets;
-  /** What every log record masks: the actor's secret fields. */
+  /** What every log record masks: the actor's secret fields and every declared secret. */
   redactPaths: readonly string[];
 }>;
 
@@ -111,10 +112,11 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
     await resolver.preflight(declared);
 
     const frameworkSecrets = resolver.scopeTo(this.name, declared);
+    const redactPaths = [...ACTOR_SECRET_LOG_PATHS, ...secretLogRedactPaths(declared)];
     const telemetry = await this.state.telemetry?.({
       config,
       secrets: frameworkSecrets,
-      redactPaths: ACTOR_SECRET_LOG_PATHS,
+      redactPaths,
     });
 
     const boundary: Parameters<typeof ProcessServer.create>[0] = {
@@ -137,7 +139,7 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
       for (const contribution of await this.state.metrics({
         config,
         secrets: frameworkSecrets,
-        redactPaths: ACTOR_SECRET_LOG_PATHS,
+        redactPaths,
       })) {
         server.with(contribution);
       }

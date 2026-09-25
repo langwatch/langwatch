@@ -49,6 +49,13 @@ export type AnalyticsFailureNotice = {
   id?: string;
 };
 
+/** Alert authoring for one saved graph; `automationId` edits the alert it already has. */
+export type AnalyticsAlertAuthoring = {
+  graphId: string;
+  automationId?: string;
+  seriesName?: string;
+};
+
 export abstract class AnalyticsHostApi {
   /** The project in scope, or undefined before one resolves. */
   abstract project(): AnalyticsHostProject | undefined;
@@ -68,6 +75,9 @@ export abstract class AnalyticsHostApi {
 
   /** Sends the reader somewhere else in the application. */
   abstract navigate(to: string): void;
+
+  /** Opens automation's drawer, which owns alert authoring; analytics never renders it. */
+  abstract openAutomationDrawer(request: AnalyticsAlertAuthoring): void;
 
   abstract succeeded(notice: AnalyticsSuccessNotice): void;
 

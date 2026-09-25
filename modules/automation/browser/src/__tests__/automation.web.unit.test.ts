@@ -1,9 +1,10 @@
 /** @vitest-environment jsdom */
 
-import { createUi } from "@langwatch/ui-kernel";
+import { createUi, installedDrawerLoaders } from "@langwatch/ui-kernel";
 import { describe, expect, it } from "vitest";
 
 import { automationWeb } from "../automation.web.ts";
+import { AutomationDrawer } from "../features/authoring/ui/sections/automation-drawer.tsx";
 
 function browserDocument() {
   const mount = document.createElement("div");
@@ -22,6 +23,14 @@ describe("given a browser that installs automation", () => {
         .render();
 
       expect(installed.modules).toContain(automationWeb);
+    });
+  });
+
+  describe("when an address names the automation drawer, as a chart's alert bell writes it", () => {
+    it("answers with the automation drawer", async () => {
+      const loaded = await installedDrawerLoaders([automationWeb]).automation?.();
+
+      expect(loaded).toEqual({ default: AutomationDrawer });
     });
   });
 

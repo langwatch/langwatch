@@ -11,6 +11,7 @@ import type { ReactElement, ReactNode } from "react";
 import {
   AnalyticsHostApi,
   AnalyticsHostProvider,
+  type AnalyticsAlertAuthoring,
   type AnalyticsFailureNotice,
   type AnalyticsHostProject,
   type AnalyticsRouteReading,
@@ -30,6 +31,7 @@ export class StubAnalyticsHost extends AnalyticsHostApi {
   readonly failures: AnalyticsFailureNotice[] = [];
   readonly navigations: string[] = [];
   readonly queries: Readonly<Record<string, string | undefined>>[] = [];
+  readonly alertAuthorings: AnalyticsAlertAuthoring[] = [];
 
   constructor(private readonly options: StubAnalyticsHostOptions = {}) {
     super();
@@ -66,6 +68,10 @@ export class StubAnalyticsHost extends AnalyticsHostApi {
 
   navigate(to: string): void {
     this.navigations.push(to);
+  }
+
+  openAutomationDrawer(request: AnalyticsAlertAuthoring): void {
+    this.alertAuthorings.push(request);
   }
 
   succeeded(notice: AnalyticsSuccessNotice): void {

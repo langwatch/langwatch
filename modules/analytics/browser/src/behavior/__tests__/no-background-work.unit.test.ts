@@ -10,7 +10,11 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-const FEATURE_ROOT = fileURLToPath(new URL("..", import.meta.url));
+const FEATURE_ROOT = fileURLToPath(new URL("../..", import.meta.url));
+
+/** The workbench's files within the package: main's `features/analytics-query` scope. */
+const WORKBENCH_FILE =
+  /lwql|langwatch-ql|langwatch-vega|vega-lite|widget-granularity|widget-coarsened/;
 
 /**
  * Skipped because this file has to spell the forbidden tokens out to look for
@@ -90,7 +94,7 @@ function sourceFiles(directory: string): string[] {
       continue;
     }
     const isSourceFile = SOURCE_EXTENSIONS.some((extension) => entry.name.endsWith(extension));
-    if (isSourceFile) found.push(path);
+    if (isSourceFile && WORKBENCH_FILE.test(entry.name)) found.push(path);
   }
   return found;
 }
@@ -118,7 +122,7 @@ describe("the feature's source", () => {
 
       // A scan that found nothing would pass vacuously, which is the one way
       // this test could go quietly useless.
-      expect(files.length).toBeGreaterThanOrEqual(8);
+      expect(files.length).toBeGreaterThanOrEqual(30);
       expect(offencesIn(files)).toEqual([]);
     });
   });

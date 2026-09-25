@@ -1,5 +1,5 @@
 /**
- * The one overlay these pages open, as a query write.
+ * The overlays these pages open, as query writes.
  */
 
 /**
@@ -32,6 +32,27 @@ function withoutDrawerKeys(
     next[key] = key.startsWith("drawer.") ? void 0 : value;
   }
   return next;
+}
+
+/** Automation's drawer, prefilled with one graph as main's `openDrawer("automation")` was. */
+export function automationDrawerAddress({
+  current,
+  graphId,
+  automationId,
+  seriesName,
+}: {
+  current: Readonly<Record<string, string | undefined>>;
+  graphId: string;
+  automationId?: string;
+  seriesName?: string;
+}): AnalyticsQueryWrite {
+  return {
+    ...withoutDrawerKeys(current),
+    "drawer.open": "automation",
+    "drawer.automationId": automationId,
+    "drawer.prefilledGraphId": graphId,
+    "drawer.prefilledSeriesName": seriesName,
+  };
 }
 
 /** The trace explorer's own drawer, opened on one trace. */

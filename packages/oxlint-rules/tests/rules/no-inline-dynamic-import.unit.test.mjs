@@ -40,6 +40,17 @@ describe("given a governed file", () => {
     });
   });
 
+  describe("when the file is the Google DLP channel", () => {
+    /** @scenario "The Google DLP channel is exempt" */
+    it("reports nothing there and still reports its siblings", () => {
+      const code = 'const mod = await import("@google-cloud/dlp");';
+      const channels = "modules/data-privacy/process/src/channels/http";
+
+      expect(report(code, `${channels}/http.google-dlp.channel.ts`)).toEqual([]);
+      expect(report(code, `${channels}/http.other.channel.ts`)).toHaveLength(1);
+    });
+  });
+
   describe("when the file is the CLI's tsup config", () => {
     /** @scenario "The CLI tsup config is exempt" */
     it("reports nothing", () => {

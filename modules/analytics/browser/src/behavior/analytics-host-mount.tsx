@@ -16,11 +16,13 @@ import { useMemo, type ReactNode } from "react";
 import {
   AnalyticsHostApi,
   AnalyticsHostProvider,
+  type AnalyticsAlertAuthoring,
   type AnalyticsFailureNotice,
   type AnalyticsHostProject,
   type AnalyticsRouteReading,
   type AnalyticsSuccessNotice,
 } from "../model/analytics-host.ts";
+import { automationDrawerAddress } from "../model/analytics-overlay-address.ts";
 
 class CapabilityAnalyticsHost extends AnalyticsHostApi {
   private readonly project_: AnalyticsHostProject | undefined;
@@ -80,6 +82,11 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
 
   navigate(to: string): void {
     this.navigationCapability.navigate(to);
+  }
+
+  openAutomationDrawer(request: AnalyticsAlertAuthoring): void {
+    const current = this.routeCapability.reading().query;
+    this.routeCapability.setQuery(automationDrawerAddress({ current, ...request }));
   }
 
   succeeded(notice: AnalyticsSuccessNotice): void {

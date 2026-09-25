@@ -38,6 +38,7 @@
     "@langwatch/analytics-browser-kit": "workspace:*",
     "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
+    "@langwatch/automation-contract": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",

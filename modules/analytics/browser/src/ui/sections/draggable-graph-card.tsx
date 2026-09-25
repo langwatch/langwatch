@@ -155,7 +155,9 @@ function GraphCardBody({
           projectSlug={projectSlug}
           dashboardId={dashboardId}
           filters={graph.filters}
+          trigger={graph.trigger ?? null}
           isWorkbenchChart={isWorkbenchChart}
+          isDashboardWidget={persistedWidget !== null}
           {...(graph.granularitySeconds == null
             ? {}
             : { granularitySeconds: graph.granularitySeconds })}

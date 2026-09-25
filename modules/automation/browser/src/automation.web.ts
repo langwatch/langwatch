@@ -24,6 +24,14 @@ export const automationWeb = defineWebModule("automation")
     requires: ["AutomationHost"],
     mounts: { AutomationHost: { load: () => import("./behavior/automation-host-mount.tsx") } },
   })
+  .withDrawers({
+    automation: {
+      load: async () => ({
+        default: (await import("./features/authoring/ui/sections/automation-drawer.tsx"))
+          .AutomationDrawer,
+      }),
+    },
+  })
   .withScreens({
     "pages/[project]/automations": {
       path: "/:project/automations",

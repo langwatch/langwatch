@@ -64,7 +64,7 @@ describe("the preamble's telemetry slot", () => {
       })
       .start();
 
-    expect(seen).toEqual(ACTOR_SECRET_LOG_PATHS);
+    expect(seen).toEqual(expect.arrayContaining([...ACTOR_SECRET_LOG_PATHS]));
     await server.close();
   });
 });
