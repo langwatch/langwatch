@@ -1083,6 +1083,9 @@ Background work is a scheduled process manager on the module's pipeline, install
 hosts it, it ticks once across the fleet, and `onWake` sends the module's own intent through the outbox.
 There is no `.withJobs` and no module-level timer loop. Work that must run in every role (ADR-090's
 lease-held writer) is not background work: it stays a service the module owns. `withWorkers` is retired.
+A module reacting to a peer's event does it through a subscriber on the event owner's pipeline that sends
+the reacting module a command through its `*Api`, so the reaction lands as a durable event on the
+reacting module's own pipeline (Alex, 2026-09-25).
 
 The framework's public types carry typed parameters or `unknown`, never `any`: an event, command or
 projection state keeps its type from declaration to handler (Alex, 2026-09-24).
