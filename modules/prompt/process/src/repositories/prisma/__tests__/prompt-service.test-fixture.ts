@@ -7,6 +7,7 @@ import {
 } from "@langwatch/prisma-client";
 import { vi } from "vitest";
 
+import { defaultModelFixture } from "../../../__tests__/default-model.test-fixture.ts";
 import { PromptTagService } from "../../../services/prompt-tag.service.ts";
 import { PromptVersionService } from "../../../services/prompt-version.service.ts";
 import { PromptService } from "../../../services/prompt.service.ts";
@@ -43,6 +44,7 @@ export function createPromptServiceForTest(): PromptService {
   const promptTagRepository = PrismaPromptTagRepository.create({ prisma: database });
 
   return PromptService.create({
+    modelProviders: defaultModelFixture(),
     repository,
     versionService: PromptVersionService.create(),
     tagRepository: PrismaPromptTagAssignmentRepository.create({ prisma: database }),

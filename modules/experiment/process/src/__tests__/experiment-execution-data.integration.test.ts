@@ -3,6 +3,7 @@ import { AgentNotFoundError } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { Evaluator, EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
 import {
@@ -184,7 +185,10 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
   });
 
   const createPromptService = (): PromptApi => {
-    const prompts = promptServiceFixture({ database: prisma! });
+    const prompts = promptServiceFixture({
+      database: prisma!,
+      modelProviders: createApiFixture<ModelProviderApi>(),
+    });
 
     return createApiFixture<PromptApi>({
       createPrompt: (input) => prompts.createPrompt(input),

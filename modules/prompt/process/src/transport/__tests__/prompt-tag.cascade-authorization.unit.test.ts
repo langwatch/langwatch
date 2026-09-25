@@ -15,6 +15,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { PromptApp } from "#app/prompt.app";
 
+import { defaultModelFixture } from "../../__tests__/default-model.test-fixture.ts";
 import type { PromptService } from "../../services/prompt.service.ts";
 import { promptTagTrpcTransport } from "../prompt-tag.trpc.ts";
 import { promptTrpcCaller } from "./prompt-trpc.fixture.ts";
@@ -43,6 +44,7 @@ function buildCaller(options: { manageable: readonly string[] }) {
         }),
         plans: createApiFixture<EntitlementApi>(),
         workflow: createApiFixture<WorkflowApi>(),
+        modelProviders: defaultModelFixture(),
       },
       members: {
         logger: createLogger("prompt-tag-cascade-test"),

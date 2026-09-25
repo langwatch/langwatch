@@ -4,6 +4,7 @@ import { EntitlementApi } from "@langwatch/entitlement-contract";
  * The prompt library's application: what its doors call.
  */
 import type { FeatureSetup } from "@langwatch/kernel";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import {
@@ -90,6 +91,8 @@ type PromptDependencies = Readonly<{
   plans: typeof EntitlementApi;
   /** Owns studio-event preparation and execution for the playground. */
   workflow: typeof WorkflowApi;
+  /** The default model a prompt created without one takes. */
+  modelProviders: typeof ModelProviderApi;
 }>;
 
 /**
@@ -132,6 +135,7 @@ export class PromptApp implements PromptApi {
     permissions: AuthzApi,
     plans: EntitlementApi,
     workflow: WorkflowApi,
+    modelProviders: ModelProviderApi,
   };
   /**
    * `rateLimiter` is the playground door's run counter.
@@ -145,6 +149,7 @@ export class PromptApp implements PromptApi {
       tagRepository: setup.repositories.tagAssignments,
       promptTagRepository: setup.repositories.tags,
       tagService: PromptTagService.create(setup.repositories.tags),
+      modelProviders: setup.dependencies.modelProviders,
     });
 
     return PromptApp.createWithPrompts(setup, prompts);

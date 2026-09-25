@@ -136,6 +136,8 @@ export abstract class LlmConfigRepository {
       prompt?: string;
       runtimeParameters?: Record<string, unknown>;
     };
+    /** The model the initial version takes when its data names none. */
+    defaultModel: string;
   }): Promise<LlmConfigWithLatestVersion>;
 
   abstract findConfigVersionByNumber(params: {

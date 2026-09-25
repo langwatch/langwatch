@@ -7365,6 +7365,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/dataset-contract':
+        specifier: workspace:*
+        version: link:../../dataset/contract
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
@@ -7386,6 +7389,9 @@ importers:
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../scenario/contract
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../../workflow/contract
@@ -7396,9 +7402,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/dataset-contract':
-        specifier: workspace:*
-        version: link:../../dataset/contract
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

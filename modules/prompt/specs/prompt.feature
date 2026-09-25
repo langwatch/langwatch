@@ -50,3 +50,15 @@ Feature: Prompt service
     When a person opens a prompt tab, edits it and closes it
     Then every read and write goes to the store the application handed it
     And Prompt Studio touches no browser storage of its own
+
+  @unit
+  Scenario: a prompt created without a model takes the project's default model
+    Given the project's default model for prompts is "openai/gpt-5.6-terra"
+    When a caller creates a prompt that names no model
+    Then the prompt's first version uses "openai/gpt-5.6-terra"
+
+  @unit
+  Scenario: a prompt created with a model never asks for the project's default
+    When a caller creates a prompt that names "openai/gpt-5-mini"
+    Then the prompt's first version uses "openai/gpt-5-mini"
+    And the project's default model is not resolved

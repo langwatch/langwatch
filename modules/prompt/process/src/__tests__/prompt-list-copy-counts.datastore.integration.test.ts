@@ -19,6 +19,7 @@ import { PrismaLlmConfigRepository } from "../repositories/prisma/prisma.prompt.
 import { PromptTagService } from "../services/prompt-tag.service.ts";
 import { PromptVersionService } from "../services/prompt-version.service.ts";
 import { PromptService } from "../services/prompt.service.ts";
+import { defaultModelFixture } from "./default-model.test-fixture.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 
@@ -31,6 +32,7 @@ describe.skipIf(!DB_URL)("Feature: The prompt list reports live copy counts", ()
 
   const tagRepository = PrismaPromptTagRepository.create({ prisma });
   const service = PromptService.create({
+    modelProviders: defaultModelFixture(),
     repository: PrismaLlmConfigRepository.create({ prisma }),
     versionService: PromptVersionService.create(),
     tagRepository: PrismaPromptTagAssignmentRepository.create({ prisma }),

@@ -1,4 +1,3 @@
-import { DEFAULT_MODEL, type ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { uniqueConstraintTargets } from "@langwatch/prisma-client/errors";
 import type {
@@ -53,13 +52,11 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
   static create({
     prisma,
     versions,
-    modelProvider,
   }: {
     prisma: PromptConfigDatabase;
     versions?: PrismaLlmConfigVersionsRepository;
-    modelProvider?: ModelProviderApi;
   }): PrismaLlmConfigRepository {
-    return new PrismaLlmConfigRepository(prisma, versions, modelProvider);
+    return new PrismaLlmConfigRepository(prisma, versions);
   }
 
   readonly versions: PrismaLlmConfigVersionsRepository;
@@ -67,7 +64,6 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
   private constructor(
     private readonly prisma: PromptConfigDatabase,
     versions: PrismaLlmConfigVersionsRepository | undefined,
-    private readonly modelProvider?: ModelProviderApi,
   ) {
     super();
     this.versions = versions ?? PrismaLlmConfigVersionsRepository.create({ prisma, configs: this });
@@ -686,6 +682,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
       prompt?: string;
       runtimeParameters?: Record<string, unknown>;
     };
+    defaultModel: string;
   }): Promise<LlmConfigWithLatestVersion> {
     const { configData, versionData } = params;
 
@@ -715,27 +712,13 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
           scope: configData.scope,
         },
       });
-      // Resolve the project's DEFAULT model via the cascade, but only on the paths that actually
-      // need one: no version data at all, or a version without a model. A prompt that ships its
-      // own model, like every prompt pushed by the CLI's sync, must not require the project to
-      // have a default model configured. Nothing configured refuses as model_not_configured.
-      const resolveDefaultModel = async (): Promise<string> =>
-        this.modelProvider
-          ? (
-              await this.modelProvider.resolveModelForFeature({
-                projectId: configData.projectId,
-                featureKey: "prompt.create_default",
-              })
-            ).model
-          : DEFAULT_MODEL;
-
       // Set version data to provided value or undefined if not provided.
       let newVersionData: Partial<CreateLlmConfigVersionParams> | undefined = versionData;
 
       // If no version data is provided, we'll create a default (draft) version.
       if (!newVersionData) {
         const defaultConfigData = this.buildDefaultVersionConfigData({
-          model: await resolveDefaultModel(),
+          model: params.defaultModel,
         });
 
         newVersionData = {
@@ -747,7 +730,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
 
       // Ensure a model is set if configData is provided
       if (newVersionData.configData && !newVersionData.configData.model) {
-        newVersionData.configData.model = await resolveDefaultModel();
+        newVersionData.configData.model = params.defaultModel;
       }
 
       const newVersion = await tx.llmPromptConfigVersion.create({

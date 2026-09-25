@@ -7,6 +7,7 @@ describe("MemoryPromptRepositories", () => {
   it("keeps versions and tag assignments in one scoped prompt store", async () => {
     const repositories = MemoryPromptRepositories.create();
     const created = await repositories.configs.createConfigWithInitialVersion({
+      defaultModel: "openai/gpt-5-mini",
       configData: {
         name: "Support triage",
         projectId: "project-source",
@@ -119,6 +120,7 @@ describe("MemoryPromptRepositories", () => {
     try {
       const repositories = MemoryPromptRepositories.create();
       const created = await repositories.configs.createConfigWithInitialVersion({
+        defaultModel: "openai/gpt-5-mini",
         configData: {
           name: "Support triage",
           projectId: "project-source",

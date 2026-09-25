@@ -1,4 +1,3 @@
-import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import {
   LATEST_SCHEMA_VERSION,
   NotFoundError,
@@ -279,8 +278,9 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
       prompt?: string;
       runtimeParameters?: Record<string, unknown>;
     };
+    defaultModel: string;
   }): Promise<LlmConfigWithLatestVersion> {
-    const { configData, versionData } = params;
+    const { configData, versionData, defaultModel } = params;
     if (versionData?.authorId && configData.authorId !== versionData.authorId) {
       throw new Error("Author ID mismatch between config and version data");
     }
@@ -313,7 +313,7 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
       outputs: [{ identifier: "output", type: "str" }],
       demonstrations: { inline: { records: {}, columnTypes: [] } },
       response_format: { type: "json_schema", json_schema: { name: "response", schema: {} } },
-      model: DEFAULT_MODEL,
+      model: defaultModel,
     };
     const input = versionData ?? {
       configData: defaultData,
@@ -322,7 +322,7 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
     };
     const configDataForVersion = input.configData.model
       ? input.configData
-      : { ...input.configData, model: DEFAULT_MODEL };
+      : { ...input.configData, model: defaultModel };
     this.#state.configs.set(config.id, config);
     const version = this.appendVersion({
       configId: config.id,

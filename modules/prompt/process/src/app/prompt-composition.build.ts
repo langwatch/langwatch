@@ -28,10 +28,8 @@ export type PromptPersistence = PromptConfigDatabase &
 
 export interface PostgresPromptAdapterOptions {
   database: PromptPersistence;
-  /**
-   * The provider cascade a prompt created without a model falls back to.
-   */
-  modelProvider?: ModelProviderApi;
+  /** The provider cascade a prompt created without a model falls back to. */
+  modelProviders: ModelProviderApi;
 }
 
 /** Process-owned PostgreSQL composition for the Prompt feature. */
@@ -45,7 +43,6 @@ export class PostgresPromptAdapter {
   build(): PromptService {
     const repository = PrismaLlmConfigRepository.create({
       prisma: this.options.database,
-      modelProvider: this.options.modelProvider,
     });
     const promptTagRepository = PrismaPromptTagRepository.create({
       prisma: this.options.database,
@@ -59,6 +56,7 @@ export class PostgresPromptAdapter {
       }),
       promptTagRepository,
       tagService: PromptTagService.create(promptTagRepository),
+      modelProviders: this.options.modelProviders,
     });
   }
 }

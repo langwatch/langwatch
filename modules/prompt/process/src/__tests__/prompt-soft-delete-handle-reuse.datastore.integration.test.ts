@@ -19,6 +19,7 @@ import { PrismaLlmConfigRepository } from "../repositories/prisma/prisma.prompt.
 import { PromptTagService } from "../services/prompt-tag.service.ts";
 import type { PromptVersionService } from "../services/prompt-version.service.ts";
 import { PromptService } from "../services/prompt.service.ts";
+import { defaultModelFixture } from "./default-model.test-fixture.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const namespace = `psd-${nanoid(8)}`;
@@ -34,6 +35,7 @@ describe.skipIf(!DB_URL)("given a prompt handle after the prompt is archived", (
   const tagRepository = PrismaPromptTagRepository.create({ prisma });
   const tags = PromptTagService.create(tagRepository);
   const prompts = PromptService.create({
+    modelProviders: defaultModelFixture(),
     repository: PrismaLlmConfigRepository.create({ prisma }),
     versionService: versions,
     tagRepository: PrismaPromptTagAssignmentRepository.create({ prisma }),

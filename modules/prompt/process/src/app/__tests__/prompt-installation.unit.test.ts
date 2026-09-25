@@ -12,6 +12,7 @@ import { createTestLogger } from "@langwatch/test-harness";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
+import { defaultModelFixture } from "../../__tests__/default-model.test-fixture.ts";
 import { promptServer } from "../../prompt.server.ts";
 
 function process(role: "api" | "worker") {
@@ -28,6 +29,7 @@ function process(role: "api" | "worker") {
       authz: createApiFixture<AuthzApi>({}),
       entitlement: createApiFixture<EntitlementApi>({}),
       workflow: createApiFixture<WorkflowApi>({}),
+      "model-provider": defaultModelFixture(),
     });
 }
 

@@ -126,3 +126,10 @@ Feature: Experiment service boundary
     Given a workflow-backed experiment whose workflow no longer resolves
     When the caller copies it into another project
     Then experiment_workflow_not_found is reported with status 404
+
+  @unit
+  Scenario: The legacy wizard's preconditions and trace mappings keep main's shape
+    When the legacy wizard saves a setup with preconditions and trace mappings
+    Then each precondition carries its field, rule and value, with an optional key and subkey
+    And the trace mappings carry their mapping and expansions
+    And a precondition or mapping missing a required part is refused

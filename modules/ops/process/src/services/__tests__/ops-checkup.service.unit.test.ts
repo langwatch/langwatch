@@ -65,6 +65,10 @@ let probes: MemoryCheckupProbeChannel;
 let gatewayAddresses: GatewayDeploymentAddresses;
 
 function checkup() {
+  return service().checkupFor({ organizationId: "org-1", requestedBy: "user-1" });
+}
+
+function service() {
   return OpsCheckupService.create({
     members: {
       isSaas: false,
@@ -76,8 +80,18 @@ function checkup() {
     config: CONFIG,
     peers: {
       ...world.peers(),
-      organizationDirectory: createApiFixture<OrganizationApi>(),
-      licensing: createApiFixture<LicensingApi>(),
+      organizationDirectory: createApiFixture<OrganizationApi>({
+        findAllIds: async () => ["org-1"],
+      }),
+      licensing: createApiFixture<LicensingApi>({
+        findInstanceIdentity: async () => [],
+        getConnectDeployment: async () => ({
+          permitted: true,
+          connected: false,
+          licenseEndpoint: "https://connect.langwatch.ai",
+          gatewayEndpoint: "https://gateway.langwatch.ai",
+        }),
+      }),
       providerTests: createApiFixture<ModelProviderApi>(),
       projectDirectory: {
         listByOrganization: async ({ page, limit }) => ({
@@ -105,7 +119,7 @@ function checkup() {
       usageReport: MemoryUsageReportChannel.create(),
       probes,
     },
-  }).checkupFor({ organizationId: "org-1", requestedBy: "user-1" });
+  });
 }
 
 async function verdictOf(id: string) {
@@ -195,6 +209,18 @@ describe("OpsCheckupService", () => {
       expect(rows.find((row) => row.id === "smtp_verify")?.verdict).toMatchObject({
         outcome: "refused",
       });
+    });
+  });
+
+  describe("given the usage report names whether a gateway is configured", () => {
+    /** @scenario "The usage report says whether an AI Gateway is configured" */
+    it("reports false without a gateway address and true with one", async () => {
+      const without = await service().usageReports.preview();
+      gatewayAddresses = { ...gatewayAddresses, baseUrl: "http://gateway:5563" };
+      const withGateway = await service().usageReports.preview();
+
+      expect(without.payload.gateway_configured).toBe(false);
+      expect(withGateway.payload.gateway_configured).toBe(true);
     });
   });
 

@@ -11,6 +11,7 @@ import { createTestLogger } from "@langwatch/test-harness";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { defaultModelFixture } from "../../__tests__/default-model.test-fixture.ts";
 import { MemoryPromptRepositories } from "../../repositories/memory/memory.prompt.repositories.ts";
 import type { PromptService } from "../../services/prompt.service.ts";
 import { PromptApp } from "../prompt.app.ts";
@@ -67,6 +68,7 @@ function harness() {
         permissions: createApiFixture<AuthzApi>(),
         plans: createApiFixture<EntitlementApi>(),
         workflow: createApiFixture<WorkflowApi>(),
+        modelProviders: defaultModelFixture(),
       },
       members: {
         logger: createTestLogger().logger,
@@ -317,6 +319,7 @@ describe("PromptApp.create", () => {
           permissions: createApiFixture<AuthzApi>(),
           plans: createApiFixture<EntitlementApi>(),
           workflow: createApiFixture<WorkflowApi>(),
+          modelProviders: defaultModelFixture(),
         },
         members: {
           logger: fakeLogger,

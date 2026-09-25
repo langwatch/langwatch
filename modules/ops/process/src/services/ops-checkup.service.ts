@@ -133,6 +133,7 @@ export class OpsCheckupService {
         chartVersion: config.usageStats.chartVersion,
         environment: members.nodeEnvironment ?? "unknown",
         hostname: members.publicBaseUrl,
+        gatewayConfigured: Boolean(peers.gateway.getDeploymentAddresses().baseUrl),
       }),
     });
     const usageReports = UsageReportService.create({

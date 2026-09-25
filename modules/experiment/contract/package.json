@@ -26,6 +26,7 @@
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/kernel": "workspace:*",
@@ -33,12 +34,12 @@
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "nanoid": "^6.0.0",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/dataset-contract": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

@@ -15,6 +15,7 @@ const config = (projectId: string, handle: string) => ({
     scope: "PROJECT" as const,
     copiedFromPromptId: null,
   },
+  defaultModel: "openai/gpt-5-mini",
 });
 
 describe("given prompts across the install", () => {

@@ -23,7 +23,7 @@ import { PromptSyncService } from "./prompt-sync.service.ts";
 import { PromptTagLookupService } from "./prompt-tag-lookup.service.ts";
 import type { PromptTagService } from "./prompt-tag.service.ts";
 import type { PromptVersionService } from "./prompt-version.service.ts";
-import { PromptWriteService } from "./prompt-write.service.ts";
+import { type DefaultModelResolver, PromptWriteService } from "./prompt-write.service.ts";
 
 /**
  * Full prompt shape that combines prompt config with version data.
@@ -114,6 +114,7 @@ export class PromptService {
     tagRepository: PromptTagAssignmentRepository;
     promptTagRepository: PromptTagRepository;
     tagService: PromptTagService;
+    modelProviders: DefaultModelResolver;
   }): PromptService {
     return new PromptService(options);
   }
@@ -124,6 +125,7 @@ export class PromptService {
     tagRepository: PromptTagAssignmentRepository;
     promptTagRepository: PromptTagRepository;
     tagService: PromptTagService;
+    modelProviders: DefaultModelResolver;
   }) {
     this.repository = options.repository;
     this.versionService = options.versionService;
@@ -146,6 +148,7 @@ export class PromptService {
       read: this.reads,
       tagLookup: this.tagLookup,
       toVersionedPrompt: (config, tags) => this.transformToVersionedPrompt(config, tags),
+      modelProviders: options.modelProviders,
     });
     this.copies = PromptCopyService.create({
       repository: options.repository,

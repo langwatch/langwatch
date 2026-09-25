@@ -36,6 +36,29 @@ describe("the wire main published", () => {
       expect(legacyWorkbenchStateSchema.parse(state)).toStrictEqual(state);
     });
 
+    /** @scenario "The legacy wizard's preconditions and trace mappings keep main's shape" */
+    it("reads preconditions and trace mappings in main's shape, and refuses a malformed one", () => {
+      const state = {
+        realTimeTraceMappings: {
+          mapping: { input: { source: "input", key: "question", type: "trace" } },
+          expansions: [],
+        },
+        realTimeExecution: {
+          preconditions: [{ field: "metadata.value", rule: "is", value: "prod", key: "env" }],
+        },
+      };
+
+      expect(legacyWorkbenchStateSchema.parse(state)).toStrictEqual(state);
+      expect(
+        legacyWorkbenchStateSchema.validate({
+          realTimeExecution: { preconditions: [{ field: "input", rule: "is" }] },
+        }),
+      ).toBe(false);
+      expect(legacyWorkbenchStateSchema.validate({ realTimeTraceMappings: { mapping: {} } })).toBe(
+        false,
+      );
+    });
+
     it("refuses a task main never offered", () => {
       expect(legacyWorkbenchStateSchema.validate({ task: "unknown" })).toBe(false);
     });

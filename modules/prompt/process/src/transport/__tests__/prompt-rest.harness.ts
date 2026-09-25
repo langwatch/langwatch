@@ -16,6 +16,7 @@ import { HTTPException } from "hono/http-exception";
 
 import { PromptApp } from "#app/prompt.app";
 
+import { defaultModelFixture } from "../../__tests__/default-model.test-fixture.ts";
 import type { PromptService } from "../../services/prompt.service.ts";
 import { promptRest, promptRestCredential, promptRestFacts } from "../prompt.rest.ts";
 
@@ -48,6 +49,7 @@ export function buildPromptApp(prompts: PromptService): PromptApp {
         permissions: createApiFixture<AuthzApi>(),
         plans: createApiFixture<EntitlementApi>(),
         workflow: createApiFixture<WorkflowApi>(),
+        modelProviders: defaultModelFixture(),
       },
       members: {
         logger: createLogger("prompt-rest-test"),

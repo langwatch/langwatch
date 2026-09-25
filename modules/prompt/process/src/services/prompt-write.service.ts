@@ -1,4 +1,5 @@
 /** Every change a caller makes to a prompt, and the permission each of them asks for first. */
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import {
   type PromptScope,
   type UpdatePromptCommand,
@@ -75,12 +76,16 @@ export type CreatePromptParams = {
   parameters?: Record<string, unknown>;
 };
 
+/** Where a prompt created without a model finds the project's default one. */
+export type DefaultModelResolver = Pick<ModelProviderApi, "resolveModelForFeature">;
+
 export class PromptWriteService {
   private readonly repository: LlmConfigRepository;
   private readonly versionService: PromptVersionService;
   private readonly read: PromptReadService;
   private readonly tagLookup: PromptTagLookupService;
   private readonly toVersionedPrompt: VersionedPromptMapper;
+  private readonly modelProviders: DefaultModelResolver;
 
   static create(options: {
     repository: LlmConfigRepository;
@@ -88,6 +93,7 @@ export class PromptWriteService {
     read: PromptReadService;
     tagLookup: PromptTagLookupService;
     toVersionedPrompt: VersionedPromptMapper;
+    modelProviders: DefaultModelResolver;
   }): PromptWriteService {
     return new PromptWriteService(options);
   }
@@ -98,12 +104,14 @@ export class PromptWriteService {
     read: PromptReadService;
     tagLookup: PromptTagLookupService;
     toVersionedPrompt: VersionedPromptMapper;
+    modelProviders: DefaultModelResolver;
   }) {
     this.repository = options.repository;
     this.versionService = options.versionService;
     this.read = options.read;
     this.tagLookup = options.tagLookup;
     this.toVersionedPrompt = options.toVersionedPrompt;
+    this.modelProviders = options.modelProviders;
   }
 
   /**
@@ -158,6 +166,7 @@ export class PromptWriteService {
         copiedFromPromptId: null,
       },
       versionData: shouldCreateVersion ? this.initialVersionData(params) : undefined,
+      defaultModel: params.model ?? (await this.projectDefaultModel(params.projectId)),
     });
 
     // A freshly created prompt's only version is also the latest; no custom
@@ -169,6 +178,15 @@ export class PromptWriteService {
       config,
       newVersionId ? [{ name: "latest", versionId: newVersionId }] : [],
     );
+  }
+
+  /** A prompt that names no model takes the project's default; nothing configured refuses. */
+  private async projectDefaultModel(projectId: string): Promise<string> {
+    const resolved = await this.modelProviders.resolveModelForFeature({
+      projectId,
+      featureKey: "prompt.create_default",
+    });
+    return resolved.model;
   }
 
   /** The first version a new prompt is created with, in the snake_case shape the database takes. */

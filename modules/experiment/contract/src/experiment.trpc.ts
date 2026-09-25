@@ -2,6 +2,8 @@
 // and runs. Legacy wizard setup stored as open record, verbatim.
 
 import { defineTrpcContract } from "@langwatch/api/contract";
+import { mappingStateSchema } from "@langwatch/dataset-contract";
+import { checkPreconditionsSchema } from "@langwatch/trace-contract";
 import { studioWorkflowSchema } from "@langwatch/workflow-contract";
 import { z } from "zod";
 
@@ -27,10 +29,7 @@ import { experimentSchema } from "./experiment.ts";
 /** Every procedure here is asked at one project, named by the input. */
 const projectScopeSchema = z.object({ projectId: z.string() });
 
-/**
- * The legacy wizard's stored setup, named as main named it. Preconditions and
- * trace mappings are another module's vocabulary, so those stay open here.
- */
+/** The legacy wizard's stored setup, named as main named it. */
 export const legacyWorkbenchStateSchema = z
   .looseObject({
     name: z.string().optional(),
@@ -55,11 +54,11 @@ export const legacyWorkbenchStateSchema = z
     evaluatorCategory: z
       .enum(["expected_answer", "llm_judge", "quality", "rag", "safety", "custom_evaluators"])
       .optional(),
-    realTimeTraceMappings: z.record(z.string(), z.unknown()).optional(),
+    realTimeTraceMappings: mappingStateSchema.optional(),
     realTimeExecution: z
       .looseObject({
         sample: z.number().min(0).max(1).optional(),
-        preconditions: z.array(z.unknown()).optional(),
+        preconditions: checkPreconditionsSchema.optional(),
       })
       .optional(),
     workspaceTab: z.enum(["dataset", "workflow", "results", "code-implementation"]).optional(),
