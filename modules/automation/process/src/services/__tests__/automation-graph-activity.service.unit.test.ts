@@ -1,4 +1,5 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
+import { createProcessMembers } from "@langwatch/process-stores";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -22,6 +23,7 @@ import { AutomationGraphDeliveryService } from "../automation-graph-delivery.ser
 import {
   AutomationSlackSecretsService,
   AutomationSlackBotTokenDecryptorService,
+  type AutomationSecretCrypto,
 } from "../automation-slack-secrets.service.ts";
 import { AutomationWebhookSecretsService } from "../automation-webhook-secrets.service.ts";
 
@@ -35,10 +37,26 @@ const crypto = {
   decrypt: (cipher: string) => cipher.replace(/^enc\(/, "").replace(/\)$/, ""),
 };
 
+function slackTriggerRow() {
+  return graphTriggerRow({
+    action: "SEND_SLACK_MESSAGE",
+    actionParams: {
+      slackDelivery: "bot",
+      slackBotToken: crypto.encrypt("xoxb-plain"),
+      slackChannelId: "C0CHANNEL",
+      threshold: 10,
+      operator: "gt",
+      timePeriod: 60,
+      seriesName: "0",
+    },
+  });
+}
+
 function compose(
   seed: Parameters<typeof createGraphActivityPrismaDouble>[0],
-  over: { delivery?: RecordingDelivery } = {},
+  over: { delivery?: RecordingDelivery; crypto?: AutomationSecretCrypto } = {},
 ) {
+  const secrets = over.crypto ?? crypto;
   const database = createGraphActivityPrismaDouble(seed);
   const clock = new FrozenClock();
   const delivery = over.delivery ?? new RecordingDelivery();
@@ -57,9 +75,9 @@ function compose(
     projects: new OneProject(),
     analytics: new BreachingAnalytics() as unknown as AnalyticsService,
     delivery,
-    webhooks: AutomationWebhookSecretsService.create(crypto),
+    webhooks: AutomationWebhookSecretsService.create(secrets),
     slackTokens: AutomationSlackBotTokenDecryptorService.create(
-      AutomationSlackSecretsService.create(crypto),
+      AutomationSlackSecretsService.create(secrets),
     ),
     emailCaps: AutomationEmailCapService.create({ store: null }),
     logger,
@@ -144,19 +162,7 @@ describe("AutomationGraphActivityService", () => {
 
     /** @scenario "A stored Slack credential is read back with the deployment's own key" */
     it("sends the Slack call with the plaintext token to the author's channel", async () => {
-      const slackTrigger = graphTriggerRow({
-        action: "SEND_SLACK_MESSAGE",
-        actionParams: {
-          slackDelivery: "bot",
-          slackBotToken: crypto.encrypt("xoxb-plain"),
-          slackChannelId: "C0CHANNEL",
-          threshold: 10,
-          operator: "gt",
-          timePeriod: 60,
-          seriesName: "0",
-        },
-      });
-      const { adapter, delivery } = compose({ triggers: [slackTrigger] });
+      const { adapter, delivery } = compose({ triggers: [slackTriggerRow()] });
 
       await adapter.evaluateGraphTrigger({
         triggerId: "trigger-1",
@@ -167,6 +173,29 @@ describe("AutomationGraphActivityService", () => {
       expect(delivery.slackBots.map(({ token, channel }) => ({ token, channel }))).toEqual([
         { token: "xoxb-plain", channel: "C0CHANNEL" },
       ]);
+    });
+
+    /** @scenario "A process holding no credentials key refuses rather than sending a ciphertext" */
+    it("refuses as the unconfigured encryption member and sends nothing to Slack", async () => {
+      const keyless = createProcessMembers({
+        config: {
+          processName: "graph-alert-keyless-test",
+          encryptionKey: "",
+          secrets: {},
+          rateLimit: { requests: 60, seconds: 60 },
+          mail: { provider: "off" },
+        },
+      }).read("encryption");
+      const { adapter, delivery } = compose({ triggers: [slackTriggerRow()] }, { crypto: keyless });
+
+      await expect(
+        adapter.evaluateGraphTrigger({
+          triggerId: "trigger-1",
+          projectId: "project-1",
+          reason: "real-time",
+        }),
+      ).rejects.toMatchObject({ name: "MemberNotConfiguredError", member: "encryption" });
+      expect(delivery.slackBots).toEqual([]);
     });
 
     /** @scenario "A suppressed recipient is not written to" */

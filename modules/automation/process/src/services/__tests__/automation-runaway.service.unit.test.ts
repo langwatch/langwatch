@@ -3,6 +3,7 @@ import { EmailDelivery } from "@langwatch/mail";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryAutomationContainmentClaimRepository } from "../../repositories/memory/memory.automation-containment-claim.repository.ts";
 import { AutomationRunawayMetricsNullService } from "../automation-runaway-metrics-null.service.ts";
 import { AutomationRunawayService } from "../automation-runaway.service.ts";
 
@@ -23,7 +24,7 @@ function adapter(
   }) => Promise<string[]>,
 ) {
   return AutomationRunawayService.create({
-    redis: null,
+    claims: MemoryAutomationContainmentClaimRepository.create(),
     directories: {
       projects: {
         getOrganizationId: vi.fn().mockResolvedValue("org-1"),
@@ -98,7 +99,7 @@ describe("given a worker holding an automation containment claim", () => {
       try {
         vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
         const worker1 = AutomationRunawayService.create({
-          redis: null,
+          claims: MemoryAutomationContainmentClaimRepository.create(),
           directories: {
             projects: { getOrganizationId: vi.fn(), findById: vi.fn() },
             authorization: { listOrganizationBindings: vi.fn() },
@@ -133,7 +134,7 @@ describe("given a project whose traces the runaway check counts", () => {
     it("asks the trace owner for the project's count", async () => {
       const countTracesInLastDay = vi.fn(async () => 42);
       const service = AutomationRunawayService.create({
-        redis: null,
+        claims: MemoryAutomationContainmentClaimRepository.create(),
         directories: {
           projects: { getOrganizationId: vi.fn(), findById: vi.fn() },
           authorization: { listOrganizationBindings: vi.fn() },

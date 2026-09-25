@@ -22,11 +22,7 @@ import {
   type DatasetApi,
   type DatasetRecordEntry,
 } from "@langwatch/dataset-contract";
-import {
-  WebhookDispatchRateLimiter,
-  WebhookEgressService,
-  type WebhookDispatchRateLimitResult,
-} from "@langwatch/egress";
+import { WebhookEgressService } from "@langwatch/egress";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { PrismaScheduledJobStore, SchedulerService } from "@langwatch/eventing/server";
@@ -58,7 +54,6 @@ import type {
 } from "../repositories/automation-settlement-read.repository.ts";
 import type { AutomationRepositories } from "../repositories/automation.repositories.ts";
 import { RedisAutomationEmailCapRepository } from "../repositories/redis/redis.automation-email-cap.repository.ts";
-import { RedisAutomationPersistCapRepository } from "../repositories/redis/redis.automation-persist-cap.repository.ts";
 import { AutomationGraphDeliveryService } from "../services/automation-graph-delivery.service.ts";
 import { AutomationNotificationDeliveryService } from "../services/automation-notification-delivery.service.ts";
 import { AutomationProviderRegistryService } from "../services/automation-provider-registry.service.ts";
@@ -84,7 +79,6 @@ import { RunawayContainmentService } from "../services/runaway-containment.servi
 import { AutomationSettlementDispatchService } from "../services/trigger-settlement-dispatch.service.ts";
 import type {
   AutomationAuditSink,
-  AutomationCallCounter,
   AutomationInfrastructure,
   AutomationProviderSecrets,
   AutomationSlackDirectory,
@@ -122,7 +116,15 @@ type AutomationInfrastructureInput = Readonly<{
   verifier: AutomationInfrastructure["verifier"];
   /** The key the verifier checks with, so every link this process mails verifies. */
   unsubscribeSigningSecret: string | undefined;
-  repositories: Pick<AutomationRepositories, "triggers" | "suppressions" | "webhookDeliveries">;
+  repositories: Pick<
+    AutomationRepositories,
+    | "triggers"
+    | "suppressions"
+    | "webhookDeliveries"
+    | "persistCaps"
+    | "callCounter"
+    | "webhookRateLimits"
+  >;
   caps: Readonly<{ emailHourlyCap: number; tenantDailyCap: number }>;
 }>;
 
@@ -159,11 +161,11 @@ export function buildAutomationInfrastructure(
     heartbeat: new UnmeasuredApiAutomationHeartbeat(),
     runaway: new UncontainedApiAutomationRunaway(members.logger),
     testFire: new UndeliverableApiTestFire(),
-    persistCaps: RedisAutomationPersistCapRepository.create({ connection: members.redis }),
+    persistCaps: input.repositories.persistCaps,
     providers: new AutomationProviderSecretsAdapter(providers),
     slackChannels: new UnavailableAutomationSlackDirectory(),
     traceFilters: new UnwiredAutomationTraceFilterCompiler(),
-    limits: new RedisAutomationCallCounter(members.redis),
+    limits: input.repositories.callCounter,
     audit: new AuditLogAutomationAuditSink(input.auditLog),
     publicBaseUrl: members.publicBaseUrl,
   };
@@ -264,13 +266,16 @@ export function buildGraphAlertNotifier(
  * (main's worker-webhook-egress.composition.ts). No public origin, no delivery.
  */
 function buildNotificationDelivery(
-  input: Pick<AutomationInfrastructureInput, "members" | "unsubscribeSigningSecret">,
+  input: Pick<
+    AutomationInfrastructureInput,
+    "members" | "unsubscribeSigningSecret" | "repositories"
+  >,
 ): AutomationNotificationDelivery {
   const { members } = input;
   if (!members.publicBaseUrl) return new UnavailableNotificationDelivery();
 
   const egress = WebhookEgressService.create({
-    rateLimiter: new RedisWebhookDispatchRateLimiter(members.redis),
+    rateLimiter: input.repositories.webhookRateLimits,
     tls: { rejectUnauthorized: members.isSaas },
   });
   return AutomationNotificationDeliveryService.create({
@@ -525,58 +530,6 @@ class UnavailableAutomationSlackDirectory implements AutomationSlackDirectory {
 class UnwiredAutomationTraceFilterCompiler implements AutomationTraceFilterCompiler {
   assertCompiles(): void {
     throw new ApiAutomationUnavailableError("validate a trace filter query");
-  }
-}
-
-const REDIS_CALL_COUNTER_PREFIX = "automation:call-counter:";
-
-/**
- * Per-key fixed-window counting for automation's multi-policy throttles
- * (test-fire, webhook flood, unsubscribe — ADR-031, ADR-040 §4): each call
- * names its own window and ceiling, unlike the boot-fixed `rateLimiter`.
- */
-class RedisAutomationCallCounter implements AutomationCallCounter {
-  constructor(private readonly redis: RedisConnection) {}
-
-  async count(
-    input: Readonly<{ key: string; windowSeconds: number; max: number }>,
-  ): Promise<Readonly<{ allowed: boolean; resetAt: number }>> {
-    const redisKey = `${REDIS_CALL_COUNTER_PREFIX}${input.key}`;
-    const count = await this.redis.incr(redisKey);
-    if (count === 1) {
-      await this.redis.expire(redisKey, input.windowSeconds);
-    }
-    const ttl = await this.redis.ttl(redisKey);
-    return {
-      allowed: count <= input.max,
-      resetAt: nowInstant().epochMilliseconds + (ttl > 0 ? ttl : input.windowSeconds) * 1000,
-    };
-  }
-}
-
-/**
- * The webhook dispatch cap, counted in Redis under main's key prefix: a different
- * key would spend a budget the platform's own limiter protects.
- */
-class RedisWebhookDispatchRateLimiter extends WebhookDispatchRateLimiter {
-  constructor(private readonly connection: RedisConnection) {
-    super();
-  }
-
-  async limit(
-    input: Readonly<{ key: string; windowSeconds: number; max: number }>,
-  ): Promise<WebhookDispatchRateLimitResult> {
-    const redisKey = `langwatch:ratelimit:${input.key}`;
-    const count = await this.connection.incr(redisKey);
-    if (count === 1) {
-      await this.connection.expire(redisKey, input.windowSeconds);
-    }
-    const ttl = await this.connection.ttl(redisKey);
-    return {
-      allowed: count <= input.max,
-      remaining: Math.max(0, input.max - count),
-      resetAt: nowInstant().epochMilliseconds + (ttl > 0 ? ttl : input.windowSeconds) * 1000,
-    };
   }
 }
 

@@ -22,24 +22,25 @@ Feature: A deployment with no encryption key still serves everything but scenari
   Background:
     Given a deployment that configured no stored-secret encryption key
 
-  @integration
+  @unit
   Scenario: The scenario surfaces still answer
     When a member lists a project's scenarios
     Then the scenarios answer
 
-  @integration
+  @unit
   Scenario: The surfaces that never read the cipher are untouched
     When a member lists a project's suites
     Then the suites answer
     And the Langy conversation and operator surfaces answer
 
-  @integration
+  @unit
   Scenario: Writing a scenario secret refuses by name
     When a member saves a scenario carrying a stored secret
     Then the write is refused as a capability this deployment does not have
     And the refusal says an encryption key is what is missing
 
-  @integration
-  Scenario: The absence is named once at boot rather than once per request
-    When the process composes its scenario surfaces
-    Then the boot report names the absent cipher and what it costs
+  @unit
+  Scenario: The missing key refuses each secret use, never the boot
+    When the process boots with its scenario surfaces installed
+    Then the boot succeeds
+    And each save and each read of a scenario secret refuses as the unconfigured encryption member

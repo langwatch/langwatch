@@ -11,7 +11,7 @@ import type { ProcessConfig } from "./config.ts";
 import { buildPrisma, buildRedis, type BuiltMember } from "./datastore-members.ts";
 import { buildEventing } from "./eventing-members.ts";
 import { buildMail, skippedMail } from "./mail-member.ts";
-import { MEMBER_NAMES, type MemberName, type ProcessMembers } from "./members.ts";
+import { type Encryption, MEMBER_NAMES, type MemberName, type ProcessMembers } from "./members.ts";
 import { buildObjectStorage } from "./object-storage-member.ts";
 import { redisCache, redisIdempotency, redisRateLimiter } from "./redis-members.ts";
 import { buildClickHouseAdmin, buildDatabaseTarget } from "./store-targets.ts";
@@ -30,6 +30,14 @@ export class MemberNotConfiguredError extends Error {
     super(`This process has no "${member}" member: ${remedy}.`);
     this.name = "MemberNotConfiguredError";
   }
+}
+
+/** No key is a state, as main's lazy key was: only a use of the cipher refuses. */
+function refusingEncryption(): Encryption {
+  const refuse = (): never => {
+    throw new MemberNotConfiguredError("encryption", "set the encryption key");
+  };
+  return { encrypt: refuse, decrypt: refuse };
 }
 
 /** A member handed in as an own property whose value is `undefined`. */
@@ -115,7 +123,7 @@ export function createProcessMembers(options: {
     secrets: () => ({ value: resolvedSecrets(config.secrets) }),
     encryption: () => {
       const key = config.encryptionKey.trim();
-      if (!key) throw new MemberNotConfiguredError("encryption", "set the encryption key");
+      if (!key) return { value: refusingEncryption() };
       return { value: aesEncryption(Buffer.from(key, "hex")) };
     },
     telemetry: () => ({ value: loggedTelemetry(read("logger")) }),

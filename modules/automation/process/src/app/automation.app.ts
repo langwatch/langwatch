@@ -388,7 +388,7 @@ export class AutomationApp implements AutomationApi {
       tenantDailyCap: config.tenantDailyCap,
       createRunaway: (suppression) =>
         AutomationRunawayService.create({
-          redis: members.redis,
+          claims: setup.repositories.containmentClaims,
           directories: {
             projects: dependencies.projects,
             authorization: dependencies.authorization,

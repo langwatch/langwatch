@@ -7,6 +7,7 @@ import { ResourceScope } from "@langwatch/kernel";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { PrismaClient, type Trigger as PrismaTrigger } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { nowInstant, type Instant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { vi } from "vitest";
@@ -207,7 +208,10 @@ export function createCanonicalAutomationApp(): {
   };
   return {
     app: AutomationApp.fromInfrastructure({
-      repositories: PostgresAutomationRepositories.create({ prisma: database }),
+      repositories: PostgresAutomationRepositories.create({
+        prisma: database,
+        redis: memoryRedisDouble(),
+      }),
       dependencies: {
         analytics,
         monitors,

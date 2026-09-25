@@ -89,10 +89,13 @@ export class MemoryTriggerRepository extends TriggerRepository {
     return Promise.resolve(new Set(claimed));
   }
 
-  async updateLastRunAt(input: { triggerId: string; projectId: string }): Promise<void> {
-    const row = await this.findById(input);
-    if (row === null) return;
-    this.write({ ...row, lastRunAt: toDate(nowInstant()) });
+  /** One column, read and written in the same tick, as Prisma's column update is. */
+  updateLastRunAt(input: { triggerId: string; projectId: string }): Promise<void> {
+    const row = this.memory.triggers.get(input.triggerId);
+    if (row?.projectId === input.projectId) {
+      this.write({ ...row, lastRunAt: toDate(nowInstant()) });
+    }
+    return Promise.resolve();
   }
 
   async findByIdOrThrow(input: { triggerId: string; projectId: string }): Promise<Trigger> {

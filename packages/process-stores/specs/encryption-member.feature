@@ -46,3 +46,15 @@ Feature: The encryption member reads and writes main's sealed credentials
     Given a process started with both CREDENTIALS_SECRET and NEXTAUTH_SECRET
     When a credential main sealed under CREDENTIALS_SECRET is decrypted through the encryption member
     Then it reads the original plaintext
+
+  @unit
+  Scenario: A process with no encryption key still opens its stores
+    Given a process started with neither CREDENTIALS_SECRET nor NEXTAUTH_SECRET
+    When the process opens its stores and reads the encryption member
+    Then the member is handed over rather than refusing the boot
+
+  @unit
+  Scenario: Using the encryption member without a key refuses by name
+    Given a process started with neither CREDENTIALS_SECRET nor NEXTAUTH_SECRET
+    When a module encrypts or decrypts through the encryption member
+    Then the use is refused as the unconfigured encryption member

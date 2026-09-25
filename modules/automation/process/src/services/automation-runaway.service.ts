@@ -1,14 +1,12 @@
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { AutomationLimitNextStep } from "@langwatch/automation-contract";
-import { generate } from "@langwatch/ksuid";
 import { type EmailDelivery, sendAutomationLimitEmail } from "@langwatch/mail";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { RedisConnection } from "@langwatch/redis-client";
-import { nowInstant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
 import type { AutomationRunawayMetricsSink } from "../app/automation.members.ts";
+import type { AutomationContainmentClaimRepository } from "../repositories/automation-containment-claim.repository.ts";
 import {
   AutomationRunawayRepository,
   type ClaimLease,
@@ -53,7 +51,7 @@ export type AutomationNextStepResolution =
  */
 export class AutomationRunawayService extends AutomationRunawayRepository {
   static create(input: {
-    redis: RedisConnection | null;
+    claims: AutomationContainmentClaimRepository;
     directories: AutomationRunawayDirectories;
     suppression: AutomationRunawaySuppression;
     mailer: EmailDelivery;
@@ -72,7 +70,7 @@ export class AutomationRunawayService extends AutomationRunawayRepository {
 
   private constructor(
     private readonly input: {
-      redis: RedisConnection | null;
+      claims: AutomationContainmentClaimRepository;
       directories: AutomationRunawayDirectories;
       suppression: AutomationRunawaySuppression;
       mailer: EmailDelivery;
@@ -139,11 +137,11 @@ export class AutomationRunawayService extends AutomationRunawayRepository {
   }
 
   claimOnce(key: string, ttlSeconds?: number): Promise<ClaimLease | "already-claimed"> {
-    return claimOnce({ connection: this.input.redis, key, ttlSeconds, logger: this.logger });
+    return this.input.claims.claimOnce(key, ttlSeconds);
   }
 
   releaseClaim(lease: ClaimLease): Promise<void> {
-    return releaseClaim({ connection: this.input.redis, lease, logger: this.logger });
+    return this.input.claims.releaseClaim(lease);
   }
 
   async projectName(projectId: string): Promise<string> {
@@ -175,85 +173,4 @@ export class AutomationRunawayService extends AutomationRunawayRepository {
   info(fields: Record<string, unknown>, message: string): void {
     this.logger.info(fields, message);
   }
-}
-
-const CLAIM_EXPIRE_SECONDS = 90_000;
-const CLAIM_SWEEP_INTERVAL_MS = 60_000;
-
-/**
- * The app's KSUID resource for a containment-notice claim's fencing token
- * (`KSUID_RESOURCES.AUTOMATION_CLAIM`), as a literal: only ever compared for
- * equality, never persisted, but the kind still says what the token is for.
- */
-const AUTOMATION_CLAIM_KSUID_RESOURCE = "automationclaim";
-
-/**
- * The per-pod fallback when Redis is unreachable. Notifies once per pod rather
- * than not at all (which would silently leave runaway automations uncontained).
- */
-const claimMemory = new Map<string, { token: string; expiresAt: number }>();
-let lastClaimSweepAt = 0;
-
-function sweepExpiredClaims(now: number): void {
-  if (now - lastClaimSweepAt < CLAIM_SWEEP_INTERVAL_MS) return;
-  lastClaimSweepAt = now;
-  for (const [key, claim] of claimMemory) {
-    if (claim.expiresAt <= now) claimMemory.delete(key);
-  }
-}
-
-async function claimOnce(input: {
-  connection: RedisConnection | null;
-  key: string;
-  ttlSeconds?: number;
-  logger: Logger;
-}): Promise<ClaimLease | "already-claimed"> {
-  const { connection, key, ttlSeconds = CLAIM_EXPIRE_SECONDS } = input;
-  const token = generate(AUTOMATION_CLAIM_KSUID_RESOURCE).toString();
-  if (connection) {
-    try {
-      const taken = await connection.set(key, token, "EX", ttlSeconds, "NX");
-
-      return taken !== null ? { key, token } : "already-claimed";
-    } catch (error) {
-      input.logger.warn(
-        { key, error: error instanceof Error ? error.message : String(error) },
-        "Redis error claiming an automation containment notification; falling back to a per-worker claim",
-      );
-    }
-  }
-
-  const now = nowInstant().epochMilliseconds;
-  sweepExpiredClaims(now);
-  const existing = claimMemory.get(key);
-  if (existing !== undefined && existing.expiresAt > now) return "already-claimed";
-  claimMemory.set(key, { token, expiresAt: now + ttlSeconds * 1000 });
-
-  return { key, token };
-}
-
-const RELEASE_IF_OWNED_SCRIPT = `
-if redis.call('GET', KEYS[1]) == ARGV[1] then
-  return redis.call('DEL', KEYS[1])
-end
-return 0
-`;
-
-async function releaseClaim(input: {
-  connection: RedisConnection | null;
-  lease: ClaimLease;
-  logger: Logger;
-}): Promise<void> {
-  const { connection, lease } = input;
-  if (connection) {
-    try {
-      await connection.eval(RELEASE_IF_OWNED_SCRIPT, 1, lease.key, lease.token);
-    } catch (error) {
-      input.logger.warn(
-        { key: lease.key, error: error instanceof Error ? error.message : String(error) },
-        "Redis error releasing an automation containment claim; the fleet keeps it until expiry",
-      );
-    }
-  }
-  if (claimMemory.get(lease.key)?.token === lease.token) claimMemory.delete(lease.key);
 }

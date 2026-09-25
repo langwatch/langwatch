@@ -1,3 +1,7 @@
+import type { AutomationCallCounterRepository } from "./automation-call-counter.repository.ts";
+import type { AutomationContainmentClaimRepository } from "./automation-containment-claim.repository.ts";
+import type { AutomationPersistCapRepository } from "./automation-persist-cap.repository.ts";
+import type { AutomationWebhookRateLimitRepository } from "./automation-webhook-rate-limit.repository.ts";
 import type { CustomGraphRepository } from "./custom-graph.repository.ts";
 import type { EmailSuppressionNameRepository } from "./email-suppression-name.repository.ts";
 import type { EmailSuppressionRepository } from "./email-suppression.repository.ts";
@@ -19,4 +23,8 @@ export interface AutomationRepositories {
   readonly customGraphs: CustomGraphRepository;
   readonly webhookDeliveries: WebhookDeliveryRepository;
   readonly graphTriggerSent: GraphTriggerSentRepository;
+  readonly persistCaps: AutomationPersistCapRepository;
+  readonly callCounter: AutomationCallCounterRepository;
+  readonly webhookRateLimits: AutomationWebhookRateLimitRepository;
+  readonly containmentClaims: AutomationContainmentClaimRepository;
 }
