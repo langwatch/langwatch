@@ -419,7 +419,7 @@ export interface GovernanceAppDependencies {
   >;
   modelProviders: Pick<
     ModelProviderApi,
-    "countEnabledInScopes" | "findEnabledProviderKeysInScopes"
+    "countEnabledInScopes" | "findEnabledProviderKeysInScopes" | "countInOrganization"
   >;
   users: Pick<UserApi, "findById" | "findByEmail" | "findLastHomePath">;
   /** Audit-log owns the AuditLog table: workspace-view rows are written and deduped there. */
@@ -630,6 +630,7 @@ export class GovernanceApp implements GovernanceRestApi {
     this.activityMonitor = ActivityMonitorService.create(repositories.activityMonitor);
     this.routingPolicies = DefaultGovernanceRoutingPolicyService.create({
       repository: repositories.routingPolicies,
+      providers: dependencies.modelProviders,
     });
     this.personalKeys = DefaultGovernancePersonalVirtualKeyService.create({
       keys: dependencies.gateway,
@@ -731,7 +732,7 @@ export class GovernanceApp implements GovernanceRestApi {
       repository: repositories.setupState,
       keys: dependencies.gateway,
       projects: dependencies.projects,
-      activity: repositories.traceActivity,
+      traces: dependencies.traces,
     });
     this.personaHome = PersonaHomeService.create({
       setupState: this.setupState,
@@ -755,7 +756,7 @@ export class GovernanceApp implements GovernanceRestApi {
     });
     this.quarantineFill = QuarantineFillEvaluatorService.create({
       tenant: ProjectQuarantineTenantResolverService.create(dependencies.projects),
-      traceActivity: repositories.traceActivity,
+      traces: dependencies.traces,
     });
     this.pullLifecycle = IngestionPullLifecycleService.create({
       repository: repositories.ingestionPullLifecycle,
@@ -829,7 +830,10 @@ export class GovernanceApp implements GovernanceRestApi {
     // and its accessor throws if a CLI/ingest transport or a personal-key/
     // routing-policy tRPC operation ever reaches it.
     this.personalUsageDashboards = PersonalUsageDashboardService.create({
-      usage: DefaultGovernancePersonalUsageService.create({ reader: repositories.personalUsage }),
+      usage: DefaultGovernancePersonalUsageService.create({
+        traces: dependencies.traces,
+        ledger: dependencies.gateway,
+      }),
       organizations: dependencies.organizations,
       projects: dependencies.projects,
     });

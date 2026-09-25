@@ -73,6 +73,22 @@ export class PrismaModelProviderRepository implements ModelProviderRepository {
     });
   }
 
+  countInScopes(input: {
+    modelProviderIds: readonly string[];
+    scopes: readonly { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
+  }): Promise<number> {
+    return this.database.modelProvider.count({
+      where: {
+        id: { in: [...input.modelProviderIds] },
+        scopes: {
+          some: {
+            OR: input.scopes.map(({ scopeType, scopeId }) => ({ scopeType, scopeId })),
+          },
+        },
+      },
+    });
+  }
+
   async findEnabledProviderKeysInScopes(input: {
     scopes: readonly { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
   }): Promise<string[]> {

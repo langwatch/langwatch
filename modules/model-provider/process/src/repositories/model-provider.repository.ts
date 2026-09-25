@@ -35,6 +35,11 @@ export interface ModelProviderRepository {
   countEnabledInScopes(input: {
     scopes: readonly { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
   }): Promise<number>;
+  /** Providers among these ids attached to any of the scopes, enabled or not. */
+  countInScopes(input: {
+    modelProviderIds: readonly string[];
+    scopes: readonly { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
+  }): Promise<number>;
   /** The distinct provider keys of those same providers (main `aiToolEntry.service.ts:1290`). */
   findEnabledProviderKeysInScopes(input: {
     scopes: readonly { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];

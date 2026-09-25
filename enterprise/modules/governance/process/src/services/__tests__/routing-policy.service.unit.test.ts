@@ -1,9 +1,11 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   RoutingPolicyModelMustBeConcreteError,
   RoutingPolicyMustHaveProviderError,
   RoutingPolicyProviderScopeError,
   type RoutingPolicy,
 } from "@langwatch/enterprise-governance-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { RoutingPolicyRepository } from "../../repositories/routing-policy.repository.ts";
@@ -27,7 +29,6 @@ const policy: RoutingPolicy = {
 };
 
 class MemoryRoutingPolicyRepository extends RoutingPolicyRepository {
-  reachable = 1;
   create = vi.fn(async () => policy);
   update = vi.fn(async () => policy);
   findAll = vi.fn(async () => [policy]);
@@ -35,13 +36,19 @@ class MemoryRoutingPolicyRepository extends RoutingPolicyRepository {
   setDefault = vi.fn(async () => policy);
   delete = vi.fn(async () => undefined);
   findDefaultForUser = vi.fn(async () => policy);
-  countReachableModelProviders = vi.fn(async () => this.reachable);
+}
+
+function providersReaching(count: number) {
+  return createApiFixture<ModelProviderApi>({ countInOrganization: () => Promise.resolve(count) });
 }
 
 describe("DefaultGovernanceRoutingPolicyService", () => {
   it("refuses empty provider chains before persistence", async () => {
     const repository = new MemoryRoutingPolicyRepository();
-    const service = DefaultGovernanceRoutingPolicyService.create({ repository });
+    const service = DefaultGovernanceRoutingPolicyService.create({
+      repository,
+      providers: providersReaching(1),
+    });
     await expect(
       service.create({
         organizationId: "organization",
@@ -56,7 +63,10 @@ describe("DefaultGovernanceRoutingPolicyService", () => {
 
   it("refuses moving model aliases", async () => {
     const repository = new MemoryRoutingPolicyRepository();
-    const service = DefaultGovernanceRoutingPolicyService.create({ repository });
+    const service = DefaultGovernanceRoutingPolicyService.create({
+      repository,
+      providers: providersReaching(1),
+    });
     await expect(
       service.create({
         organizationId: "organization",
@@ -71,8 +81,10 @@ describe("DefaultGovernanceRoutingPolicyService", () => {
 
   it("rejects providers outside the organization", async () => {
     const repository = new MemoryRoutingPolicyRepository();
-    repository.reachable = 0;
-    const service = DefaultGovernanceRoutingPolicyService.create({ repository });
+    const service = DefaultGovernanceRoutingPolicyService.create({
+      repository,
+      providers: providersReaching(0),
+    });
     await expect(
       service.create({
         organizationId: "organization",

@@ -25,7 +25,7 @@ type PolicyRow = PrismaRoutingPolicy & { scopes: PrismaRoutingPolicyScope[] };
  */
 export type RoutingPolicyDatabase = Pick<
   PrismaClient,
-  "modelProvider" | "project" | "routingPolicy" | "team" | "$transaction"
+  "project" | "routingPolicy" | "$transaction"
 >;
 
 export class PrismaRoutingPolicyRepository extends RoutingPolicyRepository {
@@ -63,34 +63,6 @@ export class PrismaRoutingPolicyRepository extends RoutingPolicyRepository {
       include: { scopes: true },
     });
     return row ? mapPolicy(row) : null;
-  }
-
-  async countReachableModelProviders(input: {
-    organizationId: string;
-    modelProviderIds: string[];
-  }): Promise<number> {
-    if (input.modelProviderIds.length === 0) return 0;
-    const teams = await this.database.team.findMany({
-      where: { organizationId: input.organizationId },
-      select: { id: true, projects: { select: { id: true } } },
-    });
-    const predicates: Prisma.ModelProviderScopeWhereInput[] = [
-      { scopeType: "ORGANIZATION", scopeId: input.organizationId },
-    ];
-    const teamIds = teams.map(({ id }) => id);
-    if (teamIds.length > 0) {
-      predicates.push({ scopeType: "TEAM", scopeId: { in: teamIds } });
-    }
-    const projectIds = teams.flatMap(({ projects }) => projects.map(({ id }) => id));
-    if (projectIds.length > 0) {
-      predicates.push({ scopeType: "PROJECT", scopeId: { in: projectIds } });
-    }
-    return this.database.modelProvider.count({
-      where: {
-        id: { in: input.modelProviderIds },
-        scopes: { some: { OR: predicates } },
-      },
-    });
   }
 
   async create(input: CreateRoutingPolicyInput): Promise<RoutingPolicy> {

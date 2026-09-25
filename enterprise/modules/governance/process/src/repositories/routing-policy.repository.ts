@@ -11,10 +11,6 @@ import type {
 export abstract class RoutingPolicyRepository {
   abstract findAll(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]>;
   abstract findById(id: string): Promise<RoutingPolicy | null>;
-  abstract countReachableModelProviders(input: {
-    organizationId: string;
-    modelProviderIds: string[];
-  }): Promise<number>;
   abstract create(input: CreateRoutingPolicyInput): Promise<RoutingPolicy>;
   abstract update(input: UpdateRoutingPolicyInput): Promise<RoutingPolicy>;
   abstract setDefault(input: SetDefaultRoutingPolicyInput): Promise<RoutingPolicy>;

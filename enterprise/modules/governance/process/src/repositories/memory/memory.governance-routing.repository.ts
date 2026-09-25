@@ -47,14 +47,6 @@ export class MemoryRoutingPolicyRepository extends RoutingPolicyRepository {
     return this.store.routingPolicies.find((policy) => policy.id === id) ?? null;
   }
 
-  async countReachableModelProviders(input: {
-    organizationId: string;
-    modelProviderIds: string[];
-  }): Promise<number> {
-    const reachable = this.store.eligibleProviderIds.get(input.organizationId) ?? [];
-    return input.modelProviderIds.filter((id) => reachable.includes(id)).length;
-  }
-
   async create(input: CreateRoutingPolicyInput): Promise<RoutingPolicy> {
     const now = nowInstant().epochMilliseconds;
     const policy: RoutingPolicy = {

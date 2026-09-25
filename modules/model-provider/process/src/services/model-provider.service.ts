@@ -97,6 +97,7 @@ export class ModelProviderService {
   private readonly query: ModelProviderQueryService;
   private readonly resolution: ModelProviderResolutionService;
   private readonly writeAuthorization: ModelProviderWriteAuthorizationService;
+  private readonly scopes: ModelProviderScopeService;
 
   private constructor(private readonly options: ModelProviderServiceOptions) {
     const authorization = ModelProviderAuthorizationService.create(options.authorization);
@@ -106,6 +107,7 @@ export class ModelProviderService {
       projects: options.projects,
       organizations: options.organizations,
     });
+    this.scopes = scopes;
     this.resolution = ModelProviderResolutionService.create({
       defaults: options.defaults,
       catalog: options.catalog,
@@ -176,6 +178,17 @@ export class ModelProviderService {
     scopes: readonly { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
   }): Promise<number> {
     return this.options.repository.countEnabledInScopes(input);
+  }
+
+  async countInOrganization(input: {
+    organizationId: string;
+    modelProviderIds: readonly string[];
+  }): Promise<number> {
+    if (input.modelProviderIds.length === 0) return 0;
+    return this.options.repository.countInScopes({
+      modelProviderIds: input.modelProviderIds,
+      scopes: await this.scopes.findOrganizationScopes(input.organizationId),
+    });
   }
 
   findEnabledProviderKeysInScopes(input: {

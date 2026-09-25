@@ -8,6 +8,7 @@ import type {
   GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationApi, OrganizationService } from "@langwatch/organization-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
@@ -51,14 +52,11 @@ import type {
   GovernanceEncryptor,
   GovernanceEventingChannel,
   GovernanceOcsfEventsReader,
-  GovernanceSetupActivityReader,
   GovernanceClickHouseResolver,
   IngestionSourceEntitlements,
   IngestionSourceLifecycleChannel,
-  PersonalUsageReader,
   PersonalVirtualKeyIssuer,
   QuarantineTenantResolver,
-  QuarantineTraceActivityReader,
 } from "./governance.members.ts";
 
 /**
@@ -80,7 +78,15 @@ export type GovernanceInstallationOptions = {
   ingestionEncryption: GovernanceEncryptor;
   ingestionSecretPepper: string;
   ingestionDiagnostics: GovernanceDiagnosticsSink;
-  personalUsageReader?: PersonalUsageReader;
+  traces: Pick<
+    TraceApi,
+    | "getSpendSummary"
+    | "findTopModelsByRequests"
+    | "findDailySpend"
+    | "findModelSpend"
+    | "hasTraceWithAttribute"
+    | "findTraceCountsByAttribute"
+  >;
   personalVirtualKeyIssuer: PersonalVirtualKeyIssuer;
   budgetOverview: PersonalBudgetOverviewReader;
   aiToolSlugs: AiToolSlug;
@@ -96,10 +102,17 @@ export type GovernanceInstallationOptions = {
     | "findByLookupId"
     | "findIngestionKeysForUser"
   >;
-  gateway: Pick<GatewayApi, "findPersonalVirtualKeys" | "findVirtualKeyById">;
+  gateway: Pick<
+    GatewayApi,
+    | "findPersonalVirtualKeys"
+    | "findVirtualKeyById"
+    | "getPrincipalSpendSummary"
+    | "findPrincipalDailySpend"
+    | "findPrincipalModelSpend"
+  >;
   modelProviders: Pick<
     ModelProviderApi,
-    "countEnabledInScopes" | "findEnabledProviderKeysInScopes"
+    "countEnabledInScopes" | "findEnabledProviderKeysInScopes" | "countInOrganization"
   >;
   aiToolMembers: Pick<
     OrganizationApi,
@@ -108,9 +121,7 @@ export type GovernanceInstallationOptions = {
   diagnostics?: GovernanceDiagnosticsSink;
   adminWorkspaceDiagnostics?: GovernanceDiagnosticsSink;
   quarantineTenant: QuarantineTenantResolver;
-  quarantineTraceActivity?: QuarantineTraceActivityReader;
   quarantineDiagnostics?: GovernanceDiagnosticsSink;
-  setupActivity?: GovernanceSetupActivityReader;
   ocsfEvents?: GovernanceOcsfEventsReader;
   ottl: GovernanceOttlGateway;
 };
@@ -149,10 +160,12 @@ export class GovernanceInstallationComposition {
       projects: this.options.projects,
     });
     const personalUsage = DefaultGovernancePersonalUsageService.create({
-      reader: this.options.personalUsageReader,
+      traces: this.options.traces,
+      ledger: this.options.gateway,
     });
     const routingPolicies = DefaultGovernanceRoutingPolicyService.create({
       repository: PrismaRoutingPolicyRepository.create(this.options.database),
+      providers: this.options.modelProviders,
     });
     const personalVirtualKeys = DefaultGovernancePersonalVirtualKeyService.create({
       keys: this.options.gateway,
@@ -238,14 +251,14 @@ export class GovernanceInstallationComposition {
     });
     const quarantineFill = QuarantineFillEvaluatorService.create({
       tenant: this.options.quarantineTenant,
-      traceActivity: this.options.quarantineTraceActivity,
+      traces: this.options.traces,
       diagnostics: this.options.quarantineDiagnostics,
     });
     const setupState = DefaultGovernanceSetupStateService.create({
       repository: PrismaGovernanceSetupStateRepository.create(this.options.database),
       keys: this.options.gateway,
       projects: this.options.projects,
-      activity: this.options.setupActivity,
+      traces: this.options.traces,
     });
 
     const rules = GovernanceRulesOperationsService.create({

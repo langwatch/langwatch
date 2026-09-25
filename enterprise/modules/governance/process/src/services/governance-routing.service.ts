@@ -20,18 +20,23 @@ import {
   type SetDefaultRoutingPolicyInput,
   type UpdateRoutingPolicyInput,
 } from "@langwatch/enterprise-governance-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
 import type { RoutingPolicyRepository } from "../repositories/routing-policy.repository.ts";
 
 const MOVING_MODEL_NAME = /^(openai|anthropic|gemini)\/(latest|latest-mini)$/;
 
 export class DefaultGovernanceRoutingPolicyService {
-  private constructor(private readonly repository: RoutingPolicyRepository) {}
+  private constructor(
+    private readonly repository: RoutingPolicyRepository,
+    private readonly providers: Pick<ModelProviderApi, "countInOrganization">,
+  ) {}
 
   static create(options: {
     repository: RoutingPolicyRepository;
+    providers: Pick<ModelProviderApi, "countInOrganization">;
   }): DefaultGovernanceRoutingPolicyService {
-    return new DefaultGovernanceRoutingPolicyService(options.repository);
+    return new DefaultGovernanceRoutingPolicyService(options.repository, options.providers);
   }
 
   list(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]> {
@@ -129,7 +134,7 @@ export class DefaultGovernanceRoutingPolicyService {
     organizationId: string,
     modelProviderIds: string[],
   ): Promise<void> {
-    const reachable = await this.repository.countReachableModelProviders({
+    const reachable = await this.providers.countInOrganization({
       organizationId,
       modelProviderIds,
     });

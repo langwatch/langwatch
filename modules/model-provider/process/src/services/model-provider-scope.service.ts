@@ -151,6 +151,21 @@ export class ModelProviderScopeService {
     };
   }
 
+  /** The organization, every team in it and every project under them, as provider scopes. */
+  async findOrganizationScopes(
+    organizationId: string,
+  ): Promise<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[]> {
+    const [teams, projectIds] = await Promise.all([
+      this.listTeams(organizationId),
+      this.projects.listIdsByOrganization({ organizationId }),
+    ]);
+    return [
+      { scopeType: "ORGANIZATION", scopeId: organizationId },
+      ...teams.map(({ id }) => ({ scopeType: "TEAM" as const, scopeId: id })),
+      ...projectIds.map((id) => ({ scopeType: "PROJECT" as const, scopeId: id })),
+    ];
+  }
+
   private async listTeams(organizationId: string): Promise<OrganizationTeam[]> {
     const teams: OrganizationTeam[] = [];
     const limit = 1_000;

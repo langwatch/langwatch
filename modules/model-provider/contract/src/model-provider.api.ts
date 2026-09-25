@@ -313,6 +313,11 @@ export interface ModelProviderApi {
   findEnabledProviderKeysInScopes(input: {
     scopes: readonly { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
   }): Promise<string[]>;
+  /** How many of these providers sit on the organization, its teams or its projects. */
+  countInOrganization(input: {
+    organizationId: string;
+    modelProviderIds: readonly string[];
+  }): Promise<number>;
   countUsage(input: { organizationIds: readonly string[] }): Promise<ModelProviderUsageCount>;
 }
 

@@ -87,6 +87,10 @@ export class TestModelProviderService implements ModelProviderApi {
     return Promise.resolve(0);
   }
 
+  countInOrganization(): Promise<number> {
+    return Promise.resolve(0);
+  }
+
   findEnabledProviderKeysInScopes(): Promise<string[]> {
     return Promise.resolve([]);
   }

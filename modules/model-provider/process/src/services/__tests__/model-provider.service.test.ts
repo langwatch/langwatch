@@ -73,6 +73,10 @@ class Providers implements ModelProviderRepository {
     return 0;
   }
 
+  async countInScopes(): Promise<number> {
+    return 0;
+  }
+
   async findEnabledProviderKeysInScopes(): Promise<string[]> {
     return [];
   }

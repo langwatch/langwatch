@@ -579,6 +579,13 @@ export class ModelProviderApp implements ModelProviderApi {
     return this.#modelProviders.countEnabledInScopes(input);
   }
 
+  countInOrganization(input: {
+    organizationId: string;
+    modelProviderIds: readonly string[];
+  }): Promise<number> {
+    return this.#modelProviders.countInOrganization(input);
+  }
+
   findEnabledProviderKeysInScopes(input: {
     scopes: readonly { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
   }): Promise<string[]> {

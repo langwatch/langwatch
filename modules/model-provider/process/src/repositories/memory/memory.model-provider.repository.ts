@@ -39,6 +39,15 @@ export class MemoryModelProviderRepository implements ModelProviderRepository {
     ).length;
   }
 
+  async countInScopes(input: {
+    modelProviderIds: readonly string[];
+    scopes: readonly { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
+  }): Promise<number> {
+    return [...this.database.providers.values()].filter(
+      (row) => input.modelProviderIds.includes(row.id) && matchesAnyScope(row.scopes, input.scopes),
+    ).length;
+  }
+
   async findEnabledProviderKeysInScopes(input: {
     scopes: readonly { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
   }): Promise<string[]> {

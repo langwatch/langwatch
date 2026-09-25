@@ -1,8 +1,10 @@
-import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 /**
  * @vitest-environment node
  * Spec: specs/ai-gateway/auth-cache.feature, Rule "A routing-policy or
  */
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -30,6 +32,9 @@ const createdKeyIds: string[] = [];
 function service(): DefaultGovernanceRoutingPolicyService {
   return DefaultGovernanceRoutingPolicyService.create({
     repository: PrismaRoutingPolicyRepository.create(prisma),
+    providers: createApiFixture<ModelProviderApi>({
+      countInOrganization: ({ modelProviderIds }) => Promise.resolve(modelProviderIds.length),
+    }),
   });
 }
 

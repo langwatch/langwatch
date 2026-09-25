@@ -43,7 +43,6 @@ export class MemoryGovernanceStore {
   readonly ingestionTemplates: IngestionTemplate[] = [];
   readonly anomalyRules: AnomalyRule[] = [];
   readonly routingPolicies: RoutingPolicy[] = [];
-  readonly eligibleProviderIds = new Map<string, string[]>();
   readonly alerts: MemoryGovernanceAlert[] = [];
 
   static create(): MemoryGovernanceStore {
