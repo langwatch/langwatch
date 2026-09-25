@@ -4484,6 +4484,9 @@ importers:
       '@langwatch/api-fixture':
         specifier: workspace:*
         version: link:../../../packages/api-fixture
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
