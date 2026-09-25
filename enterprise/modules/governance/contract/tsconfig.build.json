@@ -28,6 +28,9 @@
       "path": "../../../../modules/api-key/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/auth/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/config/tsconfig.build.json"
     },
     {
@@ -38,6 +41,9 @@
     },
     {
       "path": "../../../../packages/kernel/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/model-provider/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/otlp/tsconfig.build.json"

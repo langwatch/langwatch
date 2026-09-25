@@ -23,10 +23,12 @@
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/auth-contract": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/kernel": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/otlp": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/secrets": "workspace:*",

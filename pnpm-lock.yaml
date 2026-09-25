@@ -2414,6 +2414,9 @@ importers:
       '@langwatch/api-key-contract':
         specifier: workspace:*
         version: link:../../../../modules/api-key/contract
+      '@langwatch/auth-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/auth/contract
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../../packages/config
@@ -2426,6 +2429,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../../packages/kernel
+      '@langwatch/model-provider-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/model-provider/contract
       '@langwatch/otlp':
         specifier: workspace:*
         version: link:../../../../packages/otlp
