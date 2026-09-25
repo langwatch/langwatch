@@ -84,6 +84,8 @@ export const virtualKeyApiCreateInputSchema = z.object({
   expiresAt: z.coerce.date().optional(),
   budget: virtualKeyBudgetInputSchema.nullable().optional(),
   config: virtualKeyConfigSchema.partial().optional(),
+  /** Also park the secret under a one-time reveal id; the secret is still returned. */
+  revealOnce: z.boolean().optional(),
 });
 
 /** Editing a key, over the same parser. */

@@ -140,6 +140,8 @@ export type GatewayVirtualKeyCreateCommand = Readonly<{
   externalId?: string | null;
   metadata?: Record<string, string>;
   actorUserId: string;
+  /** Also park the secret under a one-time reveal id, for a reader other than this caller. */
+  revealOnce?: boolean;
 }>;
 
 /** Editing a key: an absent field is left alone, null clears it. */
@@ -175,6 +177,8 @@ export type GatewayVirtualKeyDisableCommand = GatewayVirtualKeyCommand &
 export type GatewayMintedVirtualKey = Readonly<{
   virtualKey: GatewayVirtualKeyRecord;
   secret: string;
+  /** Set only by a create that asked for `revealOnce`: the id that serves the secret once. */
+  reveal?: Readonly<{ revealId: string; preview: string }>;
 }>;
 
 /** One group a per-member allowance can be pointed at. */

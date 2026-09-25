@@ -26,6 +26,9 @@ export type WebhookSpendEventRow = {
   tokensCacheRead: number;
   tokensCacheWrite: number;
   tokensReasoning: number;
+  tokensInputImage: number;
+  tokensOutputImage: number;
+  imageCount: number;
   costNanoUsd: number;
   costUsd: string;
   rateVersion: string;
@@ -123,6 +126,9 @@ export function webhookEnvelopeFromSpendRow(row: WebhookSpendEventRow): WebhookE
             cache_read_input_tokens: row.tokensCacheRead,
             cache_creation_input_tokens: row.tokensCacheWrite,
             reasoning_tokens: row.tokensReasoning,
+            input_image_tokens: row.tokensInputImage,
+            output_image_tokens: row.tokensOutputImage,
+            image_count: row.imageCount,
           },
       cost: unknownQuantities
         ? null

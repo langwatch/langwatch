@@ -113,6 +113,9 @@ export type SpendEventRow = {
   tokensCacheRead: number;
   tokensCacheWrite: number;
   tokensReasoning: number;
+  tokensInputImage: number;
+  tokensOutputImage: number;
+  imageCount: number;
   /** Integer nano-USD, the authoritative figure. */
   costNanoUsd: number;
   /** Decimal USD string derived from costNanoUsd, up to 9 fractional digits. */
@@ -203,17 +206,14 @@ const spendEventUsageSchema = z.object({
   input_image_tokens: z
     .number()
     .int()
-    .optional()
     .describe("Image tokens billed on the input side, disjoint from input_tokens."),
   output_image_tokens: z
     .number()
     .int()
-    .optional()
     .describe("Image tokens the answer was billed for, disjoint from output_tokens."),
   image_count: z
     .number()
     .int()
-    .optional()
     .describe("Images the request carried. Display only: never part of a cost sum."),
 });
 

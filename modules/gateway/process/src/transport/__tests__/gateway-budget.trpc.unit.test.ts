@@ -187,6 +187,7 @@ async function callerFor(budgets: Record<string, unknown>[]) {
       featureFlags: peer("featureFlags"),
       modelProviders: peer("modelProviders"),
       traces: peer("traces"),
+      oneTimeReveals: peer("oneTimeReveals"),
     },
     members: {
       prisma: fakePrisma(budgets),

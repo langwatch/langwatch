@@ -25,6 +25,9 @@ function row(overrides: Partial<WebhookSpendEventRow> = {}): WebhookSpendEventRo
     tokensCacheRead: 0,
     tokensCacheWrite: 0,
     tokensReasoning: 0,
+    tokensInputImage: 3,
+    tokensOutputImage: 4,
+    imageCount: 1,
     costNanoUsd: 1_500,
     costUsd: "0.0000015",
     rateVersion: "rate-1",
@@ -44,6 +47,7 @@ function row(overrides: Partial<WebhookSpendEventRow> = {}): WebhookSpendEventRo
 describe("Feature: Gateway spend reconciliation REST surface", () => {
   describe("given the envelope the pull publishes", () => {
     describe("when a confirmed spend row is rendered", () => {
+      /** @scenario "The pulled envelope publishes every field the webhook delivers" */
       it("keeps every field the webhook delivers, identity and rate version included", () => {
         const envelope = gatewaySpendEventEnvelopeSchema.parse(webhookEnvelopeFromSpendRow(row()));
 
@@ -53,7 +57,13 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
           organization_id: "org-1",
           end_user_id: "end-user-1",
           status: "success",
-          usage: { input_tokens: 10, output_tokens: 20 },
+          usage: {
+            input_tokens: 10,
+            output_tokens: 20,
+            input_image_tokens: 3,
+            output_image_tokens: 4,
+            image_count: 1,
+          },
           cost: { total_usd: "0.0000015", nano_usd: 1_500, rate_version: "rate-1" },
           duration_ms: 42,
           labels: ["billing"],

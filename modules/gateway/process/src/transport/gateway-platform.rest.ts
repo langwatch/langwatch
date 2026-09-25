@@ -39,6 +39,8 @@ import {
   GatewayProviderBindingsGoneError,
   type GatewayCaller,
   type GatewayCacheRuleResource,
+  type GatewayMintedVirtualKey,
+  type GatewayVirtualKeySnakeDto,
   type GatewayVirtualKeyScope,
   type GatewayBudgetScope,
   type VirtualKeyBudgetInput,
@@ -65,6 +67,21 @@ const canonicalGoneResponses = {
 } as const;
 
 /** The stable actor id every write records, from the door's resolved caller. */
+/** With `reveal_once` the response withholds the secret and names the reveal instead. */
+function createdVirtualKeyWire(
+  virtualKey: GatewayVirtualKeySnakeDto,
+  { secret, reveal }: GatewayMintedVirtualKey,
+): {
+  virtual_key: GatewayVirtualKeySnakeDto;
+  secret?: string;
+  reveal_id?: string;
+  preview?: string;
+} {
+  if (reveal)
+    return { virtual_key: virtualKey, reveal_id: reveal.revealId, preview: reveal.preview };
+  return { virtual_key: virtualKey, secret };
+}
+
 function actorUserIdOf(actor: GatewayCaller): string {
   const caller = actor as { type?: string; id?: string } | null;
   if (caller && (caller.type === "user" || caller.type === "api_key") && caller.id) {
@@ -236,7 +253,22 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withInput(gatewayCreateVirtualKeySchema)
   .withPermission("virtualKeys:create")
   .withStatus(201)
-  .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema, secret: z.string() }))
+  .withOutput(
+    z.object({
+      virtual_key: gatewayVirtualKeyDtoSchema,
+      secret: z.string().optional().describe("The secret, absent when `reveal_once` was set."),
+      reveal_id: z
+        .string()
+        .optional()
+        .describe("With `reveal_once`: the id that serves the secret once, through the app."),
+      preview: z
+        .string()
+        .optional()
+        .describe(
+          "With `reveal_once`: the key's display prefix, safe to show in place of the secret.",
+        ),
+    }),
+  )
   // The secret is minted once and stored only as a hash, so a caller losing
   // this response has no second way to read it - the whole reason this
   // route takes an idempotency key.
@@ -244,7 +276,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withDocs({
     summary: "Create virtual key",
     description:
-      "Mints a new virtual key and returns the secret exactly once. scopes defaults to the caller's project; org- and team-scoped keys require virtualKeys:manage at each requested scope.",
+      "Mints a new virtual key and returns the secret exactly once. With `reveal_once` the response withholds the secret and carries `reveal_id` and `preview` instead: the secret is parked for 24 hours and served once, to the person the key is for, through the LangWatch app. scopes defaults to the caller's project; org- and team-scoped keys require virtualKeys:manage at each requested scope.",
     responses: { ...canonicalBaseResponses, ...canonicalConflictResponses },
   })
   .handle(async ({ app, input, scope, actor }) => {
@@ -259,7 +291,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       guardrailAttachments: input.config?.guardrailAttachments,
       callerProjectId: scope.id,
     });
-    const { virtualKey, secret } = await app.createVirtualKey({
+    const minted = await app.createVirtualKey({
       organizationId,
       name: input.name,
       description: input.description ?? null,
@@ -276,8 +308,9 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       externalId: input.external_id,
       metadata: input.metadata,
       actorUserId,
+      revealOnce: input.reveal_once === true,
     });
-    return { virtual_key: await app.toVirtualKeySnakeDto(virtualKey), secret };
+    return createdVirtualKeyWire(await app.toVirtualKeySnakeDto(minted.virtualKey), minted);
   })
 
   .get("/virtual-keys/:id", "getApiGatewayV1VirtualKeysById")

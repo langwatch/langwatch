@@ -78,6 +78,7 @@ import { MonitorApi } from "@langwatch/monitor-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { type ProcessMembers } from "@langwatch/process-stores/members";
 import { type ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
+import { SecretApi } from "@langwatch/secret-contract";
 import { gatewayInternalSecret, Secret, virtualKeyPepper } from "@langwatch/secrets";
 import { toDate, type Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
@@ -662,6 +663,8 @@ export class GatewayApp implements GatewayApi {
     modelProviders: ModelProviderApi,
     /** The per-model spend a personal budget lists its top models from. */
     traces: TraceApi,
+    /** Parks a fresh key's secret for one later read, when its create asks for `revealOnce`. */
+    oneTimeReveals: SecretApi,
   };
   static readonly config = gatewayConfig;
   /**
@@ -797,6 +800,7 @@ export class GatewayApp implements GatewayApi {
         expectedControlPlaneUrl: setup.config?.controlPlaneUrl ?? setup.members.publicBaseUrl,
       },
       connectUpstream,
+      oneTimeReveals: setup.dependencies.oneTimeReveals,
     });
   }
 
@@ -815,6 +819,7 @@ export class GatewayApp implements GatewayApi {
   #internalDoor: RestIdentity;
   #connectUpstream: GatewayConnectUpstreamService | undefined;
   #addresses: GatewayDeploymentAddresses;
+  #oneTimeReveals: SecretApi | undefined;
 
   private constructor({
     members,
@@ -829,6 +834,7 @@ export class GatewayApp implements GatewayApi {
       expectedControlPlaneUrl: void 0,
     },
     connectUpstream,
+    oneTimeReveals,
   }: {
     members: GatewayInfrastructure;
     internalProtocol: GatewayInternalProtocolService;
@@ -838,8 +844,10 @@ export class GatewayApp implements GatewayApi {
     budgetOverviewDeps?: GatewayBudgetOverviewDeps;
     addresses?: GatewayDeploymentAddresses;
     connectUpstream?: GatewayConnectUpstreamService;
+    oneTimeReveals?: SecretApi;
   }) {
     this.#addresses = addresses;
+    this.#oneTimeReveals = oneTimeReveals;
     this.#connectUpstream = connectUpstream;
     this.#spend = spend;
     this.#spendPipeline = spendPipeline;
@@ -1420,8 +1428,24 @@ export class GatewayApp implements GatewayApi {
     return this.#dependencies.virtualKeys.findById(id, organizationId);
   }
 
-  createVirtualKey(input: GatewayVirtualKeyCreateInput): Promise<GatewayMintedVirtualKey> {
-    return this.#dependencies.virtualKeys.create(input);
+  async createVirtualKey({
+    revealOnce,
+    ...input
+  }: GatewayVirtualKeyCreateInput &
+    Readonly<{ revealOnce?: boolean }>): Promise<GatewayMintedVirtualKey> {
+    const minted = await this.#dependencies.virtualKeys.create(input);
+    if (!revealOnce) return minted;
+    const reveals = this.#oneTimeReveals;
+    if (!reveals) throw new Error("The one-time reveal store was not installed");
+    const preview = minted.virtualKey.displayPrefix;
+    const { revealId } = await reveals.stashReveal({
+      organizationId: input.organizationId,
+      kind: "virtual_key",
+      keyId: minted.virtualKey.id,
+      preview,
+      secret: minted.secret,
+    });
+    return { ...minted, reveal: { revealId, preview } };
   }
 
   updateVirtualKey(input: GatewayVirtualKeyUpdateInput): Promise<GatewayVirtualKeyRecord> {

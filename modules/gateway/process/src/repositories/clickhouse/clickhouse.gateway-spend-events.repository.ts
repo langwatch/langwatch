@@ -64,7 +64,8 @@ const logger = createLogger("langwatch:gateway:spend-repository");
 export const SPEND_ROW_COLUMNS = `TenantId, GatewayRequestId, OrganizationId, VirtualKeyId,
           PrincipalUserId, EndUserId, TraceId, Model, ProviderKey, RequestType,
           TokensInput, TokensOutput, TokensCacheRead, TokensCacheWrite,
-          TokensReasoning, CostNanoUSD, RateVersion, Status, ErrorClass,
+          TokensReasoning, TokensInputImage, TokensOutputImage, ImageCount,
+          CostNanoUSD, RateVersion, Status, ErrorClass,
           HttpStatus, NeedsReconciliation, SettleReason, Labels, Metadata,
           DurationMS, toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs`;
 
@@ -224,7 +225,6 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
         SELECT ${SPEND_ROW_COLUMNS}, SettleReason, PodId, PodSeq,
                TokensCacheWrite1h, TokensInputAudio, TokensOutputAudio,
                CharsInput, AudioMS,
-               TokensInputImage, TokensOutputImage, ImageCount,
                Version, CreatedAt, LastEventOccurredAt, EventTimestamp
         FROM ${TABLE} FINAL
         WHERE TenantId = {tenantId:String}
@@ -734,6 +734,9 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
       tokensCacheRead: Number(r.TokensCacheRead),
       tokensCacheWrite: Number(r.TokensCacheWrite),
       tokensReasoning: Number(r.TokensReasoning),
+      tokensInputImage: Number(r.TokensInputImage ?? 0),
+      tokensOutputImage: Number(r.TokensOutputImage ?? 0),
+      imageCount: Number(r.ImageCount ?? 0),
       costNanoUsd: nano,
       costUsd: nanoUsdToDecimalString(nano),
       rateVersion: asString(r.RateVersion),

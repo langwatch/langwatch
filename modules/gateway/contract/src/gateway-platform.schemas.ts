@@ -226,6 +226,8 @@ export const gatewayCreateVirtualKeySchema = z.object({
   name: z.string().min(1).max(128),
   description: z.string().optional(),
   principal_user_id: z.string().nullable().optional(),
+  /** Withhold the secret from the response and park it under a one-time reveal id instead. */
+  reveal_once: z.boolean().optional(),
   scopes: z.array(gatewayScopeWireSchema).min(1).optional(),
   trace_project_id: z.string().nullable().optional(),
   routing_policy_id: z.string().nullable().optional(),

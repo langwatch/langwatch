@@ -49,7 +49,12 @@ export type VirtualKeyCamelDtoResponse = z.infer<typeof virtualKeyCamelDtoSchema
 
 /** A key was minted or rotated: the DTO, and the plaintext secret this one moment carries. */
 export const virtualKeyMintedSchema = z
-  .object({ virtualKey: virtualKeyCamelDtoSchema, secret: z.string() })
+  .object({
+    virtualKey: virtualKeyCamelDtoSchema,
+    secret: z.string(),
+    revealId: z.string().optional(),
+    preview: z.string().optional(),
+  })
   .strict();
 export type VirtualKeyMinted = z.infer<typeof virtualKeyMintedSchema>;
 
@@ -222,6 +227,9 @@ export const gatewaySpendEventRowSchema = z
     tokensCacheRead: z.number(),
     tokensCacheWrite: z.number(),
     tokensReasoning: z.number(),
+    tokensInputImage: z.number(),
+    tokensOutputImage: z.number(),
+    imageCount: z.number(),
     costNanoUsd: z.number(),
     costUsd: z.string(),
     rateVersion: z.string(),

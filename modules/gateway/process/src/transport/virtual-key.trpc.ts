@@ -198,7 +198,7 @@ export const virtualKeyTrpcTransport = defineTrpcRouter(GatewayApi, virtualKeyTr
       traceProjectId: input.traceProjectId,
       guardrailAttachments: input.config?.guardrailAttachments,
     });
-    const { virtualKey, secret } = await app.createVirtualKey({
+    const { virtualKey, secret, reveal } = await app.createVirtualKey({
       organizationId: input.organizationId,
       name: input.name,
       description: input.description ?? null,
@@ -211,10 +211,15 @@ export const virtualKeyTrpcTransport = defineTrpcRouter(GatewayApi, virtualKeyTr
       budget: input.budget ?? null,
       config: input.config,
       actorUserId: actor.id,
+      revealOnce: input.revealOnce === true,
     });
 
     // The one moment the plaintext key exists on the wire.
-    return { virtualKey: await app.toVirtualKeyCamelDto(virtualKey), secret };
+    return {
+      virtualKey: await app.toVirtualKeyCamelDto(virtualKey),
+      secret,
+      ...(reveal ? { revealId: reveal.revealId, preview: reveal.preview } : {}),
+    };
   })
 
   .procedure("update")
