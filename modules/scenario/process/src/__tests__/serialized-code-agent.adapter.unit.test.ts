@@ -6,7 +6,7 @@ import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import type { CodeAgentData } from "@langwatch/scenario-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { NlpFetchAdapter } from "../services/nlp-fetch.service.ts";
+import { HttpNlpFetchChannel } from "../channels/http/http.nlp-fetch.channel.ts";
 import recordedNlpgoResponses from "./fixtures/nlpgo-recorded-responses.json";
 import { guardAgainstGlobalFetch } from "./support/global-fetch-guard.ts";
 
@@ -204,12 +204,12 @@ describe("SerializedCodeAgentAdapter", () => {
     vi.clearAllMocks();
     withActiveSpanCalls.length = 0;
     agentOptions.length = 0;
-    // NlpFetchAdapter.dispatcher now memoizes by timeoutMs at module scope
+    // HttpNlpFetchChannel.dispatcher now memoizes by timeoutMs at module scope
     // (nlpgo/timeouts.ts). Without clearing the cache here, a dispatcher
     // built by an earlier test for the same timeoutMs is returned again
     // without touching the mocked undici.Agent constructor, so agentOptions
     // stays empty and this test's assertions see stale/undefined values.
-    await NlpFetchAdapter.create().close();
+    await HttpNlpFetchChannel.create().close();
     // clearAllMocks keeps implementations, so pin the no-active-context
     // default here; tests that need a trace context override it themselves.
     mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({

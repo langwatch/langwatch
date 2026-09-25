@@ -12,18 +12,15 @@ import { resolveFieldMappings } from "@langwatch/scenario-contract";
 import type { RunParameterValues, WorkflowAgentData } from "@langwatch/scenario-contract";
 import { type Response as UndiciResponse, fetch as undiciFetch } from "undici";
 
-import {
-  type FetchInitWithDispatcher,
-  NlpFetchAdapter,
-  type NlpFetchTimeouts,
-} from "../../services/nlp-fetch.service.ts";
+import { type FetchInitWithDispatcher, type NlpFetchTimeouts } from "../nlp-fetch.channel.ts";
 import { SerializedAgentChannel } from "../serialized-agent.channel.ts";
+import { HttpNlpFetchChannel } from "./http.nlp-fetch.channel.ts";
 
 /**
  * How long to wait on the NLP service for one turn.
  */
 function fetchTimeoutMs(timeouts: NlpFetchTimeouts): number {
-  const transport = NlpFetchAdapter.create({ timeouts });
+  const transport = HttpNlpFetchChannel.create({ timeouts });
 
   return Math.min(transport.maxTimeoutMs(), transport.floorTimeoutMs());
 }
@@ -256,7 +253,7 @@ export class HttpSerializedWorkflowAgentChannel extends SerializedAgentChannel {
         headers: { "Content-Type": "application/json" },
         body,
         signal,
-        dispatcher: NlpFetchAdapter.create().dispatcher({ timeoutMs }),
+        dispatcher: HttpNlpFetchChannel.create().dispatcher({ timeoutMs }),
       };
       // undici's own fetch, not the global one: Node's global fetch is bound
       // to the undici bundled with Node, which rejects a dispatcher built by

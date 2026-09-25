@@ -4,6 +4,7 @@
  * @see specs/agents/agent-test-run.feature
  */
 
+import { createLogger } from "@langwatch/observability";
 import * as ScenarioRunner from "@langwatch/scenario";
 import type { ConnectedAgentData } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -87,6 +88,7 @@ describe("AgentTestScriptAdapter", () => {
     it("fails the agent's turn and names it offline", async () => {
       const adapter = new HttpSerializedConnectedAgentChannel({
         config,
+        logger: createLogger("test"),
         projectApiKey: "sk-lw-project",
         fetchImpl: async () => {
           const body = { error: "agent_offline", message: "No instance" };

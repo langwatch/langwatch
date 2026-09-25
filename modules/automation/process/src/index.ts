@@ -125,11 +125,13 @@ export {
   type AutomationRunawayDirectories,
   type RunawayClickHouseResolver,
   type AutomationRunawaySuppression,
+  type AutomationNextStepResolution,
   type AutomationNextStepResolver,
 } from "./services/automation-runaway.service.ts";
 export {
   AutomationNextStepService,
   AutomationOrganizationPricing,
+  type AutomationOrganizationPricingAnswer,
 } from "./services/automation-next-step.service.ts";
 /**
  * The containment POLICY behind that port.

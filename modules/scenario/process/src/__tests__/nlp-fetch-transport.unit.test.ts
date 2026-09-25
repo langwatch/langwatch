@@ -10,7 +10,7 @@ import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import type { CodeAgentData, WorkflowAgentData } from "@langwatch/scenario-contract";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { NlpFetchAdapter } from "../services/nlp-fetch.service.ts";
+import { HttpNlpFetchChannel } from "../channels/http/http.nlp-fetch.channel.ts";
 
 // Tracing is not the boundary under test, and the real tracer would need a
 // configured exporter. undici and the global fetch are deliberately left alone.
@@ -78,7 +78,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await NlpFetchAdapter.create().close();
+  await HttpNlpFetchChannel.create().close();
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 

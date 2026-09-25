@@ -10,7 +10,9 @@ import type { ChildProcessJobData } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../services/child-process-spawn.service.ts", () => ({
-  resolveChildProcessSpawn: () => ({ command: "node", args: ["/dist/bundle.cjs"] }),
+  ChildProcessSpawnService: {
+    resolve: () => ({ command: "node", args: ["/dist/bundle.cjs"] }),
+  },
 }));
 
 const stdinWrite = vi.fn();

@@ -34,7 +34,11 @@ const launch: PlanNextStep = {
 
 class TieredEuroPricing extends AutomationOrganizationPricing {
   pricingFor() {
-    return Promise.resolve({ pricingModel: "TIERED" as const, currency: "EUR" as const });
+    return Promise.resolve({
+      kind: "priced" as const,
+      pricingModel: "TIERED" as const,
+      currency: "EUR" as const,
+    });
   }
 }
 
@@ -63,14 +67,17 @@ describe("AutomationNextStepService", () => {
 
     expect(asked).toEqual([{ plan: pro, pricingModel: "TIERED", currency: "EUR" }]);
     expect(step).toEqual({
-      kind: "self_serve",
-      name: "Launch",
-      url: "https://app.example.com/settings/subscription/checkout/launch",
-      price: 59,
-      currency: "EUR",
-      billingPeriod: "monthly",
-      pricedPerSeat: false,
-      dailyCeiling: 150,
+      kind: "named",
+      nextStep: {
+        kind: "self_serve",
+        name: "Launch",
+        url: "https://app.example.com/settings/subscription/checkout/launch",
+        price: 59,
+        currency: "EUR",
+        billingPeriod: "monthly",
+        pricedPerSeat: false,
+        dailyCeiling: 150,
+      },
     });
   });
 });

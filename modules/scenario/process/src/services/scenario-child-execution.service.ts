@@ -9,7 +9,8 @@ import type { ChildProcessJobData } from "@langwatch/scenario-contract";
 import { type TracerProvider, trace } from "@opentelemetry/api";
 
 import type { ScenarioHttp } from "../app/scenario.app.ts";
-import { HttpSerializedConnectedAgentChannel } from "../channels/http/http.serialized-connected-agent.channel.ts";
+import { litellmModelChannels } from "../channels/litellm-model-channels.registry.ts";
+import type { NlpFetchTimeouts } from "../channels/nlp-fetch.channel.ts";
 import { SerializedAgentChannelRegistry } from "../channels/serialized-agent-channels.registry.ts";
 import {
   agentGreetsFirst,
@@ -18,8 +19,6 @@ import {
 import { buildRemoteTraceRunConfig } from "../rules/remote-trace-run.rules.ts";
 import { selectRoleModelParams } from "../rules/scenario-role-model.rules.ts";
 import { AgentTestScriptAdapter } from "./agent-test-script.service.ts";
-import { createJudgeModelFromParams, createModelFromParams } from "./litellm-model.service.ts";
-import type { NlpFetchTimeouts } from "./nlp-fetch.service.ts";
 
 /**
  * Some TracerProvider implementations (like ProxyTracerProvider) wrap a delegate. This interface
@@ -77,11 +76,12 @@ function buildRunCast({
   }
   const { nlpServiceUrl, scenario } = jobData;
   const roleModelParams = selectRoleModelParams(jobData);
-  const simulatorModel = createModelFromParams({
+  const models = litellmModelChannels.live.create();
+  const simulatorModel = models.model({
     litellmParams: roleModelParams.simulator,
     nlpServiceUrl,
   });
-  const judgeModel = createJudgeModelFromParams({
+  const judgeModel = models.judgeModel({
     litellmParams: roleModelParams.judge,
     nlpServiceUrl,
   });
@@ -217,9 +217,8 @@ async function executeScenarioChildValue({
   }
   // The connected agent instance that answered the run's turns, for the
   // parent's record of which process served the run.
-  if (adapter instanceof HttpSerializedConnectedAgentChannel && adapter.servedInstance) {
-    outputResult.agentInstance = adapter.servedInstance;
-  }
+  const servedInstance = adapter.servedInstance;
+  if (servedInstance) outputResult.agentInstance = servedInstance;
   return outputResult;
 }
 

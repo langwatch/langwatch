@@ -6,7 +6,9 @@ import { generateText, tool } from "ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { createJudgeModelFromParams, createModelFromParams } from "../index.ts";
+import { HttpLitellmModelChannel } from "../index.ts";
+
+const models = HttpLitellmModelChannel.create();
 
 function requestBody(init: RequestInit | undefined): string {
   const body = init?.body;
@@ -55,7 +57,7 @@ describe("scenario model factory", () => {
     model,
     providerOptions,
   }: {
-    model: ReturnType<typeof createModelFromParams>;
+    model: ReturnType<HttpLitellmModelChannel["model"]>;
     providerOptions?: Parameters<typeof generateText>[0]["providerOptions"];
   }) {
     await generateText({
@@ -78,7 +80,7 @@ describe("scenario model factory", () => {
     "sets reasoning_effort=none on the gpt-5.6-%s judge request",
     async (variant) => {
       const body = await callWithJudgeTool({
-        model: createJudgeModelFromParams({
+        model: models.judgeModel({
           litellmParams: {
             model: `openai/gpt-5.6-${variant}`,
             api_key: "test-key",
@@ -98,7 +100,7 @@ describe("scenario model factory", () => {
   /** @scenario "The same model outside the judge is untouched" */
   it("does not change the simulator or target model using the same model id", async () => {
     const body = await callWithJudgeTool({
-      model: createModelFromParams({
+      model: models.model({
         litellmParams: {
           model: "openai/gpt-5.6-sol",
           api_key: "test-key",
@@ -115,7 +117,7 @@ describe("scenario model factory", () => {
     "does not speculate about the unverified judge model %s",
     async (modelId) => {
       const body = await callWithJudgeTool({
-        model: createJudgeModelFromParams({
+        model: models.judgeModel({
           litellmParams: { model: modelId, api_key: "test-key" },
           nlpServiceUrl: "http://nlp.test",
         }),
@@ -128,7 +130,7 @@ describe("scenario model factory", () => {
   /** @scenario "The compatibility value is a default, not an override" */
   it("uses none only as a default, preserving explicit call intent", async () => {
     const body = await callWithJudgeTool({
-      model: createJudgeModelFromParams({
+      model: models.judgeModel({
         litellmParams: {
           model: "openai/gpt-5.6-sol",
           api_key: "test-key",

@@ -20,7 +20,7 @@ import type {
   CancellationSubscriber,
   ScenarioSecretCipher,
 } from "../app/scenario.app.ts";
-import { NlpFetchAdapter } from "./nlp-fetch.service.ts";
+import { nlpFetchChannels } from "../channels/nlp-fetch-channels.registry.ts";
 import {
   NodeScenarioChildProcessAdapter,
   type ScenarioChildProcessConfig,
@@ -99,7 +99,7 @@ export class ScenarioExecutorService {
     resources?.own("scenario executor", async () => {
       const started = await running.catch(() => void 0);
       await started?.close();
-      await NlpFetchAdapter.create().close();
+      await nlpFetchChannels.live.create().close();
     });
   }
 

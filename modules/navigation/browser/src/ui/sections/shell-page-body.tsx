@@ -179,136 +179,140 @@ export const ShellPageBody = ({
 
   return (
     <VStack width="full" gap={0} {...props}>
-      {(!deployment.hasNlpService || !deployment.hasLangevals) && (
-        <Alert.Root
-          status="warning"
-          width="full"
-          borderBottom="1px solid"
-          borderBottomColor="yellow.300"
-          borderTopLeftRadius="2xl"
-        >
-          <Alert.Indicator />
-          <Alert.Content>
-            <Text>
-              Please check your environment variables, the following variables are not set which are
-              required for evaluations and workflows:
+      {/* Banners are chrome: a positioned layer so a page's own zIndex or bleed (the home
+          hero's bloom) cannot wash them out; `docked` stays under every portaled overlay. */}
+      <VStack width="full" gap={0} position="relative" zIndex="docked" data-part="page-banners">
+        {(!deployment.hasNlpService || !deployment.hasLangevals) && (
+          <Alert.Root
+            status="warning"
+            width="full"
+            borderBottom="1px solid"
+            borderBottomColor="yellow.300"
+            borderTopLeftRadius="2xl"
+          >
+            <Alert.Indicator />
+            <Alert.Content>
+              <Text>
+                Please check your environment variables, the following variables are not set which
+                are required for evaluations and workflows:
+              </Text>
+              {!deployment.hasNlpService && <Text>LANGWATCH_NLP_SERVICE</Text>}
+              {!deployment.hasLangevals && <Text>LANGEVALS_ENDPOINT</Text>}
+            </Alert.Content>
+          </Alert.Root>
+        )}
+        {usage.data?.messageLimitInfo && usage.data.messageLimitInfo.status !== "ok" && (
+          <Alert.Root
+            status={usage.data.messageLimitInfo.status === "exceeded" ? "error" : "warning"}
+            width="full"
+            borderBottom="1px solid"
+            borderBottomColor={
+              usage.data.messageLimitInfo.status === "exceeded" ? "red.300" : "yellow.300"
+            }
+          >
+            <Alert.Indicator />
+            <Alert.Content>
+              <Text>
+                {usage.data.messageLimitInfo.message}{" "}
+                <NavigationLink
+                  href={planManagementHref(deployment.isSaaS)}
+                  textDecoration="underline"
+                  _hover={{ textDecoration: "none" }}
+                >
+                  Click here
+                </NavigationLink>{" "}
+                to upgrade your plan.
+              </Text>
+            </Alert.Content>
+          </Alert.Root>
+        )}
+        {usage.data && usage.data.currentMonthCost > usage.data.maxMonthlyUsageLimit && (
+          <Alert.Root
+            status="warning"
+            width="full"
+            borderBottom="1px solid"
+            borderBottomColor="yellow.300"
+          >
+            <Alert.Indicator />
+            <Alert.Content>
+              <Text>
+                You reached the limit of{" "}
+                {usage.data.maxMonthlyUsageLimit.toLocaleString(void 0, {
+                  style: "currency",
+                  currency: "USD",
+                })}{" "}
+                usage cost for this month, evaluations and guardrails will not be processed.{" "}
+                <NavigationLink
+                  href="/settings/usage"
+                  textDecoration="underline"
+                  _hover={{ textDecoration: "none" }}
+                >
+                  Go to settings
+                </NavigationLink>{" "}
+                to check your usage spending limit or upgrade your plan.
+              </Text>
+            </Alert.Content>
+          </Alert.Root>
+        )}
+
+        {host.startupNotice()}
+
+        {host.joinOffer({
+          currentOrganizationId: isOrganizationLoading ? void 0 : (organization?.id ?? null),
+        })}
+
+        {adminViewingAs && <AdminViewingAsBanner workspaceLabel={adminViewingAs.label} />}
+
+        {ssoStatus?.pendingSsoSetup && (
+          <Alert.Root
+            status="error"
+            width="full"
+            border="1px solid"
+            borderColor="colorPalette.muted"
+            marginX={4}
+            marginTop={3}
+            borderRadius="lg"
+            maxWidth="calc(100% - 22px)"
+          >
+            <Alert.Indicator />
+            <Alert.Content>
+              <HStack width="full" gap={4}>
+                <VStack align="start" gap={0} flex={1}>
+                  <Alert.Title fontWeight="bold">
+                    Sign in with your organization's single sign-on
+                  </Alert.Title>
+                  <Text fontSize="sm">
+                    Your organization requires single sign-on. Sign out, then sign in again by
+                    entering your work email address.
+                  </Text>
+                </VStack>
+                <Button
+                  size="sm"
+                  colorPalette="red"
+                  flexShrink={0}
+                  color="white"
+                  onClick={() => host.signOut()}
+                >
+                  Sign out
+                </Button>
+              </HStack>
+            </Alert.Content>
+          </Alert.Root>
+        )}
+
+        {isDemoProject && (
+          <HStack width="full" backgroundColor="orange.400" padding={1}>
+            <Spacer />
+            <Text fontSize="sm">
+              Viewing Demo Project - Go back to yours{" "}
+              <NavigationLink href="/" textDecoration="underline">
+                here
+              </NavigationLink>
             </Text>
-            {!deployment.hasNlpService && <Text>LANGWATCH_NLP_SERVICE</Text>}
-            {!deployment.hasLangevals && <Text>LANGEVALS_ENDPOINT</Text>}
-          </Alert.Content>
-        </Alert.Root>
-      )}
-      {usage.data?.messageLimitInfo && usage.data.messageLimitInfo.status !== "ok" && (
-        <Alert.Root
-          status={usage.data.messageLimitInfo.status === "exceeded" ? "error" : "warning"}
-          width="full"
-          borderBottom="1px solid"
-          borderBottomColor={
-            usage.data.messageLimitInfo.status === "exceeded" ? "red.300" : "yellow.300"
-          }
-        >
-          <Alert.Indicator />
-          <Alert.Content>
-            <Text>
-              {usage.data.messageLimitInfo.message}{" "}
-              <NavigationLink
-                href={planManagementHref(deployment.isSaaS)}
-                textDecoration="underline"
-                _hover={{ textDecoration: "none" }}
-              >
-                Click here
-              </NavigationLink>{" "}
-              to upgrade your plan.
-            </Text>
-          </Alert.Content>
-        </Alert.Root>
-      )}
-      {usage.data && usage.data.currentMonthCost > usage.data.maxMonthlyUsageLimit && (
-        <Alert.Root
-          status="warning"
-          width="full"
-          borderBottom="1px solid"
-          borderBottomColor="yellow.300"
-        >
-          <Alert.Indicator />
-          <Alert.Content>
-            <Text>
-              You reached the limit of{" "}
-              {usage.data.maxMonthlyUsageLimit.toLocaleString(void 0, {
-                style: "currency",
-                currency: "USD",
-              })}{" "}
-              usage cost for this month, evaluations and guardrails will not be processed.{" "}
-              <NavigationLink
-                href="/settings/usage"
-                textDecoration="underline"
-                _hover={{ textDecoration: "none" }}
-              >
-                Go to settings
-              </NavigationLink>{" "}
-              to check your usage spending limit or upgrade your plan.
-            </Text>
-          </Alert.Content>
-        </Alert.Root>
-      )}
-
-      {host.startupNotice()}
-
-      {host.joinOffer({
-        currentOrganizationId: isOrganizationLoading ? void 0 : (organization?.id ?? null),
-      })}
-
-      {adminViewingAs && <AdminViewingAsBanner workspaceLabel={adminViewingAs.label} />}
-
-      {ssoStatus?.pendingSsoSetup && (
-        <Alert.Root
-          status="error"
-          width="full"
-          border="1px solid"
-          borderColor="colorPalette.muted"
-          marginX={4}
-          marginTop={3}
-          borderRadius="lg"
-          maxWidth="calc(100% - 22px)"
-        >
-          <Alert.Indicator />
-          <Alert.Content>
-            <HStack width="full" gap={4}>
-              <VStack align="start" gap={0} flex={1}>
-                <Alert.Title fontWeight="bold">
-                  Sign in with your organization's single sign-on
-                </Alert.Title>
-                <Text fontSize="sm">
-                  Your organization requires single sign-on. Sign out, then sign in again by
-                  entering your work email address.
-                </Text>
-              </VStack>
-              <Button
-                size="sm"
-                colorPalette="red"
-                flexShrink={0}
-                color="white"
-                onClick={() => host.signOut()}
-              >
-                Sign out
-              </Button>
-            </HStack>
-          </Alert.Content>
-        </Alert.Root>
-      )}
-
-      {isDemoProject && (
-        <HStack width="full" backgroundColor="orange.400" padding={1}>
-          <Spacer />
-          <Text fontSize="sm">
-            Viewing Demo Project - Go back to yours{" "}
-            <NavigationLink href="/" textDecoration="underline">
-              here
-            </NavigationLink>
-          </Text>
-          <Spacer />
-        </HStack>
-      )}
+            <Spacer />
+          </HStack>
+        )}
+      </VStack>
 
       {userIsPartOfTeam || isOrganizationLoading ? (
         // A refusal is drawn only from an answered organization read, so the

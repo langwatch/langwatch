@@ -3,7 +3,7 @@
  * everything reachable is parsed each run, and the server barrel dragged in REST and repositories.
  */
 
-export { createChildProcessLogger } from "./services/child-logger.service.ts";
+export { createChildProcessLogger } from "./app/scenario-composition.build.ts";
 export {
   decodeScenarioEgressPolicy,
   SCENARIO_EGRESS_POLICY_ENV,
@@ -13,5 +13,5 @@ export {
   flushScenarioOtelTraces,
   formatScenarioChildError,
 } from "./services/scenario-child-execution.service.ts";
-export { NlpFetchAdapter } from "./services/nlp-fetch.service.ts";
+export { HttpNlpFetchChannel } from "./channels/http/http.nlp-fetch.channel.ts";
 export type { ScenarioHttp, ScenarioHttpResponse } from "./app/scenario.app.ts";

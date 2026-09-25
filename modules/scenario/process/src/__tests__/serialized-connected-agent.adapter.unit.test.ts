@@ -4,14 +4,15 @@
  * @see specs/agents/connected-agents.feature
  */
 
+import { createLogger } from "@langwatch/observability";
 import type { ConnectedAgentData } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
 import {
   ConnectedAgentCallError,
   HttpSerializedConnectedAgentChannel,
-  type ServedInstance,
 } from "../channels/http/http.serialized-connected-agent.channel.ts";
+import type { ServedInstance } from "../channels/serialized-agent.channel.ts";
 
 const config: ConnectedAgentData = {
   type: "connected",
@@ -49,6 +50,7 @@ function fakeRelay(replies: ReturnType<typeof relayReply>[]) {
 function adapterWith(relay: ReturnType<typeof fakeRelay>) {
   return new HttpSerializedConnectedAgentChannel({
     config,
+    logger: createLogger("test"),
     projectApiKey: "sk-lw-project",
     fetchImpl: relay.fetchImpl,
     sleep: async () => {},

@@ -12,8 +12,7 @@ import { AgentRole } from "@langwatch/scenario";
 import type { ConnectedAgentData, RunParameterValues } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 
-import { createChildProcessLogger } from "../../services/child-logger.service.ts";
-import { SerializedAgentChannel } from "../serialized-agent.channel.ts";
+import { type ServedInstance, SerializedAgentChannel } from "../serialized-agent.channel.ts";
 
 /** How long the adapter keeps retrying a busy agent before it gives up. */
 export const BUSY_RETRY_BUDGET_MS = 60_000;
@@ -66,12 +65,6 @@ type FetchLike = (
   text(): Promise<string>;
 }>;
 
-/** The instance that answered the last turn, for the run's record. */
-export interface ServedInstance {
-  hostname: string;
-  label: string | null;
-}
-
 export class HttpSerializedConnectedAgentChannel extends SerializedAgentChannel {
   role = AgentRole.AGENT;
 
@@ -87,8 +80,7 @@ export class HttpSerializedConnectedAgentChannel extends SerializedAgentChannel 
     config: ConnectedAgentData;
     projectApiKey: string;
     parameters?: RunParameterValues;
-    logger?: Logger;
-    logEnvironment?: NodeJS.ProcessEnv;
+    logger: Logger;
     fetchImpl?: FetchLike;
     sleep?: (ms: number) => Promise<void>;
   }): HttpSerializedConnectedAgentChannel {
@@ -100,7 +92,6 @@ export class HttpSerializedConnectedAgentChannel extends SerializedAgentChannel 
     projectApiKey,
     parameters,
     logger,
-    logEnvironment,
     fetchImpl,
     sleep,
   }: {
@@ -108,13 +99,7 @@ export class HttpSerializedConnectedAgentChannel extends SerializedAgentChannel 
     /** The project key the relay route authenticates the child with. */
     projectApiKey: string;
     parameters?: RunParameterValues;
-    logger?: Logger;
-    /**
-     * The bindings a logger this adapter builds for itself is bound to, when
-     * no `logger` was handed down. The child process always hands one down,
-     * so this stays empty outside a test that builds the adapter bare.
-     */
-    logEnvironment?: NodeJS.ProcessEnv;
+    logger: Logger;
     /** The fetch the adapter posts with, replaceable in tests. */
     fetchImpl?: FetchLike;
     /** The wait between busy retries, replaceable in tests. */
@@ -125,15 +110,13 @@ export class HttpSerializedConnectedAgentChannel extends SerializedAgentChannel 
     this.config = config;
     this.projectApiKey = projectApiKey;
     this.parameters = parameters ?? {};
-    this.logger =
-      logger ??
-      createChildProcessLogger("langwatch:scenarios:connected-adapter", logEnvironment ?? {});
+    this.logger = logger;
     this.fetchImpl = fetchImpl ?? ((url, init) => fetch(url, init) as ReturnType<FetchLike>);
     this.sleep = sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   }
 
   /** The instance that answered the last turn, or nothing yet. */
-  get servedInstance(): ServedInstance | null {
+  override get servedInstance(): ServedInstance | null {
     return this.served;
   }
 

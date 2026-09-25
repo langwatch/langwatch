@@ -1,5 +1,9 @@
 export * from "./rules/child-egress-policy.rules.ts";
-export * from "./services/child-logger.service.ts";
+export * from "./rules/scenario-log-context.rules.ts";
+export {
+  createChildProcessLogger,
+  decodeScenarioLogContext,
+} from "./app/scenario-composition.build.ts";
 export * from "./services/child-process-spawn.service.ts";
 export * from "./rules/child-tls-env.rules.ts";
 export {
@@ -15,8 +19,10 @@ export {
   type RecordEvaluationsDeps,
   evaluationsFingerprint,
 } from "./eventing/record-evaluations.commands.ts";
-export * from "./services/litellm-model.service.ts";
-export { NlpFetchAdapter, type NlpFetchTimeouts } from "./services/nlp-fetch.service.ts";
+export { HttpLitellmModelChannel } from "./channels/http/http.litellm-model.channel.ts";
+export type { LitellmModelChannel, LitellmModelInput } from "./channels/litellm-model.channel.ts";
+export { HttpNlpFetchChannel } from "./channels/http/http.nlp-fetch.channel.ts";
+export type { NlpFetchChannel, NlpFetchTimeouts } from "./channels/nlp-fetch.channel.ts";
 export * from "./services/node-scenario-child-process.service.ts";
 export { OtelScenarioProcessorMetricsAdapter } from "./services/scenario-processor-metrics.service.ts";
 export * from "./repositories/redis/redis.cancellation-channel.repository.ts";

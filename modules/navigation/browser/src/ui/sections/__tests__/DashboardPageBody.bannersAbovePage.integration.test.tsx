@@ -161,7 +161,7 @@ describe("given a project whose message limit is exceeded", () => {
       );
 
       const alert = screen.getByText(/You reached the limit/);
-      const banners = alert.parentElement?.parentElement;
+      const banners = alert.closest<HTMLElement>("[data-part='page-banners']");
       expect(banners).not.toBeNull();
 
       const bannerStyle = getComputedStyle(banners!);

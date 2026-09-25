@@ -5,7 +5,9 @@
  */
 
 import type { LiteLLMParams } from "@langwatch/scenario-contract";
-import { createJudgeModelFromParams, createModelFromParams } from "@langwatch/scenario-process";
+import { HttpLitellmModelChannel } from "@langwatch/scenario-process";
+
+const models = HttpLitellmModelChannel.create();
 import { APICallError, generateText, tool } from "ai";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -49,7 +51,7 @@ describe("judge transport: function tools and reasoning effort", () => {
       /** @scenario "A refusal that names reasoning is answered by asking again without it" */
       it("retries with reasoning declared off and succeeds", async () => {
         endpoint = await startEndpoint("reject-tools-without-reasoning-off");
-        const model = createModelFromParams({
+        const model = models.model({
           litellmParams: JUDGE_PARAMS,
           nlpServiceUrl: endpoint.url,
         });
@@ -76,7 +78,7 @@ describe("judge transport: function tools and reasoning effort", () => {
         // The production judge path: no preemptive default applies to an
         // unlisted model, so only the transport retry stands between the
         // refusal and the verdict.
-        const model = createJudgeModelFromParams({
+        const model = models.judgeModel({
           litellmParams: UNLISTED_JUDGE_PARAMS,
           nlpServiceUrl: endpoint.url,
         });
@@ -106,7 +108,7 @@ describe("judge transport: function tools and reasoning effort", () => {
         // Composition of the two mechanisms: #6620's preemptive default puts
         // reasoning off on the FIRST body for a listed model, which also makes
         // the retry ineligible — one request, no wasted round-trip.
-        const model = createJudgeModelFromParams({
+        const model = models.judgeModel({
           litellmParams: JUDGE_PARAMS,
           nlpServiceUrl: endpoint.url,
         });
@@ -132,7 +134,7 @@ describe("judge transport: function tools and reasoning effort", () => {
       /** @scenario "A run that pins the judge's reasoning keeps it" */
       it("surfaces the rejection rather than rewriting the caller's intent", async () => {
         endpoint = await startEndpoint("reject-tools-without-reasoning-off");
-        const model = createModelFromParams({
+        const model = models.model({
           litellmParams: JUDGE_PARAMS,
           nlpServiceUrl: endpoint.url,
         });
@@ -145,7 +147,7 @@ describe("judge transport: function tools and reasoning effort", () => {
             toolChoice: "required",
             providerOptions: {
               // Namespaced under `createOpenAICompatible`'s provider name,
-              // which `createModelFromParams` derives from the model's prefix.
+              // which `HttpLitellmModelChannel.model` derives from the model's prefix.
               // The camelCase spelling is the provider's first-class option; a
               // snake_case one is overwritten by it and never reaches the wire.
               openai: { reasoningEffort: "high" },
@@ -169,7 +171,7 @@ describe("judge transport: function tools and reasoning effort", () => {
       /** @scenario "A model that accepts the first attempt is never asked anything new" */
       it("sends exactly one request with no reasoning_effort", async () => {
         endpoint = await startEndpoint("accept");
-        const model = createModelFromParams({
+        const model = models.model({
           litellmParams: JUDGE_PARAMS,
           nlpServiceUrl: endpoint.url,
         });
@@ -195,7 +197,7 @@ describe("judge transport: function tools and reasoning effort", () => {
       /** @scenario "A model whose reasoning cannot be disabled is never asked to disable it" */
       it("never asks a thinking-only model to disable reasoning", async () => {
         endpoint = await startEndpoint("accept");
-        const model = createModelFromParams({
+        const model = models.model({
           litellmParams: {
             api_key: "test-key",
             model: "gemini/gemini-2.5-pro",
@@ -222,7 +224,7 @@ describe("judge transport: function tools and reasoning effort", () => {
       /** @scenario "A second refusal ends the exchange" */
       it("stops after exactly two requests and surfaces the second refusal", async () => {
         endpoint = await startEndpoint("reject-reasoning-always");
-        const model = createModelFromParams({
+        const model = models.model({
           litellmParams: JUDGE_PARAMS,
           nlpServiceUrl: endpoint.url,
         });
@@ -252,7 +254,7 @@ describe("judge transport: function tools and reasoning effort", () => {
       /** @scenario "A request that asks for no tools is never retried" */
       it("surfaces the rejection without a second request", async () => {
         endpoint = await startEndpoint("reject-reasoning-always");
-        const model = createModelFromParams({
+        const model = models.model({
           litellmParams: JUDGE_PARAMS,
           nlpServiceUrl: endpoint.url,
         });
@@ -280,7 +282,7 @@ describe("judge transport: function tools and reasoning effort", () => {
       /** @scenario "A rejection that is not JSON is surfaced untouched" */
       it("surfaces the raw 400 without retrying", async () => {
         endpoint = await startEndpoint("reject-not-json");
-        const model = createModelFromParams({
+        const model = models.model({
           litellmParams: JUDGE_PARAMS,
           nlpServiceUrl: endpoint.url,
         });
@@ -310,7 +312,7 @@ describe("judge transport: function tools and reasoning effort", () => {
       /** @scenario "A reasoning refusal that names no remedy is surfaced, not retried" */
       it("surfaces the rejection without guessing a value", async () => {
         endpoint = await startEndpoint("reject-reasoning-without-remedy");
-        const model = createModelFromParams({
+        const model = models.model({
           litellmParams: JUDGE_PARAMS,
           nlpServiceUrl: endpoint.url,
         });
@@ -341,7 +343,7 @@ describe("judge transport: function tools and reasoning effort", () => {
       /** @scenario "An unrelated rejection is surfaced, not retried" */
       it("surfaces the rejection without retrying", async () => {
         endpoint = await startEndpoint("reject-unrelated");
-        const model = createModelFromParams({
+        const model = models.model({
           litellmParams: JUDGE_PARAMS,
           nlpServiceUrl: endpoint.url,
         });

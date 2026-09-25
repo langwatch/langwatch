@@ -6,14 +6,10 @@
 
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { LanguageModelV3 } from "@ai-sdk/provider";
-import type { LiteLLMParams } from "@langwatch/scenario-contract";
 import { defaultSettingsMiddleware, wrapLanguageModel } from "ai";
 import { z } from "zod";
 
-interface CreateModelFromParamsInput {
-  litellmParams: LiteLLMParams;
-  nlpServiceUrl: string;
-}
+import type { LitellmModelChannel, LitellmModelInput } from "../litellm-model.channel.ts";
 
 // These are the exact Chat Completions models observed rejecting the scenario
 // judge's forced function tool when reasoning is omitted. Do not broaden this
@@ -129,14 +125,14 @@ function withReasoningOffRetry(baseFetch: typeof globalThis.fetch): typeof globa
  * @param nlpServiceUrl - The URL of the LangWatch NLP service for proxying
  * @returns A configured Vercel AI model instance
  */
-export class LitellmModelAdapter {
-  static create(): LitellmModelAdapter {
-    return new LitellmModelAdapter();
+export class HttpLitellmModelChannel implements LitellmModelChannel {
+  static create(): HttpLitellmModelChannel {
+    return new HttpLitellmModelChannel();
   }
 
   private constructor() {}
 
-  static createModel(input: CreateModelFromParamsInput): LanguageModelV3 {
+  model(input: LitellmModelInput): LanguageModelV3 {
     const { litellmParams, nlpServiceUrl } = input;
     const providerKey = litellmParams.model.split("/")[0] || undefined;
     const headers = Object.fromEntries(
@@ -158,8 +154,8 @@ export class LitellmModelAdapter {
    * Creates JudgeAgent's model. Preemptively supply `reasoning_effort: 'none'`
    * for gpt-5.6 models (they enable reasoning when omitted, reject with tools).
    */
-  static createJudgeModel(input: CreateModelFromParamsInput): LanguageModelV3 {
-    const model = LitellmModelAdapter.createModel(input);
+  judgeModel(input: LitellmModelInput): LanguageModelV3 {
+    const model = this.model(input);
     if (!JUDGE_MODELS_REQUIRING_DISABLED_REASONING.has(input.litellmParams.model)) {
       return model;
     }
@@ -179,11 +175,3 @@ export class LitellmModelAdapter {
     });
   }
 }
-
-export const createModelFromParams = (
-  ...args: Parameters<typeof LitellmModelAdapter.createModel>
-): ReturnType<typeof LitellmModelAdapter.createModel> => LitellmModelAdapter.createModel(...args);
-export const createJudgeModelFromParams = (
-  ...args: Parameters<typeof LitellmModelAdapter.createJudgeModel>
-): ReturnType<typeof LitellmModelAdapter.createJudgeModel> =>
-  LitellmModelAdapter.createJudgeModel(...args);

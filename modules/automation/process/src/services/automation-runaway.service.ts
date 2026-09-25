@@ -48,8 +48,13 @@ export type AutomationRunawaySuppression = Readonly<{
  * automation, it just names no upgrade in the mail.
  */
 export type AutomationNextStepResolver = Readonly<{
-  resolve(projectId: string): Promise<AutomationLimitNextStep | undefined>;
+  resolve(projectId: string): Promise<AutomationNextStepResolution>;
 }>;
+
+/** Whether the mail can name an upgrade; `unnamed` is the normal answer for many plans. */
+export type AutomationNextStepResolution =
+  | { kind: "named"; nextStep: AutomationLimitNextStep }
+  | { kind: "unnamed" };
 
 /**
  * Infrastructure for Automation's runaway containment, in this process. Owns the
@@ -148,17 +153,12 @@ export class AutomationRunawayService extends AutomationRunawayRepository {
   }
 
   async findNextStep(projectId: string): Promise<AutomationLimitNextStep | undefined> {
-    return this.input.nextStep?.resolve(projectId);
+    const resolution = await this.input.nextStep?.resolve(projectId);
+    return resolution?.kind === "named" ? resolution.nextStep : undefined;
   }
 
-  async claimOnce(key: string, ttlSeconds?: number): Promise<ClaimLease | "already-claimed"> {
-    const lease = await claimOnce({
-      connection: this.input.redis,
-      key,
-      ttlSeconds,
-      logger: this.logger,
-    });
-    return lease ?? "already-claimed";
+  claimOnce(key: string, ttlSeconds?: number): Promise<ClaimLease | "already-claimed"> {
+    return claimOnce({ connection: this.input.redis, key, ttlSeconds, logger: this.logger });
   }
 
   releaseClaim(lease: ClaimLease): Promise<void> {
@@ -226,14 +226,14 @@ async function claimOnce(input: {
   key: string;
   ttlSeconds?: number;
   logger: Logger;
-}): Promise<ClaimLease | null> {
+}): Promise<ClaimLease | "already-claimed"> {
   const { connection, key, ttlSeconds = CLAIM_EXPIRE_SECONDS } = input;
   const token = generate(AUTOMATION_CLAIM_KSUID_RESOURCE).toString();
   if (connection) {
     try {
       const taken = await connection.set(key, token, "EX", ttlSeconds, "NX");
 
-      return taken !== null ? { key, token } : null;
+      return taken !== null ? { key, token } : "already-claimed";
     } catch (error) {
       input.logger.warn(
         { key, error: error instanceof Error ? error.message : String(error) },
@@ -245,7 +245,7 @@ async function claimOnce(input: {
   const now = nowInstant().epochMilliseconds;
   sweepExpiredClaims(now);
   const existing = claimMemory.get(key);
-  if (existing !== undefined && existing.expiresAt > now) return null;
+  if (existing !== undefined && existing.expiresAt > now) return "already-claimed";
   claimMemory.set(key, { token, expiresAt: now + ttlSeconds * 1000 });
 
   return { key, token };

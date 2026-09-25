@@ -26,10 +26,10 @@ import {
 import {
   type FetchInitWithDispatcher,
   NLP_FETCH_HEADROOM_MS,
-  NlpFetchAdapter,
   type NlpFetchTimeouts,
-} from "../../services/nlp-fetch.service.ts";
+} from "../nlp-fetch.channel.ts";
 import { SerializedAgentChannel } from "../serialized-agent.channel.ts";
+import { HttpNlpFetchChannel } from "./http.nlp-fetch.channel.ts";
 
 /**
  * Adapter failure categories for `error.kind` span attribute: `execution` (200 with failure),
@@ -336,7 +336,7 @@ export class HttpSerializedCodeAgentChannel extends SerializedAgentChannel {
    */
   private fetchTimeoutMs(): number {
     const { timeoutMs } = this.config;
-    const transport = NlpFetchAdapter.create({ timeouts: this.timeouts });
+    const transport = HttpNlpFetchChannel.create({ timeouts: this.timeouts });
     const floorTimeoutMs = transport.floorTimeoutMs();
     const maxTimeoutMs = transport.maxTimeoutMs();
     if (timeoutMs === undefined) {
@@ -413,7 +413,7 @@ export class HttpSerializedCodeAgentChannel extends SerializedAgentChannel {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(event),
               signal: controller.signal,
-              dispatcher: NlpFetchAdapter.create().dispatcher({
+              dispatcher: HttpNlpFetchChannel.create().dispatcher({
                 timeoutMs: fetchTimeoutMs,
               }),
             };

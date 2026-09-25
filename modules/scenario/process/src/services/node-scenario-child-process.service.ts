@@ -23,7 +23,10 @@ import {
   type ScenarioEgressPolicy,
 } from "../rules/child-egress-policy.rules.ts";
 import { resolveChildTlsEnv } from "../rules/child-tls-env.rules.ts";
-import { encodeScenarioLogContext, SCENARIO_LOG_CONTEXT_ENV } from "./child-logger.service.ts";
+import {
+  encodeScenarioLogContext,
+  SCENARIO_LOG_CONTEXT_ENV,
+} from "../rules/scenario-log-context.rules.ts";
 import { ChildProcessSpawnService } from "./child-process-spawn.service.ts";
 import type {
   ExecutionJobData,

@@ -17,8 +17,8 @@ import { trace } from "@opentelemetry/api";
 import { generateText } from "ai";
 
 import * as PromptTemplateAdapter from "../../rules/prompt-template.rules.ts";
-import { createModelFromParams } from "../../services/litellm-model.service.ts";
 import { SerializedAgentChannel } from "../serialized-agent.channel.ts";
+import { HttpLitellmModelChannel } from "./http.litellm-model.channel.ts";
 
 // Shared Liquid engine for template interpolation. Sandboxed: a customer
 // prompt template must not be able to inline a file from the worker's working
@@ -100,7 +100,7 @@ export class HttpSerializedPromptConfigChannel extends SerializedAgentChannel {
       ...(templateUsesConversation ? [] : input.messages),
     ];
 
-    const model = createModelFromParams({
+    const model = HttpLitellmModelChannel.create().model({
       litellmParams: this.litellmParams,
       nlpServiceUrl: this.nlpServiceUrl,
     });

@@ -1,6 +1,7 @@
 // Builds id generators, clock, and secret cipher from encryption member
 // (previously separate members of ScenarioApp)
 import { generate } from "@langwatch/ksuid";
+import { createLogger, type Logger } from "@langwatch/observability";
 import type { Encryption } from "@langwatch/process-stores/members";
 import { ScenarioSecretsUnavailableError } from "@langwatch/scenario-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
@@ -8,6 +9,11 @@ import { nowInstant, type Instant } from "@langwatch/time";
 import type { SnapshotUpdateBroadcastSubscriberDeps } from "../eventing/snapshot-update-broadcast.subscriber.ts";
 import { SimulationClickHouseRepository } from "../repositories/clickhouse/simulation-clickhouse.repository.ts";
 import type { SimulationExecutionRepository } from "../repositories/simulation-execution.repository.ts";
+import {
+  SCENARIO_LOG_CONTEXT_ENV,
+  type ScenarioLogContext,
+  scenarioLogContextSchema,
+} from "../rules/scenario-log-context.rules.ts";
 import { SimulationService } from "../services/simulation.service.ts";
 import type {
   ScenarioClock,
@@ -139,4 +145,38 @@ export function buildScenarioComposition(input: {
 /** No module offers scenario a tenant broadcast yet; main without Redis skipped it too. */
 export function undeliveredSnapshotUpdates(): SnapshotUpdateBroadcastSubscriberDeps {
   return { broadcastUpdate: () => Promise.resolve() };
+}
+
+/**
+ * Decode an env var value into a logger context object. Returns an empty
+ * object when unset or malformed, never throwing; malformed JSON warns on
+ * stderr so it's still visible during incident response.
+ */
+export function decodeScenarioLogContext(raw: string | undefined): ScenarioLogContext {
+  if (!raw) {
+    return {};
+  }
+  try {
+    const parsed = scenarioLogContextSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : {};
+  } catch {
+    process.stderr.write(
+      `[child-logger] ${SCENARIO_LOG_CONTEXT_ENV} is not valid JSON; ignoring\n`,
+    );
+    return {};
+  }
+}
+
+/**
+ * Build the base logger for a scenario child process: reads the context
+ * env var, decodes it, and returns a child logger bound to those fields.
+ * Call once at the top of `scenario-child-process.ts`.
+ */
+export function createChildProcessLogger(name: string, env: NodeJS.ProcessEnv): Logger {
+  const context = decodeScenarioLogContext(env[SCENARIO_LOG_CONTEXT_ENV]);
+  const base = createLogger(name);
+  if (Object.keys(context).length === 0) {
+    return base;
+  }
+  return base.child(context);
 }

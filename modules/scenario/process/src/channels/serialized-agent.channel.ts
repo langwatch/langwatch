@@ -37,8 +37,19 @@ function jsonByteLength(value: unknown): number {
   return Buffer.byteLength(JSON.stringify(value ?? null), "utf8");
 }
 
+/** The instance that answered the last turn, for the run's record. */
+export interface ServedInstance {
+  hostname: string;
+  label: string | null;
+}
+
 export abstract class SerializedAgentChannel extends AgentAdapter {
   private readonly sessions = new Map<string, unknown>();
+
+  /** The instance that answered the last turn; only a connected agent is served by one. */
+  get servedInstance(): ServedInstance | null {
+    return null;
+  }
 
   /** The session the agent last returned for a thread, or nothing yet. */
   protected sessionOf(threadId: string): unknown {

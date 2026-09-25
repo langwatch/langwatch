@@ -4,15 +4,16 @@
  * modification: No changes to `build` needed
  */
 
-import type { AgentAdapter } from "@langwatch/scenario";
+import { createLogger } from "@langwatch/observability";
 
 import { type AgentAdapterFactory, type AgentAdapterBuildInput } from "../app/scenario.app.ts";
-import type { NlpFetchTimeouts } from "../services/nlp-fetch.service.ts";
 import { HttpSerializedCodeAgentChannel } from "./http/http.serialized-code-agent.channel.ts";
 import { HttpSerializedConnectedAgentChannel } from "./http/http.serialized-connected-agent.channel.ts";
 import { HttpSerializedHttpAgentChannel } from "./http/http.serialized-http-agent.channel.ts";
 import { HttpSerializedPromptConfigChannel } from "./http/http.serialized-prompt-config.channel.ts";
 import { HttpSerializedWorkflowAgentChannel } from "./http/http.serialized-workflow-agent.channel.ts";
+import type { NlpFetchTimeouts } from "./nlp-fetch.channel.ts";
+import type { SerializedAgentChannel } from "./serialized-agent.channel.ts";
 
 /**
  * Creates an adapter from serialized data using the registry. @throws Error if adapter type is not
@@ -33,7 +34,7 @@ export class SerializedAgentChannelRegistry implements AgentAdapterFactory {
 
   private constructor(private readonly nlpTimeouts: NlpFetchTimeouts) {}
 
-  build(input: AgentAdapterBuildInput): AgentAdapter {
+  build(input: AgentAdapterBuildInput): SerializedAgentChannel {
     const { adapterData } = input;
     switch (adapterData.type) {
       case "prompt": {
@@ -87,7 +88,7 @@ export class SerializedAgentChannelRegistry implements AgentAdapterFactory {
           config: adapterData,
           projectApiKey: input.projectApiKey,
           parameters: input.parameters,
-          logger: input.logger,
+          logger: input.logger ?? createLogger("langwatch:scenarios:connected-adapter"),
         });
       }
       case "voice":
