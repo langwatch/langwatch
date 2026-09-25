@@ -73,10 +73,20 @@ type probeFlags struct {
 	// `probe` subcommand (no database) and for a haven-booted run. Set by
 	// `run` from Booted.ActivateEntitlement after Boot succeeds.
 	activateEntitlement EntitlementActivator
+	// modules is -module; repoRoot the checkout that maps operations to them;
+	// packetDir where per-module packets land; only the scoped operation keys.
+	modules   stringSlice
+	repoRoot  string
+	packetDir string
+	only      map[string]bool
+	// parityOnly is -parity-only; parity is phase one's result, which the
+	// behavioral phase completes with REST once both sides serve.
+	parityOnly bool
+	parity     *parityPhase
 }
 
 func (probe *probeFlags) filter() OpFilter {
-	return OpFilter{Method: probe.method, PathPrefix: probe.pathPrefix, MaxOps: probe.maxOps}
+	return OpFilter{Method: probe.method, PathPrefix: probe.pathPrefix, MaxOps: probe.maxOps, Only: probe.only}
 }
 
 func registerProbeFlags(flags *flag.FlagSet, probe *probeFlags) {
@@ -99,6 +109,7 @@ func registerProbeFlags(flags *flag.FlagSet, probe *probeFlags) {
 	flags.StringVar(&probe.reportFile, "report", "", "also write the machine report (JSON) to this file")
 	flags.StringVar(&probe.ledgerFile, "ledger", "", "write the per-operation ledger to this file (default: ledger.json beside -report)")
 	flags.StringVar(&probe.ledgerBaseline, "ledger-baseline", "", "a previous ledger.json (or JSON array of cause slugs) whose causes are already known; only NEW causes fail the run")
+	flags.Var(&probe.modules, "module", "only probe this module's operations, plus the operations outside it that mint the ids they need (repeatable)")
 }
 
 const usage = `apidiff — live two-instance API behavior diff
@@ -107,11 +118,11 @@ usage:
   apidiff run   [-main-ref REF] [-branch-dir DIR] [-work-root DIR]
                 [-keep] [-reuse-worktrees] [-skip-install] [-boot-timeout DUR]
                 [-dry-run] [-no-haven] [-pg-url URL -ch-url URL -redis-url URL]
-                [-compose-project NAME] [probe flags...]
+                [-compose-project NAME] [-parity-only] [probe flags...]
   apidiff probe -a URL -b URL [-project-key KEY] [-org-key KEY] [-admin-key KEY]
                 [-timeout DUR] [-settle-timeout DUR] [-path-prefix P] [-method M]
                 [-exclude-prefix P]... [-max-ops N] [-json] [-report FILE]
-                [-ledger FILE] [-ledger-baseline FILE]
+                [-ledger FILE] [-ledger-baseline FILE] [-module NAME]...
 
 Each run instance is a haven stack under its own run-scoped slug wherever
 haven is installed, so a run never reaches the datastores your own stack uses.
@@ -164,6 +175,17 @@ func runBootSubcommand(ctx context.Context, args []string, out streams) int {
 	if done {
 		return code
 	}
+	parity, err := runParityPhase(ctx, boot, out.stderr)
+	if err != nil {
+		fmt.Fprintln(out.stderr, "parity:", err)
+		return exitError
+	}
+	defer parity.cleanup()
+	if probe.parityOnly {
+		return parity.verdict(probe, out)
+	}
+	parity.continueInto(&boot)
+	probe.parity = parity
 
 	// The child processes inherit this context; canceling it kills them.
 	bootCtx, cancel := context.WithCancel(ctx)
@@ -197,6 +219,8 @@ func runBootSubcommand(ctx context.Context, args []string, out streams) int {
 	}
 	probe.applyRunDefaults()
 	probe.onOperationDone = findingsHook(findings, boot.BranchDir, out.stderr)
+	probe.repoRoot = boot.BranchDir
+	probe.packetDir = filepath.Join(booted.WorkRoot, "probe")
 	return probePipeline(ctx, probe, out)
 }
 
@@ -263,6 +287,7 @@ func parseRunFlags(args []string, out streams) (BootConfig, *probeFlags, int, bo
 	envFile := ""
 	flags.StringVar(&envFile, "env-file", "", "dotenv file whose DATABASE_URL, CLICKHOUSE_URL and REDIS_URL fill an empty -pg-url, -ch-url and -redis-url (never printed); not usable with the haven path")
 	registerProbeFlags(flags, probe)
+	flags.BoolVar(&probe.parityOnly, "parity-only", false, "stop after the parity phase: both worktrees prepared, tRPC inventoried, parity.json and per-module packets written, no stack booted")
 	if err := flags.Parse(args); err != nil {
 		return boot, probe, exitError, true
 	}
@@ -294,6 +319,7 @@ func writeDryRunPlanOrError(boot BootConfig, out streams) int {
 		return exitError
 	}
 	WriteDryRunPlan(out.stdout, plan)
+	WriteParityPlan(out.stdout, plan)
 	return exitEqual
 }
 
@@ -326,6 +352,15 @@ func probePipeline(ctx context.Context, probe *probeFlags, out streams) int {
 		fmt.Fprintln(out.stderr, err)
 		return exitError
 	}
+	if probe.parity != nil {
+		changes = append(changes, probe.parity.completeWithRest(specs.b, specs.a)...)
+		if err := WriteParityTable(out.stderr, probe.parity.report); err != nil {
+			fmt.Fprintln(out.stderr, err)
+		}
+	}
+	if code := probe.scopeToModules(operations, out); code != exitEqual {
+		return code
+	}
 
 	selected := SelectOperations(operations, probe.filter())
 	fmt.Fprintf(out.stderr, "probing %d operations (lockstep)\n", len(selected))
@@ -346,7 +381,7 @@ func probePipeline(ctx context.Context, probe *probeFlags, out streams) int {
 	}, operations)
 
 	verdict := runVerdict{report: BuildReport(changes, result), probe: probe}
-	verdict.ledger = BuildLedger(operations, verdict.report, baseline)
+	verdict.ledger = BuildScopedLedger(operations, verdict.report, probe.ledgerOptions(baseline))
 	if code := emitReport(verdict, out); code != exitEqual {
 		return code
 	}
@@ -571,6 +606,7 @@ func emitReport(verdict runVerdict, out streams) int {
 
 // writeFiles persists the machine report and the ledger beside it.
 func (verdict runVerdict) writeFiles(out streams) error {
+	verdict.probe.writeModulePackets(verdict, out)
 	if path := verdict.probe.reportFile; path != "" {
 		if err := writeJSONFile(path, func(file *os.File) error { return WriteJSONReport(file, verdict.report) }); err != nil {
 			return err

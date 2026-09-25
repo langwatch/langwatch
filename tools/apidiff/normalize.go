@@ -203,26 +203,34 @@ func quoteJSONKey(key string) string {
 func MaskValue(value any) any {
 	switch typed := value.(type) {
 	case map[string]any:
-		masked := make(map[string]any, len(typed))
-		for key, child := range typed {
-			if IsVolatileKey(key) || IsMintedIdentifier(child) {
-				masked[key] = "<masked:" + ShapeOf(child).Kind + ">"
-				continue
-			}
-			masked[key] = MaskValue(child)
-		}
-		return masked
+		return maskObject(typed)
 	case []any:
-		masked := make([]any, len(typed))
-		for index, element := range typed {
-			if IsMintedIdentifier(element) {
-				masked[index] = "<masked:string>"
-				continue
-			}
-			masked[index] = MaskValue(element)
-		}
-		return masked
+		return maskArray(typed)
 	default:
 		return value
 	}
+}
+
+func maskObject(object map[string]any) map[string]any {
+	masked := make(map[string]any, len(object))
+	for key, child := range object {
+		if IsVolatileKey(key) || IsMintedIdentifier(child) {
+			masked[key] = "<masked:" + ShapeOf(child).Kind + ">"
+			continue
+		}
+		masked[key] = MaskValue(child)
+	}
+	return masked
+}
+
+func maskArray(values []any) []any {
+	masked := make([]any, len(values))
+	for index, element := range values {
+		if IsMintedIdentifier(element) {
+			masked[index] = "<masked:string>"
+			continue
+		}
+		masked[index] = MaskValue(element)
+	}
+	return masked
 }

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -238,4 +240,178 @@ func WriteJSONReport(writer io.Writer, report Report) error {
 	encoder := json.NewEncoder(writer)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(report)
+}
+
+// packetExcerpt caps each body or value quoted in a module packet.
+const packetExcerpt = 240
+
+// WriteModulePackets writes one markdown packet per module that has a cause
+// or a coverage note into dir, so a lane can act on its module without the
+// full report: each operation's cases with both sides' request, status and
+// differing pointers, quoted short. It returns the files written.
+func WriteModulePackets(dir string, ledger Ledger, report Report) ([]string, error) {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return nil, err
+	}
+	evidence := indexEvidence(report)
+	notes := map[string][]LedgerRow{}
+	for index := range ledger.Operations {
+		row := &ledger.Operations[index]
+		if row.CoverageNote != "" {
+			notes[row.Module] = append(notes[row.Module], *row)
+		}
+	}
+	var written []string
+	for _, module := range ledger.Modules {
+		if len(module.Causes) == 0 && len(notes[module.Module]) == 0 {
+			continue
+		}
+		path := filepath.Join(dir, packetName(module.Module)+".md")
+		packet := renderModulePacket(module, notes[module.Module], evidence)
+		if err := os.WriteFile(path, []byte(packet), 0o600); err != nil {
+			return written, err
+		}
+		written = append(written, path)
+	}
+	return written, nil
+}
+
+func packetName(module string) string {
+	if module == "" {
+		return "unmapped"
+	}
+	return module
+}
+
+// packetEvidence is the report indexed by operation key.
+type packetEvidence struct {
+	findings    map[string][]Finding
+	transcripts map[string][]Transcript
+}
+
+func indexEvidence(report Report) packetEvidence {
+	evidence := packetEvidence{findings: map[string][]Finding{}, transcripts: map[string][]Transcript{}}
+	for index := range report.Findings {
+		finding := &report.Findings[index]
+		key := finding.Method + " " + finding.Path
+		evidence.findings[key] = append(evidence.findings[key], *finding)
+	}
+	for index := range report.Transcripts {
+		transcript := &report.Transcripts[index]
+		key := transcript.Method + " " + transcript.Path
+		evidence.transcripts[key] = append(evidence.transcripts[key], *transcript)
+	}
+	return evidence
+}
+
+func renderModulePacket(module LedgerModule, notes []LedgerRow, evidence packetEvidence) string {
+	var output strings.Builder
+	fmt.Fprintf(&output, "# Probe packet: %s\n\n", moduleLabel(module.Module))
+	fmt.Fprintf(&output, "%d operations, %d differing, %d causes (%d new), %d coverage notes. Base is main, branch is the candidate.\n",
+		module.Operations, module.Differing, len(module.Causes), module.NewCauses, len(notes))
+	for _, cause := range module.Causes {
+		status := "new"
+		if cause.Known {
+			status = "known"
+		}
+		fmt.Fprintf(&output, "\n## %s [%s]\n", cause.RootCause, status)
+		for _, operation := range cause.Operations {
+			fmt.Fprintf(&output, "\n### %s\n\n", operation)
+			evidence.write(&output, cause.RootCause, operation)
+		}
+	}
+	if len(notes) > 0 {
+		output.WriteString("\n## Coverage notes (never a cause, never fails the run)\n\n")
+		for index := range notes {
+			row := &notes[index]
+			fmt.Fprintf(&output, "- %s %s: %s (%s)\n", row.Method, row.Path, row.CoverageNote, row.SkipReason)
+		}
+	}
+	return output.String()
+}
+
+func (evidence packetEvidence) write(output *strings.Builder, cause, operation string) {
+	matched := 0
+	transcripts := evidence.transcripts[operation]
+	findings := evidence.findings[operation]
+	for index := range findings {
+		finding := &findings[index]
+		if RootCause(*finding) != cause {
+			continue
+		}
+		matched++
+		fmt.Fprintf(output, "- case %s: %s\n", caseLabel(finding.Case), finding.Kind)
+		if finding.Reason != "" {
+			fmt.Fprintf(output, "  - reason: %s\n", excerpt(finding.Reason))
+		}
+		for _, pointer := range sortedPointers(finding.Fields) {
+			pair := finding.Fields[pointer]
+			fmt.Fprintf(output, "  - `%s`: base %s, branch %s\n", pointer, excerptValue(pair[0]), excerptValue(pair[1]))
+		}
+		if transcript, ok := packetTranscript(transcripts, finding.Case); ok {
+			writeTranscript(output, transcript)
+		}
+	}
+	if matched == 0 {
+		output.WriteString("- document-level change (spec diff); no probe finding carries this cause\n")
+	}
+}
+
+func caseLabel(name string) string {
+	if name == "" {
+		return "-"
+	}
+	return name
+}
+
+func sortedPointers(fields map[string][2]any) []string {
+	pointers := make([]string, 0, len(fields))
+	for pointer := range fields {
+		pointers = append(pointers, pointer)
+	}
+	sort.Strings(pointers)
+	return pointers
+}
+
+func packetTranscript(transcripts []Transcript, caseName string) (Transcript, bool) {
+	for index := range transcripts {
+		if transcripts[index].Case == caseName || caseName == "" {
+			return transcripts[index], true
+		}
+	}
+	return Transcript{}, false
+}
+
+func writeTranscript(output *strings.Builder, transcript Transcript) {
+	fmt.Fprintf(output, "  - base: %s %s -> %d `%s`\n", transcript.Method, transcript.RequestPathB, transcript.B.Status, excerpt(sideBody(transcript.B)))
+	fmt.Fprintf(output, "  - branch: %s %s -> %d `%s`\n", transcript.Method, transcript.RequestPathA, transcript.A.Status, excerpt(sideBody(transcript.A)))
+	if transcript.RequestBody != nil {
+		fmt.Fprintf(output, "  - request body: %s\n", excerptValue(transcript.RequestBody))
+	}
+}
+
+func sideBody(side SideResult) string {
+	if side.Error != "" {
+		return "error: " + side.Error
+	}
+	return side.Body
+}
+
+func excerptValue(value any) string {
+	if text, ok := value.(string); ok {
+		return "`" + excerpt(text) + "`"
+	}
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Sprintf("`%v`", value)
+	}
+	return "`" + excerpt(string(encoded)) + "`"
+}
+
+func excerpt(text string) string {
+	flat := strings.Join(strings.Fields(strings.ReplaceAll(text, "`", "'")), " ")
+	if len(flat) <= packetExcerpt {
+		return flat
+	}
+	return flat[:packetExcerpt] + "..."
 }

@@ -14,13 +14,13 @@ state never produces false diffs.
 apidiff run   [-main-ref REF] [-branch-dir DIR] [-work-root DIR]
               [-keep] [-reuse-worktrees] [-skip-install] [-boot-timeout DUR]
               [-dry-run] [-no-haven] [-pg-url URL -ch-url URL -redis-url URL]
-              [-compose-project NAME] [probe flags...]
+              [-compose-project NAME] [-parity-only] [probe flags...]
 
 apidiff probe -a URL -b URL [-project-key KEY] [-org-key KEY] [-admin-key KEY]
               [-scim-key KEY] [-project-key-b KEY] [-project-key-c KEY]
               [-timeout DUR] [-settle-timeout DUR] [-path-prefix P]
               [-method M] [-exact-status] [-exclude-prefix P]... [-max-ops N]
-              [-json] [-report FILE] [-ledger FILE] [-ledger-baseline FILE]
+              [-json] [-report FILE] [-ledger FILE] [-ledger-baseline FILE] [-module NAME]...
 ```
 
 `run` boots both instances itself — a detached git worktree for `-main-ref`
@@ -393,8 +393,24 @@ as one `not-found-as-500:404-500`.
     "differingOperations": 41,
     "causes": 13,
     "newCauses": 2,
-    "knownCauses": 11
+    "knownCauses": 11,
+    "modules": 35,
+    "unmappedOperations": 3,
+    "coverageNotes": 106
   },
+  "scope": ["prompt"],
+  "modules": [
+    {
+      "module": "prompt",
+      "operations": 13,
+      "differingOperations": 4,
+      "newCauses": 0,
+      "coverageNotes": 0,
+      "causes": [
+        { "rootCause": "permission-leak", "known": true, "operations": ["GET /api/prompts"] }
+      ]
+    }
+  ],
   "causes": [
     {
       "rootCause": "not-found-as-500:404-500",
@@ -403,6 +419,9 @@ as one `not-found-as-500:404-500`.
       "operations": ["GET /api/prompts/{id}"],
       "known": false
     }
+  ],
+  "coverageNotes": [
+    { "note": "unresolvable-parameter", "count": 89, "operations": ["GET /api/traces/{traceId}"] }
   ],
   "operations": [
     {
@@ -414,7 +433,8 @@ as one `not-found-as-500:404-500`.
       "classification": "equal",
       "rootCauses": [],
       "sideStatus": [200, 200],
-      "known": false
+      "known": false,
+      "module": "annotation"
     }
   ]
 }
@@ -432,8 +452,7 @@ Cause slugs: `not-found-as-500:<pair>`, `handled-refusal-degraded:<pair>`,
 reported `known`, baseline or not), `operation-missing-on-candidate`,
 `operation-missing-on-base`, `permission-leak`, `permission-diff:<pair>`,
 `mutation-not-visible`, `body-shape-diff`, `body-value-diff`,
-`error-shape-diff`, `probe-failed`, `unresolvable-parameter`,
-`harness-symbol-table` (a harness artifact, not an API difference),
+`error-shape-diff`, `probe-failed`, `self-destructive-target`,
 `unverified-list-shape`, and `spec-<change kind>`. A finding from the
 entitled pass (see "Entitled pass" above) gets the SAME slug an identical
 finding would get from the main pass, prefixed with its own namespace —
@@ -448,6 +467,49 @@ exits `1`. That is how a branch ratchets from 40 causes to 0 without the tool
 being red the whole way. Every `error-improved:<pair>` cause is marked known
 unconditionally, baseline present or not — it is the one cause that never
 needs to be named to stop failing the run.
+
+### Coverage notes are not causes
+
+`unresolvable-parameter` (no id to fill a path parameter) and
+`harness-symbol-table` (only one side could fill it) say the harness could
+not reach an operation, not that the branch behaves differently. They are
+**coverage notes**: the row stays `skipped` and names its `coverageNote`, the
+ledger counts them under `coverageNotes`, stdout gives them their own closing
+section, and they are never a cause — not in `causes`, not in the baseline
+ratchet, never exit `1`. A baseline that still lists either slug keeps
+loading; the slug is simply never looked up. Do not grow harness machinery to
+shrink this count: a module lane verifies what the run could reach.
+
+## Module view, `-module` and packets
+
+Every row carries the catalogue `module` that owns it, and both the ledger's
+`modules` array and stdout group **module -> cause -> operations**, modules
+with new causes first. The mapping (`ModuleFor` / `ModuleForNamespace` in
+`findings.go`) reads the branch checkout: `modules/catalogue.json` (core and
+enterprise features), then each feature's `process/src/transport/*.rest.ts`
+(a literal `/api/...` route wins, then its router's `withNamespace`), then
+feature ids and subjects, singular/plural tolerant. tRPC namespaces come from
+each contract's `defineTrpcContract("<ns>")`, trying dotted parents. On r28
+this left 3 of 347 operations in no module (`GET /`, `POST /`,
+`POST /api/track_event`), against 103 for the old first-segment guess.
+
+`-module NAME` (repeatable) probes only that module's operations, plus their
+**parameter producers**: operations outside the scope that need no id of
+their own, are a `GET` or `POST`, and name in a literal path segment a
+resource a scoped operation needs an id for (`POST /api/traces/search` for
+`GET /api/annotations/trace/{id}`). That is one level and by name only: a
+parameter a full run fills from an unrelated operation's response body can
+go unresolved under `-module`, and it surfaces as a coverage note, which
+never fails the run. Producers are probed for real, so their findings show
+under their own module. A module no union operation maps to is refused by
+name, exit `2`. The credential canaries still read the whole union.
+
+Beside the ledger, a packet per module with a cause or a coverage note lands
+in `<work-root>/probe/<module>.md` (`run`), or in `probe/` beside `-report`
+(`probe`); operations in no module go to `unmapped.md`. Each operation lists,
+per case, the finding kind, every differing pointer with both values, both
+sides' request path, status and a short body excerpt, and the request body,
+so a lane can act without opening the multi-megabyte report.
 
 ## Findings stream
 
@@ -472,22 +534,98 @@ nothing is batched across findings:
 below). `kind` is one of `absent-on-branch`, `status-differs`,
 `shape-differs`, `identical`, `probe-failed`; a probe failure or a
 missing-on-branch result wins over a mere status or shape difference. `module`
-is the module directory under `modules/` that best-effort matches the
-operation's path (a first path segment, singular/plural tolerant), or empty
-when nothing matches — most of the REST surface predates the module layout,
-so that is the common case. `detail` is one line: the status pair, the
+is the catalogue module that owns the operation (see "Module view, `-module`
+and packets" above), empty only for the handful of paths no module declares. `detail` is one line: the status pair, the
 changed field pointers, or the skip/failure reason. The stream closes with one
 `{"kind":"run-complete","counts":{...}}` line totalling every kind emitted.
 
+## Parity phase
+
+Every `apidiff run` opens with a static surface comparison, before either
+stack boots, so missing work is found in bulk and handed out per module
+before a single request is probed. `-parity-only` stops after it: no haven,
+no database, no stack — only the two worktrees.
+
+1. **Worktrees.** Both refs are checked out under the work root exactly as the
+   boot does (`<work-root>/main`, `<work-root>/branch`), and each gets the
+   shared prepare steps minus the workspace build (`pnpm install`, then
+   `start:prepare:files`). The inventories import TypeScript source, so a
+   branch whose build is red still gets its parity. A full run hands the same
+   worktrees to the boot (`-reuse-worktrees` semantics), which then runs the
+   full prepare list.
+2. **tRPC inventory, both sides.** A script embedded in the binary
+   (`inventory/*.mjs`) is written into the worktree as
+   `.apidiff-trpc-inventory.mjs`, run, and removed again — it is never committed and never written into the invoking
+   checkout. Which script runs depends on what the checkout holds, not which
+   side it is: a monolith (`platform/app/src/server/api/root.ts`) has its
+   `appRouter` imported and its procedure record walked, zod v3 inputs
+   converted with `zod-to-json-schema`, and each namespace's source read from
+   `root.ts`'s imports; a modular checkout has every contract file that calls
+   `defineTrpcContract` imported and its built declarations converted with
+   zod v4's `z.toJSONSchema`. The monolith runs under its own `tsx`; a
+   modular checkout under `node --experimental-transform-types`, the way its
+   applications run (its `packages/api` has no `tsx`). Every datastore URL the imports could read is
+   pointed at a closed port, and `SKIP_ENV_VALIDATION` is set. Both manifests
+   land as `parity/trpc-main.json` and `parity/trpc-branch.json`:
+   `{ path, kind, input, output, source }` per procedure.
+3. **Diff.** A procedure matches by its full dotted path. Main-only procedures
+   are **missing on branch**; branch-only ones are **extra** (never a defect).
+   A procedure on both sides is **breaking** when its kind changed, its input
+   accepts less (a property removed, one added as required, a type narrowed,
+   an optional field made required) or a declared output answers less. The
+   diff also proposes **rename candidates** (same namespace, similar name,
+   same input shape) and **namespace-move candidates** (same name, same
+   non-empty input shape, another namespace).
+4. **REST.** Main's document is the artifact its monolith serves verbatim
+   (`platform/app/src/app/api/openapiLangWatch.json`); the branch generates
+   its document from the mounted routes, so it exists only once the branch
+   serves. `-parity-only` therefore reports main's REST count and leaves the
+   REST section of every packet open; a full run completes it from both
+   served documents right after the spec fetch, pairing operations that
+   differ only in path-parameter names and skipping URL version mounts.
+5. **Output.** `<work-root>/parity.json` (everything, including additive
+   changes) and `<work-root>/parity/<module>.md`, one packet per owning
+   module: counts, each missing procedure with main's source file, each
+   breaking field difference, the rename/move candidates, and the extras.
+   Modules come from the branch contract that declares the procedure, else
+   `ModuleForNamespace` / `ModuleFor`; what nothing claims lands in
+   `unowned.md`. The module × {missing, breaking, extra} table, largest work
+   first, is printed on stdout by `-parity-only` and on stderr by a full run
+   (whose stdout stays the deterministic report).
+6. **Verdict.** Parity feeds the same report, ledger and exit code as every
+   other cause: a missing procedure is the cause `spec-trpc-missing`, a
+   breaking field `spec-trpc-input-<kind>` / `spec-trpc-output-<kind>` /
+   `spec-trpc-kind-changed`, keyed `TRPC <path>` in the ledger. Without a
+   baseline any of them exits 1; `-ledger-baseline` names the ones already
+   known. `-parity-only` writes its ledger to `<work-root>/ledger.json`
+   unless `-ledger` says otherwise.
+
+### Field-level REST changes
+
+A changed operation is no longer one `operation_changed` entry. Each
+difference is its own change with its own kind, tagged breaking or additive
+against the base: `param_added` / `param_removed` / `param_required_changed`
+(and `param_type_changed` for a parameter's schema), `request_body_added` /
+`request_body_removed` / `request_body_required_changed`,
+`request_property_added` / `_removed` / `_type_changed` / `_required_changed`,
+`response_property_*` for each success status both sides declare,
+`status_added` / `status_removed`, `security_changed`, and `docs_changed` for
+summary, description, tags, operationId and extensions. References are
+resolved against each side's own document, so renaming a component with
+identical content is no change at all; component and path-item entries are
+dropped because every effect they have is reported on the operation it
+reaches. The report and ledger count the breaking changes plus whole
+operations only the candidate documents (`operation_added`, kept until that
+is ruled a non-defect too); additive field changes live in `parity.json` only.
+
 ## Not covered
 
-The ledger and the probes describe the **REST** surface only. The browser
-talks to roughly a hundred tRPC procedures that the OpenAPI document does not
-describe, so the tool sees none of them: a zero here is a REST zero. Closing
-that needs a procedure manifest emitted from the tRPC chain (procedure path,
-kind, input/output schema from the zod schemas, the declared access policy)
-served beside `/api/openapi.json`, then probed in lockstep over the batch
-link with the same ladder. That seam is deliberately left open.
+The behavioral probes describe the **REST** surface only. tRPC is covered
+statically by the parity phase (above): which procedures exist on each side,
+their kind and their input/output schemas — never how a procedure behaves.
+Procedures are not probed over the batch link, and the declared access policy
+is not compared. On main most outputs are inferred types, so an output schema
+is compared only where both sides declare one.
 
 No worker process is booted on either side, so anything whose observable
 result depends on a queue, projection or scheduler is compared in a state

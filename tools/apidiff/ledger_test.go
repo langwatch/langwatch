@@ -200,3 +200,133 @@ func TestCauseSummaryOpensWithTheCauseCount(t *testing.T) {
 		t.Fatalf("summary must name each cause:\n%s", output.String())
 	}
 }
+
+func moduleByFirstSegment(_, path string) string {
+	switch {
+	case strings.HasPrefix(path, "/api/prompts"):
+		return "prompt"
+	case strings.HasPrefix(path, "/api/webhooks"):
+		return "webhook"
+	case strings.HasPrefix(path, "/api/traces"):
+		return "trace"
+	}
+	return ""
+}
+
+func coverageReport() Report {
+	report := ledgerReport()
+	report.Findings = append(report.Findings,
+		Finding{Kind: FindingSkipped, Method: "GET", Path: "/api/quiet", Case: "read", Reason: "unresolvable parameter: id"},
+		Finding{Kind: FindingSkipped, Method: "GET", Path: "/api/traces/{traceId}", Case: entitledCaseName,
+			Reason: "parameter traceId resolvable on the candidate only; probing both sides would compare different requests"},
+	)
+	return report
+}
+
+func TestLedgerGroupsModuleThenCauseThenOperations(t *testing.T) {
+	ledger := BuildScopedLedger(ledgerUnion(), ledgerReport(), LedgerOptions{Scope: LedgerScope{ModuleOf: moduleByFirstSegment}})
+	byModule := map[string]LedgerModule{}
+	for _, module := range ledger.Modules {
+		byModule[module.Module] = module
+	}
+	webhook := byModule["webhook"]
+	if webhook.Operations != 2 || len(webhook.Causes) != 1 || webhook.Causes[0].RootCause != "handled-refusal-degraded:403-503" {
+		t.Fatalf("webhook module = %+v", webhook)
+	}
+	if len(webhook.Causes[0].Operations) != 2 || webhook.NewCauses != 1 {
+		t.Fatalf("webhook cause must carry both operations and count as new: %+v", webhook.Causes[0])
+	}
+	notFound := byModule["prompt"].Causes
+	if len(notFound) != 1 || notFound[0].Operations[0] != "GET /api/prompts/{id}" {
+		t.Fatalf("a cause spanning modules must split per module: %+v", notFound)
+	}
+	if ledger.Modules[len(ledger.Modules)-1].Module != "" {
+		t.Fatalf("the unmapped group must sort last: %+v", ledger.Modules)
+	}
+	if ledger.Totals.Unmapped != 2 {
+		t.Fatalf("unmapped operations = %d, want 2 (langy, quiet)", ledger.Totals.Unmapped)
+	}
+	var output bytes.Buffer
+	if err := WriteCauseSummary(&output, ledger); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "module webhook: 2 operations, 2 differing, 1 causes (1 new)") {
+		t.Fatalf("summary must group by module:\n%s", output.String())
+	}
+}
+
+func TestCoverageNotesAreCountedButNeverCauses(t *testing.T) {
+	ledger := BuildScopedLedger(ledgerUnion(), coverageReport(), LedgerOptions{Baseline: map[string]bool{}, Scope: LedgerScope{ModuleOf: moduleByFirstSegment}})
+	for _, cause := range ledger.Causes {
+		if IsCoverageNote(cause.RootCause) {
+			t.Fatalf("coverage note %q must not be a cause", cause.RootCause)
+		}
+	}
+	notes := map[string]int{}
+	for _, note := range ledger.CoverageNotes {
+		notes[note.Note] = len(note.Operations)
+	}
+	if notes["unresolvable-parameter"] != 1 || notes["entitled:harness-symbol-table"] != 1 {
+		t.Fatalf("coverage notes = %v", notes)
+	}
+	if ledger.Totals.CoverageNotes != 2 {
+		t.Fatalf("totals.coverageNotes = %d, want 2", ledger.Totals.CoverageNotes)
+	}
+	plain := BuildLedger(ledgerUnion(), ledgerReport(), map[string]bool{})
+	if ledger.Totals.NewCauses != plain.Totals.NewCauses {
+		t.Fatalf("coverage notes changed the new-cause count: %d vs %d", ledger.Totals.NewCauses, plain.Totals.NewCauses)
+	}
+	var output bytes.Buffer
+	if err := WriteCauseSummary(&output, ledger); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "coverage notes: 2 operations") {
+		t.Fatalf("summary must count coverage notes in their own section:\n%s", output.String())
+	}
+}
+
+func TestLedgerScopeKeepsOnlyTheScopedOperations(t *testing.T) {
+	only := map[string]bool{"GET /api/webhooks/v1/endpoints": true, "POST /api/webhooks/v1/endpoints": true}
+	ledger := BuildScopedLedger(ledgerUnion(), ledgerReport(), LedgerOptions{Scope: LedgerScope{Modules: []string{"webhook"}, ModuleOf: moduleByFirstSegment, Only: only}})
+	if ledger.Totals.UnionOperations != 2 || len(ledger.Causes) != 1 || len(ledger.Modules) != 1 {
+		t.Fatalf("scoped ledger = %+v", ledger.Totals)
+	}
+	if len(ledger.Scope) != 1 || ledger.Scope[0] != "webhook" {
+		t.Fatalf("scope = %v", ledger.Scope)
+	}
+}
+
+func TestModulePacketsCarryBothSidesEvidence(t *testing.T) {
+	report := coverageReport()
+	report.Transcripts = append(report.Transcripts, Transcript{
+		Method: "GET", Path: "/api/webhooks/v1/endpoints", Case: "read",
+		RequestPathA: "/api/webhooks/v1/endpoints", RequestPathB: "/api/webhooks/v1/endpoints",
+		A: SideResult{Status: 503, Body: `{"error":"boom"}`}, B: SideResult{Status: 403, Body: `{"error":"forbidden"}`},
+	})
+	ledger := BuildScopedLedger(ledgerUnion(), report, LedgerOptions{Scope: LedgerScope{ModuleOf: moduleByFirstSegment}})
+	dir := filepath.Join(t.TempDir(), "probe")
+	written, err := WriteModulePackets(dir, ledger, report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(written) != 4 {
+		t.Fatalf("packets = %v, want prompt, trace, webhook and unmapped", written)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "webhook.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	packet := string(data)
+	for _, want := range []string{"## handled-refusal-degraded:403-503 [new]", "### GET /api/webhooks/v1/endpoints", "base: GET /api/webhooks/v1/endpoints -> 403", "branch: GET /api/webhooks/v1/endpoints -> 503", "`status`: base `403`, branch `503`"} {
+		if !strings.Contains(packet, want) {
+			t.Fatalf("packet missing %q:\n%s", want, packet)
+		}
+	}
+	unmapped, err := os.ReadFile(filepath.Join(dir, "unmapped.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(unmapped), "GET /api/quiet: unresolvable-parameter") {
+		t.Fatalf("coverage notes belong in the packet:\n%s", unmapped)
+	}
+}

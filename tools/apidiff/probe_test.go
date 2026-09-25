@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -534,5 +536,75 @@ func TestSubstitutePathLeavesAnUnresolvedPlaceholder(t *testing.T) {
 	got := substitutePath("/api/projects/{id}", map[string]string{}, "/api/projects/{projectId}")
 	if got != "/api/projects/{id}" {
 		t.Errorf("path = %q, want the template when nothing resolved", got)
+	}
+}
+
+func TestScopeToModulesKeepsTheModuleAndItsProducers(t *testing.T) {
+	union := []Operation{
+		{Method: "GET", Path: "/api/traces/{traceId}", Params: []Param{{Name: "traceId", In: "path", Required: true}}},
+		{Method: "GET", Path: "/api/annotations/trace/{id}", Params: []Param{{Name: "id", In: "path", Required: true}}},
+		{Method: "POST", Path: "/api/traces/search"},
+		{Method: "GET", Path: "/api/prompts"},
+		{Method: "DELETE", Path: "/api/traces/all"},
+	}
+	moduleOf := func(_, path string) string {
+		if strings.HasPrefix(path, "/api/annotations") {
+			return "annotation"
+		}
+		return "other"
+	}
+	only, producers, err := ScopeToModules(union, []string{"annotation"}, moduleOf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !only["GET /api/annotations/trace/{id}"] || !only["POST /api/traces/search"] || producers != 1 {
+		t.Fatalf("scope = %v (%d producers), want the annotation read and the trace producer", only, producers)
+	}
+	if only["GET /api/prompts"] || only["DELETE /api/traces/all"] || only["GET /api/traces/{traceId}"] {
+		t.Fatalf("scope must not pull in unrelated operations, deletes, or producers that need ids themselves: %v", only)
+	}
+	selected := SelectOperations(union, OpFilter{Only: only})
+	if len(selected) != 2 {
+		t.Fatalf("SelectOperations kept %d operations, want 2", len(selected))
+	}
+	if _, _, err := ScopeToModules(union, []string{"no-such-module"}, moduleOf); err == nil {
+		t.Fatal("a module no operation maps to must be refused by name")
+	}
+}
+
+const unresolvableSpec = `{
+  "openapi": "3.0.3",
+  "paths": {
+    "/api/things/{id}": {
+      "get": {
+        "operationId": "getThing",
+        "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "responses": {"200": {"description": "ok"}}
+      }
+    }
+  }
+}`
+
+func TestCoverageNotesNeverFailTheRun(t *testing.T) {
+	routes := map[string]http.HandlerFunc{
+		"GET /api/things/{id}": func(writer http.ResponseWriter, _ *http.Request) { writeJSON(writer, 200, `{}`) },
+	}
+	candidate := newTestServer(t, unresolvableSpec, routes)
+	base := newTestServer(t, unresolvableSpec, routes)
+	baseline := filepath.Join(t.TempDir(), "baseline.json")
+	if err := os.WriteFile(baseline, []byte(`[]`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"probe", "-a", candidate.URL, "-b", base.URL},
+		{"probe", "-a", candidate.URL, "-b", base.URL, "-ledger-baseline", baseline},
+	} {
+		code, stdout, stderr := runProbeCLI(t, args...)
+		if code != 0 {
+			t.Fatalf("%v exited %d, want 0:\n%s\n%s", args[5:], code, stdout, stderr)
+		}
+		if !strings.Contains(stdout, "unresolvable-parameter: 1 operations") {
+			t.Fatalf("the skip must be a counted coverage note:\n%s", stdout)
+		}
 	}
 }

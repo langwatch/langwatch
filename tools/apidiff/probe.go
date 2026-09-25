@@ -61,6 +61,7 @@ type OpFilter struct {
 	Method     string
 	PathPrefix string
 	MaxOps     int
+	Only       map[string]bool // operation keys a -module scope kept; nil keeps all
 }
 
 // ProbeOptions configures a probe run against two running instances.
@@ -184,19 +185,113 @@ func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation)
 func SelectOperations(operations []Operation, filter OpFilter) []Operation {
 	selected := make([]Operation, 0, len(operations))
 	for index := range operations {
-		operation := operations[index]
-		if filter.Method != "" && !strings.EqualFold(operation.Method, filter.Method) {
-			continue
+		if filter.keeps(&operations[index]) {
+			selected = append(selected, operations[index])
 		}
-		if filter.PathPrefix != "" && !pathWithinPrefix(operation.Path, filter.PathPrefix) {
-			continue
-		}
-		selected = append(selected, operation)
 	}
 	if filter.MaxOps > 0 && len(selected) > filter.MaxOps {
 		selected = selected[:filter.MaxOps]
 	}
 	return selected
+}
+
+// ScopeToModules keeps the named modules' operations plus their parameter
+// producers: operations outside the scope that need no id of their own and
+// whose path names a resource a kept operation needs an id for. One level,
+// by name - README "Module scope" says which parameters that misses.
+func ScopeToModules(union []Operation, modules []string, moduleOf func(method, path string) string) (map[string]bool, int, error) {
+	wanted := map[string]bool{}
+	for _, module := range modules {
+		wanted[module] = true
+	}
+	only, matched, needed := scopedOperations(union, wanted, moduleOf)
+	for _, module := range modules {
+		if !matched[module] {
+			return nil, 0, fmt.Errorf("-module %s: no operation in the union maps to that module", module)
+		}
+	}
+	return only, addProducers(union, only, needed), nil
+}
+
+// scopedOperations keys the wanted modules' operations and collects the id
+// buckets their parameters resolve from.
+func scopedOperations(union []Operation, wanted map[string]bool, moduleOf func(method, path string) string) (only, matched, needed map[string]bool) {
+	only, matched, needed = map[string]bool{}, map[string]bool{}, map[string]bool{}
+	for index := range union {
+		operation := &union[index]
+		module := moduleOf(operation.Method, operation.Path)
+		if !wanted[module] {
+			continue
+		}
+		matched[module] = true
+		only[operationKeyOf(*operation)] = true
+		for _, bucket := range neededBuckets(operation) {
+			needed[bucket] = true
+		}
+	}
+	return only, matched, needed
+}
+
+// addProducers adds every unscoped operation that needs no id of its own and
+// names a needed resource, returning how many it added.
+func addProducers(union []Operation, only, needed map[string]bool) int {
+	producers := 0
+	for index := range union {
+		operation := &union[index]
+		key := operationKeyOf(*operation)
+		if only[key] || len(neededBuckets(operation)) > 0 || !producesAny(operation, needed) {
+			continue
+		}
+		only[key] = true
+		producers++
+	}
+	return producers
+}
+
+// neededBuckets lists the symbol-table buckets an operation's unseeded path
+// and required query parameters resolve from.
+func neededBuckets(operation *Operation) []string {
+	var buckets []string
+	for _, param := range operation.Params {
+		if param.In != "path" && (param.In != "query" || !param.Required) {
+			continue
+		}
+		if _, seeded := SeededConstants[normalizeParamName(param.Name)]; seeded {
+			continue
+		}
+		if param.In == "query" && param.HasValue {
+			continue
+		}
+		buckets = append(buckets, lookupBuckets(param.Name, operation.Path)...)
+	}
+	return buckets
+}
+
+// producesAny reports whether a read or create names, in any literal path
+// segment, a resource whose id bucket is needed.
+func producesAny(operation *Operation, needed map[string]bool) bool {
+	if operation.Method != http.MethodGet && operation.Method != http.MethodPost {
+		return false
+	}
+	for _, segment := range strings.Split(strings.Trim(operation.Path, "/"), "/") {
+		if segment == "" || strings.HasPrefix(segment, "{") || isVersionSegment(segment) {
+			continue
+		}
+		if needed[normalizeParamName(singularize(segment))+"id"] {
+			return true
+		}
+	}
+	return false
+}
+
+func (filter OpFilter) keeps(operation *Operation) bool {
+	if filter.Method != "" && !strings.EqualFold(operation.Method, filter.Method) {
+		return false
+	}
+	if filter.PathPrefix != "" && !pathWithinPrefix(operation.Path, filter.PathPrefix) {
+		return false
+	}
+	return filter.Only == nil || filter.Only[operationKeyOf(*operation)]
 }
 
 type probeEngine struct {

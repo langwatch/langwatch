@@ -168,12 +168,9 @@ func FetchSpec(ctx context.Context, client *http.Client, baseURL string) (map[st
 	return document, body, nil
 }
 
-// SpecDiff writes both served documents to temp files and reuses
-// openapidiff's Load and Diff unchanged for the spec-level comparison. Paths
-// are alias-normalized first (CanonicalAliasPath), so the branch's
-// /api ↔ /api/v1 auto-alias does not surface as removed+added noise. When one
-// document carries BOTH forms of the same alias, the bare form wins — they
-// are the same mounted operation by construction.
+// SpecDiff diffs both served documents with openapidiff after alias
+// normalization (CanonicalAliasPath; the bare form wins when one document has
+// both), then keeps only the breaking field-level changes (ClassifyChanges).
 func SpecDiff(baseBytes, candidateBytes []byte, dir string) ([]openapidiff.Change, error) {
 	baseBytes, err := normalizeAliasSpec(baseBytes)
 	if err != nil {
@@ -199,7 +196,73 @@ func SpecDiff(baseBytes, candidateBytes []byte, dir string) ([]openapidiff.Chang
 	if err != nil {
 		return nil, fmt.Errorf("candidate spec: %w", err)
 	}
-	return openapidiff.Diff(base, candidate, "", "")
+	changes, err := openapidiff.Diff(base, candidate, "", "")
+	if err != nil {
+		return nil, err
+	}
+	return reportedChanges(ClassifyChanges(base, candidate, changes)), nil
+}
+
+// reportedChanges is what the behavioral report counts: every breaking change,
+// plus each whole operation only the candidate documents (still reported as
+// operation_added until that is ruled a non-defect too).
+func reportedChanges(classified []ClassifiedChange) []openapidiff.Change {
+	kept := []openapidiff.Change{}
+	for _, change := range classified {
+		if change.Class == openapidiff.ClassBreaking || change.Kind == "added" {
+			kept = append(kept, change.Change)
+		}
+	}
+	return kept
+}
+
+// ClassifiedChange is one spec change after field-level classification: a
+// changed operation becomes one entry per changed parameter, body property,
+// status or security requirement, each tagged breaking or additive.
+type ClassifiedChange struct {
+	openapidiff.Change
+	Class string `json:"class"`
+}
+
+// ClassifyChanges splits every changed operation into its field-level changes.
+// Component and path-item changes are dropped: the operation comparison
+// resolves every reference, so each effect they have is already reported on
+// the operation it reaches. An operation only the candidate has is additive.
+func ClassifyChanges(base, candidate map[string]any, changes []openapidiff.Change) []ClassifiedChange {
+	classified := []ClassifiedChange{}
+	for _, change := range changes {
+		switch {
+		case change.Method == "component" || change.Method == "<path-item>":
+		case change.Kind == "added":
+			classified = append(classified, ClassifiedChange{Change: change, Class: openapidiff.ClassAdditive})
+		case change.Kind == "removed":
+			classified = append(classified, ClassifiedChange{Change: change, Class: openapidiff.ClassBreaking})
+		default:
+			for _, field := range openapidiff.ClassifyOperation(base, candidate, change) {
+				classified = append(classified, ClassifiedChange{
+					Change: openapidiff.Change{
+						Kind: field.Kind, Path: change.Path, Method: change.Method,
+						Fields: map[string][2]any{field.Field: {field.Before, field.After}},
+					},
+					Class: field.Class,
+				})
+			}
+		}
+	}
+	return classified
+}
+
+// BreakingChanges keeps the changes that can refuse or mislead a caller of the
+// base. Additive changes on the candidate are not defects; parity.json keeps
+// them.
+func BreakingChanges(classified []ClassifiedChange) []openapidiff.Change {
+	kept := []openapidiff.Change{}
+	for _, change := range classified {
+		if change.Class == openapidiff.ClassBreaking {
+			kept = append(kept, change.Change)
+		}
+	}
+	return kept
 }
 
 // SpecChangeKind maps an openapidiff change to its report kind.
@@ -209,6 +272,8 @@ func SpecChangeKind(change openapidiff.Change) string {
 		return "component_" + change.Kind
 	case "<path-item>":
 		return "path_item_" + change.Kind
+	case trpcMethod:
+		return "trpc_" + change.Kind
 	default:
 		return "operation_" + change.Kind
 	}

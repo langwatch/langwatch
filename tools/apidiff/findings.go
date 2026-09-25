@@ -6,8 +6,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -179,7 +181,7 @@ func findingsHook(stream *FindingsStream, repoRoot string, stderr io.Writer) fun
 			Surface: StreamSurfaceREST,
 			Name:    operation.Method + " " + operation.Path,
 			Kind:    kind,
-			Module:  ModuleForPath(repoRoot, operation.Path),
+			Module:  ModuleFor(repoRoot, operation.Method, operation.Path),
 			Detail:  detail,
 		}
 		if err := stream.Append(entry); err != nil {
@@ -188,23 +190,75 @@ func findingsHook(stream *FindingsStream, repoRoot string, stderr io.Writer) fun
 	}
 }
 
-// ModuleForPath is a best-effort mapping from a REST path to the module that
-// owns it: the first non-version, non-parameter path segment, matched (exact,
-// or with a trailing "s" added or removed) against a directory name under
-// modules/. Empty when nothing matches or repoRoot has no modules/ directory
-// at all — most of the surface predates the module layout, so that is the
-// common case, not a failure.
-func ModuleForPath(repoRoot, path string) string {
-	modules := moduleDirNames(repoRoot)
-	if len(modules) == 0 {
+// ModuleFor names the catalog module that owns one REST operation: the
+// module whose transport declares the route literally, else the module whose
+// router declares the path's namespace, else a feature id or subject the path
+// names. Empty when nothing matches or repoRoot has no modules/ directory.
+func ModuleFor(repoRoot, method, path string) string {
+	index := loadModuleIndex(repoRoot)
+	if index == nil {
 		return ""
 	}
+	key := routeShape(path)
+	if module := index.routes[strings.ToUpper(method)+" "+key]; module != "" {
+		return module
+	}
+	if module := index.paths[key]; module != "" {
+		return module
+	}
 	for _, segment := range pathSegments(path) {
-		if name, ok := matchModule(segment, modules); ok {
-			return name
+		if module := index.restNamespaces[segment]; module != "" {
+			return module
+		}
+		if module, ok := matchModule(segment, index.names); ok {
+			return module
 		}
 	}
 	return ""
+}
+
+// ModuleForNamespace names the catalog module that declares one tRPC
+// namespace (defineTrpcContract in its contract), trying each dotted parent
+// of a nested namespace before falling back to feature ids and subjects.
+func ModuleForNamespace(repoRoot, namespace string) string {
+	index := loadModuleIndex(repoRoot)
+	if index == nil {
+		return ""
+	}
+	for candidate := namespace; candidate != ""; candidate = dottedParent(candidate) {
+		if module := index.trpcNamespaces[candidate]; module != "" {
+			return module
+		}
+	}
+	for _, part := range strings.Split(namespace, ".") {
+		if module, ok := matchModule(kebabCase(part), index.names); ok {
+			return module
+		}
+	}
+	return ""
+}
+
+func dottedParent(namespace string) string {
+	position := strings.LastIndex(namespace, ".")
+	if position < 0 {
+		return ""
+	}
+	return namespace[:position]
+}
+
+func kebabCase(word string) string {
+	var out strings.Builder
+	for position, char := range word {
+		if char >= 'A' && char <= 'Z' {
+			if position > 0 {
+				out.WriteByte('-')
+			}
+			out.WriteRune(char + ('a' - 'A'))
+			continue
+		}
+		out.WriteRune(char)
+	}
+	return out.String()
 }
 
 func pathSegments(path string) []string {
@@ -217,6 +271,7 @@ func pathSegments(path string) []string {
 		switch {
 		case segment == "api":
 		case len(segment) >= 2 && segment[0] == 'v' && allDigits(segment[1:]):
+		case isVersionSegment(segment):
 		case strings.HasPrefix(segment, "{"):
 		default:
 			out = append(out, segment)
@@ -225,28 +280,247 @@ func pathSegments(path string) []string {
 	return out
 }
 
-func matchModule(segment string, modules map[string]bool) (string, bool) {
+func matchModule(segment string, modules map[string]string) (string, bool) {
 	for _, candidate := range []string{segment, strings.TrimSuffix(segment, "s"), segment + "s"} {
-		if modules[candidate] {
-			return candidate, true
+		if module, ok := modules[candidate]; ok {
+			return module, true
 		}
 	}
 	return "", false
 }
 
-func moduleDirNames(repoRoot string) map[string]bool {
+// routeShape reduces a path to its parameter-blind shape, so an OpenAPI
+// "/api/prompts/{id}" and a declared "/api/prompts/:id{.+?}" compare equal.
+func routeShape(path string) string {
+	segments := strings.Split(strings.TrimSuffix(path, "/"), "/")
+	for position, segment := range segments {
+		if strings.HasPrefix(segment, ":") || strings.HasPrefix(segment, "{") {
+			segments[position] = "{}"
+		}
+	}
+	return strings.Join(segments, "/")
+}
+
+// moduleIndex is everything the branch's own source says about which module
+// serves what, read once per repository root.
+type moduleIndex struct {
+	routes         map[string]string // "METHOD /api/x/{}" -> module
+	paths          map[string]string // "/api/x/{}" -> module
+	restNamespaces map[string]string
+	trpcNamespaces map[string]string
+	names          map[string]string // feature ids and subjects -> module
+}
+
+// moduleCatalogFile is the one map of subjects to owning modules.
+const moduleCatalogFile = "catalogue.json"
+
+type catalogueFeature struct {
+	ID       string   `json:"id"`
+	Root     string   `json:"root"`
+	Subjects []string `json:"subjects"`
+}
+
+var (
+	moduleIndexes   = map[string]*moduleIndex{}
+	moduleIndexLock sync.Mutex
+)
+
+var (
+	restRouteLiteral  = regexp.MustCompile(`\.(get|post|put|patch|delete)\(\s*"(/api/[^"]*)"`)
+	restNamespaceDecl = regexp.MustCompile(`withNamespace\(\s*"([^"]+)"`)
+	trpcNamespaceDecl = regexp.MustCompile(`defineTrpcContract\(\s*"([^"]+)"`)
+)
+
+func loadModuleIndex(repoRoot string) *moduleIndex {
 	if repoRoot == "" {
 		return nil
+	}
+	moduleIndexLock.Lock()
+	defer moduleIndexLock.Unlock()
+	if index, ok := moduleIndexes[repoRoot]; ok {
+		return index
+	}
+	index := buildModuleIndex(repoRoot)
+	moduleIndexes[repoRoot] = index
+	return index
+}
+
+// buildModuleIndex reads the modules/ catalog file, then each feature's REST
+// transports and contract sources. Without a catalog it falls back to the
+// directory names under modules/, and without either it answers nil.
+func buildModuleIndex(repoRoot string) *moduleIndex {
+	features := readCatalogue(repoRoot)
+	if len(features) == 0 {
+		return nil
+	}
+	index := &moduleIndex{
+		routes: map[string]string{}, paths: map[string]string{},
+		restNamespaces: map[string]string{}, trpcNamespaces: map[string]string{},
+		names: map[string]string{},
+	}
+	for _, feature := range features {
+		index.names[feature.ID] = feature.ID
+		for _, subject := range feature.Subjects {
+			if _, taken := index.names[subject]; !taken {
+				index.names[subject] = feature.ID
+			}
+		}
+		root := filepath.Join(repoRoot, filepath.FromSlash(feature.Root))
+		index.readRestTransports(feature.ID, filepath.Join(root, "process", "src", "transport"))
+		index.readTrpcContracts(feature.ID, filepath.Join(root, "contract", "src"))
+	}
+	return index
+}
+
+func readCatalogue(repoRoot string) []catalogueFeature {
+	// #nosec G304 -- the catalog path is fixed under the operator's checkout.
+	data, err := os.ReadFile(filepath.Join(repoRoot, "modules", moduleCatalogFile))
+	if err == nil {
+		var catalog struct {
+			Features []catalogueFeature `json:"features"`
+		}
+		if json.Unmarshal(data, &catalog) == nil && len(catalog.Features) > 0 {
+			return catalog.Features
+		}
 	}
 	entries, err := os.ReadDir(filepath.Join(repoRoot, "modules"))
 	if err != nil {
 		return nil
 	}
-	names := map[string]bool{}
+	var features []catalogueFeature
 	for _, entry := range entries {
 		if entry.IsDir() {
-			names[entry.Name()] = true
+			features = append(features, catalogueFeature{ID: entry.Name(), Root: "modules/" + entry.Name()})
 		}
 	}
-	return names
+	return features
+}
+
+func (index *moduleIndex) readRestTransports(module, dir string) {
+	files, _ := filepath.Glob(filepath.Join(dir, "*.rest.ts"))
+	for _, file := range files {
+		source := readSource(file)
+		for _, match := range restRouteLiteral.FindAllStringSubmatch(source, -1) {
+			shape := routeShape(match[2])
+			claim(index.routes, strings.ToUpper(match[1])+" "+shape, module)
+			claim(index.paths, shape, module)
+		}
+		for _, match := range restNamespaceDecl.FindAllStringSubmatch(source, -1) {
+			claim(index.restNamespaces, match[1], module)
+		}
+	}
+}
+
+func (index *moduleIndex) readTrpcContracts(module, dir string) {
+	_ = filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return skipNonSource(entry.Name())
+		}
+		if strings.HasSuffix(path, ".ts") {
+			index.claimTrpcNamespaces(module, readSource(path))
+		}
+		return nil
+	})
+}
+
+func skipNonSource(dirName string) error {
+	if dirName == "__tests__" || dirName == "node_modules" {
+		return filepath.SkipDir
+	}
+	return nil
+}
+
+func (index *moduleIndex) claimTrpcNamespaces(module, source string) {
+	for _, match := range trpcNamespaceDecl.FindAllStringSubmatch(source, -1) {
+		claim(index.trpcNamespaces, match[1], module)
+	}
+}
+
+// claim records the first module to declare a key; catalog order decides a
+// collision, and the tree has none today.
+func claim(into map[string]string, key, module string) {
+	if _, taken := into[key]; !taken {
+		into[key] = module
+	}
+}
+
+func readSource(path string) string {
+	data, err := os.ReadFile(path) // #nosec G304 -- a transport or contract file under the catalogue's own roots.
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+// moduleRoot is the checkout whose catalog maps operations to modules: the
+// run's branch, or for `probe` the nearest ancestor of the working directory
+// that has a modules/ catalog file.
+func (probe *probeFlags) moduleRoot() string {
+	if probe.repoRoot != "" {
+		return probe.repoRoot
+	}
+	dir, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "modules", moduleCatalogFile)); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
+}
+
+func (probe *probeFlags) moduleOf() func(method, path string) string {
+	root := probe.moduleRoot()
+	return func(method, path string) string { return ModuleFor(root, method, path) }
+}
+
+// scopeToModules applies -module: only the named modules' operations and
+// their parameter producers are probed and ledgered.
+func (probe *probeFlags) scopeToModules(union []Operation, out streams) int {
+	if len(probe.modules) == 0 {
+		return exitEqual
+	}
+	only, producers, err := ScopeToModules(union, probe.modules, probe.moduleOf())
+	if err != nil {
+		fmt.Fprintln(out.stderr, err)
+		return exitError
+	}
+	probe.only = only
+	fmt.Fprintf(out.stderr, "module scope %s: %d operations, %d of them parameter producers outside the scope\n",
+		strings.Join(probe.modules, ", "), len(only), producers)
+	return exitEqual
+}
+
+func (probe *probeFlags) ledgerOptions(baseline map[string]bool) LedgerOptions {
+	return LedgerOptions{
+		Baseline: baseline,
+		Scope:    LedgerScope{Modules: []string(probe.modules), ModuleOf: probe.moduleOf(), Only: probe.only},
+	}
+}
+
+// writeModulePackets writes <work-root>/probe/<module>.md for `run`, or a
+// probe/ directory beside -report for `probe`; nothing when neither exists.
+func (probe *probeFlags) writeModulePackets(verdict runVerdict, out streams) {
+	dir := probe.packetDir
+	if dir == "" && probe.reportFile != "" {
+		dir = filepath.Join(filepath.Dir(probe.reportFile), "probe")
+	}
+	if dir == "" {
+		return
+	}
+	written, err := WriteModulePackets(dir, verdict.ledger, verdict.report)
+	if err != nil {
+		fmt.Fprintln(out.stderr, "module packets:", err)
+		return
+	}
+	fmt.Fprintf(out.stderr, "module packets: %d in %s\n", len(written), dir)
 }

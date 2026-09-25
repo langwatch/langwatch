@@ -54,6 +54,8 @@ type LedgerRow struct {
 	SkipReason     string   `json:"skipReason,omitempty"`
 	SideStatus     *[2]int  `json:"sideStatus,omitempty"` // [base, candidate]
 	Known          bool     `json:"known"`                // every cause is in the baseline
+	Module         string   `json:"module"`
+	CoverageNote   string   `json:"coverageNote,omitempty"`
 }
 
 // LedgerCause groups every row sharing one root cause.
@@ -74,14 +76,54 @@ type LedgerTotals struct {
 	Causes          int `json:"causes"`
 	NewCauses       int `json:"newCauses"`
 	KnownCauses     int `json:"knownCauses"`
+	Modules         int `json:"modules"`
+	Unmapped        int `json:"unmappedOperations"`
+	CoverageNotes   int `json:"coverageNotes"`
+}
+
+// LedgerModule is one module's slice of the run: the work packet a lane
+// owning that module burns down.
+type LedgerModule struct {
+	Module        string              `json:"module"` // empty: no module claims the path
+	Operations    int                 `json:"operations"`
+	Differing     int                 `json:"differingOperations"`
+	NewCauses     int                 `json:"newCauses"`
+	CoverageNotes int                 `json:"coverageNotes"`
+	Causes        []LedgerModuleCause `json:"causes"`
+}
+
+// LedgerModuleCause is one cause as it lands in one module.
+type LedgerModuleCause struct {
+	RootCause  string   `json:"rootCause"`
+	Known      bool     `json:"known"`
+	Operations []string `json:"operations"`
+}
+
+// LedgerCoverageNote counts operations the harness could not compare. A note
+// is never a cause: it is not in the baseline ratchet and never fails a run.
+type LedgerCoverageNote struct {
+	Note       string   `json:"note"`
+	Count      int      `json:"count"`
+	Operations []string `json:"operations"`
+}
+
+// LedgerScope names each operation's module and, under -module, the
+// operations the run covered; the zero value keeps the whole union unnamed.
+type LedgerScope struct {
+	Modules  []string
+	ModuleOf func(method, path string) string
+	Only     map[string]bool
 }
 
 // Ledger is the machine-readable per-operation view, written beside the
 // report as ledger.json.
 type Ledger struct {
-	Totals     LedgerTotals  `json:"totals"`
-	Causes     []LedgerCause `json:"causes"`
-	Operations []LedgerRow   `json:"operations"`
+	Totals        LedgerTotals         `json:"totals"`
+	Scope         []string             `json:"scope,omitempty"`
+	Modules       []LedgerModule       `json:"modules"`
+	Causes        []LedgerCause        `json:"causes"`
+	CoverageNotes []LedgerCoverageNote `json:"coverageNotes"`
+	Operations    []LedgerRow          `json:"operations"`
 }
 
 // ledgerBuild accumulates the rows and cause groups while folding a run.
@@ -89,16 +131,33 @@ type ledgerBuild struct {
 	rows     map[string]*LedgerRow
 	order    []string
 	causes   map[string]*LedgerCause
+	notes    map[string]*LedgerCoverageNote
 	baseline map[string]bool
+	scope    LedgerScope
+}
+
+// LedgerOptions are what a ledger is folded against: the known causes (may
+// be nil) and the module scope (the zero value names no modules).
+type LedgerOptions struct {
+	Baseline map[string]bool
+	Scope    LedgerScope
 }
 
 // BuildLedger folds the union, the findings and the spec changes into one
 // row per operation plus the cause groups. baseline may be nil.
 func BuildLedger(union []Operation, report Report, baseline map[string]bool) Ledger {
+	return BuildScopedLedger(union, report, LedgerOptions{Baseline: baseline})
+}
+
+// BuildScopedLedger is BuildLedger with a module scope: every row names its
+// module, the module view is filled in, and a -module run keeps its own rows.
+func BuildScopedLedger(union []Operation, report Report, options LedgerOptions) Ledger {
 	build := &ledgerBuild{
 		rows:     map[string]*LedgerRow{},
 		causes:   map[string]*LedgerCause{},
-		baseline: baseline,
+		notes:    map[string]*LedgerCoverageNote{},
+		baseline: options.Baseline,
+		scope:    options.Scope,
 	}
 	build.seedRows(union)
 	build.applyTranscripts(report.Transcripts)
@@ -112,6 +171,9 @@ func (build *ledgerBuild) seedRows(union []Operation) {
 	for index := range union {
 		operation := union[index]
 		key := operationKeyOf(operation)
+		if !build.inScope(key) {
+			continue
+		}
 		row := &LedgerRow{
 			Method:         operation.Method,
 			Path:           operation.Path,
@@ -120,6 +182,7 @@ func (build *ledgerBuild) seedRows(union []Operation) {
 			Cases:          []string{},
 			Classification: ClassificationNotProbed,
 			RootCauses:     []string{},
+			Module:         build.moduleOf(operation.Method, operation.Path),
 		}
 		build.rows[key] = row
 		build.order = append(build.order, key)
@@ -163,22 +226,43 @@ func (build *ledgerBuild) applyFindings(findings []Finding) {
 	for index := range findings {
 		finding := findings[index]
 		key := finding.Method + " " + finding.Path
-		row, ok := build.rows[key]
+		row, ok := build.rowFor(finding, key)
 		if !ok {
-			row = &LedgerRow{
-				Method: finding.Method, Path: finding.Path, OperationID: finding.OperationID,
-				Presence: "both", Cases: []string{}, Classification: ClassificationEqual, RootCauses: []string{},
-			}
-			build.rows[key] = row
-			build.order = append(build.order, key)
+			continue
 		}
 		cause := RootCause(finding)
+		build.classify(row, finding)
+		if IsCoverageNote(cause) {
+			if row.CoverageNote == "" {
+				row.CoverageNote = cause
+			}
+			build.recordNote(cause, key)
+			continue
+		}
 		if !contains(row.RootCauses, cause) {
 			row.RootCauses = append(row.RootCauses, cause)
 		}
 		build.recordCause(cause, finding.Kind, key)
-		build.classify(row, finding)
 	}
+}
+
+// rowFor finds a finding's row, creating one for an operation the union did
+// not list unless a -module scope leaves it out.
+func (build *ledgerBuild) rowFor(finding Finding, key string) (*LedgerRow, bool) {
+	if row, ok := build.rows[key]; ok {
+		return row, true
+	}
+	if !build.inScope(key) {
+		return nil, false
+	}
+	row := &LedgerRow{
+		Method: finding.Method, Path: finding.Path, OperationID: finding.OperationID,
+		Presence: "both", Cases: []string{}, Classification: ClassificationEqual, RootCauses: []string{},
+		Module: build.moduleOf(finding.Method, finding.Path),
+	}
+	build.rows[key] = row
+	build.order = append(build.order, key)
+	return row, true
 }
 
 // classify lifts a row's classification for one finding. differs wins over
@@ -212,6 +296,9 @@ func (build *ledgerBuild) applySpecChanges(changes []SpecChange) {
 		change := changes[index]
 		cause := "spec-" + strings.ReplaceAll(change.Kind, "_", "-")
 		key := strings.ToUpper(change.Method) + " " + CanonicalAliasPath(change.Path)
+		if !build.inScope(key) {
+			continue
+		}
 		if row, ok := build.rows[key]; ok && !contains(row.RootCauses, cause) {
 			row.RootCauses = append(row.RootCauses, cause)
 		}
@@ -231,14 +318,185 @@ func (build *ledgerBuild) recordCause(cause, kind, operationKey string) {
 	}
 }
 
+// coverageNoteCauses are the skip slugs that say the harness could not reach
+// an operation, not that the branch behaves differently (README, "The ledger").
+var coverageNoteCauses = map[string]bool{
+	"unresolvable-parameter": true,
+	"harness-symbol-table":   true,
+}
+
+// IsCoverageNote reports whether a cause slug is a coverage note rather than
+// a cause, in either pass.
+func IsCoverageNote(cause string) bool {
+	return coverageNoteCauses[strings.TrimPrefix(cause, "entitled:")]
+}
+
+func (build *ledgerBuild) inScope(key string) bool {
+	return build.scope.Only == nil || build.scope.Only[key]
+}
+
+func (build *ledgerBuild) moduleOf(method, path string) string {
+	if build.scope.ModuleOf == nil {
+		return ""
+	}
+	return build.scope.ModuleOf(method, path)
+}
+
+func (build *ledgerBuild) recordNote(note, operationKey string) {
+	group, ok := build.notes[note]
+	if !ok {
+		group = &LedgerCoverageNote{Note: note}
+		build.notes[note] = group
+	}
+	group.Count++
+	if !contains(group.Operations, operationKey) {
+		group.Operations = append(group.Operations, operationKey)
+	}
+}
+
 // finish sorts everything deterministically and computes the totals.
 func (build *ledgerBuild) finish() Ledger {
-	ledger := Ledger{}
+	ledger := Ledger{Scope: build.scope.Modules}
 	ledger.Operations, ledger.Totals = build.finishRows()
 	ledger.Causes = build.finishCauses(&ledger.Totals)
+	ledger.CoverageNotes = build.finishNotes()
+	ledger.Modules = build.finishModules(ledger.Operations, ledger.Causes)
 	ledger.Totals.UnionOperations = len(ledger.Operations)
 	ledger.Totals.Causes = len(ledger.Causes)
+	ledger.Totals.Modules = len(ledger.Modules)
+	for index := range ledger.Operations {
+		if ledger.Operations[index].Module == "" {
+			ledger.Totals.Unmapped++
+		}
+		if ledger.Operations[index].CoverageNote != "" {
+			ledger.Totals.CoverageNotes++
+		}
+	}
 	return ledger
+}
+
+func (build *ledgerBuild) finishNotes() []LedgerCoverageNote {
+	names := make([]string, 0, len(build.notes))
+	for name := range build.notes {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	notes := make([]LedgerCoverageNote, 0, len(names))
+	for _, name := range names {
+		group := build.notes[name]
+		sort.Strings(group.Operations)
+		notes = append(notes, *group)
+	}
+	return notes
+}
+
+// finishModules regroups rows and causes by module: module -> cause ->
+// operations, ordered by module name with the unmapped group last.
+func (build *ledgerBuild) finishModules(rows []LedgerRow, causes []LedgerCause) []LedgerModule {
+	grouper := moduleGrouper{groups: map[string]*LedgerModule{}, causes: map[string]map[string]*LedgerModuleCause{}}
+	rowModule := map[string]string{}
+	for index := range rows {
+		row := &rows[index]
+		rowModule[row.Method+" "+row.Path] = row.Module
+		grouper.addRow(row)
+	}
+	for index := range causes {
+		cause := &causes[index]
+		for _, key := range cause.Operations {
+			module, ok := rowModule[key]
+			if !ok {
+				module = build.moduleOfKey(key)
+			}
+			grouper.addCause(module, cause, key)
+		}
+	}
+	return grouper.ordered()
+}
+
+func (build *ledgerBuild) moduleOfKey(key string) string {
+	method, path, _ := strings.Cut(key, " ")
+	return build.moduleOf(method, path)
+}
+
+// moduleGrouper accumulates the module view.
+type moduleGrouper struct {
+	groups map[string]*LedgerModule
+	causes map[string]map[string]*LedgerModuleCause
+}
+
+func (grouper moduleGrouper) group(module string) *LedgerModule {
+	if existing, ok := grouper.groups[module]; ok {
+		return existing
+	}
+	created := &LedgerModule{Module: module, Causes: []LedgerModuleCause{}}
+	grouper.groups[module] = created
+	grouper.causes[module] = map[string]*LedgerModuleCause{}
+	return created
+}
+
+func (grouper moduleGrouper) addRow(row *LedgerRow) {
+	moduleGroup := grouper.group(row.Module)
+	moduleGroup.Operations++
+	if isDiffering(row.Classification) {
+		moduleGroup.Differing++
+	}
+	if row.CoverageNote != "" {
+		moduleGroup.CoverageNotes++
+	}
+}
+
+func (grouper moduleGrouper) addCause(module string, cause *LedgerCause, key string) {
+	grouper.group(module)
+	entry, ok := grouper.causes[module][cause.RootCause]
+	if !ok {
+		entry = &LedgerModuleCause{RootCause: cause.RootCause, Known: cause.Known}
+		grouper.causes[module][cause.RootCause] = entry
+	}
+	entry.Operations = append(entry.Operations, key)
+}
+
+func (grouper moduleGrouper) ordered() []LedgerModule {
+	names := make([]string, 0, len(grouper.groups))
+	for name := range grouper.groups {
+		names = append(names, name)
+	}
+	sort.Slice(names, func(i, j int) bool {
+		if (names[i] == "") != (names[j] == "") {
+			return names[j] == ""
+		}
+		return names[i] < names[j]
+	})
+	modules := make([]LedgerModule, 0, len(names))
+	for _, name := range names {
+		modules = append(modules, grouper.finish(name))
+	}
+	return modules
+}
+
+func (grouper moduleGrouper) finish(name string) LedgerModule {
+	moduleGroup := grouper.groups[name]
+	causeNames := make([]string, 0, len(grouper.causes[name]))
+	for causeName := range grouper.causes[name] {
+		causeNames = append(causeNames, causeName)
+	}
+	sort.Strings(causeNames)
+	for _, causeName := range causeNames {
+		entry := grouper.causes[name][causeName]
+		sort.Strings(entry.Operations)
+		moduleGroup.Causes = append(moduleGroup.Causes, *entry)
+		if !entry.Known {
+			moduleGroup.NewCauses++
+		}
+	}
+	return *moduleGroup
+}
+
+func isDiffering(classification string) bool {
+	switch classification {
+	case ClassificationDiffers, ClassificationMissingA, ClassificationMissingB:
+		return true
+	}
+	return false
 }
 
 // finishRows orders the rows and counts what each classification means for
@@ -480,43 +738,92 @@ func WriteLedger(writer io.Writer, ledger Ledger) error {
 	return encoder.Encode(ledger)
 }
 
-// WriteCauseSummary renders the human head of the report: the causes, each
-// with how many operations carry it, newest work first (unknown causes
-// before known ones when a baseline is in play).
+// WriteCauseSummary renders the human head of the report: module -> cause
+// -> operations, the modules with new work first, then the coverage notes,
+// which are counted but never a cause.
 func WriteCauseSummary(writer io.Writer, ledger Ledger) error {
 	var output strings.Builder
-	fmt.Fprintf(&output, "root causes: %d causes across %d operations (%d in the union)\n",
-		ledger.Totals.Causes, ledger.Totals.Differing+ledger.Totals.Skipped, ledger.Totals.UnionOperations)
+	fmt.Fprintf(&output, "root causes: %d causes across %d operations (%d in the union, %d modules, %d operations in no module)\n",
+		ledger.Totals.Causes, operationsWithCause(ledger.Operations), ledger.Totals.UnionOperations, ledger.Totals.Modules, ledger.Totals.Unmapped)
+	if len(ledger.Scope) > 0 {
+		fmt.Fprintf(&output, "scope: -module %s\n", strings.Join(ledger.Scope, " -module "))
+	}
 	if ledger.Totals.Causes == 0 {
 		output.WriteString("  none\n")
 	}
-	for _, cause := range sortedCauses(ledger.Causes) {
-		marker := ""
-		if cause.Known {
-			marker = " [known]"
+	quiet := 0
+	ordered := modulesByWork(ledger.Modules)
+	for index := range ordered {
+		module := ordered[index]
+		if len(module.Causes) == 0 {
+			quiet++
+			continue
 		}
-		fmt.Fprintf(&output, "  %s%s: %d findings across %d operations\n", cause.RootCause, marker, cause.Count, len(cause.Operations))
-		for _, operation := range cause.Operations {
-			fmt.Fprintf(&output, "    %s\n", operation)
-		}
+		writeModuleCauses(&output, module)
 	}
+	if quiet > 0 {
+		fmt.Fprintf(&output, "%d modules with no cause\n", quiet)
+	}
+	writeCoverageNotes(&output, ledger)
 	_, err := io.WriteString(writer, output.String())
 	return err
 }
 
-// sortedCauses orders unknown causes first, then by descending operation
-// count, then by name — the order a burn-down is worked in.
-func sortedCauses(causes []LedgerCause) []LedgerCause {
-	ordered := make([]LedgerCause, len(causes))
-	copy(ordered, causes)
+func writeModuleCauses(output *strings.Builder, module LedgerModule) {
+	fmt.Fprintf(output, "module %s: %d operations, %d differing, %d causes (%d new)\n",
+		moduleLabel(module.Module), module.Operations, module.Differing, len(module.Causes), module.NewCauses)
+	for _, cause := range module.Causes {
+		marker := ""
+		if cause.Known {
+			marker = " [known]"
+		}
+		fmt.Fprintf(output, "  %s%s: %d operations\n", cause.RootCause, marker, len(cause.Operations))
+		for _, operation := range cause.Operations {
+			fmt.Fprintf(output, "    %s\n", operation)
+		}
+	}
+}
+
+func writeCoverageNotes(output *strings.Builder, ledger Ledger) {
+	if len(ledger.CoverageNotes) == 0 {
+		return
+	}
+	fmt.Fprintf(output, "coverage notes: %d operations the harness could not compare (never a cause, never fails the run)\n", ledger.Totals.CoverageNotes)
+	for _, note := range ledger.CoverageNotes {
+		fmt.Fprintf(output, "  %s: %d operations\n", note.Note, len(note.Operations))
+	}
+}
+
+func moduleLabel(module string) string {
+	if module == "" {
+		return "(none)"
+	}
+	return module
+}
+
+func operationsWithCause(rows []LedgerRow) int {
+	count := 0
+	for index := range rows {
+		if len(rows[index].RootCauses) > 0 {
+			count++
+		}
+	}
+	return count
+}
+
+// modulesByWork orders modules the way a burn-down is dispatched: new causes
+// first, then the most differing operations, then by name.
+func modulesByWork(modules []LedgerModule) []LedgerModule {
+	ordered := make([]LedgerModule, len(modules))
+	copy(ordered, modules)
 	sort.SliceStable(ordered, func(i, j int) bool {
-		if ordered[i].Known != ordered[j].Known {
-			return !ordered[i].Known
+		if ordered[i].NewCauses != ordered[j].NewCauses {
+			return ordered[i].NewCauses > ordered[j].NewCauses
 		}
-		if len(ordered[i].Operations) != len(ordered[j].Operations) {
-			return len(ordered[i].Operations) > len(ordered[j].Operations)
+		if ordered[i].Differing != ordered[j].Differing {
+			return ordered[i].Differing > ordered[j].Differing
 		}
-		return ordered[i].RootCause < ordered[j].RootCause
+		return ordered[i].Module < ordered[j].Module
 	})
 	return ordered
 }

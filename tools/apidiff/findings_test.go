@@ -164,7 +164,7 @@ func TestClassifyOperationMapsFindingKindsToTheStreamTaxonomy(t *testing.T) {
 	}
 }
 
-func TestModuleForPathMatchesAModulesDirectory(t *testing.T) {
+func TestModuleForFallsBackToModulesDirectoryNames(t *testing.T) {
 	repoRoot := t.TempDir()
 	for _, name := range []string{"prompt", "api-key"} {
 		if err := os.MkdirAll(filepath.Join(repoRoot, "modules", name), 0o750); err != nil {
@@ -178,11 +178,84 @@ func TestModuleForPathMatchesAModulesDirectory(t *testing.T) {
 		{"/api/nothing-like-a-module", ""},
 	}
 	for _, testCase := range cases {
-		if got := ModuleForPath(repoRoot, testCase.path); got != testCase.want {
-			t.Errorf("ModuleForPath(%q) = %q, want %q", testCase.path, got, testCase.want)
+		if got := ModuleFor(repoRoot, "GET", testCase.path); got != testCase.want {
+			t.Errorf("ModuleFor(%q) = %q, want %q", testCase.path, got, testCase.want)
 		}
 	}
-	if got := ModuleForPath("", "/api/prompts"); got != "" {
+	if got := ModuleFor("", "GET", "/api/prompts"); got != "" {
+		t.Errorf("no repo root must resolve no module, got %q", got)
+	}
+}
+
+// writeCatalogueRepo lays out a catalog with one core and one enterprise
+// module, each declaring its REST routes and tRPC namespaces the way the tree does.
+func writeCatalogueRepo(t *testing.T) string {
+	t.Helper()
+	repoRoot := t.TempDir()
+	files := map[string]string{
+		"modules/" + moduleCatalogFile: `{"version":0,"features":[
+			{"id":"gateway","root":"modules/gateway","subjects":["gateway","virtual-key"]},
+			{"id":"organization","root":"modules/organization","subjects":["organization","team"]},
+			{"id":"scim","root":"enterprise/modules/scim","subjects":["scim"]}]}`,
+		"modules/gateway/process/src/transport/gateway.rest.ts": `defineRestRouter(GatewayApi)
+  .withNamespace("gateway")
+  .get("/virtual-keys/:id", "getVk")`,
+		"modules/organization/process/src/transport/team.rest.ts": `defineRestRouter(TeamApi)
+  .withNamespace("teams")
+  .get("/", "listTeams")
+  .post("/api/members/:userId{.+?}/access", "grant")`,
+		"modules/gateway/contract/src/virtual-key.trpc.ts":           `export const vk = defineTrpcContract("virtualKeys")`,
+		"modules/organization/contract/src/nested/team.trpc.ts":      `defineTrpcContract("suites.teamSuites")`,
+		"enterprise/modules/scim/process/src/transport/scim.rest.ts": `.withNamespace("scim-tokens")`,
+	}
+	for name, body := range files {
+		path := filepath.Join(repoRoot, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return repoRoot
+}
+
+func TestModuleForReadsTheCatalogueAndTransportDeclarations(t *testing.T) {
+	repoRoot := writeCatalogueRepo(t)
+	cases := []struct{ method, path, want string }{
+		{"POST", "/api/members/{userId}/access", "organization"},
+		{"GET", "/api/members/{userId}/access", "organization"},
+		{"GET", "/api/teams/{id}", "organization"},
+		{"GET", "/api/gateway/v1/virtual-keys/{id}", "gateway"},
+		{"GET", "/api/virtual-keys", "gateway"},
+		{"POST", "/api/scim-tokens", "scim"},
+		{"GET", "/api/scim/v2/Users", "scim"},
+		{"GET", "/api/2025-01-01/teams", "organization"},
+		{"GET", "/api/nothing", ""},
+	}
+	for _, testCase := range cases {
+		if got := ModuleFor(repoRoot, testCase.method, testCase.path); got != testCase.want {
+			t.Errorf("ModuleFor(%s %s) = %q, want %q", testCase.method, testCase.path, got, testCase.want)
+		}
+	}
+}
+
+func TestModuleForNamespaceReadsContractDeclarations(t *testing.T) {
+	repoRoot := writeCatalogueRepo(t)
+	cases := []struct{ namespace, want string }{
+		{"virtualKeys", "gateway"},
+		{"suites.teamSuites", "organization"},
+		{"suites.teamSuites.deep", "organization"},
+		{"team", "organization"},
+		{"virtualKey", "gateway"},
+		{"unknown", ""},
+	}
+	for _, testCase := range cases {
+		if got := ModuleForNamespace(repoRoot, testCase.namespace); got != testCase.want {
+			t.Errorf("ModuleForNamespace(%q) = %q, want %q", testCase.namespace, got, testCase.want)
+		}
+	}
+	if got := ModuleForNamespace("", "virtualKeys"); got != "" {
 		t.Errorf("no repo root must resolve no module, got %q", got)
 	}
 }

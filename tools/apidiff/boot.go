@@ -405,6 +405,10 @@ func PlanBoot(cfg BootConfig) (DryRunPlan, error) {
 	if workRoot == "" {
 		workRoot = filepath.Join(invoking, ".apidiff", time.Now().Format("20060102-150405"))
 	}
+	workRoot, err = filepath.Abs(workRoot)
+	if err != nil {
+		return DryRunPlan{}, err
+	}
 	runID := RunID(workRoot)
 	mainDir := filepath.Join(workRoot, "main")
 	plan := DryRunPlan{
@@ -586,6 +590,9 @@ func (state *bootState) prepareLayout() error {
 	state.workRoot = state.cfg.WorkRoot
 	if state.workRoot == "" {
 		state.workRoot = filepath.Join(branchDir, ".apidiff", time.Now().Format("20060102-150405"))
+	}
+	if state.workRoot, err = filepath.Abs(state.workRoot); err != nil {
+		return err
 	}
 	if err := os.MkdirAll(filepath.Join(state.workRoot, "logs"), 0o750); err != nil {
 		return err
