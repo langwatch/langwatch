@@ -68,7 +68,7 @@ function buildService(overrides: {
     getReferenceStates: async ({ ids }: { ids: string[] }) =>
       ids.map((id) => ({ id, archivedAt: null })),
     getRunConfigs: async ({ ids }: { ids: string[] }) =>
-      ids.map((id) => ({
+      ids.map((id): Awaited<ReturnType<ScenarioApi["getRunConfigs"]>>[number] => ({
         id,
         name: id,
         version: 1,
@@ -286,9 +286,9 @@ describe("SuiteService.runPlan", () => {
 });
 
 describe("given a scenario declaring a secret parameter", () => {
-  const declaringSecret = {
+  const declaringSecret: Partial<ScenarioApi> = {
     getRunConfigs: async ({ ids }: { ids: string[] }) =>
-      ids.map((id) => ({
+      ids.map((id): Awaited<ReturnType<ScenarioApi["getRunConfigs"]>>[number] => ({
         id,
         name: id,
         version: 1,
@@ -299,7 +299,7 @@ describe("given a scenario declaring a secret parameter", () => {
           { name: "api_token", secret: true },
         ],
       })),
-  } as unknown as Partial<ScenarioApi>;
+  };
 
   describe("when a target carries an override naming that secret", () => {
     /** @scenario A target override naming a secret parameter is refused */

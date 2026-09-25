@@ -3,12 +3,10 @@
  * trace content needs. `TriggerSent` carries the `traceId` that fired,
  * but the mapped view must not, or a viewer who can't read traces gets one.
  */
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it } from "vitest";
 
-import {
-  PrismaTriggerFireHistoryRepository,
-  type TriggerFireHistoryDatabase,
-} from "../prisma.trigger-fire-history.repository.ts";
+import { PrismaTriggerFireHistoryRepository } from "../prisma.trigger-fire-history.repository.ts";
 
 const STORED_ROW = {
   id: "fire_1",
@@ -42,9 +40,7 @@ describe("PrismaTriggerFireHistoryRepository", () => {
       /** @scenario "History never exposes trace content" */
       it("returns what fired and when, and never the trace id", async () => {
         const { database } = databaseHolding([STORED_ROW]);
-        const repository = PrismaTriggerFireHistoryRepository.create(
-          database as unknown as TriggerFireHistoryDatabase,
-        );
+        const repository = PrismaTriggerFireHistoryRepository.create(prismaDouble(database));
 
         const forProject = await repository.findAllRecentForProject({
           projectId: "project_1",
@@ -74,9 +70,7 @@ describe("PrismaTriggerFireHistoryRepository", () => {
       /** @scenario "History never exposes trace content" */
       it("scopes every read to the project asking", async () => {
         const { database, queries } = databaseHolding([STORED_ROW]);
-        const repository = PrismaTriggerFireHistoryRepository.create(
-          database as unknown as TriggerFireHistoryDatabase,
-        );
+        const repository = PrismaTriggerFireHistoryRepository.create(prismaDouble(database));
 
         await repository.findAllRecentForProject({ projectId: "project_1", limit: 10 });
 

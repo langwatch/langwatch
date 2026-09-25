@@ -9,8 +9,11 @@ import {
  */
 import { describe, expect, it, vi } from "vitest";
 
+import {
+  conversationDetail,
+  langyTurnDependencies,
+} from "../../__tests__/support/langy-turn-deps.ts";
 import { LangyFinalPartsService } from "../langy-final-parts.service.ts";
-import type { LangyTurnServiceDependencies } from "../langy-turn-shared.service.ts";
 import { LangyTurnStopService } from "../langy-turn-stop.service.ts";
 
 function makeStopDeps(
@@ -24,12 +27,14 @@ function makeStopDeps(
   } = {},
 ) {
   const finalizeTurn = vi.fn(async (_args: Record<string, unknown>) => ({ messageId: "a1" }));
-  const findByIdVisible = vi.fn(async () => ({
-    isOwn: over.isOwn ?? true,
-    currentTurnId: over.currentTurnId === undefined ? "turn-1" : over.currentTurnId,
-  }));
+  const findByIdVisible = vi.fn(async () =>
+    conversationDetail({
+      isOwn: over.isOwn ?? true,
+      currentTurnId: over.currentTurnId === undefined ? "turn-1" : over.currentTurnId,
+    }),
+  );
   const isTurnActor = vi.fn(async () => over.isTurnActor ?? true);
-  const markEnd = vi.fn(async () => {});
+  const markEnd = vi.fn(async () => ({ backstopped: false }));
   const cancel = vi.fn(async () => {
     if (over.cancelRejects) throw new Error("worker unreachable");
   });
@@ -41,16 +46,16 @@ function makeStopDeps(
     lastId: "9",
   }));
 
-  const deps = {
-    conversations: { finalizeTurn, findByIdVisible } as unknown,
-    credentials: {} as unknown,
-    worker: { cancel } as unknown,
-    tokenBuffer: over.noBuffer ? null : ({ readTail, markEnd } as unknown),
-    accessStore: { isTurnActor } as unknown,
+  const deps = langyTurnDependencies({
+    conversations: { finalizeTurn, findByIdVisible },
+    credentials: {},
+    worker: { cancel },
+    tokenBuffer: over.noBuffer ? null : { readTail, markEnd },
+    accessStore: { isTurnActor },
     handoffStore: null,
     messages: null,
     finalParts: LangyFinalPartsService.create(),
-  } as unknown as LangyTurnServiceDependencies;
+  });
 
   return {
     deps,

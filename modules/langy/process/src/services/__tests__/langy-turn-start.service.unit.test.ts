@@ -12,14 +12,16 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  LangyTurnService,
-  type LangyTurnServiceDeps,
-  type StartConversationTurnInput,
-} from "../langy-turn.service.ts";
+  langyTurnDeps,
+  type LangyTurnDepsOverrides,
+  workerCredentials,
+  conversationDetail,
+} from "../../__tests__/support/langy-turn-deps.ts";
+import { LangyTurnService, type StartConversationTurnInput } from "../langy-turn.service.ts";
 
-function makeFixture(over: Partial<LangyTurnServiceDeps> = {}) {
+function makeFixture(over: LangyTurnDepsOverrides = {}) {
   const ensureConversation = vi.fn(async () => ({ id: "conversation-1", isNew: false }));
-  const acceptTurn = vi.fn(async () => undefined);
+  const acceptTurn = vi.fn(async () => ({ turnId: "turn-1" }));
   const dispatch = vi.fn(async () => "accepted" as const);
   const claim = vi.fn(
     async ({ conversationId, turnId }: { conversationId: string; turnId: string }) => ({
@@ -33,17 +35,17 @@ function makeFixture(over: Partial<LangyTurnServiceDeps> = {}) {
   const abort = vi.fn(async () => undefined);
   const mint = vi.fn(async () => ({ token: "session-key", apiKeyId: "key-1" }));
 
-  const deps = {
+  const deps = langyTurnDeps({
     conversations: {
       ensureConversation,
-      findByIdVisible: vi.fn(async () => ({ status: "idle" })),
+      findByIdVisible: vi.fn(async () => conversationDetail({ status: "idle" })),
       findPendingHandoff: vi.fn(async () => null),
       findRunToken: vi.fn(async () => "run-token"),
       acceptTurn,
-      finalizeTurn: vi.fn(async () => undefined),
+      finalizeTurn: vi.fn(async () => ({ messageId: "message-1" })),
     },
     credentials: {
-      getOrProvision: vi.fn(async () => ({ organizationId: "organization-1" })),
+      getOrProvision: vi.fn(async () => workerCredentials({ organizationId: "organization-1" })),
       findEgressAllowlist: vi.fn(async () => null),
       resolveMirrorTier: vi.fn(async () => "content" as const),
       findModelsAllowed: vi.fn(async () => null),
@@ -74,7 +76,7 @@ function makeFixture(over: Partial<LangyTurnServiceDeps> = {}) {
     handoffStore: { stash: vi.fn(async () => undefined) },
     messages: { findAllByConversation: vi.fn(async () => []) },
     ...over,
-  } as unknown as LangyTurnServiceDeps;
+  });
 
   return { deps, ensureConversation, acceptTurn, dispatch, claim, commit, abort, mint };
 }
@@ -155,8 +157,12 @@ describe("LangyTurnStartService", () => {
   describe("given no default model is configured", () => {
     it("fails before admission when no default model is configured", async () => {
       const fixture = makeFixture({
-        models: { resolve: vi.fn(async () => ({ modelId: null })) },
-      } as unknown as Partial<LangyTurnServiceDeps>);
+        models: {
+          resolve: vi.fn(async () => {
+            throw new LangyModelNotConfiguredError();
+          }),
+        },
+      });
 
       await expect(
         LangyTurnService.create(fixture.deps).startConversationTurn(input()),

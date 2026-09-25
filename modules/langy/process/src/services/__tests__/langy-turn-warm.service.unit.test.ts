@@ -9,17 +9,19 @@ import {
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import {
+  langyTurnDependencies,
+  type LangyTurnDepsOverrides,
+  workerCredentials,
+} from "../../__tests__/support/langy-turn-deps.ts";
 import type { LangyWorkerProbeInput, LangyWorkerWarmInput } from "../../app/langy.members.ts";
+import { LangyFinalPartsService } from "../langy-final-parts.service.ts";
 import { LangySessionKeyScopeError } from "../langy-session-key-scope.error.ts";
-import type {
-  LangyTurnServiceDependencies,
-  LangyTurnServiceDeps,
-} from "../langy-turn-shared.service.ts";
 import { LangyTurnWarmService } from "../langy-turn-warm.service.ts";
 
 const SESSION = { user: { id: "user-1" } };
 
-function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
+function makeDeps(over: LangyTurnDepsOverrides = {}) {
   const ensureConversation = vi.fn(async () => ({
     id: "conv-warm",
     isNew: true,
@@ -38,25 +40,25 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
     allowed: true,
     resetAt: 0,
   }));
-  const getOrProvision = vi.fn(async (): Promise<Record<string, unknown>> => ({
-    organizationId: "org-1",
-    llmVirtualKey: "vk",
-    langwatchEndpoint: "http://lw",
-    gatewayBaseUrl: "http://gw",
-  }));
+  const getOrProvision = vi.fn(async () =>
+    workerCredentials({
+      organizationId: "org-1",
+      llmVirtualKey: "vk",
+      langwatchEndpoint: "http://lw",
+      gatewayBaseUrl: "http://gw",
+    }),
+  );
   const getModelsAllowed = vi.fn(async (): Promise<string[] | null> => null);
 
-  const conversations = {
-    ensureConversation,
-  } as unknown as LangyTurnServiceDeps["conversations"];
+  const conversations = { ensureConversation };
   const credentials = {
     getOrProvision,
     findEgressAllowlist: vi.fn(async () => null),
     resolveMirrorTier: vi.fn(async () => "content" as const),
     findModelsAllowed: getModelsAllowed,
-  } as unknown as LangyTurnServiceDeps["credentials"];
+  };
 
-  const deps = {
+  const deps = langyTurnDependencies({
     conversations,
     credentials,
     models: { resolve: vi.fn(async () => ({ modelId: "openai/gpt-5-mini" })) },
@@ -69,12 +71,13 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
     },
     perDayPrCap: 5,
     sessionKeys: { mint: mintSessionKey, revoke: vi.fn(async () => {}) },
-    admission: {} as LangyTurnServiceDeps["admission"],
+    admission: {},
     accessStore: null,
     handoffStore: null,
     messages: null,
     ...over,
-  } as LangyTurnServiceDependencies;
+    finalParts: LangyFinalPartsService.create(),
+  });
 
   return {
     deps,
@@ -250,7 +253,7 @@ describe("LangyTurnWarmService.warmConversationWorker", () => {
             throw new LangyModelNotConfiguredError();
           }),
         },
-      } as unknown as Partial<LangyTurnServiceDeps>);
+      });
       const service = LangyTurnWarmService.create(deps);
 
       const result = await service.warmConversationWorker(warmInput());

@@ -7,35 +7,37 @@ import {
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { LangyWorker } from "../../app/langy.members.ts";
 import {
-  LangyTurnService,
-  type LangyTurnServiceDeps,
-  type StartConversationTurnInput,
-} from "../langy-turn.service.ts";
+  langyTurnDeps,
+  type LangyTurnDepsOverrides,
+  workerCredentials,
+  conversationDetail,
+} from "../../__tests__/support/langy-turn-deps.ts";
+import type { LangyWorker } from "../../app/langy.members.ts";
+import { LangyTurnService, type StartConversationTurnInput } from "../langy-turn.service.ts";
 
 /**
  * Spec: specs/langy/langy-worker-prewarm.feature
  */
-function makeFixture(over: Partial<LangyTurnServiceDeps> = {}) {
-  const findByIdVisible = vi.fn(async () => ({
-    status: LANGY_CONVERSATION_STATUS.IDLE,
-  }));
+function makeFixture(over: LangyTurnDepsOverrides = {}) {
+  const findByIdVisible = vi.fn(async () =>
+    conversationDetail({ status: LANGY_CONVERSATION_STATUS.IDLE }),
+  );
   const findPendingHandoff = vi.fn(async () => null);
   const dispatch = vi.fn<LangyWorker["dispatch"]>(async () => "accepted");
-  const acceptTurn = vi.fn(async () => undefined);
+  const acceptTurn = vi.fn(async () => ({ turnId: "turn-1" }));
 
-  const deps = {
+  const deps = langyTurnDeps({
     conversations: {
       ensureConversation: vi.fn(async () => ({ id: "conversation-1", isNew: true })),
       findByIdVisible,
       findPendingHandoff,
       findRunToken: vi.fn(async () => "run-token"),
       acceptTurn,
-      finalizeTurn: vi.fn(async () => undefined),
+      finalizeTurn: vi.fn(async () => ({ messageId: "message-1" })),
     },
     credentials: {
-      getOrProvision: vi.fn(async () => ({ organizationId: "organization-1" })),
+      getOrProvision: vi.fn(async () => workerCredentials({ organizationId: "organization-1" })),
       findEgressAllowlist: vi.fn(async () => null),
       resolveMirrorTier: vi.fn(async () => "content" as const),
       findModelsAllowed: vi.fn(async () => null),
@@ -79,7 +81,7 @@ function makeFixture(over: Partial<LangyTurnServiceDeps> = {}) {
     handoffStore: { stash: vi.fn(async () => undefined) },
     messages: { findAllByConversation: vi.fn(async () => []) },
     ...over,
-  } as unknown as LangyTurnServiceDeps;
+  });
 
   return { deps, findByIdVisible, findPendingHandoff, dispatch, acceptTurn };
 }
@@ -268,11 +270,13 @@ describe("LangyTurnPreparationService golden path", () => {
     const dispatch = vi.fn(async () => "accepted" as const);
     const fixture = makeFixture({
       credentials: {
-        getOrProvision: vi.fn(async () => ({
-          organizationId: "organization-1",
-          githubToken: "gh-token",
-          githubLogin: "octocat",
-        })),
+        getOrProvision: vi.fn(async () =>
+          workerCredentials({
+            organizationId: "organization-1",
+            githubToken: "gh-token",
+            githubLogin: "octocat",
+          }),
+        ),
         findEgressAllowlist: vi.fn(async () => null),
         resolveMirrorTier: vi.fn(async () => "content" as const),
         findModelsAllowed: vi.fn(async () => null),
@@ -288,7 +292,7 @@ describe("LangyTurnPreparationService golden path", () => {
         cancel: vi.fn(async () => undefined),
         warm: vi.fn(async () => undefined),
       },
-    } as unknown as Partial<LangyTurnServiceDeps>);
+    });
 
     await LangyTurnService.create(fixture.deps).startConversationTurn(input);
 
@@ -305,11 +309,13 @@ describe("LangyTurnPreparationService golden path", () => {
     const fixture = makeFixture({
       conversations: {
         ensureConversation: vi.fn(async () => ({ id: "conversation-1", isNew: false })),
-        findByIdVisible: vi.fn(async () => ({ status: LANGY_CONVERSATION_STATUS.RUNNING })),
+        findByIdVisible: vi.fn(async () =>
+          conversationDetail({ status: LANGY_CONVERSATION_STATUS.RUNNING }),
+        ),
         findPendingHandoff: vi.fn(async () => null),
         findRunToken: vi.fn(async () => "run-token"),
-        acceptTurn: vi.fn(async () => undefined),
-        finalizeTurn: vi.fn(async () => undefined),
+        acceptTurn: vi.fn(async () => ({ turnId: "turn-1" })),
+        finalizeTurn: vi.fn(async () => ({ messageId: "message-1" })),
       },
       admission: {
         claim: vi.fn(async () => ({
@@ -322,7 +328,7 @@ describe("LangyTurnPreparationService golden path", () => {
         abort,
         release: vi.fn(async () => undefined),
       },
-    } as unknown as Partial<LangyTurnServiceDeps>);
+    });
 
     await expect(
       LangyTurnService.create(fixture.deps).startConversationTurn(input),
@@ -337,7 +343,7 @@ describe("LangyTurnPreparationService golden path", () => {
     const reserve = vi.fn(async () => ({ reserved: false, allowed: true, resetAt: 0 }));
     const fixture = makeFixture({
       credentials: {
-        getOrProvision: vi.fn(async () => ({ organizationId: "organization-1" })),
+        getOrProvision: vi.fn(async () => workerCredentials({ organizationId: "organization-1" })),
         findEgressAllowlist: vi.fn(async () => null),
         resolveMirrorTier: vi.fn(async () => "content" as const),
         findModelsAllowed: vi.fn(async () => ["openai/gpt-5-mini"]),
@@ -358,7 +364,7 @@ describe("LangyTurnPreparationService golden path", () => {
         abort,
         release: vi.fn(async () => undefined),
       },
-    } as unknown as Partial<LangyTurnServiceDeps>);
+    });
 
     await expect(
       LangyTurnService.create(fixture.deps).startConversationTurn({
@@ -375,12 +381,12 @@ describe("LangyTurnPreparationService golden path", () => {
     const fixture = makeFixture({
       models: { resolve: vi.fn(async () => ({ modelId: "anthropic/claude-opus-4-8" })) },
       credentials: {
-        getOrProvision: vi.fn(async () => ({ organizationId: "organization-1" })),
+        getOrProvision: vi.fn(async () => workerCredentials({ organizationId: "organization-1" })),
         findEgressAllowlist: vi.fn(async () => null),
         resolveMirrorTier: vi.fn(async () => "content" as const),
         findModelsAllowed: vi.fn(async () => ["openai/gpt-5-mini"]),
       },
-    } as unknown as Partial<LangyTurnServiceDeps>);
+    });
 
     await expect(
       LangyTurnService.create(fixture.deps).startConversationTurn(input),
@@ -398,21 +404,25 @@ describe("LangyTurnPreparationService golden path", () => {
     });
     const fixture = makeFixture({
       credentials: {
-        getOrProvision: vi.fn(async () => ({
-          organizationId: "organization-1",
-          githubToken: "gh-token",
-        })),
+        getOrProvision: vi.fn(async () =>
+          workerCredentials({
+            organizationId: "organization-1",
+            githubToken: "gh-token",
+          }),
+        ),
         findEgressAllowlist: vi.fn(async () => null),
         resolveMirrorTier: vi.fn(async () => "content" as const),
         findModelsAllowed: vi.fn(async () => null),
       },
       conversations: {
         ensureConversation: vi.fn(async () => ({ id: "conversation-1", isNew: false })),
-        findByIdVisible: vi.fn(async () => ({ status: LANGY_CONVERSATION_STATUS.IDLE })),
+        findByIdVisible: vi.fn(async () =>
+          conversationDetail({ status: LANGY_CONVERSATION_STATUS.IDLE }),
+        ),
         findPendingHandoff: vi.fn(async () => null),
         findRunToken: vi.fn(async () => "run-token"),
         acceptTurn,
-        finalizeTurn: vi.fn(async () => undefined),
+        finalizeTurn: vi.fn(async () => ({ messageId: "message-1" })),
       },
       sessionKeys: {
         mint: vi.fn(async () => ({ token: "session-key", apiKeyId: "key-1" })),
@@ -434,7 +444,7 @@ describe("LangyTurnPreparationService golden path", () => {
         abort,
         release: vi.fn(async () => undefined),
       },
-    } as unknown as Partial<LangyTurnServiceDeps>);
+    });
 
     await expect(
       LangyTurnService.create(fixture.deps).startConversationTurn(input),
@@ -504,17 +514,19 @@ describe("LangyTurnPreparationService golden path", () => {
   });
 
   it("consumes a pending handoff in the same acceptance command", async () => {
-    const acceptTurn = vi.fn(async () => undefined);
+    const acceptTurn = vi.fn(async () => ({ turnId: "turn-1" }));
     const fixture = makeFixture({
       conversations: {
         ensureConversation: vi.fn(async () => ({ id: "conversation-1", isNew: false })),
-        findByIdVisible: vi.fn(async () => ({ status: LANGY_CONVERSATION_STATUS.IDLE })),
+        findByIdVisible: vi.fn(async () =>
+          conversationDetail({ status: LANGY_CONVERSATION_STATUS.IDLE }),
+        ),
         findPendingHandoff: vi.fn(async () => ({ turnId: "old-turn", token: "checkpoint" })),
         findRunToken: vi.fn(async () => "run-token"),
         acceptTurn,
-        finalizeTurn: vi.fn(async () => undefined),
+        finalizeTurn: vi.fn(async () => ({ messageId: "message-1" })),
       },
-    } as unknown as Partial<LangyTurnServiceDeps>);
+    });
 
     await LangyTurnService.create(fixture.deps).startConversationTurn(input);
 
@@ -537,15 +549,17 @@ describe("when the conversation's runToken cannot be resolved", () => {
     const fixture = makeFixture({
       conversations: {
         ensureConversation: vi.fn(async () => ({ id: "conversation-1", isNew: false })),
-        findByIdVisible: vi.fn(async () => ({ status: LANGY_CONVERSATION_STATUS.IDLE })),
+        findByIdVisible: vi.fn(async () =>
+          conversationDetail({ status: LANGY_CONVERSATION_STATUS.IDLE }),
+        ),
         findPendingHandoff: vi.fn(async () => null),
         findRunToken: vi.fn(async () => {
           throw new Error("postgres unavailable");
         }),
-        acceptTurn: vi.fn(async () => undefined),
-        finalizeTurn: vi.fn(async () => undefined),
+        acceptTurn: vi.fn(async () => ({ turnId: "turn-1" })),
+        finalizeTurn: vi.fn(async () => ({ messageId: "message-1" })),
       },
-    } as unknown as Partial<LangyTurnServiceDeps>);
+    });
 
     await expect(
       LangyTurnService.create(fixture.deps).startConversationTurn(input),
@@ -559,13 +573,15 @@ describe("when the conversation's runToken cannot be resolved", () => {
     const fixture = makeFixture({
       conversations: {
         ensureConversation: vi.fn(async () => ({ id: "conversation-1", isNew: false })),
-        findByIdVisible: vi.fn(async () => ({ status: LANGY_CONVERSATION_STATUS.IDLE })),
+        findByIdVisible: vi.fn(async () =>
+          conversationDetail({ status: LANGY_CONVERSATION_STATUS.IDLE }),
+        ),
         findPendingHandoff: vi.fn(async () => null),
         findRunToken: vi.fn(async (): Promise<string | null> => null),
-        acceptTurn: vi.fn(async () => undefined),
-        finalizeTurn: vi.fn(async () => undefined),
+        acceptTurn: vi.fn(async () => ({ turnId: "turn-1" })),
+        finalizeTurn: vi.fn(async () => ({ messageId: "message-1" })),
       },
-    } as unknown as Partial<LangyTurnServiceDeps>);
+    });
 
     await expect(
       LangyTurnService.create(fixture.deps).startConversationTurn(input),
@@ -579,13 +595,15 @@ describe("when the conversation's runToken cannot be resolved", () => {
     const fixture = makeFixture({
       conversations: {
         ensureConversation: vi.fn(async () => ({ id: "conversation-1", isNew: false })),
-        findByIdVisible: vi.fn(async () => ({ status: LANGY_CONVERSATION_STATUS.IDLE })),
+        findByIdVisible: vi.fn(async () =>
+          conversationDetail({ status: LANGY_CONVERSATION_STATUS.IDLE }),
+        ),
         findPendingHandoff: vi.fn(async () => null),
         findRunToken: vi.fn(async (): Promise<string | null> => ""),
-        acceptTurn: vi.fn(async () => undefined),
-        finalizeTurn: vi.fn(async () => undefined),
+        acceptTurn: vi.fn(async () => ({ turnId: "turn-1" })),
+        finalizeTurn: vi.fn(async () => ({ messageId: "message-1" })),
       },
-    } as unknown as Partial<LangyTurnServiceDeps>);
+    });
 
     await expect(
       LangyTurnService.create(fixture.deps).startConversationTurn(input),

@@ -6,27 +6,28 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  LangyTurnService,
-  type LangyTurnServiceDeps,
-  type StartConversationTurnInput,
-} from "../langy-turn.service.ts";
+  langyTurnDeps,
+  type LangyTurnDepsOverrides,
+  workerCredentials,
+} from "../../__tests__/support/langy-turn-deps.ts";
+import { LangyTurnService, type StartConversationTurnInput } from "../langy-turn.service.ts";
 
-function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
+function makeDeps(over: LangyTurnDepsOverrides = {}) {
   const dispatch = vi.fn(async () => "accepted" as const);
   const resolve = vi.fn(async () => ({ modelId: "openai/gpt-5-mini" }));
   const findModelsAllowed = vi.fn(async (): Promise<string[] | null> => null);
 
-  const deps = {
+  const deps = langyTurnDeps({
     conversations: {
       ensureConversation: vi.fn(async () => ({ id: "conv-1", isNew: false })),
       findByIdVisible: vi.fn(async () => null),
       findPendingHandoff: vi.fn(async () => null),
       findRunToken: vi.fn(async () => "run-token"),
-      acceptTurn: vi.fn(async () => undefined),
-      finalizeTurn: vi.fn(async () => undefined),
+      acceptTurn: vi.fn(async () => ({ turnId: "turn-1" })),
+      finalizeTurn: vi.fn(async () => ({ messageId: "message-1" })),
     },
     credentials: {
-      getOrProvision: vi.fn(async () => ({ organizationId: "org-1" })),
+      getOrProvision: vi.fn(async () => workerCredentials({ organizationId: "org-1" })),
       findEgressAllowlist: vi.fn(async () => null),
       resolveMirrorTier: vi.fn(async () => "content" as const),
       findModelsAllowed,
@@ -70,7 +71,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
     handoffStore: { stash: vi.fn(async () => undefined) },
     messages: { findAllByConversation: vi.fn(async () => []) },
     ...over,
-  } as unknown as LangyTurnServiceDeps;
+  });
 
   return { deps, mocks: { dispatch, resolve, findModelsAllowed } };
 }

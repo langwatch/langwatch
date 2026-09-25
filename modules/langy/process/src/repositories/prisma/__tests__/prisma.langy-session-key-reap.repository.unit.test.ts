@@ -1,28 +1,19 @@
-import { Temporal, nowInstant, toDate } from "@langwatch/time";
 /** The cross-tenant sweep write and its load-bearing clauses: name (off customer keys),
  * revokedAt: null (no rewrites), and expiresAt not null (keys without expiry). */
+import type { Prisma } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
+import { Temporal, nowInstant, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import type { LangyDatabase } from "../langy-database.mapper.ts";
-import {
-  PrismaLangySessionKeyReapRepository,
-  type PrismaLangySessionKeyReapDatabase,
-} from "../prisma.langy-session-key-reap.repository.ts";
+import { PrismaLangySessionKeyReapRepository } from "../prisma.langy-session-key-reap.repository.ts";
 import { PrismaLangySessionKeyRepository } from "../prisma.langy-session-key.repository.ts";
 
-type SweepUpdate = {
-  where: { name: string; revokedAt: Date | null; expiresAt: { not: null; lte: Date } };
-  data: { revokedAt: Date };
-};
-
 function updateSpy(count = 0) {
-  return vi.fn(async (_update: SweepUpdate) => ({ count }));
+  return vi.fn(async (_update: Prisma.ApiKeyUpdateManyArgs) => ({ count }));
 }
 
 function repositoryWith(updateMany: ReturnType<typeof updateSpy>) {
-  return PrismaLangySessionKeyReapRepository.create({
-    apiKey: { updateMany },
-  } as unknown as PrismaLangySessionKeyReapDatabase);
+  return PrismaLangySessionKeyReapRepository.create(prismaDouble({ apiKey: { updateMany } }));
 }
 
 describe("PrismaLangySessionKeyReapRepository", () => {
@@ -54,7 +45,7 @@ describe("PrismaLangySessionKeyReapRepository", () => {
           now: nowInstant(),
         });
 
-        expect(updateMany.mock.calls[0]![0].where.expiresAt).toMatchObject({ not: null });
+        expect(updateMany.mock.calls[0]![0].where?.expiresAt).toMatchObject({ not: null });
       });
 
       /** @scenario "The session-key sweep leaves live and already-revoked keys alone" */
@@ -66,7 +57,7 @@ describe("PrismaLangySessionKeyReapRepository", () => {
           now: nowInstant(),
         });
 
-        expect(updateMany.mock.calls[0]![0].where.revokedAt).toBeNull();
+        expect(updateMany.mock.calls[0]![0].where?.revokedAt).toBeNull();
       });
 
       /** @scenario "The session-key sweep reports how many keys it retired" */
@@ -89,7 +80,7 @@ describe("PrismaLangySessionKeyReapRepository", () => {
       it("issues the identical predicate the narrow repository issues", async () => {
         const updateMany = updateSpy();
         const now = new Date("2026-02-02T00:00:00.000Z");
-        const database = { apiKey: { updateMany } } as unknown as LangyDatabase;
+        const database = prismaDouble({ apiKey: { updateMany } });
 
         await PrismaLangySessionKeyRepository.create(database).reapExpired(now, "Langy session");
 

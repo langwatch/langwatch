@@ -5,29 +5,31 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import type { LangyWorkerProbeInput } from "../../app/langy.members.ts";
 import {
-  LangyTurnService,
-  type LangyTurnServiceDeps,
-  type StartConversationTurnInput,
-} from "../langy-turn.service.ts";
+  langyTurnDeps,
+  type LangyTurnDepsOverrides,
+  workerCredentials,
+  conversationDetail,
+} from "../../__tests__/support/langy-turn-deps.ts";
+import type { LangyWorkerProbeInput } from "../../app/langy.members.ts";
+import { LangyTurnService, type StartConversationTurnInput } from "../langy-turn.service.ts";
 
-function makeFixture(over: Partial<LangyTurnServiceDeps> = {}) {
+function makeFixture(over: LangyTurnDepsOverrides = {}) {
   const probe = vi.fn<(input: LangyWorkerProbeInput) => Promise<boolean>>(async () => false);
   const dispatch = vi.fn(async () => "accepted" as const);
   const stash = vi.fn(async () => undefined);
 
-  const deps = {
+  const deps = langyTurnDeps({
     conversations: {
       ensureConversation: vi.fn(async () => ({ id: "conversation-1", isNew: false })),
-      findByIdVisible: vi.fn(async () => ({ status: "idle" })),
+      findByIdVisible: vi.fn(async () => conversationDetail({ status: "idle" })),
       findPendingHandoff: vi.fn(async () => null),
       findRunToken: vi.fn(async () => "run-token"),
-      acceptTurn: vi.fn(async () => undefined),
-      finalizeTurn: vi.fn(async () => undefined),
+      acceptTurn: vi.fn(async () => ({ turnId: "turn-1" })),
+      finalizeTurn: vi.fn(async () => ({ messageId: "message-1" })),
     },
     credentials: {
-      getOrProvision: vi.fn(async () => ({ organizationId: "organization-1" })),
+      getOrProvision: vi.fn(async () => workerCredentials({ organizationId: "organization-1" })),
       findEgressAllowlist: vi.fn(async () => null),
       resolveMirrorTier: vi.fn(async () => "content" as const),
       findModelsAllowed: vi.fn(async () => null),
@@ -71,7 +73,7 @@ function makeFixture(over: Partial<LangyTurnServiceDeps> = {}) {
     handoffStore: { stash },
     messages: { findAllByConversation: vi.fn(async () => []) },
     ...over,
-  } as unknown as LangyTurnServiceDeps;
+  });
 
   return { deps, probe, dispatch, stash };
 }

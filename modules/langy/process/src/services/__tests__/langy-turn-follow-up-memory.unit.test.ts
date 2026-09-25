@@ -1,20 +1,21 @@
+import { nowInstant } from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  langyTurnDeps,
+  type LangyTurnDepsOverrides,
+  workerCredentials,
+} from "../../__tests__/support/langy-turn-deps.ts";
 /**
  * THE "run it" BUG. The agent's memory of a conversation lives only inside its live worker
  * process, and that process is reaped after ten idle minutes, killed when the turn's
  * capabilities change, and gone whenever the fleet rolls.
  */
-import type { LangyMessageRow } from "@langwatch/langy-contract";
-import { nowInstant } from "@langwatch/time";
-import { describe, expect, it, vi } from "vitest";
-
+import type { LangyMessageRow } from "../../repositories/langy-message.repository.ts";
 import { LANGY_REFERENT_POLICY } from "../langy-conversation-memory.service.ts";
-import {
-  LangyTurnService,
-  type LangyTurnServiceDeps,
-  type StartConversationTurnInput,
-} from "../langy-turn.service.ts";
+import { LangyTurnService, type StartConversationTurnInput } from "../langy-turn.service.ts";
 
-function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
+function makeDeps(over: LangyTurnDepsOverrides = {}) {
   const dispatch = vi.fn(async () => "accepted" as const);
   const stash = vi.fn<(input: { system: string; historySeed?: string }) => Promise<undefined>>(
     async () => undefined,
@@ -22,17 +23,17 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
   const findAllByConversation = vi.fn(async (): Promise<LangyMessageRow[]> => []);
   const probe = vi.fn(async () => false);
 
-  const deps = {
+  const deps = langyTurnDeps({
     conversations: {
       ensureConversation: vi.fn(async () => ({ id: "conv-1", isNew: false })),
       findByIdVisible: vi.fn(async () => null),
       findPendingHandoff: vi.fn(async () => null),
       findRunToken: vi.fn(async () => "run-token"),
-      acceptTurn: vi.fn(async () => undefined),
-      finalizeTurn: vi.fn(async () => undefined),
+      acceptTurn: vi.fn(async () => ({ turnId: "turn-1" })),
+      finalizeTurn: vi.fn(async () => ({ messageId: "message-1" })),
     },
     credentials: {
-      getOrProvision: vi.fn(async () => ({ organizationId: "org-1" })),
+      getOrProvision: vi.fn(async () => workerCredentials({ organizationId: "org-1" })),
       findEgressAllowlist: vi.fn(async () => null),
       resolveMirrorTier: vi.fn(async () => "content" as const),
       findModelsAllowed: vi.fn(async () => null),
@@ -73,7 +74,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
     handoffStore: { stash },
     messages: { findAllByConversation },
     ...over,
-  } as unknown as LangyTurnServiceDeps;
+  });
 
   return { deps, mocks: { dispatch, stash, findAllByConversation, probe } };
 }
@@ -254,9 +255,9 @@ describe("LangyTurnService.startConversationTurn conversation memory", () => {
         findByIdVisible: vi.fn(async () => null),
         findPendingHandoff: vi.fn(async () => null),
         findRunToken: vi.fn(async () => "run-token"),
-        acceptTurn: vi.fn(async () => undefined),
-        finalizeTurn: vi.fn(async () => undefined),
-      } as unknown as LangyTurnServiceDeps["conversations"],
+        acceptTurn: vi.fn(async () => ({ turnId: "turn-1" })),
+        finalizeTurn: vi.fn(async () => ({ messageId: "message-1" })),
+      },
     });
 
     await LangyTurnService.create(deps).startConversationTurn(input());

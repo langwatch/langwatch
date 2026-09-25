@@ -5,6 +5,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * store: the scope per procedure, the plan gate, and the secret-once contract.
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { WebhookEndpointsNotEntitledError } from "@langwatch/webhook-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,10 +16,7 @@ import {
   type WebhookId,
   type WebhookSecret,
 } from "../../app/webhook.app.ts";
-import {
-  PrismaWebhookEndpointRepository,
-  type WebhookEndpointDeps,
-} from "../../repositories/prisma/prisma.webhook-endpoint.repository.ts";
+import { PrismaWebhookEndpointRepository } from "../../repositories/prisma/prisma.webhook-endpoint.repository.ts";
 import { webhookEndpointTrpcTransport } from "../webhook-endpoint.trpc.ts";
 import {
   webhookEndpointTrpcTestMembers,
@@ -86,7 +84,7 @@ function buildMockPrisma() {
 function mount(options: { prisma?: ReturnType<typeof buildMockPrisma>; denied?: string[] } = {}) {
   const prisma = options.prisma ?? buildMockPrisma();
   const endpoints = PrismaWebhookEndpointRepository.create({
-    prisma: prisma as unknown as WebhookEndpointDeps["prisma"],
+    prisma: prismaDouble(prisma),
     ids: new TestId(),
     secrets: new TestSecret(),
   });

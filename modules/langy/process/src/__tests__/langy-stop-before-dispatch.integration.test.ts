@@ -3,18 +3,17 @@
  * anyway. Uses real Redis (marker+handoff two keys one lifetime). See
  * specs/langy/langy-stop-and-resume.feature.
  */
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { Redis } from "ioredis";
 import IORedis from "ioredis";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
+import type { LangyWorker } from "../app/langy.members.ts";
 import type { LangyTurnHandoff } from "../repositories/langy-live-turn.repository.ts";
 import { RedisLangyEffectRepository } from "../repositories/redis/redis.langy-effect.repository.ts";
-import {
-  type LangyHandoffRedis,
-  LangyTurnHandoffRedisRepository,
-} from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
-import type { LangyTurnServiceDeps } from "../services/langy-turn.service.ts";
+import { LangyTurnHandoffRedisRepository } from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
 import { LangyTurnService } from "../services/langy-turn.service.ts";
+import { conversationDetail, langyTurnDeps } from "./support/langy-turn-deps.ts";
 import { testRedisUrl } from "./support/test-redis-url.ts";
 
 /** Native Redis, the way every other datastore suite in this repo asks for one. */
@@ -60,34 +59,27 @@ function makeStopDeps() {
     finalizeTurn,
     cancel,
     deps: {
-      conversations: {
-        finalizeTurn,
-        findByIdVisible: vi.fn(async () => ({
-          isOwn: true,
-          currentTurnId: IDS.turnId,
-        })),
-      } as unknown as LangyTurnServiceDeps["conversations"],
-      credentials: {} as unknown as LangyTurnServiceDeps["credentials"],
-      resolveModel: vi.fn(),
-      // No worker is running the turn yet, which is the whole point: the cancel
-      // reaches the manager and finds nothing to abort.
-      worker: { cancel } as unknown as LangyTurnServiceDeps["worker"],
-      tokenBuffer: {
-        readTail: vi.fn(async () => ({ reads: [], lastId: "0" })),
-        markEnd: vi.fn(async () => {}),
-      } as unknown as LangyTurnServiceDeps["tokenBuffer"],
-      reservePermit: vi.fn(),
-      releasePermit: vi.fn(),
-      perDayPrCap: 0,
-      mintSessionKey: vi.fn(),
-      revokeSessionKey: vi.fn(),
-      admission: {} as unknown as LangyTurnServiceDeps["admission"],
-      accessStore: {
-        isTurnActor: vi.fn(async () => true),
-      } as unknown as LangyTurnServiceDeps["accessStore"],
+      ...langyTurnDeps({
+        conversations: {
+          finalizeTurn,
+          findByIdVisible: vi.fn(async () =>
+            conversationDetail({ isOwn: true, currentTurnId: IDS.turnId }),
+          ),
+        },
+        credentials: {},
+        // No worker is running the turn yet, which is the whole point: the cancel
+        // reaches the manager and finds nothing to abort.
+        worker: { cancel },
+        tokenBuffer: {
+          readTail: vi.fn(async () => ({ reads: [], lastId: "0" })),
+          markEnd: vi.fn(async () => ({ backstopped: false })),
+        },
+        admission: {},
+        accessStore: { isTurnActor: vi.fn(async () => true) },
+        messages: null,
+      }),
       handoffStore,
-      messages: null,
-    } as unknown as LangyTurnServiceDeps,
+    },
   };
 }
 
@@ -95,21 +87,21 @@ function makeDispatchPorts() {
   const dispatch = vi.fn(async () => "accepted" as const);
   const ports = RedisLangyEffectRepository.create({
     handoffStore,
-    worker: { dispatch },
+    worker: createApiFixture<LangyWorker>({ dispatch }, "worker"),
     mintSessionKey: vi.fn(),
     revokeSessionKey: vi.fn(),
     titleGenerator: vi.fn(),
     saveTitle: vi.fn(),
     failTurn: { failTurn: vi.fn() },
     markError: vi.fn(),
-  } as unknown as Parameters<typeof RedisLangyEffectRepository.create>[0]);
+  });
   return { ports, dispatch };
 }
 
 beforeAll(() => {
-  redis = new IORedis(REDIS_URL!) as unknown as Redis;
+  redis = new IORedis(REDIS_URL!);
   handoffStore = LangyTurnHandoffRedisRepository.create({
-    redis: redis as unknown as LangyHandoffRedis,
+    redis,
   });
 });
 
