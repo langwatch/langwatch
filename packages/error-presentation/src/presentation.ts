@@ -2726,6 +2726,10 @@ const presentations = {
     describe: () =>
       "Sign in with your authenticator app and generate a new set, or ask an administrator to reset two-step verification for you.",
   },
+  identity_mfa_password_invalid: {
+    title: "That password didn't match",
+    describe: () => "Enter the password you sign in to LangWatch with, then try again.",
+  },
   identity_mfa_required_by_organization: {
     title: "An organization you belong to requires two-step verification",
     describe: () =>

@@ -288,6 +288,7 @@ export const APP_ERROR_CODES = [
   "identity_mfa_enrollment_expired",
   "identity_mfa_enrollment_required",
   "identity_mfa_locked_out",
+  "identity_mfa_password_invalid",
   "identity_mfa_required_by_organization",
   "identity_passkey_ceremony_failed",
   "identity_passkey_not_recognized",

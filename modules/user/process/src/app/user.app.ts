@@ -9,10 +9,8 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import {
-  IdentityApi,
   IdentityVerificationExpiredError,
   describePasswordProblem,
-  type IdentityApi as IdentityApiContract,
   routesToOrganizationConnection,
 } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
@@ -143,7 +141,6 @@ interface UserAppDependencies {
     GovernanceRestApi,
     "personalUsageDashboard" | "personalBudgetOverview" | "cliBootstrap"
   >;
-  identity: IdentityApiContract;
   ops: OpsApi;
   organizations: OrganizationApi;
   projects: ProjectApi;
@@ -172,7 +169,6 @@ export class UserApp implements UserApi {
     auth: typeof AuthApi;
     authz: typeof AuthzApi;
     governance: typeof GovernanceRestApi;
-    identity: typeof IdentityApi;
     organizations: typeof OrganizationApi;
     ops: typeof OpsApi;
     projects: typeof ProjectApi;
@@ -180,7 +176,6 @@ export class UserApp implements UserApi {
     auth: AuthApi,
     authz: AuthzApi,
     governance: GovernanceRestApi,
-    identity: IdentityApi,
     organizations: OrganizationApi,
     ops: OpsApi,
     projects: ProjectApi,

@@ -15,6 +15,26 @@ import { z } from "zod";
  */
 export const callerEmailFact = defineTrpcFact("callerEmail", z.string().nullable());
 
+/**
+ * The headers this request arrived with, bound by auth's own install. The
+ * procedures that read it hand better-auth the caller's own cookie, nothing else.
+ */
+export const authRequestHeadersFact = defineTrpcFact(
+  "authRequestHeaders",
+  z
+    .record(z.string(), z.union([z.string(), z.array(z.string())]).optional())
+    .nullable()
+    .transform((record) => {
+      const headers = new Headers();
+      for (const [name, value] of Object.entries(record ?? {})) {
+        for (const one of typeof value === "string" ? [value] : (value ?? [])) {
+          headers.append(name, one);
+        }
+      }
+      return headers;
+    }),
+);
+
 /** An hour: the window every counter on this surface spends its budget over. */
 const HOUR_SECONDS = 60 * 60;
 
@@ -45,6 +65,11 @@ const FRESH_INVITE_REQUEST = publicRoute({
 
 const PROOF_HOLDER_ENROLLMENT = publicRoute({
   reason: "returns enrollment methods only to a visitor holding this address's proof",
+});
+
+const OWN_SESSION_COOKIE = publicRoute({
+  reason:
+    "classifies the caller's OWN session cookie so an expired session can carry its address to the sign-in screen; takes no input, names nobody the caller is not already holding a token for, and mints nothing",
 });
 
 const OWN_ADDRESS_STATE =
@@ -184,6 +209,12 @@ export const authTrpcTransport = defineTrpcRouter(AuthApi, authTrpc)
 
     return { sent: true as const };
   })
+
+  /** Why a signed-out visitor is here: only an expired session of theirs names its address. */
+  .procedure("priorSession")
+  .withFacts(authRequestHeadersFact)
+  .withAccess(OWN_SESSION_COOKIE)
+  .handle(({ app }, headers) => app.getPriorSession({ headers }))
   .build();
 
 /**

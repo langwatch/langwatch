@@ -31,12 +31,14 @@ import {
   type AuthUsageCount,
   type AddressConfirmation,
   type SignUpEnrollment,
+  type PriorSession,
 } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { SsoApi } from "@langwatch/enterprise-sso-contract";
 import {
   configuredAuthProvider,
+  isNamedProviderMounted,
   resolveSignInProviders,
 } from "@langwatch/enterprise-sso-contract/sign-in-providers";
 import {
@@ -69,6 +71,7 @@ import { RedisAuthSessionCacheRepository } from "../repositories/redis/redis.aut
 import { keyedIdentifierHasher } from "../rules/sign-in-identifier-hash.rules.ts";
 import { resolveDialableIdentityProviderOrigins } from "../rules/trusted-origins.rules.ts";
 import { AddressConfirmationService } from "../services/address-confirmation.service.ts";
+import { AuthProviderService } from "../services/auth-provider.service.ts";
 import { BrowserSessionService } from "../services/browser-session.service.ts";
 import {
   CliDeviceFlowService,
@@ -84,6 +87,7 @@ import {
   type LegacySsoAccessConnections,
   type LegacySsoAccessMemberships,
 } from "../services/legacy-sso-access.service.ts";
+import { PriorSessionService } from "../services/prior-session.service.ts";
 import {
   ProviderAccountLinkService,
   type ProviderAccountRow,
@@ -107,6 +111,10 @@ import {
   type SignUpVerificationMailer,
 } from "../services/signup-verification.service.ts";
 import type { SsoIssuerDirectory } from "../services/sso-registered-issuers.service.ts";
+import {
+  TwoStepVerificationService,
+  type TwoStepProtocol,
+} from "../services/two-step-verification.service.ts";
 import type { AuthRestFederatedLogout, AuthRestSessionAnswer } from "../transport/auth.rest.ts";
 import { buildBetterAuth, type BetterAuthDeploymentIdentity } from "./auth-composition.build.ts";
 import type { AuthDirectory } from "./auth.members.ts";
@@ -182,9 +190,6 @@ export type AuthInfrastructure = MembersRead<typeof AUTH_CLOSED_READS> &
     signUp: AuthSignUpCollaborators | null;
     /** The invitation reads, or nothing where this process composed none. */
     invites: AuthInviteDirectory | null;
-    /** This deployment's sign-in mode, ADR-027's single source of truth.
-     * `undefined` until the front-door wiring lane supplies it. */
-    authProvider: (() => Promise<string>) | undefined;
     /** Whether this is the hosted product: the process's own fact, supplied
      * as a member. The flag itself has a ruling of its own pending. */
     isSaas: boolean;
@@ -263,6 +268,12 @@ export class AuthApp implements AuthApiContract {
   readonly #signUpEnrollment: SignUpEnrollmentService;
   /** Whether the caller's own address is confirmed. */
   readonly #addressConfirmation: AddressConfirmationService;
+  /** Why a signed-out visitor is here, off their own cookie. */
+  readonly #priorSessions: PriorSessionService;
+  /** The session factors two-step verification reads, and turning it off. */
+  readonly #twoStep: TwoStepVerificationService;
+  /** This deployment's sign-in mode, set once the provider secrets resolve. */
+  #authProviders: AuthProviderService | null = null;
   /**
    * Composes the deployment's ONE Better Auth instance on first use (it asks
    * the SSO peer, which construction may not), or nothing where it named no
@@ -318,6 +329,8 @@ export class AuthApp implements AuthApiContract {
     connectionIssuers,
     signUpEnrollment,
     addressConfirmation,
+    priorSessions,
+    twoStep,
   }: {
     sessions: BrowserSessionService;
     cliSessions: CliDeviceSessionService;
@@ -331,6 +344,8 @@ export class AuthApp implements AuthApiContract {
     connectionIssuers: Pick<SsoIssuerDirectory, "findIssuersForConnection">;
     signUpEnrollment: SignUpEnrollmentService;
     addressConfirmation: AddressConfirmationService;
+    priorSessions: PriorSessionService;
+    twoStep: TwoStepVerificationService;
   }) {
     this.#sessions = sessions;
     this.#cliSessions = cliSessions;
@@ -345,6 +360,8 @@ export class AuthApp implements AuthApiContract {
     this.#signInSecurity = signInSecurity;
     this.#signUpEnrollment = signUpEnrollment;
     this.#addressConfirmation = addressConfirmation;
+    this.#priorSessions = priorSessions;
+    this.#twoStep = twoStep;
     this.#providerAccountLinks = ProviderAccountLinkService.create({
       issuers: connectionIssuers,
       accounts: { createAccount: (row) => this.#createProviderAccount(row) },
@@ -433,6 +450,17 @@ export class AuthApp implements AuthApiContract {
         isConfirmed: async ({ email }) =>
           (await dependencies.users.findByEmail({ email }))?.emailVerified === true,
       }),
+      priorSessions: PriorSessionService.create({
+        sessions: repositories.sessions,
+        findEmail: async ({ userId }) =>
+          (await dependencies.users.findById({ id: userId }))?.email ?? null,
+        now,
+      }),
+      twoStep: TwoStepVerificationService.create({
+        sessions: repositories.sessions,
+        protocol: betterAuthTwoStepProtocol(() => app.betterAuth()),
+        now,
+      }),
     });
 
     app.#offersPasskeys = config.passkeysEnabled;
@@ -448,6 +476,11 @@ export class AuthApp implements AuthApiContract {
       config: config.signInProviders,
       into: setup.secrets.into,
       baseUrl: config.sessionUrl ?? "",
+    });
+    app.#authProviders = AuthProviderService.create({
+      configuredProvider: configuredAuthProvider(config.signInProviders).provider,
+      providerMounted: isNamedProviderMounted(signInProviders),
+      platformSsoAllowed: () => dependencies.licensing.isPlatformSsoLicensed(),
     });
 
     return setup.secrets.into(AuthApp.secrets.session, (sessionSecret) => {
@@ -857,6 +890,29 @@ export class AuthApp implements AuthApiContract {
     return this.#signUpEnrollment.getEnrollment(input);
   }
 
+  getPriorSession(input: Readonly<{ headers: Headers }>): Promise<PriorSession> {
+    return this.#priorSessions.explain(input);
+  }
+
+  findSessionAmr(input: { sessionId: string }): Promise<string[]> {
+    return this.#twoStep.findSessionAmr(input);
+  }
+
+  findAssertedAmrForIdentifiers(input: {
+    userIds: readonly string[];
+    identifierIds: readonly string[];
+  }): Promise<string[]> {
+    return this.#twoStep.findAssertedAmr(input);
+  }
+
+  disableTwoStepVerification(input: {
+    headers: Headers;
+    password?: string | undefined;
+    code: string;
+  }): Promise<void> {
+    return this.#twoStep.disable(input);
+  }
+
   async completeSignUpVerification(
     input: Readonly<{ token: string }>,
   ): Promise<SignUpVerificationResult> {
@@ -895,14 +951,14 @@ export class AuthApp implements AuthApiContract {
   }
 
   resolveAuthProvider(): Promise<string> {
-    const authProvider = this.#members.authProvider;
-    if (!authProvider) {
+    const authProviders = this.#authProviders;
+    if (!authProviders) {
       throw new AuthUnavailableError({
         capability: "sign-in mode configuration, so it cannot name this deployment's auth provider",
         processName: this.#members.processName,
       });
     }
-    return authProvider();
+    return authProviders.resolve();
   }
 
   /** The ceremony, or the refusal that names why this process has none. */
@@ -965,6 +1021,25 @@ function buildSignUpVerification({
       `${signUp.baseUrl}/auth/signup?verify=${encodeURIComponent(token)}`,
     now,
   });
+}
+
+/** The two-factor plugin on the deployment's one Better Auth instance (main's protocol adapter). */
+function betterAuthTwoStepProtocol(
+  betterAuth: () => Promise<BetterAuthTransport>,
+): TwoStepProtocol {
+  return {
+    verifyTotp: async ({ headers, code }) => {
+      await (await betterAuth()).api.verifyTOTP({ body: { code }, headers });
+    },
+    disableTwoFactor: async ({ headers, password }) => {
+      await (
+        await betterAuth()
+      ).api.disableTwoFactor({
+        body: password ? { password } : {},
+        headers,
+      });
+    },
+  };
 }
 
 /** The members a cutover is asked about, from the module that owns the rows. */

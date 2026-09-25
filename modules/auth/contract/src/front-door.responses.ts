@@ -48,6 +48,14 @@ export const addressConfirmationSchema = z
   .strict();
 export type AddressConfirmation = z.infer<typeof addressConfirmationSchema>;
 
+/** Why a signed-out visitor is here: only an expired session of theirs names its address. */
+export const priorSessionSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("expired"), email: z.string() }).strict(),
+  z.object({ kind: z.literal("unknown") }).strict(),
+]);
+
+export type PriorSession = z.infer<typeof priorSessionSchema>;
+
 export const SIGN_UP_ENROLLMENT_OUTCOMES = [
   "enroll",
   "redirect",

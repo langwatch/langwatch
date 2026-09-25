@@ -3,6 +3,7 @@ import { Temporal, type Instant } from "@langwatch/time";
 import type {
   AuthSessionRepository,
   BrowserSessionRecord,
+  SessionExpiry,
   StoredBrowserSession,
 } from "../auth-session.repository.ts";
 import type { MemoryAuthDatabase, MemoryStoredSession } from "./memory.auth.database.ts";
@@ -102,6 +103,38 @@ export class MemoryAuthSessionRepository implements AuthSessionRepository {
     keepSessionId: string;
   }): Promise<number> {
     return this.remove((session) => session.userId === userId && session.id !== keepSessionId);
+  }
+
+  async findExpiryByToken({ token }: { token: string }): Promise<SessionExpiry[]> {
+    return [...this.memory.sessions.values()]
+      .filter((session) => session.sessionToken === token)
+      .map((session) => ({ expires: session.expires ?? EPOCH, userId: session.userId }));
+  }
+
+  async findAmrForSession({ sessionId }: { sessionId: string }): Promise<string[]> {
+    return [...(this.memory.sessions.get(sessionId)?.amr ?? [])];
+  }
+
+  async findAmrForIdentifiers({
+    userIds,
+    identifierIds,
+    at,
+  }: {
+    userIds: readonly string[];
+    identifierIds: readonly string[];
+    at: Instant;
+  }): Promise<string[]> {
+    const asserted = [...this.memory.sessions.values()].filter(
+      (session) =>
+        userIds.includes(session.userId) &&
+        session.identifierId !== undefined &&
+        session.identifierId !== null &&
+        identifierIds.includes(session.identifierId) &&
+        session.expires !== undefined &&
+        Temporal.Instant.compare(session.expires, at) > 0,
+    );
+
+    return [...new Set(asserted.flatMap((session) => session.amr ?? []))];
   }
 
   /** Deleting an absent row counts zero rather than raising, as `deleteMany` does. */

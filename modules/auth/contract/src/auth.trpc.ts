@@ -12,6 +12,7 @@ import {
   frontDoorAskedSchema,
   frontDoorSentSchema,
   inviteLandingSchema,
+  priorSessionSchema,
   signUpEnrollmentSchema,
   signUpVerificationResultSchema,
 } from "./front-door.responses.ts";
@@ -62,4 +63,9 @@ export const authTrpc = defineTrpcContract("auth")
   .mutation("sendMyAddressConfirmation")
   .withInput(frontDoorOwnAddressInputSchema)
   .withOutput(frontDoorSentSchema)
+
+  /** Reads only the cookie the caller presented, so it can describe no one else's session. */
+  .query("priorSession")
+  .withInput(z.void())
+  .withOutput(priorSessionSchema)
   .build();

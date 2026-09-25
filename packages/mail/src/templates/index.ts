@@ -13,6 +13,7 @@ import {
   joinRequestReminderTemplate,
 } from "./join-request-emails.tsx";
 import { licenseEmailTemplate } from "./license-email.tsx";
+import { organizationMfaRequirementEmailTemplate } from "./organization-mfa-requirement-email.tsx";
 import type { MailTemplate } from "./registry.ts";
 import { resetPasswordEmailTemplate } from "./reset-password-email.tsx";
 import { signUpVerificationEmailTemplate } from "./sign-up-verification-email.tsx";
@@ -41,6 +42,7 @@ export const mailTemplates: readonly MailTemplate[] = [
   domainAutoJoinedTemplate,
   ssoDomainProofWaveringTemplate,
   ssoDomainProofLapsedTemplate,
+  organizationMfaRequirementEmailTemplate,
   licenseEmailTemplate,
   connectedStatementEmailTemplate,
   budgetIncreaseRequestEmailTemplate,

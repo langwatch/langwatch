@@ -17,6 +17,7 @@ const {
   replaceMock,
   sessionRef,
   searchParamsRef,
+  priorSessionRef,
 } = vi.hoisted(() => ({
   routeMock: vi.fn(),
   routeErrorRef: { current: null as unknown },
@@ -25,6 +26,7 @@ const {
   replaceMock: vi.fn(),
   sessionRef: { current: { data: null as unknown } },
   searchParamsRef: { current: new URLSearchParams("") },
+  priorSessionRef: ((): { current: unknown } => ({ current: undefined }))(),
 }));
 
 vi.mock("../../../behavior/auth-api.ts", () => ({
@@ -43,6 +45,9 @@ vi.mock("../../../behavior/auth-api.ts", () => ({
           isPending: false,
           error: null,
         }),
+      },
+      priorSession: {
+        useQuery: () => ({ data: priorSessionRef.current }),
       },
     },
   },
@@ -136,6 +141,7 @@ describe("given the identifier-first sign-in screen", () => {
     routeErrorRef.current = null;
     sessionRef.current = { data: null };
     searchParamsRef.current = new URLSearchParams("");
+    priorSessionRef.current = undefined;
     window.localStorage.clear();
   });
 
@@ -527,6 +533,66 @@ describe("given the identifier-first sign-in screen", () => {
       expect(email.getAttribute("type")).toBe("email");
       await userEvent.type(email, "op@selfhosted.example");
       expect((email as HTMLInputElement).value).toBe("op@selfhosted.example");
+    });
+  });
+
+  describe("when an expired session of this browser's explains the arrival", () => {
+    /** @scenario "An expired session is recognised and the address carried forward" */
+    it("carries the address to the method step without anybody typing it", async () => {
+      priorSessionRef.current = { kind: "expired", email: "sam@acme.com" };
+      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce(localPicker);
+
+      renderScreen();
+
+      await waitFor(() => {
+        expect(routeMock).toHaveBeenCalledWith(
+          expect.objectContaining({ identifier: "sam@acme.com" }),
+        );
+      });
+      expect(await screen.findByText(/welcome back/i)).toBeInTheDocument();
+    });
+
+    /** @scenario "The expired notice replaces the greeting, not the error copy" */
+    it("says the session ran out, and does not greet a stranger or report a fault", async () => {
+      priorSessionRef.current = { kind: "expired", email: "sam@acme.com" };
+      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce(localPicker);
+
+      renderScreen();
+
+      expect(await screen.findByText(/welcome back/i)).toBeInTheDocument();
+      expect(screen.getByText(/session expired/i)).toBeInTheDocument();
+      expect(screen.queryByText(/log in to langwatch/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/went wrong/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    /** @scenario "Recognition is not authentication" */
+    it("still demands a credential, and signs nobody in on its own", async () => {
+      priorSessionRef.current = { kind: "expired", email: "sam@acme.com" };
+      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce(localPicker);
+
+      const { container } = renderScreen();
+      await screen.findByTestId("method-picker");
+
+      expect(container.querySelector('input[type="password"]')).not.toBeNull();
+      expect(signInMock).not.toHaveBeenCalled();
+      expect(replaceMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A revoked session is given the cold screen and no address" */
+    it("gives a revoked session the cold screen, naming nobody", async () => {
+      priorSessionRef.current = { kind: "unknown" };
+      routeMock.mockResolvedValue(localPicker);
+
+      renderScreen();
+
+      expect(await screen.findByText(/log in to langwatch/i)).toBeInTheDocument();
+      expect(screen.queryByText(/welcome back/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/session expired/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/acme\.com/i)).not.toBeInTheDocument();
+      expect(routeMock).not.toHaveBeenCalledWith(
+        expect.objectContaining({ identifier: expect.stringContaining("@") }),
+      );
     });
   });
 });

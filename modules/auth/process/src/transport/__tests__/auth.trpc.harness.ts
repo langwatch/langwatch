@@ -11,6 +11,8 @@ export type AuthTrpcTestContext = {
   email?: string | null;
   /** The address the process resolved, or none. */
   address?: string | null;
+  /** The headers the request arrived with. */
+  headers?: Record<string, string> | null;
   /** The addresses this deployment configured to see the operator entry. */
   operators?: string[] | null;
 };

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { safeRedirectTarget, signIn, useSession } from "../../behavior/auth-client.tsx";
 import { replaceLocation } from "../../behavior/browser-navigation.ts";
+import { useExpiredSessionRecovery } from "../../behavior/use-expired-session-recovery.ts";
 import { usePasskeyAutofill } from "../../behavior/use-passkey-autofill.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
 import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
@@ -17,6 +18,7 @@ import {
 } from "../../model/last-used-method.ts";
 import { signInMethodActionLabel, signInMethodLabel } from "../../model/method-labels.ts";
 import { normalizeSignInErrorCode } from "../../model/sign-in-error-code.ts";
+import { signInGreeting } from "../../model/sign-in-greeting.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { CheckYourEmail } from "../elements/check-your-email.tsx";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
@@ -87,6 +89,14 @@ export function IdentifierFirstSignIn() {
     });
   }, [decide, breakGlass, session]);
 
+  // After the instance question above, so the recovered address's answer is the one that stands.
+  const recoveredEmail = useExpiredSessionRecovery({
+    signedIn: Boolean(session),
+    identifierInPlay: routing.identifier,
+    decide,
+    breakGlass,
+  });
+
   const dialFederated = (method: SignInMethod) => {
     rememberPendingMethod(method);
     void signIn(method.id, { callbackUrl });
@@ -146,7 +156,7 @@ export function IdentifierFirstSignIn() {
 
   if (showPicker) {
     return (
-      <AuthCard title="Log in to LangWatch">
+      <AuthCard {...signInGreeting(recoveredEmail)}>
         <HandledErrorAlert
           error={passkeyError}
           fallbackTitle="Could not use a passkey"
@@ -186,7 +196,7 @@ export function IdentifierFirstSignIn() {
   }
 
   return (
-    <AuthCard title="Log in to LangWatch" finePrint={<FrontDoorFinePrint />}>
+    <AuthCard {...signInGreeting(recoveredEmail)} finePrint={<FrontDoorFinePrint />}>
       {/* The alert explains the form; it does not replace it. A failure to
           reach the router is nearly always worth retrying, and the retry is
           typing the address again — so taking the field away leaves somebody

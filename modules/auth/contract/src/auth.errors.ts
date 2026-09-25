@@ -144,3 +144,17 @@ export class CliSessionRecordNotFoundError extends HandledError {
     this.name = "CliSessionRecordNotFoundError";
   }
 }
+
+/** The password re-proof turning two-step verification off did not match; the code was fine. */
+export class TwoStepPasswordInvalidError extends HandledError {
+  declare readonly code: "identity_mfa_password_invalid";
+
+  constructor(detail: string) {
+    super("identity_mfa_password_invalid", "identity_mfa_password_invalid", {
+      httpStatus: 400,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "TwoStepPasswordInvalidError";
+  }
+}

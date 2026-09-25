@@ -103,3 +103,10 @@ Feature: The transactional messages LangWatch sends
     Then it goes to that address, carrying the confirmation link
     And it says the address was added as a way to sign in, not that an account was created
     And it says to open the link in the browser the address was added from
+
+  @unit
+  Scenario: A changed two-step requirement tells each member who changed it and what it means
+    Given an administrator turned an organization's two-step verification requirement on or off
+    When a member is told
+    Then the email goes to that member and names the organization and the administrator
+    And it says whether a second factor is now needed to open that organization

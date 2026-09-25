@@ -8,6 +8,7 @@ import type { AuthSessionCacheRepository } from "../../repositories/auth-session
 import type {
   AuthSessionRepository,
   BrowserSessionRecord,
+  SessionExpiry,
   StoredBrowserSession,
 } from "../../repositories/auth-session.repository.ts";
 import { signInSecurityFixture } from "../../services/__tests__/sign-in-security.fixture.ts";
@@ -94,6 +95,18 @@ class Sessions implements AuthSessionRepository {
 
   deleteOthersForUser(input: { userId: string; keepSessionId: string }): Promise<number> {
     return this.deletedOthers(input);
+  }
+
+  async findExpiryByToken(): Promise<SessionExpiry[]> {
+    return [];
+  }
+
+  async findAmrForSession(): Promise<string[]> {
+    return [];
+  }
+
+  async findAmrForIdentifiers(): Promise<string[]> {
+    return [];
   }
 }
 

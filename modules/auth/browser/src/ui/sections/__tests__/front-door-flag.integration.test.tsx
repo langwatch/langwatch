@@ -73,6 +73,12 @@ vi.mock("../../../behavior/auth-api.ts", () => ({
           error: null,
         }),
       },
+      signUpEnrollment: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
+      },
+      priorSession: {
+        useQuery: () => ({ data: undefined }),
+      },
     },
     user: {
       register: {

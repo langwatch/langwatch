@@ -4,6 +4,7 @@ import { fromDate, toDate, type Instant } from "@langwatch/time";
 import type {
   AuthSessionRepository,
   BrowserSessionRecord,
+  SessionExpiry,
   StoredBrowserSession,
 } from "../auth-session.repository.ts";
 
@@ -134,5 +135,46 @@ export class PrismaAuthSessionRepository
     });
 
     return deleted.count;
+  }
+
+  async findExpiryByToken({ token }: { token: string }): Promise<SessionExpiry[]> {
+    const rows = await this.prisma.session.findMany({
+      where: { sessionToken: token },
+      select: { expires: true, userId: true },
+    });
+
+    return rows.map((row) => ({ expires: fromDate(row.expires), userId: row.userId }));
+  }
+
+  async findAmrForSession({ sessionId }: { sessionId: string }): Promise<string[]> {
+    const row = await this.prisma.session.findUnique({
+      where: { id: sessionId },
+      select: { amr: true },
+    });
+
+    return row ? [...row.amr] : [];
+  }
+
+  async findAmrForIdentifiers({
+    userIds,
+    identifierIds,
+    at,
+  }: {
+    userIds: readonly string[];
+    identifierIds: readonly string[];
+    at: Instant;
+  }): Promise<string[]> {
+    if (userIds.length === 0 || identifierIds.length === 0) return [];
+
+    const rows = await this.prisma.session.findMany({
+      where: {
+        userId: { in: [...userIds] },
+        identifierId: { in: [...identifierIds] },
+        expires: { gt: toDate(at) },
+      },
+      select: { amr: true },
+    });
+
+    return [...new Set(rows.flatMap((row) => row.amr))];
   }
 }

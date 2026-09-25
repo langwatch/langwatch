@@ -103,7 +103,6 @@ async function appFor(
       route: undefined as never,
       signUp: null,
       invites: null,
-      authProvider: undefined as never,
       isSaas: false,
       nodeEnvironment: undefined,
       processName: "langwatch-api",

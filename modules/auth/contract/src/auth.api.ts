@@ -9,6 +9,7 @@ import type {
 import type {
   AddressConfirmation,
   InviteLanding,
+  PriorSession,
   SignUpEnrollment,
   SignUpVerificationResult,
 } from "./front-door.responses.ts";
@@ -182,6 +183,24 @@ export interface AuthApi {
   getSignUpEnrollment(
     input: Readonly<{ email: string; addressProof: string }>,
   ): Promise<SignUpEnrollment>;
+  /** Classifies the caller's own session cookie; only an expired one names its address. */
+  getPriorSession(input: Readonly<{ headers: Headers }>): Promise<PriorSession>;
+  /** The amr the session recorded; empty when the session is gone. */
+  findSessionAmr(input: { sessionId: string }): Promise<string[]>;
+  /** The distinct amr across unexpired sessions these people minted through these identifiers. */
+  findAssertedAmrForIdentifiers(input: {
+    userIds: readonly string[];
+    identifierIds: readonly string[];
+  }): Promise<string[]>;
+  /**
+   * Turns the caller's authenticator off: the code is checked first, then the password
+   * re-proof, where a mismatch raises `identity_mfa_password_invalid`.
+   */
+  disableTwoStepVerification(input: {
+    headers: Headers;
+    password?: string | undefined;
+    code: string;
+  }): Promise<void>;
   /** Spends a confirmation link and answers the address it confirmed. */
   completeSignUpVerification(input: Readonly<{ token: string }>): Promise<SignUpVerificationResult>;
   /**

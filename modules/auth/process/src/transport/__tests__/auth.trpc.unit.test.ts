@@ -13,7 +13,7 @@ import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { authTrpcTransport, callerEmailFact } from "../auth.trpc.ts";
+import { authRequestHeadersFact, authTrpcTransport, callerEmailFact } from "../auth.trpc.ts";
 import { authTrpcTestMembers, type AuthTrpcTestContext } from "./auth.trpc.harness.ts";
 
 const isWithinBudget = vi.fn<AuthApi["isWithinBudget"]>();
@@ -27,6 +27,7 @@ const readInviteLanding = vi.fn<AuthApi["readInviteLanding"]>();
 const requestFreshInvite = vi.fn<AuthApi["requestFreshInvite"]>();
 const getSignUpEnrollment = vi.fn<AuthApi["getSignUpEnrollment"]>();
 const getMyAddressConfirmation = vi.fn<AuthApi["getMyAddressConfirmation"]>();
+const getPriorSession = vi.fn<AuthApi["getPriorSession"]>();
 
 /** The seven operations this surface calls; the rest of the module refuses. */
 const door: AuthApi = {
@@ -45,6 +46,10 @@ const door: AuthApi = {
   claimSignUpAddressProof: () => unreached("claimSignUpAddressProof"),
   getSignUpEnrollment,
   getMyAddressConfirmation,
+  getPriorSession,
+  findSessionAmr: () => unreached("findSessionAmr"),
+  findAssertedAmrForIdentifiers: () => unreached("findAssertedAmrForIdentifiers"),
+  disableTwoStepVerification: () => unreached("disableTwoStepVerification"),
   linkProviderAccount: () => unreached("linkProviderAccount"),
   readInviteLanding,
   requestFreshInvite,
@@ -85,6 +90,7 @@ const router = createTrpcRuntime<AuthTrpcTestContext>({
   facts: [
     bindTrpcFact(callerAddressFact, (ctx) => ctx.address ?? null),
     bindTrpcFact(callerEmailFact, (ctx) => ctx.email ?? null),
+    bindTrpcFact(authRequestHeadersFact, (ctx) => ctx.headers ?? null),
   ],
 });
 
@@ -102,6 +108,7 @@ describe("the signed-out front door", () => {
         "completeSignUpVerification",
         "inviteLanding",
         "myAddressConfirmation",
+        "priorSession",
         "requestFreshInvite",
         "requestSignUpVerification",
         "route",
@@ -127,6 +134,7 @@ describe("the signed-out front door", () => {
         sendMyAddressConfirmation: "mutation",
         myAddressConfirmation: "query",
         signUpEnrollment: "mutation",
+        priorSession: "query",
       });
     });
   });
@@ -318,6 +326,28 @@ describe("the signed-out front door", () => {
         accountExists: false,
         addressProof: "proof",
       });
+    });
+  });
+
+  describe("when a signed-out visitor asks why they are here", () => {
+    it("hands the auth module the cookie the caller presented, and nothing they typed", async () => {
+      getPriorSession.mockResolvedValue({ kind: "expired", email: "ana@acme.com" });
+
+      await expect(
+        router
+          .createCaller({ headers: { cookie: "better-auth.session_token=tok.sig" } })
+          .priorSession(),
+      ).resolves.toEqual({ kind: "expired", email: "ana@acme.com" });
+
+      const [call] = getPriorSession.mock.calls;
+      expect(call?.[0].headers.get("cookie")).toBe("better-auth.session_token=tok.sig");
+    });
+
+    it("answers a request that arrived with no headers as a caller holding no cookie", async () => {
+      getPriorSession.mockResolvedValue({ kind: "unknown" });
+
+      await expect(router.createCaller({}).priorSession()).resolves.toEqual({ kind: "unknown" });
+      expect(getPriorSession.mock.calls[0]?.[0].headers.get("cookie")).toBeNull();
     });
   });
 });
