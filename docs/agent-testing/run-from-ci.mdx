@@ -21,6 +21,8 @@ A connected agent is `connected:<name>`, which runs it in `development` or in th
 
 Add `--format json` (or `-o json`) to get one final document on stdout instead of the progress lines. It contains `outcome`, `tallies` and the per-run `results`, so a job step can read the verdict without parsing prose.
 
+The wait limit also covers status requests and their response bodies. When it expires, the CLI stops waiting without cancelling the batch and exits non-zero. JSON output reports `outcome: "timeout"` with the last complete poll's counts and results; this does not mean the agent failed its tests.
+
 ## From the REST API
 
 `POST /api/v1/test-suites/{id}/run` schedules one run for each scenario of the test suite, against each target you name:
