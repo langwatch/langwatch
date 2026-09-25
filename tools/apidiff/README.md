@@ -579,9 +579,14 @@ no database, no stack — only the two worktrees.
    an optional field made required) or a declared output answers less. The
    diff also proposes **rename candidates** (same namespace, similar name,
    same input shape) and **namespace-move candidates** (same name, same
-   non-empty input shape, another namespace). Only the moves in
-   `acceptedNamespaceMoves` (`parity.go`) match main: `tracesV2.*` is
-   compared against `traces.*`. Every other candidate stays missing.
+   non-empty input shape, another namespace). `tracesV2.*` is compared
+   against `traces.*` (`acceptedNamespaceMoves`, `parity.go`). A move
+   candidate of the same kind whose branch module differs from the module
+   main's namespace maps to is a **ruled owner move** (ARCHITECTURE.md §3,
+   `parity-owner-moves.go`): listed under `ruledOwnerMoves` and in both
+   modules' packets, neither missing nor extra, its input still compared
+   field by field. A candidate within one module, or one of several for the
+   same path, stays missing.
    An input node main left open (`{}`, a bare object or an itemless array,
    as main's converter emits for a recursive schema) makes every change
    under it `unknown`, never breaking.

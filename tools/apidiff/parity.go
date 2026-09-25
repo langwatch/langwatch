@@ -35,10 +35,11 @@ type ProcedureDiff struct {
 // ProcedurePair is a likely rename (same namespace, similar name) or move
 // (same name under another namespace) with the same input shape.
 type ProcedurePair struct {
-	Main   string `json:"main"`
-	Branch string `json:"branch"`
-	Module string `json:"module"`
-	Reason string `json:"reason"`
+	Main       string `json:"main"`
+	Branch     string `json:"branch"`
+	Module     string `json:"module"`
+	MainModule string `json:"mainModule,omitempty"`
+	Reason     string `json:"reason"`
 }
 
 // TrpcParity is main's procedures against the branch's contract declarations.
@@ -50,11 +51,13 @@ type TrpcParity struct {
 	Breaking    []ProcedureDiff `json:"breaking"`
 	Renamed     []ProcedurePair `json:"renameCandidates"`
 	Moved       []ProcedurePair `json:"namespaceMoveCandidates"`
+	OwnerMoves  []ProcedurePair `json:"ruledOwnerMoves"`
 }
 
 // acceptedNamespaceMoves are the tRPC namespace moves ruled to match main
-// (parity rulings, 2026-09-25): only tracesV2 became traces. Every other move
-// candidate stays missing until the branch serves main's name.
+// (parity rulings, 2026-09-25): only tracesV2 became traces. A move into
+// another module's namespace is settled by ownerMoves; a same-module rename
+// stays missing until the branch serves main's name.
 var acceptedNamespaceMoves = map[string]string{"tracesV2": "traces"}
 
 // movedPath is where an accepted namespace move put a main procedure path.
@@ -79,7 +82,7 @@ func procedureIndex(procedures []Procedure) map[string]Procedure {
 // DiffProcedures compares the two manifests. moduleOf names the module that
 // owns a procedure path.
 func DiffProcedures(main, branch []Procedure, moduleOf func(Procedure) string) TrpcParity {
-	parity := TrpcParity{MainCount: len(main), BranchCount: len(branch)}
+	parity := TrpcParity{MainCount: len(main), BranchCount: len(branch), OwnerMoves: []ProcedurePair{}}
 	mainIndex, branchIndex := procedureIndex(main), procedureIndex(branch)
 	matched := map[string]bool{}
 	for _, procedure := range main {
@@ -103,6 +106,7 @@ func DiffProcedures(main, branch []Procedure, moduleOf func(Procedure) string) T
 	}
 	search := candidateSearch{mainIndex: mainIndex, branchIndex: branchIndex}
 	parity.Renamed, parity.Moved = search.pairs(parity.Missing, parity.Extra)
+	ownerMoves{mainIndex: mainIndex, branchIndex: branchIndex, moduleOf: moduleOf}.settle(&parity)
 	attributeUnowned(parity.Missing, append(append([]ProcedurePair{}, parity.Renamed...), parity.Moved...))
 	return parity
 }

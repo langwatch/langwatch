@@ -93,7 +93,7 @@ func WriteParityTable(writer io.Writer, report ParityReport) error {
 		total.Extra += row.Extra
 	}
 	fmt.Fprintf(&output, "  %-28s %8d %9d %6d\n", total.Module, total.Missing, total.Breaking, total.Extra)
-	fmt.Fprintf(&output, "  rename candidates %d, namespace-move candidates %d\n", len(report.Trpc.Renamed), len(report.Trpc.Moved))
+	fmt.Fprintf(&output, "  rename candidates %d, namespace-move candidates %d, ruled owner moves %d\n", len(report.Trpc.Renamed), len(report.Trpc.Moved), len(report.Trpc.OwnerMoves))
 	for _, note := range report.Notes {
 		fmt.Fprintf(&output, "  note: %s\n", note)
 	}
@@ -130,6 +130,7 @@ func writeTrpcSections(output *strings.Builder, trpc TrpcParity, module string) 
 	writeBreakingProcedures(output, trpc.Breaking, module)
 	writeSection(output, "Rename candidates", pairLines(trpc.Renamed, module))
 	writeSection(output, "Namespace-move candidates", pairLines(trpc.Moved, module))
+	writeSection(output, "Ruled owner moves, not defects", ownerMoveLines(trpc.OwnerMoves, module))
 	extra := []string{}
 	for _, gap := range filterGaps(trpc.Extra, module) {
 		extra = append(extra, fmt.Sprintf("- `%s` (%s) %s\n", gap.Path, gap.Kind, gap.Source))
@@ -177,6 +178,17 @@ func pairLines(pairs []ProcedurePair, module string) []string {
 	for _, pair := range pairs {
 		if pair.Module == module {
 			lines = append(lines, fmt.Sprintf("- main `%s` may be branch `%s` (%s)\n", pair.Main, pair.Branch, pair.Reason))
+		}
+	}
+	return lines
+}
+
+// ownerMoveLines lists the ruled moves a module gave away or took in.
+func ownerMoveLines(pairs []ProcedurePair, module string) []string {
+	lines := []string{}
+	for _, pair := range pairs {
+		if pair.Module == module || pair.MainModule == module {
+			lines = append(lines, fmt.Sprintf("- main `%s` (%s) is served as branch `%s` (%s)\n", pair.Main, pair.MainModule, pair.Branch, pair.Module))
 		}
 	}
 	return lines
