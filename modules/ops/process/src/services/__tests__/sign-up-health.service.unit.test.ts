@@ -3,7 +3,7 @@
  * The orphaned-organization rate, read from the organization and identity owners (D12).
  */
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { IdentityLookupApi } from "@langwatch/identity-contract";
+import type { IdentityApi } from "@langwatch/identity-contract";
 import type { OrganizationApi, OrganizationFounding } from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";
 
@@ -47,7 +47,7 @@ function serviceOver({
         return founded;
       },
     }),
-    identity: createApiFixture<Pick<IdentityLookupApi, "findVerifiedDomainsByUserIds">>({
+    identity: createApiFixture<Pick<IdentityApi, "findVerifiedDomainsByUserIds">>({
       findVerifiedDomainsByUserIds: async ({ userIds }) =>
         userIds
           .filter((userId) => provedUserIds.includes(userId))

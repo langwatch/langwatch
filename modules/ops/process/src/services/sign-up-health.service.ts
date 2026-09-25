@@ -1,4 +1,4 @@
-import type { IdentityLookupApi } from "@langwatch/identity-contract";
+import type { IdentityApi } from "@langwatch/identity-contract";
 import type { OpsSignUpHealthInput, SignUpHealth } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 
@@ -14,14 +14,14 @@ import {
 export class SignUpHealthService {
   static create(peers: {
     organizations: Pick<OrganizationApi, "findFoundedBetween">;
-    identity: Pick<IdentityLookupApi, "findVerifiedDomainsByUserIds">;
+    identity: Pick<IdentityApi, "findVerifiedDomainsByUserIds">;
   }): SignUpHealthService {
     return new SignUpHealthService(peers.organizations, peers.identity);
   }
 
   private constructor(
     private readonly organizations: Pick<OrganizationApi, "findFoundedBetween">,
-    private readonly identity: Pick<IdentityLookupApi, "findVerifiedDomainsByUserIds">,
+    private readonly identity: Pick<IdentityApi, "findVerifiedDomainsByUserIds">,
   ) {}
 
   /** Founders are followed thirty days past the window: a founding on its last day is

@@ -30,11 +30,7 @@ import {
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { GithubApi } from "@langwatch/github-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
-import {
-  IdentityApi,
-  IdentityLookupApi,
-  type IdentityApi as IdentityApiContract,
-} from "@langwatch/identity-contract";
+import { IdentityApi, type IdentityApi as IdentityApiContract } from "@langwatch/identity-contract";
 import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { LangyApi } from "@langwatch/langy-contract";
@@ -624,7 +620,6 @@ export class OpsApp implements OpsApi {
     auth: AuthApi,
     identity: IdentityApi,
     // The same identity app, asked through its lookup surface for proved domains (D12).
-    identityLookup: IdentityLookupApi,
     projects: ProjectApi,
     auditLog: AuditLogApi,
     apiKeys: ApiKeyApi,
@@ -740,7 +735,7 @@ export class OpsApp implements OpsApi {
       storageStats,
       signUpHealth: SignUpHealthService.create({
         organizations: dependencies.organizations,
-        identity: dependencies.identityLookup,
+        identity: dependencies.identity,
       }),
     });
   }

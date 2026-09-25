@@ -185,11 +185,6 @@ export interface VerifiedUserDomain {
 }
 
 export interface IdentityLookupApi {
-  /** Every domain these people proved, one row per person and domain. An address nobody
-   *  confirmed is not evidence of who somebody works for. */
-  findVerifiedDomainsByUserIds(input: {
-    userIds: readonly string[];
-  }): Promise<VerifiedUserDomain[]>;
   lookupAddress(input: {
     address: string;
     operator: IdentityLookupOperator;

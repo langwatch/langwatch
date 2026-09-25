@@ -20,7 +20,7 @@ import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { GithubApi } from "@langwatch/github-contract";
-import type { IdentityApi, IdentityLookupApi } from "@langwatch/identity-contract";
+import type { IdentityApi } from "@langwatch/identity-contract";
 import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { LangyApi } from "@langwatch/langy-contract";
@@ -93,7 +93,7 @@ function process(role: "api" | "worker", redisCommands: unknown[][] = []) {
     .provide({
       user: createApiFixture<UserApi>(),
       auth: createApiFixture<AuthApi>(),
-      identity: createApiFixture<IdentityApi & IdentityLookupApi>(),
+      identity: createApiFixture<IdentityApi>(),
       project: createApiFixture<ProjectApi>({ searchByQuery: async () => [] }),
       "audit-log": createApiFixture<AuditLogApi>({
         record: async () => ({ id: "audit", occurredAt: 0 }),

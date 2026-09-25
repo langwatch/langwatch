@@ -45,6 +45,7 @@ import type {
   VerifyIdentifierCommandData,
 } from "./facts.ts";
 import type { IdentityEmailResolution } from "./identity-email.service.ts";
+import type { VerifiedUserDomain } from "./identity-lookup.ts";
 import type { DomainJoinSetting, JoinLookupDecision, JoinOffer } from "./join-matching.ts";
 import type {
   ApproveJoinCommandData,
@@ -705,6 +706,11 @@ export interface IdentityReservationsApi {
  * reconciliation, user-migration registry, SSO backoffice connection writer.
  */
 export interface IdentityApi {
+  /** Every domain these people proved, one row per person and domain. An address nobody
+   *  confirmed is not evidence of who somebody works for. */
+  findVerifiedDomainsByUserIds(input: {
+    userIds: readonly string[];
+  }): Promise<VerifiedUserDomain[]>;
   /** The identifier-backed address, or `keep_legacy` for legacy `User.email` holders. */
   resolveEmail(input: { userId: string }): Promise<IdentityEmailResolution>;
   /** Every proven address, or `keep_legacy` for legacy `User.email` holders. */
