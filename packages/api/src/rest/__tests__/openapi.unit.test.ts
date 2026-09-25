@@ -6,7 +6,7 @@
  * @see ../../../specs/endpoint-capabilities.feature
  */
 import { Hono } from "hono";
-import { generateSpecs } from "hono-openapi";
+import { generateSpecs, validator } from "hono-openapi";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -17,6 +17,7 @@ import {
   documentRoute,
   hoistStraySchemaDefs,
   normalizeExclusiveBounds,
+  publishEnumRecordKeys,
   restRouteDocumentation,
 } from "../openapi.ts";
 import { buildStandardSuccessResponse } from "../response.ts";
@@ -511,6 +512,70 @@ describe("the generated document", () => {
       expect(operation.requestBody?.content["application/json"]?.schema).toMatchObject({
         type: "object",
       });
+    });
+  });
+});
+
+describe("publishEnumRecordKeys", () => {
+  const filterValue = z.array(z.string());
+
+  /** The body schema a validator-published JSON body carries in a generated document. */
+  async function publishedBody(body: z.ZodType): Promise<Record<string, unknown>> {
+    const app = new Hono().post("/timeseries", validator("json", body), (c) => c.body(null, 204));
+    const document: unknown = JSON.parse(JSON.stringify(await generateSpecs(app)));
+
+    publishEnumRecordKeys(document);
+
+    const schema = z
+      .object({
+        paths: z.object({
+          "/timeseries": z.object({
+            post: z.object({
+              requestBody: z.object({
+                content: z.object({ "application/json": z.object({ schema: z.looseObject({}) }) }),
+              }),
+            }),
+          }),
+        }),
+      })
+      .parse(document);
+
+    return schema.paths["/timeseries"].post.requestBody.content["application/json"].schema;
+  }
+
+  describe("given a body filtered by an enum-keyed partial record", () => {
+    it("publishes every key the record accepts as an optional property of the value's shape", async () => {
+      const published = await publishedBody(
+        z.object({
+          startDate: z.number(),
+          filters: z
+            .partialRecord(z.enum(["topics.topics", "metadata.user_id"]), filterValue)
+            .default({}),
+        }),
+      );
+
+      expect(published).toMatchObject({
+        properties: {
+          filters: {
+            properties: {
+              "topics.topics": { type: "array", items: { type: "string" } },
+              "metadata.user_id": { type: "array", items: { type: "string" } },
+            },
+            propertyNames: { enum: ["topics.topics", "metadata.user_id"] },
+          },
+        },
+      });
+      expect(published).not.toHaveProperty("properties.filters.required");
+    });
+  });
+
+  describe("given a record keyed by any string", () => {
+    it("publishes no properties, since no key is known", async () => {
+      const published = await publishedBody(
+        z.object({ startDate: z.number(), labels: z.record(z.string(), filterValue) }),
+      );
+
+      expect(published).not.toHaveProperty("properties.labels.properties");
     });
   });
 });

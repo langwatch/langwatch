@@ -486,6 +486,32 @@ function normalizeBound({
   delete node[flag];
 }
 
+/**
+ * Spells out every key an enum-keyed record accepts, in place: `z.partialRecord(z.enum(keys), v)`
+ * publishes `propertyNames` and `additionalProperties` alone, which names no key a reader can
+ * see. Each key becomes an optional property of the value's schema; the two constraints stay.
+ */
+export function publishEnumRecordKeys(document: unknown): void {
+  if (Array.isArray(document)) {
+    for (const child of document) publishEnumRecordKeys(child);
+
+    return;
+  }
+
+  if (!isRecord(document)) return;
+
+  for (const child of Object.values(document)) publishEnumRecordKeys(child);
+
+  const keys = isRecord(document.propertyNames) ? document.propertyNames.enum : undefined;
+  const value = document.additionalProperties;
+
+  if (document.properties !== undefined || !isRecord(value) || !Array.isArray(keys)) return;
+
+  if (!keys.every((key) => typeof key === "string")) return;
+
+  document.properties = Object.fromEntries(keys.map((key) => [key, value]));
+}
+
 // zod's OpenAPI adapter rewrites a recursive schema's self-reference to
 // `#/components/schemas/<name>` but leaves the definition itself sitting in
 // that response's own local `$defs`, never hoisted — so the ref dangles the

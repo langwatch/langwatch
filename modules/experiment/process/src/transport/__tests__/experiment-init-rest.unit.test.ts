@@ -1,17 +1,25 @@
 /**
- * Tests POST /api/experiment/init refusals and success. Credential refusals
- * tested at their port.
+ * Tests POST /api/experiment/init behind the project door: credential refusals in main's flat
+ * bodies, the door's own sentences, and success.
  * @vitest-environment node
  */
-import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
+import { ProjectInvalidCredentialsError, ProjectMissingCredentialsError } from "@langwatch/api";
+import {
+  bindRestMiddleware,
+  createRestRuntime,
+  projectRestFacts,
+  restRouteDocumentation,
+} from "@langwatch/api/rest";
 import type { Experiment, ExperimentApi } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it, vi } from "vitest";
 
-import { experimentInitCaller, experimentInitRest } from "../experiment-init.rest.ts";
+import { experimentInitRest } from "../experiment-init.rest.ts";
+import { stubExperimentApi } from "./experiment-rest.harness.ts";
 
 const PROJECT_ID = "project-1";
 const PROJECT_SLUG = "project-one";
+const GOOD_KEY = "sk-lw-good";
 
 const experiment: Experiment = {
   id: "experiment-1",
@@ -44,60 +52,158 @@ class PlanLimitReached extends HandledError {
   }
 }
 
-/** The door over one experiment application, with its caller already resolved. */
-function mountInit(stubs: Partial<ExperimentApi>) {
-  const app = new Proxy({} as ExperimentApi, {
-    get(_target, property) {
-      const stubbed: unknown = Reflect.get(stubs, property);
-      if (stubbed !== undefined) return stubbed;
+/** The key ceiling as the credential port raises it, declared here for the same reason. */
+class KeyCeilingDenied extends HandledError {
+  declare readonly code: "api_key_permission_denied";
 
-      return () => {
-        throw new Error(`ExperimentApi.${String(property)} was not stubbed by this test`);
-      };
-    },
-  });
+  constructor(permission: string) {
+    super("api_key_permission_denied", "This API key may not do that", {
+      httpStatus: 403,
+      meta: { permission },
+    });
+    this.name = "KeyCeilingDenied";
+  }
+}
+
+/** The door over one experiment application, behind a project door granting `granted`. */
+function mountInit({
+  stubs,
+  granted = ["experiments:manage"],
+}: {
+  stubs: Partial<ExperimentApi>;
+  granted?: readonly string[];
+}) {
+  const app = stubExperimentApi(stubs);
 
   const runtime = createRestRuntime({
     identity: {
-      // The door defers its scope: the process's credential port has already
-      // resolved the project and enforced the key's ceiling, so the runtime
-      // only identifies the caller.
-      identify: () => ({ actor: { type: "api_key", id: "key-1" }, scope: null }),
-      // Never reached: the route defers its scope, so the runtime identifies
-      // rather than authenticating. Supplied because the port declares both.
-      authenticate: () => {
-        throw new Error("a deferred route must not authenticate at the door");
+      authenticate: ({ request, permission }) => {
+        const presented = request.headers.get("Authorization");
+        if (!presented) throw new ProjectMissingCredentialsError();
+        if (presented !== `Bearer ${GOOD_KEY}`) throw new ProjectInvalidCredentialsError();
+        if (!granted.includes(permission)) throw new KeyCeilingDenied(permission);
+
+        return {
+          actor: { type: "api_key", id: "key-1" },
+          scope: { tier: "project", id: PROJECT_ID },
+        };
       },
     },
   });
 
   const hono = runtime.mount(experimentInitRest.router(), {
     app: () => app,
-    onError: (error, c) => c.json({ error: "Internal server error" }, 500),
+    // The family's boundary: a door that renders its own refusals never reaches it.
+    onError: (_error, c) => c.json({ boundary: "family" }, 500),
     facts: [
-      bindRestMiddleware(experimentInitCaller, () => ({
-        projectId: PROJECT_ID,
+      bindRestMiddleware(projectRestFacts, () => ({
         projectSlug: PROJECT_SLUG,
+        viewerUserId: null,
+        actorId: "key-1",
       })),
     ],
   });
 
-  return (body: string) =>
+  return (body: string, key: string | null = GOOD_KEY) =>
     hono.fetch(
       new Request("http://api.test/api/experiment/init", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(key === null ? {} : { Authorization: `Bearer ${key}` }),
+        },
         body,
       }),
     );
 }
 
+const FREE_SLUG = JSON.stringify({ experiment_slug: "nightly", experiment_type: "DSPY" });
+
 describe("given the SDK's experiment create-or-take door", () => {
+  describe("when the request carries no project key", () => {
+    /** @scenario "A create-or-take call with no credential is refused before the body is read" */
+    it("refuses at 401 with main's flat body naming the headers a token may be sent in", async () => {
+      const findOrCreateForRun = vi.fn();
+      const send = mountInit({ stubs: { findOrCreateForRun } });
+
+      const response = await send(FREE_SLUG, null);
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({
+        error: "Unauthorized",
+        message: new ProjectMissingCredentialsError().message,
+      });
+      expect(findOrCreateForRun).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the project key is not one the deployment knows", () => {
+    it("refuses at 401 with main's flat body", async () => {
+      const send = mountInit({ stubs: {} });
+
+      const response = await send(FREE_SLUG, "sk-lw-unknown");
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({
+        error: "Unauthorized",
+        message: new ProjectInvalidCredentialsError().message,
+      });
+    });
+  });
+
+  describe("when the key may not manage experiments", () => {
+    /** @scenario "A key without permission to manage experiments is refused as sent" */
+    it("refuses at 403 with the ceiling's code and meta spread flat", async () => {
+      const findOrCreateForRun = vi.fn();
+      const send = mountInit({ stubs: { findOrCreateForRun }, granted: [] });
+
+      const response = await send(FREE_SLUG);
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: "api_key_permission_denied",
+        message: "This API key may not do that",
+        permission: "experiments:manage",
+        fault: "customer",
+      });
+      expect(findOrCreateForRun).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when storing the experiment fails for a reason nobody handled", () => {
+    it("answers main's bare 500 sentence, not the family's envelope", async () => {
+      const send = mountInit({
+        stubs: {
+          findOrCreateForRun: async () => {
+            throw new Error("connection to db-7.internal refused");
+          },
+        },
+      });
+
+      const response = await send(FREE_SLUG);
+
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({ error: "Internal server error" });
+    });
+  });
+
+  describe("when the route is published", () => {
+    it("states the project key it enforces, not an open door", () => {
+      const declaration = experimentInitRest.router();
+
+      expect(
+        declaration.routes.map(
+          (route) => restRouteDocumentation({ route, credential: declaration.credential }).security,
+        ),
+      ).toEqual([[{ project_api_key: [] }]]);
+    });
+  });
+
   describe("when the body is not valid JSON", () => {
     /** @scenario "A body that is not valid JSON gets the door's own bare sentence" */
     it("refuses at 400 with a message field and no validation report", async () => {
       const findOrCreateForRun = vi.fn();
-      const send = mountInit({ findOrCreateForRun });
+      const send = mountInit({ stubs: { findOrCreateForRun } });
 
       const response = await send("{not json");
 
@@ -111,7 +217,7 @@ describe("given the SDK's experiment create-or-take door", () => {
     /** @scenario "A body naming neither identifier is refused with the validation sentence" */
     it("refuses at 400 with an error field carrying the schema's own sentence", async () => {
       const findOrCreateForRun = vi.fn();
-      const send = mountInit({ findOrCreateForRun });
+      const send = mountInit({ stubs: { findOrCreateForRun } });
 
       const response = await send(JSON.stringify({ experiment_type: "DSPY" }));
 
@@ -125,14 +231,14 @@ describe("given the SDK's experiment create-or-take door", () => {
     /** @scenario "A plan whose experiment limit is reached is refused with the limit in the body" */
     it("refuses at 403 with the code, the limit type, the current count and the maximum", async () => {
       const send = mountInit({
-        findOrCreateForRun: async () => {
-          throw new PlanLimitReached();
+        stubs: {
+          findOrCreateForRun: async () => {
+            throw new PlanLimitReached();
+          },
         },
       });
 
-      const response = await send(
-        JSON.stringify({ experiment_slug: "nightly", experiment_type: "DSPY" }),
-      );
+      const response = await send(FREE_SLUG);
 
       expect(response.status).toBe(403);
       expect(await response.json()).toEqual({
@@ -149,7 +255,7 @@ describe("given the SDK's experiment create-or-take door", () => {
     /** @scenario "A free slug creates the experiment and answers the app path" */
     it("creates the experiment and answers the app path built from the project's slug", async () => {
       const findOrCreateForRun = vi.fn(async () => experiment);
-      const send = mountInit({ findOrCreateForRun });
+      const send = mountInit({ stubs: { findOrCreateForRun } });
 
       const response = await send(
         JSON.stringify({ experiment_slug: "nightly-regression", experiment_type: "DSPY" }),

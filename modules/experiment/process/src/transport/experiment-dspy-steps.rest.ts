@@ -3,7 +3,6 @@
  * the create-or-take door beside it, this one answers its own bodies: an SDK
  * optimizer parses `{ message }`/`{ error }`, not a reshaping schema.
  */
-import { publicRoute } from "@langwatch/api/access";
 import {
   defineRestMiddleware,
   defineRestRouter,
@@ -24,25 +23,17 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
 import { dspyStepOf } from "../rules/experiment-dspy-step.rules.ts";
-
-/**
- * Experiments carry their own permission, decoupled from workflows. The check
- * itself is the process's: its bound credential fact resolves the project and
- * enforces `experiments:manage` before the public route handler runs.
- */
-const DOOR_REASON =
-  "the process's credential port resolves the project this key may act in and enforces experiments:manage as its ceiling before the handler runs";
+import { experimentDoorRefusal } from "./experiment-init.rest.ts";
 
 const logger = createLogger("langwatch:experiment:dspy");
 
 /** The 413 a body past its cap earns, in the plain sentence it has always been. */
-const payloadTooLarge = (): Error =>
-  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
+const payloadTooLarge = (): Error => new HTTPException(413, { message: "Payload Too Large" });
 
 /** Bodies up to 20MB: a single optimizer batch carries every example it saw. */
 const MAX_BODY_BYTES = 20 * 1024 * 1024;
 
-/** The project this request resolved to, bound by the process. */
+/** Retired: the project door resolves the caller. Kept while the package index re-exports it. */
 export const dspyStepsCaller = defineRestMiddleware(
   "dspyStepsCaller",
   z.object({ projectId: z.string() }),
@@ -124,8 +115,12 @@ export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
   // accepted, and answers its own sentence - built by `zodErrorMessage` from
   // the schema's own failure - on a bad batch.
   .withRawBody("text", { mediaType: "application/json" })
-  .withAccess(publicRoute({ reason: DOOR_REASON }))
-  .withResponse("protocol", { produces: "application/json", because: LEGACY_WIRE })
+  .withPermission("experiments:manage")
+  .withResponse("protocol", {
+    produces: "application/json",
+    because: LEGACY_WIRE,
+    refusal: experimentDoorRefusal,
+  })
   .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: payloadTooLarge })
   .withDocs({
     tags: ["Experiments"],
@@ -141,6 +136,7 @@ export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
           "The body was not valid JSON, failed validation, or carried timestamps in seconds rather than milliseconds",
       },
       { status: 401, description: "Missing or invalid API key" },
+      { status: 403, description: "The API key lacks experiments:manage" },
       {
         status: 500,
         description:
@@ -148,9 +144,8 @@ export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
       },
     ],
   })
-  .withMiddleware(dspyStepsCaller)
-  .handle(async ({ app, raw, response }, caller) => {
-    const { projectId } = caller;
+  .handle(async ({ app, raw, response, scope }) => {
+    const projectId = scope.id;
 
     // The size comes from the wire characters rather than a re-serialisation
     // of the parsed body: bodies here run to 20MB, and stringifying the parse

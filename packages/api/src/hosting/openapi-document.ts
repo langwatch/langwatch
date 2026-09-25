@@ -6,7 +6,11 @@ import type { Hono, MiddlewareHandler } from "hono";
  */
 import { generateSpecs } from "hono-openapi";
 
-import { hoistStraySchemaDefs, normalizeExclusiveBounds } from "../rest/openapi.ts";
+import {
+  hoistStraySchemaDefs,
+  normalizeExclusiveBounds,
+  publishEnumRecordKeys,
+} from "../rest/openapi.ts";
 
 const SECURITY_SCHEMES = {
   project_api_key: {
@@ -65,12 +69,13 @@ function documentation() {
 export function openapiDocumentRoute(restApp: Hono): MiddlewareHandler {
   return async (context) => {
     const generated = await generateSpecs(restApp, { documentation: documentation() });
-    // Both corrections rewrite in place, and hono-openapi hands every request the
+    // The corrections rewrite in place, and hono-openapi hands every request the
     // SAME resolved schema objects: correcting those would leave the second request
     // a `$defs` block already hoisted away and a ref pointing at nothing.
     const document: unknown = JSON.parse(JSON.stringify(generated));
 
     hoistStraySchemaDefs(document);
+    publishEnumRecordKeys(document);
 
     return context.json(normalizeExclusiveBounds(document));
   };

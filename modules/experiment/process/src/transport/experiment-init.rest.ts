@@ -2,13 +2,15 @@
  * POST /api/experiment/init: find-or-create slug endpoint. Returns raw bodies
  * (not handled-error envelope) to match SDK wire contract.
  */
-import { publicRoute } from "@langwatch/api/access";
 import {
   defineRestMiddleware,
   defineRestRouter,
   documentedResponses,
+  isFrameworkRefusal,
   MANAGEMENT_API_VERSION,
+  projectRestFacts,
   type RestProtocolProducer,
+  type RestProtocolRefusal,
 } from "@langwatch/api/rest";
 import { zodErrorMessage } from "@langwatch/config";
 import {
@@ -22,26 +24,14 @@ import { resolveRequestBound } from "@langwatch/plans";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
-/**
- * Experiments carry their own permission, decoupled from workflows. The check
- * itself is the process's: its bound credential fact resolves the project and
- * enforces `experiments:manage` before the public route handler runs.
- */
-const DOOR_REASON =
-  "the process's credential port resolves the project this key may act in and enforces experiments:manage as its ceiling before the handler runs";
-
 const logger = createLogger("langwatch:experiment:init");
 
 /** The 413 a body past its cap earns, in the plain sentence it has always been. */
-const payloadTooLarge = (): Error =>
-  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
+const payloadTooLarge = (): Error => new HTTPException(413, { message: "Payload Too Large" });
 
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
-/**
- * The project this request resolved to, bound by the process after its own
- * credential port has refused anything that should not reach the handler.
- */
+/** Retired: the project door resolves the caller. Kept while the package index re-exports it. */
 export const experimentInitCaller = defineRestMiddleware(
   "experimentInitCaller",
   z.object({ projectId: z.string(), projectSlug: z.string() }),
@@ -50,6 +40,42 @@ export const experimentInitCaller = defineRestMiddleware(
 /** A JSON answer this door writes itself, in the shape an SDK parses. */
 const LEGACY_WIRE =
   "The SDKs read this family's own flat bodies: `{ message }` for a body that is not JSON, `{ error }` with the validation sentence, and the flat plan-limit refusal at 403.";
+
+/** Main's flat body for a handled refusal below 500: the credential sentence, or code and meta. */
+function flatRefusalBody(failure: HandledError): object {
+  if (failure.httpStatus === 401) return { error: "Unauthorized", message: failure.message };
+
+  return {
+    error: failure.code,
+    message: failure.message,
+    ...failure.meta,
+    ...(failure.tips.length > 0 ? { tips: failure.tips } : {}),
+    ...(failure.docsUrl ? { docsUrl: failure.docsUrl } : {}),
+    fault: failure.fault,
+  };
+}
+
+/**
+ * Every refusal the experiment SDK doors raise, the project door's included, in main's flat
+ * bodies; a body past its cap is the plain sentence, and anything unhandled is the bare 500.
+ */
+export const experimentDoorRefusal: RestProtocolRefusal = ({ failure, response }) => {
+  if (isFrameworkRefusal(failure)) {
+    return response.write({
+      status: failure.status,
+      mediaType: "text/plain",
+      body: failure.message,
+    });
+  }
+
+  const handled = HandledError.isHandled(failure) && failure.httpStatus < 500;
+
+  return response.write({
+    status: handled ? failure.httpStatus : 500,
+    mediaType: "application/json",
+    body: JSON.stringify(handled ? flatRefusalBody(failure) : { error: "Internal server error" }),
+  });
+};
 
 const answer = ({
   response,
@@ -95,8 +121,12 @@ export const experimentInitRest = defineRestRouter(ExperimentApi)
   // which a validated input cannot hand back.
   .withRawBody("text", { mediaType: "application/json" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
-  .withAccess(publicRoute({ reason: DOOR_REASON }))
-  .withResponse("protocol", { produces: "application/json", because: LEGACY_WIRE })
+  .withPermission("experiments:manage")
+  .withResponse("protocol", {
+    produces: "application/json",
+    because: LEGACY_WIRE,
+    refusal: experimentDoorRefusal,
+  })
   .withDocs({
     tags: ["Experiments"],
     summary: "Create an experiment",
@@ -118,8 +148,8 @@ export const experimentInitRest = defineRestRouter(ExperimentApi)
       },
     ],
   })
-  .withMiddleware(experimentInitCaller)
-  .handle(async ({ app, raw, response }, caller) => {
+  .withMiddleware(projectRestFacts)
+  .handle(async ({ app, raw, response, scope }, facts) => {
     let rawBody: unknown;
     try {
       rawBody = JSON.parse(raw);
@@ -129,10 +159,7 @@ export const experimentInitRest = defineRestRouter(ExperimentApi)
 
     const parsed = experimentInitBodySchema.safeParse(rawBody);
     if (!parsed.success) {
-      logger.error(
-        { error: parsed.error, projectId: caller.projectId },
-        "invalid init data received",
-      );
+      logger.error({ error: parsed.error, projectId: scope.id }, "invalid init data received");
 
       return answer({ response, status: 400, body: { error: zodErrorMessage(parsed.error) } });
     }
@@ -143,7 +170,7 @@ export const experimentInitRest = defineRestRouter(ExperimentApi)
       // slug, so an id-only request passed validation and then raised
       // "Either experiment_id or experiment_slug is required" as a 500.
       const experiment = await app.findOrCreateForRun({
-        projectId: caller.projectId,
+        projectId: scope.id,
         experimentId: params.experiment_id,
         experimentSlug: params.experiment_slug,
         experimentType: params.experiment_type,
@@ -155,7 +182,7 @@ export const experimentInitRest = defineRestRouter(ExperimentApi)
         response,
         status: 200,
         body: {
-          path: `/${caller.projectSlug}/experiments/${experiment.slug}`,
+          path: `/${facts.projectSlug}/experiments/${experiment.slug}`,
           slug: experiment.slug,
         },
       });
