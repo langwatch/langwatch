@@ -55,6 +55,9 @@
       "path": "../../../packages/ui-kernel/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/api-fixture/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/vitest-config/tsconfig.build.json"
     }
   ]
