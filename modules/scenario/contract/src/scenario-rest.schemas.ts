@@ -117,6 +117,11 @@ export const scenarioRestVersionDetailResponseSchema = z.object({
       judgeModel: z.string().nullable(),
       maxTurns: z.number().nullable(),
       minTurns: z.number().nullable(),
+      fields: scenarioFieldValuesSchema
+        .optional()
+        .describe(
+          "The field values as this version saved them. Absent on servers that predate suite fields.",
+        ),
     })
     .describe("The editable content of the case as this version saved it."),
 });

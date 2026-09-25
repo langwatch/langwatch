@@ -54,13 +54,26 @@ const DEPRECATION = {
 } as const;
 
 /** The refusal for a body that names targets the addressed row does not take. */
-function storedTargetsRefusal(operation: "run" | "update"): ValidationError {
-  const message =
-    operation === "run"
-      ? "A run plan runs the targets it stores; send targets only when the id names a test suite"
-      : "A test suite gets its targets when a run is started, so it stores none";
+function storedTargetsRefusal(): ValidationError {
+  const message = "A test suite gets its targets when a run is started, so it stores none";
 
   return new ValidationError(message, { meta: { fieldErrors: { targets: [message] } } });
+}
+
+const PLAN_EXECUTION_FIELDS = ["targets", "repeatCount", "simulatorModel", "judgeModel"] as const;
+
+/** A run plan runs its stored configuration: one refusal naming every execution field sent. */
+function refuseExecutionFields(
+  input: Partial<Record<(typeof PLAN_EXECUTION_FIELDS)[number], unknown>>,
+): void {
+  const sent = PLAN_EXECUTION_FIELDS.filter((field) => input[field] !== undefined);
+  if (sent.length === 0) return;
+
+  const message =
+    "A run plan runs its stored configuration. Send a new configuration to run-plans/run.";
+  throw new ValidationError(message, {
+    meta: { fieldErrors: Object.fromEntries(sent.map((field) => [field, [message]])) },
+  });
 }
 
 /** A scope this family accepted, as the domain reads it. */
@@ -224,7 +237,7 @@ async function refuseTargetsOnTestSuite(params: {
   projectId: string;
 }): Promise<void> {
   const found = await params.app.getByIdOrTestSuite({ id: params.id, projectId: params.projectId });
-  if (found.kind === "test_suite") throw storedTargetsRefusal("update");
+  if (found.kind === "test_suite") throw storedTargetsRefusal();
 }
 
 async function updateSuite(params: {
@@ -312,17 +325,19 @@ async function scheduleRun(params: {
 }): Promise<z.infer<typeof suiteRunResultSchema>> {
   const { app, input, projectId, idempotencyKey, actor } = params;
   const found = await app.getByIdOrTestSuite({ id: input.id, projectId });
-  if (found.kind !== "test_suite" && input.targets !== undefined) {
-    throw storedTargetsRefusal("run");
-  }
+  if (found.kind !== "test_suite") refuseExecutionFields(input);
 
   const result =
     found.kind === "test_suite"
       ? await app.runPlan({
           projectId,
+          ...(input.name !== undefined && { name: input.name }),
           config: {
             scope: { mode: "test_suites", testSuiteIds: [input.id] },
             targets: input.targets ?? [],
+            ...(input.repeatCount !== undefined && { repeatCount: input.repeatCount }),
+            ...(input.simulatorModel !== undefined && { simulatorModel: input.simulatorModel }),
+            ...(input.judgeModel !== undefined && { judgeModel: input.judgeModel }),
           },
           idempotencyKey,
           ...(input.parameters !== undefined && { parameters: input.parameters }),
@@ -499,7 +514,7 @@ export function createSuitesAliasRest(): Readonly<{
       .withOutput(suiteRunResultSchema)
       .withDocs({
         description:
-          "Trigger a suite run. Schedules scenario executions for all active scenarios x targets x repeatCount. When the id names a test suite, the targets are read from the body.",
+          "Trigger a suite run. Schedules scenario executions for all active scenarios x targets x repeatCount. When the id names a test suite, the targets, the repeat count and the models are read from the body.",
         responses: notFound,
       })
       .withMiddleware(projectRestFacts, suiteSurfaceFact)

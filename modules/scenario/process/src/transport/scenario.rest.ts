@@ -12,6 +12,7 @@ import {
  */
 import { createLogger } from "@langwatch/observability";
 import {
+  parseScenarioFieldValues,
   parseScenarioParameterDefinitions,
   ScenarioApi,
   type Scenario,
@@ -361,6 +362,7 @@ export function createScenarioRest(): Readonly<{
             judgeModel: detail.fields.judgeModel,
             maxTurns: detail.fields.maxTurns,
             minTurns: detail.fields.minTurns,
+            fields: parseScenarioFieldValues(detail.fields.fields),
           },
         };
       })

@@ -136,4 +136,20 @@ describe("POST /api/suites/:id/run", () => {
       expect(await response.json()).toMatchObject({ error: "scenario_parameter_unknown" });
     });
   });
+
+  describe("when the id names a run plan and the body carries execution settings", () => {
+    it("refuses with validation_error and runs nothing", async () => {
+      const run = vi.fn().mockResolvedValue(runResult);
+      const api = buildApi(run);
+
+      const response = await api.fetch("/api/suites/suite_1/run", {
+        repeatCount: 2,
+        judgeModel: "openai/gpt-5",
+      });
+
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ error: "validation_error" });
+      expect(run).not.toHaveBeenCalled();
+    });
+  });
 });

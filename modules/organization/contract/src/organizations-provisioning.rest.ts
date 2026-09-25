@@ -34,9 +34,11 @@ export const organizationsProvisioningRestCreatedSchema = z.object({
     name: z.string(),
     slug: z.string(),
   }),
-  // The team the provisioning port built alongside it, passed through in the
-  // shape that port returns rather than restated here.
-  team: z.unknown(),
+  team: z.object({
+    id: z.string().min(1),
+    name: z.string(),
+    slug: z.string(),
+  }),
   adminApiKey: z.object({ id: z.string().min(1), token: z.string().min(1) }),
 });
 

@@ -1,7 +1,8 @@
 import { runNoteSchema, runParameterValuesSchema } from "@langwatch/scenario-contract";
 import { z } from "zod";
 
-import { suiteTargetSchema } from "./suite.ts";
+import { MAX_PLAN_NAME_LENGTH } from "./plan-name.ts";
+import { MAX_REPEAT_COUNT, suiteTargetSchema } from "./suite.ts";
 
 /** What a query string may say for yes and for no. Compared case-folded. */
 const QUERY_BOOLEAN_TRUE = ["true", "1", "yes"];
@@ -211,11 +212,41 @@ export const updateSuiteInputSchema = z.object({
 
 export const runSuiteInputSchema = z.object({
   idempotencyKey: z.string().optional(),
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .max(MAX_PLAN_NAME_LENGTH)
+    .optional()
+    .describe(
+      "The run plan this run joins or creates. Used only when the id names a test suite; derived from the suite name and the targets when absent.",
+    ),
   targets: z
     .array(suiteTargetSchema)
     .optional()
     .describe(
       "The prompts, agents or workflows the run goes against. Read only when the id names a test suite, which stores no target of its own; a run plan already holds its own and refuses these.",
+    ),
+  repeatCount: z
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_REPEAT_COUNT)
+    .optional()
+    .describe(
+      `How many times each scenario and target pairing runs, between 1 and ${MAX_REPEAT_COUNT}. Used only when the id names a test suite.`,
+    ),
+  simulatorModel: z
+    .string()
+    .nullish()
+    .describe(
+      "The model that plays the user for every scenario in the run. Used only when the id names a test suite.",
+    ),
+  judgeModel: z
+    .string()
+    .nullish()
+    .describe(
+      "The model that judges every scenario in the run. Used only when the id names a test suite.",
     ),
   parameters: runParameterValuesSchema
     .optional()

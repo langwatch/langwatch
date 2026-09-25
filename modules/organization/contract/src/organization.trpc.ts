@@ -1,6 +1,7 @@
 /** Organization and membership procedures; `invite.*` is its own namespace (`invite.trpc.ts`). */
 
 import { defineTrpcContract } from "@langwatch/api/contract";
+import { signUpDataSchema } from "@langwatch/onboarding-contract";
 import { z } from "zod";
 
 import {
@@ -24,19 +25,11 @@ import {
 } from "./organization.trpc-schemas.ts";
 import { organizationIntentSchema } from "./organization.ts";
 
-/**
- * The sign-up questionnaire, as the ceremony forwards it. Opaque on purpose:
- * the questions are the deployment's, and every reader of the answers is a
- * capability the process supplies.
- */
-export const organizationApiSignUpDataSchema = z.record(z.string(), z.unknown());
-export type OrganizationApiSignUpData = z.infer<typeof organizationApiSignUpDataSchema>;
-
 /** The first organization a person creates, and the name they gave it. */
 export const organizationApiCreateAndAssignInputSchema = z.object({
   orgName: z.string().optional(),
   phoneNumber: z.string().optional(),
-  signUpData: organizationApiSignUpDataSchema.optional(),
+  signUpData: signUpDataSchema.optional(),
   primaryIntent: organizationIntentSchema.optional(),
 });
 export type OrganizationApiCreateAndAssignInput = z.infer<

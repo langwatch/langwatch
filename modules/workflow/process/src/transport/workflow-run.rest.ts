@@ -35,6 +35,7 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
       "integrations; this one stays for callers written against it. The body is the workflow's " +
       "own input fields, named as its entry node names them.",
     tags: ["Workflows"],
+    requestBody: { schema: workflowRunRestBodySchema },
   })
   .handle(({ app, input, scope }) => {
     const { workflowId, versionId, ...inputs } = input;
@@ -55,6 +56,7 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
       "workflow's published version; address a specific version with the `{versionId}` form of " +
       "this path. The body is the workflow's own input fields, named as its entry node names them.",
     tags: ["Workflows"],
+    requestBody: { schema: workflowRunRestBodySchema },
   })
   .handle(({ app, input, scope }) => {
     const { workflowId, ...inputs } = input;
@@ -75,6 +77,7 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
       "output. Use this when a caller must keep hitting the same version as the workflow is " +
       "edited. The body is the workflow's own input fields, named as its entry node names them.",
     tags: ["Workflows"],
+    requestBody: { schema: workflowRunRestBodySchema },
   })
   .handle(({ app, input, scope }) => {
     const { workflowId, versionId, ...inputs } = input;
