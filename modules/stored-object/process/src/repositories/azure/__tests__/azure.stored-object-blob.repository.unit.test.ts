@@ -20,7 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // responses.
 const getAzureBlobTokenMock = vi.fn();
 const invalidateAzureBlobTokenMock = vi.fn();
-vi.mock("#adapters/azure-blob-token-provider.adapter", () => ({
+vi.mock("#services/azure-blob-token-provider.service", () => ({
   AzureBlobTokenProviderAdapter: {
     getAzureBlobToken: (...args: unknown[]) => getAzureBlobTokenMock(...args),
     invalidateAzureBlobToken: (...args: unknown[]) => invalidateAzureBlobTokenMock(...args),

@@ -28,8 +28,20 @@ const REPO_ROOT = (() => {
   return directory;
 })();
 
-/** The processes that own recurring and operator-launched work. */
-const SCHEDULED_WORK_ROOTS = ["apps/worker/src", "apps/tasks/src"];
+/** Every module's eventing half, where scheduled process managers live. */
+function eventingRootsUnder(modulesRoot: string): string[] {
+  return readdirSync(path.join(REPO_ROOT, modulesRoot))
+    .map((name) => path.join(modulesRoot, name, "process", "src", "eventing"))
+    .filter((root) => existsSync(path.join(REPO_ROOT, root)));
+}
+
+/** The processes and pipelines that own recurring and operator-launched work. */
+const SCHEDULED_WORK_ROOTS = [
+  "apps/worker/src",
+  "apps/tasks/src",
+  ...eventingRootsUnder("modules"),
+  ...eventingRootsUnder("enterprise/modules"),
+];
 
 /** What deleting a stored object looks like, at the row and at the bytes. */
 const DELETION_MARKERS = ["deleteOwnedBy", "deleteByProject", "stored_objects"];

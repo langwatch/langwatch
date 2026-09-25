@@ -168,6 +168,8 @@ describe("TraceIngestionService.handleOtlpTraceRequest", () => {
 
       await expect(handle(service, [span()])).resolves.toEqual({
         rejectedSpans: 0,
+        ingestionFailures: 0,
+        ingestionFailureMessage: "",
         errorMessage: "",
       });
     });
@@ -219,7 +221,12 @@ describe("TraceIngestionService.handleOtlpTraceRequest", () => {
 
       await expect(
         service.handleOtlpTraceRequest("project-1", {} as never, piiRedactionLevel),
-      ).resolves.toEqual({ rejectedSpans: 0, errorMessage: "" });
+      ).resolves.toEqual({
+        rejectedSpans: 0,
+        ingestionFailures: 0,
+        ingestionFailureMessage: "",
+        errorMessage: "",
+      });
     });
   });
 
@@ -358,6 +365,8 @@ describe("TraceIngestionService.handleOtlpTraceRequest", () => {
 
       await expect(handle(service, [span()])).resolves.toEqual({
         rejectedSpans: 0,
+        ingestionFailures: 0,
+        ingestionFailureMessage: "",
         errorMessage: "",
       });
     });
@@ -383,6 +392,8 @@ describe("TraceIngestionService.handleOtlpTraceRequest", () => {
 
       await expect(handle(service, [span()])).resolves.toEqual({
         rejectedSpans: 0,
+        ingestionFailures: 0,
+        ingestionFailureMessage: "",
         errorMessage: "",
       });
     });
@@ -395,6 +406,8 @@ describe("TraceIngestionService.handleOtlpTraceRequest", () => {
 
       await expect(handle(service, [span()])).resolves.toEqual({
         rejectedSpans: 1,
+        ingestionFailures: 1,
+        ingestionFailureMessage: "pipeline down",
         errorMessage: "pipeline down",
       });
     });

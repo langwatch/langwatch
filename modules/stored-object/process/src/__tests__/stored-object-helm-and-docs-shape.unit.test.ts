@@ -320,15 +320,15 @@ describe(".env.example and self-hosting docs describe the Azure stored-objects b
 describe("Route handlers delegate to the service and never touch the repository directly", () => {
   describe("when /api/scenario-events route imports are inspected", () => {
     /** @scenario "Route handlers delegate to the service and never touch the repository directly" */
-    it("takes media extraction as an injected port and does not import the repository", () => {
-      // The family moved to `@langwatch/platform-api`, which has no stored
-      // objects of its own: the walk arrives as a port the process binds to
-      // its own service, so the transport cannot reach past it.
+    it("reaches media extraction through TraceApi and does not import the repository", () => {
       const route = readRepoFile("modules/scenario/process/src/transport/scenario-event.rest.ts");
+      const service = readRepoFile(
+        "modules/scenario/process/src/services/scenario-event.service.ts",
+      );
 
-      expect(route).toContain("extractInlineMedia");
-      // Direct repository import would be a layering violation
+      expect(service).toContain("this.#traces.extractInlineMediaFromEvent(");
       expect(route).not.toContain("stored-objects.repository");
+      expect(service).not.toContain("stored-objects.repository");
     });
   });
 

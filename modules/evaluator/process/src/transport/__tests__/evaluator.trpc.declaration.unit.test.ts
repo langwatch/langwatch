@@ -59,8 +59,8 @@ function valueImports(source: string): string[] {
 
 const DECLARATION_SOURCES = [
   "contract/src/evaluator.trpc.ts",
-  "server/src/transport/evaluator.trpc.ts",
-  "server/src/transport/evaluator.rest.ts",
+  "process/src/transport/evaluator.trpc.ts",
+  "process/src/transport/evaluator.rest.ts",
 ];
 
 describe("the evaluator tRPC declaration", () => {

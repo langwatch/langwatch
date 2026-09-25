@@ -17,9 +17,9 @@ const WEEK = {
   end: "2026-02-08T00:00:00.000Z",
 };
 const TIMESERIES_SQL =
-  "SELECT toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket, " +
+  "SELECT toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket, " +
   "count() AS value FROM analytics.traces " +
-  "WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime} " +
+  "WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime} " +
   "GROUP BY bucket";
 
 /** The runner every case here is measured for: nothing content-gated is hidden. */
@@ -77,9 +77,9 @@ describe("Dashboard saved-chart execution", () => {
     expect(executor.calls).toHaveLength(1);
     expect(executor.calls[0]!.sql).toContain("FROM analytics.traces");
     expect(executor.calls[0]!.parameters).toMatchObject({
-      period_granularity_seconds: 3_600,
-      period_start: "2026-02-01 00:00:00",
-      period_end: "2026-02-08 00:00:00",
+      dashboard_context_granularity_seconds: 3_600,
+      dashboard_context_period_start: "2026-02-01 00:00:00",
+      dashboard_context_period_end: "2026-02-08 00:00:00",
     });
   });
 

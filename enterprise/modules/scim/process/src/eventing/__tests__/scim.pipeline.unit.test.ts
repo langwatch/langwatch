@@ -19,7 +19,7 @@ describe("given SCIM's eventing declaration", () => {
   describe("when the module is declared", () => {
     /** @scenario "The worker runs the request log's retention sweep on a schedule" */
     it("carries the six-hourly retention sweep onto the installable module", () => {
-      expect(scimServer.eventing).toBe(scimEventing);
+      expect(scimServer.eventing?.pipeline.split(", ")).toContain(SCIM_MAINTENANCE_PIPELINE_NAME);
       expect(scimEventing.pipeline).toBe(SCIM_MAINTENANCE_PIPELINE_NAME);
       expect(SCIM_REQUEST_LOG_RETENTION_INTERVAL_MS).toBe(6 * HOUR_MS);
     });
