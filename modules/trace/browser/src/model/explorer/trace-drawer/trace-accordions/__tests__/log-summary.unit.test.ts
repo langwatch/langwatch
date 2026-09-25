@@ -141,3 +141,23 @@ describe("logEventTone", () => {
     expect(logEventTone(log({ "event.name": "some_future_event" }))).toBe("neutral");
   });
 });
+
+describe("summarizeLogEvent across the event families", () => {
+  it.each([
+    [{ "event.name": "user_prompt", prompt: "hello" }, "User sent a prompt (5 chars)"],
+    [{ "event.name": "assistant_response", model: "gpt" }, "Assistant replied (gpt)"],
+    [{ "event.name": "turn_ttft", duration_ms: "40" }, "First token after 40 ms"],
+    [{ "event.name": "turn_ttft" }, "First token timing reported"],
+    [{ "event.name": "tool_decision", decision: "accept" }, "Approved a tool"],
+    [{ "event.name": "permission_mode_changed" }, "Approval mode changed to unknown"],
+    [{ "event.name": "skill_activated", name: "review" }, "Skill activated: review"],
+    [{ "event.name": "mcp_server_connection" }, "Connected to MCP server"],
+    [{ "event.name": "hook_execution_complete", name: "lint" }, "Hook ran: lint"],
+    [{ "event.name": "at_mention" }, "@-mentioned a file"],
+    [{ "event.name": "subtask_invoked", subagent_type: "explore" }, "Sub-agent invoked: explore"],
+    [{ "event.name": "commit" }, "Commit created"],
+    [{ "event.name": "internal_error" }, "The session hit an internal error"],
+  ])("summarises %o", (attributes, expected) => {
+    expect(summarizeLogEvent(log(attributes))).toBe(expected);
+  });
+});

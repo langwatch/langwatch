@@ -9,7 +9,7 @@ import {
 } from "@langwatch/trace-browser-kit";
 import { getFacetValueState, extractRangeValue } from "@langwatch/trace-contract";
 import type { LiqeQuery } from "liqe";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, type LucideIcon } from "lucide-react";
 import type React from "react";
 import { memo } from "react";
 
@@ -104,42 +104,114 @@ function pickSectionRenderer<T>({
   return undefined;
 }
 
-const SectionRendererInner: React.FC<SectionRendererProps> = ({
+const SectionRendererInner: React.FC<SectionRendererProps> = (props) => {
+  const { section } = props;
+  const icon = getFacetIcon({ key: section.key, group: section.group });
+  if (section.kind === "cat")
+    return <CategoricalSectionRenderer {...props} section={section} icon={icon} />;
+  if (section.kind === "range")
+    return <RangeSectionRenderer {...props} section={section} icon={icon} />;
+  return <AttributesSectionRenderer {...props} section={section} icon={icon} />;
+};
+
+const CategoricalSectionRenderer: React.FC<
+  SectionRendererProps & { section: Extract<Section, { kind: "cat" }>; icon: LucideIcon }
+> = ({
   section,
   ast,
   facetItemsByKey,
   valueStateGetters,
   toggleFacet,
   excludeFacet,
-  setRange,
-  removeRange,
   toggleEvaluatorSubFilter,
   setEvaluatorScoreRange,
   removeEvaluatorScoreRange,
   onShiftToggle,
   onHide,
   dragHandleProps,
-  numericModeByKey,
-  setNumericMode,
+  icon,
 }) => {
-  const icon = getFacetIcon({ key: section.key, group: section.group });
+  const noneToggleValue = NONE_TOGGLE_VALUE[section.key];
+  const noneRow = noneToggleValue
+    ? {
+        active: getFacetValueState(ast, "none", noneToggleValue) === "include",
+        onToggle: () => toggleFacet({ field: "none", value: noneToggleValue }),
+      }
+    : undefined;
 
-  if (section.kind === "cat") {
-    const noneToggleValue = NONE_TOGGLE_VALUE[section.key];
-    const noneRow = noneToggleValue
-      ? {
-          active: getFacetValueState(ast, "none", noneToggleValue) === "include",
-          onToggle: () => toggleFacet({ field: "none", value: noneToggleValue }),
+  // Evaluator section gets an inline drilldown rendered under each ACTIVE evaluator
+  // row — verdict pills, score range, label flag — sourced from the `aggregates` the
+  // discover endpoint already attached to each evaluator value. No second query.
+  const eventActiveRowExtras = (item: FacetItem) =>
+    item.eventMetrics ? <EventDrilldown item={item} ast={ast} toggleFacet={toggleFacet} /> : null;
+  const evaluatorActiveRowExtras = (item: FacetItem) =>
+    item.aggregates ? (
+      <EvaluatorDrilldown
+        item={item}
+        ast={ast}
+        toggleSubFilter={({ field, value }) =>
+          toggleEvaluatorSubFilter({
+            evaluatorId: item.value,
+            field,
+            value,
+          })
         }
-      : undefined;
+        setScoreRange={({ from, to }) =>
+          setEvaluatorScoreRange({
+            evaluatorId: item.value,
+            from,
+            to,
+          })
+        }
+        removeScoreRange={() => removeEvaluatorScoreRange({ evaluatorId: item.value })}
+      />
+    ) : null;
+  const renderActiveRowExtras = pickSectionRenderer({
+    sectionKey: section.key,
+    event: eventActiveRowExtras,
+    evaluator: evaluatorActiveRowExtras,
+  });
 
-    // Evaluator section gets an inline drilldown rendered under each ACTIVE evaluator
-    // row — verdict pills, score range, label flag — sourced from the `aggregates` the
-    // discover endpoint already attached to each evaluator value. No second query.
-    const eventActiveRowExtras = (item: FacetItem) =>
-      item.eventMetrics ? <EventDrilldown item={item} ast={ast} toggleFacet={toggleFacet} /> : null;
-    const evaluatorActiveRowExtras = (item: FacetItem) =>
-      item.aggregates ? (
+  // INACTIVE evaluator rows also get a drilldown affordance: a small chevron expand
+  // toggle.
+  const eventInactiveRowExtras = (
+    item: FacetItem,
+    isExpanded: boolean,
+    onToggleExpand: () => void,
+  ) => {
+    // No metrics on this event type → no expand affordance (same
+    // gating the evaluator applies via `aggregates`).
+    if (!item.eventMetrics) return null;
+    return {
+      trailing: (
+        <ExpandChevron
+          isExpanded={isExpanded}
+          onToggleExpand={onToggleExpand}
+          subject="event metric"
+        />
+      ),
+      below: isExpanded ? <EventDrilldown item={item} ast={ast} toggleFacet={toggleFacet} /> : null,
+    };
+  };
+  const evaluatorInactiveRowExtras = (
+    item: FacetItem,
+    isExpanded: boolean,
+    onToggleExpand: () => void,
+  ) => {
+    if (!item.aggregates) return null;
+    // Picking a verdict / score / label on an inactive evaluator
+    // also enables the `evaluator:<id>` anchor — the group mutation
+    // adds it automatically, so no explicit activation wrapper is
+    // needed here.
+    return {
+      trailing: (
+        <ExpandChevron
+          isExpanded={isExpanded}
+          onToggleExpand={onToggleExpand}
+          subject="evaluator"
+        />
+      ),
+      below: isExpanded ? (
         <EvaluatorDrilldown
           item={item}
           ast={ast}
@@ -159,167 +231,92 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
           }
           removeScoreRange={() => removeEvaluatorScoreRange({ evaluatorId: item.value })}
         />
-      ) : null;
-    const renderActiveRowExtras = pickSectionRenderer({
-      sectionKey: section.key,
-      event: eventActiveRowExtras,
-      evaluator: evaluatorActiveRowExtras,
-    });
-
-    // INACTIVE evaluator rows also get a drilldown affordance: a small chevron expand
-    // toggle.
-    const eventInactiveRowExtras = (
-      item: FacetItem,
-      isExpanded: boolean,
-      onToggleExpand: () => void,
-    ) => {
-      // No metrics on this event type → no expand affordance (same
-      // gating the evaluator applies via `aggregates`).
-      if (!item.eventMetrics) return null;
-      return {
-        trailing: (
-          <ExpandChevron
-            isExpanded={isExpanded}
-            onToggleExpand={onToggleExpand}
-            subject="event metric"
-          />
-        ),
-        below: isExpanded ? (
-          <EventDrilldown item={item} ast={ast} toggleFacet={toggleFacet} />
-        ) : null,
-      };
+      ) : null,
     };
-    const evaluatorInactiveRowExtras = (
-      item: FacetItem,
-      isExpanded: boolean,
-      onToggleExpand: () => void,
-    ) => {
-      if (!item.aggregates) return null;
-      // Picking a verdict / score / label on an inactive evaluator
-      // also enables the `evaluator:<id>` anchor — the group mutation
-      // adds it automatically, so no explicit activation wrapper is
-      // needed here.
-      return {
-        trailing: (
-          <ExpandChevron
-            isExpanded={isExpanded}
-            onToggleExpand={onToggleExpand}
-            subject="evaluator"
-          />
-        ),
-        below: isExpanded ? (
-          <EvaluatorDrilldown
-            item={item}
-            ast={ast}
-            toggleSubFilter={({ field, value }) =>
-              toggleEvaluatorSubFilter({
-                evaluatorId: item.value,
-                field,
-                value,
-              })
-            }
-            setScoreRange={({ from, to }) =>
-              setEvaluatorScoreRange({
-                evaluatorId: item.value,
-                from,
-                to,
-              })
-            }
-            removeScoreRange={() => removeEvaluatorScoreRange({ evaluatorId: item.value })}
-          />
-        ) : null,
-      };
-    };
-    const renderInactiveRowExtras = pickSectionRenderer({
-      sectionKey: section.key,
-      event: eventInactiveRowExtras,
-      evaluator: evaluatorInactiveRowExtras,
-    });
+  };
+  const renderInactiveRowExtras = pickSectionRenderer({
+    sectionKey: section.key,
+    event: eventInactiveRowExtras,
+    evaluator: evaluatorInactiveRowExtras,
+  });
 
-    const facetSection = (
+  const facetSection = (
+    <FacetSection
+      title={section.label}
+      icon={icon}
+      field={section.key}
+      items={facetItemsByKey.get(section.key)!}
+      getValueState={valueStateGetters.get(section.key)!}
+      onToggle={(field, value) => toggleFacet({ field, value })}
+      onExclude={(field, value) => excludeFacet({ field, value })}
+      onShiftToggle={onShiftToggle}
+      onHide={onHide}
+      dragHandleProps={dragHandleProps}
+      noneRow={noneRow}
+      renderActiveRowExtras={renderActiveRowExtras}
+      renderInactiveRowExtras={renderInactiveRowExtras}
+      synthetic={section.synthetic}
+      // Categorical facets get server-side value search; the discrete-range
+      // branch below omits it (the discriminator is the render BRANCH, not
+      // the `field`). See useFacetSearch — server search is categorical-only.
+      serverValueSearch
+    />
+  );
+
+  // Stable spotlight anchor for the tour's evaluator step — the
+  // drilldown anchor only exists while a row is expanded, so the
+  // tour falls back to the whole evaluator section.
+  if (section.key === "evaluator") {
+    return <Box data-spotlight="evaluator-section">{facetSection}</Box>;
+  }
+  return facetSection;
+};
+
+const RangeSectionRenderer: React.FC<
+  SectionRendererProps & { section: Extract<Section, { kind: "range" }>; icon: LucideIcon }
+> = ({
+  section,
+  ast,
+  facetItemsByKey,
+  valueStateGetters,
+  toggleFacet,
+  excludeFacet,
+  setRange,
+  removeRange,
+  onShiftToggle,
+  onHide,
+  dragHandleProps,
+  numericModeByKey,
+  setNumericMode,
+  icon,
+}) => {
+  // Discrete-eligible numeric facets carry an entry in `numericModeByKey`.
+  // When the effective mode is "discrete" the distinct values render as a
+  // categorical multi-select (reusing FacetSection); otherwise the slider.
+  // The header toggle, present in both, flips between them.
+  const mode = numericModeByKey.get(section.key);
+  const modeToggleProps =
+    mode !== undefined
+      ? {
+          mode,
+          onToggle: () =>
+            setNumericMode({
+              field: section.key,
+              mode: mode === "discrete" ? "range" : "discrete",
+            }),
+        }
+      : undefined;
+
+  if (mode === "discrete") {
+    return (
       <FacetSection
         title={section.label}
         icon={icon}
         field={section.key}
-        items={facetItemsByKey.get(section.key)!}
-        getValueState={valueStateGetters.get(section.key)!}
+        items={facetItemsByKey.get(section.key) ?? []}
+        getValueState={valueStateGetters.get(section.key) ?? ((): FacetValueState => "neutral")}
         onToggle={(field, value) => toggleFacet({ field, value })}
         onExclude={(field, value) => excludeFacet({ field, value })}
-        onShiftToggle={onShiftToggle}
-        onHide={onHide}
-        dragHandleProps={dragHandleProps}
-        noneRow={noneRow}
-        renderActiveRowExtras={renderActiveRowExtras}
-        renderInactiveRowExtras={renderInactiveRowExtras}
-        synthetic={section.synthetic}
-        // Categorical facets get server-side value search; the discrete-range
-        // branch below omits it (the discriminator is the render BRANCH, not
-        // the `field`). See useFacetSearch — server search is categorical-only.
-        serverValueSearch
-      />
-    );
-
-    // Stable spotlight anchor for the tour's evaluator step — the
-    // drilldown anchor only exists while a row is expanded, so the
-    // tour falls back to the whole evaluator section.
-    if (section.key === "evaluator") {
-      return <Box data-spotlight="evaluator-section">{facetSection}</Box>;
-    }
-    return facetSection;
-  }
-
-  if (section.kind === "range") {
-    // Discrete-eligible numeric facets carry an entry in `numericModeByKey`.
-    // When the effective mode is "discrete" the distinct values render as a
-    // categorical multi-select (reusing FacetSection); otherwise the slider.
-    // The header toggle, present in both, flips between them.
-    const mode = numericModeByKey.get(section.key);
-    const modeToggleProps =
-      mode !== undefined
-        ? {
-            mode,
-            onToggle: () =>
-              setNumericMode({
-                field: section.key,
-                mode: mode === "discrete" ? "range" : "discrete",
-              }),
-          }
-        : undefined;
-
-    if (mode === "discrete") {
-      return (
-        <FacetSection
-          title={section.label}
-          icon={icon}
-          field={section.key}
-          items={facetItemsByKey.get(section.key) ?? []}
-          getValueState={valueStateGetters.get(section.key) ?? ((): FacetValueState => "neutral")}
-          onToggle={(field, value) => toggleFacet({ field, value })}
-          onExclude={(field, value) => excludeFacet({ field, value })}
-          onShiftToggle={onShiftToggle}
-          onHide={onHide}
-          dragHandleProps={dragHandleProps}
-          synthetic={section.synthetic}
-          modeToggleProps={modeToggleProps}
-        />
-      );
-    }
-
-    const current = extractRangeValue(ast, section.key);
-    return (
-      <RangeSection
-        title={section.label}
-        icon={icon}
-        field={section.key}
-        min={section.min}
-        max={section.max}
-        currentFrom={current?.from}
-        currentTo={current?.to}
-        formatValue={getRangeFormatter(section.key)}
-        onChange={(from, to) =>
-          setRange({ field: section.key, from: String(from), to: String(to) })
-        }
-        onClear={() => removeRange({ field: section.key })}
         onShiftToggle={onShiftToggle}
         onHide={onHide}
         dragHandleProps={dragHandleProps}
@@ -329,6 +326,31 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
     );
   }
 
+  const current = extractRangeValue(ast, section.key);
+  return (
+    <RangeSection
+      title={section.label}
+      icon={icon}
+      field={section.key}
+      min={section.min}
+      max={section.max}
+      currentFrom={current?.from}
+      currentTo={current?.to}
+      formatValue={getRangeFormatter(section.key)}
+      onChange={(from, to) => setRange({ field: section.key, from: String(from), to: String(to) })}
+      onClear={() => removeRange({ field: section.key })}
+      onShiftToggle={onShiftToggle}
+      onHide={onHide}
+      dragHandleProps={dragHandleProps}
+      synthetic={section.synthetic}
+      modeToggleProps={modeToggleProps}
+    />
+  );
+};
+
+const AttributesSectionRenderer: React.FC<
+  SectionRendererProps & { section: Exclude<Section, { kind: "cat" | "range" }>; icon: LucideIcon }
+> = ({ section, ast, toggleFacet, onShiftToggle, onHide, dragHandleProps, icon }) => {
   // One component for trace/span/event/metadata attributes: the section data carries its own
   // filter prefix and key list, so the renderer doesn't need to know which flavour it's drawing.
   const { filterPrefix, keys, label, displayStripPrefix, emptyDocsHref } = section;

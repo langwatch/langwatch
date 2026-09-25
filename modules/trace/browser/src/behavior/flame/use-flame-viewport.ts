@@ -49,23 +49,7 @@ export function useFlameViewport({
   useEffect(() => () => cancelAnimation(), [cancelAnimation]);
 
   const clampViewport = useCallback(
-    (v: Viewport): Viewport => {
-      const fullDur = fullRange.endMs - fullRange.startMs;
-      if (fullDur <= 0) return fullRange;
-      const minDur = Math.min(MIN_VIEWPORT_MS, fullDur);
-      const dur = Math.max(minDur, Math.min(fullDur, v.endMs - v.startMs));
-      let start = v.startMs;
-      let end = start + dur;
-      if (start < fullRange.startMs) {
-        start = fullRange.startMs;
-        end = start + dur;
-      }
-      if (end > fullRange.endMs) {
-        end = fullRange.endMs;
-        start = end - dur;
-      }
-      return { startMs: start, endMs: end };
-    },
+    (v: Viewport): Viewport => clampToRange(v, fullRange),
     [fullRange],
   );
 
@@ -100,28 +84,8 @@ export function useFlameViewport({
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
       cancelAnimation();
-      const rect = el.getBoundingClientRect();
-      const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-      const isPan = e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY);
-      const delta = isPan ? e.deltaX || e.deltaY : e.deltaY;
-      setViewport((prev) => {
-        const dur = prev.endMs - prev.startMs;
-        if (isPan) {
-          const dt = (delta / rect.width) * dur;
-          return clampViewport({
-            startMs: prev.startMs + dt,
-            endMs: prev.endMs + dt,
-          });
-        }
-        const cursorTime = prev.startMs + x * dur;
-        const factor = Math.exp(delta * WHEEL_ZOOM_SENSITIVITY);
-        const newDur = dur * factor;
-        const newStart = cursorTime - x * newDur;
-        return clampViewport({
-          startMs: newStart,
-          endMs: newStart + newDur,
-        });
-      });
+      const gesture = readWheelGesture(e, el.getBoundingClientRect());
+      setViewport((prev) => clampViewport(wheelViewport(prev, gesture)));
     };
     el.addEventListener("wheel", handleWheel, { passive: false });
     return () => el.removeEventListener("wheel", handleWheel);
@@ -135,4 +99,44 @@ export function useFlameViewport({
     animateTo,
     cancelAnimation,
   };
+}
+
+function clampToRange(v: Viewport, fullRange: Viewport): Viewport {
+  const fullDur = fullRange.endMs - fullRange.startMs;
+  if (fullDur <= 0) return fullRange;
+  const minDur = Math.min(MIN_VIEWPORT_MS, fullDur);
+  const dur = Math.max(minDur, Math.min(fullDur, v.endMs - v.startMs));
+  let start = v.startMs;
+  let end = start + dur;
+  if (start < fullRange.startMs) {
+    start = fullRange.startMs;
+    end = start + dur;
+  }
+  if (end > fullRange.endMs) {
+    end = fullRange.endMs;
+    start = end - dur;
+  }
+  return { startMs: start, endMs: end };
+}
+
+type WheelGesture = { isPan: boolean; delta: number; x: number; width: number };
+
+/** A vertical wheel zooms toward the cursor; a sideways or shifted one pans. */
+function readWheelGesture(e: WheelEvent, rect: DOMRect): WheelGesture {
+  const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  const isPan = e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY);
+  const delta = isPan ? e.deltaX || e.deltaY : e.deltaY;
+  return { isPan, delta, x, width: rect.width };
+}
+
+function wheelViewport(prev: Viewport, { isPan, delta, x, width }: WheelGesture): Viewport {
+  const dur = prev.endMs - prev.startMs;
+  if (isPan) {
+    const dt = (delta / width) * dur;
+    return { startMs: prev.startMs + dt, endMs: prev.endMs + dt };
+  }
+  const cursorTime = prev.startMs + x * dur;
+  const newDur = dur * Math.exp(delta * WHEEL_ZOOM_SENSITIVITY);
+  const newStart = cursorTime - x * newDur;
+  return { startMs: newStart, endMs: newStart + newDur };
 }

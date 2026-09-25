@@ -223,20 +223,10 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
   // Partition `orderedKeysAll` by group id, filtered by the search box
   // when present. Filtering matches against either the human label or
   // the raw key so power users can grep for `selectedPrompt` directly.
-  const byGroup = useMemo(() => {
-    const out: Record<string, string[]> = {};
-    for (const key of orderedKeysAll) {
-      if (normalisedQuery) {
-        const label = sectionByKey.get(key)?.label ?? key;
-        const matchesLabel = label.toLowerCase().includes(normalisedQuery);
-        const matchesKey = key.toLowerCase().includes(normalisedQuery);
-        if (!matchesLabel && !matchesKey) continue;
-      }
-      const groupId = getFacetGroupId(key) ?? "custom";
-      (out[groupId] ??= []).push(key);
-    }
-    return out;
-  }, [orderedKeysAll, normalisedQuery, sectionByKey]);
+  const byGroup = useMemo(
+    () => partitionKeysByGroup({ keys: orderedKeysAll, query: normalisedQuery, sectionByKey }),
+    [orderedKeysAll, normalisedQuery, sectionByKey],
+  );
 
   const visibleCount = useMemo(
     () => orderedKeysAll.filter(isVisible).length,
@@ -452,103 +442,18 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
                 orderedGroups.map((group) => {
                   const keys = byGroup[group.id] ?? [];
                   if (keys.length === 0) return null;
-                  const GroupIcon = GROUP_ICON[group.id] ?? Filter;
                   return (
-                    <Box key={group.id}>
-                      <HStack gap={1.5} paddingX={3} paddingTop={2} paddingBottom={1}>
-                        <Icon boxSize={3} color="fg.subtle">
-                          <GroupIcon />
-                        </Icon>
-                        <Text
-                          textStyle="2xs"
-                          fontWeight="700"
-                          color="fg.subtle"
-                          textTransform="uppercase"
-                          letterSpacing="0.1em"
-                        >
-                          {group.label}
-                        </Text>
-                      </HStack>
-                      {keys.map((key) => {
-                        const label = sectionByKey.get(key)?.label ?? key;
-                        const checked = isVisible(key);
-                        const KeyIcon = KEY_ICON[key] ?? Filter;
-                        return (
-                          <Box
-                            key={key}
-                            paddingX={3}
-                            paddingY={1}
-                            _hover={{ bg: "bg.muted" }}
-                            cursor="pointer"
-                            onClick={() => (checked ? onHide(key) : onShow(key))}
-                          >
-                            <HStack justify="space-between" gap={2}>
-                              <Checkbox
-                                size="sm"
-                                checked={checked}
-                                onCheckedChange={() => (checked ? onHide(key) : onShow(key))}
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <HStack gap={1.5}>
-                                  <Icon boxSize={3} color={checked ? "fg.muted" : "fg.subtle"}>
-                                    <KeyIcon />
-                                  </Icon>
-                                  <Text textStyle="xs" color="fg">
-                                    {label}
-                                  </Text>
-                                </HStack>
-                              </Checkbox>
-                              {/* Numeric facets that support both presentations
-                                  get an inline Range/Discrete picker — the
-                                  same choice as the in-header toggle. */}
-                              {numericModeByKey.has(key) && (
-                                <HStack
-                                  gap={0}
-                                  flexShrink={0}
-                                  borderWidth="1px"
-                                  borderColor="border.subtle"
-                                  borderRadius="sm"
-                                  overflow="hidden"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  {(["range", "discrete"] as const).map((m) => {
-                                    const active = numericModeByKey.get(key) === m;
-                                    return (
-                                      <chakra.button
-                                        key={m}
-                                        type="button"
-                                        aria-pressed={active}
-                                        paddingX={1.5}
-                                        paddingY={0.5}
-                                        color={active ? "fg" : "fg.subtle"}
-                                        bg={active ? "bg.muted" : "transparent"}
-                                        cursor="pointer"
-                                        _hover={{ color: "fg", bg: "bg.muted" }}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setNumericMode({
-                                            field: key,
-                                            mode: m,
-                                          });
-                                        }}
-                                      >
-                                        <Text
-                                          as="span"
-                                          textStyle="2xs"
-                                          fontWeight={active ? "600" : "500"}
-                                        >
-                                          {m === "range" ? "Range" : "Discrete"}
-                                        </Text>
-                                      </chakra.button>
-                                    );
-                                  })}
-                                </HStack>
-                              )}
-                            </HStack>
-                          </Box>
-                        );
-                      })}
-                    </Box>
+                    <FacetGroupRows
+                      key={group.id}
+                      group={group}
+                      keys={keys}
+                      sectionByKey={sectionByKey}
+                      isVisible={isVisible}
+                      onShow={onShow}
+                      onHide={onHide}
+                      numericModeByKey={numericModeByKey}
+                      setNumericMode={setNumericMode}
+                    />
                   );
                 })
               )}
@@ -591,3 +496,158 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
     </Tooltip>
   );
 };
+
+type FacetRowActions = Pick<
+  FacetManagerPopoverProps,
+  "sectionByKey" | "isVisible" | "onShow" | "onHide" | "numericModeByKey" | "setNumericMode"
+>;
+
+/** One perspective group: its heading, then a toggle row per matching facet. */
+const FacetGroupRows: React.FC<
+  FacetRowActions & {
+    group: ReturnType<typeof orderedGroupDefsForPerspective>[number];
+    keys: string[];
+  }
+> = ({ group, keys, ...actions }) => {
+  const GroupIcon = GROUP_ICON[group.id] ?? Filter;
+  return (
+    <Box>
+      <HStack gap={1.5} paddingX={3} paddingTop={2} paddingBottom={1}>
+        <Icon boxSize={3} color="fg.subtle">
+          <GroupIcon />
+        </Icon>
+        <Text
+          textStyle="2xs"
+          fontWeight="700"
+          color="fg.subtle"
+          textTransform="uppercase"
+          letterSpacing="0.1em"
+        >
+          {group.label}
+        </Text>
+      </HStack>
+      {keys.map((key) => (
+        <FacetToggleRow key={key} facetKey={key} {...actions} />
+      ))}
+    </Box>
+  );
+};
+
+const FacetToggleRow: React.FC<FacetRowActions & { facetKey: string }> = ({
+  facetKey: key,
+  sectionByKey,
+  isVisible,
+  onShow,
+  onHide,
+  numericModeByKey,
+  setNumericMode,
+}) => {
+  const label = sectionByKey.get(key)?.label ?? key;
+  const checked = isVisible(key);
+  const KeyIcon = KEY_ICON[key] ?? Filter;
+  const mode = numericModeByKey.get(key);
+  return (
+    <Box
+      paddingX={3}
+      paddingY={1}
+      _hover={{ bg: "bg.muted" }}
+      cursor="pointer"
+      onClick={() => (checked ? onHide(key) : onShow(key))}
+    >
+      <HStack justify="space-between" gap={2}>
+        <Checkbox
+          size="sm"
+          checked={checked}
+          onCheckedChange={() => (checked ? onHide(key) : onShow(key))}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <HStack gap={1.5}>
+            <Icon boxSize={3} color={checked ? "fg.muted" : "fg.subtle"}>
+              <KeyIcon />
+            </Icon>
+            <Text textStyle="xs" color="fg">
+              {label}
+            </Text>
+          </HStack>
+        </Checkbox>
+        {/* Numeric facets that support both presentations get an inline
+            Range/Discrete picker — the same choice as the in-header toggle. */}
+        {numericModeByKey.has(key) && (
+          <NumericModePicker mode={mode} onPick={(m) => setNumericMode({ field: key, mode: m })} />
+        )}
+      </HStack>
+    </Box>
+  );
+};
+
+const NumericModePicker: React.FC<{
+  mode: NumericMode | undefined;
+  onPick: (mode: NumericMode) => void;
+}> = ({ mode, onPick }) => (
+  <HStack
+    gap={0}
+    flexShrink={0}
+    borderWidth="1px"
+    borderColor="border.subtle"
+    borderRadius="sm"
+    overflow="hidden"
+    onClick={(e) => e.stopPropagation()}
+  >
+    {(["range", "discrete"] as const).map((m) => {
+      const active = mode === m;
+      return (
+        <chakra.button
+          key={m}
+          type="button"
+          aria-pressed={active}
+          paddingX={1.5}
+          paddingY={0.5}
+          color={active ? "fg" : "fg.subtle"}
+          bg={active ? "bg.muted" : "transparent"}
+          cursor="pointer"
+          _hover={{ color: "fg", bg: "bg.muted" }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onPick(m);
+          }}
+        >
+          <Text as="span" textStyle="2xs" fontWeight={active ? "600" : "500"}>
+            {m === "range" ? "Range" : "Discrete"}
+          </Text>
+        </chakra.button>
+      );
+    })}
+  </HStack>
+);
+
+/** Keys by facet group, keeping only those whose label or raw key contains the query. */
+function partitionKeysByGroup({
+  keys,
+  query,
+  sectionByKey,
+}: {
+  keys: string[];
+  query: string;
+  sectionByKey: Map<string, { label: string }>;
+}): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const key of keys) {
+    if (query && !facetMatchesQuery({ key, query, sectionByKey })) continue;
+    const groupId = getFacetGroupId(key) ?? "custom";
+    (out[groupId] ??= []).push(key);
+  }
+  return out;
+}
+
+function facetMatchesQuery({
+  key,
+  query,
+  sectionByKey,
+}: {
+  key: string;
+  query: string;
+  sectionByKey: Map<string, { label: string }>;
+}): boolean {
+  const label = sectionByKey.get(key)?.label ?? key;
+  return label.toLowerCase().includes(query) || key.toLowerCase().includes(query);
+}

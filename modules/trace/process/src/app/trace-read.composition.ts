@@ -27,6 +27,7 @@ import {
   type TraceQueryFieldValuesResult,
 } from "../repositories/query-field-values.repository.ts";
 import type { TraceSpanDedupRepository } from "../repositories/trace-span-dedup.repository.ts";
+import { TraceSummaryReaderRepository } from "../repositories/trace-summary-reader.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import { EventingTraceTopicAssignment } from "../services/eventing.trace-topic-assignment.service.ts";
 import { ModelCatalogTraceModelCostAdapter } from "../services/model-catalog.trace-model-cost.service.ts";
@@ -169,19 +170,7 @@ export function composeTraceAppDependencies(
         queryClassification: TraceQueryClassificationService.create(),
         // A process that folds no trace projections has no fold to ask, so the
         // reader is left out rather than answering an empty summary.
-        ...(summaryStore
-          ? {
-              summaryReader: {
-                findSummary: ({ tenantId, traceId }: { tenantId: string; traceId: string }) =>
-                  summaryStore
-                    .get(traceId, {
-                      aggregateId: traceId,
-                      tenantId: createTenantId(tenantId),
-                    })
-                    .then((read) => (read.kind === "folded" ? read.state : null)),
-              },
-            }
-          : {}),
+        ...(summaryStore ? { summaryReader: FoldedTraceSummaryReader.create(summaryStore) } : {}),
         records: {
           getById: async ({ projectId, traceId }) => {
             const resolved = await protections.resolve({
@@ -314,6 +303,35 @@ class TraceComposedIngressCommand extends TraceIngressCommand {
 
   async recordSpan(data: RecordSpanCommandData): Promise<void> {
     await this.#commands.recordSpan(data);
+  }
+}
+
+/** The trace tree's summary, read from the folded `trace_summaries` projection. */
+class FoldedTraceSummaryReader extends TraceSummaryReaderRepository {
+  static create(store: FoldProjectionStore<TraceSummaryData>): FoldedTraceSummaryReader {
+    return new FoldedTraceSummaryReader(store);
+  }
+
+  #store: FoldProjectionStore<TraceSummaryData>;
+
+  private constructor(store: FoldProjectionStore<TraceSummaryData>) {
+    super();
+    this.#store = store;
+  }
+
+  async findSummary({
+    tenantId,
+    traceId,
+  }: {
+    tenantId: string;
+    traceId: string;
+  }): Promise<TraceSummaryData | null> {
+    const read = await this.#store.get(traceId, {
+      aggregateId: traceId,
+      tenantId: createTenantId(tenantId),
+    });
+
+    return read.kind === "folded" ? read.state : null;
   }
 }
 

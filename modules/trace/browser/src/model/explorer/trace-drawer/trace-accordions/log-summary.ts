@@ -15,9 +15,10 @@ export function summarizeLogEvent(log: TraceLogRecordDto): string | null {
 function describe(event: CodingAgentEvent, attrs: Record<string, string>): string {
   switch (event) {
     case "user_prompt":
-      return `User sent a prompt (${attrs.prompt_length ?? attrs.prompt?.length ?? "?"} chars)`;
     case "assistant_response":
-      return `Assistant replied${attrs.model ? ` (${attrs.model})` : ""}`;
+    case "compaction":
+    case "turn_ttft":
+      return describeExchangeEvent({ event, attrs });
     case "api_request":
     case "api_response":
     case "api_error":
@@ -26,6 +27,65 @@ function describe(event: CodingAgentEvent, attrs: Record<string, string>): strin
     case "retries_exhausted":
       return describeModelCallEvent({ event, attrs });
     case "tool_result":
+    case "tool_decision":
+    case "permission_mode_changed":
+      return describeToolEvent({ event, attrs });
+    case "skill_activated":
+    case "mcp_server_connection":
+    case "hook_execution_complete":
+    case "at_mention":
+    case "subtask_invoked":
+      return describeExtensionEvent({ event, attrs });
+    case "internal_error":
+      return attrs.error ? `Internal error: ${attrs.error}` : "The session hit an internal error";
+    case "session_created":
+    case "session_context":
+    case "session_idle":
+    case "session_error":
+      return describeSessionEvent({ event, attrs });
+    case "commit":
+      return "Commit created";
+    default: {
+      const exhaustive: never = event;
+      return exhaustive;
+    }
+  }
+}
+
+/** The back-and-forth of a turn: the prompt, the reply, its timing and compaction. */
+function describeExchangeEvent({
+  event,
+  attrs,
+}: {
+  event: "user_prompt" | "assistant_response" | "compaction" | "turn_ttft";
+  attrs: Record<string, string>;
+}): string {
+  switch (event) {
+    case "user_prompt":
+      return `User sent a prompt (${attrs.prompt_length ?? attrs.prompt?.length ?? "?"} chars)`;
+    case "assistant_response":
+      return `Assistant replied${attrs.model ? ` (${attrs.model})` : ""}`;
+    case "compaction":
+      return attrs.pre_tokens && attrs.post_tokens
+        ? `Context compacted: ${formatCount(attrs.pre_tokens)} → ${formatCount(attrs.post_tokens)} tokens`
+        : "Context compacted";
+    case "turn_ttft":
+      return attrs.duration_ms
+        ? `First token after ${attrs.duration_ms} ms`
+        : "First token timing reported";
+  }
+}
+
+/** A tool ran, or the user decided whether it may, or changed how approval works. */
+function describeToolEvent({
+  event,
+  attrs,
+}: {
+  event: "tool_result" | "tool_decision" | "permission_mode_changed";
+  attrs: Record<string, string>;
+}): string {
+  switch (event) {
+    case "tool_result":
       return `Tool ran${attrs.tool_name ? `: ${attrs.tool_name}` : ""}`;
     case "tool_decision": {
       const decision = attrs.decision ?? "unknown";
@@ -33,12 +93,25 @@ function describe(event: CodingAgentEvent, attrs: Record<string, string>): strin
       if (decision === "accept") return `Approved ${tool}`;
       return `Denied ${tool}${attrs.source ? ` (${attrs.source})` : ""}`;
     }
-    case "compaction":
-      return attrs.pre_tokens && attrs.post_tokens
-        ? `Context compacted: ${formatCount(attrs.pre_tokens)} → ${formatCount(attrs.post_tokens)} tokens`
-        : "Context compacted";
     case "permission_mode_changed":
       return `Approval mode changed to ${attrs.to_mode ?? "unknown"}`;
+  }
+}
+
+/** What the agent reached beyond itself for: a skill, MCP server, hook, file or sub-agent. */
+function describeExtensionEvent({
+  event,
+  attrs,
+}: {
+  event:
+    | "skill_activated"
+    | "mcp_server_connection"
+    | "hook_execution_complete"
+    | "at_mention"
+    | "subtask_invoked";
+  attrs: Record<string, string>;
+}): string {
+  switch (event) {
     case "skill_activated":
       return `Skill activated${attrs.name ? `: ${attrs.name}` : ""}`;
     case "mcp_server_connection":
@@ -47,25 +120,8 @@ function describe(event: CodingAgentEvent, attrs: Record<string, string>): strin
       return `Hook ran${attrs.name ? `: ${attrs.name}` : ""}`;
     case "at_mention":
       return `@-mentioned${attrs.target ? ` ${attrs.target}` : " a file"}`;
-    case "internal_error":
-      return attrs.error ? `Internal error: ${attrs.error}` : "The session hit an internal error";
-    case "session_created":
-    case "session_context":
-    case "session_idle":
-    case "session_error":
-      return describeSessionEvent({ event, attrs });
     case "subtask_invoked":
       return `Sub-agent invoked${attrs.subagent_type ? `: ${attrs.subagent_type}` : ""}`;
-    case "commit":
-      return "Commit created";
-    case "turn_ttft":
-      return attrs.duration_ms
-        ? `First token after ${attrs.duration_ms} ms`
-        : "First token timing reported";
-    default: {
-      const exhaustive: never = event;
-      return exhaustive;
-    }
   }
 }
 
