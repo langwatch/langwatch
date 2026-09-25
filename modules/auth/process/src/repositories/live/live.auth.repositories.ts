@@ -1,5 +1,4 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { RedisConnection } from "@langwatch/redis-client";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 
 import type { AuthRepositories } from "../auth.repositories.ts";
 import { PostgresAuthRepositories } from "../prisma/prisma.auth.repositories.ts";
@@ -15,8 +14,8 @@ export class LiveAuthRepositories {
     prisma,
     redis,
   }: {
-    prisma: PrismaClient;
-    redis: RedisConnection;
+    prisma: ProcessMembers["prisma"];
+    redis: ProcessMembers["redis"];
   }): AuthRepositories {
     return {
       ...PostgresAuthRepositories.create({ prisma }),

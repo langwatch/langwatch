@@ -6,17 +6,18 @@ import type {
 } from "@langwatch/eventing";
 import {
   DEFAULT_SSO_ARRIVAL_POLICY,
+  domainClaimRejectedPayloadSchema,
   isSsoArrivalPolicy,
   ssoDomainClaimSchema,
+  ssoDomainVerificationSchema,
+  ssoIdpMetadataSchema,
+  verificationRequestedPayloadSchema,
 } from "@langwatch/identity-contract";
 import type {
   SsoConnectionLifecycleState,
   SsoConnectionSource,
   SsoConnectionState,
   SsoConnectionType,
-  SsoDomainVerification,
-  SsoIdpMetadata,
-  SsoVerificationMethod,
 } from "@langwatch/identity-contract";
 import type { Prisma, PrismaClient, SsoConnection } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
@@ -40,15 +41,29 @@ const storedDomainClaimsSchema = z.array(ssoDomainClaimSchema).catch([]);
 /** The proof condition a decoded row carries. A row written before ADR-123
  *  has none and reads as VERIFIED: nothing had doubted it, and fabricating a
  *  clock would start one nobody set. */
-function provedCondition(entry: SsoDomainVerification): SsoDomainVerification {
+function provedCondition(entry: unknown): unknown {
+  if (typeof entry !== "object" || entry === null) return entry;
+  const stored = Object.fromEntries(Object.entries(entry));
   return {
-    ...entry,
-    proofState: entry.proofState ?? "VERIFIED",
-    firstAbsentAtMs: entry.firstAbsentAtMs ?? null,
-    graceEndsAtMs: entry.graceEndsAtMs ?? null,
-    tokenHash: entry.tokenHash ?? null,
+    ...stored,
+    proofState: stored["proofState"] ?? "VERIFIED",
+    firstAbsentAtMs: stored["firstAbsentAtMs"] ?? null,
+    graceEndsAtMs: stored["graceEndsAtMs"] ?? null,
+    tokenHash: stored["tokenHash"] ?? null,
   };
 }
+
+const storedDomainVerificationsSchema = z.array(
+  z.preprocess(provedCondition, ssoDomainVerificationSchema),
+);
+/** A ceremony written before ceremonies could expire reads with no deadline. */
+const storedPendingVerificationSchema = verificationRequestedPayloadSchema.pick({
+  domain: true,
+  method: true,
+  tokenHash: true,
+  expiresAtMs: true,
+});
+const storedRejectionSchema = domainClaimRejectedPayloadSchema.pick({ domain: true, note: true });
 
 /**
  * `SsoConnection` head and its cursor, written under the queue's per-connection lock.
@@ -106,12 +121,7 @@ export class PrismaSsoConnectionProjectionRepository implements StateProjectionS
       domainClaims: state.domainClaims,
       approvedDomains: state.approvedDomains,
       verifiedDomains: state.verifiedDomains,
-      // Prisma's `InputJsonValue` does not accept a typed array directly (it
-      // wants an index signature), so the shape is asserted at the column
-      // boundary. `rowToConnection` asserts it back on the way out, and both
-      // sides name `SsoDomainVerification` — the reducer is what actually
-      // decides the shape.
-      domainVerifications: state.domainVerifications as unknown as Prisma.InputJsonValue,
+      domainVerifications: state.domainVerifications,
       pendingVerification: state.pendingVerification ?? undefined,
       idpMetadata: state.idpMetadata,
       arrivalPolicy: state.arrivalPolicy,
@@ -196,28 +206,19 @@ export class PrismaSsoConnectionProjectionRepository implements StateProjectionS
       approvedDomains: row.approvedDomains,
       verifiedDomains: row.verifiedDomains,
       domainVerifications: Array.isArray(row.domainVerifications)
-        ? (row.domainVerifications as unknown as SsoDomainVerification[]).map(provedCondition)
+        ? storedDomainVerificationsSchema.parse(row.domainVerifications)
         : [],
       pendingVerification: row.pendingVerification
-        ? pendingVerificationOf(
-            row.pendingVerification as unknown as {
-              domain: string;
-              method: SsoVerificationMethod;
-              tokenHash: string;
-              expiresAtMs?: number | null;
-            },
-          )
+        ? storedPendingVerificationSchema.parse(row.pendingVerification)
         : null,
-      idpMetadata: row.idpMetadata as unknown as SsoIdpMetadata,
+      idpMetadata: ssoIdpMetadataSchema.parse(row.idpMetadata),
       arrivalPolicy: isSsoArrivalPolicy(row.arrivalPolicy)
         ? row.arrivalPolicy
         : DEFAULT_SSO_ARRIVAL_POLICY,
       arrivalPolicyDecidedAtMs: row.arrivalPolicyDecidedAt?.getTime() ?? null,
       source: row.source as SsoConnectionSource,
       testLoginAccountId: row.testLoginAccountId,
-      rejection: row.rejection
-        ? (row.rejection as unknown as { domain: string; note: string })
-        : null,
+      rejection: row.rejection ? storedRejectionSchema.parse(row.rejection) : null,
       createdBy: row.createdBy,
       createdAtMs: row.createdAt.getTime(),
       updatedAtMs: row.updatedAt.getTime(),
@@ -315,20 +316,4 @@ async function projectDomainHolder({
     );
   }
   await tx.ssoVerifiedDomainHolder.create({ data: { domain, connectionId, organizationId } });
-}
-
-/** A ceremony written before ceremonies could expire has no deadline, and a
- *  missing key is exactly that rather than an unknown one. */
-function pendingVerificationOf(pending: {
-  domain: string;
-  method: SsoVerificationMethod;
-  tokenHash: string;
-  expiresAtMs?: number | null;
-}): NonNullable<SsoConnectionState["pendingVerification"]> {
-  return {
-    domain: pending.domain,
-    method: pending.method,
-    tokenHash: pending.tokenHash,
-    expiresAtMs: pending.expiresAtMs ?? null,
-  };
 }

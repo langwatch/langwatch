@@ -6,20 +6,21 @@ import type {
 } from "@langwatch/eventing";
 import type {
   ScimRevokeCause,
-  ScimSyncFailure,
   ScimSyncLifecycleState,
   ScimSyncState,
 } from "@langwatch/identity-contract";
-import { ScimSyncNotFoundError } from "@langwatch/identity-contract";
+import { ScimSyncNotFoundError, scimSyncFailureSchema } from "@langwatch/identity-contract";
 import type {
   Prisma,
   PrismaClient,
   ScimSyncState as ScimSyncRow,
 } from "@langwatch/prisma-client/generated";
+import { z } from "zod";
 
 import type { ScimSyncFoldState } from "../../eventing/scim-sync-state.projection.ts";
 import type { ScimSyncReadRepository } from "../scim-sync.repository.ts";
 
+const storedFailuresSchema = z.array(scimSyncFailureSchema);
 /**
  * The directory-sync pipeline's projection store (D08): the Postgres `ScimSyncState` head and its
  * cursor, written under the queue's per-sync lock, plus the read the guards run against.
@@ -73,13 +74,8 @@ export class PrismaScimSyncProjectionRepository
       organizationId: state.organizationId,
       state: state.state,
       lastPushedAt: state.lastPushedAtMs === null ? null : new Date(state.lastPushedAtMs),
-      // Cast at the ONE seam that knows both shapes. `ScimSyncFailure` is a
-      // plain record of scalars, so it is a valid `InputJsonValue`; Prisma's
-      // generated input type cannot see that through a named interface, and
-      // widening the reducer's state to `Json` to satisfy it would lose the
-      // typing on the side that actually reads these.
-      lastFailure: (state.lastFailure ?? undefined) as unknown as Prisma.InputJsonValue,
-      deadLetters: state.deadLetters as unknown as Prisma.InputJsonValue,
+      lastFailure: state.lastFailure ?? undefined,
+      deadLetters: state.deadLetters,
       revokedCause: state.revokedCause,
       occurredAt: new Date(projection.occurredAt),
       lastEventId: projection.cursor.eventId,
@@ -188,9 +184,9 @@ export class PrismaScimSyncProjectionRepository
       organizationId: row.organizationId,
       state: row.state as ScimSyncLifecycleState,
       lastPushedAtMs: row.lastPushedAt?.getTime() ?? null,
-      lastFailure: row.lastFailure ? (row.lastFailure as unknown as ScimSyncFailure) : null,
+      lastFailure: row.lastFailure ? scimSyncFailureSchema.parse(row.lastFailure) : null,
       deadLetters: Array.isArray(row.deadLetters)
-        ? (row.deadLetters as unknown as ScimSyncFailure[])
+        ? storedFailuresSchema.parse(row.deadLetters)
         : [],
       revokedCause: (row.revokedCause as ScimRevokeCause | null) ?? null,
       createdAtMs: row.createdAt.getTime(),

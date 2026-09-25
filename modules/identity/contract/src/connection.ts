@@ -419,11 +419,16 @@ export const connectionArrivalPolicySetPayloadSchema = z.object({
 export const ssoDomainVerificationSchema = z.object({
   domain: z.string().min(1),
   method: ssoVerificationMethodSchema,
+  /** Who proved it; null for a system actor, which is what the grandfather migration is. */
   actorId: z.string().nullable(),
   verifiedAtMs: z.number().int().nonnegative(),
+  /** Whether that evidence is still there (ADR-123) — never about the method or the prover. */
   proofState: ssoDomainProofStateSchema,
+  /** When a re-check first found the record gone, and when that becomes a lapse. */
   firstAbsentAtMs: z.number().int().nonnegative().nullable(),
   graceEndsAtMs: z.number().int().nonnegative().nullable(),
+  /** `sha256:…` of the published token, so a re-read is verification; null for a proof
+   *  that published nothing (attestation, licence, grandfather), which is never re-read. */
   tokenHash: z.string().nullable(),
 });
 
@@ -567,28 +572,7 @@ export type SsoConnectionFact = SsoConnectionFactInput & { occurredAt: number };
  * method rides on the connection itself, not only the log, so an attested
  * domain can never be presented as one the customer proved.
  */
-export interface SsoDomainVerification {
-  domain: string;
-  method: SsoVerificationMethod;
-  /** Who proved it — the attesting operator, or whoever ran the ceremony.
-   *  Null for a system actor, which is what the grandfather migration is. */
-  actorId: string | null;
-  verifiedAtMs: number;
-  /** Whether that evidence is still there (ADR-123). A statement about the
-   *  evidence, never about the method or the prover: an attested domain that
-   *  wavers is still an attested domain. */
-  proofState: SsoDomainProofState;
-  /** When a re-check first found the record gone, and when that becomes a
-   *  lapse. Both null while the proof is VERIFIED. */
-  firstAbsentAtMs: number | null;
-  graceEndsAtMs: number | null;
-  /** `sha256:…` of the token the ceremony published, so a re-read is
-   *  verification rather than "is anything at all published at our name".
-   *  Null for a proof that published nothing — an attestation, a licence,
-   *  the grandfather migration — which is also what makes them never
-   *  re-read. */
-  tokenHash: string | null;
-}
+export type SsoDomainVerification = z.infer<typeof ssoDomainVerificationSchema>;
 
 /**
  * One claim on one domain. `waitedMs` is RECORDED rather than derived, because

@@ -955,17 +955,23 @@ function identityCustomAdapter({
       return rows.length;
     }
 
-    // Every method, wrapped once, rather than ten try/catch blocks that a
-    // new method could silently be added beside.
-    return Object.fromEntries(
-      Object.entries(adapter).map(([name, method]) => [
-        name,
-        async (...args: never[]) =>
-          surfaceHandledRefusals(() =>
-            (method as (...called: never[]) => Promise<unknown>)(...args),
-          ),
-      ]),
-    ) as unknown as CustomAdapter;
+    return surfacingHandledRefusals(adapter);
+  };
+}
+
+/** Every method wrapped once; a new required adapter method fails to compile here. */
+function surfacingHandledRefusals(adapter: CustomAdapter): CustomAdapter {
+  return {
+    create: (input) => surfaceHandledRefusals(() => adapter.create(input)),
+    update: (input) => surfaceHandledRefusals(() => adapter.update(input)),
+    updateMany: (input) => surfaceHandledRefusals(() => adapter.updateMany(input)),
+    findOne: (input) => surfaceHandledRefusals(() => adapter.findOne(input)),
+    findMany: (input) => surfaceHandledRefusals(() => adapter.findMany(input)),
+    delete: (input) => surfaceHandledRefusals(() => adapter.delete(input)),
+    deleteMany: (input) => surfaceHandledRefusals(() => adapter.deleteMany(input)),
+    consumeOne: (input) => surfaceHandledRefusals(() => adapter.consumeOne(input)),
+    incrementOne: (input) => surfaceHandledRefusals(() => adapter.incrementOne(input)),
+    count: (input) => surfaceHandledRefusals(() => adapter.count(input)),
   };
 }
 

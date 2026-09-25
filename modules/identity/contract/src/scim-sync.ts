@@ -195,19 +195,20 @@ export type ScimSyncFact = ScimSyncFactInput & { occurredAt: number };
  * The last thing that went wrong, as the failure surface reads it. Names the
  * connection, operation and reason code — never a token, secret, or hostname.
  */
-export interface ScimSyncFailure {
-  op: ScimApplyOp;
-  errorCode: string;
+export const scimSyncFailureSchema = z.object({
+  op: scimApplyOpSchema,
+  errorCode: z.string(),
   /** How many failed applies have accumulated since the last recovery. */
-  attempts: number;
+  attempts: z.number().int().nonnegative(),
   /** Set once the failure is retired: it will not be retried again. */
-  retiredAtMs: number | null;
+  retiredAtMs: z.number().nullable(),
   /** The person it was about, when it was about one. */
-  userId: string | null;
-  occurredAtMs: number;
-  /** Set once an operator re-drove the retired apply (ADR-122); a re-drive states it once. */
-  redrivenAtMs: number | null;
-}
+  userId: z.string().nullable(),
+  occurredAtMs: z.number(),
+  /** Set once an operator re-drove the retired apply (ADR-122); rows before it carry none. */
+  redrivenAtMs: z.number().nullable().default(null),
+});
+export type ScimSyncFailure = z.infer<typeof scimSyncFailureSchema>;
 
 /** One connection's directory sync as the projection knows it. */
 export interface ScimSyncState {

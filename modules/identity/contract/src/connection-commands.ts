@@ -109,177 +109,229 @@ const commandIdentitySchema = z.object({
  * them differently would fold events into another organization's
  * projection undetectably downstream — refused at the wire boundary.
  */
-function commandDataSchema<Shape extends z.ZodRawShape>(
-  shape: Shape,
-): z.ZodType<z.infer<ReturnType<typeof commandIdentitySchema.extend<Shape>>>> {
-  return commandIdentitySchema.extend(shape).refine(
-    (data) => {
-      // zod 4 widens `.extend()`'s output under a generic shape to a union that
-      // no longer names the base's own keys, so the fields this reads are named
-      // here rather than inferred. They come from `commandIdentitySchema`, never
-      // from `shape`, so they are always present whatever a caller extends with.
-      const { tenantId, organizationId } = data as z.infer<typeof commandIdentitySchema>;
-      return tenantId === organizationId;
-    },
-    {
-      message: "tenantId must equal organizationId: one connection history per organization",
-      path: ["tenantId"],
-    },
-  );
+function sameTenantAsOrganization(data: object): boolean {
+  return "tenantId" in data && "organizationId" in data && data.tenantId === data.organizationId;
 }
 
-export const registerConnectionCommandDataSchema = commandDataSchema({
-  type: ssoConnectionTypeSchema,
-  idp: ssoIdpMetadataSchema,
-  arrivalPolicy: ssoArrivalPolicySchema,
-});
+function commandDataSchema<Schema extends z.ZodObject>(schema: Schema) {
+  return schema.refine(sameTenantAsOrganization, {
+    message: "tenantId must equal organizationId: one connection history per organization",
+    path: ["tenantId"],
+  });
+}
+
+export const registerConnectionCommandDataSchema = commandDataSchema(
+  z.object({
+    ...commandIdentitySchema.shape,
+    type: ssoConnectionTypeSchema,
+    idp: ssoIdpMetadataSchema,
+    arrivalPolicy: ssoArrivalPolicySchema,
+  }),
+);
 export type RegisterConnectionCommandData = z.infer<typeof registerConnectionCommandDataSchema>;
 
-export const registerReplacementConnectionCommandDataSchema = commandDataSchema({
-  type: ssoConnectionTypeSchema,
-  idp: ssoIdpMetadataSchema,
-  arrivalPolicy: ssoArrivalPolicySchema,
-  replacesConnectionId: z.string().min(1),
-});
+export const registerReplacementConnectionCommandDataSchema = commandDataSchema(
+  z.object({
+    ...commandIdentitySchema.shape,
+    type: ssoConnectionTypeSchema,
+    idp: ssoIdpMetadataSchema,
+    arrivalPolicy: ssoArrivalPolicySchema,
+    replacesConnectionId: z.string().min(1),
+  }),
+);
 export type RegisterReplacementConnectionCommandData = z.infer<
   typeof registerReplacementConnectionCommandDataSchema
 >;
 
-export const selectMigrationRouteCommandDataSchema = commandDataSchema({
-  route: ssoMigrationRouteSchema,
-});
+export const selectMigrationRouteCommandDataSchema = commandDataSchema(
+  z.object({
+    ...commandIdentitySchema.shape,
+    route: ssoMigrationRouteSchema,
+  }),
+);
 export type SelectMigrationRouteCommandData = z.infer<typeof selectMigrationRouteCommandDataSchema>;
 
-export const beginMigrationFinalizationCommandDataSchema = commandDataSchema({});
+export const beginMigrationFinalizationCommandDataSchema = commandDataSchema(
+  z.object(commandIdentitySchema.shape),
+);
 export type BeginMigrationFinalizationCommandData = z.infer<
   typeof beginMigrationFinalizationCommandDataSchema
 >;
 
-export const finalizeMigrationCommandDataSchema = commandDataSchema({});
+export const finalizeMigrationCommandDataSchema = commandDataSchema(
+  z.object(commandIdentitySchema.shape),
+);
 export type FinalizeMigrationCommandData = z.infer<typeof finalizeMigrationCommandDataSchema>;
 
 /** The word on the card, and nothing else (ADR-117). Trimmed, non-empty, and
  *  bounded so a name stays a name rather than a paragraph. */
-export const renameConnectionCommandDataSchema = commandDataSchema({
-  name: z.string().trim().min(1).max(120),
-});
+export const renameConnectionCommandDataSchema = commandDataSchema(
+  z.object({
+    ...commandIdentitySchema.shape,
+    name: z.string().trim().min(1).max(120),
+  }),
+);
 export type RenameConnectionCommandData = z.infer<typeof renameConnectionCommandDataSchema>;
 
 /** The raw domain as it was typed; the guard normalizes it, and only the
  *  normalized form ever reaches a fact. */
 const domainShape = { domain: z.string().min(1) };
 
-export const claimDomainCommandDataSchema = commandDataSchema(domainShape);
+export const claimDomainCommandDataSchema = commandDataSchema(
+  z.object({ ...commandIdentitySchema.shape, ...domainShape }),
+);
 export type ClaimDomainCommandData = z.infer<typeof claimDomainCommandDataSchema>;
 
-export const approveDomainClaimCommandDataSchema = commandDataSchema({
-  ...domainShape,
-  /** What authorizes the approval. Absent means an operator's hand: a caller
-   *  written before the record could decide a claim cannot accidentally
-   *  claim an authority it never had. */
-  authority: ssoDomainClaimAuthoritySchema.optional(),
-});
+export const approveDomainClaimCommandDataSchema = commandDataSchema(
+  z.object({
+    ...commandIdentitySchema.shape,
+    ...domainShape,
+    /** What authorizes the approval. Absent means an operator's hand: a caller
+     *  written before the record could decide a claim cannot accidentally
+     *  claim an authority it never had. */
+    authority: ssoDomainClaimAuthoritySchema.optional(),
+  }),
+);
 export type ApproveDomainClaimCommandData = z.infer<typeof approveDomainClaimCommandDataSchema>;
 
-export const rejectDomainClaimCommandDataSchema = commandDataSchema({
-  ...domainShape,
-  note: z.string().min(1),
-});
+export const rejectDomainClaimCommandDataSchema = commandDataSchema(
+  z.object({
+    ...commandIdentitySchema.shape,
+    ...domainShape,
+    note: z.string().min(1),
+  }),
+);
 export type RejectDomainClaimCommandData = z.infer<typeof rejectDomainClaimCommandDataSchema>;
 
-export const discardConnectionCommandDataSchema = commandDataSchema({});
+export const discardConnectionCommandDataSchema = commandDataSchema(
+  z.object(commandIdentitySchema.shape),
+);
 export type DiscardConnectionCommandData = z.infer<typeof discardConnectionCommandDataSchema>;
 
-export const requestVerificationCommandDataSchema = commandDataSchema({
-  ...domainShape,
-  method: ssoVerificationCeremonyMethodSchema,
-  /** `sha256:…`. The caller hashes the token it showed the operator; this
-   *  boundary never sees the token, so it cannot leak one. */
-  tokenHash: z.string().min(1),
-  /** When the record stops proving anything; absent for a ceremony that does
-   *  not expire. */
-  expiresAtMs: z.number().int().nonnegative().nullable().optional(),
-});
+export const requestVerificationCommandDataSchema = commandDataSchema(
+  z.object({
+    ...commandIdentitySchema.shape,
+    ...domainShape,
+    method: ssoVerificationCeremonyMethodSchema,
+    /** `sha256:…`. The caller hashes the token it showed the operator; this
+     *  boundary never sees the token, so it cannot leak one. */
+    tokenHash: z.string().min(1),
+    /** When the record stops proving anything; absent for a ceremony that does
+     *  not expire. */
+    expiresAtMs: z.number().int().nonnegative().nullable().optional(),
+  }),
+);
 export type RequestVerificationCommandData = z.infer<typeof requestVerificationCommandDataSchema>;
 
 /**
  * Domain attestation command (D05 tier 1): carries domain only; authorization checked via port.
  */
-export const attestDomainCommandDataSchema = commandDataSchema(domainShape);
+export const attestDomainCommandDataSchema = commandDataSchema(
+  z.object({ ...commandIdentitySchema.shape, ...domainShape }),
+);
 export type AttestDomainCommandData = z.infer<typeof attestDomainCommandDataSchema>;
 
-export const withdrawDomainCommandDataSchema = commandDataSchema(domainShape);
+export const withdrawDomainCommandDataSchema = commandDataSchema(
+  z.object({ ...commandIdentitySchema.shape, ...domainShape }),
+);
 export type WithdrawDomainCommandData = z.infer<typeof withdrawDomainCommandDataSchema>;
 
-export const verifyDomainCommandDataSchema = commandDataSchema({
-  ...domainShape,
-  /** Which channel the caller read the token from. One minted token is
-   *  satisfiable as a record or as the well-known file, and what proved it is
-   *  what the verified fact records. */
-  channel: ssoPublishedProofChannelSchema.optional(),
-});
+export const verifyDomainCommandDataSchema = commandDataSchema(
+  z.object({
+    ...commandIdentitySchema.shape,
+    ...domainShape,
+    /** Which channel the caller read the token from. One minted token is
+     *  satisfiable as a record or as the well-known file, and what proved it is
+     *  what the verified fact records. */
+    channel: ssoPublishedProofChannelSchema.optional(),
+  }),
+);
 export type VerifyDomainCommandData = z.infer<typeof verifyDomainCommandDataSchema>;
 
-export const recordDomainProofPresentCommandDataSchema = commandDataSchema(domainShape);
+export const recordDomainProofPresentCommandDataSchema = commandDataSchema(
+  z.object({ ...commandIdentitySchema.shape, ...domainShape }),
+);
 export type RecordDomainProofPresentCommandData = z.infer<
   typeof recordDomainProofPresentCommandDataSchema
 >;
 
 /** `graceMs` is passed in rather than read here, so the window a customer is
  *  told about is one composed constant and not a second copy of it. */
-export const recordDomainProofAbsentCommandDataSchema = commandDataSchema({
-  ...domainShape,
-  graceMs: z.number().int().positive(),
-});
+export const recordDomainProofAbsentCommandDataSchema = commandDataSchema(
+  z.object({
+    ...commandIdentitySchema.shape,
+    ...domainShape,
+    graceMs: z.number().int().positive(),
+  }),
+);
 export type RecordDomainProofAbsentCommandData = z.infer<
   typeof recordDomainProofAbsentCommandDataSchema
 >;
 
-export const activateConnectionCommandDataSchema = commandDataSchema({
-  /** The account whose test login the activation rests on; null only for a
-   *  grandfathered connection (its production history is the test login). */
-  testLoginAccountId: z.string().min(1).nullable(),
-});
+export const activateConnectionCommandDataSchema = commandDataSchema(
+  z.object({
+    ...commandIdentitySchema.shape,
+    /** The account whose test login the activation rests on; null only for a
+     *  grandfathered connection (its production history is the test login). */
+    testLoginAccountId: z.string().min(1).nullable(),
+  }),
+);
 export type ActivateConnectionCommandData = z.infer<typeof activateConnectionCommandDataSchema>;
 
-export const suspendConnectionCommandDataSchema = commandDataSchema({
-  reason: z.string().min(1).nullable(),
-});
+export const suspendConnectionCommandDataSchema = commandDataSchema(
+  z.object({
+    ...commandIdentitySchema.shape,
+    reason: z.string().min(1).nullable(),
+  }),
+);
 export type SuspendConnectionCommandData = z.infer<typeof suspendConnectionCommandDataSchema>;
 
-export const resumeConnectionCommandDataSchema = commandDataSchema({});
+export const resumeConnectionCommandDataSchema = commandDataSchema(
+  z.object(commandIdentitySchema.shape),
+);
 export type ResumeConnectionCommandData = z.infer<typeof resumeConnectionCommandDataSchema>;
 
-export const requestTeardownCommandDataSchema = commandDataSchema({
-  reason: z.string().min(1).nullable(),
-  /** How long the connection stays reversible before the process manager's
-   *  wake completes it. Supplied by the caller so the grace is one
-   *  composed constant rather than a value this package invents. */
-  graceMs: z.number().int().nonnegative(),
-});
+export const requestTeardownCommandDataSchema = commandDataSchema(
+  z.object({
+    ...commandIdentitySchema.shape,
+    reason: z.string().min(1).nullable(),
+    /** How long the connection stays reversible before the process manager's
+     *  wake completes it. Supplied by the caller so the grace is one
+     *  composed constant rather than a value this package invents. */
+    graceMs: z.number().int().nonnegative(),
+  }),
+);
 export type RequestTeardownCommandData = z.infer<typeof requestTeardownCommandDataSchema>;
 
-export const completeTeardownCommandDataSchema = commandDataSchema({});
+export const completeTeardownCommandDataSchema = commandDataSchema(
+  z.object(commandIdentitySchema.shape),
+);
 export type CompleteTeardownCommandData = z.infer<typeof completeTeardownCommandDataSchema>;
 
 /**
  * Grandfather migration command: encodes all history as one with fixed source and idempotent keys.
  */
-export const grandfatherConnectionCommandDataSchema = commandDataSchema({
-  type: ssoConnectionTypeSchema,
-  idp: ssoIdpMetadataSchema,
-  arrivalPolicy: ssoArrivalPolicySchema,
-  /** The domains `Organization.ssoDomain` carries, already normalized. */
-  domains: z.array(z.string().min(1)).min(1),
-  source: z.literal("legacy-grandfathered"),
-});
+export const grandfatherConnectionCommandDataSchema = commandDataSchema(
+  z.object({
+    ...commandIdentitySchema.shape,
+    type: ssoConnectionTypeSchema,
+    idp: ssoIdpMetadataSchema,
+    arrivalPolicy: ssoArrivalPolicySchema,
+    /** The domains `Organization.ssoDomain` carries, already normalized. */
+    domains: z.array(z.string().min(1)).min(1),
+    source: z.literal("legacy-grandfathered"),
+  }),
+);
 export type GrandfatherConnectionCommandData = z.infer<
   typeof grandfatherConnectionCommandDataSchema
 >;
 
-export const setArrivalPolicyCommandDataSchema = commandDataSchema({
-  policy: ssoArrivalPolicySchema,
-});
+export const setArrivalPolicyCommandDataSchema = commandDataSchema(
+  z.object({
+    ...commandIdentitySchema.shape,
+    policy: ssoArrivalPolicySchema,
+  }),
+);
 export type SetArrivalPolicyCommandData = z.infer<typeof setArrivalPolicyCommandDataSchema>;
 
 /** One connection command, typed on its verb — what the ledger stages. */

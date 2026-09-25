@@ -635,6 +635,7 @@ export {
   scimGroupMappedPayloadSchema,
   scimRevokeCauseSchema,
   scimSyncFactInputSchema,
+  scimSyncFailureSchema,
   scimSyncIdFor,
   scimSyncStateSchema,
   scimTokenIssuedPayloadSchema,
