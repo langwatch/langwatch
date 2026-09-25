@@ -58,9 +58,7 @@ export function buildClickHouse(options: {
       // only name this process knows that is safe to print.
       cluster: route.organizationId,
     })),
-    ...(config.maxOpenConnections === undefined
-      ? {}
-      : { poolSizing: { override: config.maxOpenConnections } }),
+    ...(config.poolSizing === undefined ? {} : { poolSizing: config.poolSizing }),
   });
 
   const connection = ClickHouseConnectionService.create({
@@ -75,9 +73,9 @@ export function buildClickHouse(options: {
     driver: routingDriver(connection),
     tenantGuard: new TenantGuard(),
     retries: new RetryPolicy(),
-    ...(config.maxConcurrentStatements === undefined
-      ? {}
-      : { limiter: new ConcurrencyLimiter({ maxConcurrent: config.maxConcurrentStatements }) }),
+    limiter: new ConcurrencyLimiter({
+      maxConcurrent: config.maxConcurrentStatements ?? configuration.poolSizing.size,
+    }),
   });
 
   return {

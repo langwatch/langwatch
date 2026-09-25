@@ -9,6 +9,16 @@ export const storesOwner = {
       "DEFAULT_RETENTION_DAYS",
       z.coerce.number().int().positive().default(30),
     ),
+    clickhousePool: {
+      override: c.env("CLICKHOUSE_MAX_OPEN_CONNECTIONS", z.coerce.number().optional()),
+      replicas: c.env("CLICKHOUSE_CLIENT_REPLICAS", z.coerce.number().optional()),
+      serverMaxConcurrentQueries: c.env(
+        "CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES",
+        z.coerce.number().optional(),
+      ),
+      serverNodes: c.env("CLICKHOUSE_SERVER_NODES", z.coerce.number().optional()),
+      clientsPerProcess: c.env("CLICKHOUSE_CLIENTS_PER_PROCESS", z.coerce.number().optional()),
+    },
     rateLimit: {
       requests: c.env("API_RATE_LIMIT_REQUESTS", z.coerce.number().int().positive().default(60)),
       seconds: c.env("API_RATE_LIMIT_SECONDS", z.coerce.number().int().positive().default(60)),

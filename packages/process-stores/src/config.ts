@@ -3,6 +3,7 @@
  * already parsed, never a pre-built collaborator. Two exceptions carry one:
  * eventing's store/queue factory and the process store a process-manager role supplies.
  */
+import type { PoolSizingInput } from "@langwatch/clickhouse-client";
 import type { ExecutionTarget, KillSwitch } from "@langwatch/eventing";
 import type { GroupQueuePolicy, GroupQueueStorage } from "@langwatch/group-queue";
 import type { EventingParticipation } from "@langwatch/kernel";
@@ -32,11 +33,11 @@ export interface ClickHouseConfig {
   readonly url?: string;
   /** `CLICKHOUSE_PRIVATE_ROUTES` — one entry per organization on its own server. */
   readonly privateRoutes?: readonly ClickHousePrivateRoute[];
-  /** Sockets the driver keeps open per endpoint. Absent uses the driver's default. */
-  readonly maxOpenConnections?: number;
+  /** What sizes the per-endpoint pool, as main's `CLICKHOUSE_*` pool variables state it. */
+  readonly poolSizing?: PoolSizingInput;
   /** How long one statement may take before the driver abandons it. */
   readonly requestTimeoutMs?: number;
-  /** Statements allowed in flight at once. Absent means unbounded. */
+  /** Statements allowed in flight at once. Absent means the resolved pool size. */
   readonly maxConcurrentStatements?: number;
   /** Settings applied to every statement, before a statement's own. */
   readonly settings?: Readonly<Record<string, string>>;

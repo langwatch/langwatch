@@ -43,6 +43,13 @@ const CREDENTIAL = JSON.stringify({ OPENAI_API_KEY: "sk-fixture-not-a-real-key" 
 
 const storesConfig: StoresConfig = {
   defaultRetentionDays: 30,
+  clickhousePool: {
+    override: undefined,
+    replicas: undefined,
+    serverMaxConcurrentQueries: undefined,
+    serverNodes: undefined,
+    clientsPerProcess: undefined,
+  },
   rateLimit: { requests: 60, seconds: 60 },
   objectStorage: {
     backend: "file",

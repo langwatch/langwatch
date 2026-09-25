@@ -95,7 +95,9 @@ function processConfigOf(options: {
     rateLimit: config.rateLimit,
     mail: { provider: "off" },
     ...(urls.database ? { database: { url: urls.database } } : {}),
-    ...(urls.clickhouse ? { clickhouse: { url: urls.clickhouse } } : {}),
+    ...(urls.clickhouse
+      ? { clickhouse: { url: urls.clickhouse, poolSizing: config.clickhousePool } }
+      : {}),
     ...(urls.redis ? { redis: { url: urls.redis } } : {}),
     eventing: pipelines.configure(config.defaultRetentionDays),
     objectStorage: objectStorageConfig({
