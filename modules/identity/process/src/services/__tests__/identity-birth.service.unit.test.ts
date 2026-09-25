@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { IdentityBirthLedger } from "../../app/identity.members.ts";
 import type { IdentityNewbornRepository } from "../../repositories/identity-newborn.repository.ts";
 import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing.ts";
-import { CryptoIdentifierIdentityAdapter } from "../crypto-identifier-identity.service.ts";
+import { CryptoIdentifierIdentityService } from "../crypto-identifier-identity.service.ts";
 import { IdentityBirthService } from "../identity-birth.service.ts";
 /**
  * The package's own suite proves what better-auth sees; this proves the leg ORDER,
@@ -85,7 +85,7 @@ function harness(overrides?: {
       heads,
       users: inMemoryIdentityUsers(),
       reservations,
-      identifiers: CryptoIdentifierIdentityAdapter.create(),
+      identifiers: CryptoIdentifierIdentityService.create(),
     }),
     ledger,
     rows,

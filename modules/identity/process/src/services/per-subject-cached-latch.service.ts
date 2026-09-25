@@ -1,9 +1,9 @@
-import { createLogger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
 
 import type { IdentityLatchRepository } from "../repositories/identity-latch.repository.ts";
 import type { IdentityUserGate } from "../rules/identity-user-gate.rules.ts";
 
-const logger = createLogger("langwatch:identity:latch");
+const moduleLogger = createLogger("langwatch:identity:latch");
 
 /** How long one latch answer is held, in both directions. */
 export const IDENTITY_LATCH_CACHE_TTL_MS = 60_000;
@@ -24,6 +24,8 @@ export class CachedIdentityLatchService {
     ttlMs: number;
     maxUsers: number;
     now: () => number;
+    /** Defaults to the module's own logger; a test injects a captured one. */
+    logger?: Logger;
   }): CachedIdentityLatchService {
     return new CachedIdentityLatchService(options);
   }
@@ -39,6 +41,7 @@ export class CachedIdentityLatchService {
       ttlMs: number;
       maxUsers: number;
       now: () => number;
+      logger?: Logger;
     },
   ) {}
 
@@ -111,7 +114,10 @@ export class CachedIdentityLatchService {
       // leave a stale address in place, but a closed latch nobody can
       // distinguish from "not rolled out yet" is how a real outage reads as
       // routine.
-      logger.warn({ ...context, error, ttlMs: this.options.ttlMs }, message);
+      (this.options.logger ?? moduleLogger).warn(
+        { ...context, error, ttlMs: this.options.ttlMs },
+        message,
+      );
       return false;
     }
   }

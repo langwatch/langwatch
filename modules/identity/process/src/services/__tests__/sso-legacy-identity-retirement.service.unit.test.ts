@@ -13,7 +13,7 @@ import {
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { MemoryIdentityRepositories } from "../../repositories/memory/memory.identity.repositories.ts";
+import { identityRepositoriesOverMemory } from "../../repositories/memory/memory.identity.repositories.ts";
 import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
 import type { IdentityService } from "../identity.service.ts";
 import { SsoLegacyIdentityRetirementService } from "../sso-legacy-identity-retirement.service.ts";
@@ -109,7 +109,7 @@ function scenario({
     store.ssoConnections.set(connection.connectionId, connection);
   }
   for (const fact of identifiers) store.identifiers.set(fact.identifierId, fact);
-  const repositories = MemoryIdentityRepositories.over(store);
+  const repositories = identityRepositoriesOverMemory(store);
   const detachIdentifier = vi.fn(async () => []);
   const markPrimary = vi.fn(async () => []);
   const retire = vi.fn(async () => ({ retired: 1, remaining: 0 }));

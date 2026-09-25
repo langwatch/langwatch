@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { IdentityRepositories } from "../../identity.repositories.ts";
-import { MemoryIdentityRepositories } from "../memory.identity.repositories.ts";
+import { identityRepositoriesOverMemory } from "../memory.identity.repositories.ts";
 import { MemoryIdentityStore } from "../memory.identity.store.ts";
 
 /**
@@ -12,7 +12,7 @@ import { MemoryIdentityStore } from "../memory.identity.store.ts";
 function scenario(): { store: MemoryIdentityStore; repositories: IdentityRepositories } {
   const store = MemoryIdentityStore.create();
 
-  return { store, repositories: MemoryIdentityRepositories.over(store) };
+  return { store, repositories: identityRepositoriesOverMemory(store) };
 }
 
 function seedUser(store: MemoryIdentityStore, userId: string, email: string | null): void {

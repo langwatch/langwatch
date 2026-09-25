@@ -11,7 +11,7 @@ import {
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { MemoryIdentityRepositories } from "../../repositories/memory/memory.identity.repositories.ts";
+import { identityRepositoriesOverMemory } from "../../repositories/memory/memory.identity.repositories.ts";
 import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
 import { SsoConnectionReadRepository } from "../../repositories/sso-connection.repository.ts";
 import type { SsoCredentialRepository } from "../../repositories/sso-credential.repository.ts";
@@ -68,7 +68,7 @@ function serviceOver({
   const service = SsoSetupCommandsService.create({
     connections: () => createApiFixture<SsoConnectionService>({ activateConnection }),
     reads: new OneConnection(row),
-    activity: MemoryIdentityRepositories.over(store).ssoMigrationEvidence,
+    activity: identityRepositoriesOverMemory(store).ssoMigrationEvidence,
     credentials: createApiFixture<SsoCredentialRepository>({}),
     registrations: createApiFixture<SsoIdpRegistrationService>({}),
     finalization: createApiFixture<SsoMigrationFinalizationService>({}),

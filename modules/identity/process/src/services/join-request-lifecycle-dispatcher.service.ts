@@ -18,13 +18,13 @@ const logger = createLogger("langwatch:identity:join-request-lifecycle");
  * tell people about a fact the pipeline recorded. The process manager decides WHEN, the guard
  * still decides WHETHER, and every notice comes from a recorded event (ADR-135).
  */
-export class JoinRequestLifecycleDispatcherAdapter implements JoinRequestLifecycle {
+export class JoinRequestLifecycleDispatcherService implements JoinRequestLifecycle {
   static create(
     reads: Pick<JoinRequestReadRepository, "getRequest">,
     notifier: JoinRequestNotifier,
     joinRequests: () => Pick<JoinRequestService, "expireJoin">,
-  ): JoinRequestLifecycleDispatcherAdapter {
-    return new JoinRequestLifecycleDispatcherAdapter(reads, notifier, joinRequests);
+  ): JoinRequestLifecycleDispatcherService {
+    return new JoinRequestLifecycleDispatcherService(reads, notifier, joinRequests);
   }
 
   private constructor(

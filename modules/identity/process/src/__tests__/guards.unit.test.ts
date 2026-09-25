@@ -14,7 +14,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import type { MfaEnrollmentRepository } from "../repositories/mfa-enrollment.repository.ts";
-import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
+import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityGuardsService } from "../services/identity-guards.service.ts";
 import { MfaGuardsService } from "../services/mfa-guards.service.ts";
 import {
@@ -44,7 +44,7 @@ describe("attachIdentifier guard", () => {
         heads,
         users,
         reservations: new InMemoryReservations(),
-        identifiers: CryptoIdentifierIdentityAdapter.create(),
+        identifiers: CryptoIdentifierIdentityService.create(),
       }).attachIdentifier(attachData());
       expect(facts).toHaveLength(1);
       const attached = facts[0]!;
@@ -86,7 +86,7 @@ describe("attachIdentifier guard", () => {
         heads: new InMemoryHeads(),
         users,
         reservations: new InMemoryReservations(),
-        identifiers: CryptoIdentifierIdentityAdapter.create(),
+        identifiers: CryptoIdentifierIdentityService.create(),
       }).attachIdentifier(attachData());
       expect(facts[0]?.data).toMatchObject({ identifierHash: null });
     });
@@ -97,7 +97,7 @@ describe("attachIdentifier guard", () => {
         heads: new InMemoryHeads(),
         users,
         reservations: new InMemoryReservations(),
-        identifiers: CryptoIdentifierIdentityAdapter.create(),
+        identifiers: CryptoIdentifierIdentityService.create(),
       }).attachIdentifier(
         attachData({
           provider: "email",
@@ -128,7 +128,7 @@ describe("attachIdentifier guard", () => {
         heads,
         users,
         reservations,
-        identifiers: CryptoIdentifierIdentityAdapter.create(),
+        identifiers: CryptoIdentifierIdentityService.create(),
       }).attachIdentifier(attachData());
       // No caller to refuse on this side: an IdP callback that failed would
       // tell the customer nothing they could act on (D01).
@@ -155,7 +155,7 @@ describe("attachIdentifier guard", () => {
         heads,
         users,
         reservations,
-        identifiers: CryptoIdentifierIdentityAdapter.create(),
+        identifiers: CryptoIdentifierIdentityService.create(),
       }).attachIdentifier(attachData());
       expect(facts).toHaveLength(1);
       expect(facts[0]!.data).toMatchObject({ state: "VERIFIED" });
@@ -173,7 +173,7 @@ describe("attachIdentifier guard", () => {
         heads,
         users,
         reservations,
-        identifiers: CryptoIdentifierIdentityAdapter.create(),
+        identifiers: CryptoIdentifierIdentityService.create(),
       });
       const other = "user_other";
 
@@ -220,7 +220,7 @@ describe("attachIdentifier guard", () => {
         heads: new InMemoryHeads(),
         users,
         reservations,
-        identifiers: CryptoIdentifierIdentityAdapter.create(),
+        identifiers: CryptoIdentifierIdentityService.create(),
       }).attachIdentifier(
         attachData({
           provider: "email",
@@ -240,7 +240,7 @@ describe("attachIdentifier guard", () => {
         heads: new InMemoryHeads(),
         users,
         reservations: new InMemoryReservations(),
-        identifiers: CryptoIdentifierIdentityAdapter.create(),
+        identifiers: CryptoIdentifierIdentityService.create(),
       });
       const first = await guards.attachIdentifier(attachData());
       const second = await guards.attachIdentifier(attachData({ commandId: "idcmd_2" }));
@@ -259,7 +259,7 @@ describe("attachIdentifier guard", () => {
         heads,
         users,
         reservations: new InMemoryReservations(),
-        identifiers: CryptoIdentifierIdentityAdapter.create(),
+        identifiers: CryptoIdentifierIdentityService.create(),
       });
       heads.fold(USER, await guards.attachIdentifier(attachData()));
 
@@ -273,7 +273,7 @@ describe("attachIdentifier guard", () => {
         heads,
         users,
         reservations: new InMemoryReservations(),
-        identifiers: CryptoIdentifierIdentityAdapter.create(),
+        identifiers: CryptoIdentifierIdentityService.create(),
       });
       const first = await guards.attachIdentifier(attachData());
       heads.fold(USER, first);
@@ -296,7 +296,7 @@ describe("attachIdentifier guard", () => {
         heads,
         users,
         reservations: new InMemoryReservations(),
-        identifiers: CryptoIdentifierIdentityAdapter.create(),
+        identifiers: CryptoIdentifierIdentityService.create(),
       });
       const first = await guards.attachIdentifier(attachData());
       // The ledger's provisional write: the row is there, the cursor is not.
@@ -318,7 +318,7 @@ describe("attachIdentifier guard", () => {
         heads,
         users,
         reservations: new InMemoryReservations(),
-        identifiers: CryptoIdentifierIdentityAdapter.create(),
+        identifiers: CryptoIdentifierIdentityService.create(),
       });
       heads.fold(USER, await guards.attachIdentifier(attachData()));
       heads.newborns.add(USER);
@@ -339,7 +339,7 @@ describe("verifyIdentifier guard", () => {
       heads,
       users,
       reservations: new InMemoryReservations(),
-      identifiers: CryptoIdentifierIdentityAdapter.create(),
+      identifiers: CryptoIdentifierIdentityService.create(),
     }).verifyIdentifier({
       tenantId: USER,
       userId: USER,
@@ -384,7 +384,7 @@ describe("verifyIdentifier guard", () => {
           heads,
           users,
           reservations,
-          identifiers: CryptoIdentifierIdentityAdapter.create(),
+          identifiers: CryptoIdentifierIdentityService.create(),
         }).verifyIdentifier({
           tenantId: USER,
           userId: USER,
@@ -414,7 +414,7 @@ describe("verifyIdentifier guard", () => {
         heads,
         users,
         reservations,
-        identifiers: CryptoIdentifierIdentityAdapter.create(),
+        identifiers: CryptoIdentifierIdentityService.create(),
       }).verifyIdentifier({
         tenantId: USER,
         userId: USER,
@@ -482,7 +482,7 @@ describe("verifyIdentifier guard", () => {
           heads,
           users: legacy,
           reservations: new InMemoryReservations(),
-          identifiers: CryptoIdentifierIdentityAdapter.create(),
+          identifiers: CryptoIdentifierIdentityService.create(),
         }).verifyIdentifier({
           tenantId: USER,
           userId: USER,
@@ -512,7 +512,7 @@ describe("verifyIdentifier guard", () => {
         heads,
         users: legacy,
         reservations: new InMemoryReservations(),
-        identifiers: CryptoIdentifierIdentityAdapter.create(),
+        identifiers: CryptoIdentifierIdentityService.create(),
       }).verifyIdentifier({
         tenantId: USER,
         userId: USER,
@@ -540,7 +540,7 @@ describe("verifyIdentifier guard", () => {
           heads,
           users: legacy,
           reservations: new InMemoryReservations(),
-          identifiers: CryptoIdentifierIdentityAdapter.create(),
+          identifiers: CryptoIdentifierIdentityService.create(),
         }).verifyIdentifier({
           tenantId: USER,
           userId: USER,
@@ -582,7 +582,7 @@ describe("markPrimary guard", () => {
         heads,
         users,
         reservations: new InMemoryReservations(),
-        identifiers: CryptoIdentifierIdentityAdapter.create(),
+        identifiers: CryptoIdentifierIdentityService.create(),
       }).markPrimary({
         tenantId: USER,
         userId: USER,
@@ -617,7 +617,7 @@ describe("markPrimary guard", () => {
         heads,
         users,
         reservations: new InMemoryReservations(),
-        identifiers: CryptoIdentifierIdentityAdapter.create(),
+        identifiers: CryptoIdentifierIdentityService.create(),
       }).markPrimary({
         tenantId: USER,
         userId: USER,
@@ -647,7 +647,7 @@ describe("markPrimary guard", () => {
         heads,
         users,
         reservations: new InMemoryReservations(),
-        identifiers: CryptoIdentifierIdentityAdapter.create(),
+        identifiers: CryptoIdentifierIdentityService.create(),
       }).markPrimary({
         tenantId: USER,
         userId: USER,
@@ -671,7 +671,7 @@ describe("markPrimary guard", () => {
           heads,
           users,
           reservations: new InMemoryReservations(),
-          identifiers: CryptoIdentifierIdentityAdapter.create(),
+          identifiers: CryptoIdentifierIdentityService.create(),
         }).markPrimary({
           tenantId: USER,
           userId: USER,
@@ -709,7 +709,7 @@ describe("markPrimary guard", () => {
           heads,
           users: legacy,
           reservations: new InMemoryReservations(),
-          identifiers: CryptoIdentifierIdentityAdapter.create(),
+          identifiers: CryptoIdentifierIdentityService.create(),
         }).markPrimary({
           tenantId: USER,
           userId: USER,
@@ -735,7 +735,7 @@ describe("detachIdentifier guard", () => {
       heads,
       users,
       reservations: new InMemoryReservations(),
-      identifiers: CryptoIdentifierIdentityAdapter.create(),
+      identifiers: CryptoIdentifierIdentityService.create(),
     }).detachIdentifier({
       tenantId: USER,
       userId: USER,
@@ -766,7 +766,7 @@ describe("detachIdentifier guard", () => {
         heads,
         users,
         reservations: new InMemoryReservations(),
-        identifiers: CryptoIdentifierIdentityAdapter.create(),
+        identifiers: CryptoIdentifierIdentityService.create(),
       });
       const attached = await guards.attachIdentifier(attachData());
       const identifierId = (attached[0]!.data as { identifierId: string }).identifierId;
@@ -812,7 +812,7 @@ describe("eraseUser guard", () => {
         heads,
         users,
         reservations: new InMemoryReservations(),
-        identifiers: CryptoIdentifierIdentityAdapter.create(),
+        identifiers: CryptoIdentifierIdentityService.create(),
       }).eraseUser({
         tenantId: USER,
         userId: USER,
@@ -833,7 +833,7 @@ describe("detachIdentifier strands guard", () => {
       heads,
       users,
       reservations: new InMemoryReservations(),
-      identifiers: CryptoIdentifierIdentityAdapter.create(),
+      identifiers: CryptoIdentifierIdentityService.create(),
     }).detachIdentifier({
       tenantId: USER,
       userId: USER,
@@ -1054,7 +1054,7 @@ describe("detachIdentifier strands guard, given a second factor with unspent bac
         heads,
         users,
         reservations: new InMemoryReservations(),
-        identifiers: CryptoIdentifierIdentityAdapter.create(),
+        identifiers: CryptoIdentifierIdentityService.create(),
       }).detachIdentifier({
         tenantId: USER,
         userId: USER,

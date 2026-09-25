@@ -27,7 +27,6 @@ import {
   ownedVerifiedDomains,
   verifiedDomainCanBeShared,
 } from "../../rules/sso-domain-ownership.rules.ts";
-import type { SsoEngineProviderProjection } from "../sso-engine-provider.repository.ts";
 import { PrismaSsoBreakGlassRepository } from "./prisma.sso-break-glass.repository.ts";
 
 /** The connection head, and the ownership rows written in the same transaction. */
@@ -58,17 +57,11 @@ function provedCondition(entry: SsoDomainVerification): SsoDomainVerification {
 export class PrismaSsoConnectionProjectionRepository implements StateProjectionStore<SsoConnectionFoldState> {
   static create(
     database: PrismaSsoConnectionProjectionDatabase,
-    /** Keeps the engine's row in step with this head (D09). Absent, the engine's
-     * table is not maintained — what a process mounting no sign-in door wants. */
-    engineProvider?: SsoEngineProviderProjection,
   ): PrismaSsoConnectionProjectionRepository {
-    return new PrismaSsoConnectionProjectionRepository(database, engineProvider);
+    return new PrismaSsoConnectionProjectionRepository(database);
   }
 
-  constructor(
-    private readonly prisma: PrismaSsoConnectionProjectionDatabase,
-    private readonly engineProvider?: SsoEngineProviderProjection,
-  ) {}
+  constructor(private readonly prisma: PrismaSsoConnectionProjectionDatabase) {}
 
   async get(
     key: string,
@@ -176,9 +169,6 @@ export class PrismaSsoConnectionProjectionRepository implements StateProjectionS
           connectionId: id,
         });
       }
-    });
-    await this.engineProvider?.project({
-      connection: { ...state, connectionId: id },
     });
   }
 

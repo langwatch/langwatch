@@ -19,8 +19,8 @@ import {
   RecordMfaVerificationFailureCommand,
   RegenerateBackupCodesCommand,
 } from "../eventing/mfa.intent.ts";
+import { defineIdentityPipeline } from "../eventing/user-identity.pipeline.ts";
 import type { MfaEnrollmentRepository } from "../repositories/mfa-enrollment.repository.ts";
-import { IdentityPipelineDefinitionAdapter } from "../services/identity-pipeline-definition.service.ts";
 import { MfaGuardsService } from "../services/mfa-guards.service.ts";
 
 const USER = "user_sam";
@@ -179,7 +179,7 @@ describe("two-step verification event aggregate type", () => {
         },
       },
     ])("stamps $label with the pipeline's declared aggregate type", async ({ handler, data }) => {
-      const declared = IdentityPipelineDefinitionAdapter.create({
+      const declared = defineIdentityPipeline({
         identityProjectionStore: noopStore,
         identityGuards: null as never,
         mfaProjectionStore: noopStore,

@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type { PlatformOperator } from "../../app/identity.members.ts";
+import { isPlatformOperatorEmail } from "../../rules/platform-operator.rules.ts";
 import type { SsoPlatformOperatorRepository } from "../sso-connection.repository.ts";
 
 /** The one model an operator check reads, and no other. */
@@ -19,17 +19,17 @@ export class AdminEmailPlatformOperatorsRepository implements SsoPlatformOperato
    */
   static create({
     database,
-    operators,
+    adminEmails,
   }: {
     database: PrismaSsoPlatformOperatorDatabase;
-    operators: PlatformOperator;
+    adminEmails: readonly string[];
   }): AdminEmailPlatformOperatorsRepository {
-    return new AdminEmailPlatformOperatorsRepository(database, operators);
+    return new AdminEmailPlatformOperatorsRepository(database, adminEmails);
   }
 
   private constructor(
     private readonly prisma: PrismaSsoPlatformOperatorDatabase,
-    private readonly operators: PlatformOperator,
+    private readonly adminEmails: readonly string[],
   ) {}
 
   async isPlatformOperator({ actorId }: { actorId: string }): Promise<boolean> {
@@ -38,7 +38,7 @@ export class AdminEmailPlatformOperatorsRepository implements SsoPlatformOperato
       select: { email: true },
     });
     if (!user) return false;
-    return this.operators.isPlatformOperatorEmail({ email: user.email });
+    return isPlatformOperatorEmail({ adminEmails: this.adminEmails, email: user.email });
   }
 }
 

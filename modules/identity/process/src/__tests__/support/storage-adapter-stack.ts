@@ -22,7 +22,7 @@ import {
   BetterAuthIdentityStorageService,
   type PasskeyRemoval,
 } from "../../services/better-auth-identity-storage.service.ts";
-import { CryptoIdentifierIdentityAdapter } from "../../services/crypto-identifier-identity.service.ts";
+import { CryptoIdentifierIdentityService } from "../../services/crypto-identifier-identity.service.ts";
 import { IdentityGuardsService } from "../../services/identity-guards.service.ts";
 import { IdentityService } from "../../services/identity.service.ts";
 import { InMemoryIdentityEventStore, inMemoryIdentityLedger } from "./in-memory-event-store.ts";
@@ -221,7 +221,7 @@ export function identityStack({
       heads,
       users,
       reservations,
-      identifiers: CryptoIdentifierIdentityAdapter.create(),
+      identifiers: CryptoIdentifierIdentityService.create(),
     }),
     ledger,
   );

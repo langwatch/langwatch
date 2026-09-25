@@ -565,8 +565,11 @@ export interface SsoAuthenticationActivityApi {
  * reported, never turned into a refused sign-in.
  */
 export interface SsoArrivalApi {
-  admit(args: { user: SsoArrivingUser; connectionId: string; domain: string }): Promise<void>;
+  admit(args: SsoArrivalAdmission): Promise<void>;
 }
+
+/** One arrival a connection admits: who arrived, through which connection and domain. */
+export type SsoArrivalAdmission = { user: SsoArrivingUser; connectionId: string; domain: string };
 
 /** A member a matching domain admitted, and whether the policy did it with nobody approving. */
 export interface IdentityDomainAdmission {

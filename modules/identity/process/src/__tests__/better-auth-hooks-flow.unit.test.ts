@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { IdentityUsersRepository } from "../repositories/identity-users.repository.ts";
 import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
 import { IdentityCeremoniesService } from "../services/better-auth-identity-ceremonies.service.ts";
-import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
+import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityGuardsService } from "../services/identity-guards.service.ts";
 import { IdentityService } from "../services/identity.service.ts";
 import {
@@ -65,7 +65,7 @@ function harness() {
       heads,
       users,
       reservations: new InMemoryReservations(),
-      identifiers: CryptoIdentifierIdentityAdapter.create(),
+      identifiers: CryptoIdentifierIdentityService.create(),
     }),
     ledger,
   );

@@ -34,6 +34,7 @@ import {
 import { SSO_DOMAIN_PROOF_PUBLIC_EGRESS } from "../channels/sso-domain-proof-file.channel.ts";
 import { ssoIssuerDiscoveryChannels } from "../channels/sso-issuer-discovery-channels.registry.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
+import { LocalDoorBreakGlassBindingRepository } from "../repositories/local/local.door-break-glass-binding.repository.ts";
 import { breakGlassHolderEligibility } from "../rules/break-glass-eligibility.rules.ts";
 import type {
   JoinMembership,
@@ -44,7 +45,7 @@ import type {
 } from "../rules/join-requests-contract.rules.ts";
 import type { SsoArrivalMemberships } from "../rules/sso-arrival-contract.rules.ts";
 import { newSsoBreakGlassBindingId } from "../rules/sso-connection-id.rules.ts";
-import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
+import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityBackfillPlanService } from "../services/identity-backfill-plan.service.ts";
 import { IdentityBackfillService } from "../services/identity-backfill.service.ts";
 import { IdentityEmailService } from "../services/identity-email.service.ts";
@@ -60,7 +61,6 @@ import { JoinRequestGuardsService } from "../services/join-request-guards.servic
 import { JoinRequestNotificationService } from "../services/join-request-notification.service.ts";
 import { JoinRequestService } from "../services/join-request.service.ts";
 import { JoinRequestsService } from "../services/join-requests.service.ts";
-import { LocalDoorBreakGlassBindingAdapter } from "../services/local-door-break-glass-binding.service.ts";
 import { MfaGuardsService } from "../services/mfa-guards.service.ts";
 import { OrganizationSsoConnectionsService } from "../services/organization-sso-connections.service.ts";
 import { CachedIdentityLatchService } from "../services/per-subject-cached-latch.service.ts";
@@ -360,7 +360,7 @@ export class IdentityApp implements IdentityApi {
       providerConfig: sealedProviderConfigCipher(setup.members.encryption),
     });
     const infrastructure = buildIdentityInfrastructure({
-      prisma: setup.members.prisma,
+      repositories: setup.repositories,
       eventing: setup.members.eventing,
       adminEmails: setup.members.adminEmails,
       registersPipelines: setup.members.producesPipelines,
@@ -371,7 +371,7 @@ export class IdentityApp implements IdentityApi {
       heads: setup.repositories.heads,
       users: setup.repositories.users,
       reservations,
-      identifiers: CryptoIdentifierIdentityAdapter.create(),
+      identifiers: CryptoIdentifierIdentityService.create(),
     });
     const mfaGuards = MfaGuardsService.create(setup.repositories.mfaEnrollment);
     const latch = CachedIdentityLatchService.create({
@@ -400,7 +400,7 @@ export class IdentityApp implements IdentityApi {
       users: setup.repositories.users,
       identity,
       secrets,
-      plan: IdentityBackfillPlanService.create(CryptoIdentifierIdentityAdapter.create()),
+      plan: IdentityBackfillPlanService.create(CryptoIdentifierIdentityService.create()),
     });
     const joinRequestGuards = JoinRequestGuardsService.create({
       requests: setup.repositories.joinRequests,
@@ -414,7 +414,7 @@ export class IdentityApp implements IdentityApi {
     // One answer to "is there a way back in", shared: activation's second
     // precondition and the setup sign-in exemption must not disagree.
     const breakGlass = RequiresLocalDoorAndBinding.create({
-      localDoor: LocalDoorBreakGlassBindingAdapter.create(),
+      localDoor: LocalDoorBreakGlassBindingRepository.create(),
       bindings: SsoBreakGlassRecoveryService.create({ bindings: setup.repositories.ssoBreakGlass }),
     });
     const ssoConnectionGuards = SsoConnectionGuardsService.create({

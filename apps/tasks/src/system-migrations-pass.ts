@@ -13,10 +13,10 @@ import { GroupQueueDependenciesAdapter } from "@langwatch/group-queue";
 import { IDENTITY_PIPELINE_NAME } from "@langwatch/identity-contract";
 import {
   type IdentityEventing,
-  IdentityProducerPipelinesAdapter,
-  PostgresIdentityNewbornSweepAdapter,
-  PostgresIdentityOrganizationMigrationsAdapter,
-  PostgresIdentityUserMigrationsAdapter,
+  IdentityProducerPipelines,
+  IdentityNewbornSweep,
+  IdentityOrganizationMigrations,
+  IdentityUserMigrations,
 } from "@langwatch/identity-process";
 import {
   OpsSystemMigrations,
@@ -51,7 +51,7 @@ export async function systemMigrationsPass(input: TaskInput): Promise<void> {
     }
 
     const migrations: SystemMigration[] = [];
-    migrations.push(...PostgresIdentityOrganizationMigrationsAdapter.create({ database }).build());
+    migrations.push(...IdentityOrganizationMigrations.create({ database }).build());
     if (eventing) {
       const dispatcher = AuthzCommandDispatcherService.create();
       const bindingIds = AuthzBindingIdService.create();
@@ -69,7 +69,7 @@ export async function systemMigrationsPass(input: TaskInput): Promise<void> {
     const commands = new Map<string, { send(data: unknown): Promise<unknown> }>();
     if (eventing) {
       const registered = eventing.register(
-        IdentityProducerPipelinesAdapter.create({
+        IdentityProducerPipelines.create({
           processName: "langwatch-tasks",
         }).identityPipeline(),
       );
@@ -81,11 +81,11 @@ export async function systemMigrationsPass(input: TaskInput): Promise<void> {
       tryPipelineCommand: async ({ pipeline, command }) =>
         pipeline === IDENTITY_PIPELINE_NAME ? (commands.get(command) ?? null) : null,
     };
-    const userMigrations = PostgresIdentityUserMigrationsAdapter.create({
+    const userMigrations = IdentityUserMigrations.create({
       database,
       eventing: identity,
     }).build();
-    const sweep = PostgresIdentityNewbornSweepAdapter.create({
+    const sweep = IdentityNewbornSweep.create({
       database,
       eventing: identity,
     }).build();

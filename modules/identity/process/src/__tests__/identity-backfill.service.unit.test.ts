@@ -16,12 +16,12 @@ import type {
   BackfillAccountRow,
   BackfillUserRow,
 } from "../repositories/identity-backfill.repository.ts";
-import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
+import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityBackfillPlanService } from "../services/identity-backfill-plan.service.ts";
 import { IdentityBackfillService } from "../services/identity-backfill.service.ts";
 import { IdentitySecretCarryService } from "../services/identity-secret-carry.service.ts";
 
-const identifierIdentity = CryptoIdentifierIdentityAdapter.create();
+const identifierIdentity = CryptoIdentifierIdentityService.create();
 
 const USER = "user_sam";
 const USER_CREATED_AT = Date.UTC(2023, 2, 14, 9, 30);

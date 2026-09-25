@@ -13,7 +13,7 @@ import {
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
-import { MemoryIdentityRepositories } from "../../repositories/memory/memory.identity.repositories.ts";
+import { identityRepositoriesOverMemory } from "../../repositories/memory/memory.identity.repositories.ts";
 import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
 import {
   SsoMigrationProgressService,
@@ -163,7 +163,7 @@ function scenario({
   for (const record of authentications) {
     store.ssoAuthentications.push({ providerAccountId: null, ...record });
   }
-  const repositories = MemoryIdentityRepositories.over(store);
+  const repositories = identityRepositoriesOverMemory(store);
 
   return SsoMigrationProgressService.create({
     connections: repositories.ssoConnections,

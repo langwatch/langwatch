@@ -73,6 +73,7 @@ export class MemoryIdentityStore {
     providerAccountId: string | null;
   }[] = [];
   readonly organizationNames = new Map<string, string>();
+  readonly organizationAdminEmails = new Map<string, string[]>();
   readonly finalizedUsers = new Set<string>();
   /** Keyed by the lowercased address, the way the legacy read matches it. */
   readonly legacySignInAccounts = new Map<string, LegacySignInAccount>();

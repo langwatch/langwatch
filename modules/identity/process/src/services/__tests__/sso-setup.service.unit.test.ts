@@ -11,7 +11,7 @@ import {
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
-import { MemoryIdentityRepositories } from "../../repositories/memory/memory.identity.repositories.ts";
+import { identityRepositoriesOverMemory } from "../../repositories/memory/memory.identity.repositories.ts";
 import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
 import { SsoMigrationProgressService } from "../sso-migration-progress.service.ts";
 import { SsoSetupService } from "../sso-setup.service.ts";
@@ -85,7 +85,7 @@ function scenario(
   }
   for (const row of rows) store.ssoConnections.set(row.connectionId, row);
   for (const held of bindings) store.breakGlassBindings.set(held.bindingId, held);
-  const repositories = MemoryIdentityRepositories.over(store);
+  const repositories = identityRepositoriesOverMemory(store);
 
   return SsoSetupService.create({
     connections: repositories.ssoConnections,

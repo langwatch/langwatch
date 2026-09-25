@@ -1,7 +1,6 @@
 /**
- * Builds the {@link IdentityInfrastructure} that `IdentityApp.create` used to
- * receive hand-composed. It now builds this itself from the two members it
- * reads — `prisma` and `eventing` — plus its own config.
+ * Builds the {@link IdentityInfrastructure} `IdentityApp.create` hands its services, from the
+ * module's own rows and the process's `eventing` member plus its own config.
  */
 import type { EventSourcing } from "@langwatch/eventing";
 import {
@@ -10,41 +9,28 @@ import {
   SCIM_SYNC_PIPELINE_NAME,
   SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
 
+import {
+  IdentityLedgerStore,
+  type IdentityStagedSender,
+} from "../eventing/identity-ledger.store.ts";
+import { JoinRequestLedgerStore } from "../eventing/join-request-ledger.store.ts";
+import { EngineFollowingSsoConnectionHeadStore } from "../eventing/sso-connection-head.store.ts";
+import { SsoConnectionLedgerStore } from "../eventing/sso-connection-ledger.store.ts";
 import type { SsoConnectionEvent } from "../eventing/sso-connection-state.projection.ts";
 import {
   EventingSsoConnectionHistoryRepository,
   type SsoConnectionEventReads,
 } from "../repositories/eventing/eventing.sso-connection-history.repository.ts";
-import { PrismaIdentityProjectionRepository } from "../repositories/prisma/prisma.identity-projection.repository.ts";
-import { PrismaIdentityReservationRepository } from "../repositories/prisma/prisma.identity-reservations.repository.ts";
-import { PrismaIdentitySecretCarryRepository } from "../repositories/prisma/prisma.identity-secret-carry.repository.ts";
-import { PrismaJoinRequestAudienceRepository } from "../repositories/prisma/prisma.join-request-audience.repository.ts";
-import { PrismaJoinRequestProjectionRepository } from "../repositories/prisma/prisma.join-request-projection.repository.ts";
-import { PrismaScimSyncProjectionRepository } from "../repositories/prisma/prisma.scim-sync-projection.repository.ts";
-import { PrismaSsoConnectionProjectionRepository } from "../repositories/prisma/prisma.sso-connection-projection.repository.ts";
-import { AdminEmailPlatformOperatorsRepository } from "../repositories/prisma/prisma.sso-platform-operators.repository.ts";
+import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import type { SsoEngineProviderProjection } from "../repositories/sso-engine-provider.repository.ts";
-import {
-  SsoConnectionLedgerWriterAdapter,
-  type SsoConnectionStagedSender,
-} from "../services/eventing-sso-connection-ledger.service.ts";
-import {
-  IdentityLedgerWriterAdapter,
-  type IdentityStagedSender,
-} from "../services/identity-ledger.service.ts";
-import { JoinRequestLedgerWriterAdapter } from "../services/join-request-ledger.service.ts";
+import { isPlatformOperatorEmail } from "../rules/platform-operator.rules.ts";
 import {
   IDENTITY_LATCH_CACHE_MAX_USERS,
   IDENTITY_LATCH_CACHE_TTL_MS,
 } from "../services/per-subject-cached-latch.service.ts";
-import { IdentityProducerPipelinesAdapter } from "../services/producer-identity-pipelines.service.ts";
-import type {
-  IdentityEventing,
-  IdentityInfrastructure,
-  PlatformOperator,
-} from "./identity.members.ts";
+import { IdentityProducerPipelines } from "./identity-producer-composition.build.ts";
+import type { IdentityEventing, IdentityInfrastructure } from "./identity.members.ts";
 
 /** The one shape a command dispatcher has, checked rather than asserted. */
 type IdentityCommandSender = { send(data: unknown): Promise<unknown> };
@@ -144,7 +130,7 @@ const SSO_CONNECTION_COMMAND_NAMES = [
  */
 class RegisteredIdentityEventing implements IdentityEventing {
   static create(eventing: EventSourcing): RegisteredIdentityEventing {
-    const producers = IdentityProducerPipelinesAdapter.create({ processName: "identity" });
+    const producers = IdentityProducerPipelines.create({ processName: "identity" });
     const senders = new Map<string, Map<string, IdentityCommandSender>>();
     senders.set(
       IDENTITY_PIPELINE_NAME,
@@ -235,44 +221,6 @@ class ProcessRegisteredIdentityEventing implements IdentityEventing {
 }
 
 /**
- * Lifted verbatim (Step 8's rule) from the sso-connection-pipeline ledger
- * writer, over this process's own `eventing`. Not-yet-staged commands answer
- * `null`, which guards read as "not commandable on this process".
- */
-function ssoConnectionLedger(options: {
-  prisma: ProcessMembers["prisma"];
-  eventing: EventSourcing;
-  engineProvider: SsoEngineProviderProjection | undefined;
-}): SsoConnectionLedgerWriterAdapter {
-  const { prisma, eventing, engineProvider } = options;
-
-  return SsoConnectionLedgerWriterAdapter.create({
-    projectionStore: PrismaSsoConnectionProjectionRepository.create(prisma, engineProvider),
-    eventStore: async () => {
-      const eventStore = eventing.isEnabled
-        ? eventing.getEventStore<SsoConnectionEvent>()
-        : undefined;
-      if (!eventStore) {
-        throw new Error(
-          "sso connection ledger cannot append: the event-sourcing stack is unavailable",
-        );
-      }
-      return eventStore;
-    },
-    stagedSender: (name) => {
-      if (!eventing.isEnabled) return null;
-      try {
-        const pipeline = eventing.getPipeline(SSO_CONNECTION_PIPELINE_NAME);
-        const command: SsoConnectionStagedSender | undefined = pipeline.commands[name];
-        return command ?? null;
-      } catch {
-        return null;
-      }
-    },
-  });
-}
-
-/**
  * How the history reaches this process's log, resolved per read so a stack
  * that is not up yet at compose time still answers later.
  */
@@ -293,9 +241,18 @@ function ssoConnectionHistoryStore(options: {
   };
 }
 
-/** What this process hands `IdentityApp` at boot, built from its own members and config. */
+/** What this process hands `IdentityApp` at boot, built from its own rows, members and config. */
 export function buildIdentityInfrastructure(input: {
-  prisma: ProcessMembers["prisma"];
+  repositories: Pick<
+    IdentityRepositories,
+    | "identityProjection"
+    | "joinRequestProjection"
+    | "ssoConnectionHeads"
+    | "secretCarry"
+    | "joinRequestAudience"
+    | "ssoPlatformOperators"
+    | "scimSyncs"
+  >;
   eventing: EventSourcing;
   adminEmails: readonly string[];
   /** The composition's own word (unresolved, see the handoff), never a deployment's. */
@@ -303,45 +260,41 @@ export function buildIdentityInfrastructure(input: {
   /** How the engine's provider rows follow the connection head (D09). */
   engineProvider: SsoEngineProviderProjection | undefined;
 }): IdentityInfrastructure {
-  const { prisma, eventing, adminEmails, registersPipelines, engineProvider } = input;
+  const { repositories, eventing, adminEmails, registersPipelines, engineProvider } = input;
   const identityEventing = registersPipelines
     ? RegisteredIdentityEventing.create(eventing)
     : ProcessRegisteredIdentityEventing.create(eventing);
-  const operators: PlatformOperator = {
-    isPlatformOperatorEmail: ({ email }) => {
-      if (email == null) return false;
-      const normalized = email.trim().toLowerCase();
-      return adminEmails.some((admin) => admin.trim().toLowerCase() === normalized);
-    },
-  };
 
   return {
     eventing: identityEventing,
-    operators,
+    operators: {
+      isPlatformOperatorEmail: ({ email }) => isPlatformOperatorEmail({ adminEmails, email }),
+    },
     mail: null,
     latch: {
       ttlMs: IDENTITY_LATCH_CACHE_TTL_MS,
       maxUsers: IDENTITY_LATCH_CACHE_MAX_USERS,
       now: Date.now,
     },
-    ledger: IdentityLedgerWriterAdapter.create({
-      projectionStore: PrismaIdentityProjectionRepository.create({
-        prisma,
-        reservations: PrismaIdentityReservationRepository.create(prisma),
+    ledger: IdentityLedgerStore.create({
+      projectionStore: repositories.identityProjection,
+      eventing: identityEventing,
+    }),
+    joinRequestLedger: JoinRequestLedgerStore.create({
+      projectionStore: repositories.joinRequestProjection,
+      eventing: identityEventing,
+    }),
+    secrets: repositories.secretCarry,
+    joinRequestAudience: repositories.joinRequestAudience,
+    ssoPlatformOperators: repositories.ssoPlatformOperators,
+    // Not-yet-staged commands answer null, which guards read as "not commandable on this process".
+    ssoConnectionLedger: SsoConnectionLedgerStore.forEventSourcing({
+      projectionStore: EngineFollowingSsoConnectionHeadStore.create({
+        heads: repositories.ssoConnectionHeads,
+        engineProvider,
       }),
-      eventing: identityEventing,
+      eventSourcing: eventing,
     }),
-    joinRequestLedger: JoinRequestLedgerWriterAdapter.create({
-      projectionStore: PrismaJoinRequestProjectionRepository.create(prisma),
-      eventing: identityEventing,
-    }),
-    secrets: PrismaIdentitySecretCarryRepository.create(prisma),
-    joinRequestAudience: PrismaJoinRequestAudienceRepository.create(prisma),
-    ssoPlatformOperators: AdminEmailPlatformOperatorsRepository.create({
-      database: prisma,
-      operators,
-    }),
-    ssoConnectionLedger: ssoConnectionLedger({ prisma, eventing, engineProvider }),
     // Absent where this process composed no event stack: the history refuses
     // by name rather than reading as empty, which is indistinguishable from
     // a connection nothing ever happened to.
@@ -350,6 +303,6 @@ export function buildIdentityInfrastructure(input: {
           eventStore: ssoConnectionHistoryStore({ eventing }),
         })
       : null,
-    scimSyncs: PrismaScimSyncProjectionRepository.create(prisma),
+    scimSyncs: repositories.scimSyncs,
   };
 }

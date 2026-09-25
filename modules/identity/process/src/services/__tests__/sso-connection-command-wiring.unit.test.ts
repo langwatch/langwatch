@@ -2,12 +2,12 @@ import type { StateProjectionStore } from "@langwatch/eventing";
 import { SSO_CONNECTION_EVENT_TYPES } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
+import { SENDER_NAME_BY_COMMAND } from "../../eventing/sso-connection-ledger.store.ts";
 import {
   type SsoConnectionFoldState,
   SsoConnectionStateFoldProjection,
 } from "../../eventing/sso-connection-state.projection.ts";
-import { SENDER_NAME_BY_COMMAND } from "../eventing-sso-connection-ledger.service.ts";
-import { CONNECTION_COMMAND_NAMES } from "../sso-connection-pipeline-definition.service.ts";
+import { CONNECTION_COMMAND_NAMES } from "../../eventing/sso-connection.pipeline.ts";
 
 /**
  * The ledger names a queue sender per command and the pipeline registers the

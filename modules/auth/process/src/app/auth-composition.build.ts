@@ -17,6 +17,7 @@ import {
   type IdentityApi,
   type RoutingDecision,
   type SignInMethodPolicy,
+  type SsoArrivalAdmission,
   type SsoArrivalApi,
   type SsoProviderConfigCipher,
 } from "@langwatch/identity-contract";
@@ -378,7 +379,7 @@ export class IdentitySsoArrivals implements SsoArrivalApi {
 
   private constructor(private readonly identity: IdentityApi) {}
 
-  admit(args: Parameters<SsoArrivalApi["admit"]>[0]): Promise<void> {
+  admit(args: SsoArrivalAdmission): Promise<void> {
     return this.identity.ssoArrival().admit(args);
   }
 }
@@ -432,7 +433,7 @@ export type BuildBetterAuthOptions = Readonly<{
 
 export function createSecondaryStorage(
   redis: RedisConnection | null,
-): ReturnType<typeof RedisBetterAuthSecondaryStorageRepository.create> {
+): NonNullable<BetterAuthOptions["secondaryStorage"]> {
   return redis
     ? RedisBetterAuthSecondaryStorageRepository.create(redis)
     : MemoryBetterAuthSecondaryStorageRepository.create();

@@ -7,7 +7,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
-import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
+import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityGuardsService } from "../services/identity-guards.service.ts";
 import { IdentityService } from "../services/identity.service.ts";
 import { ACTOR, attachData, InMemoryHeads, T0, USER } from "./support/in-memory-heads.ts";
@@ -38,7 +38,7 @@ function harness() {
       heads,
       users,
       reservations: new InMemoryReservations(),
-      identifiers: CryptoIdentifierIdentityAdapter.create(),
+      identifiers: CryptoIdentifierIdentityService.create(),
     }),
     ledger,
   );

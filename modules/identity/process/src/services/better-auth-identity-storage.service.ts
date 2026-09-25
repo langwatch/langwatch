@@ -19,6 +19,13 @@ import { createAdapterFactory } from "better-auth/adapters";
 import { APIError } from "better-auth/api";
 
 import type { IdentityBirth } from "../app/identity.members.ts";
+import {
+  type AccountQuery,
+  type AccountWhere,
+  issuerForProviderId,
+  parseAccountQuery,
+  providerIdFromIssuer,
+} from "../rules/better-auth-account-queries.rules.ts";
 import type { IdentityAccountCeremonies } from "../rules/ceremony-types.rules.ts";
 import type {
   IdentityAccountRow,
@@ -27,11 +34,6 @@ import type {
   IdentityResolver,
 } from "../rules/identity-storage.rules.ts";
 import type { IdentityUserGate } from "../rules/identity-user-gate.rules.ts";
-import {
-  type AccountQuery,
-  type AccountWhere,
-  BetterAuthAccountQueriesAdapter,
-} from "./better-auth-account-queries.service.ts";
 import { BetterAuthIdentityBirthAdapter } from "./better-auth-identity-birth.service.ts";
 
 const logger = createLogger("langwatch:identity:storage-adapter");
@@ -90,9 +92,7 @@ const isLinkageRestatementField = (field: string): field is LinkageRestatementFi
  * form better-auth minted, and that is the value better-auth is echoing back.
  */
 const linkageValueOf = (row: IdentityAccountRow, field: LinkageRestatementField): string =>
-  field === "issuer"
-    ? (row.issuer ?? BetterAuthAccountQueriesAdapter.issuerForProviderId(row.providerId))
-    : row[field];
+  field === "issuer" ? (row.issuer ?? issuerForProviderId(row.providerId)) : row[field];
 
 export interface IdentityStorageAdapterDeps {
   /**
@@ -325,7 +325,7 @@ function identityCustomAdapter({
      */
     const withIssuer = (row: IdentityAccountRow): IdentityAccountRow => ({
       ...row,
-      issuer: row.issuer ?? BetterAuthAccountQueriesAdapter.issuerForProviderId(row.providerId),
+      issuer: row.issuer ?? issuerForProviderId(row.providerId),
     });
 
     const linkedAccount = async (key: {
@@ -445,7 +445,7 @@ function identityCustomAdapter({
       }
       let query: AccountQuery;
       try {
-        query = BetterAuthAccountQueriesAdapter.parseAccountQuery({ operation, where: canonical });
+        query = parseAccountQuery({ operation, where: canonical });
       } catch (error) {
         throw refused(error);
       }
@@ -618,20 +618,20 @@ function identityCustomAdapter({
         return null;
       }
       const rest = where.filter((clause) => clause !== issuerClause);
-      const derived = BetterAuthAccountQueriesAdapter.providerIdFromIssuer(issuer);
+      const derived = providerIdFromIssuer(issuer);
       const providerClause = rest.find((clause) => canonicalNameOf(clause) === "providerId");
       if (providerClause !== undefined) {
         const providerId = providerClause.value;
         if (typeof providerId !== "string") return null;
-        if (derived === providerId) return rest;
+        if (derived.minted && derived.providerId === providerId) return rest;
         // A real connection issuer beside a providerId that does not decode
         // to it is ordinary single sign-on, not a contradiction — see the
         // upstream note this mirrors. Refusing every such pair refused every
         // RETURNING connection sign-in.
         return null;
       }
-      if (derived === null) return [...where];
-      return [{ ...issuerClause, field: "providerId", value: derived }];
+      if (!derived.minted) return [...where];
+      return [{ ...issuerClause, field: "providerId", value: derived.providerId }];
     };
 
     /**
@@ -646,7 +646,7 @@ function identityCustomAdapter({
       if (typeof providerId !== "string") return row;
       return {
         ...row,
-        issuer: BetterAuthAccountQueriesAdapter.issuerForProviderId(providerId),
+        issuer: issuerForProviderId(providerId),
       };
     };
 

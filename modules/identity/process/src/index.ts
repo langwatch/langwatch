@@ -5,9 +5,9 @@
  */
 export { identityServer } from "./identity.server.ts";
 export type { IdentityInfrastructure } from "./app/identity.members.ts";
-export { SsoConnectionLedgerWriterAdapter } from "./services/eventing-sso-connection-ledger.service.ts";
+export { SsoConnectionLedgerStore } from "./eventing/sso-connection-ledger.store.ts";
 export type { SsoConnectionEvent } from "./eventing/sso-connection-state.projection.ts";
-export { CryptoIdentifierIdentityAdapter } from "./services/crypto-identifier-identity.service.ts";
+export { CryptoIdentifierIdentityService } from "./services/crypto-identifier-identity.service.ts";
 export { type DeriveIdentifierIdInput, type IdentifierIdentity } from "./app/identity.members.ts";
 export type {
   BackfillAccountRow,
@@ -23,35 +23,19 @@ export type {
  * from the root, not just `./better-auth`, because it is a PERSISTED format
  * every writer of a credential account row must reach and reuse.
  */
-export { BetterAuthAccountQueriesAdapter } from "./services/better-auth-account-queries.service.ts";
+export {
+  issuerForProviderId,
+  parseAccountQuery,
+  providerIdFromIssuer,
+} from "./rules/better-auth-account-queries.rules.ts";
 /**
  * The row mappings the fold writes through and every guard reads back through.
  * The identity platform's event-sourcing layer (ADR-101, ADR-115, ADR-116,
  * ADR-117), folded into this package in the core-application exit: the
  */
-export { IdentityProducerPipelinesAdapter } from "./services/producer-identity-pipelines.service.ts";
-export {
-  type IdentityPipelineDatabase,
-  PostgresIdentityPipelineAdapter,
-  type PostgresIdentityPipelineOptions,
-} from "./repositories/prisma/prisma.identity-pipeline.repository.ts";
-export {
-  PostgresJoinRequestPipelineAdapter,
-  type JoinRequestPipelineDatabase,
-  type PostgresJoinRequestPipelineOptions,
-} from "./repositories/prisma/prisma.join-request-pipeline.repository.ts";
-export {
-  PostgresScimSyncPipelineAdapter,
-  type PostgresScimSyncPipelineOptions,
-  type ScimSyncPipelineDatabase,
-} from "./repositories/prisma/prisma.scim-sync-pipeline.repository.ts";
-export {
-  PostgresSsoConnectionPipelineAdapter,
-  type PostgresSsoConnectionPipelineOptions,
-} from "./repositories/prisma/prisma.sso-connection-pipeline.repository.ts";
-export type { IdentityPipeline } from "./services/identity-pipeline-definition.service.ts";
-export type { JoinRequestPipeline } from "./services/join-request-pipeline-definition.service.ts";
-export type { ScimSyncPipeline } from "./services/scim-sync-pipeline-definition.service.ts";
+export type { IdentityPipeline } from "./eventing/user-identity.pipeline.ts";
+export type { JoinRequestPipeline } from "./eventing/join-request.pipeline.ts";
+export type { ScimSyncPipeline } from "./eventing/scim-sync.pipeline.ts";
 /** The day-7-reminder/day-14-expiry process manager's registered name, named
  *  by a caller that asserts on which process a wake dispatched through. */
 export { JOIN_REQUEST_LIFECYCLE_PROCESS_NAME } from "./eventing/join-request-lifecycle.process.ts";
@@ -66,17 +50,6 @@ export {
   UnaddressedSsoDomainProofNotifications,
   type SsoDomainProofAudience,
 } from "./services/sso-domain-proof-notification.service.ts";
-export {
-  type IdentityGuardsComposition,
-  type IdentityGuardsDatabase,
-  PostgresIdentityGuardsAdapter,
-  type PostgresIdentityGuardsOptions,
-} from "./repositories/prisma/prisma.identity-guards.repository.ts";
-export {
-  PostgresIdentityNewbornSweepAdapter,
-  type PostgresIdentityNewbornSweepOptions,
-} from "./repositories/prisma/prisma.identity-newborn-sweep.repository.ts";
-export type { PostgresIdentityEmailAdapterOptions } from "./repositories/prisma/prisma.identity-email.repository.ts";
 export type {
   AccountSecretPair,
   IdentitySecretCarryOutcome,
@@ -139,11 +112,6 @@ export type {
   SignInCallbackDirectory,
   SignInCallbackLinkingDeps,
 } from "./services/signin-callback-linking.service.ts";
-export {
-  PostgresJoinRequestNotificationAdapter,
-  type JoinRequestNotificationDatabase,
-  type PostgresJoinRequestNotificationOptions,
-} from "./repositories/prisma/prisma.join-request-notification.repository.ts";
 export type { JoinRequestGuardsDeps } from "./services/join-request-guards.service.ts";
 export type { JoinRequestAudienceRepository } from "./repositories/join-request-audience.repository.ts";
 export { type JoinRequestMail, type SsoDomainProofMail } from "./app/identity.members.ts";
@@ -171,20 +139,20 @@ export { type PlatformOperator } from "./app/identity.members.ts";
 export {
   IDENTITY_CONVERGENCE_POLL_MS,
   IDENTITY_CONVERGENCE_TIMEOUT_MS,
-  IdentityLedgerWriterAdapter,
+  IdentityLedgerStore,
   type IdentityLedgerWriterDeps,
   type IdentityStagedSender,
-} from "./services/identity-ledger.service.ts";
+} from "./eventing/identity-ledger.store.ts";
 export {
   JOIN_REQUEST_CONVERGENCE_POLL_MS,
   JOIN_REQUEST_CONVERGENCE_TIMEOUT_MS,
-  JoinRequestLedgerWriterAdapter,
+  JoinRequestLedgerStore,
   type JoinRequestLedgerWriterDeps,
   type JoinRequestStagedSender,
-} from "./services/join-request-ledger.service.ts";
+} from "./eventing/join-request-ledger.store.ts";
 export { type JoinRequestNotificationMail } from "./app/identity.members.ts";
 export { InProcessBreakGlassLimiterService } from "./services/in-process-break-glass-limiter.service.ts";
-export { LocalDoorBreakGlassBindingAdapter } from "./services/local-door-break-glass-binding.service.ts";
+export { LocalDoorBreakGlassBindingRepository } from "./repositories/local/local.door-break-glass-binding.repository.ts";
 export type { SsoConnectionBackofficePage } from "./repositories/sso-connection-backoffice.repository.ts";
 export type { PrismaSsoConnectionBackofficeDatabase } from "./repositories/prisma/prisma.sso-connection-backoffice.repository.ts";
 export { PrismaLegacySsoOrganizationRepository } from "./repositories/prisma/prisma.legacy-sso-organization.repository.ts";
@@ -246,14 +214,6 @@ export {
   IdentitySecretHealMigrationService,
 } from "./services/system-migration-identity-secret-heal.service.ts";
 export {
-  PostgresIdentityOrganizationMigrationsAdapter,
-  type PostgresIdentityOrganizationMigrationsOptions,
-} from "./repositories/prisma/prisma.identity-organization-migrations.repository.ts";
-export {
-  PostgresIdentityUserMigrationsAdapter,
-  type PostgresIdentityUserMigrationsOptions,
-} from "./repositories/prisma/prisma.identity-user-migrations.repository.ts";
-export {
   ScimSyncLedgerWriterService,
   type ScimSyncLedgerWriterDeps,
   type ScimSyncStagedSender,
@@ -267,3 +227,25 @@ export {
   BetterAuthIdentityBirthAdapter,
   type IdentityBirthScope,
 } from "./services/better-auth-identity-birth.service.ts";
+export { buildIdentityInfrastructure } from "./app/identity-composition.build.ts";
+export { IdentityProducerPipelines } from "./app/identity-producer-composition.build.ts";
+export {
+  IdentityNewbornSweep,
+  type IdentityMigrationsOptions,
+  IdentityOrganizationMigrations,
+  IdentityUserMigrations,
+} from "./app/identity-migrations-composition.build.ts";
+export {
+  composeIdentityGuards,
+  composeIdentityPipeline,
+  type IdentityGuardsComposition,
+} from "./eventing/user-identity.pipeline.ts";
+export {
+  composeJoinRequestNotifications,
+  composeJoinRequestPipeline,
+} from "./eventing/join-request.pipeline.ts";
+export { composeScimSyncPipeline } from "./eventing/scim-sync.pipeline.ts";
+export {
+  composeSsoConnectionGraph,
+  type SsoConnectionGraph,
+} from "./eventing/sso-connection.pipeline.ts";

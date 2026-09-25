@@ -13,7 +13,7 @@ import {
 } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { MemoryIdentityRepositories } from "../repositories/memory/memory.identity.repositories.ts";
+import { identityRepositoriesOverMemory } from "../repositories/memory/memory.identity.repositories.ts";
 import { MemoryIdentityStore } from "../repositories/memory/memory.identity.store.ts";
 import type { SsoCredentialRead } from "../repositories/sso-credential.repository.ts";
 import { SsoCredentialRepository } from "../repositories/sso-credential.repository.ts";
@@ -100,7 +100,7 @@ beforeEach(() => {
   commands = SsoSetupCommandsService.create({
     connections: () => connectionService,
     reads: connections,
-    activity: MemoryIdentityRepositories.over(MemoryIdentityStore.create()).ssoMigrationEvidence,
+    activity: identityRepositoriesOverMemory(MemoryIdentityStore.create()).ssoMigrationEvidence,
     credentials: vault,
     registrations: SsoIdpRegistrationService.create({ discovery: reachableDiscovery }),
     finalization: createApiFixture<SsoMigrationFinalizationService>({}),

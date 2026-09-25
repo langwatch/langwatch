@@ -56,9 +56,10 @@ vi.mock("@langwatch/authz-process", () => ({
   },
 }));
 vi.mock("@langwatch/identity-process", () => ({
-  IdentityProducerPipelinesAdapter: { create: () => ({ identityPipeline: () => "identity" }) },
-  PostgresIdentityUserMigrationsAdapter: { create: dependencies.userMigrations },
-  PostgresIdentityNewbornSweepAdapter: { create: dependencies.newbornSweep },
+  IdentityProducerPipelines: { create: () => ({ identityPipeline: () => "identity" }) },
+  IdentityUserMigrations: { create: dependencies.userMigrations },
+  IdentityNewbornSweep: { create: dependencies.newbornSweep },
+  IdentityOrganizationMigrations: { create: () => ({ build: () => [] }) },
 }));
 vi.mock("@langwatch/ops-process", () => ({
   OpsSystemMigrations: { create: dependencies.createRunner },

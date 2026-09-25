@@ -13,6 +13,8 @@ import {
 } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { identityRepositoriesOverMemory } from "../../repositories/memory/memory.identity.repositories.ts";
+import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
 import { buildIdentityInfrastructure } from "../identity-composition.build.ts";
 
 /**
@@ -32,12 +34,18 @@ function recordingRuntime() {
   });
   const runtime = {
     isEnabled: true,
-    register: (definition: { metadata: { name: string }; commands: { name: string }[] }) => {
+    register: (definition: {
+      metadata: { name: string };
+      commands: { definition: { name: string } }[];
+    }) => {
       const pipeline = definition.metadata.name;
       registered.push(pipeline);
       return {
         commands: Object.fromEntries(
-          definition.commands.map((command) => [command.name, senderFor(pipeline, command.name)]),
+          definition.commands.map(({ definition: command }) => [
+            command.name,
+            senderFor(pipeline, command.name),
+          ]),
         ),
       };
     },
@@ -65,16 +73,9 @@ function recordingRuntime() {
   };
 }
 
-/**
- * The database seam, unused here: every repository this build constructs
- * stores the client but no test makes a call. Typed off the build's own
- * parameter rather than naming `PrismaClient`, which belongs to the repository.
- */
-type IdentityBuildInput = Parameters<typeof buildIdentityInfrastructure>[0];
-
 function infrastructureFor(input: { eventing: EventSourcing; registersPipelines: boolean }) {
   return buildIdentityInfrastructure({
-    prisma: {} as IdentityBuildInput["prisma"],
+    repositories: identityRepositoriesOverMemory(MemoryIdentityStore.create()),
     eventing: input.eventing,
     adminEmails: [],
     registersPipelines: input.registersPipelines,

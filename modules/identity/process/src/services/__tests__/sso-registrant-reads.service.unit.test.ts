@@ -8,7 +8,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { MemoryIdentityRepositories } from "../../repositories/memory/memory.identity.repositories.ts";
+import { identityRepositoriesOverMemory } from "../../repositories/memory/memory.identity.repositories.ts";
 import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
 import { SsoRegistrantReadsService } from "../sso-registrant-reads.service.ts";
 
@@ -23,7 +23,7 @@ function scenario({ member = true }: { member?: boolean } = {}) {
     store,
     isMember,
     service: SsoRegistrantReadsService.create({
-      registrants: MemoryIdentityRepositories.over(store).ssoRegistrants,
+      registrants: identityRepositoriesOverMemory(store).ssoRegistrants,
       organizations: createApiFixture<OrganizationApi>({ isMember }),
     }),
   };

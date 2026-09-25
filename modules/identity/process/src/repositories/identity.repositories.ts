@@ -1,3 +1,11 @@
+import type { StateProjectionStore } from "@langwatch/eventing";
+
+import type { IdentityFoldState } from "../eventing/identity-state.projection.ts";
+import type { JoinRequestFoldState } from "../eventing/join-request-state.projection.ts";
+import type { MfaFoldState } from "../eventing/mfa-enrollment-state.projection.ts";
+import type { ScimSyncFoldState } from "../eventing/scim-sync-state.projection.ts";
+import type { SsoConnectionFoldState } from "../eventing/sso-connection-state.projection.ts";
+import type { IdentitySecretCarryRepository } from "../services/identity-secret-carry.service.ts";
 import type { IdentityBackfillRepository } from "./identity-backfill.repository.ts";
 import type { IdentityHeadsRepository } from "./identity-heads.repository.ts";
 import type { IdentityLatchRepository } from "./identity-latch.repository.ts";
@@ -7,19 +15,23 @@ import type { IdentityReservationRepository } from "./identity-reservations.repo
 import type { IdentitySignInAccountsRepository } from "./identity-signin-accounts.repository.ts";
 import type { IdentityUsersRepository } from "./identity-users.repository.ts";
 import type { IdentityVerificationRepository } from "./identity-verification.repository.ts";
+import type { JoinRequestAudienceRepository } from "./join-request-audience.repository.ts";
 import type {
   JoinCandidateRepository,
   JoinRequestListReadRepository,
 } from "./join-request.repository.ts";
 import type { MfaEnrollmentRepository } from "./mfa-enrollment.repository.ts";
+import type { ScimSyncReadRepository } from "./scim-sync.repository.ts";
 import type { SsoBreakGlassRepository } from "./sso-break-glass.repository.ts";
 import type { SsoConnectionBackofficeRepository } from "./sso-connection-backoffice.repository.ts";
 import type { SsoConnectionRegistrationRepository } from "./sso-connection-registration.repository.ts";
 import type {
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
+  SsoPlatformOperatorRepository,
 } from "./sso-connection.repository.ts";
 import type { SsoCredentialRepository } from "./sso-credential.repository.ts";
+import type { SsoDomainOwnershipRepository } from "./sso-domain-ownership.repository.ts";
 import type { SsoDomainReproofTargetRepository } from "./sso-domain-reproof.repository.ts";
 import type { SsoEngineProviderRepository } from "./sso-engine-provider.repository.ts";
 import type { SsoMigrationEvidenceRepository } from "./sso-migration-evidence.repository.ts";
@@ -59,6 +71,21 @@ export interface IdentityRepositories {
   /** Who an asserted address and a connection subject belong to (ADR-117 §5). */
   readonly ssoRegistrants: SsoRegistrantReadRepository;
   readonly ssoMigrationEvidence: SsoMigrationEvidenceRepository;
+  /** The folded heads each identity pipeline writes, under the queue's per-aggregate lock. */
+  readonly identityProjection: StateProjectionStore<IdentityFoldState>;
+  readonly mfaProjection: StateProjectionStore<MfaFoldState>;
+  readonly joinRequestProjection: StateProjectionStore<JoinRequestFoldState>;
+  readonly ssoConnectionHeads: StateProjectionStore<SsoConnectionFoldState>;
+  /** The directory-sync head and the reads over it (D08). */
+  readonly scimSyncs: StateProjectionStore<ScimSyncFoldState> & ScimSyncReadRepository;
+  /** The three backfill reads the D01 secret-carry pass writes through. */
+  readonly secretCarry: IdentitySecretCarryRepository;
+  /** Who a join-request or domain-proof notice reaches. */
+  readonly joinRequestAudience: JoinRequestAudienceRepository;
+  /** Who counts as a LangWatch platform operator, by the deployment's `ADMIN_EMAILS`. */
+  readonly ssoPlatformOperators: SsoPlatformOperatorRepository;
+  /** Which domains a connection owns, re-projected by the ownership backfill. */
+  readonly ssoDomainOwnership: SsoDomainOwnershipRepository;
   /**
    * Optional until `identity.app.ts` and the two aggregate backends wire a
    * concrete instance in (out of this lane's owned paths - see the
@@ -66,3 +93,17 @@ export interface IdentityRepositories {
    */
   readonly identityLookup?: IdentityLookupRepository;
 }
+
+/** The rows a one-shot migration pass reads, none of which needs the deployment's encryption. */
+export type IdentityMigrationRepositories = Pick<
+  IdentityRepositories,
+  | "heads"
+  | "users"
+  | "reservations"
+  | "mfaEnrollment"
+  | "identityProjection"
+  | "backfill"
+  | "secretCarry"
+  | "newborn"
+  | "ssoDomainOwnership"
+>;

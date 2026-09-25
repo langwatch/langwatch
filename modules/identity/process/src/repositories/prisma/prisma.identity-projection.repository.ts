@@ -10,7 +10,7 @@ import { createLogger } from "@langwatch/observability";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { IdentityFoldState } from "../../eventing/identity-state.projection.ts";
-import { BetterAuthAccountQueriesAdapter } from "../../services/better-auth-account-queries.service.ts";
+import { issuerForProviderId } from "../../rules/better-auth-account-queries.rules.ts";
 import type { IdentityReservationRepository } from "../identity-reservations.repository.ts";
 import {
   identifierFactToRow as factToRow,
@@ -299,9 +299,7 @@ export class PrismaIdentityProjectionRepository implements StateProjectionStore<
         // itself. Only reachable for a fact stated before the issuer was
         // carried; a fact that names one always wins, because a real OIDC
         // issuer is never what this derivation would produce.
-        issuer:
-          fact.issuer ??
-          BetterAuthAccountQueriesAdapter.issuerForProviderId(fact.providerId ?? fact.provider),
+        issuer: fact.issuer ?? issuerForProviderId(fact.providerId ?? fact.provider),
       },
       update: columns,
     });
