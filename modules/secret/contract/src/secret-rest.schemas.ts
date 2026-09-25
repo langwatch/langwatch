@@ -34,6 +34,9 @@ export type SecretPublicListInput = z.infer<typeof secretPublicListInputSchema>;
 export const secretPublicParamsSchema = z.object({ secretId: secretIdSchema }).strict();
 export type SecretPublicParams = z.infer<typeof secretPublicParamsSchema>;
 
+/** `/api/secrets` addresses a secret as `{id}`, the name main published it under. */
+export const secretPublicAliasParamsSchema = z.object({ id: secretIdSchema }).strict();
+
 /**
  * The delete body, deliberately not `.strict()`: the id it addresses is in the
  * path, and a released client that also puts it in the body is not refused.

@@ -215,9 +215,9 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
     };
   })
 
-  .get("/:projectId", "getProject")
+  .get("/:id", "getProject")
   .withParams(projectRestParamsSchema)
-  .withPermission("project:view", { at: "route", param: "projectId" })
+  .withPermission("project:view", { at: "route", param: "projectId", field: "id" })
   .withOutput(projectRestSchema)
   .withDocs({
     summary: "Get a project",
@@ -225,15 +225,13 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
     errors: [PROJECT_INVALID_TOKEN, PROJECT_INSUFFICIENT_PERMISSIONS, PROJECT_NOT_FOUND],
   })
   .handle(async ({ app, input, scope }) =>
-    projectResponse(
-      await projectInOrganization({ app, id: input.projectId, organizationId: scope.id }),
-    ),
+    projectResponse(await projectInOrganization({ app, id: input.id, organizationId: scope.id })),
   )
 
-  .patch("/:projectId", "updateProject")
+  .patch("/:id", "updateProject")
   .withParams(projectRestParamsSchema)
   .withInput(projectRestUpdateSchema)
-  .withPermission("project:update", { at: "route", param: "projectId" })
+  .withPermission("project:update", { at: "route", param: "projectId", field: "id" })
   .withOutput(projectRestSchema)
   .withDocs({
     summary: "Update a project",
@@ -249,7 +247,7 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
     try {
       return projectResponse(
         await app.updateInOrganization({
-          projectId: input.projectId,
+          projectId: input.id,
           organizationId: scope.id,
           data: {
             ...(input.name !== undefined && { name: input.name }),
@@ -264,9 +262,9 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
     }
   })
 
-  .delete("/:projectId", "archiveProject")
+  .delete("/:id", "archiveProject")
   .withParams(projectRestParamsSchema)
-  .withPermission("project:delete", { at: "route", param: "projectId" })
+  .withPermission("project:delete", { at: "route", param: "projectId", field: "id" })
   .withOutput(projectRestArchivedSchema)
   .withDocs({
     summary: "Archive a project",
@@ -279,14 +277,14 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
     ],
   })
   .handle(async ({ app, input, scope }) => {
-    const project = await archiveProject({ app, id: input.projectId, organizationId: scope.id });
+    const project = await archiveProject({ app, id: input.id, organizationId: scope.id });
 
     return { id: project.id, name: project.name, archivedAt: project.archivedAt };
   })
 
   // Both base-key routes are WITHDRAWN for this door, whatever the caller
   // holds. See `refuseBaseKeyToApiToken`.
-  .get("/:projectId/api-key", "getProjectApiKey")
+  .get("/:id/api-key", "getProjectApiKey")
   .withParams(projectRestParamsSchema)
   .withAccess(anyAuthenticated({ reason: BASE_KEY_IS_REFUSED_TO_EVERY_TOKEN }))
   .withOutput(projectApiKeyRotationSchema)
@@ -305,7 +303,7 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   })
   .handle(async () => refuseBaseKeyToApiToken())
 
-  .post("/:projectId/regenerate-api-key", "regenerateProjectApiKey")
+  .post("/:id/regenerate-api-key", "regenerateProjectApiKey")
   .withParams(projectRestParamsSchema)
   .withInput(projectRestRegenerateApiKeyInputSchema)
   .withAccess(anyAuthenticated({ reason: BASE_KEY_IS_REFUSED_TO_EVERY_TOKEN }))

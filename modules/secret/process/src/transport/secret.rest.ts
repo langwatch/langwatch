@@ -9,16 +9,13 @@
 
 import type { Actor } from "@langwatch/actor";
 import { AuthenticatedActorRequiredError, PayloadTooLargeError } from "@langwatch/api";
-import {
-  defineRestRouter,
-  type RestTransportDeclaration,
-  UnauthorizedError,
-} from "@langwatch/api/rest";
+import { defineRestRouter, UnauthorizedError } from "@langwatch/api/rest";
 import {
   SecretApi,
   secretPublicCreateInputSchema,
   secretPublicDeleteInputSchema,
   secretPublicDeleteOutputSchema,
+  secretPublicAliasParamsSchema,
   secretPublicListInputSchema,
   secretPublicParamsSchema,
   secretPublicSchema,
@@ -48,116 +45,155 @@ function callerOf(actor: Actor | null): SecretCaller {
   throw new AuthenticatedActorRequiredError();
 }
 
-/** The five operation ids one namespace mount publishes, one per route. */
-type SecretRestOperations = Readonly<{
-  list: string;
-  get: string;
-  create: string;
-  update: string;
-  delete: string;
-}>;
+const LIST_DOCS = {
+  summary: "List project secrets",
+  description:
+    "Lists metadata only. Secret values are never returned. Requests have 16 KiB inputs; the service enforces the 50-secret cap. Responses are not cached.",
+};
 
-function defineSecretRest(
-  namespace: string,
-  operations: SecretRestOperations,
-): Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<SecretApi>;
-}> {
-  return defineRestRouter(SecretApi)
-    .withNamespace(namespace)
-    .withVersion(SECRET_REST_VERSION)
+const GET_DOCS = { summary: "Get project-secret metadata" };
 
-    .get("/", operations.list)
-    .withQuery(secretPublicListInputSchema)
-    .withPermission("secrets:view")
-    .withOutput(secretPublicSchema.array())
-    .withDocs({
-      summary: "List project secrets",
-      description:
-        "Lists metadata only. Secret values are never returned. Requests have 16 KiB inputs; the service enforces the 50-secret cap. Responses are not cached.",
-    })
-    .handle(async ({ app, scope }) => {
-      const secrets = await app.list({ projectId: scope.id });
+const CREATE_DOCS = {
+  summary: "Create a project secret",
+  description: "Encrypts the value at rest and never returns it. Requests have 16 KiB inputs.",
+};
 
-      return secrets.map(toSecretPublic);
-    })
+const UPDATE_DOCS = {
+  summary: "Replace a project secret value",
+  description: "Requests have 16 KiB inputs.",
+};
 
-    .get("/:secretId", operations.get)
-    .withParams(secretPublicParamsSchema)
-    .withQuery(secretPublicListInputSchema)
-    .withPermission("secrets:view")
-    .withOutput(secretPublicSchema)
-    .withDocs({ summary: "Get project-secret metadata" })
-    .handle(async ({ app, input, scope }) =>
-      toSecretPublic(await app.get({ projectId: scope.id, id: input.secretId })),
-    )
+const DELETE_DOCS = { summary: "Delete a project secret" };
 
-    .post("/", operations.create)
-    .withInput(secretPublicCreateInputSchema)
-    .withPermission("secrets:manage")
-    .withOutput(secretPublicSchema)
-    .withStatus(201)
-    .withDocs({
-      summary: "Create a project secret",
-      description: "Encrypts the value at rest and never returns it. Requests have 16 KiB inputs.",
-    })
-    .withBodyLimit(secretBodyLimit)
-    .handle(async ({ app, input, scope, actor }) =>
-      toSecretPublic(
-        await app.create(
-          { projectId: scope.id, name: input.name, value: input.value },
-          callerOf(actor),
-        ),
+/** The branch's own family, addressing a secret as `:secretId`. */
+export const secretRest = defineRestRouter(SecretApi)
+  .withNamespace("secret")
+  .withVersion(SECRET_REST_VERSION)
+
+  .get("/", "listSecrets")
+  .withQuery(secretPublicListInputSchema)
+  .withPermission("secrets:view")
+  .withOutput(secretPublicSchema.array())
+  .withDocs(LIST_DOCS)
+  .handle(async ({ app, scope }) => (await app.list({ projectId: scope.id })).map(toSecretPublic))
+
+  .get("/:secretId", "getSecret")
+  .withParams(secretPublicParamsSchema)
+  .withQuery(secretPublicListInputSchema)
+  .withPermission("secrets:view")
+  .withOutput(secretPublicSchema)
+  .withDocs(GET_DOCS)
+  .handle(async ({ app, input, scope }) =>
+    toSecretPublic(await app.get({ projectId: scope.id, id: input.secretId })),
+  )
+
+  .post("/", "createSecret")
+  .withInput(secretPublicCreateInputSchema)
+  .withPermission("secrets:manage")
+  .withOutput(secretPublicSchema)
+  .withStatus(201)
+  .withDocs(CREATE_DOCS)
+  .withBodyLimit(secretBodyLimit)
+  .handle(async ({ app, input, scope, actor }) =>
+    toSecretPublic(
+      await app.create(
+        { projectId: scope.id, name: input.name, value: input.value },
+        callerOf(actor),
       ),
-    )
+    ),
+  )
 
-    .put("/:secretId", operations.update)
-    .withParams(secretPublicParamsSchema)
-    .withInput(secretPublicUpdateInputSchema)
-    .withPermission("secrets:manage")
-    .withOutput(secretPublicSchema)
-    .withDocs({
-      summary: "Replace a project secret value",
-      description: "Requests have 16 KiB inputs.",
-    })
-    .withBodyLimit(secretBodyLimit)
-    .handle(async ({ app, input, scope, actor }) =>
-      toSecretPublic(
-        await app.update(
-          { projectId: scope.id, id: input.secretId, value: input.value },
-          callerOf(actor),
-        ),
+  .put("/:secretId", "updateSecret")
+  .withParams(secretPublicParamsSchema)
+  .withInput(secretPublicUpdateInputSchema)
+  .withPermission("secrets:manage")
+  .withOutput(secretPublicSchema)
+  .withDocs(UPDATE_DOCS)
+  .withBodyLimit(secretBodyLimit)
+  .handle(async ({ app, input, scope, actor }) =>
+    toSecretPublic(
+      await app.update(
+        { projectId: scope.id, id: input.secretId, value: input.value },
+        callerOf(actor),
       ),
-    )
+    ),
+  )
 
-    .delete("/:secretId", operations.delete)
-    .withParams(secretPublicParamsSchema)
-    .withInput(secretPublicDeleteInputSchema)
-    .withPermission("secrets:manage")
-    .withOutput(secretPublicDeleteOutputSchema)
-    .withDocs({ summary: "Delete a project secret" })
-    .withBodyLimit(secretBodyLimit)
-    .handle(async ({ app, input, scope }) => {
-      await app.delete({ projectId: scope.id, id: input.secretId });
+  .delete("/:secretId", "deleteSecret")
+  .withParams(secretPublicParamsSchema)
+  .withInput(secretPublicDeleteInputSchema)
+  .withPermission("secrets:manage")
+  .withOutput(secretPublicDeleteOutputSchema)
+  .withDocs(DELETE_DOCS)
+  .withBodyLimit(secretBodyLimit)
+  .handle(async ({ app, input, scope }) => {
+    await app.delete({ projectId: scope.id, id: input.secretId });
 
-      return { id: input.secretId, deleted: true as const };
-    })
-    .build();
-}
+    return { id: input.secretId, deleted: true as const };
+  })
+  .build();
 
-export const secretRest = defineSecretRest("secret", {
-  list: "listSecrets",
-  get: "getSecret",
-  create: "createSecret",
-  update: "updateSecret",
-  delete: "deleteSecret",
-});
-export const secretsAliasRest = defineSecretRest("secrets", {
-  list: "getApiSecrets",
-  get: "getApiSecretsById",
-  create: "postApiSecrets",
-  update: "putApiSecretsById",
-  delete: "deleteApiSecretsById",
-});
+/** The family main published, addressing a secret as `{id}` as main did. */
+export const secretsAliasRest = defineRestRouter(SecretApi)
+  .withNamespace("secrets")
+  .withVersion(SECRET_REST_VERSION)
+
+  .get("/", "getApiSecrets")
+  .withQuery(secretPublicListInputSchema)
+  .withPermission("secrets:view")
+  .withOutput(secretPublicSchema.array())
+  .withDocs(LIST_DOCS)
+  .handle(async ({ app, scope }) => (await app.list({ projectId: scope.id })).map(toSecretPublic))
+
+  .get("/:id", "getApiSecretsById")
+  .withParams(secretPublicAliasParamsSchema)
+  .withQuery(secretPublicListInputSchema)
+  .withPermission("secrets:view")
+  .withOutput(secretPublicSchema)
+  .withDocs(GET_DOCS)
+  .handle(async ({ app, input, scope }) =>
+    toSecretPublic(await app.get({ projectId: scope.id, id: input.id })),
+  )
+
+  .post("/", "postApiSecrets")
+  .withInput(secretPublicCreateInputSchema)
+  .withPermission("secrets:manage")
+  .withOutput(secretPublicSchema)
+  .withStatus(201)
+  .withDocs(CREATE_DOCS)
+  .withBodyLimit(secretBodyLimit)
+  .handle(async ({ app, input, scope, actor }) =>
+    toSecretPublic(
+      await app.create(
+        { projectId: scope.id, name: input.name, value: input.value },
+        callerOf(actor),
+      ),
+    ),
+  )
+
+  .put("/:id", "putApiSecretsById")
+  .withParams(secretPublicAliasParamsSchema)
+  .withInput(secretPublicUpdateInputSchema)
+  .withPermission("secrets:manage")
+  .withOutput(secretPublicSchema)
+  .withDocs(UPDATE_DOCS)
+  .withBodyLimit(secretBodyLimit)
+  .handle(async ({ app, input, scope, actor }) =>
+    toSecretPublic(
+      await app.update({ projectId: scope.id, id: input.id, value: input.value }, callerOf(actor)),
+    ),
+  )
+
+  .delete("/:id", "deleteApiSecretsById")
+  .withParams(secretPublicAliasParamsSchema)
+  .withInput(secretPublicDeleteInputSchema)
+  .withPermission("secrets:manage")
+  .withOutput(secretPublicDeleteOutputSchema)
+  .withDocs(DELETE_DOCS)
+  .withBodyLimit(secretBodyLimit)
+  .handle(async ({ app, input, scope }) => {
+    await app.delete({ projectId: scope.id, id: input.id });
+
+    return { id: input.id, deleted: true as const };
+  })
+  .build();

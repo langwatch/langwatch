@@ -240,6 +240,34 @@ describe("defineRestRouter", () => {
     });
 
     /** @scenario "A route checks its permission at the scope its own path names" */
+    it("accepts a path that spells the project under another name the route parses", () => {
+      expect(() =>
+        defineRestRouter(ProjectApi)
+          .withNamespace("projects")
+          .withVersion("2026-08-07")
+          .withCredential("organization")
+          .get("/:id", "getProject")
+          .withParams(z.object({ id: z.string() }))
+          .withPermission("project:view", { at: "route", param: "projectId", field: "id" })
+          .handle(() => {}),
+      ).not.toThrow();
+    });
+
+    /** @scenario "A route checks its permission at the scope its own path names" */
+    it("refuses another name for the project that no source parses", () => {
+      expect(() =>
+        defineRestRouter(ProjectApi)
+          .withNamespace("projects")
+          .withVersion("2026-08-07")
+          .withCredential("organization")
+          .get("/:projectId", "getProject")
+          .withParams(z.object({ projectId: z.string() }))
+          .withPermission("project:view", { at: "route", param: "projectId", field: "id" })
+          .handle(() => {}),
+      ).toThrow(/scope "projectId" names, and declares no source that parses "id"/);
+    });
+
+    /** @scenario "A route checks its permission at the scope its own path names" */
     it("refuses a mount that cannot ask the question, naming the route", () => {
       const declaration = defineRestRouter(ProjectApi)
         .withNamespace("projects")

@@ -1026,6 +1026,48 @@ describe("a route whose permission is checked at the scope its path names", () =
   });
 
   /** @scenario "A route checks its permission at the scope its own path names" */
+  it("asks about the project a path spells under another name", async () => {
+    const authorize = vi.fn(() => ({ permitted: true, organizationRole: null }));
+
+    const runtime = createRestRuntime({
+      identity: {
+        authenticate: () => ({
+          actor: { type: "api_key", id: "key-1" } as const,
+          scope: { tier: "organization", id: ORGANIZATION_ID } as const,
+        }),
+        authorize,
+      },
+    });
+
+    const byId = defineRestRouter(ProjectApi)
+      .withNamespace("project-records")
+      .withVersion(VERSION)
+      .withCredential("organization")
+      .get("/:id", "getProjectRecord")
+      .withParams(z.object({ id: z.string() }))
+      .withPermission("project:view", { at: "route", param: "projectId", field: "id" })
+      .withOutput(z.object({ id: z.string() }))
+      .handle(async ({ app, input }) => app.read({ projectId: input.id }))
+      .build();
+
+    const app = runtime.mount(byId.router(), {
+      app: () => projectApplication,
+      onError: createErrorHandler(),
+    });
+
+    const response = await app.request(`/api/project-records/${PROJECT_ID}`);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ id: PROJECT_ID });
+    expect(authorize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        permission: "project:view",
+        target: { tier: "project", id: PROJECT_ID },
+      }),
+    );
+  });
+
+  /** @scenario "A route checks its permission at the scope its own path names" */
   it("denies a caller the process refused at that scope", async () => {
     const response = await projectsApp(false).app.request(`/api/projects/${PROJECT_ID}`);
 

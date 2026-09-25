@@ -215,6 +215,7 @@ Feature: Transport declaration split
     And the handler is handed the credential's scope and the route's target both
     And a caller the process refuses at that scope is denied, naming neither
     And a route whose sources parse no such field is refused at declaration
+    And a route whose path spells that scope under another name names the field, and is asked about that project the same way
     And a mount that cannot ask the question is refused, naming the route
 
   @unit

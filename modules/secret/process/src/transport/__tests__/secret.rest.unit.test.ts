@@ -1,7 +1,7 @@
 import type { Actor } from "@langwatch/actor";
 import { createErrorHandler } from "@langwatch/api";
 import { createRestRuntime } from "@langwatch/api/rest";
-import { SecretApi } from "@langwatch/secret-contract";
+import { SecretApi, secretPublicSchema } from "@langwatch/secret-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { createSecretTestApp } from "../../app/__tests__/secret.fixture.ts";
@@ -171,6 +171,28 @@ describe("the secret REST family", () => {
       await expect(listed.json()).resolves.toMatchObject([
         { projectId: PROJECT, name: "OPENAI_API_KEY" },
       ]);
+    });
+
+    /** @scenario "The modern public API is validated REST" */
+    it("reads, replaces and deletes a secret at the id its path names", async () => {
+      const created = await plural.request("/api/secrets", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "OPENAI_API_KEY", value: "sk-live" }),
+      });
+      const { id } = secretPublicSchema.parse(await created.json());
+
+      const read = await plural.request(`/api/secrets/${id}`);
+      const replaced = await plural.request(`/api/secrets/${id}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ value: "sk-rotated" }),
+      });
+      const deleted = await plural.request(`/api/secrets/${id}`, { method: "DELETE" });
+
+      expect([read.status, replaced.status, deleted.status]).toEqual([200, 200, 200]);
+      await expect(read.json()).resolves.toMatchObject({ id, name: "OPENAI_API_KEY" });
+      await expect(deleted.json()).resolves.toEqual({ id, deleted: true });
     });
   });
 

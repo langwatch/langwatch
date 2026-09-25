@@ -1423,6 +1423,16 @@ function headerScopeInput(
   return { [target.param]: Reflect.get(headers, target.header) };
 }
 
+/** The route's input, with the scope its path spells under another name read as the tier's own. */
+function pathScopeInput(
+  target: Readonly<{ param: string; field?: string }>,
+  input: unknown,
+): unknown {
+  if (target.field === undefined || typeof input !== "object" || input === null) return input;
+
+  return { [target.param]: Reflect.get(input, target.field) };
+}
+
 function resolveHeaderFact(fact: RestTransportMiddleware, context: Context): unknown {
   const cached: Map<string, unknown> =
     context.get(ROUTE_HEADER_FACTS) ?? new Map<string, unknown>();
@@ -1461,7 +1471,7 @@ async function checkRouteScope({
   const scopeInput =
     route.permissionTarget.at === "header"
       ? headerScopeInput(route, context, route.permissionTarget)
-      : input;
+      : pathScopeInput(route.permissionTarget, input);
 
   const target = routeScopeOf({ param: route.permissionTarget.param, input: scopeInput });
 

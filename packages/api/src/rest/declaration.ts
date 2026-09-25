@@ -404,11 +404,11 @@ type RawResponseArguments<Output extends RouteAnswer> = Output extends RestRawAn
 
 /**
  * Where a route's permission is checked: `route` asks at the scope the route's
- * own path names (the project or team it addresses), not the one the
- * credential resolved. `param` is the field that tier is spelled with.
+ * own path names, not the one the credential resolved. `param` is the field that
+ * tier is spelled with; `field` is the input field carrying it, when not `param`.
  */
 export type RestPermissionTarget =
-  | Readonly<{ at: "route"; param: ScopeTierField }>
+  | Readonly<{ at: "route"; param: ScopeTierField; field?: string }>
   | Readonly<{ at: "header"; param: ScopeTierField; header: string }>;
 
 export type RestTransportRoute<Api> = Readonly<{
@@ -1935,10 +1935,12 @@ function assertPermissionTarget({
     .filter((schema): schema is SourceSchema => schema !== void 0)
     .flatMap((schema) => sourceKeys(schema));
 
-  if (!declared.includes(param)) {
+  const field = target.field ?? param;
+
+  if (!declared.includes(field)) {
     throw new Error(
       `REST ${operation} checks its permission at the scope "${param}" names, and declares no ` +
-        `source that parses "${param}"`,
+        `source that parses "${field}"`,
     );
   }
 }

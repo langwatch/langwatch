@@ -35,7 +35,7 @@ export const projectRestUpdateSchema = z.object({
   teamId: z.string().min(1).optional().describe("Moves the project to this team"),
 });
 
-export const projectRestParamsSchema = z.object({ projectId: z.string().min(1) });
+export const projectRestParamsSchema = z.object({ id: z.string().min(1) });
 
 /** Regenerating the key takes no body; an absent one is read as this. */
 export const projectRestRegenerateApiKeyInputSchema = z.object({});

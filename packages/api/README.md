@@ -190,7 +190,8 @@ address, and it claims no wildcard under the prefix it shares.
 A route names either a permission or an access kind. `.withPermission(p)` asks
 `p` at the scope the credential resolved; `.withPermission(p, { at: "route",
 param: "projectId" })` asks it at the scope the route's own path names, through
-`identity.authorize`. `.withAccess(publicRoute({ reason }))` resolves no
+`identity.authorize`. A path that spells the scope under another name says so: `{ at: "route",
+param: "projectId", field: "id" }` reads the project from `:id`. `.withAccess(publicRoute({ reason }))` resolves no
 credential at all; `.withAccess(anyAuthenticated({ reason }))` opens the
 family's door through `identity.identify` and asks no permission of it. A route
 may also declare several answers — `.responds({ 200: report, 503: report })` —

@@ -32,14 +32,14 @@ describe("the projects REST declaration", () => {
       ).toEqual([
         ["get", "/", "listProjects", "authenticated"],
         ["post", "/", "createProject", "project:create"],
-        ["get", "/:projectId", "getProject", "project:view"],
-        ["patch", "/:projectId", "updateProject", "project:update"],
-        ["delete", "/:projectId", "archiveProject", "project:delete"],
+        ["get", "/:id", "getProject", "project:view"],
+        ["patch", "/:id", "updateProject", "project:update"],
+        ["delete", "/:id", "archiveProject", "project:delete"],
         // Both base-key routes answer "authenticated" rather than a
         // permission: they refuse every token, so no permission would grant
         // them and none is asked for.
-        ["get", "/:projectId/api-key", "getProjectApiKey", "authenticated"],
-        ["post", "/:projectId/regenerate-api-key", "regenerateProjectApiKey", "authenticated"],
+        ["get", "/:id/api-key", "getProjectApiKey", "authenticated"],
+        ["post", "/:id/regenerate-api-key", "regenerateProjectApiKey", "authenticated"],
       ]);
     });
 
@@ -50,14 +50,14 @@ describe("the projects REST declaration", () => {
      */
     it("asks every by-id route's permission at the project its path names", () => {
       const byId = declaration.routes.filter(
-        (route) => route.path.startsWith("/:projectId") && route.permission !== undefined,
+        (route) => route.path.startsWith("/:id") && route.permission !== undefined,
       );
 
       expect(byId).toHaveLength(3);
       for (const route of byId) {
         expect([route.operation, route.permissionTarget]).toEqual([
           route.operation,
-          { at: "route", param: "projectId" },
+          { at: "route", param: "projectId", field: "id" },
         ]);
       }
     });
