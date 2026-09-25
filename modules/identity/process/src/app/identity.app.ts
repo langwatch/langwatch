@@ -28,6 +28,8 @@ import {
   type LookupPersonDetail,
   type IdentityServerConfig,
   type MethodsLastUsed,
+  type RoutingDecision,
+  SignInMethodPolicyService,
   type OrganizationMemberFactor,
   type TwoStepAccountStanding,
   type TwoStepVerificationApi,
@@ -75,6 +77,7 @@ import type {
 } from "../rules/join-requests-contract.rules.ts";
 import type { SsoArrivalMemberships } from "../rules/sso-arrival-contract.rules.ts";
 import { newSsoBreakGlassBindingId } from "../rules/sso-connection-id.rules.ts";
+import { ssoMethodDialWith } from "../rules/sso-method-dial.rules.ts";
 import { AccountIdentifiersService } from "../services/account-identifiers.service.ts";
 import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityBackfillPlanService } from "../services/identity-backfill-plan.service.ts";
@@ -88,6 +91,7 @@ import {
 } from "../services/identity-newborn-reconciliation.service.ts";
 import { IdentitySecretCarryService } from "../services/identity-secret-carry.service.ts";
 import { IdentityService } from "../services/identity.service.ts";
+import { InProcessBreakGlassLimiterService } from "../services/in-process-break-glass-limiter.service.ts";
 import { JoinAdmissionsService } from "../services/join-admissions.service.ts";
 import { JoinRequestGuardsService } from "../services/join-request-guards.service.ts";
 import { JoinRequestNotifierService } from "../services/join-request-notifier.service.ts";
@@ -101,6 +105,8 @@ import { OrganizationSsoConnectionsService } from "../services/organization-sso-
 import { CachedIdentityLatchService } from "../services/per-subject-cached-latch.service.ts";
 import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
 import { ScimSyncReadsService } from "../services/scim-sync-reads.service.ts";
+import { SignInAccountLookupService } from "../services/signin-account-lookup.service.ts";
+import { SignInRouterService } from "../services/signin-router.service.ts";
 import { SsoArrivalAdoptionService } from "../services/sso-arrival-adoption.service.ts";
 import { SsoArrivalService } from "../services/sso-arrival.service.ts";
 import { SsoAssertionService } from "../services/sso-assertion.service.ts";
@@ -115,6 +121,7 @@ import { SsoConnectionBackofficeService } from "../services/sso-connection-backo
 import { SsoConnectionDirectoryMoveService } from "../services/sso-connection-directory-move.service.ts";
 import type { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import { SsoConnectionHistoryService } from "../services/sso-connection-history.service.ts";
+import { SsoConnectionRoutingService } from "../services/sso-connection-routing.service.ts";
 import type { SsoConnectionService } from "../services/sso-connection.service.ts";
 import { SsoDomainCeremonyService } from "../services/sso-domain-ceremony.service.ts";
 import { SsoDomainReproofService } from "../services/sso-domain-reproof.service.ts";
@@ -206,6 +213,7 @@ type IdentityAppParts = {
   lookup: IdentityLookupService;
   twoStepAccounts: TwoStepAccountService;
   organizationMfa: OrganizationMfaService;
+  signInRouter: SignInRouterService;
   pipelines: IdentityPipelineBuilders;
 };
 
@@ -628,6 +636,36 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
     });
     const scimSyncGuards = ScimSyncGuardsService.create({ syncs: infrastructure.scimSyncs });
     const scimSyncReads = ScimSyncReadsService.create({ syncs: infrastructure.scimSyncs });
+    const auth = setup.dependencies.auth;
+    const resolveAuthProvider = () => auth.resolveAuthProvider();
+    // Main's router (identity/runtime.ts): projected connections, the method policy, one
+    // per-process break-glass budget, and the projection-first account lookup.
+    const signInRouter = SignInRouterService.create({
+      domains: SsoConnectionRoutingService.create({
+        connections: setup.repositories.ssoConnectionRouting,
+        dial: ssoMethodDialWith({
+          mountedMethods: async () =>
+            (await SignInMethodPolicyService.findFederatedMethods(resolveAuthProvider)).map(
+              (method) => method.id,
+            ),
+          engineHoldsProvider: (args) =>
+            setup.repositories.ssoEngineProviders.findRegisteredProvider(args),
+        }),
+      }),
+      policy: SignInMethodPolicyService.create({
+        resolveAuthProvider,
+        federationLicensed: () => setup.dependencies.licensing.isPlatformSsoLicensed(),
+        offersPasskeys: () => auth.offersPasskeys(),
+        issuesOwnPasswords: () => auth.issuesOwnPasswords(),
+        selfHosted: () => !setup.members.isSaas,
+      }),
+      breakGlass: InProcessBreakGlassLimiterService.create(),
+      accounts: SignInAccountLookupService.create({
+        heads: setup.repositories.heads,
+        legacy: setup.repositories.signInAccounts,
+        isLatched,
+      }),
+    });
 
     return new IdentityApp({
       emails,
@@ -695,6 +733,7 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
         deployment: setup.dependencies.auth,
       }),
       organizationMfa: OrganizationMfaService.create(setup.repositories.twoStepVerification),
+      signInRouter,
       pipelines: {
         eventing: identityEventing,
         producer: IdentityProducerPipelines.create({ processName: "identity" }),
@@ -807,6 +846,12 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
 
   removeIdentifier(input: { userId: string; identifierId: string }): Promise<void> {
     return this.#parts.accountIdentifiers.removeIdentifier(input);
+  }
+
+  routeSignIn(
+    input: Readonly<{ identifier: string | null; breakGlass: boolean }>,
+  ): Promise<RoutingDecision> {
+    return this.#parts.signInRouter.route(input);
   }
 
   getMethodsLastUsed(input: { userId: string }): Promise<MethodsLastUsed> {

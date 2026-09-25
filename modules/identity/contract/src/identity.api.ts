@@ -74,6 +74,7 @@ import type {
   RevokeScimSyncCommandData,
 } from "./scim-sync-commands.ts";
 import type { ScimSyncFactInput, ScimSyncState } from "./scim-sync.ts";
+import type { RoutingDecision } from "./signin-routing.ts";
 import type {
   SsoArrivingUser,
   SsoAssertionDecision,
@@ -727,6 +728,10 @@ export interface IdentityApi {
   removeIdentifier(input: { userId: string; identifierId: string }): Promise<void>;
   /** When each sign-in method last minted a session, read from the user's sessions. */
   getMethodsLastUsed(input: { userId: string }): Promise<MethodsLastUsed>;
+  /** Where an address signs in; `breakGlass` asks for the rate-limited local door (ADR-117). */
+  routeSignIn(
+    input: Readonly<{ identifier: string | null; breakGlass: boolean }>,
+  ): Promise<RoutingDecision>;
   /** Operations, not properties: a module boundary carries callable members only. */
   guards(): IdentityGuardsApi;
   mfaGuards(): MfaGuardsApi;

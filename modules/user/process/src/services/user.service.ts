@@ -133,6 +133,12 @@ export class UserService {
     return (await this.repository.findByEmailInsensitive(parsed.email)) !== null;
   }
 
+  confirmEmailAddress(input: UserEmailInput): Promise<void> {
+    const parsed = userEmailInputSchema.parse(input);
+
+    return this.repository.confirmEmailAddress(parsed.email);
+  }
+
   create(input: CreateUserInput): Promise<UserProfile> {
     return this.repository.create(createUserInputSchema.parse(input));
   }

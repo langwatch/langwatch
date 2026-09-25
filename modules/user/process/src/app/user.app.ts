@@ -302,6 +302,10 @@ export class UserApp implements UserApi {
     return this.#users.findByEmail(input);
   }
 
+  confirmEmailAddress(input: UserEmailInput): Promise<void> {
+    return this.#users.confirmEmailAddress(input);
+  }
+
   /** The directory mint: an account row with no sign-in method attached yet. */
   create(input: CreateUserInput): Promise<UserProfile> {
     return this.#users.create(input);

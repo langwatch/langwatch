@@ -89,6 +89,12 @@ export class MemoryUserRepository implements UserRepository {
     return row ? userProfileSchema.parse(profileOf(row)) : null;
   }
 
+  async confirmEmailAddress(email: string): Promise<void> {
+    for (const row of this.#database.usersWithEmailInsensitive(email)) {
+      this.#database.writeUser({ ...row, emailVerified: true });
+    }
+  }
+
   async create(input: CreateUserInput): Promise<UserProfile> {
     const row = this.#insertUser({ name: input.name, email: input.email, emailVerified: false });
 

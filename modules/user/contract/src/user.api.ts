@@ -98,6 +98,8 @@ export interface UserApi {
   isOperator(input: { userId: string }): Promise<boolean>;
   /** The account an address belongs to, or nothing when nobody holds it. */
   findByEmail(input: UserEmailInput): Promise<UserProfile | null>;
+  /** A sign-up link came back: every account holding the address, case aside, is confirmed. */
+  confirmEmailAddress(input: UserEmailInput): Promise<void>;
   /** Mints a directory account with no sign-in method of its own. */
   create(input: CreateUserInput): Promise<UserProfile>;
   createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser>;

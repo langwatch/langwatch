@@ -2,6 +2,8 @@ import type { SsoConnection } from "@langwatch/prisma-client/generated";
 import { describe, expect, it } from "vitest";
 
 import { ssoMethodDialWith } from "../../rules/sso-method-dial.rules.ts";
+import type { SignInDomainRouting } from "../../services/signin-router.service.ts";
+import { SsoConnectionRoutingService } from "../../services/sso-connection-routing.service.ts";
 import { MemoryIdentityStore } from "../memory/memory.identity.store.ts";
 import { MemorySsoConnectionRoutingRepository } from "../memory/memory.sso-connection-routing.repository.ts";
 import { PrismaSsoConnectionProjectionRepository } from "../prisma/prisma.sso-connection-projection.repository.ts";
@@ -9,7 +11,6 @@ import {
   type PrismaSsoConnectionRoutingDatabase,
   PrismaSsoConnectionRoutingRepository,
 } from "../prisma/prisma.sso-connection-routing.repository.ts";
-import type { SsoConnectionRoutingRepository } from "../sso-connection-routing.repository.ts";
 
 /**
  * The projected domain lookup (D04, D09), one set of cases over both tiers:
@@ -171,7 +172,7 @@ function dialOver(registered: readonly string[]) {
   });
 }
 
-const tiers: { name: string; build: (fixture: Fixture) => SsoConnectionRoutingRepository }[] = [
+const tiers: { name: string; build: (fixture: Fixture) => SignInDomainRouting }[] = [
   {
     name: "memory",
     build: ({ rows, registered = [] }) => {
@@ -183,14 +184,17 @@ const tiers: { name: string; build: (fixture: Fixture) => SsoConnectionRoutingRe
         );
       }
 
-      return MemorySsoConnectionRoutingRepository.create({ store, dial: dialOver(registered) });
+      return SsoConnectionRoutingService.create({
+        connections: MemorySsoConnectionRoutingRepository.create({ store }),
+        dial: dialOver(registered),
+      });
     },
   },
   {
     name: "prisma",
     build: ({ rows, registered = [] }) =>
-      PrismaSsoConnectionRoutingRepository.create({
-        database: stubDatabase(rows),
+      SsoConnectionRoutingService.create({
+        connections: PrismaSsoConnectionRoutingRepository.create({ database: stubDatabase(rows) }),
         dial: dialOver(registered),
       }),
   },

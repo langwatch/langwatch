@@ -27,6 +27,7 @@ import type { ScimSyncReadRepository } from "./scim-sync.repository.ts";
 import type { SsoBreakGlassRepository } from "./sso-break-glass.repository.ts";
 import type { SsoConnectionBackofficeRepository } from "./sso-connection-backoffice.repository.ts";
 import type { SsoConnectionRegistrationRepository } from "./sso-connection-registration.repository.ts";
+import type { SsoConnectionRoutingRepository } from "./sso-connection-routing.repository.ts";
 import type {
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
@@ -61,6 +62,8 @@ export interface IdentityRepositories {
   readonly joinRequests: JoinRequestListReadRepository;
   readonly joinCandidates: JoinCandidateRepository;
   readonly ssoConnections: SsoConnectionReadRepository;
+  /** The connections sign-in routing reads by domain, and the live set (ADR-117 §5). */
+  readonly ssoConnectionRouting: SsoConnectionRoutingRepository;
   readonly ssoStranding: SsoConnectionStrandingRepository;
   /** The per-organization registration slots a new connection claims first. */
   readonly ssoRegistrationSlots: SsoConnectionRegistrationRepository;

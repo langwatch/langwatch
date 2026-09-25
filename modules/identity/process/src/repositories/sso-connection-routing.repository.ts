@@ -1,19 +1,13 @@
-import type { RoutableConnection } from "@langwatch/identity-contract";
-
-import type { SignInDomainRouting } from "../services/signin-router.service.ts";
+import type { SsoConnectionState } from "@langwatch/identity-contract";
 
 /**
- * The router's domain lookup over the connection PROJECTION rather than the
- * two staff-set legacy strings its twin reads (ADR-117 §5): what it answers
- * that they cannot is lifecycle - a SUSPENDED connection, not an absent one.
+ * The connections sign-in routing reads, over the connection PROJECTION rather
+ * than the legacy strings (ADR-117 §5): a SUSPENDED connection, not an absent one.
+ * Which method each is dialed through is the routing service's to decide.
  */
-export abstract class SsoConnectionRoutingRepository implements SignInDomainRouting {
-  /** The connection owning this domain, a migrating pair already collapsed
-   *  to the side sign-in goes through. Empty when nothing owns it. */
-  abstract findConnectionsForDomain(input: {
-    domain: string;
-  }): Promise<readonly RoutableConnection[]>;
-  /** Every connection this instance could auto-redirect to with no address
-   *  in hand (the self-hosted sole-connection rule). */
-  abstract findActiveConnections(): Promise<readonly RoutableConnection[]>;
+export abstract class SsoConnectionRoutingRepository {
+  /** The connections holding this domain plus their replacement partners; empty when none does. */
+  abstract findDomainConnections(input: { domain: string }): Promise<SsoConnectionState[]>;
+  /** Every connection not yet discarded or torn down, oldest first. */
+  abstract findLiveConnections(): Promise<SsoConnectionState[]>;
 }

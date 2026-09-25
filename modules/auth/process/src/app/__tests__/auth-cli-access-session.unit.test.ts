@@ -67,7 +67,6 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
       secrets,
       publicBaseUrl: void 0,
       identityEmails: void 0,
-      route: void 0,
       signUp: null,
       invites: null,
       authProvider: void 0,

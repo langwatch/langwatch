@@ -4868,6 +4868,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/mail':
+        specifier: workspace:*
+        version: link:../../../packages/mail
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability

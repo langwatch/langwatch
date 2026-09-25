@@ -175,13 +175,6 @@ export type AuthInfrastructure = MembersRead<typeof AUTH_CLOSED_READS> &
      * service — the session read then falls back to the stored user's own
      * address, which is the documented chain, not a degraded one. */
     identityEmails: IdentityEmailService | undefined;
-    /** Where an address signs in. The decision object IS the contract.
-     * `undefined` until the front-door wiring lane supplies it. */
-    route:
-      | ((
-          input: Readonly<{ identifier: string | null; breakGlass: boolean }>,
-        ) => Promise<RoutingDecision>)
-      | undefined;
     /**
      * The sign-up ceremony, or nothing. Absent together and that is not an
      * accident: without a base URL a confirmation link points at nowhere, and
@@ -201,6 +194,13 @@ export type AuthInfrastructure = MembersRead<typeof AUTH_CLOSED_READS> &
     /** Process time, injected so session expiry has deterministic tests. */
     now?: (() => Instant) | undefined;
   }>;
+
+/** The peers the app keeps past construction; identity decides where an address signs in. */
+type AuthAppPeers = Readonly<{
+  apiKeys: ApiKeyApi;
+  featureFlags: FeatureFlagApi;
+  identity: Pick<IdentityApi, "routeSignIn">;
+}>;
 
 type AuthSetup = FeatureSetup<
   typeof AuthApp.dependencies,
@@ -254,7 +254,7 @@ export class AuthApp implements AuthApiContract {
   readonly #cliDeviceFlow: CliDeviceFlowService;
   readonly #signUp: SignUpVerificationService | null;
   readonly #members: AuthInfrastructure;
-  readonly #dependencies: { apiKeys: ApiKeyApi; featureFlags: FeatureFlagApi };
+  readonly #dependencies: AuthAppPeers;
   /** The `Account` rows a retiring connection is judged over — auth's own,
    *  swept for a peer that owns none of them (ADR-129). */
   readonly #legacySsoAccess: LegacySsoAccessService;
@@ -337,7 +337,7 @@ export class AuthApp implements AuthApiContract {
     cliDeviceFlow: Omit<CliDeviceFlowCollaborators, "session">;
     signUp: SignUpVerificationService | null;
     members: AuthInfrastructure;
-    dependencies: { apiKeys: ApiKeyApi; featureFlags: FeatureFlagApi };
+    dependencies: AuthAppPeers;
     legacySsoAccess: LegacySsoAccessService;
     federatedAccounts: FederatedAccountReadsService;
     signInSecurity: SignInSecuritySettingsService;
@@ -409,7 +409,11 @@ export class AuthApp implements AuthApiContract {
       },
       signUp: buildSignUpVerification({ members, repositories, now, users: dependencies.users }),
       members,
-      dependencies: { apiKeys: dependencies.apiKeys, featureFlags: dependencies.featureFlags },
+      dependencies: {
+        apiKeys: dependencies.apiKeys,
+        featureFlags: dependencies.featureFlags,
+        identity: dependencies.identity,
+      },
       legacySsoAccess: LegacySsoAccessService.create({
         accounts: accountRows,
         memberships: legacyAccessMemberships(dependencies.organizations),
@@ -521,7 +525,7 @@ export class AuthApp implements AuthApiContract {
             auth: app,
             users: dependencies.users,
             identityApi: dependencies.identity,
-            signInRouting: members.route ?? null,
+            signInRouting: (input) => dependencies.identity.routeSignIn(input),
             authProvider: configuredAuthProvider(config.signInProviders).provider,
             signInProviders,
             licensing: dependencies.licensing,
@@ -836,14 +840,7 @@ export class AuthApp implements AuthApiContract {
   route(
     input: Readonly<{ identifier: string | null; breakGlass: boolean }>,
   ): Promise<RoutingDecision> {
-    const route = this.#members.route;
-    if (!route) {
-      throw new AuthUnavailableError({
-        capability: "sign-in routing directory, so it cannot decide where this address signs in",
-        processName: this.#members.processName,
-      });
-    }
-    return route(input);
+    return this.#dependencies.identity.routeSignIn(input);
   }
 
   async addressIsRegistered(input: Readonly<{ email: string }>): Promise<boolean> {

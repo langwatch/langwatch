@@ -37,6 +37,7 @@ import {
   PrismaSsoConnectionStrandingRepository,
 } from "./prisma.sso-connection-reads.repository.ts";
 import { PrismaSsoConnectionRegistrationRepository } from "./prisma.sso-connection-registration.repository.ts";
+import { PrismaSsoConnectionRoutingRepository } from "./prisma.sso-connection-routing.repository.ts";
 import { PrismaSsoCredentialRepository } from "./prisma.sso-credential.repository.ts";
 import { PrismaSsoDomainOwnershipRepository } from "./prisma.sso-domain-ownership.repository.ts";
 import { PrismaSsoDomainReproofTargetRepository } from "./prisma.sso-domain-reproof.repository.ts";
@@ -77,6 +78,7 @@ export class PostgresIdentityRepositories {
       joinRequests: PrismaJoinRequestReadRepository.create(database),
       joinCandidates: PrismaJoinCandidateRepository.create(database),
       ssoConnections: PrismaSsoConnectionReadRepository.create(database),
+      ssoConnectionRouting: PrismaSsoConnectionRoutingRepository.create({ database }),
       ssoStranding: PrismaSsoConnectionStrandingRepository.create(database),
       ssoRegistrationSlots: PrismaSsoConnectionRegistrationRepository.create(database),
       ssoBackoffice: PrismaSsoConnectionBackofficeRepository.create(database),

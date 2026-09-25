@@ -27,6 +27,7 @@ import { MemoryMfaEnrollmentRepository } from "./memory.mfa-enrollment.repositor
 import { MemoryScimSyncProjectionRepository } from "./memory.scim-sync-projection.repository.ts";
 import { MemorySsoBreakGlassRepository } from "./memory.sso-break-glass.repository.ts";
 import { MemorySsoConnectionRegistrationRepository } from "./memory.sso-connection-registration.repository.ts";
+import { MemorySsoConnectionRoutingRepository } from "./memory.sso-connection-routing.repository.ts";
 import {
   MemorySsoConnectionBackofficeRepository,
   MemorySsoConnectionReadRepository,
@@ -74,6 +75,7 @@ export function identityRepositoriesOverMemory(
     joinRequests: MemoryJoinRequestReadRepository.create(store),
     joinCandidates: MemoryJoinCandidateRepository.create(store),
     ssoConnections: MemorySsoConnectionReadRepository.create(store),
+    ssoConnectionRouting: MemorySsoConnectionRoutingRepository.create({ store }),
     ssoStranding: MemorySsoConnectionStrandingRepository.create(store),
     ssoRegistrationSlots: MemorySsoConnectionRegistrationRepository.create(store),
     ssoBackoffice: MemorySsoConnectionBackofficeRepository.create(store),

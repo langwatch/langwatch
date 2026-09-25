@@ -1,13 +1,6 @@
-import type { RoutableConnection, SsoConnectionState } from "@langwatch/identity-contract";
+import type { SsoConnectionState } from "@langwatch/identity-contract";
 import type { SsoConnection } from "@langwatch/prisma-client/generated";
 
-import {
-  routableSsoConnectionOf,
-  routableSsoConnections,
-  routedSsoConnections,
-  ssoRoutingMethodIdOf,
-} from "../../rules/sso-connection-routing.rules.ts";
-import type { SsoMethodDial } from "../../rules/sso-method-dial.rules.ts";
 import { SsoConnectionRoutingRepository } from "../sso-connection-routing.repository.ts";
 import { PrismaSsoConnectionProjectionRepository } from "./prisma.sso-connection-projection.repository.ts";
 
@@ -42,35 +35,21 @@ export type PrismaSsoConnectionRoutingDatabase = {
   };
 };
 
-/** The projection-backed domain lookup (D04, D09). `configured` means what it
- *  always meant - whether a sign-in sent here would ARRIVE anywhere - and
- *  since D09 there are two ways for that to be true, which the dial decides. */
+/** The projection-backed domain lookup (D04, D09), over the ownership table and its connections. */
 export class PrismaSsoConnectionRoutingRepository extends SsoConnectionRoutingRepository {
   static create({
     database,
-    dial,
   }: {
     database: PrismaSsoConnectionRoutingDatabase;
-    dial: SsoMethodDial;
   }): PrismaSsoConnectionRoutingRepository {
-    return new PrismaSsoConnectionRoutingRepository(database, dial);
+    return new PrismaSsoConnectionRoutingRepository(database);
   }
 
-  private constructor(
-    private readonly database: PrismaSsoConnectionRoutingDatabase,
-    /** WHICH method this connection is actually dialed through, or null when
-     *  none is. Injected rather than decided here, so this class holds no
-     *  policy - the same split the legacy repository makes. */
-    private readonly dial: SsoMethodDial,
-  ) {
+  private constructor(private readonly database: PrismaSsoConnectionRoutingDatabase) {
     super();
   }
 
-  async findConnectionsForDomain({
-    domain,
-  }: {
-    domain: string;
-  }): Promise<readonly RoutableConnection[]> {
+  async findDomainConnections({ domain }: { domain: string }): Promise<SsoConnectionState[]> {
     // Every state, not only ACTIVE: a SUSPENDED connection still OWNS its
     // domain, and filtering to ACTIVE here would make a paused connection
     // indistinguishable from a domain nobody ever configured.
@@ -80,27 +59,21 @@ export class PrismaSsoConnectionRoutingRepository extends SsoConnectionRoutingRe
     });
     if (ownership === null) return this.grandfathered({ domain });
 
-    const holderIds = ownership.holders.map((holder) => holder.connectionId);
-    const routed = routedSsoConnections(await this.pairedWith({ holderIds }));
-
-    return Promise.all(routed.map((connection) => this.routable(connection, domain)));
+    return this.pairedWith({ holderIds: ownership.holders.map((holder) => holder.connectionId) });
   }
 
-  /** The self-hosted sole-connection rule's input: what this deployment
-   *  could redirect to with no address in hand. */
-  async findActiveConnections(): Promise<readonly RoutableConnection[]> {
+  async findLiveConnections(): Promise<SsoConnectionState[]> {
     const rows = await this.database.ssoConnection.findMany({
       where: { state: { notIn: GONE } },
       orderBy: { createdAt: "asc" },
     });
-    const routable = routableSsoConnections(rows.map((row) => this.connectionOf(row)));
 
-    return Promise.all(routable.map((connection) => this.routable(connection)));
+    return rows.map((row) => this.connectionOf(row));
   }
 
   /** A connection whose domain predates the ownership table: the migration
    *  wrote the column, and sign-in has always been decided off it. */
-  private async grandfathered({ domain }: { domain: string }): Promise<RoutableConnection[]> {
+  private async grandfathered({ domain }: { domain: string }): Promise<SsoConnectionState[]> {
     const legacy = await this.database.ssoConnection.findFirst({
       where: {
         source: "legacy-grandfathered",
@@ -109,7 +82,7 @@ export class PrismaSsoConnectionRoutingRepository extends SsoConnectionRoutingRe
       },
     });
 
-    return legacy === null ? [] : [await this.routable(this.connectionOf(legacy), domain)];
+    return legacy === null ? [] : [this.connectionOf(legacy)];
   }
 
   /** Every connection of the holders' organization the holders are in a
@@ -143,18 +116,5 @@ export class PrismaSsoConnectionRoutingRepository extends SsoConnectionRoutingRe
 
   private connectionOf(row: SsoConnection): SsoConnectionState {
     return PrismaSsoConnectionProjectionRepository.rowToConnection(row);
-  }
-
-  private async routable(
-    connection: SsoConnectionState,
-    domain?: string,
-  ): Promise<RoutableConnection> {
-    const dial = await this.dial({
-      source: connection.source,
-      methodId: ssoRoutingMethodIdOf(connection),
-      connectionId: connection.connectionId,
-    });
-
-    return routableSsoConnectionOf({ connection, dial, domain });
   }
 }

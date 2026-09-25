@@ -83,7 +83,6 @@ async function appFor(
       },
       publicBaseUrl: undefined,
       identityEmails: undefined as never,
-      route: undefined as never,
       signUp: null,
       invites: null,
       isSaas: false,
