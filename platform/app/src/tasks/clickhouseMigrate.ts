@@ -8,10 +8,6 @@ import { prisma } from "../server/db";
 const logger = createLogger("langwatch:task:clickhouseMigrate");
 
 export default async function execute() {
-  if (!process.env.DATABASE_URL) {
-    await migrateAll();
-    return;
-  }
   await withClickHouseMigrationLock({ prisma }, migrateAll);
 }
 
