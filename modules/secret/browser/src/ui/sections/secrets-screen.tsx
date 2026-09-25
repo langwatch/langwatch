@@ -17,10 +17,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import type { WireOf } from "@langwatch/api/web";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { Secret } from "@langwatch/secret-contract";
 import { Edit, Key, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
@@ -36,6 +38,96 @@ import { describeSecretRefusal } from "../../model/secret-refusal-copy.ts";
  */
 function normaliseSecretName(raw: string): string {
   return raw.toUpperCase().replace(/[^A-Z0-9_]/g, "");
+}
+
+type PickedSecret = { id: string; name: string };
+
+/** Runs one change, clears its form, re-reads the list; any failure along the way is reported. */
+async function applySecretChange({
+  change,
+  settle,
+  refresh,
+  report,
+}: {
+  change: () => Promise<unknown>;
+  settle: () => void;
+  refresh: () => Promise<unknown>;
+  report: (error: unknown) => void;
+}): Promise<void> {
+  try {
+    await change();
+    settle();
+    await refresh();
+  } catch (error) {
+    report(error);
+  }
+}
+
+function secretFailureNotice(error: unknown, fallbackTitle: string) {
+  const copy = describeSecretRefusal(error);
+  return {
+    error,
+    fallbackTitle: copy?.title ?? fallbackTitle,
+    ...(copy ? { description: copy.description } : {}),
+  };
+}
+
+function SecretRow({
+  secret,
+  canManage,
+  onUpdate,
+  onDelete,
+}: {
+  secret: WireOf<Secret>;
+  canManage: boolean;
+  onUpdate: (picked: PickedSecret) => void;
+  onDelete: (picked: PickedSecret) => void;
+}) {
+  return (
+    <Table.Row>
+      <Table.Cell>
+        <Text fontFamily="mono">{secret.name}</Text>
+      </Table.Cell>
+      <Table.Cell>
+        <Text>{secret.createdBy?.name ?? "-"}</Text>
+      </Table.Cell>
+      <Table.Cell>
+        <Text>{readableDate(secret.updatedAt).toLocaleDateString()}</Text>
+      </Table.Cell>
+      <Table.Cell textAlign="right">
+        {canManage && (
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <Button variant="ghost" size="sm" aria-label={`Actions for ${secret.name}`}>
+                <MoreVertical />
+              </Button>
+            </Menu.Trigger>
+            <Menu.Content>
+              <Menu.Item
+                value="update"
+                onClick={() => onUpdate({ id: secret.id, name: secret.name })}
+              >
+                <Box display="flex" alignItems="center" gap={2}>
+                  <Edit size={14} />
+                  Update Value
+                </Box>
+              </Menu.Item>
+              <Menu.Item
+                value="delete"
+                color="red"
+                onClick={() => onDelete({ id: secret.id, name: secret.name })}
+              >
+                <Box display="flex" alignItems="center" gap={2}>
+                  <Trash2 size={14} />
+                  Delete Secret
+                </Box>
+              </Menu.Item>
+            </Menu.Content>
+          </Menu.Root>
+        )}
+      </Table.Cell>
+    </Table.Row>
+  );
 }
 
 export default function SecretsScreen() {
@@ -69,56 +161,46 @@ export default function SecretsScreen() {
    * side". See `model/secret-refusal-copy.ts` for why the words are here at all.
    */
   const reportFailure = (error: unknown, fallbackTitle: string) => {
-    const copy = describeSecretRefusal(error);
-    host.failed({
-      error,
-      fallbackTitle: copy?.title ?? fallbackTitle,
-      ...(copy ? { description: copy.description } : {}),
-    });
+    host.failed(secretFailureNotice(error, fallbackTitle));
   };
 
   const handleCreate = async () => {
     if (!projectId || !newSecretName || !newSecretValue) return;
-    try {
-      await createMutation.mutateAsync({
-        projectId,
-        name: newSecretName,
-        value: newSecretValue,
-      });
-      setIsAddDialogOpen(false);
-      setNewSecretName("");
-      setNewSecretValue("");
-      await utils.secrets.list.invalidate();
-    } catch (error) {
-      reportFailure(error, "Couldn't create the secret");
-    }
+    await applySecretChange({
+      change: () =>
+        createMutation.mutateAsync({ projectId, name: newSecretName, value: newSecretValue }),
+      settle: () => {
+        setIsAddDialogOpen(false);
+        setNewSecretName("");
+        setNewSecretValue("");
+      },
+      refresh: () => utils.secrets.list.invalidate(),
+      report: (error) => reportFailure(error, "Couldn't create the secret"),
+    });
   };
 
   const handleDelete = async () => {
     if (!projectId || !secretToDelete) return;
-    try {
-      await deleteMutation.mutateAsync({ projectId, secretId: secretToDelete.id });
-      setSecretToDelete(null);
-      await utils.secrets.list.invalidate();
-    } catch (error) {
-      reportFailure(error, "Couldn't delete the secret");
-    }
+    await applySecretChange({
+      change: () => deleteMutation.mutateAsync({ projectId, secretId: secretToDelete.id }),
+      settle: () => setSecretToDelete(null),
+      refresh: () => utils.secrets.list.invalidate(),
+      report: (error) => reportFailure(error, "Couldn't delete the secret"),
+    });
   };
 
   const handleUpdate = async () => {
     if (!projectId || !secretToUpdate || !updateValue) return;
-    try {
-      await updateMutation.mutateAsync({
-        projectId,
-        secretId: secretToUpdate.id,
-        value: updateValue,
-      });
-      setSecretToUpdate(null);
-      setUpdateValue("");
-      await utils.secrets.list.invalidate();
-    } catch (error) {
-      reportFailure(error, "Couldn't update the secret");
-    }
+    await applySecretChange({
+      change: () =>
+        updateMutation.mutateAsync({ projectId, secretId: secretToUpdate.id, value: updateValue }),
+      settle: () => {
+        setSecretToUpdate(null);
+        setUpdateValue("");
+      },
+      refresh: () => utils.secrets.list.invalidate(),
+      report: (error) => reportFailure(error, "Couldn't update the secret"),
+    });
   };
 
   const showEmpty = !secretsQuery.isLoading && secrets.length === 0;
@@ -167,58 +249,16 @@ export default function SecretsScreen() {
               </Table.Header>
               <Table.Body>
                 {secrets.map((secret) => (
-                  <Table.Row key={secret.id}>
-                    <Table.Cell>
-                      <Text fontFamily="mono">{secret.name}</Text>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Text>{secret.createdBy?.name ?? "-"}</Text>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Text>{readableDate(secret.updatedAt).toLocaleDateString()}</Text>
-                    </Table.Cell>
-                    <Table.Cell textAlign="right">
-                      {canManageSecrets && (
-                        <Menu.Root>
-                          <Menu.Trigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              aria-label={`Actions for ${secret.name}`}
-                            >
-                              <MoreVertical />
-                            </Button>
-                          </Menu.Trigger>
-                          <Menu.Content>
-                            <Menu.Item
-                              value="update"
-                              onClick={() => {
-                                setSecretToUpdate({ id: secret.id, name: secret.name });
-                                setUpdateValue("");
-                              }}
-                            >
-                              <Box display="flex" alignItems="center" gap={2}>
-                                <Edit size={14} />
-                                Update Value
-                              </Box>
-                            </Menu.Item>
-                            <Menu.Item
-                              value="delete"
-                              color="red"
-                              onClick={() => {
-                                setSecretToDelete({ id: secret.id, name: secret.name });
-                              }}
-                            >
-                              <Box display="flex" alignItems="center" gap={2}>
-                                <Trash2 size={14} />
-                                Delete Secret
-                              </Box>
-                            </Menu.Item>
-                          </Menu.Content>
-                        </Menu.Root>
-                      )}
-                    </Table.Cell>
-                  </Table.Row>
+                  <SecretRow
+                    key={secret.id}
+                    secret={secret}
+                    canManage={canManageSecrets}
+                    onUpdate={(picked) => {
+                      setSecretToUpdate(picked);
+                      setUpdateValue("");
+                    }}
+                    onDelete={setSecretToDelete}
+                  />
                 ))}
               </Table.Body>
             </Table.Root>

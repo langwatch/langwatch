@@ -2,6 +2,7 @@
 
 import {
   Button,
+  type ButtonProps,
   Field,
   HStack,
   Input,
@@ -37,6 +38,44 @@ function fieldProblems(error: unknown): Record<string, string> {
 }
 
 type Picked = { id: string; name: string | null };
+
+function togglePicked(list: Picked[], entry: Picked): Picked[] {
+  return list.some((picked) => picked.id === entry.id)
+    ? list.filter((picked) => picked.id !== entry.id)
+    : [...list, entry];
+}
+
+/** A pick list's trigger: the picked names as tags, or the placeholder when none. */
+function PickedTrigger({
+  picked,
+  placeholder,
+  ...triggerProps
+}: { picked: Picked[]; placeholder: string } & ButtonProps) {
+  return (
+    <Button
+      variant="outline"
+      width="full"
+      justifyContent="space-between"
+      fontWeight="normal"
+      color={picked.length === 0 ? "fg.subtle" : "fg"}
+      paddingX={3}
+      {...triggerProps}
+    >
+      {picked.length === 0 ? (
+        placeholder
+      ) : (
+        <HStack gap={1} flexWrap="wrap" flex={1}>
+          {picked.map((entry) => (
+            <Tag.Root key={entry.id} size="sm">
+              <Tag.Label>{entry.name}</Tag.Label>
+            </Tag.Root>
+          ))}
+        </HStack>
+      )}
+      <ChevronDown size={16} />
+    </Button>
+  );
+}
 
 export function AnnotationQueueEditor({
   projectId,
@@ -149,11 +188,6 @@ export function AnnotationQueueEditor({
     });
   };
 
-  const toggle = (list: Picked[], entry: Picked): Picked[] =>
-    list.some((picked) => picked.id === entry.id)
-      ? list.filter((picked) => picked.id !== entry.id)
-      : [...list, entry];
-
   return (
     <Drawer.Root
       open
@@ -196,27 +230,7 @@ export function AnnotationQueueEditor({
                   positioning={{ placement: "bottom-start" }}
                 >
                   <Popover.Trigger asChild>
-                    <Button
-                      variant="outline"
-                      width="full"
-                      justifyContent="space-between"
-                      fontWeight="normal"
-                      color={participants.length === 0 ? "fg.subtle" : "fg"}
-                      paddingX={3}
-                    >
-                      {participants.length === 0 ? (
-                        "Add Participants"
-                      ) : (
-                        <HStack gap={1} flexWrap="wrap" flex={1}>
-                          {participants.map((participant) => (
-                            <Tag.Root key={participant.id} size="sm">
-                              <Tag.Label>{participant.name}</Tag.Label>
-                            </Tag.Root>
-                          ))}
-                        </HStack>
-                      )}
-                      <ChevronDown size={16} />
-                    </Button>
+                    <PickedTrigger picked={participants} placeholder="Add Participants" />
                   </Popover.Trigger>
                   <Popover.Content width="300px">
                     <Popover.Body>
@@ -238,7 +252,7 @@ export function AnnotationQueueEditor({
                               aria-pressed={isPicked}
                               onClick={() =>
                                 setParticipants((current) =>
-                                  toggle(current, {
+                                  togglePicked(current, {
                                     id: member.user.id,
                                     name: member.user.name,
                                   }),
@@ -288,27 +302,7 @@ export function AnnotationQueueEditor({
                   positioning={{ placement: "bottom-start" }}
                 >
                   <Popover.Trigger asChild>
-                    <Button
-                      variant="outline"
-                      width="full"
-                      justifyContent="space-between"
-                      fontWeight="normal"
-                      color={scoreTypes.length === 0 ? "fg.subtle" : "fg"}
-                      paddingX={3}
-                    >
-                      {scoreTypes.length === 0 ? (
-                        "Add Score Type"
-                      ) : (
-                        <HStack gap={1} flexWrap="wrap" flex={1}>
-                          {scoreTypes.map((scoreType) => (
-                            <Tag.Root key={scoreType.id} size="sm">
-                              <Tag.Label>{scoreType.name}</Tag.Label>
-                            </Tag.Root>
-                          ))}
-                        </HStack>
-                      )}
-                      <ChevronDown size={16} />
-                    </Button>
+                    <PickedTrigger picked={scoreTypes} placeholder="Add Score Type" />
                   </Popover.Trigger>
                   <Popover.Content width="300px">
                     <Popover.Body>
@@ -330,7 +324,7 @@ export function AnnotationQueueEditor({
                               aria-pressed={isPicked}
                               onClick={() =>
                                 setScoreTypes((current) =>
-                                  toggle(current, { id: score.id, name: score.name }),
+                                  togglePicked(current, { id: score.id, name: score.name }),
                                 )
                               }
                             >

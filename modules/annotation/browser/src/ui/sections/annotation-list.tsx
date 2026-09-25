@@ -29,6 +29,7 @@ import {
   pageAddress,
   pageSizeAddress,
   readAnnotationListPaging,
+  type AnnotationListPaging,
 } from "../../model/annotation-list-paging.ts";
 import {
   addDatasetRecordAddress,
@@ -40,6 +41,8 @@ import {
   absolutePeriodAddress,
   clearedPeriodAddress,
   relativePeriodAddress,
+  type AnnotationPeriod,
+  type AnnotationPeriodMode,
 } from "../../model/annotation-period.ts";
 import { queueItemsToRows, type AnnotationRow } from "../../model/annotation-row.ts";
 import { annotationViewCopy, viewReadsMemberQueues } from "../../model/annotation-view.ts";
@@ -60,6 +63,124 @@ import { SendToQueueDialog } from "./send-to-queue-dialog.tsx";
  * queue page MOVES its selection to another queue, rather than only adding it.
  */
 export type PageQueue = { annotatorId: string; name: string };
+
+/** The queue read stays unbounded until the reviewer picks a range. */
+function queuedRangeFor({
+  period,
+  periodIsDefault,
+}: {
+  period: AnnotationPeriod;
+  periodIsDefault: boolean;
+}): {
+  rangeIsPicked: boolean;
+  queuedRange: AnnotationPeriod | Record<string, never>;
+  queuedRangeKey: string;
+} {
+  if (periodIsDefault) return { rangeIsPicked: false, queuedRange: {}, queuedRangeKey: "all" };
+  return {
+    rangeIsPicked: true,
+    queuedRange: period,
+    queuedRangeKey: `${period.startDate.getTime()}-${period.endDate.getTime()}`,
+  };
+}
+
+/** Rows a page supplies are the whole list and are paged here; the queue read is paged already. */
+function listRowsFor({
+  providedRows,
+  rowsLoading,
+  queueRead,
+  paging,
+}: {
+  providedRows: AnnotationRow[] | undefined;
+  rowsLoading: boolean | undefined;
+  queueRead: {
+    items: Parameters<typeof queueItemsToRows>[0];
+    totalCount: number;
+    loading: boolean;
+  };
+  paging: Pick<AnnotationListPaging, "pageOffset" | "pageSize">;
+}): { pageRows: AnnotationRow[]; rowCount: number; isLoading: boolean } {
+  if (providedRows === void 0) {
+    return {
+      pageRows: queueItemsToRows(queueRead.items),
+      rowCount: queueRead.totalCount,
+      isLoading: queueRead.loading,
+    };
+  }
+  return {
+    pageRows: providedRows.slice(paging.pageOffset, paging.pageOffset + paging.pageSize),
+    rowCount: providedRows.length,
+    isLoading: !!rowsLoading,
+  };
+}
+
+function removedSentence(count: number): string {
+  return `${count} ${count === 1 ? "item" : "items"} removed`;
+}
+
+function StatusFilterMenu({
+  value,
+  onChange,
+}: {
+  value: AnnotationQueueItemStatus;
+  onChange: (next: AnnotationQueueItemStatus) => void;
+}) {
+  return (
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <Button variant="outline">
+          Status <ChevronDown size={16} />
+        </Button>
+      </Menu.Trigger>
+      <Menu.Content>
+        <RadioGroup
+          value={value}
+          onValueChange={(change) => {
+            const parsed = annotationQueueItemStatusSchema.safeParse(change.value);
+            if (parsed.success) onChange(parsed.data);
+          }}
+        >
+          <VStack align="start" padding={3} gap={3}>
+            <Radio value="pending">Pending</Radio>
+            <Radio value="completed">Completed</Radio>
+            <Radio value="all">All</Radio>
+          </VStack>
+        </RadioGroup>
+      </Menu.Content>
+    </Menu.Root>
+  );
+}
+
+function ListPeriodControl({
+  reading,
+  query,
+  setQuery,
+  waitsForPick,
+  clearable,
+}: {
+  reading: { period: AnnotationPeriod; mode: AnnotationPeriodMode };
+  query: Readonly<Record<string, string | undefined>>;
+  setQuery: (next: Record<string, string | undefined>) => void;
+  waitsForPick: boolean;
+  clearable: boolean;
+}) {
+  return (
+    <PeriodPicker
+      period={reading.period}
+      mode={reading.mode}
+      // Only the queue read waits for a pick. A view that brings its own
+      // rows has already applied its own range, so its label stands.
+      {...(waitsForPick ? { label: "All time" } : {})}
+      setPeriod={(startDate, endDate) =>
+        setQuery(absolutePeriodAddress({ current: query, startDate, endDate }))
+      }
+      setRelativePeriod={(presetKey) =>
+        setQuery(relativePeriodAddress({ current: query, presetKey }))
+      }
+      {...(clearable ? { clearPeriod: () => setQuery(clearedPeriodAddress(query)) } : {})}
+    />
+  );
+}
 
 export function AnnotationList({
   view,
@@ -106,14 +227,10 @@ export function AnnotationList({
   // badge and the list disagreeing. The range narrows the read only once the
   // reviewer has picked one; until then the control says so and reads "All
   // time".
-  const rangeIsPicked = !periodIsDefault;
-  const queuedRange = rangeIsPicked ? period : {};
-
-  // The range as a value rather than two Date objects, so effects keyed on it
-  // fire when the window changes and not merely when it is re-derived.
-  const queuedRangeKey = rangeIsPicked
-    ? `${period.startDate.getTime()}-${period.endDate.getTime()}`
-    : "all";
+  const { rangeIsPicked, queuedRange, queuedRangeKey } = queuedRangeFor({
+    period,
+    periodIsDefault,
+  });
 
   const setQuery = useCallback(
     (next: Record<string, string | undefined>) => host.setQuery(next),
@@ -149,23 +266,24 @@ export function AnnotationList({
     canRead: host.hasPermission("project:view"),
   });
 
-  // A page that brings its own rows brings all of them, so the pager slices
-  // them here; the queue read is already paged by the server.
-  const allRows: AnnotationRow[] = useMemo(
-    () => providedRows ?? queueItemsToRows(assignedQueueItems),
-    [providedRows, assignedQueueItems],
-  );
-
-  const pageRows = useMemo(
+  const { pageRows, rowCount, isLoading } = useMemo(
     () =>
-      isPageProvidedRows
-        ? allRows.slice(paging.pageOffset, paging.pageOffset + paging.pageSize)
-        : allRows,
-    [allRows, isPageProvidedRows, paging.pageOffset, paging.pageSize],
+      listRowsFor({
+        providedRows,
+        rowsLoading,
+        queueRead: { items: assignedQueueItems, totalCount, loading: queuesLoading },
+        paging: { pageOffset: paging.pageOffset, pageSize: paging.pageSize },
+      }),
+    [
+      providedRows,
+      rowsLoading,
+      assignedQueueItems,
+      totalCount,
+      queuesLoading,
+      paging.pageOffset,
+      paging.pageSize,
+    ],
   );
-
-  const rowCount = isPageProvidedRows ? allRows.length : totalCount;
-  const isLoading = isPageProvidedRows ? !!rowsLoading : queuesLoading;
 
   // A selection only means something for the rows it was made on. Filtering,
   // paging or switching queue swaps those rows out, so the picks go with them.
@@ -196,7 +314,7 @@ export function AnnotationList({
 
       host.succeeded({
         title: "Removed from queue",
-        description: `${result.deleted} ${result.deleted === 1 ? "item" : "items"} removed`,
+        description: removedSentence(result.deleted),
       });
     },
     onError: (error) => host.failed({ error, fallbackTitle: "Couldn't remove from queue" }),
@@ -304,44 +422,14 @@ export function AnnotationList({
         )}
         <Spacer />
         {copy.showStatusFilter && (
-          <Menu.Root>
-            <Menu.Trigger asChild>
-              <Button variant="outline">
-                Status <ChevronDown size={16} />
-              </Button>
-            </Menu.Trigger>
-            <Menu.Content>
-              <RadioGroup
-                value={statusFilter}
-                onValueChange={(change) => {
-                  const parsed = annotationQueueItemStatusSchema.safeParse(change.value);
-                  if (parsed.success) setStatusFilter(parsed.data);
-                }}
-              >
-                <VStack align="start" padding={3} gap={3}>
-                  <Radio value="pending">Pending</Radio>
-                  <Radio value="completed">Completed</Radio>
-                  <Radio value="all">All</Radio>
-                </VStack>
-              </RadioGroup>
-            </Menu.Content>
-          </Menu.Root>
+          <StatusFilterMenu value={statusFilter} onChange={setStatusFilter} />
         )}
-        <PeriodPicker
-          period={period}
-          mode={periodMode}
-          // Only the queue read waits for a pick. A view that brings its own
-          // rows has already applied its own range, so its label stands.
-          {...(!isPageProvidedRows && !rangeIsPicked ? { label: "All time" } : {})}
-          setPeriod={(startDate, endDate) =>
-            setQuery(absolutePeriodAddress({ current: query, startDate, endDate }))
-          }
-          setRelativePeriod={(presetKey) =>
-            setQuery(relativePeriodAddress({ current: query, presetKey }))
-          }
-          {...(isPageProvidedRows
-            ? {}
-            : { clearPeriod: () => setQuery(clearedPeriodAddress(query)) })}
+        <ListPeriodControl
+          reading={{ period, mode: periodMode }}
+          query={query}
+          setQuery={setQuery}
+          waitsForPick={!isPageProvidedRows && !rangeIsPicked}
+          clearable={!isPageProvidedRows}
         />
         <Button variant="ghost" onClick={onExport ?? exportPage}>
           {exportLabel ?? "Export"} <Download size={16} />

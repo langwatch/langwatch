@@ -13,6 +13,9 @@ export default defineConfig({
   },
   test: moduleVitestTestOptions({
     kind: "jsdom",
+    // The suites mock the package's own api binding and blocks with different
+    // shapes; a shared registry lets one file's mock leak into the next.
+    isolate: true,
     test: {
       setupFiles: ["./vitest.setup.ts"],
       // The screen suites drive real user events through Chakra drawers, menus

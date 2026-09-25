@@ -4,7 +4,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { nowInstant } from "@langwatch/time";
 import { render } from "@testing-library/react";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 import {
   ApiKeyHostApi,
@@ -22,6 +22,14 @@ import {
   type CliDeviceApproval,
   type CliDeviceCodeLookup,
 } from "./model/api-key-host.ts";
+import {
+  AuthorizeHostApi,
+  AuthorizeHostProvider,
+  type AuthorizeFailureNotice,
+  type AuthorizeSessionStatus,
+  type McpAuthorizeAnswer,
+  type McpAuthorizeRequest,
+} from "./model/authorize-host.ts";
 
 /** One recorded `openPlatformDrawer` call. */
 export type RecordedDrawerOpen = {
@@ -190,4 +198,79 @@ export function renderWithApiKeyHost(
       </ChakraProvider>,
     ),
   };
+}
+
+/** Records what the authorize screens asked the shell to do; the answer is scripted. */
+export class FakeAuthorizeHost extends AuthorizeHostApi {
+  readonly requests: McpAuthorizeRequest[] = [];
+  readonly failures: AuthorizeFailureNotice[] = [];
+  readonly moves: { kind: "navigate" | "replace" | "handOff"; to: string }[] = [];
+
+  constructor(
+    private readonly options: {
+      status?: AuthorizeSessionStatus;
+      projectId?: string;
+      query?: Readonly<Record<string, string | undefined>>;
+      answer?: McpAuthorizeAnswer | Error;
+    } = {},
+  ) {
+    super();
+  }
+
+  scope() {
+    return { projectId: this.options.projectId, projectName: void 0 };
+  }
+
+  sessionStatus(): AuthorizeSessionStatus {
+    return this.options.status ?? "authenticated";
+  }
+
+  route() {
+    return { pathname: "/mcp/authorize", query: this.options.query ?? {} };
+  }
+
+  navigate(to: string): void {
+    this.moves.push({ kind: "navigate", to });
+  }
+
+  replace(to: string): void {
+    this.moves.push({ kind: "replace", to });
+  }
+
+  handOffTo(url: string): void {
+    this.moves.push({ kind: "handOff", to: url });
+  }
+
+  revealProjectApiKey(): string | undefined {
+    return void 0;
+  }
+
+  projectSwitcher(): ReactNode {
+    return null;
+  }
+
+  authorizeMcpClient(request: McpAuthorizeRequest): Promise<McpAuthorizeAnswer> {
+    this.requests.push(request);
+    const answer = this.options.answer ?? { ok: true };
+    return answer instanceof Error ? Promise.reject(answer) : Promise.resolve(answer);
+  }
+
+  succeeded(): void {}
+
+  failed(failure: AuthorizeFailureNotice): void {
+    this.failures.push(failure);
+  }
+
+  copyToClipboard(): Promise<boolean> {
+    return Promise.resolve(true);
+  }
+}
+
+/** Renders an authorize screen inside the Design System's provider and a host. */
+export function renderWithAuthorizeHost(element: ReactElement, host: FakeAuthorizeHost) {
+  return render(
+    <ChakraProvider value={defaultSystem}>
+      <AuthorizeHostProvider value={host}>{element}</AuthorizeHostProvider>
+    </ChakraProvider>,
+  );
 }

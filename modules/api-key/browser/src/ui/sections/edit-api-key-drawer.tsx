@@ -52,6 +52,17 @@ type MyBindings = {
 type OrgProject = { id: string; name: string; teamId: string };
 type OrgTeam = { id: string; name: string };
 
+type UpdateApiKeyInput = {
+  apiKeyId: string;
+  name?: string;
+  description?: string | null;
+  permissionMode?: PermissionMode;
+  scopeType?: string;
+  scopeId?: string;
+  permissions?: string[];
+  bindings?: ApiKeyTrpcRoleBinding[];
+};
+
 /** The most permissive selection a category's availability allows. */
 function defaultPermissionSelection({
   canRead,
@@ -63,6 +74,61 @@ function defaultPermissionSelection({
   if (canWrite) return "write";
   if (canRead) return "read";
   return "none";
+}
+
+function highestSelections(userPermissions: string[]): Record<string, PermissionSelection> {
+  const allSelected: Record<string, PermissionSelection> = {};
+  for (const cat of PERMISSION_CATEGORIES) {
+    const { canRead, canWrite } = categoryAccessAvailability({ category: cat, userPermissions });
+    allSelected[cat.key] = defaultPermissionSelection({ canRead, canWrite });
+  }
+  return allSelected;
+}
+
+function updateKeyInput({
+  apiKey,
+  edits,
+  selections,
+  reader,
+}: {
+  apiKey: ApiKeyRow;
+  edits: {
+    name: string;
+    description: string;
+    permissionMode: PermissionMode;
+    selectedScopes: ScopeTriadEntry[];
+    primaryScope: { scopeType: string; scopeId: string };
+  };
+  selections: Record<string, PermissionSelection>;
+  reader: {
+    myBindings: MyBindings["data"];
+    organizationId: string;
+    orgProjects: OrgProject[];
+    isServiceKey: boolean;
+  };
+}): UpdateApiKeyInput {
+  const { permissionMode } = edits;
+  return {
+    apiKeyId: apiKey.id,
+    name: edits.name !== apiKey.name ? edits.name : undefined,
+    description:
+      edits.description !== (apiKey.description ?? "") ? edits.description || null : undefined,
+    permissionMode,
+    scopeType: edits.primaryScope.scopeType,
+    scopeId: edits.primaryScope.scopeId,
+    permissions:
+      permissionMode === "restricted" ? computePermissionsFromSelections(selections) : undefined,
+    bindings: edits.selectedScopes.map((s) => ({
+      role: deriveBindingRole({
+        permissionMode,
+        scopeType: s.scopeType,
+        scopeId: s.scopeId,
+        ...reader,
+      }),
+      scopeType: s.scopeType,
+      scopeId: s.scopeId,
+    })),
+  };
 }
 
 export function EditApiKeyDrawer({
@@ -88,16 +154,7 @@ export function EditApiKeyDrawer({
   currentTeamId?: string;
   currentProjectId?: string;
   onClose: () => void;
-  onSave: (input: {
-    apiKeyId: string;
-    name?: string;
-    description?: string | null;
-    permissionMode?: PermissionMode;
-    scopeType?: string;
-    scopeId?: string;
-    permissions?: string[];
-    bindings?: ApiKeyTrpcRoleBinding[];
-  }) => void;
+  onSave: (input: UpdateApiKeyInput) => void;
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -179,51 +236,20 @@ export function EditApiKeyDrawer({
       (v) => !v || v === "none",
     );
     const shouldPreselectAll = mode === "restricted" && noCategorySelected;
-    if (shouldPreselectAll) {
-      const allSelected: Record<string, PermissionSelection> = {};
-      for (const cat of PERMISSION_CATEGORIES) {
-        const { canRead, canWrite } = categoryAccessAvailability({
-          category: cat,
-          userPermissions,
-        });
-        allSelected[cat.key] = defaultPermissionSelection({ canRead, canWrite });
-      }
-      setCategorySelections(allSelected);
-    }
+    if (shouldPreselectAll) setCategorySelections(highestSelections(userPermissions));
   };
 
   const handleSave = () => {
     if (!apiKey) return;
 
-    const permissions =
-      permissionMode === "restricted"
-        ? computePermissionsFromSelections(effectiveCategorySelections)
-        : undefined;
-
-    const bindings = selectedScopes.map((s) => ({
-      role: deriveBindingRole({
-        permissionMode,
-        scopeType: s.scopeType,
-        scopeId: s.scopeId,
-        myBindings: myBindings.data,
-        organizationId,
-        orgProjects,
-        isServiceKey,
+    onSave(
+      updateKeyInput({
+        apiKey,
+        edits: { name, description, permissionMode, selectedScopes, primaryScope },
+        selections: effectiveCategorySelections,
+        reader: { myBindings: myBindings.data, organizationId, orgProjects, isServiceKey },
       }),
-      scopeType: s.scopeType,
-      scopeId: s.scopeId,
-    }));
-
-    onSave({
-      apiKeyId: apiKey.id,
-      name: name !== apiKey.name ? name : undefined,
-      description: description !== (apiKey.description ?? "") ? description || null : undefined,
-      permissionMode,
-      scopeType: primaryScope.scopeType,
-      scopeId: primaryScope.scopeId,
-      permissions,
-      bindings,
-    });
+    );
   };
 
   const hasAnySelection =

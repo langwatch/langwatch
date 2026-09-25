@@ -62,6 +62,77 @@ export type CreateApiKeyInput = {
   bindings: ApiKeyTrpcRoleBinding[];
 };
 
+type CreateKeyForm = {
+  name: string;
+  description: string;
+  expirationPreset: string;
+  customDate: string;
+  permissionMode: PermissionMode;
+  keyType: "personal" | "service";
+};
+
+type KeyReader = {
+  myBindings: MyBindings["data"];
+  organizationId: string;
+  orgProjects: OrgProject[];
+};
+
+function assignedUserFor({
+  isAdmin,
+  selectedUserId,
+  currentUserId,
+}: {
+  isAdmin: boolean;
+  selectedUserId: string;
+  currentUserId: string;
+}): string | undefined {
+  return isAdmin && selectedUserId && selectedUserId !== currentUserId ? selectedUserId : undefined;
+}
+
+function createKeyInput({
+  form,
+  categorySelections,
+  selectedScopes,
+  primaryScope,
+  assignee,
+  reader,
+}: {
+  form: CreateKeyForm;
+  categorySelections: Record<string, PermissionSelection>;
+  selectedScopes: ScopeTriadEntry[];
+  primaryScope: { scopeType: string; scopeId: string };
+  assignee: Parameters<typeof assignedUserFor>[0];
+  reader: KeyReader;
+}): CreateApiKeyInput {
+  const { permissionMode, keyType } = form;
+  const isServiceKey = keyType === "service";
+  return {
+    name: form.name,
+    description: form.description,
+    expiresAt: resolveExpiresAt({ preset: form.expirationPreset, customDate: form.customDate }),
+    permissionMode,
+    keyType,
+    assignedToUserId: assignedUserFor(assignee),
+    scopeType: primaryScope.scopeType,
+    scopeId: primaryScope.scopeId,
+    permissions:
+      permissionMode === "restricted"
+        ? computePermissionsFromSelections(categorySelections)
+        : undefined,
+    bindings: selectedScopes.map((s) => ({
+      role: deriveBindingRole({
+        permissionMode,
+        scopeType: s.scopeType,
+        scopeId: s.scopeId,
+        ...reader,
+        isServiceKey,
+      }),
+      scopeType: s.scopeType,
+      scopeId: s.scopeId,
+    })),
+  };
+}
+
 export function CreateApiKeyDrawer({
   isOpen,
   isCreating,
@@ -170,44 +241,16 @@ export function CreateApiKeyDrawer({
   }, [isOpen, currentUserId]);
 
   const handleCreate = () => {
-    const expiresAt = resolveExpiresAt({ preset: expirationPreset, customDate });
-
-    const permissions =
-      permissionMode === "restricted"
-        ? computePermissionsFromSelections(categorySelections)
-        : undefined;
-
-    const isServiceKey = keyType === "service";
-
-    const bindings = selectedScopes.map((s) => ({
-      role: deriveBindingRole({
-        permissionMode,
-        scopeType: s.scopeType,
-        scopeId: s.scopeId,
-        myBindings: myBindings.data,
-        organizationId,
-        orgProjects,
-        isServiceKey,
+    onCreate(
+      createKeyInput({
+        form: { name, description, expirationPreset, customDate, permissionMode, keyType },
+        categorySelections,
+        selectedScopes,
+        primaryScope,
+        assignee: { isAdmin, selectedUserId, currentUserId },
+        reader: { myBindings: myBindings.data, organizationId, orgProjects },
       }),
-      scopeType: s.scopeType,
-      scopeId: s.scopeId,
-    }));
-
-    const assignedToUserId =
-      isAdmin && selectedUserId && selectedUserId !== currentUserId ? selectedUserId : undefined;
-
-    onCreate({
-      name,
-      description,
-      expiresAt,
-      permissionMode,
-      keyType,
-      assignedToUserId,
-      scopeType: primaryScope.scopeType,
-      scopeId: primaryScope.scopeId,
-      permissions,
-      bindings,
-    });
+    );
   };
 
   const hasAnySelection =
