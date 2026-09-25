@@ -33,6 +33,91 @@ import { readableDate } from "../../../model/readable-date.ts";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 
+/** What can be done to the budget from its header, by its state and the viewer's grants. */
+function BudgetHeaderActions({
+  budgetId,
+  isArchived,
+  canUpdate,
+  canDelete,
+  onReset,
+  onEdit,
+  onArchive,
+}: {
+  budgetId: string;
+  isArchived: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
+  onReset: () => void;
+  onEdit: () => void;
+  onArchive: () => void;
+}) {
+  return (
+    <HStack>
+      {/* Audit history remains reachable even after archive —
+          the full lifecycle trail stays queryable so operators
+          can reconstruct why a budget was archived. */}
+      <Link href={`/settings/audit-log?targetKind=budget&targetId=${budgetId}`}>
+        <Button variant="outline" size="sm">
+          <FileClock size={14} /> Audit history
+        </Button>
+      </Link>
+      {!isArchived && canUpdate && (
+        <Button variant="outline" size="sm" onClick={onReset}>
+          <TimerReset size={14} /> Reset period
+        </Button>
+      )}
+      {!isArchived && canUpdate && (
+        <Button variant="outline" size="sm" onClick={onEdit}>
+          <Pencil size={14} /> Edit
+        </Button>
+      )}
+      {!isArchived && canDelete && (
+        <Button colorPalette="red" variant="outline" size="sm" onClick={onArchive}>
+          <Archive size={14} /> Archive
+        </Button>
+      )}
+    </HStack>
+  );
+}
+
+/** Runs one action on a loaded budget; a failure is shown to the user, not thrown. */
+async function runBudgetAction(input: {
+  budget: { id: string } | undefined;
+  organizationId: string | undefined;
+  action: (id: string, organizationId: string) => Promise<void>;
+  onFailure: (error: unknown) => void;
+}): Promise<void> {
+  if (!input.budget || !input.organizationId) return;
+  try {
+    await input.action(input.budget.id, input.organizationId);
+  } catch (err) {
+    input.onFailure(err);
+  }
+}
+
+/**
+ * Spend against the limit, and for per-person templates the headcount: they fan out into one
+ * bucket per end user, so their standing is people over the limit rather than one total.
+ */
+function budgetStanding(
+  budget:
+    | {
+        spentUsd: string;
+        limitUsd: string;
+        endUsersSeen?: number | null;
+        endUsersOver?: number | null;
+      }
+    | undefined,
+) {
+  const spent = budget ? Number.parseFloat(budget.spentUsd) : 0;
+  const limit = budget ? Number.parseFloat(budget.limitUsd) : 0;
+  const pct = limit > 0 ? Math.min(100, (spent / limit) * 100) : 0;
+  const seatsSeen = budget?.endUsersSeen ?? 0;
+  const seatsOver = budget?.endUsersOver ?? 0;
+  const seatsOverPct = seatsSeen > 0 ? (seatsOver / seatsSeen) * 100 : 0;
+  return { spent, limit, pct, seatsSeen, seatsOver, seatsOverPct };
+}
+
 function BudgetDetailPage() {
   const showErrorToast = useShowErrorToast();
   const { organization, project, hasPermission } = useOrganizationTeamProject();
@@ -67,21 +152,16 @@ function BudgetDetailPage() {
 
   const budget = detailQuery.data;
 
-  const confirmArchive = async () => {
-    if (!budget || !organization) return;
-    try {
-      await archiveMutation.mutateAsync({
-        organizationId: organization.id,
-        id: budget.id,
-      });
-      setArchiving(false);
-    } catch (err) {
-      showErrorToast({
-        error: err,
-        fallbackTitle: "Couldn't archive the budget",
-      });
-    }
-  };
+  const confirmArchive = () =>
+    runBudgetAction({
+      budget,
+      organizationId: organization?.id,
+      action: async (id, organizationId) => {
+        await archiveMutation.mutateAsync({ organizationId, id });
+        setArchiving(false);
+      },
+      onFailure: (error) => showErrorToast({ error, fallbackTitle: "Couldn't archive the budget" }),
+    });
 
   const resetMutation = api.gatewayBudgets.reset.useMutation({
     onSuccess: async () => {
@@ -97,31 +177,20 @@ function BudgetDetailPage() {
     },
   });
 
-  const confirmReset = async () => {
-    if (!budget || !organization) return;
-    try {
-      await resetMutation.mutateAsync({
-        organizationId: organization.id,
-        id: budget.id,
-      });
-      setResetting(false);
-    } catch (err) {
-      showErrorToast({
-        error: err,
-        fallbackTitle: "Couldn't reset the budget period",
-      });
-    }
-  };
+  const confirmReset = () =>
+    runBudgetAction({
+      budget,
+      organizationId: organization?.id,
+      action: async (id, organizationId) => {
+        await resetMutation.mutateAsync({ organizationId, id });
+        setResetting(false);
+      },
+      onFailure: (error) =>
+        showErrorToast({ error, fallbackTitle: "Couldn't reset the budget period" }),
+    });
 
-  const spent = budget ? Number.parseFloat(budget.spentUsd) : 0;
-  const limit = budget ? Number.parseFloat(budget.limitUsd) : 0;
-  const pct = limit > 0 ? Math.min(100, (spent / limit) * 100) : 0;
+  const { spent, limit, pct, seatsSeen, seatsOver, seatsOverPct } = budgetStanding(budget);
   const isArchived = !!budget?.archivedAt;
-  // Per-person templates fan out into one bucket per end user, so their
-  // standing is a headcount rather than a single total.
-  const seatsSeen = budget?.endUsersSeen ?? 0;
-  const seatsOver = budget?.endUsersOver ?? 0;
-  const seatsOverPct = seatsSeen > 0 ? (seatsOver / seatsSeen) * 100 : 0;
   const isLoadingBudget = detailQuery.isLoading;
   const budgetMissing = !isLoadingBudget && !budget;
 
@@ -146,36 +215,15 @@ function BudgetDetailPage() {
           </PageLayout.Heading>
           <Spacer />
           {budget && (
-            <HStack>
-              {/* Audit history remains reachable even after archive —
-                  the full lifecycle trail stays queryable so operators
-                  can reconstruct why a budget was archived. */}
-              <Link href={`/settings/audit-log?targetKind=budget&targetId=${budget.id}`}>
-                <Button variant="outline" size="sm">
-                  <FileClock size={14} /> Audit history
-                </Button>
-              </Link>
-              {!isArchived && canUpdate && (
-                <Button variant="outline" size="sm" onClick={() => setResetting(true)}>
-                  <TimerReset size={14} /> Reset period
-                </Button>
-              )}
-              {!isArchived && canUpdate && (
-                <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-                  <Pencil size={14} /> Edit
-                </Button>
-              )}
-              {!isArchived && canDelete && (
-                <Button
-                  colorPalette="red"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setArchiving(true)}
-                >
-                  <Archive size={14} /> Archive
-                </Button>
-              )}
-            </HStack>
+            <BudgetHeaderActions
+              budgetId={budget.id}
+              isArchived={isArchived}
+              canUpdate={canUpdate}
+              canDelete={canDelete}
+              onReset={() => setResetting(true)}
+              onEdit={() => setEditing(true)}
+              onArchive={() => setArchiving(true)}
+            />
           )}
         </PageLayout.Header>
 

@@ -35,6 +35,7 @@ import type {
   UpdateTeamMemberRoleInput,
 } from "../organization-membership.repository.ts";
 import type {
+  MemoryAuditLogRow,
   MemoryOrganizationDatabase,
   MemoryOrganizationRow,
   MemoryTeamRow,
@@ -106,6 +107,17 @@ function toUser(row: MemoryUserRow): User {
  * boot. The admin-lockout guards the Postgres repository locks a row for are
  * answered here with a plain read — no concurrent writer to race against.
  */
+function matchesAuditFilters(row: MemoryAuditLogRow, filters: AuditLogFilters): boolean {
+  return (
+    row.organizationId === filters.organizationId &&
+    (!filters.userId || row.userId === filters.userId) &&
+    (!filters.projectId || row.projectId === filters.projectId) &&
+    (!filters.action || row.action.includes(filters.action)) &&
+    (!filters.targetKind || row.targetKind === filters.targetKind) &&
+    (!filters.targetId || row.targetId === filters.targetId)
+  );
+}
+
 export class MemoryOrganizationMembershipRepository implements OrganizationMembershipRepository {
   private constructor(private readonly memory: MemoryOrganizationDatabase) {}
 
@@ -721,46 +733,43 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     filters: AuditLogFilters,
   ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }> {
     const rows = this.memory.auditLogs
-      .filter((row) => row.organizationId === filters.organizationId)
-      .filter((row) => !filters.userId || row.userId === filters.userId)
-      .filter((row) => !filters.projectId || row.projectId === filters.projectId)
-      .filter((row) => !filters.action || row.action.includes(filters.action))
-      .filter((row) => !filters.targetKind || row.targetKind === filters.targetKind)
-      .filter((row) => !filters.targetId || row.targetId === filters.targetId)
+      .filter((row) => matchesAuditFilters(row, filters))
       .toSorted((a, b) => b.createdAt.epochMilliseconds - a.createdAt.epochMilliseconds);
     const page = rows.slice(filters.pageOffset, filters.pageOffset + filters.pageSize);
 
     return {
       totalCount: rows.length,
-      auditLogs: page.map((row) => {
-        const isGateway = row.action.startsWith("gateway.");
-        const user = row.userId ? this.memory.users.get(row.userId) : undefined;
-        const project = row.projectId ? this.memory.projects.get(row.projectId) : undefined;
-        return {
-          id: row.id,
-          createdAt: row.createdAt,
-          userId: row.userId,
-          organizationId: row.organizationId,
-          projectId: row.projectId,
-          action: row.action,
-          payload: isGateway ? (row.after ?? row.before ?? null) : row.payload,
-          ipAddress: row.ipAddress,
-          userAgent: row.userAgent,
-          error: row.error,
-          args: isGateway ? { before: row.before, after: row.after } : row.args,
-          user: user ? { id: user.id, name: user.name, email: user.email } : null,
-          project: project ? { id: project.id, name: project.name } : null,
-          source: isGateway ? "gateway" : "platform",
-          targetKind: row.targetKind,
-          targetId: row.targetId,
-          before: row.before,
-          after: row.after,
-        };
-      }),
+      auditLogs: page.map((row) => this.enrichedAuditLog(row)),
     };
   }
 
   // -- shared reads ------------------------------------------------------
+
+  private enrichedAuditLog(row: MemoryAuditLogRow): EnrichedAuditLog {
+    const isGateway = row.action.startsWith("gateway.");
+    const user = row.userId ? this.memory.users.get(row.userId) : undefined;
+    const project = row.projectId ? this.memory.projects.get(row.projectId) : undefined;
+    return {
+      id: row.id,
+      createdAt: row.createdAt,
+      userId: row.userId,
+      organizationId: row.organizationId,
+      projectId: row.projectId,
+      action: row.action,
+      payload: isGateway ? (row.after ?? row.before ?? null) : row.payload,
+      ipAddress: row.ipAddress,
+      userAgent: row.userAgent,
+      error: row.error,
+      args: isGateway ? { before: row.before, after: row.after } : row.args,
+      user: user ? { id: user.id, name: user.name, email: user.email } : null,
+      project: project ? { id: project.id, name: project.name } : null,
+      source: isGateway ? "gateway" : "platform",
+      targetKind: row.targetKind,
+      targetId: row.targetId,
+      before: row.before,
+      after: row.after,
+    };
+  }
 
   private membershipRow(params: { organizationId: string; userId: string }) {
     return this.memory.organizationUsers.find(

@@ -86,8 +86,24 @@ export function useFirstTraceWatch(): FirstTraceWatchState {
     return () => clearTimeout(timeout);
   }, [isRedirecting, slug, host]);
 
-  if (!personalProject || hasPriorTraces || isTimedOut) return "hidden";
-  if (isRedirecting) return "redirecting";
-  if (hasSeenNeverSynced) return "waiting";
+  return watchStateFor({
+    hasProject: !!personalProject,
+    hasPriorTraces,
+    isTimedOut,
+    isRedirecting,
+    hasSeenNeverSynced,
+  });
+}
+
+function watchStateFor(input: {
+  hasProject: boolean;
+  hasPriorTraces: boolean;
+  isTimedOut: boolean;
+  isRedirecting: boolean;
+  hasSeenNeverSynced: boolean;
+}): FirstTraceWatchState {
+  if (!input.hasProject || input.hasPriorTraces || input.isTimedOut) return "hidden";
+  if (input.isRedirecting) return "redirecting";
+  if (input.hasSeenNeverSynced) return "waiting";
   return "hidden";
 }

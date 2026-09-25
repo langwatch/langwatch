@@ -51,6 +51,19 @@ export interface OrganizationVisibilityDependencies {
   readonly demoProject: OrganizationDemoProject;
 }
 
+/** Whether an organization-scoped ADMIN binding makes this viewer an administrator. */
+function isAdminByBinding(input: {
+  bindings: readonly AuthzBindingForSynthesis[];
+  organizationId: string;
+}): boolean {
+  return input.bindings.some(
+    (binding) =>
+      binding.organizationId === input.organizationId &&
+      binding.scopeType === "ORGANIZATION" &&
+      binding.role === "ADMIN",
+  );
+}
+
 export class OrganizationVisibilityService {
   static create(dependencies: OrganizationVisibilityDependencies): OrganizationVisibilityService {
     return new OrganizationVisibilityService(dependencies);
@@ -285,12 +298,7 @@ export class OrganizationVisibilityService {
     // A person can be an administrator through the legacy membership row OR
     // through an organization-scoped ADMIN binding. The binding is
     // authoritative where present, so a stale MEMBER row cannot shadow it.
-    const adminByBinding = bindings.some(
-      (binding) =>
-        binding.organizationId === organization.id &&
-        binding.scopeType === "ORGANIZATION" &&
-        binding.role === "ADMIN",
-    );
+    const adminByBinding = isAdminByBinding({ bindings, organizationId: organization.id });
     if (adminByBinding) {
       const own = organization.members[0];
       organization.members = own

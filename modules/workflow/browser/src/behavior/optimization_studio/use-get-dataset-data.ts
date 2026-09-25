@@ -10,6 +10,59 @@ import { useMemo } from "react";
 
 import { useOrganizationTeamProject } from "../studio-host/use-organization-team-project.ts";
 
+type DatasetView = { records: DatasetRecordEntry[]; columnTypes: DatasetColumns };
+
+/** ADR-032 I-READY: a still-preparing or failed dataset reads as "no rows yet", never retried. */
+function retryUnlessPreparing(failureCount: number, error: unknown): boolean {
+  if ((error as { data?: { code?: string } })?.data?.code === "PRECONDITION_FAILED") {
+    return false;
+  }
+  return failureCount < 3;
+}
+
+/** The stored dataset once loaded, or the workflow's inline one; a preview shows 5 columns. */
+function datasetView(input: {
+  datasetId: string | undefined;
+  inline: NonNullable<Entry["dataset"]>["inline"];
+  loaded: ReturnType<typeof datasetDatabaseRecordsToInMemoryDataset> | undefined;
+  preview: boolean;
+}): DatasetView | undefined {
+  if (input.datasetId) {
+    return input.loaded
+      ? {
+          records: input.loaded.datasetRecords,
+          columnTypes: input.loaded.columnTypes.slice(0, input.preview ? 5 : undefined),
+        }
+      : undefined;
+  }
+
+  if (input.inline) {
+    return {
+      records: transposeColumnsFirstToRowsFirstWithId(input.inline.records),
+      columnTypes: input.inline.columnTypes,
+    };
+  }
+
+  return undefined;
+}
+
+/** The rows a preview shows (the first 5), keeping only the id and the visible columns. */
+function visibleRows(input: {
+  data: DatasetView | undefined;
+  preview: boolean;
+  columnSet: Set<string>;
+}): DatasetRecordEntry[] | undefined {
+  const rows = input.data ? input.data.records.slice(0, input.preview ? 5 : undefined) : undefined;
+
+  return rows?.map((row) => {
+    const row_ = Object.fromEntries(
+      Object.entries(row).filter(([key]) => key === "id" || input.columnSet.has(key)),
+    );
+
+    return row_;
+  }) as DatasetRecordEntry[];
+}
+
 export const useGetDatasetData = ({
   dataset,
   preview = false,
@@ -36,12 +89,7 @@ export const useGetDatasetData = ({
       // ADR-032 I-READY: a still-preparing/failed dataset read throws
       // PRECONDITION_FAILED. Don't retry that — treat it as "no rows yet" (the
       // hook returns `rows ?? []` below) instead of hammering the server.
-      retry: (failureCount, error) => {
-        if ((error as { data?: { code?: string } })?.data?.code === "PRECONDITION_FAILED") {
-          return false;
-        }
-        return failureCount < 3;
-      },
+      retry: retryUnlessPreparing,
       trpc: {
         context: {
           skipBatch: true,
@@ -54,42 +102,25 @@ export const useGetDatasetData = ({
       ? datasetDatabaseRecordsToInMemoryDataset(databaseDataset.data.dataset)
       : undefined;
 
-  const data: { records: DatasetRecordEntry[]; columnTypes: DatasetColumns } | undefined =
-    useMemo(() => {
-      if (dataset?.id) {
-        return databaseDataset_
-          ? {
-              records: databaseDataset_.datasetRecords,
-              columnTypes: databaseDataset_.columnTypes.slice(0, preview ? 5 : undefined),
-            }
-          : undefined;
-      }
-
-      if (dataset?.inline) {
-        return {
-          records: transposeColumnsFirstToRowsFirstWithId(dataset.inline.records),
-          columnTypes: dataset.inline.columnTypes,
-        };
-      }
-
-      return undefined;
-    }, [dataset?.id, dataset?.inline, databaseDataset_, preview]);
+  const data: { records: DatasetRecordEntry[]; columnTypes: DatasetColumns } | undefined = useMemo(
+    () =>
+      datasetView({
+        datasetId: dataset?.id,
+        inline: dataset?.inline,
+        loaded: databaseDataset_,
+        preview,
+      }),
+    [dataset?.id, dataset?.inline, databaseDataset_, preview],
+  );
 
   const columnSet = useMemo(() => {
     return new Set(data?.columnTypes.map((col) => col.name));
   }, [data?.columnTypes]);
 
-  const rows: DatasetRecordEntry[] | undefined = useMemo(() => {
-    const rows = data ? data.records.slice(0, preview ? 5 : undefined) : undefined;
-
-    return rows?.map((row) => {
-      const row_ = Object.fromEntries(
-        Object.entries(row).filter(([key]) => key === "id" || columnSet.has(key)),
-      );
-
-      return row_;
-    }) as DatasetRecordEntry[];
-  }, [data, preview, columnSet]);
+  const rows: DatasetRecordEntry[] | undefined = useMemo(
+    () => visibleRows({ data, preview, columnSet }),
+    [data, preview, columnSet],
+  );
 
   return {
     rows: rows ?? [],

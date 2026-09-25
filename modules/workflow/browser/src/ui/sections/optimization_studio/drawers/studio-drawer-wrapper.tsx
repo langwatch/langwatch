@@ -40,6 +40,12 @@ export type StudioDrawerWrapperProps = {
   footer?: React.ReactNode;
 };
 
+/** Escape collapses the expanded view first, unless an open popover should take the key. */
+function escapeCollapses(input: { key: string; expanded: boolean }): boolean {
+  const isPopoverOpen = document.querySelector(".chakra-popover__popper") !== null;
+  return input.key === "Escape" && input.expanded && !isPopoverOpen;
+}
+
 /**
  * StudioDrawerWrapper -- reusable drawer shell for the optimization studio.
  */
@@ -72,8 +78,7 @@ export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioD
   // Allow Escape to collapse the expanded view before closing.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isPopoverOpen = document.querySelector(".chakra-popover__popper") !== null;
-      if (e.key === "Escape" && propertiesExpanded && !isPopoverOpen) {
+      if (escapeCollapses({ key: e.key, expanded: propertiesExpanded })) {
         setPropertiesExpanded(false);
         e.stopPropagation();
         e.preventDefault();

@@ -55,6 +55,32 @@ function CurrentVersionDisplay() {
   );
 }
 
+type CommitMessageSeed =
+  | { kind: "clear"; previousVersionDsl: StudioWorkflow }
+  | { kind: "first-version" }
+  | { kind: "wait" }
+  | { kind: "none" };
+
+/**
+ * How the description starts: cleared (and auto-generated) once per new version, held until the
+ * model resolution answers so a slow query doesn't read as "not configured", or "First version".
+ */
+function commitMessageSeedFor(input: {
+  canSave: boolean;
+  previousVersionDsl: StudioWorkflow | undefined | null;
+  hasTriggered: boolean;
+  modelResolved: boolean;
+  hasPreviousVersion: boolean;
+}): CommitMessageSeed {
+  if (input.canSave && input.previousVersionDsl && !input.hasTriggered) {
+    return input.modelResolved
+      ? { kind: "clear", previousVersionDsl: input.previousVersionDsl }
+      : { kind: "wait" };
+  }
+  if (input.canSave && !input.hasPreviousVersion) return { kind: "first-version" };
+  return { kind: "none" };
+}
+
 export function NewVersionFields({
   canSaveOverride,
 }: {
@@ -138,10 +164,14 @@ export function NewVersionFields({
   );
 
   useEffect(() => {
-    if (canSave && previousVersionDsl && !hasTriggeredGeneration.current) {
-      // Hold the one-shot trigger until the model resolution answers,
-      // so a slow query doesn't read as "not configured".
-      if (!resolvedDefault.isFetched) return;
+    const seed = commitMessageSeedFor({
+      canSave,
+      previousVersionDsl,
+      hasTriggered: hasTriggeredGeneration.current,
+      modelResolved: resolvedDefault.isFetched,
+      hasPreviousVersion: !!previousVersion,
+    });
+    if (seed.kind === "clear") {
       hasTriggeredGeneration.current = true;
       userEditedCommitMessage.current = false;
       // No shouldValidate here: with no model to auto-fill the field,
@@ -153,10 +183,10 @@ export function NewVersionFields({
       if (isModelConfigured) {
         generateCommitMessageTimerRef.current = setTimeout(() => {
           generateCommitMessageTimerRef.current = null;
-          debouncedGenerateCommitMessage(previousVersionDsl, getWorkflow());
+          debouncedGenerateCommitMessage(seed.previousVersionDsl, getWorkflow());
         }, 0);
       }
-    } else if (canSave && !previousVersion) {
+    } else if (seed.kind === "first-version") {
       form.setValue("commitMessage", "First version", {
         shouldDirty: true,
         shouldValidate: true,
