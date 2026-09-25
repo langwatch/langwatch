@@ -46,10 +46,8 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   },
 }));
 
-import {
-  isSessionMarked,
-  useAnnotationQueueSessionStore,
-} from "../../../../../../behavior/annotation-queue-session.store.ts";
+import { isSessionMarked, useAnnotationQueueSessionStore } from "@langwatch/trace-browser-kit";
+
 import { useDrawerStore } from "../../../../../../behavior/drawer.store.ts";
 import { useTraceEditStore } from "../../../../../../behavior/trace-edit.store.ts";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";

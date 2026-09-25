@@ -328,6 +328,11 @@ export type TraceApiMap = {
       query: { input: TraceScope; output: SharedTraceDto["evaluations"] };
     };
 
+    /** One trace, whole: the queue conversation's only turn when its thread answers with none. */
+    getById: {
+      query: { input: TraceScope; output: Trace };
+    };
+
     /** What an evaluation was run over, for the evaluation cards. */
     getEvaluationInputs: {
       query: {

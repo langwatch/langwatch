@@ -557,11 +557,27 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
     }
   })
 
+  .procedure("facets")
+  .withPermission("traces:view")
+  .handle(async ({ app, input }) =>
+    discoverResultSchema.parse(
+      await app.readFilteredFacets({
+        projectId: input.projectId,
+        timeRange: input.timeRange,
+        query: input.query ?? "",
+        evalRuns: await app.findExplorerEvalRuns({
+          projectId: input.projectId,
+          evalRuns: input.evalRuns,
+        }),
+      }),
+    ),
+  )
+
   .procedure("facetValues")
   .withPermission("traces:view")
-  .handle(({ app, input }) =>
+  .handle(async ({ app, input }) =>
     facetValuesResultSchema.parse(
-      app.readFacetValues({
+      await app.readFacetValues({
         tenantId: input.projectId,
         timeRange: input.timeRange,
         facetKey: input.facetKey,
@@ -662,11 +678,18 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
     return { traceId: input.traceId, newName: parsed.data.newName };
   })
 
+  .procedure("changeMetadata")
+  .withPermission("traces:update")
+  .handle(async ({ app, input }) => {
+    await app.updateTraceMetadata(input);
+    return { traceId: input.traceId };
+  })
+
   .procedure("evals")
   .withPermission("traces:view")
-  .handle(({ app, input }) =>
+  .handle(async ({ app, input }) =>
     tracesEvaluationRunsSchema.parse(
-      app.readEvaluationRuns({ tenantId: input.projectId, traceId: input.traceId }),
+      await app.readEvaluationRuns({ tenantId: input.projectId, traceId: input.traceId }),
     ),
   )
 

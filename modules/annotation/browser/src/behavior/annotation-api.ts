@@ -5,7 +5,6 @@
 
 import type { annotationScoreTrpc, annotationTrpc } from "@langwatch/annotation-contract";
 import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
-import type { Trace } from "@langwatch/trace-contract";
 
 import type { AnnotationTrace } from "../model/annotation-row.ts";
 
@@ -23,14 +22,6 @@ export type AnnotationOrganizationMember = {
  */
 type BorrowedProcedures = {
   traces: {
-    /** One trace, whole: the walker's fallback when a thread answers with no turns. */
-    getById: {
-      query: {
-        input: ProjectScope & { traceId: string };
-        output: Trace;
-      };
-    };
-
     /**
      * The traces behind a set of annotations, for the input/output columns.
      * `AnnotationTrace` narrows the trace to the three fields a row renders,

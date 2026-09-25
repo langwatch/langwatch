@@ -83,6 +83,12 @@ export abstract class AnnotationHostApi {
 
   abstract navigate(to: string): void;
 
+  /** Opens a drawer another module registered, by the name the address bar carries. */
+  abstract openDrawer(name: string, params?: Readonly<Record<string, unknown>>): void;
+
+  /** Whether that drawer is the one open right now. */
+  abstract isDrawerOpen(name: string): boolean;
+
   abstract succeeded(notice: AnnotationSuccessNotice): void;
 
   abstract failed(failure: AnnotationFailureNotice): void;

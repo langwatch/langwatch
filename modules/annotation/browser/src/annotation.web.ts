@@ -50,6 +50,12 @@ export const annotationWeb = defineWebModule("annotation")
       within: "project",
       load: annotationList("mine"),
     },
+    // Before `[slug]`, so the reviewer's own queue is never read as a queue slug.
+    "pages/[project]/annotations/my-queue": {
+      path: "/:project/annotations/my-queue",
+      within: "project",
+      load: () => import("./ui/sections/annotation-queue-walker.tsx"),
+    },
     "pages/[project]/annotations/[slug]": {
       path: "/:project/annotations/:slug",
       within: "project",

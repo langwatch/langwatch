@@ -40,8 +40,11 @@ describe("the tracked-event family", () => {
       expect(alias.routes[0]!.permission).toBe(canonical.permission);
     });
 
-    it("stays out of the published document", () => {
-      expect(trackedEventLegacyPathRest.router().routes[0]!.docs?.hide).toBe(true);
+    it("is published under Events, as main documented it", () => {
+      const docs = trackedEventLegacyPathRest.router().routes[0]!.docs;
+
+      expect(docs?.hide).toBeUndefined();
+      expect(docs?.tags).toEqual(["Events"]);
     });
   });
 });

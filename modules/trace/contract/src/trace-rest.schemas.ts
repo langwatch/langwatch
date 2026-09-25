@@ -8,7 +8,9 @@ import { flexibleDateSchema } from "@langwatch/api/dates";
 import { Temporal, toEpochMs } from "@langwatch/time";
 import { z } from "zod";
 
+import { traceSchema } from "./trace-format.schemas.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
+import { discoverResultSchema } from "./trace-list-view.ts";
 import { projectionRequestSchema, type ProjectionRequest } from "./trace-projection.types.ts";
 
 /** Longest `filter` string the boundary accepts; a shape ceiling, not a cost one. */
@@ -126,6 +128,27 @@ export type TraceSearchBody = ProjectionRequest &
 export const traceLegacyIdParamsSchema = z.object({
   id: z.string().min(1).describe("The trace ID, or the thread ID on the thread read."),
 });
+
+/** `GET /api/trace/:id` in json format: the trace, its evaluations, the span tree as text. */
+export const traceLegacyReadResponseSchema = z.object({
+  ...traceSchema.shape,
+  ascii_tree: z.string(),
+});
+
+/** `POST /api/trace/search`: the page of traces and the scroll to the next one. */
+export const traceLegacySearchResponseSchema = z.object({
+  traces: z.array(traceSchema),
+  pagination: z.object({ totalHits: z.number(), scrollId: z.string().nullish() }),
+});
+
+/** `POST /api/trace/:id/share`: the public path the trace now answers at. */
+export const traceLegacyShareResponseSchema = z.object({
+  status: z.literal("success"),
+  path: z.string(),
+});
+
+/** `POST /api/trace/:id/unshare`: the public path is gone. */
+export const traceLegacyUnshareResponseSchema = z.object({ status: z.literal("success") });
 
 export const traceIdParamsSchema = z.object({
   traceId: z
@@ -289,8 +312,22 @@ export const traceFacetValuesResponseSchema = z.object({
 });
 
 /**
- * `GET /facets` answers one of two shapes depending on `field` - the
- * discovery payload or one field's paged values - too open to enumerate as
- * one strict schema; the precise per-shape docs live on the route.
+ * `GET /facets` answers one of two shapes depending on `field`, which the route's output
+ * validator cannot name as one object; the union below is what its docs publish.
  */
 export const traceFacetsResponseSchema = z.object({}).passthrough();
+
+/** `GET /facets`: the discovery payload without `field`, one field's paged values with it. */
+export const traceFacetsAnswerSchema = z.union([
+  z.object({
+    ...discoverResultSchema.shape,
+    pending: z
+      .boolean()
+      .describe(
+        "True when the payload is still being computed and what you have is the last committed one, possibly empty. Call again shortly.",
+      ),
+  }),
+  traceFacetValuesResponseSchema,
+]);
+
+export type TraceFacetsAnswer = z.infer<typeof traceFacetsAnswerSchema>;

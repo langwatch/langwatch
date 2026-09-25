@@ -161,6 +161,14 @@ export const trackedEventLegacyPathRest = defineRestRouter(TrackedEventApi)
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withPermission("traces:create")
   .withOutput(trackEventResponseSchema)
-  .withDocs({ hide: true })
+  .withDocs({
+    summary: "Track an event (legacy path)",
+    description:
+      "Record a customer event against a trace or thread. Identical to `POST /api/events/track`, " +
+      "which is the path to use in new integrations; this one stays for callers written against it. " +
+      "Supply `event_id` yourself to make the call idempotent.",
+    tags: ["Events"],
+    requestBody: { schema: trackEventRESTParamsValidatorSchema },
+  })
   .handle(recordTrackedEvent)
   .build();

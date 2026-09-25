@@ -108,11 +108,9 @@ vi.mock("../chat-turn-row.tsx", () => ({
   ),
 }));
 
+import { isSessionMarked, useAnnotationQueueSessionStore } from "@langwatch/trace-browser-kit";
+
 import { useAnnotationDraftStore } from "../../../../../../behavior/annotation-draft.store.ts";
-import {
-  isSessionMarked,
-  useAnnotationQueueSessionStore,
-} from "../../../../../../behavior/annotation-queue-session.store.ts";
 import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids.ts";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
 import { AnnotatedTurnRow } from "../annotated-turn-row.tsx";

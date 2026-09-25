@@ -106,7 +106,8 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-import { useAnnotationQueueSessionStore } from "../../../../behavior/annotation-queue-session.store.ts";
+import { useAnnotationQueueSessionStore } from "@langwatch/trace-browser-kit";
+
 import { clearDrawerStack, useDrawer } from "../../../../behavior/use-drawer.ts";
 import { AddDatasetRecordDrawer } from "../add-dataset-record-drawer.tsx";
 

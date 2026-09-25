@@ -53,7 +53,7 @@ export const routeSearchInputSchema = z.object({
   projectId: z.string(),
   /** The whole submitted text: bare words plus any explicit terms. */
   text: z.string().min(1).max(2000),
-  timeRange: z.object({ from: z.number(), to: z.number() }),
+  timeRange: z.object({ from: z.number(), to: z.number(), live: z.boolean().optional() }),
   /** The query applied before this submit, for context only. */
   activeQuery: z.string().max(2000).default(""),
   /** The lens the search ran in; the Conversations lens judges threads. */

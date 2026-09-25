@@ -18,6 +18,7 @@ import {
   namedTopicCountsSchema,
   tracesForProjectResultSchema,
 } from "./trace-read.contract.ts";
+import { traceMetadataResponseSchema, traceMetadataUpdateSchema } from "./trace-rest.schemas.ts";
 import { routeSearchInputSchema, routeSearchResultSchema } from "./trace-search-route.ts";
 import {
   spanDetailSchema,
@@ -338,6 +339,18 @@ export const tracesTrpc = defineTrpcContract("traces")
   )
   .withOutput(discoverResultSchema)
 
+  /** Main's facet counts under a query: every facet exempt from its own terms. */
+  .query("facets")
+  .withInput(
+    z.object({
+      projectId: z.string(),
+      timeRange: timeRangeSchema,
+      query: z.string().nullish(),
+      evalRuns: explorerInstantEvalRunsSchema,
+    }),
+  )
+  .withOutput(discoverResultSchema)
+
   /**
    * Pushes `discover_updated` when a tenant's facet payload finishes
    * background refresh, so the client invalidates its TanStack cache and
@@ -418,6 +431,16 @@ export const tracesTrpc = defineTrpcContract("traces")
     }),
   )
   .withOutput(tracesChangedNameSchema)
+
+  .mutation("changeMetadata")
+  .withInput(
+    z.object({
+      projectId: z.string(),
+      traceId: z.string(),
+      metadata: traceMetadataUpdateSchema,
+    }),
+  )
+  .withOutput(traceMetadataResponseSchema)
 
   .query("evals")
   .withInput(

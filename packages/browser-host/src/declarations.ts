@@ -76,6 +76,22 @@ export type UiTracePreviewHoverCardProps = {
   children: ReactNode;
 };
 
+/** What annotation's queue walker hands the conversation trace lends it. */
+export type UiAnnotationQueueConversationProps = {
+  /** The trace the queue item names; its turn is the one under review. */
+  traceId: string;
+  /** The thread that trace belongs to, or null for a trace in no thread. */
+  conversationId: string | null;
+};
+
+/** What a screen hands trace's way into correcting one trace. */
+export type UiTraceEditButtonProps = {
+  traceId: string;
+  /** When the trace started, so the drawer reads its partition; null when unknown. */
+  occurredAtMs: number | null;
+  disabled?: boolean;
+};
+
 /** What a screen hands trace's input/output viewer. */
 export type UiRenderInputOutputProps = {
   value: unknown;
@@ -142,6 +158,7 @@ export type UiSignInMethodLinking = {
  * to fill it: the CORE side of the contract, as `UiSlotProps` is for slots.
  */
 export type UiDeclaredCapabilities = {
+  annotationQueueConversation: UiDeclaredComponent<UiAnnotationQueueConversationProps>;
   /** A card on the Authentication overview; `section` places it, sign-in first. */
   authenticationOverviewCard: UiDeclaredComponent<UiAuthenticationOverviewCardProps> & {
     readonly section?: "sign-in" | "provisioning";
@@ -154,6 +171,7 @@ export type UiDeclaredCapabilities = {
   renderInputOutput: UiDeclaredComponent<UiRenderInputOutputProps>;
   setupWithAgentButton: UiDeclaredComponent<UiSetupWithAgentButtonProps>;
   signInMethodLinking: UiDeclaredOperations<UiSignInMethodLinking>;
+  traceEditButton: UiDeclaredComponent<UiTraceEditButtonProps>;
   traceIdPeek: UiDeclaredComponent<UiTraceIdPeekProps>;
   tracePreviewHoverCard: UiDeclaredComponent<UiTracePreviewHoverCardProps>;
   twoStepVerification: UiDeclaredOperations<UiTwoStepCeremonies>;

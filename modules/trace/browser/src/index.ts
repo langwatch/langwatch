@@ -21,7 +21,6 @@ export * from "./ui/sections/trace-find-bar.tsx";
 export * from "./model/preview-trace-id.ts";
 export * from "./model/trace-freshness.ts";
 export * from "./behavior/annotation-draft.store.ts";
-export * from "./behavior/annotation-queue-session.store.ts";
 export * from "./behavior/annotation-session.store.ts";
 export * from "./behavior/drawer.store.ts";
 export * from "./behavior/facet-lens.store.ts";

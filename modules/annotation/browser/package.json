@@ -41,6 +41,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/organization-browser": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/trace-browser-kit": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
     "diff": "catalog:",

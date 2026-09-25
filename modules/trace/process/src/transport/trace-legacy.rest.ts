@@ -2,6 +2,7 @@ import { publicRoute } from "@langwatch/api/access";
 import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
+  resolver,
   type RestCredentialPrincipal,
 } from "@langwatch/api/rest";
 import type { HandledError } from "@langwatch/handled-error";
@@ -11,6 +12,10 @@ import { toEpochMs } from "@langwatch/time";
 import {
   traceFormatQuerySchema,
   traceLegacyIdParamsSchema,
+  traceLegacyReadResponseSchema,
+  traceLegacySearchResponseSchema,
+  traceLegacyShareResponseSchema,
+  traceLegacyUnshareResponseSchema,
   type Evaluation,
   type Span,
   type Trace,
@@ -32,6 +37,7 @@ import {
   traceDoorRefusalBody,
   traceDoorRefusalStatus,
 } from "#rules/trace-ingest-refusal.rules";
+import { traceLegacySearchBodySchema } from "#rules/trace-legacy-search-body.rules";
 /**
  * Deprecated trace family (v0): GET /api/trace/:id, share/unshare/search, thread.
  * Declared public, resolves own credential, checks permissions in handler. Literal
@@ -440,7 +446,16 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   .withQuery(traceFormatQuerySchema)
   .withAccess(publicRoute({ reason: READ_REASON }))
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
-  .withDocs({ hide: true })
+  .withDocs({
+    description: "Returns single trace details based on the ID supplied",
+    tags: ["Traces"],
+    responses: {
+      200: {
+        description: "Trace details with spans and evaluations",
+        content: { "application/json": { schema: resolver(traceLegacyReadResponseSchema) } },
+      },
+    },
+  })
   .handle(async ({ app, input, request, response }) =>
     response.write(
       await authorised({ app, request, permission: "traces:view" }, (auth) =>
@@ -457,7 +472,16 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   .withParams(traceLegacyIdParamsSchema)
   .withAccess(publicRoute({ reason: SHARE_REASON }))
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
-  .withDocs({ hide: true })
+  .withDocs({
+    description: "Returns a public path for a trace",
+    tags: ["Traces"],
+    responses: {
+      200: {
+        description: "Public path created",
+        content: { "application/json": { schema: resolver(traceLegacyShareResponseSchema) } },
+      },
+    },
+  })
   .handle(async ({ app, input, request, response }) =>
     response.write(
       await authorised({ app, request, permission: "traces:share" }, (auth) =>
@@ -470,7 +494,16 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   .withParams(traceLegacyIdParamsSchema)
   .withAccess(publicRoute({ reason: SHARE_REASON }))
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
-  .withDocs({ hide: true })
+  .withDocs({
+    description: "Deletes a public path for a trace",
+    tags: ["Traces"],
+    responses: {
+      200: {
+        description: "Public path deleted",
+        content: { "application/json": { schema: resolver(traceLegacyUnshareResponseSchema) } },
+      },
+    },
+  })
   .handle(async ({ app, input, request, response }) =>
     response.write(
       await authorised({ app, request, permission: "traces:share" }, (auth) =>
@@ -488,7 +521,18 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(publicRoute({ reason: READ_REASON }))
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
-  .withDocs({ hide: true })
+  .withDocs({
+    summary: "Search traces",
+    description: "Search for traces based on given criteria",
+    tags: ["Traces"],
+    requestBody: { schema: traceLegacySearchBodySchema },
+    responses: {
+      200: {
+        description: "Successful response",
+        content: { "application/json": { schema: resolver(traceLegacySearchResponseSchema) } },
+      },
+    },
+  })
   .handle(async ({ app, raw, request, response }) =>
     response.write(
       await authorised({ app, request, permission: "traces:view" }, (auth) =>

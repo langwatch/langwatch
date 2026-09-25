@@ -53,6 +53,9 @@
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
+      "path": "../../trace/browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../trace/contract/tsconfig.build.json"
     },
     {

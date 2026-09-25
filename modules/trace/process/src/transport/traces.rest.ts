@@ -20,6 +20,8 @@ import {
   discoverResultSchema,
   traceFacetsQuerySchema,
   traceFacetsResponseSchema,
+  traceFacetsAnswerSchema,
+  type TraceFacetsAnswer,
   traceFacetValuesResponseSchema,
   traceFormatQuerySchema,
   traceIdParamsSchema,
@@ -103,7 +105,7 @@ async function answerTraceFacets({
   input: TraceFacetsQuery;
   scope: { id: string };
   caller: { apiKeyId: string | null; userId: string | null };
-}): Promise<Record<string, unknown>> {
+}): Promise<TraceFacetsAnswer> {
   const { field, prefix, limit, offset, startDate, endDate } = input;
   // One clock read for both ends: two calls landing in different
   // milliseconds would run the default window over a day.
@@ -419,10 +421,21 @@ export function createTracesRest(): Readonly<{
     .withOutput(traceFacetsResponseSchema)
     .withMiddleware(projectRestFacts, tracesRestCredential)
     .withDocs({
+      summary: "Discover what the trace filter fields hold",
       description:
         "Discover what the trace filter fields hold in this project. Without `field`, " +
         "every facet with its top values. With `field`, that field's values, paged.",
-      responses: FACETS_ERROR_ANSWERS,
+      tags: ["Traces"],
+      responses: {
+        200: {
+          description:
+            "Without `field`, every facet the project has with its top values and whether the " +
+            "payload is still being computed. With `field`, that field's values and counts plus " +
+            "the distinct total and whether more remain.",
+          content: { "application/json": { schema: resolver(traceFacetsAnswerSchema) } },
+        },
+        ...FACETS_ERROR_ANSWERS,
+      },
     })
     .handle(async ({ app, input, scope }, _project, caller) =>
       answerTraceFacets({ app, input, scope, caller }),

@@ -22,6 +22,8 @@ export type StubAnnotationHostOptions = {
   isLiteMember?: boolean;
   isOwnPersonalWorkspace?: boolean;
   route?: AnnotationRouteReading;
+  /** The drawer the address bar has open, if any. */
+  openDrawer?: string;
 };
 
 /** A host that answers from fixtures and records everything it is told. */
@@ -30,9 +32,13 @@ export class StubAnnotationHost extends AnnotationHostApi {
   readonly failures: AnnotationFailureNotice[] = [];
   readonly navigations: string[] = [];
   readonly queries: Readonly<Record<string, string | undefined>>[] = [];
+  readonly drawers: { name: string; params?: Readonly<Record<string, unknown>> }[] = [];
+  /** The drawer the address bar names; a test clears it to close the drawer. */
+  openDrawerName: string | undefined;
 
   constructor(private readonly options: StubAnnotationHostOptions = {}) {
     super();
+    this.openDrawerName = options.openDrawer;
   }
 
   project(): AnnotationHostProject | undefined {
@@ -75,6 +81,15 @@ export class StubAnnotationHost extends AnnotationHostApi {
 
   navigate(to: string): void {
     this.navigations.push(to);
+  }
+
+  openDrawer(name: string, params?: Readonly<Record<string, unknown>>): void {
+    this.drawers.push(params ? { name, params } : { name });
+    this.openDrawerName = name;
+  }
+
+  isDrawerOpen(name: string): boolean {
+    return this.openDrawerName === name;
   }
 
   succeeded(notice: AnnotationSuccessNotice): void {

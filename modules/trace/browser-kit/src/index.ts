@@ -1,3 +1,4 @@
+export * from "./behavior/annotation-queue-session.store.ts";
 export * from "./expand-context.ts";
 export * from "./model/bubble-tones.ts";
 export * from "./explorer-link-lens.ts";

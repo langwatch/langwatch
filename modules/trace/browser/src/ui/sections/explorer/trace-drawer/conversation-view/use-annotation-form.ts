@@ -13,9 +13,9 @@ import {
   describeAnnotationAnchor,
 } from "@langwatch/annotation-contract";
 import { toaster } from "@langwatch/design-system/toaster";
+import { useAnnotationQueueSessionStore } from "@langwatch/trace-browser-kit";
 import { useEffect, useMemo, useState } from "react";
 
-import { useAnnotationQueueSessionStore } from "../../../../../behavior/annotation-queue-session.store.ts";
 import { useAnnotationSessionStore } from "../../../../../behavior/annotation-session.store.ts";
 import { api } from "../../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";

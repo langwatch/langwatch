@@ -4216,6 +4216,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/trace-browser-kit':
+        specifier: workspace:*
+        version: link:../../trace/browser-kit
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract

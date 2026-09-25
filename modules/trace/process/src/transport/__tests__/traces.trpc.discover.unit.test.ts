@@ -35,10 +35,17 @@ function harness() {
     pending: false,
   }));
   const findExplorerEvalRuns = vi.fn<TraceApi["findExplorerEvalRuns"]>(async () => []);
+  const readFacetValues = vi.fn<TraceApi["readFacetValues"]>(async () => ({
+    values: [{ value: "error", count: 4 }],
+    totalDistinct: 1,
+  }));
+  const updateTraceMetadata = vi.fn<TraceApi["updateTraceMetadata"]>(async () => {});
   const app = createApiFixture<TraceApi>({
     readDiscover,
     readFilteredFacets,
     findExplorerEvalRuns,
+    readFacetValues,
+    updateTraceMetadata,
   });
 
   const trpc = initTRPC.context<TestContext>().create();
@@ -72,6 +79,7 @@ function harness() {
     caller: router.createCaller({ actor: { id: "reader-1" } }),
     readDiscover,
     readFilteredFacets,
+    updateTraceMetadata,
   };
 }
 
@@ -126,6 +134,53 @@ describe("given an active query", () => {
         }),
       );
       expect(readDiscover).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given main's `facets` procedure", () => {
+  describe("when a caller reads the counts with no query", () => {
+    it("counts under an empty query", async () => {
+      const { caller, readDiscover, readFilteredFacets } = harness();
+
+      await expect(
+        caller.facets({ projectId: PROJECT_ID, timeRange: TIME_RANGE }),
+      ).resolves.toEqual({ facets: [FACET], pending: false });
+      expect(readFilteredFacets).toHaveBeenCalledWith(expect.objectContaining({ query: "" }));
+      expect(readDiscover).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given a facet drilldown", () => {
+  describe("when the sidebar pages one facet's values", () => {
+    it("answers the values the read resolved", async () => {
+      const { caller } = harness();
+
+      await expect(
+        caller.facetValues({ projectId: PROJECT_ID, timeRange: TIME_RANGE, facetKey: "status" }),
+      ).resolves.toEqual({ values: [{ value: "error", count: 4 }], totalDistinct: 1 });
+    });
+  });
+});
+
+describe("given main's `changeMetadata` procedure", () => {
+  describe("when a caller changes a trace's metadata", () => {
+    it("records the metadata and answers the trace id", async () => {
+      const { caller, updateTraceMetadata } = harness();
+
+      await expect(
+        caller.changeMetadata({
+          projectId: PROJECT_ID,
+          traceId: "trace-1",
+          metadata: { customer_id: "c-1" },
+        }),
+      ).resolves.toEqual({ traceId: "trace-1" });
+      expect(updateTraceMetadata).toHaveBeenCalledWith({
+        projectId: PROJECT_ID,
+        traceId: "trace-1",
+        metadata: { customer_id: "c-1" },
+      });
     });
   });
 });

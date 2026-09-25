@@ -12,6 +12,7 @@ import {
   type UiRoute,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -34,6 +35,10 @@ class CapabilityAnnotationHost extends AnnotationHostApi {
       navigation: UiNavigation;
       route: UiRoute;
       feedback: UiFeedback;
+      drawers: {
+        openDrawer: (drawer: string, props?: Record<string, unknown>) => void;
+        drawerOpen: (drawer: string) => boolean;
+      };
     },
   ) {
     super();
@@ -83,6 +88,14 @@ class CapabilityAnnotationHost extends AnnotationHostApi {
     this.deps.navigation.navigate(to);
   }
 
+  openDrawer(name: string, params?: Readonly<Record<string, unknown>>): void {
+    this.deps.drawers.openDrawer(name, params ? { ...params } : void 0);
+  }
+
+  isDrawerOpen(name: string): boolean {
+    return this.deps.drawers.drawerOpen(name);
+  }
+
   succeeded(notice: AnnotationSuccessNotice): void {
     this.deps.feedback.succeeded(notice);
   }
@@ -104,6 +117,7 @@ export default function AnnotationHostMount({ children }: { children?: ReactNode
   const scopeHost = uiScope.scopeHost();
   const hostProject = scopeHost?.project();
   const isLiteMember = scopeHost?.organizationRole() === "EXTERNAL";
+  const { openDrawer, drawerOpen } = useDrawer();
 
   const host = useMemo(
     () =>
@@ -117,8 +131,19 @@ export default function AnnotationHostMount({ children }: { children?: ReactNode
         navigation,
         route,
         feedback,
+        drawers: { openDrawer, drawerOpen },
       }),
-    [organizationId, hostProject, isLiteMember, session, navigation, route, feedback],
+    [
+      organizationId,
+      hostProject,
+      isLiteMember,
+      session,
+      navigation,
+      route,
+      feedback,
+      openDrawer,
+      drawerOpen,
+    ],
   );
 
   return <AnnotationHostProvider value={host}>{children}</AnnotationHostProvider>;

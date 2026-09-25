@@ -6,10 +6,10 @@ import { Button, HStack, Text, useDisclosure, VStack } from "@chakra-ui/react";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { toaster } from "@langwatch/design-system/toaster";
 import { createLogger } from "@langwatch/observability/browser";
+import { useAnnotationQueueSessionStore } from "@langwatch/trace-browser-kit";
 import { type ComponentType, useEffect, useMemo, useRef, useState } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 
-import { useAnnotationQueueSessionStore } from "../../../behavior/annotation-queue-session.store.ts";
 import { api } from "../../../behavior/trace-api.ts";
 import { useDrawer } from "../../../behavior/use-drawer.ts";
 import { useLocalStorageSelectedDataSetId } from "../../../behavior/use-local-storage-selected-dataset-id.ts";
