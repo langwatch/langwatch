@@ -1,5 +1,5 @@
 /**
- * The passkey and two-step ceremonies auth lends through its declaration: the
+ * The passkey, two-step and linking ceremonies auth lends through its declaration: the
  * better-auth client stays auth's, and this workspace's host calls through.
  * ARCHITECTURE.md §10.1 "A capability travels by declaration", kit rule 7.
  */
@@ -11,6 +11,7 @@ import { useMemo } from "react";
 /** What auth lent, where it lent it; absent is what a composition without auth reads. */
 export type LentAuthCeremonies = {
   passkeys?: UiDeclaredCapabilities["passkeys"];
+  signInMethodLinking?: UiDeclaredCapabilities["signInMethodLinking"];
   twoStepVerification?: UiDeclaredCapabilities["twoStepVerification"];
 };
 
@@ -19,6 +20,7 @@ export function useLentAuthCeremonies(): LentAuthCeremonies {
   return useMemo(
     () => ({
       passkeys: declarations.declared("passkeys")[0]?.capability,
+      signInMethodLinking: declarations.declared("signInMethodLinking")[0]?.capability,
       twoStepVerification: declarations.declared("twoStepVerification")[0]?.capability,
     }),
     [declarations],

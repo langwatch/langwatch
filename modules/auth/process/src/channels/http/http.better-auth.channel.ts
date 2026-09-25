@@ -29,6 +29,10 @@ import { twoFactor } from "better-auth/plugins/two-factor";
 
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 import {
+  isTwoFactorPath,
+  TWO_FACTOR_REFUSAL_CODES,
+} from "../../rules/better-auth-error-code.rules.ts";
+import {
   findSubmittedAddresses,
   isLockoutCountedPath,
 } from "../../rules/sign-in-identifier-hash.rules.ts";
@@ -211,6 +215,33 @@ export async function countSignInAttempt({
       "could not record how a sign-in attempt went; the attempt itself already answered",
     );
   }
+}
+
+/**
+ * A two-factor refusal re-answered under its registered code, status and
+ * headers kept, so the browser's registry has words for it (main's
+ * handled-errors table). Server-side calls carry no request and stay untouched.
+ */
+export function answerTwoFactorRefusalByRegisteredCode(ctx: {
+  request?: { url?: string };
+  context?: { returned?: unknown };
+}): void {
+  const pathname = normalizedRequestPathname(ctx.request?.url ?? "");
+  if (!isTwoFactorPath(pathname)) return;
+
+  const returned = ctx.context?.returned;
+  if (!(returned instanceof APIError)) return;
+
+  const betterAuthCode = returned.body?.code;
+  const code =
+    betterAuthCode === undefined ? undefined : TWO_FACTOR_REFUSAL_CODES.get(betterAuthCode);
+  if (code === undefined) return;
+
+  logger.warn(
+    { path: pathname, betterAuthCode, code },
+    "a two-factor endpoint refused, and it is answered under its registered code",
+  );
+  throw APIError.from(returned.status, { code, message: code });
 }
 
 /**
@@ -626,9 +657,22 @@ export const createAuthOptions = ({
      *  endpoint has already answered. */
     after: createAuthMiddleware(async (ctx) => {
       await countSignInAttempt({ ctx, signInLockout });
+      answerTwoFactorRefusalByRegisteredCode(ctx);
     }),
   },
 });
+
+/**
+ * Two-step verification as main mounts it: an account holding no password (a
+ * passkey sign-up) sets it up without one, and backup codes are stored encrypted.
+ */
+export function twoFactorPlugin(): ReturnType<typeof twoFactor> {
+  return twoFactor({
+    issuer: "LangWatch",
+    allowPasswordless: true,
+    backupCodeOptions: { storeBackupCodes: "encrypted" },
+  });
+}
 
 /**
  * The generic-OIDC plugin, mounted only when this deployment configured a connection for
@@ -809,7 +853,7 @@ export const createBetterAuthTransport = ({
     ...authOptions,
     plugins: [
       ...genericOAuthPlugins(deployment),
-      ...(deployment.mfaEnrollmentOpen ? [twoFactor()] : []),
+      ...(deployment.mfaEnrollmentOpen ? [twoFactorPlugin()] : []),
       ...(deployment.passkeysEnabled
         ? [
             passkey({

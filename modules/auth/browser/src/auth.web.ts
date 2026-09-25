@@ -54,4 +54,8 @@ export const authWeb = defineWebModule("auth")
     passkeys: { load: () => import("./behavior/passkey-capability.ts") },
     /** Setting two-step verification up, and fresh backup codes. */
     twoStepVerification: { load: () => import("./behavior/two-step-capability.ts") },
+    /** Linking another sign-in method to the reader's own account. */
+    signInMethodLinking: {
+      load: () => import("./behavior/sign-in-method-linking-capability.ts"),
+    },
   });

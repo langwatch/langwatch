@@ -119,7 +119,7 @@ export type UiPasskeyCeremonies = {
 };
 /** The value, or the refusal as the endpoint answered it, for the registry to read by code. */
 export type UiTwoStepAnswer<Value> = { ok: true; value: Value } | { ok: false; error: unknown };
-/** What auth lends for setting two-step verification up; no password where the account holds none. */
+/** What auth lends for setting two-step verification up; no password where the account has none. */
 export type UiTwoStepCeremonies = {
   start(input: {
     password?: string;
@@ -128,6 +128,13 @@ export type UiTwoStepCeremonies = {
   regenerateBackupCodes(input: {
     password?: string;
   }): Promise<UiTwoStepAnswer<{ backupCodes: readonly string[] }>>;
+};
+
+/** How linking a further sign-in method ended; `reason` is the provider's refusal to show. */
+export type UiLinkSignInMethodOutcome = { ok: true } | { ok: false; reason?: string };
+/** What auth lends for linking another sign-in method to the reader's own account. */
+export type UiSignInMethodLinking = {
+  link(input: { provider: string }): Promise<UiLinkSignInMethodOutcome>;
 };
 
 /**
@@ -146,6 +153,7 @@ export type UiDeclaredCapabilities = {
   passkeys: UiDeclaredOperations<UiPasskeyCeremonies>;
   renderInputOutput: UiDeclaredComponent<UiRenderInputOutputProps>;
   setupWithAgentButton: UiDeclaredComponent<UiSetupWithAgentButtonProps>;
+  signInMethodLinking: UiDeclaredOperations<UiSignInMethodLinking>;
   traceIdPeek: UiDeclaredComponent<UiTraceIdPeekProps>;
   tracePreviewHoverCard: UiDeclaredComponent<UiTracePreviewHoverCardProps>;
   twoStepVerification: UiDeclaredOperations<UiTwoStepCeremonies>;

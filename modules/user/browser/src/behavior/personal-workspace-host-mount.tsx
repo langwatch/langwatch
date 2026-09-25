@@ -234,8 +234,12 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
     return ceremonies.regenerateBackupCodes(input);
   }
 
-  async linkSignInMethod(): Promise<LinkSignInMethodOutcome> {
-    return { ok: false, reason: "Linking a sign-in method is not available here." };
+  async linkSignInMethod(provider: string): Promise<LinkSignInMethodOutcome> {
+    if (!this.lent.signInMethodLinking) {
+      return { ok: false, reason: "Linking a sign-in method is not available here." };
+    }
+    const { default: linking } = await this.lent.signInMethodLinking.load();
+    return linking.link({ provider });
   }
 
   /** No assistant hand-off capability exists; false/no-op is the honest reading. */

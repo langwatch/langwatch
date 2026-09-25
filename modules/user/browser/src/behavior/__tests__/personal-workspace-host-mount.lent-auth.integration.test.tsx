@@ -62,12 +62,17 @@ const twoStepVerification = {
   ),
 };
 
+const signInMethodLinking = {
+  link: vi.fn(async () => DONE),
+};
+
 const AUTH: UiDeclaringModule = {
   name: "auth",
   installation: {
     capabilities: {
       passkeys: { load: async () => ({ default: passkeys }) },
       twoStepVerification: { load: async () => ({ default: twoStepVerification }) },
+      signInMethodLinking: { load: async () => ({ default: signInMethodLinking }) },
     },
   },
 };
@@ -134,6 +139,15 @@ describe("given auth lends its ceremonies through its declaration", () => {
       expect(twoStepVerification.confirm).toHaveBeenCalledWith({ code: "123456" });
     });
   });
+
+  describe("when the reader links another sign-in method", () => {
+    it("starts the link through auth's ceremony for that provider", async () => {
+      const host = mountedHost([AUTH]);
+
+      expect(await host.linkSignInMethod("github")).toEqual({ ok: true });
+      expect(signInMethodLinking.link).toHaveBeenCalledWith({ provider: "github" });
+    });
+  });
 });
 
 describe("given a composition where nothing lends the ceremonies", () => {
@@ -143,5 +157,6 @@ describe("given a composition where nothing lends the ceremonies", () => {
     expect(await host.listPasskeys()).toEqual([]);
     expect(await host.registerPasskey()).toEqual({ ok: false, cancelled: false });
     expect((await host.startTwoStepSetup({})).ok).toBe(false);
+    expect((await host.linkSignInMethod("github")).ok).toBe(false);
   });
 });
