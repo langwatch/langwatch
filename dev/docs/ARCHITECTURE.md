@@ -1071,6 +1071,9 @@ never thinks about resolution at all. The per-module resolver adapters
 - A branch living in a handler moves into the module as an `*Api` operation carrying that logic
   unchanged; such a one-to-one move is approved in advance. An operation that adds behaviour or a new
   shape is still asked for (Alex, 2026-09-24).
+- A protocol door whose logic main kept in the handler takes the raw request as one `*Api` op
+  (`OtlpDoorRequest`: method, path, headers, body bytes) and returns its outcomes; the handler only renders
+  them. Shared door helpers live in the protocol's framework package (`@langwatch/otlp`) (Alex, 2026-09-26).
 - The **process** mounts declarations; `boot()` opens the hosts. A module
   never mounts anything.
 - **A route's documentation lives on the route, in its own `.withDocs()`
