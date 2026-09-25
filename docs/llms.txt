@@ -320,8 +320,6 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [LangGraph Instrumentation](https://langwatch.ai/docs/integration/typescript/integrations/langgraph.md): Instrument LangGraph applications with the LangWatch TypeScript SDK for deep observability and agent testing workflows.
 
 - [Vercel AI SDK](https://langwatch.ai/docs/integration/typescript/integrations/vercel-ai-sdk.md): Integrate the Vercel AI SDK with LangWatch for TypeScript-based tracing, token tracking, and real-time agent testing.
-- [LiteLLM Instrumentation](https://langwatch.ai/docs/integration/python/integrations/lite-llm.md): Instrument LiteLLM calls with the LangWatch Python SDK to capture LLM traces, measure quality, and support AI agent testing workflows.
-- [LiteLLM Proxy Integration](https://langwatch.ai/docs/integration/litellm-proxy.md): Trace every LLM call that goes through your LiteLLM Proxy in LangWatch, with tokens, cost, latency and optionally the messages, without touching your application code.
 - [OpenAI Agents SDK Instrumentation](https://langwatch.ai/docs/integration/python/integrations/open-ai-agents.md): Instrument OpenAI Agents with the LangWatch Python SDK to capture traces, run AI agent evaluations, and debug agent testing scenarios.
 - [PydanticAI Instrumentation](https://langwatch.ai/docs/integration/python/integrations/pydantic-ai.md): Connect PydanticAI applications to LangWatch using the Python SDK to trace calls, debug structured outputs, and improve AI agent evaluations.
 - [Mastra](https://langwatch.ai/docs/integration/typescript/integrations/mastra.md): LangWatch traces agents built with Mastra, the TypeScript agent framework.
@@ -384,6 +382,11 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Grok (xAI) Integration](https://langwatch.ai/docs/integration/go/integrations/grok.md): Instrument Grok (xAI) API calls in Go using LangWatch to capture traces and improve AI agent evaluations.
 - [Ollama (Local Models) Integration](https://langwatch.ai/docs/integration/go/integrations/ollama.md): Instrument local Ollama models in Go to monitor performance, debug RAG flows, and support AI agent testing environments.
 - [OpenRouter Integration](https://langwatch.ai/docs/integration/go/integrations/openrouter.md): Instrument OpenRouter model calls in Go with LangWatch to compare models, track quality, and run AI agent evaluations.
+
+### LiteLLM
+
+- [LiteLLM Proxy Integration](https://langwatch.ai/docs/integration/litellm-proxy.md): Trace every LLM call that goes through your LiteLLM Proxy in LangWatch, with tokens, cost, latency and optionally the messages, without touching your application code.
+- [LiteLLM Instrumentation](https://langwatch.ai/docs/integration/python/integrations/lite-llm.md): Instrument LiteLLM calls with the LangWatch Python SDK to capture LLM traces, measure quality, and support AI agent testing workflows.
 
 ## Tools
 

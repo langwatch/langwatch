@@ -493,8 +493,6 @@
                 ]
               },
               "integration/typescript/integrations/vercel-ai-sdk",
-              "integration/python/integrations/lite-llm",
-              "integration/litellm-proxy",
               "integration/python/integrations/open-ai-agents",
               "integration/python/integrations/pydantic-ai",
               "integration/typescript/integrations/mastra",
@@ -568,7 +566,14 @@
               "integration/go/integrations/groq",
               "integration/go/integrations/grok",
               "integration/go/integrations/ollama",
-              "integration/go/integrations/openrouter"
+              "integration/go/integrations/openrouter",
+              {
+                "group": "LiteLLM",
+                "pages": [
+                  "integration/litellm-proxy",
+                  "integration/python/integrations/lite-llm"
+                ]
+              }
             ]
           },
           {
