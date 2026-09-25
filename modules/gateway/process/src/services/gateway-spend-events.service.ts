@@ -1,4 +1,9 @@
-import type { GatewayUsageCount, SpendEventRow, SpendFilters } from "@langwatch/gateway-contract";
+import type {
+  GatewaySpendDay,
+  GatewayUsageCount,
+  SpendEventRow,
+  SpendFilters,
+} from "@langwatch/gateway-contract";
 
 import type {
   GatewaySpendEventsRepository,
@@ -59,6 +64,16 @@ export class GatewaySpendEventsService {
     toMs?: number;
   }): Promise<number> {
     return this.repository.sumCostNanoUsdByRequestType(input);
+  }
+
+  /** Main's governance metered-lane read, served by the ledger's owner. */
+  findSpendDaysForOrganizationProjects(input: {
+    tenantIds: readonly string[];
+    fromDay: string;
+    toDay: string;
+  }): Promise<GatewaySpendDay[]> {
+    if (input.tenantIds.length === 0) return Promise.resolve([]);
+    return this.repository.sumDaysForOrganizationProjects(input);
   }
 
   getEndUserSpend(input: {

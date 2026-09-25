@@ -23,6 +23,7 @@ import {
 
 import type { CostRollupWatchProcess } from "../eventing/cost-rollup-watch.process.ts";
 import { COST_ROLLUP_WATCH_PROCESS_NAME } from "../eventing/cost-rollup-watch.process.ts";
+import type { GovernanceCostRollupFoldProjection } from "../eventing/governance-cost-rollup.projection.ts";
 import type { PulledUsageLedgerProcess } from "../eventing/pulled-usage-ledger.process.ts";
 import { PULLED_USAGE_LEDGER_PROCESS_NAME } from "../eventing/pulled-usage-ledger.process.ts";
 
@@ -32,6 +33,12 @@ import { PULLED_USAGE_LEDGER_PROCESS_NAME } from "../eventing/pulled-usage-ledge
  * it is type-checked against the same set the pipeline registers.
  */
 type PulledUsageEvent = (PulledUsageObservedEvent & Event) | (PulledUsageRetractedEvent & Event);
+
+export type PulledUsageDefinition = StaticPipelineDefinition<
+  PulledUsageEvent,
+  Record<string, Projection>,
+  RegisteredCommand
+>;
 
 const RecordPulledUsageCommand = defineCommand({
   commandType: PULLED_USAGE_COMMAND_TYPES.RECORD,
@@ -59,6 +66,7 @@ export class PulledUsageEventingAdapter {
   private constructor(
     private readonly ledger: PulledUsageLedgerProcess | undefined,
     private readonly costRollupWatch: CostRollupWatchProcess | undefined,
+    private readonly costRollup: GovernanceCostRollupFoldProjection | undefined,
   ) {}
 
   static create(
@@ -66,20 +74,22 @@ export class PulledUsageEventingAdapter {
       ledger?: PulledUsageLedgerProcess;
       /** Absent in a deployment with no cost summary to check. */
       costRollupWatch?: CostRollupWatchProcess;
+      /** Main's `governanceCostRollup` fold; the worker hosts it, the api constructs none. */
+      costRollup?: GovernanceCostRollupFoldProjection;
     } = {},
   ): PulledUsageEventingAdapter {
-    return new PulledUsageEventingAdapter(options.ledger, options.costRollupWatch);
+    return new PulledUsageEventingAdapter(
+      options.ledger,
+      options.costRollupWatch,
+      options.costRollup,
+    );
   }
 
   static commandHandlers(): { recordPulledUsage: typeof RecordPulledUsageCommand } {
     return { recordPulledUsage: RecordPulledUsageCommand } as const;
   }
 
-  build(): StaticPipelineDefinition<
-    PulledUsageEvent,
-    Record<string, Projection>,
-    RegisteredCommand
-  > {
+  build(): PulledUsageDefinition {
     const pipeline = definePipeline({
       name: PULLED_USAGE_PIPELINE_NAME,
       aggregate: defineAggregate({
@@ -88,6 +98,9 @@ export class PulledUsageEventingAdapter {
     })
       .withEvents([pulledUsageObservedEventSchema, pulledUsageRetractedEventSchema])
       .withCommand("recordPulledUsage", RecordPulledUsageCommand);
+    if (this.costRollup) {
+      pipeline.withClickHouseFoldProjection(this.costRollup);
+    }
     if (this.ledger) {
       pipeline.withProcessManager(PULLED_USAGE_LEDGER_PROCESS_NAME, this.ledger.processManager());
     }

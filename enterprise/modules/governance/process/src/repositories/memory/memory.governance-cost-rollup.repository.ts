@@ -4,6 +4,8 @@ import {
   GOVERNANCE_COST_SOURCE,
   GovernanceCostRollupRepository,
   type GovernanceCostModelGroup,
+  type GovernanceCostRollupCellAddress,
+  type GovernanceCostRollupRow,
   type GovernanceCostPeriodRecordGroup,
   type GovernanceCostProviderDayGroup,
   type GovernanceCostRollupWindow,
@@ -90,8 +92,39 @@ function groupBy(
   );
 }
 
+function memoryCellOf(
+  row: GovernanceCostRollupCellAddress &
+    Pick<GovernanceCostRollupRow, "AmountNanoUsd" | "AmountNanoMinor">,
+): MemoryGovernanceCostCell {
+  return {
+    tenantId: row.TenantId,
+    day: row.Day,
+    costSource: row.CostSource,
+    ingestionSourceId: row.IngestionSourceId,
+    provider: row.Provider,
+    model: row.Model,
+    agentId: row.AgentId,
+    currencyCode: row.CurrencyCode,
+    rawActorId: row.RawActorId,
+    amountNanoUsd: row.AmountNanoUsd,
+    amountNanoMinor: row.AmountNanoMinor,
+  };
+}
+
+function parsePulledItems(json: string): Record<string, unknown> {
+  if (!json) return {};
+  try {
+    const parsed: unknown = JSON.parse(json);
+    return parsed !== null && typeof parsed === "object" ? { ...parsed } : {};
+  } catch {
+    return {};
+  }
+}
+
 export class MemoryGovernanceCostRollupRepository extends GovernanceCostRollupRepository {
   private readonly cells = new Map<string, MemoryGovernanceCostCell>();
+  private readonly rows = new Map<string, GovernanceCostRollupRow>();
+  private readonly restatementIndex = new Map<string, Set<string>>();
 
   static create(): MemoryGovernanceCostRollupRepository {
     return new MemoryGovernanceCostRollupRepository();
@@ -100,6 +133,28 @@ export class MemoryGovernanceCostRollupRepository extends GovernanceCostRollupRe
   /** The newest version of a cell replaces the one before it, as the table's collapse does. */
   seed(cell: MemoryGovernanceCostCell): void {
     this.cells.set(cellKey(cell), cell);
+  }
+
+  /** The newest write stands as the cell's surviving version, as the table's argMax collapse reads it. */
+  async upsert(row: GovernanceCostRollupRow): Promise<void> {
+    const cell = memoryCellOf(row);
+    this.rows.set(cellKey(cell), { ...row });
+    this.seed(cell);
+    const recorded = this.restatementIndex.get(row.TenantId) ?? new Set<string>();
+    for (const key of Object.keys(parsePulledItems(row.PulledItemsJson))) recorded.add(key);
+    this.restatementIndex.set(row.TenantId, recorded);
+  }
+
+  async findCellRows(cell: GovernanceCostRollupCellAddress): Promise<GovernanceCostRollupRow[]> {
+    const row = this.rows.get(
+      cellKey(memoryCellOf({ ...cell, AmountNanoUsd: null, AmountNanoMinor: 0 })),
+    );
+    return row ? [{ ...row }] : [];
+  }
+
+  /** The restatement keys the index holds for a tenant, as main's index table records them. */
+  findRestatementKeys({ tenantId }: { tenantId: string }): string[] {
+    return [...(this.restatementIndex.get(tenantId) ?? [])].toSorted();
   }
 
   async sumDaysByProvider(

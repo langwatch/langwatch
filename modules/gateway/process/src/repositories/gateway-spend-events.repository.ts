@@ -1,4 +1,9 @@
-import type { GatewayUsageCount, SpendEventRow, SpendFilters } from "@langwatch/gateway-contract";
+import type {
+  GatewaySpendDay,
+  GatewayUsageCount,
+  SpendEventRow,
+  SpendFilters,
+} from "@langwatch/gateway-contract";
 
 import type { GatewaySpendState } from "../eventing/gateway-spend.projection.ts";
 
@@ -131,6 +136,13 @@ export abstract class GatewaySpendEventsRepository {
     tokensOutputImage: number;
     imageCount: number;
   }>;
+
+  /** Main's `sumDaysForOrganizationProjects`: the metered lane per UTC day, oldest first. */
+  abstract sumDaysForOrganizationProjects(input: {
+    tenantIds: readonly string[];
+    fromDay: string;
+    toDay: string;
+  }): Promise<GatewaySpendDay[]>;
 
   /** The usage report's figures: one row per request at its latest status. */
   abstract countUsage(input: {

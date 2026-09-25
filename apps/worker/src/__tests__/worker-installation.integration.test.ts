@@ -152,6 +152,11 @@ describe("the worker process installation", () => {
       expect(pipelines).toContain("webhook_delivery");
       expect(pipelines).toContain("governance_events_processing");
       expect(pipelines).toContain("pulled_usage_processing");
+      expect(
+        eventing.definitions
+          .find((definition) => definition.metadata.name === "pulled_usage_processing")
+          ?.foldProjections.has("governanceCostRollup"),
+      ).toBe(true);
       expect(pipelines).toContain("ingestion_pull_processing");
       expect(pipelines).toContain("ingestion_pull_reconcile");
       expect(pipelines).toContain("blob_maintenance");

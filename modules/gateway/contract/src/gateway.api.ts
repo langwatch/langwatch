@@ -390,6 +390,15 @@ export interface GatewayUsageCount {
   readonly firstRequestAt?: number;
 }
 
+/** One UTC day of the metered lane: charged requests at their latest status, nano-USD. */
+export interface GatewaySpendDay {
+  readonly day: string;
+  readonly amountNanoUsd: number;
+  readonly requestCount: number;
+  readonly pricedRequestCount: number;
+  readonly requestsWithoutAmount: number;
+}
+
 export interface GatewayApi extends GatewayInternalProtocol {
   getAgentCacheEntry(input: {
     projectId: string;
@@ -741,6 +750,16 @@ export interface GatewayApi extends GatewayInternalProtocol {
     cursor?: { occurredAtMs: number; gatewayRequestId: string };
     limit?: number;
   }): Promise<GatewaySpendEventPage | null>;
+  /**
+   * The metered lane per UTC day across these tenants' ledgers, inclusive days,
+   * oldest first; none for no tenants or no ledger. Main's governance
+   * `sumDaysForOrganizationProjects`, served by the ledger's owner.
+   */
+  findSpendDaysForOrganizationProjects(input: {
+    tenantIds: readonly string[];
+    fromDay: string;
+    toDay: string;
+  }): Promise<GatewaySpendDay[]>;
   /** The usage report's figures (ADR-156, section 10). */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<GatewayUsageCount>;
 }

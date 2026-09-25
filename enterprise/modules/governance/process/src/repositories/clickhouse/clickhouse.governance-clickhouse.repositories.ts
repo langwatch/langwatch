@@ -11,7 +11,6 @@ import type {
   GovernanceClickHouseTenantResolver,
 } from "../governance.repositories.ts";
 import { ClickHouseAnomalySpendRepository } from "./clickhouse.anomaly-spend.repository.ts";
-import { ClickHouseGatewaySpendRepository } from "./clickhouse.gateway-spend.repository.ts";
 import { ClickHouseOcsfEventsRepository } from "./clickhouse.ocsf-events.repository.ts";
 import { ClickHousePersonalUsageRepository } from "./clickhouse.personal-usage.repository.ts";
 import { ClickHouseTraceActivityRepository } from "./clickhouse.trace-activity.repository.ts";
@@ -129,7 +128,6 @@ export class ClickHouseGovernanceRepositories {
       ocsfEvents: ClickHouseOcsfEventsRepository.create(clickhouse),
       traceActivity: ClickHouseTraceActivityRepository.create(clickhouse),
       personalUsage: ClickHousePersonalUsageRepository.create(clickhouse),
-      gatewaySpend: ClickHouseGatewaySpendRepository.create(clickhouse),
     };
   }
 }

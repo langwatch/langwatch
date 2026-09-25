@@ -10,7 +10,10 @@ import {
   type ErasureSuppressionCheck,
   NO_SUPPRESSION,
 } from "../rules/erasure-suppression.rules.ts";
-import type { SuppressionSnapshotData } from "./suppression-snapshot.service.ts";
+import type {
+  SuppressionSnapshotData,
+  SuppressionSnapshotService,
+} from "./suppression-snapshot.service.ts";
 
 /**
  * The check that makes an erasure hold (ADR-128 §9 step 1): what must never be re-imported,
@@ -111,5 +114,36 @@ export class ErasureSuppressionService {
       digestsByOrganization,
       organizationByTenant: new Map(tenants.map((row) => [row.tenantId, row.organizationId])),
     };
+  }
+
+  /** Main's `actorIdForRollupWrite`: the erased identifier's stand-in, substituted where the cell is keyed. */
+  actorIdForRollupWrite({
+    tenantId,
+    rawActorId,
+    snapshot,
+  }: {
+    tenantId: string;
+    rawActorId: string;
+    snapshot: Pick<
+      SuppressionSnapshotService,
+      "hasAnySuppressionForTenant" | "isSuppressedForTenant"
+    >;
+  }): string {
+    if (rawActorId === "") return rawActorId;
+    if (!snapshot.hasAnySuppressionForTenant(tenantId)) return rawActorId;
+    let secret: string;
+    try {
+      secret = getErasureSecret({ secret: this.erasureSecret });
+    } catch (error) {
+      if (!(error instanceof ErasureSecretMissingError)) throw error;
+      throw new Error(
+        `Governance area ${tenantId} belongs to an organization that has erased somebody, but this process has no erasure secret, so the stand-in cannot be computed. Writing the identifier as it stands would put an erased person's address into the daily cost table. Set the same value every other process uses.`,
+        { cause: error },
+      );
+    }
+    const identifierHash = erasureDigest({ secret, identifier: rawActorId });
+    return snapshot.isSuppressedForTenant({ tenantId, identifierHash })
+      ? identifierHash
+      : rawActorId;
   }
 }

@@ -2,7 +2,6 @@
 
 import type { GovernanceClickHouseRepositories } from "../governance.repositories.ts";
 import { MemoryAnomalySpendRepository } from "./memory.anomaly-spend.repository.ts";
-import { MemoryGatewaySpendRepository } from "./memory.gateway-spend.repository.ts";
 import { MemoryOcsfEventsRepository } from "./memory.ocsf-events.repository.ts";
 import { MemoryPersonalUsageRepository } from "./memory.personal-usage.repository.ts";
 import { MemoryTraceActivityRepository } from "./memory.trace-activity.repository.ts";
@@ -18,7 +17,6 @@ export class MemoryGovernanceClickHouseRepositories {
       ocsfEvents: MemoryOcsfEventsRepository.create(),
       traceActivity: MemoryTraceActivityRepository.create(),
       personalUsage: MemoryPersonalUsageRepository.create(),
-      gatewaySpend: MemoryGatewaySpendRepository.create(),
     };
   }
 }

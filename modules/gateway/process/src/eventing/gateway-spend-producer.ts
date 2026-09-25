@@ -51,6 +51,10 @@ class ProducerOnlyGatewaySpendEvents extends GatewaySpendEventsRepository {
     return Promise.reject(producerOnly(this.processName, "read one end user's spend"));
   }
 
+  sumDaysForOrganizationProjects(): Promise<never> {
+    return Promise.reject(producerOnly(this.processName, "sum the spend ledger by day"));
+  }
+
   countUsage(): Promise<never> {
     return Promise.reject(producerOnly(this.processName, "count the spend ledger"));
   }

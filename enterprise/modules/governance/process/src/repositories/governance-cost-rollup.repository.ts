@@ -3,6 +3,8 @@
 
 export const GOVERNANCE_COST_SOURCE = { GATEWAY: "gateway", PULLED: "pulled" } as const;
 export const GOVERNANCE_COST_CURRENCY_USD = "USD";
+export const GOVERNANCE_COST_ROLLUP_PROJECTION_NAME = "governanceCostRollup";
+export const GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST = "2026-08-28";
 
 /** Inclusive `YYYY-MM-DD` bounds on one tenant's pulled cells. */
 export interface GovernanceCostRollupWindow {
@@ -44,7 +46,59 @@ export interface GovernanceCostModelGroup {
   cellsWithoutAmount: number;
 }
 
+/** One stored version of a cell, as the fold writes it; the key columns lead. */
+export interface GovernanceCostRollupRow {
+  TenantId: string;
+  Day: string;
+  CostSource: string;
+  IngestionSourceId: string;
+  Provider: string;
+  Model: string;
+  AgentId: string;
+  CurrencyCode: string;
+  RawActorId: string;
+  OrganizationId: string;
+  ExactOrEstimate: string;
+  AmountNanoUsd: number | null;
+  AmountNanoMinor: number;
+  TokensInput: number;
+  TokensOutput: number;
+  TokensCacheRead: number;
+  TokensCacheWrite: number;
+  RequestCount: number;
+  RevisionCount: number;
+  PreviousAmountNanoUsd: number | null;
+  RevisedAt: number | null;
+  LastObservedAt: number;
+  PulledItemsJson: string;
+  Version: string;
+  AppliedEventIds: string[];
+  CreatedAt: number;
+  LastEventOccurredAt: number;
+  EventTimestamp: number;
+}
+
+/** The nine sort-key columns that address one cell. */
+export type GovernanceCostRollupCellAddress = Pick<
+  GovernanceCostRollupRow,
+  | "TenantId"
+  | "Day"
+  | "CostSource"
+  | "IngestionSourceId"
+  | "Provider"
+  | "Model"
+  | "AgentId"
+  | "CurrencyCode"
+  | "RawActorId"
+>;
+
 export abstract class GovernanceCostRollupRepository {
+  /** Appends a cell version and records its restatement keys in the index beside it. */
+  abstract upsert(row: GovernanceCostRollupRow): Promise<void>;
+
+  /** The cell at its surviving version: one row, or none. */
+  abstract findCellRows(cell: GovernanceCostRollupCellAddress): Promise<GovernanceCostRollupRow[]>;
+
   /** The pulled lane per day and provider, each cell at its surviving version. */
   abstract sumDaysByProvider(
     input: GovernanceCostRollupWindow,

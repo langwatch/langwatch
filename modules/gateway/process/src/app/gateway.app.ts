@@ -60,6 +60,7 @@ import {
   type GatewayBudgetPageWithHealth,
   type GatewayPricedSpend,
   type GatewayPricedSpendResult,
+  type GatewaySpendDay,
   type GatewayInternalSpendCommandRecord,
   type GatewayInternalSpendSubmission,
   type GatewayVirtualKeyRecord,
@@ -1342,6 +1343,16 @@ export class GatewayApp implements GatewayApi {
       ...input,
       tenantIds: [...input.tenantIds],
     });
+  }
+
+  async findSpendDaysForOrganizationProjects(input: {
+    tenantIds: readonly string[];
+    fromDay: string;
+    toDay: string;
+  }): Promise<GatewaySpendDay[]> {
+    const service = this.#dependencies.spendEvents;
+    if (!service) return [];
+    return service.findSpendDaysForOrganizationProjects(input);
   }
 
   async listSpendEventsPage(

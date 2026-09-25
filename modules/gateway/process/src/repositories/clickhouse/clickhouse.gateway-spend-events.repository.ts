@@ -1,4 +1,5 @@
 import {
+  type GatewaySpendDay,
   type GatewayUsageCount,
   type SpendUsage,
   nanoUsdToDecimalString,
@@ -76,6 +77,59 @@ interface SummaryDimension {
 
 const spendFilters = GatewaySpendFiltersAdapter.create();
 const spendGrouping = GatewaySpendGroupingAdapter.create();
+
+const CHARGED_STATUSES = "('confirmed', 'failed')";
+const METERED_READ_MAX_EXECUTION_SECONDS = 20;
+const DAY_MS = 86_400_000;
+
+/** Main's governance metered-lane read: each request at its latest version, summed per day. */
+const SPEND_DAYS_QUERY = `
+  SELECT
+    toDate(RequestOccurredAt, 'UTC') AS Day,
+    toString(sumIf(RequestCostNanoUSD, RequestStatus IN ${CHARGED_STATUSES})) AS AmountNanoUsd,
+    countIf(RequestStatus IN ${CHARGED_STATUSES}) AS RequestCount,
+    countIf(RequestStatus IN ${CHARGED_STATUSES} AND RequestCostNanoUSD > 0) AS PricedRequestCount,
+    countIf(
+      RequestStatus IN ${CHARGED_STATUSES}
+      AND RequestCostNanoUSD = 0
+      AND (
+        RequestTokensInput + RequestTokensOutput + RequestTokensCacheRead
+        + RequestTokensCacheWrite + RequestTokensReasoning
+      ) > 0
+    ) + countIf(RequestStatus = 'settled') AS RequestsWithoutAmount
+  FROM (
+    SELECT
+      GatewayRequestId,
+      argMax(Status, EventTimestamp)           AS RequestStatus,
+      argMax(CostNanoUSD, EventTimestamp)      AS RequestCostNanoUSD,
+      argMax(OccurredAt, EventTimestamp)       AS RequestOccurredAt,
+      argMax(TokensInput, EventTimestamp)      AS RequestTokensInput,
+      argMax(TokensOutput, EventTimestamp)     AS RequestTokensOutput,
+      argMax(TokensCacheRead, EventTimestamp)  AS RequestTokensCacheRead,
+      argMax(TokensCacheWrite, EventTimestamp) AS RequestTokensCacheWrite,
+      argMax(TokensReasoning, EventTimestamp)  AS RequestTokensReasoning
+    FROM ${TABLE}
+    WHERE TenantId IN {tenantIds:Array(String)}
+    GROUP BY TenantId, GatewayRequestId
+    HAVING RequestOccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+      AND RequestOccurredAt < fromUnixTimestamp64Milli({toMs:Int64})
+  )
+  GROUP BY Day
+  ORDER BY Day
+`;
+
+const spendDayRowSchema = z.object({
+  Day: z.string(),
+  AmountNanoUsd: z.union([z.string(), z.number()]),
+  RequestCount: z.coerce.number(),
+  PricedRequestCount: z.coerce.number(),
+  RequestsWithoutAmount: z.coerce.number(),
+});
+
+const spendDayRowsSchema = z.array(spendDayRowSchema);
+
+const utcDayStartMs = (day: string): number =>
+  Temporal.Instant.from(`${day}T00:00:00.000Z`).epochMilliseconds;
 
 export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRepository {
   static create(resolveClient: GatewayClickHouseResolver): ClickHouseGatewaySpendEventsRepository {
@@ -538,6 +592,37 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
     });
     const rows = (await result.json()) as Record<string, unknown>[];
     return parseSummedNanoUsd(rows[0]?.CostNanoUSD ?? 0);
+  }
+
+  async sumDaysForOrganizationProjects({
+    tenantIds,
+    fromDay,
+    toDay,
+  }: {
+    tenantIds: readonly string[];
+    fromDay: string;
+    toDay: string;
+  }): Promise<GatewaySpendDay[]> {
+    const [firstTenantId] = tenantIds;
+    if (firstTenantId === undefined) return [];
+    const client = await this.resolveClient(firstTenantId);
+    const result = await client.query({
+      query: SPEND_DAYS_QUERY,
+      query_params: {
+        tenantIds: [...tenantIds],
+        fromMs: utcDayStartMs(fromDay),
+        toMs: utcDayStartMs(toDay) + DAY_MS,
+      },
+      format: "JSONEachRow",
+      clickhouse_settings: { max_execution_time: METERED_READ_MAX_EXECUTION_SECONDS },
+    });
+    return spendDayRowsSchema.parse(await result.json()).map((row) => ({
+      day: row.Day,
+      amountNanoUsd: parseSummedNanoUsd(row.AmountNanoUsd),
+      requestCount: row.RequestCount,
+      pricedRequestCount: row.PricedRequestCount,
+      requestsWithoutAmount: row.RequestsWithoutAmount,
+    }));
   }
 
   async readEndUserSpend({
