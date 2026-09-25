@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * Server-side cover for the two typed rejections on the Langy turn-start path.
+ * Server-side coverage for handled and deliberately unhandled rejections on the Langy turn-start path.
  *
  * WHY THIS FILE EXISTS: the whole premise of throwing a `HandledError` instead
  * of a bare `TRPCError` is that only a handled error puts `data.error` on the
@@ -14,6 +14,8 @@
  * through the REAL `errorFormatter`, so the assertion is about what actually
  * reaches the browser.
  */
+import { context as otelContext, propagation, trace } from "@opentelemetry/api";
+import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -111,6 +113,27 @@ function onTheWire(error: unknown) {
   });
 }
 
+async function withActiveSpan<T>(
+  fn: () => Promise<T>,
+): Promise<{ result: T; traceId: string }> {
+  const provider = new NodeTracerProvider();
+  provider.register();
+  const span = provider.getTracer("test").startSpan("trpc.call");
+  try {
+    const result = await otelContext.with(
+      trace.setSpan(otelContext.active(), span),
+      fn,
+    );
+    return { result, traceId: span.spanContext().traceId };
+  } finally {
+    span.end();
+    await provider.shutdown();
+    trace.disable();
+    otelContext.disable();
+    propagation.disable();
+  }
+}
+
 describe("langy turn-start rejections", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -176,6 +199,35 @@ describe("langy turn-start rejections", () => {
       const wire = onTheWire(error);
       expect(wire.data.error).not.toBeNull();
       expect(wire.data.error).toMatchObject({ code: "langy_rate_limited" });
+    });
+  });
+
+  describe("when the app layer rejects the turn for an unexpected reason", () => {
+    /** @scenario An unexpected turn-acceptance failure stays unknown */
+    it("keeps the internal failure unknown at the public error boundary", async () => {
+      const acceptanceFailure = new Error("event store failed");
+      startConversationTurn.mockRejectedValue(acceptanceFailure);
+
+      const { result: error, traceId } = await withActiveSpan(() =>
+        caller()
+          .createConversation({
+            projectId: "project_1",
+            idempotencyKey: "idem-key-0001",
+            messages: [message],
+          })
+          .catch((e: unknown) => e),
+      );
+
+      expect(error).toBeInstanceOf(TRPCError);
+      expect(error).toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
+      expect((error as TRPCError).cause).toBe(acceptanceFailure);
+
+      const wire = onTheWire(error);
+      expect(wire.message).toBe("An unknown error occurred");
+      expect(wire.data.error).toBeNull();
+      expect(wire.data.authored).toBe(false);
+      expect(wire.data.traceId).toBe(traceId);
+      expect(JSON.stringify(wire)).not.toContain(acceptanceFailure.message);
     });
   });
 
