@@ -205,6 +205,9 @@ function mountIngest(world: World = {}) {
     departmentArchive: unsupportedRestOperation,
     departmentAssignTeam: unsupportedRestOperation,
     departmentAssignProject: unsupportedRestOperation,
+    personalUsageDashboard: unsupportedRestOperation,
+    personalBudgetOverview: unsupportedRestOperation,
+    cliBootstrap: unsupportedRestOperation,
   };
 
   const runtime = createRestRuntime({

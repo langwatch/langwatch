@@ -68,3 +68,4 @@ export const personalUsageRollupSchema = z
     breakdownByModel: z.array(personalUsageBreakdownSchema),
   })
   .strict();
+export type PersonalUsageRollup = z.infer<typeof personalUsageRollupSchema>;

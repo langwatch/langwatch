@@ -151,7 +151,9 @@ import type {
   PersonalUsageBreakdown,
   PersonalUsageBucket,
   PersonalUsageQueryInput,
+  PersonalUsageRollup,
   PersonalUsageSummary,
+  PersonalUsageWindow,
 } from "./personal-usage.ts";
 import type {
   EnsureDefaultPersonalVirtualKeyInput,
@@ -700,6 +702,18 @@ export interface GovernanceRestApi {
     projectId: string;
     departmentId: string | null;
   }): Promise<void>;
+  personalUsageDashboard(
+    input: { organizationId: string; window?: PersonalUsageWindow },
+    by: GovernanceCaller,
+  ): Promise<PersonalUsageRollup>;
+  personalBudgetOverview(
+    input: { organizationId: string; includeTopModels?: boolean },
+    by: GovernanceCaller,
+  ): Promise<GovernanceBudgetOverviewForUser>;
+  cliBootstrap(
+    input: { organizationId: string },
+    by: GovernanceCaller,
+  ): Promise<CliBootstrapResult>;
 }
 
 export const GovernanceRestApi = moduleApi<GovernanceRestApi>()("governance");

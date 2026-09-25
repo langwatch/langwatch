@@ -1,22 +1,14 @@
 // Personal usage dashboard: resolves two tenants (personal project, org
 // governance with PRINCIPAL-scope); returns zeros for new members.
 import type {
-  GovernanceApi,
-  PersonalUsageBreakdown,
-  PersonalUsageBucket,
   PersonalUsageQueryInput,
-  PersonalUsageSummary,
+  PersonalUsageRollup,
   PersonalUsageWindow,
 } from "@langwatch/enterprise-governance-contract";
 import { type OrganizationService, TeamNotFoundError } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-/** The three answers one /me usage screen renders, resolved together. */
-export type PersonalUsageRollup = {
-  summary: PersonalUsageSummary;
-  dailyBuckets: PersonalUsageBucket[];
-  breakdownByModel: PersonalUsageBreakdown[];
-};
+import type { DefaultGovernancePersonalUsageService } from "./personal-usage.service.ts";
 
 /** Whose usage, over which window. Absent window means the store's default. */
 export type PersonalUsageDashboardQuery = {
@@ -26,9 +18,9 @@ export type PersonalUsageDashboardQuery = {
 };
 
 export type PersonalUsageDashboardServiceOptions = {
-  governance: Pick<
-    GovernanceApi,
-    "personalUsageSummary" | "personalUsageDailyBuckets" | "personalUsageBreakdownByModel"
+  usage: Pick<
+    DefaultGovernancePersonalUsageService,
+    "summary" | "dailyBuckets" | "breakdownByModel"
   >;
   /** The member's personal workspace, which is the tenant their traces land in. */
   organizations: Pick<OrganizationService, "getPersonalWorkspace">;
@@ -99,9 +91,9 @@ export class PersonalUsageDashboardService {
    */
   async rollup(query: PersonalUsageQueryInput): Promise<PersonalUsageRollup> {
     const [summary, dailyBuckets, breakdownByModel] = await Promise.all([
-      this.options.governance.personalUsageSummary(query),
-      this.options.governance.personalUsageDailyBuckets(query),
-      this.options.governance.personalUsageBreakdownByModel(query),
+      this.options.usage.summary(query),
+      this.options.usage.dailyBuckets(query),
+      this.options.usage.breakdownByModel(query),
     ]);
 
     return { summary, dailyBuckets, breakdownByModel };

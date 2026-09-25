@@ -76,10 +76,10 @@ function build(
   );
 
   const dependencies: PersonalUsageDashboardServiceOptions = {
-    governance: {
-      personalUsageSummary,
-      personalUsageDailyBuckets,
-      personalUsageBreakdownByModel,
+    usage: {
+      summary: personalUsageSummary,
+      dailyBuckets: personalUsageDailyBuckets,
+      breakdownByModel: personalUsageBreakdownByModel,
     },
     organizations: { getPersonalWorkspace },
     projects: { findInternal },

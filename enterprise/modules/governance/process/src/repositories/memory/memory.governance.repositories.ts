@@ -24,6 +24,7 @@ import { MemoryIngestionSourceRepository } from "./memory.ingestion-source.repos
 import { MemoryIngestionTemplateRepository } from "./memory.ingestion-template.repository.ts";
 import { MemoryOcsfEventsRepository } from "./memory.ocsf-events.repository.ts";
 import { MemoryOrganizationSupportContactRepository } from "./memory.organization-support-contact.repository.ts";
+import { MemoryPersonalUsageRepository } from "./memory.personal-usage.repository.ts";
 import { MemoryRollupErasureRepository } from "./memory.rollup-erasure.repository.ts";
 import { MemorySpendSpikeAnomalyRepository } from "./memory.spend-spike-anomaly.repository.ts";
 import { MemoryTraceActivityRepository } from "./memory.trace-activity.repository.ts";
@@ -57,6 +58,7 @@ export class MemoryGovernanceRepositories {
       costRollup: MemoryGovernanceCostRollupRepository.create(),
       ocsfEvents: MemoryOcsfEventsRepository.create(),
       traceActivity: MemoryTraceActivityRepository.create(),
+      personalUsage: MemoryPersonalUsageRepository.create(),
       ocsfExports: MemoryGovernanceOcsfExportRepository.create(store),
       rollupErasure: MemoryRollupErasureRepository.create(),
       routingPolicies: MemoryRoutingPolicyRepository.create(store),

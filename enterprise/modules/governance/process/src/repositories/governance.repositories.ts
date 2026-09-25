@@ -20,7 +20,6 @@ import type { DepartmentRepository } from "./department.repository.ts";
 import type { DiscoveredAgentRepository } from "./discovered-agent.repository.ts";
 import type { DiscoveredPersonRepository } from "./discovered-person.repository.ts";
 import type { ErasedIdentifierSuppressionRepository } from "./erased-identifier-suppression.repository.ts";
-import type { GatewaySpendRepository } from "./gateway-spend.repository.ts";
 import type { GovernanceCostRollupRepository } from "./governance-cost-rollup.repository.ts";
 import type { GovernanceDirectoryRepository } from "./governance-directory.repository.ts";
 import type {
@@ -75,6 +74,7 @@ export interface GovernanceRepositories {
   readonly supportContacts: OrganizationSupportContactRepository;
   readonly tenantHistory: GovernanceTenantHistoryRepository;
   readonly traceActivity: GovernanceClickHouseRepositories["traceActivity"];
+  readonly personalUsage: GovernanceClickHouseRepositories["personalUsage"];
 }
 
 /**
@@ -98,7 +98,6 @@ export interface GovernanceClickHouseRepositories {
     OcsfSeatReportReader;
   readonly traceActivity: GovernanceSetupActivityReader & QuarantineTraceActivityReader;
   readonly personalUsage: PersonalUsageReader;
-  readonly gatewaySpend: GatewaySpendRepository;
 }
 
 /**

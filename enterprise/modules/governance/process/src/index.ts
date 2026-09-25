@@ -12,7 +12,6 @@ export type {
   GovernanceDirectoryProject,
   GovernanceMembershipStatus,
 } from "./repositories/governance-directory.repository.ts";
-export type { PersonalUsageRollup } from "./services/personal-usage-dashboard.service.ts";
 /**
  * The landing decision, re-exported beside the service it gathers signals from.
  */

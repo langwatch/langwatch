@@ -245,6 +245,9 @@ function mountCli(world: World = {}) {
     departmentArchive: unavailable,
     departmentAssignTeam: unavailable,
     departmentAssignProject: unavailable,
+    personalUsageDashboard: unavailable,
+    personalBudgetOverview: unavailable,
+    cliBootstrap: unavailable,
   };
 
   const runtime = createRestRuntime({

@@ -149,6 +149,7 @@ import {
   type GovernanceActorWorkspace,
   type PersonalVirtualKey,
   type PersonalUsageQueryInput,
+  type PersonalUsageRollup,
   type PersonalUsageWindow,
   type RoutingPolicy,
   type SetDefaultRoutingPolicyInput,
@@ -208,6 +209,8 @@ import { HttpCopilotStudioChannel } from "../channels/http/http.copilot-studio.c
 import { HttpOttlTransformChannel } from "../channels/http/http.ottl-transform.channel.ts";
 import { HttpPollingPullerAdapter } from "../channels/http/http.polling.channel.ts";
 import { HttpProviderAccountChannel } from "../channels/http/http.provider-account.channel.ts";
+import { GovernanceCostRollupFoldProjection } from "../eventing/governance-cost-rollup.projection.ts";
+import { GovernanceCostRollupStore } from "../eventing/governance-cost-rollup.store.ts";
 import { IngestionPullProcess } from "../eventing/ingestion-pull.process.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import { anomalyRuleConfigComplaint } from "../rules/anomaly-rule-config-error.rules.ts";
@@ -244,6 +247,7 @@ import {
   type GovernanceCliCredentialApi,
   type GovernanceCliPersonDirectory,
 } from "../services/governance-cli-credentials.service.ts";
+import { DefaultGovernanceCliBootstrapService } from "../services/governance-cli-tool-bootstrap.service.ts";
 import { GovernanceCliService } from "../services/governance-cli.service.ts";
 import { GovernanceCostBreakdownService } from "../services/governance-cost-breakdown.service.ts";
 import { GovernanceIngestAccessService } from "../services/governance-ingest-access.service.ts";
@@ -286,17 +290,19 @@ import { DefaultGovernanceOcsfExportService } from "../services/ocsf-export.serv
 import { OpenAiAdminPullerAdapter } from "../services/openai-admin-puller.service.ts";
 import { OpenAiComplianceReferencePullerService } from "../services/openai-compliance-puller.service.ts";
 import { OrganizationSessionPolicyService } from "../services/organization-session-policy.service.ts";
-import type { OrganizationSupportContactService } from "../services/organization-support-contact.service.ts";
+import { OrganizationSupportContactService } from "../services/organization-support-contact.service.ts";
 import { PersonDiscoveryService } from "../services/person-discovery.service.ts";
 import { PersonListingService } from "../services/person-listing.service.ts";
 import { PersonaHomeService } from "../services/persona-home.service.ts";
 import { PersonalIngestionKeyService } from "../services/personal-ingestion-key.service.ts";
-import {
-  PersonalUsageDashboardService,
-  type PersonalUsageRollup,
-} from "../services/personal-usage-dashboard.service.ts";
+import { PersonalUsageDashboardService } from "../services/personal-usage-dashboard.service.ts";
+import { DefaultGovernancePersonalUsageService } from "../services/personal-usage.service.ts";
 import { GatewayPersonalVirtualKeyIssuerService } from "../services/personal-virtual-key-issuer.service.ts";
 import { PullDestinationService } from "../services/pull-destination.service.ts";
+import {
+  PulledUsageEventingAdapter,
+  type PulledUsageDefinition,
+} from "../services/pulled-usage-eventing.service.ts";
 import { PulledUsagePricingService } from "../services/pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../services/pulled-usage-record.service.ts";
 import { PullerRegistryService } from "../services/puller-registry.service.ts";
@@ -420,7 +426,11 @@ export interface GovernanceAppDependencies {
   >;
   gateway: Pick<
     GatewayApi,
-    "createVirtualKey" | "revokeVirtualKey" | "findPersonalVirtualKeys" | "findVirtualKeyById"
+    | "createVirtualKey"
+    | "revokeVirtualKey"
+    | "findPersonalVirtualKeys"
+    | "findVirtualKeyById"
+    | "budgetOverviewForUser"
   >;
   modelProviders: Pick<
     ModelProviderApi,
@@ -824,13 +834,24 @@ export class GovernanceApp implements GovernanceRestApi {
     // process makes that call today, so every service below stays unbuilt
     // and its accessor throws if a CLI/ingest transport or a personal-key/
     // routing-policy tRPC operation ever reaches it.
+    this.personalUsageDashboards = PersonalUsageDashboardService.create({
+      usage: DefaultGovernancePersonalUsageService.create({ reader: repositories.personalUsage }),
+      organizations: dependencies.organizations,
+      projects: dependencies.projects,
+    });
+    const supportContacts = OrganizationSupportContactService.create({
+      repository: repositories.supportContacts,
+    });
+    this.cliBootstraps = DefaultGovernanceCliBootstrapService.create({
+      catalog: this.aiTools,
+      budgets: { overviewForUser: (input) => dependencies.gateway.budgetOverviewForUser(input) },
+      contacts: {
+        findAdminEmail: (organizationId) => supportContacts.findSupportContact({ organizationId }),
+      },
+      gatewayUrl: gatewayBaseUrl,
+    });
     const { governance, cli, ingest } = dependencies;
     if (governance && cli && ingest) {
-      this.personalUsageDashboards = PersonalUsageDashboardService.create({
-        governance,
-        organizations: dependencies.organizations,
-        projects: dependencies.projects,
-      });
       this.cliAccessService = GovernanceCliAccessService.create({
         accessTokens: cliAccessTokens(dependencies.auth),
         directory: () => cli.members,
@@ -914,7 +935,8 @@ export class GovernanceApp implements GovernanceRestApi {
   private readonly http: GovernanceHttpClient;
   private ingestionPullCommands: EventingSenders | undefined;
   private pulledUsageCommands: EventingSenders | undefined;
-  private readonly personalUsageDashboards?: PersonalUsageDashboardService;
+  private readonly personalUsageDashboards: PersonalUsageDashboardService;
+  private readonly cliBootstraps: DefaultGovernanceCliBootstrapService;
   private readonly cliAccessService?: GovernanceCliAccessApi;
   private readonly cliCredentialService?: GovernanceCliCredentialApi;
   private readonly cliActivityService?: GovernanceCliActivityApi;
@@ -988,6 +1010,27 @@ export class GovernanceApp implements GovernanceRestApi {
     findPullProcessKeys: (input: { projectIds: string[] }) => Promise<string[]>;
   }): Promise<{ reconciled: number; failed: number }> {
     return this.pullLifecycle.reconcile({ findPullProcessKeys });
+  }
+
+  /** pulled_usage_processing for this role: the worker also hosts main's `governanceCostRollup` fold. */
+  pulledUsagePipeline({
+    participation,
+  }: {
+    participation: EventingParticipation;
+  }): PulledUsageDefinition {
+    if (participation === "produce") return PulledUsageEventingAdapter.create().build();
+    const costRollup = GovernanceCostRollupFoldProjection.create({
+      store: GovernanceCostRollupStore.create(this.repositories.costRollup),
+      actorIds: {
+        actorIdForRollupWrite: ({ tenantId, rawActorId }) =>
+          this.erasureSuppression.actorIdForRollupWrite({
+            tenantId,
+            rawActorId,
+            snapshot: this.suppressionSnapshot,
+          }),
+      },
+    });
+    return PulledUsageEventingAdapter.create({ costRollup }).build();
   }
 
   connectPulledUsage(commands: EventingSenders): void {
@@ -2014,7 +2057,7 @@ export class GovernanceApp implements GovernanceRestApi {
    * the totals, the per-day buckets, and the split by model.
    */
   personalUsage(input: PersonalUsageQueryInput): Promise<PersonalUsageRollup> {
-    return (this.personalUsageDashboards ?? this.unfinishedCapability()).rollup(input);
+    return this.personalUsageDashboards.rollup(input);
   }
 
   /**
@@ -2026,7 +2069,7 @@ export class GovernanceApp implements GovernanceRestApi {
     input: { organizationId: string; window?: PersonalUsageWindow },
     by: GovernanceCaller,
   ): Promise<PersonalUsageRollup> {
-    return (this.personalUsageDashboards ?? this.unfinishedCapability()).read({
+    return this.personalUsageDashboards.read({
       userId: by.id,
       organizationId: input.organizationId,
       window: input.window,
@@ -2046,10 +2089,9 @@ export class GovernanceApp implements GovernanceRestApi {
     input: { organizationId: string; includeTopModels?: boolean },
     by: GovernanceCaller,
   ): Promise<GovernanceBudgetOverviewForUser> {
-    return this.governanceApi.personalBudgetOverviewForUser({
+    return this.dependencies.gateway.budgetOverviewForUser({
       organizationId: input.organizationId,
       userId: by.id,
-      includeTopModels: input.includeTopModels,
     });
   }
 
@@ -2061,10 +2103,7 @@ export class GovernanceApp implements GovernanceRestApi {
     input: { organizationId: string },
     by: GovernanceCaller,
   ): Promise<CliBootstrapResult> {
-    return this.governanceApi.cliBootstrapResolve({
-      userId: by.id,
-      organizationId: input.organizationId,
-    });
+    return this.cliBootstraps.resolve({ userId: by.id, organizationId: input.organizationId });
   }
 
   /**

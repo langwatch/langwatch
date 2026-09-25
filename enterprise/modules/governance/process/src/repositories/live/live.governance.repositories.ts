@@ -8,6 +8,7 @@ import {
 } from "../clickhouse/clickhouse.governance-clickhouse.repositories.ts";
 import { ClickHouseGovernanceCostRollupRepository } from "../clickhouse/clickhouse.governance-cost-rollup.repository.ts";
 import { ClickHouseOcsfEventsRepository } from "../clickhouse/clickhouse.ocsf-events.repository.ts";
+import { ClickHousePersonalUsageRepository } from "../clickhouse/clickhouse.personal-usage.repository.ts";
 import { ClickHouseRollupErasureRepository } from "../clickhouse/clickhouse.rollup-erasure.repository.ts";
 import { ClickHouseTraceActivityRepository } from "../clickhouse/clickhouse.trace-activity.repository.ts";
 import type { GovernanceRepositories } from "../governance.repositories.ts";
@@ -34,6 +35,7 @@ export class LiveGovernanceRepositories {
       ocsfEvents: ClickHouseOcsfEventsRepository.create(memberClickHouseResolver(clickhouse)),
       rollupErasure: ClickHouseRollupErasureRepository.create(clickhouse),
       traceActivity: ClickHouseTraceActivityRepository.create(memberClickHouseResolver(clickhouse)),
+      personalUsage: ClickHousePersonalUsageRepository.create(memberClickHouseResolver(clickhouse)),
     };
   }
 }
