@@ -19,10 +19,7 @@ vi.mock("~/utils/api", () => ({
   api: {
     topics: {
       getClusteringStatus: {
-        useQuery: (
-          _input?: unknown,
-          _opts?: unknown,
-        ) => ({
+        useQuery: (_input?: unknown, _opts?: unknown) => ({
           isLoading: false,
           data: {
             lastRunOutcome: "failed",
@@ -36,10 +33,7 @@ vi.mock("~/utils/api", () => ({
         }),
       },
       getClusteringRunHistory: {
-        useQuery: (
-          _input?: unknown,
-          _opts?: unknown,
-        ) => ({
+        useQuery: (_input?: unknown, _opts?: unknown) => ({
           isLoading: false,
           data: [
             {
