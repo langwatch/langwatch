@@ -14,7 +14,7 @@ interface SessionTabProps {
  * The Session tab's data boundary.
  */
 export function SessionTab({ projectId, traceId, occurredAtMs }: SessionTabProps) {
-  const query = api.traces.codingAgentSession.useQuery(
+  const query = api.codingAgents.session.useQuery(
     { projectId, traceId },
     { refetchOnWindowFocus: false, staleTime: 60_000 },
   );
@@ -23,7 +23,7 @@ export function SessionTab({ projectId, traceId, occurredAtMs }: SessionTabProps
   // sibling traces is a reasonable follow-up, not done here. Shares its
   // cache key with the Terminal tab's own read, so switching tabs on a
   // session already opened once costs nothing extra.
-  const transcriptQuery = api.traces.codingAgentTranscript.useQuery(
+  const transcriptQuery = api.codingAgents.transcript.useQuery(
     { projectId, traceId, occurredAtMs },
     { refetchOnWindowFocus: false, staleTime: 60_000, enabled: !!query.data },
   );

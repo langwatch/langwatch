@@ -22,7 +22,7 @@ export function InstantEvalProgressBanner() {
   const stoppedByUser = useInstantEvalRunStore((s) => s.stoppedByUser);
   const settled = useInstantEvalRunStore((s) => s.settled);
   const markStopped = useInstantEvalRunStore((s) => s.markStopped);
-  const cancel = api.traces.instantEvalCancel.useMutation();
+  const cancel = api.traces.instantEval.cancel.useMutation();
 
   // The last chip typed is the one being judged; an earlier chip's run has
   // already settled, and a settled run has no bar.

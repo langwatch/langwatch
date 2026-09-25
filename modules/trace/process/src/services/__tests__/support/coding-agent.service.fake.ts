@@ -41,6 +41,10 @@ export class TestCodingAgentService implements CodingAgentApi {
     return this.unused();
   }
 
+  readTranscriptForViewer(): Promise<never> {
+    return this.unused();
+  }
+
   listRecent(): Promise<never> {
     return this.unused();
   }

@@ -19,7 +19,7 @@ export const annotationScoreUpsertInputSchema = z.object({
   name: z.string(),
   dataType: annotationScoreDataTypeSchema,
   description: z.string().optional().nullable(),
-  options: z.array(z.string()).optional().nullable(),
+  options: z.object({}).optional().nullable(),
   category: z.array(z.string()).optional().nullable(),
   categoryExplanation: z.array(z.string()).optional().nullable(),
   radioCheckboxOptions: z.array(z.string()),

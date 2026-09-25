@@ -160,7 +160,6 @@ function useScoreSubmit({
         category: data.category,
         categoryExplanation: data.categoryExplanation,
         projectId,
-        options: data.options,
         radioCheckboxOptions,
         defaultRadioOption,
         defaultCheckboxOption,

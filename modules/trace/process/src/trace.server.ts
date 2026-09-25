@@ -20,6 +20,7 @@ import { spansTrpcTransport } from "./transport/spans.trpc.ts";
 import { traceEditOverlayTrpcTransport } from "./transport/trace-edit-overlay.trpc.ts";
 import { traceExportRest } from "./transport/trace-export.rest.ts";
 import { traceLegacyRest } from "./transport/trace-legacy.rest.ts";
+import { tracesInstantEvalTrpcTransport } from "./transport/traces-instant-eval.trpc.ts";
 import { tracesRest, tracesRestCredential } from "./transport/traces.rest.ts";
 import { tracesTrpcTransport } from "./transport/traces.trpc.ts";
 import { trackedEventLegacyPathRest, trackedEventRest } from "./transport/tracked-event.rest.ts";
@@ -60,6 +61,7 @@ export const traceServer = defineServerModule("trace")
   .withApp(TraceApp)
   .withTransports(
     tracesTrpcTransport,
+    tracesInstantEvalTrpcTransport,
     sharedTraceTrpcTransport,
     spansTrpcTransport,
     exportProgressTrpcTransport,

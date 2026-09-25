@@ -162,7 +162,7 @@ function useInstantEvalStarter({
   applyChip: (args: PendingRoute & { runId: string }) => void;
   startRun: (args: PendingRoute & { seq: number }) => void;
 } {
-  const start = api.traces.instantEvalStart.useMutation();
+  const start = api.traces.instantEval.start.useMutation();
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
   const registerEvalRun = useFilterStore((s) => s.registerEvalRun);
   const recordSearchNotice = useFilterStore((s) => s.recordSearchNotice);
@@ -217,7 +217,7 @@ function useInstantEvalStarter({
 }
 
 export function useInstantEvalRoute(): InstantEvalRouteState {
-  const estimate = api.traces.instantEvalEstimate.useMutation();
+  const estimate = api.traces.instantEval.estimate.useMutation();
   const outcome = useInstantEvalOutcome();
   const { pendingRef, setConfirmation, refuse } = outcome;
   const seqRef = useRef(0);

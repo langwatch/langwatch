@@ -143,6 +143,23 @@ describe("the api process installation", () => {
     }
   });
 
+  /** @scenario "The installed api serves the trace reads from coding-agent's namespace only" */
+  it("serves the drawer's coding-agent reads under codingAgents, not traces", () => {
+    const procedures = serverModules
+      .flatMap((module) => module.transports ?? [])
+      .flatMap((transport) =>
+        "protocol" in transport && transport.protocol === "trpc"
+          ? Object.keys(transport.contract.members).map((name) => `${transport.namespace}.${name}`)
+          : [],
+      );
+
+    expect(procedures).toEqual(
+      expect.arrayContaining(["codingAgents.session", "codingAgents.transcript"]),
+    );
+    expect(procedures).not.toContain("traces.codingAgentSession");
+    expect(procedures).not.toContain("traces.codingAgentTranscript");
+  });
+
   /** @scenario "Two process installations share no state" */
   it("keeps what one installation writes out of another", async () => {
     const first = await bootApi();

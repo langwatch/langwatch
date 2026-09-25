@@ -42,7 +42,7 @@ export function useInstantEvalRunWatch(): void {
   const results = api.useQueries((t) =>
     runIds.map((runId) => {
       const isWatched = !settled[runId];
-      return t.traces.instantEvalGet(
+      return t.traces.instantEval.get(
         { projectId, runId },
         {
           enabled: !!projectId,

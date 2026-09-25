@@ -698,6 +698,11 @@ const presentations = {
     describe: () =>
       "Check the API key, the project and the permissions the process connects with. The process prints the reason at startup.",
   },
+  protocol_invalid: {
+    title: "The agent spoke a protocol the platform does not understand",
+    describe: () =>
+      "Update the LangWatch SDK the agent process runs to the latest version, then restart the process.",
+  },
   agent_session_unknown: {
     title: "The agent process needs to register again",
     describe: () =>
@@ -2886,6 +2891,22 @@ const presentations = {
     describe: () =>
       "Single sign-on you can set up yourself is OpenID Connect for now. Contact support to set up SAML and we will do it with you.",
   },
+  identity_link_proposal_not_found: {
+    title: "That waiting sign-in is no longer there",
+    describe: () =>
+      "It was decided or withdrawn since this page was loaded. Reload the person and look at what is waiting now.",
+  },
+  identity_link_proposal_resolved: {
+    title: "Somebody already decided this sign-in",
+    describe: (error) => {
+      const outcome =
+        str(error, "decidedOutcome", "decided") === "confirmed" ? "confirmed" : "rejected";
+      const by = str(error, "decidedByActorId", "");
+      return by
+        ? `It was ${outcome} by ${by}. Reload the person to see what changed, and talk to them before deciding anything else here.`
+        : `It was ${outcome} already. Reload the person to see what changed.`;
+    },
+  },
   identity_link_proposed: {
     title: "An administrator needs to confirm this sign-in",
     // Deliberately says nothing about whether an account exists, who holds the
@@ -2893,10 +2914,6 @@ const presentations = {
     // and that is not necessarily the owner of the address.
     describe: () =>
       "Your workspace administrator has been asked to confirm it. Try again once they have.",
-  },
-  identity_lookup_not_found: {
-    title: "Not found",
-    describe: () => "Check the address, or go back to the page you came from.",
   },
   identity_jit_disabled: {
     title: "This workspace does not create accounts automatically",
@@ -3758,6 +3775,21 @@ const presentations = {
     title: "No folder is connected",
     describe: () =>
       "Langy has no folder to work in. Run `npx langwatch@latest langy --share-control` in the folder you want it to change, then approve the request in the terminal.",
+  },
+  langy_session_key_invalid: {
+    title: "That key does not belong to this project",
+    describe: () =>
+      "Run `npx langwatch@latest langy --share-control` in your folder and approve the request to get a key for this project.",
+  },
+  langy_session_key_wrong_type: {
+    title: "This key can't share a folder",
+    describe: () =>
+      "Only the key you get by approving a control request can. Run `npx langwatch@latest langy --share-control` and approve the request.",
+  },
+  langy_session_key_unbound: {
+    title: "That key no longer controls a conversation",
+    describe: () =>
+      "The conversation it was approved for has ended or is gone. Ask Langy for the code change again and approve the new request.",
   },
   langy_local_record_not_found: {
     title: "Langy has no record of this request",

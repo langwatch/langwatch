@@ -27,7 +27,7 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
       discover: { useQuery: harness.discover },
       newCount: { useQuery: harness.newCount },
       sessions: { useQuery: harness.sessions },
-      instantEvalGet: (input: unknown) => input,
+      instantEval: { get: (input: unknown) => input },
     },
     useUtils: () => ({
       traces: {

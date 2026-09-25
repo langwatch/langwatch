@@ -199,28 +199,30 @@ export type TraceApiMap = {
      * cancel, and the counters a chip and the progress bar read back.
      * @see specs/traces-v2/instant-eval-search.feature
      */
-    instantEvalEstimate: {
-      mutation: {
-        input: ExplorerInstantEvalRunInput;
-        output: ExplorerInstantEvalEstimate;
+    instantEval: {
+      estimate: {
+        mutation: {
+          input: ExplorerInstantEvalRunInput;
+          output: ExplorerInstantEvalEstimate;
+        };
       };
-    };
-    instantEvalStart: {
-      mutation: {
-        input: ExplorerInstantEvalRunInput;
-        output: ExplorerInstantEvalProgress;
+      start: {
+        mutation: {
+          input: ExplorerInstantEvalRunInput;
+          output: ExplorerInstantEvalProgress;
+        };
       };
-    };
-    instantEvalCancel: {
-      mutation: {
-        input: ProjectScope & { runId: string };
-        output: ExplorerInstantEvalProgress;
+      cancel: {
+        mutation: {
+          input: ProjectScope & { runId: string };
+          output: ExplorerInstantEvalProgress;
+        };
       };
-    };
-    instantEvalGet: {
-      query: {
-        input: ProjectScope & { runId: string };
-        output: ExplorerInstantEvalProgress;
+      get: {
+        query: {
+          input: ProjectScope & { runId: string };
+          output: ExplorerInstantEvalProgress;
+        };
       };
     };
 
@@ -294,11 +296,6 @@ export type TraceApiMap = {
     /** Every span in the trace, in full. */
     spansFull: { query: { input: TraceScope & SpanReadHint; output: SpanDetail[] } };
 
-    /** The coding-agent transcript built from the trace's spans and logs. */
-    codingAgentTranscript: {
-      query: { input: TraceScope & SpanReadHint; output: CodingAgentTranscript };
-    };
-
     /** One span, in full. */
     spanDetail: {
       query: { input: TraceScope & SpanReadHint & { spanId: string }; output: SpanDetail };
@@ -312,11 +309,6 @@ export type TraceApiMap = {
     /** Events derived from the trace's spans. */
     traceEvents: {
       query: { input: TraceScope & SpanReadHint; output: DerivedTraceEvent[] };
-    };
-
-    /** The coding-agent session a trace belongs to, if any. */
-    codingAgentSession: {
-      query: { input: TraceScope; output: CodingAgentSessionDisplay | null };
     };
 
     /**
@@ -392,6 +384,16 @@ export type TraceApiMap = {
     /** Pushed when a trace this project owns changes. */
     onTraceUpdate: {
       subscription: { input: ProjectScope; output: { traceId: string } };
+    };
+  };
+
+  codingAgents: {
+    /** The coding-agent session a trace belongs to, if any. */
+    session: { query: { input: TraceScope; output: CodingAgentSessionDisplay | null } };
+
+    /** The coding-agent transcript built from the trace's spans and logs. */
+    transcript: {
+      query: { input: TraceScope & SpanReadHint; output: CodingAgentTranscript };
     };
   };
 

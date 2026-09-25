@@ -65,6 +65,10 @@ class TestCodingAgentApi {
     throw new Error("Not used by session group tests: findSessionForTrace.");
   }
 
+  readTranscriptForViewer(): never {
+    throw new Error("Not used by session group tests: readTranscriptForViewer.");
+  }
+
   recordPullRequestUsageRead(): never {
     throw new Error("Not used by session group tests: recordPullRequestUsageRead.");
   }

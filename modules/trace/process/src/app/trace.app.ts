@@ -108,7 +108,10 @@ import {
   type LangWatchQLTraceFilter,
   type ResolvedInstantEvalRun,
   type TraceDateField,
+  type TraceAttributedTrace,
   type TraceAttributeMatch,
+  type TraceAttributeUsageBucket,
+  type TraceAttributeValueSpend,
   type TraceDailySpend,
   type TraceModelRequests,
   type TraceModelSpend,
@@ -153,6 +156,7 @@ import { ClickhouseTraceQueryEvaluationRepository } from "../repositories/clickh
 import { ClickHouseTraceQueryLangWatchQLRepository } from "../repositories/clickhouse/clickhouse.trace-query-langwatch-ql.repository.ts";
 import { ClickHouseTraceQueryRepository } from "../repositories/clickhouse/clickhouse.trace-query.repository.ts";
 import { RedisTraceSpanDedupRepository } from "../repositories/redis/redis.trace-span-dedup.repository.ts";
+import type { TraceAttributeSpendRepository } from "../repositories/trace-attribute-spend.repository.ts";
 import type { TraceExistenceRepository } from "../repositories/trace-existence.repository.ts";
 import type { TraceModelSpendRepository } from "../repositories/trace-model-spend.repository.ts";
 import type { TraceUsageCountRepository } from "../repositories/trace-usage-count.repository.ts";
@@ -698,6 +702,7 @@ export class TraceApp implements TraceApi, CollectorApp {
       usageCount: input.repositories.usageCount,
     });
     app.#modelSpend = input.repositories.modelSpend;
+    app.#attributeSpend = input.repositories.attributeSpend;
     app.#usageCount = input.repositories.usageCount;
     app.#preconditionSamples = TracePreconditionSampleService.create({
       traces: app,
@@ -723,6 +728,7 @@ export class TraceApp implements TraceApi, CollectorApp {
   #processingCommands: TraceProcessingCommandsService | null = null;
   #usageCounts: TraceUsageCountService | null = null;
   #modelSpend: TraceModelSpendRepository | null = null;
+  #attributeSpend: TraceAttributeSpendRepository | null = null;
   #usageCount: TraceUsageCountRepository | null = null;
   #preconditionSamples: TracePreconditionSampleService | null = null;
 
@@ -1933,6 +1939,45 @@ export class TraceApp implements TraceApi, CollectorApp {
     });
   }
 
+  findSpendByAttributeValue(input: {
+    projectId: string;
+    attributeKey: string;
+    values: string[];
+    window: TraceModelSpendWindow;
+  }): Promise<TraceAttributeValueSpend[]> {
+    const { projectId, ...query } = input;
+    return this.#attributeSpendRead().findSpendByAttributeValue({ tenantId: projectId, ...query });
+  }
+
+  findAttributeUsageBuckets(input: {
+    projectId: string;
+    attributeKey: string;
+    window: TraceModelSpendWindow;
+    values?: string[];
+  }): Promise<TraceAttributeUsageBucket[]> {
+    const { projectId, ...query } = input;
+    return this.#attributeSpendRead().findAttributeUsageBuckets({ tenantId: projectId, ...query });
+  }
+
+  findAttributedTraces(input: {
+    projectId: string;
+    attributeKey: string;
+    window: TraceModelSpendWindow;
+    values?: string[];
+    model?: string;
+    limit: number;
+  }): Promise<TraceAttributedTrace[]> {
+    const { projectId, ...query } = input;
+    return this.#attributeSpendRead().findAttributedTraces({ tenantId: projectId, ...query });
+  }
+
+  #attributeSpendRead(): TraceAttributeSpendRepository {
+    if (!this.#attributeSpend) {
+      throw new TraceCapabilityUnavailableError("this process", "the attributed trace spend read");
+    }
+    return this.#attributeSpend;
+  }
+
   #modelSpendRead(): TraceModelSpendRepository {
     if (!this.#modelSpend) {
       throw new TraceCapabilityUnavailableError("this process", "the trace spend read");
@@ -2042,13 +2087,6 @@ export class TraceApp implements TraceApi, CollectorApp {
   /** The evaluation runs recorded against one trace. */
   readEvaluationRuns(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[]> {
     return this.#dependencies.evaluations.findRunsByTraceId(input);
-  }
-
-  /** The pre-folded coding-agent session rollup for one trace, or null. */
-  readCodingAgentSession(
-    input: Parameters<CodingAgentApi["findSessionForTrace"]>[0],
-  ): ReturnType<CodingAgentApi["findSessionForTrace"]> {
-    return this.#dependencies.codingAgents.findSessionForTrace(input);
   }
 
   /** Port of main's `codingAgentTranscript`: the viewer's protections, then the shared read. */

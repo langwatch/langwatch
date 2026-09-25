@@ -30,6 +30,7 @@ import {
   type CodingAgentTracePullRequestInput,
   type CodingAgentTracePullRequestLink,
   type CodingAgentTranscript,
+  codingAgentTranscriptSchema,
   type ContributeSpanFactsCommandData,
   type CodingAgentReceivedSpan,
 } from "@langwatch/coding-agent-contract";
@@ -219,6 +220,7 @@ export class CodingAgentApp implements CodingAgentApi {
     return new CodingAgentApp({
       codingAgents: service,
       github: dependencies.github,
+      traces: dependencies.traces,
       scope,
       members,
       processing,
@@ -240,6 +242,7 @@ export class CodingAgentApp implements CodingAgentApi {
 
   readonly #codingAgents: CodingAgentSessionService;
   readonly #github: GithubApi;
+  readonly #traces: TraceApi;
   readonly #scope: CodingAgentScopeMembers;
   readonly #visibility: CodingAgentViewerVisibilityReader;
   readonly #audit: CodingAgentAuditSink;
@@ -249,6 +252,7 @@ export class CodingAgentApp implements CodingAgentApi {
   private constructor({
     codingAgents,
     github,
+    traces,
     scope,
     members,
     processing,
@@ -256,6 +260,7 @@ export class CodingAgentApp implements CodingAgentApi {
   }: {
     codingAgents: CodingAgentSessionService;
     github: GithubApi;
+    traces: TraceApi;
     scope: CodingAgentScopeMembers;
     members: CodingAgentInfrastructure;
     processing: CodingAgentProcessingPipeline;
@@ -263,6 +268,7 @@ export class CodingAgentApp implements CodingAgentApi {
   }) {
     this.#codingAgents = codingAgents;
     this.#github = github;
+    this.#traces = traces;
     this.#scope = scope;
     this.#visibility = members.visibility;
     this.#audit = members.audit;
@@ -320,6 +326,16 @@ export class CodingAgentApp implements CodingAgentApi {
     traceId: string;
   }): Promise<CodingAgentSession | null> {
     return this.#codingAgents.findSessionForTrace(input);
+  }
+
+  /** Port of main's `traces.codingAgentTranscript`: trace redacts for the viewer, then builds. */
+  async readTranscriptForViewer(input: {
+    projectId: string;
+    traceId: string;
+    occurredAtMs?: number | undefined;
+    viewerUserId: string;
+  }): Promise<CodingAgentTranscript> {
+    return codingAgentTranscriptSchema.parse(await this.#traces.readCodingAgentTranscript(input));
   }
 
   linkTraceSessionsToPullRequests(

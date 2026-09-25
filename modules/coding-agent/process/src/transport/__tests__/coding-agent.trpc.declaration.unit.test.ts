@@ -52,6 +52,8 @@ describe("the codingAgents tRPC surface", () => {
         ["sessionsList", "query"],
         ["pullRequestUsage", "query"],
         ["pullRequestDetail", "query"],
+        ["session", "query"],
+        ["transcript", "query"],
       ]);
     });
 
@@ -63,6 +65,7 @@ describe("the codingAgents tRPC surface", () => {
   });
 
   describe("given the binding a process mounts", () => {
+    /** @scenario "The coding-agent trace reads need permission to view traces" */
     it("asks traces:view of every procedure, the cut traces asks", () => {
       expect(boundProcedures()).toEqual([
         { procedure: "codingAgents.usageTotals", permission: "traces:view" },
@@ -70,6 +73,8 @@ describe("the codingAgents tRPC surface", () => {
         { procedure: "codingAgents.sessionsList", permission: "traces:view" },
         { procedure: "codingAgents.pullRequestUsage", permission: "traces:view" },
         { procedure: "codingAgents.pullRequestDetail", permission: "traces:view" },
+        { procedure: "codingAgents.session", permission: "traces:view" },
+        { procedure: "codingAgents.transcript", permission: "traces:view" },
       ]);
     });
   });

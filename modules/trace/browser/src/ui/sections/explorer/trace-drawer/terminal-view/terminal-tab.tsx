@@ -40,7 +40,7 @@ export function TerminalTab({
   sessionName,
   conversationId,
 }: TerminalTabProps) {
-  const transcriptQuery = api.traces.codingAgentTranscript.useQuery(
+  const transcriptQuery = api.codingAgents.transcript.useQuery(
     { projectId, traceId, occurredAtMs },
     { refetchOnWindowFocus: false, staleTime: 60_000 },
   );
@@ -143,7 +143,7 @@ function useSessionCostUsd({
   projectId: string;
   traceId: string;
 }): number | null {
-  const sessionQuery = api.traces.codingAgentSession.useQuery(
+  const sessionQuery = api.codingAgents.session.useQuery(
     { projectId, traceId },
     { refetchOnWindowFocus: false, staleTime: 60_000 },
   );

@@ -5,10 +5,12 @@
  */
 import { defineTrpcContract } from "@langwatch/api/contract";
 
+import { codingAgentTranscriptSchema } from "./coding-agent-transcript.ts";
 import {
   codingAgentTrpcProjectScopeSchema,
   codingAgentTrpcPullRequestDetailInputSchema,
   codingAgentTrpcRecentSessionsInputSchema,
+  codingAgentTrpcTraceScopeSchema,
   codingAgentTrpcUsageTotalsInputSchema,
 } from "./coding-agent-trpc.schemas.ts";
 import {
@@ -49,4 +51,14 @@ export const codingAgentTrpc = defineTrpcContract("codingAgents")
   .query("pullRequestDetail")
   .withInput(codingAgentTrpcPullRequestDetailInputSchema)
   .withOutput(codingAgentPullRequestDetailSchema)
+
+  // The session one trace belongs to, or null. Main served it as `traces.codingAgentSession`.
+  .query("session")
+  .withInput(codingAgentTrpcTraceScopeSchema.omit({ occurredAtMs: true }))
+  .withOutput(codingAgentSessionSchema.nullable())
+
+  // One trace's transcript through the viewer's redactions. Main: `traces.codingAgentTranscript`.
+  .query("transcript")
+  .withInput(codingAgentTrpcTraceScopeSchema)
+  .withOutput(codingAgentTranscriptSchema)
   .build();

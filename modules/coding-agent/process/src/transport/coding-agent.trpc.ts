@@ -53,4 +53,21 @@ export const codingAgentTrpcTransport = defineTrpcRouter(CodingAgentApi, codingA
   .procedure("pullRequestDetail")
   .withPermission(CODING_AGENT_PERMISSION)
   .handle(({ app, input, actor }) => app.getPullRequestDetail(input, actor))
+
+  .procedure("session")
+  .withPermission(CODING_AGENT_PERMISSION)
+  .handle(({ app, input }) =>
+    app.findSessionForTrace({ projectId: input.projectId, traceId: input.traceId }),
+  )
+
+  .procedure("transcript")
+  .withPermission(CODING_AGENT_PERMISSION)
+  .handle(({ app, input, actor }) =>
+    app.readTranscriptForViewer({
+      projectId: input.projectId,
+      traceId: input.traceId,
+      occurredAtMs: input.occurredAtMs,
+      viewerUserId: actor.id,
+    }),
+  )
   .build();

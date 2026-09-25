@@ -72,7 +72,7 @@ async function readTurn({
     occurredAtMs: target.timestamp,
   };
   const [transcript, spans, events] = await Promise.all([
-    utils.traces.codingAgentTranscript.fetch(input, EARLIER_TURN_FETCH),
+    utils.codingAgents.transcript.fetch(input, EARLIER_TURN_FETCH),
     utils.traces.spansFull.fetch(input, EARLIER_TURN_FETCH).catch(() => []),
     utils.traces.traceEvents.fetch(input, EARLIER_TURN_FETCH).catch(() => []),
   ]);

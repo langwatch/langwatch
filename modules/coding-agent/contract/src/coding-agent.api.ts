@@ -79,6 +79,12 @@ export interface CodingAgentApi {
     projectId: string;
     traceId: string;
   }): Promise<CodingAgentSession | null>;
+  readTranscriptForViewer(input: {
+    projectId: string;
+    traceId: string;
+    occurredAtMs?: number | undefined;
+    viewerUserId: string;
+  }): Promise<CodingAgentTranscript>;
   linkTraceSessionsToPullRequests(
     input: CodingAgentTracePullRequestInput,
   ): Promise<CodingAgentTracePullRequestLink[]>;

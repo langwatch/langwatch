@@ -37,7 +37,10 @@ import type { TraceDateField } from "./trace-legacy-read.types.ts";
 import type { DiscoverResult, FacetValuesResult } from "./trace-list-view.ts";
 import type { LogTraceContribution } from "./trace-log-contribution.ts";
 import type {
+  TraceAttributedTrace,
   TraceAttributeMatch,
+  TraceAttributeUsageBucket,
+  TraceAttributeValueSpend,
   TraceDailySpend,
   TraceModelRequests,
   TraceModelSpend,
@@ -403,6 +406,29 @@ export interface TraceApi extends TraceOtlpIngestApi {
     projectId: string;
     window: TraceModelSpendWindow;
   }): Promise<TraceDailySpend[]>;
+  /** Per attribute value in `values`, the project's deduped spend and trace count in the window. */
+  findSpendByAttributeValue(input: {
+    projectId: string;
+    attributeKey: string;
+    values: string[];
+    window: TraceModelSpendWindow;
+  }): Promise<TraceAttributeValueSpend[]>;
+  /** The project's traces carrying the attribute (or one of `values`), per value, model and day. */
+  findAttributeUsageBuckets(input: {
+    projectId: string;
+    attributeKey: string;
+    window: TraceModelSpendWindow;
+    values?: string[];
+  }): Promise<TraceAttributeUsageBucket[]>;
+  /** The project's newest traces carrying the attribute, at most `limit`; `model` is the first. */
+  findAttributedTraces(input: {
+    projectId: string;
+    attributeKey: string;
+    window: TraceModelSpendWindow;
+    values?: string[];
+    model?: string;
+    limit: number;
+  }): Promise<TraceAttributedTrace[]>;
   readRecentSpansByModels(input: {
     projectId: string;
     models: string[];
@@ -541,8 +567,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
   ): Promise<TraceEditOverlayDto>;
   deleteTraceEditOverlay(input: { projectId: string; traceId: string }): Promise<void>;
   readEvaluationRuns(input: { tenantId: string; traceId: string }): Promise<unknown>;
-  readCodingAgentSession(input: { projectId: string; traceId: string }): Promise<unknown>;
-  /** Main's `codingAgentTranscript`: the transcript through the viewer's own protections. */
+  /** The transcript through the viewer's own protections; `codingAgents.transcript` reads it. */
   readCodingAgentTranscript(input: {
     projectId: string;
     traceId: string;

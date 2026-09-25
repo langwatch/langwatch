@@ -5,18 +5,12 @@
  */
 import { sharedFiltersInputSchema } from "@langwatch/analytics-contract";
 import { defineTrpcContract } from "@langwatch/api/contract";
-import { instantEvalEstimateSchema } from "@langwatch/instant-eval-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
 
 import { aiActionResultSchema, aiQueryResultSchema } from "./trace-ai-query.ts";
 import { evaluationSchema, traceSchema } from "./trace-format.schemas.ts";
-import {
-  explorerInstantEvalProgressSchema,
-  explorerInstantEvalRunIdSchema,
-  explorerInstantEvalRunSchema,
-  explorerInstantEvalRunsSchema,
-} from "./trace-instant-eval.schemas.ts";
+import { explorerInstantEvalRunsSchema } from "./trace-instant-eval.schemas.ts";
 import { discoverResultSchema, facetValuesResultSchema } from "./trace-list-view.ts";
 import {
   customersAndLabelsResultSchema,
@@ -404,27 +398,6 @@ export const tracesTrpc = defineTrpcContract("traces")
   .withInput(routeSearchInputSchema)
   .withOutput(routeSearchResultSchema)
 
-  /**
-   * An Instant Eval as the Explorer drives it: price it, start it, stop it,
-   * read it back. Flattened out of upstream's `instantEval.*` group: a
-   * declaration carries one namespace level. @see specs/traces-v2/instant-eval-search.feature
-   */
-  .mutation("instantEvalEstimate")
-  .withInput(explorerInstantEvalRunSchema)
-  .withOutput(instantEvalEstimateSchema)
-
-  .mutation("instantEvalStart")
-  .withInput(explorerInstantEvalRunSchema)
-  .withOutput(explorerInstantEvalProgressSchema)
-
-  .mutation("instantEvalCancel")
-  .withInput(explorerInstantEvalRunIdSchema)
-  .withOutput(explorerInstantEvalProgressSchema)
-
-  .query("instantEvalGet")
-  .withInput(explorerInstantEvalRunIdSchema)
-  .withOutput(explorerInstantEvalProgressSchema)
-
   .query("header")
   .withInput(
     z.object({
@@ -464,30 +437,6 @@ export const tracesTrpc = defineTrpcContract("traces")
     }),
   )
   .withOutput(tracesTraceLogsSchema)
-
-  /**
-   * The coding-agent transcript derived from the trace's redacted spans and logs.
-   * Unshaped here because coding-agent's contract depends on this one.
-   */
-  .query("codingAgentTranscript")
-  .withInput(
-    z.object({
-      projectId: z.string(),
-      traceId: z.string(),
-      ...spanReadHintShape,
-    }),
-  )
-  .withOutput(z.unknown())
-
-  /** The coding-agent session a trace belongs to, or null. Shaped by coding-agent. */
-  .query("codingAgentSession")
-  .withInput(
-    z.object({
-      projectId: z.string(),
-      traceId: z.string(),
-    }),
-  )
-  .withOutput(z.unknown())
 
   .query("spansPaginated")
   .withInput(

@@ -8,6 +8,13 @@ import { z } from "zod";
 /** Every procedure on this surface is asked about one project. */
 export const codingAgentTrpcProjectScopeSchema = z.object({ projectId: z.string() });
 
+/** One trace; `occurredAtMs` is the caller's hint for which partition holds it. */
+export const codingAgentTrpcTraceScopeSchema = z.object({
+  projectId: z.string(),
+  traceId: z.string(),
+  occurredAtMs: z.number().int().optional(),
+});
+
 /** Window bounds in epoch ms; an open end becomes the trailing thirty days. */
 export const codingAgentTrpcUsageTotalsInputSchema = z.object({
   projectId: z.string(),
