@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-// Port of main's directoryDepartmentSync unit and integration tests, over the memory tier.
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+// Port of main's directoryDepartmentSync unit and integration tests, over the memory tier.
 import { describe, expect, it } from "vitest";
 
 import { MemoryDepartmentRepository } from "../../repositories/memory/memory.department.repository.ts";
@@ -52,20 +52,14 @@ function harness(input: {
   const pointers = new Map(
     Object.entries(input.memberDepartments ?? { [MARIA]: null, [OTHER]: null }),
   );
-  /** Organization's open dated links, kept as its `assignMemberDepartment` keeps them. */
-  const links: { userId: string; departmentId: string }[] = [];
+  /** Governance's own dated links, which `DepartmentService.assignUser` records. */
+  const links = store.departmentMemberships;
   const organizations = createApiFixture<OrganizationApi>({
     assignMemberDepartment: async ({ userId, departmentId }) => {
       if (!pointers.has(userId)) return false;
       pointers.set(userId, departmentId);
-      const open = links.findIndex((link) => link.userId === userId);
-      if (open >= 0 && links[open]?.departmentId === departmentId) return true;
-      if (open >= 0) links.splice(open, 1);
-      if (departmentId !== null) links.push({ userId, departmentId });
       return true;
     },
-    findOpenMemberDepartmentLinks: async ({ userIds }) =>
-      links.filter((link) => userIds.includes(link.userId)),
     findMemberDepartments: async ({ userIds }) =>
       userIds.flatMap((userId) =>
         pointers.has(userId) ? [{ userId, departmentId: pointers.get(userId) ?? null }] : [],

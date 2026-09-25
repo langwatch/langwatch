@@ -2,7 +2,7 @@
 
 import type { Department } from "@langwatch/enterprise-governance-contract";
 import { generate } from "@langwatch/ksuid";
-import { nowInstant, toDate } from "@langwatch/time";
+import { nowInstant, Temporal, toDate, type Instant } from "@langwatch/time";
 
 import { DepartmentRepository } from "../department.repository.ts";
 import type { MemoryGovernanceStore } from "./memory.governance.store.ts";
@@ -74,5 +74,62 @@ export class MemoryDepartmentRepository extends DepartmentRepository {
     if (index < 0) return false;
     this.store.departments.splice(index, 1);
     return true;
+  }
+
+  async recordMemberDepartment(input: {
+    organizationId: string;
+    userId: string;
+    departmentId: string | null;
+    at: Instant;
+  }): Promise<void> {
+    const { organizationId, userId, departmentId } = input;
+    const links = this.store.departmentMemberships;
+    const open = links.find(
+      (link) =>
+        link.organizationId === organizationId && link.userId === userId && link.validTo === null,
+    );
+    if (open?.departmentId === departmentId) return;
+    if (open) open.validTo = input.at;
+    if (departmentId !== null) {
+      links.push({
+        id: `department_link_${links.length + 1}`,
+        organizationId,
+        userId,
+        departmentId,
+        validFrom: input.at,
+        validTo: null,
+      });
+    }
+  }
+
+  async findMemberDepartmentsOnDay(input: {
+    organizationId: string;
+    userIds: readonly string[];
+    dayUtc: string;
+  }): Promise<{ userId: string; departmentId: string }[]> {
+    const endOfDay = Temporal.Instant.from(`${input.dayUtc}T23:59:59.999Z`).epochMilliseconds;
+    return this.#links(input)
+      .filter(
+        (link) =>
+          link.validFrom.epochMilliseconds <= endOfDay &&
+          (link.validTo === null || link.validTo.epochMilliseconds > endOfDay),
+      )
+      .map(({ userId, departmentId }) => ({ userId, departmentId }));
+  }
+
+  async findOpenMemberDepartmentLinks(input: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<{ userId: string; departmentId: string }[]> {
+    return this.#links(input)
+      .filter((link) => link.validTo === null)
+      .map(({ userId, departmentId }) => ({ userId, departmentId }));
+  }
+
+  #links(input: { organizationId: string; userIds: readonly string[] }) {
+    const wanted = new Set(input.userIds);
+    return this.store.departmentMemberships.filter(
+      (link) => link.organizationId === input.organizationId && wanted.has(link.userId),
+    );
   }
 }

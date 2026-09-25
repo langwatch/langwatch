@@ -119,7 +119,7 @@
       "id": "gateway",
       "root": "modules/gateway",
       "classification": "core",
-      "subjects": ["gateway", "personal-virtual-key", "routing-policy", "virtual-key"]
+      "subjects": ["gateway", "virtual-key"]
     },
     {
       "id": "github",
@@ -316,6 +316,12 @@
       "subjects": ["enterprise-ops"]
     },
     {
+      "id": "enterprise-gateway",
+      "root": "enterprise/modules/enterprise-gateway",
+      "classification": "enterprise",
+      "subjects": ["enterprise-gateway", "personal-virtual-key", "routing-policy"]
+    },
+    {
       "id": "governance",
       "root": "enterprise/modules/governance",
       "classification": "enterprise",
@@ -341,6 +347,7 @@
         "pulled-usage",
         "puller",
         "quarantine-fill",
+        "session-policy",
         "spend-spike-anomaly"
       ]
     },

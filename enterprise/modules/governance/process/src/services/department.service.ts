@@ -6,18 +6,15 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { nowInstant } from "@langwatch/time";
 
 import type { DepartmentRepository } from "../repositories/department.repository.ts";
 
-/**
- * Members, their dated links and teams sit in organization's tables, so they are read and written
- * there.
- */
+/** Members and teams sit in organization's tables; the dated links are this module's own. */
 export type DepartmentOrganizations = Pick<
   OrganizationApi,
   | "findMembersWithDepartments"
   | "assignMemberDepartment"
-  | "findMemberDepartmentsOnDay"
   | "findTeamsWithDepartments"
   | "assignTeamDepartment"
 >;
@@ -77,7 +74,7 @@ export class DepartmentService {
     userIds: readonly string[];
     dayUtc: string;
   }): Promise<Map<string, string>> {
-    const links = await this.organizations.findMemberDepartmentsOnDay(input);
+    const links = await this.repository.findMemberDepartmentsOnDay(input);
     return new Map(links.map((link) => [link.userId, link.departmentId]));
   }
 
@@ -112,6 +109,14 @@ export class DepartmentService {
     if (!(await this.organizations.assignMemberDepartment(input))) {
       throw new DepartmentAssignmentTargetNotFoundError("user");
     }
+    await this.repository.recordMemberDepartment({ ...input, at: nowInstant() });
+  }
+
+  findOpenUserLinks(input: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<{ userId: string; departmentId: string }[]> {
+    return this.repository.findOpenMemberDepartmentLinks(input);
   }
 
   async assignTeam(input: {

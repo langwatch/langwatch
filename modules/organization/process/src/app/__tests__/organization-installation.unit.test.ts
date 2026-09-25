@@ -55,4 +55,16 @@ describe("organization app installation", () => {
       await runtime.stop();
     }
   });
+
+  it("leaves the dated department-link reads to governance, which owns the table", async () => {
+    const runtime = await process("api").boot();
+
+    try {
+      const organizations = runtime.service(OrganizationApi);
+      expect("findMemberDepartmentsOnDay" in organizations).toBe(false);
+      expect("findOpenMemberDepartmentLinks" in organizations).toBe(false);
+    } finally {
+      await runtime.stop();
+    }
+  });
 });

@@ -410,57 +410,14 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     organizationId: string;
     userId: string;
     departmentId: string | null;
-    at: Instant;
   }): Promise<boolean> {
-    const { organizationId, userId, departmentId } = input;
     const row = this.memory.organizationUsers.find(
-      (candidate) => candidate.organizationId === organizationId && candidate.userId === userId,
+      (candidate) =>
+        candidate.organizationId === input.organizationId && candidate.userId === input.userId,
     );
     if (!row) return false;
-    row.departmentId = departmentId;
-
-    const links = this.memory.departmentMemberships;
-    const open = links.find(
-      (link) =>
-        link.organizationId === organizationId && link.userId === userId && link.validTo === null,
-    );
-    if (open?.departmentId === departmentId) return true;
-    if (open) open.validTo = input.at;
-    if (departmentId !== null) {
-      links.push({
-        id: `department_link_${links.length + 1}`,
-        organizationId,
-        userId,
-        departmentId,
-        validFrom: input.at,
-        validTo: null,
-      });
-    }
+    row.departmentId = input.departmentId;
     return true;
-  }
-
-  async findMemberDepartmentsOnDay(input: {
-    organizationId: string;
-    userIds: readonly string[];
-    dayUtc: string;
-  }): Promise<{ userId: string; departmentId: string }[]> {
-    const endOfDay = Temporal.Instant.from(`${input.dayUtc}T23:59:59.999Z`).epochMilliseconds;
-    return this.#links(input)
-      .filter(
-        (link) =>
-          link.validFrom.epochMilliseconds <= endOfDay &&
-          (link.validTo === null || link.validTo.epochMilliseconds > endOfDay),
-      )
-      .map(({ userId, departmentId }) => ({ userId, departmentId }));
-  }
-
-  async findOpenMemberDepartmentLinks(input: {
-    organizationId: string;
-    userIds: readonly string[];
-  }): Promise<{ userId: string; departmentId: string }[]> {
-    return this.#links(input)
-      .filter((link) => link.validTo === null)
-      .map(({ userId, departmentId }) => ({ userId, departmentId }));
   }
 
   async findTeamsWithDepartments({
@@ -483,13 +440,6 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     if (team?.organizationId !== input.organizationId) return false;
     team.departmentId = input.departmentId;
     return true;
-  }
-
-  #links(input: { organizationId: string; userIds: readonly string[] }) {
-    const wanted = new Set(input.userIds);
-    return this.memory.departmentMemberships.filter(
-      (link) => link.organizationId === input.organizationId && wanted.has(link.userId),
-    );
   }
 
   async findMemberDepartments({

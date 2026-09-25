@@ -1,5 +1,6 @@
 import { departmentSchema, type Department } from "@langwatch/enterprise-governance-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { toDate, type Instant } from "@langwatch/time";
 
 import { DepartmentRepository } from "../department.repository.ts";
 
@@ -7,7 +8,10 @@ import { DepartmentRepository } from "../department.repository.ts";
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type DepartmentDatabase = Pick<PrismaClient, "department">;
+export type DepartmentDatabase = Pick<
+  PrismaClient,
+  "department" | "departmentMembershipHistory" | "$transaction"
+>;
 
 export class PrismaDepartmentRepository extends DepartmentRepository {
   private constructor(private readonly prisma: DepartmentDatabase) {
@@ -72,6 +76,69 @@ export class PrismaDepartmentRepository extends DepartmentRepository {
       data: { archivedAt: new Date() },
     });
     return result.count > 0;
+  }
+
+  async recordMemberDepartment(input: {
+    organizationId: string;
+    userId: string;
+    departmentId: string | null;
+    at: Instant;
+  }): Promise<void> {
+    const { organizationId, userId, departmentId } = input;
+    await this.prisma.$transaction(async (tx) => {
+      const open = await tx.departmentMembershipHistory.findFirst({
+        where: { organizationId, userId, validTo: null },
+      });
+      if (open?.departmentId === departmentId) return;
+
+      const at = toDate(input.at);
+      if (open) {
+        await tx.departmentMembershipHistory.update({
+          where: { id: open.id },
+          data: { validTo: at },
+        });
+      }
+      if (departmentId !== null) {
+        await tx.departmentMembershipHistory.create({
+          data: { organizationId, userId, departmentId, validFrom: at },
+        });
+      }
+    });
+  }
+
+  async findMemberDepartmentsOnDay({
+    organizationId,
+    userIds,
+    dayUtc,
+  }: {
+    organizationId: string;
+    userIds: readonly string[];
+    dayUtc: string;
+  }): Promise<{ userId: string; departmentId: string }[]> {
+    if (userIds.length === 0) return [];
+    const endOfDay = new Date(`${dayUtc}T23:59:59.999Z`);
+    return this.prisma.departmentMembershipHistory.findMany({
+      where: {
+        organizationId,
+        userId: { in: [...userIds] },
+        validFrom: { lte: endOfDay },
+        OR: [{ validTo: null }, { validTo: { gt: endOfDay } }],
+      },
+      select: { userId: true, departmentId: true },
+    });
+  }
+
+  async findOpenMemberDepartmentLinks({
+    organizationId,
+    userIds,
+  }: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<{ userId: string; departmentId: string }[]> {
+    return this.prisma.departmentMembershipHistory.findMany({
+      where: { organizationId, userId: { in: [...userIds] }, validTo: null },
+      select: { userId: true, departmentId: true },
+    });
   }
 
   private async tryFindActiveByName(input: {

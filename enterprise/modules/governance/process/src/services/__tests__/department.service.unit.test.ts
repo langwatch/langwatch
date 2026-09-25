@@ -5,6 +5,7 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { MemoryDepartmentRepository } from "../../repositories/memory/memory.department.repository.ts";
@@ -30,7 +31,12 @@ async function harness(options: { targetExists?: boolean } = {}) {
       },
     ],
     findTeamsWithDepartments: async () => [{ id: "team-1", name: "Web", departmentId: null }],
-    findMemberDepartmentsOnDay: async () => [{ userId: "user-1", departmentId: department.id }],
+  });
+  await repository.recordMemberDepartment({
+    organizationId: ORG,
+    userId: "user-1",
+    departmentId: department.id,
+    at: Temporal.Instant.from("2026-01-01T00:00:00Z"),
   });
   const projects = createApiFixture<ProjectApi>({
     assignProjectDepartment: async ({ projectId }) => (writes.push(`project:${projectId}`), exists),
@@ -39,7 +45,7 @@ async function harness(options: { targetExists?: boolean } = {}) {
     ],
   });
   const service = DepartmentService.create({ repository, organizations, projects });
-  return { service, department, writes };
+  return { service, department, writes, repository };
 }
 
 describe("DepartmentService", () => {
@@ -77,6 +83,30 @@ describe("DepartmentService", () => {
     await expect(
       service.assignUser({ organizationId: ORG, userId: "ghost", departmentId: null }),
     ).rejects.toBeInstanceOf(DepartmentAssignmentTargetNotFoundError);
+  });
+
+  it("dates the member's link once organization has moved the column, once per resend", async () => {
+    const { service, department, repository } = await harness();
+    const assign = () =>
+      service.assignUser({ organizationId: ORG, userId: "user-3", departmentId: department.id });
+
+    await assign();
+    await assign();
+
+    expect(
+      await repository.findOpenMemberDepartmentLinks({ organizationId: ORG, userIds: ["user-3"] }),
+    ).toEqual([{ userId: "user-3", departmentId: department.id }]);
+  });
+
+  it("dates no link for someone organization has no member row for", async () => {
+    const { service, department, repository } = await harness({ targetExists: false });
+
+    await expect(
+      service.assignUser({ organizationId: ORG, userId: "ghost", departmentId: department.id }),
+    ).rejects.toBeInstanceOf(DepartmentAssignmentTargetNotFoundError);
+    expect(
+      await repository.findOpenMemberDepartmentLinks({ organizationId: ORG, userIds: ["ghost"] }),
+    ).toEqual([]);
   });
 
   it("returns the tenant-scoped row after renaming", async () => {

@@ -427,22 +427,7 @@ export class OrganizationMembershipService {
     userId: string;
     departmentId: string | null;
   }): Promise<boolean> {
-    return this.repo.assignMemberDepartment({ ...input, at: nowInstant() });
-  }
-
-  findMemberDepartmentsOnDay(input: {
-    organizationId: string;
-    userIds: readonly string[];
-    dayUtc: string;
-  }): Promise<{ userId: string; departmentId: string }[]> {
-    return this.repo.findMemberDepartmentsOnDay(input);
-  }
-
-  findOpenMemberDepartmentLinks(input: {
-    organizationId: string;
-    userIds: readonly string[];
-  }): Promise<{ userId: string; departmentId: string }[]> {
-    return this.repo.findOpenMemberDepartmentLinks(input);
+    return this.repo.assignMemberDepartment(input);
   }
 
   findTeamsWithDepartments(input: {

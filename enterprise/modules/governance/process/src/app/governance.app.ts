@@ -461,8 +461,6 @@ export interface GovernanceAppDependencies {
       | "findMemberDepartments"
       | "findMembersWithDepartments"
       | "assignMemberDepartment"
-      | "findMemberDepartmentsOnDay"
-      | "findOpenMemberDepartmentLinks"
       | "findTeamsWithDepartments"
       | "findMemberTeamIds"
       | "assignTeamDepartment"

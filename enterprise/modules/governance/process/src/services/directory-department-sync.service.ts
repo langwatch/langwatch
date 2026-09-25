@@ -14,11 +14,14 @@ import type { IdentityMatchService } from "./identity-match.service.ts";
 const logger = createLogger("langwatch:governance:directory-departments");
 
 export interface DirectoryDepartmentSyncDependencies {
-  departments: Pick<DepartmentService, "resolveByNameOrCreate" | "assignUser">;
+  departments: Pick<
+    DepartmentService,
+    "resolveByNameOrCreate" | "assignUser" | "findOpenUserLinks"
+  >;
   matcher: Pick<IdentityMatchService, "loadAccountIndex">;
   discoveredPeople: Pick<DiscoveredPersonRepository, "findByActorIds">;
   matches: Pick<IdentityMatchRepository, "findOpenByOrganization">;
-  organizations: Pick<OrganizationApi, "findMemberDepartments" | "findOpenMemberDepartmentLinks">;
+  organizations: Pick<OrganizationApi, "findMemberDepartments">;
 }
 
 /**
@@ -113,7 +116,7 @@ export class DirectoryDepartmentSyncService {
     const userIds = [...desired.keys()];
     const [memberships, openLinks] = await Promise.all([
       this.deps.organizations.findMemberDepartments({ organizationId, userIds }),
-      this.deps.organizations.findOpenMemberDepartmentLinks({ organizationId, userIds }),
+      this.deps.departments.findOpenUserLinks({ organizationId, userIds }),
     ]);
     const currentByUser = new Map(memberships.map((m) => [m.userId, m.departmentId]));
     const openLinkByUser = new Map(openLinks.map((link) => [link.userId, link.departmentId]));

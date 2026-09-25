@@ -56,8 +56,6 @@ describe("OrganizationMembershipService", () => {
     findMemberTeamIds: vi.fn(),
     findMembersWithDepartments: vi.fn(),
     assignMemberDepartment: vi.fn(),
-    findMemberDepartmentsOnDay: vi.fn(),
-    findOpenMemberDepartmentLinks: vi.fn(),
     findTeamsWithDepartments: vi.fn(),
     assignTeamDepartment: vi.fn(),
     getMembership: vi.fn(),

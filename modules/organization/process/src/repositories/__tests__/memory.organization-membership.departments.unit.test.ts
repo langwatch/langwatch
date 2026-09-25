@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
- * The member-department reads and write governance's departments go through.
+ * The member-department column governance's departments read and write.
+ * The dated links are governance's own.
  */
 import { OrganizationUserRole } from "@langwatch/organization-contract";
 import { Temporal } from "@langwatch/time";
@@ -83,7 +84,6 @@ describe("the member department column", () => {
           organizationId: ACME,
           userId: "maria",
           departmentId: "dept_eng",
-          at: EPOCH,
         }),
       ).resolves.toBe(true);
       await expect(
@@ -91,7 +91,6 @@ describe("the member department column", () => {
           organizationId: ACME,
           userId: "nobody",
           departmentId: null,
-          at: EPOCH,
         }),
       ).resolves.toBe(false);
 
@@ -101,69 +100,6 @@ describe("the member department column", () => {
       expect(
         await repository.findMemberDepartments({ organizationId: ACME, userIds: ["maria"] }),
       ).toEqual([{ userId: "maria", departmentId: "dept_eng" }]);
-    });
-  });
-
-  describe("when a member is reassigned over several days", () => {
-    const at = (iso: string) => Temporal.Instant.from(iso);
-    const assign = (
-      repository: ReturnType<typeof harness>["repository"],
-      departmentId: string | null,
-      iso: string,
-    ) =>
-      repository.assignMemberDepartment({
-        organizationId: ACME,
-        userId: "maria",
-        departmentId,
-        at: at(iso),
-      });
-
-    it("dates each move so a past day resolves to where the member ended it", async () => {
-      const { member, repository } = harness();
-      member("maria", ACME);
-      await assign(repository, "dept_eng", "2026-01-10T09:00:00Z");
-      await assign(repository, "dept_ops", "2026-02-03T12:00:00Z");
-      const onDay = (dayUtc: string) =>
-        repository.findMemberDepartmentsOnDay({ organizationId: ACME, userIds: ["maria"], dayUtc });
-
-      expect(await onDay("2026-01-09")).toEqual([]);
-      expect(await onDay("2026-01-20")).toEqual([{ userId: "maria", departmentId: "dept_eng" }]);
-      expect(await onDay("2026-02-03")).toEqual([{ userId: "maria", departmentId: "dept_ops" }]);
-    });
-
-    it("keeps the open link when the standing department is asserted again", async () => {
-      const { member, memory, repository } = harness();
-      member("maria", ACME);
-      await assign(repository, "dept_eng", "2026-01-10T09:00:00Z");
-      await assign(repository, "dept_eng", "2026-01-11T09:00:00Z");
-
-      expect(memory.departmentMemberships).toHaveLength(1);
-      expect(
-        await repository.findOpenMemberDepartmentLinks({
-          organizationId: ACME,
-          userIds: ["maria"],
-        }),
-      ).toEqual([{ userId: "maria", departmentId: "dept_eng" }]);
-    });
-
-    it("closes the open link and opens none when the department is cleared", async () => {
-      const { member, repository } = harness();
-      member("maria", ACME);
-      await assign(repository, "dept_eng", "2026-01-10T09:00:00Z");
-      await assign(repository, null, "2026-01-12T09:00:00Z");
-
-      expect(
-        await repository.findOpenMemberDepartmentLinks({
-          organizationId: ACME,
-          userIds: ["maria"],
-        }),
-      ).toEqual([]);
-    });
-
-    it("writes no link for someone who is not a member", async () => {
-      const { memory, repository } = harness();
-      await expect(assign(repository, "dept_eng", "2026-01-10T09:00:00Z")).resolves.toBe(false);
-      expect(memory.departmentMemberships).toEqual([]);
     });
   });
 

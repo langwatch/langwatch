@@ -345,7 +345,7 @@ export interface OrganizationApi {
     }[]
   >;
   /**
-   * Points one member at a department (or clears it) and dates the link, in one transaction; false
+   * Points one member at a department (or clears it), then has governance date the link; false
    * when no such member (main `department.service.ts:229-282`).
    */
   assignMemberDepartment(input: {
@@ -360,23 +360,6 @@ export interface OrganizationApi {
   }): Promise<{ userId: string; departmentId: string | null }[]>;
   /** The organization's teams the member belongs to (main `aiToolEntry.service.ts:1278`). */
   findMemberTeamIds(input: { organizationId: string; userId: string }): Promise<string[]>;
-  /**
-   * Each named member's department on a UTC day, from the link open at the day's end (main
-   * `department.service.ts:293-316`).
-   */
-  findMemberDepartmentsOnDay(input: {
-    organizationId: string;
-    userIds: readonly string[];
-    dayUtc: string;
-  }): Promise<{ userId: string; departmentId: string }[]>;
-  /**
-   * Each named member's open dated department link (main
-   * `directoryDepartmentSync.service.ts:220-227`).
-   */
-  findOpenMemberDepartmentLinks(input: {
-    organizationId: string;
-    userIds: readonly string[];
-  }): Promise<{ userId: string; departmentId: string }[]>;
   /** Every team with its department (main `department.service.ts:121-125`). */
   findTeamsWithDepartments(input: {
     organizationId: string;
