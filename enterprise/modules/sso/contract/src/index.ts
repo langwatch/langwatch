@@ -69,6 +69,7 @@ export {
 } from "./sso-self-serve.contract.ts";
 export {
   activateSsoConnectionInputSchema,
+  attestSsoDomainInputSchema,
   backofficeSsoConnectionPageSchema,
   backofficeSsoConnectionSchema,
   listSsoConnectionsInputSchema,
@@ -80,6 +81,7 @@ export {
   ssoConnectionTargetSchema,
   ssoDomainTargetSchema,
   type ActivateSsoConnectionInput,
+  type AttestSsoDomainInput,
   type BackofficeSsoConnection,
   type BackofficeSsoConnectionPage,
   type ListSsoConnectionsInput,

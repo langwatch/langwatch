@@ -36,6 +36,7 @@ import type {
   BackofficeSsoConnectionPage,
   ListSsoConnectionsInput,
   RegisterSsoConnectionInput,
+  AttestSsoDomainInput,
   RejectSsoDomainClaimInput,
   SsoConnectionByIdInput,
   SsoConnectionReasonInput,
@@ -93,7 +94,7 @@ export interface SsoApi {
   claimDomain(input: SsoDomainTarget, by: SsoOperator): Promise<void>;
   approveDomainClaim(input: SsoDomainTarget, by: SsoOperator): Promise<void>;
   rejectDomainClaim(input: RejectSsoDomainClaimInput, by: SsoOperator): Promise<void>;
-  attestDomain(input: SsoDomainTarget, by: SsoOperator): Promise<void>;
+  attestDomain(input: AttestSsoDomainInput, by: SsoOperator): Promise<void>;
   activateConnection(input: ActivateSsoConnectionInput, by: SsoOperator): Promise<void>;
   suspendConnection(input: SsoConnectionReasonInput, by: SsoOperator): Promise<void>;
   resumeConnection(input: SsoConnectionTarget, by: SsoOperator): Promise<void>;

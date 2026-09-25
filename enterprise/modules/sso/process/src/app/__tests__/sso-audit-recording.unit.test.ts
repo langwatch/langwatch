@@ -18,7 +18,13 @@ import {
 
 const STAFF_ID = "user_olive";
 const CUSTOMER_ID = "user_customer";
-const TARGET = { organizationId: "org_acme", connectionId: "ssoc_1", domain: "acme.com" };
+const TARGET = {
+  organizationId: "org_acme",
+  connectionId: "ssoc_1",
+  domain: "acme.com",
+  evidenceRef: "ticket:SEC-123",
+  note: "Signed contract names acme.com",
+};
 
 async function harness() {
   const record = vi.fn<AuditLogApi["record"]>(async () => ({ id: "audit", occurredAt: 0 }));

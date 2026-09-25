@@ -10,6 +10,7 @@ import type {
   BackofficeSsoConnectionPage,
   ListSsoConnectionsInput,
   RegisterSsoConnectionInput,
+  AttestSsoDomainInput,
   RejectSsoDomainClaimInput,
   SsoBreakGlassBinding,
   SsoBreakGlassBindingInput,
@@ -52,7 +53,7 @@ export interface SsoConnectionLedger {
   claimDomain(input: Commanded<SsoDomainTarget>): Promise<void>;
   approveDomainClaim(input: Commanded<SsoDomainTarget>): Promise<void>;
   rejectDomainClaim(input: Commanded<RejectSsoDomainClaimInput>): Promise<void>;
-  attestDomain(input: Commanded<SsoDomainTarget>): Promise<void>;
+  attestDomain(input: Commanded<AttestSsoDomainInput>): Promise<void>;
   activateConnection(input: Commanded<ActivateSsoConnectionInput>): Promise<void>;
   suspendConnection(input: Commanded<SsoConnectionReasonInput>): Promise<void>;
   resumeConnection(input: Commanded<SsoConnectionTarget>): Promise<void>;

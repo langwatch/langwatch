@@ -123,7 +123,13 @@ type BorrowedProcedures = {
     };
     attestDomain: {
       mutation: {
-        input: { organizationId: string; connectionId: string; domain: string };
+        input: {
+          organizationId: string;
+          connectionId: string;
+          domain: string;
+          evidenceRef: string;
+          note: string;
+        };
         output: undefined;
       };
     };

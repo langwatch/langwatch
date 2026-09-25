@@ -91,6 +91,7 @@ async function harness() {
 }
 
 const TARGET = { organizationId: "org_acme", connectionId: "ssoc_1" };
+const EVIDENCE = { evidenceRef: "ticket:SEC-123", note: "Signed contract names acme.com" };
 
 describe("the back-office single sign-on surface", () => {
   let context: Awaited<ReturnType<typeof harness>>;
@@ -105,7 +106,7 @@ describe("the back-office single sign-on surface", () => {
 
       // The hidden-surface error, not a FORBIDDEN: the surface does not confirm
       // its own existence to whoever is probing it.
-      const denial = await caller.attestDomain({ ...TARGET, domain: "acme.com" }).then(
+      const denial = await caller.attestDomain({ ...TARGET, ...EVIDENCE, domain: "acme.com" }).then(
         () => {
           throw new Error("attestDomain resolved: the back office gate let the call through");
         },
@@ -128,7 +129,7 @@ describe("the back-office single sign-on surface", () => {
         () => caller.getById({ connectionId: "ssoc_1" }),
         () => caller.claimDomain({ ...TARGET, domain: "acme.com" }),
         () => caller.approveDomainClaim({ ...TARGET, domain: "acme.com" }),
-        () => caller.attestDomain({ ...TARGET, domain: "acme.com" }),
+        () => caller.attestDomain({ ...TARGET, ...EVIDENCE, domain: "acme.com" }),
         () => caller.activate({ ...TARGET, testLoginAccountId: "acc_test" }),
         () => caller.suspend({ ...TARGET, reason: null }),
         () => caller.resume(TARGET),
@@ -153,7 +154,7 @@ describe("the back-office single sign-on surface", () => {
 
       await caller.claimDomain({ ...TARGET, domain: "acme.com" });
       await caller.approveDomainClaim({ ...TARGET, domain: "acme.com" });
-      await caller.attestDomain({ ...TARGET, domain: "acme.com" });
+      await caller.attestDomain({ ...TARGET, ...EVIDENCE, domain: "acme.com" });
       await caller.activate({ ...TARGET, testLoginAccountId: "acc_test" });
       await caller.suspend({ ...TARGET, reason: null });
       await caller.resume(TARGET);
@@ -193,7 +194,7 @@ describe("the back-office single sign-on surface", () => {
     it("reads the impersonator, so debugging a customer stays operator work", async () => {
       const caller = context.callerFor({ id: CUSTOMER_ID, impersonatorId: STAFF_ID });
 
-      await caller.attestDomain({ ...TARGET, domain: "acme.com" });
+      await caller.attestDomain({ ...TARGET, ...EVIDENCE, domain: "acme.com" });
 
       expect(context.connections.attestDomain.mock.calls[0]![0]).toMatchObject({
         operator: { userId: STAFF_ID },
@@ -202,7 +203,7 @@ describe("the back-office single sign-on surface", () => {
 
     it("records the command in the audit log once the ledger has run it", async () => {
       const caller = context.callerFor({ id: STAFF_ID });
-      await caller.attestDomain({ ...TARGET, domain: "acme.com" });
+      await caller.attestDomain({ ...TARGET, ...EVIDENCE, domain: "acme.com" });
 
       expect(context.record).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -235,6 +236,32 @@ describe("the back-office single sign-on surface", () => {
           note: "the requester could not be reached at that domain",
         }),
       );
+    });
+
+    it("audits an attestation's evidence and keeps its note out of the row", async () => {
+      const caller = context.callerFor({ id: STAFF_ID });
+      await caller.attestDomain({ ...TARGET, ...EVIDENCE, domain: "acme.com" });
+
+      const audited = context.record.mock.calls[0]?.[0];
+      expect(audited?.args).toMatchObject({ evidenceRef: "ticket:SEC-123" });
+      expect(audited?.args).not.toHaveProperty("note");
+      expect(context.connections.attestDomain).toHaveBeenCalledWith(
+        expect.objectContaining({ evidenceRef: "ticket:SEC-123", note: EVIDENCE.note }),
+      );
+    });
+
+    it("refuses an attestation without evidence before the ledger is asked", async () => {
+      const caller = context.callerFor({ id: STAFF_ID });
+
+      await expect(
+        caller.attestDomain({
+          ...TARGET,
+          domain: "acme.com",
+          evidenceRef: " ",
+          note: EVIDENCE.note,
+        }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      expect(context.connections.attestDomain).not.toHaveBeenCalled();
     });
 
     /** @scenario "Setting up a SAML connection is not something anybody does themselves yet" */

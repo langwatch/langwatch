@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import {
   activateSsoConnectionInputSchema,
+  attestSsoDomainInputSchema,
   backofficeSsoConnectionPageSchema,
   backofficeSsoConnectionSchema,
   listSsoConnectionsInputSchema,
@@ -49,7 +50,7 @@ export const ssoConnectionTrpc = defineTrpcContract("ssoConnections")
   .withOutput(z.void())
 
   .mutation("attestDomain")
-  .withInput(ssoDomainTargetSchema)
+  .withInput(attestSsoDomainInputSchema)
   .withOutput(z.void())
 
   .mutation("activate")

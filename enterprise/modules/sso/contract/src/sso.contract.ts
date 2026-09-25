@@ -90,6 +90,14 @@ export const rejectSsoDomainClaimInputSchema = z.object({
 });
 export type RejectSsoDomainClaimInput = z.infer<typeof rejectSsoDomainClaimInputSchema>;
 
+/** Vouching for a domain names the evidence and why it proves control. */
+export const attestSsoDomainInputSchema = z.object({
+  ...ssoDomainTargetSchema.shape,
+  evidenceRef: z.string().trim().min(1).max(500),
+  note: z.string().trim().min(1).max(1_000),
+});
+export type AttestSsoDomainInput = z.infer<typeof attestSsoDomainInputSchema>;
+
 /**
  * The protocol union the aggregate speaks, so a SAML request reaches the ledger
  * and is refused BY NAME. Narrowing it to `"oidc"` would tell the operator the

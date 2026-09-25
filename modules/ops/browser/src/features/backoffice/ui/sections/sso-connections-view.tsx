@@ -2,7 +2,9 @@ import {
   Badge,
   Box,
   Button,
+  Field,
   HStack,
+  Input,
   SimpleGrid,
   Table,
   Text,
@@ -239,11 +241,13 @@ function rowActionsFor({
   connection,
   commands,
   onOpen,
+  onStartAttest,
   onStartRemoval,
 }: {
   connection: ConnectionRow;
   commands: ReturnType<typeof useConnectionCommands>;
   onOpen: (connectionId: string) => void;
+  onStartAttest: (domain: string) => void;
   onStartRemoval: () => void;
 }): RowAction[] {
   const target = {
@@ -268,7 +272,7 @@ function rowActionsFor({
     approved && {
       value: "attest",
       label: `Vouch for ${approved}`,
-      run: () => commands.attestDomain.mutate({ ...target, domain: approved }),
+      run: () => onStartAttest(approved),
     },
     connection.state === "VERIFIED" && {
       value: "activate",
@@ -305,11 +309,13 @@ function RowActions({
   onOpen: (connectionId: string) => void;
 }) {
   const [removing, setRemoving] = useState(false);
+  const [attesting, setAttesting] = useState<string | null>(null);
   const commands = useConnectionCommands();
   const actions = rowActionsFor({
     connection,
     commands,
     onOpen,
+    onStartAttest: setAttesting,
     onStartRemoval: () => setRemoving(true),
   });
 
@@ -345,6 +351,22 @@ function RowActions({
         </Menu.Content>
       </Menu.Root>
 
+      <AttestDomainDialog
+        domain={attesting}
+        onClose={() => setAttesting(null)}
+        onConfirm={({ evidenceRef, note }) => {
+          if (!attesting) return;
+          commands.attestDomain.mutate({
+            organizationId: connection.organizationId,
+            connectionId: connection.connectionId,
+            domain: attesting,
+            evidenceRef,
+            note,
+          });
+          setAttesting(null);
+        }}
+      />
+
       <RemoveConnectionDialog
         connection={connection}
         open={removing}
@@ -359,6 +381,75 @@ function RowActions({
         }}
       />
     </>
+  );
+}
+
+/** Vouching stands in for the customer proving the domain, so it records what proved it. */
+function AttestDomainDialog({
+  domain,
+  onClose,
+  onConfirm,
+}: {
+  domain: string | null;
+  onClose: () => void;
+  onConfirm: (evidence: { evidenceRef: string; note: string }) => void;
+}) {
+  const [evidenceRef, setEvidenceRef] = useState("");
+  const [note, setNote] = useState("");
+
+  useEffect(() => {
+    if (domain) {
+      setEvidenceRef("");
+      setNote("");
+    }
+  }, [domain]);
+
+  const complete = evidenceRef.trim().length > 0 && note.trim().length > 0;
+
+  return (
+    <Dialog.Root
+      open={domain !== null}
+      onOpenChange={({ open: next }) => {
+        if (!next) onClose();
+      }}
+    >
+      <Dialog.Content onClick={(event) => event.stopPropagation()}>
+        <Dialog.Header>
+          <Dialog.Title>{`Vouch for ${domain ?? ""}?`}</Dialog.Title>
+        </Dialog.Header>
+        <Dialog.Body>
+          <VStack align="stretch" gap={3}>
+            <Text>
+              Vouching confirms the customer controls {domain} without asking them to publish a
+              record. Say what proved it, so anyone reading this connection later can check.
+            </Text>
+            <Field.Root required>
+              <Field.Label>Evidence reference</Field.Label>
+              <Input
+                value={evidenceRef}
+                onChange={(event) => setEvidenceRef(event.target.value)}
+                placeholder="Ticket, contract, or verification record"
+              />
+            </Field.Root>
+            <Field.Root required>
+              <Field.Label>Why does this evidence prove domain control?</Field.Label>
+              <Textarea rows={3} value={note} onChange={(event) => setNote(event.target.value)} />
+            </Field.Root>
+          </VStack>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            disabled={!complete}
+            onClick={() => onConfirm({ evidenceRef: evidenceRef.trim(), note: note.trim() })}
+          >
+            Vouch for domain
+          </Button>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog.Root>
   );
 }
 

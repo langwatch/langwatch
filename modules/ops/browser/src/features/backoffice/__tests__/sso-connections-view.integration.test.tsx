@@ -238,6 +238,66 @@ describe("the back-office single sign-on list", () => {
     });
   });
 
+  describe("when an operator vouches for an approved domain", () => {
+    const APPROVED = {
+      ...ATTESTED,
+      state: "APPROVED",
+      approvedDomains: ["acme.com"],
+      verifiedDomains: [] as string[],
+      domainVerifications: [],
+    };
+
+    async function openVouching() {
+      listState.current = { ...listState.current, data: { connections: [APPROVED], total: 1 } };
+      renderView();
+      fireEvent.click(screen.getByLabelText("Actions for Acme"));
+      await waitFor(() => screen.getByText("Vouch for acme.com"));
+      fireEvent.click(screen.getByText("Vouch for acme.com"));
+      await waitFor(() => screen.getByText("Vouch for acme.com?"));
+    }
+
+    function confirmButton() {
+      return screen.getByRole("button", { name: "Vouch for domain" });
+    }
+
+    /** @scenario "An operator takes a customer from nothing to a connection ready to go live" */
+    it("records the evidence and why it proves control alongside the attestation", async () => {
+      await openVouching();
+
+      fireEvent.change(screen.getByLabelText(/Evidence reference/), {
+        target: { value: "  SUP-1234  " },
+      });
+      fireEvent.change(screen.getByLabelText(/Why does this evidence prove domain control/), {
+        target: { value: " Signed contract names acme.com " },
+      });
+      fireEvent.click(confirmButton());
+
+      expect(mutations.attestDomain).toHaveBeenCalledWith({
+        organizationId: "org_acme",
+        connectionId: "ssoc_1",
+        domain: "acme.com",
+        evidenceRef: "SUP-1234",
+        note: "Signed contract names acme.com",
+      });
+    });
+
+    /** @scenario "An operator takes a customer from nothing to a connection ready to go live" */
+    it("does not vouch while the evidence or its explanation is blank", async () => {
+      await openVouching();
+
+      fireEvent.change(screen.getByLabelText(/Evidence reference/), {
+        target: { value: "SUP-1234" },
+      });
+      fireEvent.change(screen.getByLabelText(/Why does this evidence prove domain control/), {
+        target: { value: "   " },
+      });
+
+      expect(confirmButton().hasAttribute("disabled")).toBe(true);
+      fireEvent.click(confirmButton());
+      expect(mutations.attestDomain).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when an operator opens a connection from the list", () => {
     /** @scenario "A connection's detail opens beside the list, not on a page of its own" */
     it("opens its state, domains, provider reference and history in a drawer over the list", async () => {
@@ -276,11 +336,9 @@ describe("the back-office single sign-on list", () => {
       await waitFor(() => {
         expect(routerState.replace).toHaveBeenCalled();
       });
-      const [[destination, , options]] = routerState.replace.mock.calls as unknown as [
-        [{ query: Record<string, unknown> }, undefined, { shallow: boolean }],
-      ];
-      expect(destination.query).toEqual({ q: "acme" });
-      expect(options.shallow).toBe(true);
+      expect(routerState.replace).toHaveBeenCalledWith({ query: { q: "acme" } }, undefined, {
+        shallow: true,
+      });
     });
   });
 });

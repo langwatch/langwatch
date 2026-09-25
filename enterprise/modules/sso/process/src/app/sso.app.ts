@@ -21,6 +21,7 @@ import {
   type BackofficeSsoConnectionPage,
   type ListSsoConnectionsInput,
   type RegisterSsoConnectionInput,
+  type AttestSsoDomainInput,
   type RejectSsoDomainClaimInput,
   type SsoBreakGlassBinding,
   type SsoBreakGlassBindingInput,
@@ -455,11 +456,12 @@ export class SsoApp implements SsoApiContract {
     });
   }
 
-  async attestDomain(input: SsoDomainTarget, by: SsoOperator): Promise<void> {
+  async attestDomain(input: AttestSsoDomainInput, by: SsoOperator): Promise<void> {
+    const { note: _note, ...recorded } = input;
     await this.#audited({
       by,
       action: "attestDomain",
-      args: { ...input },
+      args: recorded,
       command: (operator) => this.#connections.attestDomain({ ...input, operator }),
     });
   }
