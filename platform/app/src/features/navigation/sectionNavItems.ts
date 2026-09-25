@@ -6,6 +6,7 @@ import {
   Gauge,
   Inbox,
   KeyRound,
+  LayoutDashboard,
   LineChart,
   type LucideIcon,
   PackageOpen,
@@ -116,6 +117,13 @@ export const governanceNavItems: readonly SectionNavItemData[] = [
     href: "/governance/costs",
     includePath: "/governance/costs",
     icon: Coins,
+    featureFlag: "release_ui_governance_billed_cost_enabled",
+  },
+  {
+    label: "Dashboards",
+    href: "/governance/dashboards",
+    includePath: "/governance/dashboards",
+    icon: LayoutDashboard,
     featureFlag: "release_ui_governance_billed_cost_enabled",
   },
   {
