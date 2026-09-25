@@ -34,6 +34,7 @@ import {
   type ScimApi as ScimApiContract,
   type ScimDirectoryScope,
   type ScimError,
+  type ConnectionReconciliation,
   type OrganizationReconciliation,
   type ScimGroup,
   type ScimListResponse,
@@ -487,6 +488,14 @@ export class ScimApp implements ScimApiContract {
     if (!(await this.isEnterpriseEntitled(input))) throw new EnterprisePlanRequiredError("SCIM");
 
     return this.#reconciliation.getAll(input);
+  }
+
+  async findConnectionReconciliation(
+    input: ScimConnectionRequestsInput,
+  ): Promise<ConnectionReconciliation[]> {
+    if (!(await this.isEnterpriseEntitled(input))) throw new EnterprisePlanRequiredError("SCIM");
+
+    return this.#reconciliation.findById(input);
   }
 
   async findDirectoryRequests(input: ScimConnectionRequestsInput): Promise<ScimRequestEntry[]> {

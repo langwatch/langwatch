@@ -6,6 +6,7 @@
  * single sign-on without managing it (ADR-126).
  */
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
@@ -57,10 +58,25 @@ function testPorts(
   };
 }
 
-function mount(permits: (permission: string) => boolean = () => true) {
+const OKTA: OrganizationSsoConnection = {
+  connectionId: "conn-okta",
+  displayName: "okta",
+  providerId: "okta",
+  verifiedDomains: ["acme.com"],
+  type: "oidc",
+  state: "ACTIVE",
+  replacesConnectionId: null,
+  migrationPhase: null,
+};
+
+function mount(
+  permits: (permission: string) => boolean = () => true,
+  options: { planType?: string } = {},
+) {
   const scim = new ScimServiceFake();
   scim.findRequestLog.mockResolvedValue([ENTRY]);
-  const { app } = scimTestApp({ scim });
+  scim.findDirectoryOwnership.mockResolvedValue([]);
+  const { app } = scimTestApp({ scim, connections: [OKTA], ...options });
   const trpc = initTRPC.context<ScimTrpcTestContext>().create();
   const router = createTrpcRuntime<ScimTrpcTestContext>({
     root: trpc,
@@ -117,5 +133,47 @@ describe("the scimReconciliation tRPC namespace", () => {
       caller.getRequests({ organizationId: "org-acme", connectionId: "conn-okta" }),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(scim.findRequestLog).not.toHaveBeenCalled();
+  });
+
+  describe("when one connection's panel is read", () => {
+    /** @scenario "One connection's panel says where its sync stands" */
+    it("answers the connection in the overview's words, under sso:view", async () => {
+      const seen: string[] = [];
+      const { caller } = mount((permission) => {
+        seen.push(permission);
+
+        return permission === "sso:view";
+      });
+
+      await expect(
+        caller.getById({ organizationId: "org-acme", connectionId: "conn-okta" }),
+      ).resolves.toMatchObject({
+        connectionId: "conn-okta",
+        providerId: "okta",
+        state: null,
+        lastPushedAtMs: null,
+        managedPeople: 0,
+        failures: [],
+      });
+      expect(seen).toEqual(["sso:view"]);
+    });
+
+    /** @scenario "A connection the organization does not have reads as nothing" */
+    it("answers null for a connection outside the organization", async () => {
+      const { caller } = mount();
+
+      await expect(
+        caller.getById({ organizationId: "org-acme", connectionId: "conn-globex" }),
+      ).resolves.toBeNull();
+    });
+
+    /** @scenario "A connection's panel is refused once the plan no longer includes directory sync" */
+    it("refuses an organization whose plan lapsed", async () => {
+      const { caller } = mount(() => true, { planType: "FREE" });
+
+      await expect(
+        caller.getById({ organizationId: "org-acme", connectionId: "conn-okta" }),
+      ).rejects.toMatchObject({ cause: { code: "enterprise_plan_required" } });
+    });
   });
 });

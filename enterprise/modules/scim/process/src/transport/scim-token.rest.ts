@@ -65,8 +65,8 @@ export const scimTokenRest = defineRestRouter(ScimApi)
       token: z.string(),
       // Declared because the handler returns it and the framework validates the
       // answer against this schema: undeclared, the one field naming what the
-      // token can reach was dropped on the way out.
-      connectionId: z.string().nullable(),
+      // token can reach was dropped on the way out. Minting refuses without one.
+      connectionId: z.string(),
       description: z.string().nullable(),
     }),
   )

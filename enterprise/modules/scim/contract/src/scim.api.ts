@@ -21,7 +21,11 @@ import type {
   RedriveRetiredApplyResult,
   ScimOperator,
 } from "./scim-oversight.ts";
-import type { OrganizationReconciliation, ScimReconciliationScope } from "./scim-reconciliation.ts";
+import type {
+  ConnectionReconciliation,
+  OrganizationReconciliation,
+  ScimReconciliationScope,
+} from "./scim-reconciliation.ts";
 import type { ScimConnectionRequestsInput, ScimRequestEntry } from "./scim-request-log.ts";
 import type {
   IssuedScimToken,
@@ -144,6 +148,12 @@ export interface ScimApi {
    * excluded — it was never in the answer to be excluded from.
    */
   getDirectoryReconciliation(input: ScimReconciliationScope): Promise<OrganizationReconciliation>;
+
+  /** One connection's sync in the same words, empty for a connection this
+   *  organization does not have — another's included, which reads the same. */
+  findConnectionReconciliation(
+    input: ScimConnectionRequestsInput,
+  ): Promise<ConnectionReconciliation[]>;
 
   // ── The platform operator's oversight (ADR-122) ─────────────────────────
   // Staff-list gated: anyone else is answered as if the surface did not exist.

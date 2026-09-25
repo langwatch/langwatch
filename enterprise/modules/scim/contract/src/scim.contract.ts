@@ -4,7 +4,7 @@ import { z } from "zod";
 export const SCIM_FEATURE_ID = "scim" as const;
 
 export const scimUserSchema = z.object({
-  schemas: z.tuple([z.literal("urn:ietf:params:scim:schemas:core:2.0:User")]),
+  schemas: z.array(z.literal("urn:ietf:params:scim:schemas:core:2.0:User")),
   id: z.string(),
   /** The identity provider's identifier, scoped to its SSO connection. */
   externalId: z.string().optional(),
@@ -34,15 +34,15 @@ export function scimListResponseSchema<Item extends z.ZodType>(
   item: Item,
 ): z.ZodType<ScimListResponse<z.infer<Item>>> {
   return z.object({
-    schemas: z.tuple([z.literal("urn:ietf:params:scim:api:messages:2.0:ListResponse")]),
-    totalResults: z.number(),
-    startIndex: z.number(),
-    itemsPerPage: z.number(),
+    schemas: z.array(z.literal("urn:ietf:params:scim:api:messages:2.0:ListResponse")),
+    totalResults: z.number().int(),
+    startIndex: z.number().int(),
+    itemsPerPage: z.number().int(),
     Resources: z.array(item),
   });
 }
 export type ScimListResponse<T> = Readonly<{
-  schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"];
+  schemas: "urn:ietf:params:scim:api:messages:2.0:ListResponse"[];
   totalResults: number;
   startIndex: number;
   itemsPerPage: number;
@@ -50,7 +50,7 @@ export type ScimListResponse<T> = Readonly<{
 }>;
 
 export const scimErrorSchema = z.object({
-  schemas: z.tuple([z.literal("urn:ietf:params:scim:api:messages:2.0:Error")]),
+  schemas: z.array(z.literal("urn:ietf:params:scim:api:messages:2.0:Error")),
   status: z.string(),
   detail: z.string(),
   /** RFC 7644 §3.12's error type, when the refusal has one. */
@@ -143,7 +143,7 @@ export type ScimCreateUserRequest = z.infer<typeof scimCreateUserRequestSchema>;
 // SCIM Group types
 
 export const scimGroupSchema = z.object({
-  schemas: z.tuple([z.literal("urn:ietf:params:scim:schemas:core:2.0:Group")]),
+  schemas: z.array(z.literal("urn:ietf:params:scim:schemas:core:2.0:Group")),
   id: z.string(),
   /** The identity provider's identifier, scoped to its SSO connection. */
   externalId: z.string().optional(),
@@ -235,7 +235,7 @@ const scimSchemaAttributeSchema: z.ZodType<{
 });
 
 export const scimSchemaDefinitionSchema = z.object({
-  schemas: z.tuple([z.literal("urn:ietf:params:scim:schemas:core:2.0:Schema")]),
+  schemas: z.array(z.literal("urn:ietf:params:scim:schemas:core:2.0:Schema")),
   id: z.string(),
   name: z.string(),
   description: z.string(),
@@ -245,7 +245,7 @@ export const scimSchemaDefinitionSchema = z.object({
 export type ScimSchemaDefinition = z.infer<typeof scimSchemaDefinitionSchema>;
 
 export const scimResourceTypeSchema = z.object({
-  schemas: z.tuple([z.literal("urn:ietf:params:scim:schemas:core:2.0:ResourceType")]),
+  schemas: z.array(z.literal("urn:ietf:params:scim:schemas:core:2.0:ResourceType")),
   id: z.string(),
   name: z.string(),
   endpoint: z.string(),
@@ -255,15 +255,15 @@ export const scimResourceTypeSchema = z.object({
 export type ScimResourceType = z.infer<typeof scimResourceTypeSchema>;
 
 export const scimServiceProviderConfigSchema = z.object({
-  schemas: z.tuple([z.literal("urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig")]),
+  schemas: z.array(z.literal("urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig")),
   documentationUri: z.string(),
   patch: z.object({ supported: z.boolean() }),
   bulk: z.object({
     supported: z.boolean(),
-    maxOperations: z.number(),
-    maxPayloadSize: z.number(),
+    maxOperations: z.number().int(),
+    maxPayloadSize: z.number().int(),
   }),
-  filter: z.object({ supported: z.boolean(), maxResults: z.number() }),
+  filter: z.object({ supported: z.boolean(), maxResults: z.number().int() }),
   changePassword: z.object({ supported: z.boolean() }),
   sort: z.object({ supported: z.boolean() }),
   etag: z.object({ supported: z.boolean() }),

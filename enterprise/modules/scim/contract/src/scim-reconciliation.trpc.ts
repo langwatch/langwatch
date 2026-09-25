@@ -10,6 +10,7 @@
 import { defineTrpcContract } from "@langwatch/api/contract";
 
 import {
+  connectionReconciliationSchema,
   organizationReconciliationSchema,
   scimReconciliationScopeSchema,
 } from "./scim-reconciliation.ts";
@@ -37,4 +38,8 @@ export const scimReconciliationTrpc = defineTrpcContract("scimReconciliation")
   .query("getRequests")
   .withInput(scimConnectionRequestsInputSchema)
   .withOutput(scimRequestEntrySchema.array())
+  /** One connection's panel; null for a connection this organization does not have. */
+  .query("getById")
+  .withInput(scimConnectionRequestsInputSchema)
+  .withOutput(connectionReconciliationSchema.nullable())
   .build();

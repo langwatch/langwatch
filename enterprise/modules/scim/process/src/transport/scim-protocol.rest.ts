@@ -110,34 +110,59 @@ export const scimRestCredential = defineRestMiddleware(
 const idParams = z.object({ id: z.string().min(1) });
 
 /** A query value as main read it: the first one, where the parameter is repeated. */
-function firstQueryValue(description: string) {
-  return z
-    .union([z.string(), z.array(z.string())])
-    .optional()
-    .transform((value) => (Array.isArray(value) ? value[0] : value))
-    .describe(description);
+function firstValue(raw: unknown): unknown {
+  return Array.isArray(raw) ? raw[0] : raw;
+}
+
+function queryText(description: string) {
+  return z.preprocess(firstValue, z.string()).optional().describe(description);
 }
 
 /**
- * The three query parameters a collection reads, each optional and each read
- * leniently: a value that is not a positive integer is the documented default
- * rather than a refusal, because an identity provider that sends one should
- * still get its page.
+ * A page bound, published as the integer main documented and read leniently:
+ * a value that is not a positive integer is the default rather than a refusal,
+ * because an identity provider that sends one should still get its page.
  */
+function pageBound({
+  fallback,
+  max,
+  description,
+}: {
+  fallback: number;
+  max: number;
+  description: string;
+}) {
+  return z
+    .preprocess((raw) => {
+      const first = firstValue(raw);
+      const value = Number.parseInt(typeof first === "string" ? first : "", 10);
+
+      return Math.min(Number.isInteger(value) && value > 0 ? value : fallback, max);
+    }, z.number().int().max(max))
+    .default(fallback)
+    .describe(description);
+}
+
 const listQuery = z.object({
-  filter: firstQueryValue(
+  filter: queryText(
     'A SCIM filter. Only `attribute eq "..."` is understood; any other expression is refused.',
   ),
-  startIndex: firstQueryValue(
-    "1-based index of the first resource to return. Anything that does not parse as a positive integer is read as 1.",
-  ),
-  count: firstQueryValue(
-    "How many resources to return, capped at 100 (the `filter.maxResults` ServiceProviderConfig publishes). Anything that does not parse as a positive integer is read as 100, and anything above 100 is served as 100.",
-  ),
+  startIndex: pageBound({
+    fallback: 1,
+    max: Number.MAX_SAFE_INTEGER,
+    description:
+      "1-based index of the first resource to return. Anything that does not parse as a positive integer is read as 1.",
+  }),
+  count: pageBound({
+    fallback: MAX_PAGE_SIZE,
+    max: MAX_PAGE_SIZE,
+    description:
+      "How many resources to return, capped at 100 (the `filter.maxResults` ServiceProviderConfig publishes). Anything that does not parse as a positive integer is read as 100, and anything above 100 is served as 100.",
+  }),
 });
 
 const excludedAttributesQuery = z.object({
-  excludedAttributes: firstQueryValue(
+  excludedAttributes: queryText(
     "Comma-separated attribute names to leave out of the response. Only `members` is honoured, and it is what lets a directory page through groups without pulling every membership.",
   ),
 });
@@ -365,16 +390,6 @@ function deprovisioned({ response }: { response: RestProtocolProducer<typeof SCI
   return response.write({ status: 204, mediaType: SCIM_MEDIA_TYPE, body: null });
 }
 
-function positiveInteger(raw: string | undefined, fallback: number): number {
-  const value = Number.parseInt(raw ?? "", 10);
-
-  return Number.isInteger(value) && value > 0 ? value : fallback;
-}
-
-function pageSize(raw: string | undefined): number {
-  return Math.min(positiveInteger(raw, MAX_PAGE_SIZE), MAX_PAGE_SIZE);
-}
-
 function excludesMembers(raw: string | undefined): boolean {
   return (raw ?? "")
     .split(",")
@@ -461,8 +476,8 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
         organizationId: scope.id,
         connectionId,
         filter: input.filter,
-        startIndex: positiveInteger(input.startIndex, 1),
-        count: pageSize(input.count),
+        startIndex: input.startIndex,
+        count: input.count,
       }),
     }),
   )
@@ -614,8 +629,8 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
         organizationId: scope.id,
         connectionId,
         filter: input.filter,
-        startIndex: positiveInteger(input.startIndex, 1),
-        count: pageSize(input.count),
+        startIndex: input.startIndex,
+        count: input.count,
         excludeMembers: excludesMembers(input.excludedAttributes),
       }),
     }),

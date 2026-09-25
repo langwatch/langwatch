@@ -17,10 +17,22 @@ import {
 } from "@langwatch/enterprise-scim-contract";
 import { ENTERPRISE_FEATURE_ERRORS } from "@langwatch/entitlement-contract";
 import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
+import { generateSpecs } from "hono-openapi";
 import { describe, expect, it, vi } from "vitest";
 
 import { scimProtocolRest, scimRestCredential } from "../scim-protocol.rest.ts";
 import { ScimServiceFake, scimTestApp } from "./support/scim-app.fixture.ts";
+
+type PublishedSchema = Readonly<{
+  type?: string;
+  items?: PublishedSchema;
+  properties?: Record<string, PublishedSchema>;
+}>;
+type PublishedOperation = Readonly<{
+  parameters?: { name: string; in: string; schema: PublishedSchema }[];
+  responses: Record<string, { content?: Record<string, { schema: PublishedSchema }> }>;
+}>;
+type Published = Readonly<{ paths: Record<string, Record<string, PublishedOperation>> }>;
 
 const ORGANIZATION_ID = "org_acme";
 const BEARER = "Bearer scim_token_acme";
@@ -154,6 +166,7 @@ function mount(
   return {
     scim,
     send,
+    document: async () => JSON.parse(JSON.stringify(await generateSpecs(host.app))) as Published,
     get: (path: string, authorization?: string) =>
       send(path, { headers: authorization ? { authorization } : {} }),
     post: (path: string, body: string) =>
@@ -186,6 +199,64 @@ describe("Feature: SCIM API reference", () => {
   });
 });
 
+describe("Feature: the published SCIM reference", () => {
+  const listed = ["/api/scim/v2/Users", "/api/scim/v2/Groups"];
+  const collections = [...listed, "/api/scim/v2/ResourceTypes", "/api/scim/v2/Schemas"];
+
+  function answer(operation: PublishedOperation | undefined): PublishedSchema {
+    const [status] = Object.keys(operation?.responses ?? {}).filter((code) => code.startsWith("2"));
+    const content = operation?.responses[status ?? ""]?.content ?? {};
+
+    return Object.values(content)[0]?.schema ?? {};
+  }
+
+  /** @scenario "Paging and counts are published as integers" */
+  it("publishes paging parameters and collection counts as integers", async () => {
+    const { paths } = await mount().document();
+
+    for (const path of listed) {
+      const parameters = paths[path]?.get?.parameters ?? [];
+      for (const name of ["startIndex", "count"]) {
+        expect(parameters.find((parameter) => parameter.name === name)?.schema.type).toBe(
+          "integer",
+        );
+      }
+      expect(parameters.find((parameter) => parameter.name === "filter")?.schema.type).toBe(
+        "string",
+      );
+    }
+    for (const path of collections) {
+      const properties = answer(paths[path]?.get).properties ?? {};
+      for (const count of ["totalResults", "startIndex", "itemsPerPage"]) {
+        expect(properties[count]?.type).toBe("integer");
+      }
+    }
+  });
+
+  /** @scenario "Every SCIM document publishes its schemas as a list of URNs" */
+  it("publishes schemas as an array of strings on every document", async () => {
+    const { paths } = await mount().document();
+    expect(Object.keys(paths)).toEqual(expect.arrayContaining(collections));
+
+    for (const [path, operations] of Object.entries(paths)) {
+      for (const operation of Object.values(operations)) {
+        const published = answer(operation);
+        if (!published.properties) continue;
+
+        expect({ path, schemas: published.properties.schemas?.items?.type }).toEqual({
+          path,
+          schemas: "string",
+        });
+        for (const resource of collections.includes(path)
+          ? [published.properties.Resources?.items]
+          : []) {
+          expect(resource?.properties?.schemas?.items?.type).toBe("string");
+        }
+      }
+    }
+  });
+});
+
 describe("given a directory holding this organization's SCIM bearer token", () => {
   describe("when it lists the organization's users", () => {
     it("reads the tenant off the credential rather than off the request", async () => {
@@ -214,6 +285,17 @@ describe("given a directory holding this organization's SCIM bearer token", () =
       expect(response.status).toBe(200);
       expect(api.scim.listUsers).toHaveBeenCalledWith(
         expect.objectContaining({ filter: 'userName eq "a@b.c"', startIndex: 3, count: 5 }),
+      );
+    });
+
+    it("reads a page bound that is not a positive integer as its default, as main did", async () => {
+      const api = mount();
+
+      const response = await api.get("/api/scim/v2/Users?startIndex=abc&count=500", BEARER);
+
+      expect(response.status).toBe(200);
+      expect(api.scim.listUsers).toHaveBeenCalledWith(
+        expect.objectContaining({ startIndex: 1, count: 100 }),
       );
     });
 

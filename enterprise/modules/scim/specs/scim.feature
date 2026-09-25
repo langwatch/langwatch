@@ -402,3 +402,36 @@ Feature: Enterprise SCIM package boundary
     Given a process that registered no scim directory pipeline
     When identity asks scim to move a directory
     Then the request is refused naming the scim_directory pipeline
+
+  Rule: One connection's directory sync reads as the overview does
+
+    @unit
+    Scenario: One connection's panel says where its sync stands
+      Given an Enterprise organization with a directory connection
+      When somebody who may see single sign-on reads that connection's panel
+      Then they see the connection's sync in the same words as the overview
+
+    @unit
+    Scenario: A connection the organization does not have reads as nothing
+      Given a connection that belongs to another organization
+      When the organization reads that connection's panel
+      Then the panel is empty, exactly as for a connection that does not exist
+
+    @unit
+    Scenario: A connection's panel is refused once the plan no longer includes directory sync
+      Given an organization whose plan does not include directory sync
+      When it reads one connection's panel
+      Then the read is refused with enterprise_plan_required
+
+  Rule: The published SCIM reference keeps the protocol's own types
+
+    @unit
+    Scenario: Paging and counts are published as integers
+      When the SCIM API reference is generated
+      Then startIndex and count are integer query parameters
+      And every collection's totalResults, startIndex and itemsPerPage are integers
+
+    @unit
+    Scenario: Every SCIM document publishes its schemas as a list of URNs
+      When the SCIM API reference is generated
+      Then every resource and collection declares schemas as an array of strings

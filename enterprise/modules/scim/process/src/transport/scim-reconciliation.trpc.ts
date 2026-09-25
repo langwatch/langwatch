@@ -22,4 +22,8 @@ export const scimReconciliationTrpcTransport = defineTrpcRouter(ScimApi, scimRec
   .procedure("getRequests")
   .withPermission("sso:view")
   .handle(({ app, input }) => app.findDirectoryRequests(input))
+
+  .procedure("getById")
+  .withPermission("sso:view")
+  .handle(async ({ app, input }) => (await app.findConnectionReconciliation(input))[0] ?? null)
   .build();
