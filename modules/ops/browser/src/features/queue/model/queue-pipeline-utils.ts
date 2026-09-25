@@ -167,3 +167,77 @@ export function matchesStatusFilter(
       return state === "active";
   }
 }
+
+/** Whether a pipeline or any pipeline below it has pending, active or blocked work. */
+export function hasPipelineWork(node: OpsPipelineNode): boolean {
+  return (
+    node.pending > 0 || node.active > 0 || node.blocked > 0 || node.children.some(hasPipelineWork)
+  );
+}
+
+/** Every node's slash-joined path, parents before children. */
+export function pipelinePaths(nodes: OpsPipelineNode[], parentPath = ""): Set<string> {
+  const paths = new Set<string>();
+  for (const node of nodes) {
+    const path = parentPath ? `${parentPath}/${node.name}` : node.name;
+    paths.add(path);
+    for (const child of pipelinePaths(node.children, path)) paths.add(child);
+  }
+  return paths;
+}
+
+export function togglePath(paths: Set<string>, path: string): Set<string> {
+  const next = new Set(paths);
+  if (next.has(path)) next.delete(path);
+  else next.add(path);
+  return next;
+}
+
+/** The status filter, then a case-blind search over id, pipeline and error, sorted by severity. */
+export function filterGroups<T extends OpsQueueGroup>({
+  groups,
+  statusFilter,
+  search,
+  now,
+}: {
+  groups: T[];
+  statusFilter: StatusFilter;
+  search: string;
+  now: number;
+}): T[] {
+  const lower = search.toLowerCase();
+  const matchesSearch = (g: T) =>
+    g.groupId.toLowerCase().includes(lower) ||
+    g.pipelineName?.toLowerCase().includes(lower) ||
+    g.errorMessage?.toLowerCase().includes(lower);
+  const byStatus =
+    statusFilter === "all"
+      ? groups
+      : groups.filter((g) => matchesStatusFilter(g, statusFilter, now));
+  const bySearch = search.trim() ? byStatus.filter(matchesSearch) : byStatus;
+  return sortGroupsBySeverity(bySearch, now);
+}
+
+export function countGroupsByStatus(
+  groups: OpsQueueGroup[],
+  now: number,
+): Record<StatusFilter, number> {
+  const countMatching = (filter: StatusFilter) =>
+    groups.filter((g) => matchesStatusFilter(g, filter, now)).length;
+  return {
+    all: groups.length,
+    ok: countMatching("ok"),
+    blocked: countMatching("blocked"),
+    stale: countMatching("stale"),
+    active: countMatching("active"),
+    retrying: countMatching("retrying"),
+  };
+}
+
+/** A search that is one `project_…` tenant prefix scopes the tenant controls to it. */
+export function tenantScopeOf(search: string): string | null {
+  const s = search.trim();
+  const isOneTenantPrefix = s !== "" && !s.includes("/") && !s.includes(" ");
+  if (!isOneTenantPrefix || !s.startsWith("project_")) return null;
+  return s;
+}

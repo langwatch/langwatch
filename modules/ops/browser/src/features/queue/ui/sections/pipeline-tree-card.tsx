@@ -5,7 +5,12 @@ import { useMemo, useState } from "react";
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
-import { filterTree } from "../../model/queue-pipeline-utils.ts";
+import {
+  filterTree,
+  hasPipelineWork,
+  pipelinePaths,
+  togglePath,
+} from "../../model/queue-pipeline-utils.ts";
 import { PipelineTreeNode } from "../blocks/queue-pipeline-tree-node.tsx";
 import { PipelineTreeFilter } from "../elements/queue-pipeline-tree-filter.tsx";
 export function PipelineTreeCard({
@@ -32,14 +37,13 @@ export function PipelineTreeCard({
   // pipelines render as pure whitespace; idle rows fold away and say how
   // many. Folding is recursive: classifying on a root's own direct counts
   // alone hid every parent of a busy child, not just the whitespace.
-  const { working, idle } = useMemo(() => {
-    const hasWork = (node: PipelineNode): boolean =>
-      node.pending > 0 || node.active > 0 || node.blocked > 0 || node.children.some(hasWork);
-    return {
-      working: pipelineTree.filter(hasWork),
-      idle: pipelineTree.filter((node) => !hasWork(node)),
-    };
-  }, [pipelineTree]);
+  const { working, idle } = useMemo(
+    () => ({
+      working: pipelineTree.filter(hasPipelineWork),
+      idle: pipelineTree.filter((node) => !hasPipelineWork(node)),
+    }),
+    [pipelineTree],
+  );
 
   // A pipeline that gains work leaves the fold on its own, because membership
   // is derived from the counts rather than latched when the fold was closed.
@@ -67,28 +71,11 @@ export function PipelineTreeCard({
   });
 
   function handleToggleExpand(path: string) {
-    setExpandedPaths((prev) => {
-      const next = new Set(prev);
-      if (next.has(path)) {
-        next.delete(path);
-      } else {
-        next.add(path);
-      }
-      return next;
-    });
+    setExpandedPaths((prev) => togglePath(prev, path));
   }
 
   function handleExpandAll() {
-    const all = new Set<string>();
-    function walk(nodes: PipelineNode[], parentPath: string) {
-      for (const node of nodes) {
-        const path = parentPath ? `${parentPath}/${node.name}` : node.name;
-        all.add(path);
-        walk(node.children, path);
-      }
-    }
-    walk(pipelineTree, "");
-    setExpandedPaths(all);
+    setExpandedPaths(pipelinePaths(pipelineTree));
   }
 
   const queueName = queueNames[0];

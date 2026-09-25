@@ -223,6 +223,87 @@ function stripTransientFlags(data: TabData): TabData {
   };
 }
 
+/** The last-persisted `data` reference per tab, so unchanged (immer-shared) tabs skip a write. */
+type PersistedTabRefs = Map<string, TabData>;
+
+/**
+ * A tab's data from its own per-tab key, else the legacy embedded `data` (old single-key
+ * format, so upgrading users keep their open tabs); a tab neither reads is dropped.
+ */
+function rehydrateTab({
+  projectId,
+  capabilities: { storage, logger },
+  tab,
+  refs,
+}: {
+  projectId: string;
+  capabilities: PromptTabsCapabilities;
+  tab: LightTab;
+  refs: PersistedTabRefs;
+}): { id: string; data: TabData }[] {
+  const tabRaw = storage.getItem(getTabStorageKey(projectId, tab.id));
+  if (tabRaw) {
+    let data: TabData;
+    try {
+      data = JSON.parse(tabRaw) as TabData;
+    } catch (parseError) {
+      logger.warn(
+        { tabId: tab.id, error: parseError },
+        "Corrupt per-tab data during rehydration, dropping tab",
+      );
+      return [];
+    }
+    refs.set(tab.id, data);
+    return [{ id: tab.id, data }];
+  }
+  // Legacy payload: not seeded into refs, so the next persist writes the tab's own key.
+  if (tab.data) return [{ id: tab.id, data: tab.data }];
+  logger.warn({ tabId: tab.id }, "Missing per-tab data key during rehydration, dropping tab");
+  return [];
+}
+
+/**
+ * Reference equality is enough only because this store is wrapped in Immer, which keeps an
+ * unedited tab's `data` reference across `set()` calls; outside Immer it degrades to always-write.
+ */
+function persistTabIfChanged({
+  projectId,
+  storage,
+  tab,
+  refs,
+}: {
+  projectId: string;
+  storage: PromptTabsCapabilities["storage"];
+  tab: { id: string; data: TabData };
+  refs: PersistedTabRefs;
+}): void {
+  if (refs.get(tab.id) === tab.data) return;
+  storage.setItem(
+    getTabStorageKey(projectId, tab.id),
+    JSON.stringify(stripTransientFlags(tab.data)),
+  );
+  refs.set(tab.id, tab.data);
+}
+
+/** Removes the per-tab keys of tabs that were closed since the last persist. */
+function dropClosedTabs({
+  projectId,
+  storage,
+  currentTabIds,
+  refs,
+}: {
+  projectId: string;
+  storage: PromptTabsCapabilities["storage"];
+  currentTabIds: Set<string>;
+  refs: PersistedTabRefs;
+}): void {
+  for (const tabId of refs.keys()) {
+    if (currentTabIds.has(tabId)) continue;
+    storage.removeItem(getTabStorageKey(projectId, tabId));
+    refs.delete(tabId);
+  }
+}
+
 /**
  * Custom persist storage that splits the heavy per-tab `data` out of the single
  * windows/tabs storage key into its own key per tab (`${projectId}:tab:${tabId}`).
@@ -232,9 +313,7 @@ function createTabAwarePersistStorage(
   capabilities: PromptTabsCapabilities,
 ): PersistStorage<PersistedTopLevelState> {
   const { storage, logger } = capabilities;
-  // Tracks the last-persisted `data` reference per tab so unchanged tabs
-  // (structurally shared by immer) can be skipped on write.
-  const lastPersistedDataRefs = new Map<string, TabData>();
+  const refs: PersistedTabRefs = new Map();
 
   return {
     getItem: (name) => {
@@ -250,38 +329,7 @@ function createTabAwarePersistStorage(
         const windows: Window[] = parsed.state.windows.map((w) => ({
           id: w.id,
           activeTabId: w.activeTabId,
-          // Resolve each tab's data from its own per-tab key. Fall back to the legacy embedded
-          // `t.data` (old single-key format) so existing users don't lose their open tabs on
-          // upgrade.
-          tabs: w.tabs.flatMap((t) => {
-            const tabRaw = storage.getItem(getTabStorageKey(projectId, t.id));
-            if (tabRaw) {
-              let data: TabData;
-              try {
-                data = JSON.parse(tabRaw) as TabData;
-              } catch (parseError) {
-                logger.warn(
-                  { tabId: t.id, error: parseError },
-                  "Corrupt per-tab data during rehydration, dropping tab",
-                );
-                return [];
-              }
-              lastPersistedDataRefs.set(t.id, data);
-              return [{ id: t.id, data }];
-            }
-            if (t.data) {
-              // Legacy single-key payload: adopt the embedded data. Do NOT seed
-              // lastPersistedDataRefs so the next persist writes this tab's own
-              // per-tab key (completing the migration) instead of dedup-skipping
-              // it, which would strand the data as the index drops embedded data.
-              return [{ id: t.id, data: t.data }];
-            }
-            logger.warn(
-              { tabId: t.id },
-              "Missing per-tab data key during rehydration, dropping tab",
-            );
-            return [];
-          }),
+          tabs: w.tabs.flatMap((tab) => rehydrateTab({ projectId, capabilities, tab, refs })),
         }));
 
         return {
@@ -304,31 +352,14 @@ function createTabAwarePersistStorage(
         const lightWindows: LightWindow[] = value.state.windows.map((w) => ({
           id: w.id,
           activeTabId: w.activeTabId,
-          tabs: w.tabs.map((t) => {
-            currentTabIds.add(t.id);
-            // Reference equality is sufficient (not deep-equal) only because this store is
-            // wrapped in Immer: `produce` structurally shares untouched branches, so an
-            // unedited tab's `data` object keeps the same reference across `set()` calls. If
-            // this store is ever updated outside Immer's `set()`, this check silently
-            // degrades to "always write" for every tab.
-            if (lastPersistedDataRefs.get(t.id) !== t.data) {
-              storage.setItem(
-                getTabStorageKey(projectId, t.id),
-                JSON.stringify(stripTransientFlags(t.data)),
-              );
-              lastPersistedDataRefs.set(t.id, t.data);
-            }
-            return { id: t.id };
+          tabs: w.tabs.map((tab) => {
+            currentTabIds.add(tab.id);
+            persistTabIfChanged({ projectId, storage, tab, refs });
+            return { id: tab.id };
           }),
         }));
 
-        // Clean up storage for tabs that no longer exist (removed/closed).
-        for (const tabId of lastPersistedDataRefs.keys()) {
-          if (!currentTabIds.has(tabId)) {
-            storage.removeItem(getTabStorageKey(projectId, tabId));
-            lastPersistedDataRefs.delete(tabId);
-          }
-        }
+        dropClosedTabs({ projectId, storage, currentTabIds, refs });
 
         const lightState: LightPersistedState = {
           windows: lightWindows,
@@ -347,7 +378,7 @@ function createTabAwarePersistStorage(
       // by another store instance (e.g. the same project open in a second
       // browser tab) would be orphaned. Also drop our own tracked refs.
       clearAllPersistedDataForProject(projectId, capabilities);
-      lastPersistedDataRefs.clear();
+      refs.clear();
     },
   };
 }

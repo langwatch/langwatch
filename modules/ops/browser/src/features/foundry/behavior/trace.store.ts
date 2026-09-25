@@ -141,6 +141,65 @@ function findSpanParent(
   return null;
 }
 
+/** An in-place edit on a clone of the spans; the state stays as it was when the edit declines. */
+function withEditedSpans(state: TraceStore, edit: (spans: SpanConfig[]) => boolean) {
+  const spans = structuredClone(state.trace.spans);
+  return edit(spans) ? { trace: { ...state.trace, spans } } : state;
+}
+
+function moveAmongSiblings({
+  spans,
+  id,
+  direction,
+}: {
+  spans: SpanConfig[];
+  id: string;
+  direction: Parameters<TraceStore["moveSpan"]>[1];
+}): boolean {
+  const found = findSpanParent(spans, id);
+  if (!found) return false;
+  const { siblings, index } = found;
+  const targetIndex = direction === "up" ? index - 1 : index + 1;
+  if (targetIndex < 0 || targetIndex >= siblings.length) return false;
+  [siblings[index], siblings[targetIndex]] = [siblings[targetIndex]!, siblings[index]!];
+  return true;
+}
+
+function indentUnderPreviousSibling(spans: SpanConfig[], id: string): boolean {
+  const found = findSpanParent(spans, id);
+  if (!found || found.index === 0) return false;
+  const span = found.siblings.splice(found.index, 1)[0]!;
+  found.siblings[found.index - 1]!.children.push(span);
+  return true;
+}
+
+function outdentBesideParent(spans: SpanConfig[], id: string): boolean {
+  const found = findSpanParent(spans, id);
+  if (!found?.parent) return false;
+  const span = found.siblings.splice(found.index, 1)[0]!;
+  const parentFound = findSpanParent(spans, found.parent.id);
+  if (!parentFound) return false;
+  parentFound.siblings.splice(parentFound.index + 1, 0, span);
+  return true;
+}
+
+function reassignIds(span: SpanConfig): void {
+  span.id = shortId();
+  span.children.forEach(reassignIds);
+}
+
+/** Inserts a fresh-id copy right after the span, answering the copy's id, or null when absent. */
+function insertDuplicate(spans: SpanConfig[], id: string): string | null {
+  const found = findSpanParent(spans, id);
+  if (!found) return null;
+  const original = found.siblings[found.index]!;
+  const duplicate = structuredClone(original);
+  reassignIds(duplicate);
+  duplicate.name = `${original.name} (copy)`;
+  found.siblings.splice(found.index + 1, 0, duplicate);
+  return duplicate.id;
+}
+
 export const useTraceStore = create<TraceStore>((set) => ({
   trace: createDefaultTrace(),
   selectedSpanId: null,
@@ -191,62 +250,23 @@ export const useTraceStore = create<TraceStore>((set) => ({
   },
 
   moveSpan(id, direction) {
-    set((state) => {
-      const newSpans = structuredClone(state.trace.spans);
-      const found = findSpanParent(newSpans, id);
-      if (!found) return state;
-      const { siblings, index } = found;
-      const targetIndex = direction === "up" ? index - 1 : index + 1;
-      if (targetIndex < 0 || targetIndex >= siblings.length) return state;
-      const temp = siblings[index];
-      siblings[index] = siblings[targetIndex]!;
-      siblings[targetIndex] = temp!;
-      return { trace: { ...state.trace, spans: newSpans } };
-    });
+    set((state) => withEditedSpans(state, (spans) => moveAmongSiblings({ spans, id, direction })));
   },
 
   indentSpan(id) {
-    set((state) => {
-      const newSpans = structuredClone(state.trace.spans);
-      const found = findSpanParent(newSpans, id);
-      if (!found || found.index === 0) return state;
-      const span = found.siblings.splice(found.index, 1)[0]!;
-      found.siblings[found.index - 1]!.children.push(span);
-      return { trace: { ...state.trace, spans: newSpans } };
-    });
+    set((state) => withEditedSpans(state, (spans) => indentUnderPreviousSibling(spans, id)));
   },
 
   outdentSpan(id) {
-    set((state) => {
-      const newSpans = structuredClone(state.trace.spans);
-      const found = findSpanParent(newSpans, id);
-      if (!found?.parent) return state;
-      const span = found.siblings.splice(found.index, 1)[0]!;
-      const parentFound = findSpanParent(newSpans, found.parent.id);
-      if (!parentFound) return state;
-      parentFound.siblings.splice(parentFound.index + 1, 0, span);
-      return { trace: { ...state.trace, spans: newSpans } };
-    });
+    set((state) => withEditedSpans(state, (spans) => outdentBesideParent(spans, id)));
   },
 
   duplicateSpan(id) {
     set((state) => {
-      const newSpans = structuredClone(state.trace.spans);
-      const found = findSpanParent(newSpans, id);
-      if (!found) return state;
-      const original = found.siblings[found.index]!;
-      const duplicate = structuredClone(original);
-      function reassignIds(span: SpanConfig) {
-        span.id = shortId();
-        span.children.forEach(reassignIds);
-      }
-      reassignIds(duplicate);
-      duplicate.name = `${original.name} (copy)`;
-      found.siblings.splice(found.index + 1, 0, duplicate);
-      return {
-        trace: { ...state.trace, spans: newSpans },
-        selectedSpanId: duplicate.id,
-      };
+      const spans = structuredClone(state.trace.spans);
+      const duplicateId = insertDuplicate(spans, id);
+      if (duplicateId === null) return state;
+      return { trace: { ...state.trace, spans }, selectedSpanId: duplicateId };
     });
   },
 

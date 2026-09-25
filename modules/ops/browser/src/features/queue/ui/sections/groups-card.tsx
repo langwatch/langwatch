@@ -27,10 +27,11 @@ import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 import { VirtualizedTableRows } from "../../../../ui/elements/ops-virtualized-table-rows.tsx";
 import {
   classifyGroup,
+  countGroupsByStatus,
   describeNextRun,
+  filterGroups,
   isOverdue,
-  matchesStatusFilter,
-  sortGroupsBySeverity,
+  tenantScopeOf,
   type GroupClassification,
 } from "../../model/queue-pipeline-utils.ts";
 import { type StatusFilter } from "../../model/queue-types.ts";
@@ -99,34 +100,11 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
   // reclassifying on every unrelated render.
   const now = groupsQuery.dataUpdatedAt || nowInstant().epochMilliseconds;
 
-  const filteredGroups = useMemo(() => {
-    let groups = allGroups;
-    if (statusFilter !== "all")
-      groups = groups.filter((g) => matchesStatusFilter(g, statusFilter, now));
-    if (search.trim()) {
-      const lower = search.toLowerCase();
-      groups = groups.filter(
-        (g) =>
-          g.groupId.toLowerCase().includes(lower) ||
-          g.pipelineName?.toLowerCase().includes(lower) ||
-          g.errorMessage?.toLowerCase().includes(lower),
-      );
-    }
-    return sortGroupsBySeverity(groups, now);
-  }, [allGroups, statusFilter, search, now]);
-
-  const counts = useMemo(() => {
-    const countMatching = (filter: StatusFilter) =>
-      allGroups.filter((g) => matchesStatusFilter(g, filter, now)).length;
-    return {
-      all: allGroups.length,
-      ok: countMatching("ok"),
-      blocked: countMatching("blocked"),
-      stale: countMatching("stale"),
-      active: countMatching("active"),
-      retrying: countMatching("retrying"),
-    };
-  }, [allGroups, now]);
+  const filteredGroups = useMemo(
+    () => filterGroups({ groups: allGroups, statusFilter, search, now }),
+    [allGroups, statusFilter, search, now],
+  );
+  const counts = useMemo(() => countGroupsByStatus(allGroups, now), [allGroups, now]);
 
   // Filter changes shrink the visible row count without re-mounting the
   // scroll container, so the virtualizer's total height drops while
@@ -200,13 +178,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
   // Tenant-scoped controls. Activated when the search box is a single
   // tenant prefix (no slash) — typically `project_…`. Reuses the same
   // search input the operator was already typing for filter scope.
-  const tenantScope = useMemo(() => {
-    const s = search.trim();
-    const isOneTenantPrefix = s !== "" && !s.includes("/") && !s.includes(" ");
-    if (!isOneTenantPrefix) return null;
-    if (!s.startsWith("project_")) return null;
-    return s;
-  }, [search]);
+  const tenantScope = useMemo(() => tenantScopeOf(search), [search]);
 
   const pausedTenantsQuery = api.ops.listPausedTenants.useQuery(
     { queueName: primaryQueue ?? "" },

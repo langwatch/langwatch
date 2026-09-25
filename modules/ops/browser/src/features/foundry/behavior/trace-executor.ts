@@ -1,9 +1,18 @@
 import { nowInstant, Temporal, toDate } from "@langwatch/time";
-import type { Context, Tracer } from "@opentelemetry/api";
+import type { Context, Span, Tracer } from "@opentelemetry/api";
 import { context, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
 import type * as apiModule from "@opentelemetry/api";
 
-import type { SpanConfig, TraceConfig } from "../model/foundry-types.ts";
+import type {
+  ChatMessage,
+  LLMConfig,
+  PromptConfig,
+  SpanConfig,
+  SpanEvent,
+  SpanMetrics,
+  TraceConfig,
+  TraceMetadata,
+} from "../model/foundry-types.ts";
 import { createFoundryProvider } from "./otel-browser.ts";
 
 interface ExecutorOpts {
@@ -103,7 +112,14 @@ function createFoundryExecutor(opts: ExecutorOpts): FoundryExecutor {
     const now = nowInstant().epochMilliseconds;
     let traceId = "";
     for (const spanConfig of traceConfig.spans) {
-      const id = buildSpan(tracer, spanConfig, ROOT_CONTEXT, now, traceConfig, otelDeps);
+      const id = buildSpan({
+        tracer,
+        config: spanConfig,
+        parentContext: ROOT_CONTEXT,
+        baseTime: now,
+        traceConfig,
+        otel: otelDeps,
+      });
       if (!traceId) traceId = id;
     }
     return traceId;
@@ -148,207 +164,232 @@ function spanTime(epochMs: number) {
   return toDate(Temporal.Instant.fromEpochMilliseconds(epochMs));
 }
 
-function buildSpan(
-  tracer: Tracer,
-  config: SpanConfig,
-  parentContext: Context,
-  baseTime: number,
-  traceConfig: TraceConfig,
+function buildSpan({
+  tracer,
+  config,
+  parentContext,
+  baseTime,
+  traceConfig,
+  otel,
+}: {
+  tracer: Tracer;
+  config: SpanConfig;
+  parentContext: Context;
+  baseTime: number;
+  traceConfig: TraceConfig;
   otel: {
     context: typeof apiModule.context;
     trace: typeof apiModule.trace;
     SpanStatusCode: typeof apiModule.SpanStatusCode;
-  },
-): string {
+  };
+}): string {
   const startTimeMs = baseTime + config.offsetMs;
   const endTimeMs = startTimeMs + config.durationMs;
 
   const span = tracer.startSpan(config.name, { startTime: spanTime(startTimeMs) }, parentContext);
 
-  span.setAttribute("langwatch.span.type", config.type);
-  // Foundry-emitted traces are always tagged "sample" so they're trivial to
-  // isolate from real production traffic via `origin:sample`. Set early so
-  // user-supplied attributes can still override per-span if a future
-  // workflow needs to (e.g., simulated production replay).
-  span.setAttribute("langwatch.origin", "sample");
-
-  if (config.input) {
-    span.setAttribute("langwatch.input", JSON.stringify(config.input));
-  }
-  if (config.output) {
-    span.setAttribute("langwatch.output", JSON.stringify(config.output));
-  }
-
-  // Metadata on root spans
+  setSpanPayload(span, config);
   if (parentContext === otel.context.active() || !parentContext) {
-    if (traceConfig.metadata.userId) {
-      span.setAttribute("langwatch.user.id", traceConfig.metadata.userId);
-    }
-    if (traceConfig.metadata.threadId) {
-      span.setAttribute("langwatch.thread.id", traceConfig.metadata.threadId);
-    }
-    if (traceConfig.metadata.customerId) {
-      span.setAttribute("langwatch.customer.id", traceConfig.metadata.customerId);
-    }
-    const labels = traceConfig.metadata.labels;
-    if (labels?.length) {
-      span.setAttribute("langwatch.labels", labels);
-    }
+    setRootMetadata(span, traceConfig.metadata);
   }
-
-  // LLM spans emit OTel gen-AI semantic conventions alongside legacy langwatch keys;
-  // dual emission for spec-compliance and trace-summary rollup.
-  if (config.llm) {
-    span.setAttribute("gen_ai.operation.name", "chat");
-    const system = inferGenAiSystem(config.llm.requestModel ?? config.llm.responseModel);
-    if (system) span.setAttribute("gen_ai.system", system);
-    if (config.llm.requestModel) {
-      span.setAttribute("gen_ai.request.model", config.llm.requestModel);
-    }
-    if (config.llm.responseModel) {
-      span.setAttribute("gen_ai.response.model", config.llm.responseModel);
-    }
-    if (config.llm.temperature !== undefined) {
-      span.setAttribute("gen_ai.request.temperature", config.llm.temperature);
-    }
-    if (config.llm.stream) {
-      span.setAttribute("gen_ai.request.streaming", true);
-    }
-    if (config.llm.messages) {
-      // Per-turn events: `gen_ai.system.message`, `gen_ai.user.message`,
-      // `gen_ai.assistant.message`, `gen_ai.tool.message`. The body
-      // carries `role` + `content` per the semconv.
-      for (const msg of config.llm.messages) {
-        span.addEvent(
-          `gen_ai.${msg.role}.message`,
-          { role: msg.role, content: msg.content },
-          spanTime(startTimeMs),
-        );
-      }
-      const lastAssistant = [...config.llm.messages].reverse().find((m) => m.role === "assistant");
-      if (lastAssistant) {
-        span.addEvent(
-          "gen_ai.choice",
-          {
-            index: 0,
-            finish_reason: "stop",
-            message: JSON.stringify({
-              role: "assistant",
-              content: lastAssistant.content,
-            }),
-          },
-          spanTime(endTimeMs),
-        );
-      }
-      span.setAttribute(
-        "langwatch.input",
-        JSON.stringify({ type: "chat_messages", value: config.llm.messages }),
-      );
-      if (lastAssistant) {
-        span.setAttribute(
-          "langwatch.output",
-          JSON.stringify({ type: "text", value: lastAssistant.content }),
-        );
-      }
-    }
-    const metrics = config.llm.metrics;
-    if (metrics) {
-      if (metrics.promptTokens !== undefined) {
-        span.setAttribute("gen_ai.usage.input_tokens", metrics.promptTokens);
-      }
-      if (metrics.completionTokens !== undefined) {
-        span.setAttribute("gen_ai.usage.output_tokens", metrics.completionTokens);
-      }
-      span.setAttribute(
-        "langwatch.metrics",
-        JSON.stringify({
-          prompt_tokens: metrics.promptTokens,
-          completion_tokens: metrics.completionTokens,
-          cost: metrics.cost,
-        }),
-      );
-    }
-  }
+  if (config.llm) recordLlm({ span, llm: config.llm, startTimeMs, endTimeMs });
 
   const ragContexts = config.rag?.contexts;
   if (ragContexts?.length) {
     span.setAttribute("langwatch.rag.contexts", JSON.stringify(ragContexts));
   }
-
-  if (config.prompt) {
-    if (config.prompt.promptId) {
-      // The trace-summary projection only registers prompt ids in the
-      // canonical `handle:version_or_tag` shorthand — bare slugs (no
-      // colon) get dropped, which means no `langwatch.prompt_ids` union
-      // and no chips on the drawer. Coerce bare slugs into shorthand so
-      // Foundry-emitted traces participate in the prompt rollup.
-      const raw = config.prompt.promptId;
-      const versionRef = config.prompt.version ?? config.prompt.versionId;
-      const id = raw.includes(":") || !versionRef ? raw : `${raw}:${versionRef}`;
-      span.setAttribute("langwatch.prompt.id", id);
-
-      // Also emit the separate-format keys when we have a numeric
-      // version. The server's `parsePromptReference` accepts either form,
-      // and writing both makes the rollup robust to either projection
-      // path.
-      if (typeof config.prompt.version === "number") {
-        const slug = raw.includes(":") ? raw.split(":")[0]! : raw;
-        span.setAttribute("langwatch.prompt.handle", slug);
-        span.setAttribute("langwatch.prompt.version.number", config.prompt.version);
-      }
-    }
-    if (config.prompt.versionId) {
-      span.setAttribute("langwatch.prompt.version.id", config.prompt.versionId);
-    }
-    if (config.prompt.selectedId) {
-      // The pin the developer set on the call site. The projection
-      // records this verbatim into `SelectedPromptId`; when it differs
-      // from the resolved runtime id the drawer flags drift.
-      span.setAttribute("langwatch.prompt.selected.id", config.prompt.selectedId);
-    }
-    if (config.prompt.variables) {
-      span.setAttribute("langwatch.prompt.variables", JSON.stringify(config.prompt.variables));
-    }
-  }
-
-  if (config.events) {
-    for (const event of config.events) {
-      const eventTimeMs = startTimeMs + (event.offsetMs ?? 0);
-      const attrs: Record<string, string> = {};
-      for (const [k, v] of Object.entries(event.attributes)) {
-        attrs[k] = typeof v === "string" ? v : JSON.stringify(v);
-      }
-      span.addEvent(event.name, attrs, spanTime(eventTimeMs));
-    }
-  }
+  if (config.prompt) setPromptReference(span, config.prompt);
+  recordEvents({ span, events: config.events ?? [], startTimeMs });
 
   for (const [key, value] of Object.entries(config.attributes)) {
     span.setAttribute(key, value);
   }
-
-  if (config.status === "error") {
-    span.setStatus({
-      code: otel.SpanStatusCode.ERROR,
-      message: config.exception?.message,
-    });
-    if (config.exception) {
-      span.recordException({
-        message: config.exception.message,
-        stack: config.exception.stackTrace,
-      });
-    }
-  } else if (config.status === "ok") {
-    span.setStatus({ code: otel.SpanStatusCode.OK });
-  }
+  setSpanStatus({ span, config, statusCodes: otel.SpanStatusCode });
 
   const childContext = otel.trace.setSpan(parentContext, span);
   for (const child of config.children) {
-    buildSpan(tracer, child, childContext, startTimeMs, traceConfig, otel);
+    buildSpan({
+      tracer,
+      config: child,
+      parentContext: childContext,
+      baseTime: startTimeMs,
+      traceConfig,
+      otel,
+    });
   }
 
   span.end(spanTime(endTimeMs));
 
   return span.spanContext().traceId;
+}
+
+function setSpanPayload(span: Span, config: SpanConfig): void {
+  span.setAttribute("langwatch.span.type", config.type);
+  // Foundry-emitted traces are always tagged "sample" so they're trivial to
+  // isolate from real production traffic via `origin:sample`; user-supplied
+  // attributes are set later, so a workflow can still override it per span.
+  span.setAttribute("langwatch.origin", "sample");
+  if (config.input) span.setAttribute("langwatch.input", JSON.stringify(config.input));
+  if (config.output) span.setAttribute("langwatch.output", JSON.stringify(config.output));
+}
+
+function setRootMetadata(span: Span, metadata: TraceMetadata): void {
+  if (metadata.userId) span.setAttribute("langwatch.user.id", metadata.userId);
+  if (metadata.threadId) span.setAttribute("langwatch.thread.id", metadata.threadId);
+  if (metadata.customerId) span.setAttribute("langwatch.customer.id", metadata.customerId);
+  if (metadata.labels?.length) span.setAttribute("langwatch.labels", metadata.labels);
+}
+
+/** OTel gen-AI semantic conventions beside the legacy langwatch keys, for the summary rollup. */
+function recordLlm({
+  span,
+  llm,
+  startTimeMs,
+  endTimeMs,
+}: {
+  span: Span;
+  llm: LLMConfig;
+  startTimeMs: number;
+  endTimeMs: number;
+}): void {
+  span.setAttribute("gen_ai.operation.name", "chat");
+  const system = inferGenAiSystem(llm.requestModel ?? llm.responseModel);
+  if (system) span.setAttribute("gen_ai.system", system);
+  if (llm.requestModel) span.setAttribute("gen_ai.request.model", llm.requestModel);
+  if (llm.responseModel) span.setAttribute("gen_ai.response.model", llm.responseModel);
+  if (llm.temperature !== undefined) {
+    span.setAttribute("gen_ai.request.temperature", llm.temperature);
+  }
+  if (llm.stream) span.setAttribute("gen_ai.request.streaming", true);
+  if (llm.messages) recordLlmMessages({ span, messages: llm.messages, startTimeMs, endTimeMs });
+  if (llm.metrics) recordLlmMetrics(span, llm.metrics);
+}
+
+/** One `gen_ai.<role>.message` event per turn, then the last assistant turn as the choice. */
+function recordLlmMessages({
+  span,
+  messages,
+  startTimeMs,
+  endTimeMs,
+}: {
+  span: Span;
+  messages: ChatMessage[];
+  startTimeMs: number;
+  endTimeMs: number;
+}): void {
+  for (const msg of messages) {
+    span.addEvent(
+      `gen_ai.${msg.role}.message`,
+      { role: msg.role, content: msg.content },
+      spanTime(startTimeMs),
+    );
+  }
+  const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
+  if (lastAssistant) {
+    span.addEvent(
+      "gen_ai.choice",
+      {
+        index: 0,
+        finish_reason: "stop",
+        message: JSON.stringify({ role: "assistant", content: lastAssistant.content }),
+      },
+      spanTime(endTimeMs),
+    );
+  }
+  span.setAttribute("langwatch.input", JSON.stringify({ type: "chat_messages", value: messages }));
+  if (lastAssistant) {
+    span.setAttribute(
+      "langwatch.output",
+      JSON.stringify({ type: "text", value: lastAssistant.content }),
+    );
+  }
+}
+
+function recordLlmMetrics(span: Span, metrics: SpanMetrics): void {
+  if (metrics.promptTokens !== undefined) {
+    span.setAttribute("gen_ai.usage.input_tokens", metrics.promptTokens);
+  }
+  if (metrics.completionTokens !== undefined) {
+    span.setAttribute("gen_ai.usage.output_tokens", metrics.completionTokens);
+  }
+  span.setAttribute(
+    "langwatch.metrics",
+    JSON.stringify({
+      prompt_tokens: metrics.promptTokens,
+      completion_tokens: metrics.completionTokens,
+      cost: metrics.cost,
+    }),
+  );
+}
+
+function setPromptReference(span: Span, prompt: PromptConfig): void {
+  if (prompt.promptId) setPromptId(span, { ...prompt, promptId: prompt.promptId });
+  if (prompt.versionId) span.setAttribute("langwatch.prompt.version.id", prompt.versionId);
+  // The pin set on the call site; the drawer flags drift when it differs from the runtime id.
+  if (prompt.selectedId) span.setAttribute("langwatch.prompt.selected.id", prompt.selectedId);
+  if (prompt.variables) {
+    span.setAttribute("langwatch.prompt.variables", JSON.stringify(prompt.variables));
+  }
+}
+
+/**
+ * The trace-summary projection only registers `handle:version_or_tag` ids, so a bare slug is
+ * coerced into that shorthand; a numeric version also writes the separate handle/number keys,
+ * which the server's `parsePromptReference` accepts too.
+ */
+function setPromptId(span: Span, prompt: PromptConfig & { promptId: string }): void {
+  const raw = prompt.promptId;
+  const versionRef = prompt.version ?? prompt.versionId;
+  const id = raw.includes(":") || !versionRef ? raw : `${raw}:${versionRef}`;
+  span.setAttribute("langwatch.prompt.id", id);
+  if (typeof prompt.version === "number") {
+    const slug = raw.includes(":") ? raw.split(":")[0]! : raw;
+    span.setAttribute("langwatch.prompt.handle", slug);
+    span.setAttribute("langwatch.prompt.version.number", prompt.version);
+  }
+}
+
+function recordEvents({
+  span,
+  events,
+  startTimeMs,
+}: {
+  span: Span;
+  events: SpanEvent[];
+  startTimeMs: number;
+}): void {
+  for (const event of events) {
+    const attrs = Object.fromEntries(
+      Object.entries(event.attributes).map(([k, v]) => [
+        k,
+        typeof v === "string" ? v : JSON.stringify(v),
+      ]),
+    );
+    span.addEvent(event.name, attrs, spanTime(startTimeMs + (event.offsetMs ?? 0)));
+  }
+}
+
+function setSpanStatus({
+  span,
+  config,
+  statusCodes,
+}: {
+  span: Span;
+  config: SpanConfig;
+  statusCodes: typeof apiModule.SpanStatusCode;
+}): void {
+  if (config.status === "ok") {
+    span.setStatus({ code: statusCodes.OK });
+    return;
+  }
+  if (config.status !== "error") return;
+  span.setStatus({ code: statusCodes.ERROR, message: config.exception?.message });
+  if (config.exception) {
+    span.recordException({
+      message: config.exception.message,
+      stack: config.exception.stackTrace,
+    });
+  }
 }
 
 /** The vendor families a model id alone can name, in the order they are tested. */

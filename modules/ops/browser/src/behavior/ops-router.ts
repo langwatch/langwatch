@@ -43,42 +43,43 @@ function normalizeQuery(query: Record<string, unknown>): Record<string, string |
   return next;
 }
 
+type OpsHost = ReturnType<typeof useOpsHost>;
+
+function pathWithQuery(pathname: string, query: Record<string, unknown> | undefined): string {
+  if (!query) return pathname;
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(normalizeQuery(query))) {
+    if (value !== void 0) search.set(key, value);
+  }
+  const queryString = search.toString();
+  return queryString ? `${pathname}?${queryString}` : pathname;
+}
+
+function go({ host, to, replace }: { host: OpsHost; to: OpsRouterTarget; replace: boolean }) {
+  if (typeof to !== "string") {
+    if (to.pathname !== void 0) host.navigate(pathWithQuery(to.pathname, to.query));
+    else host.setQuery(normalizeQuery(to.query ?? {}), { replace });
+    return;
+  }
+  if (to.startsWith("?")) host.setQuery(queryOf(to), { replace });
+  else host.navigate(to);
+}
+
 export function useOpsRouter(): OpsRouter {
   const host = useOpsHost();
   const reading = host.route();
   const asPath = host.asPath();
 
-  return useMemo(() => {
-    const go = (to: OpsRouterTarget, replace: boolean) => {
-      if (typeof to === "string") {
-        if (to.startsWith("?")) {
-          host.setQuery(queryOf(to), { replace });
-          return;
-        }
-        host.navigate(to);
-        return;
-      }
-      if (to.pathname !== void 0) {
-        const search = to.query ? new URLSearchParams() : null;
-        if (search && to.query) {
-          for (const [key, value] of Object.entries(normalizeQuery(to.query))) {
-            if (value !== void 0) search.set(key, value);
-          }
-        }
-        const suffix = search && search.toString() ? `?${search.toString()}` : "";
-        host.navigate(`${to.pathname}${suffix}`);
-        return;
-      }
-      host.setQuery(normalizeQuery(to.query ?? {}), { replace });
-    };
-    return {
+  return useMemo(
+    () => ({
       // Path parameters first, then the query string, exactly as the compat
       // router merged them: a `?id=` that shadows a `:id` segment never wins.
       query: { ...reading.query, ...reading.params },
       asPath,
-      push: (to: OpsRouterTarget) => go(to, false),
-      replace: (to: OpsRouterTarget) => go(to, true),
+      push: (to: OpsRouterTarget) => go({ host, to, replace: false }),
+      replace: (to: OpsRouterTarget) => go({ host, to, replace: true }),
       back: () => host.navigate(".."),
-    };
-  }, [host, reading, asPath]);
+    }),
+    [host, reading, asPath],
+  );
 }
