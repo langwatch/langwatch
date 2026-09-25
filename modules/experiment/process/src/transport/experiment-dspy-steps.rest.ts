@@ -3,6 +3,7 @@
  * the create-or-take door beside it, this one answers its own bodies: an SDK
  * optimizer parses `{ message }`/`{ error }`, not a reshaping schema.
  */
+import { PayloadTooLargeError } from "@langwatch/api";
 import {
   defineRestMiddleware,
   defineRestRouter,
@@ -19,16 +20,11 @@ import {
 } from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
-import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
 import { dspyStepOf } from "../rules/experiment-dspy-step.rules.ts";
-import { experimentDoorRefusal } from "./experiment-init.rest.ts";
 
 const logger = createLogger("langwatch:experiment:dspy");
-
-/** The 413 a body past its cap earns, in the plain sentence it has always been. */
-const payloadTooLarge = (): Error => new HTTPException(413, { message: "Payload Too Large" });
 
 /** Bodies up to 20MB: a single optimizer batch carries every example it saw. */
 const MAX_BODY_BYTES = 20 * 1024 * 1024;
@@ -119,9 +115,8 @@ export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
   .withResponse("protocol", {
     produces: "application/json",
     because: LEGACY_WIRE,
-    refusal: experimentDoorRefusal,
   })
-  .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
   .withDocs({
     tags: ["Experiments"],
     summary: "Report DSPy optimizer steps",

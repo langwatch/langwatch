@@ -74,19 +74,15 @@ describe("given the Slack alert door", () => {
 
   describe("when the body fails the schema", () => {
     /** @scenario "A body missing its required fields is refused by name" */
-    it("answers main's 400 naming the refused fields, never the 500 that told a caller to retry", async () => {
+    it("answers the handled validation refusal, never the 500 that told a caller to retry", async () => {
       const api = mount();
 
       const response = await api.post("/api/trigger/slack", { name: "No webhook" });
+      const body = await response.json();
 
-      expect(response.status).toBe(400);
-      expect(await response.json()).toMatchObject({
-        message: "Invalid request data",
-        errors: expect.arrayContaining([
-          expect.objectContaining({ field: "slack_webhook" }),
-          expect.objectContaining({ field: "alert_type" }),
-        ]),
-      });
+      expect(response.status).toBe(422);
+      expect(body).toMatchObject({ code: "validation_error" });
+      expect(JSON.stringify(body)).toContain("slack_webhook");
       expect(api.created).toEqual([]);
     });
 
@@ -100,8 +96,8 @@ describe("given the Slack alert door", () => {
         alert_type: "CRITICAL",
       });
 
-      expect(response.status).toBe(400);
-      expect(await response.json()).toMatchObject({ message: "Invalid request data" });
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ code: "validation_error" });
       expect(api.created).toEqual([]);
     });
   });
@@ -129,13 +125,13 @@ describe("given the Slack alert door", () => {
       const response = await api.postRaw("/api/trigger/slack", "{not json");
 
       expect(response.status).toBe(400);
-      await expect(response.json()).resolves.toEqual({ message: "Bad request" });
+      expect(await response.json()).toMatchObject({ code: "malformed_request" });
       expect(api.created).toEqual([]);
     });
   });
 
   describe("when the application refuses the create", () => {
-    it("answers main's one 500 sentence, with the detail left in the log", async () => {
+    it("answers the generic unknown error, with the detail left in the log", async () => {
       const api = mount(async () => {
         throw new Error("connection reset");
       });
@@ -147,7 +143,7 @@ describe("given the Slack alert door", () => {
       });
 
       expect(response.status).toBe(500);
-      await expect(response.json()).resolves.toEqual({ message: "Error creating trigger" });
+      expect(await response.json()).toMatchObject({ code: "internal_error" });
     });
   });
 });

@@ -1,11 +1,12 @@
 /**
- * Tests POST /api/experiment/init behind the project door: credential refusals in main's flat
- * bodies, the door's own sentences, and success.
+ * Tests POST /api/experiment/init behind the project door: credential refusals as handled
+ * errors in the canonical envelope, the door's own sentences, and success.
  * @vitest-environment node
  */
 import { ProjectInvalidCredentialsError, ProjectMissingCredentialsError } from "@langwatch/api";
 import {
   bindRestMiddleware,
+  canonicalErrorResponse,
   createRestRuntime,
   projectRestFacts,
   restRouteDocumentation,
@@ -93,8 +94,7 @@ function mountInit({
 
   const hono = runtime.mount(experimentInitRest.router(), {
     app: () => app,
-    // The family's boundary: a door that renders its own refusals never reaches it.
-    onError: (_error, c) => c.json({ boundary: "family" }, 500),
+    onError: canonicalErrorResponse,
     facts: [
       bindRestMiddleware(projectRestFacts, () => ({
         projectSlug: PROJECT_SLUG,
@@ -122,56 +122,52 @@ const FREE_SLUG = JSON.stringify({ experiment_slug: "nightly", experiment_type: 
 describe("given the SDK's experiment create-or-take door", () => {
   describe("when the request carries no project key", () => {
     /** @scenario "A create-or-take call with no credential is refused before the body is read" */
-    it("refuses at 401 with main's flat body naming the headers a token may be sent in", async () => {
+    it("refuses at 401 with the missing-credentials code", async () => {
       const findOrCreateForRun = vi.fn();
       const send = mountInit({ stubs: { findOrCreateForRun } });
 
       const response = await send(FREE_SLUG, null);
 
       expect(response.status).toBe(401);
-      expect(await response.json()).toEqual({
-        error: "Unauthorized",
-        message: new ProjectMissingCredentialsError().message,
+      expect(await response.json()).toMatchObject({
+        code: new ProjectMissingCredentialsError().code,
       });
       expect(findOrCreateForRun).not.toHaveBeenCalled();
     });
   });
 
   describe("when the project key is not one the deployment knows", () => {
-    it("refuses at 401 with main's flat body", async () => {
+    it("refuses at 401 with the invalid-credentials code", async () => {
       const send = mountInit({ stubs: {} });
 
       const response = await send(FREE_SLUG, "sk-lw-unknown");
 
       expect(response.status).toBe(401);
-      expect(await response.json()).toEqual({
-        error: "Unauthorized",
-        message: new ProjectInvalidCredentialsError().message,
+      expect(await response.json()).toMatchObject({
+        code: new ProjectInvalidCredentialsError().code,
       });
     });
   });
 
   describe("when the key may not manage experiments", () => {
     /** @scenario "A key without permission to manage experiments is refused as sent" */
-    it("refuses at 403 with the ceiling's code and meta spread flat", async () => {
+    it("refuses at 403 with the ceiling's code and the permission it lacks", async () => {
       const findOrCreateForRun = vi.fn();
       const send = mountInit({ stubs: { findOrCreateForRun }, granted: [] });
 
       const response = await send(FREE_SLUG);
 
       expect(response.status).toBe(403);
-      expect(await response.json()).toEqual({
-        error: "api_key_permission_denied",
-        message: "This API key may not do that",
-        permission: "experiments:manage",
-        fault: "customer",
+      expect(await response.json()).toMatchObject({
+        code: "api_key_permission_denied",
+        meta: { permission: "experiments:manage" },
       });
       expect(findOrCreateForRun).not.toHaveBeenCalled();
     });
   });
 
   describe("when storing the experiment fails for a reason nobody handled", () => {
-    it("answers main's bare 500 sentence, not the family's envelope", async () => {
+    it("answers the generic unknown error, never the underlying detail", async () => {
       const send = mountInit({
         stubs: {
           findOrCreateForRun: async () => {
@@ -182,8 +178,11 @@ describe("given the SDK's experiment create-or-take door", () => {
 
       const response = await send(FREE_SLUG);
 
+      const body = await response.json();
+
       expect(response.status).toBe(500);
-      expect(await response.json()).toEqual({ error: "Internal server error" });
+      expect(body).toMatchObject({ code: "internal_error" });
+      expect(JSON.stringify(body)).not.toContain("db-7.internal");
     });
   });
 

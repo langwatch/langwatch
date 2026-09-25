@@ -48,8 +48,7 @@ Feature: Experiment service boundary
   Scenario: A create-or-take call with no credential is refused before the body is read
     Given a request to the experiment create-or-take door carrying no project key
     When the door answers
-    Then it refuses at 401
-    And the body carries a message naming the headers a token may be sent in
+    Then it refuses at 401 with code "missing_credentials"
     And nothing is read from the experiment store
 
   @unimplemented
@@ -57,7 +56,7 @@ Feature: Experiment service boundary
   Scenario: A key without permission to manage experiments is refused as sent
     Given a project key that may not manage experiments
     When it calls the experiment create-or-take door
-    Then the door answers the ceiling refusal exactly as the credential port sent it
+    Then the door refuses at 403 with code "api_key_permission_denied" naming the permission
     And nothing is read from the experiment store
 
   @unit

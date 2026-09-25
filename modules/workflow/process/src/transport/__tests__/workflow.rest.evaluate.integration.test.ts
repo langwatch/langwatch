@@ -6,11 +6,11 @@ import { createApiFixture } from "@langwatch/api-fixture";
  */
 import {
   bindRestMiddleware,
+  canonicalErrorResponse,
   createRestRuntime,
   projectRestFacts,
-  type RestErrorHandler,
 } from "@langwatch/api/rest";
-import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { NotFoundError } from "@langwatch/handled-error";
 import {
   WorkflowVersionRequiredError,
   type WorkflowApi,
@@ -19,20 +19,6 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import { createWorkflowRest, workflowEvaluationRunCeiling } from "../workflow.rest.ts";
-
-/** The process's own boundary renderer, reduced to what these tests read back. */
-const renderHandled: RestErrorHandler = (error, c) => {
-  if (HandledError.isHandled(error)) {
-    const serialized = error.serialize();
-
-    return c.json(
-      { error: serialized.code, message: error.message, ...serialized.meta },
-      serialized.httpStatus as 400,
-    );
-  }
-
-  return c.json({ error: "internal_server_error" }, 500);
-};
 
 const started: WorkflowEvaluationStarted = {
   runId: "run_1",
@@ -59,7 +45,7 @@ function buildApi(options: {
   const hono = runtime.mount(createWorkflowRest().router(), {
     app: () => app,
     credential: "project",
-    onError: renderHandled,
+    onError: canonicalErrorResponse,
     facts: [
       bindRestMiddleware(projectRestFacts, () => ({
         projectSlug: "project-one",
@@ -225,7 +211,7 @@ describe("POST /api/workflows/:id/evaluate", () => {
 
   describe("given the workflow has no committed version", () => {
     /** @scenario A workflow with no committed version cannot be evaluated */
-    it("answers main's 400 with the refusal's own sentence", async () => {
+    it("refuses at 400 with the workflow_version_required code", async () => {
       const refusal = new WorkflowVersionRequiredError();
       const response = await post(
         buildApi({
@@ -236,9 +222,8 @@ describe("POST /api/workflows/:id/evaluate", () => {
         "workflow_1",
       );
 
-      expect(refusal.code).toBe("workflow_version_required");
       expect(response.status).toBe(400);
-      expect(await response.json()).toEqual({ error: refusal.message });
+      expect(await response.json()).toMatchObject({ code: "workflow_version_required" });
     });
   });
 });

@@ -1,13 +1,14 @@
 Feature: The Slack alert trigger door refuses a bad body the way it always has
 
   `POST /api/trigger/slack` is the narrow ancestor of `/api/triggers`, kept for
-  callers written against it. It publishes three answers and no others: a 400
-  for a body it cannot read, a 400 naming the fields it refused, and one 500
-  sentence for a failure the caller has no action for.
+  callers written against it. Its refusals are handled errors in the
+  platform's error envelope: a 400 for a body it cannot read, a 422 naming the
+  fields it refused, and the generic unknown error for a failure the caller has
+  no action for.
 
-  A refused body must not reach the 500. "Error creating trigger" tells the
-  caller the server broke and invites a retry of a body that will never be
-  accepted, and it hides which field was wrong.
+  A refused body must not reach the 500. A 500 tells the caller the server broke
+  and invites a retry of a body that will never be accepted, and it hides which
+  field was wrong.
 
   The route also answers at its bare path and its `/api/v1` alias. Those are spellings of one route, so they authenticate
   alike; an alias that let a caller in where the canonical path refuses would
@@ -17,7 +18,7 @@ Feature: The Slack alert trigger door refuses a bad body the way it always has
   Scenario: A body missing its required fields is refused by name
     Given a caller holding the trigger permission
     When it creates a Slack trigger with an empty body
-    Then the request is refused with status 400
+    Then the request is refused with status 422 and code "validation_error"
     And the answer names the fields that were refused
     And no trigger is created
 
@@ -25,7 +26,7 @@ Feature: The Slack alert trigger door refuses a bad body the way it always has
   Scenario: A body that is not JSON is refused
     Given a caller holding the trigger permission
     When it creates a Slack trigger with a body that is not JSON
-    Then the request is refused with status 400
+    Then the request is refused with status 400 and code "malformed_request"
     And no trigger is created
 
   @integration

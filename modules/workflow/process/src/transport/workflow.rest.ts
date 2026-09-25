@@ -15,6 +15,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   WorkflowApi,
   WorkflowNotFoundError,
+  WorkflowVersionRequiredError,
   workflowRestArchivedSchema,
   workflowRestDetailSchema,
   workflowRestEvaluateSchema,
@@ -150,6 +151,8 @@ async function startEvaluation(params: {
       },
     };
   } catch (error) {
+    if (error instanceof WorkflowVersionRequiredError) throw error;
+
     const refusal = findEvaluationRefusal(error);
 
     if (refusal) return refusal;

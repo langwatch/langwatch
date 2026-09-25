@@ -1,10 +1,14 @@
 /**
  * Tests POST /api/dspy/log_steps behind the project door: credential refusals and a body past
- * its cap in main's own bodies, and an accepted batch stored under the key's project.
+ * its cap as handled errors, and an accepted batch stored under the key's project.
  * @vitest-environment node
  */
 import { ProjectMissingCredentialsError } from "@langwatch/api";
-import { createRestRuntime, restRouteDocumentation } from "@langwatch/api/rest";
+import {
+  canonicalErrorResponse,
+  createRestRuntime,
+  restRouteDocumentation,
+} from "@langwatch/api/rest";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it, vi } from "vitest";
@@ -57,8 +61,7 @@ function mountLogSteps({
 
   const hono = runtime.mount(experimentDspyStepsRest.router(), {
     app: () => app,
-    // The family's boundary: a door that renders its own refusals never reaches it.
-    onError: (_error, c) => c.json({ boundary: "family" }, 500),
+    onError: canonicalErrorResponse,
   });
 
   return (body: string, key: string | null = GOOD_KEY) =>
@@ -76,47 +79,44 @@ function mountLogSteps({
 
 describe("given the DSPy optimizer's step log door", () => {
   describe("when the request carries no project key", () => {
-    it("refuses at 401 with main's flat body and reads nothing", async () => {
+    it("refuses at 401 with the missing-credentials code and reads nothing", async () => {
       const listModelCosts = vi.fn();
       const send = mountLogSteps({ stubs: { listModelCosts } });
 
       const response = await send("[]", null);
 
       expect(response.status).toBe(401);
-      expect(await response.json()).toEqual({
-        error: "Unauthorized",
-        message: new ProjectMissingCredentialsError().message,
+      expect(await response.json()).toMatchObject({
+        code: new ProjectMissingCredentialsError().code,
       });
       expect(listModelCosts).not.toHaveBeenCalled();
     });
   });
 
   describe("when the key may not manage experiments", () => {
-    it("refuses at 403 with the ceiling's code and meta spread flat", async () => {
+    it("refuses at 403 with the ceiling's code and the permission it lacks", async () => {
       const listModelCosts = vi.fn();
       const send = mountLogSteps({ stubs: { listModelCosts }, granted: [] });
 
       const response = await send("[]");
 
       expect(response.status).toBe(403);
-      expect(await response.json()).toEqual({
-        error: "api_key_permission_denied",
-        message: "This API key may not do that",
-        permission: "experiments:manage",
-        fault: "customer",
+      expect(await response.json()).toMatchObject({
+        code: "api_key_permission_denied",
+        meta: { permission: "experiments:manage" },
       });
       expect(listModelCosts).not.toHaveBeenCalled();
     });
   });
 
   describe("when the body is past its cap", () => {
-    it("refuses at 413 with the plain sentence it has always been", async () => {
+    it("refuses at 413 with the payload-too-large code", async () => {
       const send = mountLogSteps({ stubs: {} });
 
       const response = await send(" ".repeat(MAX_BODY_BYTES + 1));
 
       expect(response.status).toBe(413);
-      expect(await response.text()).toBe("Payload Too Large");
+      expect(await response.json()).toMatchObject({ code: "payload_too_large" });
     });
   });
 
