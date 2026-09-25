@@ -235,32 +235,24 @@ export async function resolveWrapperPath(
   } = opts;
   const isTTY = opts.isTTY ?? (Boolean(process.stdin.isTTY) && Boolean(process.stdout.isTTY));
 
+  const context: PathContext = { cfg, tool, promptImpl, saveImpl, writeImpl };
+
   // 1. Explicit override (flag or env) wins outright - no prompt, no persist.
   if (override) {
     // Explicit or not, a copilot gateway route shifts spend off the user's
     // Copilot seat — every route that lands there names the shift (ADR-039
     // D3): here, the pinned branch below, the policy branches, and
     // resolveWrapperMode's downgrade.
-    if (override === "gateway" && resolvePlatformToolPolicy(tool, cfg.tool_policies).allowVk) {
-      // Policy gate: when the org disables the gateway, resolveWrapperMode
-      // downgrades this run to ingestion with its own notice — warning about
-      // a billing shift that then doesn't happen would be false.
-      const suffix = copilotSeatBypassSuffix(tool);
-      if (suffix) {
-        writeImpl(`${lwTag()} using the gateway (--tool-mode).${suffix}\n`);
-      }
-    }
+    if (override === "gateway")
+      announceGatewayShift({ context, lead: "using the gateway (--tool-mode)." });
     return { mode: override, prompted: false };
   }
 
   // 2. Remembered answer pinned in cfg.tool_mode[tool].
   const pinned = cfg.tool_mode?.[tool];
   if (pinned === "gateway" || pinned === "ingestion") {
-    if (pinned === "gateway" && resolvePlatformToolPolicy(tool, cfg.tool_policies).allowVk) {
-      const suffix = copilotSeatBypassSuffix(tool);
-      if (suffix) {
-        writeImpl(`${lwTag()} using your saved gateway preference for ${tool}.${suffix}\n`);
-      }
+    if (pinned === "gateway") {
+      announceGatewayShift({ context, lead: `using your saved gateway preference for ${tool}.` });
     }
     return { mode: pinned, prompted: false };
   }
@@ -271,23 +263,68 @@ export async function resolveWrapperPath(
   // then re-cache it. A saved tool_mode short-circuits above, so this costs a
   // request only on the runs before the user pins a path.
   if (opts.refreshPolicies) {
-    try {
-      const fresh = await opts.refreshPolicies(cfg);
-      if (fresh) {
-        cfg.tool_policies = fresh;
-        try {
-          saveImpl({ ...cfg, tool_policies: fresh });
-        } catch {
-          // best-effort re-cache; a write failure must not block the run.
-          void 0;
-        }
-      }
-    } catch {
-      // offline / server error: fall back to the cached policy map.
-      void 0;
-    }
+    await refreshCachedPolicies({ cfg, refreshPolicies: opts.refreshPolicies, saveImpl });
   }
 
+  return pathForPolicy({ context, isTTY, env });
+}
+
+type PathContext = {
+  cfg: GovernanceConfig;
+  tool: string;
+  promptImpl: NonNullable<ResolveWrapperPathOptions["promptImpl"]>;
+  saveImpl: NonNullable<ResolveWrapperPathOptions["saveImpl"]>;
+  writeImpl: NonNullable<ResolveWrapperPathOptions["writeImpl"]>;
+};
+
+/**
+ * Names the Copilot seat shift when the gateway route is allowed. When the
+ * org disables the gateway, resolveWrapperMode downgrades the run with its
+ * own notice, so warning about a shift that then doesn't happen would be false.
+ */
+function announceGatewayShift({ context, lead }: { context: PathContext; lead: string }): void {
+  const { cfg, tool, writeImpl } = context;
+  if (!resolvePlatformToolPolicy(tool, cfg.tool_policies).allowVk) return;
+  const suffix = copilotSeatBypassSuffix(tool);
+  if (suffix) writeImpl(`${lwTag()} ${lead}${suffix}\n`);
+}
+
+async function refreshCachedPolicies({
+  cfg,
+  refreshPolicies,
+  saveImpl,
+}: {
+  cfg: GovernanceConfig;
+  refreshPolicies: NonNullable<ResolveWrapperPathOptions["refreshPolicies"]>;
+  saveImpl: PathContext["saveImpl"];
+}): Promise<void> {
+  let fresh: Awaited<ReturnType<typeof refreshPolicies>>;
+  try {
+    fresh = await refreshPolicies(cfg);
+  } catch {
+    // offline / server error: fall back to the cached policy map.
+    return;
+  }
+  if (!fresh) return;
+  cfg.tool_policies = fresh;
+  try {
+    saveImpl({ ...cfg, tool_policies: fresh });
+  } catch {
+    // best-effort re-cache; a write failure must not block the run.
+    void 0;
+  }
+}
+
+async function pathForPolicy({
+  context,
+  isTTY,
+  env,
+}: {
+  context: PathContext;
+  isTTY: boolean;
+  env: NodeJS.ProcessEnv;
+}): Promise<ResolveWrapperPathResult> {
+  const { cfg, tool, writeImpl } = context;
   // Resolve which paths the org policy permits for this tool.
   const policy = resolvePlatformToolPolicy(tool, cfg.tool_policies);
   const allowGateway = policy.allowVk;
@@ -328,6 +365,11 @@ export async function resolveWrapperPath(
     return { mode: "ingestion", prompted: false };
   }
 
+  return askAndRememberPath(context);
+}
+
+async function askAndRememberPath(context: PathContext): Promise<ResolveWrapperPathResult> {
+  const { cfg, tool, promptImpl, saveImpl, writeImpl } = context;
   const res = await promptImpl({
     type: "select",
     name: "path",

@@ -509,84 +509,183 @@ export function noticeRows(
   return [headlineRow(paint(first ?? "")), ...rest.map((line) => continuationRow(paint(line)))];
 }
 
-/** The terminal side of a shared folder, over one writer. */
-export function createUi(
-  writer: UiWriter = consoleWriter,
-  { width = terminalWidth }: { width?: () => number } = {},
-): LangyUi {
-  let held = false;
-  const queue: string[] = [];
-  /** The call the last headline was printed for, so a result finds its own. */
-  let lastCallId: string | undefined;
+type Paint = (line: string) => string;
 
-  const emit = (text: string): void => {
-    if (held) {
-      queue.push(text);
+const unpainted: Paint = (line) => line;
+
+/** The transcript's lines, held back while a question owns the bottom of the screen. */
+class Transcript {
+  private held = false;
+  private readonly queue: string[] = [];
+  /** The call the last headline was printed for, so a result finds its own. */
+  private lastCallId: string | undefined;
+  private readonly writer: UiWriter;
+  private readonly width: () => number;
+
+  constructor({ writer, width }: { writer: UiWriter; width: () => number }) {
+    this.writer = writer;
+    this.width = width;
+  }
+
+  emit(text: string): void {
+    if (this.held) {
+      this.queue.push(text);
       return;
     }
-    writer.line(text);
-  };
+    this.writer.line(text);
+  }
 
-  const emitResult = (lines: string[]): void => {
-    lines.forEach((text, index) => {
-      emit((index === 0 ? resultRow(text) : continuationRow(text)).replace(/\s+$/, ""));
-    });
-  };
+  callPrinted(callId: string): void {
+    this.lastCallId = callId;
+  }
 
   /**
    * The result of one call, under its own call line. Langy makes several
    * calls at once, so a result whose call isn't the last one printed
    * reprints that call's line first, dim.
    */
-  const emitResultFor = (call: LocalCall | undefined, lines: string[]): void => {
-    if (call && lastCallId !== undefined && lastCallId !== call.callId) {
-      emit(headlineRow(chalk.gray(callHeadline(call))));
-      lastCallId = call.callId;
+  emitResultFor(call: LocalCall | undefined, lines: string[]): void {
+    if (call && this.lastCallId !== undefined && this.lastCallId !== call.callId) {
+      this.emit(headlineRow(chalk.gray(callHeadline(call))));
+      this.lastCallId = call.callId;
     }
-    emitResult(lines);
-  };
+    lines.forEach((text, index) => {
+      this.emit((index === 0 ? resultRow(text) : continuationRow(text)).replace(/\s+$/, ""));
+    });
+  }
 
   /** Text broken on words to the width of a line that starts with `indent`. */
-  const fit = (text: string, indent: number): string[] =>
-    wrapWords(text, Math.max(20, width() - indent));
+  fit(text: string, indent: number): string[] {
+    return wrapWords(text, Math.max(20, this.width() - indent));
+  }
 
   /** A notice: the glyph, then as many rows as the words need. */
-  const notice = (text: string, paint: (line: string) => string = (line) => line): void => {
-    for (const row of noticeRows(text, { width: width(), paint })) emit(row);
-  };
+  notice(text: string, paint: Paint = unpainted): void {
+    for (const row of noticeRows(text, { width: this.width(), paint })) this.emit(row);
+  }
 
   /** A line under a notice, wrapped the same way. */
-  const detail = (text: string, paint: (line: string) => string = (line) => line): void => {
-    for (const line of fit(text, CONTINUATION_INDENT)) {
-      emit(continuationRow(paint(line)));
+  detail(text: string, paint: Paint = unpainted): void {
+    for (const line of this.fit(text, CONTINUATION_INDENT)) {
+      this.emit(continuationRow(paint(line)));
     }
+  }
+
+  hold(): void {
+    this.held = true;
+  }
+
+  release(): void {
+    this.held = false;
+    while (this.queue.length > 0) this.writer.line(this.queue.shift()!);
+  }
+}
+
+const showConnected = ({
+  transcript,
+  interactive,
+  root,
+  conversationTitle,
+  conversationUrl,
+}: {
+  transcript: Transcript;
+  interactive: boolean | undefined;
+  root: string;
+  conversationTitle: string;
+  conversationUrl: string;
+}): void => {
+  transcript.emit("");
+  transcript.notice(`Connected ${root} to "${conversationTitle}".`);
+  // The link is one word, so it keeps its own row rather than being cut.
+  for (const line of transcript.fit(`Follow along at ${conversationUrl}`, CONTINUATION_INDENT)) {
+    transcript.emit(continuationRow(line.replace(conversationUrl, chalk.cyan(conversationUrl))));
+  }
+  transcript.detail(
+    interactive === true
+      ? "Permission questions are answered here, or on the card in LangWatch."
+      : "Permission questions are answered on the card in LangWatch.",
+    chalk.gray,
+  );
+  transcript.detail("Press Ctrl-C to stop sharing.", chalk.gray);
+  transcript.emit("");
+};
+
+/**
+ * A command that failed says so first, whatever it printed. One that worked
+ * is its own output, and one that printed nothing says how long it took, so
+ * a line is never empty.
+ */
+const commandOutcomeLines = (output: BashOutput): string[] => {
+  if (output.pid !== undefined) return [chalk.gray(backgroundOutcome(output))];
+  const { lines, hidden } = tailLines(commandText(output));
+  const printed = [
+    ...lines.map((line) => chalk.gray(shorten(line, MAX_TARGET_LENGTH * 2))),
+    ...(hidden > 0 ? [chalk.gray(`… +${plural(hidden, "line")}`)] : []),
+  ];
+  if (commandFailed(output)) return [chalk.red(`Exit code ${output.exitCode}`), ...printed];
+  return printed.length === 0 ? [chalk.gray(silentOutcome(output))] : printed;
+};
+
+/** The spinner under a running command; the returned function stops it. */
+const startSpinner = (writer: UiWriter): (() => void) => {
+  if (!writer.draw) return () => undefined;
+  const startedAt = Date.now();
+  // The spinner never takes the screen from an open question, and it
+  // erases only what it drew itself.
+  const paint = (): void =>
+    writer.draw?.(
+      [resultRow(chalk.gray(`Running… ${elapsedLabel(Date.now() - startedAt)}`))],
+      "spinner",
+    );
+  paint();
+  const timer = setInterval(paint, 1000);
+  timer.unref?.();
+  return () => {
+    clearInterval(timer);
+    writer.erase?.("spinner");
   };
+};
+
+const showBackgroundKept = ({
+  transcript,
+  processes,
+}: {
+  transcript: Transcript;
+  processes: { pid: number; logPath: string }[];
+}): void => {
+  if (processes.length === 0) return;
+  transcript.emit("");
+  transcript.notice("These processes Langy started keep running:");
+  for (const entry of processes) {
+    transcript.emit(continuationRow(`process ${entry.pid}, log ${entry.logPath}`));
+  }
+  transcript.detail(
+    `Stop one with: kill ${processes.map((entry) => entry.pid).join(" ")}`,
+    chalk.gray,
+  );
+};
+
+/** The terminal side of a shared folder, over one writer. */
+export function createUi(
+  writer: UiWriter = consoleWriter,
+  { width = terminalWidth }: { width?: () => number } = {},
+): LangyUi {
+  const transcript = new Transcript({ writer, width });
+  const notice = transcript.notice.bind(transcript);
+  const detail = transcript.detail.bind(transcript);
+  const emit = transcript.emit.bind(transcript);
+  const emitResultFor = transcript.emitResultFor.bind(transcript);
 
   return {
     writer,
-    connected: ({ root, conversationTitle, conversationUrl }) => {
-      emit("");
-      notice(`Connected ${root} to "${conversationTitle}".`);
-      // The link is one word, so it keeps its own row rather than being cut.
-      for (const line of fit(`Follow along at ${conversationUrl}`, CONTINUATION_INDENT)) {
-        emit(continuationRow(line.replace(conversationUrl, chalk.cyan(conversationUrl))));
-      }
-      detail(
-        writer.interactive === true
-          ? "Permission questions are answered here, or on the card in LangWatch."
-          : "Permission questions are answered on the card in LangWatch.",
-        chalk.gray,
-      );
-      detail("Press Ctrl-C to stop sharing.", chalk.gray);
-      emit("");
-    },
+    connected: (input) => showConnected({ transcript, interactive: writer.interactive, ...input }),
     noGitRepository: () =>
       notice(
         "This folder is not a git repository, so Langy cannot open a pull request from here.",
         chalk.yellow,
       ),
     call: (call) => {
-      lastCallId = call.callId;
+      transcript.callPrinted(call.callId);
       emit(
         headlineRow(
           `${chalk.bold(TOOL_LABELS[call.tool])}(${chalk.gray(shorten(callArgument(call), MAX_TARGET_LENGTH))})`,
@@ -594,47 +693,12 @@ export function createUi(
       );
     },
     callResult: ({ call, text }) => emitResultFor(call, [chalk.gray(fileOutcome({ call, text }))]),
-    callOutcome: ({ call, output }) => {
-      if (output.pid !== undefined) {
-        emitResultFor(call, [chalk.gray(backgroundOutcome(output))]);
-        return;
-      }
-      const { lines, hidden } = tailLines(commandText(output));
-      const printed = [
-        ...lines.map((line) => chalk.gray(shorten(line, MAX_TARGET_LENGTH * 2))),
-        ...(hidden > 0 ? [chalk.gray(`… +${plural(hidden, "line")}`)] : []),
-      ];
-      // A command that failed says so first, whatever it printed. One that
-      // worked is its own output, and one that printed nothing says how long
-      // it took, so a line is never empty.
-      if (commandFailed(output)) {
-        emitResultFor(call, [chalk.red(`Exit code ${output.exitCode}`), ...printed]);
-        return;
-      }
-      emitResultFor(call, printed.length === 0 ? [chalk.gray(silentOutcome(output))] : printed);
-    },
+    callOutcome: ({ call, output }) => emitResultFor(call, commandOutcomeLines(output)),
     callFailed: ({ call, message }) =>
       emitResultFor(call, [chalk.red(`Failed: ${shortReason(message)}`)]),
     callRefused: ({ call, message }) =>
       emitResultFor(call, [chalk.yellow(`Refused: ${shortReason(message)}`)]),
-    startRunning: () => {
-      if (!writer.draw) return () => undefined;
-      const startedAt = Date.now();
-      // The spinner never takes the screen from an open question, and it
-      // erases only what it drew itself.
-      const paint = (): void =>
-        writer.draw?.(
-          [resultRow(chalk.gray(`Running… ${elapsedLabel(Date.now() - startedAt)}`))],
-          "spinner",
-        );
-      paint();
-      const timer = setInterval(paint, 1000);
-      timer.unref?.();
-      return () => {
-        clearInterval(timer);
-        writer.erase?.("spinner");
-      };
-    },
+    startRunning: () => startSpinner(writer),
     permissionAsked: ({ summary }) => {
       // With no selector on this screen the command is the only thing the
       // developer reads before the card is answered, so it prints in full,
@@ -661,22 +725,9 @@ export function createUi(
       emit("");
       notice("Leaving. Telling LangWatch the folder is gone.");
     },
-    backgroundKept: (processes) => {
-      if (processes.length === 0) return;
-      emit("");
-      notice("These processes Langy started keep running:");
-      for (const entry of processes) {
-        emit(continuationRow(`process ${entry.pid}, log ${entry.logPath}`));
-      }
-      detail(`Stop one with: kill ${processes.map((entry) => entry.pid).join(" ")}`, chalk.gray);
-    },
+    backgroundKept: (processes) => showBackgroundKept({ transcript, processes }),
     note: (text) => notice(text, chalk.gray),
-    hold: () => {
-      held = true;
-    },
-    release: () => {
-      held = false;
-      while (queue.length > 0) writer.line(queue.shift()!);
-    },
+    hold: () => transcript.hold(),
+    release: () => transcript.release(),
   };
 }

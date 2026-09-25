@@ -170,6 +170,139 @@ const loginToProjectBySlug = async (slug: string): Promise<void> => {
   }
 };
 
+function persistPresetEndpoint(flagEndpoint: string | undefined): void {
+  const presetEndpoint = flagEndpoint ?? process.env.LANGWATCH_ENDPOINT?.trim();
+  if (!presetEndpoint) return;
+  const trimmed = normalizeEndpoint(presetEndpoint);
+  const cfg = loadConfig();
+  cfg.control_plane_url = trimmed;
+  saveConfig(cfg);
+  warnIfLocalEndpointTakesOverGlobalConfig(trimmed);
+}
+
+function saveDeviceSessionToken(rawToken: string): void {
+  const token = rawToken.trim();
+  if (token.length < 10) {
+    console.error(chalk.red("Error: token seems too short. Please check and try again."));
+    process.exit(1);
+  }
+  const cfg = loadConfig();
+  cfg.access_token = token;
+  // No refresh_token / expires_at — that's the trade-off of bypassing
+  // the device flow. The wrapper auto-login will mint a real session
+  // if this token expires, since loadConfig+isLoggedIn only checks
+  // access_token presence.
+  saveConfig(cfg);
+  console.log(chalk.green("✓ device-session token saved"));
+  console.log(chalk.gray("  ~/.langwatch/config.json"));
+}
+
+function saveApiKeyFlag(rawApiKey: string): void {
+  const apiKey = rawApiKey.trim();
+  if (apiKey.length < 10) {
+    console.error(chalk.red("Error: API key seems too short. Please check and try again."));
+    process.exit(1);
+  }
+
+  const envResult = updateEnvFile(apiKey);
+  console.log(chalk.green("API key saved successfully."));
+  if (envResult.created) {
+    console.log(chalk.gray(`Created .env file at ${envResult.path}`));
+  } else if (envResult.updated) {
+    console.log(chalk.gray(`Updated existing API key in ${envResult.path}`));
+  } else {
+    console.log(chalk.gray(`Added API key to ${envResult.path}`));
+  }
+}
+
+const validateEndpointUrl = (v: string): string | true => {
+  try {
+    const parsed = new URL(v);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return "URL must start with http(s)://";
+    }
+    return true;
+  } catch {
+    return "URL must be absolute (https://...)";
+  }
+};
+
+/** Asks cloud or self-hosted, and persists the answer so every later resolver targets it. */
+async function chooseEndpoint(): Promise<void> {
+  // When the user already resolved a non-cloud endpoint (local dev or a
+  // self-hosted deployment via LANGWATCH_ENDPOINT or persisted config),
+  // default to keeping it but still offer to switch endpoint or jump to
+  // Cloud. On a fresh install Cloud stays the priority default.
+  const current = resolveControlPlaneEndpoint();
+  const hasCustomEndpoint = current.url !== DEFAULT_ENDPOINT;
+
+  const cloudChoice = {
+    title: "LangWatch Cloud",
+    description: "app.langwatch.ai",
+    value: "cloud",
+  };
+  const choices = hasCustomEndpoint
+    ? [
+        {
+          title: `Self-hosted instance (${current.url})`,
+          description: "Keep using your current endpoint",
+          value: "keep",
+        },
+        {
+          title: "Self-hosted instance (different endpoint)",
+          description: "Point at another LangWatch deployment",
+          value: "self-hosted",
+        },
+        cloudChoice,
+      ]
+    : [
+        cloudChoice,
+        {
+          title: "Self-hosted instance",
+          description: "Your company's LangWatch deployment (custom URL)",
+          value: "self-hosted",
+        },
+      ];
+
+  const where = await prompts({
+    type: "select",
+    name: "where",
+    message: "Where do you want to log in?",
+    choices,
+    initial: 0,
+  });
+  if (!where.where) {
+    console.log(chalk.yellow("Login cancelled"));
+    process.exit(0);
+  }
+
+  const cfg = loadConfig();
+  if (where.where === "cloud") {
+    // Always repoint to cloud, overriding any stale local control_plane_url.
+    // Otherwise the device flow would dial the old localhost host and fail
+    // with ECONNREFUSED.
+    cfg.control_plane_url = DEFAULT_ENDPOINT;
+    saveConfig(cfg);
+  } else if (where.where === "keep") {
+    cfg.control_plane_url = current.url;
+    saveConfig(cfg);
+  } else if (where.where === "self-hosted") {
+    const url = await prompts({
+      type: "text",
+      name: "url",
+      message: "Self-hosted LangWatch URL (e.g. https://lw.acme.internal):",
+      validate: validateEndpointUrl,
+    });
+    if (!url.url) {
+      console.log(chalk.yellow("Login cancelled"));
+      process.exit(0);
+    }
+    cfg.control_plane_url = normalizeEndpoint(url.url as string);
+    saveConfig(cfg);
+  }
+  warnIfLocalEndpointTakesOverGlobalConfig(cfg.control_plane_url);
+}
+
 export const loginCommand = async (options?: {
   apiKey?: string;
   device?: boolean;
@@ -187,35 +320,14 @@ export const loginCommand = async (options?: {
     // runs so every subsequent read (device flow, API-key flow, spawned
     // sub-commands) sees it — the env var becomes the picker's default choice,
     // so `LANGWATCH_ENDPOINT=... langwatch login` is one Enter, not a retyped URL.
-    const endpointFromEnv = process.env.LANGWATCH_ENDPOINT?.trim();
-    const presetEndpoint = options?.endpoint ?? endpointFromEnv;
-    if (presetEndpoint) {
-      const trimmed = normalizeEndpoint(presetEndpoint);
-      const cfg = loadConfig();
-      cfg.control_plane_url = trimmed;
-      saveConfig(cfg);
-      warnIfLocalEndpointTakesOverGlobalConfig(trimmed);
-    }
+    persistPresetEndpoint(options?.endpoint);
 
     // --token: pre-minted device-session escape hatch (CI / agent contexts
     // where the token was minted via the dashboard 'Personal Access Tokens'
     // surface). No browser, no prompts — just persist the token so
     // subsequent `langwatch claude/codex/...` invocations can use it.
     if (options?.token) {
-      const token = options.token.trim();
-      if (token.length < 10) {
-        console.error(chalk.red("Error: token seems too short. Please check and try again."));
-        process.exit(1);
-      }
-      const cfg = loadConfig();
-      cfg.access_token = token;
-      // No refresh_token / expires_at — that's the trade-off of bypassing
-      // the device flow. The wrapper auto-login will mint a real session
-      // if this token expires, since loadConfig+isLoggedIn only checks
-      // access_token presence.
-      saveConfig(cfg);
-      console.log(chalk.green("✓ device-session token saved"));
-      console.log(chalk.gray("  ~/.langwatch/config.json"));
+      saveDeviceSessionToken(options.token);
       return;
     }
 
@@ -248,21 +360,7 @@ export const loginCommand = async (options?: {
 
     // Non-interactive mode: --api-key flag provided
     if (options?.apiKey) {
-      const apiKey = options.apiKey.trim();
-      if (apiKey.length < 10) {
-        console.error(chalk.red("Error: API key seems too short. Please check and try again."));
-        process.exit(1);
-      }
-
-      const envResult = updateEnvFile(apiKey);
-      console.log(chalk.green("API key saved successfully."));
-      if (envResult.created) {
-        console.log(chalk.gray(`Created .env file at ${envResult.path}`));
-      } else if (envResult.updated) {
-        console.log(chalk.gray(`Updated existing API key in ${envResult.path}`));
-      } else {
-        console.log(chalk.gray(`Added API key to ${envResult.path}`));
-      }
+      saveApiKeyFlag(options.apiKey);
       return;
     }
 
@@ -296,90 +394,7 @@ export const loginCommand = async (options?: {
     // Q1 -- endpoint (cloud vs self-hosted), skipped if --endpoint was
     // passed. Persisted to ~/.langwatch/config.json on every branch so the
     // login call and every later resolver target the right host.
-    if (!options?.endpoint) {
-      // When the user already resolved a non-cloud endpoint (local dev or a
-      // self-hosted deployment via LANGWATCH_ENDPOINT or persisted config),
-      // default to keeping it but still offer to switch endpoint or jump to
-      // Cloud. On a fresh install Cloud stays the priority default.
-      const current = resolveControlPlaneEndpoint();
-      const hasCustomEndpoint = current.url !== DEFAULT_ENDPOINT;
-
-      const cloudChoice = {
-        title: "LangWatch Cloud",
-        description: "app.langwatch.ai",
-        value: "cloud",
-      };
-      const choices = hasCustomEndpoint
-        ? [
-            {
-              title: `Self-hosted instance (${current.url})`,
-              description: "Keep using your current endpoint",
-              value: "keep",
-            },
-            {
-              title: "Self-hosted instance (different endpoint)",
-              description: "Point at another LangWatch deployment",
-              value: "self-hosted",
-            },
-            cloudChoice,
-          ]
-        : [
-            cloudChoice,
-            {
-              title: "Self-hosted instance",
-              description: "Your company's LangWatch deployment (custom URL)",
-              value: "self-hosted",
-            },
-          ];
-
-      const where = await prompts({
-        type: "select",
-        name: "where",
-        message: "Where do you want to log in?",
-        choices,
-        initial: 0,
-      });
-      if (!where.where) {
-        console.log(chalk.yellow("Login cancelled"));
-        process.exit(0);
-      }
-
-      const cfg = loadConfig();
-      if (where.where === "cloud") {
-        // Always repoint to cloud, overriding any stale local control_plane_url.
-        // Otherwise the device flow would dial the old localhost host and fail
-        // with ECONNREFUSED.
-        cfg.control_plane_url = DEFAULT_ENDPOINT;
-        saveConfig(cfg);
-      } else if (where.where === "keep") {
-        cfg.control_plane_url = current.url;
-        saveConfig(cfg);
-      } else if (where.where === "self-hosted") {
-        const url = await prompts({
-          type: "text",
-          name: "url",
-          message: "Self-hosted LangWatch URL (e.g. https://lw.acme.internal):",
-          validate: (v: string) => {
-            try {
-              const parsed = new URL(v);
-              if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-                return "URL must start with http(s)://";
-              }
-              return true;
-            } catch {
-              return "URL must be absolute (https://...)";
-            }
-          },
-        });
-        if (!url.url) {
-          console.log(chalk.yellow("Login cancelled"));
-          process.exit(0);
-        }
-        cfg.control_plane_url = normalizeEndpoint(url.url as string);
-        saveConfig(cfg);
-      }
-      warnIfLocalEndpointTakesOverGlobalConfig(cfg.control_plane_url);
-    }
+    if (!options?.endpoint) await chooseEndpoint();
 
     // Q2 — auth mode (AI tools = device-flow vs Project SDK = API key)
     const mode = await prompts({

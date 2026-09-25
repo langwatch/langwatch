@@ -133,6 +133,451 @@ export interface StatusDocument {
   resources: Record<string, { count: number; error?: string; status?: number }>;
 }
 
+interface StatusContext {
+  endpoint: string;
+  apiKey: string;
+  projectId: Awaited<ReturnType<typeof resolveCredentials>>["projectId"];
+}
+
+async function fetchCount({
+  context,
+  url,
+  options,
+}: {
+  context: StatusContext;
+  url: string;
+  options?: { method?: "GET" | "POST"; body?: unknown };
+}): Promise<{ data: unknown; error?: unknown; status?: number }> {
+  const response = await langwatchFetch(`${context.endpoint}${url}`, {
+    method: options?.method,
+    headers: {
+      ...buildAuthHeaders({ apiKey: context.apiKey, projectId: context.projectId }),
+      ...(options?.body === undefined ? {} : { "Content-Type": "application/json" }),
+    },
+    ...(options?.body === undefined ? {} : { body: JSON.stringify(options.body) }),
+  });
+  if (!response.ok) {
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch {
+      body = undefined;
+    }
+    return { data: null, error: body ?? response.statusText, status: response.status };
+  }
+  const data = await response.json();
+  return { data, error: undefined };
+}
+
+// ── Attention-section fetchers ──────────────────────────────────────
+// Each one is soft-fail: it either returns its section value or throws, and
+// the allSettled below turns a throw into an `errors` entry.
+
+async function fetchErroredTraces24h(): Promise<number> {
+  const now = Date.now();
+  // Only the count matters — one trace back is enough to read totalHits.
+  const result = await new TracesApiService().search({
+    startDate: now - DAY_MS,
+    endDate: now,
+    pageSize: 1,
+    format: "json",
+    filters: { "traces.error": ["true"] },
+  });
+  return result.pagination.totalHits;
+}
+
+async function fetchRunningExperiments(
+  errors: Record<string, string>,
+): Promise<RunningExperiment[]> {
+  const service = new ExperimentsApiService();
+  const list = await service.listExperiments({ pageSize: EXPERIMENT_PAGE_SIZE });
+  // "Running" is a property of a run, and runs are only listed per experiment — so check the
+  // latest run of just the most recently active experiments rather than fanning out over all
+  // of them.
+  const recent = list.experiments
+    .filter((experiment) => experiment.lastRunAt !== null)
+    .toSorted(
+      (a, b) => new Date(b.lastRunAt ?? 0).getTime() - new Date(a.lastRunAt ?? 0).getTime(),
+    );
+  const candidates = recent.slice(0, RUNNING_EXPERIMENT_CANDIDATES);
+
+  const checks = await Promise.allSettled(
+    candidates.map(async (experiment): Promise<RunningExperiment | null> => {
+      const runs = await service.listRuns({
+        experimentSlug: experiment.slug,
+        pageSize: 1,
+      });
+      const latest = runs.runs[0];
+      if (!latest) return null;
+      const { finishedAt, stoppedAt } = latest.timestamps;
+      if (finishedAt != null || stoppedAt != null) return null;
+      return {
+        slug: experiment.slug,
+        name: experiment.name,
+        runId: latest.runId,
+        progress: latest.progress ?? null,
+        total: latest.total ?? null,
+      };
+    }),
+  );
+
+  // This scan is inherently PARTIAL (capped candidates, and only the first
+  // page of experiments). Whatever was found is still worth reporting, but
+  // the gaps must be on the record too: silently dropping them is how a
+  // running experiment the scan never looked at turns into a green
+  // "nothing needs your attention".
+  const failedChecks = checks.filter((check) => check.status === "rejected").length;
+  const gaps: string[] = [];
+  // `GET /api/v1/experiments` is ordered by `updatedAt desc`, NOT by `lastRunAt`
+  // — so a running experiment whose row has a stale `updatedAt` can sit past
+  // the page boundary and never be seen at all. An unread page is the single
+  // biggest hole in this scan; it goes on the record first.
+  if (list.pagination.hasMore) {
+    gaps.push(
+      `only the first ${list.experiments.length} of ${list.pagination.totalHits} experiments were listed`,
+    );
+  }
+  const running = checks.flatMap((check) =>
+    check.status === "fulfilled" && check.value !== null ? [check.value] : [],
+  );
+  // Only a gap when the cap plausibly HID something. Every experiment that ever ran has a
+  // non-null `lastRunAt`, so "there are more than 5 of them" describes almost every real
+  // project and would suppress the all-clear permanently. The candidates are ranked
+  // most-recently-active first: if every one we checked came back finished, the older,
+  // less-recently-active tail behind them is not evidence of anything running.
+  if (running.length > 0 && recent.length > candidates.length) {
+    gaps.push(
+      `only the ${RUNNING_EXPERIMENT_CANDIDATES} most recently active of ${recent.length} candidate experiments were checked`,
+    );
+  }
+  if (failedChecks > 0) {
+    gaps.push(`${failedChecks} experiment${failedChecks === 1 ? "" : "s"} could not be checked`);
+  }
+  if (gaps.length > 0) {
+    errors.runningExperiments = `incomplete scan: ${gaps.join("; ")}`;
+  }
+
+  return running;
+}
+
+/**
+ * `GET /api/gateway/v1/budgets` returns every scope dimension: org, team, project,
+ * virtual-key, principal, group, and per-person, with live ledger spend, so a virtual-key
+ * budget at 100% with `on_breach: block` is visible here like any other.
+ */
+type GatewayBudget = Awaited<ReturnType<GatewayBudgetsApiService["list"]>>[number];
+
+/** One budget's standing, or none when its limit or spend cannot be read. */
+function scoreBudget({
+  budget,
+  unreadable,
+}: {
+  budget: GatewayBudget;
+  unreadable: string[];
+}): BudgetAtRisk[] {
+  const limit = Number(budget.limit_usd);
+  // `spent_usd` is null when spend could not be totalled. `Number(null)`
+  // is 0, which passes the finite check and scores the budget at 0%, so
+  // an unreadable budget would drop out of the at-risk list looking
+  // healthy. Absent spend is unreadable, not zero spend.
+  const spent = budget.spent_usd === null ? Number.NaN : Number(budget.spent_usd);
+  // Neither "at risk" nor "fine" - we cannot say which, so say that.
+  if (!Number.isFinite(limit)) {
+    unreadable.push(budget.name);
+    return [];
+  }
+  if (!Number.isFinite(spent)) {
+    unreadable.push(budget.name);
+    return [];
+  }
+  // `attributed_user` rows: limit_usd is a per-person cap and spent_usd
+  // totals the template's bare anchor, which no debit lands on. A
+  // percentage of it is a confident zero about nobody. The standing is
+  // a headcount: how many of the people seen this period are at or over
+  // their own cap.
+  if (budget.scope_type === "attributed_user") {
+    const seen = budget.end_users_seen ?? 0;
+    const over = budget.end_users_over ?? 0;
+    return [
+      {
+        name: budget.name,
+        scope: budget.scope_type,
+        window: budget.window,
+        utilizationPct: seen > 0 ? Math.round((over / seen) * 100) : 0,
+        spentUsd: budget.spent_usd,
+        limitUsd: budget.limit_usd,
+        onBreach: budget.on_breach,
+        endUsersSeen: seen,
+        endUsersOver: over,
+      },
+    ];
+  }
+  // `group` rows: limit_usd is the PER-MEMBER allowance while
+  // spent_usd sums the whole group, so the comparable ceiling is
+  // limit x member_count. Without a member count (empty group) the
+  // allowance covers nobody and any spend is over it.
+  const effectiveLimit = budget.scope_type === "group" ? limit * (budget.member_count ?? 0) : limit;
+  return [
+    {
+      name: budget.name,
+      scope: budget.scope_type,
+      window: budget.window,
+      // A limit of zero admits no spend at all: it is the maximally
+      // breached state, not a 0%-utilized one. Scoring it 0 and dropping
+      // it below the threshold is how a `block` budget that rejects every
+      // single request turns into a green tick.
+      utilizationPct: effectiveLimit <= 0 ? 100 : Math.round((spent / effectiveLimit) * 100),
+      spentUsd: budget.spent_usd,
+      limitUsd: budget.limit_usd,
+      onBreach: budget.on_breach,
+    },
+  ];
+}
+
+async function fetchBudgetsAtRisk({
+  context,
+  errors,
+}: {
+  context: StatusContext;
+  errors: Record<string, string>;
+}): Promise<BudgetAtRisk[]> {
+  const budgets = await new GatewayBudgetsApiService({
+    endpoint: context.endpoint,
+    apiKey: context.apiKey,
+  }).list();
+  // A budget whose spend could not be totalled serves a null `spent_usd`
+  // rather than a stale figure, so one null anywhere makes the whole
+  // listing's spend unreal.
+  const spend_available = budgets.every((b) => b.spent_usd !== null);
+
+  const unreadable: string[] = [];
+  const scored = budgets
+    .filter((budget) => budget.archived_at === null)
+    .flatMap((budget) => scoreBudget({ budget, unreadable }));
+
+  const gaps: string[] = [];
+  if (!spend_available) {
+    gaps.push("spend could not be totalled server-side, so utilization is not real spend");
+  }
+  if (unreadable.length > 0) {
+    gaps.push(
+      `the limit or spend of ${unreadable.length} budget${unreadable.length === 1 ? "" : "s"} could not be read (${unreadable.join(", ")})`,
+    );
+  }
+  if (gaps.length > 0) {
+    errors.budgetsAtRisk = `incomplete scan: ${gaps.join("; ")}`;
+  }
+
+  return scored
+    .filter((budget) =>
+      budget.scope === "attributed_user"
+        ? // One person refused is worth a look, and the share of seats over
+          // cap is not a utilization to threshold on: 1 of 20 people blocked
+          // reads as 5% and would never surface.
+          (budget.endUsersOver ?? 0) > 0
+        : budget.utilizationPct >= BUDGET_ATTENTION_THRESHOLD_PCT,
+    )
+    .toSorted((a, b) => b.utilizationPct - a.utilizationPct);
+}
+
+type ResourceResults = StatusDocument["resources"];
+
+/** Every resource failed: likely auth, endpoint or server, so say which to check. */
+function printFetchFailure({
+  results,
+  apiKey,
+  endpoint,
+}: {
+  results: ResourceResults;
+  apiKey: string;
+  endpoint: string;
+}): void {
+  const sampleError = Object.values(results).find((r) => r.error)?.error ?? "";
+  const statuses = Object.values(results)
+    .map((r) => r.status)
+    .filter((s): s is number => typeof s === "number");
+  const allUnauthorized = statuses.length > 0 && statuses.every((s) => s === 401 || s === 403);
+  console.log();
+  console.log(chalk.red("  ✗ Could not fetch any project resources."));
+  console.log(chalk.gray(`    Reason: ${sampleError}`));
+  console.log();
+  if (allUnauthorized && isPersonalAccessToken(apiKey) && !process.env.LANGWATCH_PROJECT_ID) {
+    console.log(
+      chalk.gray(`    Your PAT requires ${chalk.cyan("LANGWATCH_PROJECT_ID")} to be set.`),
+    );
+    console.log(
+      chalk.gray(`    Set it via: ${chalk.cyan("export LANGWATCH_PROJECT_ID=<your-project-id>")}`),
+    );
+    console.log(
+      chalk.gray(`    Or add to .env: ${chalk.cyan("LANGWATCH_PROJECT_ID=<your-project-id>")}`),
+    );
+  } else if (allUnauthorized) {
+    console.log(
+      chalk.gray(
+        `    Your API key appears to be invalid or revoked. Re-run ${chalk.cyan("langwatch login")} or check ${chalk.cyan("LANGWATCH_API_KEY")}.`,
+      ),
+    );
+  } else {
+    console.log(
+      chalk.gray(
+        `    Check ${chalk.cyan("LANGWATCH_API_KEY")} (current endpoint: ${chalk.cyan(endpoint)}).`,
+      ),
+    );
+  }
+  console.log();
+  process.exit(1);
+}
+
+/** A listing's size, whether it arrives bare, wrapped in `data`, or paginated. */
+function countOf(data: unknown): number {
+  if (Array.isArray(data)) {
+    return data.length;
+  } else if (data && typeof data === "object" && "data" in (data as Record<string, unknown>)) {
+    const arr = (data as { data: unknown[] }).data;
+    return Array.isArray(arr) ? arr.length : 0;
+  } else if (
+    data &&
+    typeof data === "object" &&
+    "pagination" in (data as Record<string, unknown>)
+  ) {
+    const pagination = (data as { pagination: { total: number } }).pagination;
+    return pagination.total;
+  } else {
+    return 0;
+  }
+}
+
+function experimentAttentionLine(experiment: RunningExperiment): string {
+  const progress =
+    experiment.progress !== null && experiment.total !== null
+      ? ` (${experiment.progress}/${experiment.total})`
+      : "";
+  return (
+    chalk.yellow(
+      `    ⚠ experiment "${experiment.name ?? experiment.slug}" is still running${progress}`,
+    ) +
+    chalk.gray(`  →  langwatch experiment status ${experiment.slug} --run-id ${experiment.runId}`)
+  );
+}
+
+function budgetAttentionLine(budget: BudgetAtRisk): string {
+  // A per-person template carries a headcount instead of a total, so it
+  // reports the headcount and the cap each person carries.
+  const overCap = budget.endUsersOver;
+  const breached = overCap !== undefined ? overCap > 0 : budget.utilizationPct >= 100;
+  const standing =
+    overCap !== undefined
+      ? `${overCap} of ${budget.endUsersSeen} over cap, $${budget.limitUsd}/person`
+      : `at ${budget.utilizationPct}%, $${budget.spentUsd} of $${budget.limitUsd}`;
+  const line = `    ⚠ budget "${budget.name}" (${budget.window}, ${budget.scope}) ${standing}${budget.onBreach === "block" ? ", blocks on breach" : ""}`;
+  return (
+    (breached ? chalk.red(line) : chalk.yellow(line)) +
+    chalk.gray(`  →  langwatch gateway-budgets list`)
+  );
+}
+
+function printAttention({
+  attention,
+  errorCount,
+}: {
+  attention: AttentionReport;
+  errorCount: number;
+}): void {
+  // ── What needs attention (gh-status style) ─────────────────────
+  console.log();
+  console.log(chalk.bold("  Needs Attention:"));
+
+  let flagged = 0;
+  if (attention.erroredTraces24h !== null && attention.erroredTraces24h > 0) {
+    flagged++;
+    console.log(
+      chalk.red(
+        `    ⚠ ${attention.erroredTraces24h} trace${attention.erroredTraces24h === 1 ? "" : "s"} errored in the last 24h`,
+      ) + chalk.gray(`  →  langwatch trace search  (defaults to the last 24h)`),
+    );
+  }
+  for (const experiment of attention.runningExperiments ?? []) {
+    flagged++;
+    console.log(experimentAttentionLine(experiment));
+  }
+  for (const budget of attention.budgetsAtRisk ?? []) {
+    flagged++;
+    console.log(budgetAttentionLine(budget));
+  }
+  if (flagged === 0) {
+    // All-clear only means something when the whole scan actually ran —
+    // don't print a green ✓ next to a list of sections we couldn't check,
+    // and don't print one directly above a grid of red 403s either. A
+    // resource we could not read is a resource we cannot vouch for.
+    if (Object.keys(attention.errors).length === 0 && errorCount === 0) {
+      console.log(chalk.green("    ✓ nothing needs your attention"));
+    } else {
+      console.log(chalk.gray("    – nothing flagged, but some checks did not run"));
+    }
+  }
+  // Sections that could not be fetched are noted dimly, never fatal.
+  const sectionLabels: Record<string, string> = {
+    erroredTraces24h: "errored traces",
+    runningExperiments: "running experiments",
+    budgetsAtRisk: "gateway budgets",
+  };
+  for (const [key, message] of Object.entries(attention.errors)) {
+    console.log(chalk.gray(`    (could not check ${sectionLabels[key] ?? key}: ${message})`));
+  }
+  // Advisories read differently on purpose: "note" is a standing limit of
+  // the API, not a check that failed this run, and it does not gate the ✓.
+  for (const [key, message] of Object.entries(attention.advisories)) {
+    console.log(chalk.gray(`    (note — ${sectionLabels[key] ?? key}: ${message})`));
+  }
+}
+
+function printStatusTable({
+  document,
+  errorCount,
+  totalCount,
+  apiKey,
+  endpoint,
+}: {
+  document: StatusDocument;
+  errorCount: number;
+  totalCount: number;
+  apiKey: string;
+  endpoint: string;
+}): void {
+  const { attention, resources: results } = document;
+  // If every resource failed — likely auth/endpoint/server issue. Show a
+  // clear diagnostic so the user knows what to check instead of puzzling
+  // over a grid of red error messages. (Machine formats print the document
+  // and exit 0 — the per-resource errors are IN the document.)
+  if (errorCount === totalCount && totalCount > 0) {
+    printFetchFailure({ results, apiKey, endpoint });
+  }
+
+  printAttention({ attention, errorCount });
+
+  console.log();
+  console.log(chalk.bold("  Resource Counts:"));
+
+  for (const key of RESOURCE_KEYS) {
+    const r = results[key];
+    if (!r) continue;
+    const countStr = r.error ? chalk.red(r.error) : chalk.cyan(String(r.count));
+    console.log(`    ${chalk.gray(key + ":")} ${" ".repeat(14 - key.length)}${countStr}`);
+  }
+
+  console.log();
+  console.log(chalk.gray("  Available CLI commands:"));
+  // Generated from the live command tree (same catalog builder behind
+  // `langwatch commands` / `langwatch help-tree`) — no hand-maintained
+  // list to drift from what the CLI actually registers.
+  for (const line of renderStatusSummary(buildCatalog(buildProgram()))) {
+    console.log(chalk.gray(`    ${line}`));
+  }
+  console.log();
+  console.log(chalk.gray("  Run `langwatch commands` for the full catalog (args, flags, hints)."));
+  console.log();
+}
+
 export const statusCommand = async (options?: RawOutputFlags): Promise<void> => {
   const credentials = await resolveCredentials();
 
@@ -141,6 +586,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
   const endpoint = resolveControlPlaneUrl();
   const spinner = createSpinner("Fetching project status...").start();
 
+  const context: StatusContext = { endpoint, apiKey, projectId: credentials.projectId };
   const results: Record<string, { count: number; error?: string; status?: number }> = {};
   const attention: AttentionReport = {
     erroredTraces24h: null,
@@ -149,224 +595,6 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     errors: {},
     advisories: {},
   };
-
-  async function fetchCount(
-    url: string,
-    options?: { method?: "GET" | "POST"; body?: unknown },
-  ): Promise<{ data: unknown; error?: unknown; status?: number }> {
-    const response = await langwatchFetch(`${endpoint}${url}`, {
-      method: options?.method,
-      headers: {
-        ...buildAuthHeaders({ apiKey, projectId: credentials.projectId }),
-        ...(options?.body === undefined ? {} : { "Content-Type": "application/json" }),
-      },
-      ...(options?.body === undefined ? {} : { body: JSON.stringify(options.body) }),
-    });
-    if (!response.ok) {
-      let body: unknown;
-      try {
-        body = await response.json();
-      } catch {
-        body = undefined;
-      }
-      return { data: null, error: body ?? response.statusText, status: response.status };
-    }
-    const data = await response.json();
-    return { data, error: undefined };
-  }
-
-  // ── Attention-section fetchers ──────────────────────────────────────
-  // Each one is soft-fail: it either returns its section value or throws, and
-  // the allSettled below turns a throw into an `errors` entry.
-
-  async function fetchErroredTraces24h(): Promise<number> {
-    const now = Date.now();
-    // Only the count matters — one trace back is enough to read totalHits.
-    const result = await new TracesApiService().search({
-      startDate: now - DAY_MS,
-      endDate: now,
-      pageSize: 1,
-      format: "json",
-      filters: { "traces.error": ["true"] },
-    });
-    return result.pagination.totalHits;
-  }
-
-  async function fetchRunningExperiments(): Promise<RunningExperiment[]> {
-    const service = new ExperimentsApiService();
-    const list = await service.listExperiments({ pageSize: EXPERIMENT_PAGE_SIZE });
-    // "Running" is a property of a run, and runs are only listed per experiment — so check the
-    // latest run of just the most recently active experiments rather than fanning out over all
-    // of them.
-    const recent = list.experiments
-      .filter((experiment) => experiment.lastRunAt !== null)
-      .toSorted(
-        (a, b) => new Date(b.lastRunAt ?? 0).getTime() - new Date(a.lastRunAt ?? 0).getTime(),
-      );
-    const candidates = recent.slice(0, RUNNING_EXPERIMENT_CANDIDATES);
-
-    const checks = await Promise.allSettled(
-      candidates.map(async (experiment): Promise<RunningExperiment | null> => {
-        const runs = await service.listRuns({
-          experimentSlug: experiment.slug,
-          pageSize: 1,
-        });
-        const latest = runs.runs[0];
-        if (!latest) return null;
-        const { finishedAt, stoppedAt } = latest.timestamps;
-        if (finishedAt != null || stoppedAt != null) return null;
-        return {
-          slug: experiment.slug,
-          name: experiment.name,
-          runId: latest.runId,
-          progress: latest.progress ?? null,
-          total: latest.total ?? null,
-        };
-      }),
-    );
-
-    // This scan is inherently PARTIAL (capped candidates, and only the first
-    // page of experiments). Whatever was found is still worth reporting, but
-    // the gaps must be on the record too: silently dropping them is how a
-    // running experiment the scan never looked at turns into a green
-    // "nothing needs your attention".
-    const failedChecks = checks.filter((check) => check.status === "rejected").length;
-    const gaps: string[] = [];
-    // `GET /api/v1/experiments` is ordered by `updatedAt desc`, NOT by `lastRunAt`
-    // — so a running experiment whose row has a stale `updatedAt` can sit past
-    // the page boundary and never be seen at all. An unread page is the single
-    // biggest hole in this scan; it goes on the record first.
-    if (list.pagination.hasMore) {
-      gaps.push(
-        `only the first ${list.experiments.length} of ${list.pagination.totalHits} experiments were listed`,
-      );
-    }
-    const running = checks.flatMap((check) =>
-      check.status === "fulfilled" && check.value !== null ? [check.value] : [],
-    );
-    // Only a gap when the cap plausibly HID something. Every experiment that ever ran has a
-    // non-null `lastRunAt`, so "there are more than 5 of them" describes almost every real
-    // project and would suppress the all-clear permanently. The candidates are ranked
-    // most-recently-active first: if every one we checked came back finished, the older,
-    // less-recently-active tail behind them is not evidence of anything running.
-    if (running.length > 0 && recent.length > candidates.length) {
-      gaps.push(
-        `only the ${RUNNING_EXPERIMENT_CANDIDATES} most recently active of ${recent.length} candidate experiments were checked`,
-      );
-    }
-    if (failedChecks > 0) {
-      gaps.push(`${failedChecks} experiment${failedChecks === 1 ? "" : "s"} could not be checked`);
-    }
-    if (gaps.length > 0) {
-      attention.errors.runningExperiments = `incomplete scan: ${gaps.join("; ")}`;
-    }
-
-    return running;
-  }
-
-  /**
-   * `GET /api/gateway/v1/budgets` returns every scope dimension: org, team, project,
-   * virtual-key, principal, group, and per-person, with live ledger spend, so a virtual-key
-   * budget at 100% with `on_breach: block` is visible here like any other.
-   */
-  async function fetchBudgetsAtRisk(): Promise<BudgetAtRisk[]> {
-    const budgets = await new GatewayBudgetsApiService({
-      endpoint,
-      apiKey,
-    }).list();
-    // A budget whose spend could not be totalled serves a null `spent_usd`
-    // rather than a stale figure, so one null anywhere makes the whole
-    // listing's spend unreal.
-    const spend_available = budgets.every((b) => b.spent_usd !== null);
-
-    const unreadable: string[] = [];
-    const scored = budgets
-      .filter((budget) => budget.archived_at === null)
-      .flatMap((budget): BudgetAtRisk[] => {
-        const limit = Number(budget.limit_usd);
-        // `spent_usd` is null when spend could not be totalled. `Number(null)`
-        // is 0, which passes the finite check and scores the budget at 0%, so
-        // an unreadable budget would drop out of the at-risk list looking
-        // healthy. Absent spend is unreadable, not zero spend.
-        const spent = budget.spent_usd === null ? Number.NaN : Number(budget.spent_usd);
-        // Neither "at risk" nor "fine" - we cannot say which, so say that.
-        if (!Number.isFinite(limit)) {
-          unreadable.push(budget.name);
-          return [];
-        }
-        if (!Number.isFinite(spent)) {
-          unreadable.push(budget.name);
-          return [];
-        }
-        // `attributed_user` rows: limit_usd is a per-person cap and spent_usd
-        // totals the template's bare anchor, which no debit lands on. A
-        // percentage of it is a confident zero about nobody. The standing is
-        // a headcount: how many of the people seen this period are at or over
-        // their own cap.
-        if (budget.scope_type === "attributed_user") {
-          const seen = budget.end_users_seen ?? 0;
-          const over = budget.end_users_over ?? 0;
-          return [
-            {
-              name: budget.name,
-              scope: budget.scope_type,
-              window: budget.window,
-              utilizationPct: seen > 0 ? Math.round((over / seen) * 100) : 0,
-              spentUsd: budget.spent_usd,
-              limitUsd: budget.limit_usd,
-              onBreach: budget.on_breach,
-              endUsersSeen: seen,
-              endUsersOver: over,
-            },
-          ];
-        }
-        // `group` rows: limit_usd is the PER-MEMBER allowance while
-        // spent_usd sums the whole group, so the comparable ceiling is
-        // limit x member_count. Without a member count (empty group) the
-        // allowance covers nobody and any spend is over it.
-        const effectiveLimit =
-          budget.scope_type === "group" ? limit * (budget.member_count ?? 0) : limit;
-        return [
-          {
-            name: budget.name,
-            scope: budget.scope_type,
-            window: budget.window,
-            // A limit of zero admits no spend at all: it is the maximally
-            // breached state, not a 0%-utilized one. Scoring it 0 and dropping
-            // it below the threshold is how a `block` budget that rejects every
-            // single request turns into a green tick.
-            utilizationPct: effectiveLimit <= 0 ? 100 : Math.round((spent / effectiveLimit) * 100),
-            spentUsd: budget.spent_usd,
-            limitUsd: budget.limit_usd,
-            onBreach: budget.on_breach,
-          },
-        ];
-      });
-
-    const gaps: string[] = [];
-    if (!spend_available) {
-      gaps.push("spend could not be totalled server-side, so utilization is not real spend");
-    }
-    if (unreadable.length > 0) {
-      gaps.push(
-        `the limit or spend of ${unreadable.length} budget${unreadable.length === 1 ? "" : "s"} could not be read (${unreadable.join(", ")})`,
-      );
-    }
-    if (gaps.length > 0) {
-      attention.errors.budgetsAtRisk = `incomplete scan: ${gaps.join("; ")}`;
-    }
-
-    return scored
-      .filter((budget) =>
-        budget.scope === "attributed_user"
-          ? // One person refused is worth a look, and the share of seats over
-            // cap is not a utilization to threshold on: 1 of 20 people blocked
-            // reads as 5% and would never surface.
-            (budget.endUsersOver ?? 0) > 0
-          : budget.utilizationPct >= BUDGET_ATTENTION_THRESHOLD_PCT,
-      )
-      .toSorted((a, b) => b.utilizationPct - a.utilizationPct);
-  }
 
   // Fetch counts for all major resources in parallel.
   const fetchers: {
@@ -380,17 +608,20 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
   }[] = [
     { key: "evaluators", fn: () => apiClient.GET("/api/v1/evaluators") },
     { key: "scenarios", fn: () => apiClient.GET("/api/v1/scenarios") },
-    { key: "suites", fn: () => fetchCount("/api/v1/suites") },
+    { key: "suites", fn: () => fetchCount({ context, url: "/api/v1/suites" }) },
     { key: "datasets", fn: () => apiClient.GET("/api/v1/dataset") },
     { key: "agents", fn: () => apiClient.GET("/api/v1/agents") },
     { key: "workflows", fn: () => apiClient.GET("/api/v1/workflows") },
     { key: "dashboards", fn: () => apiClient.GET("/api/v1/dashboards") },
-    { key: "triggers", fn: () => fetchCount("/api/v1/triggers") },
-    { key: "monitors", fn: () => fetchCount("/api/v1/monitors") },
+    { key: "triggers", fn: () => fetchCount({ context, url: "/api/v1/triggers" }) },
+    { key: "monitors", fn: () => fetchCount({ context, url: "/api/v1/monitors" }) },
     {
       key: "secrets",
       fn: () =>
-        fetchCount(`/api/v1/secret?projectId=${encodeURIComponent(credentials.projectId ?? "")}`),
+        fetchCount({
+          context,
+          url: `/api/v1/secret?projectId=${encodeURIComponent(credentials.projectId ?? "")}`,
+        }),
     },
   ];
 
@@ -400,8 +631,8 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
   // the per-key types are reconciled.
   const sectionFetchers: { key: AttentionSectionKey; fn: () => Promise<unknown> }[] = [
     { key: "erroredTraces24h", fn: fetchErroredTraces24h },
-    { key: "runningExperiments", fn: fetchRunningExperiments },
-    { key: "budgetsAtRisk", fn: fetchBudgetsAtRisk },
+    { key: "runningExperiments", fn: () => fetchRunningExperiments(attention.errors) },
+    { key: "budgetsAtRisk", fn: () => fetchBudgetsAtRisk({ context, errors: attention.errors }) },
   ];
 
   await Promise.allSettled([
@@ -420,25 +651,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
           };
           return;
         }
-        if (Array.isArray(data)) {
-          results[key] = { count: data.length };
-        } else if (
-          data &&
-          typeof data === "object" &&
-          "data" in (data as Record<string, unknown>)
-        ) {
-          const arr = (data as { data: unknown[] }).data;
-          results[key] = { count: Array.isArray(arr) ? arr.length : 0 };
-        } else if (
-          data &&
-          typeof data === "object" &&
-          "pagination" in (data as Record<string, unknown>)
-        ) {
-          const pagination = (data as { pagination: { total: number } }).pagination;
-          results[key] = { count: pagination.total };
-        } else {
-          results[key] = { count: 0 };
-        }
+        results[key] = { count: countOf(data) };
       } catch (err) {
         results[key] = { count: 0, error: describeFailure(err) };
       }
@@ -474,146 +687,6 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
 
   await printResult(document, {
     ...options,
-    table: () => {
-      // If every resource failed — likely auth/endpoint/server issue. Show a
-      // clear diagnostic so the user knows what to check instead of puzzling
-      // over a grid of red error messages. (Machine formats print the document
-      // and exit 0 — the per-resource errors are IN the document.)
-      if (errorCount === totalCount && totalCount > 0) {
-        const sampleError = Object.values(results).find((r) => r.error)?.error ?? "";
-        const statuses = Object.values(results)
-          .map((r) => r.status)
-          .filter((s): s is number => typeof s === "number");
-        const allUnauthorized =
-          statuses.length > 0 && statuses.every((s) => s === 401 || s === 403);
-        console.log();
-        console.log(chalk.red("  ✗ Could not fetch any project resources."));
-        console.log(chalk.gray(`    Reason: ${sampleError}`));
-        console.log();
-        if (allUnauthorized && isPersonalAccessToken(apiKey) && !process.env.LANGWATCH_PROJECT_ID) {
-          console.log(
-            chalk.gray(`    Your PAT requires ${chalk.cyan("LANGWATCH_PROJECT_ID")} to be set.`),
-          );
-          console.log(
-            chalk.gray(
-              `    Set it via: ${chalk.cyan("export LANGWATCH_PROJECT_ID=<your-project-id>")}`,
-            ),
-          );
-          console.log(
-            chalk.gray(
-              `    Or add to .env: ${chalk.cyan("LANGWATCH_PROJECT_ID=<your-project-id>")}`,
-            ),
-          );
-        } else if (allUnauthorized) {
-          console.log(
-            chalk.gray(
-              `    Your API key appears to be invalid or revoked. Re-run ${chalk.cyan("langwatch login")} or check ${chalk.cyan("LANGWATCH_API_KEY")}.`,
-            ),
-          );
-        } else {
-          console.log(
-            chalk.gray(
-              `    Check ${chalk.cyan("LANGWATCH_API_KEY")} (current endpoint: ${chalk.cyan(endpoint)}).`,
-            ),
-          );
-        }
-        console.log();
-        process.exit(1);
-      }
-
-      // ── What needs attention (gh-status style) ─────────────────────
-      console.log();
-      console.log(chalk.bold("  Needs Attention:"));
-
-      let flagged = 0;
-      if (attention.erroredTraces24h !== null && attention.erroredTraces24h > 0) {
-        flagged++;
-        console.log(
-          chalk.red(
-            `    ⚠ ${attention.erroredTraces24h} trace${attention.erroredTraces24h === 1 ? "" : "s"} errored in the last 24h`,
-          ) + chalk.gray(`  →  langwatch trace search  (defaults to the last 24h)`),
-        );
-      }
-      for (const experiment of attention.runningExperiments ?? []) {
-        flagged++;
-        const progress =
-          experiment.progress !== null && experiment.total !== null
-            ? ` (${experiment.progress}/${experiment.total})`
-            : "";
-        console.log(
-          chalk.yellow(
-            `    ⚠ experiment "${experiment.name ?? experiment.slug}" is still running${progress}`,
-          ) +
-            chalk.gray(
-              `  →  langwatch experiment status ${experiment.slug} --run-id ${experiment.runId}`,
-            ),
-        );
-      }
-      for (const budget of attention.budgetsAtRisk ?? []) {
-        flagged++;
-        // A per-person template carries a headcount instead of a total, so it
-        // reports the headcount and the cap each person carries.
-        const overCap = budget.endUsersOver;
-        const breached = overCap !== undefined ? overCap > 0 : budget.utilizationPct >= 100;
-        const standing =
-          overCap !== undefined
-            ? `${overCap} of ${budget.endUsersSeen} over cap, $${budget.limitUsd}/person`
-            : `at ${budget.utilizationPct}%, $${budget.spentUsd} of $${budget.limitUsd}`;
-        const line = `    ⚠ budget "${budget.name}" (${budget.window}, ${budget.scope}) ${standing}${budget.onBreach === "block" ? ", blocks on breach" : ""}`;
-        console.log(
-          (breached ? chalk.red(line) : chalk.yellow(line)) +
-            chalk.gray(`  →  langwatch gateway-budgets list`),
-        );
-      }
-      if (flagged === 0) {
-        // All-clear only means something when the whole scan actually ran —
-        // don't print a green ✓ next to a list of sections we couldn't check,
-        // and don't print one directly above a grid of red 403s either. A
-        // resource we could not read is a resource we cannot vouch for.
-        if (Object.keys(attention.errors).length === 0 && errorCount === 0) {
-          console.log(chalk.green("    ✓ nothing needs your attention"));
-        } else {
-          console.log(chalk.gray("    – nothing flagged, but some checks did not run"));
-        }
-      }
-      // Sections that could not be fetched are noted dimly, never fatal.
-      const sectionLabels: Record<string, string> = {
-        erroredTraces24h: "errored traces",
-        runningExperiments: "running experiments",
-        budgetsAtRisk: "gateway budgets",
-      };
-      for (const [key, message] of Object.entries(attention.errors)) {
-        console.log(chalk.gray(`    (could not check ${sectionLabels[key] ?? key}: ${message})`));
-      }
-      // Advisories read differently on purpose: "note" is a standing limit of
-      // the API, not a check that failed this run, and it does not gate the ✓.
-      for (const [key, message] of Object.entries(attention.advisories)) {
-        console.log(chalk.gray(`    (note — ${sectionLabels[key] ?? key}: ${message})`));
-      }
-
-      console.log();
-      console.log(chalk.bold("  Resource Counts:"));
-
-      for (const key of RESOURCE_KEYS) {
-        const r = results[key];
-        if (!r) continue;
-        const countStr = r.error ? chalk.red(r.error) : chalk.cyan(String(r.count));
-        console.log(`    ${chalk.gray(key + ":")} ${" ".repeat(14 - key.length)}${countStr}`);
-      }
-
-      console.log();
-      console.log(chalk.gray("  Available CLI commands:"));
-      // Generated from the live command tree (same catalog builder behind
-      // `langwatch commands` / `langwatch help-tree`) — no hand-maintained
-      // list to drift from what the CLI actually registers.
-      for (const line of renderStatusSummary(buildCatalog(buildProgram()))) {
-        console.log(chalk.gray(`    ${line}`));
-      }
-      console.log();
-      console.log(
-        chalk.gray("  Run `langwatch commands` for the full catalog (args, flags, hints)."),
-      );
-      console.log();
-    },
+    table: () => printStatusTable({ document, errorCount, totalCount, apiKey, endpoint }),
   });
 };

@@ -239,6 +239,156 @@ const GIT_FORCE_OPTIONS: ReadonlySet<string> = new Set(["-f", "--force"]);
 /** The `git config` scopes that reach outside the folder. */
 const GIT_CONFIG_OUTSIDE_SCOPES: ReadonlySet<string> = new Set(["--global", "--system"]);
 
+interface GitInvocation {
+  args: string[];
+  subcommand: string;
+  operands: string[];
+  option: (options: ReadonlySet<string>) => string | undefined;
+  form: (effect: CommandEffect, marker: string) => GitDestructiveForm;
+}
+
+type GitFormReader = (invocation: GitInvocation) => GitDestructiveForm | null;
+
+const rewritesHistory: GitFormReader = ({ subcommand }) => ({
+  effect: "rewrites_history",
+  pattern: `git ${subcommand}`,
+});
+
+/** The git subcommands that can be destructive, each with how its dangerous form reads. */
+const GIT_FORM_READERS: ReadonlyMap<string, GitFormReader> = new Map<string, GitFormReader>([
+  [
+    "push",
+    ({ operands, option, form }) => {
+      const forced =
+        option(GIT_PUSH_FORCE_OPTIONS) ?? operands.find((operand) => operand.startsWith("+"));
+      if (forced !== undefined) return form("rewrites_remote_history", forced);
+      const deleted =
+        option(GIT_PUSH_DELETE_OPTIONS) ?? operands.find((operand) => operand.startsWith(":"));
+      if (deleted !== undefined) return form("deletes_remote_branch", deleted);
+      return null;
+    },
+  ],
+  [
+    "reset",
+    ({ args, form }) => {
+      // A reset with a path moves the index and leaves the working tree alone;
+      // only `--hard` throws away what is written in the files.
+      const hard = args.find((argument) => argument === "--hard");
+      return hard === undefined ? null : form("discards_work", hard);
+    },
+  ],
+  [
+    "clean",
+    ({ option, form }) => {
+      const removing = option(GIT_CLEAN_OPTIONS);
+      return removing === undefined ? null : form("discards_work", removing);
+    },
+  ],
+  [
+    "checkout",
+    ({ args, operands, option, form }) => {
+      const forced = option(GIT_FORCE_OPTIONS);
+      if (forced !== undefined) return form("discards_work", forced);
+      // `git checkout -- <path>` and `git checkout .` overwrite the file with
+      // the index; `git checkout -b langy/x origin/main` moves the branch.
+      const endOfOptions = args.indexOf("--");
+      if (endOfOptions !== -1 && args.length > endOfOptions + 1) {
+        return form("discards_work", "--");
+      }
+      const here = operands.find((operand) => operand === "." || operand === "./");
+      return here === undefined ? null : form("discards_work", here);
+    },
+  ],
+  [
+    "switch",
+    ({ option, form }) => {
+      const forced = option(new Set([...GIT_FORCE_OPTIONS, "--discard-changes"]));
+      return forced === undefined ? null : form("discards_work", forced);
+    },
+  ],
+  [
+    "restore",
+    ({ args }) => {
+      // `--staged` restores the index alone. Without it the file on disk is
+      // overwritten, which is the one form of restore that loses work.
+      const staged = args.some(
+        (argument) => argument === "--staged" || carriesOption(argument, new Set(["-S"])),
+      );
+      const worktree = args.some(
+        (argument) => argument === "--worktree" || carriesOption(argument, new Set(["-W"])),
+      );
+      return staged && !worktree ? null : { effect: "discards_work", pattern: "git restore" };
+    },
+  ],
+  [
+    "branch",
+    ({ option, form }) => {
+      const dropped = option(new Set(["-D"]));
+      if (dropped !== undefined) return form("discards_work", dropped);
+      const deleted = option(new Set(["-d", "--delete"]));
+      const forced = option(GIT_FORCE_OPTIONS);
+      return deleted === undefined || forced === undefined
+        ? null
+        : form("discards_work", `${deleted} ${forced}`);
+    },
+  ],
+  [
+    "stash",
+    ({ operands, form }) => {
+      const verb = operands[0];
+      return verb === "drop" || verb === "clear" ? form("discards_work", verb) : null;
+    },
+  ],
+  [
+    "worktree",
+    ({ operands, option, form }) => {
+      const forced = option(GIT_FORCE_OPTIONS);
+      return operands[0] === "remove" && forced !== undefined
+        ? form("discards_work", `remove ${forced}`)
+        : null;
+    },
+  ],
+  [
+    "rm",
+    ({ option, form }) => {
+      const forced = option(GIT_FORCE_OPTIONS);
+      return forced === undefined ? null : form("discards_work", forced);
+    },
+  ],
+  [
+    "update-ref",
+    ({ option, form }) => {
+      const deleted = option(new Set(["-d", "--delete"]));
+      return deleted === undefined ? null : form("discards_work", deleted);
+    },
+  ],
+  [
+    "gc",
+    ({ args, form }) => {
+      const pruned = args.find(
+        (argument) => argument === "--prune=now" || argument === "--prune=all",
+      );
+      return pruned === undefined ? null : form("discards_work", pruned);
+    },
+  ],
+  [
+    "reflog",
+    ({ operands, form }) => {
+      const verb = operands[0];
+      return verb === "expire" || verb === "delete" ? form("discards_work", verb) : null;
+    },
+  ],
+  ["filter-branch", rewritesHistory],
+  ["filter-repo", rewritesHistory],
+  [
+    "config",
+    ({ option, form }) => {
+      const scope = option(GIT_CONFIG_OUTSIDE_SCOPES);
+      return scope === undefined ? null : form("changes_git_settings", scope);
+    },
+  ],
+]);
+
 /**
  * The git form this command is, when it is one that asks, and null otherwise.
  * The pattern names that form rather than the whole subcommand, so allowing a
@@ -256,100 +406,8 @@ export function gitDestructiveForm(args: string[]): GitDestructiveForm | null {
     pattern: `git ${subcommand} ${marker}`,
   });
 
-  switch (subcommand) {
-    case "push": {
-      const forced =
-        option(GIT_PUSH_FORCE_OPTIONS) ?? operands.find((operand) => operand.startsWith("+"));
-      if (forced !== undefined) return form("rewrites_remote_history", forced);
-      const deleted =
-        option(GIT_PUSH_DELETE_OPTIONS) ?? operands.find((operand) => operand.startsWith(":"));
-      if (deleted !== undefined) return form("deletes_remote_branch", deleted);
-      return null;
-    }
-    case "reset": {
-      // A reset with a path moves the index and leaves the working tree alone;
-      // only `--hard` throws away what is written in the files.
-      const hard = args.find((argument) => argument === "--hard");
-      return hard === undefined ? null : form("discards_work", hard);
-    }
-    case "clean": {
-      const removing = option(GIT_CLEAN_OPTIONS);
-      return removing === undefined ? null : form("discards_work", removing);
-    }
-    case "checkout": {
-      const forced = option(GIT_FORCE_OPTIONS);
-      if (forced !== undefined) return form("discards_work", forced);
-      // `git checkout -- <path>` and `git checkout .` overwrite the file with
-      // the index; `git checkout -b langy/x origin/main` moves the branch.
-      const endOfOptions = args.indexOf("--");
-      if (endOfOptions !== -1 && args.length > endOfOptions + 1) {
-        return form("discards_work", "--");
-      }
-      const here = operands.find((operand) => operand === "." || operand === "./");
-      return here === undefined ? null : form("discards_work", here);
-    }
-    case "switch": {
-      const forced = option(new Set([...GIT_FORCE_OPTIONS, "--discard-changes"]));
-      return forced === undefined ? null : form("discards_work", forced);
-    }
-    case "restore": {
-      // `--staged` restores the index alone. Without it the file on disk is
-      // overwritten, which is the one form of restore that loses work.
-      const staged = args.some(
-        (argument) => argument === "--staged" || carriesOption(argument, new Set(["-S"])),
-      );
-      const worktree = args.some(
-        (argument) => argument === "--worktree" || carriesOption(argument, new Set(["-W"])),
-      );
-      return staged && !worktree ? null : { effect: "discards_work", pattern: "git restore" };
-    }
-    case "branch": {
-      const dropped = option(new Set(["-D"]));
-      if (dropped !== undefined) return form("discards_work", dropped);
-      const deleted = option(new Set(["-d", "--delete"]));
-      const forced = option(GIT_FORCE_OPTIONS);
-      return deleted === undefined || forced === undefined
-        ? null
-        : form("discards_work", `${deleted} ${forced}`);
-    }
-    case "stash": {
-      const verb = operands[0];
-      return verb === "drop" || verb === "clear" ? form("discards_work", verb) : null;
-    }
-    case "worktree": {
-      const forced = option(GIT_FORCE_OPTIONS);
-      return operands[0] === "remove" && forced !== undefined
-        ? form("discards_work", `remove ${forced}`)
-        : null;
-    }
-    case "rm": {
-      const forced = option(GIT_FORCE_OPTIONS);
-      return forced === undefined ? null : form("discards_work", forced);
-    }
-    case "update-ref": {
-      const deleted = option(new Set(["-d", "--delete"]));
-      return deleted === undefined ? null : form("discards_work", deleted);
-    }
-    case "gc": {
-      const pruned = args.find(
-        (argument) => argument === "--prune=now" || argument === "--prune=all",
-      );
-      return pruned === undefined ? null : form("discards_work", pruned);
-    }
-    case "reflog": {
-      const verb = operands[0];
-      return verb === "expire" || verb === "delete" ? form("discards_work", verb) : null;
-    }
-    case "filter-branch":
-    case "filter-repo":
-      return { effect: "rewrites_history", pattern: `git ${subcommand}` };
-    case "config": {
-      const scope = option(GIT_CONFIG_OUTSIDE_SCOPES);
-      return scope === undefined ? null : form("changes_git_settings", scope);
-    }
-    default:
-      return null;
-  }
+  const reader = GIT_FORM_READERS.get(subcommand);
+  return reader === undefined ? null : reader({ args, subcommand, operands, option, form });
 }
 
 /**
@@ -590,170 +648,186 @@ function readHeredocBody(command: string, start: number, heredoc: PendingHeredoc
   return command.length;
 }
 
+/** One pass over a command, holding the part and token being read. */
+class CommandScanner {
+  private readonly command: string;
+  private readonly parts: CommandPart[] = [];
+  private hasSubstitution = false;
+  private heredocs: PendingHeredoc[] = [];
+  private partStart = 0;
+  private tokens: string[] = [];
+  private quoted: boolean[] = [];
+  private redirectTarget: boolean[] = [];
+  private token = "";
+  private tokenOpen = false;
+  private tokenQuoted = false;
+  private tokenBare = false;
+  private redirectPending = false;
+  private hasRedirect = false;
+  private index = 0;
+
+  constructor(command: string) {
+    this.command = command;
+  }
+
+  parse(): ParsedCommand {
+    while (this.index < this.command.length) this.step();
+    this.endPart(this.command.length);
+    return { parts: this.parts, hasSubstitution: this.hasSubstitution };
+  }
+
+  private get next(): string | undefined {
+    return this.command[this.index + 1];
+  }
+
+  private step(): void {
+    const char = this.command[this.index]!;
+    if (char === "'") return this.readSingleQuoted();
+    if (char === '"') return this.readDoubleQuoted();
+    if (char === "\\" && this.index + 1 < this.command.length) return this.readEscaped();
+    if (char === "`" || (char === "$" && this.next === "(")) {
+      this.hasSubstitution = true;
+      return this.appendBare(char, 1);
+    }
+    this.stepRedirect(char);
+  }
+
+  private stepRedirect(char: string): void {
+    if ((char === "<" || char === ">") && this.next === "(") {
+      this.hasSubstitution = true;
+      this.hasRedirect = true;
+      this.index += 2;
+      return;
+    }
+    const heredocOperator =
+      char === "<" && this.next === "<" && this.command[this.index + 2] !== "<";
+    if (heredocOperator && this.openHeredoc()) return;
+    if (char === ">" || char === "<") {
+      this.endToken();
+      return this.startRedirect(1);
+    }
+    // `2>file` and `&>file`: the digit or ampersand belongs to the redirect.
+    if (/[0-9&]/.test(char) && this.next === ">" && !this.tokenOpen) return this.startRedirect(2);
+    this.stepSeparator(char);
+  }
+
+  private stepSeparator(char: string): void {
+    const operator = OPERATORS.find((entry) => this.command.startsWith(entry, this.index));
+    if (operator === "\n" && this.heredocs.length > 0) return this.endLineWithHeredocs();
+    if (operator) {
+      this.endPart(this.index);
+      this.index += operator.length;
+      this.partStart = this.index;
+      return;
+    }
+    if (/\s/.test(char)) {
+      this.endToken();
+      this.index += 1;
+      if (!this.tokenOpen && this.tokens.length === 0) this.partStart = this.index;
+      return;
+    }
+    this.appendBare(char, 1);
+  }
+
+  private appendBare(text: string, width: number): void {
+    this.token += text;
+    this.tokenOpen = true;
+    this.tokenBare = true;
+    this.index += width;
+  }
+
+  private readEscaped(): void {
+    this.appendBare(this.command[this.index + 1]!, 2);
+  }
+
+  private readSingleQuoted(): void {
+    const close = this.command.indexOf("'", this.index + 1);
+    const end = close === -1 ? this.command.length : close;
+    this.token += this.command.slice(this.index + 1, end);
+    this.tokenOpen = true;
+    this.tokenQuoted = true;
+    this.index = end + 1;
+  }
+
+  private readDoubleQuoted(): void {
+    const { command } = this;
+    let cursor = this.index + 1;
+    while (cursor < command.length && command[cursor] !== '"') {
+      if (command[cursor] === "\\" && cursor + 1 < command.length) {
+        this.token += command[cursor + 1];
+        cursor += 2;
+        continue;
+      }
+      if (command[cursor] === "$" && command[cursor + 1] === "(") this.hasSubstitution = true;
+      if (command[cursor] === "`") this.hasSubstitution = true;
+      this.token += command[cursor];
+      cursor += 1;
+    }
+    this.tokenOpen = true;
+    this.tokenQuoted = true;
+    this.index = cursor + 1;
+  }
+
+  private startRedirect(width: number): void {
+    this.hasRedirect = true;
+    this.redirectPending = true;
+    this.index += width;
+  }
+
+  /** Whether a `<<` here opened a here-document; a malformed one reads as a redirect. */
+  private openHeredoc(): boolean {
+    const opener = readHeredocOpener(this.command, this.index);
+    if (!opener) return false;
+    this.endToken();
+    this.heredocs.push(opener.heredoc);
+    this.index = opener.end;
+    return true;
+  }
+
+  /** The line ends and the bodies it announced follow, one after another. */
+  private endLineWithHeredocs(): void {
+    let end = this.index + 1;
+    for (const heredoc of this.heredocs) end = readHeredocBody(this.command, end, heredoc);
+    this.heredocs = [];
+    this.endPart(end);
+    this.index = Math.min(end + 1, this.command.length);
+    this.partStart = this.index;
+  }
+
+  private endToken(): void {
+    if (!this.tokenOpen) return;
+    this.tokens.push(this.token);
+    this.quoted.push(this.tokenQuoted && !this.tokenBare);
+    this.redirectTarget.push(this.redirectPending);
+    this.token = "";
+    this.tokenOpen = false;
+    this.tokenQuoted = false;
+    this.tokenBare = false;
+    this.redirectPending = false;
+  }
+
+  private endPart(end: number): void {
+    this.endToken();
+    const text = this.command.slice(this.partStart, end).trim();
+    if (this.tokens.length > 0 || text !== "") {
+      const { tokens, quoted, redirectTarget, hasRedirect } = this;
+      this.parts.push({ text, tokens, quoted, redirectTarget, hasRedirect });
+    }
+    this.tokens = [];
+    this.quoted = [];
+    this.redirectTarget = [];
+    this.redirectPending = false;
+    this.hasRedirect = false;
+  }
+}
+
 /**
  * Splits a command into its parts and their tokens. Quotes are honored, so
  * `echo "a && b"` is one part. A substitution is reported rather than
  * parsed, since what it expands to is not knowable here.
  */
 export function parseCommand(command: string): ParsedCommand {
-  const parts: CommandPart[] = [];
-  let hasSubstitution = false;
-  let heredocs: PendingHeredoc[] = [];
-
-  let partStart = 0;
-  let tokens: string[] = [];
-  let quoted: boolean[] = [];
-  let redirectTarget: boolean[] = [];
-  let token = "";
-  let tokenOpen = false;
-  let tokenQuoted = false;
-  let tokenBare = false;
-  let redirectPending = false;
-  let hasRedirect = false;
-  let index = 0;
-
-  const endToken = () => {
-    if (!tokenOpen) return;
-    tokens.push(token);
-    quoted.push(tokenQuoted && !tokenBare);
-    redirectTarget.push(redirectPending);
-    token = "";
-    tokenOpen = false;
-    tokenQuoted = false;
-    tokenBare = false;
-    redirectPending = false;
-  };
-
-  const endPart = (end: number) => {
-    endToken();
-    const text = command.slice(partStart, end).trim();
-    if (tokens.length > 0 || text !== "") {
-      parts.push({ text, tokens, quoted, redirectTarget, hasRedirect });
-    }
-    tokens = [];
-    quoted = [];
-    redirectTarget = [];
-    redirectPending = false;
-    hasRedirect = false;
-  };
-
-  while (index < command.length) {
-    const char = command[index]!;
-
-    if (char === "'") {
-      const close = command.indexOf("'", index + 1);
-      const end = close === -1 ? command.length : close;
-      token += command.slice(index + 1, end);
-      tokenOpen = true;
-      tokenQuoted = true;
-      index = end + 1;
-      continue;
-    }
-
-    if (char === '"') {
-      let cursor = index + 1;
-      while (cursor < command.length && command[cursor] !== '"') {
-        if (command[cursor] === "\\" && cursor + 1 < command.length) {
-          token += command[cursor + 1];
-          cursor += 2;
-          continue;
-        }
-        if (command[cursor] === "$" && command[cursor + 1] === "(") {
-          hasSubstitution = true;
-        }
-        if (command[cursor] === "`") hasSubstitution = true;
-        token += command[cursor];
-        cursor += 1;
-      }
-      tokenOpen = true;
-      tokenQuoted = true;
-      index = cursor + 1;
-      continue;
-    }
-
-    if (char === "\\" && index + 1 < command.length) {
-      token += command[index + 1];
-      tokenOpen = true;
-      tokenBare = true;
-      index += 2;
-      continue;
-    }
-
-    if (char === "`" || (char === "$" && command[index + 1] === "(")) {
-      hasSubstitution = true;
-      token += char;
-      tokenOpen = true;
-      tokenBare = true;
-      index += 1;
-      continue;
-    }
-
-    if ((char === "<" || char === ">") && command[index + 1] === "(") {
-      hasSubstitution = true;
-      hasRedirect = true;
-      index += 2;
-      continue;
-    }
-
-    if (char === "<" && command[index + 1] === "<" && command[index + 2] !== "<") {
-      const opener = readHeredocOpener(command, index);
-      if (opener) {
-        endToken();
-        heredocs.push(opener.heredoc);
-        index = opener.end;
-        continue;
-      }
-    }
-
-    if (char === ">" || char === "<") {
-      endToken();
-      hasRedirect = true;
-      redirectPending = true;
-      index += 1;
-      continue;
-    }
-
-    // `2>file` and `&>file`: the digit or ampersand belongs to the redirect.
-    if (/[0-9&]/.test(char) && command[index + 1] === ">" && !tokenOpen) {
-      hasRedirect = true;
-      redirectPending = true;
-      index += 2;
-      continue;
-    }
-
-    const operator = OPERATORS.find((entry) => command.startsWith(entry, index));
-    if (operator === "\n" && heredocs.length > 0) {
-      // The line ends and the bodies it announced follow, one after another.
-      let end = index + 1;
-      for (const heredoc of heredocs) end = readHeredocBody(command, end, heredoc);
-      heredocs = [];
-      endPart(end);
-      index = Math.min(end + 1, command.length);
-      partStart = index;
-      continue;
-    }
-    if (operator) {
-      endPart(index);
-      index += operator.length;
-      partStart = index;
-      continue;
-    }
-
-    if (/\s/.test(char)) {
-      endToken();
-      index += 1;
-      if (!tokenOpen && tokens.length === 0) partStart = index;
-      continue;
-    }
-
-    token += char;
-    tokenOpen = true;
-    tokenBare = true;
-    index += 1;
-  }
-
-  endPart(command.length);
-  return { parts, hasSubstitution };
+  return new CommandScanner(command).parse();
 }
 
 /**

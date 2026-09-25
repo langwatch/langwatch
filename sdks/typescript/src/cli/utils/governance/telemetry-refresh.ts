@@ -491,6 +491,149 @@ export interface LoginTelemetryRefreshResult {
   kept?: { tools: string[]; reason: "isolated_config" | "loopback_login" };
 }
 
+function ensureCodexHooks(): void {
+  if (!codexHasOtelBlock(defaultCodexConfigPath())) return;
+  assertCodexTurnHarvest();
+  assertCodexAgentGuidance();
+}
+
+function rewriteToolWiring({
+  cfg,
+  tool,
+  key,
+  labels,
+  warnings,
+}: {
+  cfg: GovernanceConfig;
+  tool: string;
+  key: Awaited<ReturnType<typeof resolveLiveIngestionKey>>;
+  labels: string[];
+  warnings: string[];
+}): void {
+  const vars = buildOtelEnvBlock(tool, key.endpoint, key.token);
+  if (tool === "claude") {
+    const label = refreshClaudeUserTelemetryEnv({ vars });
+    if (label) labels.push(label);
+  } else if (tool === "codex") {
+    const label = refreshCodexOtelBlockTo({
+      endpoint: key.endpoint,
+      token: key.token,
+      environment: cfg.organization?.slug ?? "langwatch",
+    });
+    if (label) labels.push(label);
+  } else {
+    const refreshed = refreshScopedShellFunctions({ tool, vars });
+    labels.push(...refreshed);
+    if (tool === "code" && refreshed.length > 0) {
+      const notice = runningCodeRestartNotice();
+      if (notice) warnings.push(notice);
+    }
+  }
+}
+
+/** Refreshes one tool's stale wiring for the new login; true when it minted a key. */
+async function refreshToolForLogin({
+  cfg,
+  tool,
+  sourceType,
+  expectedEndpoint,
+  loopbackLogin,
+  keptForLoopback,
+  labels,
+  warnings,
+}: {
+  cfg: GovernanceConfig;
+  tool: string;
+  sourceType: string;
+  expectedEndpoint: string;
+  loopbackLogin: boolean;
+  keptForLoopback: string[];
+  labels: string[];
+  warnings: string[];
+}): Promise<boolean> {
+  if (!resolvePlatformToolPolicy(tool, cfg.tool_policies).allowOtelDirect) {
+    // The new org forbids direct OTLP for this tool; the wrapper
+    // surfaces that on the next run rather than login guessing.
+    return false;
+  }
+  // A login on this machine leaves a tool that reports elsewhere wholly
+  // alone: the hook names this CLI's own path, which is no business of a
+  // config file this login does not take over.
+  if (loopbackLogin && keepsWiringForLoopback(tool, expectedEndpoint)) {
+    keptForLoopback.push(tool);
+    return false;
+  }
+  // codex's notify hook recovers the conversation, and its guidance tells a session to
+  // declare the checkout it moved to. Neither names an endpoint or a key, so both stand
+  // ahead of the pin check — a pinned codex needs them exactly as a personal one does.
+  // A config already pointing at this login skips the refresh below, so a device whose
+  // [otel] block predates either would never be given one; both calls are idempotent.
+  if (tool === "codex") ensureCodexHooks();
+  if (cfg.tool_project_keys?.[tool]?.secret) {
+    // Project-pinned wiring is deliberate scope, not stale personal
+    // wiring; a new login never re-points it at the personal path.
+    return false;
+  }
+  if (!toolWiringNeedsLoginRefresh(tool, expectedEndpoint)) return false;
+  // allowOfflineFallback: false - see resolveLiveIngestionKey's doc.
+  // This caller only gets here because the persisted endpoint
+  // already differs from the new login, so a network hiccup must
+  // mint fresh rather than reuse a secret bound to the old instance.
+  const key = await resolveLiveIngestionKey({
+    cfg,
+    sourceType,
+    allowOfflineFallback: false,
+  });
+  if (key.minted) {
+    cfg.default_personal_ingest_keys = {
+      ...cfg.default_personal_ingest_keys,
+      [sourceType]: { secret: key.token, prefix: key.prefix },
+    };
+  }
+  try {
+    rewriteToolWiring({ cfg, tool, key, labels, warnings });
+  } catch {
+    // Best-effort per tool: the key minted above stays cached.
+    void 0;
+  }
+  return key.minted;
+}
+
+/**
+ * Path A: the codex gateway provider block pins the gateway URL of the login
+ * that wrote it. Re-sync it with this login's gateway URL when present.
+ */
+function resyncCodexGatewayBlock({
+  cfg,
+  loopbackLogin,
+  keptForLoopback,
+  labels,
+}: {
+  cfg: GovernanceConfig;
+  loopbackLogin: boolean;
+  keptForLoopback: string[];
+  labels: string[];
+}): void {
+  try {
+    const codexConfigPath = defaultCodexConfigPath();
+    const keepsGatewayBlock =
+      loopbackLogin && !isLoopbackEndpoint(codexGatewayBlockBaseUrl() ?? undefined);
+    if (!codexHasGatewayBlock(codexConfigPath)) {
+      // Nothing to re-sync.
+    } else if (keepsGatewayBlock) {
+      if (!keptForLoopback.includes("codex")) keptForLoopback.push("codex");
+    } else {
+      const result = writeCodexGatewayBlock({ gatewayUrl: cfg.gateway_url });
+      if (result.action !== "unchanged") {
+        labels.push(`codex gateway block (${displayCodexConfigPath()})`);
+      }
+    }
+  } catch {
+    // Best-effort, same as the per-tool refresh.
+    void 0;
+  }
+}
+
 /**
  * Login-time half of latest-login-wins: refresh any langwatch-authored block whose endpoint
  * differs from the new control plane; a block already pointing here is left for the next
@@ -524,71 +667,17 @@ export async function refreshTelemetryWiringForLogin(
 
   for (const [tool, sourceType] of Object.entries(SOURCE_TYPE_BY_TOOL)) {
     try {
-      if (!resolvePlatformToolPolicy(tool, cfg.tool_policies).allowOtelDirect) {
-        // The new org forbids direct OTLP for this tool; the wrapper
-        // surfaces that on the next run rather than login guessing.
-        continue;
-      }
-      // A login on this machine leaves a tool that reports elsewhere wholly
-      // alone: the hook names this CLI's own path, which is no business of a
-      // config file this login does not take over.
-      if (loopbackLogin && keepsWiringForLoopback(tool, expectedEndpoint)) {
-        keptForLoopback.push(tool);
-        continue;
-      }
-      // codex's notify hook recovers the conversation, and its guidance tells a session to
-      // declare the checkout it moved to. Neither names an endpoint or a key, so both stand
-      // ahead of the pin check — a pinned codex needs them exactly as a personal one does.
-      // A config already pointing at this login skips the refresh below, so a device whose
-      // [otel] block predates either would never be given one; both calls are idempotent.
-      if (tool === "codex") {
-        const codexConfigPath = defaultCodexConfigPath();
-        if (codexHasOtelBlock(codexConfigPath)) {
-          assertCodexTurnHarvest();
-          assertCodexAgentGuidance();
-        }
-      }
-      if (cfg.tool_project_keys?.[tool]?.secret) {
-        // Project-pinned wiring is deliberate scope, not stale personal
-        // wiring; a new login never re-points it at the personal path.
-        continue;
-      }
-      if (!toolWiringNeedsLoginRefresh(tool, expectedEndpoint)) continue;
-      // allowOfflineFallback: false - see resolveLiveIngestionKey's doc.
-      // This caller only gets here because the persisted endpoint
-      // already differs from the new login, so a network hiccup must
-      // mint fresh rather than reuse a secret bound to the old instance.
-      const key = await resolveLiveIngestionKey({
+      const minted = await refreshToolForLogin({
         cfg,
+        tool,
         sourceType,
-        allowOfflineFallback: false,
+        expectedEndpoint,
+        loopbackLogin,
+        keptForLoopback,
+        labels,
+        warnings,
       });
-      if (key.minted) {
-        cfg.default_personal_ingest_keys = {
-          ...cfg.default_personal_ingest_keys,
-          [sourceType]: { secret: key.token, prefix: key.prefix },
-        };
-        mintedAny = true;
-      }
-      const vars = buildOtelEnvBlock(tool, key.endpoint, key.token);
-      if (tool === "claude") {
-        const label = refreshClaudeUserTelemetryEnv({ vars });
-        if (label) labels.push(label);
-      } else if (tool === "codex") {
-        const label = refreshCodexOtelBlockTo({
-          endpoint: key.endpoint,
-          token: key.token,
-          environment: cfg.organization?.slug ?? "langwatch",
-        });
-        if (label) labels.push(label);
-      } else {
-        const refreshed = refreshScopedShellFunctions({ tool, vars });
-        labels.push(...refreshed);
-        if (tool === "code" && refreshed.length > 0) {
-          const notice = runningCodeRestartNotice();
-          if (notice) warnings.push(notice);
-        }
-      }
+      if (minted) mintedAny = true;
     } catch {
       // Best-effort per tool: one failed mint must not block the login
       // or the other tools' refreshes.
@@ -596,27 +685,7 @@ export async function refreshTelemetryWiringForLogin(
     }
   }
 
-  // Path A: the codex gateway provider block pins the gateway URL of
-  // the login that wrote it. Re-sync it with this login's gateway URL
-  // when present - no ingest key involved.
-  try {
-    const codexConfigPath = defaultCodexConfigPath();
-    const keepsGatewayBlock =
-      loopbackLogin && !isLoopbackEndpoint(codexGatewayBlockBaseUrl() ?? undefined);
-    if (!codexHasGatewayBlock(codexConfigPath)) {
-      // Nothing to re-sync.
-    } else if (keepsGatewayBlock) {
-      if (!keptForLoopback.includes("codex")) keptForLoopback.push("codex");
-    } else {
-      const result = writeCodexGatewayBlock({ gatewayUrl: cfg.gateway_url });
-      if (result.action !== "unchanged") {
-        labels.push(`codex gateway block (${displayCodexConfigPath()})`);
-      }
-    }
-  } catch {
-    // Best-effort, same as above.
-    void 0;
-  }
+  resyncCodexGatewayBlock({ cfg, loopbackLogin, keptForLoopback, labels });
 
   return {
     labels,

@@ -407,12 +407,24 @@ const readRegistered = (frame: Record<string, unknown>): LocalRegisteredFrame | 
   };
 };
 
-/** The tool call inside a `call` frame, or null when the tool is unknown. */
-const readToolCall = (value: Record<string, unknown>): LocalToolCall | null => {
-  const params = isRecord(value.params) ? value.params : null;
-  if (!params) return null;
-  switch (value.tool) {
-    case "local_read":
+/** A `local_edit` call's replacements, or null when one is malformed. */
+const readEdits = (entries: unknown[]): LocalEditReplace[] | null => {
+  const edits: LocalEditReplace[] = [];
+  for (const entry of entries) {
+    if (!isRecord(entry)) return null;
+    if (!isString(entry.oldText)) return null;
+    edits.push({ oldText: entry.oldText, newText: readString(entry.newText, "") });
+  }
+  return edits;
+};
+
+type ToolCallReader = (params: Record<string, unknown>) => LocalToolCall | null;
+
+/** Each local tool, with how its params read off the wire. */
+const TOOL_CALL_READERS: ReadonlyMap<string, ToolCallReader> = new Map<string, ToolCallReader>([
+  [
+    "local_read",
+    (params) => {
       if (!isString(params.path)) return null;
       return {
         tool: "local_read",
@@ -422,28 +434,31 @@ const readToolCall = (value: Record<string, unknown>): LocalToolCall | null => {
           ...(isNumber(params.limit) ? { limit: params.limit } : {}),
         },
       };
-    case "local_write":
+    },
+  ],
+  [
+    "local_write",
+    (params) => {
       if (!isString(params.path)) return null;
       if (!isString(params.content)) return null;
       return {
         tool: "local_write",
         params: { path: params.path, content: params.content },
       };
-    case "local_edit": {
+    },
+  ],
+  [
+    "local_edit",
+    (params) => {
       if (!isString(params.path)) return null;
       if (!Array.isArray(params.edits)) return null;
-      const edits: LocalEditReplace[] = [];
-      for (const entry of params.edits) {
-        if (!isRecord(entry)) return null;
-        if (!isString(entry.oldText)) return null;
-        edits.push({
-          oldText: entry.oldText,
-          newText: readString(entry.newText, ""),
-        });
-      }
-      return { tool: "local_edit", params: { path: params.path, edits } };
-    }
-    case "local_bash":
+      const edits = readEdits(params.edits);
+      return edits === null ? null : { tool: "local_edit", params: { path: params.path, edits } };
+    },
+  ],
+  [
+    "local_bash",
+    (params) => {
       if (!isString(params.command)) return null;
       return {
         tool: "local_bash",
@@ -453,7 +468,11 @@ const readToolCall = (value: Record<string, unknown>): LocalToolCall | null => {
           ...(params.background === true ? { background: true } : {}),
         },
       };
-    case "local_grep":
+    },
+  ],
+  [
+    "local_grep",
+    (params) => {
       if (!isString(params.pattern)) return null;
       return {
         tool: "local_grep",
@@ -467,7 +486,11 @@ const readToolCall = (value: Record<string, unknown>): LocalToolCall | null => {
           ...(isNumber(params.limit) ? { limit: params.limit } : {}),
         },
       };
-    case "local_find":
+    },
+  ],
+  [
+    "local_find",
+    (params) => {
       if (!isString(params.pattern)) return null;
       return {
         tool: "local_find",
@@ -477,7 +500,11 @@ const readToolCall = (value: Record<string, unknown>): LocalToolCall | null => {
           ...(isNumber(params.limit) ? { limit: params.limit } : {}),
         },
       };
-    case "local_ls":
+    },
+  ],
+  [
+    "local_ls",
+    (params) => {
       return {
         tool: "local_ls",
         params: {
@@ -485,14 +512,25 @@ const readToolCall = (value: Record<string, unknown>): LocalToolCall | null => {
           ...(isNumber(params.limit) ? { limit: params.limit } : {}),
         },
       };
-    case "local_langwatch_env":
+    },
+  ],
+  [
+    "local_langwatch_env",
+    (params) => {
       return {
         tool: "local_langwatch_env",
         params: isString(params.path) ? { path: params.path } : {},
       };
-    default:
-      return null;
-  }
+    },
+  ],
+]);
+
+/** The tool call inside a `call` frame, or null when the tool is unknown. */
+const readToolCall = (value: Record<string, unknown>): LocalToolCall | null => {
+  const params = isRecord(value.params) ? value.params : null;
+  if (!params) return null;
+  const reader = isString(value.tool) ? TOOL_CALL_READERS.get(value.tool) : undefined;
+  return reader === undefined ? null : reader(params);
 };
 
 const readCall = (frame: Record<string, unknown>): LocalCallFrame | null => {

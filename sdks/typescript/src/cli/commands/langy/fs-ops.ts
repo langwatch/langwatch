@@ -352,6 +352,47 @@ export function* walkFiles({
 
 const escapeLiteral = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/** The file's lines, or none when it is too large, unreadable or binary. */
+const searchableLines = (absolute: string): string[] => {
+  let content: string;
+  try {
+    if (fs.statSync(absolute).size > MAX_SEARCHED_FILE_BYTES) return [];
+    content = fs.readFileSync(absolute, "utf8");
+  } catch {
+    return [];
+  }
+  // A null byte means a binary file: searching it produces noise.
+  if (content.includes("\u0000")) return [];
+  return content.split("\n");
+};
+
+const appendMatchingLines = ({
+  relative,
+  lines,
+  matcher,
+  context,
+  limit,
+  found,
+}: {
+  relative: string;
+  lines: string[];
+  matcher: RegExp;
+  context: number;
+  limit: number;
+  found: string[];
+}): void => {
+  for (const [index, line] of lines.entries()) {
+    if (found.length >= limit) break;
+    if (!matcher.test(line)) continue;
+    const first = Math.max(0, index - context);
+    const last = Math.min(lines.length - 1, index + context);
+    for (let cursor = first; cursor <= last; cursor += 1) {
+      const marker = cursor === index ? ":" : "-";
+      found.push(`${relative}${marker}${cursor + 1}${marker}${lines[cursor]}`);
+    }
+  }
+};
+
 /** Text search over the folder, with the matching lines and their numbers. */
 export function grep({ params, root }: { params: LocalGrepParams; root: string }): string {
   const from = insideRoot({ target: params.path ?? ".", root });
@@ -376,27 +417,8 @@ export function grep({ params, root }: { params: LocalGrepParams; root: string }
   for (const relative of walkFiles({ from, root, rules })) {
     if (found.length >= limit) break;
     if (glob && !glob.test(relative)) continue;
-    const absolute = path.join(root, relative);
-    let content: string;
-    try {
-      if (fs.statSync(absolute).size > MAX_SEARCHED_FILE_BYTES) continue;
-      content = fs.readFileSync(absolute, "utf8");
-    } catch {
-      continue;
-    }
-    // A null byte means a binary file: searching it produces noise.
-    if (content.includes("\u0000")) continue;
-    const lines = content.split("\n");
-    for (const [index, line] of lines.entries()) {
-      if (found.length >= limit) break;
-      if (!matcher.test(line)) continue;
-      const first = Math.max(0, index - context);
-      const last = Math.min(lines.length - 1, index + context);
-      for (let cursor = first; cursor <= last; cursor += 1) {
-        const marker = cursor === index ? ":" : "-";
-        found.push(`${relative}${marker}${cursor + 1}${marker}${lines[cursor]}`);
-      }
-    }
+    const lines = searchableLines(path.join(root, relative));
+    appendMatchingLines({ relative, lines, matcher, context, limit, found });
   }
   if (found.length === 0) return `No line matches ${params.pattern}.`;
   return found.length >= limit

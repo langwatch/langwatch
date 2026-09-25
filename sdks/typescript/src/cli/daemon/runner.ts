@@ -124,167 +124,95 @@ export function createCommandExecutor({
   const timeoutMs = requestTimeoutMs ?? resolveRequestTimeoutMs();
   const graceMs = abandonGraceMs ?? resolveAbandonGraceMs();
 
-  return (request: ExecuteRequest): CommandExecution => {
-    const context = new ExecutionContext(request.requestId, (stream, chunk) => {
+  return (request: ExecuteRequest): CommandExecution =>
+    new RequestExecution({ request, window, telemetry, timeoutMs, graceMs, onWedged }).start();
+}
+
+/** Node's own report for a rejection nobody handled: the stack, else name and message. */
+const unhandledReport = (error: unknown): string =>
+  error instanceof Error ? (error.stack ?? `${error.name}: ${error.message}`) : String(error);
+
+/**
+ * Runs the request's command in its context and answers the failure it threw,
+ * if any. A process.exit call already finalised the context, so its code wins.
+ */
+async function runProgram({
+  request,
+  context,
+}: {
+  request: ExecuteRequest;
+  context: ExecutionContext;
+}): Promise<unknown> {
+  try {
+    // A fresh tree per request: commander mutates its Command objects with
+    // the parsed option values, so a shared tree would leak options between
+    // callers. Named from the CALLER's bin, not this process's — see
+    // `ExecuteRequest.bin`.
+    const program = buildProgram({ bin: request.bin });
+    await withExecutionContext(context, () => program.parseAsync(request.args, { from: "user" }));
+    context.finalize(0);
+    return undefined;
+  } catch (error) {
+    if (isDaemonExitSignal(error)) {
+      context.finalize(error.code);
+      return undefined;
+    }
+    // An action that rejected without handling it. In a real process this
+    // is an unhandled rejection: node prints the error and exits 1, and so do we.
+    context.write("stderr", Buffer.from(unhandledReport(error) + "\n", "utf8"));
+    context.finalize(1);
+    return error;
+  }
+}
+
+/** One request's run: its window, its cancellation and its abandon grace. */
+class RequestExecution {
+  private cancelled = false;
+  private settle: ((code: number) => void) | undefined;
+  private releaseWindow: (() => void) | undefined;
+  private abandonTimer: NodeJS.Timeout | undefined;
+  private readonly abortController = new AbortController();
+  private readonly context: ExecutionContext;
+  private readonly request: ExecuteRequest;
+  private readonly window: ExecutionWindow;
+  private readonly telemetry: DaemonTelemetry;
+  private readonly timeoutMs: number;
+  private readonly graceMs: number;
+  private readonly onWedged: WedgedHandler;
+
+  constructor(input: {
+    request: ExecuteRequest;
+    window: ExecutionWindow;
+    telemetry: DaemonTelemetry;
+    timeoutMs: number;
+    graceMs: number;
+    onWedged: WedgedHandler;
+  }) {
+    this.request = input.request;
+    this.window = input.window;
+    this.telemetry = input.telemetry;
+    this.timeoutMs = input.timeoutMs;
+    this.graceMs = input.graceMs;
+    this.onWedged = input.onWedged;
+    const { request, telemetry } = input;
+    this.context = new ExecutionContext(request.requestId, (stream, chunk) => {
       request.sink(stream, chunk);
-      telemetry.requestProgress({
-        requestId: request.requestId,
-        stream,
-        bytes: chunk.byteLength,
-      });
+      telemetry.requestProgress({ requestId: request.requestId, stream, bytes: chunk.byteLength });
     });
+  }
 
-    let cancelled = false;
-    let settle: ((code: number) => void) | undefined;
-    let releaseWindow: (() => void) | undefined;
-    let abandonTimer: NodeJS.Timeout | undefined;
-    const abortController = new AbortController();
-
-    /**
-     * Hand the execution window back. Exactly once, and only ever from a point
-     * at which the command's own promise chain has actually settled.
-     */
-    const releaseOnce = (): void => {
-      if (abandonTimer) {
-        clearTimeout(abandonTimer);
-        abandonTimer = undefined;
-      }
-      const release = releaseWindow;
-      releaseWindow = undefined;
-      release?.();
-    };
-
-    /**
-     * The abandoned command still holds the window; this bounds how long. Nothing
-     * here waits on the CALLER — they already have their 124/130 — it only stops
-     * a command that never settles from keeping the daemon usable for nobody, forever.
-     */
-    const armAbandonGrace = (): void => {
-      // Safe only because the post-acquire `cancelled` check re-reads before
-      // starting work, releasing any window taken in the gap between admission
-      // and cancellation; delete it and this early return becomes a permanent
-      // wedge (see runner.unit.test.ts).
-      if (releaseWindow === undefined || abandonTimer) return;
-      abandonTimer = setTimeout(() => {
-        abandonTimer = undefined;
-        onWedged({ requestId: request.requestId, graceMs });
-      }, graceMs);
-      abandonTimer.unref();
-    };
-
-    const abort = ({ code, note }: { code: number; note?: string }): void => {
-      if (context.isFinished) return;
-      cancelled = true;
-      if (note !== undefined) {
-        context.write("stderr", Buffer.from(note, "utf8"));
-      }
-      // Finalising first is what actually enforces the cancellation: every
-      // subsequent write from the abandoned command is dropped on the floor.
-      context.finalize(code);
-      // Wakes a request still QUEUED for its window; a no-op otherwise.
-      abortController.abort();
-      // The caller settles now, but the WINDOW stays held: node can't unwind
-      // the abandoned promise chain, so it's still running and will later read
-      // `process.cwd()`/`process.env` — releasing early would let the next
-      // caller's `applyWindow` rewrite those out from under it. `finally`
-      // releases it once work truly settles; `armAbandonGrace` bounds the rest.
-      settle?.(code);
-      armAbandonGrace();
-    };
-
+  start(): CommandExecution {
     // 124, the `timeout(1)` convention, so scripts can tell a timeout apart
     // from both a command failure (1) and a client cancel (130).
     const timeout = setTimeout(() => {
-      abort({
+      this.abort({
         code: 124,
-        note: `langwatch: request timed out after ${Math.round(timeoutMs / 1000)}s; the daemon abandoned it\n`,
+        note: `langwatch: request timed out after ${Math.round(this.timeoutMs / 1000)}s; the daemon abandoned it\n`,
       });
-    }, timeoutMs);
+    }, this.timeoutMs);
     timeout.unref();
 
-    const completed = (async (): Promise<number> => {
-      const startedAt = Date.now();
-
-      // May reject when the caller's cwd no longer exists. The server turns
-      // that into a `fallback` frame — no output has been emitted yet, so the
-      // client can safely re-run the command itself.
-      let release: (() => void) | undefined;
-      try {
-        release = await window.acquire({
-          request: {
-            cwd: request.cwd,
-            env: request.env,
-            colorLevel: request.colorLevel,
-          },
-          signal: abortController.signal,
-        });
-      } catch (error) {
-        // Aborted while queued: the cancel/timeout path already settled the
-        // caller; there is nothing left to report.
-        if (cancelled) return context.exitCode;
-        throw error;
-      }
-      releaseWindow = release;
-
-      // Admitted at the same moment the abort fired. Don't start the work.
-      if (cancelled) {
-        releaseOnce();
-        return context.exitCode;
-      }
-
-      telemetry.requestStarted({
-        requestId: request.requestId,
-        args: request.args,
-        cwd: request.cwd,
-      });
-
-      let failure: unknown;
-      try {
-        // A fresh tree per request: commander mutates its Command objects with
-        // the parsed option values, so a shared tree would leak options between
-        // callers. Named from the CALLER's bin, not this process's — see
-        // `ExecuteRequest.bin`.
-        const program = buildProgram({ bin: request.bin });
-        await withExecutionContext(context, () =>
-          program.parseAsync(request.args, { from: "user" }),
-        );
-        context.finalize(0);
-      } catch (error) {
-        if (isDaemonExitSignal(error)) {
-          // The command (or commander itself) called process.exit. The context
-          // was finalised at the moment of the call, so its code already wins
-          // and anything the unwinding stack printed was discarded.
-          context.finalize(error.code);
-        } else {
-          failure = error;
-          // An action that rejected without handling it. In a real process this
-          // is an unhandled rejection: node prints the error and exits 1. We
-          // print the same error and exit 1. (Node also prints its own internal
-          // frames and a version banner; those we do not reproduce.)
-          const stack =
-            error instanceof Error
-              ? (error.stack ?? `${error.name}: ${error.message}`)
-              : String(error);
-          context.write("stderr", Buffer.from(stack + "\n", "utf8"));
-          context.finalize(1);
-        }
-      } finally {
-        // The ONLY place a window taken by a running command is handed back —
-        // including for a command that was abandoned long ago, whose caller is
-        // already gone. See the note in `abort`.
-        releaseOnce();
-      }
-
-      telemetry.requestFinished({
-        requestId: request.requestId,
-        exitCode: context.exitCode,
-        durationMs: Date.now() - startedAt,
-        error: failure,
-        cancelled,
-      });
-
-      return context.exitCode;
-    })();
+    const completed = this.run();
 
     // The promise the server awaits: whichever of "the command finished" or
     // "the client cancelled" happens first.
@@ -293,7 +221,7 @@ export function createCommandExecutor({
         clearTimeout(timeout);
         resolve(code);
       };
-      settle = finish;
+      this.settle = finish;
       completed.then(finish).catch((error: unknown) => {
         clearTimeout(timeout);
         // A rejection means the window couldn't be applied before any output was
@@ -305,7 +233,111 @@ export function createCommandExecutor({
 
     return {
       completed: raced,
-      cancel: (code: number) => abort({ code }),
+      cancel: (code: number) => this.abort({ code }),
     };
-  };
+  }
+
+  /**
+   * Hand the execution window back. Exactly once, and only ever from a point
+   * at which the command's own promise chain has actually settled.
+   */
+  private releaseOnce(): void {
+    if (this.abandonTimer) {
+      clearTimeout(this.abandonTimer);
+      this.abandonTimer = undefined;
+    }
+    const release = this.releaseWindow;
+    this.releaseWindow = undefined;
+    release?.();
+  }
+
+  /**
+   * The abandoned command still holds the window; this bounds how long. Nothing
+   * here waits on the CALLER — they already have their 124/130 — it only stops
+   * a command that never settles from keeping the daemon usable for nobody.
+   */
+  private armAbandonGrace(): void {
+    // Safe only because the post-acquire `cancelled` check re-reads before
+    // starting work, releasing any window taken in the gap between admission
+    // and cancellation; delete it and this early return becomes a permanent
+    // wedge (see runner.unit.test.ts).
+    if (this.releaseWindow === undefined || this.abandonTimer) return;
+    this.abandonTimer = setTimeout(() => {
+      this.abandonTimer = undefined;
+      this.onWedged({ requestId: this.request.requestId, graceMs: this.graceMs });
+    }, this.graceMs);
+    this.abandonTimer.unref();
+  }
+
+  private abort({ code, note }: { code: number; note?: string }): void {
+    if (this.context.isFinished) return;
+    this.cancelled = true;
+    if (note !== undefined) {
+      this.context.write("stderr", Buffer.from(note, "utf8"));
+    }
+    // Finalising first is what actually enforces the cancellation: every
+    // subsequent write from the abandoned command is dropped on the floor.
+    this.context.finalize(code);
+    // Wakes a request still QUEUED for its window; a no-op otherwise.
+    this.abortController.abort();
+    // The caller settles now, but the WINDOW stays held: node can't unwind the
+    // abandoned chain, which will still read `process.cwd()`/`process.env`.
+    // `run`'s `finally` releases it once work truly settles; `armAbandonGrace`
+    // bounds the rest.
+    this.settle?.(code);
+    this.armAbandonGrace();
+  }
+
+  private async run(): Promise<number> {
+    const { request, context, telemetry } = this;
+    const startedAt = Date.now();
+
+    // May reject when the caller's cwd no longer exists. The server turns
+    // that into a `fallback` frame — no output has been emitted yet, so the
+    // client can safely re-run the command itself.
+    let release: (() => void) | undefined;
+    try {
+      release = await this.window.acquire({
+        request: { cwd: request.cwd, env: request.env, colorLevel: request.colorLevel },
+        signal: this.abortController.signal,
+      });
+    } catch (error) {
+      // Aborted while queued: the cancel/timeout path already settled the
+      // caller; there is nothing left to report.
+      if (this.cancelled) return context.exitCode;
+      throw error;
+    }
+    this.releaseWindow = release;
+
+    // Admitted at the same moment the abort fired. Don't start the work.
+    if (this.cancelled) {
+      this.releaseOnce();
+      return context.exitCode;
+    }
+
+    telemetry.requestStarted({
+      requestId: request.requestId,
+      args: request.args,
+      cwd: request.cwd,
+    });
+
+    let failure: unknown;
+    try {
+      failure = await runProgram({ request, context });
+    } finally {
+      // The ONLY place a window taken by a running command is handed back —
+      // including for a command abandoned long ago. See the note in `abort`.
+      this.releaseOnce();
+    }
+
+    telemetry.requestFinished({
+      requestId: request.requestId,
+      exitCode: context.exitCode,
+      durationMs: Date.now() - startedAt,
+      error: failure,
+      cancelled: this.cancelled,
+    });
+
+    return context.exitCode;
+  }
 }
