@@ -94,6 +94,9 @@ in a server graph; no `process*` package in a web graph.
 
 A module is one folder owning up to four workspace packages.
 `modules/catalogue.json` maps every subject to exactly one owning module.
+The owning module's process serves the subject's endpoints and runs its collection; another module's
+share crosses only as its `*Api` ops. Where main hosted a subject elsewhere (`traces.logCollection`),
+the port moves it to its owner — main decides *what*, the record decides *where* (Alex, 2026-09-25).
 Enterprise modules mirror the shape exactly under `enterprise/modules/`.
 
 ```
