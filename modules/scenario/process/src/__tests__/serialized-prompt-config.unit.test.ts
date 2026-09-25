@@ -4,7 +4,7 @@
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import type { LiteLLMParams, PromptConfigData } from "@langwatch/scenario-contract";
-import { SerializedPromptConfigAdapter } from "@langwatch/scenario-process";
+import { HttpSerializedPromptConfigChannel } from "@langwatch/scenario-process";
 import { createTestLogger } from "@langwatch/test-harness";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -61,7 +61,7 @@ describe("SerializedPromptConfigAdapter", () => {
   });
 
   it("has AGENT role", () => {
-    const adapter = new SerializedPromptConfigAdapter({
+    const adapter = new HttpSerializedPromptConfigChannel({
       config: defaultConfig,
       litellmParams: defaultLitellmParams,
       nlpServiceUrl: "http://localhost:8080",
@@ -70,7 +70,7 @@ describe("SerializedPromptConfigAdapter", () => {
   });
 
   it("has correct name", () => {
-    const adapter = new SerializedPromptConfigAdapter({
+    const adapter = new HttpSerializedPromptConfigChannel({
       config: defaultConfig,
       litellmParams: defaultLitellmParams,
       nlpServiceUrl: "http://localhost:8080",
@@ -79,7 +79,7 @@ describe("SerializedPromptConfigAdapter", () => {
   });
 
   it("builds messages with system prompt first", async () => {
-    const adapter = new SerializedPromptConfigAdapter({
+    const adapter = new HttpSerializedPromptConfigChannel({
       config: defaultConfig,
       litellmParams: defaultLitellmParams,
       nlpServiceUrl: "http://localhost:8080",
@@ -97,7 +97,7 @@ describe("SerializedPromptConfigAdapter", () => {
   });
 
   it("includes prompt messages before conversation history", async () => {
-    const adapter = new SerializedPromptConfigAdapter({
+    const adapter = new HttpSerializedPromptConfigChannel({
       config: defaultConfig,
       litellmParams: defaultLitellmParams,
       nlpServiceUrl: "http://localhost:8080",
@@ -120,7 +120,7 @@ describe("SerializedPromptConfigAdapter", () => {
   });
 
   it("passes temperature to generateText", async () => {
-    const adapter = new SerializedPromptConfigAdapter({
+    const adapter = new HttpSerializedPromptConfigChannel({
       config: { ...defaultConfig, temperature: 0.5 },
       litellmParams: defaultLitellmParams,
       nlpServiceUrl: "http://localhost:8080",
@@ -136,7 +136,7 @@ describe("SerializedPromptConfigAdapter", () => {
   });
 
   it("passes maxTokens to generateText", async () => {
-    const adapter = new SerializedPromptConfigAdapter({
+    const adapter = new HttpSerializedPromptConfigChannel({
       config: { ...defaultConfig, maxTokens: 500 },
       litellmParams: defaultLitellmParams,
       nlpServiceUrl: "http://localhost:8080",
@@ -156,7 +156,7 @@ describe("SerializedPromptConfigAdapter", () => {
       text: "Generated response",
     } as Awaited<ReturnType<typeof generateText>>);
 
-    const adapter = new SerializedPromptConfigAdapter({
+    const adapter = new HttpSerializedPromptConfigChannel({
       config: defaultConfig,
       litellmParams: defaultLitellmParams,
       nlpServiceUrl: "http://localhost:8080",
@@ -174,7 +174,7 @@ describe("SerializedPromptConfigAdapter", () => {
         systemPrompt: "You are helping with: {{input}}",
         messages: [],
       };
-      const adapter = new SerializedPromptConfigAdapter({
+      const adapter = new HttpSerializedPromptConfigChannel({
         config: config,
         litellmParams: defaultLitellmParams,
         nlpServiceUrl: "http://localhost:8080",
@@ -202,7 +202,7 @@ describe("SerializedPromptConfigAdapter", () => {
         systemPrompt: "You are a helpful assistant.",
         messages: [{ role: "user", content: "User asked: {{input}}" }],
       };
-      const adapter = new SerializedPromptConfigAdapter({
+      const adapter = new HttpSerializedPromptConfigChannel({
         config: config,
         litellmParams: defaultLitellmParams,
         nlpServiceUrl: "http://localhost:8080",
@@ -230,7 +230,7 @@ describe("SerializedPromptConfigAdapter", () => {
           systemPrompt: "Summarise the customer's messages politely.",
           messages: [],
         };
-        const adapter = new SerializedPromptConfigAdapter({
+        const adapter = new HttpSerializedPromptConfigChannel({
           config: config,
           litellmParams: defaultLitellmParams,
           nlpServiceUrl: "http://localhost:8080",
@@ -267,7 +267,7 @@ describe("SerializedPromptConfigAdapter", () => {
             { identifier: "thread_id", type: "str" },
           ],
         };
-        const adapter = new SerializedPromptConfigAdapter({
+        const adapter = new HttpSerializedPromptConfigChannel({
           config: config,
           litellmParams: defaultLitellmParams,
           nlpServiceUrl: "http://localhost:8080",
@@ -299,7 +299,7 @@ describe("SerializedPromptConfigAdapter", () => {
           ],
         };
         const { logger } = createTestLogger();
-        const adapter = new SerializedPromptConfigAdapter({
+        const adapter = new HttpSerializedPromptConfigChannel({
           config: config,
           litellmParams: defaultLitellmParams,
           nlpServiceUrl: "http://localhost:8080",
@@ -324,7 +324,7 @@ describe("SerializedPromptConfigAdapter", () => {
         systemPrompt: "Conversation so far: {{messages}}",
         messages: [],
       };
-      const adapter = new SerializedPromptConfigAdapter({
+      const adapter = new HttpSerializedPromptConfigChannel({
         config: config,
         litellmParams: defaultLitellmParams,
         nlpServiceUrl: "http://localhost:8080",
@@ -350,7 +350,7 @@ describe("SerializedPromptConfigAdapter", () => {
         systemPrompt: "You are helpful.",
         messages: [{ role: "user", content: "History: {{messages}}" }],
       };
-      const adapter = new SerializedPromptConfigAdapter({
+      const adapter = new HttpSerializedPromptConfigChannel({
         config: config,
         litellmParams: defaultLitellmParams,
         nlpServiceUrl: "http://localhost:8080",
@@ -378,7 +378,7 @@ describe("SerializedPromptConfigAdapter", () => {
           systemPrompt: "Conversation so far: {{messagesJson}}",
           messages: [],
         };
-        const adapter = new SerializedPromptConfigAdapter({
+        const adapter = new HttpSerializedPromptConfigChannel({
           config: config,
           litellmParams: defaultLitellmParams,
           nlpServiceUrl: "http://localhost:8080",
@@ -402,7 +402,7 @@ describe("SerializedPromptConfigAdapter", () => {
     });
 
     it("appends input.messages when no {{messages}} in template", async () => {
-      const adapter = new SerializedPromptConfigAdapter({
+      const adapter = new HttpSerializedPromptConfigChannel({
         config: defaultConfig,
         litellmParams: defaultLitellmParams,
         nlpServiceUrl: "http://localhost:8080",
@@ -429,7 +429,7 @@ describe("SerializedPromptConfigAdapter", () => {
             "{% if input contains 'refund' %}You handle refunds.{% else %}You are a general assistant.{% endif %}",
           messages: [],
         };
-        const adapter = new SerializedPromptConfigAdapter({
+        const adapter = new HttpSerializedPromptConfigChannel({
           config: config,
           litellmParams: defaultLitellmParams,
           nlpServiceUrl: "http://localhost:8080",
@@ -472,7 +472,7 @@ describe("SerializedPromptConfigAdapter", () => {
             },
           ],
         };
-        const adapter = new SerializedPromptConfigAdapter({
+        const adapter = new HttpSerializedPromptConfigChannel({
           config: config,
           litellmParams: defaultLitellmParams,
           nlpServiceUrl: "http://localhost:8080",
@@ -499,7 +499,7 @@ describe("SerializedPromptConfigAdapter", () => {
   describe("given a run that resolved parameter values", () => {
     /** @scenario "A prompt target reads params in its prompt template" */
     it("sends the model a prompt that reads the resolved value", async () => {
-      const adapter = new SerializedPromptConfigAdapter({
+      const adapter = new HttpSerializedPromptConfigChannel({
         config: {
           ...defaultConfig,
           systemPrompt: "You serve a {{ params.account_tier }} customer in {{ params.region }}.",

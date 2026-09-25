@@ -11,7 +11,7 @@ import {
 import type { HttpAgentData } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { HttpAgentTransportError } from "../../services/serialized-http-agent.service.ts";
+import { HttpAgentTransportError } from "../../channels/http/http.serialized-http-agent.channel.ts";
 import {
   createMockHttpAgentAdapter,
   mockScenarioHttpFetch,

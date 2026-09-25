@@ -1,5 +1,5 @@
 /** @vitest-environment node
- * Structured logging in SerializedHttpAgentAdapter: every request logged
+ * Structured logging in HttpSerializedHttpAgentChannel: every request logged
  * at appropriate level with CloudWatch-friendly fields (lw#3593).
  */
 

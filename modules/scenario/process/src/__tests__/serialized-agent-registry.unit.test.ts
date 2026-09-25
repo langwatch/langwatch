@@ -6,10 +6,10 @@ import type { LiteLLMParams, TargetAdapterData } from "@langwatch/scenario-contr
 import { describe, expect, it } from "vitest";
 
 import {
-  SerializedAgentRegistryAdapter,
-  SerializedCodeAgentAdapter,
-  SerializedHttpAgentAdapter,
-  SerializedPromptConfigAdapter,
+  SerializedAgentChannelRegistry,
+  HttpSerializedCodeAgentChannel,
+  HttpSerializedHttpAgentChannel,
+  HttpSerializedPromptConfigChannel,
 } from "../index.ts";
 
 describe("SerializedAgentRegistryAdapter", () => {
@@ -20,7 +20,7 @@ describe("SerializedAgentRegistryAdapter", () => {
   const nlpServiceUrl = "http://localhost:8080";
 
   describe("given a prompt-type adapter", () => {
-    it("creates SerializedPromptConfigAdapter for prompt type", () => {
+    it("creates HttpSerializedPromptConfigChannel for prompt type", () => {
       const adapterData: TargetAdapterData = {
         type: "prompt",
         promptId: "prompt_123",
@@ -29,19 +29,19 @@ describe("SerializedAgentRegistryAdapter", () => {
         inputs: [],
       };
 
-      const adapter = SerializedAgentRegistryAdapter.create().build({
+      const adapter = SerializedAgentChannelRegistry.create().build({
         adapterData,
         modelParams: defaultModelParams,
         projectApiKey: "lw-project-key",
         nlpServiceUrl,
       });
 
-      expect(adapter).toBeInstanceOf(SerializedPromptConfigAdapter);
+      expect(adapter).toBeInstanceOf(HttpSerializedPromptConfigChannel);
     });
   });
 
   describe("given an http-type adapter", () => {
-    it("creates SerializedHttpAgentAdapter for http type", () => {
+    it("creates HttpSerializedHttpAgentChannel for http type", () => {
       const adapterData: TargetAdapterData = {
         type: "http",
         agentId: "agent_123",
@@ -51,19 +51,19 @@ describe("SerializedAgentRegistryAdapter", () => {
         secrets: {},
       };
 
-      const adapter = SerializedAgentRegistryAdapter.create().build({
+      const adapter = SerializedAgentChannelRegistry.create().build({
         adapterData,
         modelParams: defaultModelParams,
         projectApiKey: "lw-project-key",
         nlpServiceUrl,
       });
 
-      expect(adapter).toBeInstanceOf(SerializedHttpAgentAdapter);
+      expect(adapter).toBeInstanceOf(HttpSerializedHttpAgentChannel);
     });
   });
 
   describe("given a code-type adapter", () => {
-    it("creates SerializedCodeAgentAdapter for code type", () => {
+    it("creates HttpSerializedCodeAgentChannel for code type", () => {
       const adapterData: TargetAdapterData = {
         type: "code",
         agentId: "agent_456",
@@ -73,14 +73,14 @@ describe("SerializedAgentRegistryAdapter", () => {
         secrets: {},
       };
 
-      const adapter = SerializedAgentRegistryAdapter.create().build({
+      const adapter = SerializedAgentChannelRegistry.create().build({
         adapterData,
         modelParams: defaultModelParams,
         projectApiKey: "lw-project-key",
         nlpServiceUrl,
       });
 
-      expect(adapter).toBeInstanceOf(SerializedCodeAgentAdapter);
+      expect(adapter).toBeInstanceOf(HttpSerializedCodeAgentChannel);
     });
   });
 });

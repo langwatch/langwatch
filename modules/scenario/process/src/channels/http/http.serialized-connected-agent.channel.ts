@@ -12,8 +12,8 @@ import { AgentRole } from "@langwatch/scenario";
 import type { ConnectedAgentData, RunParameterValues } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 
-import { createChildProcessLogger } from "./child-logger.service.ts";
-import { SerializedAgent } from "./serialized-agent.service.ts";
+import { createChildProcessLogger } from "../../services/child-logger.service.ts";
+import { SerializedAgentChannel } from "../serialized-agent.channel.ts";
 
 /** How long the adapter keeps retrying a busy agent before it gives up. */
 export const BUSY_RETRY_BUDGET_MS = 60_000;
@@ -72,7 +72,7 @@ export interface ServedInstance {
   label: string | null;
 }
 
-export class SerializedConnectedAgentAdapter extends SerializedAgent {
+export class HttpSerializedConnectedAgentChannel extends SerializedAgentChannel {
   role = AgentRole.AGENT;
 
   private readonly config: ConnectedAgentData;
@@ -91,8 +91,8 @@ export class SerializedConnectedAgentAdapter extends SerializedAgent {
     logEnvironment?: NodeJS.ProcessEnv;
     fetchImpl?: FetchLike;
     sleep?: (ms: number) => Promise<void>;
-  }): SerializedConnectedAgentAdapter {
-    return new SerializedConnectedAgentAdapter(options);
+  }): HttpSerializedConnectedAgentChannel {
+    return new HttpSerializedConnectedAgentChannel(options);
   }
 
   constructor({

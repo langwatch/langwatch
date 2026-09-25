@@ -25,6 +25,9 @@ vi.mock("../../../../behavior/navigation-api.ts", () => ({
     governance: {
       resolveHome: { useQuery: () => mockResolveHome },
     },
+    identity: {
+      myTestArrival: { useQuery: () => ({ data: { testing: false }, isLoading: false }) },
+    },
   },
 }));
 

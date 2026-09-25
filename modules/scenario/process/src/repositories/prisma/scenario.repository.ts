@@ -260,14 +260,10 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     });
   }
 
-  async archive(input: {
-    id: string;
-    projectId: string;
-    archivedAt: Instant;
-  }): Promise<Scenario | null> {
+  async archive(input: { id: string; projectId: string; archivedAt: Instant }): Promise<Scenario> {
     return this.database.$transaction(async (transaction) => {
       const found = await this.lockScenario(transaction, input.projectId, input.id);
-      if (!found) return null;
+      if (!found) throw new ScenarioNotFoundError(input.id);
       if (found.archivedAt) return scenarioSchema.parse(found);
 
       const testSuites = await this.lockTestSuites(transaction, input.projectId, [

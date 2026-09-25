@@ -2,12 +2,12 @@ import { vi } from "vitest";
 
 import {
   type ScenarioHttpResponse,
-  SerializedHttpAgentAdapter,
+  HttpSerializedHttpAgentChannel,
   type ScenarioHttp,
 } from "../../index.ts";
 
 type ScenarioHttpRequest = Parameters<ScenarioHttp["fetch"]>[0];
-type ScenarioHttpAdapterOptions = ConstructorParameters<typeof SerializedHttpAgentAdapter>[0];
+type ScenarioHttpAdapterOptions = ConstructorParameters<typeof HttpSerializedHttpAgentChannel>[0];
 
 export const mockScenarioHttpFetch = vi.fn(
   async (_url: string, _init: ScenarioHttpRequest["init"]): Promise<ScenarioHttpResponse> => {
@@ -29,8 +29,8 @@ class NativeScenarioHttp implements ScenarioHttp {
 
 export function createMockHttpAgentAdapter(
   options: Omit<ScenarioHttpAdapterOptions, "httpPort">,
-): SerializedHttpAgentAdapter {
-  return new SerializedHttpAgentAdapter({
+): HttpSerializedHttpAgentChannel {
+  return new HttpSerializedHttpAgentChannel({
     ...options,
     httpPort: new TestScenarioHttp(),
   });
@@ -38,8 +38,8 @@ export function createMockHttpAgentAdapter(
 
 export function createNativeHttpAgentAdapter(
   options: Omit<ScenarioHttpAdapterOptions, "httpPort">,
-): SerializedHttpAgentAdapter {
-  return new SerializedHttpAgentAdapter({
+): HttpSerializedHttpAgentChannel {
+  return new HttpSerializedHttpAgentChannel({
     ...options,
     httpPort: new NativeScenarioHttp(),
   });

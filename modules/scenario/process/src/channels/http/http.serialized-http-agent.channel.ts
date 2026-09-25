@@ -19,10 +19,10 @@ import type { HttpAgentData, RunParameterValues } from "@langwatch/scenario-cont
 import { nowInstant } from "@langwatch/time";
 import { JSONPath } from "jsonpath-plus";
 
-import type { ScenarioHttp } from "../app/scenario.app.ts";
-import { applyAuthentication } from "../rules/http-auth.rules.ts";
-import * as ScenarioSecretReferenceAdapter from "../rules/scenario-secret-reference.rules.ts";
-import { SerializedAgent } from "./serialized-agent.service.ts";
+import type { ScenarioHttp } from "../../app/scenario.app.ts";
+import { applyAuthentication } from "../../rules/http-auth.rules.ts";
+import * as ScenarioSecretReferenceAdapter from "../../rules/scenario-secret-reference.rules.ts";
+import { SerializedAgentChannel } from "../serialized-agent.channel.ts";
 
 /**
  * Truncate a response body for log inclusion. Long bodies are useless in
@@ -133,14 +133,14 @@ function pickUpstreamRequestId(headers: Pick<Headers, "get">): string | undefine
  * Serialized HTTP agent adapter that uses pre-fetched configuration.
  * No database access required.
  */
-export class SerializedHttpAgentAdapter extends SerializedAgent {
+export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
   static create(options: {
     config: HttpAgentData;
     logger?: Logger;
     parameters?: RunParameterValues;
     httpPort?: ScenarioHttp;
-  }): SerializedHttpAgentAdapter {
-    return new SerializedHttpAgentAdapter(options);
+  }): HttpSerializedHttpAgentChannel {
+    return new HttpSerializedHttpAgentChannel(options);
   }
 
   role = AgentRole.AGENT;

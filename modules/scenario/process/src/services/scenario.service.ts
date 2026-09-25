@@ -292,17 +292,9 @@ export class ScenarioService {
     return this.options.repository.restoreVersion(scenarioVersionRestoreInputSchema.parse(input));
   }
 
-  async archive(input: ScenarioIdInput): Promise<Scenario> {
+  archive(input: ScenarioIdInput): Promise<Scenario> {
     const parsed = scenarioIdInputSchema.parse(input);
-    const scenario = await this.options.repository.archive({
-      ...parsed,
-      archivedAt: this.options.clock.now(),
-    });
-    if (!scenario) {
-      throw new ScenarioNotFoundError(parsed.id);
-    }
-
-    return scenario;
+    return this.options.repository.archive({ ...parsed, archivedAt: this.options.clock.now() });
   }
 
   async batchArchive(input: {

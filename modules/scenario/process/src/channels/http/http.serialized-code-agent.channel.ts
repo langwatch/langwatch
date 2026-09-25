@@ -15,21 +15,21 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { type Response as UndiciResponse, fetch as undiciFetch } from "undici";
 
-import type { NlpEngineResult } from "../rules/execution-error.rules.ts";
+import type { NlpEngineResult } from "../../rules/execution-error.rules.ts";
 import {
   formatEngineError,
   formatFetchError,
   formatHttpError,
   formatMalformedBodyError,
   scrubKnownSecrets,
-} from "../rules/execution-error.rules.ts";
+} from "../../rules/execution-error.rules.ts";
 import {
   type FetchInitWithDispatcher,
   NLP_FETCH_HEADROOM_MS,
   NlpFetchAdapter,
   type NlpFetchTimeouts,
-} from "./nlp-fetch.service.ts";
-import { SerializedAgent } from "./serialized-agent.service.ts";
+} from "../../services/nlp-fetch.service.ts";
+import { SerializedAgentChannel } from "../serialized-agent.channel.ts";
 
 /**
  * Adapter failure categories for `error.kind` span attribute: `execution` (200 with failure),
@@ -84,15 +84,15 @@ const tracer = getLangWatchTracer("langwatch.scenarios.code-agent-adapter");
  * Serialized code agent adapter that uses pre-fetched configuration.
  * Sends code execution requests to the NLP service. No database access required.
  */
-export class SerializedCodeAgentAdapter extends SerializedAgent {
+export class HttpSerializedCodeAgentChannel extends SerializedAgentChannel {
   static create(options: {
     config: CodeAgentData;
     nlpServiceUrl: string;
     projectApiKey: string;
     parameters?: RunParameterValues;
     timeouts?: NlpFetchTimeouts;
-  }): SerializedCodeAgentAdapter {
-    return new SerializedCodeAgentAdapter(options);
+  }): HttpSerializedCodeAgentChannel {
+    return new HttpSerializedCodeAgentChannel(options);
   }
 
   role = AgentRole.AGENT;
@@ -199,7 +199,7 @@ export class SerializedCodeAgentAdapter extends SerializedAgent {
    * node's outputs.
    */
   private buildWorkflow(resolvedValues: Record<string, unknown>, params: RunParameterValues) {
-    const { ENTRY_NODE_ID, CODE_NODE_ID, END_NODE_ID } = SerializedCodeAgentAdapter;
+    const { ENTRY_NODE_ID, CODE_NODE_ID, END_NODE_ID } = HttpSerializedCodeAgentChannel;
 
     const inputs =
       this.config.inputs.length > 0
@@ -270,7 +270,7 @@ export class SerializedCodeAgentAdapter extends SerializedAgent {
   /** Build the entry node that provides input fields to the workflow. */
   private buildEntryNode(inputs: { identifier: string; type: string; value: unknown }[]) {
     return {
-      id: SerializedCodeAgentAdapter.ENTRY_NODE_ID,
+      id: HttpSerializedCodeAgentChannel.ENTRY_NODE_ID,
       type: "entry",
       position: { x: 0, y: 0 },
       data: {
@@ -302,7 +302,7 @@ export class SerializedCodeAgentAdapter extends SerializedAgent {
   ) {
     const { timeoutMs } = this.config;
     return {
-      id: SerializedCodeAgentAdapter.CODE_NODE_ID,
+      id: HttpSerializedCodeAgentChannel.CODE_NODE_ID,
       type: "code",
       position: { x: 200, y: 0 },
       data: {
@@ -348,7 +348,7 @@ export class SerializedCodeAgentAdapter extends SerializedAgent {
   /** Build the end node that captures code node outputs for the response. */
   private buildEndNode(outputs: { identifier: string; type: string }[]) {
     return {
-      id: SerializedCodeAgentAdapter.END_NODE_ID,
+      id: HttpSerializedCodeAgentChannel.END_NODE_ID,
       type: "end",
       position: { x: 400, y: 0 },
       data: {
@@ -742,7 +742,7 @@ export class SerializedCodeAgentAdapter extends SerializedAgent {
   private extractSession(
     nodes: Record<string, { outputs?: Record<string, unknown> | null } | null> | undefined,
   ): unknown {
-    const outputs = nodes?.[SerializedCodeAgentAdapter.CODE_NODE_ID]?.outputs;
+    const outputs = nodes?.[HttpSerializedCodeAgentChannel.CODE_NODE_ID]?.outputs;
     if (!outputs || typeof outputs !== "object") return undefined;
     return "session" in outputs ? outputs.session : undefined;
   }

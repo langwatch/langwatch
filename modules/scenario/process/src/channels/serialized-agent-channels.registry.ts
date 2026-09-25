@@ -7,19 +7,19 @@
 import type { AgentAdapter } from "@langwatch/scenario";
 
 import { type AgentAdapterFactory, type AgentAdapterBuildInput } from "../app/scenario.app.ts";
-import type { NlpFetchTimeouts } from "./nlp-fetch.service.ts";
-import { SerializedCodeAgentAdapter } from "./serialized-code-agent.service.ts";
-import { SerializedConnectedAgentAdapter } from "./serialized-connected-agent.service.ts";
-import { SerializedHttpAgentAdapter } from "./serialized-http-agent.service.ts";
-import { SerializedPromptConfigAdapter } from "./serialized-prompt-config.service.ts";
-import { SerializedWorkflowAgentAdapter } from "./serialized-workflow-agent.service.ts";
+import type { NlpFetchTimeouts } from "../services/nlp-fetch.service.ts";
+import { HttpSerializedCodeAgentChannel } from "./http/http.serialized-code-agent.channel.ts";
+import { HttpSerializedConnectedAgentChannel } from "./http/http.serialized-connected-agent.channel.ts";
+import { HttpSerializedHttpAgentChannel } from "./http/http.serialized-http-agent.channel.ts";
+import { HttpSerializedPromptConfigChannel } from "./http/http.serialized-prompt-config.channel.ts";
+import { HttpSerializedWorkflowAgentChannel } from "./http/http.serialized-workflow-agent.channel.ts";
 
 /**
  * Creates an adapter from serialized data using the registry. @throws Error if adapter type is not
  * registered, or if the resolved factory is missing the credential it needs (modelParams for
  * prompt, projectApiKey for workflow/code).
  */
-export class SerializedAgentRegistryAdapter implements AgentAdapterFactory {
+export class SerializedAgentChannelRegistry implements AgentAdapterFactory {
   /**
    * `nlpTimeouts` are the operator's nlpgo deadlines, read by the process that
    * composed this registry — an unset one falls back to the same default the
@@ -27,8 +27,8 @@ export class SerializedAgentRegistryAdapter implements AgentAdapterFactory {
    */
   static create({
     nlpTimeouts,
-  }: { nlpTimeouts?: NlpFetchTimeouts } = {}): SerializedAgentRegistryAdapter {
-    return new SerializedAgentRegistryAdapter(nlpTimeouts ?? {});
+  }: { nlpTimeouts?: NlpFetchTimeouts } = {}): SerializedAgentChannelRegistry {
+    return new SerializedAgentChannelRegistry(nlpTimeouts ?? {});
   }
 
   private constructor(private readonly nlpTimeouts: NlpFetchTimeouts) {}
@@ -40,7 +40,7 @@ export class SerializedAgentRegistryAdapter implements AgentAdapterFactory {
         if (!input.modelParams) {
           throw new Error("Prompt adapter requires modelParams");
         }
-        return SerializedPromptConfigAdapter.create({
+        return HttpSerializedPromptConfigChannel.create({
           config: adapterData,
           litellmParams: input.modelParams,
           nlpServiceUrl: input.nlpServiceUrl,
@@ -49,7 +49,7 @@ export class SerializedAgentRegistryAdapter implements AgentAdapterFactory {
         });
       }
       case "http":
-        return SerializedHttpAgentAdapter.create({
+        return HttpSerializedHttpAgentChannel.create({
           config: adapterData,
           parameters: input.parameters,
           httpPort: input.httpPort,
@@ -59,7 +59,7 @@ export class SerializedAgentRegistryAdapter implements AgentAdapterFactory {
         if (!input.projectApiKey) {
           throw new Error("Code adapter requires projectApiKey");
         }
-        return SerializedCodeAgentAdapter.create({
+        return HttpSerializedCodeAgentChannel.create({
           config: adapterData,
           nlpServiceUrl: input.nlpServiceUrl,
           projectApiKey: input.projectApiKey,
@@ -71,7 +71,7 @@ export class SerializedAgentRegistryAdapter implements AgentAdapterFactory {
         if (!input.projectApiKey) {
           throw new Error("Workflow adapter requires projectApiKey");
         }
-        return SerializedWorkflowAgentAdapter.create({
+        return HttpSerializedWorkflowAgentChannel.create({
           config: adapterData,
           nlpServiceUrl: input.nlpServiceUrl,
           projectApiKey: input.projectApiKey,
@@ -83,7 +83,7 @@ export class SerializedAgentRegistryAdapter implements AgentAdapterFactory {
         if (!input.projectApiKey) {
           throw new Error("Connected adapter requires projectApiKey");
         }
-        return SerializedConnectedAgentAdapter.create({
+        return HttpSerializedConnectedAgentChannel.create({
           config: adapterData,
           projectApiKey: input.projectApiKey,
           parameters: input.parameters,

@@ -16,9 +16,9 @@ import type {
 import { trace } from "@opentelemetry/api";
 import { generateText } from "ai";
 
-import * as PromptTemplateAdapter from "../rules/prompt-template.rules.ts";
-import { createModelFromParams } from "./litellm-model.service.ts";
-import { SerializedAgent } from "./serialized-agent.service.ts";
+import * as PromptTemplateAdapter from "../../rules/prompt-template.rules.ts";
+import { createModelFromParams } from "../../services/litellm-model.service.ts";
+import { SerializedAgentChannel } from "../serialized-agent.channel.ts";
 
 // Shared Liquid engine for template interpolation. Sandboxed: a customer
 // prompt template must not be able to inline a file from the worker's working
@@ -29,15 +29,15 @@ const liquid = createSandboxedLiquid();
  * Serialized prompt config adapter that uses pre-fetched configuration.
  * No database access required.
  */
-export class SerializedPromptConfigAdapter extends SerializedAgent {
+export class HttpSerializedPromptConfigChannel extends SerializedAgentChannel {
   static create(options: {
     config: PromptConfigData;
     litellmParams: LiteLLMParams;
     nlpServiceUrl: string;
     logger?: Logger;
     parameters?: RunParameterValues;
-  }): SerializedPromptConfigAdapter {
-    return new SerializedPromptConfigAdapter(options);
+  }): HttpSerializedPromptConfigChannel {
+    return new HttpSerializedPromptConfigChannel(options);
   }
 
   role = AgentRole.AGENT;

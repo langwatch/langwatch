@@ -9,9 +9,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   ConnectedAgentCallError,
-  SerializedConnectedAgentAdapter,
+  HttpSerializedConnectedAgentChannel,
   type ServedInstance,
-} from "../services/serialized-connected-agent.service.ts";
+} from "../channels/http/http.serialized-connected-agent.channel.ts";
 
 const config: ConnectedAgentData = {
   type: "connected",
@@ -47,7 +47,7 @@ function fakeRelay(replies: ReturnType<typeof relayReply>[]) {
 }
 
 function adapterWith(relay: ReturnType<typeof fakeRelay>) {
-  return new SerializedConnectedAgentAdapter({
+  return new HttpSerializedConnectedAgentChannel({
     config,
     projectApiKey: "sk-lw-project",
     fetchImpl: relay.fetchImpl,

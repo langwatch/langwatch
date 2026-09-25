@@ -44,8 +44,8 @@ vi.mock("@langwatch/observability/tracing", () => ({
   }),
 }));
 
-import { SerializedCodeAgentAdapter } from "../services/serialized-code-agent.service.ts";
-import { SerializedWorkflowAgentAdapter } from "../services/serialized-workflow-agent.service.ts";
+import { HttpSerializedCodeAgentChannel } from "../channels/http/http.serialized-code-agent.channel.ts";
+import { HttpSerializedWorkflowAgentChannel } from "../channels/http/http.serialized-workflow-agent.channel.ts";
 
 /** Bodies the fake nlpgo received, so the request itself can be asserted on. */
 const receivedBodies: string[] = [];
@@ -108,7 +108,7 @@ describe("given a dispatcher built by the undici package", () => {
 
     /** @scenario "A code agent turn reaches the NLP service" */
     it("reaches the service and returns its output", async () => {
-      const adapter = new SerializedCodeAgentAdapter({
+      const adapter = new HttpSerializedCodeAgentChannel({
         config,
         nlpServiceUrl,
         projectApiKey: "test-api-key",
@@ -119,7 +119,7 @@ describe("given a dispatcher built by the undici package", () => {
 
     /** @scenario "A code agent turn reaches the NLP service" */
     it("sends the execute_flow event the service expects", async () => {
-      const adapter = new SerializedCodeAgentAdapter({
+      const adapter = new HttpSerializedCodeAgentChannel({
         config,
         nlpServiceUrl,
         projectApiKey: "test-api-key",
@@ -137,7 +137,7 @@ describe("given a dispatcher built by the undici package", () => {
      * @scenario "A code agent with a deadline past undici's own default still reaches the service"
      */
     it("still reaches the service with a deadline past undici's 300s default", async () => {
-      const adapter = new SerializedCodeAgentAdapter({
+      const adapter = new HttpSerializedCodeAgentChannel({
         config: { ...config, timeoutMs: 615_000 },
         nlpServiceUrl,
         projectApiKey: "test-api-key",
@@ -165,7 +165,7 @@ describe("given a dispatcher built by the undici package", () => {
 
     /** @scenario "A workflow agent turn reaches the NLP service" */
     it("reaches the service and returns its output", async () => {
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config,
         nlpServiceUrl,
         projectApiKey: "test-api-key",

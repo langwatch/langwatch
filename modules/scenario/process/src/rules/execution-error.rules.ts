@@ -1,5 +1,5 @@
 /**
- * Formats NLP engine failures from SerializedCodeAgentAdapter: distinguishes user-code from infra,
+ * Formats NLP engine failures from HttpSerializedCodeAgentChannel: distinguishes user-code from infra,
  * omits endpoints, strips noise, caps length.
  */
 

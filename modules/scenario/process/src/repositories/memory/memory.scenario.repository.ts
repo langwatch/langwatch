@@ -130,13 +130,9 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     throw new Error("Version history is not exercised by this repository double");
   }
 
-  async archive(input: {
-    id: string;
-    projectId: string;
-    archivedAt: Instant;
-  }): Promise<Scenario | null> {
+  async archive(input: { id: string; projectId: string; archivedAt: Instant }): Promise<Scenario> {
     const existing = await this.tryFindByIdIncludingArchived(input);
-    if (!existing) return null;
+    if (!existing) throw new ScenarioNotFoundError(input.id);
     const row = { ...existing, archivedAt: existing.archivedAt ?? toDate(input.archivedAt) };
     this.rows.set(row.id, row);
     return row;
@@ -150,13 +146,13 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     const archived: string[] = [];
     const missing: string[] = [];
     for (const id of input.ids) {
-      const row = await this.archive({
-        id,
-        projectId: input.projectId,
-        archivedAt: input.archivedAt,
-      });
-      if (row) archived.push(id);
-      else missing.push(id);
+      try {
+        await this.archive({ id, projectId: input.projectId, archivedAt: input.archivedAt });
+        archived.push(id);
+      } catch (error) {
+        if (!(error instanceof ScenarioNotFoundError)) throw error;
+        missing.push(id);
+      }
     }
     return { archived, missing };
   }

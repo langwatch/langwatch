@@ -10,11 +10,11 @@ import type {
 } from "@langwatch/scenario-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import type { ScenarioExecutionPrefetchConfig } from "../services/scenario-execution-prefetcher.service.ts";
 import type {
   RunSuite,
   ScenarioExecutionLookupService,
 } from "./scenario-execution-lookup.service.ts";
+import type { ScenarioExecutionPrefetchConfig } from "./scenario-execution-prefetcher.service.ts";
 import {
   type ScenarioModelParametersService,
   type ModelParamsResult,

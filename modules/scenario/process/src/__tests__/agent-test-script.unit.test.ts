@@ -9,13 +9,13 @@ import type { ConnectedAgentData } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  ConnectedAgentCallError,
+  HttpSerializedConnectedAgentChannel,
+} from "../channels/http/http.serialized-connected-agent.channel.ts";
+import {
   AgentTestScriptAdapter,
   ScriptedUserAgent,
 } from "../services/agent-test-script.service.ts";
-import {
-  ConnectedAgentCallError,
-  SerializedConnectedAgentAdapter,
-} from "../services/serialized-connected-agent.service.ts";
 
 class AnsweringAgent extends ScenarioRunner.AgentAdapter {
   role = ScenarioRunner.AgentRole.AGENT;
@@ -85,7 +85,7 @@ describe("AgentTestScriptAdapter", () => {
 
     /** @scenario "An offline connected agent fails the run" */
     it("fails the agent's turn and names it offline", async () => {
-      const adapter = new SerializedConnectedAgentAdapter({
+      const adapter = new HttpSerializedConnectedAgentChannel({
         config,
         projectApiKey: "sk-lw-project",
         fetchImpl: async () => {

@@ -12,7 +12,7 @@ import {
   ScenarioExecutionState,
 } from "@langwatch/scenario";
 import type { LiteLLMParams, PromptConfigData } from "@langwatch/scenario-contract";
-import { SerializedPromptConfigAdapter } from "@langwatch/scenario-process";
+import { HttpSerializedPromptConfigChannel } from "@langwatch/scenario-process";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const LITELLM_PARAMS: LiteLLMParams = {
@@ -86,7 +86,7 @@ async function startEchoingModel(): Promise<StubModel> {
 }
 
 /** Runs `turns` turns the way the scenario executor does. */
-async function runTurns(adapter: SerializedPromptConfigAdapter, turns: number): Promise<void> {
+async function runTurns(adapter: HttpSerializedPromptConfigChannel, turns: number): Promise<void> {
   let sequence = 0;
   const stamp = (message: AgentInput["messages"][number]): StampedMessage => ({
     ...message,
@@ -160,7 +160,7 @@ describe("prompt agent over four turns", () => {
         };
 
         await runTurns(
-          new SerializedPromptConfigAdapter({
+          new HttpSerializedPromptConfigChannel({
             config: config,
             litellmParams: LITELLM_PARAMS,
             nlpServiceUrl: model.url,
@@ -199,7 +199,7 @@ describe("prompt agent over four turns", () => {
         };
 
         await runTurns(
-          new SerializedPromptConfigAdapter({
+          new HttpSerializedPromptConfigChannel({
             config: config,
             litellmParams: LITELLM_PARAMS,
             nlpServiceUrl: model.url,
@@ -225,7 +225,7 @@ describe("prompt agent over four turns", () => {
         };
 
         await runTurns(
-          new SerializedPromptConfigAdapter({
+          new HttpSerializedPromptConfigChannel({
             config: config,
             litellmParams: LITELLM_PARAMS,
             nlpServiceUrl: model.url,
@@ -254,7 +254,7 @@ describe("prompt agent over four turns", () => {
         };
 
         await runTurns(
-          new SerializedPromptConfigAdapter({
+          new HttpSerializedPromptConfigChannel({
             config: config,
             litellmParams: LITELLM_PARAMS,
             nlpServiceUrl: model.url,
@@ -291,7 +291,7 @@ describe("prompt agent over four turns", () => {
         };
 
         await runTurns(
-          new SerializedPromptConfigAdapter({
+          new HttpSerializedPromptConfigChannel({
             config: config,
             litellmParams: LITELLM_PARAMS,
             nlpServiceUrl: model.url,

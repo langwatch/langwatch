@@ -22,7 +22,7 @@ import {
   ScenarioSecretParameterMissingError,
   type ScenarioApi,
   type ScenarioRunConfig,
-  type ScenarioTestSuite,
+  scenarioTestSuiteSchema,
 } from "@langwatch/scenario-contract";
 import {
   CLI_EPHEMERAL_LABEL,
@@ -92,10 +92,31 @@ function fakePromptService(): PromptApi {
   });
 }
 
+const TEST_SUITE_COLUMNS = {
+  id: true,
+  projectId: true,
+  name: true,
+  slug: true,
+  description: true,
+  scenarioIds: true,
+  targets: true,
+  repeatCount: true,
+  labels: true,
+  simulatorModel: true,
+  judgeModel: true,
+  kind: true,
+  scope: true,
+  fields: true,
+  evaluators: true,
+  archivedAt: true,
+  createdAt: true,
+  updatedAt: true,
+};
+
 /** Backed by the same database the repository reads: scope resolution and
  * test-suite/scenario references are real, not re-implemented. */
 function fakeScenarioService(): ScenarioApi {
-  return {
+  return createApiFixture<ScenarioApi>({
     findTestSuite: async ({
       testSuiteId,
       projectId: pid,
@@ -105,14 +126,16 @@ function fakeScenarioService(): ScenarioApi {
     }) => {
       const row = await database().simulationSuite.findFirst({
         where: { id: testSuiteId, projectId: pid, kind: "test_suite" },
+        select: TEST_SUITE_COLUMNS,
       });
-      return row ? (row as unknown as ScenarioTestSuite) : null;
+      return row ? scenarioTestSuiteSchema.parse(row) : null;
     },
     listTestSuites: async ({ projectId: pid }: { projectId: string }) => {
       const rows = await database().simulationSuite.findMany({
         where: { projectId: pid, kind: "test_suite", archivedAt: null },
+        select: TEST_SUITE_COLUMNS,
       });
-      return rows as unknown as ScenarioTestSuite[];
+      return rows.map((row) => scenarioTestSuiteSchema.parse(row));
     },
     getReferenceStates: async ({ ids, projectId: pid }: { ids: string[]; projectId: string }) => {
       if (ids.length === 0) return [];
@@ -168,7 +191,7 @@ function fakeScenarioService(): ScenarioApi {
         scenarioVersion: scenarios.find((s) => s.id === scenarioId)?.version ?? 1,
       }));
     },
-  } as unknown as ScenarioApi;
+  });
 }
 
 function capturingExecution(started: Record<string, unknown>[]): SuiteExecution {

@@ -17,7 +17,7 @@ vi.mock("@langwatch/observability/tracing", () => ({
 }));
 
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
-import { SerializedWorkflowAgentAdapter } from "@langwatch/scenario-process";
+import { HttpSerializedWorkflowAgentChannel } from "@langwatch/scenario-process";
 import type * as undiciModule from "undici";
 
 const mockInjectTraceContextHeaders = vi.mocked(injectTraceContextHeaders);
@@ -153,7 +153,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
   describe("given its basic contract", () => {
     it("has AGENT role", () => {
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config: defaultConfig,
         nlpServiceUrl,
         projectApiKey: apiKey,
@@ -162,7 +162,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     });
 
     it("has correct name", () => {
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config: defaultConfig,
         nlpServiceUrl,
         projectApiKey: apiKey,
@@ -173,7 +173,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
   describe("when the adapter receives a message from the simulator", () => {
     it("sends an execute_flow event to /go/studio/execute_sync", async () => {
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config: defaultConfig,
         nlpServiceUrl,
         projectApiKey: apiKey,
@@ -196,7 +196,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
     describe("when the config has project secrets", () => {
       it("merges them into workflow.secrets so `secrets.NAME` resolves in code nodes", async () => {
-        const adapter = new SerializedWorkflowAgentAdapter({
+        const adapter = new HttpSerializedWorkflowAgentChannel({
           config: {
             ...defaultConfig,
             secrets: {
@@ -218,7 +218,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
       });
 
       it("overrides pre-existing workflow.secrets values with the fresh prefetched ones", async () => {
-        const adapter = new SerializedWorkflowAgentAdapter({
+        const adapter = new HttpSerializedWorkflowAgentChannel({
           config: {
             ...defaultConfig,
             workflow: {
@@ -248,7 +248,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     });
 
     it("passes the pre-fetched workflow DSL through unchanged", async () => {
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config: defaultConfig,
         nlpServiceUrl,
         projectApiKey: apiKey,
@@ -265,7 +265,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     });
 
     it("returns the end node output as a response string", async () => {
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config: defaultConfig,
         nlpServiceUrl,
         projectApiKey: apiKey,
@@ -277,7 +277,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     });
 
     it("sets run_evaluations to false and do_not_trace to true", async () => {
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config: defaultConfig,
         nlpServiceUrl,
         projectApiKey: apiKey,
@@ -290,7 +290,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     });
 
     it("generates a valid 32-char hex trace_id", async () => {
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config: defaultConfig,
         nlpServiceUrl,
         projectApiKey: apiKey,
@@ -311,7 +311,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
           { identifier: "context", type: "str" },
         ],
       };
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config: multiInputConfig,
         nlpServiceUrl,
         projectApiKey: apiKey,
@@ -335,7 +335,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
         ],
       };
 
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config: defaultConfig,
         nlpServiceUrl,
         projectApiKey: apiKey,
@@ -361,7 +361,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     };
 
     it("uses resolved mappings for input record values", async () => {
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config: multiInputConfig,
         nlpServiceUrl,
         projectApiKey: apiKey,
@@ -387,7 +387,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
           },
         },
       };
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config,
         nlpServiceUrl,
         projectApiKey: apiKey,
@@ -409,7 +409,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
           deleted_field: { type: "value", value: "stale mapping" },
         },
       };
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config: singleInputConfig,
         nlpServiceUrl,
         projectApiKey: apiKey,
@@ -436,7 +436,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
         scenarioOutputField: "answer",
       };
 
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config,
         nlpServiceUrl,
         projectApiKey: apiKey,
@@ -454,7 +454,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
         scenarioOutputField: "structured",
       };
 
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config,
         nlpServiceUrl,
         projectApiKey: apiKey,
@@ -471,7 +471,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
         scenarioOutputField: "missing_field",
       };
 
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config,
         nlpServiceUrl,
         projectApiKey: apiKey,
@@ -492,7 +492,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
         text: vi.fn().mockResolvedValue('{"detail": "Workflow crashed"}'),
       });
 
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config: defaultConfig,
         nlpServiceUrl,
         projectApiKey: apiKey,
@@ -511,7 +511,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
         text: vi.fn().mockResolvedValue("Bad Gateway"),
       });
 
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config: defaultConfig,
         nlpServiceUrl,
         projectApiKey: apiKey,
@@ -527,7 +527,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     it("returns an empty string", async () => {
       mockFetch.mockResolvedValue(nlpResponse(null));
 
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config: defaultConfig,
         nlpServiceUrl,
         projectApiKey: apiKey,
@@ -540,7 +540,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
   describe("when sending the request to the NLP service", () => {
     it("passes an abort signal for timeout protection", async () => {
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config: defaultConfig,
         nlpServiceUrl,
         projectApiKey: apiKey,
@@ -582,7 +582,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
       vi.useFakeTimers();
       let aborted = false;
       try {
-        const adapter = new SerializedWorkflowAgentAdapter({
+        const adapter = new HttpSerializedWorkflowAgentChannel({
           config: defaultConfig,
           nlpServiceUrl,
           projectApiKey: apiKey,
@@ -625,7 +625,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     // AbortSignal can raise. A run past 300s died with HeadersTimeoutError well
     // inside the 630s abort, so the dispatcher must carry the same deadline.
     it("passes a dispatcher whose headers timeout matches the 630s default deadline", async () => {
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config: defaultConfig,
         nlpServiceUrl,
         projectApiKey: apiKey,
@@ -641,7 +641,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
   describe("given a run that resolved parameter values", () => {
     function callWithParameters(parameters: Record<string, string | number | boolean>) {
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config: defaultConfig,
         nlpServiceUrl,
         projectApiKey: apiKey,
@@ -716,7 +716,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     /** @scenario "A workflow execution receives the trace context in its params" */
     it("carries params.trace_id and params.traceparent on the workflow", async () => {
       injectTraceContext();
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config: defaultConfig,
         nlpServiceUrl,
         projectApiKey: apiKey,
@@ -735,7 +735,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     /** @scenario "The trace context wins over a run parameter with the same name" */
     it("overrides a run parameter named trace_id or traceparent", async () => {
       injectTraceContext();
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config: defaultConfig,
         nlpServiceUrl,
         projectApiKey: apiKey,
@@ -753,7 +753,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     /** @scenario "A workflow execution receives the trace context in its params" */
     it("keeps the trace context out of the entry inputs", async () => {
       injectTraceContext();
-      const adapter = new SerializedWorkflowAgentAdapter({
+      const adapter = new HttpSerializedWorkflowAgentChannel({
         config: defaultConfig,
         nlpServiceUrl,
         projectApiKey: apiKey,

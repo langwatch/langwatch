@@ -9,6 +9,8 @@ import type { ChildProcessJobData } from "@langwatch/scenario-contract";
 import { type TracerProvider, trace } from "@opentelemetry/api";
 
 import type { ScenarioHttp } from "../app/scenario.app.ts";
+import { HttpSerializedConnectedAgentChannel } from "../channels/http/http.serialized-connected-agent.channel.ts";
+import { SerializedAgentChannelRegistry } from "../channels/serialized-agent-channels.registry.ts";
 import {
   agentGreetsFirst,
   buildAgentGreetsFirstScript,
@@ -18,8 +20,6 @@ import { selectRoleModelParams } from "../rules/scenario-role-model.rules.ts";
 import { AgentTestScriptAdapter } from "./agent-test-script.service.ts";
 import { createJudgeModelFromParams, createModelFromParams } from "./litellm-model.service.ts";
 import type { NlpFetchTimeouts } from "./nlp-fetch.service.ts";
-import { SerializedAgentRegistryAdapter } from "./serialized-agent-registry.service.ts";
-import { SerializedConnectedAgentAdapter } from "./serialized-connected-agent.service.ts";
 
 /**
  * Some TracerProvider implementations (like ProxyTracerProvider) wrap a delegate. This interface
@@ -139,7 +139,7 @@ async function executeScenarioChildValue({
   // sets LANGWATCH_API_KEY from the prefetched project telemetry key —
   // no need to duplicate it onto the job payload. The workflow/code
   // factories consume it as workflow.api_key; prompt and http ignore it.
-  const adapter = SerializedAgentRegistryAdapter.create({
+  const adapter = SerializedAgentChannelRegistry.create({
     nlpTimeouts: runtime.nlpTimeouts,
   }).build({
     adapterData,
@@ -217,7 +217,7 @@ async function executeScenarioChildValue({
   }
   // The connected agent instance that answered the run's turns, for the
   // parent's record of which process served the run.
-  if (adapter instanceof SerializedConnectedAgentAdapter && adapter.servedInstance) {
+  if (adapter instanceof HttpSerializedConnectedAgentChannel && adapter.servedInstance) {
     outputResult.agentInstance = adapter.servedInstance;
   }
   return outputResult;

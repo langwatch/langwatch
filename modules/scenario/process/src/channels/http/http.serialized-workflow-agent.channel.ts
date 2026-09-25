@@ -16,8 +16,8 @@ import {
   type FetchInitWithDispatcher,
   NlpFetchAdapter,
   type NlpFetchTimeouts,
-} from "./nlp-fetch.service.ts";
-import { SerializedAgent } from "./serialized-agent.service.ts";
+} from "../../services/nlp-fetch.service.ts";
+import { SerializedAgentChannel } from "../serialized-agent.channel.ts";
 
 /**
  * How long to wait on the NLP service for one turn.
@@ -32,15 +32,15 @@ function fetchTimeoutMs(timeouts: NlpFetchTimeouts): number {
  * Serialized workflow agent adapter that uses pre-fetched workflow DSL.
  * Sends execute_flow events to the NLP service. No database access required.
  */
-export class SerializedWorkflowAgentAdapter extends SerializedAgent {
+export class HttpSerializedWorkflowAgentChannel extends SerializedAgentChannel {
   static create(options: {
     config: WorkflowAgentData;
     nlpServiceUrl: string;
     projectApiKey: string;
     parameters?: RunParameterValues;
     timeouts?: NlpFetchTimeouts;
-  }): SerializedWorkflowAgentAdapter {
-    return new SerializedWorkflowAgentAdapter(options);
+  }): HttpSerializedWorkflowAgentChannel {
+    return new HttpSerializedWorkflowAgentChannel(options);
   }
 
   role = AgentRole.AGENT;

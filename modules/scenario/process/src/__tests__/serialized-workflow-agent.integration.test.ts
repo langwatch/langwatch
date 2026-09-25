@@ -1,5 +1,5 @@
 /** @vitest-environment node
- * Integration test for issue #3415: SerializedWorkflowAgentAdapter against
+ * Integration test for issue #3415: HttpSerializedWorkflowAgentChannel against
  * running NLP service (skipped if unreachable).
  */
 
@@ -13,7 +13,7 @@ import {
   ScenarioExecutionState,
 } from "@langwatch/scenario";
 import type { WorkflowAgentData } from "@langwatch/scenario-contract";
-import { SerializedWorkflowAgentAdapter } from "@langwatch/scenario-process";
+import { HttpSerializedWorkflowAgentChannel } from "@langwatch/scenario-process";
 import { beforeAll, describe, expect, it } from "vitest";
 
 const NLP = process.env.LANGWATCH_NLP_SERVICE ?? "http://localhost:5561";
@@ -97,7 +97,7 @@ function addStaticInput(sig: SignatureNode, identifier: string, value: string): 
   }
 }
 
-function buildAdapter(workflow: WorkflowDsl): SerializedWorkflowAgentAdapter {
+function buildAdapter(workflow: WorkflowDsl): HttpSerializedWorkflowAgentChannel {
   const entry = (
     workflow.nodes as {
       id: string;
@@ -123,7 +123,7 @@ function buildAdapter(workflow: WorkflowDsl): SerializedWorkflowAgentAdapter {
     },
     secrets: {},
   };
-  return new SerializedWorkflowAgentAdapter({
+  return new HttpSerializedWorkflowAgentChannel({
     config,
     nlpServiceUrl: NLP,
     projectApiKey: "sk-e2e-3415",

@@ -11,11 +11,11 @@ import { describe, expect, it } from "vitest";
 import {
   AgentSessionTooLargeError,
   SESSION_TOO_LARGE_PREFIX,
-  SerializedAgent,
-} from "../serialized-agent.service.ts";
+  SerializedAgentChannel,
+} from "../serialized-agent.channel.ts";
 
 /** The smallest adapter that exposes the store: no transport, no call. */
-class StoreOnlyAdapter extends SerializedAgent {
+class StoreOnlyAdapter extends SerializedAgentChannel {
   role = AgentRole.AGENT;
 
   async call(): Promise<string> {

@@ -51,11 +51,12 @@ export abstract class ScenarioRepository {
   ): Promise<ScenarioVersionSummary[]>;
   abstract findVersion(input: ScenarioVersionInput): Promise<ScenarioVersionDetail>;
   abstract restoreVersion(input: ScenarioVersionRestoreInput): Promise<Scenario>;
+  /** @throws ScenarioNotFoundError when the project holds no such scenario. */
   abstract archive(input: {
     id: string;
     projectId: string;
     archivedAt: Instant;
-  }): Promise<Scenario | null>;
+  }): Promise<Scenario>;
   abstract archiveMany(input: {
     ids: string[];
     projectId: string;

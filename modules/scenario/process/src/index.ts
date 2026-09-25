@@ -22,11 +22,11 @@ export { OtelScenarioProcessorMetricsAdapter } from "./services/scenario-process
 export * from "./repositories/redis/redis.cancellation-channel.repository.ts";
 export * from "./repositories/redis/redis.scenario-tab-store.repository.ts";
 export * from "./services/scenario-child-execution.service.ts";
-export * from "./services/serialized-agent-registry.service.ts";
-export * from "./services/serialized-code-agent.service.ts";
-export * from "./services/serialized-http-agent.service.ts";
-export * from "./services/serialized-prompt-config.service.ts";
-export * from "./services/serialized-workflow-agent.service.ts";
+export * from "./channels/serialized-agent-channels.registry.ts";
+export * from "./channels/http/http.serialized-code-agent.channel.ts";
+export * from "./channels/http/http.serialized-http-agent.channel.ts";
+export * from "./channels/http/http.serialized-prompt-config.channel.ts";
+export * from "./channels/http/http.serialized-workflow-agent.channel.ts";
 export {
   BACKFILL_STALE_THRESHOLD_MS,
   SimulationRunMetricsStoreAdapter,
