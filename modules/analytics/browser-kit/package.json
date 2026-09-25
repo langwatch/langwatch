@@ -23,6 +23,7 @@
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "numeral": "catalog:",
     "qs": "catalog:",
     "react-feather": "catalog:",
