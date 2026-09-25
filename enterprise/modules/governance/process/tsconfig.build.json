@@ -30,6 +30,9 @@
       "path": "../../../../modules/api-key/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/audit-log/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/auth/contract/tsconfig.build.json"
     },
     {
