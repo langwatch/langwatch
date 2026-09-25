@@ -77,7 +77,9 @@ By default LiteLLM only exports metadata (model, tokens, cost, timing) and never
 export OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT="span_only"
 ```
 
-Once the content reaches LangWatch, your [Data Privacy](/platform/data-privacy) rules apply: PII and secrets are redacted before storage, and you can drop or restrict input and output per organization, team or project. The default Essential PII redaction does not catch everything (names and locations, for example, need the Strict level), and captured content is readable by everyone with access to the project. Check your privacy settings before turning capture on. A common setup is to capture at the proxy, restrict input and output in LangWatch, and decide there who can read what.
+Once the content reaches LangWatch, your [Data Privacy](/platform/data-privacy) rules apply: PII and secrets are redacted before storage, and you can drop or restrict input and output per organization, team or project.
+
+The default Essential PII redaction does not catch everything (names and locations, for example, need the Strict level), and captured content is readable by everyone with access to the project. Check your privacy settings before turning capture on. A common setup is to capture at the proxy, restrict input and output in LangWatch, and decide there who can read what.
 
 ## Linking proxy calls to your application traces
 
