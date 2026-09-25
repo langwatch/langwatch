@@ -8,8 +8,8 @@
 
 import { nanoUsdToDecimalString } from "@langwatch/gateway-contract";
 import { Temporal, toEpochMs } from "@langwatch/time";
+import type { WebhookSpendEventRow } from "@langwatch/webhook-contract";
 
-import type { WebhookSpendEventRow } from "../services/webhook-envelope.service.ts";
 import {
   EMPTY_SPEND_USAGE,
   WEBHOOK_RETRY_LADDER_MS,
@@ -67,6 +67,9 @@ export function payloadToRow(payload: DeliverPayload): WebhookSpendEventRow {
     tokensCacheRead: usage.cache_read_input_tokens,
     tokensCacheWrite: usage.cache_creation_input_tokens,
     tokensReasoning: usage.reasoning_tokens,
+    tokensInputImage: usage.input_image_tokens,
+    tokensOutputImage: usage.output_image_tokens,
+    imageCount: usage.image_count,
     costNanoUsd: payload.cost_nano_usd,
     costUsd: nanoUsdToDecimalString(payload.cost_nano_usd),
     rateVersion: payload.rate_version,

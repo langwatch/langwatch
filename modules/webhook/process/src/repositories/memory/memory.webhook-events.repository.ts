@@ -1,4 +1,5 @@
-import type { WebhookSpendEventRow } from "../../services/webhook-envelope.service.ts";
+import type { WebhookSpendEventRow } from "@langwatch/webhook-contract";
+
 import { WebhookEventsRepository, type WebhookEventsPage } from "../webhook-events.repository.ts";
 
 function idSuffixFor(status: WebhookSpendEventRow["status"]): string {

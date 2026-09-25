@@ -12,9 +12,10 @@
  */
 
 import { Temporal } from "@langwatch/time";
+import type { WebhookSpendEventRow } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
-import { WebhookEnvelopeService, type WebhookSpendEventRow } from "../webhook-envelope.service.ts";
+import { WebhookEnvelopeService } from "../webhook-envelope.service.ts";
 
 function row(overrides: Partial<WebhookSpendEventRow> = {}): WebhookSpendEventRow {
   return {
@@ -34,6 +35,9 @@ function row(overrides: Partial<WebhookSpendEventRow> = {}): WebhookSpendEventRo
     tokensCacheRead: 5,
     tokensCacheWrite: 3,
     tokensReasoning: 2,
+    tokensInputImage: 7,
+    tokensOutputImage: 11,
+    imageCount: 1,
     costNanoUsd: 1_234_000,
     costUsd: "0.001234",
     rateVersion: "catalog@2026-07-26",
@@ -61,6 +65,16 @@ describe("WebhookEnvelopeService.fromSpendRow", () => {
       expect(envelope.data.model_provider_id).toBe("provider_row_id_1");
       expect(envelope.data).not.toHaveProperty("provider_key");
       expect(envelope.data).not.toHaveProperty("ProviderKey");
+    });
+  });
+
+  describe("given a confirmed row that generated images", () => {
+    it("reports the image quantities in usage beside the token counters", () => {
+      expect(WebhookEnvelopeService.fromSpendRow(row()).data.usage).toMatchObject({
+        input_image_tokens: 7,
+        output_image_tokens: 11,
+        image_count: 1,
+      });
     });
   });
 

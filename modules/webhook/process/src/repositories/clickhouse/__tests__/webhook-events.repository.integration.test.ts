@@ -28,6 +28,8 @@ const CREATE_TABLE = `
     TokensInput UInt64 DEFAULT 0, TokensOutput UInt64 DEFAULT 0,
     TokensCacheRead UInt64 DEFAULT 0, TokensCacheWrite UInt64 DEFAULT 0,
     TokensReasoning UInt64 DEFAULT 0,
+    TokensInputImage UInt64 DEFAULT 0, TokensOutputImage UInt64 DEFAULT 0,
+    ImageCount UInt64 DEFAULT 0,
     CostNanoUSD Int64 DEFAULT 0, RateVersion LowCardinality(String) DEFAULT '',
     Labels Array(String) DEFAULT [], Metadata String DEFAULT '',
     PodId String DEFAULT '', PodSeq UInt64 DEFAULT 0,

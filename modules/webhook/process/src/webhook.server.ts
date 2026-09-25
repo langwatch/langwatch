@@ -1,13 +1,10 @@
 import { defineServerModule } from "@langwatch/kernel";
-import type { WebhookEnvelope } from "@langwatch/webhook-contract";
+import type { WebhookEnvelope, WebhookSpendEventRow } from "@langwatch/webhook-contract";
 
 import { WebhookApp } from "./app/webhook.app.ts";
 import { webhookDeliveryEventing } from "./eventing/webhook-delivery.pipeline.ts";
 import { webhookRepositories } from "./repositories/webhook-repositories.registry.ts";
-import {
-  WebhookEnvelopeService,
-  type WebhookSpendEventRow,
-} from "./services/webhook-envelope.service.ts";
+import { WebhookEnvelopeService } from "./services/webhook-envelope.service.ts";
 import { webhookEndpointTrpcTransport } from "./transport/webhook-endpoint.trpc.ts";
 import { webhookRest } from "./transport/webhook.rest.ts";
 

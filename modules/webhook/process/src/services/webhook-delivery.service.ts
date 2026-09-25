@@ -12,6 +12,7 @@ import {
   eventMatches,
   WEBHOOK_SPEND_DELIVERY_REQUESTED_EVENT_TYPE,
   type WebhookEndpointView,
+  type WebhookSpendEventRow,
 } from "@langwatch/webhook-contract";
 
 import type { WebhookDispatchChannel } from "../channels/webhook-dispatch.channel.ts";
@@ -55,7 +56,7 @@ import { WebhookBatchSendService } from "./webhook-batch-send.service.ts";
 import { WebhookDeliveryMaintenanceService } from "./webhook-delivery-maintenance.service.ts";
 import type { WebhookDestinationConfig } from "./webhook-destination.service.ts";
 import { WebhookEndpointStreamService } from "./webhook-endpoint-stream.service.ts";
-import { WebhookEnvelopeService, type WebhookSpendEventRow } from "./webhook-envelope.service.ts";
+import { WebhookEnvelopeService } from "./webhook-envelope.service.ts";
 
 const logger = createLogger("langwatch:webhooks:delivery-process");
 

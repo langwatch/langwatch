@@ -1,4 +1,4 @@
-import type { WebhookSpendEventRow } from "../services/webhook-envelope.service.ts";
+import type { WebhookSpendEventRow } from "@langwatch/webhook-contract";
 
 export type WebhookEventsPage = {
   rows: WebhookSpendEventRow[];

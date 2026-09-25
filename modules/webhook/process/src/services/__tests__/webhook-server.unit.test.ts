@@ -1,9 +1,10 @@
 import { Temporal } from "@langwatch/time";
+import type { WebhookSpendEventRow } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
 import { WebhookDeliveryService } from "../webhook-delivery.service.ts";
 import { WebhookDestinationService } from "../webhook-destination.service.ts";
-import { WebhookEnvelopeService, type WebhookSpendEventRow } from "../webhook-envelope.service.ts";
+import { WebhookEnvelopeService } from "../webhook-envelope.service.ts";
 
 const spendRow = (overrides: Partial<WebhookSpendEventRow> = {}): WebhookSpendEventRow => ({
   tenantId: "project_1",
@@ -22,6 +23,9 @@ const spendRow = (overrides: Partial<WebhookSpendEventRow> = {}): WebhookSpendEv
   tokensCacheRead: 0,
   tokensCacheWrite: 0,
   tokensReasoning: 0,
+  tokensInputImage: 0,
+  tokensOutputImage: 0,
+  imageCount: 0,
   costNanoUsd: 25,
   costUsd: "0.000000025",
   rateVersion: "rates-1",

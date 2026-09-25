@@ -62,11 +62,7 @@ export type {
   WebhookDeliveryState,
 } from "./rules/webhook-delivery-contract.rules.ts";
 export type { PendingEnvelope } from "./services/webhook-batch-planner.service.ts";
-export {
-  WebhookEnvelopeService,
-  type WebhookSpendEventRow,
-  type WebhookSpendEventStatus,
-} from "./services/webhook-envelope.service.ts";
+export { WebhookEnvelopeService } from "./services/webhook-envelope.service.ts";
 export type {
   WebhookEventsService,
   LegacyWebhookEventsServiceOptions,

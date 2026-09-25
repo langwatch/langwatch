@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import type { WebhookSpendEventRow } from "../services/webhook-envelope.service.ts";
+import type { WebhookSpendEventRow } from "@langwatch/webhook-contract";
+
 import type {
   AdmitSpendCommandData,
   ConfirmSpendCommandData,

@@ -15,6 +15,7 @@ import {
   endpointWithSecretResponseSchema,
   webhookEventResponseSchema,
   WebhookEndpointsNotEntitledError,
+  type WebhookSpendEventRow,
 } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
@@ -24,10 +25,7 @@ import {
   type WebhookEventsPage,
 } from "../../repositories/webhook-events.repository.ts";
 import { WebhookTenantsRepository } from "../../repositories/webhook-tenants.repository.ts";
-import {
-  WebhookEnvelopeService,
-  type WebhookSpendEventRow,
-} from "../../services/webhook-envelope.service.ts";
+import { WebhookEnvelopeService } from "../../services/webhook-envelope.service.ts";
 import { WebhookEventsService } from "../../services/webhook-events.service.ts";
 import { mountWebhookRest, ORGANIZATION_ID } from "./webhook-rest.harness.ts";
 
@@ -131,6 +129,9 @@ function spendRow(overrides: Partial<WebhookSpendEventRow>): WebhookSpendEventRo
     tokensCacheRead: 0,
     tokensCacheWrite: 0,
     tokensReasoning: 0,
+    tokensInputImage: 0,
+    tokensOutputImage: 0,
+    imageCount: 0,
     costNanoUsd: 1_000_000,
     costUsd: "0.001000000",
     rateVersion: "catalog@1",

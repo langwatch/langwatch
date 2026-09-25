@@ -1,10 +1,7 @@
 import { nanoUsdToDecimalString } from "@langwatch/gateway-contract";
 import { Temporal } from "@langwatch/time";
+import type { WebhookSpendEventRow, WebhookSpendEventStatus } from "@langwatch/webhook-contract";
 
-import type {
-  WebhookSpendEventRow,
-  WebhookSpendEventStatus,
-} from "../../services/webhook-envelope.service.ts";
 import { WebhookEventsRepository, type WebhookEventsPage } from "../webhook-events.repository.ts";
 
 const asString = (value: unknown): string =>
@@ -16,7 +13,8 @@ const SPEND_TABLE = "gateway_spend";
 const SPEND_ROW_COLUMNS = `TenantId, GatewayRequestId, OrganizationId, VirtualKeyId,
           PrincipalUserId, EndUserId, TraceId, Model, ProviderKey, RequestType,
           TokensInput, TokensOutput, TokensCacheRead, TokensCacheWrite,
-          TokensReasoning, CostNanoUSD, RateVersion, Status, ErrorClass,
+          TokensReasoning, TokensInputImage, TokensOutputImage, ImageCount,
+          CostNanoUSD, RateVersion, Status, ErrorClass,
           HttpStatus, NeedsReconciliation, SettleReason, Labels, Metadata,
           DurationMS, toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs`;
 
@@ -51,6 +49,9 @@ function mapSpendEventRow(raw: Record<string, unknown>): WebhookSpendEventRow {
     tokensCacheRead: Number(raw.TokensCacheRead),
     tokensCacheWrite: Number(raw.TokensCacheWrite),
     tokensReasoning: Number(raw.TokensReasoning),
+    tokensInputImage: Number(raw.TokensInputImage ?? 0),
+    tokensOutputImage: Number(raw.TokensOutputImage ?? 0),
+    imageCount: Number(raw.ImageCount ?? 0),
     costNanoUsd,
     costUsd: nanoUsdToDecimalString(costNanoUsd),
     rateVersion: asString(raw.RateVersion),

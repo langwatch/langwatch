@@ -160,6 +160,9 @@ describe("WebhookDeliveryService.payloadToRow", () => {
         tokensCacheRead: 0,
         tokensCacheWrite: 0,
         tokensReasoning: 0,
+        tokensInputImage: 0,
+        tokensOutputImage: 0,
+        imageCount: 0,
       });
     });
 
@@ -172,6 +175,9 @@ describe("WebhookDeliveryService.payloadToRow", () => {
             cache_read_input_tokens: 3,
             cache_creation_input_tokens: 4,
             reasoning_tokens: 5,
+            input_image_tokens: 6,
+            output_image_tokens: 7,
+            image_count: 2,
           },
         }),
       ).toMatchObject({
@@ -180,6 +186,9 @@ describe("WebhookDeliveryService.payloadToRow", () => {
         tokensCacheRead: 3,
         tokensCacheWrite: 4,
         tokensReasoning: 5,
+        tokensInputImage: 6,
+        tokensOutputImage: 7,
+        imageCount: 2,
       });
     });
   });
