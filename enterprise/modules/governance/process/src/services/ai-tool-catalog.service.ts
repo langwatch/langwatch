@@ -27,30 +27,46 @@ import {
   type SeedAiToolStarterPackInput,
   type UpdateAiToolEntryInput,
 } from "@langwatch/enterprise-governance-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 
 import type {
   AiToolCatalogRepository,
   AiToolProviderCatalog,
   AiToolSlug,
 } from "../repositories/ai-tool-catalog.repository.ts";
+import type { DepartmentRepository } from "../repositories/department.repository.ts";
+import type { IngestionSourceRepository } from "../repositories/ingestion-source.repository.ts";
+import type { RoutingPolicyRepository } from "../repositories/routing-policy.repository.ts";
+import {
+  selectClaudeCodeOtlpEndpoint,
+  selectVisibleAiTools,
+} from "../rules/ai-tool-visibility.rules.ts";
+import type { AiToolProviderReachService } from "./ai-tool-provider-reach.service.ts";
+
+type AiToolCatalogCollaborators = {
+  repository: AiToolCatalogRepository;
+  slugs: AiToolSlug;
+  providers: AiToolProviderCatalog;
+  reach: Pick<
+    AiToolProviderReachService,
+    "findConfiguredForMember" | "findConfiguredForOrganization"
+  >;
+  departments: Pick<DepartmentRepository, "findAll">;
+  routingPolicies: Pick<RoutingPolicyRepository, "findAll">;
+  sources: Pick<IngestionSourceRepository, "findAll">;
+  members: Pick<OrganizationApi, "findMemberDepartments">;
+  diagnostics: { warn(message: string, context: Record<string, unknown>): void };
+};
 
 export class DefaultGovernanceAiToolCatalogService {
-  private constructor(
-    private readonly repository: AiToolCatalogRepository,
-    private readonly slugs: AiToolSlug,
-    private readonly providers: AiToolProviderCatalog,
-  ) {}
+  private readonly repository: AiToolCatalogRepository;
 
-  static create(options: {
-    repository: AiToolCatalogRepository;
-    slugs: AiToolSlug;
-    providers: AiToolProviderCatalog;
-  }): DefaultGovernanceAiToolCatalogService {
-    return new DefaultGovernanceAiToolCatalogService(
-      options.repository,
-      options.slugs,
-      options.providers,
-    );
+  private constructor(private readonly collaborators: AiToolCatalogCollaborators) {
+    this.repository = collaborators.repository;
+  }
+
+  static create(options: AiToolCatalogCollaborators): DefaultGovernanceAiToolCatalogService {
+    return new DefaultGovernanceAiToolCatalogService(options);
   }
 
   static listStarterPackTiles(): {
@@ -66,7 +82,35 @@ export class DefaultGovernanceAiToolCatalogService {
   }
 
   listForUser(input: AiToolMemberInput): Promise<AiToolEntry[]> {
-    return this.repository.findVisible(aiToolMemberInputSchema.parse(input));
+    return this.visible(aiToolMemberInputSchema.parse(input));
+  }
+
+  /** Main's `aiTools.list`: provisions the default catalogue first, never failing the read. */
+  async findForMember(input: AiToolMemberInput): Promise<AiToolEntry[]> {
+    try {
+      await this.ensureDefaultCatalog({ organizationId: input.organizationId });
+    } catch (error) {
+      this.collaborators.diagnostics.warn("aiTools.list.ensureDefaultCatalog failed", {
+        organizationId: input.organizationId,
+        error,
+      });
+    }
+    return this.listForUser(input);
+  }
+
+  async findClaudeCodeOtlpEndpoint(
+    input: AiToolOrganizationInput,
+  ): Promise<{ endpoint: string | null }> {
+    const parsed = aiToolOrganizationInputSchema.parse(input);
+    const sources = await this.collaborators.sources.findAll(parsed.organizationId);
+    return selectClaudeCodeOtlpEndpoint(
+      sources.map(({ id, sourceType, status, createdAt }) => ({
+        id,
+        sourceType,
+        status,
+        createdAtMs: createdAt.getTime(),
+      })),
+    );
   }
 
   listForAdmin(input: AiToolOrganizationInput): Promise<AiToolEntry[]> {
@@ -98,7 +142,7 @@ export class DefaultGovernanceAiToolCatalogService {
 
     return this.repository.create({
       values: parsed,
-      slug: this.slugs.generate(parsed.displayName),
+      slug: this.collaborators.slugs.generate(parsed.displayName),
     });
   }
 
@@ -149,7 +193,7 @@ export class DefaultGovernanceAiToolCatalogService {
   }
 
   listConfiguredProvidersForUser(input: AiToolMemberInput): Promise<string[]> {
-    return this.repository.findConfiguredProvidersForUser(aiToolMemberInputSchema.parse(input));
+    return this.collaborators.reach.findConfiguredForMember(aiToolMemberInputSchema.parse(input));
   }
 
   async listProviderOptionsForAdmin(
@@ -157,10 +201,10 @@ export class DefaultGovernanceAiToolCatalogService {
   ): Promise<AiToolProviderOption[]> {
     const parsed = aiToolOrganizationInputSchema.parse(input);
     const configured = new Set(
-      await this.repository.findConfiguredProvidersForOrganization(parsed.organizationId),
+      await this.collaborators.reach.findConfiguredForOrganization(parsed.organizationId),
     );
 
-    return this.providers
+    return this.collaborators.providers
       .findAll()
       .filter(({ type }) => type === "llm")
       .map(({ providerKey, displayName }) => ({
@@ -171,12 +215,16 @@ export class DefaultGovernanceAiToolCatalogService {
       .toSorted((left, right) => left.displayName.localeCompare(right.displayName));
   }
 
-  listRoutingPolicyOptionsForAdmin(
+  async listRoutingPolicyOptionsForAdmin(
     input: AiToolOrganizationInput,
   ): Promise<{ id: string; name: string }[]> {
-    const parsed = aiToolOrganizationInputSchema.parse(input);
+    const { organizationId } = aiToolOrganizationInputSchema.parse(input);
+    const policies = await this.collaborators.routingPolicies.findAll({
+      organizationId,
+      selectableForScope: { scopeType: "ORGANIZATION", scopeId: organizationId },
+    });
 
-    return this.repository.findRoutingPolicyOptions(parsed.organizationId);
+    return policies.map(({ id, name }) => ({ id, name }));
   }
 
   reorder(input: ReorderAiToolEntriesInput): Promise<void> {
@@ -187,7 +235,7 @@ export class DefaultGovernanceAiToolCatalogService {
     input: AiToolMemberInput,
   ): Promise<Partial<Record<PlatformToolSlug, PlatformToolPolicy>>> {
     const parsed = aiToolMemberInputSchema.parse(input);
-    const tiles = await this.repository.findVisible({
+    const tiles = await this.visible({
       ...parsed,
       type: "coding_assistant",
     });
@@ -250,12 +298,9 @@ export class DefaultGovernanceAiToolCatalogService {
   async resolveCliCatalogForUser(input: AiToolMemberInput): Promise<AiToolCliCatalog> {
     const parsed = aiToolMemberInputSchema.parse(input);
     const [assistantTiles, providerTiles, configuredProviderKeys] = await Promise.all([
-      this.repository.findVisible({
-        ...parsed,
-        type: "coding_assistant",
-      }),
-      this.repository.findVisible({ ...parsed, type: "model_provider" }),
-      this.repository.findConfiguredProvidersForUser(parsed),
+      this.visible({ ...parsed, type: "coding_assistant" }),
+      this.visible({ ...parsed, type: "model_provider" }),
+      this.collaborators.reach.findConfiguredForMember(parsed),
     ]);
     const configured = new Set(configuredProviderKeys);
     const tools: AiToolCliCatalog["tools"] = [];
@@ -294,10 +339,25 @@ export class DefaultGovernanceAiToolCatalogService {
     return { tools, providers, configuredProviderKeys };
   }
 
+  private async visible(input: {
+    organizationId: string;
+    userId: string;
+    type?: AiToolEntry["type"];
+  }): Promise<AiToolEntry[]> {
+    const [entries, members] = await Promise.all([
+      this.repository.findEnabled({ organizationId: input.organizationId, type: input.type }),
+      this.collaborators.members.findMemberDepartments({
+        organizationId: input.organizationId,
+        userIds: [input.userId],
+      }),
+    ]);
+    return selectVisibleAiTools({ entries, departmentId: members[0]?.departmentId ?? null });
+  }
+
   private async getOwn(id: string, organizationId: string): Promise<AiToolEntry> {
     const entry = await this.repository.findById(id);
     if (!entry || entry.organizationId !== organizationId) {
-      throw new AiToolEntryNotFoundError(id, organizationId);
+      throw new AiToolEntryNotFoundError(id);
     }
 
     return entry;
@@ -308,11 +368,10 @@ export class DefaultGovernanceAiToolCatalogService {
       return;
     }
 
-    const valid = await this.repository.departmentsBelongToOrganization({
-      organizationId,
-      departmentIds,
-    });
-    if (!valid) {
+    const live = new Set(
+      (await this.collaborators.departments.findAll(organizationId)).map(({ id }) => id),
+    );
+    if (!departmentIds.every((id) => live.has(id))) {
       throw new AiToolDepartmentScopeError();
     }
   }

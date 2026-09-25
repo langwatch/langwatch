@@ -899,6 +899,10 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#dependencies.membership.findMemberDepartments(input);
   }
 
+  findMemberTeamIds(input: { organizationId: string; userId: string }): Promise<string[]> {
+    return this.#dependencies.membership.findMemberTeamIds(input);
+  }
+
   findMemberDepartmentsOnDay(input: {
     organizationId: string;
     userIds: readonly string[];

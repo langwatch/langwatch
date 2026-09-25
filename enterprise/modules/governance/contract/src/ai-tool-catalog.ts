@@ -1,3 +1,4 @@
+import { NotFoundError } from "@langwatch/handled-error";
 import { z } from "zod";
 
 import type { PlatformToolSlug } from "./platform-tool-policy.ts";
@@ -312,12 +313,12 @@ export const aiToolStarterPackImportSchema = z
   })
   .strict();
 
-export class AiToolEntryNotFoundError extends Error {
-  constructor(
-    readonly entryId: string,
-    readonly organizationId: string,
-  ) {
-    super(`AI tool entry ${entryId} was not found in organization ${organizationId}`);
+export type AiToolStarterTileChoice = z.infer<typeof aiToolStarterTileChoiceSchema>;
+
+/** Main answered NOT_FOUND on `get` and a plain error on update and remove; each refuses here. */
+export class AiToolEntryNotFoundError extends NotFoundError {
+  constructor(entryId: string) {
+    super("not_found", "AI tool entry", entryId);
     this.name = "AiToolEntryNotFoundError";
   }
 }

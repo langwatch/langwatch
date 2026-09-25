@@ -9,7 +9,7 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
+import type { OrganizationApi, OrganizationService } from "@langwatch/organization-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 
@@ -97,7 +97,14 @@ export type GovernanceInstallationOptions = {
     | "findIngestionKeysForUser"
   >;
   gateway: Pick<GatewayApi, "findPersonalVirtualKeys" | "findVirtualKeyById">;
-  modelProviders: Pick<ModelProviderApi, "countEnabledInScopes">;
+  modelProviders: Pick<
+    ModelProviderApi,
+    "countEnabledInScopes" | "findEnabledProviderKeysInScopes"
+  >;
+  aiToolMembers: Pick<
+    OrganizationApi,
+    "findMemberDepartments" | "findMemberTeamIds" | "findTeamsWithDepartments"
+  >;
   diagnostics?: GovernanceDiagnosticsSink;
   adminWorkspaceDiagnostics?: GovernanceDiagnosticsSink;
   quarantineTenant: QuarantineTenantResolver;
@@ -117,6 +124,7 @@ import { PrismaIngestionTemplateRepository } from "../repositories/prisma/prisma
 import { PrismaGovernanceOcsfExportRepository } from "../repositories/prisma/prisma.ocsf-export.repository.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";
 import { DefaultGovernanceAiToolCatalogService } from "../services/ai-tool-catalog.service.ts";
+import { AiToolProviderReachService } from "../services/ai-tool-provider-reach.service.ts";
 import { AnomalyRuleService } from "../services/anomaly-rule.service.ts";
 import { DefaultGovernanceSetupStateService } from "../services/governance-setup-state.service.ts";
 import { IngestionSourceService } from "../services/ingestion-source.service.ts";
@@ -158,6 +166,16 @@ export class GovernanceInstallationComposition {
       repository: PrismaAiToolCatalogRepository.create(this.options.database),
       slugs: this.options.aiToolSlugs,
       providers: this.options.aiToolProviders,
+      reach: AiToolProviderReachService.create({
+        organizations: this.options.aiToolMembers,
+        projects: this.options.projects,
+        modelProviders: this.options.modelProviders,
+      }),
+      departments: PrismaDepartmentRepository.create(this.options.database),
+      routingPolicies: PrismaRoutingPolicyRepository.create(this.options.database),
+      sources: PrismaIngestionSourceRepository.create(this.options.database),
+      members: this.options.aiToolMembers,
+      diagnostics: this.options.ingestionDiagnostics,
     });
     const activity = ActivityMonitorService.create(
       PrismaActivityMonitorRepository.create({

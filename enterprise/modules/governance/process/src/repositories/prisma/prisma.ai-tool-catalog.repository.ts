@@ -1,6 +1,5 @@
 import type {
   AiToolEntry,
-  AiToolMemberInput,
   AiToolStarterTile,
   AiToolType,
   CreateAiToolEntryInput,
@@ -25,17 +24,7 @@ type EntryRow = PrismaAiToolEntry & {
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type AiToolCatalogDatabase = Pick<
-  PrismaClient,
-  | "aiToolEntry"
-  | "department"
-  | "modelProvider"
-  | "organizationUser"
-  | "routingPolicy"
-  | "team"
-  | "teamUser"
-  | "$transaction"
->;
+export type AiToolCatalogDatabase = Pick<PrismaClient, "aiToolEntry" | "$transaction">;
 
 export class PrismaAiToolCatalogRepository extends AiToolCatalogRepository {
   private constructor(private readonly database: AiToolCatalogDatabase) {
@@ -46,20 +35,7 @@ export class PrismaAiToolCatalogRepository extends AiToolCatalogRepository {
     return new PrismaAiToolCatalogRepository(database);
   }
 
-  async findVisible(input: {
-    organizationId: string;
-    userId: string;
-    type?: AiToolType;
-  }): Promise<AiToolEntry[]> {
-    const membership = await this.database.organizationUser.findUnique({
-      where: {
-        userId_organizationId: {
-          userId: input.userId,
-          organizationId: input.organizationId,
-        },
-      },
-      select: { departmentId: true },
-    });
+  async findEnabled(input: { organizationId: string; type?: AiToolType }): Promise<AiToolEntry[]> {
     const where: Prisma.AiToolEntryWhereInput = {
       organizationId: input.organizationId,
       enabled: true,
@@ -71,31 +47,7 @@ export class PrismaAiToolCatalogRepository extends AiToolCatalogRepository {
       orderBy: [{ order: "asc" }, { displayName: "asc" }],
       include: { departments: { select: { departmentId: true } } },
     });
-    const departmentId = membership?.departmentId ?? null;
-    const visible = rows.filter((row) => {
-      if (row.departments.length > 0) {
-        return (
-          departmentId !== null &&
-          row.departments.some((department) => department.departmentId === departmentId)
-        );
-      }
-      if (row.scope === "department") {
-        return departmentId !== null && row.scopeId === departmentId;
-      }
-      return true;
-    });
-    const bySlug = new Map<string, (typeof visible)[number]>();
-    for (const row of visible) {
-      const existing = bySlug.get(row.slug);
-      if (!existing) {
-        bySlug.set(row.slug, row);
-        continue;
-      }
-      const rowDepartment = row.departments.length > 0 || row.scope === "department";
-      const existingDepartment = existing.departments.length > 0 || existing.scope === "department";
-      if (rowDepartment && !existingDepartment) bySlug.set(row.slug, row);
-    }
-    return Array.from(bySlug.values(), mapEntry);
+    return rows.map(mapEntry);
   }
 
   async findAdmin(organizationId: string): Promise<AiToolEntry[]> {
@@ -113,21 +65,6 @@ export class PrismaAiToolCatalogRepository extends AiToolCatalogRepository {
       include: { departments: { select: { departmentId: true } } },
     });
     return row ? mapEntry(row) : null;
-  }
-
-  async departmentsBelongToOrganization(input: {
-    organizationId: string;
-    departmentIds: string[];
-  }): Promise<boolean> {
-    const ids = new Set(input.departmentIds);
-    const count = await this.database.department.count({
-      where: {
-        id: { in: Array.from(ids) },
-        organizationId: input.organizationId,
-        archivedAt: null,
-      },
-    });
-    return count === ids.size;
   }
 
   async create(input: { values: CreateAiToolEntryInput; slug: string }): Promise<AiToolEntry> {
@@ -297,47 +234,6 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${input
     return { created: create.length, updated: update.length, skipped };
   }
 
-  async findConfiguredProvidersForUser(input: AiToolMemberInput): Promise<string[]> {
-    const memberships = await this.database.teamUser.findMany({
-      where: {
-        userId: input.userId,
-        team: { organizationId: input.organizationId },
-      },
-      select: {
-        teamId: true,
-        team: { select: { projects: { select: { id: true } } } },
-      },
-    });
-    const teamIds = memberships.map(({ teamId }) => teamId);
-    const projectIds = memberships.flatMap(({ team }) => team.projects.map(({ id }) => id));
-    return this.configuredProviders(input.organizationId, teamIds, projectIds);
-  }
-
-  async findConfiguredProvidersForOrganization(organizationId: string): Promise<string[]> {
-    const teams = await this.database.team.findMany({
-      where: { organizationId },
-      select: { id: true, projects: { select: { id: true } } },
-    });
-    return this.configuredProviders(
-      organizationId,
-      teams.map(({ id }) => id),
-      teams.flatMap(({ projects }) => projects.map(({ id }) => id)),
-    );
-  }
-
-  async findRoutingPolicyOptions(organizationId: string): Promise<{ id: string; name: string }[]> {
-    return this.database.routingPolicy.findMany({
-      where: {
-        organizationId,
-        scopes: {
-          some: { scopeType: "ORGANIZATION", scopeId: organizationId },
-        },
-      },
-      select: { id: true, name: true },
-      orderBy: [{ isDefault: "desc" }, { name: "asc" }],
-    });
-  }
-
   async reorder(input: ReorderAiToolEntriesInput): Promise<void> {
     const operations = input.updates.map(({ id, order }) =>
       this.database.aiToolEntry.updateMany({
@@ -346,31 +242,6 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${input
       }),
     );
     await this.database.$transaction(operations);
-  }
-
-  private async configuredProviders(
-    organizationId: string,
-    teamIds: string[],
-    projectIds: string[],
-  ): Promise<string[]> {
-    const scopes: Prisma.ModelProviderScopeWhereInput[] = [
-      { scopeType: "ORGANIZATION", scopeId: organizationId },
-    ];
-    if (teamIds.length > 0) {
-      scopes.push({ scopeType: "TEAM", scopeId: { in: teamIds } });
-    }
-    if (projectIds.length > 0) {
-      scopes.push({ scopeType: "PROJECT", scopeId: { in: projectIds } });
-    }
-    const rows = await this.database.modelProvider.findMany({
-      where: {
-        enabled: true,
-        disabledAt: null,
-        scopes: { some: { OR: scopes } },
-      },
-      select: { provider: true },
-    });
-    return Array.from(new Set(rows.map(({ provider }) => provider).filter(Boolean)));
   }
 }
 

@@ -178,6 +178,12 @@ export class ModelProviderService {
     return this.options.repository.countEnabledInScopes(input);
   }
 
+  findEnabledProviderKeysInScopes(input: {
+    scopes: readonly { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
+  }): Promise<string[]> {
+    return this.options.repository.findEnabledProviderKeysInScopes(input);
+  }
+
   countUsage(input: { organizationIds: readonly string[] }): Promise<ModelProviderUsageCount> {
     return this.options.repository.countUsage(input);
   }

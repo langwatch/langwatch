@@ -493,6 +493,16 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       .map((row) => ({ userId: row.userId, departmentId: row.departmentId ?? null }));
   }
 
+  async findMemberTeamIds(input: { organizationId: string; userId: string }): Promise<string[]> {
+    return this.memory.teamUsers
+      .filter(
+        (row) =>
+          row.userId === input.userId &&
+          this.memory.teams.get(row.teamId)?.organizationId === input.organizationId,
+      )
+      .map((row) => row.teamId);
+  }
+
   async getMembership(params: {
     organizationId: string;
     userId: string;

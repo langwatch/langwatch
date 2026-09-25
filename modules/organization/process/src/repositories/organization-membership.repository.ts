@@ -332,9 +332,7 @@ export abstract class OrganizationMembershipRepository {
 
   abstract findMemberUsersIncludingDeactivated(input: { organizationId: string }): Promise<User[]>;
 
-  abstract findMembersWithDepartments(input: {
-    organizationId: string;
-  }): Promise<
+  abstract findMembersWithDepartments(input: { organizationId: string }): Promise<
     {
       userId: string;
       departmentId: string | null;
@@ -377,6 +375,8 @@ export abstract class OrganizationMembershipRepository {
     organizationId: string;
     userIds: readonly string[];
   }): Promise<{ userId: string; departmentId: string | null }[]>;
+
+  abstract findMemberTeamIds(input: { organizationId: string; userId: string }): Promise<string[]>;
 
   /**
    * A single membership row with its user, disabled or not; throws `MemberNotFoundError`. Unlike

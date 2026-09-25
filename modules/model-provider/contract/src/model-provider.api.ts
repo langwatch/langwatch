@@ -309,6 +309,10 @@ export interface ModelProviderApi {
   countEnabledInScopes(input: {
     scopes: readonly { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
   }): Promise<number>;
+  /** The distinct provider keys of those same providers; main's aiTools provider availability. */
+  findEnabledProviderKeysInScopes(input: {
+    scopes: readonly { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
+  }): Promise<string[]>;
   countUsage(input: { organizationIds: readonly string[] }): Promise<ModelProviderUsageCount>;
 }
 

@@ -73,6 +73,10 @@ class Providers implements ModelProviderRepository {
     return 0;
   }
 
+  async findEnabledProviderKeysInScopes(): Promise<string[]> {
+    return [];
+  }
+
   rows = [provider()];
   created: ModelProvider[] = [];
   deleted: string[] = [];

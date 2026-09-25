@@ -357,6 +357,8 @@ export interface OrganizationApi {
     organizationId: string;
     userIds: readonly string[];
   }): Promise<{ userId: string; departmentId: string | null }[]>;
+  /** The organization's teams the member belongs to (main `aiToolEntry.service.ts:1278`). */
+  findMemberTeamIds(input: { organizationId: string; userId: string }): Promise<string[]>;
   /**
    * Each named member's department on a UTC day, from the link open at the day's end (main
    * `department.service.ts:293-316`).

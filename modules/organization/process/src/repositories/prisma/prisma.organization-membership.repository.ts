@@ -776,11 +776,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     return users.map(userFromRecord);
   }
 
-  async findMembersWithDepartments({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<
+  async findMembersWithDepartments({ organizationId }: { organizationId: string }): Promise<
     {
       userId: string;
       departmentId: string | null;
@@ -898,6 +894,14 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       where: { organizationId, userId: { in: [...userIds] } },
       select: { userId: true, departmentId: true },
     });
+  }
+
+  async findMemberTeamIds(input: { organizationId: string; userId: string }): Promise<string[]> {
+    const memberships = await this.prisma.teamUser.findMany({
+      where: { userId: input.userId, team: { organizationId: input.organizationId } },
+      select: { teamId: true },
+    });
+    return memberships.map(({ teamId }) => teamId);
   }
 
   async getMembership(params: {

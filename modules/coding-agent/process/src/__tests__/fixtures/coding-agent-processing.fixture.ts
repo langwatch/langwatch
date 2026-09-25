@@ -87,6 +87,10 @@ export class TestModelProviderService implements ModelProviderApi {
     return Promise.resolve(0);
   }
 
+  findEnabledProviderKeysInScopes(): Promise<string[]> {
+    return Promise.resolve([]);
+  }
+
   constructor(
     private readonly estimate: (input: ModelCostEstimateInput) => number = () => 0,
   ) {}

@@ -1,6 +1,5 @@
 import type {
   AiToolEntry,
-  AiToolMemberInput,
   AiToolStarterTile,
   AiToolType,
   CreateAiToolEntryInput,
@@ -9,18 +8,15 @@ import type {
   UpdateAiToolEntryInput,
 } from "@langwatch/enterprise-governance-contract";
 
+/** The organization's AI tool catalogue: entries and their department bindings. */
 export abstract class AiToolCatalogRepository {
-  abstract findVisible(input: {
+  /** Enabled, unarchived entries, ordered by (order, displayName). */
+  abstract findEnabled(input: {
     organizationId: string;
-    userId: string;
     type?: AiToolType;
   }): Promise<AiToolEntry[]>;
   abstract findAdmin(organizationId: string): Promise<AiToolEntry[]>;
   abstract findById(id: string): Promise<AiToolEntry | null>;
-  abstract departmentsBelongToOrganization(input: {
-    organizationId: string;
-    departmentIds: string[];
-  }): Promise<boolean>;
   abstract create(input: { values: CreateAiToolEntryInput; slug: string }): Promise<AiToolEntry>;
   abstract update(input: UpdateAiToolEntryInput): Promise<AiToolEntry>;
   abstract remove(id: string): Promise<AiToolEntry>;
@@ -32,11 +28,6 @@ export abstract class AiToolCatalogRepository {
     values: SeedAiToolStarterPackInput;
     tiles: readonly AiToolStarterTile[];
   }): Promise<{ created: number; updated: number; skipped: number }>;
-  abstract findConfiguredProvidersForUser(input: AiToolMemberInput): Promise<string[]>;
-  abstract findConfiguredProvidersForOrganization(organizationId: string): Promise<string[]>;
-  abstract findRoutingPolicyOptions(
-    organizationId: string,
-  ): Promise<{ id: string; name: string }[]>;
   abstract reorder(input: ReorderAiToolEntriesInput): Promise<void>;
 }
 

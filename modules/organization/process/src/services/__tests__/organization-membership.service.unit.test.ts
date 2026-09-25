@@ -53,6 +53,7 @@ describe("OrganizationMembershipService", () => {
     findActiveMemberUsers: vi.fn(),
     findMemberUsersIncludingDeactivated: vi.fn(),
     findMemberDepartments: vi.fn(),
+    findMemberTeamIds: vi.fn(),
     findMembersWithDepartments: vi.fn(),
     assignMemberDepartment: vi.fn(),
     findMemberDepartmentsOnDay: vi.fn(),

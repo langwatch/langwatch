@@ -293,6 +293,8 @@ describe("GovernanceApp as the module a process installs", () => {
         "trpc",
         "trpc",
         "trpc",
+        "trpc",
+        "trpc",
       ]);
       expect(app.cliAccess().findCaller).toBeTypeOf("function");
       expect(app.cliCredentials().budgetStatus).toBeTypeOf("function");

@@ -13,6 +13,10 @@ export class TestModelProviderService implements ModelProviderApi {
     return Promise.resolve(0);
   }
 
+  findEnabledProviderKeysInScopes(): Promise<string[]> {
+    return Promise.resolve([]);
+  }
+
   constructor(private readonly providers: Record<string, ModelProviderSummary> = {}) {}
 
   listForProject(): Promise<ModelProviderSummary[]> {

@@ -412,9 +412,7 @@ export class OrganizationMembershipService {
     return this.repo.findMemberUsersIncludingDeactivated(input);
   }
 
-  findMembersWithDepartments(input: {
-    organizationId: string;
-  }): Promise<
+  findMembersWithDepartments(input: { organizationId: string }): Promise<
     {
       userId: string;
       departmentId: string | null;
@@ -466,6 +464,10 @@ export class OrganizationMembershipService {
     userIds: readonly string[];
   }): Promise<{ userId: string; departmentId: string | null }[]> {
     return this.repo.findMemberDepartments(input);
+  }
+
+  findMemberTeamIds(input: { organizationId: string; userId: string }): Promise<string[]> {
+    return this.repo.findMemberTeamIds(input);
   }
 
   /** Every administrator who can still sign in, named. Both halves are read
