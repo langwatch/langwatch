@@ -111,6 +111,12 @@ describe("the dataset REST declaration", () => {
           permission: "datasets:view",
         },
         {
+          method: "patch",
+          path: "/:slugOrId/records/:recordId",
+          operation: "patchApiDatasetBySlugOrIdRecordsByRecordId",
+          permission: "datasets:update",
+        },
+        {
           method: "delete",
           path: "/:slugOrId/records",
           operation: "deleteApiDatasetBySlugOrIdRecords",
@@ -238,7 +244,7 @@ describe("the dataset REST declaration", () => {
         answer(
           "postApiDatasetAttachments",
           completeDatasetApi({ storeAttachmentUpload }),
-          { datasetId: "dataset-1" },
+          { projectId: "project-1", datasetId: "dataset-1" },
           { file },
         ),
       ).resolves.toEqual(stored);
@@ -251,6 +257,47 @@ describe("the dataset REST declaration", () => {
           fileSize: 3,
         }),
       );
+    });
+  });
+
+  describe("when one record is patched", () => {
+    const stored = {
+      id: "record-1",
+      datasetId: "dataset-1",
+      projectId: "project-1",
+      entry: { input: "hi" },
+      createdAt: new Date("2026-01-01T00:00:00Z"),
+      updatedAt: new Date("2026-01-01T00:00:00Z"),
+    };
+
+    it("answers 200 with the record when it already existed", async () => {
+      const upsertRecord = vi.fn(async () => ({ record: stored, created: false }));
+
+      await expect(
+        answer("patchApiDatasetBySlugOrIdRecordsByRecordId", completeDatasetApi({ upsertRecord }), {
+          slugOrId: "my-dataset",
+          recordId: "record-1",
+          entry: { input: "hi" },
+        }),
+      ).resolves.toEqual({ status: 200, body: stored });
+      expect(upsertRecord).toHaveBeenCalledWith({
+        slugOrId: "my-dataset",
+        projectId: "project-1",
+        recordId: "record-1",
+        updatedRecord: { input: "hi" },
+      });
+    });
+
+    it("answers 201 with the record when it was created", async () => {
+      const upsertRecord = vi.fn(async () => ({ record: stored, created: true }));
+
+      await expect(
+        answer("patchApiDatasetBySlugOrIdRecordsByRecordId", completeDatasetApi({ upsertRecord }), {
+          slugOrId: "my-dataset",
+          recordId: "record-1",
+          entry: { input: "hi" },
+        }),
+      ).resolves.toEqual({ status: 201, body: stored });
     });
   });
 

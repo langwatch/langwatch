@@ -782,3 +782,35 @@ describe("dataset search (postgres-backed)", () => {
     });
   });
 });
+
+describe("the editor's page read (datasetRecord.listPaginated)", () => {
+  describe("given a search term", () => {
+    it("pages the matches and counts them, as main's getDatasetPage does", async () => {
+      mockChunks();
+      const service = makeService({});
+      activeDataset = datasetSchema.parse({
+        archivedAt: null,
+        mapping: null,
+        useS3: true,
+        s3RecordCount: null,
+        stagingKey: null,
+        uploadFilename: null,
+        sizeBytes: null,
+        ...baseS3Dataset,
+      });
+
+      const page = await service.getDatasetPage({
+        slugOrId: activeDataset.id,
+        projectId: "p1",
+        page: 2,
+        limit: 1,
+        search: "escalation",
+      });
+
+      expect(page.datasetRecords.map((r) => r.entry.text)).toEqual(["escalation follow-up"]);
+      expect(page.count).toBe(2);
+      expect(page.totalPages).toBe(2);
+      expect(page.page).toBe(2);
+    });
+  });
+});

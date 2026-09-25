@@ -221,6 +221,20 @@ export class DatasetRecordService {
       projectId: parsed.projectId,
     });
     this.assertReady(dataset);
+    const search = normalizeDatasetSearch(parsed.search);
+    if (search) {
+      const matches = await this.searchRecords({ dataset, input: parsed, search });
+      return {
+        id: dataset.id,
+        name: dataset.name,
+        columnTypes: dataset.columnTypes,
+        datasetRecords: matches.data,
+        count: matches.pagination.total,
+        page: matches.pagination.page,
+        limit: matches.pagination.limit,
+        totalPages: matches.pagination.totalPages,
+      };
+    }
     if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
       return this.options.content.getDatasetPage({ dataset, input: parsed });
     }

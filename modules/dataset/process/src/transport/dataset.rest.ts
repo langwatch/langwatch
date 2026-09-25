@@ -16,6 +16,7 @@ import {
   DatasetAttachmentTooLargeError,
   datasetRestArchivedSchema,
   datasetRestAttachmentFieldsSchema,
+  datasetRestAttachmentQuerySchema,
   datasetRestBatchCreateRecordsSchema,
   datasetRestCreateSchema,
   datasetRestDeleteRecordsSchema,
@@ -31,12 +32,15 @@ import {
   datasetRestLegacyEntriesSchema,
   datasetRestListResponseSchema,
   datasetRestPaginationQuerySchema,
+  datasetRecordSchema,
   datasetRestRecordPageSchema,
+  datasetRestRecordParamsSchema,
   datasetRestRecordsCreatedSchema,
   datasetRestRecordsDeletedSchema,
   datasetRestSlugOrIdParamsSchema,
   datasetRestSlugParamsSchema,
   datasetRestSummarySchema,
+  datasetRestUpdateRecordSchema,
   datasetRestUpdateSchema,
   MAX_FILE_SIZE_BYTES,
   storedDatasetAttachmentSchema,
@@ -264,6 +268,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
       // Deprecated, the same time-boxed exception as the /upload pair: the posted
       // file is stored as a dataset attachment. Retires in the next release (ADR-158 §8).
       .post("/attachments", "postApiDatasetAttachments")
+      .withQuery(datasetRestAttachmentQuerySchema)
       .withMultipart({
         fields: datasetRestAttachmentFieldsSchema,
         files: { file: { required: true } },
@@ -281,7 +286,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
       })
       .withDocs({
         description:
-          "Upload a file for an image or file column and get the reference a cell holds. The file goes in the `file` multipart field, with an optional `datasetId` field.",
+          "Upload a file for an image or file column and get the reference a cell holds. The project is named by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional `datasetId` field.",
       })
       .handle(({ app, input, files, scope }) =>
         app.storeAttachmentUpload({
@@ -378,6 +383,24 @@ export function createDatasetRest(): DatasetRestDeclaration {
           limit: input.limit,
         }),
       )
+
+      // 201 when the record did not exist yet and was created, 200 when it was updated.
+      .patch("/:slugOrId/records/:recordId", "patchApiDatasetBySlugOrIdRecordsByRecordId")
+      .withParams(datasetRestRecordParamsSchema)
+      .withInput(datasetRestUpdateRecordSchema)
+      .withPermission("datasets:update")
+      .responds({ 200: datasetRecordSchema, 201: datasetRecordSchema })
+      .withDocs({ description: "Update or create a record in a dataset" })
+      .handle(async ({ app, input, scope }) => {
+        const { record, created } = await app.upsertRecord({
+          slugOrId: input.slugOrId,
+          projectId: scope.id,
+          recordId: input.recordId,
+          updatedRecord: input.entry,
+        });
+
+        return created ? { status: 201, body: record } : { status: 200, body: record };
+      })
 
       // Destructive — stays at `:manage`, like the dataset archive above.
       .delete("/:slugOrId/records", "deleteApiDatasetBySlugOrIdRecords")

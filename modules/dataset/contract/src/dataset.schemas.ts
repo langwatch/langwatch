@@ -91,10 +91,11 @@ export const datasetApiCopyInputSchema = z.object({
 });
 
 /** `datasetRecord.create`: new entries appended to a dataset. */
-export const datasetRecordApiCreateInputSchema = z.intersection(
-  z.object({ projectId: z.string(), datasetId: z.string() }),
-  newDatasetEntriesSchema,
-);
+export const datasetRecordApiCreateInputSchema = z.object({
+  projectId: z.string(),
+  datasetId: z.string(),
+  ...newDatasetEntriesSchema.shape,
+});
 
 /** `datasetRecord.update`: one entry replaced, or created, by id. */
 export const datasetRecordApiUpdateInputSchema = z.object({
@@ -116,6 +117,7 @@ export const datasetRecordApiPageInputSchema = z.object({
   datasetId: z.string(),
   page: z.number().int().positive().default(1),
   limit: z.number().int().positive().max(200).default(50),
+  search: z.string().optional(),
 });
 
 /** `datasetRecord.deleteMany`: entries removed by id. */

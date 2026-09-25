@@ -70,6 +70,17 @@ export const datasetRestLegacyEntriesSchema = z
 export const datasetRestSlugOrIdParamsSchema = z.object({ slugOrId: z.string() });
 export const datasetRestSlugParamsSchema = z.object({ datasetSlug: z.string() });
 
+/** `PATCH /api/dataset/:slugOrId/records/:recordId`: one record in one dataset. */
+export const datasetRestRecordParamsSchema = z.object({
+  slugOrId: z.string(),
+  recordId: z.string(),
+});
+
+/** `PATCH /api/dataset/:slugOrId/records/:recordId`: the entry the record holds now. */
+export const datasetRestUpdateRecordSchema = z.object({
+  entry: z.record(z.string(), z.any()),
+});
+
 /** `POST /api/dataset/imports`: the dataset to build, and the confirmed file it reads. */
 export const datasetRestImportSchema = createDatasetFromStoredObjectInputSchema
   .omit({ projectId: true })
@@ -85,6 +96,11 @@ export const datasetRestUploadFieldsSchema = z.object({ name: z.string().trim().
 export const datasetRestNoUploadFieldsSchema = z.object({});
 
 /** The deprecated multipart `/attachments` text field: the owning dataset, absent for a draft. */
+/** `POST /api/dataset/attachments`: the project the file is stored for, as on main. */
+export const datasetRestAttachmentQuerySchema = z.object({
+  projectId: z.string().min(1).describe("The project the file is stored for."),
+});
+
 export const datasetRestAttachmentFieldsSchema = z.object({
   datasetId: z
     .string()

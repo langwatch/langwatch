@@ -697,6 +697,62 @@ describe("the mounted dataset REST family", () => {
     });
   });
 
+  describe("when one record is patched over a real request", () => {
+    it("answers 201 for a record it created and 200 for one it updated", async () => {
+      const record = {
+        id: "rec-1",
+        datasetId: "dataset_1",
+        projectId: "project-1",
+        entry: { input: "hi" },
+        createdAt: NOW,
+        updatedAt: NOW,
+      };
+      for (const [created, status] of [
+        [true, 201],
+        [false, 200],
+      ] as const) {
+        const upsertRecord = vi.fn(async () => ({ record, created }));
+        const { send } = mount({ upsertRecord });
+
+        const response = await send("PATCH", "/api/dataset/my-dataset/records/rec-1", {
+          entry: { input: "hi" },
+        });
+
+        expect(response.status).toBe(status);
+        await expect(response.json()).resolves.toMatchObject({ id: "rec-1" });
+        expect(upsertRecord).toHaveBeenCalledWith(
+          expect.objectContaining({
+            slugOrId: "my-dataset",
+            recordId: "rec-1",
+            projectId: "project-1",
+          }),
+        );
+      }
+    });
+  });
+
+  describe("when a file is posted to the attachments address with main's projectId query", () => {
+    it("reads the project from the query and hands the file to the application", async () => {
+      const storeAttachmentUpload = vi.fn(async () => ({
+        url: "/api/files/project-1/object-1/a.csv",
+        name: "a.csv",
+        mediaType: "text/csv",
+        sizeBytes: MIB,
+      }));
+      const { sendStream } = mount({ storeAttachmentUpload });
+
+      const response = await sendStream(
+        "/api/dataset/attachments?projectId=project-1",
+        streamedUpload(MIB).body,
+      );
+
+      expect(response.status).toBe(200);
+      expect(storeAttachmentUpload).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: "project-1", filename: "big.csv" }),
+      );
+    });
+  });
+
   describe("when the caller carries no usable credential", () => {
     /**
      * @scenario "Request without API key returns 401"

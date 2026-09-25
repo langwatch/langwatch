@@ -56,6 +56,7 @@ export const datasetRecordTrpcTransport = defineTrpcRouter(DatasetApi, datasetRe
       projectId: input.projectId,
       page: input.page,
       limit: input.limit,
+      search: input.search,
     }),
   )
 
