@@ -99,6 +99,7 @@ async function bootApi() {
         nodeEnvironment: config.process.nodeEnvironment,
         isSaas: config.process.isSaas ?? false,
         nlpServiceUrl: config.process.nlpServiceUrl,
+        nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
         adminEmails: config.process.adminEmails,
         processName: "langwatch-api",
         dataPrivacy: { directory: unreachable<object>("dataPrivacy.directory") },

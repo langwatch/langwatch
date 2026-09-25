@@ -51,6 +51,14 @@ export const processOwner = {
         .optional()
         .transform((value) => value?.trim() || void 0),
     ),
+    /**
+     * How long a code block may run inside the engine, raw as the engine reads it.
+     * One owner for a fact workflow and scenario both read; each clamps its own way.
+     */
+    nlpCodeBlockTimeoutSeconds: c.env(
+      "NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS",
+      z.string().optional(),
+    ),
     /** Keeps the development badge off a development build (demos, screenshots). */
     hideDevIndicator: c.env(
       "HIDE_DEV_INDICATOR",

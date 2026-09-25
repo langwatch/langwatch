@@ -173,6 +173,7 @@ export class ProcessServer implements ProcessBoot {
               nodeEnvironment: this.settings.nodeEnvironment,
               isSaas: this.settings.isSaas ?? false,
               nlpServiceUrl: this.settings.nlpServiceUrl,
+              nlpCodeBlockTimeoutSeconds: this.settings.nlpCodeBlockTimeoutSeconds,
               adminEmails: this.settings.adminEmails ?? [],
               // Role facts: the composition's word, never a deployment's.
               processName: this.server.name,
@@ -236,5 +237,6 @@ const processSettings = z.object({
   nodeEnvironment: z.string().optional(),
   isSaas: z.boolean().optional(),
   nlpServiceUrl: z.string().optional(),
+  nlpCodeBlockTimeoutSeconds: z.string().optional(),
   adminEmails: z.array(z.string()).optional(),
 });

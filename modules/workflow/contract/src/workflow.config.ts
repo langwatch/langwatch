@@ -57,9 +57,7 @@ export const nlpLambdaFleetFromSecret = z
     return fields.data;
   });
 
-export const workflowConfig = Config.define((c) => ({
-  /** How long a code block may run inside the engine, as the engine reads it. */
-  codeBlockTimeoutSeconds: c.env("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", z.string().optional()),
+export const workflowConfig = Config.define(() => ({
   /** Above this many bytes a payload is staged rather than sent inline. */
   stagingThresholdBytes: langevalsStagingThresholdBytes,
   stagingTtlSeconds: langevalsStagingTtlSeconds,

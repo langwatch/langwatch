@@ -11,7 +11,7 @@ export const scenarioTestConfig: ScenarioServerConfig = {
   blockLocalHttpCalls: true,
   allowedProxyHosts: [],
   defaultModel: void 0,
-  nlpTimeouts: { engineCodeBlockTimeoutSeconds: void 0, maxTimeoutMs: void 0 },
+  nlpTimeouts: { maxTimeoutMs: void 0 },
   childParentEnvironment: {
     path: void 0,
     home: void 0,
@@ -38,6 +38,7 @@ export function scenarioExecutorPeers() {
 /** The process facts a child is started with, as a test process answers them. */
 export const scenarioHostMembers = {
   nlpServiceUrl: void 0,
+  nlpCodeBlockTimeoutSeconds: void 0,
   isSaas: false,
   nodeEnvironment: "test",
 };

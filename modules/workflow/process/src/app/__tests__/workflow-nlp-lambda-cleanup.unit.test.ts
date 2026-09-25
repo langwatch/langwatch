@@ -55,7 +55,6 @@ function appWith(fleet?: NlpLambdaFleet): WorkflowApp {
       datasets: members.datasets,
     },
     config: {
-      codeBlockTimeoutSeconds: undefined,
       stagingThresholdBytes: undefined,
       stagingTtlSeconds: 600,
     },

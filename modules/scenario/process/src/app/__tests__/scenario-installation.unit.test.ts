@@ -64,6 +64,7 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
     .withMember("idempotency", { claim: async () => true })
     .withMember("publicBaseUrl", "https://app.langwatch.test")
     .withMember("nlpServiceUrl", undefined)
+    .withMember("nlpCodeBlockTimeoutSeconds", undefined)
     .withMember("isSaas", false)
     .withMember("nodeEnvironment", "test")
     .provide({

@@ -63,7 +63,6 @@ function appWith({
       datasets: members.datasets,
     },
     config: {
-      codeBlockTimeoutSeconds: void 0,
       stagingThresholdBytes: void 0,
       stagingTtlSeconds: 600,
     },

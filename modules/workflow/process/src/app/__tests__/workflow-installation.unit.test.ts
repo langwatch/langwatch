@@ -40,7 +40,6 @@ function process_() {
     .withModules([withMemoryRepositories(workflowServer)])
     .withConfig({
       workflow: {
-        codeBlockTimeoutSeconds: undefined,
         stagingThresholdBytes: undefined,
         stagingTtlSeconds: 600,
       },

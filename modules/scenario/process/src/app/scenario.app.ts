@@ -251,6 +251,7 @@ type ScenarioProcessMembers = Readonly<{
   redis: ScenarioEventBroadcastPublisher;
   publicBaseUrl: string | undefined;
   nlpServiceUrl: string | undefined;
+  nlpCodeBlockTimeoutSeconds: string | undefined;
   isSaas: boolean;
   nodeEnvironment: string | undefined;
 }>;
@@ -278,6 +279,7 @@ export class ScenarioApp implements ScenarioApi {
     "redis",
     "publicBaseUrl",
     "nlpServiceUrl",
+    "nlpCodeBlockTimeoutSeconds",
     "isSaas",
     "nodeEnvironment",
   ] as const;
@@ -337,7 +339,12 @@ export class ScenarioApp implements ScenarioApi {
         modelProviders: peers.modelProviders,
         simulations,
         config: prefetchConfig,
-        agentAdapters: SerializedAgentChannelRegistry.create({ nlpTimeouts: config.nlpTimeouts }),
+        agentAdapters: SerializedAgentChannelRegistry.create({
+          nlpTimeouts: {
+            ...config.nlpTimeouts,
+            engineCodeBlockTimeoutSeconds: Number(setup.members.nlpCodeBlockTimeoutSeconds),
+          },
+        }),
         maxCallTimeoutMs: MAX_CALL_TIMEOUT_MS,
       }),
       connectedTargets: ConnectedTargetService.create(setup.dependencies.agents),

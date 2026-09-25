@@ -31,7 +31,6 @@ export const scenarioConfig = Config.define((c) => ({
   defaultModel: langwatchDefaultModel,
   /** The nlpgo deadlines an agent-test turn answers inside; unusable values clamp to defaults. */
   nlpTimeouts: {
-    engineCodeBlockTimeoutSeconds: c.env("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", optionalNumber),
     maxTimeoutMs: c.env("NLP_FETCH_MAX_TIMEOUT_MS", optionalNumber),
   },
   childParentEnvironment: {
