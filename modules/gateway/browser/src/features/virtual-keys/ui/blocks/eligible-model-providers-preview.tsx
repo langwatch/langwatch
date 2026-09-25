@@ -7,6 +7,7 @@ import { useMemo } from "react";
 import { Link } from "../../../../ui/elements/gateway-link.tsx";
 import {
   buildScopeHierarchy,
+  type EligibleModelProvider,
   type ModelProviderScopeEntry,
   type OrgModelProvider,
   resolveEligible,
@@ -42,6 +43,82 @@ function listScopeNames(scopes: VirtualKeyScopeEntry[], names: ScopeNames): stri
   const labels = scopes.map((s) => scopeName(s, names) ?? s.scopeId);
   if (labels.length <= 1) return labels[0] ?? "";
   return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]!}`;
+}
+
+function EligibleProviderRow({
+  provider: mp,
+  names,
+  isSelected,
+  outsideRoutingPolicy,
+  onSelectProviderModel,
+}: {
+  provider: EligibleModelProvider;
+  names: ScopeNames;
+  isSelected: boolean;
+  outsideRoutingPolicy: boolean;
+  onSelectProviderModel?: (model: string) => void;
+}) {
+  const icon =
+    mp.provider in modelProviderIcons
+      ? modelProviderIcons[mp.provider as keyof typeof modelProviderIcons]
+      : null;
+  const interactive = !!onSelectProviderModel;
+  return (
+    <HStack
+      borderWidth="1px"
+      borderColor={isSelected ? "blue.400" : "border.subtle"}
+      borderRadius="md"
+      paddingX={2}
+      paddingY={1.5}
+      gap={2}
+      cursor={interactive ? "pointer" : "default"}
+      background={isSelected ? "blue.50" : undefined}
+      _hover={interactive ? { background: isSelected ? "blue.50" : "bg.subtle" } : undefined}
+      onClick={interactive ? () => onSelectProviderModel?.(mp.defaultModel) : undefined}
+      title={interactive ? `Use ${mp.defaultModel} in the snippet above` : undefined}
+    >
+      <Box
+        width="16px"
+        height="16px"
+        flexShrink={0}
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        css={{ "& > svg": { width: "100%", height: "100%" } }}
+      >
+        {icon}
+      </Box>
+      <Text fontSize="sm" fontWeight="medium">
+        {mp.label}
+      </Text>
+      {mp.modelCount > 0 && (
+        <Text fontSize="xs" color="fg.muted">
+          · {mp.modelCount} {mp.modelCount === 1 ? "model" : "models"}
+        </Text>
+      )}
+      {interactive && (
+        <Text fontSize="2xs" color="fg.muted" fontFamily="mono">
+          {mp.defaultModel}
+        </Text>
+      )}
+      {outsideRoutingPolicy && (
+        <Text fontSize="2xs" color="fg.muted" data-testid={`vk-provider-outside-policy-${mp.id}`}>
+          Not in routing policy
+        </Text>
+      )}
+      <Box flex={1} />
+      <ProviderScopeChips
+        size="xs"
+        scopes={[
+          {
+            scopeType: mp.definedAt.scopeType,
+            scopeId: mp.definedAt.scopeId,
+            name: scopeName(mp.definedAt, names),
+          },
+        ]}
+      />
+    </HStack>
+  );
 }
 
 export function EligibleModelProvidersPreview({
@@ -156,78 +233,18 @@ export function EligibleModelProvidersPreview({
     );
   }
 
-  const interactive = !!onSelectProviderModel;
-
   return (
     <VStack align="stretch" gap={1}>
-      {eligible.map((mp) => {
-        const icon =
-          mp.provider in modelProviderIcons
-            ? modelProviderIcons[mp.provider as keyof typeof modelProviderIcons]
-            : null;
-        const isSelected = selectedModel === mp.defaultModel;
-        return (
-          <HStack
-            key={mp.id}
-            borderWidth="1px"
-            borderColor={isSelected ? "blue.400" : "border.subtle"}
-            borderRadius="md"
-            paddingX={2}
-            paddingY={1.5}
-            gap={2}
-            cursor={interactive ? "pointer" : "default"}
-            background={isSelected ? "blue.50" : undefined}
-            _hover={interactive ? { background: isSelected ? "blue.50" : "bg.subtle" } : undefined}
-            onClick={interactive ? () => onSelectProviderModel?.(mp.defaultModel) : undefined}
-            title={interactive ? `Use ${mp.defaultModel} in the snippet above` : undefined}
-          >
-            <Box
-              width="16px"
-              height="16px"
-              flexShrink={0}
-              display="flex"
-              alignItems="center"
-              justifyContent="center"
-              css={{ "& > svg": { width: "100%", height: "100%" } }}
-            >
-              {icon}
-            </Box>
-            <Text fontSize="sm" fontWeight="medium">
-              {mp.label}
-            </Text>
-            {mp.modelCount > 0 && (
-              <Text fontSize="xs" color="fg.muted">
-                · {mp.modelCount} {mp.modelCount === 1 ? "model" : "models"}
-              </Text>
-            )}
-            {interactive && (
-              <Text fontSize="2xs" color="fg.muted" fontFamily="mono">
-                {mp.defaultModel}
-              </Text>
-            )}
-            {inRoutingPolicy && !inRoutingPolicy.has(mp.id) && (
-              <Text
-                fontSize="2xs"
-                color="fg.muted"
-                data-testid={`vk-provider-outside-policy-${mp.id}`}
-              >
-                Not in routing policy
-              </Text>
-            )}
-            <Box flex={1} />
-            <ProviderScopeChips
-              size="xs"
-              scopes={[
-                {
-                  scopeType: mp.definedAt.scopeType,
-                  scopeId: mp.definedAt.scopeId,
-                  name: scopeName(mp.definedAt, names),
-                },
-              ]}
-            />
-          </HStack>
-        );
-      })}
+      {eligible.map((mp) => (
+        <EligibleProviderRow
+          key={mp.id}
+          provider={mp}
+          names={names}
+          isSelected={selectedModel === mp.defaultModel}
+          outsideRoutingPolicy={!!inRoutingPolicy && !inRoutingPolicy.has(mp.id)}
+          onSelectProviderModel={onSelectProviderModel}
+        />
+      ))}
     </VStack>
   );
 }

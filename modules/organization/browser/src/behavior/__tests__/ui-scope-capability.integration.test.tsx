@@ -4,6 +4,7 @@
  * @vitest-environment jsdom
  */
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import { UiSession } from "@langwatch/browser-host/capabilities";
 import type { UiSessionReading, UiSessionSnapshot } from "@langwatch/browser-host/session";
 import type { UiScopeTeam } from "@langwatch/organization-contract";
@@ -32,7 +33,7 @@ function recordingTransport({
   teams = [PERSONAL_TEAM, SHARED_TEAM],
 }: { teams?: readonly UiScopeTeam[] } = {}) {
   const calls: Call[] = [];
-  const transport = {
+  const transport = createApiFixture<UiFeatureApiTransport>({
     query: (path: string, input: unknown) => {
       calls.push({ path, input });
       switch (path) {
@@ -46,9 +47,9 @@ function recordingTransport({
           return Promise.reject(new Error(`No test answer for ${path}`));
       }
     },
-  };
+  });
   const callsTo = (path: string) => calls.filter((call) => call.path === path);
-  return { transport: transport as unknown as UiFeatureApiTransport, callsTo };
+  return { transport, callsTo };
 }
 
 const SIGNED_IN: UiSessionReading = {

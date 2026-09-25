@@ -144,29 +144,35 @@ export function parseSimpleDictEntries(body: string): DictEntry[] {
     if (i >= body.length) break;
     const keyQuote = body[i];
     if (keyQuote !== '"' && keyQuote !== "'") {
-      // skip until comma at depth 0
       i = advancePastEntry(body, i);
       continue;
     }
-    let j = i + 1;
-    while (j < body.length && body[j] !== keyQuote) {
-      if (body[j] === "\\") j++;
-      j++;
-    }
-    if (j >= body.length) break;
-    const key = body.slice(i + 1, j);
-    j++;
-    while (j < body.length && body[j] !== ":") j++;
-    if (j >= body.length) break;
-    j++; // past colon
-    while (j < body.length && /\s/.test(body[j] ?? "")) j++;
-    const valueStart = j;
-    j = advancePastEntry(body, j);
-    const value = body.slice(valueStart, j).trim();
-    entries.push({ key, value, valueOffset: valueStart });
-    i = j;
+    const parsed = parseQuotedKeyEntry(body, i, keyQuote);
+    if (parsed.kind === "truncated") break;
+    entries.push(parsed.entry);
+    i = parsed.next;
   }
   return entries;
+}
+
+/** One `"key": value` entry starting at its key's opening quote. */
+function parseQuotedKeyEntry(
+  body: string,
+  keyStart: number,
+  keyQuote: '"' | "'",
+): { kind: "entry"; entry: DictEntry; next: number } | { kind: "truncated" } {
+  let j = closingQuoteIndex(body, keyStart + 1, keyQuote);
+  if (j >= body.length) return { kind: "truncated" };
+  const key = body.slice(keyStart + 1, j);
+  j++;
+  while (j < body.length && body[j] !== ":") j++;
+  if (j >= body.length) return { kind: "truncated" };
+  j++; // past colon
+  while (j < body.length && /\s/.test(body[j] ?? "")) j++;
+  const valueStart = j;
+  const next = advancePastEntry(body, valueStart);
+  const value = body.slice(valueStart, next).trim();
+  return { kind: "entry", entry: { key, value, valueOffset: valueStart }, next };
 }
 
 function closingQuoteIndex(body: string, from: number, quote: '"' | "'"): number {

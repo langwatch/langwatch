@@ -8,7 +8,7 @@ import { type AnchorHTMLAttributes, forwardRef, type MouseEvent, type ReactNode 
 import { useOptionalWorkflowHost } from "../../model/workflow-host.ts";
 
 interface NextLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> {
-  href: string | { pathname: string; query?: Record<string, any> };
+  href: string | { pathname: string; query?: LinkQuery };
   as?: string;
   replace?: boolean;
   scroll?: boolean;
@@ -24,7 +24,12 @@ interface NextLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "h
   children?: ReactNode;
 }
 
-function buildHref(href: string | { pathname: string; query?: Record<string, any> }): string {
+type LinkQuery = Record<
+  string,
+  string | number | boolean | null | undefined | readonly (string | number | boolean)[]
+>;
+
+function buildHref(href: string | { pathname: string; query?: LinkQuery }): string {
   if (typeof href === "string") return href;
   const { pathname, query } = href;
   if (!query || Object.keys(query).length === 0) return pathname;

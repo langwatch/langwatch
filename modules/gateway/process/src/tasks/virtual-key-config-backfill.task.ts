@@ -77,40 +77,11 @@ export async function backfillVirtualKeyConfig({
   let skippedWithoutProjectScope = 0;
 
   for (const virtualKey of virtualKeys) {
-    const raw = objectOf(virtualKey.config);
-    const config = readLegacyConfig(raw);
-    const carries = {
-      aliases: hasAliases(config),
-      rules: hasPolicyRules(config),
-      guardrails: hasGuardrails(config),
-    };
-    if (!carries.aliases && !carries.rules && !carries.guardrails) continue;
-
-    let routingPolicyId = virtualKey.routingPolicyId;
-    if ((carries.aliases || carries.rules) && !routingPolicyId) {
-      routingPolicyId = await mintRoutingPolicy({ repository, execute, virtualKey, config, now });
-      routingPoliciesMinted += 1;
-    }
-
-    const guardrails = carries.guardrails
-      ? await mintGuardrails({ repository, execute, virtualKey, config })
-      : { attachments: [], minted: 0, skipped: false };
-    guardrailsMinted += guardrails.minted;
-    if (guardrails.skipped) skippedWithoutProjectScope += 1;
-
-    const next: Record<string, unknown> = { ...raw };
-    delete next.modelAliases;
-    delete next.policyRules;
-    delete next.guardrails;
-    if (guardrails.attachments.length > 0) next.guardrailAttachments = guardrails.attachments;
-
-    if (execute) {
-      await repository.updateVirtualKeyConfig({
-        id: virtualKey.id,
-        config: next as BackfillJsonObject,
-        routingPolicyId,
-      });
-    }
+    const migrated = await migrateVirtualKeyConfig({ repository, execute, virtualKey, now });
+    if (!migrated.carriedLegacyConfig) continue;
+    if (migrated.routingPolicyMinted) routingPoliciesMinted += 1;
+    guardrailsMinted += migrated.guardrailsMinted;
+    if (migrated.skippedWithoutProjectScope) skippedWithoutProjectScope += 1;
     touched += 1;
   }
 
@@ -124,6 +95,68 @@ export async function backfillVirtualKeyConfig({
   };
   logger.info({ outcome }, "virtual-key config backfill finished");
   return outcome;
+}
+
+/** Moves one key's legacy config onto minted rows, when it carries any. */
+async function migrateVirtualKeyConfig({
+  repository,
+  execute,
+  virtualKey,
+  now,
+}: {
+  repository: GatewayVirtualKeyConfigBackfillRepository;
+  execute: boolean;
+  virtualKey: VirtualKeyRow;
+  now: () => Instant;
+}): Promise<
+  | { carriedLegacyConfig: false }
+  | {
+      carriedLegacyConfig: true;
+      routingPolicyMinted: boolean;
+      guardrailsMinted: number;
+      skippedWithoutProjectScope: boolean;
+    }
+> {
+  const raw = objectOf(virtualKey.config);
+  const config = readLegacyConfig(raw);
+  const carries = {
+    aliases: hasAliases(config),
+    rules: hasPolicyRules(config),
+    guardrails: hasGuardrails(config),
+  };
+  if (!carries.aliases && !carries.rules && !carries.guardrails) {
+    return { carriedLegacyConfig: false };
+  }
+
+  let routingPolicyId = virtualKey.routingPolicyId;
+  const routingPolicyMinted = (carries.aliases || carries.rules) && !routingPolicyId;
+  if (routingPolicyMinted) {
+    routingPolicyId = await mintRoutingPolicy({ repository, execute, virtualKey, config, now });
+  }
+
+  const guardrails = carries.guardrails
+    ? await mintGuardrails({ repository, execute, virtualKey, config })
+    : { attachments: [], minted: 0, skipped: false };
+
+  const next: Record<string, unknown> = { ...raw };
+  delete next.modelAliases;
+  delete next.policyRules;
+  delete next.guardrails;
+  if (guardrails.attachments.length > 0) next.guardrailAttachments = guardrails.attachments;
+
+  if (execute) {
+    await repository.updateVirtualKeyConfig({
+      id: virtualKey.id,
+      config: next as BackfillJsonObject,
+      routingPolicyId,
+    });
+  }
+  return {
+    carriedLegacyConfig: true,
+    routingPolicyMinted,
+    guardrailsMinted: guardrails.minted,
+    skippedWithoutProjectScope: guardrails.skipped,
+  };
 }
 
 /** The ksuid kind an auto-migrated routing policy is minted under. */

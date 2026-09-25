@@ -105,6 +105,76 @@ function isRoutable(provider: OrgModelProvider): boolean {
   );
 }
 
+function providerScopeReaches({
+  mpScope,
+  vkScope,
+  hierarchy,
+}: {
+  mpScope: ModelProviderScopeEntry;
+  vkScope: VirtualKeyScopeEntry;
+  hierarchy: ScopeHierarchy;
+}): boolean {
+  if (mpScope.scopeType === "ORGANIZATION") {
+    return mpScope.scopeId === hierarchy.organizationId;
+  }
+  if (mpScope.scopeType === "TEAM") {
+    if (vkScope.scopeType === "ORGANIZATION") return false;
+    if (vkScope.scopeType === "TEAM") return mpScope.scopeId === vkScope.scopeId;
+    return mpScope.scopeId === hierarchy.teamOfProject.get(vkScope.scopeId);
+  }
+  if (mpScope.scopeType === "PROJECT") {
+    return vkScope.scopeType === "PROJECT" && mpScope.scopeId === vkScope.scopeId;
+  }
+  return false;
+}
+
+/** The broadest scope (ORG > TEAM > PROJECT) through which the provider reaches the key. */
+function broadestReachingScope({
+  provider,
+  scopes,
+  hierarchy,
+}: {
+  provider: OrgModelProvider;
+  scopes: VirtualKeyScopeEntry[];
+  hierarchy: ScopeHierarchy;
+}): ModelProviderScopeEntry | undefined {
+  let definedAt: ModelProviderScopeEntry | undefined;
+  for (const mpScope of provider.scopes) {
+    if (!scopes.some((vkScope) => providerScopeReaches({ mpScope, vkScope, hierarchy }))) continue;
+    if (!definedAt || SCOPE_BREADTH[mpScope.scopeType] < SCOPE_BREADTH[definedAt.scopeType]) {
+      definedAt = mpScope;
+    }
+  }
+  return definedAt;
+}
+
+function toEligibleProvider({
+  id,
+  provider,
+  definedAt,
+}: {
+  id: string;
+  provider: OrgModelProvider;
+  definedAt: ModelProviderScopeEntry;
+}): EligibleModelProvider {
+  const chatModels = provider.models ?? [];
+  const customCount = provider.customModels?.length ?? 0;
+  const label = provider.name ?? provider.provider;
+  return {
+    id,
+    provider: provider.provider,
+    label,
+    modelCount: chatModels.length + customCount,
+    definedAt,
+    defaultModel: resolveProviderDefaultModel({
+      providerKey: provider.provider,
+      providerLabel: label,
+      providerModels: chatModels,
+      customModels: provider.customModels,
+    }),
+  };
+}
+
 /**
  * Resolves the scope-reachable ModelProvider set for a VirtualKey client-side,
  * with each provider carrying its broadest reachable scope. Rows sorted by scope
@@ -128,56 +198,13 @@ export function resolveEligible({
   if (scopes.length === 0 || providers.length === 0) return [];
   const allowed =
     providersAllowed && providersAllowed.length > 0 ? new Set(providersAllowed) : null;
-  const matchesScope = (
-    mpScope: ModelProviderScopeEntry,
-    vkScope: VirtualKeyScopeEntry,
-  ): boolean => {
-    if (mpScope.scopeType === "ORGANIZATION") {
-      return mpScope.scopeId === hierarchy.organizationId;
-    }
-    if (mpScope.scopeType === "TEAM") {
-      if (vkScope.scopeType === "ORGANIZATION") return false;
-      if (vkScope.scopeType === "TEAM") return mpScope.scopeId === vkScope.scopeId;
-      const teamOfVkProject = hierarchy.teamOfProject.get(vkScope.scopeId);
-      return mpScope.scopeId === teamOfVkProject;
-    }
-    if (mpScope.scopeType === "PROJECT") {
-      return vkScope.scopeType === "PROJECT" && mpScope.scopeId === vkScope.scopeId;
-    }
-    return false;
-  };
-
-  // Rank the tiers so a provider attached at several scopes is attributed to
-  // the broadest one (ORG > TEAM > PROJECT) it reaches the key through.
   const result = new Map<string, EligibleModelProvider>();
   for (const provider of providers) {
-    if (!provider.id) continue;
-    if (allowed && !allowed.has(provider.id)) continue;
-    if (!isRoutable(provider)) continue;
-    let definedAt: ModelProviderScopeEntry | undefined;
-    for (const mpScope of provider.scopes) {
-      if (!scopes.some((vkScope) => matchesScope(mpScope, vkScope))) continue;
-      if (!definedAt || SCOPE_BREADTH[mpScope.scopeType] < SCOPE_BREADTH[definedAt.scopeType]) {
-        definedAt = mpScope;
-      }
-    }
+    const id = provider.id;
+    if (!id || (allowed && !allowed.has(id)) || !isRoutable(provider)) continue;
+    const definedAt = broadestReachingScope({ provider, scopes, hierarchy });
     if (!definedAt) continue;
-    const chatModels = provider.models ?? [];
-    const customCount = provider.customModels?.length ?? 0;
-    const label = provider.name ?? provider.provider;
-    result.set(provider.id, {
-      id: provider.id,
-      provider: provider.provider,
-      label,
-      modelCount: chatModels.length + customCount,
-      definedAt,
-      defaultModel: resolveProviderDefaultModel({
-        providerKey: provider.provider,
-        providerLabel: label,
-        providerModels: chatModels,
-        customModels: provider.customModels,
-      }),
-    });
+    result.set(id, toEligibleProvider({ id, provider, definedAt }));
   }
   return Array.from(result.values()).toSorted(
     (a, b) =>

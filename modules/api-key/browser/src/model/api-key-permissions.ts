@@ -306,15 +306,7 @@ export function bindingsToSelections(
 ): Record<string, string> {
   const mode = apiKey.permissionMode as PermissionMode;
 
-  if (mode === "readonly") {
-    const selections: Record<string, string> = {};
-    for (const cat of deps.permissionCategories) {
-      // Write-only categories (no read level) have nothing to show on a
-      // readonly key.
-      if (cat.accessLevels.includes("read")) selections[cat.key] = "read";
-    }
-    return selections;
-  }
+  if (mode === "readonly") return readSelections(deps.permissionCategories);
 
   const binding = apiKey.roleBindings[0];
   if (!binding) return {};
@@ -326,20 +318,32 @@ export function bindingsToSelections(
     }
   }
 
-  if (binding.role === "VIEWER") {
-    const selections: Record<string, string> = {};
-    for (const cat of deps.permissionCategories) {
-      if (cat.accessLevels.includes("read")) selections[cat.key] = "read";
-    }
-    return selections;
-  }
+  if (binding.role === "VIEWER") return readSelections(deps.permissionCategories);
 
   if (binding.role === "MEMBER") {
     return deps.selectionsFromPermissions(deps.getTeamRolePermissions("MEMBER"));
   }
 
+  return fullAccessSelections(deps.permissionCategories);
+}
+
+type PermissionCategoryLevels = { key: string; accessLevels: readonly string[] };
+
+/** Read on every category that has a read level; write-only categories show nothing. */
+function readSelections(categories: readonly PermissionCategoryLevels[]): Record<string, string> {
   const selections: Record<string, string> = {};
-  for (const cat of deps.permissionCategories) {
+  for (const cat of categories) {
+    if (cat.accessLevels.includes("read")) selections[cat.key] = "read";
+  }
+  return selections;
+}
+
+/** The broadest level on every category: write where it exists, else read. */
+function fullAccessSelections(
+  categories: readonly PermissionCategoryLevels[],
+): Record<string, string> {
+  const selections: Record<string, string> = {};
+  for (const cat of categories) {
     selections[cat.key] = cat.accessLevels.includes("write") ? "write" : "read";
   }
   return selections;

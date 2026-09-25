@@ -818,14 +818,8 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     return this.scopeReach.findAll(organizationId);
   }
 
-  async create(input: CreateBudgetInput): Promise<GatewayBudgetResource> {
-    // An anchor only means something on a window that rolls. Checked before
-    // any lookup, since it needs nothing but the request.
-    const cycleAnchorAt = input.cycleAnchorAt ?? null;
-    if (cycleAnchorAt && !GatewayWindow.isCyclicWindow(input.window)) {
-      throw new GatewayBudgetCycleAnchorInvalidError(input.window.toLowerCase());
-    }
-
+  /** Every request-supplied scope id must name something in the budget's own organization. */
+  private async assertScopeWithinOrganization(input: CreateBudgetInput): Promise<void> {
     // Cross-org guard for PRINCIPAL budgets: the named user must belong to
     // the budget's organization, or the FK to User would pass while the
     // budget silently never matched the user's traffic (PRINCIPAL spans only
@@ -898,6 +892,12 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       }
     }
 
+    await this.assertAttributedUserAnchorWithinOrganization(input);
+  }
+
+  private async assertAttributedUserAnchorWithinOrganization(
+    input: CreateBudgetInput,
+  ): Promise<void> {
     if (input.scope.kind === "ATTRIBUTED_USER") {
       // Per-end-user buckets are unbounded-cardinality and only exist on
       // the ClickHouse spend path; same refusal as GROUP, for the same
@@ -926,7 +926,9 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
         }
       }
     }
+  }
 
+  private async assertProviderWithinOrganization(input: CreateBudgetInput): Promise<void> {
     // Provider-filtered budgets reference a ModelProvider row. The id is
     // request-supplied, so pin it to the budget's own organization: a
     // cross-org id would create a filter that can never match this org's
@@ -943,6 +945,18 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
         throw new GatewayScopeOrgMismatchError("model provider");
       }
     }
+  }
+
+  async create(input: CreateBudgetInput): Promise<GatewayBudgetResource> {
+    // An anchor only means something on a window that rolls. Checked before
+    // any lookup, since it needs nothing but the request.
+    const cycleAnchorAt = input.cycleAnchorAt ?? null;
+    if (cycleAnchorAt && !GatewayWindow.isCyclicWindow(input.window)) {
+      throw new GatewayBudgetCycleAnchorInvalidError(input.window.toLowerCase());
+    }
+
+    await this.assertScopeWithinOrganization(input);
+    await this.assertProviderWithinOrganization(input);
 
     const resetsAt = GatewayWindow.nextBoundaryFor({
       budget: { window: input.window, cycleAnchorAt },
@@ -1301,29 +1315,12 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
         limitUsd: budget.limitUsd.toFixed(6),
       });
 
-      const projectedTotal = effectiveSpent.plus(projected);
-      if (projectedTotal.greaterThanOrEqualTo(budget.limitUsd)) {
-        if (budget.onBreach === "BLOCK") {
-          blockedBy.push(lineFor(budget, effectiveSpent));
-          blockReason =
-            blockReason ??
-            `Budget exceeded for scope=${budget.scopeType.toLowerCase()} window=${budget.window.toLowerCase()}`;
-        } else {
-          warnings.push({
-            scope: budget.scopeType.toLowerCase(),
-            pctUsed: percentUsed(projectedTotal, budget.limitUsd),
-            limitUsd: budget.limitUsd.toString(),
-          });
-        }
-      } else if (
-        percentUsed(projectedTotal, budget.limitUsd) >= 80 &&
-        budget.onBreach === "BLOCK"
-      ) {
-        warnings.push({
-          scope: budget.scopeType.toLowerCase(),
-          pctUsed: percentUsed(projectedTotal, budget.limitUsd),
-          limitUsd: budget.limitUsd.toString(),
-        });
+      const standing = budgetStandingAfter({ budget, effectiveSpent, projected });
+      if (standing.kind === "blocked") {
+        blockedBy.push(standing.line);
+        blockReason = blockReason ?? standing.reason;
+      } else if (standing.kind === "warned") {
+        warnings.push(standing.warning);
       }
     }
 
@@ -1415,6 +1412,38 @@ function scopeIdForScope(scope: BudgetScope): string {
 
 function extractScopeProjectId(scope: BudgetScope): string | null {
   return scope.kind === "PROJECT" ? scope.projectId : null;
+}
+
+/** Where a budget stands once the projected cost lands on its effective spend. */
+function budgetStandingAfter({
+  budget,
+  effectiveSpent,
+  projected,
+}: {
+  budget: GatewayBudget;
+  effectiveSpent: Prisma.Decimal;
+  projected: Prisma.Decimal;
+}):
+  | { kind: "blocked"; line: BudgetCheckResult["blockedBy"][number]; reason: string }
+  | { kind: "warned"; warning: BudgetCheckResult["warnings"][number] }
+  | { kind: "clear" } {
+  const projectedTotal = effectiveSpent.plus(projected);
+  const pctUsed = percentUsed(projectedTotal, budget.limitUsd);
+  const warning = {
+    scope: budget.scopeType.toLowerCase(),
+    pctUsed,
+    limitUsd: budget.limitUsd.toString(),
+  };
+  if (projectedTotal.greaterThanOrEqualTo(budget.limitUsd)) {
+    if (budget.onBreach !== "BLOCK") return { kind: "warned", warning };
+    return {
+      kind: "blocked",
+      line: lineFor(budget, effectiveSpent),
+      reason: `Budget exceeded for scope=${budget.scopeType.toLowerCase()} window=${budget.window.toLowerCase()}`,
+    };
+  }
+  if (pctUsed >= 80 && budget.onBreach === "BLOCK") return { kind: "warned", warning };
+  return { kind: "clear" };
 }
 
 // Builds a blockedBy line for a breached budget. effectiveSpent is the

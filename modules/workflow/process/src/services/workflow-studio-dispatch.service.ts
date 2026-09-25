@@ -151,16 +151,8 @@ export class WorkflowStudioDispatchService {
     let streamDone = false;
 
     while (!streamDone) {
-      if (isAborted && (await isAborted())) {
-        logger.info("Execution aborted, cancelling stream reader");
-        await reader.cancel();
-
-        return;
-      }
-
-      const read = await readChunkOrAbort(reader, isAborted);
+      const read = await this.nextChunkOrAbort(reader, isAborted);
       if (read === "aborted") {
-        logger.info("Execution aborted mid-read, cancelling stream reader");
         await reader.cancel();
 
         return;
@@ -188,6 +180,20 @@ export class WorkflowStudioDispatchService {
     if (frames === 0 && !(isAborted && (await isAborted()))) {
       throw new Error(`Studio invalid response: ${buffered}`);
     }
+  }
+
+  /** The next chunk, or "aborted" when the caller aborted before or during the read. */
+  private async nextChunkOrAbort(
+    reader: ReadableStreamDefaultReader<Uint8Array>,
+    isAborted: WorkflowStudioDispatchInput["isAborted"],
+  ): Promise<Awaited<ReturnType<typeof readChunkOrAbort>>> {
+    if (isAborted && (await isAborted())) {
+      logger.info("Execution aborted, cancelling stream reader");
+      return "aborted";
+    }
+    const read = await readChunkOrAbort(reader, isAborted);
+    if (read === "aborted") logger.info("Execution aborted mid-read, cancelling stream reader");
+    return read;
   }
 
   /** Emits every `data:` frame in one chunk. True once the engine said `done`. */
