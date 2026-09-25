@@ -96,7 +96,7 @@ export interface UserApi {
   isAdmin(identity: Readonly<{ email?: string | null }>): boolean;
   /** Whether the account behind an id is a platform operator, by its own address. */
   isOperator(input: { userId: string }): Promise<boolean>;
-  /** The account an address belongs to, or nothing when nobody holds it. */
+  /** The account an address belongs to, ignoring case, or nothing when nobody holds it. */
   findByEmail(input: UserEmailInput): Promise<UserProfile | null>;
   /** Mints a directory account with no sign-in method of its own. */
   create(input: CreateUserInput): Promise<UserProfile>;

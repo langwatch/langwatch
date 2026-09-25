@@ -57,10 +57,6 @@ export class MemoryUserDatabase {
   }
 
   usersWithEmail(email: string): MemoryUserRow[] {
-    return [...this.#users.values()].filter((row) => row.email === email);
-  }
-
-  usersWithEmailInsensitive(email: string): MemoryUserRow[] {
     const wanted = email.toLowerCase();
 
     return [...this.#users.values()].filter((row) => row.email?.toLowerCase() === wanted);

@@ -41,7 +41,6 @@ class StubRepository implements UserRepository {
   findProfiles = vi.fn(async () => [user]);
   findById = vi.fn(async () => user);
   findByEmail = vi.fn(async () => user);
-  findByEmailInsensitive = vi.fn(async () => user);
   create = vi.fn(async () => user);
   updateProfile = vi.fn(async () => user);
   findAccountInfo = vi.fn(async () => ({ createdAt: user.createdAt }));

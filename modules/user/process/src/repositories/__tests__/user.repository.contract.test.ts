@@ -69,11 +69,7 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
       await expect(users.findByEmail(EMAIL)).resolves.toMatchObject({ id: created.id });
     });
 
-    /**
-     * Rows written before sign-in lowercased addresses may carry capitals, so
-     * the signup gate asks this question rather than the exact-match one: a
-     * case-twin beside one would leave two accounts answering for one person.
-     */
+    /** A case-twin beside an address would leave two accounts answering for one person. */
     it("finds the same account from an address typed with capitals", async () => {
       const { users } = create();
 
@@ -85,10 +81,10 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
         emailVerified: false,
       });
 
-      await expect(users.findByEmailInsensitive("Ada@Example.com")).resolves.toMatchObject({
+      await expect(users.findByEmail("Ada@Example.com")).resolves.toMatchObject({
         id: created.id,
       });
-      await expect(users.findByEmailInsensitive("other@example.com")).resolves.toBeNull();
+      await expect(users.findByEmail("other@example.com")).resolves.toBeNull();
     });
 
     it("reports that the account can sign in with a password", async () => {
@@ -135,6 +131,17 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
       await expect(
         users.setFirstPassword({ id: created.id, passwordHash: "another", issuer: ISSUER }),
       ).resolves.toBe("already_set");
+    });
+  });
+
+  describe("when an account was stored with capitals in its address", () => {
+    /** Rows written before sign-in lowercased addresses may carry capitals. */
+    it("finds it from the lowercased address", async () => {
+      const { users } = create();
+
+      const created = await users.create({ name: "Ada", email: "Ada@Example.com" });
+
+      await expect(users.findByEmail(EMAIL)).resolves.toMatchObject({ id: created.id });
     });
   });
 

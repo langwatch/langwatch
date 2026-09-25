@@ -122,15 +122,11 @@ export class UserService {
     return this.repository.findByEmail(parsed.email);
   }
 
-  /**
-   * Whether an address already answers for somebody, ignoring case: rows
-   * written before sign-in lowercased addresses may carry capitals, and a
-   * case-twin beside one would leave two accounts answering for one person.
-   */
+  /** A case-twin beside a taken address would leave two accounts answering for one person. */
   async emailIsTaken(input: UserEmailInput): Promise<boolean> {
     const parsed = userEmailInputSchema.parse(input);
 
-    return (await this.repository.findByEmailInsensitive(parsed.email)) !== null;
+    return (await this.repository.findByEmail(parsed.email)) !== null;
   }
 
   create(input: CreateUserInput): Promise<UserProfile> {

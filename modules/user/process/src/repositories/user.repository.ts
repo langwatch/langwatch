@@ -38,9 +38,8 @@ export type SetFirstUserPasswordRow = SetFirstUserPasswordInput & UserCredential
 export interface UserRepository {
   findProfiles(userIds: string[]): Promise<UserFullProfile[]>;
   findById(id: string): Promise<UserProfile | null>;
+  /** Ignores case: rows written before sign-in lowercased addresses may carry capitals. */
   findByEmail(email: string): Promise<UserProfile | null>;
-  /** The same lookup ignoring case, for rows written before sign-in lowercased. */
-  findByEmailInsensitive(email: string): Promise<UserProfile | null>;
   create(input: CreateUserInput): Promise<UserProfile>;
   createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedUser>;
   createPasskeyUser(input: CreatePasskeyUserRow): Promise<CreatedUser>;

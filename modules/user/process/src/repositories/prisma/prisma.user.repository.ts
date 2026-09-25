@@ -107,12 +107,6 @@ export class PrismaUserRepository
   }
 
   async findByEmail(email: string): Promise<UserProfile | null> {
-    const row = await this.prisma.user.findUnique({ where: { email }, select: userProfileSelect });
-
-    return row ? userProfileSchema.parse(row) : null;
-  }
-
-  async findByEmailInsensitive(email: string): Promise<UserProfile | null> {
     const row = await this.prisma.user.findFirst({
       where: { email: { equals: email, mode: "insensitive" } },
       select: userProfileSelect,
