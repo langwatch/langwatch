@@ -207,6 +207,9 @@ func ModuleFor(repoRoot, method, path string) string {
 		return module
 	}
 	for _, segment := range pathSegments(path) {
+		if module := index.names[segment]; module != "" {
+			return module
+		}
 		if module := index.restNamespaces[segment]; module != "" {
 			return module
 		}
@@ -236,6 +239,17 @@ func ModuleForNamespace(repoRoot, namespace string) string {
 		}
 	}
 	return ""
+}
+
+// ModuleNamed is the catalog module whose id or subject is exactly name,
+// kebab-cased. An exact name outranks every prefix heuristic (parity rulings,
+// 2026-09-25): identityLookup's leading word is the identity module.
+func ModuleNamed(repoRoot, name string) string {
+	index := loadModuleIndex(repoRoot)
+	if index == nil || name == "" {
+		return ""
+	}
+	return index.names[kebabCase(name)]
 }
 
 func dottedParent(namespace string) string {

@@ -52,6 +52,21 @@ type TrpcParity struct {
 	Moved       []ProcedurePair `json:"namespaceMoveCandidates"`
 }
 
+// acceptedNamespaceMoves are the tRPC namespace moves ruled to match main
+// (parity rulings, 2026-09-25): only tracesV2 became traces. Every other move
+// candidate stays missing until the branch serves main's name.
+var acceptedNamespaceMoves = map[string]string{"tracesV2": "traces"}
+
+// movedPath is where an accepted namespace move put a main procedure path.
+func movedPath(path string) (string, bool) {
+	namespace, rest, found := strings.Cut(path, ".")
+	target, accepted := acceptedNamespaceMoves[namespace]
+	if !found || !accepted {
+		return "", false
+	}
+	return target + "." + rest, true
+}
+
 // procedureIndex maps a path to its procedure.
 func procedureIndex(procedures []Procedure) map[string]Procedure {
 	index := make(map[string]Procedure, len(procedures))
@@ -66,12 +81,14 @@ func procedureIndex(procedures []Procedure) map[string]Procedure {
 func DiffProcedures(main, branch []Procedure, moduleOf func(Procedure) string) TrpcParity {
 	parity := TrpcParity{MainCount: len(main), BranchCount: len(branch)}
 	mainIndex, branchIndex := procedureIndex(main), procedureIndex(branch)
+	matched := map[string]bool{}
 	for _, procedure := range main {
-		counterpart, ok := branchIndex[procedure.Path]
+		counterpart, ok := counterpartOf(procedure.Path, branchIndex)
 		if !ok {
 			parity.Missing = append(parity.Missing, gapOf(procedure, moduleOf))
 			continue
 		}
+		matched[counterpart.Path] = true
 		if changes := procedureChanges(procedure, counterpart); len(changes) > 0 {
 			parity.Breaking = append(parity.Breaking, ProcedureDiff{
 				Path: procedure.Path, Module: moduleOf(counterpart),
@@ -80,7 +97,7 @@ func DiffProcedures(main, branch []Procedure, moduleOf func(Procedure) string) T
 		}
 	}
 	for _, procedure := range branch {
-		if _, ok := mainIndex[procedure.Path]; !ok {
+		if _, ok := mainIndex[procedure.Path]; !ok && !matched[procedure.Path] {
 			parity.Extra = append(parity.Extra, gapOf(procedure, moduleOf))
 		}
 	}
@@ -107,6 +124,20 @@ func attributeUnowned(missing []ProcedureGap, pairs []ProcedurePair) {
 			missing[index].Module = module
 		}
 	}
+}
+
+// counterpartOf is the branch procedure serving a main path: the same path,
+// else the path an accepted namespace move gave it.
+func counterpartOf(path string, branchIndex map[string]Procedure) (Procedure, bool) {
+	if counterpart, ok := branchIndex[path]; ok {
+		return counterpart, true
+	}
+	moved, isMoved := movedPath(path)
+	if !isMoved {
+		return Procedure{}, false
+	}
+	counterpart, ok := branchIndex[moved]
+	return counterpart, ok
 }
 
 func gapOf(procedure Procedure, moduleOf func(Procedure) string) ProcedureGap {

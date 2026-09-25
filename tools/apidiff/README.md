@@ -487,8 +487,12 @@ Every row carries the catalogue `module` that owns it, and both the ledger's
 with new causes first. The mapping (`ModuleFor` / `ModuleForNamespace` in
 `findings.go`) reads the branch checkout: `modules/catalogue.json` (core and
 enterprise features), then each feature's `process/src/transport/*.rest.ts`
-(a literal `/api/...` route wins, then its router's `withNamespace`), then
-feature ids and subjects, singular/plural tolerant. tRPC namespaces come from
+(a literal `/api/...` route wins, then a path segment that is exactly a
+feature id or subject, then its router's `withNamespace`), then feature ids
+and subjects, singular/plural tolerant. For a main-only tRPC namespace an
+exact id or subject also outranks a peer's namespace declaration, so
+`identityLookup`'s leading word gives the identity module, not the user
+contract that declares `identity`; `twoStepVerification` stays unowned. tRPC namespaces come from
 each contract's `defineTrpcContract("<ns>")`, trying dotted parents. On r28
 this left 3 of 347 operations in no module (`GET /`, `POST /`,
 `POST /api/track_event`), against 103 for the old first-segment guess.
@@ -575,7 +579,12 @@ no database, no stack — only the two worktrees.
    an optional field made required) or a declared output answers less. The
    diff also proposes **rename candidates** (same namespace, similar name,
    same input shape) and **namespace-move candidates** (same name, same
-   non-empty input shape, another namespace).
+   non-empty input shape, another namespace). Only the moves in
+   `acceptedNamespaceMoves` (`parity.go`) match main: `tracesV2.*` is
+   compared against `traces.*`. Every other candidate stays missing.
+   An input node main left open (`{}`, a bare object or an itemless array,
+   as main's converter emits for a recursive schema) makes every change
+   under it `unknown`, never breaking.
 4. **REST.** Main's document is the artifact its monolith serves verbatim
    (`platform/app/src/app/api/openapiLangWatch.json`); the branch generates
    its document from the mounted routes, so it exists only once the branch
@@ -617,6 +626,17 @@ dropped because every effect they have is reported on the operation it
 reaches. The report and ledger count the breaking changes plus whole
 operations only the candidate documents (`operation_added`, kept until that
 is ruled a non-defect too); additive field changes live in `parity.json` only.
+
+The parity rulings of 2026-09-25 narrow what is breaking:
+
+- A documented error status (anything but 2xx) added or removed is
+  `not-compared`: never a cause, never listed in a packet, which only
+  counts the operations it touched.
+- A body main never documented (`request_body_added`) is additive. A request
+  body main documented and the branch documents with no properties is one
+  `request_body_undocumented` change, not one per property.
+- A nullable object written as `anyOf` / `oneOf` of one schema and
+  `{type: null}` keeps that schema's `required` list.
 
 ## Not covered
 

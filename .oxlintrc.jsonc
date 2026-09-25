@@ -16,6 +16,7 @@
     "**/*.generated.tsx",
     "**/*.generated.js",
     "plugins/langwatch/scripts/session-context.mjs",
+    "tools/apidiff/inventory/**",
   ],
 
   // The correctness tier defaults to `warn`, which --quiet drops.

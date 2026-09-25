@@ -11,6 +11,11 @@ import (
 const (
 	ClassBreaking = "breaking"
 	ClassAdditive = "additive"
+	// ClassUnknown is a change under a node the base left open ({}, a bare
+	// object or an itemless array): the base never said what it accepted there.
+	ClassUnknown = "unknown"
+	// ClassNotCompared is a documented error status: parity is not required.
+	ClassNotCompared = "not-compared"
 )
 
 // Direction says which side of the wire a schema describes. A request schema
@@ -29,6 +34,9 @@ type SchemaField struct {
 	Types    []string `json:"types,omitempty"`
 	Required bool     `json:"required"`
 	Nullable bool     `json:"nullable,omitempty"`
+	// Open is a node that declares no shape of its own: no properties, no
+	// items, no composition, as a converter emits for a recursive schema.
+	Open bool `json:"open,omitempty"`
 }
 
 // FieldChange is one field-level difference between two schemas or two
@@ -111,6 +119,7 @@ func (walker schemaWalker) record(path string, object map[string]any, required b
 	types, nullable := schemaTypes(object)
 	field.Types = mergeTypes(field.Types, types)
 	field.Nullable = field.Nullable || nullable
+	field.Open = field.Open || declaresNoShape(object, types)
 	walker.fields[path] = field
 }
 
@@ -129,15 +138,29 @@ func (walker schemaWalker) walkChildren(node schemaNode, object map[string]any) 
 		walker.walk(node.child(node.path+"[]", true), items)
 	}
 	for _, key := range []string{"allOf", "anyOf", "oneOf"} {
+		keepRequired := key == "allOf" || onlyNullAlternative(asList(object[key]))
 		for _, branch := range asList(object[key]) {
-			walker.walkBranch(node, branch, key == "allOf")
+			walker.walkBranch(node, branch, keepRequired)
 		}
 	}
 }
 
+// onlyNullAlternative is anyOf/oneOf of one schema and {type: null}, the way
+// a generator writes a nullable object: that object keeps its required list.
+func onlyNullAlternative(branches []any) bool {
+	others := 0
+	for _, branch := range branches {
+		object, _ := branch.(map[string]any)
+		if object["type"] != "null" {
+			others++
+		}
+	}
+	return others == 1 && len(branches) > 1
+}
+
 // walkBranch folds a composition branch into the node it composes: allOf
 // contributes its required list, anyOf/oneOf contribute shape but never make a
-// property required.
+// property required, unless the only alternative is null.
 func (walker schemaWalker) walkBranch(node schemaNode, branch any, required bool) {
 	object, seen := walker.resolve(branch, node.seen)
 	if object == nil {
@@ -149,6 +172,20 @@ func (walker schemaWalker) walkBranch(node schemaNode, branch any, required bool
 		object = withoutRequired(object)
 	}
 	walker.walkChildren(node, object)
+}
+
+func declaresNoShape(object map[string]any, types []string) bool {
+	for _, key := range []string{"properties", "items", "allOf", "anyOf", "oneOf", "enum", "const"} {
+		if _, ok := object[key]; ok {
+			return false
+		}
+	}
+	for _, name := range types {
+		if name != "object" && name != "array" {
+			return false
+		}
+	}
+	return true
 }
 
 func withoutRequired(object map[string]any) map[string]any {
@@ -262,10 +299,12 @@ type Comparison struct {
 }
 
 // Compare reports the field-level differences between two flattened schemas.
-// A node whose parent was added or removed is not reported again.
+// A node whose parent was added or removed is not reported again, and on a
+// request a change below a node the base left open is unknown, never breaking.
 func (comparison Comparison) Compare(base, candidate map[string]SchemaField) []FieldChange {
 	changes := []FieldChange{}
 	gone := map[string]bool{}
+	open := openNodes(base)
 	for _, path := range unionKeys(base, candidate) {
 		if underGone(path, gone) {
 			continue
@@ -275,7 +314,57 @@ func (comparison Comparison) Compare(base, candidate map[string]SchemaField) []F
 		} else if _, inCandidate := candidate[path]; !inCandidate {
 			gone[path] = true
 		}
-		changes = append(changes, comparison.comparePath(path, base, candidate)...)
+		compared := comparison.comparePath(path, base, candidate)
+		if comparison.Direction == Request && underOpen(path, open) {
+			compared = reclassified(compared, ClassUnknown)
+		}
+		changes = append(changes, compared...)
+	}
+	return changes
+}
+
+// openNodes are the base's open nodes that have no children of their own.
+func openNodes(fields map[string]SchemaField) map[string]bool {
+	parents := map[string]bool{}
+	for path := range fields {
+		if parent, ok := parentPath(path); ok {
+			parents[parent] = true
+		}
+	}
+	open := map[string]bool{}
+	for path, field := range fields {
+		if field.Open && !parents[path] {
+			open[path] = true
+		}
+	}
+	return open
+}
+
+func parentPath(path string) (string, bool) {
+	switch {
+	case path == "$":
+		return "", false
+	case strings.HasSuffix(path, "[]"):
+		return strings.TrimSuffix(path, "[]"), true
+	case strings.Contains(path, "."):
+		return path[:strings.LastIndex(path, ".")], true
+	default:
+		return "$", true
+	}
+}
+
+func underOpen(path string, open map[string]bool) bool {
+	for parent, ok := parentPath(path); ok; parent, ok = parentPath(parent) {
+		if open[parent] {
+			return true
+		}
+	}
+	return false
+}
+
+func reclassified(changes []FieldChange, class string) []FieldChange {
+	for index := range changes {
+		changes[index].Class = class
 	}
 	return changes
 }
@@ -528,19 +617,23 @@ func (docs documents) compareRequestBody(before, after any) []FieldChange {
 	case was.present && !now.present:
 		return []FieldChange{{Kind: "request_body_removed", Class: ClassBreaking, Field: "body"}}
 	case !was.present && now.present:
-		return []FieldChange{{Kind: "request_body_added", Class: classIf(now.required), Field: "body"}}
+		return []FieldChange{{Kind: "request_body_added", Class: ClassAdditive, Field: "body"}}
+	}
+	wasFields, nowFields := FlattenSchema(docs.base, was.schema), FlattenSchema(docs.candidate, now.schema)
+	if len(wasFields) > 1 && len(nowFields) <= 1 {
+		return []FieldChange{{Kind: "request_body_undocumented", Class: ClassBreaking, Field: "body"}}
 	}
 	changes := []FieldChange{}
 	if was.required != now.required {
 		changes = append(changes, FieldChange{Kind: "request_body_required_changed", Class: classIf(now.required), Field: "body", Before: was.required, After: now.required})
 	}
-	compared := Comparison{Direction: Request, Prefix: "body"}.Compare(FlattenSchema(docs.base, was.schema), FlattenSchema(docs.candidate, now.schema))
+	compared := Comparison{Direction: Request, Prefix: "body"}.Compare(wasFields, nowFields)
 	return append(changes, renamed(compared, "request_")...)
 }
 
 // compareResponses reports the status set and, for every success status both
 // sides declare, the body's fields. Error bodies are the handled-error
-// envelope's business and are not compared.
+// envelope's business, and a documented error status is not compared either.
 func (docs documents) compareResponses(before, after any) []FieldChange {
 	baseResponses, _ := before.(map[string]any)
 	candidateResponses, _ := after.(map[string]any)
@@ -550,14 +643,21 @@ func (docs documents) compareResponses(before, after any) []FieldChange {
 		now, inCandidate := candidateResponses[status]
 		switch {
 		case inBase && !inCandidate:
-			changes = append(changes, FieldChange{Kind: "status_removed", Class: ClassBreaking, Field: status})
+			changes = append(changes, FieldChange{Kind: "status_removed", Class: statusClass(status, ClassBreaking), Field: status})
 		case !inBase && inCandidate:
-			changes = append(changes, FieldChange{Kind: "status_added", Class: ClassAdditive, Field: status})
+			changes = append(changes, FieldChange{Kind: "status_added", Class: statusClass(status, ClassAdditive), Field: status})
 		case strings.HasPrefix(status, "2"):
 			changes = append(changes, docs.compareResponseBody(status, was, now)...)
 		}
 	}
 	return changes
+}
+
+func statusClass(status, success string) string {
+	if strings.HasPrefix(status, "2") {
+		return success
+	}
+	return ClassNotCompared
 }
 
 func (docs documents) compareResponseBody(status string, before, after any) []FieldChange {

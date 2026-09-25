@@ -102,7 +102,7 @@ func TestClassifyOperationSplitsFields(t *testing.T) {
 		"param_required_changed query.limit": ClassBreaking,
 		"param_removed query.tenant":         ClassBreaking,
 		"param_added query.cursor":           ClassAdditive,
-		"status_removed 404":                 ClassBreaking,
+		"status_removed 404":                 ClassNotCompared,
 		"status_added 201":                   ClassAdditive,
 		"security_changed security":          ClassBreaking,
 		"docs_changed summary":               ClassAdditive,
@@ -116,5 +116,77 @@ func TestClassifyOperationSplitsFields(t *testing.T) {
 		if len(key) > 8 && key[:8] == "request_" {
 			t.Errorf("a component rename with identical content reported %s", key)
 		}
+	}
+}
+
+// Parity rulings, 2026-09-25: a documented error status is not compared, a
+// body only the base documents is one finding, and a base node left open
+// (recursive schemas emitted as {}) makes what lies under it unknown.
+func TestDocumentedErrorStatusesAreNotCompared(t *testing.T) {
+	change := Change{Kind: "changed", Path: "/api/x", Method: "get", Fields: map[string][2]any{"responses": {
+		map[string]any{"200": map[string]any{}, "401": map[string]any{}, "500": map[string]any{}},
+		map[string]any{"200": map[string]any{}, "422": map[string]any{}},
+	}}}
+	got := kinds(ClassifyOperation(nil, nil, change))
+	for _, key := range []string{"status_removed 401", "status_removed 500", "status_added 422"} {
+		if got[key] != ClassNotCompared {
+			t.Errorf("%s = %q, want %q (all: %v)", key, got[key], ClassNotCompared, got)
+		}
+	}
+}
+
+func TestRequestBodyUndocumentedIsOneBreakingChange(t *testing.T) {
+	body := func(schema string) map[string]any {
+		return decode(t, `{"content": {"application/json": {"schema": `+schema+`}}}`)
+	}
+	change := Change{Kind: "changed", Path: "/api/x", Method: "post", Fields: map[string][2]any{"requestBody": {
+		body(`{"type": "object", "properties": {"a": {"type": "string"}, "b": {"type": "integer"}, "c": {"type": "object", "properties": {"d": {"type": "string"}}}}}`),
+		body(`{}`),
+	}}}
+	changes := ClassifyOperation(nil, nil, change)
+	if len(changes) != 1 || changes[0].Kind != "request_body_undocumented" || changes[0].Class != ClassBreaking {
+		t.Fatalf("changes = %+v, want one breaking request_body_undocumented", changes)
+	}
+	added := Change{Kind: "changed", Path: "/api/x", Method: "post", Fields: map[string][2]any{"requestBody": {nil, map[string]any{"required": true, "content": map[string]any{}}}}}
+	if got := kinds(ClassifyOperation(nil, nil, added)); got["request_body_added body"] != ClassAdditive {
+		t.Errorf("a body main never documented is additive documentation: %v", got)
+	}
+}
+
+func TestChangesUnderAnOpenBaseNodeAreUnknown(t *testing.T) {
+	base := FlattenSchema(nil, decode(t, `{"type": "object", "required": ["dsl"], "properties": {"dsl": {"type": "object", "required": ["nodes"], "properties": {"nodes": {"type": "array"}, "config": {"type": "object", "additionalProperties": {}}}}}}`))
+	candidate := FlattenSchema(nil, decode(t, `{"type": "object", "required": ["dsl"], "properties": {"dsl": {"type": "object", "required": ["nodes", "state"], "properties": {"nodes": {"type": "array", "items": {"type": "object", "required": ["id"], "properties": {"id": {"type": "string"}}}}, "config": {"type": "object", "required": ["url"], "properties": {"url": {"type": "string"}}}, "state": {"type": "object"}}}}}`))
+	got := kinds(Comparison{Direction: Request, Prefix: "input"}.Compare(base, candidate))
+	want := map[string]string{
+		"property_added input.dsl.nodes[]":    ClassUnknown,
+		"property_added input.dsl.config.url": ClassUnknown,
+		"property_added input.dsl.state":      ClassBreaking,
+	}
+	for key, class := range want {
+		if got[key] != class {
+			t.Errorf("%s = %q, want %q (all: %v)", key, got[key], class, got)
+		}
+	}
+	recursive := decode(t, `{"$defs": {"Node": {"type": "object", "properties": {"children": {"type": "array", "items": {"$ref": "#/$defs/Node"}}}}}, "$ref": "#/$defs/Node"}`)
+	fields := FlattenSchema(recursive, recursive)
+	if !fields["children[]"].Open {
+		t.Errorf("a recursive reference is not open: %+v", fields["children[]"])
+	}
+}
+
+// Parity ruling 7, 2026-09-25: a nullable object written as anyOf [object, null]
+// keeps its required list, so it compares equal to main's nullable object.
+func TestNullableObjectKeepsItsRequiredList(t *testing.T) {
+	base := FlattenSchema(nil, decode(t, `{"type": "object", "properties": {"mostUsedModel": {"type": ["object", "null"], "required": ["name", "usagePct"], "properties": {"name": {"type": "string"}, "usagePct": {"type": "number"}}}}}`))
+	candidate := FlattenSchema(nil, decode(t, `{"type": "object", "properties": {"mostUsedModel": {"anyOf": [{"type": "object", "required": ["name", "usagePct"], "properties": {"name": {"type": "string"}, "usagePct": {"type": "number"}}}, {"type": "null"}]}}}`))
+	if field := candidate["mostUsedModel.name"]; !field.Required {
+		t.Fatalf("mostUsedModel.name lost its required flag: %+v", field)
+	}
+	if changes := (Comparison{Direction: Response, Prefix: "200"}).Compare(base, candidate); len(changes) != 0 {
+		t.Errorf("identical nullable objects differ: %+v", changes)
+	}
+	either := FlattenSchema(nil, decode(t, `{"anyOf": [{"type": "object", "required": ["a"], "properties": {"a": {"type": "string"}}}, {"type": "object", "required": ["b"], "properties": {"b": {"type": "string"}}}]}`))
+	if either["a"].Required || either["b"].Required {
+		t.Errorf("a two-object anyOf made its properties required: %+v", either)
 	}
 }

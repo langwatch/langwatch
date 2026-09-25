@@ -145,12 +145,24 @@ func (phase *parityPhase) procedureModule(procedure Procedure) string {
 	namespace, _ := splitProcedurePath(procedure.Path)
 	return phase.memo("trpc "+namespace, func() string {
 		for _, candidate := range []string{namespace, leadingWord(namespace), enterpriseSegment(procedure.Source)} {
-			if module := ModuleForNamespace(phase.state.branchDir, candidate); candidate != "" && module != "" {
+			if module := namespaceModule(phase.state.branchDir, candidate); module != "" {
 				return module
 			}
 		}
 		return ""
 	})
+}
+
+// namespaceModule is the module an exact catalog name gives a namespace
+// candidate, else the one its declarations and heuristics give it.
+func namespaceModule(repoRoot, candidate string) string {
+	if candidate == "" {
+		return ""
+	}
+	if module := ModuleNamed(repoRoot, candidate); module != "" {
+		return module
+	}
+	return ModuleForNamespace(repoRoot, candidate)
 }
 
 // leadingWord is a camelCase namespace's first word: governanceCost is governance's.

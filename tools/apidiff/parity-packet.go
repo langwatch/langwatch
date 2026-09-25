@@ -3,8 +3,11 @@ package apidiff
 import (
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 	"strings"
+
+	"github.com/langwatch/langwatch/tools/openapidiff"
 )
 
 // ModuleCounts is one module's row of the parity table. Extra is branch-only
@@ -202,12 +205,37 @@ func writeRestSections(output *strings.Builder, rest RestParity, module string) 
 		}
 	}
 	writeSection(output, "Breaking REST differences", breaking)
+	if statuses := notComparedStatuses(rest, module); statuses > 0 {
+		fmt.Fprintf(output, "Documented error statuses differ on %d operations; parity there is not required, so they are not listed.\n", statuses)
+	}
 }
 
+// notComparedStatuses counts the module's operations whose documented error
+// statuses differ: counted once, never listed (parity rulings, 2026-09-25).
+func notComparedStatuses(rest RestParity, module string) int {
+	count := 0
+	for index := range rest.Changed {
+		diff := rest.Changed[index]
+		if diff.Module == module && slices.ContainsFunc(diff.Changes, isNotCompared) {
+			count++
+		}
+	}
+	return count
+}
+
+func isNotCompared(change ClassifiedChange) bool {
+	return change.Class == openapidiff.ClassNotCompared
+}
+
+// restDiffLines lists an operation's breaking changes; what is additive,
+// unknown or not compared stays in parity.json.
 func restDiffLines(diff RestDiff) []string {
 	lines := []string{fmt.Sprintf("- `%s %s`\n", diff.Method, diff.Path)}
 	for index := range diff.Changes {
 		change := diff.Changes[index]
+		if change.Class != openapidiff.ClassBreaking {
+			continue
+		}
 		for field, pair := range change.Fields {
 			lines = append(lines, fmt.Sprintf("  - %s %s %s (%v -> %v)\n", change.Class, change.Kind, field, pair[0], pair[1]))
 		}
