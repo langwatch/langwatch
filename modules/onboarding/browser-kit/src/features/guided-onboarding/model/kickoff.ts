@@ -82,9 +82,10 @@ export function guidedKickoffStateFactsOf(
   };
 }
 
-export const guidedKickoffPartSchema = z
-  .object({ type: z.literal(GUIDED_ONBOARDING_KICKOFF_PART_TYPE) })
-  .and(guidedKickoffInputSchema);
+export const guidedKickoffPartSchema = z.object({
+  type: z.literal(GUIDED_ONBOARDING_KICKOFF_PART_TYPE),
+  ...guidedKickoffInputSchema.shape,
+});
 export type GuidedKickoffPart = z.infer<typeof guidedKickoffPartSchema>;
 
 /** Parse an opaque message part as the kickoff part, or null. */

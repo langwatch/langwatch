@@ -27,7 +27,7 @@ class MissingFullTraceRecords extends TraceFullRecordRepository {
     throw new TraceNotFoundError(input.traceId);
   }
 
-  async getThread(_input: TraceFullThreadReadInput): Promise<[]> {
+  async findThread(_input: TraceFullThreadReadInput): Promise<[]> {
     return [];
   }
 }

@@ -1,16 +1,16 @@
-import type { Redis as IORedis } from "ioredis";
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
 
 import { CachedLuaScript } from "../cachedLuaScript.ts";
 
 function makeRedis({ cacheHit }: { cacheHit: boolean }) {
-  const evalsha = vi.fn(async (..._args: (string | number)[]) => {
+  const evalsha = vi.fn(async () => {
     if (!cacheHit) throw new Error("NOSCRIPT No matching script.");
     return "sha-result";
   });
   const evalFn = vi.fn(async () => "eval-result");
   return {
-    redis: { evalsha, eval: evalFn } as unknown as IORedis,
+    redis: redisDouble({ evalsha, eval: evalFn }),
     evalsha,
     evalFn,
   };
@@ -56,7 +56,7 @@ describe("CachedLuaScript", () => {
       const evalFn = vi.fn();
       const script = new CachedLuaScript("return nil.x");
 
-      await expect(script.run({ evalsha, eval: evalFn } as unknown as IORedis, 0)).rejects.toThrow(
+      await expect(script.run(redisDouble({ evalsha, eval: evalFn }), 0)).rejects.toThrow(
         "attempt to index a nil value",
       );
       expect(evalFn).not.toHaveBeenCalled();

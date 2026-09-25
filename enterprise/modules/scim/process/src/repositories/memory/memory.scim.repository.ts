@@ -315,7 +315,7 @@ export class MemoryScimRepository extends ScimRepository {
       rows: await Promise.all(
         page.map(async (group) => ({
           ...group,
-          members: await this.listGroupMembers({ groupId: group.id }),
+          members: await this.findGroupMembers({ groupId: group.id }),
         })),
       ),
       total: matching.length,
@@ -368,17 +368,17 @@ export class MemoryScimRepository extends ScimRepository {
     this.groups.splice(index, 1);
     await this.removeGroupMembers({
       groupId: input.id,
-      userIds: await this.listGroupMemberIds({ groupId: input.id }),
+      userIds: await this.findGroupMemberIds({ groupId: input.id }),
     });
   }
 
-  async listGroupMembers(input: { groupId: string }): Promise<ScimGroupMembershipRecord[]> {
+  async findGroupMembers(input: { groupId: string }): Promise<ScimGroupMembershipRecord[]> {
     return this.groupMembers
       .filter((row) => row.groupId === input.groupId)
       .map((row) => ({ ...row, user: this.#memberUserOf(row.userId) }));
   }
 
-  async listGroupMemberIds(input: { groupId: string }): Promise<string[]> {
+  async findGroupMemberIds(input: { groupId: string }): Promise<string[]> {
     return this.groupMembers
       .filter((row) => row.groupId === input.groupId)
       .map((row) => row.userId);
@@ -410,7 +410,7 @@ export class MemoryScimRepository extends ScimRepository {
     );
   }
 
-  async listRoleBindings(scope: ScimGrantBindingScope): Promise<ScimRoleBindingRecord[]> {
+  async findRoleBindings(scope: ScimGrantBindingScope): Promise<ScimRoleBindingRecord[]> {
     return this.bindings
       .filter((binding) => {
         if (binding.organizationId !== scope.organizationId) return false;

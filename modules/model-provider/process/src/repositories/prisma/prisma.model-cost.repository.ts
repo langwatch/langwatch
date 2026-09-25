@@ -13,7 +13,7 @@ export class PrismaModelCostRepository implements ModelCostRepository {
     return new PrismaModelCostRepository(database);
   }
 
-  async listForProject(projectScopes: ModelDefaultScope[]): Promise<ModelCost[]> {
+  async findForProject(projectScopes: ModelDefaultScope[]): Promise<ModelCost[]> {
     const rows = await this.database.customLLMModelCost.findMany({
       where: {
         OR: projectScopes,

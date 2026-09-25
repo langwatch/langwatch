@@ -839,9 +839,6 @@ describe("tracer.ts", () => {
           });
         }),
       ).rejects.toThrow(outerError);
-
-      // Verify error was handled
-      expect(true).toBe(true);
     });
   });
 

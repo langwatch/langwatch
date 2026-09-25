@@ -16,7 +16,7 @@ describe("modelOverrideSchema", () => {
       "bedrock/anthropic.claude-sonnet-4-20250514-v1:0",
       "openrouter/meta-llama/llama-3",
     ])("accepts %s", (value) => {
-      expect(modelOverrideSchema.safeParse(value).success).toBe(true);
+      expect(modelOverrideSchema.validate(value)).toBe(true);
     });
   });
 

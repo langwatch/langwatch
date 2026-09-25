@@ -42,10 +42,10 @@ describe("the me REST family", () => {
     it("refuses it, rather than silently answering for the default month", () => {
       const usage = declaration.routes.find((route) => route.operation === "getApiMeUsage");
 
-      expect(usage?.query?.safeParse({ windowStartMs: 1 }).success).toBe(false);
-      expect(usage?.query?.safeParse({ windowStartMs: 2, windowEndMs: 1 }).success).toBe(false);
-      expect(usage?.query?.safeParse({ windowStartMs: 1, windowEndMs: 2 }).success).toBe(true);
-      expect(usage?.query?.safeParse({}).success).toBe(true);
+      expect(usage?.query?.validate({ windowStartMs: 1 })).toBe(false);
+      expect(usage?.query?.validate({ windowStartMs: 2, windowEndMs: 1 })).toBe(false);
+      expect(usage?.query?.validate({ windowStartMs: 1, windowEndMs: 2 })).toBe(true);
+      expect(usage?.query?.validate({})).toBe(true);
     });
   });
 });

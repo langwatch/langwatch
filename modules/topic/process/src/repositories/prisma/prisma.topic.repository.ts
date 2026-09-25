@@ -2,7 +2,6 @@ import { PrismaRepository } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   topicClusteringRunHistoryEntrySchema,
-  topicSchema,
   type Topic,
   type TopicClusteringRunHistoryEntry,
   type TopicNamesInput,
@@ -11,23 +10,6 @@ import {
 import { z } from "zod";
 
 import type { TopicClusteringStatusRecord, TopicRepository } from "../topic.repository.ts";
-
-const projectionSchema = z.object({
-  LastRequestedAt: z.number().nullable(),
-  LastRequestTrigger: z.string().nullable(),
-  LastRunAt: z.number().nullable(),
-  LastRunOutcome: z.string().nullable(),
-  LastRunMode: z.string().nullable(),
-  LastRunSkippedReason: z.string().nullable(),
-  LastRunErrorCode: z.string().nullable(),
-  LastRunErrorUserActionable: z.boolean(),
-  LastRunTracesProcessed: z.number().int().nonnegative(),
-  LastRunTopicsCount: z.number().int().nonnegative(),
-  LastRunSubtopicsCount: z.number().int().nonnegative(),
-  InProgressRunId: z.string().nullable(),
-  InProgressStartedAt: z.number().nullable(),
-  OccurredAt: z.number(),
-});
 
 const runsSchema = z.array(topicClusteringRunHistoryEntrySchema);
 
@@ -61,7 +43,7 @@ export class PrismaTopicRepository
         automaticallyGenerated: true,
       },
     });
-    return rows.map((row) => topicSchema.parse(row));
+    return rows;
   }
 
   async findNamesByIds(input: TopicNamesInput): Promise<Map<string, string>> {
@@ -70,12 +52,7 @@ export class PrismaTopicRepository
       where: { projectId: input.projectId, id: { in: input.ids } },
       select: { id: true, name: true },
     });
-    return new Map(
-      rows.map((row) => {
-        const parsed = z.object({ id: z.string(), name: z.string() }).parse(row);
-        return [parsed.id, parsed.name];
-      }),
-    );
+    return new Map(rows.map((row) => [row.id, row.name]));
   }
 
   async findClusteringStatus(input: TopicProjectInput): Promise<TopicClusteringStatusRecord> {
@@ -83,24 +60,23 @@ export class PrismaTopicRepository
       where: { projectId: input.projectId },
     });
 
-    const parsed = projection ? projectionSchema.parse(projection) : null;
     return {
-      projection: parsed
+      projection: projection
         ? {
-            lastRequestedAt: parsed.LastRequestedAt,
-            lastRequestTrigger: parsed.LastRequestTrigger,
-            lastRunAt: parsed.LastRunAt,
-            lastRunOutcome: parsed.LastRunOutcome,
-            lastRunMode: parsed.LastRunMode,
-            lastRunSkippedReason: parsed.LastRunSkippedReason,
-            lastRunErrorCode: parsed.LastRunErrorCode,
-            lastRunErrorUserActionable: parsed.LastRunErrorUserActionable,
-            lastRunTracesProcessed: parsed.LastRunTracesProcessed,
-            lastRunTopicsCount: parsed.LastRunTopicsCount,
-            lastRunSubtopicsCount: parsed.LastRunSubtopicsCount,
-            inProgressRunId: parsed.InProgressRunId,
-            inProgressStartedAt: parsed.InProgressStartedAt,
-            occurredAt: parsed.OccurredAt,
+            lastRequestedAt: projection.LastRequestedAt,
+            lastRequestTrigger: projection.LastRequestTrigger,
+            lastRunAt: projection.LastRunAt,
+            lastRunOutcome: projection.LastRunOutcome,
+            lastRunMode: projection.LastRunMode,
+            lastRunSkippedReason: projection.LastRunSkippedReason,
+            lastRunErrorCode: projection.LastRunErrorCode,
+            lastRunErrorUserActionable: projection.LastRunErrorUserActionable,
+            lastRunTracesProcessed: projection.LastRunTracesProcessed,
+            lastRunTopicsCount: projection.LastRunTopicsCount,
+            lastRunSubtopicsCount: projection.LastRunSubtopicsCount,
+            inProgressRunId: projection.InProgressRunId,
+            inProgressStartedAt: projection.InProgressStartedAt,
+            occurredAt: projection.OccurredAt,
           }
         : null,
     };

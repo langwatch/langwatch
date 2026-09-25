@@ -17,7 +17,7 @@ import { GrantsFake } from "./support/grants-fake.ts";
 
 function groupsRepository(): ScimDirectoryRepository {
   return {
-    listGroupMemberIds: vi.fn(async () => ["user_1"]),
+    findGroupMemberIds: vi.fn(async () => ["user_1"]),
     findGroupByExternalId: vi.fn(async () => null),
     findGroup: vi.fn(async () => ({
       id: "group_1",
@@ -32,13 +32,13 @@ function groupsRepository(): ScimDirectoryRepository {
     })),
     addGroupMember: vi.fn(async () => undefined),
     removeGroupMembers: vi.fn(async () => undefined),
-    listRoleBindings: vi.fn(async () => []),
+    findRoleBindings: vi.fn(async () => []),
     groupSlugExists: vi.fn(async () => false),
     listGroups: vi.fn(async () => ({ rows: [], total: 0 })),
     createGroup: vi.fn(),
     renameGroup: vi.fn(),
     deleteGroup: vi.fn(),
-    listGroupMembers: vi.fn(async () => []),
+    findGroupMembers: vi.fn(async () => []),
   };
 }
 /**

@@ -124,37 +124,35 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
       const evaluation = await langwatch.experiments.init(`test-log-${Date.now()}`);
       const dataset = [{ question: "test" }];
 
-      await evaluation.run(dataset, async ({ index }) => {
-        evaluation.log("accuracy", { index, score: 0.95 });
-        evaluation.log("latency", { index, score: 150 });
-      });
-
-      // If we get here without errors, the API accepted the logs
-      expect(true).toBe(true);
+      await expect(
+        evaluation.run(dataset, async ({ index }) => {
+          evaluation.log("accuracy", { index, score: 0.95 });
+          evaluation.log("latency", { index, score: 150 });
+        }),
+      ).resolves.not.toThrow();
     });
 
     it("logs with target and metadata", async () => {
       const evaluation = await langwatch.experiments.init(`test-targets-${Date.now()}`);
       const dataset = [{ question: "test" }];
 
-      await evaluation.run(dataset, async ({ index }) => {
-        evaluation.log("accuracy", {
-          index,
-          score: 0.9,
-          target: "gpt4",
-          metadata: { model: "gpt-4", temperature: 0.7 },
-        });
+      await expect(
+        evaluation.run(dataset, async ({ index }) => {
+          evaluation.log("accuracy", {
+            index,
+            score: 0.9,
+            target: "gpt4",
+            metadata: { model: "gpt-4", temperature: 0.7 },
+          });
 
-        evaluation.log("accuracy", {
-          index,
-          score: 0.85,
-          target: "claude",
-          metadata: { model: "claude-3", temperature: 0.5 },
-        });
-      });
-
-      // Success if no errors
-      expect(true).toBe(true);
+          evaluation.log("accuracy", {
+            index,
+            score: 0.85,
+            target: "claude",
+            metadata: { model: "claude-3", temperature: 0.5 },
+          });
+        }),
+      ).resolves.not.toThrow();
     });
   });
 
@@ -253,24 +251,24 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
       const evaluation = await langwatch.experiments.init(`test-no-conflict-${Date.now()}`);
       const dataset = [{ q: "test" }];
 
-      await evaluation.run(dataset, async ({ index }) => {
-        // First call with metadata
-        evaluation.log("m1", {
-          index,
-          score: 1,
-          target: "my-target",
-          metadata: { model: "gpt-4" },
-        });
+      await expect(
+        evaluation.run(dataset, async ({ index }) => {
+          // First call with metadata
+          evaluation.log("m1", {
+            index,
+            score: 1,
+            target: "my-target",
+            metadata: { model: "gpt-4" },
+          });
 
-        // Second call without metadata - should work
-        evaluation.log("m2", {
-          index,
-          score: 0.9,
-          target: "my-target",
-        });
-      });
-
-      expect(true).toBe(true);
+          // Second call without metadata - should work
+          evaluation.log("m2", {
+            index,
+            score: 0.9,
+            target: "my-target",
+          });
+        }),
+      ).resolves.not.toThrow();
     });
   });
 

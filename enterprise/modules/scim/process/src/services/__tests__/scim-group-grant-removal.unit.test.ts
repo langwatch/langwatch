@@ -77,21 +77,21 @@ function directoryOver(provenOffboarding = false) {
       writes.push("deleteGroup");
       groups.delete(input.id);
     }),
-    listGroupMembers: vi.fn(async (input: { groupId: string }) =>
+    findGroupMembers: vi.fn(async (input: { groupId: string }) =>
       [...members].map((userId) => ({
         userId,
         groupId: input.groupId,
         user: { id: userId, email: `${userId}@acme.test`, name: null },
       })),
     ),
-    listGroupMemberIds: vi.fn(async () => [...members]),
+    findGroupMemberIds: vi.fn(async () => [...members]),
     addGroupMember: vi.fn(async () => undefined),
     removeGroupMembers: vi.fn(async (input: { groupId: string; userIds: string[] }) => {
       writes.push("removeGroupMembers");
       for (const userId of input.userIds) members.delete(userId);
     }),
     groupSlugExists: vi.fn(async () => false),
-    listRoleBindings: vi.fn(async (scope: ScimGrantBindingScope) =>
+    findRoleBindings: vi.fn(async (scope: ScimGrantBindingScope) =>
       scope.kind === "group" ? [groupBinding] : [manualBinding],
     ),
   };

@@ -56,6 +56,8 @@ type RunFailedInput = RunStartedInput & {
  * through the owning Eventing pipeline.
  */
 export class EventingTopicClusteringCommandsService implements TopicClusteringCommands {
+  private constructor() {}
+
   static create(): EventingTopicClusteringCommandsService {
     return new EventingTopicClusteringCommandsService();
   }
@@ -96,6 +98,8 @@ export class EventingTopicClusteringCommandsService implements TopicClusteringCo
 
 /** Late-bound outcome transport for the pipeline's own retry-safe intent executor. */
 export class EventingTopicClusteringOutcomeCommandsService implements TopicClusteringOutcomeCommands {
+  private constructor() {}
+
   static create(): EventingTopicClusteringOutcomeCommandsService {
     return new EventingTopicClusteringOutcomeCommandsService();
   }

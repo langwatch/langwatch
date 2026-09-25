@@ -14,6 +14,8 @@ import {
   type ModelProviderCredentialProbe,
 } from "../app/model-provider.members.ts";
 
+const customKeysSchema = z.record(z.string(), z.string());
+
 export type RegistryModelProviderCatalogOptions = {
   /**
    * Whether LangWatch supplies a provider's credentials, and with what. The
@@ -112,7 +114,7 @@ export class RegistryModelProviderCatalogAdapter extends ModelProviderCatalog {
   ): Promise<ModelProviderApiKeyValidation> {
     const result = await this.options.probe.probe({
       provider,
-      customKeys: z.record(z.string(), z.string()).parse(customKeys),
+      customKeys: customKeysSchema.parse(customKeys),
     });
     return { valid: result.valid, message: result.valid ? undefined : result.outcome };
   }
@@ -128,7 +130,7 @@ export class RegistryModelProviderCatalogAdapter extends ModelProviderCatalog {
   ): Promise<ModelProviderCredentialVerdict> {
     return this.options.probe.probe({
       provider,
-      customKeys: z.record(z.string(), z.string()).parse(customKeys),
+      customKeys: customKeysSchema.parse(customKeys),
     });
   }
 

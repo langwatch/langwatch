@@ -61,12 +61,12 @@ function repository(overrides: Partial<ScimRepository> = {}): ScimRepository {
     createGroup: vi.fn(),
     renameGroup: vi.fn(async () => undefined),
     deleteGroup: vi.fn(async () => undefined),
-    listGroupMembers: vi.fn(async () => []),
-    listGroupMemberIds: vi.fn(async () => []),
+    findGroupMembers: vi.fn(async () => []),
+    findGroupMemberIds: vi.fn(async () => []),
     addGroupMember: vi.fn(async () => undefined),
     removeGroupMembers: vi.fn(async () => undefined),
     groupSlugExists: vi.fn(async () => false),
-    listRoleBindings: vi.fn(async () => []),
+    findRoleBindings: vi.fn(async () => []),
     ...overrides,
   };
 }
@@ -265,7 +265,7 @@ describe("SCIM characterization: provisioning invariants", () => {
     const writer = new GrantsFake();
     const repo = repository({
       addMembership: vi.fn(async () => undefined),
-      listRoleBindings: vi.fn(async () => []),
+      findRoleBindings: vi.fn(async () => []),
     });
     const users = {
       findByEmail: vi.fn(async () => ({

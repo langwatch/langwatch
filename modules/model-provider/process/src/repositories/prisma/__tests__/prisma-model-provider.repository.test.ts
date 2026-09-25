@@ -1,4 +1,5 @@
 import { Prisma } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -44,11 +45,11 @@ const row = {
 describe("PrismaModelProviderRepository", () => {
   it("recognises only a routing-handle unique constraint", () => {
     const repository = PrismaModelProviderRepository.create(
-      {
+      prismaDouble({
         modelProvider: {},
         gatewayChangeEvent: {},
         $transaction: vi.fn(),
-      } as unknown as Parameters<typeof PrismaModelProviderRepository.create>[0],
+      }),
       new Credentials(),
     );
     const routingHandleConflict = new Prisma.PrismaClientKnownRequestError("conflict", {
@@ -70,11 +71,11 @@ describe("PrismaModelProviderRepository", () => {
   it("reads a provider only inside the selected tenant and decodes credentials", async () => {
     const findFirst = vi.fn().mockResolvedValue(row);
     const repository = PrismaModelProviderRepository.create(
-      {
+      prismaDouble({
         modelProvider: { findFirst },
         gatewayChangeEvent: {},
         $transaction: vi.fn(),
-      } as unknown as Parameters<typeof PrismaModelProviderRepository.create>[0],
+      }),
       new Credentials(),
     );
 
@@ -96,15 +97,17 @@ describe("PrismaModelProviderRepository", () => {
     const create = vi.fn().mockResolvedValue(row);
     const appendChange = vi.fn().mockResolvedValue({});
     const repository = PrismaModelProviderRepository.create(
-      {
+      prismaDouble({
         modelProvider: {},
         gatewayChangeEvent: {},
-        $transaction: async (operation: (database: unknown) => unknown) =>
-          operation({
-            modelProvider: { create },
-            gatewayChangeEvent: { create: appendChange },
-          }),
-      } as unknown as Parameters<typeof PrismaModelProviderRepository.create>[0],
+        $transaction: async (operation) =>
+          operation(
+            prismaDouble({
+              modelProvider: { create },
+              gatewayChangeEvent: { create: appendChange },
+            }),
+          ),
+      }),
       new Credentials(),
     );
 
@@ -140,15 +143,17 @@ describe("PrismaModelProviderRepository", () => {
     });
     const appendChange = vi.fn().mockResolvedValue({});
     const repository = PrismaModelProviderRepository.create(
-      {
+      prismaDouble({
         modelProvider: {},
         gatewayChangeEvent: {},
-        $transaction: async (operation: (database: unknown) => unknown) =>
-          operation({
-            modelProvider: { update },
-            gatewayChangeEvent: { create: appendChange },
-          }),
-      } as unknown as Parameters<typeof PrismaModelProviderRepository.create>[0],
+        $transaction: async (operation) =>
+          operation(
+            prismaDouble({
+              modelProvider: { update },
+              gatewayChangeEvent: { create: appendChange },
+            }),
+          ),
+      }),
       new Credentials(),
     );
 
@@ -177,11 +182,11 @@ describe("PrismaModelProviderRepository", () => {
   it("lists every row visible through the project, team, or organization scope", async () => {
     const findMany = vi.fn().mockResolvedValue([row]);
     const repository = PrismaModelProviderRepository.create(
-      {
+      prismaDouble({
         modelProvider: { findMany },
         gatewayChangeEvent: {},
         $transaction: vi.fn(),
-      } as unknown as Parameters<typeof PrismaModelProviderRepository.create>[0],
+      }),
       new Credentials(),
     );
 

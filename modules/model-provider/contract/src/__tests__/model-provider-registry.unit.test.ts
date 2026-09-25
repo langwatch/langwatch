@@ -25,29 +25,29 @@ describe("Model Provider registry", () => {
     const schema = modelProviders.azure_safety.keysSchema;
 
     expect(
-      schema.safeParse({
+      schema.validate({
         AZURE_CONTENT_SAFETY_ENDPOINT: "https://my-account.cognitiveservices.azure.com/",
         AZURE_CONTENT_SAFETY_KEY: "my-subscription-key",
-      }).success,
+      }),
     ).toBe(true);
     expect(
-      schema.safeParse({
+      schema.validate({
         AZURE_CONTENT_SAFETY_ENDPOINT: "not-a-url",
         AZURE_CONTENT_SAFETY_KEY: "key",
-      }).success,
+      }),
     ).toBe(false);
     expect(
-      schema.safeParse({
+      schema.validate({
         AZURE_CONTENT_SAFETY_ENDPOINT: "https://my-account.cognitiveservices.azure.com/",
-      }).success,
+      }),
     ).toBe(false);
     expect(
-      schema.safeParse({
+      schema.validate({
         AZURE_CONTENT_SAFETY_ENDPOINT: "https://my-account.cognitiveservices.azure.com/",
         AZURE_CONTENT_SAFETY_KEY: "",
-      }).success,
+      }),
     ).toBe(false);
-    expect(schema.safeParse({ AZURE_CONTENT_SAFETY_KEY: "key" }).success).toBe(false);
+    expect(schema.validate({ AZURE_CONTENT_SAFETY_KEY: "key" })).toBe(false);
   });
 
   it("classifies every registered provider and the established LLM providers", () => {

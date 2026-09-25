@@ -255,7 +255,7 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
     });
 
     await expect(
-      repository.findSummaryPage({ tenantId: " ", traceId: "trace_1", limit: 1 }),
+      repository.listSummaryPage({ tenantId: " ", traceId: "trace_1", limit: 1 }),
     ).rejects.toThrow("TenantId must be a non-empty string");
     expect(queryCount).toBe(0);
   });
@@ -293,7 +293,7 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
       }),
     });
 
-    const page = await repository.findSummaryPage({
+    const page = await repository.listSummaryPage({
       tenantId: "project_1",
       traceId: "trace_1",
       limit: 1,
@@ -363,7 +363,7 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
       }),
     });
 
-    const page = await repository.findSummaryPage({
+    const page = await repository.listSummaryPage({
       tenantId: "project_1",
       traceId: "trace_1",
       limit: 1,
@@ -388,7 +388,7 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
       }),
     });
 
-    const page = await repository.findSummaryPage({
+    const page = await repository.listSummaryPage({
       tenantId: "project_1",
       traceId: "trace_1",
       limit: 1,

@@ -50,8 +50,8 @@ function groupRepository(): ScimDirectoryRepository {
       createdAt: Temporal.Instant.from("2024-01-01T00:00:00Z"),
       updatedAt: Temporal.Instant.from("2024-01-02T00:00:00Z"),
     })),
-    listGroupMemberIds: vi.fn(async () => ["user-1"]),
-    listGroupMembers: vi.fn(async () => []),
+    findGroupMemberIds: vi.fn(async () => ["user-1"]),
+    findGroupMembers: vi.fn(async () => []),
     addGroupMember: vi.fn(async () => undefined),
     removeGroupMembers: vi.fn(async () => undefined),
     listGroups: vi.fn(async () => ({ rows: [], total: 0 })),
@@ -59,7 +59,7 @@ function groupRepository(): ScimDirectoryRepository {
     renameGroup: vi.fn(async () => undefined),
     deleteGroup: vi.fn(async () => undefined),
     groupSlugExists: vi.fn(async () => false),
-    listRoleBindings: vi.fn(async () => []),
+    findRoleBindings: vi.fn(async () => []),
   };
 }
 

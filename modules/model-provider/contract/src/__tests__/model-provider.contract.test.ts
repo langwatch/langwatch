@@ -26,43 +26,41 @@ describe("Model Provider contract", () => {
   });
 
   it("keeps scopes portable and strict", () => {
+    expect(modelProviderScopeSchema.validate({ scopeType: "PROJECT", scopeId: "p1" })).toBe(true);
     expect(
-      modelProviderScopeSchema.safeParse({ scopeType: "PROJECT", scopeId: "p1" }).success,
-    ).toBe(true);
-    expect(
-      modelProviderScopeSchema.safeParse({
+      modelProviderScopeSchema.validate({
         scopeType: "PROJECT",
         scopeId: "p1",
         prisma: true,
-      }).success,
+      }),
     ).toBe(false);
   });
 
   it("bounds translation input at the contract boundary", () => {
-    expect(translateInputSchema.safeParse({ projectId: "p1", text: "hello" }).success).toBe(true);
-    expect(
-      translateInputSchema.safeParse({ projectId: "p1", text: "x".repeat(100_001) }).success,
-    ).toBe(false);
+    expect(translateInputSchema.validate({ projectId: "p1", text: "hello" })).toBe(true);
+    expect(translateInputSchema.validate({ projectId: "p1", text: "x".repeat(100_001) })).toBe(
+      false,
+    );
   });
 
   it("owns the custom-model and Codex credential schemas", () => {
     expect(
-      customModelEntrySchema.safeParse({
+      customModelEntrySchema.validate({
         modelId: "my-model",
         displayName: "My model",
         mode: "chat",
-      }).success,
+      }),
     ).toBe(true);
     expect(
-      customModelEntrySchema.safeParse({
+      customModelEntrySchema.validate({
         modelId: "my-model",
         displayName: "My model",
         mode: "chat",
         privateField: true,
-      }).success,
+      }),
     ).toBe(false);
     expect(
-      codexTokenKeysSchema.safeParse({
+      codexTokenKeysSchema.validate({
         CODEX_ACCESS_TOKEN: "access",
         CODEX_REFRESH_TOKEN: "refresh",
         CODEX_ID_TOKEN: "id",
@@ -70,7 +68,7 @@ describe("Model Provider contract", () => {
         CODEX_PLAN: "plus",
         CODEX_EMAIL: "user@example.com",
         CODEX_TOKENS_SAVED_AT: new Date().toISOString(),
-      }).success,
+      }),
     ).toBe(true);
     expect(CODEX_OAUTH_ISSUER).toBe("https://auth.openai.com");
     expect(isLegacyCustomModels(["my-model"])).toBe(true);

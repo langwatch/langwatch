@@ -593,7 +593,7 @@ class Defaults implements ModelDefaultRepository {
 }
 class Costs implements ModelCostRepository {
   rows: ModelCost[] = [];
-  listForProject(): Promise<ModelCost[]> {
+  findForProject(): Promise<ModelCost[]> {
     return Promise.resolve(this.rows);
   }
   tryFindById(id: string): Promise<ModelCost | null> {

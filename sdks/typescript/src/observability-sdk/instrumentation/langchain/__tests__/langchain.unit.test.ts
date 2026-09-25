@@ -154,9 +154,9 @@ describe("LangWatchCallbackHandler", () => {
         checkpoint_ns: "ns",
       };
       await handler.handleChatModelStart({} as any, [], "run", undefined, {}, [], metadata);
-      await handler.handleLLMEnd({ generations: [[]] } as any, "run");
-      // If we reached here, it means building attributes didn't throw and filtering worked
-      expect(true).toBe(true);
+      await expect(
+        handler.handleLLMEnd({ generations: [[]] } as any, "run"),
+      ).resolves.not.toThrow();
     });
   });
 

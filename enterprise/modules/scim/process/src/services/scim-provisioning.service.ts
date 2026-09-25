@@ -263,7 +263,7 @@ export class ScimProvisioningService {
     }
 
     await this.organization.assertRemovalKeepsAnAdministrator({ organizationId, userId });
-    const visibleGrants = await this.prisma.listRoleBindings({
+    const visibleGrants = await this.prisma.findRoleBindings({
       kind: "member-offboarding",
       organizationId,
       userId,

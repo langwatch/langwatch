@@ -1,5 +1,5 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectNotFoundError, type ProjectWithTeam } from "@langwatch/project-contract";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 /**
  * The setup checklist's provider step, read through this feature's own
  * persistence.
@@ -42,7 +42,7 @@ function testDatabase(row: { id: string } | null) {
   const findFirst = vi.fn(async () => row);
   return {
     findFirst,
-    database: { modelProvider: { findFirst } } as unknown as Pick<PrismaClient, "modelProvider">,
+    database: prismaDouble({ modelProvider: { findFirst } }),
   };
 }
 

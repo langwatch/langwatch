@@ -259,7 +259,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     };
   }
 
-  async findSummaryPage(input: {
+  async listSummaryPage(input: {
     tenantId: string;
     traceId: string;
     limit: number;
@@ -268,7 +268,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
   }): Promise<TraceSpanPage> {
     EventUtils.validateTenantId(
       { tenantId: input.tenantId },
-      "ClickHouseTraceSpanRepository.findSummaryPage",
+      "ClickHouseTraceSpanRepository.listSummaryPage",
     );
 
     if (input.cursor) {

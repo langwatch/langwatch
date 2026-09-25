@@ -11,10 +11,10 @@ describe("given a display name at the boundary", () => {
   describe("when it is whitespace", () => {
     /** @scenario A blank name is refused at the boundary as well */
     it("is refused rather than trimmed down to nothing and stored", () => {
-      expect(userProfileNameSchema.safeParse("   ").success).toBe(false);
-      expect(userProfileNameSchema.safeParse("").success).toBe(false);
-      expect(userProfileNameSchema.safeParse("\t\n").success).toBe(false);
-      expect(userApiUpdateNameInputSchema.safeParse({ name: "  " }).success).toBe(false);
+      expect(userProfileNameSchema.validate("   ")).toBe(false);
+      expect(userProfileNameSchema.validate("")).toBe(false);
+      expect(userProfileNameSchema.validate("\t\n")).toBe(false);
+      expect(userApiUpdateNameInputSchema.validate({ name: "  " })).toBe(false);
     });
   });
 
@@ -28,8 +28,8 @@ describe("given a display name at the boundary", () => {
 
   describe("when it runs past what a member list can carry", () => {
     it("is refused rather than truncated behind the reader's back", () => {
-      expect(userProfileNameSchema.safeParse("a".repeat(121)).success).toBe(false);
-      expect(userProfileNameSchema.safeParse("a".repeat(120)).success).toBe(true);
+      expect(userProfileNameSchema.validate("a".repeat(121))).toBe(false);
+      expect(userProfileNameSchema.validate("a".repeat(120))).toBe(true);
     });
   });
 });

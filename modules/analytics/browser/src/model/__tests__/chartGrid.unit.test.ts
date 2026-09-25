@@ -40,12 +40,12 @@ describe("chartGridPlacementSchema", () => {
   describe("when a placement spans the full grid", () => {
     it("accepts it", () => {
       expect(
-        chartGridPlacementSchema.safeParse({
+        chartGridPlacementSchema.validate({
           gridColumn: 0,
           gridRow: 0,
           colSpan: CHART_GRID_COLUMNS,
           rowSpan: 20,
-        }).success,
+        }),
       ).toBe(true);
     });
   });
@@ -53,10 +53,10 @@ describe("chartGridPlacementSchema", () => {
   describe("when a placement starts past the last column, spans more than the grid, or is taller than the ceiling", () => {
     it("refuses each", () => {
       const base = { gridColumn: 0, gridRow: 0, colSpan: 1, rowSpan: 1 };
-      expect(chartGridPlacementSchema.safeParse({ ...base, gridColumn: 8 }).success).toBe(false);
-      expect(chartGridPlacementSchema.safeParse({ ...base, colSpan: 9 }).success).toBe(false);
-      expect(chartGridPlacementSchema.safeParse({ ...base, rowSpan: 21 }).success).toBe(false);
-      expect(chartGridPlacementSchema.safeParse({ ...base, colSpan: 1.5 }).success).toBe(false);
+      expect(chartGridPlacementSchema.validate({ ...base, gridColumn: 8 })).toBe(false);
+      expect(chartGridPlacementSchema.validate({ ...base, colSpan: 9 })).toBe(false);
+      expect(chartGridPlacementSchema.validate({ ...base, rowSpan: 21 })).toBe(false);
+      expect(chartGridPlacementSchema.validate({ ...base, colSpan: 1.5 })).toBe(false);
     });
   });
 });

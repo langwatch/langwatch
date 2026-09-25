@@ -29,7 +29,9 @@ export type SpanIngestionResult = {
 
 export type TraceRequestCollectionResult = {
   rejectedSpans: number;
-  /** The dispatch failures within `rejectedSpans`: transient, so a durable-cursor caller retries. */
+  /**
+   * The dispatch failures within `rejectedSpans`: transient, so a durable-cursor caller retries.
+   */
   ingestionFailures: number;
   /** Only the dispatch failures' messages, without the drop reasons `errorMessage` carries. */
   ingestionFailureMessage: string;

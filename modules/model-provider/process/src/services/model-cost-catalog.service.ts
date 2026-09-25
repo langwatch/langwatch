@@ -26,7 +26,7 @@ export class ModelCostCatalogService {
     const projectId = modelCostListInputSchema.parse(input).projectId;
     return this.scopes
       .getProjectScopes(projectId)
-      .then((projectScopes) => this.costs.listForProject(projectScopes))
+      .then((projectScopes) => this.costs.findForProject(projectScopes))
       .catch((error: unknown) => {
         if (HandledError.isHandled(error) && error.code === "project_not_found") return [];
         throw error;

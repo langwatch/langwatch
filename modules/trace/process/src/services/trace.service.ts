@@ -102,7 +102,7 @@ export class TraceService {
   async getFullThread(input: TraceFullThreadReadInput): Promise<TraceFullRecord[]> {
     const parsed = traceFullThreadReadInputSchema.parse(input);
 
-    return this.composition.fullRecords.getThread(parsed);
+    return this.composition.fullRecords.findThread(parsed);
   }
 
   async deriveEvents(input: TraceDerivedEventsInput): Promise<DerivedTraceEvent[]> {
@@ -125,7 +125,7 @@ export class TraceService {
 
   async getSpanTreePage(input: SpanTreeInput): Promise<SpanTreePage> {
     const parsed = spanTreeInputSchema.parse(input);
-    const page = await this.composition.repository.findSummaryPage({
+    const page = await this.composition.repository.listSummaryPage({
       tenantId: parsed.projectId,
       traceId: parsed.traceId,
       limit: parsed.limit,

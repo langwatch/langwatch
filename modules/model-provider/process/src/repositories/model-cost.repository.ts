@@ -9,7 +9,7 @@ export type ModelCostRecord = ModelCost;
  * organization row naming the same model whichever was saved last.
  */
 export interface ModelCostRepository {
-  listForProject(projectScopes: ModelDefaultScope[]): Promise<ModelCost[]>;
+  findForProject(projectScopes: ModelDefaultScope[]): Promise<ModelCost[]>;
   tryFindById(id: string): Promise<ModelCost | null>;
   save(input: ModelCostRecord): Promise<ModelCost>;
   delete(id: string): Promise<void>;

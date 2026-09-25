@@ -1,4 +1,7 @@
-/** `GET /api/v1/traces/:traceId/transcript`: main's REST read of one trace's coding-agent transcript. */
+/**
+ * `GET /api/v1/traces/:traceId/transcript`: main's REST read of one trace's coding-agent
+ * transcript.
+ */
 import { createApiFixture } from "@langwatch/api-fixture";
 import {
   bindRestMiddleware,

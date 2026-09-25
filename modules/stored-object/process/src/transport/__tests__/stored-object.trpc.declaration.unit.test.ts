@@ -62,10 +62,10 @@ describe("the storedObjects tRPC declaration", () => {
     it("answers the probe's three states and nothing else", () => {
       const output = storedObjectTrpc.members.headById?.output;
 
-      expect(output?.safeParse({ status: "not_found" }).success).toBe(true);
-      expect(output?.safeParse({ status: "missing", mediaType: "image/png" }).success).toBe(true);
-      expect(output?.safeParse({ status: "available", mediaType: "image/png" }).success).toBe(true);
-      expect(output?.safeParse({ status: "gone" }).success).toBe(false);
+      expect(output?.validate({ status: "not_found" })).toBe(true);
+      expect(output?.validate({ status: "missing", mediaType: "image/png" })).toBe(true);
+      expect(output?.validate({ status: "available", mediaType: "image/png" })).toBe(true);
+      expect(output?.validate({ status: "gone" })).toBe(false);
     });
   });
 });

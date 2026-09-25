@@ -2,28 +2,28 @@
  * The key a pull request is stored and found under.
  */
 
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import {
-  PrismaGithubPullRequestsRepository,
-  type PrismaGithubPullRequestsDatabase,
-} from "../prisma.github-pull-requests.repository.ts";
+import { PrismaGithubPullRequestsRepository } from "../prisma.github-pull-requests.repository.ts";
 
 type Call = { method: string; args: Record<string, unknown> };
 
 /** A Prisma stand-in that records the shape it was handed. */
 function recordingDatabase(over: { updatedCount?: number } = {}) {
   const calls: Call[] = [];
-  const record = (method: string) => async (args: Record<string, unknown>) => {
-    calls.push({ method, args });
-    if (method === "githubPullRequest.updateMany") {
-      return { count: over.updatedCount ?? 1 };
-    }
-    return [];
-  };
+  const record =
+    (method: string) =>
+    async (args: Record<string, unknown> = {}) => {
+      calls.push({ method, args });
+      if (method === "githubPullRequest.updateMany") {
+        return { count: over.updatedCount ?? 1 };
+      }
+      return [];
+    };
 
-  const database = {
+  const database = prismaDouble({
     githubPullRequest: {
       findMany: record("githubPullRequest.findMany"),
       updateMany: record("githubPullRequest.updateMany"),
@@ -37,13 +37,11 @@ function recordingDatabase(over: { updatedCount?: number } = {}) {
       deleteMany: record("githubBranchPullRequestCheck.deleteMany"),
     },
     $executeRaw: async () => 0,
-  };
+  });
 
   return {
     calls,
-    repository: PrismaGithubPullRequestsRepository.create(
-      database as unknown as PrismaGithubPullRequestsDatabase,
-    ),
+    repository: PrismaGithubPullRequestsRepository.create(database),
   };
 }
 

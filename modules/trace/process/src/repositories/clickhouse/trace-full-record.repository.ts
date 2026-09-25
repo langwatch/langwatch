@@ -123,10 +123,10 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
     );
   }
 
-  async getThread(input: TraceFullThreadReadInput): Promise<TraceFullRecord[]> {
+  async findThread(input: TraceFullThreadReadInput): Promise<TraceFullRecord[]> {
     EventUtils.validateTenantId(
       { tenantId: input.tenantId },
-      "ClickHouseTraceFullRecordRepository.getThread",
+      "ClickHouseTraceFullRecordRepository.findThread",
     );
     const client = await this.clickhouse.resolve(input.tenantId);
     const result = await client.query<{ TraceId: string; OccurredAtMs: number }>({

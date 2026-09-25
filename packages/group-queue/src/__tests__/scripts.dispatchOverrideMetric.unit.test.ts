@@ -1,4 +1,4 @@
-import type { Redis as IORedis } from "ioredis";
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { gqJobsDispatchedOverrideTotal } from "../metrics.ts";
@@ -18,10 +18,10 @@ function jobTuple(id: string): string[] {
 }
 
 function scriptsReturning(value: unknown): GroupStagingScripts {
-  const redis = {
+  const redis = redisDouble({
     // CachedLuaScript sends EVALSHA; nothing else is reached in this path.
     evalsha: async () => value,
-  } as unknown as IORedis;
+  });
 
   return new GroupStagingScripts(redis, QUEUE_NAME);
 }

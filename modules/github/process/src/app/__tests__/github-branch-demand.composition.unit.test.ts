@@ -4,6 +4,8 @@
  */
 import { generateKeyPairSync } from "node:crypto";
 
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import type { Instant } from "@langwatch/time";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -44,7 +46,7 @@ function database() {
 
   return {
     writes,
-    client: {
+    client: prismaDouble({
       githubInstallation: {
         findMany: async () => [
           {
@@ -73,7 +75,7 @@ function database() {
         upsert: write("githubBranchPullRequestCheck.upsert"),
       },
       $executeRaw: async () => 1,
-    },
+    }),
   };
 }
 
@@ -104,16 +106,12 @@ function githubApi() {
   return paths;
 }
 
-function demand(client: object, project: GithubProjectActivity) {
+function demand(client: PrismaClient, project: GithubProjectActivity) {
   return GithubApp.composeBranchDemand({
     repositories: {
       ...unansweredRedisRepositories(),
-      installations: PrismaGithubInstallationsRepository.create(
-        client as unknown as Parameters<typeof PrismaGithubInstallationsRepository.create>[0],
-      ),
-      pullRequests: PrismaGithubPullRequestsRepository.create(
-        client as unknown as Parameters<typeof PrismaGithubPullRequestsRepository.create>[0],
-      ),
+      installations: PrismaGithubInstallationsRepository.create(client),
+      pullRequests: PrismaGithubPullRequestsRepository.create(client),
     },
     config: { appId: "1234", privateKey },
     project,

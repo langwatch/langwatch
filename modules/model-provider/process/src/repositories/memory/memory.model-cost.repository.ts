@@ -17,7 +17,7 @@ export class MemoryModelCostRepository implements ModelCostRepository {
 
   private constructor(private readonly database: MemoryModelProviderDatabase) {}
 
-  listForProject(projectScopes: ModelDefaultScope[]): Promise<ModelCost[]> {
+  findForProject(projectScopes: ModelDefaultScope[]): Promise<ModelCost[]> {
     const rows = [...this.database.costs.values()].filter((row) =>
       projectScopes.some(
         (scope) => scope.scopeType === row.scopeType && scope.scopeId === row.scopeId,

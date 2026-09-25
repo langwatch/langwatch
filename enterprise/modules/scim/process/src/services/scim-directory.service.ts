@@ -37,10 +37,10 @@ export type ScimDirectoryRepository = Pick<
   ScimRepository,
   | "createGroup"
   | "deleteGroup"
-  | "listGroupMemberIds"
-  | "listGroupMembers"
+  | "findGroupMemberIds"
+  | "findGroupMembers"
   | "listGroups"
-  | "listRoleBindings"
+  | "findRoleBindings"
   | "renameGroup"
   | "findGroup"
   | "findGroupByExternalId"
@@ -151,7 +151,7 @@ export class ScimDirectoryService {
       return this.scimError({ status: "404", detail: "Group not found" });
     }
 
-    const members = await this.prisma.listGroupMembers({ groupId: group.id });
+    const members = await this.prisma.findGroupMembers({ groupId: group.id });
 
     return this.toScimGroup(group, members, excludeMembers);
   }
@@ -202,7 +202,7 @@ export class ScimDirectoryService {
       });
     }
 
-    const members = await this.prisma.listGroupMembers({ groupId: group.id });
+    const members = await this.prisma.findGroupMembers({ groupId: group.id });
 
     return this.toScimGroup(group, members);
   }
@@ -228,7 +228,7 @@ export class ScimDirectoryService {
     await this.authorizeMembers({
       connectionId,
       memberIds: [
-        ...(await this.prisma.listGroupMemberIds({ groupId: group.id })),
+        ...(await this.prisma.findGroupMemberIds({ groupId: group.id })),
         ...(request.members ?? []).map((member) => member.value),
       ],
     });
@@ -243,7 +243,7 @@ export class ScimDirectoryService {
     });
 
     const updatedGroup = (await this.findGroup({ externalScimId, organizationId, connectionId }))!;
-    const members = await this.prisma.listGroupMembers({ groupId: group.id });
+    const members = await this.prisma.findGroupMembers({ groupId: group.id });
 
     return this.toScimGroup(updatedGroup, members);
   }
@@ -279,7 +279,7 @@ export class ScimDirectoryService {
     }
 
     const updatedGroup = (await this.findGroup({ externalScimId, organizationId, connectionId }))!;
-    const members = await this.prisma.listGroupMembers({ groupId: group.id });
+    const members = await this.prisma.findGroupMembers({ groupId: group.id });
 
     return this.toScimGroup(updatedGroup, members);
   }
@@ -300,7 +300,7 @@ export class ScimDirectoryService {
 
     // Deleting a group unmembers everyone in it, so a directory that does not
     // own one of them may not delete it — asked before anything is written.
-    const memberIds = await this.prisma.listGroupMemberIds({ groupId: group.id });
+    const memberIds = await this.prisma.findGroupMemberIds({ groupId: group.id });
     await this.authorizeMembers({ connectionId, memberIds });
 
     // The grants the group carried go first and carry instant enforcement:

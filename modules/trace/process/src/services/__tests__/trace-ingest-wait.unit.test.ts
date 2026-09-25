@@ -32,7 +32,7 @@ class IngestLagRepository extends TraceProjectedReadRepository {
     return this.sample;
   }
 
-  findSummaryPage(): Promise<TraceSpanPage> {
+  listSummaryPage(): Promise<TraceSpanPage> {
     return Promise.resolve({ rows: [], hasMore: false });
   }
 

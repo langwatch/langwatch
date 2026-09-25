@@ -479,13 +479,13 @@ export class PrismaScimRepository extends ScimRepository {
   async deleteGroup(input: { id: string }): Promise<void> {
     await this.prisma.group.delete({ where: { id: input.id } });
   }
-  listGroupMembers(input: { groupId: string }): Promise<ScimGroupMembershipRecord[]> {
+  findGroupMembers(input: { groupId: string }): Promise<ScimGroupMembershipRecord[]> {
     return this.prisma.groupMembership.findMany({
       where: { groupId: input.groupId },
       include: { user: { select: { id: true, email: true, name: true } } },
     });
   }
-  async listGroupMemberIds(input: { groupId: string }): Promise<string[]> {
+  async findGroupMemberIds(input: { groupId: string }): Promise<string[]> {
     const rows: { userId: string }[] = await this.prisma.groupMembership.findMany({
       where: { groupId: input.groupId },
       select: { userId: true },
@@ -521,7 +521,7 @@ export class PrismaScimRepository extends ScimRepository {
   async groupSlugExists(input: { organizationId: string; slug: string }): Promise<boolean> {
     return (await this.prisma.group.findFirst({ where: input, select: { id: true } })) !== null;
   }
-  listRoleBindings(scope: ScimGrantBindingScope): Promise<ScimRoleBindingRecord[]> {
+  findRoleBindings(scope: ScimGrantBindingScope): Promise<ScimRoleBindingRecord[]> {
     return this.prisma.roleBinding.findMany({
       where: {
         organizationId: scope.organizationId,

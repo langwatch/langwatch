@@ -31,7 +31,7 @@ export abstract class TraceProjectedReadRepository {
 
   abstract findIngestLag(input: { tenantId: string }): Promise<TraceIngestLagSample | null>;
 
-  abstract findSummaryPage(input: {
+  abstract listSummaryPage(input: {
     tenantId: string;
     traceId: string;
     limit: number;

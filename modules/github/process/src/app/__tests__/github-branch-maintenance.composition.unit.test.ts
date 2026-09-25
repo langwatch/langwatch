@@ -4,6 +4,8 @@
  */
 import { generateKeyPairSync } from "node:crypto";
 
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { unansweredRedisRepositories } from "../../__tests__/support/github-unanswered-redis.support.ts";
@@ -55,7 +57,7 @@ function database(over: { due?: (typeof DUE_BRANCH)[]; claimed?: number } = {}) 
 
   return {
     writes,
-    client: {
+    client: prismaDouble({
       githubInstallation: {
         findMany: async () => [
           {
@@ -84,7 +86,7 @@ function database(over: { due?: (typeof DUE_BRANCH)[]; claimed?: number } = {}) 
         upsert: write("githubBranchPullRequestCheck.upsert"),
       },
       $executeRaw: async () => over.claimed ?? 1,
-    },
+    }),
   };
 }
 
@@ -101,16 +103,12 @@ function githubApi() {
   return paths;
 }
 
-function sweep(client: object) {
+function sweep(client: PrismaClient) {
   return GithubApp.composeBranchMaintenance({
     repositories: {
       ...unansweredRedisRepositories(),
-      installations: PrismaGithubInstallationsRepository.create(
-        client as unknown as Parameters<typeof PrismaGithubInstallationsRepository.create>[0],
-      ),
-      pullRequests: PrismaGithubPullRequestsRepository.create(
-        client as unknown as Parameters<typeof PrismaGithubPullRequestsRepository.create>[0],
-      ),
+      installations: PrismaGithubInstallationsRepository.create(client),
+      pullRequests: PrismaGithubPullRequestsRepository.create(client),
     },
     config: { appId: "1234", privateKey },
   });
@@ -164,12 +162,8 @@ describe("the GitHub branch sweep composed from Postgres alone", () => {
       const uncredentialed = GithubApp.composeBranchMaintenance({
         repositories: {
           ...unansweredRedisRepositories(),
-          installations: PrismaGithubInstallationsRepository.create(
-            client as unknown as Parameters<typeof PrismaGithubInstallationsRepository.create>[0],
-          ),
-          pullRequests: PrismaGithubPullRequestsRepository.create(
-            client as unknown as Parameters<typeof PrismaGithubPullRequestsRepository.create>[0],
-          ),
+          installations: PrismaGithubInstallationsRepository.create(client),
+          pullRequests: PrismaGithubPullRequestsRepository.create(client),
         },
         config: { appId: "", privateKey: "" },
       });
@@ -186,12 +180,8 @@ describe("the GitHub branch sweep composed from Postgres alone", () => {
       const uncredentialed = GithubApp.composeBranchMaintenance({
         repositories: {
           ...unansweredRedisRepositories(),
-          installations: PrismaGithubInstallationsRepository.create(
-            client as unknown as Parameters<typeof PrismaGithubInstallationsRepository.create>[0],
-          ),
-          pullRequests: PrismaGithubPullRequestsRepository.create(
-            client as unknown as Parameters<typeof PrismaGithubPullRequestsRepository.create>[0],
-          ),
+          installations: PrismaGithubInstallationsRepository.create(client),
+          pullRequests: PrismaGithubPullRequestsRepository.create(client),
         },
         config: { appId: "", privateKey: "" },
       });

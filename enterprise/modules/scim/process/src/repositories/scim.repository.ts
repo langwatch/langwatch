@@ -105,7 +105,7 @@ export interface ScimDirectoryIdentityRecord {
 
 /** Semantic store used by the SCIM service; no transport or ORM vocabulary. */
 export abstract class ScimGrantRepository {
-  abstract listRoleBindings(scope: ScimGrantBindingScope): Promise<ScimRoleBindingRecord[]>;
+  abstract findRoleBindings(scope: ScimGrantBindingScope): Promise<ScimRoleBindingRecord[]>;
 }
 
 export abstract class ScimRepository extends ScimGrantRepository {
@@ -201,8 +201,8 @@ export abstract class ScimRepository extends ScimGrantRepository {
   }): Promise<ScimGroupRecord>;
   abstract renameGroup(input: { id: string; name: string }): Promise<void>;
   abstract deleteGroup(input: { id: string }): Promise<void>;
-  abstract listGroupMembers(input: { groupId: string }): Promise<ScimGroupMembershipRecord[]>;
-  abstract listGroupMemberIds(input: { groupId: string }): Promise<string[]>;
+  abstract findGroupMembers(input: { groupId: string }): Promise<ScimGroupMembershipRecord[]>;
+  abstract findGroupMemberIds(input: { groupId: string }): Promise<string[]>;
   abstract addGroupMember(input: {
     groupId: string;
     organizationId: string;

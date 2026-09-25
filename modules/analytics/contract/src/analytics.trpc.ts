@@ -26,14 +26,10 @@ export const analyticsFilterSelectionSchema = z.object({
   query: z.string().optional(),
 });
 
-/**
- * The picker's whole request. An intersection rather than an extension, because
- * the shared half is a schema the other three procedures take whole.
- */
-export const analyticsDataForFilterInputSchema = z.intersection(
-  sharedFiltersInputSchema,
-  analyticsFilterSelectionSchema,
-);
+export const analyticsDataForFilterInputSchema = z.object({
+  ...sharedFiltersInputSchema.shape,
+  ...analyticsFilterSelectionSchema.shape,
+});
 
 export const analyticsTrpc = defineTrpcContract("analytics")
   .query("getTimeseries")

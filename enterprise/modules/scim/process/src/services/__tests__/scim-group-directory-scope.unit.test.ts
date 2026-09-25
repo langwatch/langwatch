@@ -114,12 +114,12 @@ function repositoryOver(groups: ScimGroupRecord[]) {
     ),
     renameGroup: vi.fn(async () => undefined),
     deleteGroup: vi.fn(async () => undefined),
-    listGroupMembers: vi.fn(async () => []),
-    listGroupMemberIds: vi.fn(async () => []),
+    findGroupMembers: vi.fn(async () => []),
+    findGroupMemberIds: vi.fn(async () => []),
     addGroupMember: vi.fn(async () => undefined),
     removeGroupMembers: vi.fn(async () => undefined),
     groupSlugExists: vi.fn(async () => false),
-    listRoleBindings: vi.fn(async () => []),
+    findRoleBindings: vi.fn(async () => []),
   };
 
   return { repository, created };
@@ -345,7 +345,7 @@ describe("a group belongs to the connection that pushed it", () => {
         const { repository } = repositoryOver(
           verb === "post" ? [] : [group({ connectionId: OKTA })],
         );
-        repository.listGroupMemberIds = vi.fn(async () => [FOREIGN]);
+        repository.findGroupMemberIds = vi.fn(async () => [FOREIGN]);
         const identities = {
           assertWritable: vi.fn(async ({ userId }: { connectionId: string; userId: string }) => {
             if (userId === FOREIGN) throw new ScimWriteOutsideConnectionError({ userId });

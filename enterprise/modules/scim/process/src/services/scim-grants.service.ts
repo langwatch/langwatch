@@ -120,7 +120,7 @@ export class ScimGrantsService {
     desired: DesiredScimGrant[];
     actor: LedgerActor;
   }): Promise<{ attached: number; revoked: number }> {
-    const current = await this.repository.listRoleBindings(input.scope);
+    const current = await this.repository.findRoleBindings(input.scope);
 
     const desiredKeys = new Set(input.desired.map(keyOfDesired));
     const currentKeys = new Set(current.map((row) => grantKey(row)));

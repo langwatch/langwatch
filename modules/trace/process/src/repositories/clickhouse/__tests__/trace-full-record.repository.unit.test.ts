@@ -213,7 +213,7 @@ describe("ClickHouseTraceFullRecordRepository", () => {
       },
     );
     await expect(
-      repository.getThread({ tenantId: "tenant_a", threadId: "thread" }),
+      repository.findThread({ tenantId: "tenant_a", threadId: "thread" }),
     ).resolves.toMatchObject([{ trace_id: "first" }, { trace_id: "later" }]);
   });
 

@@ -183,7 +183,7 @@ describe("given the memory model-provider repositories", () => {
         scopeId: "project_1",
       });
 
-      const rows = await repositories.costs.listForProject([PROJECT_SCOPE, ORGANIZATION_SCOPE]);
+      const rows = await repositories.costs.findForProject([PROJECT_SCOPE, ORGANIZATION_SCOPE]);
 
       expect(rows.map((row) => row.id)).toEqual(["cost_project", "cost_org"]);
     });

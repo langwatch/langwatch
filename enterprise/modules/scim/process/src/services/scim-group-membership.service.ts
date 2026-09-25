@@ -32,7 +32,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /** The five writes and reads a membership diff makes. */
 export type ScimGroupMembershipRepository = Pick<
   ScimRepository,
-  "addGroupMember" | "groupSlugExists" | "listGroupMemberIds" | "removeGroupMembers" | "renameGroup"
+  "addGroupMember" | "groupSlugExists" | "findGroupMemberIds" | "removeGroupMembers" | "renameGroup"
 >;
 
 /** Owns SCIM Group membership diffs and their conservative PATCH interpretation. */
@@ -117,7 +117,7 @@ export class ScimGroupMembershipService {
     memberIds: string[];
   }): Promise<void> {
     const currentIds = new Set(
-      await this.repository.listGroupMemberIds({ groupId: input.group.id }),
+      await this.repository.findGroupMemberIds({ groupId: input.group.id }),
     );
     const requestedIds = new Set(input.memberIds);
     const toAdd = [...requestedIds].filter((id) => !currentIds.has(id));
@@ -159,7 +159,7 @@ export class ScimGroupMembershipService {
     }
 
     if (replacesMembers) {
-      for (const id of await this.repository.listGroupMemberIds({ groupId: input.groupId })) {
+      for (const id of await this.repository.findGroupMemberIds({ groupId: input.groupId })) {
         touched.add(id);
       }
     }

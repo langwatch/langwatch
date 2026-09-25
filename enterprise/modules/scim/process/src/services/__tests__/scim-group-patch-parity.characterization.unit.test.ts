@@ -26,8 +26,8 @@ function repository(): ScimDirectoryRepository {
   return {
     findGroup: vi.fn(async () => group),
     findGroupByExternalId: vi.fn(async () => null),
-    listGroupMemberIds: vi.fn(async () => ["user-1", "user-2"]),
-    listGroupMembers: vi.fn(async () => []),
+    findGroupMemberIds: vi.fn(async () => ["user-1", "user-2"]),
+    findGroupMembers: vi.fn(async () => []),
     addGroupMember: vi.fn(async () => undefined),
     removeGroupMembers: vi.fn(async () => undefined),
     listGroups: vi.fn(async () => ({ rows: [], total: 0 })),
@@ -35,7 +35,7 @@ function repository(): ScimDirectoryRepository {
     renameGroup: vi.fn(async () => undefined),
     deleteGroup: vi.fn(async () => undefined),
     groupSlugExists: vi.fn(async () => false),
-    listRoleBindings: vi.fn(async () => []),
+    findRoleBindings: vi.fn(async () => []),
   };
 }
 

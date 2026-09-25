@@ -8,5 +8,5 @@ import type {
 export abstract class TraceFullRecordRepository {
   abstract get(input: TraceFullReadInput): Promise<TraceFullRecord>;
 
-  abstract getThread(input: TraceFullThreadReadInput): Promise<TraceFullRecord[]>;
+  abstract findThread(input: TraceFullThreadReadInput): Promise<TraceFullRecord[]>;
 }

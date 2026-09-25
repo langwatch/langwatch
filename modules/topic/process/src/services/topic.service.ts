@@ -1,6 +1,5 @@
 import {
   topicClusteringStatusSchema,
-  topicClusteringRunHistoryEntrySchema,
   topicNamesInputSchema,
   topicProjectInputSchema,
   type Topic,
@@ -84,14 +83,11 @@ export class TopicService {
       topicProjectInputSchema.parse(input),
     );
 
-    return runs.map((run) => {
-      const parsed = topicClusteringRunHistoryEntrySchema.parse(run);
-
-      return parsed.outcome === "running" &&
-        this.now() - parsed.startedAt >= TOPIC_CLUSTERING_STALE_RUN_MS
-        ? { ...parsed, outcome: "abandoned" }
-        : parsed;
-    });
+    return runs.map((run) =>
+      run.outcome === "running" && this.now() - run.startedAt >= TOPIC_CLUSTERING_STALE_RUN_MS
+        ? { ...run, outcome: "abandoned" }
+        : run,
+    );
   }
 
   private hasUnansweredRequest(input: {

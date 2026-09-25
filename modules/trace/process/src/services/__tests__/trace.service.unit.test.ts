@@ -64,7 +64,7 @@ class FakeTraceRepository extends TraceProjectedReadRepository {
     super();
   }
 
-  async findSummaryPage(input: {
+  async listSummaryPage(input: {
     tenantId: string;
     traceId: string;
     limit: number;
@@ -109,7 +109,7 @@ class FullRecords extends TraceFullRecordRepository {
     };
   }
 
-  async getThread(): Promise<TraceFullRecord[]> {
+  async findThread(): Promise<TraceFullRecord[]> {
     this.calls.push("thread");
     return [];
   }
@@ -206,7 +206,7 @@ describe("TraceService span-tree read", () => {
             return null;
           }
 
-          async findSummaryPage(input: { tenantId: string }): Promise<TraceSpanPage> {
+          async listSummaryPage(input: { tenantId: string }): Promise<TraceSpanPage> {
             this.seen.push(input.tenantId);
             const rows = input.tenantId === "project_1" ? [record(node)] : [];
             return { rows, hasMore: rows.length > 0 };
@@ -294,7 +294,7 @@ describe("TraceService span-tree read", () => {
         return null;
       }
 
-      async findSummaryPage(): Promise<TraceSpanPage> {
+      async listSummaryPage(): Promise<TraceSpanPage> {
         return { rows: [], hasMore: true };
       }
 

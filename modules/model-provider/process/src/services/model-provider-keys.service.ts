@@ -12,6 +12,9 @@ import { ModelProviderCredentialPolicy } from "../app/model-provider.members.ts"
 
 type Header = { key: string; value: string };
 
+const managedKeysSchema = z.object({ MANAGED: z.string() });
+const normalizedKeysSchema = z.record(z.string(), z.unknown());
+
 export class ModelProviderKeysService extends ModelProviderCredentialPolicy {
   private constructor() {
     super();
@@ -29,12 +32,7 @@ export class ModelProviderKeysService extends ModelProviderCredentialPolicy {
       return null;
     }
 
-    const definition = providerDefinition(provider);
-
-    return z
-      .union([definition.keysSchema, z.object({ MANAGED: z.string() })])
-      .pipe(z.record(z.string(), z.unknown()))
-      .parse(value);
+    return getKeysNormalizer(provider).parse(value);
   }
 
   merge(input: {
@@ -152,6 +150,23 @@ export class ModelProviderKeysService extends ModelProviderCredentialPolicy {
  */
 function trimHeaders(headers: Header[]): Header[] {
   return headers.map(({ key, value }) => ({ key: key.trim(), value: value.trim() }));
+}
+
+const providerRegistry: Record<string, ModelProviderDefinition> = modelProviders;
+const keysNormalizers = new Map(
+  Object.entries(providerRegistry).map(([provider, definition]) => [
+    provider,
+    z.union([definition.keysSchema, managedKeysSchema]).pipe(normalizedKeysSchema),
+  ]),
+);
+
+function getKeysNormalizer(provider: string) {
+  const normalizer = keysNormalizers.get(provider);
+  if (!normalizer) {
+    throw new Error(`Unknown model provider: ${provider}`);
+  }
+
+  return normalizer;
 }
 
 function providerDefinition(provider: string): ModelProviderDefinition {

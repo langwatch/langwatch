@@ -33,6 +33,8 @@ const pullRequestSchema = z.object({
   user: z.object({ login: z.string().optional() }).nullish(),
 });
 
+const pullRequestsSchema = z.array(pullRequestSchema);
+
 const installationSchema = z.object({
   id: z.number(),
   account: z
@@ -233,7 +235,7 @@ export class HttpGithubApiAdapter implements GithubAppClient {
     const body = await this.readPullRequests(
       input,
       `/pulls?head=${encodeURIComponent(head)}&state=all&per_page=50`,
-      z.array(pullRequestSchema),
+      pullRequestsSchema,
     );
     return body.map(toPullRequestSummary);
   }

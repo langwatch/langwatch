@@ -18,9 +18,7 @@ export const userAvatarMediaTypeSchema = z.enum(USER_AVATAR_ALLOWED_MEDIA_TYPES)
 export type UserAvatarMediaType = z.infer<typeof userAvatarMediaTypeSchema>;
 
 export function safeUserAvatarMediaType(mediaType: string): string {
-  return userAvatarMediaTypeSchema.safeParse(mediaType).success
-    ? mediaType
-    : "application/octet-stream";
+  return userAvatarMediaTypeSchema.validate(mediaType) ? mediaType : "application/octet-stream";
 }
 
 export const userProfileSchema = z

@@ -1,6 +1,7 @@
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
-import { PrismaTopicRepository, type TopicDatabase } from "../prisma.topic.repository.ts";
+import { PrismaTopicRepository } from "../prisma.topic.repository.ts";
 
 const topicRows = [
   {
@@ -30,11 +31,11 @@ function makeDatabase(
     .fn()
     .mockResolvedValue(overrides.history === undefined ? null : { Runs: overrides.history });
 
-  const database = {
+  const database = prismaDouble({
     topic: { findMany: topicFindMany },
     topicClusteringRunProjection: { findUnique: statusFindUnique },
     topicClusteringRunHistoryProjection: { findUnique: historyFindUnique },
-  } as unknown as TopicDatabase;
+  });
 
   return { database, topicFindMany, statusFindUnique, historyFindUnique };
 }
