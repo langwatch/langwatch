@@ -62668,20 +62668,20 @@ clickhouse:
 
 You only need to set these two values, the subchart computes optimal settings for query limits, merge threads, insert batching, and S3 download parallelism.
 
-### AI Gateway sub-chart (optional)
+### AI Gateway sub-chart
 
-The umbrella chart bundles the AI Gateway as an opt-in sub-chart that runs alongside the core LangWatch app. Enabling it gives you virtual keys, hierarchical budgets, multi-provider routing via Bifrost, guardrails, and prompt caching, all governed by the same control plane.
+The umbrella chart bundles the AI Gateway as a sub-chart that runs alongside the core LangWatch app, and installs it by default. It gives you virtual keys, hierarchical budgets, multi-provider routing via Bifrost, guardrails, and prompt caching, all governed by the same control plane.
 
-Minimum viable opt-in:
+To run without it:
 
 ```yaml
 gateway:
-  enabled: true
+  chartManaged: false
 ```
 
-That ships sane defaults (2 replicas, ClusterIP service, no ingress). For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
+The defaults are 2 replicas, a ClusterIP service and an ingress for the placeholder host `gateway.langwatch.ai`. Set `gateway.ingress.host` to your own hostname, or `gateway.ingress.enabled: false` to reach the gateway only from inside the cluster. For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
 
-Three things to know before flipping it on:
+Three things to know when running it:
 
 1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI Gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`), which also holds the app keys `credentialsEncryptionKey`, `cronApiKey`, `nextAuthSecret` and `virtualKeyPepper`.
 
@@ -62731,6 +62731,18 @@ cronjobs:
     annotations:
       sidecar.istio.io/inject: "false"
 ```
+
+### Two installs in one cluster
+
+The bundled Prometheus creates a cluster-scoped ClusterRole named `<release>-prometheus-server`. A second install with the same release name in another namespace, for example a staging `langwatch` beside a production `langwatch`, fails with `ClusterRole "langwatch-prometheus-server" ... exists and cannot be imported into the current release`. Give the second install its own ClusterRole name, or use a different release name:
+
+```yaml
+prometheus:
+  server:
+    clusterRoleNameOverride: langwatch-staging-prometheus-server
+```
+
+Both installs render ingress rules for the same default hosts and paths, and overlapping host and path rules conflict in the ingress controller. Give each install its own `ingress.hosts` and `gateway.ingress.host`, or disable an ingress that install does not need.
 
 ### Custom StorageClass
 
@@ -65084,7 +65096,7 @@ Choose the deployment method that fits your environment.
 - **Auto-tuned ClickHouse** via the `clickhouse-serverless` subchart adapts resource allocation to your workload.
 - **Composable Helm chart overlays** let you customize deployments without forking the chart.
 - **Deep OpenTelemetry integration**: ingest traces via OTLP, export platform metrics and logs via OTel for infrastructure monitoring.
-- **AI Gateway sub-chart** (optional), terminate LLM traffic on your own perimeter with virtual keys, hierarchical budgets, multi-provider routing, guardrails, and prompt caching. Same Helm install, opt in via `gateway.enabled=true`. See [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm).
+- **AI Gateway sub-chart**, terminate LLM traffic on your own perimeter with virtual keys, hierarchical budgets, multi-provider routing, guardrails, and prompt caching. Same Helm install, on by default; turn it off with `gateway.chartManaged=false`. See [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm).
 
 ## Enterprise
 

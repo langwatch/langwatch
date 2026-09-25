@@ -103,16 +103,17 @@ export function resolveWorkerCallbackUrl(
 }
 
 /**
- * The AI gateway base URL the worker dials (handed to it as OPENAI_BASE_URL). Same
- * container caveat as {@link resolveWorkerCallbackUrl}: `LANGY_WORKER_GATEWAY_URL`
- * (a `host.docker.internal` address haven injects for a containerized worker) wins
- * when present; otherwise the usual LW_GATEWAY_PUBLIC_URL / LW_GATEWAY_BASE_URL.
+ * The AI gateway base URL the worker dials (handed to it as OPENAI_BASE_URL).
+ * `LANGY_WORKER_GATEWAY_URL` (haven's address for a containerized worker) wins,
+ * then the in-cluster LW_GATEWAY_INTERNAL_URL: the worker runs beside the
+ * control plane, and the public URL may not resolve from inside the cluster.
  */
 export function resolveWorkerGatewayBaseUrl(
   env: Record<string, string | undefined> = process.env,
 ): string | undefined {
   return (
     env.LANGY_WORKER_GATEWAY_URL ??
+    env.LW_GATEWAY_INTERNAL_URL ??
     env.LW_GATEWAY_PUBLIC_URL ??
     env.LW_GATEWAY_BASE_URL
   );

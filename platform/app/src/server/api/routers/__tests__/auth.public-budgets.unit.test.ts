@@ -42,6 +42,14 @@ vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
   signUpVerification: () => ({ addressState, requestVerification }),
 }));
 
+// These budgets guard the mailing path, which runs only where an email
+// provider is configured.
+vi.mock("~/server/mailer/providers", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/server/mailer/providers")>()),
+  hasEmailProvider: () => true,
+  isEmailUnconfigured: () => false,
+}));
+
 /**
  * A request whose socket peer is the address the budget is keyed on.
  *

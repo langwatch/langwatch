@@ -207,6 +207,10 @@ jobs:
         if: "!cancelled()"
         run: ./tests/lwql-connection-env.sh
 
+      - name: "assert app and workers get the in-cluster gateway address"
+        if: "!cancelled()"
+        run: ./tests/gateway-internal-url.sh
+
       # Connect's upgrade guarantee is a claim about absence: an install that
       # changes no value must carry no LANGWATCH_CONNECT_ variable, so nothing
       # in the app can decide to call LangWatch. A wrong `{{- if }}` emits the

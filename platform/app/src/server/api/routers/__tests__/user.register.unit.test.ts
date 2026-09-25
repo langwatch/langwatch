@@ -45,8 +45,20 @@ vi.mock("~/server/auth/rate-limit-client-ip", () => ({
 const { resolveAuthProviderMock } = vi.hoisted(() => ({
   resolveAuthProviderMock: vi.fn(),
 }));
-const { claimAddressProofMock } = vi.hoisted(() => ({
-  claimAddressProofMock: vi.fn(),
+const { claimAddressProofMock, claimUnconfirmedAddressProofMock } = vi.hoisted(
+  () => ({
+    claimAddressProofMock: vi.fn(),
+    claimUnconfirmedAddressProofMock: vi.fn(),
+  }),
+);
+const { hasEmailProviderMock, isEmailUnconfiguredMock } = vi.hoisted(() => ({
+  hasEmailProviderMock: vi.fn(),
+  isEmailUnconfiguredMock: vi.fn(),
+}));
+vi.mock("~/server/mailer/providers", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/server/mailer/providers")>()),
+  hasEmailProvider: hasEmailProviderMock,
+  isEmailUnconfigured: isEmailUnconfiguredMock,
 }));
 const { registerMock } = vi.hoisted(() => ({
   registerMock: vi.fn(),
@@ -67,6 +79,7 @@ vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
   localSignUpDecision: localSignUpDecisionMock,
   signUpVerification: () => ({
     claimAddressProof: claimAddressProofMock,
+    claimUnconfirmedAddressProof: claimUnconfirmedAddressProofMock,
   }),
 }));
 
@@ -104,6 +117,9 @@ describe("userRouter.register()", () => {
       reasonCode: "identifier_unknown",
     });
     claimAddressProofMock.mockResolvedValue(true);
+    claimUnconfirmedAddressProofMock.mockResolvedValue(false);
+    hasEmailProviderMock.mockReturnValue(true);
+    isEmailUnconfiguredMock.mockReturnValue(false);
   });
 
   const createCaller = () =>
@@ -124,6 +140,7 @@ describe("userRouter.register()", () => {
         name: "Alice",
         email: "a@x.com",
         password: "supersecret",
+        addressConfirmed: true,
       });
       expect(rateLimitMock).toHaveBeenCalledWith({
         key: "user.register:198.51.100.11",
@@ -221,6 +238,103 @@ describe("userRouter.register()", () => {
           addressProof: "spent-or-borrowed",
         }),
       ).rejects.toMatchObject({ code: "NOT_FOUND" });
+      expect(registerMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the named email provider cannot be used", () => {
+    /** @scenario "A misconfigured email provider keeps sign-up on the mailed link" */
+    it("refuses an unconfirmed proof without spending it", async () => {
+      hasEmailProviderMock.mockReturnValue(false);
+      isEmailUnconfiguredMock.mockReturnValue(false);
+      claimAddressProofMock.mockResolvedValue(false);
+      claimUnconfirmedAddressProofMock.mockResolvedValue(true);
+
+      await expect(
+        createCaller().register({
+          email: "sam@acme.com",
+          password: "correct horse battery staple",
+          addressProof: "unconfirmed-proof",
+        }),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+      expect(claimUnconfirmedAddressProofMock).not.toHaveBeenCalled();
+      expect(registerMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the installation has no email provider", () => {
+    beforeEach(() => {
+      hasEmailProviderMock.mockReturnValue(false);
+      isEmailUnconfiguredMock.mockReturnValue(true);
+      claimAddressProofMock.mockResolvedValue(false);
+      claimUnconfirmedAddressProofMock.mockResolvedValue(true);
+    });
+
+    /** @scenario "An installation that cannot send email signs up with a password and leaves the address unconfirmed" */
+    it("spends the unconfirmed proof and opens the account unconfirmed", async () => {
+      await expect(
+        createCaller().register({
+          email: "Sam@Acme.com",
+          password: "correct horse battery staple",
+          addressProof: "unconfirmed-proof",
+        }),
+      ).resolves.toEqual({ id: "user-1" });
+
+      expect(claimUnconfirmedAddressProofMock).toHaveBeenCalledWith({
+        token: "unconfirmed-proof",
+        email: "sam@acme.com",
+      });
+      expect(registerMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: "sam@acme.com",
+          addressConfirmed: false,
+        }),
+      );
+    });
+
+    it("still opens the account confirmed when a confirmed proof is spent", async () => {
+      claimAddressProofMock.mockResolvedValue(true);
+
+      await createCaller().register({
+        email: "sam@acme.com",
+        password: "correct horse battery staple",
+        addressProof: "confirmed-proof",
+      });
+
+      expect(claimUnconfirmedAddressProofMock).not.toHaveBeenCalled();
+      expect(registerMock).toHaveBeenCalledWith(
+        expect.objectContaining({ addressConfirmed: true }),
+      );
+    });
+
+    it("refuses when neither proof checks out", async () => {
+      claimUnconfirmedAddressProofMock.mockResolvedValue(false);
+
+      await expect(
+        createCaller().register({
+          email: "sam@acme.com",
+          password: "correct horse battery staple",
+          addressProof: "spent-or-borrowed",
+        }),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+      expect(registerMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the installation can send email again", () => {
+    /** @scenario "An unconfirmed address proof is refused once the installation can send email" */
+    it("refuses an unconfirmed proof without spending it", async () => {
+      claimAddressProofMock.mockResolvedValue(false);
+      claimUnconfirmedAddressProofMock.mockResolvedValue(true);
+
+      await expect(
+        createCaller().register({
+          email: "sam@acme.com",
+          password: "correct horse battery staple",
+          addressProof: "unconfirmed-proof",
+        }),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+      expect(claimUnconfirmedAddressProofMock).not.toHaveBeenCalled();
       expect(registerMock).not.toHaveBeenCalled();
     });
   });

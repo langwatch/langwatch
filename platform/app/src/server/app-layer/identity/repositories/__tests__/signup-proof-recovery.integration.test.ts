@@ -12,6 +12,7 @@ import {
 describe("sign-up proof recovery after enrollment failure", () => {
   const namespace = nanoid(8).toLowerCase();
   const email = `signup-proof-recovery-${namespace}@example.com`;
+  const unconfirmedEmail = `signup-unconfirmed-${namespace}@example.com`;
   const issuedTokens: string[] = [];
   const sentLinks: string[] = [];
   const now = new Date("2026-09-07T08:00:00.000Z");
@@ -39,7 +40,10 @@ describe("sign-up proof recovery after enrollment failure", () => {
     await prisma.verificationToken.deleteMany({
       where: { token: { in: issuedTokens } },
     });
-    await cleanupTestRows(prisma, [["user", { email }]]);
+    await cleanupTestRows(prisma, [
+      ["user", { email }],
+      ["user", { email: unconfirmedEmail }],
+    ]);
   });
 
   /** @scenario A claimed proof whose enrollment failed recovers by email */
@@ -73,6 +77,7 @@ describe("sign-up proof recovery after enrollment failure", () => {
         name: "invalid\u0000postgres-text",
         email,
         passwordHash: "first-password-hash",
+        addressConfirmed: true,
       }),
     ).rejects.toThrow();
 
@@ -121,6 +126,7 @@ describe("sign-up proof recovery after enrollment failure", () => {
       name: email,
       email,
       passwordHash: "recovery-password-hash",
+      addressConfirmed: true,
     });
 
     const recovered = await prisma.user.findUniqueOrThrow({
@@ -142,6 +148,51 @@ describe("sign-up proof recovery after enrollment failure", () => {
       ],
       sessions: [],
     });
+  });
+
+  /** @scenario "An installation that cannot send email signs up with a password and leaves the address unconfirmed" */
+  it("creates an unconfirmed account from an unconfirmed proof, mailing nothing", async () => {
+    const mailedBefore = sentLinks.length;
+    const proof = await verification.issueUnconfirmedAddressProof({
+      email: unconfirmedEmail,
+    });
+
+    expect(
+      await verification.claimAddressProof({
+        token: proof,
+        email: unconfirmedEmail,
+      }),
+    ).toBe(false);
+    expect(
+      await verification.claimUnconfirmedAddressProof({
+        token: proof,
+        email: unconfirmedEmail,
+      }),
+    ).toBe(true);
+    expect(
+      await verification.claimUnconfirmedAddressProof({
+        token: proof,
+        email: unconfirmedEmail,
+      }),
+    ).toBe(false);
+
+    await credentials.createCredentialUser({
+      name: unconfirmedEmail,
+      email: unconfirmedEmail,
+      passwordHash: "unconfirmed-password-hash",
+      addressConfirmed: false,
+    });
+
+    expect(sentLinks).toHaveLength(mailedBefore);
+    expect(
+      await prisma.user.findUniqueOrThrow({
+        where: { email: unconfirmedEmail },
+        select: { emailVerified: true, signupConfirmationPending: true },
+      }),
+    ).toEqual({ emailVerified: false, signupConfirmationPending: false });
+    expect(await verification.addressState({ email: unconfirmedEmail })).toBe(
+      "awaiting_confirmation",
+    );
   });
 
   function tokenFromLastMail(): string {

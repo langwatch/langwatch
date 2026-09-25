@@ -58,6 +58,13 @@ Feature: The checkup page of a self-hosted install
     And the row names the address
 
   @unit
+  Scenario: The Redis address is shown without its password
+    Given REDIS_URL carries a password
+    When the checkup runs, with Redis answering and with Redis not answering
+    Then the Redis row names the host and port
+    And the row never shows the password
+
+  @unit
   Scenario: A ClickHouse install where the goose binary is absent leaves migrations not checked
     Given ClickHouse answers a ping
     And the goose binary is not on this install

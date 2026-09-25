@@ -138,7 +138,7 @@ Choose the deployment method that fits your environment.
 - **Auto-tuned ClickHouse** via the `clickhouse-serverless` subchart adapts resource allocation to your workload.
 - **Composable Helm chart overlays** let you customize deployments without forking the chart.
 - **Deep OpenTelemetry integration**: ingest traces via OTLP, export platform metrics and logs via OTel for infrastructure monitoring.
-- **AI Gateway sub-chart** (optional), terminate LLM traffic on your own perimeter with virtual keys, hierarchical budgets, multi-provider routing, guardrails, and prompt caching. Same Helm install, opt in via `gateway.enabled=true`. See [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm).
+- **AI Gateway sub-chart**, terminate LLM traffic on your own perimeter with virtual keys, hierarchical budgets, multi-provider routing, guardrails, and prompt caching. Same Helm install, on by default; turn it off with `gateway.chartManaged=false`. See [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm).
 
 ## Enterprise
 

@@ -1939,6 +1939,11 @@ const presentations = {
     describe: () =>
       "Add an email address in your account settings, then confirm it.",
   },
+  auth_email_sending_unavailable: {
+    title: "This installation does not send email",
+    describe: () =>
+      "Your address cannot be confirmed here until an administrator sets up an email provider.",
+  },
   auth_direct_registration_unavailable: {
     title: "Accounts here are created by your identity provider",
     describe: () =>
