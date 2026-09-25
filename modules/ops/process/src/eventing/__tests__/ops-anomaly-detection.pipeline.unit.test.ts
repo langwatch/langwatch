@@ -107,12 +107,12 @@ describe("given ops's anomaly detection declaration", () => {
       const { process } = built(() => detector.tick());
 
       await deliver(process, NOW);
-      const afterFirst = await anomalyState.list();
+      const afterFirst = await anomalyState.findAll();
       await deliver(process, NOW);
 
       expect(afterFirst).toHaveLength(1);
       expect(afterFirst[0]).toMatchObject({ tenantId: "proj_runaway", tier: "hard" });
-      expect(await anomalyState.list()).toEqual(afterFirst);
+      expect(await anomalyState.findAll()).toEqual(afterFirst);
       expect(notify).toHaveBeenCalledTimes(1);
     });
   });

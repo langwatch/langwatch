@@ -9,13 +9,13 @@ describe("admin contract", () => {
 
   it("requires a non-empty impersonation reason", () => {
     expect(
-      startImpersonationInputSchema.safeParse({
+      startImpersonationInputSchema.validate({
         sessionId: "session_1",
         impersonatorUserId: "user_admin",
         userIdToImpersonate: "user_target",
         reason: "",
         req: { headers: {} },
-      }).success,
+      }),
     ).toBe(false);
   });
 });

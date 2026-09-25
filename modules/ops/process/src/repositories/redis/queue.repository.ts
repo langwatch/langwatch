@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import {
   CachedLuaScript,
   GROUP_QUEUE_REGISTRY_KEY,
@@ -14,6 +12,7 @@ import {
   splitEnvelope,
   TTL_HELPER_LUA,
 } from "@langwatch/group-queue/operational";
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type {
   ErrorCluster,
@@ -1886,7 +1885,7 @@ export class QueueRedisRepository extends QueueRepository {
     const prefix = `${queueName}:gq:`;
     const counterKey = `${prefix}stats:total-pending`;
     const markerKey = `${prefix}stats:pending-recon-ts`;
-    const holderToken = randomUUID();
+    const holderToken = generate("opsreconcilelock").toString();
     const startedAtMs = nowInstant().epochMilliseconds;
 
     // Single-flight gate: only one pod/cycle runs per window. The marker is

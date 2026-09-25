@@ -22,12 +22,22 @@ export const MIN_BASELINE_RATE = 5;
 export const INSUFFICIENT_DATA_RECHECK_SECONDS = 10 * 60;
 
 export class AnomalyDetectorService {
-  private constructor(
-    private readonly rateTracker: AnomalyRateTrackerRepository,
-    private readonly anomalyState: AnomalyStateRepository,
-    private readonly featureFlags: FeatureFlagApi | undefined,
-    private readonly hardTierAlerts: AnomalyHardTierAlert | undefined,
-  ) {}
+  private readonly rateTracker: AnomalyRateTrackerRepository;
+  private readonly anomalyState: AnomalyStateRepository;
+  private readonly featureFlags: FeatureFlagApi | undefined;
+  private readonly hardTierAlerts: AnomalyHardTierAlert | undefined;
+
+  private constructor(deps: {
+    rateTracker: AnomalyRateTrackerRepository;
+    anomalyState: AnomalyStateRepository;
+    featureFlags: FeatureFlagApi | undefined;
+    hardTierAlerts: AnomalyHardTierAlert | undefined;
+  }) {
+    this.rateTracker = deps.rateTracker;
+    this.anomalyState = deps.anomalyState;
+    this.featureFlags = deps.featureFlags;
+    this.hardTierAlerts = deps.hardTierAlerts;
+  }
 
   static create(options: {
     rateTracker: AnomalyRateTrackerRepository;
@@ -35,12 +45,12 @@ export class AnomalyDetectorService {
     featureFlags?: FeatureFlagApi | undefined;
     hardTierAlerts?: AnomalyHardTierAlert | undefined;
   }): AnomalyDetectorService {
-    return new AnomalyDetectorService(
-      options.rateTracker,
-      options.anomalyState,
-      options.featureFlags,
-      options.hardTierAlerts,
-    );
+    return new AnomalyDetectorService({
+      rateTracker: options.rateTracker,
+      anomalyState: options.anomalyState,
+      featureFlags: options.featureFlags,
+      hardTierAlerts: options.hardTierAlerts,
+    });
   }
 
   async tick(): Promise<{
@@ -49,7 +59,7 @@ export class AnomalyDetectorService {
     cleared: number;
     skippedKillSwitch: number;
   }> {
-    const tenants = await this.rateTracker.listActiveTenants();
+    const tenants = await this.rateTracker.findActiveTenants();
     let surfaced = 0;
     let cleared = 0;
     let skippedKillSwitch = 0;

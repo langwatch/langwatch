@@ -19,7 +19,7 @@ import { createLogTestService } from "./log.fixture.ts";
 const unreadableLogRecords: CanonicalLogRecordRepository = {
   ensureLogRecord: async () => undefined,
   ensureLogRecords: async () => undefined,
-  getLogsByTraceId: async () => {
+  findLogsByTraceId: async () => {
     throw new Error("this suite reads no log back");
   },
 };

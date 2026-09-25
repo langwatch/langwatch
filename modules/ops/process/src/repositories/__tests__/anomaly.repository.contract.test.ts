@@ -55,7 +55,7 @@ function contractCases(backend: Backend): void {
       await backend.state().upsert(anomaly());
       await backend.state().upsert(anomaly({ tier: "hard" }));
 
-      const listed = await backend.state().list();
+      const listed = await backend.state().findAll();
 
       expect(listed).toHaveLength(1);
       expect(listed[0]).toMatchObject({ tier: "hard" });
@@ -67,7 +67,7 @@ function contractCases(backend: Backend): void {
       await backend.state().upsert(anomaly());
       await backend.state().clear("tenant-1", "rate_breaker");
 
-      expect(await backend.state().list()).toEqual([]);
+      expect(await backend.state().findAll()).toEqual([]);
       expect(await backend.state().findByKind("tenant-1", "rate_breaker")).toBeNull();
     });
   });
@@ -77,7 +77,7 @@ function contractCases(backend: Backend): void {
       await backend.rates().record("tenant-1", 4);
       await backend.rates().record("tenant-1", 3);
 
-      expect(await backend.rates().listActiveTenants()).toEqual(["tenant-1"]);
+      expect(await backend.rates().findActiveTenants()).toEqual(["tenant-1"]);
       expect(await backend.rates().currentWindowCount("tenant-1", 300)).toBe(7);
     });
 

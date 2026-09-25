@@ -1,6 +1,5 @@
 import {
   type CodingAgentRecentSessionsInput,
-  codingAgentRecentSessionsInputSchema,
   type CodingAgentSession,
   type CodingAgentSessionCursor,
   type CodingAgentSessionEvent,
@@ -10,7 +9,6 @@ import {
   type CodingAgentUsageCount,
   type CodingAgentUsageTotals,
   type CodingAgentUsageTotalsInput,
-  codingAgentUsageTotalsInputSchema,
   codingAgentUsageTotalsSchema,
   MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE,
   normalizeMetricName,
@@ -69,7 +67,7 @@ export class CodingAgentSessionReadService {
         projectId: parsed.projectId,
         sessionId: parsed.sessionId,
       }));
-    const page = await this.dependencies.sessionEvents.findBySessionId({
+    const page = await this.dependencies.sessionEvents.listBySessionId({
       tenantId: parsed.projectId,
       sessionId: parsed.sessionId,
       kinds: parsed.kinds,
@@ -82,7 +80,7 @@ export class CodingAgentSessionReadService {
       return page;
     }
 
-    return this.dependencies.sessionEvents.findBySessionId({
+    return this.dependencies.sessionEvents.listBySessionId({
       tenantId: parsed.projectId,
       sessionId: parsed.sessionId,
       kinds: parsed.kinds,
@@ -147,16 +145,15 @@ export class CodingAgentSessionReadService {
   }
 
   async listRecent(input: CodingAgentRecentSessionsInput): Promise<CodingAgentSession[]> {
-    const parsed = codingAgentRecentSessionsInputSchema.parse(input);
     const rows = await this.dependencies.sessions.findManyRecent({
-      tenantId: parsed.projectId,
-      userId: parsed.userId,
-      fromMs: parsed.fromMs,
-      toMs: parsed.toMs,
-      limit: parsed.limit ?? 50,
+      tenantId: input.projectId,
+      userId: input.userId,
+      fromMs: input.fromMs,
+      toMs: input.toMs,
+      limit: input.limit ?? 50,
     });
 
-    return this.withMetricTotals(parsed.projectId, rows, parsed);
+    return this.withMetricTotals(input.projectId, rows, input);
   }
 
   /** The usage report's figures (ADR-156, section 10). */
@@ -168,8 +165,7 @@ export class CodingAgentSessionReadService {
   }
 
   async getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTotals> {
-    const parsed = codingAgentUsageTotalsInputSchema.parse(input);
-    const rows = await this.listRecent({ ...parsed, limit: 1000 });
+    const rows = await this.listRecent({ ...input, limit: 1000 });
 
     return codingAgentUsageTotalsSchema.parse(
       rows.reduce<CodingAgentUsageTotals>(

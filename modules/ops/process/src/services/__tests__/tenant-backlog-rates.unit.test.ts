@@ -71,7 +71,7 @@ describe("the queue-metrics writer feeding anomaly detection", () => {
 
         await scanOnce({ proj_a: 4, proj_b: 9 });
 
-        expect((await rateTracker.listActiveTenants()).toSorted()).toEqual(["proj_a", "proj_b"]);
+        expect((await rateTracker.findActiveTenants()).toSorted()).toEqual(["proj_a", "proj_b"]);
         expect(await rateTracker.currentWindowCount("proj_a", 60)).toBe(4);
         expect(await rateTracker.currentWindowCount("proj_b", 60)).toBe(9);
       });

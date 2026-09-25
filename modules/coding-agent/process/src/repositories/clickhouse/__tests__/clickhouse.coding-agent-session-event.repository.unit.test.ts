@@ -100,7 +100,7 @@ async function repositoryReading(rows: Record<string, unknown>[]) {
 }
 
 const page = async (rows: Record<string, unknown>[], limit = 10) =>
-  (await repositoryReading(rows)).findBySessionId({
+  (await repositoryReading(rows)).listBySessionId({
     tenantId: "tenant-a",
     sessionId: "session-a",
     limit,

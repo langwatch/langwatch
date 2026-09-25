@@ -25,7 +25,7 @@ export class MemoryAnomalyStateRepository extends AnomalyStateRepository {
     this.store.anomalies.delete(field(tenantId, kind));
   }
 
-  async list(): Promise<Anomaly[]> {
+  async findAll(): Promise<Anomaly[]> {
     return [...this.store.anomalies.values()];
   }
 }

@@ -36,12 +36,15 @@ export class SystemMigrationsService {
     return new SystemMigrationsService(deps);
   }
 
-  private constructor(
-    private readonly deps: SystemMigrationsServiceDependencies,
-    private readonly enrollment = SystemMigrationEnrollmentService.create(deps),
-    private readonly runs = SystemMigrationRunService.create(deps),
-    private readonly rollback = SystemMigrationRollbackService.create(deps),
-  ) {}
+  private readonly enrollment: SystemMigrationEnrollmentService;
+  private readonly runs: SystemMigrationRunService;
+  private readonly rollback: SystemMigrationRollbackService;
+
+  private constructor(private readonly deps: SystemMigrationsServiceDependencies) {
+    this.enrollment = SystemMigrationEnrollmentService.create(deps);
+    this.runs = SystemMigrationRunService.create(deps);
+    this.rollback = SystemMigrationRollbackService.create(deps);
+  }
 
   /**
    * Per migration: the status rollup, plus the tenants needing attention - held (`migrated`,

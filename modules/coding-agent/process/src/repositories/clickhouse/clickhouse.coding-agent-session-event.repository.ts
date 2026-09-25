@@ -225,7 +225,7 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
     }
   }
 
-  async findBySessionId({
+  async listBySessionId({
     tenantId,
     sessionId,
     kinds,

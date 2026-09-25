@@ -1,9 +1,8 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: empty blocks in
 // this file are deliberate no-ops.
 
-import { randomUUID } from "crypto";
-
 import type { ReplayProgress } from "@langwatch/eventing";
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
   ReplayAlreadyRunningError,
@@ -79,7 +78,7 @@ export class ReplayService {
     description: string;
     userName: string;
   }): Promise<{ runId: string }> {
-    const runId = randomUUID();
+    const runId = generate("replayrun").toString();
 
     let acquired: boolean;
     try {

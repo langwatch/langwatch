@@ -456,7 +456,7 @@ export class TestEvents extends CodingAgentSessionEventRepository {
 
   async ensure(): Promise<void> {}
 
-  async findBySessionId(input: {
+  async listBySessionId(input: {
     tenantId: string;
     sessionId: string;
     kinds?: string[];

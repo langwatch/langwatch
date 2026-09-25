@@ -189,8 +189,8 @@ describe("given a report from a newer or older install", () => {
 
   /** @scenario "The receiver accepts a report missing fields it expects" */
   it("accepts a report carrying only the event and the instance", () => {
-    expect(usageReportBodySchema.safeParse(report).success).toBe(true);
-    expect(usageReportBodySchema.safeParse({ event: "daily_usage_stats" }).success).toBe(false);
+    expect(usageReportBodySchema.validate(report)).toBe(true);
+    expect(usageReportBodySchema.validate({ event: "daily_usage_stats" })).toBe(false);
   });
 
   it("names the optional category's keys for the switch that turns them off", () => {

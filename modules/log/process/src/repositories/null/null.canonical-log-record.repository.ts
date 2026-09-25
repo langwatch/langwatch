@@ -16,7 +16,7 @@ export class NullCanonicalLogRecordRepository extends CanonicalLogRecordReposito
 
   async ensureLogRecords(_records: CanonicalLogRecord[], _retentionDays?: number): Promise<void> {}
 
-  async getLogsByTraceId(_params: {
+  async findLogsByTraceId(_params: {
     tenantId: string;
     traceId: string;
     occurredAtMs?: number;

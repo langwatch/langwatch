@@ -43,22 +43,34 @@ const STRINGS_STILL_DECIDE: OrganizationSsoRouting = {
 
 /** Ops-owned application service for the legacy react-admin wire surface. */
 export class AdminBackofficeService {
-  private constructor(
-    private readonly repository: AdminBackofficeRepository,
-    private readonly users: UserApi,
-    private readonly auth: AuthApi,
-    private readonly audit: AdminAuditSink,
-    private readonly ssoRouting: OrganizationSsoRouting,
-  ) {}
+  private readonly repository: AdminBackofficeRepository;
+  private readonly users: UserApi;
+  private readonly auth: AuthApi;
+  private readonly audit: AdminAuditSink;
+  private readonly ssoRouting: OrganizationSsoRouting;
+
+  private constructor(deps: {
+    repository: AdminBackofficeRepository;
+    users: UserApi;
+    auth: AuthApi;
+    audit: AdminAuditSink;
+    ssoRouting: OrganizationSsoRouting;
+  }) {
+    this.repository = deps.repository;
+    this.users = deps.users;
+    this.auth = deps.auth;
+    this.audit = deps.audit;
+    this.ssoRouting = deps.ssoRouting;
+  }
 
   static create(options: AdminBackofficeServiceOptions): AdminBackofficeService {
-    return new AdminBackofficeService(
-      options.repository,
-      options.users,
-      options.auth,
-      options.audit,
-      options.ssoRouting ?? STRINGS_STILL_DECIDE,
-    );
+    return new AdminBackofficeService({
+      repository: options.repository,
+      users: options.users,
+      auth: options.auth,
+      audit: options.audit,
+      ssoRouting: options.ssoRouting ?? STRINGS_STILL_DECIDE,
+    });
   }
 
   async execute(input: AdminOperationInput): Promise<AdminOperationResult> {

@@ -136,7 +136,7 @@ describe.skipIf(clickHouseUrl === null)("CodingAgentSessionEventsClickHouseRepos
       await repository.ensure([record]);
       await repository.ensure([record]);
 
-      const { events } = await repository.findBySessionId({
+      const { events } = await repository.listBySessionId({
         tenantId,
         sessionId,
         kinds: ["model_call"],
@@ -172,7 +172,7 @@ describe.skipIf(clickHouseUrl === null)("CodingAgentSessionEventsClickHouseRepos
       const seen: string[] = [];
       let cursor;
       for (;;) {
-        const page = await repository.findBySessionId({
+        const page = await repository.listBySessionId({
           tenantId,
           sessionId: pagedSession,
           cursor,
@@ -189,7 +189,7 @@ describe.skipIf(clickHouseUrl === null)("CodingAgentSessionEventsClickHouseRepos
     it("filters by kind without disturbing the walk", async () => {
       const toolResultCount = records.filter((record) => record.eventKind === "tool_result").length;
 
-      const { events } = await repository.findBySessionId({
+      const { events } = await repository.listBySessionId({
         tenantId,
         sessionId: pagedSession,
         kinds: ["tool_result"],

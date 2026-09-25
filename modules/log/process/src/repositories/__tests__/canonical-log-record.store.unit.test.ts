@@ -13,7 +13,7 @@ describe("CanonicalLogRecordStore", () => {
     const repository = {
       ensureLogRecord,
       ensureLogRecords,
-      getLogsByTraceId,
+      findLogsByTraceId: getLogsByTraceId,
     } satisfies CanonicalLogRecordRepository;
     const records = [
       { recordId: "a".repeat(64) },

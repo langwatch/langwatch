@@ -25,7 +25,7 @@ function projectIdOf(target: FeatureFlagTarget): string | undefined {
 class RateTrackerFake extends AnomalyRateTrackerRepository {
   readonly baselines = new Map<string, number>();
   readonly record = vi.fn<(tenantId: string, count?: number) => Promise<void>>(async () => {});
-  readonly listActiveTenants = vi.fn<() => Promise<string[]>>(async () => []);
+  readonly findActiveTenants = vi.fn<() => Promise<string[]>>(async () => []);
   readonly currentWindowCount = vi.fn<(tenantId: string, seconds: number) => Promise<number>>(
     async () => 0,
   );
@@ -59,7 +59,7 @@ class AnomalyStateFake extends AnomalyStateRepository {
   readonly findByKind = vi.fn<(tenantId: string, kind: Anomaly["kind"]) => Promise<Anomaly | null>>(
     async (tenantId, kind) => this.anomalies.get(`${kind}:${tenantId}`) ?? null,
   );
-  readonly list = vi.fn<() => Promise<Anomaly[]>>(async () => [...this.anomalies.values()]);
+  readonly findAll = vi.fn<() => Promise<Anomaly[]>>(async () => [...this.anomalies.values()]);
 }
 
 class HardTierAlertsFake implements AnomalyHardTierAlert {
@@ -95,7 +95,7 @@ describe("AnomalyDetectorService", () => {
   /** @scenario "Insufficient history is cached briefly so quiet tenants are not re-read every tick" */
   it("caches an insufficient-history verdict with its short retry TTL", async () => {
     const { detector, rateTracker, anomalyState } = createDetector();
-    rateTracker.listActiveTenants.mockResolvedValue(["proj_new"]);
+    rateTracker.findActiveTenants.mockResolvedValue(["proj_new"]);
     rateTracker.perMinuteSeries.mockResolvedValue([5, 10, 5]);
 
     await detector.tick();
@@ -112,7 +112,7 @@ describe("AnomalyDetectorService", () => {
   it("uses a warm baseline without rescanning the seven-day series", async () => {
     const { detector, rateTracker } = createDetector();
     rateTracker.baselines.set("proj_acme", 10);
-    rateTracker.listActiveTenants.mockResolvedValue(["proj_acme"]);
+    rateTracker.findActiveTenants.mockResolvedValue(["proj_acme"]);
     rateTracker.currentWindowCount.mockResolvedValue(500);
 
     await detector.tick();
@@ -124,7 +124,7 @@ describe("AnomalyDetectorService", () => {
   /** @scenario "Baseline cache miss triggers a fresh p95 computation and stores it" */
   it("surfaces a rate breaker at the surface threshold", async () => {
     const { detector, rateTracker, anomalyState } = createDetector();
-    rateTracker.listActiveTenants.mockResolvedValue(["proj_acme"]);
+    rateTracker.findActiveTenants.mockResolvedValue(["proj_acme"]);
     rateTracker.perMinuteSeries.mockResolvedValue(stableBaseline);
     rateTracker.currentWindowCount.mockImplementation(async (_tenantId, seconds) => {
       if (seconds === SURFACE_TIER_SUSTAIN_MINUTES * 60) return 500;
@@ -148,7 +148,7 @@ describe("AnomalyDetectorService", () => {
   it("notifies once when a hard anomaly first appears", async () => {
     const alerts = new HardTierAlertsFake();
     const { detector, rateTracker, anomalyState } = createDetector({ alerts });
-    rateTracker.listActiveTenants.mockResolvedValue(["proj_runaway"]);
+    rateTracker.findActiveTenants.mockResolvedValue(["proj_runaway"]);
     rateTracker.perMinuteSeries.mockResolvedValue(stableBaseline);
     rateTracker.currentWindowCount.mockImplementation(async (_tenantId, seconds) => {
       if (seconds === SURFACE_TIER_SUSTAIN_MINUTES * 60) return 5_000;
@@ -174,7 +174,7 @@ describe("AnomalyDetectorService", () => {
       triggeredAt,
       reason: "first tick",
     });
-    rateTracker.listActiveTenants.mockResolvedValue(["proj_acme"]);
+    rateTracker.findActiveTenants.mockResolvedValue(["proj_acme"]);
     rateTracker.perMinuteSeries.mockResolvedValue(stableBaseline);
     rateTracker.currentWindowCount.mockResolvedValue(500);
 
@@ -192,7 +192,7 @@ describe("AnomalyDetectorService", () => {
       const isEnabled = vi.fn<FeatureFlagApi["isEnabled"]>(async () => false);
       const flags = createApiFixture<FeatureFlagApi>({ isEnabled }, "anomaly kill switch");
       const { detector, rateTracker, anomalyState } = createDetector({ flags });
-      rateTracker.listActiveTenants.mockResolvedValue(["proj_killed", "proj_normal"]);
+      rateTracker.findActiveTenants.mockResolvedValue(["proj_killed", "proj_normal"]);
       rateTracker.perMinuteSeries.mockResolvedValue(stableBaseline);
       rateTracker.currentWindowCount.mockResolvedValue(500);
       isEnabled.mockImplementation(async (_key, target) => projectIdOf(target) === "proj_killed");
@@ -212,7 +212,7 @@ describe("AnomalyDetectorService", () => {
       const isEnabled = vi.fn<FeatureFlagApi["isEnabled"]>(async () => false);
       const flags = createApiFixture<FeatureFlagApi>({ isEnabled }, "anomaly kill switch");
       const { detector, rateTracker } = createDetector({ flags });
-      rateTracker.listActiveTenants.mockResolvedValue(["proj_acme"]);
+      rateTracker.findActiveTenants.mockResolvedValue(["proj_acme"]);
       rateTracker.perMinuteSeries.mockResolvedValue(stableBaseline);
       rateTracker.currentWindowCount.mockResolvedValue(500);
 
@@ -229,7 +229,7 @@ describe("AnomalyDetectorService", () => {
       const isEnabled = vi.fn<FeatureFlagApi["isEnabled"]>(async () => false);
       const flags = createApiFixture<FeatureFlagApi>({ isEnabled }, "anomaly kill switch");
       const { detector, rateTracker, anomalyState } = createDetector({ flags });
-      rateTracker.listActiveTenants.mockResolvedValue(["proj_acme"]);
+      rateTracker.findActiveTenants.mockResolvedValue(["proj_acme"]);
       rateTracker.perMinuteSeries.mockResolvedValue(stableBaseline);
       rateTracker.currentWindowCount.mockResolvedValue(500);
       isEnabled.mockRejectedValue(new Error("feature flag service unavailable"));

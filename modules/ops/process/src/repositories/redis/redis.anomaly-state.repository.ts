@@ -42,7 +42,7 @@ export class RedisAnomalyStateRepository extends AnomalyStateRepository {
     await this.redis.hdel(RedisAnomalyStateRepository.hashKey, `${kind}:${tenantId}`);
   }
 
-  async list(): Promise<Anomaly[]> {
+  async findAll(): Promise<Anomaly[]> {
     const raw = await this.redis.hgetall(RedisAnomalyStateRepository.hashKey);
     const anomalies: Anomaly[] = [];
     for (const [, json] of Object.entries(raw)) {

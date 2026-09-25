@@ -7,7 +7,7 @@ import { CanonicalLogRecordAppendRepository } from "./canonical-log-record-appen
  * plus the trace-scoped read only a query graph makes.
  */
 export abstract class CanonicalLogRecordRepository extends CanonicalLogRecordAppendRepository {
-  abstract getLogsByTraceId(params: {
+  abstract findLogsByTraceId(params: {
     tenantId: string;
     traceId: string;
     occurredAtMs?: number;

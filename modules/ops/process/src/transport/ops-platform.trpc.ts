@@ -120,7 +120,7 @@ export const opsPlatformTrpcTransport = defineTrpcRouter(OpsApi, opsPlatformTrpc
   .serviceAuthorized(OPS_MANAGE)
   .handle(({ app, input, actor }, operator) => {
     app.admitOperator(operator, "ops:manage");
-    app.requireDestructiveOperator(operator, input.confirm);
+    app.assertDestructiveOperator(operator, input.confirm);
 
     return app.deleteBlob({
       queueName: input.queueName,

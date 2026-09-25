@@ -7,7 +7,7 @@ export abstract class AnomalyStateRepository {
   abstract findByKind(tenantId: string, kind: AnomalyKind): Promise<Anomaly | null>;
   abstract upsert(anomaly: Anomaly): Promise<void>;
   abstract clear(tenantId: string, kind: AnomalyKind): Promise<void>;
-  abstract list(): Promise<Anomaly[]>;
+  abstract findAll(): Promise<Anomaly[]>;
 }
 
 /**
@@ -16,7 +16,7 @@ export abstract class AnomalyStateRepository {
  */
 export abstract class AnomalyRateTrackerRepository {
   abstract record(tenantId: string, count?: number): Promise<void>;
-  abstract listActiveTenants(): Promise<string[]>;
+  abstract findActiveTenants(): Promise<string[]>;
   abstract currentWindowCount(tenantId: string, windowSeconds: number): Promise<number>;
   abstract findCachedBaseline(tenantId: string): Promise<number | null>;
   abstract perMinuteSeries(tenantId: string, lookbackSeconds: number): Promise<number[]>;

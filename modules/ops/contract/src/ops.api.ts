@@ -91,6 +91,7 @@ import type {
   SchedulerAuditEntryView,
   SetScheduleActiveInput,
 } from "./ops-scheduler.ts";
+import type { OpsSnapshotAbortSignal } from "./ops-snapshot.service.ts";
 import type {
   OpsMigrationCohortResult,
   OpsMigrationEnrollmentListing,
@@ -111,6 +112,307 @@ import type {
 } from "./ops.responses.ts";
 import type { SelfHostedInstanceDetail, SelfHostedInstancePage } from "./self-hosted-instance.ts";
 
+export type DiscoverAggregatesInput = {
+  projectionNames: string[];
+  since: string;
+  tenantIds: string[];
+};
+
+export type GetAggregateEventsInput = {
+  aggregateId: string;
+  tenantId: string;
+  limit: number;
+};
+
+export type GetForAggregateInput = {
+  aggregateType: string;
+  projectId: string;
+  aggregateId: string;
+};
+
+export type RequeueDeadMessagesInput = {
+  processName: string;
+  projectId: string;
+  processKey: string;
+  messageKeyPrefix?: string;
+  requestedBy: string;
+};
+
+export type RequeueDeadMessagesResult = { requeued: number };
+
+export type GetDeadLettersInput = {
+  processName?: string;
+  page: number;
+  pageSize: number;
+};
+
+export type GetDeadLettersResult = {
+  messages: DeadOutboxMessageView[];
+  total: number;
+  byProcess: DeadLetterCount[];
+};
+
+export type GetInstancesInput = {
+  processName?: string;
+  page: number;
+  pageSize: number;
+  search?: string;
+};
+
+export type GetInstancesResult = { instances: ProcessInstanceRow[]; total: number };
+
+export type GetUpcomingWakesInput = { limit: number };
+
+export type FindInstanceDetailInput = {
+  ref: { processName: string; projectId: string; processKey: string };
+};
+
+export type GetOutboxInput = {
+  ref: { processName: string; projectId: string; processKey: string };
+  page: number;
+  pageSize: number;
+};
+
+export type GetOutboxResult = { messages: ProcessOutboxMessageView[]; total: number };
+
+export type ListRecentActionsInput = { limit: number };
+
+export type WakeNowInput = {
+  ref: { processName: string; projectId: string; processKey: string };
+  actorUserId: string;
+};
+
+export type WakeNowResult = { woke: boolean };
+
+export type RedriveDeadInstanceInput = {
+  ref: { processName: string; projectId: string; processKey: string };
+  actorUserId: string;
+};
+
+export type RedriveDeadInstanceResult = { requeued: number };
+
+export type RedriveDeadMessageInput = {
+  ref: { processName: string; projectId: string; processKey: string };
+  messageId: string;
+  actorUserId: string;
+};
+
+export type RedriveDeadMessageResult = { redriven: boolean };
+
+export type DiscardDeadMessageInput = {
+  ref: { processName: string; projectId: string; processKey: string };
+  messageId: string;
+  actorUserId: string;
+};
+
+export type DiscardDeadMessageResult = { discarded: boolean };
+
+export type RedriveDeadLettersInput = {
+  processName?: string;
+  actorUserId: string;
+};
+
+export type RedriveDeadLettersResult = { redriven: number };
+
+export type DiscardDeadLettersInput = {
+  processName?: string;
+  actorUserId: string;
+};
+
+export type DiscardDeadLettersResult = { discarded: number };
+
+export type GetOutboxAttemptsInput = { outboxId: string; projectId: string };
+
+export type ReleaseLapsedLeaseInput = {
+  ref: { processName: string; projectId: string; processKey: string };
+  messageId: string;
+  actorUserId: string;
+};
+
+export type ReleaseLapsedLeaseResult = { released: boolean };
+
+export type FindHistoryEntryInput = { runId: string };
+
+export type StartReplayInput = {
+  projectionNames: string[];
+  since: string;
+  tenantIds: string[];
+  aggregateIds?: string[];
+  fullRebuild?: boolean;
+  description: string;
+  userName: string;
+};
+
+export type StartReplayResult = { runId: string };
+
+export type CancelReplayResult = { cancelled: boolean };
+
+export type PauseQueuePipelineInput = { queueName: string; key: string };
+
+export type UnpauseQueuePipelineInput = { queueName: string; key: string };
+
+export type ListPausedQueueKeysInput = { queueName: string };
+
+export type PauseQueueTenantInput = { queueName: string; tenantId: string };
+
+export type UnpauseQueueTenantInput = { queueName: string; tenantId: string };
+
+export type ListPausedQueueTenantsInput = { queueName: string };
+
+export type ListQueueDlqGroupsInput = { queueName: string };
+
+export type ScanQueuesInput = { queueNames: string[] };
+
+export type ReadQueuePendingDriftInput = { queueNames: string[] };
+
+export type ListPausedSchedulesResult = { schedules: OpsScheduledJob[]; total: number };
+
+export type ListQueueGroupsInput = {
+  queueName: string;
+  page: number;
+  pageSize: number;
+};
+
+export type FindQueueGroupInput = { queueName: string; groupId: string };
+
+export type ListQueueGroupJobsInput = {
+  queueName: string;
+  groupId: string;
+  page: number;
+  pageSize: number;
+};
+
+export type ListParkedQueueGroupsInput = {
+  queueName: string;
+  tenantId: string;
+  page: number;
+  pageSize: number;
+};
+
+export type UnblockQueueGroupInput = {
+  queueName: string;
+  groupId: string;
+  requestedBy: string;
+};
+
+export type UnblockQueueGroupResult = { wasBlocked: boolean };
+
+export type UnblockAllQueueGroupsInput = {
+  queueName: string;
+  requestedBy: string;
+};
+
+export type UnblockAllQueueGroupsResult = { unblockedCount: number };
+
+export type DrainQueueGroupInput = {
+  queueName: string;
+  groupId: string;
+  requestedBy: string;
+};
+
+export type DrainQueueGroupResult = { jobsRemoved: number };
+
+export type RetryBlockedQueueJobInput = {
+  queueName: string;
+  groupId: string;
+  jobId: string;
+};
+
+export type RetryBlockedQueueJobResult = { wasBlocked: boolean };
+
+export type DrainQueueTenantInput = {
+  queueName: string;
+  tenantId: string;
+  groupIdContains?: string;
+  requestedBy: string;
+};
+
+export type DrainQueueTenantResult = { groupsDrained: number; jobsDrained: number };
+
+export type MoveQueueGroupToDlqInput = {
+  queueName: string;
+  groupId: string;
+  requestedBy: string;
+};
+
+export type MoveQueueGroupToDlqResult = { jobsMoved: number };
+
+export type ReplayQueueGroupFromDlqInput = {
+  queueName: string;
+  groupId: string;
+};
+
+export type ReplayQueueGroupFromDlqResult = { jobsReplayed: number };
+
+export type ReplayAllQueueGroupsFromDlqInput = {
+  queueName: string;
+  pipelineFilter?: string;
+  errorFilter?: string;
+};
+
+export type ReplayAllQueueGroupsFromDlqResult = { replayedCount: number; jobsReplayed: number };
+
+export type RedriveQueueDlqGroupsInput = {
+  queueName: string;
+  groupIds: string[];
+  requestedBy: string;
+};
+
+export type RedriveQueueDlqGroupsResult = { redrivenCount: number; jobsRedriven: number };
+
+export type DiscardQueueDlqGroupsInput = {
+  queueName: string;
+  groupIds: string[];
+  requestedBy: string;
+};
+
+export type DiscardQueueDlqGroupsResult = { discardedCount: number; jobsDiscarded: number };
+
+export type CanaryRedriveQueueDlqInput = {
+  queueName: string;
+  count?: number;
+  pipelineFilter?: string;
+};
+
+export type CanaryRedriveQueueDlqResult = { redrivenCount: number; groupIds: string[] };
+
+export type CanaryUnblockQueueGroupsInput = {
+  queueName: string;
+  count?: number;
+  pipelineFilter?: string;
+};
+
+export type CanaryUnblockQueueGroupsResult = { unblockedCount: number; groupIds: string[] };
+
+export type GetQueueDrainPreviewInput = {
+  queueName: string;
+  pipelineFilter?: string;
+  errorFilter?: string;
+};
+
+export type TryReconcileQueuePendingInput = { queueName: string };
+
+export type ListParkedQueueTenantsInput = {
+  queueNames: string[];
+  maxTenants: number;
+};
+
+export type MoveAllBlockedQueueGroupsToDlqInput = {
+  queueName: string;
+  pipelineFilter?: string;
+  errorFilter?: string;
+  requestedBy: string;
+};
+
+export type MoveAllBlockedQueueGroupsToDlqResult = { movedCount: number; jobsMoved: number };
+
+export type StreamDashboardInput = { signal?: OpsSnapshotAbortSignal };
+
+export type RunBlobCleanupCommand = RunBlobCleanupInput & {
+  operator: OpsOperator | null;
+  confirm?: string | undefined;
+};
+
 export interface OpsApi {
   startAdminImpersonation(input: StartAdminImpersonationInput): Promise<AdminImpersonationStarted>;
   stopAdminImpersonation(input: StopAdminImpersonationInput): Promise<AdminImpersonationStopped>;
@@ -123,128 +425,61 @@ export interface OpsApi {
   listBlobs(input: ListBlobsInput): Promise<OpsBlobPage>;
   findBlob(input: GetBlobInput): Promise<OpsBlobSummary | null>;
   /** A real sweep destroys blobs, so it asks the operator's confirmation; a dry run does not. */
-  runBlobCleanup(
-    input: RunBlobCleanupInput & { operator: OpsOperator | null; confirm?: string | undefined },
-  ): Promise<BlobSweepReport>;
+  runBlobCleanup(input: RunBlobCleanupCommand): Promise<BlobSweepReport>;
   deleteBlob(input: DeleteBlobInput): Promise<DeleteBlobResult>;
   listAnomalies(): Promise<Anomaly[]>;
   dismissAnomaly(input: { tenantId: string; kind: AnomalyKind }): Promise<boolean>;
   listScheduledJobs(input: ListScheduledJobsInput): Promise<OpsScheduledJob[]>;
-  listPausedSchedules(
-    input: ListPausedSchedulesInput,
-  ): Promise<{ schedules: OpsScheduledJob[]; total: number }>;
+  listPausedSchedules(input: ListPausedSchedulesInput): Promise<ListPausedSchedulesResult>;
   listSchedulerActions(input: ListSchedulerActionsInput): Promise<SchedulerAuditEntryView[]>;
   setScheduleActive(input: SetScheduleActiveInput): Promise<OpsScheduledJob>;
   clearStuckScheduleSlot(input: ScheduleControlInput): Promise<OpsScheduledJob>;
   runScheduleNow(input: ScheduleControlInput): Promise<OpsScheduledJob>;
   listQueues(): Promise<QueueSummaryInfo[]>;
-  listQueueGroups(input: {
-    queueName: string;
-    page: number;
-    pageSize: number;
-  }): Promise<OpsQueueGroupsPage>;
-  findQueueGroup(input: { queueName: string; groupId: string }): Promise<GroupInfo | null>;
-  listQueueGroupJobs(input: {
-    queueName: string;
-    groupId: string;
-    page: number;
-    pageSize: number;
-  }): Promise<OpsQueueJobsPage>;
+  listQueueGroups(input: ListQueueGroupsInput): Promise<OpsQueueGroupsPage>;
+  findQueueGroup(input: FindQueueGroupInput): Promise<GroupInfo | null>;
+  listQueueGroupJobs(input: ListQueueGroupJobsInput): Promise<OpsQueueJobsPage>;
   getBlockedQueueSummary(): Promise<OpsBlockedSummary>;
-  listParkedQueueGroups(input: {
-    queueName: string;
-    tenantId: string;
-    page: number;
-    pageSize: number;
-  }): Promise<OpsParkedGroupsPage>;
+  listParkedQueueGroups(input: ListParkedQueueGroupsInput): Promise<OpsParkedGroupsPage>;
   listAllQueueDlqGroups(): Promise<OpsQueueDlqGroupWithQueue[]>;
-  unblockQueueGroup(input: {
-    queueName: string;
-    groupId: string;
-    requestedBy: string;
-  }): Promise<{ wasBlocked: boolean }>;
-  unblockAllQueueGroups(input: {
-    queueName: string;
-    requestedBy: string;
-  }): Promise<{ unblockedCount: number }>;
-  drainQueueGroup(input: {
-    queueName: string;
-    groupId: string;
-    requestedBy: string;
-  }): Promise<{ jobsRemoved: number }>;
-  pauseQueuePipeline(input: { queueName: string; key: string }): Promise<void>;
-  unpauseQueuePipeline(input: { queueName: string; key: string }): Promise<void>;
-  retryBlockedQueueJob(input: {
-    queueName: string;
-    groupId: string;
-    jobId: string;
-  }): Promise<{ wasBlocked: boolean }>;
-  listPausedQueueKeys(input: { queueName: string }): Promise<string[]>;
-  pauseQueueTenant(input: { queueName: string; tenantId: string }): Promise<void>;
-  unpauseQueueTenant(input: { queueName: string; tenantId: string }): Promise<void>;
-  listPausedQueueTenants(input: { queueName: string }): Promise<string[]>;
-  drainQueueTenant(input: {
-    queueName: string;
-    tenantId: string;
-    groupIdContains?: string;
-    requestedBy: string;
-  }): Promise<{ groupsDrained: number; jobsDrained: number }>;
-  moveQueueGroupToDlq(input: {
-    queueName: string;
-    groupId: string;
-    requestedBy: string;
-  }): Promise<{ jobsMoved: number }>;
-  moveAllBlockedQueueGroupsToDlq(input: {
-    queueName: string;
-    pipelineFilter?: string;
-    errorFilter?: string;
-    requestedBy: string;
-  }): Promise<{ movedCount: number; jobsMoved: number }>;
-  replayQueueGroupFromDlq(input: {
-    queueName: string;
-    groupId: string;
-  }): Promise<{ jobsReplayed: number }>;
-  replayAllQueueGroupsFromDlq(input: {
-    queueName: string;
-    pipelineFilter?: string;
-    errorFilter?: string;
-  }): Promise<{ replayedCount: number; jobsReplayed: number }>;
-  redriveQueueDlqGroups(input: {
-    queueName: string;
-    groupIds: string[];
-    requestedBy: string;
-  }): Promise<{ redrivenCount: number; jobsRedriven: number }>;
-  discardQueueDlqGroups(input: {
-    queueName: string;
-    groupIds: string[];
-    requestedBy: string;
-  }): Promise<{ discardedCount: number; jobsDiscarded: number }>;
-  canaryRedriveQueueDlq(input: {
-    queueName: string;
-    count?: number;
-    pipelineFilter?: string;
-  }): Promise<{ redrivenCount: number; groupIds: string[] }>;
-  canaryUnblockQueueGroups(input: {
-    queueName: string;
-    count?: number;
-    pipelineFilter?: string;
-  }): Promise<{ unblockedCount: number; groupIds: string[] }>;
-  listQueueDlqGroups(input: { queueName: string }): Promise<OpsQueueDlqGroup[]>;
-  getQueueDrainPreview(input: {
-    queueName: string;
-    pipelineFilter?: string;
-    errorFilter?: string;
-  }): Promise<OpsQueueDrainPreview>;
+  unblockQueueGroup(input: UnblockQueueGroupInput): Promise<UnblockQueueGroupResult>;
+  unblockAllQueueGroups(input: UnblockAllQueueGroupsInput): Promise<UnblockAllQueueGroupsResult>;
+  drainQueueGroup(input: DrainQueueGroupInput): Promise<DrainQueueGroupResult>;
+  pauseQueuePipeline(input: PauseQueuePipelineInput): Promise<void>;
+  unpauseQueuePipeline(input: UnpauseQueuePipelineInput): Promise<void>;
+  retryBlockedQueueJob(input: RetryBlockedQueueJobInput): Promise<RetryBlockedQueueJobResult>;
+  listPausedQueueKeys(input: ListPausedQueueKeysInput): Promise<string[]>;
+  pauseQueueTenant(input: PauseQueueTenantInput): Promise<void>;
+  unpauseQueueTenant(input: UnpauseQueueTenantInput): Promise<void>;
+  listPausedQueueTenants(input: ListPausedQueueTenantsInput): Promise<string[]>;
+  drainQueueTenant(input: DrainQueueTenantInput): Promise<DrainQueueTenantResult>;
+  moveQueueGroupToDlq(input: MoveQueueGroupToDlqInput): Promise<MoveQueueGroupToDlqResult>;
+  moveAllBlockedQueueGroupsToDlq(
+    input: MoveAllBlockedQueueGroupsToDlqInput,
+  ): Promise<MoveAllBlockedQueueGroupsToDlqResult>;
+  replayQueueGroupFromDlq(
+    input: ReplayQueueGroupFromDlqInput,
+  ): Promise<ReplayQueueGroupFromDlqResult>;
+  replayAllQueueGroupsFromDlq(
+    input: ReplayAllQueueGroupsFromDlqInput,
+  ): Promise<ReplayAllQueueGroupsFromDlqResult>;
+  redriveQueueDlqGroups(input: RedriveQueueDlqGroupsInput): Promise<RedriveQueueDlqGroupsResult>;
+  discardQueueDlqGroups(input: DiscardQueueDlqGroupsInput): Promise<DiscardQueueDlqGroupsResult>;
+  canaryRedriveQueueDlq(input: CanaryRedriveQueueDlqInput): Promise<CanaryRedriveQueueDlqResult>;
+  canaryUnblockQueueGroups(
+    input: CanaryUnblockQueueGroupsInput,
+  ): Promise<CanaryUnblockQueueGroupsResult>;
+  listQueueDlqGroups(input: ListQueueDlqGroupsInput): Promise<OpsQueueDlqGroup[]>;
+  getQueueDrainPreview(input: GetQueueDrainPreviewInput): Promise<OpsQueueDrainPreview>;
   discoverQueueNames(): Promise<string[]>;
-  scanQueues(input: { queueNames: string[] }): Promise<QueueInfo[]>;
-  tryReconcileQueuePending(input: { queueName: string }): Promise<OpsQueueReconcileResult | null>;
-  readQueuePendingDrift(input: { queueNames: string[] }): Promise<number>;
-  listParkedQueueTenants(input: {
-    queueNames: string[];
-    maxTenants: number;
-  }): Promise<OpsParkedTenantsPage>;
+  scanQueues(input: ScanQueuesInput): Promise<QueueInfo[]>;
+  tryReconcileQueuePending(
+    input: TryReconcileQueuePendingInput,
+  ): Promise<OpsQueueReconcileResult | null>;
+  readQueuePendingDrift(input: ReadQueuePendingDriftInput): Promise<number>;
+  listParkedQueueTenants(input: ListParkedQueueTenantsInput): Promise<OpsParkedTenantsPage>;
   isAdmin(identity: AdminIdentity): boolean;
-  requireDestructiveOperator(operator: OpsOperator | null, confirmation: string | undefined): void;
+  assertDestructiveOperator(operator: OpsOperator | null, confirmation: string | undefined): void;
   /**
    * The caller's operator reach. `{ kind: "none" }` is an answer rather than a
    * refusal, so the global menu can poll it on every page load.
@@ -335,7 +570,7 @@ export interface OpsApi {
   }): Promise<{ id: string }>;
   findDashboardData(): DashboardData | null;
   badgeCounts(): { blockedCount: number; dlqCount: number; computedAt: Date | null };
-  streamDashboard(input: { signal?: { readonly aborted: boolean } }): AsyncIterable<DashboardData>;
+  streamDashboard(input: StreamDashboardInput): AsyncIterable<DashboardData>;
   getQueueGroup(input: { queueName: string; groupId: string }): Promise<GroupInfo>;
   computeProjectionState(input: {
     aggregateId: string;
@@ -360,11 +595,7 @@ export interface OpsApi {
     lastEditedBy: string | null;
   }): Promise<void>;
   clearFeatureFlag(input: { key: string; lastEditedBy: string | null }): Promise<void>;
-  discoverAggregates(input: {
-    projectionNames: string[];
-    since: string;
-    tenantIds: string[];
-  }): Promise<AggregateDiscovery>;
+  discoverAggregates(input: DiscoverAggregatesInput): Promise<AggregateDiscovery>;
   /**
    * The event-log search. `sinceMs` is optional because the explorer's own
    * default lookback is the module's rule, not the door's: two doors asking
@@ -375,91 +606,30 @@ export interface OpsApi {
     tenantIds: string[];
     sinceMs?: number | undefined;
   }): Promise<AggregateSearchResult[]>;
-  getAggregateEvents(input: {
-    aggregateId: string;
-    tenantId: string;
-    limit: number;
-  }): Promise<AggregateEventView[]>;
-  getForAggregate(input: {
-    aggregateType: string;
-    projectId: string;
-    aggregateId: string;
-  }): Promise<AggregateProcessManager[]>;
-  requeueDeadMessages(input: {
-    processName: string;
-    projectId: string;
-    processKey: string;
-    messageKeyPrefix?: string;
-    requestedBy: string;
-  }): Promise<{ requeued: number }>;
+  getAggregateEvents(input: GetAggregateEventsInput): Promise<AggregateEventView[]>;
+  getForAggregate(input: GetForAggregateInput): Promise<AggregateProcessManager[]>;
+  requeueDeadMessages(input: RequeueDeadMessagesInput): Promise<RequeueDeadMessagesResult>;
   getFleetSummary(): Promise<ProcessFleetSummary[]>;
-  getDeadLetters(input: {
-    processName?: string;
-    page: number;
-    pageSize: number;
-  }): Promise<{ messages: DeadOutboxMessageView[]; total: number; byProcess: DeadLetterCount[] }>;
+  getDeadLetters(input: GetDeadLettersInput): Promise<GetDeadLettersResult>;
   getDeadLetterCounts(): Promise<DeadLetterCount[]>;
-  getInstances(input: {
-    processName?: string;
-    page: number;
-    pageSize: number;
-    search?: string;
-  }): Promise<{ instances: ProcessInstanceRow[]; total: number }>;
-  getUpcomingWakes(input: { limit: number }): Promise<ProcessWakeRow[]>;
-  findInstanceDetail(input: {
-    ref: { processName: string; projectId: string; processKey: string };
-  }): Promise<ProcessInstanceDetail | null>;
-  getOutbox(input: {
-    ref: { processName: string; projectId: string; processKey: string };
-    page: number;
-    pageSize: number;
-  }): Promise<{ messages: ProcessOutboxMessageView[]; total: number }>;
-  listRecentActions(input: { limit: number }): Promise<ProcessAuditEntryView[]>;
-  wakeNow(input: {
-    ref: { processName: string; projectId: string; processKey: string };
-    actorUserId: string;
-  }): Promise<{ woke: boolean }>;
-  redriveDeadInstance(input: {
-    ref: { processName: string; projectId: string; processKey: string };
-    actorUserId: string;
-  }): Promise<{ requeued: number }>;
-  redriveDeadMessage(input: {
-    ref: { processName: string; projectId: string; processKey: string };
-    messageId: string;
-    actorUserId: string;
-  }): Promise<{ redriven: boolean }>;
-  discardDeadMessage(input: {
-    ref: { processName: string; projectId: string; processKey: string };
-    messageId: string;
-    actorUserId: string;
-  }): Promise<{ discarded: boolean }>;
-  redriveDeadLetters(input: {
-    processName?: string;
-    actorUserId: string;
-  }): Promise<{ redriven: number }>;
-  discardDeadLetters(input: {
-    processName?: string;
-    actorUserId: string;
-  }): Promise<{ discarded: number }>;
-  getOutboxAttempts(input: { outboxId: string; projectId: string }): Promise<OutboxAttemptView[]>;
-  releaseLapsedLease(input: {
-    ref: { processName: string; projectId: string; processKey: string };
-    messageId: string;
-    actorUserId: string;
-  }): Promise<{ released: boolean }>;
+  getInstances(input: GetInstancesInput): Promise<GetInstancesResult>;
+  getUpcomingWakes(input: GetUpcomingWakesInput): Promise<ProcessWakeRow[]>;
+  findInstanceDetail(input: FindInstanceDetailInput): Promise<ProcessInstanceDetail | null>;
+  getOutbox(input: GetOutboxInput): Promise<GetOutboxResult>;
+  listRecentActions(input: ListRecentActionsInput): Promise<ProcessAuditEntryView[]>;
+  wakeNow(input: WakeNowInput): Promise<WakeNowResult>;
+  redriveDeadInstance(input: RedriveDeadInstanceInput): Promise<RedriveDeadInstanceResult>;
+  redriveDeadMessage(input: RedriveDeadMessageInput): Promise<RedriveDeadMessageResult>;
+  discardDeadMessage(input: DiscardDeadMessageInput): Promise<DiscardDeadMessageResult>;
+  redriveDeadLetters(input: RedriveDeadLettersInput): Promise<RedriveDeadLettersResult>;
+  discardDeadLetters(input: DiscardDeadLettersInput): Promise<DiscardDeadLettersResult>;
+  getOutboxAttempts(input: GetOutboxAttemptsInput): Promise<OutboxAttemptView[]>;
+  releaseLapsedLease(input: ReleaseLapsedLeaseInput): Promise<ReleaseLapsedLeaseResult>;
   getHistory(): Promise<ReplayHistoryEntry[]>;
-  findHistoryEntry(input: { runId: string }): Promise<ReplayHistoryEntry | null>;
-  startReplay(input: {
-    projectionNames: string[];
-    since: string;
-    tenantIds: string[];
-    aggregateIds?: string[];
-    fullRebuild?: boolean;
-    description: string;
-    userName: string;
-  }): Promise<{ runId: string }>;
+  findHistoryEntry(input: FindHistoryEntryInput): Promise<ReplayHistoryEntry | null>;
+  startReplay(input: StartReplayInput): Promise<StartReplayResult>;
   getStatus(): Promise<ReplayStatus>;
-  cancelReplay(): Promise<{ cancelled: boolean }>;
+  cancelReplay(): Promise<CancelReplayResult>;
   listAnomalies(): Promise<Anomaly[]>;
   dismissAnomaly(input: { tenantId: string; kind: AnomalyKind }): Promise<boolean>;
 

@@ -37,6 +37,6 @@ export class LogService {
     occurredAtMs?: number;
     limit?: number;
   }): Promise<CanonicalTraceLogRecord[]> {
-    return this.repository.getLogsByTraceId(input);
+    return this.repository.findLogsByTraceId(input);
   }
 }

@@ -69,12 +69,12 @@ const tenantMigrationStatusSchema: z.ZodType<TenantMigrationStatus> = z.enum([
 ]);
 
 /** One tenant's row on the ledger, as the runner writes it. @see above. */
-const tenantMigrationRecordSchema: z.ZodType<TenantMigrationRecord> = z.object({
+const tenantMigrationRecordSchema = z.object({
   migrationName: z.string(),
   tenantId: z.string(),
   status: tenantMigrationStatusSchema,
   report: z.unknown(),
-});
+}) satisfies z.ZodType<TenantMigrationRecord>;
 
 /** One enrollment row as the ops page lists it. */
 export const opsMigrationEnrollmentRecordSchema = z.object({
@@ -142,7 +142,7 @@ export const opsMigrationOverviewSchema = z.object({
    * for a migration that admits every organization automatically.
    */
   enrollment: z.object({ enrolledCount: z.number(), notEnrolledCount: z.number() }).nullable(),
-  attention: z.array(tenantMigrationRecordSchema.and(z.object({ updatedAt: z.date() }))),
+  attention: z.array(z.object({ ...tenantMigrationRecordSchema.shape, updatedAt: z.date() })),
 });
 export type OpsMigrationOverview = z.infer<typeof opsMigrationOverviewSchema>;
 

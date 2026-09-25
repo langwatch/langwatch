@@ -30,7 +30,7 @@ class RecordingRetroactive implements RetroactiveRetentionRepository {
     return { tables: [] };
   }
 
-  async getMutationProgress(): Promise<never[]> {
+  async findMutationProgress(): Promise<never[]> {
     this.calls.push("getMutationProgress");
 
     return [];

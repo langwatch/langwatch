@@ -53,7 +53,7 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
   }
 
   /** The unfinished mutations of one project, newest first. */
-  async getMutationProgress(input: { projectId: string }): Promise<RetroactiveMutationProgress[]> {
+  async findMutationProgress(input: { projectId: string }): Promise<RetroactiveMutationProgress[]> {
     return (this.#mutations.get(input.projectId) ?? [])
       .filter((mutation) => !mutation.isDone)
       .reverse();

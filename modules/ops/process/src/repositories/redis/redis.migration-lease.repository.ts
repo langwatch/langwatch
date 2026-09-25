@@ -1,5 +1,4 @@
-import { randomUUID } from "node:crypto";
-
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { MigrationLeaseRepository } from "@langwatch/system-migrations";
 import type { Cluster, Redis } from "ioredis";
@@ -30,7 +29,7 @@ return 0
  * organization is worked on this boot, and the legacy paths keep answering.
  */
 export class RedisMigrationLeaseRepository implements MigrationLeaseRepository {
-  private readonly token = randomUUID();
+  private readonly token = generate("migrationlease").toString();
 
   static create({ redis }: { redis: Redis | Cluster | null }): RedisMigrationLeaseRepository {
     return new RedisMigrationLeaseRepository(redis);

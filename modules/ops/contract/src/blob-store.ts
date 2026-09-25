@@ -78,7 +78,7 @@ const blobSweepTallySchema = z.object({
 });
 
 export const blobSweepReportSchema = z.object({
-  queues: z.array(z.object({ queueName: z.string() }).and(blobSweepTallySchema)),
+  queues: z.array(z.object({ queueName: z.string(), ...blobSweepTallySchema.shape })),
   totals: blobSweepTallySchema,
   dryRun: z.boolean(),
   durationMs: z.number(),

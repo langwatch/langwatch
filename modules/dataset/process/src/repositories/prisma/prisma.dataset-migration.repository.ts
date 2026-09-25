@@ -267,5 +267,5 @@ function increment(summary: DatasetMigrationSummary, outcome: DatasetMigrationOu
 }
 
 function isMissingColumnError(error: unknown): boolean {
-  return z.object({ code: z.literal("P2022") }).safeParse(error).success;
+  return z.object({ code: z.literal("P2022") }).validate(error);
 }

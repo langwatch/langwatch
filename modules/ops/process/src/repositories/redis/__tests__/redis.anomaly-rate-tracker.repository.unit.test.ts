@@ -1,5 +1,5 @@
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import Redis from "ioredis";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -88,7 +88,7 @@ describe("RedisAnomalyRateTrackerRepository", () => {
     await tracker.record("proj_acme", 2);
 
     expect(await tracker.currentWindowCount("proj_acme", 120)).toBe(3);
-    expect(await tracker.listActiveTenants()).toEqual(["proj_acme"]);
+    expect(await tracker.findActiveTenants()).toEqual(["proj_acme"]);
   });
 
   it("zero-pads the requested series and trims orphaned minute fields", async () => {
@@ -125,7 +125,7 @@ describe("RedisAnomalyRateTrackerRepository", () => {
       await tracker.record("proj_open");
 
       expect(pipelineSpy).toHaveBeenCalledTimes(1);
-      expect(await tracker.listActiveTenants()).toEqual(["proj_open"]);
+      expect(await tracker.findActiveTenants()).toEqual(["proj_open"]);
       expect(isEnabled).toHaveBeenCalledWith(ANOMALY_DETECTION_KILL_SWITCH_FLAG, {
         kind: "project",
         projectId: "proj_killed",
@@ -145,7 +145,7 @@ describe("RedisAnomalyRateTrackerRepository", () => {
 
       await tracker.record("proj_open");
 
-      expect(await tracker.listActiveTenants()).toEqual(["proj_open"]);
+      expect(await tracker.findActiveTenants()).toEqual(["proj_open"]);
     });
   });
 

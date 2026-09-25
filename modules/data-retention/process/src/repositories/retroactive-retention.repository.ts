@@ -13,6 +13,6 @@ export interface RetroactiveRetentionRepository {
     category: RetentionCategory;
     newRetentionDays: number;
   }): Promise<{ tables: string[] }>;
-  getMutationProgress(input: { projectId: string }): Promise<RetroactiveMutationProgress[]>;
+  findMutationProgress(input: { projectId: string }): Promise<RetroactiveMutationProgress[]>;
   killMutation(input: { projectId: string; mutationId: string }): Promise<void>;
 }

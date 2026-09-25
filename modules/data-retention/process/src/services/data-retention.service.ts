@@ -1,11 +1,9 @@
 import {
-  killRetroactiveMutationInputSchema,
   ScopeTargetNotFoundError,
   platformDefaultRetentionDaysSchema,
   resolveRetention,
   resolveScopeChain,
   retentionDaysInputSchema,
-  retroactiveMutationProjectInputSchema,
   retroactiveRetentionUpdateInputSchema,
   type KillRetroactiveMutationInput,
   type ResolvedRetention,
@@ -211,13 +209,11 @@ export class DataRetentionService {
   async getRetroactiveMutationProgress(
     input: RetroactiveMutationProjectInput,
   ): Promise<RetroactiveMutationProgress[]> {
-    const parsed = retroactiveMutationProjectInputSchema.parse(input);
-    return this.options.retroactive.getMutationProgress(parsed);
+    return this.options.retroactive.findMutationProgress(input);
   }
 
   async killRetroactiveMutation(input: KillRetroactiveMutationInput): Promise<void> {
-    const parsed = killRetroactiveMutationInputSchema.parse(input);
-    await this.options.retroactive.killMutation(parsed);
+    await this.options.retroactive.killMutation(input);
   }
 
   getTotalStorageBytes(input: { tenantId: string }): Promise<number> {

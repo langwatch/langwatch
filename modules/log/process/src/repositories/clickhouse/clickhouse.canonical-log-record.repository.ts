@@ -32,6 +32,10 @@ const traceLogRowSchema = z.object({
   EventName: z.string(),
 });
 
+const traceLogRowsSchema = z.array(traceLogRowSchema);
+
+const flatAttributesSchema = z.record(z.string(), z.string());
+
 /**
  * Canonical-log over ClickHouse: delegated append (shared with log_processing) and
  * trace-scoped read to keep both graphs in sync on what an append does.
@@ -71,7 +75,7 @@ export class ClickHouseCanonicalLogRecordRepository extends CanonicalLogRecordRe
     await this.append.ensureLogRecords(records, retentionDays);
   }
 
-  async getLogsByTraceId({
+  async findLogsByTraceId({
     tenantId,
     traceId,
     occurredAtMs,
@@ -116,12 +120,12 @@ export class ClickHouseCanonicalLogRecordRepository extends CanonicalLogRecordRe
       query_params: { tenantId, traceId, from, to, limit },
       format: "JSONEachRow",
     });
-    const rows = z.array(traceLogRowSchema).parse(await result.json());
+    const rows = traceLogRowsSchema.parse(await result.json());
     if (rows.length >= limit) {
       logger.warn({ tenantId, traceId, limit }, "Canonical trace log read hit its row cap");
     }
     return rows.map((row) => {
-      const attributes = z.record(z.string(), z.string()).parse(JSON.parse(row.AttributesFlatJson));
+      const attributes = flatAttributesSchema.parse(JSON.parse(row.AttributesFlatJson));
       if (row.EventName && attributes["event.name"] === undefined) {
         attributes["event.name"] = row.EventName;
       }
@@ -131,9 +135,7 @@ export class ClickHouseCanonicalLogRecordRepository extends CanonicalLogRecordRe
         timeUnixMs: Number(row.TimeUnixMs),
         body: row.BodyText ?? "",
         attributes,
-        resourceAttributes: z
-          .record(z.string(), z.string())
-          .parse(JSON.parse(row.ResourceAttributesFlatJson)),
+        resourceAttributes: flatAttributesSchema.parse(JSON.parse(row.ResourceAttributesFlatJson)),
         scopeName: row.ScopeName,
         scopeVersion: row.ScopeVersion || null,
       };

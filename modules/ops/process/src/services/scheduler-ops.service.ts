@@ -25,12 +25,22 @@ const logger = createLogger("langwatch:ops:scheduler");
 
 /** Cross-tenant scheduler controls; manual runs only make work due. */
 export class SchedulerOpsService {
-  private constructor(
-    private readonly repository: SchedulerOpsRepository,
-    private readonly audit: SchedulerAuditRepository,
-    private readonly wake: SchedulerWake,
-    private readonly projects: ProjectApi,
-  ) {}
+  private readonly repository: SchedulerOpsRepository;
+  private readonly audit: SchedulerAuditRepository;
+  private readonly wake: SchedulerWake;
+  private readonly projects: ProjectApi;
+
+  private constructor(deps: {
+    repository: SchedulerOpsRepository;
+    audit: SchedulerAuditRepository;
+    wake: SchedulerWake;
+    projects: ProjectApi;
+  }) {
+    this.repository = deps.repository;
+    this.audit = deps.audit;
+    this.wake = deps.wake;
+    this.projects = deps.projects;
+  }
 
   static create(input: {
     repository: SchedulerOpsRepository;
@@ -38,7 +48,12 @@ export class SchedulerOpsService {
     wake: SchedulerWake;
     projects: ProjectApi;
   }): SchedulerOpsService {
-    return new SchedulerOpsService(input.repository, input.audit, input.wake, input.projects);
+    return new SchedulerOpsService({
+      repository: input.repository,
+      audit: input.audit,
+      wake: input.wake,
+      projects: input.projects,
+    });
   }
 
   async listScheduledJobs({ limit = 200 }: { limit?: number }): Promise<OpsScheduledJob[]> {

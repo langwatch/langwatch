@@ -154,7 +154,7 @@ describe("ClickHouseCanonicalLogRecordRepository", () => {
     >(async () => ({ json: async () => [] }));
     const repository = createRepository(async () => clientWithQuery(query));
 
-    await repository.getLogsByTraceId({
+    await repository.findLogsByTraceId({
       tenantId: "project_test",
       traceId: "b".repeat(32),
       occurredAtMs: 1_700_000_000_000,
@@ -173,7 +173,7 @@ describe("ClickHouseCanonicalLogRecordRepository", () => {
     function readOneRow(row: Record<string, unknown>) {
       const query = vi.fn(async () => ({ json: async () => [row] }));
       const repository = createRepository(async () => clientWithQuery(query));
-      return repository.getLogsByTraceId({
+      return repository.findLogsByTraceId({
         tenantId: "project_test",
         traceId: "b".repeat(32),
         occurredAtMs: 1_700_000_000_000,

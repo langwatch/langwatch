@@ -33,7 +33,7 @@ export class MemoryCodingAgentSessionEventRepository extends CodingAgentSessionE
     }
   }
 
-  async findBySessionId(input: {
+  async listBySessionId(input: {
     tenantId: string;
     sessionId: string;
     kinds?: string[];

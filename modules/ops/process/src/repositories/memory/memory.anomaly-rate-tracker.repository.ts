@@ -32,7 +32,7 @@ export class MemoryAnomalyRateTrackerRepository extends AnomalyRateTrackerReposi
     this.store.tenantRateMinutes.set(tenantId, minutes);
   }
 
-  async listActiveTenants(): Promise<string[]> {
+  async findActiveTenants(): Promise<string[]> {
     return [...this.store.tenantRateMinutes.keys()];
   }
 

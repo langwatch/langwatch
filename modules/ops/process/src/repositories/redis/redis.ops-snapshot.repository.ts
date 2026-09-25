@@ -1,5 +1,4 @@
-import { randomUUID } from "node:crypto";
-
+import { generate } from "@langwatch/ksuid";
 import {
   type DetailSnapshot,
   type LiveSnapshot,
@@ -111,7 +110,7 @@ export class RedisOpsSnapshotRepository extends OpsSnapshotRepository {
       this.currentToken = null;
     }
 
-    const token = `${writerId}:${randomUUID()}`;
+    const token = `${writerId}:${generate("opssnapshotlock").toString()}`;
     const acquired = await this.redis.set(SNAPSHOT_LEASE_KEY, token, "EX", LEASE_TTL_SECONDS, "NX");
     if (acquired !== "OK") {
       return { isHeld: false, epoch: this.currentEpoch, token: null };

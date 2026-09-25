@@ -8,7 +8,7 @@ import type {
 export abstract class CodingAgentSessionEventRepository {
   abstract ensure(records: CodingAgentSessionEventRecord[], retentionDays: number): Promise<void>;
 
-  abstract findBySessionId(input: {
+  abstract listBySessionId(input: {
     tenantId: string;
     sessionId: string;
     kinds?: string[];

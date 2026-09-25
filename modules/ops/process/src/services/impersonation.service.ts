@@ -34,20 +34,30 @@ export interface ImpersonationServiceOptions {
 }
 
 export class ImpersonationService {
-  private constructor(
-    private readonly repository: ImpersonationRepository,
-    private readonly access: AdminAccess,
-    private readonly audit: AdminAuditSink,
-    private readonly now: () => Instant,
-  ) {}
+  private readonly repository: ImpersonationRepository;
+  private readonly access: AdminAccess;
+  private readonly audit: AdminAuditSink;
+  private readonly now: () => Instant;
+
+  private constructor(deps: {
+    repository: ImpersonationRepository;
+    access: AdminAccess;
+    audit: AdminAuditSink;
+    now: () => Instant;
+  }) {
+    this.repository = deps.repository;
+    this.access = deps.access;
+    this.audit = deps.audit;
+    this.now = deps.now;
+  }
 
   static create(options: ImpersonationServiceOptions): ImpersonationService {
-    return new ImpersonationService(
-      options.repository,
-      options.access,
-      options.audit,
-      options.now ?? nowInstant,
-    );
+    return new ImpersonationService({
+      repository: options.repository,
+      access: options.access,
+      audit: options.audit,
+      now: options.now ?? nowInstant,
+    });
   }
 
   async start(input: StartImpersonationInput): Promise<void> {

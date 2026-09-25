@@ -75,7 +75,7 @@ describe.each(backends)("given the $name coding-agent repositories", ({ create }
         30,
       );
 
-      const page = await repositories.sessionEvents.findBySessionId({
+      const page = await repositories.sessionEvents.listBySessionId({
         tenantId: "project-1",
         sessionId: "session-1",
         limit: 1,

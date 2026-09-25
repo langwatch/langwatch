@@ -46,15 +46,31 @@ import type { SchedulerOpsService } from "./scheduler-ops.service.ts";
 
 /** The operations half of `OpsApi`, over the repositories and services this process composed. */
 export class OpsService {
-  private constructor(
-    private readonly access: AdminAccess,
-    private readonly impersonation: ImpersonationService,
-    private readonly adminBackoffice: AdminBackofficeService,
-    private readonly blobStore: BlobStoreService,
-    private readonly scheduler: SchedulerOpsService,
-    private readonly anomalyState: AnomalyStateRepository | null,
-    private readonly queues: QueueService,
-  ) {}
+  private readonly access: AdminAccess;
+  private readonly impersonation: ImpersonationService;
+  private readonly adminBackoffice: AdminBackofficeService;
+  private readonly blobStore: BlobStoreService;
+  private readonly scheduler: SchedulerOpsService;
+  private readonly anomalyState: AnomalyStateRepository | null;
+  private readonly queues: QueueService;
+
+  private constructor(deps: {
+    access: AdminAccess;
+    impersonation: ImpersonationService;
+    adminBackoffice: AdminBackofficeService;
+    blobStore: BlobStoreService;
+    scheduler: SchedulerOpsService;
+    anomalyState: AnomalyStateRepository | null;
+    queues: QueueService;
+  }) {
+    this.access = deps.access;
+    this.impersonation = deps.impersonation;
+    this.adminBackoffice = deps.adminBackoffice;
+    this.blobStore = deps.blobStore;
+    this.scheduler = deps.scheduler;
+    this.anomalyState = deps.anomalyState;
+    this.queues = deps.queues;
+  }
 
   static create(options: {
     access: AdminAccess;
@@ -65,15 +81,15 @@ export class OpsService {
     anomalyState: AnomalyStateRepository | null;
     queues: QueueService;
   }): OpsService {
-    return new OpsService(
-      options.access,
-      options.impersonation,
-      options.adminBackoffice,
-      options.blobStore,
-      options.scheduler,
-      options.anomalyState,
-      options.queues,
-    );
+    return new OpsService({
+      access: options.access,
+      impersonation: options.impersonation,
+      adminBackoffice: options.adminBackoffice,
+      blobStore: options.blobStore,
+      scheduler: options.scheduler,
+      anomalyState: options.anomalyState,
+      queues: options.queues,
+    });
   }
 
   isAdmin(identity: AdminIdentity): boolean {
@@ -124,7 +140,7 @@ export class OpsService {
       return [];
     }
 
-    const anomalies = await this.anomalyState.list();
+    const anomalies = await this.anomalyState.findAll();
 
     return anomalies.toSorted((left, right) => {
       if (left.tier !== right.tier) {

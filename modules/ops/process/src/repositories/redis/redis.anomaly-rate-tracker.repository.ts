@@ -126,7 +126,7 @@ export class RedisAnomalyRateTrackerRepository extends AnomalyRateTrackerReposit
     return series;
   }
 
-  async listActiveTenants(): Promise<string[]> {
+  async findActiveTenants(): Promise<string[]> {
     return this.redis.smembers(RedisAnomalyRateTrackerRepository.activeSet);
   }
 

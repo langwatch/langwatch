@@ -40,15 +40,31 @@ export class OpsMetricsPublicationService {
   /** Latest scan, held so a reader can have what this writer most recently produced. */
   private latestDetail: DetailSnapshot | null = null;
 
-  private constructor(
-    private readonly ops: OpsQueueMetricsSourceRepository,
-    private readonly sampling: OpsMetricsSamplingService,
-    private readonly window: OpsMetricsWindowService,
-    private readonly writerId: string,
-    private readonly queueNames: () => string[],
-    private readonly lease: () => { token: string | null; epoch: number },
-    private readonly snapshots: OpsSnapshotService | null,
-  ) {}
+  private readonly ops: OpsQueueMetricsSourceRepository;
+  private readonly sampling: OpsMetricsSamplingService;
+  private readonly window: OpsMetricsWindowService;
+  private readonly writerId: string;
+  private readonly queueNames: () => string[];
+  private readonly lease: () => { token: string | null; epoch: number };
+  private readonly snapshots: OpsSnapshotService | null;
+
+  private constructor(deps: {
+    ops: OpsQueueMetricsSourceRepository;
+    sampling: OpsMetricsSamplingService;
+    window: OpsMetricsWindowService;
+    writerId: string;
+    queueNames: () => string[];
+    lease: () => { token: string | null; epoch: number };
+    snapshots: OpsSnapshotService | null;
+  }) {
+    this.ops = deps.ops;
+    this.sampling = deps.sampling;
+    this.window = deps.window;
+    this.writerId = deps.writerId;
+    this.queueNames = deps.queueNames;
+    this.lease = deps.lease;
+    this.snapshots = deps.snapshots;
+  }
 
   static create(params: {
     ops: OpsQueueMetricsSourceRepository;
@@ -59,15 +75,15 @@ export class OpsMetricsPublicationService {
     lease: () => { token: string | null; epoch: number };
     snapshots: OpsSnapshotService | null;
   }): OpsMetricsPublicationService {
-    return new OpsMetricsPublicationService(
-      params.ops,
-      params.sampling,
-      params.window,
-      params.writerId,
-      params.queueNames,
-      params.lease,
-      params.snapshots,
-    );
+    return new OpsMetricsPublicationService({
+      ops: params.ops,
+      sampling: params.sampling,
+      window: params.window,
+      writerId: params.writerId,
+      queueNames: params.queueNames,
+      lease: params.lease,
+      snapshots: params.snapshots,
+    });
   }
 
   /** This writer's own view of the dashboard, which is also what it publishes. */

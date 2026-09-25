@@ -32,6 +32,8 @@ const mutationRowSchema = z
   })
   .strict();
 
+const mutationRowsSchema = z.array(mutationRowSchema);
+
 const tenantFilterSql = "position(command, {tenantFilterNeedle:String}) > 0";
 
 function tenantFilterParams(projectId: string): Record<string, string> {
@@ -108,7 +110,7 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     return { tables };
   }
 
-  async getMutationProgress(input: { projectId: string }): Promise<RetroactiveMutationProgress[]> {
+  async findMutationProgress(input: { projectId: string }): Promise<RetroactiveMutationProgress[]> {
     const { rows } = await this.clickhouse.query<unknown>({
       tenantId: input.projectId,
       table: "system.mutations",
@@ -197,8 +199,7 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     rows: unknown,
     options?: { keepEventLogRow: (category: RetentionCategory | null) => boolean },
   ): RetroactiveMutationProgress[] {
-    return z
-      .array(mutationRowSchema)
+    return mutationRowsSchema
       .parse(rows)
       .map(({ command, ...row }) => {
         const category = this.categoryForRow(row.table, command);

@@ -246,7 +246,7 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
       },
     ]);
 
-    const progress = await repository.getMutationProgress({ projectId: "weird'\\id" });
+    const progress = await repository.findMutationProgress({ projectId: "weird'\\id" });
 
     expect(progress.map((mutation) => mutation.category)).toEqual([
       "traces",

@@ -8,11 +8,17 @@ export class PrismaProjectTenantSourceRepository implements TenantSource {
     this.#prisma = prisma;
   }
 
-  static create(prisma: PrismaClient) {
+  static create(prisma: PrismaClient): PrismaProjectTenantSourceRepository {
     return new PrismaProjectTenantSourceRepository(prisma);
   }
 
-  async findTenantIdsAfter({ cursor, limit }: { cursor: string | null; limit: number }) {
+  async findTenantIdsAfter({
+    cursor,
+    limit,
+  }: {
+    cursor: string | null;
+    limit: number;
+  }): Promise<string[]> {
     const projects = await this.#prisma.project.findMany({
       where: cursor === null ? {} : { id: { gt: cursor } },
       orderBy: { id: "asc" },
