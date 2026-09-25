@@ -173,6 +173,138 @@ const applyRename = (
   return out;
 };
 
+type TargetBinding =
+  | {
+      kind: "bound";
+      byCanonical: Map<string, DatasetColumns[number]>;
+      /** The file headers when bound by `sourceHeader`; null on the positional path. */
+      canonicalSet: Set<string> | null;
+    }
+  | { kind: "unbound" };
+
+/** Binds the confirmed columns to the file's canonical headers, or degrades to unbound. */
+const bindTargetColumns = ({
+  targetColumns,
+  canonical,
+}: {
+  targetColumns: DatasetConfirmColumns | DatasetColumns | null | undefined;
+  canonical: string[];
+}): TargetBinding => {
+  // An empty confirmed list can't produce a 0-column dataset; degrade instead.
+  if (!targetColumns || targetColumns.length === 0) return { kind: "unbound" };
+  // Confirmed names become the stored record keys (`out[target.name]` below), so a blank or
+  // duplicated name would collapse two columns onto one key (silent per-record data loss) or
+  // write an `""`-keyed column. The upload route's schema already rejects this, so reaching
+  // here means a malformed stored row — degrade to a derived all-`string` schema rather than
+  // emit the corruption.
+  const names = targetColumns.map((c) => c.name);
+  if (names.some((name) => name.trim() === "") || new Set(names).size !== names.length) {
+    return { kind: "unbound" };
+  }
+  // Prefer binding by the immutable `sourceHeader` (survives drag-reorder +
+  // rename + exclusion); fall back to positional binding for legacy bare
+  // name+type lists (which require an exact 1:1 count — no exclusion).
+  const hasSourceHeaders = targetColumns.every(
+    (c) => typeof (c as DatasetConfirmColumns[number]).sourceHeader === "string",
+  );
+  // A PARTIAL confirm payload (some items carry `sourceHeader`, some don't) is
+  // a client bug, not a legacy list — positional-binding it could silently map
+  // values to the wrong column. Mirror the upload route (which rejects any
+  // "looks like confirm" payload) and degrade rather than fall through to the
+  // positional branch below.
+  const hasAnySourceHeaders = targetColumns.some(
+    (c) => typeof (c as DatasetConfirmColumns[number]).sourceHeader === "string",
+  );
+  if (hasAnySourceHeaders && !hasSourceHeaders) return { kind: "unbound" };
+  if (hasSourceHeaders) {
+    const byHeader = new Map(
+      (targetColumns as DatasetConfirmColumns).map((c) => [c.sourceHeader, c]),
+    );
+    // Duplicate `sourceHeader`s collapse in the Map (last wins), which would
+    // bind fewer columns than `targetColumns` claims while `appliedColumnTypes`
+    // still persists the phantom duplicate. Degrade rather than emit that.
+    if (byHeader.size !== targetColumns.length) return { kind: "unbound" };
+    // Every confirmed column must reference a real file header (no phantom).
+    // A SUBSET is allowed — headers absent from the confirmed list are the
+    // columns the user excluded, and are dropped per-record below.
+    const canonicalHeaders = new Set(canonical);
+    const confirmedHeaders = [...byHeader.keys()];
+    const everyHeaderIsReal = confirmedHeaders.every((h) => canonicalHeaders.has(h));
+    if (!everyHeaderIsReal) return { kind: "unbound" };
+    return { kind: "bound", byCanonical: byHeader, canonicalSet: canonicalHeaders };
+  }
+  if (targetColumns.length !== canonical.length) return { kind: "unbound" };
+  return {
+    kind: "bound",
+    byCanonical: new Map(canonical.map((h, i) => [h, targetColumns[i]!])),
+    canonicalSet: null,
+  };
+};
+
+// CSV is parsed with `header:false` (rows as arrays) and mapped to objects by index here —
+// NOT papaparse's `header:true`. Under our pause/resume backpressure, papaparse re-runs its
+// duplicate-header dedup against the current data row on every resume, suffixing the second
+// of any two equal cells with `_1` (corrupting e.g. input==expected rows, or two blank
+// cells) and warning once per row. We dedup the real header row ONCE instead.
+const streamCsvRecords = ({
+  stream,
+  onHeaders,
+  onRecord,
+}: {
+  stream: Readable;
+  onHeaders: (headers: string[]) => void;
+  onRecord: (record: Record<string, unknown>) => Promise<void>;
+}): Promise<void> =>
+  new Promise<void>((resolve, reject) => {
+    let csvHeaders: string[] | null = null;
+    // papaparse accepts a Node Readable and emits rows via `step`, so the
+    // whole CSV is never materialized in memory. Serialize the backpressured
+    // chunk writes by pausing the parser while a flush is in flight.
+    let chain: Promise<void> = Promise.resolve();
+    Papa.parse<string[]>(stream, {
+      header: false,
+      skipEmptyLines: true,
+      // Bound papaparse's read buffer so it pulls the stream in fixed-size
+      // chunks rather than draining it as fast as the chunk writer allows.
+      chunkSize: CSV_IO_CHUNK_BYTES,
+      step: (row, parser) => {
+        const values = row.data;
+        // The first row is the header: dedupe repeats + reserved-rename once.
+        if (csvHeaders === null) {
+          const raw = values.map((value) => (value == null ? "" : String(value)));
+          csvHeaders = renameReservedColumns(dedupeHeaders(raw));
+          onHeaders(csvHeaders);
+          return;
+        }
+        const record: Record<string, unknown> = {};
+        csvHeaders.forEach((header, i) => {
+          record[header] = values[i];
+        });
+        // I-MEM: reject a single row whose serialized fields cross
+        // MAX_CSV_ROW_BYTES (a malformed CSV with no row delimiter or one
+        // giant field), the CSV counterpart to the JSONL line cap — fail the
+        // dataset rather than risk an OOM accumulating an unbounded row.
+        if (csvRowBytes(record) > MAX_CSV_ROW_BYTES) {
+          parser.abort();
+          reject(new Error("CSV row exceeds max size — malformed file"));
+          return;
+        }
+        parser.pause();
+        chain = chain
+          .then(() => onRecord(record))
+          .then(() => parser.resume())
+          .catch((error: unknown) => {
+            parser.abort();
+            reject(error);
+          });
+      },
+      complete: () => {
+        chain.then(() => resolve()).catch(reject);
+      },
+      error: (error: unknown) => reject(error),
+    });
+  });
+
 /**
  * Stream-parse a staged source into the chunk writer and capture the (already reserved-renamed)
  * column headers from the first record / CSV fields. Each record's keys are rewritten through
@@ -206,53 +338,10 @@ const parseInto = async (params: {
   // extra keys → keep). Null on the legacy positional path (no exclusion).
   let canonicalSet: Set<string> | null = null;
   const buildTargetMap = (canonical: string[]): void => {
-    // An empty confirmed list can't produce a 0-column dataset; degrade instead.
-    if (!targetColumns || targetColumns.length === 0) return;
-    // Confirmed names become the stored record keys (`out[target.name]` below), so a blank or
-    // duplicated name would collapse two columns onto one key (silent per-record data loss) or
-    // write an `""`-keyed column. The upload route's schema already rejects this, so reaching
-    // here means a malformed stored row — degrade to a derived all-`string` schema rather than
-    // emit the corruption.
-    const names = targetColumns.map((c) => c.name);
-    if (names.some((name) => name.trim() === "") || new Set(names).size !== names.length) {
-      return;
-    }
-    // Prefer binding by the immutable `sourceHeader` (survives drag-reorder +
-    // rename + exclusion); fall back to positional binding for legacy bare
-    // name+type lists (which require an exact 1:1 count — no exclusion).
-    const hasSourceHeaders = targetColumns.every(
-      (c) => typeof (c as DatasetConfirmColumns[number]).sourceHeader === "string",
-    );
-    // A PARTIAL confirm payload (some items carry `sourceHeader`, some don't) is
-    // a client bug, not a legacy list — positional-binding it could silently map
-    // values to the wrong column. Mirror the upload route (which rejects any
-    // "looks like confirm" payload) and degrade rather than fall through to the
-    // positional branch below.
-    const hasAnySourceHeaders = targetColumns.some(
-      (c) => typeof (c as DatasetConfirmColumns[number]).sourceHeader === "string",
-    );
-    if (hasAnySourceHeaders && !hasSourceHeaders) return;
-    if (hasSourceHeaders) {
-      const byHeader = new Map(
-        (targetColumns as DatasetConfirmColumns).map((c) => [c.sourceHeader, c]),
-      );
-      // Duplicate `sourceHeader`s collapse in the Map (last wins), which would
-      // bind fewer columns than `targetColumns` claims while `appliedColumnTypes`
-      // still persists the phantom duplicate. Degrade rather than emit that.
-      if (byHeader.size !== targetColumns.length) return;
-      // Every confirmed column must reference a real file header (no phantom).
-      // A SUBSET is allowed — headers absent from the confirmed list are the
-      // columns the user excluded, and are dropped per-record below.
-      const canonicalHeaders = new Set(canonical);
-      const confirmedHeaders = [...byHeader.keys()];
-      const everyHeaderIsReal = confirmedHeaders.every((h) => canonicalHeaders.has(h));
-      if (!everyHeaderIsReal) return;
-      targetByCanonical = byHeader;
-      canonicalSet = canonicalHeaders;
-      return;
-    }
-    if (targetColumns.length !== canonical.length) return;
-    targetByCanonical = new Map(canonical.map((h, i) => [h, targetColumns[i]!]));
+    const binding = bindTargetColumns({ targetColumns, canonical });
+    if (binding.kind !== "bound") return;
+    targetByCanonical = binding.byCanonical;
+    canonicalSet = binding.canonicalSet;
   };
   // Rename confirmed keys to their new names and convert their values to the
   // confirmed types; drop excluded file headers; keep stray keys untouched.
@@ -312,60 +401,13 @@ const parseInto = async (params: {
   }
 
   if (format === "csv") {
-    // CSV is parsed with `header:false` (rows as arrays) and mapped to objects by index here —
-    // NOT papaparse's `header:true`. Under our pause/resume backpressure, papaparse re-runs its
-    // duplicate-header dedup against the current data row on every resume, suffixing the second
-    // of any two equal cells with `_1` (corrupting e.g. input==expected rows, or two blank
-    // cells) and warning once per row. We dedup the real header row ONCE instead.
-    let csvHeaders: string[] | null = null;
-    await new Promise<void>((resolve, reject) => {
-      // papaparse accepts a Node Readable and emits rows via `step`, so the
-      // whole CSV is never materialized in memory. Serialize the backpressured
-      // chunk writes by pausing the parser while a flush is in flight.
-      let chain: Promise<void> = Promise.resolve();
-      Papa.parse<string[]>(stream, {
-        header: false,
-        skipEmptyLines: true,
-        // Bound papaparse's read buffer so it pulls the stream in fixed-size
-        // chunks rather than draining it as fast as the chunk writer allows.
-        chunkSize: CSV_IO_CHUNK_BYTES,
-        step: (row, parser) => {
-          const values = row.data;
-          // The first row is the header: dedupe repeats + reserved-rename once.
-          if (csvHeaders === null) {
-            const raw = values.map((value) => (value == null ? "" : String(value)));
-            csvHeaders = renameReservedColumns(dedupeHeaders(raw));
-            headers = csvHeaders;
-            buildTargetMap(headers);
-            return;
-          }
-          const record: Record<string, unknown> = {};
-          csvHeaders.forEach((header, i) => {
-            record[header] = values[i];
-          });
-          // I-MEM: reject a single row whose serialized fields cross
-          // MAX_CSV_ROW_BYTES (a malformed CSV with no row delimiter or one
-          // giant field), the CSV counterpart to the JSONL line cap — fail the
-          // dataset rather than risk an OOM accumulating an unbounded row.
-          if (csvRowBytes(record) > MAX_CSV_ROW_BYTES) {
-            parser.abort();
-            reject(new Error("CSV row exceeds max size — malformed file"));
-            return;
-          }
-          parser.pause();
-          chain = chain
-            .then(() => writer.push(applyTarget(record)))
-            .then(() => parser.resume())
-            .catch((error: unknown) => {
-              parser.abort();
-              reject(error);
-            });
-        },
-        complete: () => {
-          chain.then(() => resolve()).catch(reject);
-        },
-        error: (error: unknown) => reject(error),
-      });
+    await streamCsvRecords({
+      stream,
+      onHeaders: (csvHeaders) => {
+        headers = csvHeaders;
+        buildTargetMap(headers);
+      },
+      onRecord: (record) => writer.push(applyTarget(record)),
     });
     return {
       headers,

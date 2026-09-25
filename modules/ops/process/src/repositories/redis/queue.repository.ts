@@ -1248,16 +1248,7 @@ export class QueueRedisRepository extends QueueRepository {
       const [next, members] = await this.redis.zscan(readyKey, cursor, "COUNT", SCAN_BATCH);
       cursor = next;
 
-      // members alternates [groupId, score, groupId, score, ...] — collect
-      // just the groupIds that match our tenant prefix (and the optional
-      // groupIdContains fragment, if set).
-      const matched: string[] = [];
-      for (let i = 0; i < members.length; i += 2) {
-        const groupId = members[i]!;
-        if (!groupId.startsWith(tenantPrefix)) continue;
-        if (contains && !groupId.includes(contains)) continue;
-        matched.push(groupId);
-      }
+      const matched = QueueRedisRepository.tenantGroupsOnPage({ members, tenantPrefix, contains });
       if (matched.length === 0) continue;
 
       // Pipeline all the drains for this page into a single network round-trip.
@@ -1285,8 +1276,7 @@ export class QueueRedisRepository extends QueueRepository {
         pipeline,
         rerun: (index) => drainGroupScript.run(this.redis, 11, ...argsByIndex[index]!),
       });
-      if (!results) continue;
-      for (const [err, value] of results) {
+      for (const [err, value] of results ?? []) {
         if (err) continue;
         groupsDrained++;
         jobsDrained += Number(value);
@@ -1295,6 +1285,24 @@ export class QueueRedisRepository extends QueueRepository {
 
     return { groupsDrained, jobsDrained };
   };
+
+  /** A zscan page alternates [groupId, score, ...]: the tenant's groups holding the fragment. */
+  private static tenantGroupsOnPage({
+    members,
+    tenantPrefix,
+    contains,
+  }: {
+    members: string[];
+    tenantPrefix: string;
+    contains: string | null;
+  }): string[] {
+    return members.filter(
+      (groupId, index) =>
+        index % 2 === 0 &&
+        groupId.startsWith(tenantPrefix) &&
+        (!contains || groupId.includes(contains)),
+    );
+  }
 
   // ── DLQ Operations ──────────────────────────────────────────────
 

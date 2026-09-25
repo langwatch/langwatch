@@ -93,6 +93,31 @@ export class OpsCheckupService {
     }) => CheckupFacts,
   ) {}
 
+  /** The gateway's addresses, with its health and control-plane reach probed on demand. */
+  private static async gatewayFacts({
+    gateway,
+    probes,
+  }: {
+    gateway: OpsCheckupDependencies["peers"]["gateway"];
+    probes: OpsCheckupDependencies["channels"]["probes"];
+  }): ReturnType<CheckupFacts["gateway"]> {
+    const { baseUrl, expectedControlPlaneUrl } = gateway.getDeploymentAddresses();
+    return {
+      baseUrl,
+      expectedControlPlaneUrl,
+      health: async () => {
+        const answer = await probes.get({
+          url: `${baseUrl}/healthz`,
+          timeoutMs: GATEWAY_PROBE_TIMEOUT_MS,
+        });
+        if (answer.status < 200 || answer.status >= 300) {
+          throw new Error(`answered ${answer.status}`);
+        }
+      },
+      probeControlPlane: () => probeControlPlane({ probes, baseUrl }),
+    };
+  }
+
   static create({
     members,
     config,
@@ -150,23 +175,8 @@ export class OpsCheckupService {
         findAppFunctionsProvisionable: () => peers.lwql.findAppFunctionsProvisionable(),
       },
       redis: { target: redis.describeTarget(), ready: () => redis.ping() },
-      gateway: async () => {
-        const { baseUrl, expectedControlPlaneUrl } = peers.gateway.getDeploymentAddresses();
-        return {
-          baseUrl,
-          expectedControlPlaneUrl,
-          health: async () => {
-            const answer = await channels.probes.get({
-              url: `${baseUrl}/healthz`,
-              timeoutMs: GATEWAY_PROBE_TIMEOUT_MS,
-            });
-            if (answer.status < 200 || answer.status >= 300) {
-              throw new Error(`answered ${answer.status}`);
-            }
-          },
-          probeControlPlane: () => probeControlPlane({ probes: channels.probes, baseUrl }),
-        };
-      },
+      gateway: () =>
+        OpsCheckupService.gatewayFacts({ gateway: peers.gateway, probes: channels.probes }),
       license: async () => licenseView(await peers.licensing.getLicenseStatus(organizationId)),
       connect: async () => {
         const [status, deployment] = await Promise.all([

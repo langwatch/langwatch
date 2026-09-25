@@ -204,27 +204,38 @@ export class ReplayService {
 
       await this.finalizeCompleted({ params, result });
     } catch (err) {
-      // A run that has lost the lock owns nothing: finalizing would overwrite the successor's
-      // running status with this stale run's end state. A free lock still finalizes, so the
-      // run's end state stays observable.
-      const lockHolder = await this.repo.getLockHolder();
-      if (lockHolder.kind === "held" && lockHolder.runId !== params.runId) {
-        logger.warn(
-          { runId: params.runId, lockHolder: lockHolder.runId },
-          "Skipping replay finalization: lock now held by another run",
-        );
-      } else if (err instanceof ReplayCancelledError) {
-        await this.finalizeCancelled({ runId: params.runId, historyCtx: params });
-      } else {
-        await this.finalizeWithError({
-          runId: params.runId,
-          errorMessage: err instanceof Error ? err.message : String(err),
-          historyCtx: params,
-        });
-      }
+      await this.finalizeAfterFailure({ params, err });
     } finally {
       await runtime.close();
       await this.repo.releaseLock({ runId: params.runId });
+    }
+  }
+
+  /** A failed run's end state: cancelled or errored, unless another run has taken the lock. */
+  private async finalizeAfterFailure({
+    params,
+    err,
+  }: {
+    params: Parameters<ReplayService["executeReplay"]>[0];
+    err: unknown;
+  }): Promise<void> {
+    // A run that has lost the lock owns nothing: finalizing would overwrite the successor's
+    // running status with this stale run's end state. A free lock still finalizes, so the
+    // run's end state stays observable.
+    const lockHolder = await this.repo.getLockHolder();
+    if (lockHolder.kind === "held" && lockHolder.runId !== params.runId) {
+      logger.warn(
+        { runId: params.runId, lockHolder: lockHolder.runId },
+        "Skipping replay finalization: lock now held by another run",
+      );
+    } else if (err instanceof ReplayCancelledError) {
+      await this.finalizeCancelled({ runId: params.runId, historyCtx: params });
+    } else {
+      await this.finalizeWithError({
+        runId: params.runId,
+        errorMessage: err instanceof Error ? err.message : String(err),
+        historyCtx: params,
+      });
     }
   }
 

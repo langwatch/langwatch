@@ -1147,31 +1147,37 @@ export const convertTo = <T extends keyof StringTypeToType>(
     typeof subject === "string" && (type === "object" || type === "string[]" || type === "array");
 
   if (isEncodedStringToStructuredType) {
-    try {
-      const parsed = JSON.parse(subject);
-      if (!Array.isArray(parsed) && typeof parsed === "object") {
-        return parsed as unknown as StringTypeToType[T];
-      }
-      if (Array.isArray(parsed)) {
-        if (type === "string[]") {
-          return parsed.map((v) => convertTo(v, "string")) as unknown as StringTypeToType[T];
-        }
-        return parsed as unknown as StringTypeToType[T];
-      }
-      throw new Error("Failed to parse to a valid type, falling back");
-    } catch {
-      if (type === "string[]") {
-        return [convertTo(subject, "string")] as unknown as StringTypeToType[T];
-      }
-      if (type === "array") {
-        return [subject] as unknown as StringTypeToType[T];
-      }
-      if (type === "object") {
-        return { _json: subject } as unknown as StringTypeToType[T];
-      }
-    }
+    return decodeEncodedStructure(subject, type);
   }
   return subject as unknown as StringTypeToType[T];
+};
+
+/** A JSON string read as an object, string[] or array; wrapped whole when it will not parse. */
+const decodeEncodedStructure = <T extends keyof StringTypeToType>(
+  subject: string,
+  type: T,
+): StringTypeToType[T] => {
+  try {
+    const parsed = JSON.parse(subject);
+    if (!Array.isArray(parsed) && typeof parsed === "object") {
+      return parsed as unknown as StringTypeToType[T];
+    }
+    if (Array.isArray(parsed)) {
+      if (type === "string[]") {
+        return parsed.map((v) => convertTo(v, "string")) as unknown as StringTypeToType[T];
+      }
+      return parsed as unknown as StringTypeToType[T];
+    }
+    throw new Error("Failed to parse to a valid type, falling back");
+  } catch {
+    if (type === "string[]") {
+      return [convertTo(subject, "string")] as unknown as StringTypeToType[T];
+    }
+    if (type === "array") {
+      return [subject] as unknown as StringTypeToType[T];
+    }
+    return { _json: subject } as unknown as StringTypeToType[T];
+  }
 };
 
 // ============================================================================
