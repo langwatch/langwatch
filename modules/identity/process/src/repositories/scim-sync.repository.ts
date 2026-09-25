@@ -17,7 +17,7 @@ export abstract class ScimSyncReadRepository {
   abstract findForOrganization(args: { organizationId: string }): Promise<ScimSyncState[]>;
 
   /** The operator's cross-customer page (ADR-122), newest first. */
-  abstract findPageForOperator(args: {
+  abstract listPageForOperator(args: {
     page: number;
     pageSize: number;
     search?: string | undefined;

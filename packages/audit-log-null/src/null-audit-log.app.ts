@@ -1,12 +1,11 @@
 import {
   AuditLogApi,
-  type AuditLogApiContract,
   type AuditLogHistoryEntry,
   type RecordedAuditLogEntry,
 } from "@langwatch/audit-log-contract";
 
 /** The audit log an installation without the Enterprise feature answers with. */
-export class NullAuditLog implements AuditLogApiContract {
+export class NullAuditLog implements AuditLogApi {
   static readonly contract = AuditLogApi;
   static readonly dependencies = {};
 

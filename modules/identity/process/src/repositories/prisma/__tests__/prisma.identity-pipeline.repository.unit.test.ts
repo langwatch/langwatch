@@ -1,14 +1,12 @@
 import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
 import type { IdentifierFact } from "@langwatch/identity-contract";
 import { IdentityIdentifierNotFoundError } from "@langwatch/identity-contract";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import type { IdentityFoldState } from "../../../eventing/identity-state.projection.ts";
 import type { IdentityPipeline } from "../../../services/identity-pipeline-definition.service.ts";
-import {
-  type IdentityPipelineDatabase,
-  PostgresIdentityPipelineAdapter,
-} from "../prisma.identity-pipeline.repository.ts";
+import { PostgresIdentityPipelineAdapter } from "../prisma.identity-pipeline.repository.ts";
 
 const USER = "user_sam";
 const IDENTIFIER = "idf_1";
@@ -38,7 +36,7 @@ function recordingDatabase() {
   const accountDeleteMany = vi.fn(record("account.deleteMany", { count: 0 }));
   const userFindUnique = vi.fn(record("user.findUnique", { id: USER }));
 
-  const database = {
+  const database = prismaDouble({
     identifier: {
       upsert: identifierUpsert,
       findMany: identifierFindMany,
@@ -57,7 +55,7 @@ function recordingDatabase() {
       upsert: vi.fn(record("mfa.upsert", undefined)),
     },
     $queryRaw: vi.fn(record("$queryRaw", [] as unknown[])),
-  } as unknown as IdentityPipelineDatabase;
+  });
 
   return {
     database,
@@ -177,15 +175,15 @@ describe("PostgresIdentityPipelineAdapter", () => {
       await storeThrough(pipeline, [verifiedIdentifier()]);
 
       expect(identifierUpsert).toHaveBeenCalledTimes(1);
-      const [request] = identifierUpsert.mock.calls[0] as unknown as [
-        { where: { id: string }; create: Record<string, unknown> },
-      ];
-      expect(request.where).toEqual({ id: IDENTIFIER });
-      expect(request.create).toMatchObject({
-        id: IDENTIFIER,
-        userId: USER,
-        value: "sam@acme.com",
-        state: "VERIFIED",
+      const [request] = identifierUpsert.mock.calls[0] ?? [];
+      expect(request).toHaveProperty("where", { id: IDENTIFIER });
+      expect(request).toMatchObject({
+        create: {
+          id: IDENTIFIER,
+          userId: USER,
+          value: "sam@acme.com",
+          state: "VERIFIED",
+        },
       });
       expect(cursorUpsert).toHaveBeenCalledTimes(1);
       // The commit marker goes last. A crash before it leaves rows a

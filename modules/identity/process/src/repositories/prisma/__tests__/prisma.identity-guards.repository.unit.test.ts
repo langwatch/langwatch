@@ -2,12 +2,10 @@ import {
   IdentityIdentifierNotFoundError,
   MFA_ENROLLED_EVENT_TYPE,
 } from "@langwatch/identity-contract";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  type IdentityGuardsDatabase,
-  PostgresIdentityGuardsAdapter,
-} from "../prisma.identity-guards.repository.ts";
+import { PostgresIdentityGuardsAdapter } from "../prisma.identity-guards.repository.ts";
 
 const USER = "user_sam";
 const ACTOR = { type: "user", id: USER } as const;
@@ -27,7 +25,7 @@ function recordingDatabase() {
   const reservationDeleteMany = vi.fn(async () => ({ count: 3 }));
   const queryRaw = vi.fn(async () => [] as unknown[]);
 
-  const database = {
+  const database = prismaDouble({
     identifier: { findMany: identifierFindMany, findFirst: identifierFindFirst },
     user: {
       findUnique: userFindUnique,
@@ -37,7 +35,7 @@ function recordingDatabase() {
     mfaEnrollment: { findUnique: mfaFindUnique },
     identifierReservation: { deleteMany: reservationDeleteMany },
     $queryRaw: queryRaw,
-  } as unknown as IdentityGuardsDatabase;
+  });
 
   return {
     database,

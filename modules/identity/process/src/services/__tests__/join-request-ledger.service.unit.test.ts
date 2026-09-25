@@ -1,7 +1,6 @@
 import type {
   ProjectionStoreContext,
   StateProjectionStore,
-  StoredProjection,
   StoredProjectionRead,
 } from "@langwatch/eventing";
 /**

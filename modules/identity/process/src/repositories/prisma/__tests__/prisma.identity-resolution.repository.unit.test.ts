@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaIdentityResolutionRepository } from "../prisma.identity-resolution.repository.ts";
@@ -23,10 +23,10 @@ function repositoryOver({
   const update = vi.fn(updateImpl ?? (async () => ({})));
   const warn = vi.fn();
 
-  const prisma = {
+  const prisma = prismaDouble({
     $queryRaw: queryRaw,
     identifier: { update },
-  } as unknown as PrismaClient;
+  });
 
   return {
     queryRaw,

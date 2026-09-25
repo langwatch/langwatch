@@ -1,5 +1,5 @@
 import { ScimSsoMigrationSubscriberService } from "@langwatch/enterprise-scim-contract";
-import type { StateProjectionStore, StoredProjection } from "@langwatch/eventing";
+import type { StateProjectionStore } from "@langwatch/eventing";
 
 import type { ConnectionTeardown } from "../eventing/connection-teardown.process.ts";
 import type { IdentityFoldState } from "../eventing/identity-state.projection.ts";

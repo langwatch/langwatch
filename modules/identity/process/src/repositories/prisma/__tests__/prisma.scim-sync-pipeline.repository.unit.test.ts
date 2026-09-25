@@ -1,13 +1,11 @@
 import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
 import { SCIM_TOKEN_REVOKED_EVENT_TYPE } from "@langwatch/identity-contract";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ScimSyncFoldState } from "../../../eventing/scim-sync-state.projection.ts";
 import type { ScimSyncPipeline } from "../../../services/scim-sync-pipeline-definition.service.ts";
-import {
-  PostgresScimSyncPipelineAdapter,
-  type ScimSyncPipelineDatabase,
-} from "../prisma.scim-sync-pipeline.repository.ts";
+import { PostgresScimSyncPipelineAdapter } from "../prisma.scim-sync-pipeline.repository.ts";
 
 const ORGANIZATION = "organization_acme";
 const SYNC = "scimsync_1";
@@ -16,10 +14,10 @@ const CONNECTION = "ssoconn_1";
 function recordingDatabase() {
   const findUnique = vi.fn(async () => null);
   const findFirst = vi.fn(async () => null);
-  const upsert = vi.fn(async () => undefined);
-  const database = {
+  const upsert = vi.fn(async (..._args: unknown[]) => undefined);
+  const database = prismaDouble({
     scimSyncState: { findUnique, findFirst, upsert },
-  } as unknown as ScimSyncPipelineDatabase;
+  });
   return { database, findUnique, findFirst, upsert };
 }
 
@@ -104,20 +102,20 @@ describe("PostgresScimSyncPipelineAdapter", () => {
       );
 
       expect(upsert).toHaveBeenCalledTimes(1);
-      const [request] = upsert.mock.calls[0] as unknown as [
-        { where: { id: string }; create: Record<string, unknown> },
-      ];
-      expect(request.where).toEqual({ id: SYNC });
-      expect(request.create).toMatchObject({
-        id: SYNC,
-        connectionId: CONNECTION,
-        organizationId: ORGANIZATION,
-        state: "SYNCING",
-        lastEventId: "evt_1",
-        // Business time from the events, never `now()` — a replay has to
-        // rebuild the identical row.
-        createdAt: new Date(1_600_000_000_000),
-        updatedAt: new Date(1_700_000_000_000),
+      const [request] = upsert.mock.calls[0] ?? [];
+      expect(request).toHaveProperty("where", { id: SYNC });
+      expect(request).toMatchObject({
+        create: {
+          id: SYNC,
+          connectionId: CONNECTION,
+          organizationId: ORGANIZATION,
+          state: "SYNCING",
+          lastEventId: "evt_1",
+          // Business time from the events, never `now()` — a replay has to
+          // rebuild the identical row.
+          createdAt: new Date(1_600_000_000_000),
+          updatedAt: new Date(1_700_000_000_000),
+        },
       });
     });
 

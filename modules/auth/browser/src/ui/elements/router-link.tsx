@@ -2,8 +2,17 @@
 
 import { type AnchorHTMLAttributes, forwardRef, type ReactNode } from "react";
 
+/** A value `buildHref` writes into the query string. */
+type QueryValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | readonly (string | number | boolean)[];
+
 interface NextLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> {
-  href: string | { pathname: string; query?: Record<string, any> };
+  href: string | { pathname: string; query?: Record<string, QueryValue> };
   as?: string;
   replace?: boolean;
   scroll?: boolean;
@@ -19,7 +28,9 @@ interface NextLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "h
   children?: ReactNode;
 }
 
-function buildHref(href: string | { pathname: string; query?: Record<string, any> }): string {
+function buildHref(
+  href: string | { pathname: string; query?: Record<string, QueryValue> },
+): string {
   if (typeof href === "string") return href;
   const { pathname, query } = href;
   if (!query || Object.keys(query).length === 0) return pathname;

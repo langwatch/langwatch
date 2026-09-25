@@ -3,7 +3,7 @@ import { createLogger } from "@langwatch/observability";
 
 import type { JoinRequestNotificationMail } from "../app/identity.members.ts";
 import type { JoinRequestAudienceRepository } from "../repositories/join-request-audience.repository.ts";
-import type { PrismaJoinRequestNotificationContextRepository } from "../repositories/prisma/prisma.join-request-notification-context.repository.ts";
+import type { JoinRequestNotificationContextRepository } from "../repositories/join-request-notification-context.repository.ts";
 import type { JoinRequestNotifier } from "../rules/join-requests-contract.rules.ts";
 
 const logger = createLogger("langwatch:identity:join-request-adapters");
@@ -28,7 +28,7 @@ export type JoinRequestNotifierMemberships = {
 export class JoinRequestNotifierService implements JoinRequestNotifier {
   static create(options: {
     audience: JoinRequestAudienceRepository;
-    context: PrismaJoinRequestNotificationContextRepository;
+    context: JoinRequestNotificationContextRepository;
     mail: JoinRequestNotificationMail;
     /** This deployment's public origin, for a lapsed requester's personal project link. */
     baseHost: string;
@@ -47,7 +47,7 @@ export class JoinRequestNotifierService implements JoinRequestNotifier {
   }
 
   private readonly audience: JoinRequestAudienceRepository;
-  private readonly context: PrismaJoinRequestNotificationContextRepository;
+  private readonly context: JoinRequestNotificationContextRepository;
   private readonly mail: JoinRequestNotificationMail;
   private readonly baseHost: string;
   private readonly plans: JoinRequestNotifierPlans | undefined;
@@ -62,7 +62,7 @@ export class JoinRequestNotifierService implements JoinRequestNotifier {
     memberships,
   }: {
     audience: JoinRequestAudienceRepository;
-    context: PrismaJoinRequestNotificationContextRepository;
+    context: JoinRequestNotificationContextRepository;
     mail: JoinRequestNotificationMail;
     baseHost: string;
     plans: JoinRequestNotifierPlans | undefined;

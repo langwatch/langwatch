@@ -1,11 +1,11 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaLegacySsoOrganizationRepository } from "../prisma.legacy-sso-organization.repository.ts";
 
 function repositoryOver(findUniqueImpl: () => Promise<unknown>) {
   const findUnique = vi.fn(findUniqueImpl);
-  const prisma = { organization: { findUnique } } as unknown as PrismaClient;
+  const prisma = prismaDouble({ organization: { findUnique } });
 
   return { findUnique, repository: PrismaLegacySsoOrganizationRepository.create(prisma) };
 }

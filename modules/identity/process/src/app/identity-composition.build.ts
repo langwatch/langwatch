@@ -40,8 +40,11 @@ import {
   IDENTITY_LATCH_CACHE_TTL_MS,
 } from "../services/per-subject-cached-latch.service.ts";
 import { IdentityProducerPipelinesAdapter } from "../services/producer-identity-pipelines.service.ts";
-import type { IdentityInfrastructure } from "./identity-members.ts";
-import type { IdentityEventing, PlatformOperator } from "./identity.members.ts";
+import type {
+  IdentityEventing,
+  IdentityInfrastructure,
+  PlatformOperator,
+} from "./identity.members.ts";
 
 /** The one shape a command dispatcher has, checked rather than asserted. */
 type IdentityCommandSender = { send(data: unknown): Promise<unknown> };

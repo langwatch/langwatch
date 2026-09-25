@@ -15,6 +15,7 @@ import {
   identityConfig,
   sealedProviderConfigCipher,
   type IdentityEmailResolution,
+  type IdentityReservationsApi,
   type IdentityServerConfig,
   type VerifiedEmailsResolution,
 } from "@langwatch/identity-contract";
@@ -650,7 +651,7 @@ export class IdentityApp implements IdentityApi {
     return this.#parts.mfaGuards;
   }
 
-  reservations() {
+  reservations(): IdentityReservationsApi {
     const reservations = this.#parts.reservations;
     return {
       claim: (args: {

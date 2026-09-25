@@ -4,7 +4,7 @@
  * heads/ledger/records ports. The pure half is `@langwatch/identity-contract`.
  */
 export { identityServer } from "./identity.server.ts";
-export type { IdentityInfrastructure } from "./app/identity-members.ts";
+export type { IdentityInfrastructure } from "./app/identity.members.ts";
 export { SsoConnectionLedgerWriterAdapter } from "./services/eventing-sso-connection-ledger.service.ts";
 export type { SsoConnectionEvent } from "./eventing/sso-connection-state.projection.ts";
 export { CryptoIdentifierIdentityAdapter } from "./services/crypto-identifier-identity.service.ts";

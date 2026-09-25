@@ -273,10 +273,12 @@ const commandIdentitySchema = z.object({
  */
 export function userTenantedCommandSchema<Shape extends z.ZodRawShape>(
   shape: Shape,
-): z.ZodType<z.infer<ReturnType<typeof commandIdentitySchema.extend<Shape>>>> {
-  return commandIdentitySchema.extend(shape).refine(
+): z.ZodType<
+  z.output<z.ZodObject<z.core.util.Writeable<typeof commandIdentitySchema.shape & Shape>>>
+> {
+  return z.object({ ...commandIdentitySchema.shape, ...shape }).refine(
     (data) => {
-      // zod 4 widens `.extend()`'s output under a generic shape to a union that
+      // zod 4 widens the spread object's output under a generic shape to a union that
       // no longer names the base's own keys, so the fields this reads are named
       // here rather than inferred. They come from `commandIdentitySchema`, never
       // from `shape`, so they are always present whatever a caller extends with.

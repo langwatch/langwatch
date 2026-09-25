@@ -30,7 +30,7 @@ function guardsOver(state: ScimSyncState | null) {
         return state;
       },
       findForOrganization: async () => [],
-      findPageForOperator: async () => ({ syncs: [], total: 0 }),
+      listPageForOperator: async () => ({ syncs: [], total: 0 }),
       findByConnectionForOperator: async () => [],
     },
   });

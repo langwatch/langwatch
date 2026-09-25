@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { JoinRequestNotificationMail } from "../../app/identity.members.ts";
 import type { JoinRequestAudienceRepository } from "../../repositories/join-request-audience.repository.ts";
-import type { PrismaJoinRequestNotificationContextRepository } from "../../repositories/prisma/prisma.join-request-notification-context.repository.ts";
+import type { JoinRequestNotificationContextRepository } from "../../repositories/join-request-notification-context.repository.ts";
 import { JoinRequestNotifierService } from "../join-request-notifier.service.ts";
 
 /**
@@ -54,14 +54,14 @@ function fakeAudience(): JoinRequestAudienceRepository {
 }
 
 function fakeContext(
-  overrides: Record<string, unknown> = {},
-): PrismaJoinRequestNotificationContextRepository {
+  overrides: Partial<JoinRequestNotificationContextRepository> = {},
+): JoinRequestNotificationContextRepository {
   return {
     getOrganizationIntent: vi.fn(async () => ({ primaryIntent: null })),
     countApprovedFromDomain: vi.fn(async () => 0),
     findPersonalTeamSlugs: vi.fn(async () => []),
     ...overrides,
-  } as unknown as PrismaJoinRequestNotificationContextRepository;
+  };
 }
 
 describe("JoinRequestNotifierService", () => {

@@ -132,7 +132,7 @@ export class PrismaScimSyncProjectionRepository
   }
 
   /** Searched on ids rather than prose: that is what a support case carries. */
-  async findPageForOperator({
+  async listPageForOperator({
     page,
     pageSize,
     search,

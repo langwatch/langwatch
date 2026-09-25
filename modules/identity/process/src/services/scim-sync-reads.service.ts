@@ -44,7 +44,7 @@ export class ScimSyncReadsService implements ScimSyncReadsApi {
     pageSize: number;
     search?: string | undefined;
   }): Promise<{ syncs: ScimSyncState[]; total: number }> {
-    return this.syncs.findPageForOperator(input);
+    return this.syncs.listPageForOperator(input);
   }
 
   findForOperator(input: { connectionId: string }): Promise<ScimSyncState[]> {

@@ -1,7 +1,6 @@
 import { AnnotationApi } from "@langwatch/annotation-contract";
 import {
   AuditLogApi,
-  type AuditLogApiContract,
   type AuditLogHistoryEntry,
   type ListAuditLogEntityHistoryInput,
   type RecentItem,
@@ -35,7 +34,7 @@ type AuditLogSetup = FeatureSetup<
   AuditLogRepositories
 >;
 
-export class AuditLogApp implements AuditLogApiContract, AuditLogHomeApi {
+export class AuditLogApp implements AuditLogApi, AuditLogHomeApi {
   static readonly contract = AuditLogApi;
   static readonly dependencies = {
     projects: ProjectApi,

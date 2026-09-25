@@ -5,11 +5,12 @@
  * @see ../prisma.sso-connection-pipeline.repository.ts
  */
 import { ScimSsoMigrationSubscriberService } from "@langwatch/enterprise-scim-contract";
-import type { EventSourcing } from "@langwatch/eventing";
+import { EventSourcing } from "@langwatch/eventing";
 import {
   MIGRATION_FINALIZED_EVENT_TYPE,
   SSO_CONNECTION_AGGREGATE_TYPE,
 } from "@langwatch/identity-contract";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import type { PlatformOperator } from "../../../app/identity.members.ts";
@@ -22,21 +23,16 @@ import {
 /** The models the connection graph reads, none of them touched at composition time. */
 function testDatabase(): SsoConnectionPipelineDatabase {
   const model = { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), upsert: vi.fn() };
-  return {
+  return prismaDouble({
     ssoConnection: model,
-    ssoConnectionStranding: model,
     user: model,
     organization: model,
-  } as unknown as SsoConnectionPipelineDatabase;
+  });
 }
 
 /** A runtime with the stack switched off: nothing here commits. */
 function testEventSourcing(): EventSourcing {
-  return {
-    isEnabled: false,
-    getEventStore: vi.fn(),
-    getPipeline: vi.fn(),
-  } as unknown as EventSourcing;
+  return new EventSourcing({ enabled: false });
 }
 
 class TestOperators implements PlatformOperator {

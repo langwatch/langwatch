@@ -1,13 +1,11 @@
-import { createTenantId, type EventSourcing, type StateProjectionStore } from "@langwatch/eventing";
+import { createTenantId, EventSourcing, type StateProjectionStore } from "@langwatch/eventing";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import type { JoinRequestFoldState } from "../../../eventing/join-request-state.projection.ts";
 import type { JoinRequestNotifier } from "../../../rules/join-requests-contract.rules.ts";
 import type { JoinRequestPipeline } from "../../../services/join-request-pipeline-definition.service.ts";
-import {
-  PostgresJoinRequestPipelineAdapter,
-  type JoinRequestPipelineDatabase,
-} from "../prisma.join-request-pipeline.repository.ts";
+import { PostgresJoinRequestPipelineAdapter } from "../prisma.join-request-pipeline.repository.ts";
 
 /**
  * Spec: modules/identity/specs/join-request-worker-composition.feature
@@ -35,19 +33,19 @@ class SilentNotifier implements JoinRequestNotifier {
 function recordingDatabase() {
   const findUnique = vi.fn(async () => null);
   const findFirst = vi.fn(async () => null);
-  const upsert = vi.fn(async () => undefined);
-  const database = {
+  const upsert = vi.fn(async (..._args: unknown[]) => undefined);
+  const database = prismaDouble({
     joinRequest: { findUnique, findFirst, upsert },
     organization: { findUnique: vi.fn(async () => null) },
     organizationUser: { findMany: vi.fn(async () => []) },
     user: { findUnique: vi.fn(async () => null) },
-  } as unknown as JoinRequestPipelineDatabase;
+  });
   return { database, findUnique, findFirst, upsert };
 }
 
 function compose() {
   const recording = recordingDatabase();
-  const eventSourcing = { isEnabled: false } as unknown as EventSourcing;
+  const eventSourcing = new EventSourcing({ enabled: false });
   const pipeline: JoinRequestPipeline = PostgresJoinRequestPipelineAdapter.create({
     database: recording.database,
     eventSourcing,
@@ -132,20 +130,20 @@ describe("given a process holding one typed Prisma client", () => {
       );
 
       expect(upsert).toHaveBeenCalledTimes(1);
-      const [request] = upsert.mock.calls[0] as unknown as [
-        { where: { id: string }; create: Record<string, unknown> },
-      ];
-      expect(request.where).toEqual({ id: REQUEST });
-      expect(request.create).toMatchObject({
-        id: REQUEST,
-        userId: REQUESTER,
-        organizationId: ORGANIZATION,
-        state: "PENDING",
-        lastEventId: "evt_1",
-        // Business time from the events, never `now()` — a replay has to
-        // rebuild the identical row.
-        createdAt: new Date(1_600_000_000_000),
-        updatedAt: new Date(1_700_000_000_000),
+      const [request] = upsert.mock.calls[0] ?? [];
+      expect(request).toHaveProperty("where", { id: REQUEST });
+      expect(request).toMatchObject({
+        create: {
+          id: REQUEST,
+          userId: REQUESTER,
+          organizationId: ORGANIZATION,
+          state: "PENDING",
+          lastEventId: "evt_1",
+          // Business time from the events, never `now()` — a replay has to
+          // rebuild the identical row.
+          createdAt: new Date(1_600_000_000_000),
+          updatedAt: new Date(1_700_000_000_000),
+        },
       });
     });
   });

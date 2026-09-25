@@ -16,8 +16,7 @@ import {
 } from "@langwatch/identity-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OpsApi } from "@langwatch/ops-contract";
-import { signInProviderSecrets } from "@langwatch/secrets";
-import { ScopedSecrets, type SecretHandle } from "@langwatch/secrets";
+import { ScopedSecrets, signInProviderSecrets, type SecretHandle } from "@langwatch/secrets";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
 

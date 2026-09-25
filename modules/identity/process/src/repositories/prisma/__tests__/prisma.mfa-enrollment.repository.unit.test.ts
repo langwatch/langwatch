@@ -1,5 +1,5 @@
 import { guardOrganizationId } from "@langwatch/prisma-client";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaMfaEnrollmentRepository } from "../prisma.mfa-enrollment.repository.ts";
@@ -34,7 +34,7 @@ describe("PrismaMfaEnrollmentRepository", () => {
             { organization: { slug: "globex" } },
           ],
         });
-        const repository = PrismaMfaEnrollmentRepository.create(prisma as unknown as PrismaClient);
+        const repository = PrismaMfaEnrollmentRepository.create(prismaDouble(prisma));
 
         const slugs = await repository.findRequiringOrganizationSlugs({
           userId: "user_1",
@@ -56,7 +56,7 @@ describe("PrismaMfaEnrollmentRepository", () => {
 
       it("answers empty for somebody the row lookup does not find", async () => {
         const prisma = makeGuardedPrisma(null);
-        const repository = PrismaMfaEnrollmentRepository.create(prisma as unknown as PrismaClient);
+        const repository = PrismaMfaEnrollmentRepository.create(prismaDouble(prisma));
 
         const slugs = await repository.findRequiringOrganizationSlugs({
           userId: "user_missing",

@@ -34,7 +34,7 @@ function readsOver(states: ScimSyncState[]) {
     async getSync({ scimSyncId }: { scimSyncId: string }): Promise<ScimSyncState> {
       throw new ScimSyncNotFoundError(scimSyncId);
     }
-    async findPageForOperator(): Promise<{ syncs: ScimSyncState[]; total: number }> {
+    async listPageForOperator(): Promise<{ syncs: ScimSyncState[]; total: number }> {
       return { syncs: states, total: states.length };
     }
     async findByConnectionForOperator({

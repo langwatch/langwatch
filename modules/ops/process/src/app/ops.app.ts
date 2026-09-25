@@ -9,7 +9,6 @@ import { ApiKeyApi, type ApiKeyApi as ApiKeyApiContract } from "@langwatch/api-k
  */
 import {
   AuditLogApi,
-  type AuditLogApi as AuditLogApiContract,
   type RecordAuditLogCommand,
 } from "@langwatch/audit-log-contract";
 import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contract";
@@ -446,7 +445,7 @@ export interface OpsAppDependencies {
    */
   identity: IdentityApiContract;
   projects: ProjectApiContract;
-  auditLog: AuditLogApiContract;
+  auditLog: AuditLogApi;
 }
 
 /** The process-owned adapters used to make one Ops capability at boot. */
@@ -637,7 +636,7 @@ type OpsRuntimeDependencies = Readonly<{
   ops: OpsCapability;
   featureFlags: FeatureFlagApi;
   projects: ProjectApiContract;
-  auditLog: AuditLogApiContract;
+  auditLog: AuditLogApi;
   apiKeys: ApiKeyApiContract;
   eventingIntrospection: OpsEventingIntrospection;
   pipelines: OpsPipelineRegistry;

@@ -664,6 +664,23 @@ export interface ScimSyncGuardsApi {
   revokeScimSync(data: RevokeScimSyncCommandData): Promise<ScimSyncFactInput[]>;
 }
 
+/** The address-lock reservations the identity ledger claims and releases. */
+export interface IdentityReservationsApi {
+  claim(args: {
+    normalizedValue: string;
+    userId: string;
+    identifierId: string;
+    commandId: string;
+  }): Promise<{
+    normalizedValue: string;
+    userId: string;
+    identifierId: string;
+    commandId: string;
+  }>;
+  release(args: { userId: string; holdingIdentifierIds: readonly string[] }): Promise<number>;
+  reapOrphans(): Promise<number>;
+}
+
 /**
  * The capabilities identity publishes across a package boundary today: email
  * fork read, guard services, address-lock reservations, newborn
@@ -685,21 +702,7 @@ export interface IdentityApi {
   /** Operations, not properties: a module boundary carries callable members only. */
   guards(): IdentityGuardsApi;
   mfaGuards(): MfaGuardsApi;
-  reservations(): {
-    claim(args: {
-      normalizedValue: string;
-      userId: string;
-      identifierId: string;
-      commandId: string;
-    }): Promise<{
-      normalizedValue: string;
-      userId: string;
-      identifierId: string;
-      commandId: string;
-    }>;
-    release(args: { userId: string; holdingIdentifierIds: readonly string[] }): Promise<number>;
-    reapOrphans(): Promise<number>;
-  };
+  reservations(): IdentityReservationsApi;
   identity(): IdentityLedgerApi;
   newbornSweep(): IdentityNewbornSweepApi;
   /** The USER-rooted migration registry (ADR-101 §6), in main's order. */

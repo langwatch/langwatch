@@ -1,25 +1,25 @@
 import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
+import { JoinRequestNotificationContextRepository } from "../join-request-notification-context.repository.ts";
+
 /** Only what this repository touches, so composition names the slice it needs. */
 export type JoinRequestNotificationContextDatabase = Pick<
   PrismaClient,
   "organization" | "joinRequest" | "team"
 >;
 
-/**
- * The extra context a join-request notification's copy carries, beyond who
- * to address: why the organization exists, how many requests from a domain
- * were already approved, and a lapsed requester's own personal project link.
- */
-export class PrismaJoinRequestNotificationContextRepository {
+/** The notification context, read from the organization, join-request and team tables. */
+export class PrismaJoinRequestNotificationContextRepository extends JoinRequestNotificationContextRepository {
   static create(
     database: JoinRequestNotificationContextDatabase,
   ): PrismaJoinRequestNotificationContextRepository {
     return new PrismaJoinRequestNotificationContextRepository(database);
   }
 
-  private constructor(private readonly database: JoinRequestNotificationContextDatabase) {}
+  private constructor(private readonly database: JoinRequestNotificationContextDatabase) {
+    super();
+  }
 
   /**
    * Why the organization came, for the one message a new member reads first.
