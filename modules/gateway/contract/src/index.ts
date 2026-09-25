@@ -27,3 +27,4 @@ export * from "./gateway-spend.schemas.ts";
 export * from "./gateway.spend-rating.ts";
 export * from "./gateway-internal.schemas.ts";
 export * from "./gateway-spend-event.trpc.ts";
+export * from "./gateway-principal-spend.ts";

@@ -1,49 +1,51 @@
 import {
+  GOVERNANCE_ATTR,
+  GOVERNANCE_ORIGIN_KIND_VALUE,
   QUARANTINE_DEFAULT_THRESHOLD,
   QUARANTINE_DEFAULT_WINDOW_SECONDS,
   type QuarantineFillInput,
   type QuarantineFillStats,
 } from "@langwatch/enterprise-governance-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
 
 import type {
   GovernanceDiagnosticsSink,
   QuarantineTenantResolver,
-  QuarantineTraceActivityReader,
 } from "../app/governance.members.ts";
 import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 
 export class QuarantineFillEvaluatorService {
   private readonly tenant: QuarantineTenantResolver;
-  private readonly traceActivity: QuarantineTraceActivityReader | undefined;
+  private readonly traces: Pick<TraceApi, "findTraceCountsByAttribute">;
   private readonly diagnostics: GovernanceDiagnosticsSink;
   private readonly now: () => number;
 
   private constructor({
     tenant,
-    traceActivity,
+    traces,
     diagnostics,
     now,
   }: {
     tenant: QuarantineTenantResolver;
-    traceActivity: QuarantineTraceActivityReader | undefined;
+    traces: Pick<TraceApi, "findTraceCountsByAttribute">;
     diagnostics: GovernanceDiagnosticsSink;
     now: () => number;
   }) {
     this.tenant = tenant;
-    this.traceActivity = traceActivity;
+    this.traces = traces;
     this.diagnostics = diagnostics;
     this.now = now;
   }
 
   static create(options: {
     tenant: QuarantineTenantResolver;
-    traceActivity?: QuarantineTraceActivityReader;
+    traces: Pick<TraceApi, "findTraceCountsByAttribute">;
     diagnostics?: GovernanceDiagnosticsSink;
     now?: () => number;
   }): QuarantineFillEvaluatorService {
     return new QuarantineFillEvaluatorService({
       tenant: options.tenant,
-      traceActivity: options.traceActivity,
+      traces: options.traces,
       diagnostics: options.diagnostics ?? new NullGovernanceDiagnosticsAdapter(),
       now: options.now ?? Date.now,
     });
@@ -53,22 +55,19 @@ export class QuarantineFillEvaluatorService {
     const windowSeconds = input.windowSeconds ?? QUARANTINE_DEFAULT_WINDOW_SECONDS;
     const threshold = input.threshold ?? QUARANTINE_DEFAULT_THRESHOLD;
     const tenantId = await this.tenant.resolveTenantId(input.organizationId);
-    if (!this.traceActivity) {
-      throw new Error(
-        "ClickHouse client is not available — check ClickHouse connection configuration",
-      );
-    }
 
     try {
-      const rows = await this.traceActivity.findSpanCountsBySource({
-        tenantId,
+      const rows = await this.traces.findTraceCountsByAttribute({
+        projectId: tenantId,
         sinceMs: this.now() - windowSeconds * 1_000,
+        attribute: { key: GOVERNANCE_ATTR.ORIGIN_KIND, value: GOVERNANCE_ORIGIN_KIND_VALUE },
+        groupByKey: GOVERNANCE_ATTR.INGESTION_SOURCE_ID,
       });
       const perSource = rows
-        .filter(({ sourceId }) => sourceId.length > 0)
-        .map(({ sourceId, spanCount }) => ({
-          ingestionSourceId: sourceId,
-          spanCount,
+        .filter(({ value }) => value.length > 0)
+        .map(({ value, count }) => ({
+          ingestionSourceId: value,
+          spanCount: count,
         }));
       const spanCount = perSource.reduce((total, source) => total + source.spanCount, 0);
       const rate = (spanCount * 60) / Math.max(1, windowSeconds);

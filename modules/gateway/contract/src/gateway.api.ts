@@ -21,6 +21,12 @@ import type {
 } from "./gateway-guardrail.ts";
 import type { GatewayInternalSpendCommandRecord } from "./gateway-internal.schemas.ts";
 import type {
+  GatewayPrincipalDailySpend,
+  GatewayPrincipalModelSpend,
+  GatewayPrincipalSpendSummary,
+  GatewayPrincipalSpendWindow,
+} from "./gateway-principal-spend.ts";
+import type {
   GatewayPricedSpend,
   GatewayPricedSpendResult,
   SpendFilters,
@@ -778,6 +784,24 @@ export interface GatewayApi extends GatewayInternalProtocol {
   }): Promise<GatewaySpendDay[]>;
   /** The usage report's figures (ADR-156, section 10). */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<GatewayUsageCount>;
+  /** One user's principal-scope ledger totals and most-used model (main's personal usage). */
+  getPrincipalSpendSummary(input: {
+    projectId: string;
+    userId: string;
+    window: GatewayPrincipalSpendWindow;
+  }): Promise<GatewayPrincipalSpendSummary>;
+  /** One user's principal-scope ledger spend per UTC day, oldest first. */
+  findPrincipalDailySpend(input: {
+    projectId: string;
+    userId: string;
+    window: GatewayPrincipalSpendWindow;
+  }): Promise<GatewayPrincipalDailySpend[]>;
+  /** One user's principal-scope ledger spend per model, most spent first. */
+  findPrincipalModelSpend(input: {
+    projectId: string;
+    userId: string;
+    window: GatewayPrincipalSpendWindow;
+  }): Promise<GatewayPrincipalModelSpend[]>;
 }
 
 export const GatewayApi = moduleApi<GatewayApi>()("gateway");

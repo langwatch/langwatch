@@ -1,4 +1,6 @@
-import { EmailDelivery } from "@langwatch/notification-process";
+import { createApiFixture } from "@langwatch/api-fixture";
+import { EmailDelivery } from "@langwatch/mail";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { AutomationRunawayMetricsNullService } from "../automation-runaway-metrics-null.service.ts";
@@ -37,7 +39,7 @@ function adapter(
     },
     suppression: { filterSuppressed },
     mailer: new NoopMailer(),
-    resolveClickHouseClient: vi.fn().mockResolvedValue(null),
+    traces: createApiFixture<TraceApi>({ countTracesInLastDay: async () => 0 }),
     metrics: AutomationRunawayMetricsNullService.create(),
     baseHost: "https://app.langwatch.test",
   });
@@ -103,7 +105,7 @@ describe("given a worker holding an automation containment claim", () => {
           },
           suppression: { filterSuppressed: vi.fn() },
           mailer: new NoopMailer(),
-          resolveClickHouseClient: vi.fn(),
+          traces: createApiFixture<TraceApi>(),
           metrics: AutomationRunawayMetricsNullService.create(),
           baseHost: "https://app.langwatch.test",
         });
@@ -122,6 +124,29 @@ describe("given a worker holding an automation containment claim", () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+  });
+});
+
+describe("given a project whose traces the runaway check counts", () => {
+  describe("when the last day's traces are counted", () => {
+    it("asks the trace owner for the project's count", async () => {
+      const countTracesInLastDay = vi.fn(async () => 42);
+      const service = AutomationRunawayService.create({
+        redis: null,
+        directories: {
+          projects: { getOrganizationId: vi.fn(), findById: vi.fn() },
+          authorization: { listOrganizationBindings: vi.fn() },
+        },
+        suppression: { filterSuppressed: vi.fn() },
+        mailer: new NoopMailer(),
+        traces: createApiFixture<TraceApi>({ countTracesInLastDay }),
+        metrics: AutomationRunawayMetricsNullService.create(),
+        baseHost: "https://app.langwatch.test",
+      });
+
+      await expect(service.countProjectTraces24h("project-1")).resolves.toBe(42);
+      expect(countTracesInLastDay).toHaveBeenCalledWith({ projectId: "project-1" });
     });
   });
 });

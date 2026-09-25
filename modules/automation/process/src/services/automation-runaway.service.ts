@@ -1,24 +1,18 @@
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { AutomationLimitNextStep } from "@langwatch/automation-contract";
 import { generate } from "@langwatch/ksuid";
-import { sendAutomationLimitEmail } from "@langwatch/mail";
-import type { EmailDelivery } from "@langwatch/notification-process";
+import { type EmailDelivery, sendAutomationLimitEmail } from "@langwatch/mail";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { nowInstant } from "@langwatch/time";
-import { z } from "zod";
+import type { TraceApi } from "@langwatch/trace-contract";
 
-import type {
-  AutomationHeartbeat,
-  AutomationRunawayMetricsSink,
-} from "../app/automation.members.ts";
+import type { AutomationRunawayMetricsSink } from "../app/automation.members.ts";
 import {
   AutomationRunawayRepository,
   type ClaimLease,
 } from "../repositories/automation-runaway.repository.ts";
-
-const traceCountRowsSchema = z.array(z.object({ Total: z.string() }));
 
 /**
  * Who a limit notice goes to, resolved through this process's own
@@ -29,9 +23,6 @@ export type AutomationRunawayDirectories = Readonly<{
   projects: Pick<ProjectApi, "getOrganizationId" | "findById">;
   authorization: Pick<AuthzService, "listOrganizationBindings">;
 }>;
-
-/** The routed client a project's traces are counted on. */
-export type RunawayClickHouseResolver = AutomationHeartbeat["findClickHouseClient"];
 
 /** Which addresses this project has already asked not to hear from again. */
 export type AutomationRunawaySuppression = Readonly<{
@@ -66,7 +57,7 @@ export class AutomationRunawayService extends AutomationRunawayRepository {
     directories: AutomationRunawayDirectories;
     suppression: AutomationRunawaySuppression;
     mailer: EmailDelivery;
-    resolveClickHouseClient: RunawayClickHouseResolver;
+    traces: Pick<TraceApi, "countTracesInLastDay">;
     metrics: AutomationRunawayMetricsSink;
     baseHost: string;
     /** Absent on a deployment that composed no self-serve plan catalogue. */
@@ -85,7 +76,7 @@ export class AutomationRunawayService extends AutomationRunawayRepository {
       directories: AutomationRunawayDirectories;
       suppression: AutomationRunawaySuppression;
       mailer: EmailDelivery;
-      resolveClickHouseClient: RunawayClickHouseResolver;
+      traces: Pick<TraceApi, "countTracesInLastDay">;
       metrics: AutomationRunawayMetricsSink;
       baseHost: string;
       nextStep?: AutomationNextStepResolver | null;
@@ -95,18 +86,8 @@ export class AutomationRunawayService extends AutomationRunawayRepository {
     super();
   }
 
-  async countProjectTraces24h(projectId: string): Promise<number> {
-    const client = await this.input.resolveClickHouseClient(projectId);
-    if (!client) return 0;
-    const result = await client.query({
-      query:
-        "SELECT toString(count(DISTINCT TraceId)) AS Total FROM trace_summaries WHERE TenantId = {tenantId:String} AND OccurredAt >= now() - INTERVAL 24 HOUR",
-      query_params: { tenantId: projectId },
-      format: "JSONEachRow",
-    });
-    const rows = traceCountRowsSchema.parse(await result.json());
-
-    return Number.parseInt(rows[0]?.Total ?? "0", 10);
+  countProjectTraces24h(projectId: string): Promise<number> {
+    return this.input.traces.countTracesInLastDay({ projectId });
   }
 
   async notificationRecipients(input: { projectId: string; triggerId: string }): Promise<string[]> {

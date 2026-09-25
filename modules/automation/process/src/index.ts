@@ -123,7 +123,6 @@ export { AutomationRunawaySignals } from "./app/automation.members.ts";
 export {
   AutomationRunawayService,
   type AutomationRunawayDirectories,
-  type RunawayClickHouseResolver,
   type AutomationRunawaySuppression,
   type AutomationNextStepResolution,
   type AutomationNextStepResolver,

@@ -71,6 +71,10 @@ import {
   type GatewayInternalSpendSubmission,
   type GatewayVirtualKeyRecord,
   GatewayBudgetNotFoundError,
+  type GatewayPrincipalDailySpend,
+  type GatewayPrincipalModelSpend,
+  type GatewayPrincipalSpendSummary,
+  type GatewayPrincipalSpendWindow,
 } from "@langwatch/gateway-contract";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -98,6 +102,7 @@ import { settlementGraceMs } from "../eventing/gateway-spend-settlement.intent.t
 import { EventingGatewaySpendAdapter } from "../eventing/gateway-spend.adapter.ts";
 import type { GatewaySpendProcessingEvent } from "../eventing/gateway-spend.intent.ts";
 import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
+import type { GatewayPrincipalSpendRepository } from "../repositories/gateway-principal-spend.repository.ts";
 import type { GatewaySpendEventsRepository } from "../repositories/gateway-spend-events.repository.ts";
 import type { GatewayLicensedKey } from "../repositories/gateway-virtual-key.repository.ts";
 import { PrismaGatewayConnectUpstreamRepository } from "../repositories/prisma/prisma.gateway-connect-upstream.repository.ts";
@@ -366,6 +371,8 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
   changeEvents: GatewayChangeEvents;
   /** The ClickHouse per-key spend source. Absent likewise. */
   virtualKeySpend: GatewayVirtualKeySpend | undefined;
+  /** The ClickHouse principal-scope ledger reader. Absent likewise. */
+  principalSpend: GatewayPrincipalSpendRepository | undefined;
   /** The spend-event ledger reader. Absent likewise. */
   spendEvents: GatewaySpendEventsService | undefined;
   /** Project reads: organization resolution and trace-destination facts. */
@@ -1140,6 +1147,48 @@ export class GatewayApp implements GatewayApi {
       tenantIds,
       ...(virtualKeyId === undefined ? {} : { virtualKeyId }),
     });
+  }
+
+  getPrincipalSpendSummary(input: {
+    projectId: string;
+    userId: string;
+    window: GatewayPrincipalSpendWindow;
+  }): Promise<GatewayPrincipalSpendSummary> {
+    return this.#principalSpendRead().getSummary({
+      tenantId: input.projectId,
+      userId: input.userId,
+      window: input.window,
+    });
+  }
+
+  findPrincipalDailySpend(input: {
+    projectId: string;
+    userId: string;
+    window: GatewayPrincipalSpendWindow;
+  }): Promise<GatewayPrincipalDailySpend[]> {
+    return this.#principalSpendRead().findDailySpend({
+      tenantId: input.projectId,
+      userId: input.userId,
+      window: input.window,
+    });
+  }
+
+  findPrincipalModelSpend(input: {
+    projectId: string;
+    userId: string;
+    window: GatewayPrincipalSpendWindow;
+  }): Promise<GatewayPrincipalModelSpend[]> {
+    return this.#principalSpendRead().findModelSpend({
+      tenantId: input.projectId,
+      userId: input.userId,
+      window: input.window,
+    });
+  }
+
+  #principalSpendRead(): GatewayPrincipalSpendRepository {
+    const principalSpend = this.#coreDependencies?.principalSpend;
+    if (!principalSpend) throw this.spendStoreUnavailable();
+    return principalSpend;
   }
 
   /** The refusal for "the store these figures live in is not reachable". */

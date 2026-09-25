@@ -1,10 +1,14 @@
 import { createApiFixture } from "@langwatch/api-fixture";
+import {
+  GOVERNANCE_ATTR,
+  GOVERNANCE_ORIGIN_KIND_VALUE,
+} from "@langwatch/enterprise-governance-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { InternalProject, ProjectApi } from "@langwatch/project-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { gatewayKey } from "../../__tests__/support/gateway-virtual-key.fixture.ts";
-import type { GovernanceSetupActivityReader } from "../../app/governance.members.ts";
 import {
   GovernanceSetupStateRepository,
   type GovernanceSetupCounts,
@@ -39,6 +43,7 @@ const peers = ({
     findInternal: async () => (tenant ? governanceProject : null),
     countWithTraces: async () => traced,
   }),
+  traces: createApiFixture<TraceApi>({ hasTraceWithAttribute: async () => false }),
 });
 
 class FixedSetupRepository extends GovernanceSetupStateRepository {
@@ -49,10 +54,6 @@ class FixedSetupRepository extends GovernanceSetupStateRepository {
   async counts(): Promise<GovernanceSetupCounts> {
     return this.value;
   }
-}
-
-class RecordingActivity implements GovernanceSetupActivityReader {
-  readonly hasRecentActivity = vi.fn().mockResolvedValue(false);
 }
 
 describe("DefaultGovernanceSetupStateService", () => {
@@ -87,20 +88,21 @@ describe("DefaultGovernanceSetupStateService", () => {
   });
 
   it("probes recent activity only when a governance tenant exists", async () => {
-    const activity = new RecordingActivity();
-    activity.hasRecentActivity.mockResolvedValue(true);
+    const hasTraceWithAttribute = vi.fn().mockResolvedValue(true);
+    const traces = createApiFixture<TraceApi>({ hasTraceWithAttribute });
     const service = DefaultGovernanceSetupStateService.create({
       repository: new FixedSetupRepository(emptyCounts()),
       ...peers({ tenant: true }),
-      activity,
+      traces,
       now: () => 40 * 24 * 60 * 60 * 1_000,
     });
 
     const state = await service.resolve("organization");
 
-    expect(activity.hasRecentActivity).toHaveBeenCalledWith({
-      tenantId: "governance-project",
+    expect(hasTraceWithAttribute).toHaveBeenCalledWith({
+      projectId: "governance-project",
       sinceMs: 10 * 24 * 60 * 60 * 1_000,
+      attribute: { key: GOVERNANCE_ATTR.ORIGIN_KIND, value: GOVERNANCE_ORIGIN_KIND_VALUE },
     });
     expect(state.hasRecentActivity).toBe(true);
     expect(state.governanceActive).toBe(true);

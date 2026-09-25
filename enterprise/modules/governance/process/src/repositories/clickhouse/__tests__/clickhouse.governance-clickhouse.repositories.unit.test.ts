@@ -16,6 +16,7 @@
  */
 import type { QueryRequest, QueryResult } from "@langwatch/clickhouse-client";
 import { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { ClickHouseGovernanceRepositories } from "../clickhouse.governance-clickhouse.repositories.ts";
@@ -46,18 +47,23 @@ function memberOver(rows: unknown[]) {
   return { calls, clickhouse };
 }
 
+const spendTotalsInput = {
+  tenantId: "org_test",
+  windowStart: Temporal.Instant.fromEpochMilliseconds(2_000),
+  windowEnd: Temporal.Instant.fromEpochMilliseconds(3_000),
+  baselineStart: Temporal.Instant.fromEpochMilliseconds(1_000),
+  sourceFilter: { type: "all" as const },
+};
+
 describe("ClickHouseGovernanceRepositories.create", () => {
   describe("given the real clickhouse process member, a ClickHouseQueryClient instance", () => {
     it("constructs every repository and performs a scoped read through it", async () => {
-      const { calls, clickhouse } = memberOver([{ hit: 1 }]);
+      const { calls, clickhouse } = memberOver([{ currentSpend: "2", baselineSpend: "1" }]);
 
       const repositories = ClickHouseGovernanceRepositories.create({ clickhouse });
-      const hasActivity = await repositories.traceActivity.hasRecentActivity({
-        tenantId: "org_test",
-        sinceMs: 0,
-      });
+      const totals = await repositories.anomalySpend.findSpendTotals(spendTotalsInput);
 
-      expect(hasActivity).toBe(true);
+      expect(totals).toEqual({ currentSpend: 2, baselineSpend: 1 });
       expect(calls).toHaveLength(1);
       const request = calls[0];
       // Per-tenant scoping is the point: the member call itself names the
@@ -67,16 +73,13 @@ describe("ClickHouseGovernanceRepositories.create", () => {
       expect(request?.sql).toContain("TenantId = {tenantId:String}");
     });
 
-    it("reads an empty result as no recent activity", async () => {
+    it("reads an empty result as zero spend", async () => {
       const { clickhouse } = memberOver([]);
 
       const repositories = ClickHouseGovernanceRepositories.create({ clickhouse });
-      const hasActivity = await repositories.traceActivity.hasRecentActivity({
-        tenantId: "org_test",
-        sinceMs: 0,
-      });
+      const totals = await repositories.anomalySpend.findSpendTotals(spendTotalsInput);
 
-      expect(hasActivity).toBe(false);
+      expect(totals).toEqual({ currentSpend: 0, baselineSpend: 0 });
     });
   });
 });

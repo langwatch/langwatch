@@ -6,9 +6,6 @@ import type {
   GovernanceKpiContributionWriter,
   GovernanceOcsfEventsReader,
   GovernanceOcsfEventWriter,
-  GovernanceSetupActivityReader,
-  PersonalUsageReader,
-  QuarantineTraceActivityReader,
 } from "../app/governance.members.ts";
 import type { AiToolCatalogRepository } from "./ai-tool-catalog.repository.ts";
 import type { AnomalyRuleRepository } from "./anomaly-rule.repository.ts";
@@ -71,22 +68,11 @@ export interface GovernanceRepositories {
   readonly spendSpikeAnomalies: SpendSpikeAnomalyRepository;
   readonly supportContacts: OrganizationSupportContactRepository;
   readonly tenantHistory: GovernanceTenantHistoryRepository;
-  readonly traceActivity: GovernanceClickHouseRepositories["traceActivity"];
-  readonly personalUsage: GovernanceClickHouseRepositories["personalUsage"];
 }
 
 /**
- * The ClickHouse-backed rows the governance module owns, chosen once at
- * boot — a second tier alongside {@link GovernanceRepositories} because the
- * two live behind different process members (`prisma` vs `clickhouse`) and
- * different registries, not because the rows differ in kind. One class can
- * (and does) answer more than one of the app's declared reader/writer
- * interfaces — `anomalySpend` is both an `AnomalySpendReader` and a
- * `GovernanceKpiContributionWriter`, `ocsfEvents` both a
- * `GovernanceOcsfEventsReader` and a `GovernanceOcsfEventWriter`, and
- * `traceActivity` both a `GovernanceSetupActivityReader` and a
- * `QuarantineTraceActivityReader` — the app hands the same instance to
- * whichever `GovernanceInfrastructure` member asks for it.
+ * The ClickHouse-backed rows the governance module owns: a second tier beside
+ * {@link GovernanceRepositories} because it lives behind the `clickhouse` member.
  */
 export interface GovernanceClickHouseRepositories {
   readonly anomalySpend: AnomalySpendReader & GovernanceKpiContributionWriter;
@@ -94,8 +80,6 @@ export interface GovernanceClickHouseRepositories {
     GovernanceOcsfEventWriter &
     OcsfEventBatchWriter &
     OcsfSeatReportReader;
-  readonly traceActivity: GovernanceSetupActivityReader & QuarantineTraceActivityReader;
-  readonly personalUsage: PersonalUsageReader;
 }
 
 /**

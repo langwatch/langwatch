@@ -396,7 +396,16 @@ export interface GovernanceAppDependencies {
   /** The release flag that decides whether an organization's pulled usage carries a cost. */
   featureFlags: Pick<FeatureFlagApi, "isEnabled">;
   /** Where a pulled Genie/Copilot conversation lands as a trace: the OTLP door main routed through. */
-  traces: Pick<TraceApi, "otlpTraces">;
+  traces: Pick<
+    TraceApi,
+    | "otlpTraces"
+    | "getSpendSummary"
+    | "findTopModelsByRequests"
+    | "findDailySpend"
+    | "findModelSpend"
+    | "hasTraceWithAttribute"
+    | "findTraceCountsByAttribute"
+  >;
   apiKeys: Pick<
     ApiKeyApi,
     | "revokeCliSessionKey"
@@ -416,6 +425,9 @@ export interface GovernanceAppDependencies {
     | "budgetOverviewForUser"
     | "findSpendDaysForOrganizationProjects"
     | "checkBudget"
+    | "getPrincipalSpendSummary"
+    | "findPrincipalDailySpend"
+    | "findPrincipalModelSpend"
   >;
   modelProviders: Pick<
     ModelProviderApi,

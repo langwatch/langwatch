@@ -1,13 +1,14 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
+  GOVERNANCE_ATTR,
+  GOVERNANCE_ORIGIN_KIND_VALUE,
   QUARANTINE_DEFAULT_THRESHOLD,
   QUARANTINE_DEFAULT_WINDOW_SECONDS,
 } from "@langwatch/enterprise-governance-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type {
-  QuarantineTenantResolver,
-  QuarantineTraceActivityReader,
-} from "../../app/governance.members.ts";
+import type { QuarantineTenantResolver } from "../../app/governance.members.ts";
 import { QuarantineFillEvaluatorService } from "../quarantine-fill.service.ts";
 
 const ORGANIZATION_ID = "org-qfe-unit";
@@ -18,25 +19,25 @@ class FixedTenantResolver implements QuarantineTenantResolver {
   }
 }
 
-class StubTraceActivityReader implements QuarantineTraceActivityReader {
-  constructor(private readonly rows: { sourceId: string; spanCount: number }[]) {}
-
-  async findSpanCountsBySource() {
-    return this.rows;
-  }
+function tracesCounting(rows: { sourceId: string; spanCount: number }[]) {
+  return createApiFixture<TraceApi>({
+    findTraceCountsByAttribute: vi.fn(async () =>
+      rows.map(({ sourceId, spanCount }) => ({ value: sourceId, count: spanCount })),
+    ),
+  });
 }
 
-const evaluator = (traceActivity?: QuarantineTraceActivityReader): QuarantineFillEvaluatorService =>
+const evaluator = (traces: Pick<TraceApi, "findTraceCountsByAttribute">) =>
   QuarantineFillEvaluatorService.create({
     tenant: new FixedTenantResolver(),
-    traceActivity,
+    traces,
     now: () => 120_000,
   });
 
 describe("QuarantineFillEvaluatorService", () => {
   it("returns zero rate for a quiescent organization", async () => {
     await expect(
-      evaluator(new StubTraceActivityReader([])).evaluate({
+      evaluator(tracesCounting([])).evaluate({
         organizationId: ORGANIZATION_ID,
       }),
     ).resolves.toEqual({
@@ -52,7 +53,7 @@ describe("QuarantineFillEvaluatorService", () => {
   /** @scenario "Governance evaluates quarantine fill without owning trace storage" */
   it("computes spans per minute and the default threshold", async () => {
     const stats = await evaluator(
-      new StubTraceActivityReader([
+      tracesCounting([
         { sourceId: "source-a", spanCount: 60 },
         { sourceId: "source-b", spanCount: 40 },
       ]),
@@ -64,13 +65,13 @@ describe("QuarantineFillEvaluatorService", () => {
   });
 
   it("normalises non-default windows and respects threshold overrides", async () => {
-    const stats = await evaluator(
-      new StubTraceActivityReader([{ sourceId: "source", spanCount: 30 }]),
-    ).evaluate({
-      organizationId: ORGANIZATION_ID,
-      windowSeconds: 30,
-      threshold: 50,
-    });
+    const stats = await evaluator(tracesCounting([{ sourceId: "source", spanCount: 30 }])).evaluate(
+      {
+        organizationId: ORGANIZATION_ID,
+        windowSeconds: 30,
+        threshold: 50,
+      },
+    );
 
     expect(stats.rate).toBe(60);
     expect(stats.exceeded).toBe(true);
@@ -79,7 +80,7 @@ describe("QuarantineFillEvaluatorService", () => {
   /** @scenario "Governance evaluates quarantine fill without owning trace storage" */
   it("drops unattributed rows from both the breakdown and total", async () => {
     const stats = await evaluator(
-      new StubTraceActivityReader([
+      tracesCounting([
         { sourceId: "source", spanCount: 40 },
         { sourceId: "", spanCount: 10 },
       ]),
@@ -90,12 +91,11 @@ describe("QuarantineFillEvaluatorService", () => {
   });
 
   it("fail-safes to zero stats when ClickHouse rejects the query", async () => {
-    const traceActivity = new StubTraceActivityReader([]);
-    vi.spyOn(traceActivity, "findSpanCountsBySource").mockRejectedValue(
-      new Error("clickhouse unavailable"),
-    );
+    const traces = createApiFixture<TraceApi>({
+      findTraceCountsByAttribute: vi.fn().mockRejectedValue(new Error("clickhouse unavailable")),
+    });
 
-    const stats = await evaluator(traceActivity).evaluate({
+    const stats = await evaluator(traces).evaluate({
       organizationId: ORGANIZATION_ID,
     });
 
@@ -103,9 +103,18 @@ describe("QuarantineFillEvaluatorService", () => {
   });
 
   /** @scenario "Governance evaluates quarantine fill without owning trace storage" */
-  it("rejects composition without a ClickHouse capability", async () => {
-    await expect(evaluator().evaluate({ organizationId: ORGANIZATION_ID })).rejects.toThrow(
-      "ClickHouse client is not available",
-    );
+  it("asks the trace owner for governance-origin rows grouped by ingestion source", async () => {
+    const findTraceCountsByAttribute = vi.fn(async () => []);
+
+    await evaluator(createApiFixture<TraceApi>({ findTraceCountsByAttribute })).evaluate({
+      organizationId: ORGANIZATION_ID,
+    });
+
+    expect(findTraceCountsByAttribute).toHaveBeenCalledWith({
+      projectId: "governance-project-qfe-unit",
+      sinceMs: 120_000 - QUARANTINE_DEFAULT_WINDOW_SECONDS * 1_000,
+      attribute: { key: GOVERNANCE_ATTR.ORIGIN_KIND, value: GOVERNANCE_ORIGIN_KIND_VALUE },
+      groupByKey: GOVERNANCE_ATTR.INGESTION_SOURCE_ID,
+    });
   });
 });

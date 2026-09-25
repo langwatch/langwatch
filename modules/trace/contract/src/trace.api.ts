@@ -36,7 +36,14 @@ import type { LangWatchQLTraceFilter } from "./trace-langwatch-ql-filter.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
 import type { DiscoverResult, FacetValuesResult } from "./trace-list-view.ts";
 import type { LogTraceContribution } from "./trace-log-contribution.ts";
-import type { TraceModelSpend, TraceModelSpendWindow } from "./trace-model-spend.ts";
+import type {
+  TraceAttributeMatch,
+  TraceDailySpend,
+  TraceModelRequests,
+  TraceModelSpend,
+  TraceModelSpendWindow,
+  TraceSpendSummary,
+} from "./trace-model-spend.ts";
 import type {
   AssignTopicCommandData,
   RecordMetricCorrelationCommandData,
@@ -380,6 +387,22 @@ export interface TraceApi extends TraceOtlpIngestApi {
     window: TraceModelSpendWindow;
     limit: number;
   }): Promise<TraceModelSpend[]>;
+  /** The project's deduped spend and token totals in the window. */
+  getSpendSummary(input: {
+    projectId: string;
+    window: TraceModelSpendWindow;
+  }): Promise<TraceSpendSummary>;
+  /** The project's most-used models by trace count in the window, most first, at most `limit`. */
+  findTopModelsByRequests(input: {
+    projectId: string;
+    window: TraceModelSpendWindow;
+    limit: number;
+  }): Promise<TraceModelRequests[]>;
+  /** The project's spend per UTC day in the window, oldest first. */
+  findDailySpend(input: {
+    projectId: string;
+    window: TraceModelSpendWindow;
+  }): Promise<TraceDailySpend[]>;
   readRecentSpansByModels(input: {
     projectId: string;
     models: string[];
@@ -649,6 +672,21 @@ export interface TraceApi extends TraceOtlpIngestApi {
     organizationId: string;
     projectIds: string[];
   }): Promise<{ projectId: string; count: number }[]>;
+  /** The project's distinct traces over the last 24 hours. */
+  countTracesInLastDay(input: { projectId: string }): Promise<number>;
+  /** Whether any trace carrying `attribute` landed for the project at or after `sinceMs`. */
+  hasTraceWithAttribute(input: {
+    projectId: string;
+    sinceMs: number;
+    attribute: TraceAttributeMatch;
+  }): Promise<boolean>;
+  /** Rows carrying `attribute` since `sinceMs`, counted per `groupByKey` value, most first. */
+  findTraceCountsByAttribute(input: {
+    projectId: string;
+    sinceMs: number;
+    attribute: TraceAttributeMatch;
+    groupByKey: string;
+  }): Promise<{ value: string; count: number }[]>;
 }
 
 /** `preconditions` is evaluator's to parse; this contract cannot name its schema. */

@@ -11,9 +11,6 @@ import type {
   GovernanceIngestionSource,
   GovernanceOcsfExportRow,
   IngestionSourceHealthRow,
-  PersonalUsageBreakdown,
-  PersonalUsageBucket,
-  PersonalUsageWindow,
   PersonalVirtualKey,
   PulledUsageObservedEventData,
   RecentAnomalyRow,
@@ -244,10 +241,6 @@ export interface GovernanceOcsfEventsReader {
     sinceEventId: string;
     limit: number;
   }): Promise<GovernanceOcsfExportRow[]>;
-}
-
-export interface GovernanceSetupActivityReader {
-  hasRecentActivity(input: { tenantId: string; sinceMs: number }): Promise<boolean>;
 }
 
 export interface GovernanceDiagnosticsSink {
@@ -746,69 +739,6 @@ export interface PersonalVirtualKeyIssuer {
   }): Promise<PersonalVirtualKey>;
 }
 
-export type PersonalUsageSummaryRow = {
-  totalCost: number;
-  billedCost: number;
-  requestCount: number;
-  promptTokens: number;
-  completionTokens: number;
-};
-
-export type PersonalUsageTopModelRow = {
-  model: string;
-  requests: number;
-};
-
-export type IngestionPrincipalSummaryRow = {
-  totalCost: number;
-  requestCount: number;
-  promptTokens: number;
-  completionTokens: number;
-  topModel: { name: string; requests: number } | null;
-};
-
-export interface PersonalUsageReader {
-  findSummary(input: {
-    tenantId: string;
-    window: PersonalUsageWindow;
-  }): Promise<PersonalUsageSummaryRow>;
-
-  findTopModels(input: {
-    tenantId: string;
-    window: PersonalUsageWindow;
-    limit: number;
-  }): Promise<PersonalUsageTopModelRow[]>;
-
-  findDailyBuckets(input: {
-    tenantId: string;
-    window: PersonalUsageWindow;
-  }): Promise<PersonalUsageBucket[]>;
-
-  findModelBreakdown(input: {
-    tenantId: string;
-    window: PersonalUsageWindow;
-    limit: number;
-  }): Promise<PersonalUsageBreakdown[]>;
-
-  getIngestionPrincipalSummary(input: {
-    tenantId: string;
-    userId: string;
-    window: PersonalUsageWindow;
-  }): Promise<IngestionPrincipalSummaryRow>;
-
-  findIngestionPrincipalBuckets(input: {
-    tenantId: string;
-    userId: string;
-    window: PersonalUsageWindow;
-  }): Promise<PersonalUsageBucket[]>;
-
-  findIngestionPrincipalBreakdown(input: {
-    tenantId: string;
-    userId: string;
-    window: PersonalUsageWindow;
-  }): Promise<PersonalUsageBreakdown[]>;
-}
-
 export type PulledUsageLedgerRow = {
   tenantId: string;
   scopeId: string;
@@ -883,13 +813,6 @@ export interface PulledUsageRateReader {
 
 export interface QuarantineTenantResolver {
   resolveTenantId(organizationId: string): Promise<string>;
-}
-
-export interface QuarantineTraceActivityReader {
-  findSpanCountsBySource(input: {
-    tenantId: string;
-    sinceMs: number;
-  }): Promise<{ sourceId: string; spanCount: number }[]>;
 }
 
 export type AnomalySpendSourceFilter =

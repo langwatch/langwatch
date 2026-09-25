@@ -23,7 +23,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { GovernanceEncryptor } from "../../app/governance.members.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
-import { MemoryPersonalUsageRepository } from "../../repositories/memory/memory.personal-usage.repository.ts";
 import { GovernanceApp } from "../governance.app.ts";
 
 const ORGANIZATION_ID = "org-1";
@@ -48,11 +47,17 @@ const noGatewayAccess: GatewayBudgetOverviewForUser = {
 };
 
 async function buildApp(options: { workspace: PersonalWorkspace | null }) {
-  const personalUsage = MemoryPersonalUsageRepository.create();
+  const traceSpend = vi.fn(async (_input: { projectId: string }) => ({
+    totalCost: 0,
+    billedCost: 0,
+    requestCount: 0,
+    promptTokens: 0,
+    completionTokens: 0,
+  }));
   const budgetOverviewForUser = vi.fn(async () => noGatewayAccess);
   const app = await GovernanceApp.create({
     config: void 0,
-    repositories: { ...MemoryGovernanceRepositories.create(), personalUsage },
+    repositories: MemoryGovernanceRepositories.create(),
     dependencies: {
       agents: createApiFixture<AgentApi>(),
       projects: createApiFixture<ProjectApi>({ findInternal: async () => null }),
@@ -67,7 +72,12 @@ async function buildApp(options: { workspace: PersonalWorkspace | null }) {
       permissions: createApiFixture<AuthzApi>(),
       scim: createApiFixture<ScimApi>(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
-      traces: createApiFixture<TraceApi>(),
+      traces: createApiFixture<TraceApi>({
+        getSpendSummary: traceSpend,
+        findTopModelsByRequests: async () => [{ model: "claude-opus", requests: 1 }],
+        findDailySpend: async () => [],
+        findModelSpend: async () => [],
+      }),
       apiKeys: createApiFixture<ApiKeyApi>(),
       gateway: createApiFixture<GatewayApi>({ budgetOverviewForUser }),
       modelProviders: createApiFixture<ModelProviderApi>(),
@@ -79,7 +89,7 @@ async function buildApp(options: { workspace: PersonalWorkspace | null }) {
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
 
-  return { app, personalUsage, budgetOverviewForUser };
+  return { app, traceSpend, budgetOverviewForUser };
 }
 
 describe("GovernanceApp personal surface", () => {
@@ -97,16 +107,14 @@ describe("GovernanceApp personal surface", () => {
 
   describe("given a member whose personal tenant carries traffic", () => {
     it("reads the usage dashboard from their personal tenant", async () => {
-      const { app, personalUsage } = await buildApp({ workspace });
-      personalUsage.recordTraceUsage({
-        tenantId: workspace.project.id,
-        occurredAtMs: NOW,
-        totalCost: 2.5,
-        nonBilledCost: 0,
-        promptTokens: 100,
-        completionTokens: 50,
-        models: ["claude-opus"],
-      });
+      const { app, traceSpend } = await buildApp({ workspace });
+      traceSpend.mockImplementation(async ({ projectId }) => ({
+        totalCost: projectId === workspace.project.id ? 2.5 : 0,
+        billedCost: projectId === workspace.project.id ? 2.5 : 0,
+        requestCount: projectId === workspace.project.id ? 1 : 0,
+        promptTokens: projectId === workspace.project.id ? 100 : 0,
+        completionTokens: projectId === workspace.project.id ? 50 : 0,
+      }));
 
       const rollup = await app.personalUsageDashboard({ organizationId: ORGANIZATION_ID }, CALLER);
 

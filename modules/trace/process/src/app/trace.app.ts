@@ -108,8 +108,12 @@ import {
   type LangWatchQLTraceFilter,
   type ResolvedInstantEvalRun,
   type TraceDateField,
+  type TraceAttributeMatch,
+  type TraceDailySpend,
+  type TraceModelRequests,
   type TraceModelSpend,
   type TraceModelSpendWindow,
+  type TraceSpendSummary,
   type TraceUsageCount,
   type EvaluationTraceEvent,
   type EvaluationTraceSpan,
@@ -151,6 +155,7 @@ import { ClickHouseTraceQueryRepository } from "../repositories/clickhouse/click
 import { RedisTraceSpanDedupRepository } from "../repositories/redis/redis.trace-span-dedup.repository.ts";
 import type { TraceExistenceRepository } from "../repositories/trace-existence.repository.ts";
 import type { TraceModelSpendRepository } from "../repositories/trace-model-spend.repository.ts";
+import type { TraceUsageCountRepository } from "../repositories/trace-usage-count.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import {
   createFacetFilterResolver,
@@ -693,6 +698,7 @@ export class TraceApp implements TraceApi, CollectorApp {
       usageCount: input.repositories.usageCount,
     });
     app.#modelSpend = input.repositories.modelSpend;
+    app.#usageCount = input.repositories.usageCount;
     app.#preconditionSamples = TracePreconditionSampleService.create({
       traces: app,
       evaluators: input.dependencies.evaluators,
@@ -717,6 +723,7 @@ export class TraceApp implements TraceApi, CollectorApp {
   #processingCommands: TraceProcessingCommandsService | null = null;
   #usageCounts: TraceUsageCountService | null = null;
   #modelSpend: TraceModelSpendRepository | null = null;
+  #usageCount: TraceUsageCountRepository | null = null;
   #preconditionSamples: TracePreconditionSampleService | null = null;
 
   readPreconditionSampleTraces(
@@ -1862,6 +1869,82 @@ export class TraceApp implements TraceApi, CollectorApp {
       window: input.window,
       limit: input.limit,
     });
+  }
+
+  getSpendSummary(input: {
+    projectId: string;
+    window: TraceModelSpendWindow;
+  }): Promise<TraceSpendSummary> {
+    return this.#modelSpendRead().getSpendSummary({
+      tenantId: input.projectId,
+      window: input.window,
+    });
+  }
+
+  findTopModelsByRequests(input: {
+    projectId: string;
+    window: TraceModelSpendWindow;
+    limit: number;
+  }): Promise<TraceModelRequests[]> {
+    return this.#modelSpendRead().findTopModelsByRequests({
+      tenantId: input.projectId,
+      window: input.window,
+      limit: input.limit,
+    });
+  }
+
+  findDailySpend(input: {
+    projectId: string;
+    window: TraceModelSpendWindow;
+  }): Promise<TraceDailySpend[]> {
+    return this.#modelSpendRead().findDailySpend({
+      tenantId: input.projectId,
+      window: input.window,
+    });
+  }
+
+  countTracesInLastDay(input: { projectId: string }): Promise<number> {
+    return this.#usageCountRead().countTracesInLastDay({ tenantId: input.projectId });
+  }
+
+  hasTraceWithAttribute(input: {
+    projectId: string;
+    sinceMs: number;
+    attribute: TraceAttributeMatch;
+  }): Promise<boolean> {
+    return this.#usageCountRead().hasTraceWithAttribute({
+      tenantId: input.projectId,
+      sinceMs: input.sinceMs,
+      attribute: input.attribute,
+    });
+  }
+
+  findTraceCountsByAttribute(input: {
+    projectId: string;
+    sinceMs: number;
+    attribute: TraceAttributeMatch;
+    groupByKey: string;
+  }): Promise<{ value: string; count: number }[]> {
+    return this.#usageCountRead().findTraceCountsByAttribute({
+      tenantId: input.projectId,
+      sinceMs: input.sinceMs,
+      attribute: input.attribute,
+      groupByKey: input.groupByKey,
+    });
+  }
+
+  #modelSpendRead(): TraceModelSpendRepository {
+    if (!this.#modelSpend) {
+      throw new TraceCapabilityUnavailableError("this process", "the trace spend read");
+    }
+    return this.#modelSpend;
+  }
+
+  #usageCountRead(): TraceUsageCountRepository {
+    if (!this.#usageCount) {
+      throw new TraceCapabilityUnavailableError("this process", "the trace count read");
+    }
+    return this.#usageCount;
   }
 
   readRecentSpansByModels(input: {

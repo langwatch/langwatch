@@ -8,11 +8,11 @@ import type {
   GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
-import type { TraceApi } from "@langwatch/trace-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationApi, OrganizationService } from "@langwatch/organization-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
 
 import type {
   AiToolProviderCatalog,

@@ -6,38 +6,54 @@ import {
   type PersonalUsageWindow,
   personalUsageQueryInputSchema,
 } from "@langwatch/enterprise-governance-contract";
+import type { GatewayApi, GatewayPrincipalSpendSummary } from "@langwatch/gateway-contract";
 import { Temporal } from "@langwatch/time";
-
-import type {
-  IngestionPrincipalSummaryRow,
-  PersonalUsageReader,
-} from "../app/governance.members.ts";
+import type { TraceApi } from "@langwatch/trace-contract";
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
 
 export class DefaultGovernancePersonalUsageService {
   private constructor(
-    private readonly reader: PersonalUsageReader | undefined,
+    private readonly traces: Pick<
+      TraceApi,
+      "getSpendSummary" | "findTopModelsByRequests" | "findDailySpend" | "findModelSpend"
+    >,
+    private readonly ledger: Pick<
+      GatewayApi,
+      "getPrincipalSpendSummary" | "findPrincipalDailySpend" | "findPrincipalModelSpend"
+    >,
     private readonly clock: () => number,
   ) {}
 
   static create(options: {
-    reader?: PersonalUsageReader;
+    traces: Pick<
+      TraceApi,
+      "getSpendSummary" | "findTopModelsByRequests" | "findDailySpend" | "findModelSpend"
+    >;
+    ledger: Pick<
+      GatewayApi,
+      "getPrincipalSpendSummary" | "findPrincipalDailySpend" | "findPrincipalModelSpend"
+    >;
     clock?: () => number;
   }): DefaultGovernancePersonalUsageService {
-    return new DefaultGovernancePersonalUsageService(options.reader, options.clock ?? Date.now);
+    return new DefaultGovernancePersonalUsageService(
+      options.traces,
+      options.ledger,
+      options.clock ?? Date.now,
+    );
   }
 
   async summary(input: PersonalUsageQueryInput): Promise<PersonalUsageSummary> {
     const parsed = personalUsageQueryInputSchema.parse(input);
     const window = parsed.window ?? this.currentMonthWindow();
-    if (!this.reader) {
-      return this.emptySummary();
-    }
 
     const [summary, [topModel]] = await Promise.all([
-      this.reader.findSummary({ tenantId: parsed.personalProjectId, window }),
-      this.reader.findTopModels({ tenantId: parsed.personalProjectId, window, limit: 1 }),
+      this.traces.getSpendSummary({ projectId: parsed.personalProjectId, window }),
+      this.traces.findTopModelsByRequests({
+        projectId: parsed.personalProjectId,
+        window,
+        limit: 1,
+      }),
     ]);
     const ingestion =
       parsed.userId && parsed.ingestionTenantId
@@ -76,12 +92,9 @@ export class DefaultGovernancePersonalUsageService {
   async dailyBuckets(input: PersonalUsageQueryInput): Promise<PersonalUsageBucket[]> {
     const parsed = personalUsageQueryInputSchema.parse(input);
     const window = parsed.window ?? this.lastFourteenDaysWindow();
-    if (!this.reader) {
-      return this.fillEmptyBuckets(window);
-    }
 
-    const rows = await this.reader.findDailyBuckets({
-      tenantId: parsed.personalProjectId,
+    const rows = await this.traces.findDailySpend({
+      projectId: parsed.personalProjectId,
       window,
     });
     const byDay = new Map(rows.map((row) => [row.day, { ...row }]));
@@ -115,12 +128,9 @@ export class DefaultGovernancePersonalUsageService {
   ): Promise<PersonalUsageBreakdown[]> {
     const parsed = personalUsageQueryInputSchema.parse(input);
     const window = parsed.window ?? this.currentMonthWindow();
-    if (!this.reader) {
-      return [];
-    }
 
-    const rows = await this.reader.findModelBreakdown({
-      tenantId: parsed.personalProjectId,
+    const rows = await this.traces.findModelSpend({
+      projectId: parsed.personalProjectId,
       window,
       limit,
     });
@@ -154,9 +164,13 @@ export class DefaultGovernancePersonalUsageService {
     tenantId: string;
     userId: string;
     window: PersonalUsageWindow;
-  }): Promise<IngestionPrincipalSummaryRow | null> {
+  }): Promise<GatewayPrincipalSpendSummary | null> {
     try {
-      return (await this.reader?.getIngestionPrincipalSummary(input)) ?? null;
+      return await this.ledger.getPrincipalSpendSummary({
+        projectId: input.tenantId,
+        userId: input.userId,
+        window: input.window,
+      });
     } catch {
       return null;
     }
@@ -168,7 +182,11 @@ export class DefaultGovernancePersonalUsageService {
     window: PersonalUsageWindow;
   }): Promise<PersonalUsageBucket[]> {
     try {
-      return (await this.reader?.findIngestionPrincipalBuckets(input)) ?? [];
+      return await this.ledger.findPrincipalDailySpend({
+        projectId: input.tenantId,
+        userId: input.userId,
+        window: input.window,
+      });
     } catch {
       return [];
     }
@@ -180,7 +198,11 @@ export class DefaultGovernancePersonalUsageService {
     window: PersonalUsageWindow;
   }): Promise<PersonalUsageBreakdown[]> {
     try {
-      return (await this.reader?.findIngestionPrincipalBreakdown(input)) ?? [];
+      return await this.ledger.findPrincipalModelSpend({
+        projectId: input.tenantId,
+        userId: input.userId,
+        window: input.window,
+      });
     } catch {
       return [];
     }
@@ -222,16 +244,5 @@ export class DefaultGovernancePersonalUsageService {
     }
 
     return buckets;
-  }
-
-  private emptySummary(): PersonalUsageSummary {
-    return {
-      spentUsd: 0,
-      billedUsd: 0,
-      requests: 0,
-      promptTokens: 0,
-      completionTokens: 0,
-      mostUsedModel: null,
-    };
   }
 }

@@ -7,6 +7,7 @@ import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi, ProjectIdentity } from "@langwatch/project-contract";
 
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
+import { ClickHouseGatewayPrincipalSpendRepository } from "../repositories/clickhouse/clickhouse.gateway-principal-spend.repository.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
 import { GatewayVirtualKeySpendRepository } from "../repositories/clickhouse/clickhouse.gateway-virtual-key-spend.repository.ts";
 import { PrismaGatewayAuditRepository } from "../repositories/prisma/prisma.gateway-audit.repository.ts";
@@ -211,6 +212,7 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
 
   const budgetSpend = GatewayBudgetClickHouseRepository.create(resolveClickHouse);
   const virtualKeySpend = GatewayVirtualKeySpendRepository.create(resolveClickHouse);
+  const principalSpend = ClickHouseGatewayPrincipalSpendRepository.create(resolveClickHouse);
   const spendLedger = ClickHouseGatewaySpendEventsRepository.create(resolveClickHouse);
   const spendEvents = GatewaySpendEventsService.create(spendLedger);
 
@@ -248,6 +250,7 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
     budgetSpend,
     changeEvents: changes,
     virtualKeySpend,
+    principalSpend,
     spendEvents,
     projects,
     usage,
