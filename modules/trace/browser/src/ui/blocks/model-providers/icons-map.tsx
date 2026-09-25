@@ -24,6 +24,7 @@ export const modelProviderIcons: Record<keyof typeof modelProviders, React.React
   azure: <Azure />,
   anthropic: <Anthropic />,
   elevenlabs: <ElevenLabs />,
+  twilio: <Custom />,
   groq: <Groq />,
   vertex_ai: <GoogleCloud />,
   gemini: <Gemini />,

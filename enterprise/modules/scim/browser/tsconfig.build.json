@@ -33,6 +33,9 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/error-views/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/organization/contract/tsconfig.build.json"
     },
     {

@@ -1,16 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** What the directory did on one connection, newest first, read only while open (ADR-126). */
-import {
-  Alert,
-  Badge,
-  Box,
-  Button,
-  Collapsible,
-  HStack,
-  Skeleton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, Collapsible, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { ChevronRight } from "lucide-react";
 
 import { scimApi, type DirectoryActivityRow } from "../../behavior/scim-api.ts";
@@ -74,12 +65,11 @@ function DirectoryActivityFeed(scope: ConnectionScope) {
       )}
       {activity.isError && (
         <VStack align="stretch" gap={2}>
-          <Alert.Root status="warning" role="alert">
-            <Alert.Indicator />
-            <Alert.Content>
-              <Alert.Title>We couldn't load recent directory activity</Alert.Title>
-            </Alert.Content>
-          </Alert.Root>
+          <HandledErrorAlert
+            error={activity.error}
+            fallbackTitle="We couldn't load recent directory activity"
+            onRetry={() => void activity.refetch()}
+          />
           <Button
             alignSelf="start"
             size="xs"

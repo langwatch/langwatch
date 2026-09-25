@@ -41,6 +41,8 @@ const KNOWN_UNPRICED: Record<string, string> = {
     "Music generation billed per 30-second clip at $0.04. Both upstream sources report zero per token and the catalog has no per-clip unit.",
   "gemini/lyria-3-pro-preview":
     "Music generation billed per song at $0.08, same missing per-clip unit.",
+  "stealth/space-bunny-alpha":
+    "Anonymous preview model offered free of charge upstream, so zero per token is its real rate.",
 };
 
 const isPricedElsewhere = (modelId: string) =>

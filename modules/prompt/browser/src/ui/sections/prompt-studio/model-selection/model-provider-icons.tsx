@@ -272,6 +272,7 @@ export const modelProviderIcons: Record<keyof typeof modelProviders, ReactNode> 
   azure: <AzureIcon />,
   anthropic: <AnthropicIcon />,
   elevenlabs: <ElevenLabsIcon />,
+  twilio: <CustomIcon />,
   groq: <GroqIcon />,
   vertex_ai: <GoogleCloudIcon />,
   gemini: <GeminiIcon />,
@@ -297,6 +298,7 @@ export const MONOCHROME_PROVIDER_ICONS = new Set<keyof typeof modelProviders>([
   "anthropic",
   "voyage",
   "custom",
+  "twilio",
 ]);
 
 /** Wraps a provider mark so it stays legible in dark mode. */

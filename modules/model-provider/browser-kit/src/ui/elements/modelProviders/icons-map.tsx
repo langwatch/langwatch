@@ -15,6 +15,7 @@ import { Gemini } from "../icons/gemini.tsx";
 import { GoogleCloud } from "../icons/google-cloud.tsx";
 import { Groq } from "../icons/groq.tsx";
 import { OpenAI } from "../icons/open-ai.tsx";
+import { Twilio } from "../icons/twilio.tsx";
 import { Voyage } from "../icons/voyage.tsx";
 import { Xai } from "../icons/xai.tsx";
 
@@ -24,6 +25,7 @@ export const modelProviderIcons: Record<keyof typeof modelProviders, React.React
   azure: <Azure />,
   anthropic: <Anthropic />,
   elevenlabs: <ElevenLabs />,
+  twilio: <Twilio />,
   groq: <Groq />,
   vertex_ai: <GoogleCloud />,
   gemini: <Gemini />,
@@ -49,6 +51,7 @@ export const MONOCHROME_PROVIDER_ICONS = new Set<keyof typeof modelProviders>([
   "anthropic",
   "voyage",
   "custom",
+  "twilio",
 ]);
 
 /**

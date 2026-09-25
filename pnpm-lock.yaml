@@ -3057,6 +3057,9 @@ importers:
       '@langwatch/enterprise-scim-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/error-views':
+        specifier: workspace:*
+        version: link:../../../../packages/error-views
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../../../modules/organization/contract
@@ -9252,6 +9255,9 @@ importers:
 
   modules/model-provider/contract:
     dependencies:
+      '@langwatch/agent-contract':
+        specifier: workspace:*
+        version: link:../../agent/contract
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api

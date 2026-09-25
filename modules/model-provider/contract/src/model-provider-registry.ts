@@ -1,3 +1,4 @@
+import { E164_PHONE_PATTERN } from "@langwatch/agent-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -248,6 +249,24 @@ export const modelProviders = {
     optionalKeys: ["ELEVENLABS_WEBHOOK_SECRET", "ELEVENLABS_BASE_URL"],
     enabledSince: Temporal.Instant.from("2026-07-25T00:00:00Z"),
     blurb: "Voice models for lifelike text to speech and accurate transcription.",
+  },
+  twilio: {
+    name: "Twilio",
+    // A credential container with no chat models: `safety` keeps it out of selectors and dispatch.
+    type: "safety",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
+    apiKey: "TWILIO_AUTH_TOKEN",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      TWILIO_ACCOUNT_SID: z.string().min(1),
+      TWILIO_AUTH_TOKEN: z.string().min(1),
+      TWILIO_FROM_NUMBER: z.string().regex(E164_PHONE_PATTERN, {
+        message: "Enter the number in E.164 form, like +14155550123",
+      }),
+    }),
+    optionalKeys: [],
+    enabledSince: Temporal.Instant.from("2026-09-10T00:00:00Z"),
+    blurb: "Dial phone-target voice agents from your Twilio account.",
   },
   azure: {
     name: "Azure OpenAI",

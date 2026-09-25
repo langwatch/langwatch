@@ -13,7 +13,7 @@ describe("given the committed model catalog", () => {
     /** @scenario The recommendation is the newest main-tier model of each provider */
     it.each([
       ["openai", "openai/gpt-5.6-terra"],
-      ["anthropic", "anthropic/claude-opus-5"],
+      ["anthropic", "anthropic/claude-opus-5-5"],
       ["gemini", "gemini/gemini-3.8-flash"],
       ["deepseek", "deepseek/deepseek-v4-pro"],
     ])("recommends %s's newest main-tier model", (provider, expected) => {
@@ -48,7 +48,7 @@ describe("given the committed model catalog", () => {
 
     /** @scenario Latest-mini resolves to the fast tier of each provider */
     it.each([
-      ["openai", "openai/gpt-5.6-luna"],
+      ["openai", "openai/gpt-6-luna"],
       ["anthropic", "anthropic/claude-sonnet-5"],
       ["gemini", "gemini/gemini-3.5-flash-lite"],
     ])("resolves %s/latest-mini to the newest fast-tier model", (provider, expected) => {

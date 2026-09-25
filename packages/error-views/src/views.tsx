@@ -84,7 +84,7 @@ export function HandledErrorAlert({
 }) {
   const explanation = explainAnyError(error);
   return (
-    <Alert.Root status="error">
+    <Alert.Root status="error" role="alert">
       <Alert.Indicator />
       <Alert.Content>
         <Alert.Title>{fallbackTitle ?? explanation.title}</Alert.Title>
