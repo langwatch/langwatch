@@ -3,19 +3,31 @@ import {
   type DatasetColumn,
   type DatasetReference,
   type EvaluationsV3State,
+  ExperimentEvaluationInputError,
+  ExperimentRunLoopUnavailableError,
   extractPersistedState,
   type FindOrCreateWorkflowExperimentInput,
+  generateHumanReadableId,
   type TargetConfig,
 } from "@langwatch/experiment-contract";
-import type {
-  Entry,
-  Field,
-  StudioWorkflow as WorkflowDSL,
-  WorkflowApi,
+import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
+import {
+  type Entry,
+  type Field,
+  type StudioWorkflow as WorkflowDSL,
+  type WorkflowEvaluationRequest,
+  type WorkflowEvaluationStarted,
+  WorkflowNotFoundError,
+  WorkflowVersionRequiredError,
 } from "@langwatch/workflow-contract";
 
-import type { ExperimentRunProgressRepository } from "../repositories/experiment-run-progress.repository.ts";
+import type { ExperimentV3RunLoop } from "../app/experiment-workbench.members.ts";
+import type { WorkflowEvaluationRequestedEventData } from "../eventing/experiment-run-events.process.ts";
 import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
+import { runLoopOf, runProgressOf } from "../rules/experiment-run-loop.rules.ts";
+import { getRunUrl } from "../rules/experiment-run-url.rules.ts";
+import { requestedRunIsUntouched } from "../rules/experiment-workflow-evaluation.rules.ts";
 import type {
   ExperimentWorkflowDsl,
   ExecutionDataServices,
@@ -23,47 +35,14 @@ import type {
 } from "./experiment-execution-data.service.ts";
 import { ExperimentExecutionDataService } from "./experiment-execution-data.service.ts";
 import { ExperimentPollingRunService } from "./experiment-polling-run.service.ts";
+import type { ExperimentRunCommandDispatcherService } from "./experiment-run-command-dispatcher.service.ts";
+import { ExperimentRunOrchestratorService } from "./experiment-run-orchestrator.service.ts";
 import type { ExperimentRunErrorReporting } from "./experiment-run-results-writer.service.ts";
 import type { ExperimentService } from "./experiment.service.ts";
 
 export type WorkflowEvaluationParameters = Record<string, string | number | boolean>;
 
-/**
- * What an evaluation trigger answers with.
- */
-export type WorkflowEvaluationOutcome =
-  | Readonly<{
-      ok: true;
-      runId: string;
-      runUrl: string;
-      workflowVersionId: string;
-      version: string;
-    }>
-  | Readonly<{ ok: false; status: 400 | 404; error: string }>;
-
-export class WorkflowNotFoundError extends Error {
-  constructor(workflowId: string) {
-    super(`Workflow ${workflowId} not found`);
-  }
-}
-
-export class NoCommittedVersionError extends Error {
-  constructor() {
-    super(
-      "This workflow has no committed version to evaluate. Commit a version (or run Evaluate once in the studio) first.",
-    );
-  }
-}
-
-/** A bad dataset reference (e.g. an unknown dataset id) the route maps to a status. */
-export class EvaluationInputError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number,
-  ) {
-    super(message);
-  }
-}
+const logger = createLogger("langwatch:experiment:workflow-evaluation");
 
 // Stable ids for the single workflow target + dataset of a workflow experiment.
 const WORKFLOW_TARGET_ID = "workflow-target";
@@ -74,21 +53,32 @@ const WORKFLOW_DATASET_ID = "workflow-dataset";
  * backend execution path, shared with the evaluations-v3 run API.
  */
 export type WorkflowEvaluationDependencies = {
-  experiments: ExperimentService;
+  experiments: Pick<ExperimentService, "findOrCreateForWorkflow">;
   /** The workflow rows and versions this run reads, which it does not own. */
   workflowSource: ExperimentWorkflowDsl;
-  /** Everything the run loop reaches outside itself. */
-  ports: ExperimentRunCollaborators;
-  workflows: WorkflowApi;
   /** The datasets, prompts, agents and evaluators the load reads through. */
   services: ExecutionDataServices;
-  /** Where the run's progress is written so a poll on another process finds it. */
-  progress: ExperimentRunProgressRepository;
+  /** The run loop and its progress store, as this process composed them. */
+  runLoop: ExperimentV3RunLoop;
+  /** Where the request is sent for the worker to run. */
+  requests: Pick<ExperimentRunCommandDispatcherService, "requestWorkflowEvaluation">;
   /** The deployment's public base URL, for the shareable results link. */
-  baseUrl: string;
-  defaultConcurrency: number;
+  baseUrl: string | undefined;
   errorReporting?: ExperimentRunErrorReporting;
 };
+
+/** The workflow, the version and the loaded rows one evaluation runs over. */
+type PreparedEvaluation = {
+  workflow: { id: string; name: string };
+  version: { id: string; version: string };
+  state: EvaluationsV3State;
+  dataResult: LoadedExecutionData;
+};
+
+type WorkflowEvaluationInputs = Pick<
+  WorkflowEvaluationRequest,
+  "projectId" | "workflowId" | "versionId" | "data" | "datasetId" | "parameters"
+>;
 
 export class WorkflowEvaluationService {
   private constructor(private readonly dependencies: WorkflowEvaluationDependencies) {}
@@ -97,71 +87,138 @@ export class WorkflowEvaluationService {
     return new WorkflowEvaluationService(dependencies);
   }
 
-  /**
-   * The same trigger, as the REST boundary reads it: a run, or a refusal
-   * carrying the status and the sentence the caller is answered with.
-   */
-  async triggerEvaluationForRest(input: {
-    projectId: string;
-    projectSlug: string;
-    workflowId: string;
-    versionId?: string;
-    data?: Record<string, unknown>[];
-    datasetId?: string;
-    parameters?: WorkflowEvaluationParameters;
-    rowIndices?: number[];
-  }): Promise<WorkflowEvaluationOutcome> {
-    try {
-      const result = await this.triggerEvaluation(input);
+  /** Refuses what it can, registers the run and sends it to the worker. */
+  async request(input: WorkflowEvaluationRequest): Promise<WorkflowEvaluationStarted> {
+    const baseUrl = this.#baseUrl();
+    const progress = runProgressOf(this.dependencies.runLoop);
+    const { workflow, version, state, dataResult } = await this.prepare(input);
+    const experiment = await this.findOrCreateExperiment({
+      projectId: input.projectId,
+      workflow,
+      state,
+    });
+    const runId = generateHumanReadableId();
+    const total = ExperimentRunOrchestratorService.countScopedCells({
+      state,
+      datasetRows: dataResult.datasetRows,
+      scope: input.rowIndices ? { type: "rows", rowIndices: input.rowIndices } : { type: "full" },
+    });
 
-      return { ok: true, ...result };
-    } catch (error) {
-      if (error instanceof WorkflowNotFoundError) {
-        return { ok: false, status: 404, error: "Workflow not found" };
-      }
+    await progress.createRun({
+      runId,
+      projectId: input.projectId,
+      experimentId: experiment.id,
+      experimentSlug: experiment.slug,
+      total,
+    });
+    await this.dependencies.requests.requestWorkflowEvaluation({
+      tenantId: input.projectId,
+      occurredAt: nowInstant().epochMilliseconds,
+      runId,
+      experimentId: experiment.id,
+      experimentSlug: experiment.slug,
+      projectSlug: input.projectSlug,
+      workflowId: workflow.id,
+      workflowVersionId: version.id,
+      total,
+      ...(input.data ? { data: input.data } : {}),
+      ...(input.datasetId ? { datasetId: input.datasetId } : {}),
+      ...(input.parameters ? { parameters: input.parameters } : {}),
+      ...(input.rowIndices ? { rowIndices: input.rowIndices } : {}),
+    });
 
-      if (error instanceof NoCommittedVersionError) {
-        return { ok: false, status: 400, error: error.message };
-      }
-
-      if (error instanceof EvaluationInputError) {
-        return { ok: false, status: error.status as 400 | 404, error: error.message };
-      }
-
-      throw error;
-    }
+    return {
+      runId,
+      runUrl: getRunUrl({
+        baseUrl,
+        projectSlug: input.projectSlug,
+        experimentSlug: experiment.slug,
+        runId,
+      }),
+      workflowVersionId: version.id,
+      version: version.version,
+    };
   }
 
-  async triggerEvaluation({
+  /** Runs a requested evaluation to its end, once: a redelivery finds the run already touched. */
+  async run(request: WorkflowEvaluationRequestedEventData & { tenantId: string }): Promise<void> {
+    const progress = runProgressOf(this.dependencies.runLoop);
+    if (!requestedRunIsUntouched(await progress.findRunState(request.runId))) {
+      logger.info({ runId: request.runId }, "Requested evaluation already ran; skipping");
+      return;
+    }
+
+    let started: { ports: ExperimentRunCollaborators; prepared: PreparedEvaluation };
+    try {
+      started = {
+        ports: runLoopOf(this.dependencies.runLoop).ports,
+        prepared: await this.prepare({
+          projectId: request.tenantId,
+          workflowId: request.workflowId,
+          versionId: request.workflowVersionId,
+          data: request.data,
+          datasetId: request.datasetId,
+          parameters: request.parameters,
+        }),
+      };
+    } catch (error) {
+      await ExperimentPollingRunService.failRegistered({
+        error,
+        runId: request.runId,
+        experimentSlug: request.experimentSlug,
+        projectId: request.tenantId,
+        progress,
+        ...(this.dependencies.errorReporting
+          ? { errorReporting: this.dependencies.errorReporting }
+          : {}),
+      });
+      return;
+    }
+    const { ports, prepared } = started;
+    const { state, dataResult } = prepared;
+
+    await ExperimentPollingRunService.runRegistered({
+      runId: request.runId,
+      projectId: request.tenantId,
+      projectSlug: request.projectSlug,
+      experimentId: request.experimentId,
+      experimentSlug: request.experimentSlug,
+      scope: request.rowIndices
+        ? { type: "rows", rowIndices: request.rowIndices }
+        : { type: "full" },
+      state,
+      datasetRows: dataResult.datasetRows,
+      datasetColumns: dataResult.datasetColumns,
+      loadedPrompts: dataResult.loadedPrompts,
+      loadedAgents: dataResult.loadedAgents,
+      ports,
+      workflows: this.dependencies.runLoop.workflows,
+      loadedEvaluators: dataResult.loadedEvaluators,
+      loadedWorkflows: dataResult.loadedWorkflows,
+      defaultConcurrency: this.dependencies.runLoop.defaultConcurrency,
+      baseUrl: this.#baseUrl(),
+      progress,
+      ...(this.dependencies.errorReporting
+        ? { errorReporting: this.dependencies.errorReporting }
+        : {}),
+    });
+  }
+
+  /** Loads what one evaluation runs over, or refuses it. */
+  private async prepare({
     projectId,
-    projectSlug,
     workflowId,
     versionId,
     data,
     datasetId,
     parameters,
-    rowIndices,
-  }: {
-    projectId: string;
-    projectSlug: string;
-    workflowId: string;
-    versionId?: string;
-    data?: Record<string, unknown>[];
-    datasetId?: string;
-    parameters?: WorkflowEvaluationParameters;
-    rowIndices?: number[];
-  }): Promise<{
-    runId: string;
-    runUrl: string;
-    workflowVersionId: string;
-    version: string;
-  }> {
+  }: WorkflowEvaluationInputs): Promise<PreparedEvaluation> {
     const workflow = await this.dependencies.workflowSource.findEvaluableWorkflow({
       projectId,
       workflowId,
     });
     if (!workflow) {
-      throw new WorkflowNotFoundError(workflowId);
+      throw new WorkflowNotFoundError(workflowId, projectId);
     }
 
     const version = await this.dependencies.workflowSource.findEvaluableVersion({
@@ -170,7 +227,7 @@ export class WorkflowEvaluationService {
       ...(versionId ? { versionId } : {}),
     });
     if (!version) {
-      throw new NoCommittedVersionError();
+      throw new WorkflowVersionRequiredError();
     }
 
     const dsl = version.dsl as unknown as WorkflowDSL;
@@ -198,7 +255,10 @@ export class WorkflowEvaluationService {
       inputs: { data, datasetId: resolvedDatasetId, parameters },
     });
     if ("error" in dataResult) {
-      throw new EvaluationInputError(dataResult.error, dataResult.status);
+      throw new ExperimentEvaluationInputError({
+        status: dataResult.status,
+        reason: dataResult.error,
+      });
     }
 
     const state = WorkflowEvaluationService.evaluationState({
@@ -208,39 +268,20 @@ export class WorkflowEvaluationService {
       resolvedDatasetId,
     });
 
-    const { runId, runUrl } = await this.startPollingRun({
-      projectId,
-      projectSlug,
-      workflow,
-      state,
-      dataResult,
-      ...(rowIndices ? { rowIndices } : {}),
-    });
-
-    return { runId, runUrl, workflowVersionId: version.id, version: version.version };
+    return { workflow, version, state, dataResult };
   }
 
-  /**
-   * The experiment this workflow's runs live under, and one polling run started against it. The
-   * persisted state is JSON by construction, but `z.json()` does not accept a structural type
-   * whose optional keys may be `undefined`, so the transport's own cast is made here too.
-   */
-  private async startPollingRun({
+  /** The experiment this workflow's runs live under, found or started. */
+  private findOrCreateExperiment({
     projectId,
-    projectSlug,
     workflow,
     state,
-    dataResult,
-    rowIndices,
   }: {
     projectId: string;
-    projectSlug: string;
     workflow: { id: string; name: string };
     state: EvaluationsV3State;
-    dataResult: LoadedExecutionData;
-    rowIndices?: number[];
-  }): Promise<{ runId: string; runUrl: string }> {
-    const experiment = await this.dependencies.experiments.findOrCreateForWorkflow({
+  }): Promise<{ id: string; slug: string }> {
+    return this.dependencies.experiments.findOrCreateForWorkflow({
       projectId,
       workflowId: workflow.id,
       name: workflow.name,
@@ -248,29 +289,15 @@ export class WorkflowEvaluationService {
         state,
       ) as FindOrCreateWorkflowExperimentInput["workbenchState"],
     });
+  }
 
-    return ExperimentPollingRunService.startPollingRun({
-      projectId,
-      projectSlug,
-      experimentId: experiment.id,
-      experimentSlug: experiment.slug,
-      scope: rowIndices ? { type: "rows", rowIndices } : { type: "full" },
-      state,
-      datasetRows: dataResult.datasetRows,
-      datasetColumns: dataResult.datasetColumns,
-      loadedPrompts: dataResult.loadedPrompts,
-      loadedAgents: dataResult.loadedAgents,
-      ports: this.dependencies.ports,
-      workflows: this.dependencies.workflows,
-      loadedEvaluators: dataResult.loadedEvaluators,
-      loadedWorkflows: dataResult.loadedWorkflows,
-      defaultConcurrency: this.dependencies.defaultConcurrency,
-      baseUrl: this.dependencies.baseUrl,
-      progress: this.dependencies.progress,
-      ...(this.dependencies.errorReporting
-        ? { errorReporting: this.dependencies.errorReporting }
-        : {}),
-    });
+  #baseUrl(): string {
+    const baseUrl = this.dependencies.baseUrl;
+    if (!baseUrl) {
+      throw new ExperimentRunLoopUnavailableError("public address for the run's results link");
+    }
+
+    return baseUrl;
   }
 
   /**

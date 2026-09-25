@@ -6,6 +6,7 @@ import type {
   StartExperimentRunInput,
 } from "@langwatch/experiment-contract";
 
+import type { WorkflowEvaluationRequestedEventData } from "../eventing/experiment-run-events.process.ts";
 import { ExperimentExecution } from "./experiment.service.ts";
 
 type ExperimentRunCommandSender = { send(data: unknown): Promise<unknown> };
@@ -55,6 +56,12 @@ export class ExperimentRunCommandDispatcherService extends ExperimentExecution {
 
   async computeRunMetrics(input: ComputeExperimentRunMetricsCommandData): Promise<void> {
     await this.#send("computeExperimentRunMetrics", input);
+  }
+
+  async requestWorkflowEvaluation(
+    input: WorkflowEvaluationRequestedEventData & { tenantId: string; occurredAt: number },
+  ): Promise<void> {
+    await this.#send("requestWorkflowEvaluation", input);
   }
 
   async #send(name: string, data: unknown): Promise<void> {

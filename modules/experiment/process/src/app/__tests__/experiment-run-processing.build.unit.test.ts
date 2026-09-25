@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   ClickHouseQueryClient,
   type InsertRequest,
@@ -6,6 +7,7 @@ import {
 } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
 
+import type { WorkflowEvaluationRunner } from "../../eventing/experiment-workflow-evaluation.subscriber.ts";
 import { buildExperimentRunProcessing } from "../experiment-composition.build.ts";
 
 class SilentDriver implements QueryDriver {
@@ -34,6 +36,7 @@ function build() {
       retentionReads += 1;
       return 49;
     },
+    workflowEvaluations: createApiFixture<WorkflowEvaluationRunner>({}, "workflowEvaluations"),
   });
   return { pipeline, retentionReads: () => retentionReads };
 }

@@ -211,3 +211,25 @@ export class ExperimentPermissionDeniedError extends HandledError {
     this.name = "ExperimentPermissionDeniedError";
   }
 }
+
+const EVALUATION_INPUT_REFUSALS = {
+  400: { code: "experiment_evaluation_input_invalid" },
+  404: { code: "experiment_evaluation_reference_not_found" },
+  422: { code: "experiment_evaluation_too_many_rows" },
+} as const;
+
+type EvaluationInputStatus = keyof typeof EVALUATION_INPUT_REFUSALS;
+
+/** A workflow evaluation's rows, dataset or targets could not be loaded as sent. */
+export class ExperimentEvaluationInputError extends HandledError {
+  declare readonly code: (typeof EVALUATION_INPUT_REFUSALS)[EvaluationInputStatus]["code"];
+
+  constructor({ status, reason }: { status: number; reason: string }) {
+    const httpStatus: EvaluationInputStatus = status === 404 || status === 422 ? status : 400;
+    super(EVALUATION_INPUT_REFUSALS[httpStatus].code, reason, {
+      httpStatus,
+      fault: "customer",
+    });
+    this.name = "ExperimentEvaluationInputError";
+  }
+}

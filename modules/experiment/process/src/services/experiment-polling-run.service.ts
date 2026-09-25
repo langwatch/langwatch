@@ -273,4 +273,42 @@ export class ExperimentPollingRunService {
 
     return { runId, runUrl, total: totalCells };
   }
+
+  /** Records why a registered run could not start, in the words a poll reads. */
+  static failRegistered(input: {
+    error: unknown;
+    runId: string;
+    experimentSlug: string;
+    projectId: string;
+    progress: ExperimentRunProgressRepository;
+    errorReporting?: ExperimentRunErrorReporting;
+  }): Promise<void> {
+    return reportFailedRun(input);
+  }
+
+  /** Runs a run already registered under `runId` to its end, as the worker does for a request. */
+  static async runRegistered(input: StartPollingRunInput & { runId: string }): Promise<void> {
+    const {
+      projectSlug,
+      experimentSlug,
+      scope,
+      persistResults,
+      baseUrl,
+      progress,
+      errorReporting,
+      runId,
+      ...orchestratorInput
+    } = input;
+
+    await runExecution({
+      orchestratorInput,
+      scope: scope ?? { type: "full" },
+      runId,
+      runUrl: getRunUrl({ baseUrl, projectSlug, experimentSlug, runId }),
+      experimentSlug,
+      persistResults,
+      progress,
+      errorReporting,
+    });
+  }
 }

@@ -1,8 +1,10 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import { createTenantId, type AppendStore, type FoldProjectionStore } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ClickHouseExperimentRunResultRecord } from "../../eventing/experiment-run-result-storage.projection.ts";
 import type { ExperimentRunStateData } from "../../eventing/experiment-run-state.projection.ts";
+import type { WorkflowEvaluationRunner } from "../../eventing/experiment-workflow-evaluation.subscriber.ts";
 import type { ExperimentRunProcessingPipeline } from "../clickhouse/clickhouse.experiment-run-processing.repository.ts";
 import { RedisExperimentRunProcessingRepository } from "../redis/redis.experiment-run-processing.repository.ts";
 
@@ -89,7 +91,7 @@ function compose(options: { foldCacheTtlSeconds?: number } = {}) {
     ...(options.foldCacheTtlSeconds === undefined
       ? {}
       : { foldCacheTtlSeconds: options.foldCacheTtlSeconds }),
-  }).buildProcessing();
+  }).buildProcessing(createApiFixture<WorkflowEvaluationRunner>({}, "workflowEvaluations"));
 
   return { pipeline, insert, resolveClient, redis, set };
 }
@@ -132,6 +134,7 @@ describe("ClickHouseExperimentRunProcessingAdapter", () => {
         "recordEvaluatorResult",
         "computeExperimentRunMetrics",
         "completeExperimentRun",
+        "requestWorkflowEvaluation",
       ]);
     });
 

@@ -78,11 +78,6 @@ export type {
   LoadedWorkflow,
 } from "./services/experiment-execution-data.service.ts";
 export type { RunStateMirror } from "./services/experiment-run-state-mirror.service.ts";
-export type {
-  WorkflowEvaluationDependencies,
-  WorkflowEvaluationOutcome,
-  WorkflowEvaluationParameters,
-} from "./services/experiment-workflow-evaluation.service.ts";
 export {
   extractTargetOutput,
   mapNlpEvent,

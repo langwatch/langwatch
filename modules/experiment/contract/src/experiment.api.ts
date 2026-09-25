@@ -1,7 +1,12 @@
 import type { Dataset } from "@langwatch/dataset-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import type { ModelCostRate } from "@langwatch/model-provider-contract";
-import type { StudioWorkflow, WorkflowWithVersion } from "@langwatch/workflow-contract";
+import type {
+  StudioWorkflow,
+  WorkflowEvaluationRequest,
+  WorkflowEvaluationStarted,
+  WorkflowWithVersion,
+} from "@langwatch/workflow-contract";
 
 import type {
   ExperimentDspyStep,
@@ -148,6 +153,8 @@ export interface ExperimentApi {
     input: FindOrCreateWorkflowExperimentInput,
   ): Promise<{ id: string; slug: string }>;
   findNextDraftName(input: { projectId: string }): Promise<string>;
+  /** Refuses what it can before answering; the worker runs the evaluation itself. */
+  triggerWorkflowEvaluation(input: WorkflowEvaluationRequest): Promise<WorkflowEvaluationStarted>;
   /**
    * The experiment an SDK's own identifier names, created if it is free. The
    * one rule the create-or-take door and the batch result log both resolve a

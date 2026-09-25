@@ -25,6 +25,9 @@ import {
   evaluatorResultEventSchema,
   traceMetricsComputedEventSchema,
   experimentRunCompletedEventSchema,
+  type WorkflowEvaluationRequestedEventData,
+  workflowEvaluationRequestedEventDataSchema,
+  workflowEvaluationRequestedEventSchema,
 } from "../../eventing/experiment-run-events.process.ts";
 import { ExperimentRunItemStore } from "../../eventing/experiment-run-item.store.ts";
 import {
@@ -35,6 +38,10 @@ import {
   type ExperimentRunStateData,
   ExperimentRunStateFoldProjection,
 } from "../../eventing/experiment-run-state.projection.ts";
+import {
+  createWorkflowEvaluationRequestedSubscriber,
+  type WorkflowEvaluationRunner,
+} from "../../eventing/experiment-workflow-evaluation.subscriber.ts";
 import { makeExperimentRunKey } from "../../rules/experiment-run-key.rules.ts";
 import type { ExperimentClickHouseRepository } from "../experiment-clickhouse.repository.ts";
 import type { ExperimentIdLookupRepository } from "../experiment-id-lookup.repository.ts";
@@ -159,6 +166,22 @@ export const CompleteExperimentRunCommand = defineCommand({
   makeJobId: (d) => `${d.tenantId}:${d.runId}:complete`,
 });
 
+export const RequestWorkflowEvaluationCommand = defineCommand({
+  commandType: "lw.experiment_run.request_workflow_evaluation",
+  eventType: "lw.experiment_run.workflow_evaluation_requested",
+  eventVersion: "2026-09-25",
+  aggregateType: "experiment_run",
+  schema: workflowEvaluationRequestedEventDataSchema,
+  aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
+  idempotencyKey: (d) => `${d.tenantId}:${d.runId}:workflow-evaluation`,
+  spanAttributes: (d) => ({
+    "payload.run.id": d.runId,
+    "payload.experiment.id": d.experimentId,
+    "payload.workflow.id": d.workflowId,
+  }),
+  makeJobId: (d) => `${d.tenantId}:${d.runId}:workflow-evaluation`,
+});
+
 export type ExperimentRunEventingStateRepository = ExperimentRunStateRepository;
 export type ExperimentRunEventingIdLookup = ExperimentIdLookupRepository;
 export type ExperimentRunEventingResultRecord = ClickHouseExperimentRunResultRecord;
@@ -167,6 +190,8 @@ export type ExperimentRunEventingState = ExperimentRunStateData;
 export interface ClickhouseExperimentRunProcessingRepository {
   experimentRunStateFoldStore: FoldProjectionStore<ExperimentRunStateData>;
   experimentRunItemAppendStore: AppendStore<ClickHouseExperimentRunResultRecord>;
+  /** Runs a requested workflow evaluation; hosted only where the pipeline is drained. */
+  workflowEvaluations: WorkflowEvaluationRunner;
 }
 
 export type ExperimentRunProcessingPipeline = StaticPipelineDefinition<
@@ -177,6 +202,7 @@ export type ExperimentRunProcessingPipeline = StaticPipelineDefinition<
   | { name: "recordEvaluatorResult"; payload: EvaluatorResultEventData }
   | { name: "computeExperimentRunMetrics"; payload: TraceMetricsComputedEventData }
   | { name: "completeExperimentRun"; payload: ExperimentRunCompletedEventData }
+  | { name: "requestWorkflowEvaluation"; payload: WorkflowEvaluationRequestedEventData }
 >;
 
 /**
@@ -236,6 +262,7 @@ export class ClickHouseExperimentRunProcessingRepository {
         evaluatorResultEventSchema,
         traceMetricsComputedEventSchema,
         experimentRunCompletedEventSchema,
+        workflowEvaluationRequestedEventSchema,
       ])
       .withClickHouseFoldProjection(
         ExperimentRunStateFoldProjection.create({
@@ -246,6 +273,10 @@ export class ClickHouseExperimentRunProcessingRepository {
         ExperimentRunResultStorageMapProjection.create({
           store: deps.experimentRunItemAppendStore,
         }),
+      )
+      .withEventSubscriber(
+        "workflowEvaluationRequested",
+        createWorkflowEvaluationRequestedSubscriber(deps.workflowEvaluations),
       );
 
     return builder
@@ -254,6 +285,7 @@ export class ClickHouseExperimentRunProcessingRepository {
       .withCommand("recordEvaluatorResult", RecordEvaluatorResultCommand)
       .withCommand("computeExperimentRunMetrics", ComputeExperimentRunMetricsCommand)
       .withCommand("completeExperimentRun", CompleteExperimentRunCommand)
+      .withCommand("requestWorkflowEvaluation", RequestWorkflowEvaluationCommand)
       .build();
   }
 }

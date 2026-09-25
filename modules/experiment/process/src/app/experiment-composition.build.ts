@@ -26,6 +26,7 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { ExperimentRunStateStore } from "../eventing/experiment-run-state.store.ts";
+import type { WorkflowEvaluationRunner } from "../eventing/experiment-workflow-evaluation.subscriber.ts";
 import { ClickHouseExperimentDspyRepository } from "../repositories/clickhouse/clickhouse.experiment-dspy.repository.ts";
 import {
   ClickHouseExperimentRunProcessingRepository,
@@ -39,11 +40,11 @@ import { PrismaExperimentWorkflowVersionRepository } from "../repositories/prism
 import { PrismaExperimentRepository } from "../repositories/prisma/prisma.experiment.repository.ts";
 import { RedisExperimentRunProcessingRepository } from "../repositories/redis/redis.experiment-run-processing.repository.ts";
 import { RedisExperimentRunProgressRepository } from "../repositories/redis/redis.experiment-run-progress.repository.ts";
-import type {
-  ExecutionDataServices,
-  ExperimentWorkflowDsl,
-} from "../services/experiment-execution-data.service.ts";
-import { type ExperimentExecution, ExperimentService } from "../services/experiment.service.ts";
+import type { ExecutionDataServices } from "../services/experiment-execution-data.service.ts";
+import type { ExperimentRunCommandDispatcherService } from "../services/experiment-run-command-dispatcher.service.ts";
+import { WorkflowEvaluationService } from "../services/experiment-workflow-evaluation.service.ts";
+import { ExperimentWorkflowSourceService } from "../services/experiment-workflow-source.service.ts";
+import { ExperimentService } from "../services/experiment.service.ts";
 import type {
   ExperimentV3RunLoop,
   ExperimentWorkbenchObserver,
@@ -277,15 +278,16 @@ export function buildExperimentRunProcessing(input: {
   clickhouse: ClickHouseQueryClient;
   redis: ProcessMembers["redis"] | undefined;
   defaultRetentionDays: () => number;
+  workflowEvaluations: WorkflowEvaluationRunner;
 }): ExperimentRunProcessingPipeline {
-  const { redis, defaultRetentionDays } = input;
+  const { redis, defaultRetentionDays, workflowEvaluations } = input;
   const resolveClient = memberSessionResolver(input.clickhouse);
   if (redis) {
     return RedisExperimentRunProcessingRepository.create({
       resolveClient,
       defaultRetentionDays,
       redis,
-    }).buildProcessing();
+    }).buildProcessing(workflowEvaluations);
   }
 
   const eventing = ClickHouseExperimentRunProcessingRepository.create({
@@ -293,6 +295,7 @@ export function buildExperimentRunProcessing(input: {
     clickhouseEnabled: true,
   });
   return ClickHouseExperimentRunProcessingRepository.pipeline({
+    workflowEvaluations,
     experimentRunStateFoldStore: ExperimentRunStateStore.create({
       repository: eventing.stateRepository({ defaultRetentionDays }),
     }),
@@ -316,8 +319,10 @@ export function buildExperimentInfrastructure(input: {
   /** Where a run's progress is written and polled; shared across replicas. */
   redis: ProcessMembers["redis"] | undefined;
   logger: Logger;
-  /** Where a run's writes are sent: the run pipeline's own senders. */
-  execution: ExperimentExecution;
+  /** Where a run's writes and requests are sent: the run pipeline's own senders. */
+  execution: ExperimentRunCommandDispatcherService;
+  /** This deployment's public origin, for the link a run answers with. */
+  publicBaseUrl: string | undefined;
   dependencies: {
     workflows: WorkflowApi;
     dataset: DatasetApi;
@@ -334,7 +339,7 @@ export function buildExperimentInfrastructure(input: {
     modelProviders: ModelProviderApi;
   };
 }): Omit<ExperimentAppDependencies, "runLookup"> {
-  const { prisma, clickhouse, redis, logger, execution, dependencies } = input;
+  const { prisma, clickhouse, redis, logger, execution, publicBaseUrl, dependencies } = input;
   const resolveClient = memberSessionResolver(clickhouse);
   const runHistoryTelemetry = LoggedExperimentRunHistoryTelemetry.create(logger);
   const tupleParam = (values: string[]) => new TupleParam(values);
@@ -370,7 +375,7 @@ export function buildExperimentInfrastructure(input: {
     prompts: dependencies.prompts,
     agents: dependencies.agents,
     evaluators: dependencies.evaluators,
-    workflows: refusing<ExperimentWorkflowDsl>("workflow-backed experiment execution"),
+    workflows: ExperimentWorkflowSourceService.create(dependencies.workflows),
     entitlements: dependencies.entitlement,
     projects: dependencies.projects,
   };
@@ -381,10 +386,7 @@ export function buildExperimentInfrastructure(input: {
     // `ports` stays null — starting a run belongs to the worker.
     progress: redis ? RedisExperimentRunProgressRepository.create({ redis }) : null,
     services,
-    // The orchestrator's own collaborator, server-private to the workflow
-    // module. This process composes no run loop, so nothing behind it is
-    // ever called; see `services.workflows` above for the same refusal.
-    workflows: refusing<WorkflowApi>("workflow-backed experiment execution"),
+    workflows: dependencies.workflows,
     defaultConcurrency: RUN_DEFAULT_CONCURRENCY,
     startRun: () => Promise.reject(new ExperimentCapabilityUnavailableError("experiment run loop")),
   };
@@ -401,6 +403,14 @@ export function buildExperimentInfrastructure(input: {
     modelCosts: modelCostCatalogue(dependencies.modelProviders),
     workflowAuthoring: refusing<ExperimentWorkflowAuthoring>("wizard workflow authoring"),
     runLoop,
+    workflowEvaluations: WorkflowEvaluationService.create({
+      experiments,
+      workflowSource: services.workflows,
+      services,
+      runLoop,
+      requests: execution,
+      baseUrl: publicBaseUrl,
+    }),
     workbenchObserver: loggedObserver(logger),
   };
 }

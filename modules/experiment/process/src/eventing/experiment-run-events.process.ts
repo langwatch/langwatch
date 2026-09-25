@@ -155,9 +155,38 @@ export type ExperimentRunCompletedEvent = z.infer<typeof experimentRunCompletedE
 /**
  * Union of all experiment run processing event types.
  */
+export const workflowEvaluationRequestedEventDataSchema = z.object({
+  runId: z.string(),
+  experimentId: z.string(),
+  experimentSlug: z.string(),
+  projectSlug: z.string(),
+  workflowId: z.string(),
+  workflowVersionId: z.string(),
+  total: z.number(),
+  data: z.array(z.record(z.string(), z.unknown())).optional(),
+  datasetId: z.string().optional(),
+  parameters: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+  rowIndices: z.array(z.number()).optional(),
+});
+
+export const workflowEvaluationRequestedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.WORKFLOW_EVALUATION_REQUESTED),
+  data: workflowEvaluationRequestedEventDataSchema,
+  metadata: experimentRunEventMetadataSchema.optional(),
+});
+
+export type WorkflowEvaluationRequestedEventData = z.infer<
+  typeof workflowEvaluationRequestedEventDataSchema
+>;
+export type WorkflowEvaluationRequestedEvent = z.infer<
+  typeof workflowEvaluationRequestedEventSchema
+>;
+
 export type ExperimentRunProcessingEvent =
   | ExperimentRunStartedEvent
   | TargetResultEvent
   | EvaluatorResultEvent
   | TraceMetricsComputedEvent
-  | ExperimentRunCompletedEvent;
+  | ExperimentRunCompletedEvent
+  | WorkflowEvaluationRequestedEvent;

@@ -86,6 +86,8 @@ import { PromptApi } from "@langwatch/prompt-contract";
 import {
   WorkflowApi,
   type StudioWorkflow,
+  type WorkflowEvaluationRequest,
+  type WorkflowEvaluationStarted,
   type WorkflowWithVersion,
 } from "@langwatch/workflow-contract";
 
@@ -108,6 +110,7 @@ import {
   type WorkbenchExecutionRequest,
 } from "../services/experiment-workbench-run.service.ts";
 import { ExperimentWorkbenchVersionService } from "../services/experiment-workbench-version.service.ts";
+import type { WorkflowEvaluationService } from "../services/experiment-workflow-evaluation.service.ts";
 import { ExperimentWorkflowLinkService } from "../services/experiment-workflow-link.service.ts";
 import type { ExperimentService } from "../services/experiment.service.ts";
 import {
@@ -212,6 +215,8 @@ export interface ExperimentAppDependencies {
   runLoop: ExperimentV3RunLoop;
   /** Where a run is recorded and an unnamed failure reported. Both best-effort. */
   workbenchObserver: ExperimentWorkbenchObserver;
+  /** Starts a workflow's evaluation here and runs it where the pipeline is drained. */
+  workflowEvaluations: WorkflowEvaluationService;
   /** `experiment_run_processing`, its senders and run lookup; absent where a suite builds none. */
   runProcessing?: Readonly<{
     pipeline: ExperimentRunProcessingPipeline;
@@ -225,7 +230,8 @@ const NO_RUNS: ExperimentRunAggregate = { runsCount: 0, lastRunAt: null };
 
 type ExperimentSetup = FeatureSetup<
   typeof ExperimentApp.dependencies,
-  MembersRead<typeof ExperimentApp.reads>,
+  MembersRead<readonly ["prisma", "clickhouse", "redis", "logger"]> &
+    Readonly<{ publicBaseUrl: string | undefined }>,
   undefined
 >;
 
@@ -248,7 +254,10 @@ export class ExperimentApp implements ExperimentApi {
     /** Owns the project's custom model cost rules the optimizer log prices against. */
     modelProviders: ModelProviderApi,
   };
-  static readonly reads = reads("prisma", "clickhouse", "redis", "logger");
+  static readonly reads = [
+    ...reads("prisma", "clickhouse", "redis", "logger"),
+    "publicBaseUrl",
+  ] as const;
 
   static create(setup: ExperimentSetup): ExperimentApp {
     const { members, dependencies } = setup;
@@ -259,6 +268,7 @@ export class ExperimentApp implements ExperimentApi {
       redis: members.redis,
       logger: members.logger,
       execution: commands,
+      publicBaseUrl: members.publicBaseUrl,
       dependencies,
     });
     return new ExperimentApp({
@@ -269,6 +279,7 @@ export class ExperimentApp implements ExperimentApi {
           clickhouse: members.clickhouse,
           redis: members.redis,
           defaultRetentionDays: () => dependencies.retention.getPlatformDefaultRetentionDays(),
+          workflowEvaluations: built.workflowEvaluations,
         }),
         commands,
         idLookup: buildExperimentIdLookup(members.clickhouse),
@@ -551,6 +562,11 @@ export class ExperimentApp implements ExperimentApi {
   /** The pipeline `experiment_run_processing` registers, built once by {@link create}. */
   eventingPipeline(): ExperimentRunProcessingPipeline {
     return this.#runProcessing().pipeline;
+  }
+
+  /** Refuses what it can, then sends the evaluation for the worker to run. */
+  triggerWorkflowEvaluation(input: WorkflowEvaluationRequest): Promise<WorkflowEvaluationStarted> {
+    return this.#dependencies.workflowEvaluations.request(input);
   }
 
   /** Binds the registered pipeline's own senders; every run write goes through them. */

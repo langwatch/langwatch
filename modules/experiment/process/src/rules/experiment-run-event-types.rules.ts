@@ -12,6 +12,7 @@ export const EXPERIMENT_RUN_EVENT_TYPES = {
   EVALUATOR_RESULT: "lw.experiment_run.evaluator_result",
   COMPLETED: "lw.experiment_run.completed",
   TRACE_METRICS_COMPUTED: "lw.experiment_run.trace_metrics_computed",
+  WORKFLOW_EVALUATION_REQUESTED: "lw.experiment_run.workflow_evaluation_requested",
 } as const;
 
 /**
@@ -23,6 +24,7 @@ export const EXPERIMENT_RUN_EVENT_VERSIONS = {
   EVALUATOR_RESULT: "2025-02-01",
   COMPLETED: "2025-02-01",
   TRACE_METRICS_COMPUTED: "2026-04-15",
+  WORKFLOW_EVALUATION_REQUESTED: "2026-09-25",
 } as const;
 
 export const EXPERIMENT_RUN_PROCESSING_EVENT_TYPES = [
@@ -31,6 +33,7 @@ export const EXPERIMENT_RUN_PROCESSING_EVENT_TYPES = [
   EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT,
   EXPERIMENT_RUN_EVENT_TYPES.COMPLETED,
   EXPERIMENT_RUN_EVENT_TYPES.TRACE_METRICS_COMPUTED,
+  EXPERIMENT_RUN_EVENT_TYPES.WORKFLOW_EVALUATION_REQUESTED,
 ] as const;
 
 export type ExperimentRunProcessingEventType =
@@ -46,6 +49,7 @@ export const EXPERIMENT_RUN_COMMAND_TYPES = {
   RECORD_EVALUATOR_RESULT: "lw.experiment_run.record_evaluator_result",
   COMPLETE: "lw.experiment_run.complete",
   COMPUTE_TRACE_METRICS: "lw.experiment_run.compute_trace_metrics",
+  REQUEST_WORKFLOW_EVALUATION: "lw.experiment_run.request_workflow_evaluation",
 } as const;
 
 export const EXPERIMENT_RUN_PROCESSING_COMMAND_TYPES = [
@@ -54,6 +58,7 @@ export const EXPERIMENT_RUN_PROCESSING_COMMAND_TYPES = [
   EXPERIMENT_RUN_COMMAND_TYPES.RECORD_EVALUATOR_RESULT,
   EXPERIMENT_RUN_COMMAND_TYPES.COMPLETE,
   EXPERIMENT_RUN_COMMAND_TYPES.COMPUTE_TRACE_METRICS,
+  EXPERIMENT_RUN_COMMAND_TYPES.REQUEST_WORKFLOW_EVALUATION,
 ] as const;
 
 export type ExperimentRunProcessingCommandType =

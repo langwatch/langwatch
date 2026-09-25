@@ -17,6 +17,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ExperimentWorkflowDsl } from "../../services/experiment-execution-data.service.ts";
 import { ExperimentFindOrCreateService } from "../../services/experiment-find-or-create.service.ts";
+import type { WorkflowEvaluationService } from "../../services/experiment-workflow-evaluation.service.ts";
 import type { ExperimentService } from "../../services/experiment.service.ts";
 import type { ExperimentV3RestApi } from "../../transport/experiment-v3.rest.ts";
 import type { ExperimentV3RunLoop } from "../experiment-workbench.members.ts";
@@ -216,6 +217,7 @@ function harness({
       slugify: (value: string) => value,
       runLoop,
       workbenchObserver,
+      workflowEvaluations: createApiFixture<WorkflowEvaluationService>({}, "workflowEvaluations"),
     }),
   };
 }

@@ -832,6 +832,21 @@ const presentations = {
     title: "This evaluation can't run as a monitor yet",
     describe: () => "Add an evaluator to it and save, then try again.",
   },
+  experiment_evaluation_input_invalid: {
+    title: "This evaluation's data could not be read",
+    describe: () =>
+      "Check the rows, dataset id and parameters you sent match what the workflow expects, then try again.",
+  },
+  experiment_evaluation_reference_not_found: {
+    title: "Something this evaluation uses is gone",
+    describe: () =>
+      "The dataset or workflow version it names may have been deleted. Check the ids you sent, then try again.",
+  },
+  experiment_evaluation_too_many_rows: {
+    title: "Too many rows for one evaluation",
+    describe: () =>
+      "Your plan limits how many rows one run can evaluate. Send fewer rows, or run against a saved dataset.",
+  },
   experiment_workflow_not_found: {
     title: "This evaluation's workflow is gone",
     describe: () => "It may have been archived. Reload the page, or create the evaluation again.",

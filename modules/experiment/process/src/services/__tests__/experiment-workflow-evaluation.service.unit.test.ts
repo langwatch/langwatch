@@ -1,12 +1,24 @@
+import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { DatasetApi } from "@langwatch/dataset-contract";
+import type {
+  EvaluationV3Event,
+  FindOrCreateWorkflowExperimentInput,
+} from "@langwatch/experiment-contract";
 import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
-import { describe, expect, it, vi } from "vitest";
+import type { PromptApi } from "@langwatch/prompt-contract";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
+import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
-import type { ExperimentRunProgressRepository } from "../../repositories/experiment-run-progress.repository.ts";
-import type { ExperimentWorkflowDsl } from "../experiment-execution-data.service.ts";
+import type { WorkflowEvaluationRequestedEventData } from "../../eventing/experiment-run-events.process.ts";
 import {
-  WorkflowEvaluationService,
-  type WorkflowEvaluationDependencies,
-} from "../experiment-workflow-evaluation.service.ts";
+  ExperimentRunProgressRepository,
+  type ExperimentRunProgressFailure,
+  type ExperimentRunProgressState,
+} from "../../repositories/experiment-run-progress.repository.ts";
+import type { ExperimentWorkflowDsl } from "../experiment-execution-data.service.ts";
+import { WorkflowEvaluationService } from "../experiment-workflow-evaluation.service.ts";
 
 const PROJECT_ID = "project-1";
 const PROJECT_SLUG = "project-one";
@@ -67,11 +79,9 @@ function entryDsl(inline: { question: string[] } = { question: ["a", "b", "c"] }
 
 type FakeVersion = { id: string; version: string; dsl: unknown };
 type FakeWorkflow = { id: string; name: string; archived?: boolean; versions: FakeVersion[] };
+type SentRequest = WorkflowEvaluationRequestedEventData & { tenantId: string; occurredAt: number };
 
-/**
- * In-memory ExperimentWorkflowDsl proving the service delegates version
- * selection to the port rather than deciding it itself.
- */
+/** Version selection belongs to the source, so this one answers the last version by default. */
 function buildWorkflowSource(workflows: Record<string, FakeWorkflow>): ExperimentWorkflowDsl {
   return {
     async findWorkflow(input) {
@@ -99,12 +109,51 @@ function buildWorkflowSource(workflows: Record<string, FakeWorkflow>): Experimen
   };
 }
 
-function buildDeps(
-  overrides: {
-    workflows?: Record<string, FakeWorkflow>;
-    findOrCreateForWorkflow?: ReturnType<typeof vi.fn>;
-  } = {},
-): { deps: WorkflowEvaluationDependencies; findOrCreateForWorkflow: ReturnType<typeof vi.fn> } {
+/** The run records a poll reads, kept in memory. */
+class RecordedRunProgress extends ExperimentRunProgressRepository {
+  readonly runs = new Map<string, ExperimentRunProgressState>();
+  readonly failures = new Map<string, ExperimentRunProgressFailure>();
+
+  async createRun(input: {
+    runId: string;
+    projectId: string;
+    experimentId?: string;
+    experimentSlug: string;
+    total: number;
+  }): Promise<void> {
+    this.runs.set(input.runId, {
+      ...input,
+      status: "running",
+      progress: 0,
+      startedAt: 0,
+      recentEvents: [],
+    });
+  }
+  async updateProgress(): Promise<void> {}
+  async addEvent(_runId: string, _event: EvaluationV3Event): Promise<void> {}
+  async completeRun(): Promise<void> {}
+  async failRun(runId: string, failure: ExperimentRunProgressFailure): Promise<void> {
+    this.failures.set(runId, failure);
+  }
+  async stopRun(): Promise<void> {}
+  async findRunState(runId: string): Promise<ExperimentRunProgressState | null> {
+    return this.runs.get(runId) ?? null;
+  }
+  async deleteRun(): Promise<void> {}
+}
+
+const persistedTargetsSchema = z.object({
+  targets: z.array(
+    z.object({
+      inputs: z.array(z.object({ identifier: z.string() })),
+      mappings: z.record(z.string(), z.record(z.string(), z.unknown())),
+    }),
+  ),
+});
+
+function buildService(
+  overrides: { workflows?: Record<string, FakeWorkflow>; rowBound?: number } = {},
+) {
   const workflows =
     overrides.workflows ??
     ({
@@ -117,56 +166,50 @@ function buildDeps(
         ],
       },
     } satisfies Record<string, FakeWorkflow>);
-
   const workflowSource = buildWorkflowSource(workflows);
-  const findOrCreateForWorkflow =
-    overrides.findOrCreateForWorkflow ??
-    vi.fn().mockResolvedValue({ id: "experiment_1", slug: "evaluate-me" });
-
-  const progress: ExperimentRunProgressRepository = {
-    createRun: vi.fn().mockResolvedValue(undefined),
-    updateProgress: vi.fn(),
-    addEvent: vi.fn(),
-    completeRun: vi.fn(),
-    failRun: vi.fn(),
-    stopRun: vi.fn(),
-    findRunState: vi.fn(),
-    deleteRun: vi.fn(),
+  const experimentsAsked: FindOrCreateWorkflowExperimentInput[] = [];
+  const sent: SentRequest[] = [];
+  const progress = new RecordedRunProgress();
+  const services = {
+    datasets: createApiFixture<DatasetApi>({}),
+    prompts: createApiFixture<PromptApi>({}),
+    agents: createApiFixture<AgentApi>({}),
+    workflows: workflowSource,
+    entitlements: {
+      requestBound: async ({ key }: { key: RequestBoundKey }) =>
+        overrides.rowBound ?? resolveRequestBound(key, "FREE"),
+    },
+    projects: {
+      getOrganizationId: async (projectId: string) => `organization-of-${projectId}`,
+    },
   };
 
-  const deps: WorkflowEvaluationDependencies = {
-    experiments: { findOrCreateForWorkflow } as never,
-    workflowSource,
-    // The ownership check runs before any cell exists; a stub that passes is
-    // what lets the run reach the part this file is about.
-    ports: {
-      connectedAgentOwnership: { assertRunnable: vi.fn(async () => undefined) },
-    } as never,
-    workflows: {} as never,
-    services: {
-      datasets: {} as never,
-      prompts: {} as never,
-      agents: {} as never,
-      workflows: workflowSource,
-      evaluators: {} as never,
-      entitlements: {
-        requestBound: async ({ key }: { key: RequestBoundKey }) => resolveRequestBound(key, "FREE"),
-      },
-      projects: {
-        getOrganizationId: async (projectId: string) => `organization-of-${projectId}`,
+  const service = WorkflowEvaluationService.create({
+    experiments: {
+      findOrCreateForWorkflow: async (input) => {
+        experimentsAsked.push(input);
+        return { id: "experiment_1", slug: "evaluate-me" };
       },
     },
-    progress,
+    workflowSource,
+    services,
+    runLoop: {
+      ports: null,
+      progress,
+      services,
+      workflows: createApiFixture<WorkflowApi>({}),
+      defaultConcurrency: 1,
+      startRun: () => Promise.reject(new Error("Not used by workflow evaluation tests.")),
+    },
+    requests: {
+      requestWorkflowEvaluation: async (input) => {
+        sent.push(input);
+      },
+    },
     baseUrl: "https://app.langwatch.test",
-    defaultConcurrency: 1,
-  };
+  });
 
-  return { deps, findOrCreateForWorkflow };
-}
-
-function buildService(overrides?: Parameters<typeof buildDeps>[0]) {
-  const { deps, findOrCreateForWorkflow } = buildDeps(overrides);
-  return { service: WorkflowEvaluationService.create(deps), findOrCreateForWorkflow };
+  return { service, experimentsAsked, sent, progress };
 }
 
 const baseInput = {
@@ -175,129 +218,164 @@ const baseInput = {
   workflowId: WORKFLOW_ID,
 };
 
-describe("WorkflowEvaluationService.triggerEvaluationForRest", () => {
+describe("WorkflowEvaluationService.request", () => {
   describe("given a workflow with a committed version", () => {
     /** @scenario Triggering an evaluation returns a run id and a results url */
     it("returns a run id and a results url", async () => {
       const { service } = buildService();
 
-      const outcome = await service.triggerEvaluationForRest(baseInput);
+      const started = await service.request(baseInput);
 
-      expect(outcome.ok).toBe(true);
-      if (!outcome.ok) throw new Error("unreachable");
-      expect(typeof outcome.runId).toBe("string");
-      expect(outcome.runId.length).toBeGreaterThan(0);
-      expect(outcome.runUrl).toContain("/experiments/evaluate-me");
-      expect(outcome.runUrl).toContain(`runId=${outcome.runId}`);
+      expect(started.runId.length).toBeGreaterThan(0);
+      expect(started.runUrl).toContain("/experiments/evaluate-me");
+      expect(started.runUrl).toContain(`runId=${started.runId}`);
     });
 
     /** @scenario The response stays backward compatible */
     it("still carries the evaluated version id and version", async () => {
       const { service } = buildService();
 
-      const outcome = await service.triggerEvaluationForRest(baseInput);
+      const started = await service.request(baseInput);
 
-      expect(outcome.ok).toBe(true);
-      if (!outcome.ok) throw new Error("unreachable");
-      expect(outcome.workflowVersionId).toBe("version_2");
-      expect(outcome.version).toBe("2");
+      expect(started.workflowVersionId).toBe("version_2");
+      expect(started.version).toBe("2");
     });
 
     /** @scenario The latest committed version is evaluated by default */
-    it("evaluates the latest committed version when none is named", async () => {
-      const { service } = buildService();
+    it("evaluates the version its source answers when none is named", async () => {
+      const { service, sent } = buildService();
 
-      const outcome = await service.triggerEvaluationForRest(baseInput);
+      await service.request(baseInput);
 
-      expect(outcome.ok).toBe(true);
-      if (!outcome.ok) throw new Error("unreachable");
-      // The service asks its port for "no version named" and trusts the
-      // answer, rather than picking a version itself.
-      expect(outcome.workflowVersionId).toBe("version_2");
+      expect(sent[0]?.workflowVersionId).toBe("version_2");
     });
 
     /** @scenario A specific committed version can be requested */
     it("evaluates the requested version", async () => {
       const { service } = buildService();
 
-      const outcome = await service.triggerEvaluationForRest({
-        ...baseInput,
-        versionId: "version_1",
-      });
+      const started = await service.request({ ...baseInput, versionId: "version_1" });
 
-      expect(outcome.ok).toBe(true);
-      if (!outcome.ok) throw new Error("unreachable");
-      expect(outcome.workflowVersionId).toBe("version_1");
-      expect(outcome.version).toBe("1");
+      expect(started.workflowVersionId).toBe("version_1");
+      expect(started.version).toBe("1");
     });
 
     /** @scenario Caller-supplied parameters are accepted */
     it("binds an undeclared parameter as a target input and dataset mapping", async () => {
-      const { service, findOrCreateForWorkflow } = buildService();
+      const { service, experimentsAsked } = buildService();
 
-      const outcome = await service.triggerEvaluationForRest({
-        ...baseInput,
-        parameters: { feature_flag: "variant-b" },
-      });
+      await service.request({ ...baseInput, parameters: { feature_flag: "variant-b" } });
 
-      expect(outcome.ok).toBe(true);
-      const call = findOrCreateForWorkflow.mock.calls[0]?.[0] as {
-        workbenchState: {
-          targets: {
-            inputs: { identifier: string }[];
-            mappings: Record<string, Record<string, unknown>>;
-          }[];
-        };
-      };
-      const target = call.workbenchState.targets[0]!;
-      const inputIdentifiers = target.inputs.map((i) => i.identifier);
+      const target = persistedTargetsSchema.parse(experimentsAsked[0]?.workbenchState).targets[0];
+      const inputIdentifiers = target?.inputs.map((i) => i.identifier);
       expect(inputIdentifiers).toContain("feature_flag");
       expect(inputIdentifiers).toContain("question");
-      const mapping = Object.values(target.mappings)[0]!;
-      expect(Object.keys(mapping)).toContain("feature_flag");
+      expect(Object.keys(Object.values(target?.mappings ?? {})[0] ?? {})).toContain("feature_flag");
     });
 
     /** @scenario Inline data can be evaluated instead of the attached dataset */
-    it("accepts inline data and starts a run", async () => {
-      const { service } = buildService();
+    it("accepts inline data and sends it with the request", async () => {
+      const { service, sent } = buildService();
 
-      const outcome = await service.triggerEvaluationForRest({
-        ...baseInput,
-        data: [{ question: "x" }, { question: "y" }],
+      await service.request({ ...baseInput, data: [{ question: "x" }, { question: "y" }] });
+
+      expect(sent[0]?.data).toEqual([{ question: "x" }, { question: "y" }]);
+    });
+
+    /** @scenario The evaluation runs on the worker under the run id it answered with */
+    it("registers the run for polling and sends it under the same id", async () => {
+      const { service, sent, progress } = buildService();
+
+      const started = await service.request(baseInput);
+
+      expect(sent).toHaveLength(1);
+      expect(sent[0]).toMatchObject({
+        tenantId: PROJECT_ID,
+        runId: started.runId,
+        experimentId: "experiment_1",
+        workflowId: WORKFLOW_ID,
       });
-
-      expect(outcome.ok).toBe(true);
-      if (!outcome.ok) throw new Error("unreachable");
-      expect(outcome.runUrl).toBeTruthy();
+      expect(progress.runs.get(started.runId)?.status).toBe("running");
     });
   });
 
   describe("given a workflow id from another project", () => {
     /** @scenario Unknown workflow returns not found */
-    it("returns a 404 outcome", async () => {
-      const { service } = buildService({ workflows: {} });
+    it("refuses with workflow_not_found and sends nothing", async () => {
+      const { service, sent } = buildService({ workflows: {} });
 
-      const outcome = await service.triggerEvaluationForRest(baseInput);
-
-      expect(outcome).toEqual({ ok: false, status: 404, error: "Workflow not found" });
+      await expect(service.request(baseInput)).rejects.toMatchObject({
+        code: "workflow_not_found",
+      });
+      expect(sent).toHaveLength(0);
     });
   });
 
   describe("given a workflow that was never committed", () => {
     /** @scenario A workflow with no committed version cannot be evaluated */
-    it("returns a 400 outcome explaining a version must be committed first", async () => {
+    it("refuses with workflow_version_required", async () => {
       const { service } = buildService({
         workflows: {
           [WORKFLOW_ID]: { id: WORKFLOW_ID, name: "Never committed", versions: [] },
         },
       });
 
-      const outcome = await service.triggerEvaluationForRest(baseInput);
+      await expect(service.request(baseInput)).rejects.toMatchObject({
+        code: "workflow_version_required",
+      });
+    });
+  });
 
-      expect(outcome.ok).toBe(false);
-      if (outcome.ok) throw new Error("unreachable");
-      expect(outcome.status).toBe(400);
-      expect(outcome.error).toMatch(/committed version/i);
+  describe("given more rows than the plan allows per run", () => {
+    /** @scenario Rows beyond the plan's bound are refused before a run starts */
+    it("refuses with experiment_evaluation_too_many_rows", async () => {
+      const { service, sent } = buildService({ rowBound: 1 });
+
+      await expect(
+        service.request({ ...baseInput, data: [{ question: "x" }, { question: "y" }] }),
+      ).rejects.toMatchObject({ code: "experiment_evaluation_too_many_rows", httpStatus: 422 });
+      expect(sent).toHaveLength(0);
     });
   });
 });
+
+describe("WorkflowEvaluationService.run", () => {
+  describe("given a request whose run already moved on", () => {
+    /** @scenario A redelivered evaluation request does not run twice */
+    it("skips it without failing the run", async () => {
+      const { service, progress } = buildService();
+      const started = await service.request(baseInput);
+      const registered = progress.runs.get(started.runId);
+      if (registered) progress.runs.set(started.runId, { ...registered, status: "completed" });
+
+      await service.run(requestFor(started.runId));
+
+      expect(progress.failures.size).toBe(0);
+    });
+  });
+
+  describe("given a process that composed no run loop", () => {
+    /** @scenario A worker without a run loop fails the run it was sent */
+    it("records the run as failed rather than retrying it", async () => {
+      const { service, progress } = buildService();
+      const started = await service.request(baseInput);
+
+      await service.run(requestFor(started.runId));
+
+      expect(progress.failures.has(started.runId)).toBe(true);
+    });
+  });
+});
+
+function requestFor(runId: string): WorkflowEvaluationRequestedEventData & { tenantId: string } {
+  return {
+    tenantId: PROJECT_ID,
+    runId,
+    experimentId: "experiment_1",
+    experimentSlug: "evaluate-me",
+    projectSlug: PROJECT_SLUG,
+    workflowId: WORKFLOW_ID,
+    workflowVersionId: "version_2",
+    total: 3,
+  };
+}

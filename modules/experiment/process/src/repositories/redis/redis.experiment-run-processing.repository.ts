@@ -4,6 +4,7 @@ import type { Cluster, Redis } from "ioredis";
 import { ExperimentRunItemStore } from "../../eventing/experiment-run-item.store.ts";
 import type { ExperimentRunStateData } from "../../eventing/experiment-run-state.projection.ts";
 import { ExperimentRunStateStore } from "../../eventing/experiment-run-state.store.ts";
+import type { WorkflowEvaluationRunner } from "../../eventing/experiment-workflow-evaluation.subscriber.ts";
 import {
   ClickhouseExperimentClickHouseRepository,
   type ExperimentEventingClickHouseResolver,
@@ -47,10 +48,11 @@ export class RedisExperimentRunProcessingRepository {
 
   private constructor(private readonly options: ClickHouseExperimentRunProcessingAdapterOptions) {}
 
-  buildProcessing(): ExperimentRunProcessingPipeline {
+  buildProcessing(workflowEvaluations: WorkflowEvaluationRunner): ExperimentRunProcessingPipeline {
     const clickHouse = ClickhouseExperimentClickHouseRepository.create(this.options.resolveClient);
 
     return ClickHouseExperimentRunProcessingRepository.pipeline({
+      workflowEvaluations,
       experimentRunStateFoldStore: new RedisCachedFoldStore<ExperimentRunStateData>(
         ExperimentRunStateStore.create({
           repository: ClickHouseExperimentRunStateRepository.create({

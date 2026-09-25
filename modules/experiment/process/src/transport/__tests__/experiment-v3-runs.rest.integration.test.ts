@@ -25,6 +25,7 @@ import type {
 import type { ExperimentRunCollaborators } from "../../rules/experiment-run-input.rules.ts";
 import type { ExperimentWorkflowDsl } from "../../services/experiment-execution-data.service.ts";
 import { ExperimentFindOrCreateService } from "../../services/experiment-find-or-create.service.ts";
+import type { WorkflowEvaluationService } from "../../services/experiment-workflow-evaluation.service.ts";
 import type { ExperimentService } from "../../services/experiment.service.ts";
 import {
   experimentV3LegacyRest,
@@ -121,6 +122,7 @@ function harness({ experiments = {}, progress = null, ports = null }: Harness = 
     slugify: (value) => value,
     runLoop,
     workbenchObserver: { recordExperimentRan: vi.fn(), reportError: vi.fn() },
+    workflowEvaluations: createApiFixture<WorkflowEvaluationService>({}, "workflowEvaluations"),
   };
   const app = ExperimentApp.createForTesting(dependencies);
 
