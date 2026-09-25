@@ -1,54 +1,33 @@
-import type { CanonicalLogRecord, LogApi, LogPreparation } from "@langwatch/log-contract";
+import type {
+  CanonicalLogRecord,
+  LogApi,
+  LogPiiRedactionLevel,
+  LogPreparation,
+  LogRequestCollectionResult,
+} from "@langwatch/log-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import {
   NON_BILLABLE_ATTR,
-  type LogTraceContribution,
-  type TraceCanonicalisationService,
-  piiRedactionLevelSchema,
   type LogRecordReceivedEventData,
+  type LogTraceContribution,
+  type TraceApi,
 } from "@langwatch/trace-contract";
 import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
-import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
 
-import type { LogTraceIoExtractor } from "../app/log.members.ts";
-
-/**
- * Every field optional, all the way down.
- */
-type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
+/** Trace's share of a log: its canonical names, its I/O preview and its contribution command. */
+export type LogTraceSlice = Pick<
+  TraceApi,
+  "canonicalizeLogRecord" | "extractLogRecordIO" | "recordLogContributions"
+>;
 
 export interface LogRequestCollectionDeps {
-  traceCanonicalisation: TraceCanonicalisationService;
-  traceIo: LogTraceIoExtractor;
+  traces: LogTraceSlice;
   /** Only the preparation half of `LogApi`: this collector sends its own batch, itself. */
   logs: Pick<LogApi, "prepareCanonicalLogRecords">;
   recordLogRecords: (data: CanonicalLogRecord[]) => Promise<void>;
-  recordLogContributions: (data: LogTraceContribution[]) => Promise<void>;
 }
-
-/**
- * The outcome of an OTLP log request. The two cases are deliberately separate shapes rather
- * than a counter pair.
- */
-export type LogRequestCollectionResult =
-  | {
-      outcome: "collected";
-      acceptedLogRecords: number;
-      /** Rejected for good — the caller must NOT retry these. */
-      rejectedLogRecords: number;
-      errorMessage?: string;
-    }
-  | {
-      /**
-       * Nothing was durably accepted. `recordLogRecords` enqueues the batch in
-       * one call, so this is all-or-nothing: the caller must retry the whole
-       * request, and the route must answer with a retryable status.
-       */
-      outcome: "unavailable";
-      errorMessage: string;
-    };
 
 /** Returned in place of a persistence exception, which may name internals. */
 const PERSISTENCE_ERROR_MESSAGE = "failed to record log record";
@@ -70,8 +49,8 @@ export class LogRequestCollectionService {
   }: {
     tenantId: string;
     organizationId: string;
-    logRequest: DeepPartial<IExportLogsServiceRequest>;
-    piiRedactionLevel: string;
+    logRequest: unknown;
+    piiRedactionLevel: LogPiiRedactionLevel;
   }): Promise<LogRequestCollectionResult> {
     return this.tracer.withActiveSpan(
       "LogRequestCollectionService.handleOtlpLogRequest",
@@ -80,7 +59,7 @@ export class LogRequestCollectionService {
         attributes: {
           "tenant.id": tenantId,
           "organization.id": organizationId,
-          resource_log_count: logRequest.resourceLogs?.length ?? 0,
+          resource_log_count: countResourceLogs(logRequest),
         },
       },
       async (span): Promise<LogRequestCollectionResult> => {
@@ -88,7 +67,7 @@ export class LogRequestCollectionService {
           tenantId,
           organizationId,
           request: logRequest,
-          piiRedactionLevel: piiRedactionLevelSchema.parse(piiRedactionLevel),
+          piiRedactionLevel,
           acceptedAt: nowInstant().epochMilliseconds,
         });
         // Only preparation can reject: it is the sole stage that judges the
@@ -173,21 +152,14 @@ export class LogRequestCollectionService {
     const contributions: LogTraceContribution[] = [];
     for (const prepared of preparation.accepted) {
       const { record } = prepared;
-      if (
-        record.correlationSource === "none" ||
-        !record.correlationTraceId ||
-        !record.correlationSpanId
-      ) {
+      const correlationSource = record.correlationSource;
+      if (correlationSource === "none" || !record.correlationTraceId || !record.correlationSpanId) {
         continue;
       }
 
       try {
         contributions.push(
-          makeTraceContribution({
-            prepared,
-            traceCanonicalisation: this.deps.traceCanonicalisation,
-            traceIo: this.deps.traceIo,
-          }),
+          makeTraceContribution({ prepared, correlationSource, traces: this.deps.traces }),
         );
       } catch (error) {
         this.logger.error(
@@ -216,7 +188,7 @@ export class LogRequestCollectionService {
     }
 
     try {
-      await this.deps.recordLogContributions(contributions);
+      await this.deps.traces.recordLogContributions(contributions);
     } catch (error) {
       this.logger.error(
         {
@@ -233,12 +205,12 @@ export class LogRequestCollectionService {
 
 function makeTraceContribution({
   prepared,
-  traceCanonicalisation,
-  traceIo,
+  correlationSource,
+  traces,
 }: {
   prepared: LogPreparation["accepted"][number];
-  traceCanonicalisation: TraceCanonicalisationService;
-  traceIo: LogTraceIoExtractor;
+  correlationSource: LogTraceContribution["correlationSource"];
+  traces: LogTraceSlice;
 }): LogTraceContribution {
   const { record, normalized } = prepared;
   const legacyView: LogRecordReceivedEventData = {
@@ -254,7 +226,7 @@ function makeTraceContribution({
     scopeVersion: normalized.scopeVersion,
     piiRedactionLevel: record.piiRedactionLevel,
   };
-  const lifted = traceCanonicalisation.canonicalizeLogRecord({
+  const lifted = traces.canonicalizeLogRecord({
     scopeName: legacyView.scopeName,
     body: legacyView.body,
     attributes: legacyView.attributes,
@@ -266,10 +238,8 @@ function makeTraceContribution({
     }
   }
 
-  const io = traceIo.extractIo(legacyView);
-  const input = io.input === null ? null : traceIo.preview(io.input);
-  const output = io.output === null ? null : traceIo.preview(io.output);
-  if (input !== io.input || output !== io.output) {
+  const { input, output, truncated } = traces.extractLogRecordIO(legacyView);
+  if (truncated) {
     liftedAttributes["langwatch.reserved.log_io_truncated"] = true;
   }
 
@@ -283,7 +253,7 @@ function makeTraceContribution({
     severityText: record.severityText,
     providerKind: record.providerKind,
     scopeName: record.scopeName,
-    correlationSource: record.correlationSource as Exclude<typeof record.correlationSource, "none">,
+    correlationSource,
     input,
     output,
     liftedAttributes,
@@ -291,4 +261,9 @@ function makeTraceContribution({
     piiRedactionLevel: record.piiRedactionLevel,
     occurredAt: record.acceptedAt,
   };
+}
+
+function countResourceLogs(request: unknown): number {
+  if (typeof request !== "object" || request === null || !("resourceLogs" in request)) return 0;
+  return Array.isArray(request.resourceLogs) ? request.resourceLogs.length : 0;
 }

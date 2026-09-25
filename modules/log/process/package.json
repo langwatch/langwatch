@@ -36,7 +36,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/trace-process": "workspace:*",
+    "@langwatch/api-fixture": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

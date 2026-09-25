@@ -12,13 +12,16 @@ import {
   type LogApi as LogApiContract,
   type LogPiiRedactionLevel,
   type LogPreparation,
+  type LogRequestCollectionResult,
   type LogServerConfig,
 } from "@langwatch/log-contract";
+import { TraceApi } from "@langwatch/trace-contract";
 
 import { LogProcessingAdapter, type LogProcessingPipeline } from "../eventing/log.pipeline.ts";
 import { createLogClickHouseResolver } from "../repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts";
 import { ClickHouseCanonicalLogRecordRepository } from "../repositories/clickhouse/clickhouse.canonical-log-record.repository.ts";
 import { CanonicalLogService } from "../services/canonical-log.service.ts";
+import { LogRequestCollectionService } from "../services/log-request-collection.service.ts";
 import { LogService } from "../services/log.service.ts";
 
 export type LogInfrastructure = Readonly<{
@@ -26,24 +29,30 @@ export type LogInfrastructure = Readonly<{
   clickhouse: ClickHouseQueryClient;
 }>;
 
-type LogDependencies = Readonly<{ dataPrivacy: typeof DataPrivacyApi }>;
+type LogDependencies = Readonly<{ dataPrivacy: typeof DataPrivacyApi; traces: typeof TraceApi }>;
 type LogSetup = FeatureSetup<LogDependencies, LogInfrastructure, LogServerConfig>;
 
 /** The process-owned Log capability over private preparation, persistence and its pipeline. */
 export class LogApp implements LogApiContract {
   static readonly contract = LogApi;
   static readonly config = logConfig;
-  static readonly dependencies: LogDependencies = { dataPrivacy: DataPrivacyApi };
+  static readonly dependencies: LogDependencies = { dataPrivacy: DataPrivacyApi, traces: TraceApi };
   /** The run this module's durable processing needs, over ClickHouse only. */
   static readonly reads = ["clickhouse"] as const;
 
   readonly #service: LogService;
   readonly #pipeline: LogProcessingPipeline;
+  readonly #collection: LogRequestCollectionService;
   #commands: EventingCommands<LogProcessingPipeline> | undefined;
 
-  private constructor(service: LogService, pipeline: LogProcessingPipeline) {
+  private constructor(
+    service: LogService,
+    pipeline: LogProcessingPipeline,
+    collection: LogRequestCollectionService,
+  ) {
     this.#service = service;
     this.#pipeline = pipeline;
+    this.#collection = collection;
   }
 
   static create({ dependencies, members, config }: LogSetup): LogApp {
@@ -63,7 +72,16 @@ export class LogApp implements LogApiContract {
         config.processingShards,
       ),
     }).build();
-    return new LogApp(service, pipeline);
+    const app: LogApp = new LogApp(
+      service,
+      pipeline,
+      LogRequestCollectionService.create({
+        traces: dependencies.traces,
+        logs: service,
+        recordLogRecords: (records) => app.recordCanonicalLogRecords(records),
+      }),
+    );
+    return app;
   }
 
   prepareCanonicalLogRecords(input: {
@@ -74,6 +92,15 @@ export class LogApp implements LogApiContract {
     acceptedAt?: number;
   }): Promise<LogPreparation> {
     return this.#service.prepareCanonicalLogRecords(input);
+  }
+
+  handleOtlpLogRequest(input: {
+    tenantId: string;
+    organizationId: string;
+    logRequest: unknown;
+    piiRedactionLevel: LogPiiRedactionLevel;
+  }): Promise<LogRequestCollectionResult> {
+    return this.#collection.handleOtlpLogRequest(input);
   }
 
   getLogsByTraceId(input: {

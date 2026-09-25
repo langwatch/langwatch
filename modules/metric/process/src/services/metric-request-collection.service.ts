@@ -2,50 +2,22 @@ import type {
   CanonicalMetricDataPoint,
   MetricApi,
   MetricDataPointPreparation,
+  MetricPiiRedactionLevel,
+  MetricRequestCollectionResult,
 } from "@langwatch/metric-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
-import {
-  piiRedactionLevelSchema,
-  type RecordMetricCorrelationCommandData,
-} from "@langwatch/trace-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
-import type { IExportMetricsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
 
-/**
- * Every field optional, all the way down.
- */
-type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
-
 export interface MetricRequestCollectionDeps {
+  /** Trace's share of a metric: the exemplar correlations it folds. */
+  traces: Pick<TraceApi, "recordMetricCorrelations">;
   /** Only the preparation half of `MetricApi`: this collector sends its own batch, itself. */
   metrics: Pick<MetricApi, "prepareMetricDataPoints">;
   recordDataPoints: (data: CanonicalMetricDataPoint[]) => Promise<void>;
-  recordMetricCorrelations: (data: RecordMetricCorrelationCommandData[]) => Promise<void>;
 }
-
-/**
- * The outcome of an OTLP metric request. The two cases are deliberately separate shapes rather
- * than a counter pair.
- */
-export type MetricRequestCollectionResult =
-  | {
-      outcome: "collected";
-      acceptedDataPoints: number;
-      /** Rejected for good — the caller must NOT retry these. */
-      rejectedDataPoints: number;
-      errorMessage?: string;
-    }
-  | {
-      /**
-       * Nothing was durably accepted. `recordDataPoints` enqueues the batch in
-       * one call, so this is all-or-nothing: the caller must retry the whole
-       * request, and the route must answer with a retryable status.
-       */
-      outcome: "unavailable";
-      errorMessage: string;
-    };
 
 /** Returned in place of a persistence exception, which may name internals. */
 const PERSISTENCE_ERROR_MESSAGE = "failed to record data point";
@@ -72,8 +44,8 @@ export class MetricRequestCollectionService {
   }: {
     tenantId: string;
     organizationId: string;
-    metricRequest: DeepPartial<IExportMetricsServiceRequest>;
-    piiRedactionLevel: string;
+    metricRequest: unknown;
+    piiRedactionLevel: MetricPiiRedactionLevel;
   }): Promise<MetricRequestCollectionResult> {
     return this.tracer.withActiveSpan(
       "MetricRequestCollectionService.handleOtlpMetricRequest",
@@ -87,7 +59,7 @@ export class MetricRequestCollectionService {
           // organization id an operator cannot tie a metric span to the
           // account it bills to. Neither id carries end-user data.
           "organization.id": organizationId,
-          resource_metric_count: metricRequest.resourceMetrics?.length ?? 0,
+          resource_metric_count: countResourceMetrics(metricRequest),
         },
       },
       async (span): Promise<MetricRequestCollectionResult> => {
@@ -97,7 +69,7 @@ export class MetricRequestCollectionService {
             tenantId,
             organizationId,
             request: metricRequest,
-            piiRedactionLevel: piiRedactionLevelSchema.parse(piiRedactionLevel),
+            piiRedactionLevel,
             acceptedAt,
           });
 
@@ -182,7 +154,7 @@ export class MetricRequestCollectionService {
     }
 
     try {
-      await this.deps.recordMetricCorrelations(correlations);
+      await this.deps.traces.recordMetricCorrelations(correlations);
     } catch (error) {
       this.logger.error(
         {
@@ -195,4 +167,9 @@ export class MetricRequestCollectionService {
       );
     }
   }
+}
+
+function countResourceMetrics(request: unknown): number {
+  if (typeof request !== "object" || request === null || !("resourceMetrics" in request)) return 0;
+  return Array.isArray(request.resourceMetrics) ? request.resourceMetrics.length : 0;
 }

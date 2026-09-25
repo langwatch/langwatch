@@ -10,8 +10,10 @@ import {
   type MetricApi as MetricApiContract,
   type MetricDataPointPreparation,
   type MetricPiiRedactionLevel,
+  type MetricRequestCollectionResult,
   type MetricServerConfig,
 } from "@langwatch/metric-contract";
+import { TraceApi } from "@langwatch/trace-contract";
 
 import {
   ClickHouseMetricDataPointAppendRepository,
@@ -23,6 +25,7 @@ import {
   MetricProcessingService,
   type MetricProcessingPipeline,
 } from "../services/metric-processing.service.ts";
+import { MetricRequestCollectionService } from "../services/metric-request-collection.service.ts";
 import { MetricService } from "../services/metric.service.ts";
 
 export type MetricInfrastructure = Readonly<{
@@ -30,24 +33,36 @@ export type MetricInfrastructure = Readonly<{
   clickhouse: ClickHouseQueryClient;
 }>;
 
-type MetricDependencies = Readonly<{ dataPrivacy: typeof DataPrivacyApi }>;
+type MetricDependencies = Readonly<{
+  dataPrivacy: typeof DataPrivacyApi;
+  traces: typeof TraceApi;
+}>;
 type MetricSetup = FeatureSetup<MetricDependencies, MetricInfrastructure, MetricServerConfig>;
 
 /** The process-owned metric preparation capability, and its durable processing pipeline. */
 export class MetricApp implements MetricApiContract {
   static readonly contract = MetricApi;
   static readonly config = metricConfig;
-  static readonly dependencies: MetricDependencies = { dataPrivacy: DataPrivacyApi };
+  static readonly dependencies: MetricDependencies = {
+    dataPrivacy: DataPrivacyApi,
+    traces: TraceApi,
+  };
   /** The run this module's durable processing needs, over ClickHouse only. */
   static readonly reads = ["clickhouse"] as const;
 
   readonly #service: MetricService;
   readonly #pipeline: MetricProcessingPipeline;
+  readonly #collection: MetricRequestCollectionService;
   #commands: EventingCommands<MetricProcessingPipeline> | undefined;
 
-  private constructor(service: MetricService, pipeline: MetricProcessingPipeline) {
+  private constructor(
+    service: MetricService,
+    pipeline: MetricProcessingPipeline,
+    collection: MetricRequestCollectionService,
+  ) {
     this.#service = service;
     this.#pipeline = pipeline;
+    this.#collection = collection;
   }
 
   static create({ dependencies, members, config }: MetricSetup): MetricApp {
@@ -60,7 +75,17 @@ export class MetricApp implements MetricApiContract {
       defaultRetentionDays: METRIC_DEFAULT_RETENTION_DAYS,
       metricCommandShardCount: resolveMetricCommandShardCount(config.processingShards),
     }).build();
-    return new MetricApp(MetricService.create({ preparation }), pipeline);
+    const service = MetricService.create({ preparation });
+    const app: MetricApp = new MetricApp(
+      service,
+      pipeline,
+      MetricRequestCollectionService.create({
+        traces: dependencies.traces,
+        metrics: service,
+        recordDataPoints: (points) => app.recordCanonicalMetricDataPoints(points),
+      }),
+    );
+    return app;
   }
 
   prepareMetricDataPoints(input: {
@@ -71,6 +96,15 @@ export class MetricApp implements MetricApiContract {
     acceptedAt?: number;
   }): Promise<MetricDataPointPreparation> {
     return this.#service.prepareMetricDataPoints(input);
+  }
+
+  handleOtlpMetricRequest(input: {
+    tenantId: string;
+    organizationId: string;
+    metricRequest: unknown;
+    piiRedactionLevel: MetricPiiRedactionLevel;
+  }): Promise<MetricRequestCollectionResult> {
+    return this.#collection.handleOtlpMetricRequest(input);
   }
 
   async recordCanonicalMetricDataPoints(

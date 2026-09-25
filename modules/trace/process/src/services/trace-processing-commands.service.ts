@@ -3,6 +3,7 @@ import {
   TraceCapabilityUnavailableError,
   type AssignTopicCommandData,
   type LogTraceContribution,
+  type RecordMetricCorrelationCommandData,
   type RecordSpanCommandData,
   type ResolveOriginCommandData,
 } from "@langwatch/trace-contract";
@@ -57,6 +58,10 @@ export class TraceProcessingCommandsService implements TraceProcessingCommands {
 
   async recordLogContributions(data: LogTraceContribution[]): Promise<void> {
     await this.#connected("recordLogContribution").recordLogContribution.sendBatch(data);
+  }
+
+  async recordMetricCorrelations(data: RecordMetricCorrelationCommandData[]): Promise<void> {
+    await this.#connected("recordMetricCorrelation").recordMetricCorrelation.sendBatch(data);
   }
 
   #connected(command: string): TraceProcessingSenders {

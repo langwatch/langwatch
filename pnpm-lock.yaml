@@ -7841,6 +7841,9 @@ importers:
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../packages/redis-client
+      '@langwatch/secret-contract':
+        specifier: workspace:*
+        version: link:../../secret/contract
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
@@ -8880,9 +8883,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/trace-process':
+      '@langwatch/api-fixture':
         specifier: workspace:*
-        version: link:../../trace/process
+        version: link:../../../packages/api-fixture
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

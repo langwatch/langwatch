@@ -10,6 +10,8 @@ import type { TraceOtlpIngestApi } from "./otlp-ingest.rest.ts";
 import type {
   ClassifyClaudeCallInput,
   ClassifyClaudeCallResult,
+  CanonicalizeLogRecordInput,
+  CanonicalizeLogRecordResult,
   DeriveClaudeResponseContentInput,
   DeriveClaudeResponseContentResult,
 } from "./trace-canonicalisation.ts";
@@ -33,8 +35,13 @@ import type { ExplorerInstantEvalRunInput } from "./trace-instant-eval.schemas.t
 import type { LangWatchQLTraceFilter } from "./trace-langwatch-ql-filter.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
 import type { DiscoverResult, FacetValuesResult } from "./trace-list-view.ts";
+import type { LogTraceContribution } from "./trace-log-contribution.ts";
 import type { TraceModelSpend, TraceModelSpendWindow } from "./trace-model-spend.ts";
-import type { AssignTopicCommandData } from "./trace-processing.commands.ts";
+import type {
+  AssignTopicCommandData,
+  RecordMetricCorrelationCommandData,
+} from "./trace-processing.commands.ts";
+import type { LogRecordReceivedEventData } from "./trace-processing.events.ts";
 import type { TraceSummaryData } from "./trace-projection.ts";
 import type { TraceQueryEvaluationRun } from "./trace-query-evaluation.types.ts";
 import type {
@@ -607,6 +614,18 @@ export interface TraceApi extends TraceOtlpIngestApi {
   deriveClaudeResponseContent(
     input: DeriveClaudeResponseContentInput,
   ): DeriveClaudeResponseContentResult;
+  /** Lifts a log record's attributes into Trace's canonical names. */
+  canonicalizeLogRecord(input: CanonicalizeLogRecordInput): CanonicalizeLogRecordResult;
+  /** A log record's input and output, each cut to Trace's 64 KiB projection preview. */
+  extractLogRecordIO(input: LogRecordReceivedEventData): {
+    input: string | null;
+    output: string | null;
+    truncated: boolean;
+  };
+  /** Sends trace_processing's recordLogContribution batch; refuses where none is registered. */
+  recordLogContributions(input: readonly LogTraceContribution[]): Promise<void>;
+  /** Sends trace_processing's recordMetricCorrelation batch; refuses where none is registered. */
+  recordMetricCorrelations(input: readonly RecordMetricCorrelationCommandData[]): Promise<void>;
   /** Sends trace_processing's assignTopic command; refuses where this process registered none. */
   assignTopic(input: AssignTopicCommandData): Promise<void>;
   deriveScenarioRoleMetrics(input: ScenarioRoleMetricsInput): Promise<ScenarioRoleMetrics>;

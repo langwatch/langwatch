@@ -1,13 +1,14 @@
-import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
-import type { RecordMetricCorrelationCommandData } from "@langwatch/trace-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
+import type {
+  CanonicalMetricDataPoint,
+  MetricRequestCollectionResult,
+} from "@langwatch/metric-contract";
+import type { RecordMetricCorrelationCommandData, TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { MetricRedaction } from "../../app/metric.members.ts";
 import { CanonicalMetricService } from "../canonical-metric.service.ts";
-import {
-  type MetricRequestCollectionResult,
-  MetricRequestCollectionService,
-} from "../metric-request-collection.service.ts";
+import { MetricRequestCollectionService } from "../metric-request-collection.service.ts";
 import { MetricService } from "../metric.service.ts";
 
 /** The request context below asks for no redaction, so the port never rewrites. */
@@ -29,7 +30,7 @@ function makeService(
   const recordDataPoints =
     vi.fn<(data: CanonicalMetricDataPoint[]) => Promise<void>>(recordDataPointsImpl);
   const recordMetricCorrelations = vi.fn<
-    (data: RecordMetricCorrelationCommandData[]) => Promise<void>
+    (data: readonly RecordMetricCorrelationCommandData[]) => Promise<void>
   >(async () => {});
   const metrics = MetricService.create({
     preparation: CanonicalMetricService.create({
@@ -37,9 +38,9 @@ function makeService(
     }),
   });
   const service = MetricRequestCollectionService.create({
+    traces: createApiFixture<TraceApi>({ recordMetricCorrelations }),
     metrics,
     recordDataPoints,
-    recordMetricCorrelations,
   });
   return { service, recordDataPoints, recordMetricCorrelations };
 }

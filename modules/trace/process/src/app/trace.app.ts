@@ -115,8 +115,13 @@ import {
   type EvaluationTraceSpan,
   type TracesForProjectResult,
   type AssignTopicCommandData,
+  type CanonicalizeLogRecordInput,
+  type CanonicalizeLogRecordResult,
   type ClassifyClaudeCallInput,
   type ClassifyClaudeCallResult,
+  type LogRecordReceivedEventData,
+  type LogTraceContribution,
+  type RecordMetricCorrelationCommandData,
   type DeriveClaudeResponseContentInput,
   type DeriveClaudeResponseContentResult,
   type ScenarioRoleMetrics,
@@ -170,8 +175,11 @@ import { traceToConversationTurn } from "../rules/trace-thread-conversation.rule
 import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
 import { ClaudeCodeLogEnrichmentService } from "../services/claude-code-log-enrichment.service.ts";
 import { LegacyFilterMatchingService } from "../services/legacy-filter-matching.service.ts";
-import { LogRequestCollectionService } from "../services/log-request-collection.service.ts";
 import { PreconditionTraceDataService } from "../services/precondition-trace-data.service.ts";
+import {
+  IO_PREVIEW_BYTES,
+  TraceProjectionLeanService,
+} from "../services/projection/trace-projection-lean.service.ts";
 import type { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
 import { TraceCollectorSpanService } from "../services/trace-collector-span.service.ts";
 import { TraceContentReadService as ConcreteTraceContentReadService } from "../services/trace-content-read.service.ts";
@@ -218,6 +226,7 @@ import {
  */
 const TRACKED_EVENT_KSUID_RESOURCE = "trackedevent";
 import type { RestCredentialPrincipal } from "@langwatch/api/rest";
+import type { LogApi } from "@langwatch/log-contract";
 import type * as traceContractModule from "@langwatch/trace-contract";
 
 import type {
@@ -561,7 +570,7 @@ export interface TraceAppDependencies {
    */
   ingestion?: TraceIngestionService;
   /** Where an exported OTLP log batch goes; absent, the door refuses permanently. */
-  logCollection?: LogRequestCollectionService;
+  logCollection?: Pick<LogApi, "handleOtlpLogRequest">;
   /** The metric signal's twin of {@link logCollection}, absent for the same reason. */
   metricCollection?: TraceOtlpIngestApi["otlpMetrics"];
   /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
@@ -676,12 +685,7 @@ export class TraceApp implements TraceApi, CollectorApp {
           processName: collaborators.processName,
         },
       }),
-      logCollection: LogRequestCollectionService.create({
-        logs: input.dependencies.logs,
-        traceCanonicalisation: collaborators.canonicalisation,
-        logRecordIO: TraceLogRecordIOService.create(collaborators.canonicalisation),
-        recordLogContributions: (data) => commands.recordLogContributions(data),
-      }),
+      logCollection: input.dependencies.logs,
     });
     app.#processingCommands = commands;
     app.#usageCounts = TraceUsageCountService.create({
@@ -1081,6 +1085,46 @@ export class TraceApp implements TraceApi, CollectorApp {
     input: DeriveClaudeResponseContentInput,
   ): DeriveClaudeResponseContentResult {
     return this.#dependencies.traces.canonicalisation.deriveClaudeResponseContent(input);
+  }
+
+  canonicalizeLogRecord(input: CanonicalizeLogRecordInput): CanonicalizeLogRecordResult {
+    return this.#dependencies.traces.canonicalisation.canonicalizeLogRecord(input);
+  }
+
+  extractLogRecordIO(input: LogRecordReceivedEventData): {
+    input: string | null;
+    output: string | null;
+    truncated: boolean;
+  } {
+    const io = TraceLogRecordIOService.create(this.#dependencies.traces.canonicalisation).extractIO(
+      input,
+    );
+    const preview = (value: string | null): string | null =>
+      value === null ? null : TraceProjectionLeanService.utf8Preview(value, IO_PREVIEW_BYTES);
+    const previewInput = preview(io.input);
+    const previewOutput = preview(io.output);
+    return {
+      input: previewInput,
+      output: previewOutput,
+      truncated: previewInput !== io.input || previewOutput !== io.output,
+    };
+  }
+
+  async recordLogContributions(input: readonly LogTraceContribution[]): Promise<void> {
+    await this.#commandsOrRefuse().recordLogContributions([...input]);
+  }
+
+  async recordMetricCorrelations(
+    input: readonly RecordMetricCorrelationCommandData[],
+  ): Promise<void> {
+    await this.#commandsOrRefuse().recordMetricCorrelations([...input]);
+  }
+
+  #commandsOrRefuse(): TraceProcessingCommandsService {
+    if (!this.#processingCommands) {
+      throw new TraceCapabilityUnavailableError("this process", "the trace_processing pipeline");
+    }
+    return this.#processingCommands;
   }
 
   async assignTopic(input: AssignTopicCommandData): Promise<void> {

@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { LogApi } from "@langwatch/log-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -35,15 +36,7 @@ function makeService({ legacyRows = [row], canonicalRows = [] as StoredLogRecord
     findLogsByTraceId: getLogsByTraceId,
   };
   const canonicalGetLogsByTraceId = vi.fn().mockResolvedValue(canonicalRows);
-  const canonical: LogApi = {
-    prepareCanonicalLogRecords: async () => ({
-      accepted: [],
-      rejectedLogRecords: 0,
-      errors: [],
-    }),
-    getLogsByTraceId: canonicalGetLogsByTraceId,
-    recordCanonicalLogRecords: async () => {},
-  };
+  const canonical = createApiFixture<LogApi>({ getLogsByTraceId: canonicalGetLogsByTraceId });
   return {
     service: LogRecordStorageService.create({ repository, canonical }),
     getLogsByTraceId,

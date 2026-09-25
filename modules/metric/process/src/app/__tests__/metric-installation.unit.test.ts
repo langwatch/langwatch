@@ -3,6 +3,7 @@ import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { createApp } from "@langwatch/kernel";
 import { MetricApi } from "@langwatch/metric-contract";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { metricServer } from "../../metric.server.ts";
@@ -40,6 +41,7 @@ function process(redactMetricAttributes: DataPrivacyApi["redactMetricAttributes"
     .withConfig({ metric: { processingShards: void 0 } })
     .provide({
       "data-privacy": createApiFixture<DataPrivacyApi>({ redactMetricAttributes }),
+      trace: createApiFixture<TraceApi>({}),
     });
 }
 
