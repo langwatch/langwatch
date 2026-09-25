@@ -33,6 +33,10 @@ export type ScimRequestRow =
 export type ConnectionReconciliationRow =
   OutputsFromMap<ScimApiMap>["scimReconciliation"]["getAll"]["connections"][number];
 
+/** One line of what the directory did on one connection, in words. */
+export type DirectoryActivityRow =
+  OutputsFromMap<ScimApiMap>["scimReconciliation"]["getActivity"][number];
+
 /** One membership change the directory itself caused. */
 export type DirectoryChangeRow =
   OutputsFromMap<ScimApiMap>["scimReconciliation"]["getAll"]["recentChanges"][number];

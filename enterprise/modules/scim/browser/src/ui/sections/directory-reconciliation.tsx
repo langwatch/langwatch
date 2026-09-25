@@ -32,6 +32,7 @@ import {
 } from "../../behavior/scim-api.ts";
 import { isRunningConnection } from "../../model/connection-lifecycle.ts";
 import { readableDate } from "../../model/display-formatters.ts";
+import { RecentDirectoryActivity } from "./recent-directory-activity.tsx";
 
 /**
  * Colour tracks whether the reader has something to do, not how far along the
@@ -76,7 +77,11 @@ export function DirectoryReconciliation({ organizationId }: { organizationId: st
             isRunningConnection({ connectionState: connection.connectionState }),
           )
           .map((connection) => (
-            <ConnectionCard key={connection.connectionId} connection={connection} />
+            <ConnectionCard
+              key={connection.connectionId}
+              organizationId={organizationId}
+              connection={connection}
+            />
           ))}
         <RetiredConnections
           connections={connections.filter(
@@ -170,7 +175,13 @@ function RetiredConnections({ connections }: { connections: ConnectionReconcilia
   );
 }
 
-function ConnectionCard({ connection }: { connection: ConnectionReconciliationRow }) {
+function ConnectionCard({
+  organizationId,
+  connection,
+}: {
+  organizationId: string;
+  connection: ConnectionReconciliationRow;
+}) {
   return (
     <Card.Root width="full" data-testid="directory-connection">
       <Card.Body>
@@ -204,6 +215,11 @@ function ConnectionCard({ connection }: { connection: ConnectionReconciliationRo
           </SimpleGrid>
 
           {connection.failures.length > 0 && <DirectoryFailures connection={connection} />}
+
+          <RecentDirectoryActivity
+            organizationId={organizationId}
+            connectionId={connection.connectionId}
+          />
         </VStack>
       </Card.Body>
     </Card.Root>
