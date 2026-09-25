@@ -4,26 +4,14 @@ import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
 import { notificationServer } from "../../notification.server.ts";
-import { NotificationApp } from "../notification.app.ts";
 import { createNotificationTestApp } from "./notification.fixture.ts";
-
-/** Secrets come from an empty environment, as data-privacy's installation fixture does. */
-function installableNotification(resolver: SecretsResolver) {
-  const server = withMemoryRepositories(notificationServer);
-  const secrets = resolver.scopeTo("notification", Object.values(NotificationApp.secrets));
-  const installable: typeof server = {
-    ...server,
-    install: (args) => server.install({ ...args, secrets }),
-  };
-  return installable;
-}
 
 function process(
   role: "api" | "worker",
   resolver = SecretsResolver.over(SecretsChain.start({ environment: {} })),
 ) {
-  return createApp({ role })
-    .withModules([installableNotification(resolver)])
+  return createApp({ role, secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
+    .withModules([withMemoryRepositories(notificationServer)])
     .withConfig({
       notification: {
         defaultFrom: undefined,

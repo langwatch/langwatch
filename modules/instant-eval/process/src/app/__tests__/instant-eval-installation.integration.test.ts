@@ -21,10 +21,10 @@ import {
   type InstantEvalActor,
   type InstantEvalRunInput,
 } from "@langwatch/instant-eval-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, type ModuleSecretsScope, withMemoryRepositories } from "@langwatch/kernel";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { ScopedSecrets } from "@langwatch/secrets";
+import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
@@ -73,24 +73,15 @@ function planFor({ free }: { free: boolean }): Plan {
   };
 }
 
-/**
- * The judge credential, answered the way a process answers this module's one
- * declared handle: `createApp` composes no secrets chain, so the scope is
- * handed to the declaration's install (handoff §10 carries the kernel seam).
- */
-function judgeSecrets(judgeKey: string | undefined): ScopedSecrets {
-  return new ScopedSecrets(async (handle, build) =>
-    build(handle.id === "JEV_API_KEY" ? judgeKey : undefined),
+/** The judge credential, from a chain over a fake environment, scoped as boot scopes it. */
+function judgeSecrets(judgeKey: string | undefined): ModuleSecretsScope {
+  const resolver = SecretsResolver.over(
+    SecretsChain.start({ environment: { JEV_API_KEY: judgeKey } }).withEnv(),
   );
+  return (owner, declared) => resolver.scopeTo(owner, declared);
 }
 
 const instantEval = withMemoryRepositories(instantEvalServer);
-function installableWith({ judgeKey }: { judgeKey: string | undefined }): typeof instantEval {
-  return {
-    ...instantEval,
-    install: (args) => instantEval.install({ ...args, secrets: judgeSecrets(judgeKey) }),
-  };
-}
 
 /** A connect judge that records which organizations it was asked about. */
 function connectJudgeAskedAbout(asked: string[]): InstantEvalJudgeChannel {
@@ -124,8 +115,8 @@ function installation({
   isBounded?: boolean;
 } = {}) {
   return (
-    createApp({ role: "api" })
-      .withModules([installableWith({ judgeKey: judgeKey ?? undefined })])
+    createApp({ role: "api", secrets: judgeSecrets(judgeKey ?? undefined) })
+      .withModules([instantEval])
       .withConfig({
         "instant-eval": {
           classifier,

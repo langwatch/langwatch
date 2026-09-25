@@ -1,6 +1,10 @@
 import { ApplicationBuilder, type BootedRuntime, type RuntimeService } from "./application.ts";
 import type { ResolvedTokens } from "./dependency-token.ts";
-import type { InstallableServerFeature, ServerRole } from "./feature-installer.ts";
+import type {
+  InstallableServerFeature,
+  ModuleSecretsScope,
+  ServerRole,
+} from "./feature-installer.ts";
 import { ModuleApiToken } from "./module-api-token.ts";
 import { membersFrom, storesBackedMembers, type StoresMemberSource } from "./module-members.ts";
 import { ObservabilitySupply } from "./process-supply.options.ts";
@@ -56,6 +60,8 @@ export interface ExposedSurface<Rest, Trpc> {
 }
 interface SupplyState<Rest, Trpc> {
   readonly role: ServerRole;
+  /** Scopes the process resolver per module, as the Server does; absent where none was stated. */
+  readonly secrets?: ModuleSecretsScope;
   readonly modules: readonly SupplyModule[];
   readonly members: SupplyRecord;
   readonly config: SupplyRecord;
@@ -193,7 +199,7 @@ export class ProcessSupply<
     });
   }
 
-  static create(options: { readonly role: ServerRole }): ProcessSupply {
+  static create(options: CreateAppOptions): ProcessSupply {
     return new ProcessSupply({
       ...options,
       modules: [],
@@ -493,6 +499,7 @@ export class ProcessSupply<
     const options = {
       role: state.role,
       config: state.config,
+      ...(state.secrets ? { secrets: state.secrets } : {}),
       members: state.stores
         ? storesBackedMembers(state.stores, legacyMemberNames(state.members))
         : membersFrom(legacyMemberNames(state.members)),
@@ -537,6 +544,11 @@ export class ProcessSupply<
   }
 }
 
+interface CreateAppOptions {
+  readonly role: ServerRole;
+  readonly secrets?: ModuleSecretsScope;
+}
+
 function legacyMemberNames(members: SupplyRecord): SupplyRecord {
   const aliases: Readonly<Record<string, string>> = {
     relational: "prisma",
@@ -554,6 +566,6 @@ function legacyMemberNames(members: SupplyRecord): SupplyRecord {
   return result;
 }
 
-export function createApp(options: { readonly role: ServerRole }): ProcessSupply {
+export function createApp(options: CreateAppOptions): ProcessSupply {
   return ProcessSupply.create(options);
 }
