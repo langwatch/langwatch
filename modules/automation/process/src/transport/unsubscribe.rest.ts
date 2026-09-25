@@ -12,9 +12,7 @@ import {
 import {
   AutomationApi,
   unsubscribeRestAcknowledgedSchema,
-  unsubscribeRestRefusalSchema,
   UnsubscribeLinkInvalidError,
-  UnsubscribeRateLimitedError,
 } from "@langwatch/automation-contract";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
@@ -50,48 +48,32 @@ export const unsubscribeRest = defineRestRouter(AutomationApi)
   .post("/api/unsubscribe", "confirmOneClickUnsubscribe")
   .withQuery(unsubscribeQuery)
   .withAccess(publicRoute({ reason: ONE_CLICK_IS_TOKEN_AUTHORIZED }))
-  .responds({
-    200: unsubscribeRestAcknowledgedSchema,
-    400: unsubscribeRestRefusalSchema,
-    429: unsubscribeRestRefusalSchema,
-  })
+  .withOutput(unsubscribeRestAcknowledgedSchema)
   .withDocs({
     tags: ["Triggers"],
     summary: "RFC 8058 one-click unsubscribe",
     description:
       "Stop the automation named by the signed token in `token` from mailing this recipient.",
+    errors: [
+      { status: 400, description: "The token is missing, invalid or tampered with" },
+      { status: 429, description: "Too many unsubscribe attempts from this caller" },
+    ],
   })
   .withMiddleware(unsubscribeCallerAddress)
   .handle(async ({ app, input }, callerAddress) => {
-    const token = input.token ?? null;
+    if (!input.token)
+      throw new UnsubscribeLinkInvalidError("This unsubscribe link has no token.", 400);
 
-    if (!token) return { status: 400, body: { error: "Missing token" } } as const;
-
-    try {
-      await app.acceptUnsubscribe({
-        token,
-        scope: "trigger",
-        callerAddress,
-        via: "one-click",
-      });
-    } catch (err) {
-      // A bad or tampered token (4xx) is not a downstream persistence failure
-      // (5xx): a database blip must never be reported to the mail client as an
-      // invalid link, so anything else is re-raised for the family's boundary.
-      if (err instanceof UnsubscribeRateLimitedError) {
-        return { status: 429, body: { error: "Too many requests" } } as const;
-      }
-
-      if (err instanceof UnsubscribeLinkInvalidError) {
-        return { status: 400, body: { error: "Invalid token" } } as const;
-      }
-
-      throw err;
-    }
+    await app.acceptUnsubscribe({
+      token: input.token,
+      scope: "trigger",
+      callerAddress,
+      via: "one-click",
+    });
 
     logger.info("One-click unsubscribe processed");
 
-    return { status: 200, body: { ok: true } } as const;
+    return { ok: true };
   })
 
   /**

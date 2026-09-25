@@ -50,7 +50,7 @@ describe("given the one-click unsubscribe door", () => {
       const response = await api.send("POST", "/api/unsubscribe");
 
       expect(response.status).toBe(400);
-      await expect(response.json()).resolves.toEqual({ error: "Missing token" });
+      expect(await response.json()).toMatchObject({ code: "unsubscribe_link_invalid" });
       expect(api.spent).toEqual([]);
     });
   });
@@ -66,7 +66,7 @@ describe("given the one-click unsubscribe door", () => {
 
       const tampered = await refusing.send("POST", "/api/unsubscribe?token=t_bad");
       expect(tampered.status).toBe(400);
-      await expect(tampered.json()).resolves.toEqual({ error: "Invalid token" });
+      expect(await tampered.json()).toMatchObject({ code: "unsubscribe_link_invalid" });
 
       const failed = await broken.send("POST", "/api/unsubscribe?token=t_valid");
       expect(failed.status).toBe(500);
@@ -75,7 +75,7 @@ describe("given the one-click unsubscribe door", () => {
   });
 
   describe("when the caller has already filled the window", () => {
-    it("answers 429 in the body the mail client has always read", async () => {
+    it("answers 429 with the unsubscribe_rate_limited code", async () => {
       const api = mount(async () => {
         throw new UnsubscribeRateLimitedError();
       });
@@ -83,7 +83,7 @@ describe("given the one-click unsubscribe door", () => {
       const response = await api.send("POST", "/api/unsubscribe?token=t_valid");
 
       expect(response.status).toBe(429);
-      await expect(response.json()).resolves.toEqual({ error: "Too many requests" });
+      expect(await response.json()).toMatchObject({ code: "unsubscribe_rate_limited" });
     });
   });
 

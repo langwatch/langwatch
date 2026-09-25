@@ -30,6 +30,7 @@
     "@aws-sdk/client-lambda": "catalog:",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
+    "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",

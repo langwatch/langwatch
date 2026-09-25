@@ -1,3 +1,4 @@
+import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 /**
  * The `/api/workflows` CRUD family, dated, as the public API publishes it. The
  * Studio's own two doors are a separate family the process mounts ahead of
@@ -7,7 +8,6 @@ import {
   defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  ForbiddenError,
   projectRestFacts,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
@@ -177,7 +177,7 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
       })
       .withMiddleware(projectRestFacts, workflowEvaluationRunCeiling)
       .handle(async ({ app, input, scope }, project, mayReadRuns) => {
-        if (!mayReadRuns) throw new ForbiddenError("This key cannot read evaluation runs");
+        if (!mayReadRuns) throw new ApiKeyPermissionDeniedError("evaluations:view");
 
         logger.info(
           { projectId: scope.id, workflowId: input.id },

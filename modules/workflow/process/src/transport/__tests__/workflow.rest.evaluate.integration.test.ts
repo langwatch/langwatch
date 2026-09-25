@@ -189,7 +189,10 @@ describe("POST /api/workflows/:id/evaluate", () => {
       );
 
       expect(response.status).toBe(403);
-      expect(await response.json()).toMatchObject({ code: "forbidden" });
+      expect(await response.json()).toMatchObject({
+        code: "api_key_permission_denied",
+        meta: { permission: "evaluations:view" },
+      });
       expect(triggerEvaluation).not.toHaveBeenCalled();
     });
   });

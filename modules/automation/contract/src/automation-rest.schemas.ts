@@ -83,6 +83,3 @@ export const slackAutomationRestCreatedSchema = z.object({ message: z.string() }
 
 /** What the mail client reads back from `/api/unsubscribe`. */
 export const unsubscribeRestAcknowledgedSchema = z.object({ ok: z.boolean() });
-
-/** Every refusal `/api/unsubscribe` words, in the one-word body it always has. */
-export const unsubscribeRestRefusalSchema = z.object({ error: z.string() });
