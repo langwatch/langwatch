@@ -18,6 +18,7 @@ import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { VirtualKeyCamelDtoResponse } from "@langwatch/gateway-contract";
 import { Temporal, formatDistanceToNow, toEpochMs } from "@langwatch/time";
 import {
   ArrowLeft,
@@ -67,10 +68,222 @@ import {
 } from "../../../features/virtual-keys/ui/sections/virtual-key-edit-drawer.tsx";
 import { VirtualKeySecretReveal } from "../../../features/virtual-keys/ui/sections/virtual-key-secret-reveal.tsx";
 import { VirtualKeyUsageSnippet } from "../../../features/virtual-keys/ui/sections/virtual-key-usage-snippet.tsx";
+import type { GatewayTeam } from "../../../model/gateway-host.ts";
 import { keepPreviousData } from "../../../model/keep-previous-data.ts";
 import { readableDate } from "../../../model/readable-date.ts";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
+
+function availableProjectsOf(
+  teams: readonly GatewayTeam[],
+): { id: string; name: string; teamId: string }[] {
+  return teams.flatMap((t) =>
+    t.projects.map((p) => ({
+      id: p.id,
+      name: `${p.name} · ${t.name}`,
+      teamId: t.id,
+    })),
+  );
+}
+
+/** Guardrails are project-scoped: only a key reaching exactly one project has one to edit. */
+function guardrailProjectOf(input: {
+  scopes: readonly { scopeType: string; scopeId: string }[];
+  teams: readonly GatewayTeam[];
+}): { id: string; slug: string | null } | null {
+  const projectScopes = input.scopes.filter((s) => s.scopeType === "PROJECT");
+  if (projectScopes.length !== 1) return null;
+  const id = projectScopes[0]!.scopeId;
+  for (const t of input.teams) {
+    const p = t.projects.find((proj) => proj.id === id);
+    if (p) return { id: p.id, slug: p.slug };
+  }
+  return { id, slug: null as string | null };
+}
+
+function tracesHrefFor(input: {
+  vk: { id: string; traceProjectId: string | null; traceProjectArchived: boolean } | undefined;
+  teams: readonly GatewayTeam[];
+  model?: string | null;
+}): string | undefined {
+  if (!input.vk) return undefined;
+  return resolveTracesHrefForKey({
+    teams: input.teams,
+    virtualKeyId: input.vk.id,
+    traceProjectId: input.vk.traceProjectId,
+    traceProjectArchived: input.vk.traceProjectArchived,
+    ...(input.model === undefined ? {} : { model: input.model }),
+  });
+}
+
+function stringIdsOf(ids: unknown): string[] {
+  return Array.isArray(ids) ? ids.filter((id) => typeof id === "string") : [];
+}
+
+function VirtualKeyIdentitySection({
+  vk,
+}: {
+  vk: Pick<VirtualKeyCamelDtoResponse, "displayPrefix" | "status" | "expiresAt" | "description">;
+}) {
+  return (
+    <Section title="Identity">
+      <DetailRow label="Prefix">
+        <HStack gap={1}>
+          <Code fontSize="xs">{vk.displayPrefix}…</Code>
+          <FieldInfoTooltip description="First chars of the secret. The full secret is shown only once at create or rotate: if it's lost, rotate the key to mint a fresh one." />
+        </HStack>
+      </DetailRow>
+      <DetailRow label="Status">
+        <Badge colorPalette={statusPalette(vk)} data-testid="vk-detail-status">
+          {vk.status === "active" && isExpired(vk.expiresAt) ? "expired" : vk.status}
+        </Badge>
+      </DetailRow>
+      <DetailRow label="Expires">
+        {vk.expiresAt ? (
+          <Tooltip content={readableDate(vk.expiresAt).toLocaleString()}>
+            <Text fontSize="sm" color="fg.muted" data-testid="vk-detail-expires">
+              {formatExpiry(Temporal.Instant.fromEpochMilliseconds(toEpochMs(vk.expiresAt)))} (
+              {formatDistanceToNow(vk.expiresAt, { addSuffix: true })})
+            </Text>
+          </Tooltip>
+        ) : (
+          <Text fontSize="sm" color="fg.muted" data-testid="vk-detail-expires">
+            Never
+          </Text>
+        )}
+      </DetailRow>
+      {vk.description && (
+        <DetailRow label="Description">
+          <Text fontSize="sm">{vk.description}</Text>
+        </DetailRow>
+      )}
+    </Section>
+  );
+}
+
+function VirtualKeyActivitySection({
+  vk,
+}: {
+  vk: Pick<VirtualKeyCamelDtoResponse, "lastUsedAt" | "createdAt" | "revision">;
+}) {
+  return (
+    <Section title="Activity">
+      <DetailRow label="Last used">
+        {vk.lastUsedAt ? (
+          <Tooltip content={readableDate(vk.lastUsedAt).toLocaleString()}>
+            <Text fontSize="sm" color="fg.muted">
+              {formatTimeAgo(toEpochMs(vk.lastUsedAt))}
+            </Text>
+          </Tooltip>
+        ) : (
+          <Text fontSize="sm" color="fg.muted">
+            never
+          </Text>
+        )}
+      </DetailRow>
+      <DetailRow label="Created">
+        <Tooltip content={readableDate(vk.createdAt).toLocaleString()}>
+          <Text fontSize="sm" color="fg.muted">
+            {formatTimeAgo(toEpochMs(vk.createdAt))}
+          </Text>
+        </Tooltip>
+      </DetailRow>
+      <DetailRow label="Revision">
+        <Text fontSize="sm" color="fg.muted">
+          {vk.revision}
+        </Text>
+      </DetailRow>
+    </Section>
+  );
+}
+
+/** What can be done to the key from its header, by its status and the viewer's grants. */
+function VirtualKeyHeaderActions({
+  vk,
+  viewTracesHref,
+  canUpdate,
+  canRotate,
+  isEnabling,
+  onEdit,
+  onRotate,
+  onDisable,
+  onEnable,
+  onRevoke,
+}: {
+  vk: { id: string; status: "active" | "disabled" | "revoked" };
+  viewTracesHref: string | undefined;
+  canUpdate: boolean;
+  canRotate: boolean;
+  isEnabling: boolean;
+  onEdit: () => void;
+  onRotate: () => void;
+  onDisable: () => void;
+  onEnable: () => void;
+  onRevoke: () => void;
+}) {
+  return (
+    <HStack>
+      {/* Audit history stays available even when revoked —
+          operators forensically investigating a revoked VK
+          still need its create/update/rotate/revoke trail. */}
+      <Link href={`/settings/audit-log?targetKind=virtual_key&targetId=${vk.id}`}>
+        <Button variant="outline" size="sm">
+          <FileClock size={14} /> Audit history
+        </Button>
+      </Link>
+      {/* Traces outlive the key, so this is offered whatever the
+          key's status: investigating what a revoked key did is
+          exactly when somebody needs it. */}
+      {viewTracesHref && (
+        <Link href={viewTracesHref}>
+          <Button variant="outline" size="sm" data-testid="vk-header-view-traces">
+            <Bird size={14} /> View traces
+          </Button>
+        </Link>
+      )}
+      {vk.status === "active" && canUpdate && (
+        <Button variant="outline" size="sm" onClick={onEdit}>
+          <Pencil size={14} /> Edit
+        </Button>
+      )}
+      {vk.status === "active" && canRotate && (
+        <Button variant="outline" size="sm" onClick={onRotate}>
+          <RotateCw size={14} /> Rotate
+        </Button>
+      )}
+      {vk.status === "active" && canUpdate && (
+        <Button variant="outline" size="sm" onClick={onDisable}>
+          <PauseCircle size={14} /> Disable
+        </Button>
+      )}
+      {vk.status === "disabled" && canUpdate && (
+        <Button variant="outline" size="sm" loading={isEnabling} onClick={onEnable}>
+          <PlayCircle size={14} /> Enable
+        </Button>
+      )}
+      {vk.status !== "revoked" && canUpdate && (
+        <Button colorPalette="red" variant="outline" size="sm" onClick={onRevoke}>
+          <Trash2 size={14} /> Revoke
+        </Button>
+      )}
+    </HStack>
+  );
+}
+
+/** Runs one lifecycle action on a loaded key; a failure is shown to the user, not thrown. */
+async function runKeyAction<Key>(input: {
+  vk: Key | undefined;
+  organizationId: string;
+  action: (vk: Key, organizationId: string) => Promise<void>;
+  onFailure: (error: unknown) => void;
+}): Promise<void> {
+  if (!input.vk || !input.organizationId) return;
+  try {
+    await input.action(input.vk, input.organizationId);
+  } catch (err) {
+    input.onFailure(err);
+  }
+}
 
 function VirtualKeyDetailPage() {
   const showErrorToast = useShowErrorToast();
@@ -100,14 +313,7 @@ function VirtualKeyDetailPage() {
     [organization?.teams],
   );
   const availableProjects = useMemo(
-    () =>
-      organization?.teams?.flatMap((t) =>
-        t.projects.map((p) => ({
-          id: p.id,
-          name: `${p.name} · ${t.name}`,
-          teamId: t.id,
-        })),
-      ) ?? [],
+    () => availableProjectsOf(organization?.teams ?? []),
     [organization?.teams],
   );
   // The model picked in Spend by model, or null for every model. It
@@ -181,52 +387,29 @@ function VirtualKeyDetailPage() {
 
   // Guardrails are project-scoped: only a VK reachable from exactly one
   // PROJECT scope has a single guardrail surface to edit.
-  const guardrailProject = useMemo(() => {
-    const projectScopes = (vk?.scopes ?? []).filter((s) => s.scopeType === "PROJECT");
-    if (projectScopes.length !== 1) return null;
-    const id = projectScopes[0]!.scopeId;
-    for (const t of organization?.teams ?? []) {
-      const p = t.projects.find((proj) => proj.id === id);
-      if (p) return { id: p.id, slug: p.slug };
-    }
-    return { id, slug: null as string | null };
-  }, [vk?.scopes, organization?.teams]);
+  const guardrailProject = useMemo(
+    () => guardrailProjectOf({ scopes: vk?.scopes ?? [], teams: organization?.teams ?? [] }),
+    [vk?.scopes, organization?.teams],
+  );
 
   const viewTracesHref = useMemo(
-    () =>
-      vk
-        ? resolveTracesHrefForKey({
-            teams: organization?.teams ?? [],
-            virtualKeyId: vk.id,
-            traceProjectId: vk.traceProjectId,
-            traceProjectArchived: vk.traceProjectArchived,
-          })
-        : undefined,
+    () => tracesHrefFor({ vk, teams: organization?.teams ?? [] }),
     [vk, organization?.teams],
   );
   // The same link, narrowed to whatever the usage block is showing, so the
   // trace list opens on the requests the table underneath it lists.
   const usageTracesHref = useMemo(
-    () =>
-      vk
-        ? resolveTracesHrefForKey({
-            teams: organization?.teams ?? [],
-            virtualKeyId: vk.id,
-            traceProjectId: vk.traceProjectId,
-            traceProjectArchived: vk.traceProjectArchived,
-            model: usageModel,
-          })
-        : undefined,
+    () => tracesHrefFor({ vk, teams: organization?.teams ?? [], model: usageModel }),
     [vk, organization?.teams, usageModel],
   );
 
   const routingPolicyName = routingPolicyQuery.data?.name ?? null;
   // The providers the pinned policy walks, so the panel can mark one the
   // key may hold but dispatch would never reach.
-  const routingPolicyProviderIds = useMemo(() => {
-    const ids = routingPolicyQuery.data?.modelProviderIds;
-    return Array.isArray(ids) ? ids.filter((id) => typeof id === "string") : [];
-  }, [routingPolicyQuery.data?.modelProviderIds]);
+  const routingPolicyProviderIds = useMemo(
+    () => stringIdsOf(routingPolicyQuery.data?.modelProviderIds),
+    [routingPolicyQuery.data?.modelProviderIds],
+  );
   const providersAllowed = useMemo(() => {
     const config = vk?.config as VkConfig | null | undefined;
     return config?.providersAllowed ?? null;
@@ -241,48 +424,52 @@ function VirtualKeyDetailPage() {
     [vk?.config],
   );
 
-  const confirmRotate = async () => {
-    if (!vk || !orgId) return;
-    try {
-      const result = await rotateMutation.mutateAsync({
-        organizationId: orgId,
-        id: vk.id,
-      });
-      setRevealSecret({ name: vk.name, secret: result.secret });
-      setRotating(false);
-    } catch (err) {
-      showErrorToast({ error: err, fallbackTitle: "Couldn't rotate the key" });
-    }
-  };
+  const confirmRotate = () =>
+    runKeyAction({
+      vk,
+      organizationId: orgId,
+      action: async (vk, organizationId) => {
+        const result = await rotateMutation.mutateAsync({
+          organizationId,
+          id: vk.id,
+        });
+        setRevealSecret({ name: vk.name, secret: result.secret });
+        setRotating(false);
+      },
+      onFailure: (error) => showErrorToast({ error, fallbackTitle: "Couldn't rotate the key" }),
+    });
 
-  const confirmDisable = async () => {
-    if (!vk || !orgId) return;
-    try {
-      await disableMutation.mutateAsync({ organizationId: orgId, id: vk.id });
-      setDisabling(false);
-    } catch (err) {
-      showErrorToast({ error: err, fallbackTitle: "Couldn't disable the key" });
-    }
-  };
+  const confirmDisable = () =>
+    runKeyAction({
+      vk,
+      organizationId: orgId,
+      action: async (vk, organizationId) => {
+        await disableMutation.mutateAsync({ organizationId, id: vk.id });
+        setDisabling(false);
+      },
+      onFailure: (error) => showErrorToast({ error, fallbackTitle: "Couldn't disable the key" }),
+    });
 
-  const confirmEnable = async () => {
-    if (!vk || !orgId) return;
-    try {
-      await enableMutation.mutateAsync({ organizationId: orgId, id: vk.id });
-    } catch (err) {
-      showErrorToast({ error: err, fallbackTitle: "Couldn't enable the key" });
-    }
-  };
+  const confirmEnable = () =>
+    runKeyAction({
+      vk,
+      organizationId: orgId,
+      action: async (vk, organizationId) => {
+        await enableMutation.mutateAsync({ organizationId, id: vk.id });
+      },
+      onFailure: (error) => showErrorToast({ error, fallbackTitle: "Couldn't enable the key" }),
+    });
 
-  const confirmRevoke = async () => {
-    if (!vk || !orgId) return;
-    try {
-      await revokeMutation.mutateAsync({ organizationId: orgId, id: vk.id });
-      setRevoking(false);
-    } catch (err) {
-      showErrorToast({ error: err, fallbackTitle: "Couldn't revoke the key" });
-    }
-  };
+  const confirmRevoke = () =>
+    runKeyAction({
+      vk,
+      organizationId: orgId,
+      action: async (vk, organizationId) => {
+        await revokeMutation.mutateAsync({ organizationId, id: vk.id });
+        setRevoking(false);
+      },
+      onFailure: (error) => showErrorToast({ error, fallbackTitle: "Couldn't revoke the key" }),
+    });
 
   return (
     <AiGatewayLayout>
@@ -298,61 +485,18 @@ function VirtualKeyDetailPage() {
           <PageLayout.Heading>{vk?.name ?? "Virtual key"}</PageLayout.Heading>
           <Spacer />
           {vk && (
-            <HStack>
-              {/* Audit history stays available even when revoked —
-                  operators forensically investigating a revoked VK
-                  still need its create/update/rotate/revoke trail. */}
-              <Link href={`/settings/audit-log?targetKind=virtual_key&targetId=${vk.id}`}>
-                <Button variant="outline" size="sm">
-                  <FileClock size={14} /> Audit history
-                </Button>
-              </Link>
-              {/* Traces outlive the key, so this is offered whatever the
-                  key's status: investigating what a revoked key did is
-                  exactly when somebody needs it. */}
-              {viewTracesHref && (
-                <Link href={viewTracesHref}>
-                  <Button variant="outline" size="sm" data-testid="vk-header-view-traces">
-                    <Bird size={14} /> View traces
-                  </Button>
-                </Link>
-              )}
-              {vk.status === "active" && canUpdate && (
-                <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-                  <Pencil size={14} /> Edit
-                </Button>
-              )}
-              {vk.status === "active" && canRotate && (
-                <Button variant="outline" size="sm" onClick={() => setRotating(true)}>
-                  <RotateCw size={14} /> Rotate
-                </Button>
-              )}
-              {vk.status === "active" && canUpdate && (
-                <Button variant="outline" size="sm" onClick={() => setDisabling(true)}>
-                  <PauseCircle size={14} /> Disable
-                </Button>
-              )}
-              {vk.status === "disabled" && canUpdate && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  loading={enableMutation.isPending}
-                  onClick={() => void confirmEnable()}
-                >
-                  <PlayCircle size={14} /> Enable
-                </Button>
-              )}
-              {vk.status !== "revoked" && canUpdate && (
-                <Button
-                  colorPalette="red"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setRevoking(true)}
-                >
-                  <Trash2 size={14} /> Revoke
-                </Button>
-              )}
-            </HStack>
+            <VirtualKeyHeaderActions
+              vk={vk}
+              viewTracesHref={viewTracesHref}
+              canUpdate={canUpdate}
+              canRotate={canRotate}
+              isEnabling={enableMutation.isPending}
+              onEdit={() => setEditing(true)}
+              onRotate={() => setRotating(true)}
+              onDisable={() => setDisabling(true)}
+              onEnable={() => void confirmEnable()}
+              onRevoke={() => setRevoking(true)}
+            />
           )}
         </PageLayout.Header>
 
@@ -361,68 +505,9 @@ function VirtualKeyDetailPage() {
           {!detailQuery.isLoading && !vk && <Text color="fg.muted">Virtual key not found.</Text>}
           {!detailQuery.isLoading && vk && (
             <VStack align="stretch" gap={6} maxWidth="900px">
-              <Section title="Identity">
-                <DetailRow label="Prefix">
-                  <HStack gap={1}>
-                    <Code fontSize="xs">{vk.displayPrefix}…</Code>
-                    <FieldInfoTooltip description="First chars of the secret. The full secret is shown only once at create or rotate: if it's lost, rotate the key to mint a fresh one." />
-                  </HStack>
-                </DetailRow>
-                <DetailRow label="Status">
-                  <Badge colorPalette={statusPalette(vk)} data-testid="vk-detail-status">
-                    {vk.status === "active" && isExpired(vk.expiresAt) ? "expired" : vk.status}
-                  </Badge>
-                </DetailRow>
-                <DetailRow label="Expires">
-                  {vk.expiresAt ? (
-                    <Tooltip content={readableDate(vk.expiresAt).toLocaleString()}>
-                      <Text fontSize="sm" color="fg.muted" data-testid="vk-detail-expires">
-                        {formatExpiry(
-                          Temporal.Instant.fromEpochMilliseconds(toEpochMs(vk.expiresAt)),
-                        )}{" "}
-                        ({formatDistanceToNow(vk.expiresAt, { addSuffix: true })})
-                      </Text>
-                    </Tooltip>
-                  ) : (
-                    <Text fontSize="sm" color="fg.muted" data-testid="vk-detail-expires">
-                      Never
-                    </Text>
-                  )}
-                </DetailRow>
-                {vk.description && (
-                  <DetailRow label="Description">
-                    <Text fontSize="sm">{vk.description}</Text>
-                  </DetailRow>
-                )}
-              </Section>
+              <VirtualKeyIdentitySection vk={vk} />
 
-              <Section title="Activity">
-                <DetailRow label="Last used">
-                  {vk.lastUsedAt ? (
-                    <Tooltip content={readableDate(vk.lastUsedAt).toLocaleString()}>
-                      <Text fontSize="sm" color="fg.muted">
-                        {formatTimeAgo(toEpochMs(vk.lastUsedAt))}
-                      </Text>
-                    </Tooltip>
-                  ) : (
-                    <Text fontSize="sm" color="fg.muted">
-                      never
-                    </Text>
-                  )}
-                </DetailRow>
-                <DetailRow label="Created">
-                  <Tooltip content={readableDate(vk.createdAt).toLocaleString()}>
-                    <Text fontSize="sm" color="fg.muted">
-                      {formatTimeAgo(toEpochMs(vk.createdAt))}
-                    </Text>
-                  </Tooltip>
-                </DetailRow>
-                <DetailRow label="Revision">
-                  <Text fontSize="sm" color="fg.muted">
-                    {vk.revision}
-                  </Text>
-                </DetailRow>
-              </Section>
+              <VirtualKeyActivitySection vk={vk} />
 
               <Section title="How to use">
                 <VirtualKeyUsageSnippet model={snippetModel} />

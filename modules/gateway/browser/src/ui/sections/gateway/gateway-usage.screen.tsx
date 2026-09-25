@@ -16,7 +16,11 @@ import {
 import { neutralizeRows } from "@langwatch/csv";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip as UITooltip } from "@langwatch/design-system/tooltip";
-import { formatBudgetUsd } from "@langwatch/gateway-contract";
+import {
+  formatBudgetUsd,
+  type GatewayUsageSummary,
+  type GatewayVirtualKeyUsageSummary,
+} from "@langwatch/gateway-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import { BarChart3, Bird, Download, X } from "lucide-react";
 import Parse from "papaparse";
@@ -39,6 +43,7 @@ import {
   resolveTracesHrefForKey,
   type TracesWindow,
 } from "../../../features/virtual-keys/model/traces-href-for-key.ts";
+import type { GatewayTeam } from "../../../model/gateway-host.ts";
 import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
@@ -87,6 +92,99 @@ function traceWindowFor({
   };
 }
 
+/** A single key's usage has no per-key breakdown of its own. */
+const NO_KEY_ROWS: GatewayUsageSummary["byVirtualKey"] = [];
+
+function firstQueryValue(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+/** The range preset the URL names, falling back to 30 days for anything unrecognised. */
+function daysFromQuery(value: string | string[] | undefined): number | "mtd" {
+  const raw = firstQueryValue(value);
+  if (raw === "mtd") return "mtd";
+  const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+  return PRESETS.some((p) => p.days === parsed) ? parsed : 30;
+}
+
+function keyTracesHref(input: {
+  virtualKeyId: string | null;
+  key: { traceProjectId: string | null; traceProjectArchived: boolean } | undefined;
+  teams: readonly GatewayTeam[];
+  window: ReturnType<typeof traceWindowFor>;
+}): string | undefined {
+  if (!input.virtualKeyId || !input.key) return undefined;
+  return resolveTracesHrefForKey({
+    teams: input.teams,
+    virtualKeyId: input.virtualKeyId,
+    traceProjectId: input.key.traceProjectId,
+    traceProjectArchived: input.key.traceProjectArchived,
+    window: input.window,
+  });
+}
+
+/** A single key's summary, given the breakdown shape the organization-wide one has. */
+function usageShown(input: {
+  virtualKeyId: string | null;
+  keySummary: GatewayVirtualKeyUsageSummary | undefined;
+  organizationSummary: GatewayUsageSummary | undefined;
+}) {
+  if (!input.virtualKeyId) return input.organizationSummary;
+  return input.keySummary && { ...input.keySummary, byVirtualKey: NO_KEY_ROWS };
+}
+
+function usageCsvFileName(input: {
+  slug: string | undefined;
+  virtualKeyId: string | null;
+  days: number | "mtd";
+}): string {
+  const stamp = nowInstant().toString({ fractionalSecondDigits: 3 }).split("T")[0];
+  const keyPart = input.virtualKeyId ? `_${input.virtualKeyId}` : "";
+  const rangePart = input.days === "mtd" ? "mtd" : `${input.days}d`;
+  return `gateway_usage_${input.slug ?? "organization"}${keyPart}_${rangePart}_${stamp}.csv`;
+}
+
+function downloadCsv({ csv, fileName }: { csv: string; fileName: string }): void {
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", fileName);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+/** One sectioned sheet: daily spend, spend by virtual key, then spend by model. */
+function usageCsvRows(
+  data: Pick<GatewayUsageSummary, "byDay" | "byVirtualKey" | "byModel">,
+): (string | number)[][] {
+  const rows: (string | number)[][] = [];
+  rows.push(["Section", "Key", "Prefix / Model", "Spend (USD)", "Requests"]);
+  rows.push(["daily", "day", "", "", ""]);
+  for (const d of data.byDay) {
+    rows.push(["daily", d.day, "", Number(d.totalUsd).toFixed(6), d.requests]);
+  }
+  rows.push([]);
+  rows.push(["virtual_key", "id", "prefix", "spend", "requests"]);
+  for (const vk of data.byVirtualKey) {
+    rows.push([
+      "virtual_key",
+      vk.name,
+      vk.displayPrefix ?? "",
+      Number(vk.totalUsd).toFixed(6),
+      vk.requests,
+    ]);
+  }
+  rows.push([]);
+  rows.push(["model", "id", "", "spend", "requests"]);
+  for (const m of data.byModel) {
+    rows.push(["model", m.model, "", Number(m.totalUsd).toFixed(6), m.requests]);
+  }
+  return rows;
+}
+
 function GatewayUsagePage() {
   const { organization } = useOrganizationTeamProject();
   const router = useGatewayRouter();
@@ -94,14 +192,8 @@ function GatewayUsagePage() {
   // Range and key filter live in the URL, so the deep link from the
   // virtual-keys table ("Spent this month" click-through) survives a
   // refresh and can be shared as-is.
-  const days = ((): number | "mtd" => {
-    const raw = Array.isArray(router.query.days) ? router.query.days[0] : router.query.days;
-    if (raw === "mtd") return "mtd";
-    const parsed = raw ? Number.parseInt(raw, 10) : NaN;
-    return PRESETS.some((p) => p.days === parsed) ? parsed : 30;
-  })();
-  const virtualKeyId =
-    (Array.isArray(router.query.vk) ? router.query.vk[0] : router.query.vk) ?? null;
+  const days = daysFromQuery(router.query.days);
+  const virtualKeyId = firstQueryValue(router.query.vk) ?? null;
 
   // Both of these rewrite the query of the page the reader is already on. The
   // compat router spelled that `push({ pathname: router.pathname, query })`,
@@ -144,31 +236,21 @@ function GatewayUsagePage() {
   // what decides whether there is anything to open at all.
   const viewTracesHref = useMemo(
     () =>
-      virtualKeyId && keyQuery.data
-        ? resolveTracesHrefForKey({
-            teams: organization?.teams ?? [],
-            virtualKeyId,
-            traceProjectId: keyQuery.data.traceProjectId,
-            traceProjectArchived: keyQuery.data.traceProjectArchived,
-            window: traceWindowFor({ days, fromIso, toIso }),
-          })
-        : undefined,
+      keyTracesHref({
+        virtualKeyId,
+        key: keyQuery.data,
+        teams: organization?.teams ?? [],
+        window: traceWindowFor({ days, fromIso, toIso }),
+      }),
     [virtualKeyId, keyQuery.data, organization?.teams, days, fromIso, toIso],
   );
 
   const activeQuery = virtualKeyId ? vkSummaryQuery : summaryQuery;
-  const data = virtualKeyId
-    ? vkSummaryQuery.data && {
-        ...vkSummaryQuery.data,
-        byVirtualKey: [] as {
-          virtualKeyId: string;
-          name: string;
-          displayPrefix: string | null;
-          totalUsd: string;
-          requests: number;
-        }[],
-      }
-    : summaryQuery.data;
+  const data = usageShown({
+    virtualKeyId,
+    keySummary: vkSummaryQuery.data,
+    organizationSummary: summaryQuery.data,
+  });
 
   // Build a single CSV that flattens the three summary slices the
   // finance reviewer usually wants together: daily spend, spend by
@@ -176,47 +258,15 @@ function GatewayUsagePage() {
   // tables so a spreadsheet pivot / chart still reads naturally.
   const exportCsv = () => {
     if (!data) return;
-    const rows: (string | number)[][] = [];
-    rows.push(["Section", "Key", "Prefix / Model", "Spend (USD)", "Requests"]);
-    rows.push(["daily", "day", "", "", ""]);
-    for (const d of data.byDay) {
-      rows.push(["daily", d.day, "", Number(d.totalUsd).toFixed(6), d.requests]);
-    }
-    rows.push([]);
-    rows.push(["virtual_key", "id", "prefix", "spend", "requests"]);
-    for (const vk of data.byVirtualKey) {
-      rows.push([
-        "virtual_key",
-        vk.name,
-        vk.displayPrefix ?? "",
-        Number(vk.totalUsd).toFixed(6),
-        vk.requests,
-      ]);
-    }
-    rows.push([]);
-    rows.push(["model", "id", "", "spend", "requests"]);
-    for (const m of data.byModel) {
-      rows.push(["model", m.model, "", Number(m.totalUsd).toFixed(6), m.requests]);
-    }
+    const rows = usageCsvRows(data);
     // Sectioned: the file carries several header rows and blank separators, so
     // there is no single `fields` list to pass and every row is guarded in
     // place. Virtual key and model names are typed by whoever created them.
     const csv = Parse.unparse(neutralizeRows(rows));
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    const stamp = nowInstant().toString({ fractionalSecondDigits: 3 }).split("T")[0];
-    link.setAttribute(
-      "download",
-      `gateway_usage_${organization?.slug ?? "organization"}${
-        virtualKeyId ? `_${virtualKeyId}` : ""
-      }_${days === "mtd" ? "mtd" : `${days}d`}_${stamp}.csv`,
-    );
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
+    downloadCsv({
+      csv,
+      fileName: usageCsvFileName({ slug: organization?.slug, virtualKeyId, days }),
+    });
   };
 
   const isLoadingUsage = activeQuery.isLoading;
@@ -307,98 +357,111 @@ function GatewayUsagePage() {
             </EmptyState.Root>
           )}
           {showUsage && data && (
-            <VStack align="stretch" gap={6}>
-              <HStack gap={4} align="stretch">
-                <StatTile label="Total spend" value={formatBudgetUsd(data.totalUsd)} />
-                <StatTile
-                  label="Requests"
-                  value={data.totalRequests.toLocaleString()}
-                  help="Every dispatch attempt is counted, including upstream 4xx/5xx responses. Failed-auth requests don't bill tokens but do ledger as 0-cost entries so blip-driven spikes stay visible in ops review."
-                />
-                <StatTile label="Avg $/request" value={formatAvgCost(data.avgUsdPerRequest)} />
-                <StatTile
-                  label="Blocked by guardrail"
-                  value={data.blockedRequests.toLocaleString()}
-                  tone={data.blockedRequests > 0 ? "red" : undefined}
-                />
-              </HStack>
-
-              {data.byDay.length >= 2 && <SpendSparkline byDay={data.byDay} />}
-
-              {!virtualKeyId && (
-                <VStack align="stretch" gap={2}>
-                  <Heading size="sm">Top virtual keys</Heading>
-                  <Table.Root size="sm">
-                    <Table.Header>
-                      <Table.Row>
-                        <Table.ColumnHeader>Key</Table.ColumnHeader>
-                        <Table.ColumnHeader>Prefix</Table.ColumnHeader>
-                        <Table.ColumnHeader>Spend</Table.ColumnHeader>
-                        <Table.ColumnHeader>Requests</Table.ColumnHeader>
-                      </Table.Row>
-                    </Table.Header>
-                    <Table.Body>
-                      {data.byVirtualKey.map((row) => (
-                        <Table.Row key={row.virtualKeyId}>
-                          <Table.Cell>
-                            <Link href={`/gateway/virtual-keys/${row.virtualKeyId}`}>
-                              {row.name}
-                            </Link>
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Text fontFamily="mono" fontSize="xs">
-                              {row.displayPrefix}…
-                            </Text>
-                          </Table.Cell>
-                          <Table.Cell>{formatBudgetUsd(row.totalUsd)}</Table.Cell>
-                          <Table.Cell>{row.requests}</Table.Cell>
-                        </Table.Row>
-                      ))}
-                    </Table.Body>
-                  </Table.Root>
-                </VStack>
-              )}
-
-              <VStack align="stretch" gap={2}>
-                <HStack>
-                  <Heading size="sm">Top models</Heading>
-                  <Spacer />
-                  {viewTracesHref && (
-                    <Link href={viewTracesHref}>
-                      <Button variant="outline" size="xs" data-testid="usage-view-all-traces">
-                        <Bird size={14} /> View all traces
-                      </Button>
-                    </Link>
-                  )}
-                </HStack>
-                <Table.Root size="sm">
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.ColumnHeader>Model</Table.ColumnHeader>
-                      <Table.ColumnHeader>Spend</Table.ColumnHeader>
-                      <Table.ColumnHeader>Requests</Table.ColumnHeader>
-                    </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    {data.byModel.map((row) => (
-                      <Table.Row key={row.model}>
-                        <Table.Cell>
-                          <Text fontFamily="mono" fontSize="xs">
-                            {row.model}
-                          </Text>
-                        </Table.Cell>
-                        <Table.Cell>{formatBudgetUsd(row.totalUsd)}</Table.Cell>
-                        <Table.Cell>{row.requests}</Table.Cell>
-                      </Table.Row>
-                    ))}
-                  </Table.Body>
-                </Table.Root>
-              </VStack>
-            </VStack>
+            <UsageBreakdown data={data} showKeys={!virtualKeyId} viewTracesHref={viewTracesHref} />
           )}
         </Box>
       </>
     </AiGatewayLayout>
+  );
+}
+
+/** The loaded window: totals, the daily trend, and spend by key and by model. */
+function UsageBreakdown({
+  data,
+  showKeys,
+  viewTracesHref,
+}: {
+  data: NonNullable<ReturnType<typeof usageShown>>;
+  showKeys: boolean;
+  viewTracesHref: string | undefined;
+}) {
+  return (
+    <VStack align="stretch" gap={6}>
+      <HStack gap={4} align="stretch">
+        <StatTile label="Total spend" value={formatBudgetUsd(data.totalUsd)} />
+        <StatTile
+          label="Requests"
+          value={data.totalRequests.toLocaleString()}
+          help="Every dispatch attempt is counted, including upstream 4xx/5xx responses. Failed-auth requests don't bill tokens but do ledger as 0-cost entries so blip-driven spikes stay visible in ops review."
+        />
+        <StatTile label="Avg $/request" value={formatAvgCost(data.avgUsdPerRequest)} />
+        <StatTile
+          label="Blocked by guardrail"
+          value={data.blockedRequests.toLocaleString()}
+          tone={data.blockedRequests > 0 ? "red" : undefined}
+        />
+      </HStack>
+
+      {data.byDay.length >= 2 && <SpendSparkline byDay={data.byDay} />}
+
+      {showKeys && (
+        <VStack align="stretch" gap={2}>
+          <Heading size="sm">Top virtual keys</Heading>
+          <Table.Root size="sm">
+            <Table.Header>
+              <Table.Row>
+                <Table.ColumnHeader>Key</Table.ColumnHeader>
+                <Table.ColumnHeader>Prefix</Table.ColumnHeader>
+                <Table.ColumnHeader>Spend</Table.ColumnHeader>
+                <Table.ColumnHeader>Requests</Table.ColumnHeader>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {data.byVirtualKey.map((row) => (
+                <Table.Row key={row.virtualKeyId}>
+                  <Table.Cell>
+                    <Link href={`/gateway/virtual-keys/${row.virtualKeyId}`}>{row.name}</Link>
+                  </Table.Cell>
+                  <Table.Cell>
+                    <Text fontFamily="mono" fontSize="xs">
+                      {row.displayPrefix}…
+                    </Text>
+                  </Table.Cell>
+                  <Table.Cell>{formatBudgetUsd(row.totalUsd)}</Table.Cell>
+                  <Table.Cell>{row.requests}</Table.Cell>
+                </Table.Row>
+              ))}
+            </Table.Body>
+          </Table.Root>
+        </VStack>
+      )}
+
+      <VStack align="stretch" gap={2}>
+        <HStack>
+          <Heading size="sm">Top models</Heading>
+          <Spacer />
+          {viewTracesHref && (
+            <Link href={viewTracesHref}>
+              <Button variant="outline" size="xs" data-testid="usage-view-all-traces">
+                <Bird size={14} /> View all traces
+              </Button>
+            </Link>
+          )}
+        </HStack>
+        <Table.Root size="sm">
+          <Table.Header>
+            <Table.Row>
+              <Table.ColumnHeader>Model</Table.ColumnHeader>
+              <Table.ColumnHeader>Spend</Table.ColumnHeader>
+              <Table.ColumnHeader>Requests</Table.ColumnHeader>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {data.byModel.map((row) => (
+              <Table.Row key={row.model}>
+                <Table.Cell>
+                  <Text fontFamily="mono" fontSize="xs">
+                    {row.model}
+                  </Text>
+                </Table.Cell>
+                <Table.Cell>{formatBudgetUsd(row.totalUsd)}</Table.Cell>
+                <Table.Cell>{row.requests}</Table.Cell>
+              </Table.Row>
+            ))}
+          </Table.Body>
+        </Table.Root>
+      </VStack>
+    </VStack>
   );
 }
 

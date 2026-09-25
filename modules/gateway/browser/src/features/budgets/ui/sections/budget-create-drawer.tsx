@@ -12,7 +12,7 @@ import {
 } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
-import { Temporal, currentTimeZone } from "@langwatch/time";
+import { type Instant, Temporal, currentTimeZone } from "@langwatch/time";
 import { Boxes, Building2, Folder, KeyRound, User, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -21,6 +21,7 @@ import { useGatewayToaster } from "../../../../behavior/gateway-feedback.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
 import { describeError } from "../../../../model/describe-error.ts";
 import { humanizeGatewayError } from "../../../../model/gateway-error-copy.ts";
+import type { GatewayTeam } from "../../../../model/gateway-host.ts";
 import { readHandledError } from "../../../../model/handled-error.ts";
 
 /**
@@ -122,6 +123,56 @@ function budgetScope({
   }
 }
 
+function projectOptionsOf(teams: readonly GatewayTeam[]): { id: string; name: string }[] {
+  return teams.flatMap((t) => t.projects.map((p) => ({ id: p.id, name: `${p.name} · ${t.name}` })));
+}
+
+function providerOptionsOf(
+  providers: readonly { id?: string | null; name?: string | null; provider: string }[],
+): { id: string; name: string }[] {
+  return providers.filter((p) => p.id).map((p) => ({ id: p.id!, name: p.name ?? p.provider }));
+}
+
+function targetsLoadingFor(input: {
+  scopeKind: ScopeKind;
+  groupsLoading: boolean;
+  membersLoading: boolean;
+  keysLoading: boolean;
+}): boolean {
+  return (
+    (input.scopeKind === "GROUP" && input.groupsLoading) ||
+    (input.scopeKind === "PRINCIPAL" && input.membersLoading) ||
+    (input.scopeKind === "VIRTUAL_KEY" && input.keysLoading)
+  );
+}
+
+/** Why the name and limit cannot be sent yet, as the toast says it, or null when they can. */
+function limitRefusal({ name, limitUsd }: { name: string; limitUsd: string }): string | null {
+  if (!name || !limitUsd) return "Name and limit are required";
+  const parsed = Number.parseFloat(limitUsd);
+  if (!Number.isFinite(parsed) || parsed <= 0) return "Limit must be a positive number";
+  return null;
+}
+
+/** The picker's zoneless wall-clock time, read in the browser's zone the admin typed it in. */
+function cycleAnchorInstant(input: {
+  isScheduledWindow: boolean;
+  cycleAnchorAt: string;
+}): Instant | null {
+  if (!input.isScheduledWindow || !input.cycleAnchorAt) return null;
+  return Temporal.PlainDateTime.from(input.cycleAnchorAt)
+    .toZonedDateTime(currentTimeZone())
+    .toInstant();
+}
+
+/** A refused create: an unreachable scope offers the retry, anything else reads as a failure. */
+function createFailure(error: unknown): { unreachable: boolean; message: string } {
+  if (readHandledError(error)?.code === UNREACHABLE_SCOPE_CODE) {
+    return { unreachable: true, message: describeError({ error }) };
+  }
+  return { unreachable: false, message: humanizeGatewayError(error, "Failed to create budget") };
+}
+
 export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCreateDrawerProps) {
   const toaster = useGatewayToaster();
   const { project, team, organization } = useOrganizationTeamProject();
@@ -181,10 +232,7 @@ export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCrea
     [organization?.teams],
   );
   const projects = useMemo(
-    () =>
-      organization?.teams?.flatMap((t) =>
-        t.projects.map((p) => ({ id: p.id, name: `${p.name} · ${t.name}` })),
-      ) ?? [],
+    () => projectOptionsOf(organization?.teams ?? []),
     [organization?.teams],
   );
   const activeKeys = useMemo(
@@ -192,10 +240,7 @@ export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCrea
     [keysQuery.data],
   );
   const providerOptions = useMemo(
-    () =>
-      (providersQuery.data ?? [])
-        .filter((p) => p.id)
-        .map((p) => ({ id: p.id!, name: p.name ?? p.provider })),
+    () => providerOptionsOf(providersQuery.data ?? []),
     [providersQuery.data],
   );
 
@@ -273,23 +318,18 @@ export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCrea
           keys: activeKeys,
         });
 
-  const targetsLoading =
-    (scopeKind === "GROUP" && groupsQuery.isLoading) ||
-    (scopeKind === "PRINCIPAL" && membersQuery.isLoading) ||
-    (scopeKind === "VIRTUAL_KEY" && keysQuery.isLoading);
+  const targetsLoading = targetsLoadingFor({
+    scopeKind,
+    groupsLoading: groupsQuery.isLoading,
+    membersLoading: membersQuery.isLoading,
+    keysLoading: keysQuery.isLoading,
+  });
 
   const submit = async ({ allowUnreachable = false } = {}) => {
     if (!organization) return;
-    if (!name || !limitUsd) {
-      toaster.create({ title: "Name and limit are required", type: "error" });
-      return;
-    }
-    const parsed = Number.parseFloat(limitUsd);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      toaster.create({
-        title: "Limit must be a positive number",
-        type: "error",
-      });
+    const refusal = limitRefusal({ name, limitUsd });
+    if (refusal) {
+      toaster.create({ title: refusal, type: "error" });
       return;
     }
     if (scopeKind !== "ORGANIZATION" && !targetId) {
@@ -310,25 +350,16 @@ export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCrea
         providerKey: providerKey || null,
         // The picker gives a local wall-clock string with no zone, read in
         // the browser's zone, which is the one the admin typed it in.
-        cycleAnchorAt:
-          isScheduledWindow && cycleAnchorAt
-            ? Temporal.PlainDateTime.from(cycleAnchorAt)
-                .toZonedDateTime(currentTimeZone())
-                .toInstant()
-            : null,
+        cycleAnchorAt: cycleAnchorInstant({ isScheduledWindow, cycleAnchorAt }),
         allowUnreachable: allowUnreachable || undefined,
       });
       onCreated();
       reset();
       onOpenChange(false);
     } catch (error) {
-      if (readHandledError(error)?.code === UNREACHABLE_SCOPE_CODE) {
-        setScopeUnreachable(true);
-        setSubmitError(describeError({ error }));
-        return;
-      }
-      setScopeUnreachable(false);
-      setSubmitError(humanizeGatewayError(error, "Failed to create budget"));
+      const failure = createFailure(error);
+      setScopeUnreachable(failure.unreachable);
+      setSubmitError(failure.message);
     }
   };
 

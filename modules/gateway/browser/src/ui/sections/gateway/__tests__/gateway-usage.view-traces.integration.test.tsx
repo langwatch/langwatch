@@ -127,6 +127,12 @@ describe("Usage page view-all-traces button", () => {
   afterEach(() => cleanup());
 
   describe("when the page is filtered to one key", () => {
+    it("leaves out the spend-by-key table", () => {
+      renderUsagePage(`/gateway/usage?days=30&vk=${VK_ID}`);
+      expect(screen.getByText("Top models")).toBeInTheDocument();
+      expect(screen.queryByText("Top virtual keys")).not.toBeInTheDocument();
+    });
+
     /** @scenario "The traces link carries the window the reader is looking at" */
     it("opens the key's own project on the preset for that period", () => {
       for (const [days, preset] of [
@@ -161,6 +167,14 @@ describe("Usage page view-all-traces button", () => {
     it("offers nothing, since the organization has no single destination", () => {
       renderUsagePage("/gateway/usage?days=30");
       expect(screen.queryByTestId("usage-view-all-traces")).not.toBeInTheDocument();
+    });
+
+    it("shows the totals with spend by key and by model", () => {
+      renderUsagePage("/gateway/usage?days=30");
+      expect(screen.getByText("Total spend")).toBeInTheDocument();
+      expect(screen.getByText("Top virtual keys")).toBeInTheDocument();
+      expect(screen.getByText("Top models")).toBeInTheDocument();
+      expect(screen.getByText("gpt-5-mini")).toBeInTheDocument();
     });
   });
 
