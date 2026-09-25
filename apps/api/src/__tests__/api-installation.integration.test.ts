@@ -33,7 +33,6 @@ import {
   type SecretHandle,
 } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
-import { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 const ROLE = "api";
@@ -122,6 +121,74 @@ async function bootApi() {
   });
   return { runtime, eventing };
 }
+
+const OTLP_FAMILIES: ReadonlySet<string> = new Set(["otel", "otel-logs", "otel-metrics"]);
+const OTLP_TRACE_BATCH = {
+  resourceSpans: [
+    {
+      resource: { attributes: [] },
+      scopeSpans: [
+        {
+          scope: { name: "app.tracer" },
+          spans: [
+            {
+              traceId: "AAECAwQFBgcICQoLDA0ODw==",
+              spanId: "AAECAwQFBgc=",
+              name: "call",
+              kind: 1,
+              startTimeUnixNano: "1700000000000000000",
+              endTimeUnixNano: "1700000001000000000",
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+const OTLP_LOG_BATCH = {
+  resourceLogs: [
+    {
+      resource: { attributes: [] },
+      scopeLogs: [
+        {
+          scope: { name: "app.logger" },
+          logRecords: [{ timeUnixNano: "1700000000000000000", body: { stringValue: "hello" } }],
+        },
+      ],
+    },
+  ],
+};
+const OTLP_METRIC_BATCH = {
+  resourceMetrics: [
+    {
+      resource: { attributes: [] },
+      scopeMetrics: [
+        {
+          scope: { name: "app.meter" },
+          metrics: [
+            {
+              name: "requests",
+              sum: {
+                aggregationTemporality: 2,
+                isMonotonic: true,
+                dataPoints: [{ timeUnixNano: "1700000000000000000", asInt: "12" }],
+              },
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+/** Main's canonical door and one misconfigured exporter base per signal. */
+const OTLP_POSTS: readonly (readonly [string, object])[] = [
+  ["/api/otel/v1/traces", OTLP_TRACE_BATCH],
+  ["/api/collector/v1/traces", OTLP_TRACE_BATCH],
+  ["/api/otel/v1/logs", OTLP_LOG_BATCH],
+  ["/api/otel/v1/traces/v1/logs", OTLP_LOG_BATCH],
+  ["/api/otel/v1/metrics", OTLP_METRIC_BATCH],
+  ["/v1/metrics", OTLP_METRIC_BATCH],
+];
 
 const moduleApis = serverModules.flatMap((module) =>
   module.apiContract instanceof ModuleApiToken ? [module.apiContract] : [],
@@ -246,37 +313,61 @@ describe("the api process installation", () => {
     }
   });
 
-  /** @scenario "The api process receives OTLP logs rather than refusing them" */
-  it("collects an OTLP log batch through the installed log module", async () => {
+  /** @scenario "The api process serves every OTLP signal at its own module's door" */
+  it("answers every OTLP signal from its owner's door, canonically and under an alias", async () => {
     const { runtime } = await bootApi();
 
     try {
-      await expect(
-        runtime.service(TraceApi).otlpLogs({
-          tenantId: "project-1",
-          organizationId: "organization-1",
-          logRequest: {
-            resourceLogs: [
-              {
-                resource: { attributes: [] },
-                scopeLogs: [
-                  {
-                    scope: { name: "app.logger" },
-                    logRecords: [
-                      {
-                        timeUnixNano: "1700000000000000000",
-                        severityNumber: 9,
-                        body: { stringValue: "hello" },
-                        attributes: [],
-                      },
-                    ],
-                  },
-                ],
-              },
-            ],
-          },
+      const closed = {
+        authenticate: () => {
+          throw new Error("the OTLP doors resolve their key themselves.");
+        },
+      };
+      const host = RestHost.create({
+        identities: {
+          project: closed,
+          organization: closed,
+          apiKey: closed,
+          scimToken: closed,
+          "instance-admin": closed,
+          browser: closed,
+        },
+        bearers: () => closed,
+        audit: { record: async () => {} },
+      });
+      const families = new Map<string, string>();
+      for (const module of serverModules) {
+        const token = module.apiContract;
+        if (!(token instanceof ModuleApiToken)) continue;
+        for (const transport of module.transports ?? []) {
+          const namespace = transport.namespace ?? "";
+          if (transport.protocol !== "rest" || !OTLP_FAMILIES.has(namespace)) continue;
+          families.set(namespace, module.name);
+          host.mount(transport.router(), () => runtime.service(token));
+        }
+      }
+      const post = (path: string, body: object) =>
+        host.app.fetch(
+          new Request(`http://api.test${path}`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+          }),
+        );
+      const answers = await Promise.all(
+        OTLP_POSTS.map(async ([path, body]) => {
+          const response = await post(path, body);
+          return [path, response.status, Object.keys(await response.json())];
         }),
-      ).resolves.toEqual({ outcome: "collected", acceptedLogRecords: 1, rejectedLogRecords: 0 });
+      );
+
+      expect(Object.fromEntries(families)).toEqual({
+        otel: "trace",
+        "otel-logs": "log",
+        "otel-metrics": "metric",
+      });
+      expect(answers).toEqual(OTLP_POSTS.map(([path]) => [path, 401, ["message"]]));
+      expect((await post("/elsewhere/v1/metrics", OTLP_METRIC_BATCH)).status).toBe(404);
     } finally {
       await runtime.stop();
     }

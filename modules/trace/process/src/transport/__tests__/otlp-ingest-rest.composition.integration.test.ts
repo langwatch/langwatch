@@ -287,61 +287,6 @@ function otlpTraceBody() {
   };
 }
 
-/** One log record, in the JSON shape an OTLP exporter posts it. */
-function otlpLogBody() {
-  return {
-    resourceLogs: [
-      {
-        resource: { attributes: [] },
-        scopeLogs: [
-          {
-            scope: { name: "langwatch-exporter" },
-            logRecords: [
-              {
-                timeUnixNano: `${NOW}${NANOS}`,
-                body: { stringValue: "hello" },
-                attributes: [],
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  };
-}
-
-/** One metric, in the JSON shape an OTLP exporter posts it. */
-function otlpMetricBody() {
-  return {
-    resourceMetrics: [
-      {
-        resource: { attributes: [] },
-        scopeMetrics: [
-          {
-            scope: { name: "langwatch-exporter" },
-            metrics: [
-              {
-                name: "claude_code.token.usage",
-                sum: {
-                  aggregationTemporality: 2,
-                  isMonotonic: true,
-                  dataPoints: [
-                    {
-                      timeUnixNano: `${NOW}${NANOS}`,
-                      asInt: "12",
-                      attributes: [],
-                    },
-                  ],
-                },
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  };
-}
-
 describe("given the trace module as a process composes it", () => {
   describe("when an OTLP exporter posts a trace batch to /api/otel/v1/traces", () => {
     /** @scenario "The OTLP receiver accepts an exported trace batch" */
@@ -391,6 +336,7 @@ describe("given the trace module as a process composes it", () => {
   });
 
   describe("when an exporter appends the signal to a root-level base", () => {
+    /** @scenario "A corrected path answers like the canonical one" */
     it("accepts the same bytes and returns the canonical trace status", async () => {
       const { post, recordedSpans } = deployment();
 
@@ -401,6 +347,7 @@ describe("given the trace module as a process composes it", () => {
       expect(recordedSpans).toHaveLength(1);
     });
 
+    /** @scenario "A corrected path still needs a valid key" */
     it("applies the canonical credential refusal before parsing the alias body", async () => {
       const { post, recordedSpans } = deployment();
 
@@ -459,39 +406,6 @@ describe("given the trace module as a process composes it", () => {
 
       expect(response.status).toBe(200);
       expect(recordedSpans).toHaveLength(1);
-    });
-  });
-
-  describe("when an exporter posts logs to a deployment that receives none", () => {
-    /**
-     * No composition supplies a log collection, so the signal is permanently
-     * unserved. 404 rather than 503 on purpose: a retryable status would have
-     * an exporter fleet re-post a batch that can never land.
-     *
-     * @scenario "The OTLP receiver refuses a signal this deployment does not receive"
-     */
-    it("refuses permanently rather than asking the exporter to retry", async () => {
-      const { post } = deployment();
-
-      const response = await post("/api/otel/v1/logs", otlpLogBody());
-
-      expect(response.status).toBe(404);
-      expect(await response.json()).toMatchObject({
-        error: "This deployment does not receive OpenTelemetry logs",
-      });
-    });
-  });
-
-  describe("when an exporter posts metrics to a deployment that receives none", () => {
-    it("refuses permanently rather than asking the exporter to retry", async () => {
-      const { post } = deployment();
-
-      const response = await post("/api/otel/v1/metrics", otlpMetricBody());
-
-      expect(response.status).toBe(404);
-      expect(await response.json()).toMatchObject({
-        error: "This deployment does not receive OpenTelemetry metrics",
-      });
     });
   });
 });

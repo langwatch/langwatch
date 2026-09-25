@@ -23,6 +23,8 @@
   },
   "dependencies": {
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@opentelemetry/otlp-transformer": "catalog:",
     "zod": "catalog:"
   },

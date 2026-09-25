@@ -11,12 +11,12 @@ import { otlpIngestRest } from "../otlp-ingest.rest.ts";
 
 const declaration = otlpIngestRest.router();
 
-const RECEIVERS = ["ingestOtlpTraces", "ingestOtlpLogs", "ingestOtlpMetrics"];
+const RECEIVERS = ["ingestOtlpTraces"];
 const ALIASES = [
-  "ingestOtlpAliasOtel",
-  "ingestOtlpAliasCollector",
-  "ingestOtlpAliasApiV1",
-  "ingestOtlpAliasRootV1",
+  "ingestOtlpTracesAlias",
+  "ingestOtlpTracesAliasSlash",
+  "ingestOtlpTracesRootV1",
+  "ingestOtlpTracesRootV1Slash",
 ];
 
 describe("the OTLP receiver family", () => {
@@ -37,16 +37,14 @@ describe("the OTLP receiver family", () => {
       }
     });
 
-    it("keeps every corrected exporter base in the receiver's one declaration", () => {
+    it("serves only the traces suffix, leaving logs and metrics to their own modules", () => {
       expect(declaration.addressing).toBe("literal");
       expect(declaration.routes.map((route) => route.path)).toEqual([
         "/api/otel/v1/traces",
-        "/api/otel/v1/logs",
-        "/api/otel/v1/metrics",
-        "/api/otel/*",
-        "/api/collector/*",
-        "/api/v1/*",
-        "/v1/*",
+        "/:otlpBase{.+}/v1/traces",
+        "/:otlpBase{.+}/v1/traces/",
+        "/v1/traces",
+        "/v1/traces/",
       ]);
     });
   });

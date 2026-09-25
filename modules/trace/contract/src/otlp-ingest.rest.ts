@@ -3,9 +3,12 @@
  * server transport file instead, keeping this contract free of the DOM-lib
  * `Request` dependency neither the browser SDK nor another module needs.
  */
-import { HandledError } from "@langwatch/handled-error";
-import type { OtlpReceiverPolicy } from "@langwatch/otlp";
+import type { OtlpSourcePolicy } from "@langwatch/otlp";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
+import { z } from "zod";
+
+/** The exporter base a `/v1/traces` suffix was appended to; the receiver checks it. */
+export const otlpTraceAliasParamsSchema = z.object({ otlpBase: z.string() });
 
 export type OtlpIngestCredentialInput = Readonly<{
   authorization: string | null;
@@ -24,9 +27,7 @@ export type OtlpIngestIdentity = Readonly<{
   organizationId: string;
   ingestSourceType: string | null;
   ingestionTemplateId: string | null;
-  sourcePolicy?:
-    | { status: "ready"; policies: Record<"traces" | "logs" | "metrics", OtlpReceiverPolicy> }
-    | { status: "failed"; error: unknown };
+  sourcePolicy?: OtlpSourcePolicy;
 }>;
 
 /** A resolved receiver credential; a refusal is thrown, and the receiver renders it. */
@@ -43,24 +44,6 @@ export type OtlpTraceCollectionResult = Readonly<{
   errorMessage?: string;
 }>;
 
-export type OtlpLogCollectionOutcome =
-  | Readonly<{
-      outcome: "collected";
-      rejectedLogRecords: number;
-      errorMessage?: string | undefined;
-    }>
-  | Readonly<{ outcome: "unavailable"; errorMessage: string }>
-  | Readonly<{ outcome: "not-served"; errorMessage: string }>;
-
-export type OtlpMetricCollectionOutcome =
-  | Readonly<{
-      outcome: "collected";
-      rejectedDataPoints: number;
-      errorMessage?: string | undefined;
-    }>
-  | Readonly<{ outcome: "unavailable"; errorMessage: string }>
-  | Readonly<{ outcome: "not-served"; errorMessage: string }>;
-
 /** OTLP operations are part of Trace's one public process API. */
 export type TraceOtlpIngestApi = Readonly<{
   otlpCredential(input: OtlpIngestCredentialInput): Promise<OtlpIngestCredential>;
@@ -70,42 +53,11 @@ export type TraceOtlpIngestApi = Readonly<{
     tenantId: string;
     traceRequest: IExportTraceServiceRequest;
   }): Promise<OtlpTraceCollectionResult>;
-  otlpLogs(input: {
-    tenantId: string;
-    organizationId: string;
-    logRequest: unknown;
-  }): Promise<OtlpLogCollectionOutcome>;
-  otlpMetrics(input: {
-    tenantId: string;
-    organizationId: string;
-    metricRequest: unknown;
-  }): Promise<OtlpMetricCollectionOutcome>;
   otlpReportError(
     error: Error,
     context: Readonly<{ projectId: string; customerTraceIds: string[] }>,
   ): void;
 }>;
-
-/**
- * An ingestion key arrived on a process that resolves no source billing.
- */
-export class OtlpIngestSourceBillingUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor(sourceType: string) {
-    super(
-      "service_unavailable",
-      "This deployment cannot resolve the billing treatment for an ingestion key's source, so it will not record traffic sent on one.",
-      {
-        meta: { sourceType },
-        httpStatus: 503,
-        fault: "platform",
-        retryable: true,
-      },
-    );
-    this.name = "OtlpIngestSourceBillingUnavailableError";
-  }
-}
 
 /**
  * Classifies a token by prefix without exposing the value. `sk-lw-` keys

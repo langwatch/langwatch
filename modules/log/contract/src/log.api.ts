@@ -1,4 +1,6 @@
 import { moduleApi } from "@langwatch/kernel/module-api";
+import type { OtlpDoorRefusal, OtlpDoorRequest } from "@langwatch/otlp";
+import { z } from "zod";
 
 import type { LogPiiRedactionLevel, LogPreparation } from "./log-preparation.types.ts";
 import type { CanonicalLogRecord, CanonicalTraceLogRecord } from "./log-record.ts";
@@ -16,6 +18,12 @@ export type LogRequestCollectionResult =
     }
   | { outcome: "unavailable"; errorMessage: string };
 
+/** What `POST /api/otel/v1/logs` answers from: the collection, or the door's own refusal. */
+export type LogOtlpDoorResult = LogRequestCollectionResult | OtlpDoorRefusal;
+
+/** The exporter base a `/v1/logs` suffix was appended to; the receiver checks it. */
+export const otlpLogAliasParamsSchema = z.object({ otlpBase: z.string() });
+
 /** The portable canonical log capability shared by process features. */
 export interface LogApi {
   prepareCanonicalLogRecords(input: {
@@ -31,13 +39,8 @@ export interface LogApi {
     occurredAtMs?: number;
     limit?: number;
   }): Promise<CanonicalTraceLogRecord[]>;
-  /** Prepares, records and correlates one OTLP log request (main: LogRequestCollectionService). */
-  handleOtlpLogRequest(input: {
-    tenantId: string;
-    organizationId: string;
-    logRequest: unknown;
-    piiRedactionLevel: LogPiiRedactionLevel;
-  }): Promise<LogRequestCollectionResult>;
+  /** One exporter request at the logs door: key, allowance, parse, then collection. */
+  receiveOtlpLogs(request: OtlpDoorRequest): Promise<LogOtlpDoorResult>;
   /** Sends prepared records onto the `log_processing` pipeline for durable storage. */
   recordCanonicalLogRecords(records: readonly CanonicalLogRecord[]): Promise<void>;
 }

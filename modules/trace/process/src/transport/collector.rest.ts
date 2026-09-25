@@ -8,6 +8,12 @@ import type { HandledError } from "@langwatch/handled-error";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import { createLogger, validationMeta } from "@langwatch/observability";
 import {
+  ingestDoorRefusalBody,
+  ingestDoorRefusalStatus,
+  isIngestDoorRefusal,
+  isUnknownCredentialRefusal,
+} from "@langwatch/otlp";
+import {
   collectorRESTParamsValidatorSchema,
   type CollectorRESTParamsValidator,
   type Span,
@@ -32,12 +38,6 @@ import {
   type CollectorMetadata,
   type CollectorRejection,
 } from "#rules/trace-collector-body.rules";
-import {
-  isTraceDoorRefusal,
-  isUnknownCredentialRefusal,
-  traceDoorRefusalBody,
-  traceDoorRefusalStatus,
-} from "#rules/trace-ingest-refusal.rules";
 import {
   TraceCollectorDispatchService,
   type CollectorEvaluationReport,
@@ -124,7 +124,7 @@ function refusalAnswer(refusal: HandledError): CollectorAnswer {
   }
 
   logger.warn("collector request denied by API key ceiling");
-  return answer(traceDoorRefusalBody(refusal), traceDoorRefusalStatus(refusal));
+  return answer(ingestDoorRefusalBody(refusal), ingestDoorRefusalStatus(refusal));
 }
 
 /** The 413 a body past its cap earns, in the plain sentence it has always been. */
@@ -254,10 +254,13 @@ async function ingestCollectorBody(input: {
     reportEvaluation: app.reportEvaluation,
   });
 
-  const { freshSpans, droppedOldSpans, droppedUnstorableSpans } = dispatch.partitionFreshSpans(spans, {
-    projectId: project.id,
-    traceId,
-  });
+  const { freshSpans, droppedOldSpans, droppedUnstorableSpans } = dispatch.partitionFreshSpans(
+    spans,
+    {
+      projectId: project.id,
+      traceId,
+    },
+  );
 
   const spanOutcome = await dispatch.dispatchSpans(freshSpans, {
     projectId: project.id,
@@ -316,7 +319,7 @@ async function collect({
   try {
     auth = await app.collectorCredential({ request });
   } catch (error) {
-    if (!isTraceDoorRefusal(error)) throw error;
+    if (!isIngestDoorRefusal(error)) throw error;
     return refusalAnswer(error);
   }
 

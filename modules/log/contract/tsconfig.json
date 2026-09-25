@@ -19,6 +19,9 @@
     },
     {
       "path": "../../../packages/kernel/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/otlp/tsconfig.build.json"
     }
   ]
 }

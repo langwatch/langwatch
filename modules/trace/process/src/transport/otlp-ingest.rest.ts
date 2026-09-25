@@ -1,5 +1,5 @@
 /**
- * The OTLP receiver: `POST /api/otel/v1/{traces,logs,metrics}`. Declared
+ * The OTLP trace receiver: `POST /api/otel/v1/traces` and its aliases. Declared
  * public since it resolves its own credential via `app.otlpCredential`,
  * so a refusal answers with the credential chain's own status and body.
  */
@@ -11,27 +11,27 @@ import {
 import type { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import {
-  applyOtlpReceiverPolicy,
+  applyReceiverProvenance,
   canonicalOtlpPath,
-  type OtlpReceiverRequest,
   decodeBase64OpenTelemetryId,
+  ingestDoorRefusalBody,
+  ingestDoorRefusalStatus,
+  isIngestDoorRefusal,
+  logCorrectedOtlpPath,
   OTLP_CORRECTED_PATH_HEADER,
+  otlpBodyForensics,
   otlpProtobufRoot,
-  parseOtlpLogs,
-  parseOtlpMetrics,
   parseOtlpTraces,
   readCorrectedPath,
   readOtlpBody,
   stampCorrectedPath,
 } from "@langwatch/otlp";
 import { resolveRequestBound } from "@langwatch/plans";
-import { nowInstant } from "@langwatch/time";
 import {
-  OtlpIngestSourceBillingUnavailableError,
+  otlpTraceAliasParamsSchema,
   TraceApi,
   type OtlpIngestCredential,
   type OtlpIngestCredentialInput,
-  type OtlpIngestIdentity,
   type TraceOtlpIngestApi,
 } from "@langwatch/trace-contract";
 import { SpanKind, SpanStatusCode, type Span } from "@opentelemetry/api";
@@ -40,15 +40,7 @@ import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { getLangWatchTracer } from "langwatch";
 
-import {
-  isTraceDoorRefusal,
-  traceDoorRefusalBody,
-  traceDoorRefusalStatus,
-} from "#rules/trace-ingest-refusal.rules";
-
 const loggerTraces = createLogger("langwatch:otel:v1:traces");
-const loggerLogs = createLogger("langwatch:otel:v1:logs");
-const loggerMetrics = createLogger("langwatch:otel:v1:metrics");
 
 const AUTH_REASON = "OTLP ingestion API key resolved in-handler";
 
@@ -63,67 +55,6 @@ const OTLP_PROTOCOL_REASON =
  */
 const traceRequestType =
   otlpProtobufRoot.opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest;
-
-/**
- * A rejected OTLP body is unparsed, so it has not been through PII redaction.
- * Only its length may be recorded: the bytes carry prompts, completions and
- * host identifiers, and a log sink is not a place customer content may reach.
- */
-function bodyForensics(body: ArrayBuffer | Uint8Array): { bodyBytes: number } {
-  return { bodyBytes: body.byteLength };
-}
-
-/**
- * A misconfigured exporter fleet posts continuously with an identical
- * project/path signal, so a pair is reported at most once a window —
- * repetition costs money on an ingestion hot path for no new information.
- */
-const CORRECTED_PATH_LOG_WINDOW_MS = 10 * 60 * 1000;
-const CORRECTED_PATH_LOG_MAX_PAIRS = 1000;
-const correctedPathLastLoggedAt = new Map<string, number>();
-
-function correctedPathIsDueToLog({ pair, now }: { pair: string; now: number }): boolean {
-  const last = correctedPathLastLoggedAt.get(pair);
-  if (last !== void 0 && now - last < CORRECTED_PATH_LOG_WINDOW_MS) return false;
-
-  if (correctedPathLastLoggedAt.size >= CORRECTED_PATH_LOG_MAX_PAIRS) {
-    correctedPathLastLoggedAt.clear();
-  }
-  correctedPathLastLoggedAt.set(pair, now);
-  return true;
-}
-
-/**
- * Records that this request reached us on a path a misconfigured exporter
- * produced. Logged here, not at the alias, since the project id is what
- * makes it actionable.
- */
-function logCorrectedPath({
-  request,
-  path,
-  projectId,
-  logger,
-}: {
-  request: Request;
-  path: string;
-  projectId: string;
-  logger: Logger;
-}): void {
-  const originalPath = readCorrectedPath(
-    request.headers.get(OTLP_CORRECTED_PATH_HEADER) ?? undefined,
-  );
-  if (!originalPath) return;
-  // A NUL joins the pair because it cannot appear in a URL pathname, so no
-  // project and path can collide with a different pair.
-  const pair = [projectId, originalPath].join("\u0000");
-  const isDueToLog = correctedPathIsDueToLog({ pair, now: nowInstant().epochMilliseconds });
-  if (!isDueToLog) return;
-
-  logger.warn(
-    { projectId, originalPath, canonicalPath: path },
-    "OTLP exporter posted to a non-canonical path; served from the canonical route",
-  );
-}
 
 type OtlpAuthenticated = OtlpIngestCredential | Readonly<{ refusal: HandledError }>;
 
@@ -152,10 +83,10 @@ async function authenticate(
   try {
     resolution = await credential(credentialInput);
   } catch (error) {
-    if (!isTraceDoorRefusal(error)) throw error;
+    if (!isIngestDoorRefusal(error)) throw error;
 
     logger.warn(
-      { ...diagnostics, refusalStatus: traceDoorRefusalStatus(error) },
+      { ...diagnostics, refusalStatus: ingestDoorRefusalStatus(error) },
       diagnostics.hasEmptyAuthToken
         ? "Authentication failed: X-Auth-Token sent but empty"
         : "Authentication failed",
@@ -163,40 +94,13 @@ async function authenticate(
     return { refusal: error };
   }
 
-  logCorrectedPath({ request, path: url.pathname, projectId: resolution.project.id, logger });
+  logCorrectedOtlpPath({
+    originalPath: readCorrectedPath(request.headers.get(OTLP_CORRECTED_PATH_HEADER) ?? undefined),
+    canonicalPath: url.pathname,
+    projectId: resolution.project.id,
+    logger,
+  });
   return resolution;
-}
-
-function applyReceiverProvenance({
-  request,
-  identity,
-  signal,
-  logger,
-}: {
-  request: OtlpReceiverRequest;
-  identity: OtlpIngestIdentity;
-  signal: "traces" | "logs" | "metrics";
-  logger: Logger;
-}): void {
-  const isIngestionKey = identity.apiKeyId !== null && Boolean(identity.ingestSourceType);
-  const source = identity.sourcePolicy;
-  if (isIngestionKey && !source) {
-    throw new OtlpIngestSourceBillingUnavailableError(identity.ingestSourceType ?? "");
-  }
-
-  if (isIngestionKey && source?.status === "failed") {
-    throw source.error;
-  }
-
-  const policy = isIngestionKey && source?.status === "ready" ? source.policies[signal] : void 0;
-  const { droppedScopes } = applyOtlpReceiverPolicy(request, signal, identity.apiKeyId, policy);
-
-  if (droppedScopes > 0) {
-    logger.warn(
-      { droppedForeign: droppedScopes, apiKeyId: identity.apiKeyId },
-      "dropped instrumentation scopes outside the authenticated ingestion policy",
-    );
-  }
 }
 
 /**
@@ -287,7 +191,7 @@ const jsonAnswer = (body: unknown, status: ContentfulStatusCode): OtlpAnswer => 
 });
 
 const refusalAnswer = (refusal: HandledError): OtlpAnswer =>
-  jsonAnswer(traceDoorRefusalBody(refusal), traceDoorRefusalStatus(refusal));
+  jsonAnswer(ingestDoorRefusalBody(refusal), ingestDoorRefusalStatus(refusal));
 
 /** The whole of one `POST /api/otel/v1/traces` request, inside its server span. */
 async function handleTracesRequest({
@@ -338,7 +242,7 @@ async function handleTracesRequest({
 
   if (!parsed.ok) {
     loggerTraces.error(
-      { error: parsed.error, projectId: project.id, customerTraceIds, ...bodyForensics(body) },
+      { error: parsed.error, projectId: project.id, customerTraceIds, ...otlpBodyForensics(body) },
       "error parsing traces",
     );
     ports.otlpReportError(new Error(parsed.error), { projectId: project.id, customerTraceIds });
@@ -370,161 +274,6 @@ async function handleTracesRequest({
   );
 }
 
-/** The whole of one `POST /api/otel/v1/logs` request, inside its server span. */
-async function handleLogsRequest({
-  request,
-  span,
-  rawBytes,
-  ports,
-}: {
-  request: Request;
-  span: Span;
-  rawBytes: Uint8Array;
-  ports: TraceOtlpIngestApi;
-}): Promise<OtlpAnswer> {
-  const authenticated = await authenticate(request, ports.otlpCredential, loggerLogs);
-  if ("refusal" in authenticated) {
-    span.setStatus({ code: SpanStatusCode.ERROR, message: "unauthenticated" });
-    return refusalAnswer(authenticated.refusal);
-  }
-
-  const { project, identity } = authenticated;
-  span.setAttribute("langwatch.project.id", project.id);
-
-  await ports.otlpUsageLimit({ project, customerTraceIds: [] });
-
-  const body = await readOtlpBody(requestForDecompression(request, rawBytes));
-  const parsed = parseOtlpLogs(body, request.headers.get("content-type") ?? undefined);
-  if (!parsed.ok) {
-    span.setStatus({ code: SpanStatusCode.ERROR, message: "Failed to parse logs" });
-    span.recordException(new Error(parsed.error));
-    loggerLogs.error(
-      { error: parsed.error, projectId: project.id, ...bodyForensics(body) },
-      "error parsing logs",
-    );
-    ports.otlpReportError(new Error(parsed.error), { projectId: project.id, customerTraceIds: [] });
-    return jsonAnswer({ error: "Failed to parse logs" }, 400);
-  }
-
-  if (identity.apiKeyId) ports.otlpMarkCredentialUsed({ apiKeyId: identity.apiKeyId });
-
-  applyReceiverProvenance({
-    request: parsed.request,
-    identity,
-    signal: "logs",
-    logger: loggerLogs,
-  });
-
-  const result = await ports.otlpLogs({
-    tenantId: project.id,
-    organizationId: project.organizationId,
-    logRequest: parsed.request,
-  });
-
-  // Nothing was durably accepted and the cause is ours. OTLP treats a 200
-  // with `partialSuccess` as a permanent rejection the client must not
-  // re-send, so answering that here would turn a queue blip into fleet-wide
-  // data loss. 503 is in OTLP's retryable set.
-  if (result.outcome === "unavailable") {
-    return jsonAnswer({ error: result.errorMessage }, 503);
-  }
-
-  // This deployment receives no logs at all, which is not a blip and will not
-  // pass: 404, the same permanent refusal this address answers where the
-  // family is not mounted, rather than a retryable status an exporter would
-  // hammer forever for a batch that can never land.
-  if (result.outcome === "not-served") {
-    return jsonAnswer({ error: result.errorMessage }, 404);
-  }
-
-  return jsonAnswer(
-    result.rejectedLogRecords > 0
-      ? {
-          partialSuccess: {
-            rejectedLogRecords: result.rejectedLogRecords,
-            ...(result.errorMessage ? { errorMessage: result.errorMessage } : {}),
-          },
-        }
-      : {},
-    200,
-  );
-}
-
-/** The whole of one `POST /api/otel/v1/metrics` request, inside its server span. */
-async function handleMetricsRequest({
-  request,
-  span,
-  rawBytes,
-  ports,
-}: {
-  request: Request;
-  span: Span;
-  rawBytes: Uint8Array;
-  ports: TraceOtlpIngestApi;
-}): Promise<OtlpAnswer> {
-  const authenticated = await authenticate(request, ports.otlpCredential, loggerMetrics);
-  if ("refusal" in authenticated) {
-    span.setStatus({ code: SpanStatusCode.ERROR, message: "unauthenticated" });
-    return refusalAnswer(authenticated.refusal);
-  }
-
-  const { project, identity } = authenticated;
-  span.setAttribute("langwatch.project.id", project.id);
-
-  await ports.otlpUsageLimit({ project, customerTraceIds: [] });
-
-  const body = await readOtlpBody(requestForDecompression(request, rawBytes));
-  const parsed = parseOtlpMetrics(body, request.headers.get("content-type") ?? undefined);
-  if (!parsed.ok) {
-    span.setStatus({ code: SpanStatusCode.ERROR, message: "Failed to parse metrics" });
-    span.recordException(new Error(parsed.error));
-    loggerMetrics.error(
-      { error: parsed.error, projectId: project.id, ...bodyForensics(body) },
-      "error parsing metrics",
-    );
-    ports.otlpReportError(new Error(parsed.error), {
-      projectId: project.id,
-      customerTraceIds: [],
-    });
-    return jsonAnswer({ error: "Failed to parse metrics" }, 400);
-  }
-
-  applyReceiverProvenance({
-    request: parsed.request,
-    identity,
-    signal: "metrics",
-    logger: loggerMetrics,
-  });
-
-  if (identity.apiKeyId) ports.otlpMarkCredentialUsed({ apiKeyId: identity.apiKeyId });
-
-  const result = await ports.otlpMetrics({
-    tenantId: project.id,
-    organizationId: project.organizationId,
-    metricRequest: parsed.request,
-  });
-
-  if (result.outcome === "unavailable") {
-    return jsonAnswer({ error: result.errorMessage }, 503);
-  }
-
-  // As the logs signal: permanent, so not a retryable status. See there.
-  if (result.outcome === "not-served") {
-    return jsonAnswer({ error: result.errorMessage }, 404);
-  }
-
-  if (result.rejectedDataPoints === 0) return jsonAnswer({}, 200);
-  return jsonAnswer(
-    {
-      partialSuccess: {
-        rejectedDataPoints: result.rejectedDataPoints,
-        ...(result.errorMessage ? { errorMessage: result.errorMessage } : {}),
-      },
-    },
-    200,
-  );
-}
-
 const PUBLIC_ACCESS = {
   kind: "public" as const,
   reason: AUTH_REASON,
@@ -534,10 +283,10 @@ const PUBLIC_ACCESS = {
 const payloadTooLarge = (): Error =>
   new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
 
-/** Wire-body cap for all three receivers; the decompressed cap is separate. */
+/** Wire-body cap; the decompressed cap is separate. */
 const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
 
-/** Dispatches a recognised legacy exporter URL through the canonical receiver. */
+/** Serves a recognised misconfigured exporter URL from the canonical trace receiver. */
 async function handleOtlpPathAlias({
   app,
   raw,
@@ -557,20 +306,6 @@ async function handleOtlpPathAlias({
         "TracesV1.handleTracesRequest",
         { kind: SpanKind.SERVER },
         (span) => handleTracesRequest({ request: corrected, span, rawBytes: raw, ports: app }),
-      );
-    }
-    case "/api/otel/v1/logs": {
-      const tracer = getLangWatchTracer("langwatch.otel.logs");
-      return tracer.withActiveSpan("[POST] /api/otel/v1/logs", { kind: SpanKind.SERVER }, (span) =>
-        handleLogsRequest({ request: corrected, span, rawBytes: raw, ports: app }),
-      );
-    }
-    case "/api/otel/v1/metrics": {
-      const tracer = getLangWatchTracer("langwatch.otel.metrics");
-      return tracer.withActiveSpan(
-        "[POST] /api/otel/v1/metrics",
-        { kind: SpanKind.SERVER },
-        (span) => handleMetricsRequest({ request: corrected, span, rawBytes: raw, ports: app }),
       );
     }
     default:
@@ -599,42 +334,10 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
     ),
   )
 
-  .post("/api/otel/v1/logs", "ingestOtlpLogs")
-  .withRawBody("bytes")
-  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
-  .withAccess(PUBLIC_ACCESS)
-  .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
-  .withDocs({ hide: true })
-  .handle(async ({ app, raw, request, response }) =>
-    response.write(
-      await getLangWatchTracer("langwatch.otel.logs").withActiveSpan(
-        "[POST] /api/otel/v1/logs",
-        { kind: SpanKind.SERVER },
-        (span) => handleLogsRequest({ request, span, rawBytes: raw, ports: app }),
-      ),
-    ),
-  )
-
-  .post("/api/otel/v1/metrics", "ingestOtlpMetrics")
-  .withRawBody("bytes")
-  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
-  .withAccess(PUBLIC_ACCESS)
-  .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
-  .withDocs({ hide: true })
-  .handle(async ({ app, raw, request, response }) =>
-    response.write(
-      await getLangWatchTracer("langwatch.otel.metrics").withActiveSpan(
-        "[POST] /api/otel/v1/metrics",
-        { kind: SpanKind.SERVER },
-        (span) => handleMetricsRequest({ request, span, rawBytes: raw, ports: app }),
-      ),
-    ),
-  )
-
-  // Exporters append `/v1/{signal}` to their configured base. Keep each
-  // released base in this one canonical declaration so it shares byte parsing,
-  // limits, credentials and response statuses with the receiver above.
-  .post("/api/otel/*", "ingestOtlpAliasOtel")
+  // Exporters append `/v1/traces` to their configured base; each suffix is checked
+  // against the allow-list in `canonicalOtlpPath` before it is served.
+  .post("/:otlpBase{.+}/v1/traces", "ingestOtlpTracesAlias")
+  .withParams(otlpTraceAliasParamsSchema)
   .withRawBody("bytes")
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(PUBLIC_ACCESS)
@@ -644,7 +347,8 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
     response.write(await handleOtlpPathAlias({ app, raw, request })),
   )
 
-  .post("/api/collector/*", "ingestOtlpAliasCollector")
+  .post("/:otlpBase{.+}/v1/traces/", "ingestOtlpTracesAliasSlash")
+  .withParams(otlpTraceAliasParamsSchema)
   .withRawBody("bytes")
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(PUBLIC_ACCESS)
@@ -654,7 +358,7 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
     response.write(await handleOtlpPathAlias({ app, raw, request })),
   )
 
-  .post("/api/v1/*", "ingestOtlpAliasApiV1")
+  .post("/v1/traces", "ingestOtlpTracesRootV1")
   .withRawBody("bytes")
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(PUBLIC_ACCESS)
@@ -664,7 +368,7 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
     response.write(await handleOtlpPathAlias({ app, raw, request })),
   )
 
-  .post("/v1/*", "ingestOtlpAliasRootV1")
+  .post("/v1/traces/", "ingestOtlpTracesRootV1Slash")
   .withRawBody("bytes")
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(PUBLIC_ACCESS)

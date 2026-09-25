@@ -97,14 +97,3 @@ Feature: The trace ingestion doors are served
     Then the batch is accepted
     And the span is recorded
 
-  @integration
-  Scenario: The OTLP receiver refuses a signal this deployment does not receive
-    A deployment that receives no logs cannot accept one however often it is
-    offered, so the refusal is permanent rather than retryable. A retryable
-    answer would have an exporter fleet re-post the same batch until its budget
-    ran out, against a door that can never take it.
-
-    Given the deployment receives no OpenTelemetry logs
-    When an exporter exports a log batch to the OpenTelemetry receiver
-    Then the batch is refused permanently
-    And the exporter is not asked to retry

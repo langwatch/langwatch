@@ -11,10 +11,11 @@ import {
   type CanonicalTraceLogRecord,
   type LogApi as LogApiContract,
   type LogPiiRedactionLevel,
+  type LogOtlpDoorResult,
   type LogPreparation,
-  type LogRequestCollectionResult,
   type LogServerConfig,
 } from "@langwatch/log-contract";
+import type { OtlpDoorRequest } from "@langwatch/otlp";
 import { TraceApi } from "@langwatch/trace-contract";
 
 import { LogProcessingAdapter, type LogProcessingPipeline } from "../eventing/log.pipeline.ts";
@@ -23,6 +24,7 @@ import { ClickHouseCanonicalLogRecordRepository } from "../repositories/clickhou
 import { CanonicalLogService } from "../services/canonical-log.service.ts";
 import { LogRequestCollectionService } from "../services/log-request-collection.service.ts";
 import { LogService } from "../services/log.service.ts";
+import { OtlpLogReceiverService } from "../services/otlp-log-receiver.service.ts";
 
 export type LogInfrastructure = Readonly<{
   /** The process's one ClickHouse client, which routes each statement itself. */
@@ -42,17 +44,17 @@ export class LogApp implements LogApiContract {
 
   readonly #service: LogService;
   readonly #pipeline: LogProcessingPipeline;
-  readonly #collection: LogRequestCollectionService;
+  readonly #receiver: OtlpLogReceiverService;
   #commands: EventingCommands<LogProcessingPipeline> | undefined;
 
   private constructor(
     service: LogService,
     pipeline: LogProcessingPipeline,
-    collection: LogRequestCollectionService,
+    receiver: OtlpLogReceiverService,
   ) {
     this.#service = service;
     this.#pipeline = pipeline;
-    this.#collection = collection;
+    this.#receiver = receiver;
   }
 
   static create({ dependencies, members, config }: LogSetup): LogApp {
@@ -75,10 +77,13 @@ export class LogApp implements LogApiContract {
     const app: LogApp = new LogApp(
       service,
       pipeline,
-      LogRequestCollectionService.create({
+      OtlpLogReceiverService.create({
         traces: dependencies.traces,
-        logs: service,
-        recordLogRecords: (records) => app.recordCanonicalLogRecords(records),
+        collection: LogRequestCollectionService.create({
+          traces: dependencies.traces,
+          logs: service,
+          recordLogRecords: (records) => app.recordCanonicalLogRecords(records),
+        }),
       }),
     );
     return app;
@@ -94,13 +99,8 @@ export class LogApp implements LogApiContract {
     return this.#service.prepareCanonicalLogRecords(input);
   }
 
-  handleOtlpLogRequest(input: {
-    tenantId: string;
-    organizationId: string;
-    logRequest: unknown;
-    piiRedactionLevel: LogPiiRedactionLevel;
-  }): Promise<LogRequestCollectionResult> {
-    return this.#collection.handleOtlpLogRequest(input);
+  receiveOtlpLogs(request: OtlpDoorRequest): Promise<LogOtlpDoorResult> {
+    return this.#receiver.receive(request);
   }
 
   getLogsByTraceId(input: {

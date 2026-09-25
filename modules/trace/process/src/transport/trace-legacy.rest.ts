@@ -7,6 +7,11 @@ import {
 } from "@langwatch/api/rest";
 import type { HandledError } from "@langwatch/handled-error";
 import { moduleApi } from "@langwatch/kernel/module-api";
+import {
+  ingestDoorRefusalBody,
+  ingestDoorRefusalStatus,
+  isIngestDoorRefusal,
+} from "@langwatch/otlp";
 import { resolveRequestBound } from "@langwatch/plans";
 import { toEpochMs } from "@langwatch/time";
 import {
@@ -32,11 +37,6 @@ import {
   generateAsciiTree,
   toLLMModeTrace,
 } from "#rules/trace-formatting.rules";
-import {
-  isTraceDoorRefusal,
-  traceDoorRefusalBody,
-  traceDoorRefusalStatus,
-} from "#rules/trace-ingest-refusal.rules";
 import { traceLegacySearchBodySchema } from "#rules/trace-legacy-search-body.rules";
 /**
  * Deprecated trace family (v0): GET /api/trace/:id, share/unshare/search, thread.
@@ -176,7 +176,7 @@ async function authorised(
   try {
     auth = await input.app.credential({ request: input.request, permission: input.permission });
   } catch (error) {
-    if (!isTraceDoorRefusal(error)) throw error;
+    if (!isIngestDoorRefusal(error)) throw error;
     return refusalAnswer(error);
   }
 
@@ -184,7 +184,7 @@ async function authorised(
 }
 
 function refusalAnswer(refusal: HandledError): LegacyAnswer {
-  return answer(traceDoorRefusalBody(refusal), traceDoorRefusalStatus(refusal));
+  return answer(ingestDoorRefusalBody(refusal), ingestDoorRefusalStatus(refusal));
 }
 
 /** The two headers a superseded route names its replacement with. */

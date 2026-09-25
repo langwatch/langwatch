@@ -9026,6 +9026,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
+      '@langwatch/otlp':
+        specifier: workspace:*
+        version: link:../../../packages/otlp
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -9042,6 +9045,9 @@ importers:
       '@clickhouse/client':
         specifier: 'catalog:'
         version: 1.23.0
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client
@@ -9063,6 +9069,9 @@ importers:
       '@langwatch/otlp':
         specifier: workspace:*
         version: link:../../../packages/otlp
+      '@langwatch/plans':
+        specifier: workspace:*
+        version: link:../../../packages/plans
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -9075,6 +9084,9 @@ importers:
       '@opentelemetry/otlp-transformer':
         specifier: 'catalog:'
         version: 0.55.0(@opentelemetry/api@1.9.1)
+      hono:
+        specifier: 'catalog:'
+        version: 4.13.1
       langwatch:
         specifier: workspace:*
         version: link:../../../sdks/typescript
@@ -9100,6 +9112,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
+      '@langwatch/otlp':
+        specifier: workspace:*
+        version: link:../../../packages/otlp
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -9119,6 +9134,9 @@ importers:
       '@clickhouse/client':
         specifier: 'catalog:'
         version: 1.23.0
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
       '@langwatch/data-privacy-contract':
         specifier: workspace:*
         version: link:../../data-privacy/contract
@@ -9140,6 +9158,9 @@ importers:
       '@langwatch/otlp':
         specifier: workspace:*
         version: link:../../../packages/otlp
+      '@langwatch/plans':
+        specifier: workspace:*
+        version: link:../../../packages/plans
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -9155,6 +9176,9 @@ importers:
       '@opentelemetry/otlp-transformer':
         specifier: 'catalog:'
         version: 0.55.0(@opentelemetry/api@1.9.1)
+      hono:
+        specifier: 'catalog:'
+        version: 4.13.1
       langwatch:
         specifier: workspace:*
         version: link:../../../sdks/typescript
@@ -15674,6 +15698,12 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../handled-error
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../observability
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../time
       '@opentelemetry/otlp-transformer':
         specifier: 'catalog:'
         version: 0.55.0(@opentelemetry/api@1.9.1)
@@ -33134,10 +33164,10 @@ snapshots:
     dependencies:
       '@types/yargs-parser': 21.0.3
 
-  '@typescript-eslint/eslint-plugin@8.58.1(@typescript-eslint/parser@8.58.1(eslint@10.2.1(jiti@2.7.0))(typescript@6.0.3))(eslint@10.2.1(jiti@2.7.0))(typescript@6.0.3)':
+  '@typescript-eslint/eslint-plugin@8.58.1(@typescript-eslint/parser@8.58.1(eslint@10.2.1(jiti@2.7.0))(typescript@7.0.2))(eslint@10.2.1(jiti@2.7.0))(typescript@6.0.3)':
     dependencies:
       '@eslint-community/regexpp': 4.12.2
-      '@typescript-eslint/parser': 8.58.1(eslint@10.2.1(jiti@2.7.0))(typescript@6.0.3)
+      '@typescript-eslint/parser': 8.58.1(eslint@10.2.1(jiti@2.7.0))(typescript@7.0.2)
       '@typescript-eslint/scope-manager': 8.58.1
       '@typescript-eslint/type-utils': 8.58.1(eslint@10.2.1(jiti@2.7.0))(typescript@6.0.3)
       '@typescript-eslint/utils': 8.58.1(eslint@10.2.1(jiti@2.7.0))(typescript@6.0.3)
@@ -33150,10 +33180,10 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/eslint-plugin@8.58.1(@typescript-eslint/parser@8.58.1(eslint@10.2.1(jiti@2.7.0))(typescript@7.0.2))(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3)':
+  '@typescript-eslint/eslint-plugin@8.58.1(@typescript-eslint/parser@8.58.1(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3))(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3)':
     dependencies:
       '@eslint-community/regexpp': 4.12.2
-      '@typescript-eslint/parser': 8.58.1(eslint@10.2.1(jiti@2.7.0))(typescript@7.0.2)
+      '@typescript-eslint/parser': 8.58.1(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3)
       '@typescript-eslint/scope-manager': 8.58.1
       '@typescript-eslint/type-utils': 8.58.1(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3)
       '@typescript-eslint/utils': 8.58.1(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3)
@@ -40051,7 +40081,7 @@ snapshots:
 
   typescript-eslint@8.58.1(eslint@10.2.1(jiti@2.7.0))(typescript@6.0.3):
     dependencies:
-      '@typescript-eslint/eslint-plugin': 8.58.1(@typescript-eslint/parser@8.58.1(eslint@10.2.1(jiti@2.7.0))(typescript@6.0.3))(eslint@10.2.1(jiti@2.7.0))(typescript@6.0.3)
+      '@typescript-eslint/eslint-plugin': 8.58.1(@typescript-eslint/parser@8.58.1(eslint@10.2.1(jiti@2.7.0))(typescript@7.0.2))(eslint@10.2.1(jiti@2.7.0))(typescript@6.0.3)
       '@typescript-eslint/parser': 8.58.1(eslint@10.2.1(jiti@2.7.0))(typescript@6.0.3)
       '@typescript-eslint/typescript-estree': 8.58.1(typescript@6.0.3)
       '@typescript-eslint/utils': 8.58.1(eslint@10.2.1(jiti@2.7.0))(typescript@6.0.3)
@@ -40062,7 +40092,7 @@ snapshots:
 
   typescript-eslint@8.58.1(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3):
     dependencies:
-      '@typescript-eslint/eslint-plugin': 8.58.1(@typescript-eslint/parser@8.58.1(eslint@10.2.1(jiti@2.7.0))(typescript@7.0.2))(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3)
+      '@typescript-eslint/eslint-plugin': 8.58.1(@typescript-eslint/parser@8.58.1(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3))(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3)
       '@typescript-eslint/parser': 8.58.1(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3)
       '@typescript-eslint/typescript-estree': 8.58.1(typescript@6.0.3)
       '@typescript-eslint/utils': 8.58.1(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3)

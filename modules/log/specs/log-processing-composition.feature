@@ -38,7 +38,7 @@ Feature: Composing durable log processing
     And nothing is reported at boot about a missing Coding Agent pipeline
 
   @integration
-  Scenario: The api process receives OTLP logs rather than refusing them
+  Scenario: The api process serves every OTLP signal at its own module's door
     Given the api process installed over memory stores
-    When an exporter's log batch reaches Trace's OTLP door
-    Then Log prepares and records it and the door answers collected, not not-served
+    When an exporter posts a trace, a log and a metric batch without a key, canonically and under an alias
+    Then each door answers main's credential refusal, and none answers not found

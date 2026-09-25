@@ -70,3 +70,22 @@ export class OtlpUnsupportedEncodingError extends HandledError {
     this.name = "OtlpUnsupportedEncodingError";
   }
 }
+
+/** An ingestion key arrived on a process that resolves no source billing. */
+export class OtlpIngestSourceBillingUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor(sourceType: string) {
+    super(
+      "service_unavailable",
+      "This deployment cannot resolve the billing treatment for an ingestion key's source, so it will not record traffic sent on one.",
+      {
+        meta: { sourceType },
+        httpStatus: 503,
+        fault: "platform",
+        retryable: true,
+      },
+    );
+    this.name = "OtlpIngestSourceBillingUnavailableError";
+  }
+}

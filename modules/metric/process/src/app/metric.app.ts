@@ -9,10 +9,11 @@ import {
   type CanonicalMetricDataPoint,
   type MetricApi as MetricApiContract,
   type MetricDataPointPreparation,
+  type MetricOtlpDoorResult,
   type MetricPiiRedactionLevel,
-  type MetricRequestCollectionResult,
   type MetricServerConfig,
 } from "@langwatch/metric-contract";
+import type { OtlpDoorRequest } from "@langwatch/otlp";
 import { TraceApi } from "@langwatch/trace-contract";
 
 import {
@@ -27,6 +28,7 @@ import {
 } from "../services/metric-processing.service.ts";
 import { MetricRequestCollectionService } from "../services/metric-request-collection.service.ts";
 import { MetricService } from "../services/metric.service.ts";
+import { OtlpMetricReceiverService } from "../services/otlp-metric-receiver.service.ts";
 
 export type MetricInfrastructure = Readonly<{
   /** The process's one ClickHouse client, which routes each statement itself. */
@@ -52,17 +54,17 @@ export class MetricApp implements MetricApiContract {
 
   readonly #service: MetricService;
   readonly #pipeline: MetricProcessingPipeline;
-  readonly #collection: MetricRequestCollectionService;
+  readonly #receiver: OtlpMetricReceiverService;
   #commands: EventingCommands<MetricProcessingPipeline> | undefined;
 
   private constructor(
     service: MetricService,
     pipeline: MetricProcessingPipeline,
-    collection: MetricRequestCollectionService,
+    receiver: OtlpMetricReceiverService,
   ) {
     this.#service = service;
     this.#pipeline = pipeline;
-    this.#collection = collection;
+    this.#receiver = receiver;
   }
 
   static create({ dependencies, members, config }: MetricSetup): MetricApp {
@@ -79,10 +81,13 @@ export class MetricApp implements MetricApiContract {
     const app: MetricApp = new MetricApp(
       service,
       pipeline,
-      MetricRequestCollectionService.create({
+      OtlpMetricReceiverService.create({
         traces: dependencies.traces,
-        metrics: service,
-        recordDataPoints: (points) => app.recordCanonicalMetricDataPoints(points),
+        collection: MetricRequestCollectionService.create({
+          traces: dependencies.traces,
+          metrics: service,
+          recordDataPoints: (points) => app.recordCanonicalMetricDataPoints(points),
+        }),
       }),
     );
     return app;
@@ -98,13 +103,8 @@ export class MetricApp implements MetricApiContract {
     return this.#service.prepareMetricDataPoints(input);
   }
 
-  handleOtlpMetricRequest(input: {
-    tenantId: string;
-    organizationId: string;
-    metricRequest: unknown;
-    piiRedactionLevel: MetricPiiRedactionLevel;
-  }): Promise<MetricRequestCollectionResult> {
-    return this.#collection.handleOtlpMetricRequest(input);
+  receiveOtlpMetrics(request: OtlpDoorRequest): Promise<MetricOtlpDoorResult> {
+    return this.#receiver.receive(request);
   }
 
   async recordCanonicalMetricDataPoints(

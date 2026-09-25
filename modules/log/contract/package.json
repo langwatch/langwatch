@@ -22,6 +22,7 @@
   "dependencies": {
     "@langwatch/config": "workspace:*",
     "@langwatch/kernel": "workspace:*",
+    "@langwatch/otlp": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

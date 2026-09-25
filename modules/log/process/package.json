@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@clickhouse/client": "catalog:",
+    "@langwatch/api": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
@@ -28,10 +29,12 @@
     "@langwatch/log-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/otlp": "workspace:*",
+    "@langwatch/plans": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "@opentelemetry/otlp-transformer": "catalog:",
+    "hono": "catalog:",
     "langwatch": "workspace:*",
     "zod": "catalog:"
   },

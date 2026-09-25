@@ -24,8 +24,24 @@ export {
 export {
   OtlpBodyTooLargeError,
   OtlpBodyUnreadableError,
+  OtlpIngestSourceBillingUnavailableError,
   OtlpUnsupportedEncodingError,
 } from "./errors.ts";
+export {
+  applyReceiverProvenance,
+  ingestDoorRefusalBody,
+  ingestDoorRefusalStatus,
+  isIngestDoorRefusal,
+  isUnknownCredentialRefusal,
+  logCorrectedOtlpPath,
+  otlpBodyForensics,
+  otlpDoorFailureAnswer,
+  type OtlpDoorAnswer,
+  type OtlpDoorRefusal,
+  type OtlpDoorRequest,
+  type OtlpSignal,
+  type OtlpSourcePolicy,
+} from "./door.ts";
 export {
   CANONICAL_OTLP_BASE_PATH,
   canonicalOtlpPath,

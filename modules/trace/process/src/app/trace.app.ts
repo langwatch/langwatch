@@ -97,8 +97,6 @@ import {
   type OtlpIngestCredential,
   type OtlpIngestCredentialInput,
   type OtlpIngestProject,
-  type OtlpLogCollectionOutcome,
-  type OtlpMetricCollectionOutcome,
   type OtlpTraceCollectionResult,
   TraceApi as TraceApiToken,
   DEFAULT_PII_REDACTION_LEVEL,
@@ -235,7 +233,6 @@ import {
  */
 const TRACKED_EVENT_KSUID_RESOURCE = "trackedevent";
 import type { RestCredentialPrincipal } from "@langwatch/api/rest";
-import type { LogApi } from "@langwatch/log-contract";
 import type * as traceContractModule from "@langwatch/trace-contract";
 
 import type {
@@ -578,10 +575,6 @@ export interface TraceAppDependencies {
    * data they drop.
    */
   ingestion?: TraceIngestionService;
-  /** Where an exported OTLP log batch goes; absent, the door refuses permanently. */
-  logCollection?: Pick<LogApi, "handleOtlpLogRequest">;
-  /** The metric signal's twin of {@link logCollection}, absent for the same reason. */
-  metricCollection?: TraceOtlpIngestApi["otlpMetrics"];
   /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
   publicBaseUrl?: string;
   /** Counts the anonymous share read per token and per IP; absent, the share read refuses. */
@@ -694,7 +687,6 @@ export class TraceApp implements TraceApi, CollectorApp {
           processName: collaborators.processName,
         },
       }),
-      logCollection: input.dependencies.logs,
     });
     app.#processingCommands = commands;
     app.#usageCounts = TraceUsageCountService.create({
@@ -2435,7 +2427,7 @@ export class TraceApp implements TraceApi, CollectorApp {
 
   // -- the OTLP receiver's own members ---------------------------------------
   // `transport/otlp-ingest.rest.ts` reads this application through the same
-  // operations-only proxy; all six members are required and each is a METHOD
+  // operations-only proxy; all five members are required and each is a METHOD
   // for the same reason.
 
   /**
@@ -2486,39 +2478,6 @@ export class TraceApp implements TraceApi, CollectorApp {
     return ingestion
       .handleOtlpTraceRequest(input.tenantId, input.traceRequest, DEFAULT_PII_REDACTION_LEVEL)
       .then((result) => result ?? {});
-  }
-
-  /** The log signal; a composition without a collection answers `not-served`, never a retry. */
-  otlpLogs(
-    input: Parameters<TraceOtlpIngestApi["otlpLogs"]>[0],
-  ): Promise<OtlpLogCollectionOutcome> {
-    const collection = this.#dependencies.logCollection;
-    if (!collection) {
-      return Promise.resolve({
-        outcome: "not-served",
-        errorMessage: "This deployment does not receive OpenTelemetry logs",
-      });
-    }
-
-    return collection.handleOtlpLogRequest({
-      ...input,
-      piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
-    });
-  }
-
-  /** The metric signal, absent for the reason {@link otlpLogs} gives. */
-  otlpMetrics(
-    input: Parameters<TraceOtlpIngestApi["otlpMetrics"]>[0],
-  ): Promise<OtlpMetricCollectionOutcome> {
-    const collection = this.#dependencies.metricCollection;
-    if (!collection) {
-      return Promise.resolve({
-        outcome: "not-served",
-        errorMessage: "This deployment does not receive OpenTelemetry metrics",
-      });
-    }
-
-    return collection(input);
   }
 
   /** A failure the receiver answered but did not raise. */
