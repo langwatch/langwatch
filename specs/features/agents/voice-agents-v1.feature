@@ -653,13 +653,36 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     When the browser retries the finish
     Then the run completes with no duplicate messages
 
-  # 7973 AC6
+  # 8032 AC1
+  # A re-drive's second started event is first-wins in the fold (and deduped by
+  # a per-run idempotency key in production), so it cannot carry the second
+  # attempt's metadata. The retry emits a metadata_refresh event instead, which
+  # the fold merges over the run's top-level metadata: a "browser, no recording"
+  # first attempt becomes the "provider, with audio" the retry saw (#8032), so
+  # findExistingRun reads the right source and audio back on any later retry.
   @unit @regression
-  Scenario: A re-driven finish keeps the first attempt's metadata
-    Given a run for the session was started twice with different metadata
-    When a snapshot and the finish are folded onto it
-    Then the run keeps the first attempt's metadata
-    And it reaches the finished status with the snapshot's messages
+  Scenario: A re-driven finish refreshes the run's metadata to the second attempt
+    Given a run started with a first attempt's metadata
+    When a metadata refresh carrying the second attempt's fields is folded onto it
+    Then the run's refreshed fields win while its other metadata is kept
+
+  # 8032 AC2
+  @unit @regression
+  Scenario: A metadata refresh does not disturb the run's terminal status
+    Given a finished run
+    When a metadata refresh is folded onto it
+    Then the run stays finished and takes the refreshed metadata
+
+  # 8032 AC3
+  # The refresh always carries audioUrl, as null when this attempt has no
+  # recording, so the fold overwrites a stale url rather than keeping the key
+  # the refresh omitted: a first attempt that had audio then a retry that does
+  # not must lose the Play link, not keep offering a recording that is gone.
+  @unit @regression
+  Scenario: A re-drive that lost its recording clears the run's audio link
+    Given a run whose first attempt carried a recording url
+    When a metadata refresh carrying a null audio url is folded onto it
+    Then the run's audio url is cleared while its other refreshed fields win
 
   # ---------------------------------------------------------------------------
   # Talk to it authorization and the cutoff marker (#8021)

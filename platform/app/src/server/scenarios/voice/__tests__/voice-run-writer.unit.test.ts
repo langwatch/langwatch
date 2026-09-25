@@ -20,12 +20,14 @@ vi.mock("~/server/agents/agent.repository", () => ({
 const mockStartRun = vi.fn().mockResolvedValue(undefined);
 const mockMessageSnapshot = vi.fn().mockResolvedValue(undefined);
 const mockFinishRun = vi.fn().mockResolvedValue(undefined);
+const mockRefreshMetadata = vi.fn().mockResolvedValue(undefined);
 vi.mock("~/server/app-layer/app", () => ({
   getApp: vi.fn().mockReturnValue({
     simulations: {
       startRun: (...args: unknown[]) => mockStartRun(...args),
       messageSnapshot: (...args: unknown[]) => mockMessageSnapshot(...args),
       finishRun: (...args: unknown[]) => mockFinishRun(...args),
+      refreshMetadata: (...args: unknown[]) => mockRefreshMetadata(...args),
     },
   }),
 }));
@@ -81,6 +83,87 @@ describe("writeVoiceCallRun", () => {
         };
         expect(metadata.langwatch.isCutAtLimit).toBe(true);
         expect(metadata.isCutAtLimit).toBeUndefined();
+      });
+    });
+
+    describe("when the write is a first attempt", () => {
+      // Not bound to the re-drive scenario: this test asserts the refresh does
+      // NOT happen, so it does not cover that scenario — the re-drive test
+      // below carries the @scenario binding.
+      it("emits no metadata refresh — the started event already carries it", async () => {
+        await writeVoiceCallRun({
+          projectId: "project_1",
+          scenarioRunId: "run_1",
+          agentRowId: "agent_1",
+          agentDisplayName: "Support Bot",
+          record: fakeRecord(),
+          scenario: { scenarioId: "scenario_1", scenarioSetId: "set_x" },
+          turnTraceIds: [],
+        });
+
+        expect(mockRefreshMetadata).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the write is a re-drive", () => {
+      /** @scenario "A re-driven finish refreshes the run's metadata to the second attempt" */
+      it("refreshes the run's source, audio and cutoff to this attempt's, after the snapshot", async () => {
+        await writeVoiceCallRun({
+          projectId: "project_1",
+          scenarioRunId: "run_1",
+          agentRowId: "agent_1",
+          agentDisplayName: "Support Bot",
+          record: fakeRecord({
+            source: "provider",
+            audioUrl: "/api/voice/session/conv_1/audio?projectId=project_1",
+            isCutAtLimit: true,
+          }),
+          scenario: { scenarioId: "scenario_1", scenarioSetId: "set_x" },
+          turnTraceIds: [],
+          isRedrive: true,
+        });
+
+        expect(mockRefreshMetadata).toHaveBeenCalledTimes(1);
+        const refresh = mockRefreshMetadata.mock.calls[0]?.[0] as {
+          scenarioRunId: string;
+          metadata: {
+            source?: unknown;
+            audioUrl?: unknown;
+            langwatch?: { isCutAtLimit?: unknown };
+          };
+          occurredAt: number;
+        };
+        expect(refresh.scenarioRunId).toBe("run_1");
+        expect(refresh.metadata.source).toBe("provider");
+        expect(refresh.metadata.audioUrl).toBe(
+          "/api/voice/session/conv_1/audio?projectId=project_1",
+        );
+        expect(refresh.metadata.langwatch?.isCutAtLimit).toBe(true);
+        // Stamped at the call's end, so it folds after the first attempt's
+        // started event and never before it.
+        expect(refresh.occurredAt).toBe(2);
+      });
+
+      it("carries audioUrl: null in the refresh when this attempt has none, clearing any stale link", async () => {
+        await writeVoiceCallRun({
+          projectId: "project_1",
+          scenarioRunId: "run_1",
+          agentRowId: "agent_1",
+          agentDisplayName: "Support Bot",
+          record: fakeRecord({ source: "browser", audioUrl: undefined }),
+          scenario: { scenarioId: "scenario_1", scenarioSetId: "set_x" },
+          turnTraceIds: [],
+          isRedrive: true,
+        });
+
+        const refresh = mockRefreshMetadata.mock.calls[0]?.[0] as {
+          metadata: Record<string, unknown>;
+        };
+        // The key is present and null so the fold overwrites — a first attempt
+        // that had audio then a retry that does not must lose the stale Play
+        // link, not keep it (#8032).
+        expect(refresh.metadata).toHaveProperty("audioUrl", null);
+        expect(refresh.metadata.source).toBe("browser");
       });
     });
 

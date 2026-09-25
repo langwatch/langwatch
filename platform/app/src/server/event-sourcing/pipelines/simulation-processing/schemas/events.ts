@@ -344,6 +344,33 @@ export type SimulationRunCutAtLimitRecordedEvent = z.infer<
 >;
 
 /**
+ * MetadataRefreshed event — a later attempt at the same run carries metadata
+ * the first attempt could not. A "Call it myself" voice finish that failed
+ * part-way writes `source: "browser"` with no `audioUrl`; the retry, once the
+ * provider's record is ready, has the recording and `source: "provider"`
+ * (#8032). The started event is first-wins on metadata (and its second copy is
+ * deduped away by a per-run idempotency key), so the refresh is its own event.
+ * The fold merges these fields over the run's top-level metadata, so a reader
+ * that keys on `source` / `audioUrl` / `agentId` sees the latest attempt. Only
+ * the keys present are touched; the run's other metadata is left as it was.
+ */
+export const simulationRunMetadataRefreshedEventDataSchema = z.object({
+  scenarioRunId: z.string(),
+  metadata: z.record(z.unknown()),
+});
+export type SimulationRunMetadataRefreshedEventData = z.infer<
+  typeof simulationRunMetadataRefreshedEventDataSchema
+>;
+export const SimulationRunMetadataRefreshedEventSchema = EventSchema.extend({
+  type: z.literal(SIMULATION_RUN_EVENT_TYPES.METADATA_REFRESHED),
+  version: z.literal(SIMULATION_EVENT_VERSIONS.METADATA_REFRESHED),
+  data: simulationRunMetadataRefreshedEventDataSchema,
+});
+export type SimulationRunMetadataRefreshedEvent = z.infer<
+  typeof SimulationRunMetadataRefreshedEventSchema
+>;
+
+/**
  * RunDeleted event - emitted when a simulation run is soft-deleted.
  */
 export const simulationRunDeletedEventDataSchema = z.object({
@@ -411,6 +438,7 @@ export type SimulationProcessingEvent =
   | SimulationRunCancelRequestedEvent
   | SimulationRunAgentInstanceRecordedEvent
   | SimulationRunCutAtLimitRecordedEvent
+  | SimulationRunMetadataRefreshedEvent
   | SimulationRunDeletedEvent
   | SimulationSetArchivedEvent;
 
@@ -422,6 +450,7 @@ export {
   isSimulationRunDeletedEvent,
   isSimulationRunEvaluatedEvent,
   isSimulationRunFinishedEvent,
+  isSimulationRunMetadataRefreshedEvent,
   isSimulationRunMetricsComputedEvent,
   isSimulationRunQueuedEvent,
   isSimulationRunStartedEvent,

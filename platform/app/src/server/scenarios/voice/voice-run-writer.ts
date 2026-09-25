@@ -82,6 +82,7 @@ export async function writeVoiceCallRun({
   record,
   scenario,
   turnTraceIds,
+  isRedrive = false,
 }: {
   projectId: string;
   scenarioRunId: string;
@@ -93,6 +94,11 @@ export async function writeVoiceCallRun({
    *  {@link recordVoiceCallTraces}. Set on the message and the run's trace list
    *  so the drawer probes the exchange's trace. */
   turnTraceIds: readonly string[];
+  /** True when this write is a retry completing a half-written run (#7973
+   *  AC2). The first attempt's started event already set the metadata and is
+   *  first-wins, so this attempt's `source` / `audioUrl` / cutoff reach the
+   *  run through a refresh event instead (#8032). */
+  isRedrive?: boolean;
 }): Promise<void> {
   // The row id is trusted only as far as the token that carried it; the row
   // itself must exist in this project before a run is written under it.
@@ -147,6 +153,30 @@ export async function writeVoiceCallRun({
     traceIds: [...turnTraceIds],
     occurredAt: record.endedAt,
   });
+
+  // On a re-drive the run's metadata was set by the first attempt's started
+  // event, which is first-wins in the fold — so this attempt's source, audio
+  // and cutoff would be lost. A refresh event carries them onto the run, so a
+  // "browser, no recording" first attempt becomes the "provider, with audio"
+  // the retry actually saw (#8032). Skipped on a first write: the started
+  // event already carries these, and there is nothing to refresh over.
+  if (isRedrive) {
+    await getApp().simulations.refreshMetadata({
+      tenantId: projectId,
+      scenarioRunId,
+      metadata: {
+        source: record.source,
+        langwatch: { isCutAtLimit: record.isCutAtLimit },
+        // Always carry audioUrl, as null when this attempt has no recording:
+        // a first attempt that had audio then a retry that does not must clear
+        // the stale link, else the run keeps offering a Play control for a
+        // recording that is no longer there (#8032). The fold overwrites the
+        // top-level key, so null replaces the earlier url.
+        audioUrl: record.audioUrl ?? null,
+      },
+      occurredAt: record.endedAt,
+    });
+  }
 
   // No results envelope: the verdict is not decided here. The run is finished
   // SUCCESS with the scenario id named on the event, so the scenario-evaluations
