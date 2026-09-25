@@ -58,6 +58,7 @@ function process_() {
       dataset: members.datasets,
       agent: createApiFixture({}, "AgentApi"),
       "model-provider": createApiFixture({}, "ModelProviderApi"),
+      experiment: createApiFixture({}, "ExperimentApi"),
     });
 }
 

@@ -11,6 +11,7 @@ import {
  */
 import { DatasetApi } from "@langwatch/dataset-contract";
 import { EvaluatorApi, newEvaluatorId, type Evaluator } from "@langwatch/evaluator-contract";
+import { ExperimentApi } from "@langwatch/experiment-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
@@ -317,6 +318,7 @@ export type WorkflowHostMembers = Omit<
   | "studioRuns"
   | "studioDispatch"
   | "publicBaseUrl"
+  | "evaluations"
 >;
 
 /** The engine address and public origin are process facts, not this module's env spellings. */
@@ -413,6 +415,8 @@ export class WorkflowApp implements WorkflowApi {
     datasets: DatasetApi,
     /** Whether one person holds a permission on a project the caller names. */
     authz: AuthzApi,
+    /** Registers and runs a workflow's evaluation over its batch. */
+    experiments: ExperimentApi,
   };
   static readonly config = workflowConfig;
   /**
@@ -485,6 +489,9 @@ export class WorkflowApp implements WorkflowApi {
       }),
       agentMappings: WorkflowAgentMappingService.create({ agents: setup.dependencies.agents }),
       workflowRows: setup.repositories.workflowRows,
+      evaluations: {
+        trigger: (input) => setup.dependencies.experiments.triggerWorkflowEvaluation(input),
+      },
     });
   }
 
