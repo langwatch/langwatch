@@ -84,7 +84,7 @@ export function AnalyticsV2Page() {
 }
 
 /**
- * The page guard is the routes section's, not this module's:
- * `analytics-routes.tsx` wraps the loader in `withPermissionGuard("analytics:view")`.
+ * No client-side permission guard, same as the sibling analytics screens: the
+ * LangWatchQL and flag endpoints enforce project access on the server.
  */
 export default AnalyticsV2Page;
