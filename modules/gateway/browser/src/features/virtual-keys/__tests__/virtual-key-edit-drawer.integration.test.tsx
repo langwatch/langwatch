@@ -9,7 +9,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
-import { VirtualKeyEditDrawer } from "../ui/sections/virtual-key-edit-drawer.tsx";
+import {
+  type VirtualKeyDetail,
+  VirtualKeyEditDrawer,
+} from "../ui/sections/virtual-key-edit-drawer.tsx";
 
 const ORG_ID = "org-acme";
 const TEAM_ID = "team-platform";
@@ -111,7 +114,7 @@ const host = fakeGatewayHost({
   },
 });
 
-const baseVk = {
+const baseVk: VirtualKeyDetail = {
   id: VK_ID,
   organizationId: ORG_ID,
   name: "legacy-key",
@@ -123,6 +126,18 @@ const baseVk = {
   principalUserId: null,
   principalUser: null,
   config: {},
+  purpose: "user",
+  displayPrefix: "vk-lw-abc",
+  traceProjectId: null,
+  traceProjectArchived: false,
+  externalId: null,
+  metadata: {},
+  revision: "1",
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+  lastUsedAt: null,
+  revokedAt: null,
+  expiresAt: null,
 };
 
 const renderDrawer = (vk: Partial<typeof baseVk> & Record<string, any> = {}) =>
@@ -297,6 +312,45 @@ describe("given the edit drawer for an existing key", () => {
           a < b ? -1 : Number(a > b),
         ),
       ).toEqual(["mp-anthropic", "mp-openai"]);
+    });
+  });
+
+  describe("when the key carries cache, rate limit and session settings", () => {
+    it("prefills each field from the stored config", async () => {
+      renderDrawer({
+        config: {
+          cache: { mode: "force", ttlS: 600 },
+          rateLimits: { rpm: 120, tpm: null, rpd: 5000 },
+          realtime: { maxOpenSessions: 3 },
+        },
+      });
+
+      await waitFor(() => expect(screen.getByDisplayValue("600")).toBeInTheDocument());
+      expect(screen.getByDisplayValue("120")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("5000")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("3")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the wire left the key's config out", () => {
+    it("seeds the defaults instead of failing", async () => {
+      renderDrawer({ config: undefined });
+
+      await waitFor(() => expect(screen.getByDisplayValue("legacy-key")).toBeInTheDocument());
+      expect(screen.getByDisplayValue("3600")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the key's config is empty", () => {
+    it("prefills the cache default and leaves the limits unlimited", async () => {
+      renderDrawer({ config: {} });
+
+      await waitFor(() => expect(screen.getByDisplayValue("3600")).toBeInTheDocument());
+      expect(
+        screen
+          .getAllByPlaceholderText("unlimited")
+          .map((input) => input.getAttribute("value") ?? ""),
+      ).toEqual(["", "", ""]);
     });
   });
 

@@ -18,11 +18,7 @@ import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import {
-  formatBudgetUsd,
-  type VirtualKeyCamelDtoResponse,
-  type VirtualKeySpendThisMonth,
-} from "@langwatch/gateway-contract";
+import { formatBudgetUsd, type VirtualKeySpendThisMonth } from "@langwatch/gateway-contract";
 import { toEpochMs } from "@langwatch/time";
 import {
   Ban,
@@ -52,7 +48,10 @@ import {
   type VirtualKeyBudgetBarValue,
 } from "../../../features/virtual-keys/ui/elements/virtual-key-budget-bar.tsx";
 import { VirtualKeyCreateDrawer } from "../../../features/virtual-keys/ui/sections/virtual-key-create-drawer.tsx";
-import { VirtualKeyEditDrawer } from "../../../features/virtual-keys/ui/sections/virtual-key-edit-drawer.tsx";
+import {
+  type VirtualKeyDetail,
+  VirtualKeyEditDrawer,
+} from "../../../features/virtual-keys/ui/sections/virtual-key-edit-drawer.tsx";
 import { VirtualKeySecretReveal } from "../../../features/virtual-keys/ui/sections/virtual-key-secret-reveal.tsx";
 import type { GatewayTeam } from "../../../model/gateway-host.ts";
 import { readableDate } from "../../../model/readable-date.ts";
@@ -155,7 +154,7 @@ function VirtualKeysPage() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [revealSecret, setRevealSecret] = useState<CreatedSecret | null>(null);
-  const [editing, setEditing] = useState<any>(null);
+  const [editing, setEditing] = useState<VirtualKeyDetail | null>(null);
   const [rotating, setRotating] = useState<{ id: string; name: string } | null>(null);
   const [revoking, setRevoking] = useState<{
     id: string;
@@ -390,10 +389,6 @@ function VirtualKeysPage() {
   );
 }
 
-/** The list's row as the client receives it: the wire leaves an unset `config` out. */
-type VirtualKeyListRow = Omit<VirtualKeyCamelDtoResponse, "config"> &
-  Partial<Pick<VirtualKeyCamelDtoResponse, "config">>;
-
 function VirtualKeyTableRow({
   vk,
   scopes,
@@ -411,7 +406,7 @@ function VirtualKeyTableRow({
   onRotate,
   onRevoke,
 }: {
-  vk: VirtualKeyListRow;
+  vk: VirtualKeyDetail;
   scopes: Parameters<typeof ProviderScopeChips>[0]["scopes"];
   policyNameById: Map<string, string>;
   spend: string | undefined;
@@ -632,7 +627,7 @@ function indexScopeNames(teams: readonly GatewayTeam[]): {
 
 /** Keys whose traces can be opened; a key missing here gets no "View traces" action. */
 function traceHrefsByKeyId(input: {
-  rows: VirtualKeyListRow[];
+  rows: VirtualKeyDetail[];
   teams: readonly GatewayTeam[];
 }): Map<string, string> {
   const map = new Map<string, string>();

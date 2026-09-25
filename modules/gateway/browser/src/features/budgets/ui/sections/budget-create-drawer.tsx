@@ -146,6 +146,17 @@ function targetsLoadingFor(input: {
   );
 }
 
+/** A newly picked scope kind starts on the current team or project, where one exists. */
+function seededTargetFor(input: {
+  kind: ScopeKind;
+  teamId: string | undefined;
+  projectId: string | undefined;
+}): string {
+  if (input.kind === "TEAM") return input.teamId ?? "";
+  if (input.kind === "PROJECT") return input.projectId ?? "";
+  return "";
+}
+
 /** Why the name and limit cannot be sent yet, as the toast says it, or null when they can. */
 function limitRefusal({ name, limitUsd }: { name: string; limitUsd: string }): string | null {
   if (!name || !limitUsd) return "Name and limit are required";
@@ -165,12 +176,176 @@ function cycleAnchorInstant(input: {
     .toInstant();
 }
 
+type CreateBudgetInput = Parameters<
+  ReturnType<typeof api.gatewayBudgets.create.useMutation>["mutateAsync"]
+>[0];
+
+/** The form as the create call takes it: blanks left out or nulled, the anchor as an instant. */
+function createBudgetInput(form: {
+  organizationId: string;
+  scopeKind: ScopeKind;
+  targetId: string;
+  name: string;
+  description: string;
+  window: Window;
+  limitUsd: string;
+  onBreach: "BLOCK" | "WARN";
+  providerKey: string;
+  isScheduledWindow: boolean;
+  cycleAnchorAt: string;
+  allowUnreachable: boolean;
+}): CreateBudgetInput {
+  return {
+    organizationId: form.organizationId,
+    name: form.name,
+    description: form.description || undefined,
+    scope: budgetScope({
+      scopeKind: form.scopeKind,
+      organizationId: form.organizationId,
+      targetId: form.targetId,
+    }),
+    window: form.window,
+    limitUsd: form.limitUsd,
+    onBreach: form.onBreach,
+    providerKey: form.providerKey || null,
+    cycleAnchorAt: cycleAnchorInstant({
+      isScheduledWindow: form.isScheduledWindow,
+      cycleAnchorAt: form.cycleAnchorAt,
+    }),
+    allowUnreachable: form.allowUnreachable || undefined,
+  };
+}
+
 /** A refused create: an unreachable scope offers the retry, anything else reads as a failure. */
 function createFailure(error: unknown): { unreachable: boolean; message: string } {
   if (readHandledError(error)?.code === UNREACHABLE_SCOPE_CODE) {
     return { unreachable: true, message: describeError({ error }) };
   }
   return { unreachable: false, message: humanizeGatewayError(error, "Failed to create budget") };
+}
+
+/** What the budget applies to: the kind of scope, then the one target of that kind. */
+function BudgetScopeField({
+  scopeKind,
+  organizationName,
+  targetId,
+  targetOptions,
+  targetsLoading,
+  groupsFailed,
+  onPickKind,
+  onPickTarget,
+}: {
+  scopeKind: ScopeKind;
+  organizationName: string | undefined;
+  targetId: string;
+  targetOptions: { id: string; name: string }[];
+  targetsLoading: boolean;
+  groupsFailed: boolean;
+  onPickKind: (kind: ScopeKind) => void;
+  onPickTarget: (id: string) => void;
+}) {
+  return (
+    <Field.Root required>
+      <Field.Label>
+        Applies to
+        <FieldInfoTooltip
+          description="What the budget covers. Budgets stack: a request is checked against every budget that applies to it (organization + group + team + project + member + virtual key), and any one in breach blocks or warns per its on-breach action. A group budget gives each member their own allowance rather than one shared pot."
+          docHref="/ai-gateway/budgets#scopes"
+          testId="budget-applies-to-info"
+        />
+      </Field.Label>
+      <Wrap
+        as="fieldset"
+        gap={2}
+        border={0}
+        margin={0}
+        padding={0}
+        minWidth={0}
+        aria-label="Budget target kind"
+      >
+        {KIND_OPTIONS.map((o) => {
+          const active = scopeKind === o.kind;
+          return (
+            <Button
+              key={o.kind}
+              type="button"
+              size="xs"
+              variant={active ? "solid" : "outline"}
+              aria-pressed={active}
+              onClick={() => onPickKind(o.kind)}
+              data-testid={`budget-kind-${o.kind.toLowerCase()}`}
+            >
+              <HStack gap={1}>
+                {o.icon}
+                <Text>{o.label}</Text>
+              </HStack>
+            </Button>
+          );
+        })}
+      </Wrap>
+      {scopeKind === "ORGANIZATION" ? (
+        <Text fontSize="xs" color="fg.muted" marginTop={1}>
+          All AI spend in {organizationName ?? "the organization"}.
+        </Text>
+      ) : (
+        <BudgetTargetSelect
+          scopeKind={scopeKind}
+          targetId={targetId}
+          targetOptions={targetOptions}
+          targetsLoading={targetsLoading}
+          onPick={onPickTarget}
+        />
+      )}
+      {scopeKind === "GROUP" && (
+        <Text fontSize="xs" color="fg.muted" marginTop={1}>
+          Each member of the group gets this limit individually.
+        </Text>
+      )}
+      {scopeKind === "GROUP" && groupsFailed && (
+        <Text fontSize="xs" color="red.600" marginTop={1}>
+          Groups could not be loaded.
+        </Text>
+      )}
+    </Field.Root>
+  );
+}
+
+function BudgetTargetSelect({
+  scopeKind,
+  targetId,
+  targetOptions,
+  targetsLoading,
+  onPick,
+}: {
+  scopeKind: ScopeKind;
+  targetId: string;
+  targetOptions: { id: string; name: string }[];
+  targetsLoading: boolean;
+  onPick: (id: string) => void;
+}) {
+  return (
+    <NativeSelect.Root size="sm" marginTop={1} disabled={targetsLoading}>
+      <NativeSelect.Field
+        value={targetId}
+        aria-label="Budget target"
+        data-testid="budget-target"
+        onChange={(e) => onPick(e.target.value)}
+      >
+        <option value="">
+          {targetsLoading
+            ? "Loading…"
+            : `Pick a ${
+                KIND_OPTIONS.find((o) => o.kind === scopeKind)?.label.toLowerCase() ?? "target"
+              }`}
+        </option>
+        {targetOptions.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+          </option>
+        ))}
+      </NativeSelect.Field>
+    </NativeSelect.Root>
+  );
 }
 
 export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCreateDrawerProps) {
@@ -295,10 +470,7 @@ export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCrea
   const pickKind = (kind: ScopeKind) => {
     setScopeKind(kind);
     clearRefusal();
-    // Seed the target with the current context where one exists.
-    if (kind === "TEAM") setTargetId(team?.id ?? "");
-    else if (kind === "PROJECT") setTargetId(project?.id ?? "");
-    else setTargetId("");
+    setTargetId(seededTargetFor({ kind, teamId: team?.id, projectId: project?.id }));
   };
 
   const pickTarget = (id: string) => {
@@ -338,21 +510,22 @@ export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCrea
     }
     setSubmitError(null);
     try {
-      const scope = budgetScope({ scopeKind, organizationId: organization.id, targetId });
-      await createMutation.mutateAsync({
-        organizationId: organization.id,
-        name,
-        description: description || undefined,
-        scope,
-        window,
-        limitUsd,
-        onBreach,
-        providerKey: providerKey || null,
-        // The picker gives a local wall-clock string with no zone, read in
-        // the browser's zone, which is the one the admin typed it in.
-        cycleAnchorAt: cycleAnchorInstant({ isScheduledWindow, cycleAnchorAt }),
-        allowUnreachable: allowUnreachable || undefined,
-      });
+      await createMutation.mutateAsync(
+        createBudgetInput({
+          organizationId: organization.id,
+          scopeKind,
+          targetId,
+          name,
+          description,
+          window,
+          limitUsd,
+          onBreach,
+          providerKey,
+          isScheduledWindow,
+          cycleAnchorAt,
+          allowUnreachable,
+        }),
+      );
       onCreated();
       reset();
       onOpenChange(false);
@@ -395,83 +568,16 @@ export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCrea
               />
             </Field.Root>
 
-            <Field.Root required>
-              <Field.Label>
-                Applies to
-                <FieldInfoTooltip
-                  description="What the budget covers. Budgets stack: a request is checked against every budget that applies to it (organization + group + team + project + member + virtual key), and any one in breach blocks or warns per its on-breach action. A group budget gives each member their own allowance rather than one shared pot."
-                  docHref="/ai-gateway/budgets#scopes"
-                  testId="budget-applies-to-info"
-                />
-              </Field.Label>
-              <Wrap
-                as="fieldset"
-                gap={2}
-                border={0}
-                margin={0}
-                padding={0}
-                minWidth={0}
-                aria-label="Budget target kind"
-              >
-                {KIND_OPTIONS.map((o) => {
-                  const active = scopeKind === o.kind;
-                  return (
-                    <Button
-                      key={o.kind}
-                      type="button"
-                      size="xs"
-                      variant={active ? "solid" : "outline"}
-                      aria-pressed={active}
-                      onClick={() => pickKind(o.kind)}
-                      data-testid={`budget-kind-${o.kind.toLowerCase()}`}
-                    >
-                      <HStack gap={1}>
-                        {o.icon}
-                        <Text>{o.label}</Text>
-                      </HStack>
-                    </Button>
-                  );
-                })}
-              </Wrap>
-              {scopeKind === "ORGANIZATION" ? (
-                <Text fontSize="xs" color="fg.muted" marginTop={1}>
-                  All AI spend in {organization?.name ?? "the organization"}.
-                </Text>
-              ) : (
-                <NativeSelect.Root size="sm" marginTop={1} disabled={targetsLoading}>
-                  <NativeSelect.Field
-                    value={targetId}
-                    aria-label="Budget target"
-                    data-testid="budget-target"
-                    onChange={(e) => pickTarget(e.target.value)}
-                  >
-                    <option value="">
-                      {targetsLoading
-                        ? "Loading…"
-                        : `Pick a ${
-                            KIND_OPTIONS.find((o) => o.kind === scopeKind)?.label.toLowerCase() ??
-                            "target"
-                          }`}
-                    </option>
-                    {(targetOptions ?? []).map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </NativeSelect.Field>
-                </NativeSelect.Root>
-              )}
-              {scopeKind === "GROUP" && (
-                <Text fontSize="xs" color="fg.muted" marginTop={1}>
-                  Each member of the group gets this limit individually.
-                </Text>
-              )}
-              {scopeKind === "GROUP" && groupsQuery.isError && (
-                <Text fontSize="xs" color="red.600" marginTop={1}>
-                  Groups could not be loaded.
-                </Text>
-              )}
-            </Field.Root>
+            <BudgetScopeField
+              scopeKind={scopeKind}
+              organizationName={organization?.name}
+              targetId={targetId}
+              targetOptions={targetOptions ?? []}
+              targetsLoading={targetsLoading}
+              groupsFailed={groupsQuery.isError}
+              onPickKind={pickKind}
+              onPickTarget={pickTarget}
+            />
 
             <Field.Root>
               <Field.Label>

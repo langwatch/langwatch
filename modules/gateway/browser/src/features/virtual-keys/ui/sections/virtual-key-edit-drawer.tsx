@@ -12,6 +12,12 @@ import {
 } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import {
+  defaultVirtualKeyConfig,
+  type VirtualKeyCamelDtoResponse,
+  type VirtualKeyConfig,
+  virtualKeyConfigSchema,
+} from "@langwatch/gateway-contract";
 import { useEffect, useMemo, useState } from "react";
 
 import { api } from "../../../../behavior/gateway-api.ts";
@@ -22,7 +28,6 @@ import {
   buildScopeHierarchy,
   type OrgModelProvider,
   resolveEligible,
-  type VirtualKeyScopeEntry,
 } from "../../model/eligible-model-providers.ts";
 import { resolveTracesHrefForKey } from "../../model/traces-href-for-key.ts";
 import {
@@ -63,42 +68,15 @@ import {
   type VirtualKeyBudgetWindow,
 } from "./virtual-key-budget-section.tsx";
 
-export type VirtualKeyDetail = {
-  id: string;
-  organizationId: string;
-  name: string;
-  description: string | null;
-  status: "active" | "disabled" | "revoked";
-  scopes: VirtualKeyScopeEntry[];
-  routingPolicyId: string | null;
-  routingMode?: "NONE" | "FALLBACK_ALL" | "POLICY";
-  traceProjectId?: string | null;
-  /** True when the project the key traces into has been deleted. */
-  traceProjectArchived?: boolean;
-  principalUserId?: string | null;
-  principalUser?: { name: string | null; email: string | null } | null;
-  /** When the key stops serving; null or absent means it never expires. */
-  expiresAt?: string | null;
-  config: {
-    // null / undefined = no allowlist = every eligible model is allowed.
-    modelsAllowed?: string[] | null;
-    // null / undefined = every provider in scope, current and future.
-    providersAllowed?: string[] | null;
-    cache?: { mode: "respect" | "force" | "disable"; ttlS: number };
-    rateLimits?: {
-      rpm: number | null;
-      tpm: number | null;
-      rpd: number | null;
-    };
-    realtime?: {
-      maxOpenSessions: number | null;
-    };
-    metadata?: {
-      label?: string;
-      tags?: string[];
-    };
-  };
-};
+/** The key as the list and detail pages hold it: the wire leaves an unset `config` out. */
+export type VirtualKeyDetail = Omit<VirtualKeyCamelDtoResponse, "config"> &
+  Partial<Pick<VirtualKeyCamelDtoResponse, "config">>;
+
+/** The stored config the form seeds from; a missing or unparseable one seeds the defaults. */
+function storedConfig(raw: unknown): VirtualKeyConfig {
+  const parsed = virtualKeyConfigSchema.safeParse(raw ?? {});
+  return parsed.success ? parsed.data : defaultVirtualKeyConfig();
+}
 
 type VirtualKeyEditDrawerProps = {
   organizationId: string;
@@ -152,18 +130,19 @@ export function VirtualKeyEditDrawer({
     if (!vk) return;
     setName(vk.name);
     setDescription(vk.description ?? "");
-    setTagsCsv((vk.config.metadata?.tags ?? []).join(", "));
-    setCacheMode(vk.config.cache?.mode ?? "respect");
-    setCacheTtlS(vk.config.cache?.ttlS ?? 3600);
-    setRpm(vk.config.rateLimits?.rpm?.toString() ?? "");
-    setTpm(vk.config.rateLimits?.tpm?.toString() ?? "");
-    setRpd(vk.config.rateLimits?.rpd?.toString() ?? "");
-    setMaxOpenSessions(vk.config.realtime?.maxOpenSessions?.toString() ?? "");
-    const providersAllowed = vk.config.providersAllowed ?? null;
+    const config = storedConfig(vk.config);
+    setTagsCsv((config.metadata?.tags ?? []).join(", "));
+    setCacheMode(config.cache?.mode ?? "respect");
+    setCacheTtlS(config.cache?.ttlS ?? 3600);
+    setRpm(config.rateLimits?.rpm?.toString() ?? "");
+    setTpm(config.rateLimits?.tpm?.toString() ?? "");
+    setRpd(config.rateLimits?.rpd?.toString() ?? "");
+    setMaxOpenSessions(config.realtime?.maxOpenSessions?.toString() ?? "");
+    const providersAllowed = config.providersAllowed ?? null;
     setProviderAccess({
       allProviders: !providersAllowed || providersAllowed.length === 0,
       providerIds: providersAllowed ?? [],
-      modelsAllowed: vk.config.modelsAllowed ?? [],
+      modelsAllowed: config.modelsAllowed ?? [],
     });
     setRouting(
       routingValueFromKey({

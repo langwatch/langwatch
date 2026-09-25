@@ -62,10 +62,7 @@ import {
   EligibleModelProvidersSummary,
 } from "../../../features/virtual-keys/ui/blocks/eligible-model-providers-preview.tsx";
 import { VirtualKeyOwnershipReadOnly } from "../../../features/virtual-keys/ui/blocks/virtual-key-ownership-section.tsx";
-import {
-  type VirtualKeyDetail,
-  VirtualKeyEditDrawer,
-} from "../../../features/virtual-keys/ui/sections/virtual-key-edit-drawer.tsx";
+import { VirtualKeyEditDrawer } from "../../../features/virtual-keys/ui/sections/virtual-key-edit-drawer.tsx";
 import { VirtualKeySecretReveal } from "../../../features/virtual-keys/ui/sections/virtual-key-secret-reveal.tsx";
 import { VirtualKeyUsageSnippet } from "../../../features/virtual-keys/ui/sections/virtual-key-usage-snippet.tsx";
 import type { GatewayTeam } from "../../../model/gateway-host.ts";
@@ -606,11 +603,7 @@ function VirtualKeyDetailPage() {
       {orgId && vk && (
         <VirtualKeyEditDrawer
           organizationId={orgId}
-          // The cast stands on one field: VirtualKeyCamelDto types `config`
-          // as `unknown`, while the drawer names the config shape it reads.
-          // Modelling the config JSON on the DTO is what removes this, and it
-          // is a change to the wire type rather than to this call.
-          vk={editing ? (vk as VirtualKeyDetail) : null}
+          vk={editing ? vk : null}
           onOpenChange={(open) => {
             if (!open) setEditing(false);
           }}

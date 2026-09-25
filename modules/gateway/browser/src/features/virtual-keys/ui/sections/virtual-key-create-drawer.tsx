@@ -76,6 +76,97 @@ type VirtualKeyCreateDrawerProps = {
   onCreated: (result: { id: string; name: string; secret: string; model?: string }) => void;
 };
 
+/** On first open, own the key by the current project; a no-op seed keeps the state's identity. */
+function seededOwnership(
+  prev: VirtualKeyOwnership,
+  input: {
+    projectId: string | undefined;
+    availableProjects: readonly { id: string }[];
+    availableTeams: readonly { id: string }[];
+  },
+): VirtualKeyOwnership {
+  if (prev.projectId ?? prev.teamId) return prev;
+  const seedProject = input.projectId ?? input.availableProjects[0]?.id ?? null;
+  const seedTeam = input.availableTeams.length === 1 ? (input.availableTeams[0]?.id ?? null) : null;
+  if (prev.projectId === seedProject && prev.teamId === seedTeam) {
+    return prev;
+  }
+  return { ...prev, projectId: seedProject, teamId: seedTeam };
+}
+
+/** The first thing that keeps the key from being issued yet, in the order the form reads. */
+function cannotIssueReasonFor(input: {
+  name: string;
+  ownership: VirtualKeyOwnership;
+  personalProjectId: string | null;
+  budget: VirtualKeyBudgetValue;
+  providersLoading: boolean;
+  providerAccess: ProviderAccessValue;
+  eligible: ReturnType<typeof resolveEligible>;
+  expiration: VirtualKeyExpirationValue;
+  expiresAt: ReturnType<typeof resolveExpiresAt>;
+}): ReturnType<typeof expiryIncompleteReason> | string {
+  if (!input.name) return "Name is required.";
+  const ownershipReason = ownershipIncompleteReason(input.ownership, {
+    personalProjectId: input.personalProjectId,
+  });
+  if (ownershipReason) return ownershipReason;
+  const budgetReason = budgetInvalidReason(input.budget);
+  if (budgetReason) return budgetReason;
+  // An explicit provider selection cannot be validated against a list
+  // that has not arrived; creating now would persist an allowlist
+  // filtered against nothing.
+  if (input.providersLoading) {
+    return "Loading providers…";
+  }
+  const providerReason = providerAccessInvalidReason(input.providerAccess, input.eligible);
+  if (providerReason) return providerReason;
+  return expiryIncompleteReason({ preset: input.expiration.preset, expiresAt: input.expiresAt });
+}
+
+type CreateVirtualKeyInput = Parameters<
+  ReturnType<typeof api.virtualKeys.create.useMutation>["mutateAsync"]
+>[0];
+
+/** The form as the create call takes it: blanks left out, the budget only when a limit is set. */
+function createVirtualKeyInput(form: {
+  organizationId: string;
+  name: string;
+  description: string;
+  tagsCsv: string;
+  ownership: VirtualKeyOwnership;
+  currentUserId: string | undefined;
+  scopes: CreateVirtualKeyInput["scopes"];
+  routing: VirtualKeyRoutingValue;
+  expiresAt: ReturnType<typeof resolveExpiresAt>;
+  budget: VirtualKeyBudgetValue;
+  access: ReturnType<typeof providerAccessToConfig>;
+}): CreateVirtualKeyInput {
+  const tags = parseTagsCsv(form.tagsCsv);
+  return {
+    organizationId: form.organizationId,
+    name: form.name,
+    description: form.description || undefined,
+    principalUserId: form.ownership.kind === "PERSONAL" ? (form.currentUserId ?? null) : null,
+    scopes: form.scopes,
+    traceProjectId: ownershipTraceProjectId(form.ownership),
+    routingMode: form.routing.mode,
+    routingPolicyId: form.routing.mode === "POLICY" ? form.routing.policyId : null,
+    ...(form.expiresAt ? { expiresAt: form.expiresAt } : {}),
+    budget: form.budget.limitUsd.trim()
+      ? {
+          limitUsd: form.budget.limitUsd.trim(),
+          window: form.budget.window,
+        }
+      : null,
+    config: {
+      providersAllowed: form.access.providersAllowed,
+      modelsAllowed: form.access.modelsAllowed,
+      ...(tags.length > 0 ? { metadata: { tags } } : {}),
+    },
+  };
+}
+
 export function VirtualKeyCreateDrawer({
   organizationId,
   open,
@@ -124,19 +215,9 @@ export function VirtualKeyCreateDrawer({
   // where a shared key's traces and costs land is an explicit choice.
   useEffect(() => {
     if (!open) return;
-    setOwnership((prev) => {
-      if (prev.projectId ?? prev.teamId) return prev;
-      const seedProject = project?.id ?? availableProjects[0]?.id ?? null;
-      const seedTeam = availableTeams.length === 1 ? (availableTeams[0]?.id ?? null) : null;
-      // A no-op seed must keep the previous state's identity: a fresh
-      // but value-identical object re-arms this effect through its own
-      // render and spins the drawer at 100% CPU in an org with no
-      // projects.
-      if (prev.projectId === seedProject && prev.teamId === seedTeam) {
-        return prev;
-      }
-      return { ...prev, projectId: seedProject, teamId: seedTeam };
-    });
+    setOwnership((prev) =>
+      seededOwnership(prev, { projectId: project?.id, availableProjects, availableTeams }),
+    );
   }, [open, project?.id, availableProjects, availableTeams]);
 
   const utils = api.useUtils();
@@ -223,24 +304,17 @@ export function VirtualKeyCreateDrawer({
     onOpenChange(false);
   };
 
-  const cannotIssueReason = (() => {
-    if (!name) return "Name is required.";
-    const ownershipReason = ownershipIncompleteReason(ownership, {
-      personalProjectId,
-    });
-    if (ownershipReason) return ownershipReason;
-    const budgetReason = budgetInvalidReason(budget);
-    if (budgetReason) return budgetReason;
-    // An explicit provider selection cannot be validated against a list
-    // that has not arrived; creating now would persist an allowlist
-    // filtered against nothing.
-    if (orgProvidersQuery.isLoading) {
-      return "Loading providers…";
-    }
-    const providerReason = providerAccessInvalidReason(providerAccess, eligible);
-    if (providerReason) return providerReason;
-    return expiryIncompleteReason({ preset: expiration.preset, expiresAt });
-  })();
+  const cannotIssueReason = cannotIssueReasonFor({
+    name,
+    ownership,
+    personalProjectId,
+    budget,
+    providersLoading: orgProvidersQuery.isLoading,
+    providerAccess,
+    eligible,
+    expiration,
+    expiresAt,
+  });
 
   const handleSubmit = async () => {
     if (cannotIssueReason) {
@@ -249,30 +323,21 @@ export function VirtualKeyCreateDrawer({
     }
     setExpiryFieldError(null);
     try {
-      const tags = parseTagsCsv(tagsCsv);
-      const access = providerAccessToConfig(providerAccess, eligible);
-      const result = await createMutation.mutateAsync({
-        organizationId,
-        name,
-        description: description || undefined,
-        principalUserId: ownership.kind === "PERSONAL" ? (currentUser?.id ?? null) : null,
-        scopes,
-        traceProjectId: ownershipTraceProjectId(ownership),
-        routingMode: routing.mode,
-        routingPolicyId: routing.mode === "POLICY" ? routing.policyId : null,
-        ...(expiresAt ? { expiresAt } : {}),
-        budget: budget.limitUsd.trim()
-          ? {
-              limitUsd: budget.limitUsd.trim(),
-              window: budget.window,
-            }
-          : null,
-        config: {
-          providersAllowed: access.providersAllowed,
-          modelsAllowed: access.modelsAllowed,
-          ...(tags.length > 0 ? { metadata: { tags } } : {}),
-        },
-      });
+      const result = await createMutation.mutateAsync(
+        createVirtualKeyInput({
+          organizationId,
+          name,
+          description,
+          tagsCsv,
+          ownership,
+          currentUserId: currentUser?.id,
+          scopes,
+          routing,
+          expiresAt,
+          budget,
+          access: providerAccessToConfig(providerAccess, eligible),
+        }),
+      );
       onCreated({
         id: result.virtualKey.id,
         name: result.virtualKey.name,
