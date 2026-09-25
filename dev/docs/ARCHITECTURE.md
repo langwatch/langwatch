@@ -197,6 +197,9 @@ One unowned service has one owning module: evaluation owns the langevals boundar
 the S3 staging of large payloads and their config — and topic and workflow reach langevals through
 `EvaluationApi` (Alex, 2026-09-25).
 
+Enterprise-licensed code stays in enterprise modules: auth (open) obtains the SSO provider configs better-auth needs from
+`SsoApi`, building better-auth lazily so no peer is called during construction (Alex, 2026-09-25).
+
 ### 3.4 The browser half and the kit
 
 `trace-browser` layers: flat public entries → `model/` (pure) → `behavior/`
