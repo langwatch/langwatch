@@ -11,7 +11,7 @@ import * as path from "node:path";
 import { openai } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import {
-  getLatestFlagshipForProvider,
+  findLatestFlagshipForProvider,
   getProviderModelOptions,
 } from "@langwatch/model-provider-contract";
 import {
@@ -417,7 +417,7 @@ const GUIDED_MODEL_PILLS_MAX = 4;
 function guidedChatModels(provider: GuidedProvider): string[] {
   const backend = provider.registryKey === "openai_codex" ? "openai" : provider.registryKey;
   const catalog = getProviderModelOptions(backend, "chat").map((option) => option.value);
-  const recommended = getLatestFlagshipForProvider(backend, "chat")?.slice(backend.length + 1);
+  const recommended = findLatestFlagshipForProvider(backend, "chat")[0]?.slice(backend.length + 1);
   const ordered = recommended
     ? [recommended, ...catalog.filter((m) => m !== recommended)]
     : catalog;

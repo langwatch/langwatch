@@ -4,7 +4,7 @@ import {
   allFeatures,
   buildProviderOnboardingDefaultPlan,
   expandLatestAlias,
-  featureByKey,
+  findFeatureByKey,
   getProviderModelOptions,
   getStaticModelCostRates,
   isLatestAlias,
@@ -12,7 +12,7 @@ import {
   isModelAllowedForFeature,
   isModelRole,
   normalizeRoutingHandle,
-  providerDeprecation,
+  findProviderDeprecation,
   classifyRoutingHandleProblem,
   findModelProviderDefinition,
   type ModelCostRate,
@@ -132,7 +132,7 @@ export abstract class ModelProviderCatalog {
     const allowed = isModelRole(input.key)
       ? isModelAllowedAsRoleDefault(model, input.key)
       : Boolean(
-          featureByKey(input.key) &&
+          findFeatureByKey(input.key)[0] &&
           isModelAllowedForFeature({ modelId: model, featureKey: input.key }),
         );
 
@@ -168,7 +168,8 @@ export abstract class ModelProviderCatalog {
       const allowed = isModelRole(key)
         ? isModelAllowedAsRoleDefault(value, key)
         : Boolean(
-            featureByKey(key) && isModelAllowedForFeature({ modelId: value, featureKey: key }),
+            findFeatureByKey(key)[0] &&
+            isModelAllowedForFeature({ modelId: value, featureKey: key }),
           );
       if (!allowed) {
         throw new ModelDefaultValidationError(
@@ -188,7 +189,7 @@ export abstract class ModelProviderCatalog {
     return classifyRoutingHandleProblem(handle);
   }
   pickProviderDeprecation(provider: string): { replacement?: string } | null {
-    const deprecation = providerDeprecation(provider);
+    const deprecation = findProviderDeprecation(provider)[0];
     return deprecation ? { replacement: deprecation.replacedBy } : null;
   }
   isManagedProvider(_input: { organizationId: string; provider: string }): boolean {

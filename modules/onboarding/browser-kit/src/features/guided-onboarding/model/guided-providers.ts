@@ -3,7 +3,7 @@
  * goes through the shared credential form, which already knows the fields.
  */
 
-import { modelProviders, providerDeprecation } from "@langwatch/model-provider-contract";
+import { modelProviders, findProviderDeprecation } from "@langwatch/model-provider-contract";
 
 export interface GuidedProvider {
   readonly id: string;
@@ -44,6 +44,6 @@ export const GUIDED_PROVIDERS: readonly GuidedProvider[] = [
 export function guidedProvidersFor(): GuidedProvider[] {
   return GUIDED_PROVIDERS.filter((provider) => {
     const entry = modelProviders[provider.registryKey];
-    return entry.type === "llm" && !providerDeprecation(provider.registryKey);
+    return entry.type === "llm" && !findProviderDeprecation(provider.registryKey)[0];
   });
 }

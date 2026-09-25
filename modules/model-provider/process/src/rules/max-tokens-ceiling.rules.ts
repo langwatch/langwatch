@@ -1,4 +1,4 @@
-import { getModelById, type CustomModelEntry } from "@langwatch/model-provider-contract";
+import { findModelById, type CustomModelEntry } from "@langwatch/model-provider-contract";
 
 export type ProviderWithCustomModels = {
   customModels?: CustomModelEntry[] | null;
@@ -16,6 +16,6 @@ export function pickMaxTokensCeiling(
   const custom = modelProvider?.customModels?.find((entry) => entry.modelId === modelName);
   if (custom?.maxTokens && custom.maxTokens > 0) return custom.maxTokens;
 
-  const model = getModelById(modelId) ?? getModelById(modelName);
+  const model = findModelById(modelId)[0] ?? findModelById(modelName)[0];
   return model?.maxCompletionTokens ?? undefined;
 }

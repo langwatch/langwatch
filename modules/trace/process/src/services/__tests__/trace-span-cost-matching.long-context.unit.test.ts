@@ -1,4 +1,4 @@
-import { getStaticModelCostRates, matchModelCost } from "@langwatch/model-provider-contract";
+import { getStaticModelCostRates, findMatchingModelCost } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
 import { TraceSpanCostMatchingService } from "../trace-span-cost-matching.service.ts";
@@ -13,7 +13,7 @@ const OPUS_5_CACHE_READ = 0.0000005;
 describe("long-context [1m] model cost matching", () => {
   /** @scenario "A [1m] long-context model id is priced as its base model" */
   it("matches claude-opus-5[1m] to the anthropic/claude-opus-5 registry entry at standard rates", () => {
-    const match = matchModelCost("claude-opus-5[1m]", getStaticModelCostRates());
+    const match = findMatchingModelCost("claude-opus-5[1m]", getStaticModelCostRates())[0];
 
     expect(match?.model).toBe("anthropic/claude-opus-5");
     expect(match?.inputCostPerToken).toBe(OPUS_5_INPUT);
@@ -63,10 +63,10 @@ describe("long-context [1m] model cost matching", () => {
   it("resolves the [1m] suffix for other Claude spellings too", () => {
     const costs = getStaticModelCostRates();
 
-    expect(matchModelCost("claude-sonnet-4-5[1m]", costs)?.model).toBe(
+    expect(findMatchingModelCost("claude-sonnet-4-5[1m]", costs)[0]?.model).toBe(
       "anthropic/claude-sonnet-4-5",
     );
-    expect(matchModelCost("anthropic/claude-opus-5[1m]", costs)?.model).toBe(
+    expect(findMatchingModelCost("anthropic/claude-opus-5[1m]", costs)[0]?.model).toBe(
       "anthropic/claude-opus-5",
     );
   });

@@ -1,4 +1,4 @@
-import { getModelById } from "@langwatch/model-provider-contract";
+import { findModelById } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
 import { pickMaxTokensCeiling } from "../rules/max-tokens-ceiling.rules.ts";
@@ -20,7 +20,7 @@ describe("pickMaxTokensCeiling", () => {
   });
 
   it("falls back to the catalog completion limit", () => {
-    const model = getModelById("openai/gpt-5");
+    const model = findModelById("openai/gpt-5")[0];
     expect(model).toBeDefined();
     expect(pickMaxTokensCeiling("openai/gpt-5", null)).toBe(
       model?.maxCompletionTokens ?? undefined,

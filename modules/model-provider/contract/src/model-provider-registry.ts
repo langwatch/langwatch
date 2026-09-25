@@ -358,10 +358,11 @@ export function isDispatchableProvider(providerId: string): boolean {
   return !definition || definition.type === "llm";
 }
 
-export function providerDeprecation(provider: string): { replacedBy: string } | undefined {
-  return (
+export function findProviderDeprecation(provider: string): { replacedBy: string }[] {
+  const deprecated = (
     modelProviders[provider as keyof typeof modelProviders] as ModelProviderDefinition | undefined
   )?.deprecated;
+  return deprecated ? [deprecated] : [];
 }
 
 export function pickParameterConstraints(modelId: string): ParameterConstraints | undefined {

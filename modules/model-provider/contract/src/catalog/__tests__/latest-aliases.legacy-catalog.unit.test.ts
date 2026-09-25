@@ -39,18 +39,18 @@ vi.mock("../model-catalog.ts", () => ({
   },
 }));
 
-import { resolveLatestAlias } from "../latest-aliases.ts";
+import { findAliasTarget } from "../latest-aliases.ts";
 
 describe("given a catalog with no named-tier generation", () => {
   describe("when resolving the openai aliases", () => {
     /** @scenario Older naming still resolves when no newer generation exists */
     it("falls back to the unsuffixed model and its -mini counterpart", () => {
-      expect(resolveLatestAlias("openai/latest")).toBe("openai/gpt-5.5");
-      expect(resolveLatestAlias("openai/latest-mini")).toBe("openai/gpt-5.5-mini");
+      expect(findAliasTarget("openai/latest")[0]).toBe("openai/gpt-5.5");
+      expect(findAliasTarget("openai/latest-mini")[0]).toBe("openai/gpt-5.5-mini");
     });
 
     it("still skips the -pro serving mode", () => {
-      expect(resolveLatestAlias("openai/latest")).not.toBe("openai/gpt-5.5-pro");
+      expect(findAliasTarget("openai/latest")[0]).not.toBe("openai/gpt-5.5-pro");
     });
   });
 });

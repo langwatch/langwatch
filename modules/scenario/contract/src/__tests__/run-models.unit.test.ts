@@ -3,7 +3,7 @@
  * Model resolution chain for runs.
  */
 
-import { resolveLatestAlias } from "@langwatch/model-provider-contract";
+import { findAliasTarget } from "@langwatch/model-provider-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -76,8 +76,8 @@ describe("the models a run resolves", () => {
     const judgeAlias = "anthropic/latest-mini";
 
     it("has a concrete model for each alias in the registry", () => {
-      expect(resolveLatestAlias(simulatorAlias)).toBeTruthy();
-      expect(resolveLatestAlias(judgeAlias)).toBeTruthy();
+      expect(findAliasTarget(simulatorAlias)[0]).toBeTruthy();
+      expect(findAliasTarget(judgeAlias)[0]).toBeTruthy();
     });
 
     /** @scenario "A latest alias expands where the run models resolve" */
@@ -88,7 +88,7 @@ describe("the models a run resolves", () => {
         resolveFeatureModel: projectDefaults(),
       });
 
-      expect(models.simulatorModel).toBe(resolveLatestAlias(simulatorAlias));
+      expect(models.simulatorModel).toBe(findAliasTarget(simulatorAlias)[0]);
       expect(models.simulatorModel).not.toBe(simulatorAlias);
     });
 
@@ -100,7 +100,7 @@ describe("the models a run resolves", () => {
         resolveFeatureModel: projectDefaults(),
       });
 
-      expect(models.judgeModel).toBe(resolveLatestAlias(judgeAlias));
+      expect(models.judgeModel).toBe(findAliasTarget(judgeAlias)[0]);
       expect(models.judgeModel).not.toBe(judgeAlias);
     });
 

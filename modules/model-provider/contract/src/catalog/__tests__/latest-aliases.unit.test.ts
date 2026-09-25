@@ -55,7 +55,7 @@ import {
   isLatestAlias,
   parseLatestAlias,
   pickRecommendedChatModel,
-  resolveLatestAlias,
+  findAliasTarget,
 } from "../latest-aliases.ts";
 
 describe("given latest-alias model resolution", () => {
@@ -90,39 +90,39 @@ describe("given latest-alias model resolution", () => {
   describe("when resolving an alias to a concrete id", () => {
     /** @scenario Latest picks the main tier of the newest generation */
     it("resolves openai/latest to the newest generation's main tier", () => {
-      expect(resolveLatestAlias("openai/latest")).toBe("openai/gpt-5.6-terra");
+      expect(findAliasTarget("openai/latest")[0]).toBe("openai/gpt-5.6-terra");
     });
     /** @scenario Latest-mini picks the fast tier of the newest generation */
     it("resolves openai/latest-mini to the newest generation's fast tier", () => {
-      expect(resolveLatestAlias("openai/latest-mini")).toBe("openai/gpt-5.6-luna");
+      expect(findAliasTarget("openai/latest-mini")[0]).toBe("openai/gpt-5.6-luna");
     });
     /** @scenario The top tier is never an alias target */
     it("never resolves either openai alias to sol or astra", () => {
       for (const alias of ["openai/latest", "openai/latest-mini"]) {
-        expect(resolveLatestAlias(alias)).not.toMatch(/sol|astra/);
+        expect(findAliasTarget(alias)[0]).not.toMatch(/sol|astra/);
       }
     });
     /** @scenario Pro serving modes are skipped */
     it("skips -pro serving modes and batch lanes when picking the main tier", () => {
-      expect(resolveLatestAlias("openai/latest")).toBe("openai/gpt-5.6-terra");
-      expect(resolveLatestAlias("openai/latest")).not.toMatch(/-pro|:batch/);
+      expect(findAliasTarget("openai/latest")[0]).toBe("openai/gpt-5.6-terra");
+      expect(findAliasTarget("openai/latest")[0]).not.toMatch(/-pro|:batch/);
     });
     /** @scenario Anthropic latest is the newest Opus, never Fable */
     it("resolves anthropic/latest to the newest claude-opus model", () => {
-      expect(resolveLatestAlias("anthropic/latest")).toBe("anthropic/claude-opus-5");
+      expect(findAliasTarget("anthropic/latest")[0]).toBe("anthropic/claude-opus-5");
     });
     it("resolves anthropic/latest-mini to the newest claude-sonnet model (not haiku, parallel to gpt-luna above nano)", () => {
-      expect(resolveLatestAlias("anthropic/latest-mini")).toBe("anthropic/claude-sonnet-5");
+      expect(findAliasTarget("anthropic/latest-mini")[0]).toBe("anthropic/claude-sonnet-5");
     });
     /** @scenario Gemini latest is the newest Flash, never Pro */
     it("resolves gemini/latest to the newest gemini flash model", () => {
-      expect(resolveLatestAlias("gemini/latest")).toBe("gemini/gemini-3.8-flash");
+      expect(findAliasTarget("gemini/latest")[0]).toBe("gemini/gemini-3.8-flash");
     });
     it("resolves gemini/latest-mini to the newest gemini flash-lite model", () => {
-      expect(resolveLatestAlias("gemini/latest-mini")).toBe("gemini/gemini-3.5-flash-lite");
+      expect(findAliasTarget("gemini/latest-mini")[0]).toBe("gemini/gemini-3.5-flash-lite");
     });
     it("returns null for non-aliases", () => {
-      expect(resolveLatestAlias("openai/gpt-5.5")).toBeNull();
+      expect(findAliasTarget("openai/gpt-5.5")).toEqual([]);
     });
   });
 

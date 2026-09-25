@@ -168,27 +168,31 @@ export const normalizeBedrockModelId = (model: string): string => {
  * stripped, then with a Bedrock envelope normalized away — each of those four candidates first
  * as given and then normalized, and each lookup falling back through `/`-separated prefixes.
  */
-export const matchModelCost = (
+export const findMatchingModelCost = (
   model: string,
   costs: readonly ModelCostRate[],
-): ModelCostRate | undefined => {
-  const matching = (candidate: string): ModelCostRate | undefined => {
-    const raw = findModelCost(candidate, costs);
+): ModelCostRate[] => {
+  const cascade = (): ModelCostRate | undefined => {
+    const matching = (candidate: string): ModelCostRate | undefined => {
+      const raw = findModelCost(candidate, costs);
+      if (raw) return raw;
+      const normalized = normalizeModelName(candidate);
+      return normalized === candidate ? undefined : findModelCost(normalized, costs);
+    };
+    const raw = matching(model);
     if (raw) return raw;
-    const normalized = normalizeModelName(candidate);
-    return normalized === candidate ? undefined : findModelCost(normalized, costs);
+    const slash = model.indexOf("/");
+    const provider = slash === -1 ? undefined : model.slice(0, slash);
+    if (provider?.includes(".")) {
+      const strippedSubtype = provider.split(".")[0] + model.slice(slash);
+      const subtypeMatch = matching(strippedSubtype);
+      if (subtypeMatch) return subtypeMatch;
+    }
+    const bedrock = normalizeBedrockModelId(model);
+    return bedrock === model ? undefined : matching(bedrock);
   };
-  const raw = matching(model);
-  if (raw) return raw;
-  const slash = model.indexOf("/");
-  const provider = slash === -1 ? undefined : model.slice(0, slash);
-  if (provider?.includes(".")) {
-    const strippedSubtype = provider.split(".")[0] + model.slice(slash);
-    const subtypeMatch = matching(strippedSubtype);
-    if (subtypeMatch) return subtypeMatch;
-  }
-  const bedrock = normalizeBedrockModelId(model);
-  return bedrock === model ? undefined : matching(bedrock);
+  const match = cascade();
+  return match ? [match] : [];
 };
 
 /**
@@ -245,7 +249,7 @@ export const estimateModelCost = (
     ].some((rate) => (rate ?? 0) > 0);
     const registryImageRates =
       overridePricesSomething && resolvedModel
-        ? matchModelCost(resolvedModel, staticCosts)
+        ? findMatchingModelCost(resolvedModel, staticCosts)[0]
         : undefined;
 
     return (
@@ -290,7 +294,7 @@ export const estimateModelCost = (
     inputImageTokens > 0 ||
     outputImageTokens > 0;
   const matched =
-    resolvedModel && hasUsage ? matchModelCost(resolvedModel, staticCosts) : undefined;
+    resolvedModel && hasUsage ? findMatchingModelCost(resolvedModel, staticCosts)[0] : undefined;
   const computed = matched
     ? (computeCost({
         rate: matched,

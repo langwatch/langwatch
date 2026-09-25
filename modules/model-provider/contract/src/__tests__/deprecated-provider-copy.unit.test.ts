@@ -1,6 +1,6 @@
 import { explainHandledError } from "@langwatch/error-presentation/presentation";
 import type { HandledErrorShape } from "@langwatch/error-presentation/read-handled-error";
-import { modelProviders, providerDeprecation } from "@langwatch/model-provider-contract";
+import { modelProviders, findProviderDeprecation } from "@langwatch/model-provider-contract";
 /**
  * The refusal a retired provider hands back is only actionable if the customer is told
  * what to add instead.
@@ -33,7 +33,7 @@ describe("the copy a retired provider's refusal renders", () => {
   const deprecated = Object.keys(modelProviders)
     .map((provider) => ({
       provider,
-      replacedBy: providerDeprecation(provider)?.replacedBy,
+      replacedBy: findProviderDeprecation(provider)[0]?.replacedBy,
     }))
     .filter((entry): entry is { provider: string; replacedBy: string } => !!entry.replacedBy);
 

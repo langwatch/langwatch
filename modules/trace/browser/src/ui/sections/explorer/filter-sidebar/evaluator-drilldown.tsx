@@ -1,4 +1,4 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { CheckboxCard, Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { SimpleSlider } from "@langwatch/design-system/slider";
 import { type FacetItem, formatCount } from "@langwatch/trace-browser-kit";
 import {
@@ -15,7 +15,6 @@ import {
   RangeEndpointInput,
   stepForSpan,
 } from "../../../elements/explorer/filter-sidebar/range-controls.tsx";
-import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button.tsx";
 
 interface EvaluatorDrilldownProps {
   /** The evaluator FacetItem (must carry aggregates). */
@@ -212,11 +211,11 @@ const ValueRow: React.FC<{
 }> = ({ label, count, palette, maxCount, active, onClick, showDot = false }) => {
   const fillPct = maxCount > 0 ? Math.max((count / maxCount) * 100, MIN_VISIBLE_FILL_PCT) : 0;
   return (
-    <RowButton
-      type="button"
-      role="checkbox"
-      aria-checked={active}
-      aria-label={`${label} — ${active ? "included" : "click to include"}`}
+    <CheckboxCard.Root
+      unstyled
+      checked={active}
+      onCheckedChange={() => onClick()}
+      display="block"
       position="relative"
       width="full"
       paddingY={0.5}
@@ -228,7 +227,6 @@ const ValueRow: React.FC<{
       overflow="hidden"
       background={active ? `${palette}.subtle` : "transparent"}
       borderWidth={0}
-      onClick={onClick}
       transition="background 120ms ease"
       _hover={{
         background: active ? `${palette}.subtle` : "bg.muted",
@@ -239,6 +237,9 @@ const ValueRow: React.FC<{
         outlineOffset: "-2px",
       }}
     >
+      <CheckboxCard.HiddenInput
+        aria-label={`${label} — ${active ? "included" : "click to include"}`}
+      />
       <Box
         position="absolute"
         bottom={0}
@@ -290,7 +291,7 @@ const ValueRow: React.FC<{
           {formatCount(count)}
         </Text>
       </HStack>
-    </RowButton>
+    </CheckboxCard.Root>
   );
 };
 

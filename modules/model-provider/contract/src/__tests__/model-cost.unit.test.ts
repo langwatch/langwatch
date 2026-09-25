@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { getStaticModelCostRates, deriveCacheWrite1hRate } from "../catalog/static-model-costs.ts";
 import {
   computeCost as estimateCostUnderOneRate,
-  matchModelCost,
+  findMatchingModelCost,
   normalizeBedrockModelId,
   normalizeModelName,
 } from "../model-cost.ts";
@@ -16,7 +16,7 @@ const getStaticModelCosts = getStaticModelCostRates;
 
 /** The fallback cascade, under the name this suite has always used. */
 const matchModelCostWithFallbacks = (model: string, costs: readonly ModelCostRate[]) =>
-  matchModelCost(model, costs);
+  findMatchingModelCost(model, costs)[0];
 
 /**
  * Prices one invocation, defaulting every quantity the caller did not name.

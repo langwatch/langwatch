@@ -12,7 +12,7 @@ import {
 } from "@langwatch/experiment-contract";
 import {
   computeCost,
-  matchModelCost,
+  findMatchingModelCost,
   type ModelCostRate,
 } from "@langwatch/model-provider-contract";
 import { z } from "zod";
@@ -104,7 +104,7 @@ function priceLlmCall(call: DSPyLLMCall, costs: readonly ModelCostRate[]): DSPyL
   const fields = llmCallCostFieldsSchema.safeParse(call.response);
   const costFields = fields.success ? fields.data : undefined;
   const model = costFields?.model;
-  const rate = model ? matchModelCost(model, costs) : undefined;
+  const rate = model ? findMatchingModelCost(model, costs)[0] : undefined;
   const promptTokens = costFields?.usage?.prompt_tokens;
   const completionTokens = costFields?.usage?.completion_tokens;
   return {

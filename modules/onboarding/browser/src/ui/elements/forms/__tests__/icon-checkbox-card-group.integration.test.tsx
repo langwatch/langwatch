@@ -53,7 +53,7 @@ describe("<IconCheckboxCardGroup/>", () => {
       const checkboxes = screen.getAllByRole("checkbox");
       expect(checkboxes).toHaveLength(3);
       for (const cb of checkboxes) {
-        expect(cb).toHaveAttribute("aria-checked", "false");
+        expect(cb).not.toBeChecked();
       }
     });
 
@@ -93,9 +93,9 @@ describe("<IconCheckboxCardGroup/>", () => {
       );
 
       const checkboxes = screen.getAllByRole("checkbox");
-      expect(checkboxes[0]).toHaveAttribute("aria-checked", "true");
-      expect(checkboxes[1]).toHaveAttribute("aria-checked", "false");
-      expect(checkboxes[2]).toHaveAttribute("aria-checked", "true");
+      expect(checkboxes[0]).toBeChecked();
+      expect(checkboxes[1]).not.toBeChecked();
+      expect(checkboxes[2]).toBeChecked();
     });
   });
 

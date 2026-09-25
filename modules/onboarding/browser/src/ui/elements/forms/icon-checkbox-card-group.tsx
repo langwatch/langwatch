@@ -1,4 +1,4 @@
-import { Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { CheckboxCard, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { Check } from "lucide-react";
 import type React from "react";
 
@@ -37,20 +37,22 @@ export const IconCheckboxCardGroup = <T extends string = string>({
       {items.map((item) => {
         const isSelected = value.includes(item.value);
         return (
-          <Button
+          <CheckboxCard.Root
             key={item.value}
-            variant="plain"
-            role="checkbox"
-            aria-checked={isSelected}
-            onClick={() => toggle(item.value)}
+            unstyled
+            checked={isSelected}
+            onCheckedChange={() => toggle(item.value)}
+            display="flex"
+            alignItems="center"
             cursor="pointer"
+            userSelect="none"
+            focusVisibleRing="outside"
             borderWidth="1px"
             borderColor={isSelected ? "orange.emphasized" : "border.subtle"}
             borderRadius="xl"
             bg={isSelected ? "orange.subtle" : "bg.panel"}
             py="3"
             px={isSelected ? "5" : "3"}
-            h="auto"
             transition="all 0.2s ease"
             boxShadow={isSelected ? "0 0 0 1px var(--colors-orange-muted)" : "none"}
             position="relative"
@@ -65,6 +67,7 @@ export const IconCheckboxCardGroup = <T extends string = string>({
             minW="0"
             textAlign="start"
           >
+            <CheckboxCard.HiddenInput />
             <HStack align="center" justify="space-between" w="full" minW="0">
               <HStack align="center" gap="2" minW="0" flex="1">
                 <Icon
@@ -95,7 +98,7 @@ export const IconCheckboxCardGroup = <T extends string = string>({
                 {isSelected && <Check size={10} color="white" strokeWidth={3} />}
               </HStack>
             </HStack>
-          </Button>
+          </CheckboxCard.Root>
         );
       })}
     </VStack>

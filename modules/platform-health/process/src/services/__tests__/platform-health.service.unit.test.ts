@@ -125,7 +125,7 @@ describe("given a subsystem refused the probe with a message of its own", () => 
           SubsystemProbeAdapter.create({
             name: "workflows",
             probes,
-            credential: { authToken: "probe-key", resolveProjectId: async () => "project-1" },
+            credential: { authToken: "probe-key", findProjectIds: async () => ["project-1"] },
           }),
         ],
       });
@@ -152,7 +152,7 @@ describe("given a subsystem the deployment named no target for", () => {
           SubsystemProbeAdapter.create({
             name: "triggers",
             probes,
-            credential: { authToken: "probe-key", resolveProjectId: async () => "project-1" },
+            credential: { authToken: "probe-key", findProjectIds: async () => ["project-1"] },
           }),
         ],
       });

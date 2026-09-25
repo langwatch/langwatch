@@ -3,7 +3,7 @@
  */
 import {
   ModelNotConfiguredError,
-  getLatestOpenAIChatFlagship,
+  findLatestOpenAIChatFlagship,
   type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
 import {
@@ -17,7 +17,7 @@ import { type WorkflowStudioDsl } from "../app/workflow.app.ts";
 /**
  * Terminal fallback model (registry flagship); derived from registry call, not hardcoded.
  */
-const REGISTRY_FLAGSHIP_MODEL = getLatestOpenAIChatFlagship() ?? "openai/gpt-5";
+const REGISTRY_FLAGSHIP_MODEL = findLatestOpenAIChatFlagship()[0] ?? "openai/gpt-5";
 
 type LlmParameterLike = { identifier?: string; type?: string; value?: unknown };
 type NodeLike = { data?: { parameters?: LlmParameterLike[] } };

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { resolveLatestAlias } from "./latest-aliases.ts";
+import { findAliasTarget } from "./latest-aliases.ts";
 import { llmModels } from "./model-catalog.ts";
 import type { LLMModelEntry } from "./model-catalog.types.ts";
 
@@ -76,7 +76,7 @@ function toSuggestion(entry: LLMModelEntry): TierTargetSuggestion {
 function resolvedAliasIds(aliases: readonly string[]): string[] {
   const ids: string[] = [];
   for (const alias of aliases) {
-    const resolved = resolveLatestAlias(alias);
+    const resolved = findAliasTarget(alias)[0];
     if (resolved && !ids.includes(resolved)) ids.push(resolved);
   }
   return ids;

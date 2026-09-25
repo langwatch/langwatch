@@ -15,7 +15,7 @@ import {
   isModelAllowedForFeature,
   LANGY_CHAT_FEATURE_KEY,
 } from "../codex-restrictions.ts";
-import { allFeatures, featureByKey, featuresByRole } from "../model-feature-registry.ts";
+import { allFeatures, findFeatureByKey, featuresByRole } from "../model-feature-registry.ts";
 
 describe("codexRestrictions", () => {
   it("recognises codex model ids by provider prefix", () => {
@@ -29,10 +29,10 @@ describe("codexRestrictions", () => {
       // The connection test is the one exception: it names no surface anyone
       // configures a model for, so it has no registry entry to find.
       if (key === CONNECTION_TEST_FEATURE_KEY) continue;
-      expect(featureByKey(key), `feature "${key}" must exist`).toBeTruthy();
+      expect(findFeatureByKey(key)[0], `feature "${key}" must exist`).toBeTruthy();
     }
-    expect(featureByKey(LANGY_CHAT_FEATURE_KEY)?.role).toBe("LANGY");
-    expect(featureByKey(CONNECTION_TEST_FEATURE_KEY)).toBeFalsy();
+    expect(findFeatureByKey(LANGY_CHAT_FEATURE_KEY)[0]?.role).toBe("LANGY");
+    expect(findFeatureByKey(CONNECTION_TEST_FEATURE_KEY)[0]).toBeFalsy();
   });
 
   it("allows codex on Langy and the fast assists, nowhere else", () => {
@@ -85,7 +85,7 @@ describe("codexRestrictions", () => {
     // DEFAULT-role so a codex FAST/coding default still resolves a real model.
     describe("when the run-time agent-under-test key is checked", () => {
       it("registers it as DEFAULT-role and refuses codex", () => {
-        const feature = featureByKey("scenarios.agent_under_test");
+        const feature = findFeatureByKey("scenarios.agent_under_test")[0];
         expect(feature, 'feature "scenarios.agent_under_test" must exist').toBeTruthy();
         expect(feature?.role).toBe("DEFAULT");
         expect(
@@ -99,7 +99,7 @@ describe("codexRestrictions", () => {
 
     describe("when the authoring-time generator key is checked", () => {
       it("keeps it FAST and codex-allowed, unaffected by the new run-time key", () => {
-        const generator = featureByKey("scenarios.generator");
+        const generator = findFeatureByKey("scenarios.generator")[0];
         expect(generator?.role).toBe("FAST");
         expect(
           isModelAllowedForFeature({

@@ -1,4 +1,4 @@
-import { matchModelCost, type ModelCostRate } from "@langwatch/model-provider-contract";
+import { findMatchingModelCost, type ModelCostRate } from "@langwatch/model-provider-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import {
   ATTR_KEYS,
@@ -74,7 +74,7 @@ export class OtlpSpanCostEnrichmentService {
       return;
     }
 
-    const matched = matchModelCost(modelName, customCosts);
+    const matched = findMatchingModelCost(modelName, customCosts)[0];
     if (!matched) {
       return;
     }

@@ -6,6 +6,7 @@ import type {
   AnalyticsTimeseriesResult,
   SharedFiltersInput,
 } from "@langwatch/analytics-contract";
+import { clickHouseClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { addDays, differenceInCalendarDays } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -185,12 +186,12 @@ describe("AnalyticsService", () => {
   });
 
   it("validates and decodes ClickHouse JSONEachRow results", async () => {
-    const calls: Record<string, unknown>[] = [];
+    const calls: Parameters<ClickHouseClient["query"]>[0][] = [];
     const service = AnalyticsAdapter.create({
       clickhouseEnabled: true,
       resolveClient: async () =>
-        ({
-          query: async (options: Record<string, unknown>) => {
+        clickHouseClientDouble({
+          query: async (options) => {
             calls.push(options);
             return {
               json: async () => [
@@ -202,7 +203,7 @@ describe("AnalyticsService", () => {
               ],
             };
           },
-        }) as unknown as ClickHouseClient,
+        }),
     });
 
     await expect(service.getTimeseries(input())).resolves.toEqual({
@@ -278,12 +279,12 @@ describe("AnalyticsService", () => {
   /** @scenario "Feedback reads preserve their existing result shape" */
   /** @scenario "Top-document reads preserve their existing result shape" */
   it("preserves legacy feedback decoding and document ordering", async () => {
-    const calls: Record<string, unknown>[] = [];
+    const calls: Parameters<ClickHouseClient["query"]>[0][] = [];
     const service = AnalyticsAdapter.create({
       clickhouseEnabled: true,
       resolveClient: async () =>
-        ({
-          query: async (options: Record<string, unknown>) => {
+        clickHouseClientDouble({
+          query: async (options) => {
             calls.push(options);
             const query = typeof options.query === "string" ? options.query : "";
             const documentRows = query.includes("document_refs")
@@ -313,7 +314,7 @@ describe("AnalyticsService", () => {
               json: async () => (isDocumentTotal ? [{ total: "7" }] : documentRows),
             };
           },
-        }) as unknown as ClickHouseClient,
+        }),
     });
 
     await expect(

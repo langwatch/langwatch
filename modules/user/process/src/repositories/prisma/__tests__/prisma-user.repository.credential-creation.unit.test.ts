@@ -1,3 +1,5 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -30,19 +32,18 @@ const FULL_USER_ROW = {
 };
 
 /** Projects `FULL_USER_ROW` through a `select`, the way Prisma would. */
-function selectFrom(select?: Record<string, boolean>): Record<string, unknown> {
+function selectFrom(select?: object | null): Record<string, unknown> {
   if (!select) return { ...FULL_USER_ROW };
   return Object.fromEntries(
-    Object.keys(select)
-      .filter((column) => select[column])
+    Object.entries(select)
+      .filter(([, picked]) => Boolean(picked))
+      .map(([column]) => column)
       .map((column) => [column, FULL_USER_ROW[column as keyof typeof FULL_USER_ROW]]),
   );
 }
 
 function makeDatabase() {
-  const userCreate = vi.fn(async (args: { select?: Record<string, boolean> }) =>
-    selectFrom(args.select),
-  );
+  const userCreate = vi.fn(async (args: { select?: object | null }) => selectFrom(args.select));
   const accountCreate = vi.fn(async () => ({}));
   const accountUpdate = vi.fn(async () => ({}));
   const userUpdate = vi.fn(async () => ({}));
@@ -54,7 +55,7 @@ function makeDatabase() {
     async () => null,
   );
   const state = { committed: false };
-  const transaction = {
+  const client: PrismaClient = prismaDouble({
     user: {
       findMany: vi.fn(async () => []),
       findUnique: userFindUnique,
@@ -68,14 +69,15 @@ function makeDatabase() {
       update: accountUpdate,
     },
     passkey: { count: passkeyCount },
-    $transaction: vi.fn(async (callback) => {
-      const result = await callback(transaction);
+    $transaction: vi.fn(async (callback: (prisma: PrismaClient) => Promise<unknown>) => {
+      const result = await callback(client);
       state.committed = true;
       return result;
     }),
-  };
+  });
+  const database: UserDatabase = client;
   return {
-    database: transaction as unknown as UserDatabase,
+    database,
     userCreate,
     userUpdate,
     userFindUnique,

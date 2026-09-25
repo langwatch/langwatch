@@ -17,21 +17,22 @@ const logger = createLogger("langwatch:clickhouse:retention-floor");
 class PlatformRetentionDaysProvider implements RetentionDaysProvider {
   constructor(private readonly resolver: DataRetentionApi) {}
 
-  async tryGetRetentionDays({
+  async findRetentionDays({
     tenantId,
     table,
   }: {
     tenantId: string;
     table: string;
-  }): Promise<number | null> {
+  }): Promise<number[]> {
     const category = RETENTION_TABLE_CATEGORY_MAP[table as RetentionManagedTable];
     if (!category) {
-      return null;
+      return [];
     }
 
     const resolved = await this.resolver.getResolvedForProject({ projectId: tenantId });
+    const days = resolved[category];
 
-    return resolved[category];
+    return typeof days === "number" ? [days] : [];
   }
 }
 

@@ -1,7 +1,5 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { CheckboxCard, Box, HStack, Text } from "@chakra-ui/react";
 import { memo } from "react";
-
-import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button.tsx";
 
 export const NoneFacetRow = memo(function NoneFacetRow({
   active,
@@ -11,11 +9,11 @@ export const NoneFacetRow = memo(function NoneFacetRow({
   onToggle: () => void;
 }) {
   return (
-    <RowButton
-      type="button"
-      role="checkbox"
-      aria-checked={active}
-      aria-label={active ? "Filtering for missing values" : "Show missing values only"}
+    <CheckboxCard.Root
+      unstyled
+      checked={active}
+      onCheckedChange={() => onToggle()}
+      display="block"
       position="relative"
       width="full"
       paddingY={1}
@@ -28,7 +26,6 @@ export const NoneFacetRow = memo(function NoneFacetRow({
       background={active ? "bg.subtle" : "transparent"}
       borderWidth={0}
       data-state={active ? "include" : "neutral"}
-      onClick={onToggle}
       transition="background 120ms ease, border-color 120ms ease"
       _hover={{
         background: active ? "bg.subtle" : "bg.muted",
@@ -39,6 +36,9 @@ export const NoneFacetRow = memo(function NoneFacetRow({
         outlineOffset: "-2px",
       }}
     >
+      <CheckboxCard.HiddenInput
+        aria-label={active ? "Filtering for missing values" : "Show missing values only"}
+      />
       {active && (
         <Box
           position="absolute"
@@ -72,6 +72,6 @@ export const NoneFacetRow = memo(function NoneFacetRow({
           (none)
         </Text>
       </HStack>
-    </RowButton>
+    </CheckboxCard.Root>
   );
 });

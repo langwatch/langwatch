@@ -7,6 +7,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { FacetItem, FacetValueState } from "@langwatch/trace-browser-kit";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -50,10 +51,10 @@ describe("<FacetRow /> include / exclude affordance", () => {
   describe("given a neutral value", () => {
     describe("when the row body is clicked", () => {
       /** @scenario "Clicking a neutral value's row body includes it" */
-      it("routes to onToggle (include)", () => {
+      it("routes to onToggle (include)", async () => {
         const onToggle = vi.fn();
         renderRow({ state: "neutral", onToggle });
-        fireEvent.click(screen.getByRole("checkbox", { name: /error/i }));
+        await userEvent.setup().click(screen.getByRole("checkbox", { name: /error/i }));
         expect(onToggle).toHaveBeenCalledWith("error");
       });
     });
@@ -84,10 +85,10 @@ describe("<FacetRow /> include / exclude affordance", () => {
   describe("given an excluded value", () => {
     describe("when the row body is clicked", () => {
       /** @scenario "Clicking the row body of an excluded value clears it back to neutral" */
-      it("routes to onToggle (which clears an excluded value)", () => {
+      it("routes to onToggle (which clears an excluded value)", async () => {
         const onToggle = vi.fn();
         renderRow({ state: "exclude", onToggle });
-        fireEvent.click(screen.getByRole("checkbox", { name: /error/i }));
+        await userEvent.setup().click(screen.getByRole("checkbox", { name: /error/i }));
         expect(onToggle).toHaveBeenCalledWith("error");
       });
     });

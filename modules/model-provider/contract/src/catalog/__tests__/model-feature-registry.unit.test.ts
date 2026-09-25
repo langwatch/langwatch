@@ -4,7 +4,7 @@ import {
   allFeatures,
   assertUniqueFeatureKeys,
   type FeatureDescriptor,
-  featureByKey,
+  findFeatureByKey,
   featuresByRole,
 } from "../model-feature-registry.ts";
 
@@ -25,15 +25,15 @@ describe("feature registry", () => {
   });
 
   it("looks up by key", () => {
-    const f = featureByKey("traces.ai_search");
+    const f = findFeatureByKey("traces.ai_search")[0];
     expect(f?.role).toBe("FAST");
     expect(f?.displayName).toBe("AI search");
   });
 
   /** @scenario "User-simulator and judge are registered as DEFAULT-role features" */
   it("registers the scenario simulator and judge as DEFAULT-role features", () => {
-    expect(featureByKey("scenarios.user_simulator")?.role).toBe("DEFAULT");
-    expect(featureByKey("scenarios.judge")?.role).toBe("DEFAULT");
+    expect(findFeatureByKey("scenarios.user_simulator")[0]?.role).toBe("DEFAULT");
+    expect(findFeatureByKey("scenarios.judge")[0]?.role).toBe("DEFAULT");
   });
 
   /** @scenario "New scenario model features surface under the Default role expansion" */
@@ -47,13 +47,13 @@ describe("feature registry", () => {
     describe("when it is looked up by key", () => {
       /** @scenario "A prompt without a model resolves the agent-under-test default" */
       it("registers it under the DEFAULT role", () => {
-        const feature = featureByKey("scenarios.agent_under_test");
+        const feature = findFeatureByKey("scenarios.agent_under_test")[0];
         expect(feature, 'feature "scenarios.agent_under_test" must exist').toBeTruthy();
         expect(feature?.role).toBe("DEFAULT");
       });
 
       it("carries customer-safe copy naming no internal machinery", () => {
-        const feature = featureByKey("scenarios.agent_under_test");
+        const feature = findFeatureByKey("scenarios.agent_under_test")[0];
         expect(feature?.displayName.length).toBeGreaterThan(0);
         expect(feature?.description.length).toBeGreaterThan(0);
 
@@ -70,7 +70,7 @@ describe("feature registry", () => {
   });
 
   it("returns undefined for an unknown key", () => {
-    expect(featureByKey("not-a-real-key")).toBeUndefined();
+    expect(findFeatureByKey("not-a-real-key")[0]).toBeUndefined();
   });
 
   it("guarantees stable keys (snake_case, area-prefixed)", () => {

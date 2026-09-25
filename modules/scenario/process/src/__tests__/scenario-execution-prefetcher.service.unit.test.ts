@@ -2,7 +2,7 @@
  * Unit tests for model selection logic with dependency injection.
  */
 
-import { ModelNotConfiguredError, resolveLatestAlias } from "@langwatch/model-provider-contract";
+import { ModelNotConfiguredError, findAliasTarget } from "@langwatch/model-provider-contract";
 import type {
   ScenarioChildEnvironment,
   ScenarioExecutionPrefetchInput,
@@ -716,8 +716,8 @@ describe("prefetchWithFixture", () => {
       // do not understand "latest" as a model id. The expected concrete
       // model comes from the same registry resolution the picker shows.
       const concreteFor = (alias: string) => {
-        const concrete = resolveLatestAlias(alias);
-        if (concrete === null || concrete === alias) {
+        const concrete = findAliasTarget(alias)[0];
+        if (concrete === undefined || concrete === alias) {
           throw new Error(`"${alias}" does not resolve to a concrete model`);
         }
         return concrete;

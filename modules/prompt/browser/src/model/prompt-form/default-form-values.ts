@@ -1,4 +1,4 @@
-import { getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
+import { findLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
 import { FALLBACK_MAX_TOKENS, type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import merge from "lodash-es/merge";
 
@@ -7,7 +7,7 @@ type DeepPartial<T> = T extends object ? { [P in keyof T]?: DeepPartial<T[P]> } 
 // Auto-derived from the model registry — always the newest plain
 // `openai/gpt-<major>.<minor>` flagship. Hard fallback only for the
 // unreachable case where the registry has no plain flagship.
-const DEFAULT_MODEL = getLatestOpenAIChatFlagship() ?? "openai/gpt-5";
+const DEFAULT_MODEL = findLatestOpenAIChatFlagship()[0] ?? "openai/gpt-5";
 
 /**
  * Single source of truth for default prompt configuration.

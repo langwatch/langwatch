@@ -2,7 +2,7 @@ import {
   computeCost,
   getStaticModelCostRates,
   llmModels,
-  matchModelCost,
+  findMatchingModelCost,
   type ModelCostRate,
 } from "@langwatch/model-provider-contract";
 
@@ -66,7 +66,7 @@ export function rateSpendNanoUsd({
   usage: SpendUsage;
   rateVersion?: string;
 }): { costNanoUsd: number; rateVersion: string } {
-  const rate = matchModelCost(model, getStaticModelCostRates());
+  const rate = findMatchingModelCost(model, getStaticModelCostRates())[0];
   const usd = rate
     ? computeCost({
         rate,
@@ -103,7 +103,7 @@ export function findSpendRatingFaults({
 }): SpendRatingFault[] {
   if (!model || model === "unknown") return [];
   const measured = measuredQuantities(usage);
-  const rule = matchModelCost(model, getStaticModelCostRates());
+  const rule = findMatchingModelCost(model, getStaticModelCostRates())[0];
   if (!rule) return [{ code: NO_RATE_RULE_CODE, measured }];
   if (Object.keys(measured).length === 0 || !pricesAnything(rule)) return [];
   return [{ code: UNPRICED_QUANTITIES_CODE, measured }];

@@ -5,7 +5,7 @@ import { titleCase } from "@langwatch/design-system/string-casing";
 import {
   modelDisplayLabel,
   isLatestAlias,
-  resolveLatestAlias,
+  findAliasTarget,
 } from "@langwatch/model-provider-contract";
 import {
   MODEL_ICON_SIZE,
@@ -97,7 +97,7 @@ function toModelOption({
     label: suffix === "latest" ? "Latest" : "Latest smaller model",
     value: modelValue,
     icon,
-    subtitle: resolveLatestAlias(modelValue) ?? "",
+    subtitle: findAliasTarget(modelValue)[0] ?? "",
   };
 }
 

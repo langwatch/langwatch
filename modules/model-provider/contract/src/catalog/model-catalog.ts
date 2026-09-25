@@ -117,8 +117,9 @@ export function getAllModels(): Record<string, LLMModelEntry> {
   return llmModels.models;
 }
 
-export function getModelById(modelId: string): LLMModelEntry | undefined {
-  return llmModels.models[modelId];
+export function findModelById(modelId: string): LLMModelEntry[] {
+  const entry = llmModels.models[modelId];
+  return entry ? [entry] : [];
 }
 
 export function getProviderModelOptions(

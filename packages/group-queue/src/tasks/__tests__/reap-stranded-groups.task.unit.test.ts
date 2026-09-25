@@ -1,6 +1,6 @@
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
 
-import type { GroupQueueRedis } from "../../dependencies-adapter.ts";
 import { reapStrandedGroups } from "../reap-stranded-groups.task.ts";
 
 const PREFIX = "{event-sourcing/jobs}:gq:";
@@ -19,7 +19,7 @@ function fakeRedis(state: {
   const deleted: string[] = [];
   const written: Record<string, string> = {};
   const jobs = { ...state.jobs };
-  const redis = {
+  const redis = redisDouble({
     scan: vi.fn(async () => [
       "0",
       Object.keys(jobs).map((groupId) => `${PREFIX}group:${groupId}:jobs`),
@@ -55,8 +55,8 @@ function fakeRedis(state: {
       written[key] = value;
       return "OK";
     }),
-  };
-  return { redis: redis as unknown as GroupQueueRedis, deleted, written };
+  });
+  return { redis, deleted, written };
 }
 
 const hoursAgo = (hours: number) => NOW - hours * 60 * 60 * 1000;

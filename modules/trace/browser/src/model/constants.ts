@@ -1,9 +1,9 @@
-import { getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
+import { findLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
 
 // Auto-derived from the LLM model registry (llmModels.json) — always the
 // newest plain `openai/gpt-<major>.<minor>` flagship. Hard fallback only
 // for the unreachable case where the registry has no plain flagship.
-export const DEFAULT_MODEL = getLatestOpenAIChatFlagship() ?? "openai/gpt-5";
+export const DEFAULT_MODEL = findLatestOpenAIChatFlagship()[0] ?? "openai/gpt-5";
 
 export const DEFAULT_EMBEDDINGS_MODEL = "openai/text-embedding-3-small";
 

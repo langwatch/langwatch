@@ -48,19 +48,17 @@ describe("<IconRadioCardGroup/>", () => {
       const radios = screen.getAllByRole("radio");
       expect(radios).toHaveLength(3);
       for (const radio of radios) {
-        expect(radio).toHaveAttribute("aria-checked", "false");
+        expect(radio).not.toBeChecked();
       }
     });
 
-    it("makes only the first item tabbable", () => {
+    it("keeps every item in one radio group, so Tab stops on the group once", () => {
       render(<IconRadioCardGroup items={items} onChange={() => {}} />, {
         wrapper: Wrapper,
       });
 
-      const radios = screen.getAllByRole("radio");
-      expect(radios[0]).toHaveAttribute("tabindex", "0");
-      expect(radios[1]).toHaveAttribute("tabindex", "-1");
-      expect(radios[2]).toHaveAttribute("tabindex", "-1");
+      const names = screen.getAllByRole("radio").map((radio) => radio.getAttribute("name"));
+      expect(new Set(names).size).toBe(1);
     });
   });
 
@@ -71,20 +69,18 @@ describe("<IconRadioCardGroup/>", () => {
       });
 
       const radios = screen.getAllByRole("radio");
-      expect(radios[0]).toHaveAttribute("aria-checked", "false");
-      expect(radios[1]).toHaveAttribute("aria-checked", "true");
-      expect(radios[2]).toHaveAttribute("aria-checked", "false");
+      expect(radios[0]).not.toBeChecked();
+      expect(radios[1]).toBeChecked();
+      expect(radios[2]).not.toBeChecked();
     });
 
-    it("makes the selected item tabbable", () => {
+    it("checks only the selected item in the shared group", () => {
       render(<IconRadioCardGroup items={items} value="beta" onChange={() => {}} />, {
         wrapper: Wrapper,
       });
 
       const radios = screen.getAllByRole("radio");
-      expect(radios[0]).toHaveAttribute("tabindex", "-1");
-      expect(radios[1]).toHaveAttribute("tabindex", "0");
-      expect(radios[2]).toHaveAttribute("tabindex", "-1");
+      expect(radios.filter((radio) => radio.matches(":checked"))).toEqual([radios[1]]);
     });
   });
 

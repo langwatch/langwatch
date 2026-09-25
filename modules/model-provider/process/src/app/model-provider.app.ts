@@ -7,7 +7,7 @@ import type { FeatureSetup } from "@langwatch/kernel";
  */
 import {
   CODEX_DEFAULT_MODEL,
-  featureByKey,
+  findFeatureByKey,
   ModelCostPreviewUnavailableError,
   ModelProviderAnchorRequiredError,
   ModelProviderApi,
@@ -722,7 +722,7 @@ export class ModelProviderApp implements ModelProviderApi {
    * provider's own words reach the log rather than the browser.
    */
   translate(input: TranslateInput): Promise<TranslateOutput> {
-    const feature = featureByKey(TRANSLATE_FEATURE_KEY);
+    const feature = findFeatureByKey(TRANSLATE_FEATURE_KEY)[0];
 
     // A missing registry entry is a build-time mistake, not a customer-actionable
     // cause, so it stays a plain Error and degrades to unknown plus a trace id.

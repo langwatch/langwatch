@@ -1,4 +1,4 @@
-import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Icon, RadioCard, Text, VStack } from "@chakra-ui/react";
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import {
   accentChipBg,
@@ -46,22 +46,36 @@ export const IntentSelectionScreen: React.FC<OnboardingScreenProps> = ({ surface
   const analytics = useUiAnalytics();
 
   return (
-    <VStack
+    <RadioCard.Root
+      unstyled
+      value={intent ?? null}
+      onValueChange={(details) => {
+        const chosen = intentOptions.find((opt) => opt.value === details.value);
+        if (!chosen) return;
+        setIntent(chosen.value);
+        analytics.track({
+          boundary: surface.boundary,
+          action: "selected",
+          name: "intent",
+          attributes: { ...surface.attributes, value: chosen.value },
+        });
+      }}
+      display="flex"
+      flexDirection="column"
       gap={3}
-      align="stretch"
+      alignItems="stretch"
       w="full"
       minW="0"
-      role="radiogroup"
       aria-label="What do you want to do?"
     >
       {intentOptions.map((opt) => {
         const isSelected = intent === opt.value;
         return (
-          <Box
-            as="button"
+          <RadioCard.Item
             key={opt.value}
-            role="radio"
-            aria-checked={isSelected}
+            value={opt.value}
+            unstyled
+            display="block"
             w="full"
             textAlign="left"
             borderRadius="2xl"
@@ -73,16 +87,9 @@ export const IntentSelectionScreen: React.FC<OnboardingScreenProps> = ({ surface
             cursor="pointer"
             transition="all 0.2s ease"
             _hover={{ borderColor: "orange.300" }}
-            onClick={() => {
-              setIntent(opt.value);
-              analytics.track({
-                boundary: surface.boundary,
-                action: "selected",
-                name: "intent",
-                attributes: { ...surface.attributes, value: opt.value },
-              });
-            }}
+            focusVisibleRing="outside"
           >
+            <RadioCard.ItemHiddenInput />
             <HStack gap={4} align="center">
               <Box
                 data-testid="intent-icon-chip"
@@ -106,9 +113,9 @@ export const IntentSelectionScreen: React.FC<OnboardingScreenProps> = ({ surface
                 </Text>
               </VStack>
             </HStack>
-          </Box>
+          </RadioCard.Item>
         );
       })}
-    </VStack>
+    </RadioCard.Root>
   );
 };

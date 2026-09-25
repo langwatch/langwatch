@@ -8,7 +8,7 @@
  * specs/model-providers/missing-model-popup.feature.
  */
 
-import { featureByKey } from "@langwatch/model-provider-contract";
+import { findFeatureByKey } from "@langwatch/model-provider-contract";
 import { generateText } from "ai";
 import { createPatch } from "diff";
 
@@ -44,7 +44,7 @@ export class WorkflowCommitMessageService {
     previousDsl: string;
     nextDsl: string;
   }): Promise<string> {
-    const feature = featureByKey(WORKFLOW_COMMIT_MESSAGE_FEATURE_KEY);
+    const feature = findFeatureByKey(WORKFLOW_COMMIT_MESSAGE_FEATURE_KEY)[0];
     // A missing registry entry is a build-time mistake in the process that
     // composed this service, not a cause a customer can act on, so it stays an
     // ordinary error and degrades to an unknown failure carrying a trace id.

@@ -3,7 +3,7 @@
  * reader who already pays for ChatGPT gets a working model without pasting a
  * key. Everything else keeps registry order, and a deprecated one is dropped.
  */
-import { modelProviders, providerDeprecation } from "@langwatch/model-provider-contract";
+import { modelProviders, findProviderDeprecation } from "@langwatch/model-provider-contract";
 
 export const LANGY_RECOMMENDED_PROVIDER = "openai_codex";
 
@@ -15,7 +15,7 @@ export type LangyModelProvider = {
 
 export function langyModelProviders(): LangyModelProvider[] {
   const offered = Object.entries(modelProviders)
-    .filter(([provider, entry]) => entry.type === "llm" && !providerDeprecation(provider))
+    .filter(([provider, entry]) => entry.type === "llm" && !findProviderDeprecation(provider)[0])
     .map(([provider, entry]) => ({
       provider,
       name: entry.name,

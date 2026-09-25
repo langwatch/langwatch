@@ -17,10 +17,10 @@ export const DEFAULT_RETENTION_FLOOR_MARGIN_MS = 2 * DAY_MS;
 /** Answers the retention question this package deliberately does not own. */
 export interface RetentionDaysProvider {
   /**
-   * Retention in days for this tenant's copy of `table`, or null when the
+   * Retention in days for this tenant's copy of `table`, or none when the
    * policy cascade cannot answer.
    */
-  tryGetRetentionDays: (input: { tenantId: string; table: string }) => Promise<number | null>;
+  findRetentionDays: (input: { tenantId: string; table: string }) => Promise<number[]>;
 }
 
 /** The subset of a structured logger this needs; keeps the package dep-free. */
@@ -174,7 +174,7 @@ export class RetentionFloorService {
   }): Promise<number> {
     let days: number;
     try {
-      const resolved = await provider.tryGetRetentionDays({
+      const [resolved] = await provider.findRetentionDays({
         tenantId,
         table,
       });

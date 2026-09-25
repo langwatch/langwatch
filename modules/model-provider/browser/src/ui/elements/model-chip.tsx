@@ -10,7 +10,7 @@ import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
 import {
   isLatestAlias,
   modelDisplayLabel,
-  resolveLatestAlias,
+  findAliasTarget,
 } from "@langwatch/model-provider-contract";
 import { AlertTriangle } from "lucide-react";
 
@@ -132,7 +132,7 @@ export function ModelChip({
   const icon = modelProviderIcons[providerKey as keyof typeof modelProviderIcons];
   const iconSlot = size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE;
   const fontSize = size === "sm" ? "xs" : "sm";
-  const aliasResolved = isLatestAlias(model) ? resolveLatestAlias(model) : null;
+  const aliasResolved = isLatestAlias(model) ? (findAliasTarget(model)[0] ?? null) : null;
   const aliasLabel = aliasKindLabel(model);
 
   const chip = (

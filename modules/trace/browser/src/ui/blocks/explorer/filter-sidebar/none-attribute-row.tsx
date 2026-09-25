@@ -1,16 +1,15 @@
-import { HStack, Text } from "@chakra-ui/react";
+import { CheckboxCard, HStack, Text } from "@chakra-ui/react";
 import type React from "react";
-
-import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button.tsx";
 
 export const NoneAttributeRow: React.FC<{
   active: boolean;
   onToggle: () => void;
 }> = ({ active, onToggle }) => (
-  <RowButton
-    type="button"
-    role="checkbox"
-    aria-checked={active}
+  <CheckboxCard.Root
+    unstyled
+    checked={active}
+    onCheckedChange={() => onToggle()}
+    display="block"
     position="relative"
     width="full"
     paddingY={1}
@@ -21,7 +20,6 @@ export const NoneAttributeRow: React.FC<{
     overflow="hidden"
     background={active ? "gray.solid" : "transparent"}
     border="none"
-    onClick={onToggle}
     _hover={{
       background: active ? "gray.solid" : "gray.subtle",
       "& [data-facet-label]": active ? { fontWeight: 700 } : { color: "fg", fontWeight: 500 },
@@ -32,6 +30,7 @@ export const NoneAttributeRow: React.FC<{
       outlineOffset: "-2px",
     }}
   >
+    <CheckboxCard.HiddenInput />
     <HStack gap={1.5} minWidth={0}>
       <Text
         textStyle="xs"
@@ -43,5 +42,5 @@ export const NoneAttributeRow: React.FC<{
         (none)
       </Text>
     </HStack>
-  </RowButton>
+  </CheckboxCard.Root>
 );

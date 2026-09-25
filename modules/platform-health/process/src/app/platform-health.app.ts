@@ -99,8 +99,10 @@ export class PlatformHealthApp implements PlatformHealthApiContract {
     const probes = SubsystemProbeService.create({ collaborators });
     const credential = {
       authToken: probeApiKey,
-      resolveProjectId: async (): Promise<string | null> =>
-        dependencies.projects.findIdByLegacyApiKey({ token: probeApiKey }),
+      findProjectIds: async (): Promise<string[]> => {
+        const projectId = await dependencies.projects.findIdByLegacyApiKey({ token: probeApiKey });
+        return projectId ? [projectId] : [];
+      },
     };
 
     return new PlatformHealthApp({

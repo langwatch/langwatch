@@ -7,6 +7,7 @@ import type { FacetItem } from "@langwatch/trace-browser-kit";
 import { EMPTY_AST, parse } from "@langwatch/trace-contract";
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { EvaluatorDrilldown } from "../evaluator-drilldown.tsx";
@@ -71,9 +72,9 @@ describe("EvaluatorDrilldown", () => {
     });
 
     describe("when the Errored row is clicked", () => {
-      it("toggles the 'error' verdict bucket, not 'unknown'", () => {
+      it("toggles the 'error' verdict bucket, not 'unknown'", async () => {
         const { toggleSubFilter } = renderDrilldown();
-        fireEvent.click(screen.getByText("Errored"));
+        await userEvent.setup().click(screen.getByText("Errored"));
         expect(toggleSubFilter).toHaveBeenCalledWith({
           field: "evaluatorVerdict",
           value: "error",
@@ -101,9 +102,9 @@ describe("EvaluatorDrilldown", () => {
     });
 
     describe("when a label row is clicked", () => {
-      it("toggles the evaluatorLabel sub-filter for that value", () => {
+      it("toggles the evaluatorLabel sub-filter for that value", async () => {
         const { toggleSubFilter } = renderDrilldown({ item: labelItem() });
-        fireEvent.click(screen.getByText("unfaithful"));
+        await userEvent.setup().click(screen.getByText("unfaithful"));
         expect(toggleSubFilter).toHaveBeenCalledWith({
           field: "evaluatorLabel",
           value: "unfaithful",
@@ -141,8 +142,8 @@ describe("EvaluatorDrilldown", () => {
       // drilldown for "faithfulness" must read its own (empty) group state.
       const ast = parse("(evaluator:other AND evaluatorVerdict:pass)");
       renderDrilldown({ item: buildItem(), ast });
-      const passedRow = screen.getByText("Passed").closest("[role=checkbox]");
-      expect(passedRow).toHaveAttribute("aria-checked", "false");
+      const passedRow = screen.getByRole("checkbox", { name: /^Passed/ });
+      expect(passedRow).not.toBeChecked();
     });
   });
 
@@ -150,8 +151,8 @@ describe("EvaluatorDrilldown", () => {
     it("marks the matching verdict row active", () => {
       const ast = parse("(evaluator:faithfulness AND evaluatorVerdict:pass)");
       renderDrilldown({ item: buildItem(), ast });
-      const passedRow = screen.getByText("Passed").closest("[role=checkbox]");
-      expect(passedRow).toHaveAttribute("aria-checked", "true");
+      const passedRow = screen.getByRole("checkbox", { name: /^Passed/ });
+      expect(passedRow).toBeChecked();
     });
   });
 

@@ -5,8 +5,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { pickRecommendedChatModel, resolveLatestAlias } from "../latest-aliases.ts";
-import { getModelById } from "../model-catalog.ts";
+import { pickRecommendedChatModel, findAliasTarget } from "../latest-aliases.ts";
+import { findModelById } from "../model-catalog.ts";
 
 describe("given the committed model catalog", () => {
   describe("when the recommendation is read per provider", () => {
@@ -18,7 +18,7 @@ describe("given the committed model catalog", () => {
       ["deepseek", "deepseek/deepseek-v4-pro"],
     ])("recommends %s's newest main-tier model", (provider, expected) => {
       expect(pickRecommendedChatModel(provider)).toBe(expected);
-      expect(getModelById(expected)?.mode).toBe("chat");
+      expect(findModelById(expected)[0]?.mode).toBe("chat");
     });
 
     /** @scenario The recommendation is never the top tier, a serving mode or a batch lane */
@@ -42,7 +42,7 @@ describe("given the committed model catalog", () => {
     it.each(["openai", "anthropic", "gemini"])(
       "resolves %s/latest to the recommendation",
       (provider) => {
-        expect(resolveLatestAlias(`${provider}/latest`)).toBe(pickRecommendedChatModel(provider));
+        expect(findAliasTarget(`${provider}/latest`)[0]).toBe(pickRecommendedChatModel(provider));
       },
     );
 
@@ -52,7 +52,7 @@ describe("given the committed model catalog", () => {
       ["anthropic", "anthropic/claude-sonnet-5"],
       ["gemini", "gemini/gemini-3.5-flash-lite"],
     ])("resolves %s/latest-mini to the newest fast-tier model", (provider, expected) => {
-      expect(resolveLatestAlias(`${provider}/latest-mini`)).toBe(expected);
+      expect(findAliasTarget(`${provider}/latest-mini`)[0]).toBe(expected);
     });
   });
 });

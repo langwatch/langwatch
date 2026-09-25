@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { computeCost, matchModelCost } from "../../model-cost.ts";
+import { computeCost, findMatchingModelCost } from "../../model-cost.ts";
 import type { ModelCostRate } from "../../model-provider.ts";
 import {
   baseModelCatalog,
@@ -20,7 +20,7 @@ const getStaticModelCosts = getStaticModelCostRates;
 
 /** The fallback cascade, under the name this guard has always used. */
 const matchModelCostWithFallbacks = (model: string, costs: readonly ModelCostRate[]) =>
-  matchModelCost(model, costs);
+  findMatchingModelCost(model, costs)[0];
 
 const baseModels = baseModelCatalog.models;
 const overlayModels = overlayModelCatalog.models;

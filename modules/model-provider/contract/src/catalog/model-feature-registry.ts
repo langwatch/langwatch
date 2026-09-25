@@ -161,5 +161,5 @@ export const allFeatures = (): FeatureDescriptor[] => [...REGISTRY];
 export const featuresByRole = (role: ModelRole): FeatureDescriptor[] =>
   REGISTRY.filter((f) => f.role === role);
 
-export const featureByKey = (key: string): FeatureDescriptor | undefined =>
-  REGISTRY.find((f) => f.key === key);
+export const findFeatureByKey = (key: string): FeatureDescriptor[] =>
+  REGISTRY.filter((f) => f.key === key);

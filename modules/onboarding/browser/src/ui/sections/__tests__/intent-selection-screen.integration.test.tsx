@@ -9,7 +9,8 @@ import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilitie
 import "@testing-library/jest-dom/vitest";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 import type { OrganizationIntent } from "@langwatch/organization-contract";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { OnboardingFormProvider } from "../form-context.tsx";
@@ -95,7 +96,7 @@ describe("IntentSelectionScreen", () => {
       it("shows the LLMOps option first", () => {
         renderScreen();
         const [firstCard] = screen.getAllByRole("radio");
-        expect(firstCard?.textContent).toContain("Monitor & evaluate my LLM app");
+        expect(firstCard).toHaveAccessibleName(/Monitor & evaluate my LLM app/);
       });
 
       it("pins the governance card copy to the team's coding-tool usage", () => {
@@ -119,21 +120,27 @@ describe("IntentSelectionScreen", () => {
     });
 
     describe("when the user picks a card", () => {
-      it("records the governance intent", () => {
+      it("records the governance intent", async () => {
         const { setIntent } = renderScreen();
-        fireEvent.click(screen.getByText("Track AI coding agents"));
+        await userEvent
+          .setup()
+          .click(screen.getByRole("radio", { name: /Track AI coding agents/ }));
         expect(setIntent).toHaveBeenCalledWith("AGENT_GOVERNANCE");
       });
 
-      it("records the LLMOps intent", () => {
+      it("records the LLMOps intent", async () => {
         const { setIntent } = renderScreen();
-        fireEvent.click(screen.getByText("Monitor & evaluate my LLM app"));
+        await userEvent
+          .setup()
+          .click(screen.getByRole("radio", { name: /Monitor & evaluate my LLM app/ }));
         expect(setIntent).toHaveBeenCalledWith("LLM_OPS");
       });
 
-      it("names the surface it was mounted on, and carries that surface's facts", () => {
+      it("names the surface it was mounted on, and carries that surface's facts", async () => {
         const { analytics } = renderScreen();
-        fireEvent.click(screen.getByText("Track AI coding agents"));
+        await userEvent
+          .setup()
+          .click(screen.getByRole("radio", { name: /Track AI coding agents/ }));
 
         expect(analytics.tracked).toEqual([
           {
@@ -152,8 +159,8 @@ describe("IntentSelectionScreen", () => {
       it("marks that card as checked", () => {
         renderScreen({ intent: "AGENT_GOVERNANCE" });
         const [llmOpsCard, governanceCard] = screen.getAllByRole("radio");
-        expect(governanceCard?.getAttribute("aria-checked")).toBe("true");
-        expect(llmOpsCard?.getAttribute("aria-checked")).toBe("false");
+        expect(governanceCard).toBeChecked();
+        expect(llmOpsCard).not.toBeChecked();
       });
     });
   });

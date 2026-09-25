@@ -5,7 +5,7 @@ import { ValidationError } from "@langwatch/handled-error";
  */
 import {
   computeCost,
-  matchModelCost,
+  findMatchingModelCost,
   type CostRuleMatchingSpansPreview,
   type CostRulePreviewInput,
   type CostRulePreviewSampleSpan,
@@ -122,7 +122,7 @@ export class ModelCostPreviewService {
     const matchedModels: CostRuleMatchingSpansPreview["matchedModels"] = [];
     const unmatchedModels: CostRuleMatchingSpansPreview["unmatchedModels"] = [];
     for (const stat of stats) {
-      if (matchModelCost(stat.model, [candidate])) {
+      if (findMatchingModelCost(stat.model, [candidate])[0]) {
         matchedModels.push(stat);
       } else if (unmatchedModels.length < MAX_UNMATCHED_MODELS) {
         unmatchedModels.push({ model: stat.model, spanCount: stat.spanCount });

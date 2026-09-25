@@ -4,7 +4,7 @@
  * without pasting a key; everything else keeps registry order.
  */
 
-import { modelProviders, providerDeprecation } from "@langwatch/model-provider-contract";
+import { modelProviders, findProviderDeprecation } from "@langwatch/model-provider-contract";
 
 export const RECOMMENDED_ONBOARDING_PROVIDER = "openai_codex";
 
@@ -16,7 +16,7 @@ export type OnboardingModelProvider = {
 
 export function onboardingModelProviders(): OnboardingModelProvider[] {
   const offered = Object.entries(modelProviders)
-    .filter(([provider, entry]) => entry.type === "llm" && !providerDeprecation(provider))
+    .filter(([provider, entry]) => entry.type === "llm" && !findProviderDeprecation(provider)[0])
     .map(([provider, entry]) => ({
       provider,
       name: entry.name,

@@ -4,6 +4,6 @@
  * `@langwatch/model-provider-contract`'s flagship lookup, so the two cannot drift.
  */
 
-import { getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
+import { findLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
 
-export const DEFAULT_MODEL = getLatestOpenAIChatFlagship() ?? "openai/gpt-5";
+export const DEFAULT_MODEL = findLatestOpenAIChatFlagship()[0] ?? "openai/gpt-5";

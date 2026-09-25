@@ -6,7 +6,7 @@
  * @see specs/model-providers/custom-model-display-name.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { resolveLatestAlias } from "@langwatch/model-provider-contract";
+import { findAliasTarget } from "@langwatch/model-provider-contract";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -245,7 +245,7 @@ describe("<ProviderModelSelector/>", () => {
 
       /** @scenario Registry and alias labels are unchanged by the resolution fix */
       it("shows the alias entry by its alias label with the resolved model as subtitle", () => {
-        const resolvedLatest = resolveLatestAlias(ALIAS_ID);
+        const resolvedLatest = findAliasTarget(ALIAS_ID)[0];
         expect(resolvedLatest).toBeTruthy();
 
         renderSelector(

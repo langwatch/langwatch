@@ -6,7 +6,7 @@
 
 import {
   modelProviders as modelProvidersRegistry,
-  providerDeprecation,
+  findProviderDeprecation,
 } from "@langwatch/model-provider-contract";
 
 import type { ModelProviderAvailableScopes } from "./model-provider-host.ts";
@@ -31,7 +31,7 @@ export type AddableProvider = {
  */
 export function addableProviders(): AddableProvider[] {
   return Object.keys(modelProvidersRegistry)
-    .filter((providerKey) => !providerDeprecation(providerKey))
+    .filter((providerKey) => !findProviderDeprecation(providerKey)[0])
     .map((providerKey) => {
       const entry = modelProvidersRegistry[providerKey as keyof typeof modelProvidersRegistry];
       return {

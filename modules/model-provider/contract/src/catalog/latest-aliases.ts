@@ -65,12 +65,13 @@ export function pickRecommendedChatModel(provider: string): string | null {
 
 /**
  * Resolves an alias to its concrete current pick, e.g. `openai/gpt-5.6-luna`.
- * Null if the input is not an alias or nothing matches the variant.
+ * Empty if the input is not an alias or nothing matches the variant.
  */
-export function resolveLatestAlias(model: string): string | null {
+export function findAliasTarget(model: string): string[] {
   const parts = parseLatestAlias(model);
-  if (!parts) return null;
-  return pickChatModel(parts.provider, parts.suffix === "latest" ? "main" : "fast");
+  if (!parts) return [];
+  const target = pickChatModel(parts.provider, parts.suffix === "latest" ? "main" : "fast");
+  return target ? [target] : [];
 }
 
 /**
@@ -79,7 +80,7 @@ export function resolveLatestAlias(model: string): string | null {
  * handing a model id to a downstream service that doesn't understand aliases.
  */
 export function expandLatestAlias(model: string): string {
-  const resolved = resolveLatestAlias(model);
+  const resolved = findAliasTarget(model)[0];
   return resolved ?? model;
 }
 
@@ -104,7 +105,7 @@ export function allLatestAliases(): LatestAliasEntry[] {
       const alias = `${provider}/${suffix}`;
       out.push({
         alias,
-        resolved: resolveLatestAlias(alias),
+        resolved: findAliasTarget(alias)[0] ?? null,
         provider,
         suffix,
       });

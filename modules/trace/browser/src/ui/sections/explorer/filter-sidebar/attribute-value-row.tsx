@@ -1,12 +1,10 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { CheckboxCard, Box, HStack, Text } from "@chakra-ui/react";
 import { type FacetValueState, hashColor, paletteFromColor } from "@langwatch/trace-browser-kit";
 import { memo } from "react";
 
-import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button.tsx";
-
-function attributeAriaChecked(state: FacetValueState): boolean | "mixed" {
+function attributeCheckedState(state: FacetValueState): boolean | "indeterminate" {
   if (state === "include") return true;
-  if (state === "exclude") return "mixed";
+  if (state === "exclude") return "indeterminate";
   return false;
 }
 
@@ -31,10 +29,11 @@ export const AttributeValueRow = memo(function AttributeValueRow({
   const barBg = isExclude ? "red.solid" : `${palette}.solid`;
 
   return (
-    <RowButton
-      type="button"
-      role="checkbox"
-      aria-checked={attributeAriaChecked(state)}
+    <CheckboxCard.Root
+      unstyled
+      checked={attributeCheckedState(state)}
+      onCheckedChange={() => onToggle(attrKey, value)}
+      display="block"
       position="relative"
       width="full"
       paddingY={1}
@@ -45,7 +44,6 @@ export const AttributeValueRow = memo(function AttributeValueRow({
       overflow="hidden"
       background="transparent"
       border="none"
-      onClick={() => onToggle(attrKey, value)}
       _hover={{
         "& [data-facet-label]": {
           color: "white",
@@ -61,6 +59,7 @@ export const AttributeValueRow = memo(function AttributeValueRow({
         outlineOffset: "-2px",
       }}
     >
+      <CheckboxCard.HiddenInput />
       <Box
         data-facet-bar
         position="absolute"
@@ -87,6 +86,6 @@ export const AttributeValueRow = memo(function AttributeValueRow({
           {label}
         </Text>
       </HStack>
-    </RowButton>
+    </CheckboxCard.Root>
   );
 });

@@ -10,7 +10,7 @@ import {
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { modelProviderIcons, ProviderIconGlyph } from "@langwatch/model-provider-browser-kit";
 import { useModelSelectionOptions } from "@langwatch/model-provider-browser/surfaces/model-selector";
-import { LANGY_CHAT_FEATURE_KEY, getModelById } from "@langwatch/model-provider-contract";
+import { LANGY_CHAT_FEATURE_KEY, findModelById } from "@langwatch/model-provider-contract";
 import {
   Brain,
   Check,
@@ -136,7 +136,7 @@ export const LangyModelPill = memo(function LangyModelPill({
           isLangyDefault: option.value === langyDefaultModel,
           profile: profileLangyModel({
             modelId: option.value,
-            metadata: getModelById(option.value),
+            metadata: findModelById(option.value)[0],
             isCustom: option.isCustom,
           }),
         };

@@ -92,7 +92,7 @@ async function tailorStep(page: Page): Promise<void> {
   const company = page.getByRole("radio", { name: "Company" });
   await expect(company).toBeVisible();
   for (const name of ["Company", "Clients", "Myself"]) {
-    await expect(page.getByRole("radio", { name })).toHaveAttribute("aria-checked", "false");
+    await expect(page.getByRole("radio", { name })).not.toBeChecked();
   }
   await company.click();
   await expect(page.getByText("How large is your company?")).toBeVisible();

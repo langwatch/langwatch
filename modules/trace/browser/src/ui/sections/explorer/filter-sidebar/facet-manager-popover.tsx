@@ -6,6 +6,7 @@ import {
   Icon,
   IconButton,
   Input,
+  RadioCard,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -335,15 +336,22 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
                 {visibleCount} of {orderedKeysAll.length}
               </Text>
             </HStack>
-            <VStack
-              align="stretch"
+            <RadioCard.Root
+              unstyled
+              value={activePerspectiveId}
+              onValueChange={(details) => {
+                const chosen = FACET_PERSPECTIVES.find((x) => x.id === details.value);
+                if (chosen) selectPerspective(chosen.id);
+              }}
+              display="flex"
+              flexDirection="column"
+              alignItems="stretch"
               gap={0}
               paddingX={2}
               paddingTop={2}
               paddingBottom={1}
               borderBottomWidth="1px"
               borderColor="border.subtle"
-              role="radiogroup"
               aria-label="Perspective"
             >
               <Text
@@ -361,9 +369,10 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
                 const active = p.id === activePerspectiveId;
                 const RadioIcon = active ? CircleDot : Circle;
                 return (
-                  <chakra.button
+                  <RadioCard.Item
                     key={p.id}
-                    type="button"
+                    value={p.id}
+                    unstyled
                     display="flex"
                     alignItems="center"
                     gap={2}
@@ -373,39 +382,19 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
                     cursor="pointer"
                     bg={active ? "bg.muted" : undefined}
                     _hover={{ bg: "bg.muted" }}
-                    onClick={() => selectPerspective(p.id)}
-                    role="radio"
-                    aria-checked={active}
-                    // Radiogroup keyboard pattern: only the active radio is
-                    // tabbable, and arrow keys move selection + focus.
-                    tabIndex={active ? 0 : -1}
-                    onKeyDown={(e) => {
-                      const idx = FACET_PERSPECTIVES.findIndex((x) => x.id === p.id);
-                      const len = FACET_PERSPECTIVES.length;
-                      let nextIdx: number | null = null;
-                      if (e.key === "ArrowDown" || e.key === "ArrowRight") {
-                        nextIdx = (idx + 1) % len;
-                      } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
-                        nextIdx = (idx - 1 + len) % len;
-                      }
-                      if (nextIdx === null) return;
-                      e.preventDefault();
-                      selectPerspective(FACET_PERSPECTIVES[nextIdx]!.id);
-                      const radios =
-                        e.currentTarget.parentElement?.querySelectorAll('[role="radio"]');
-                      (radios?.[nextIdx] as HTMLElement | undefined)?.focus();
-                    }}
+                    focusVisibleRing="inside"
                   >
+                    <RadioCard.ItemHiddenInput />
                     <Icon boxSize={3} color={active ? "blue.solid" : "fg.subtle"}>
                       <RadioIcon />
                     </Icon>
                     <Text textStyle="xs" color="fg" fontWeight={active ? "600" : "500"}>
                       {p.label}
                     </Text>
-                  </chakra.button>
+                  </RadioCard.Item>
                 );
               })}
-            </VStack>
+            </RadioCard.Root>
             <Box paddingX={2} paddingY={2}>
               <HStack
                 gap={1.5}

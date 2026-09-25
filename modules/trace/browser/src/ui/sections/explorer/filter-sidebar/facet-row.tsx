@@ -1,4 +1,4 @@
-import { Box, chakra, HStack, Icon, Text } from "@chakra-ui/react";
+import { CheckboxCard, Box, chakra, HStack, Icon, Text } from "@chakra-ui/react";
 import {
   type FacetItem,
   type FacetValueState,
@@ -9,13 +9,12 @@ import { Ban, Minus } from "lucide-react";
 import { memo, useCallback } from "react";
 
 import { useFacetHoverStore } from "../../../../behavior/facet-hover.store.ts";
-import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button.tsx";
 
 const MIN_VISIBLE_FILL_PCT = 4;
 
-function facetAriaChecked(state: FacetValueState): boolean | "mixed" {
+function facetCheckedState(state: FacetValueState): boolean | "indeterminate" {
   if (state === "include") return true;
-  if (state === "exclude") return "mixed";
+  if (state === "exclude") return "indeterminate";
   return false;
 }
 
@@ -66,7 +65,7 @@ export const FacetRow = memo(function FacetRow({
   const palette = isExclude ? "red" : paletteFromColor(item.dotColor);
   const orbOpacity = orbOpacityFor({ dimmed: item.dimmed, isActive });
 
-  const ariaChecked = facetAriaChecked(state);
+  const checkedState = facetCheckedState(state);
   const ariaLabel = `${item.label} — ${facetStateLabel(state)}`;
 
   const subtleBg = `${palette}.subtle`;
@@ -110,11 +109,11 @@ export const FacetRow = memo(function FacetRow({
       }}
     >
       <HStack gap={0.5} align="center" width="full">
-        <RowButton
-          type="button"
-          role="checkbox"
-          aria-checked={ariaChecked}
-          aria-label={ariaLabel}
+        <CheckboxCard.Root
+          unstyled
+          checked={checkedState}
+          onCheckedChange={() => onToggle(item.value)}
+          display="block"
           position="relative"
           flex={1}
           minWidth={0}
@@ -132,7 +131,6 @@ export const FacetRow = memo(function FacetRow({
           data-state={state}
           data-facet-field={field}
           data-facet-value={item.value}
-          onClick={() => onToggle(item.value)}
           transition="background 120ms ease"
           _hover={{
             background: isActive ? subtleBg : "bg.muted",
@@ -144,6 +142,7 @@ export const FacetRow = memo(function FacetRow({
             outlineOffset: "-2px",
           }}
         >
+          <CheckboxCard.HiddenInput aria-label={ariaLabel} />
           {/* Count bar — a thin underline whose width encodes relative volume.
               Sits flush at the bottom so it never competes with the label. */}
           <Box
@@ -194,12 +193,12 @@ export const FacetRow = memo(function FacetRow({
               </Text>
             )}
           </HStack>
-        </RowButton>
+        </CheckboxCard.Root>
         {/* Exclude affordance — its own element at the END of the line, after
             the count (a separate but joined slot, never overlaying the count).
             Its width is always reserved so the layout is stable; the glyph is
             hidden at rest, fades in on row hover, and stays solid (as a `Ban`
-            ∅, in red) while the value is excluded. Sibling of RowButton, not a
+            ∅, in red) while the value is excluded. Sibling of the checkbox card, not a
             child — you can't nest a <button> inside the row's <button>. */}
         <chakra.button
           type="button"

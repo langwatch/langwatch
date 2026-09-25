@@ -10,10 +10,10 @@ const registry = llmModels;
 
 const FLAGSHIP_PATTERN = /^([a-z0-9_-]+)\/([a-z]+)-(\d+)\.(\d+)$/;
 
-export const getLatestFlagshipForProvider = (
+export const findLatestFlagshipForProvider = (
   provider: string,
   mode: "chat" | "embedding" = "chat",
-): string | undefined => {
+): string[] => {
   let bestId: string | undefined;
   let bestVersion: [number, number] = [-1, -1];
 
@@ -30,11 +30,11 @@ export const getLatestFlagshipForProvider = (
     }
   }
 
-  return bestId;
+  return bestId ? [bestId] : [];
 };
 
-export const getLatestOpenAIChatFlagship = (): string | undefined =>
-  getLatestFlagshipForProvider("openai", "chat");
+export const findLatestOpenAIChatFlagship = (): string[] =>
+  findLatestFlagshipForProvider("openai", "chat");
 
 /** The newest plain OpenAI chat flagship, falling back only when unreachable. */
-export const DEFAULT_MODEL = getLatestOpenAIChatFlagship() ?? "openai/gpt-5";
+export const DEFAULT_MODEL = findLatestOpenAIChatFlagship()[0] ?? "openai/gpt-5";

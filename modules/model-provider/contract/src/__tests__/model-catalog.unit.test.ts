@@ -2,7 +2,7 @@ import {
   allLitellmModels,
   getAllModels,
   getAllProviders,
-  getModelById,
+  findModelById,
   pickModelMetadata,
   getModelsForProvider,
   getProviderModelOptions,
@@ -39,13 +39,13 @@ describe("Registry Model Access", () => {
     it("returns a model when it exists", () => {
       const allModels = getAllModels();
       const modelId = Object.keys(allModels)[0]!;
-      const model = getModelById(modelId);
+      const model = findModelById(modelId)[0];
       expect(model).toBeDefined();
       expect(model?.name).toBeDefined();
     });
 
     it("returns undefined for non-existent model", () => {
-      const model = getModelById("nonexistent/model");
+      const model = findModelById("nonexistent/model")[0];
       expect(model).toBeUndefined();
     });
   });
