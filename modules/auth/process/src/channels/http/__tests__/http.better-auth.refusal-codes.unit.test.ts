@@ -1,12 +1,17 @@
 /**
  * @see modules/auth/specs/auth-refusal-codes.feature
  */
+import { createErrorHandler } from "@langwatch/api";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { APIError, createAuthMiddleware } from "better-auth/api";
+import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
-import { answerAuthRefusalByRegisteredCode } from "../http.better-auth.channel.ts";
+import {
+  answerAuthRefusalByRegisteredCode,
+  releaseHandledRefusal,
+} from "../http.better-auth.channel.ts";
 
 const BASE = "http://localhost:3000/api/auth";
 
@@ -16,6 +21,7 @@ function refusalHarness() {
     secret: "test-secret-test-secret-test-secret",
     database: memoryAdapter({ user: [], session: [], account: [], verification: [] }),
     emailAndPassword: { enabled: true },
+    onAPIError: { onError: releaseHandledRefusal },
     hooks: {
       after: createAuthMiddleware(async (ctx) => {
         answerAuthRefusalByRegisteredCode(ctx);
@@ -23,8 +29,12 @@ function refusalHarness() {
     },
   });
 
+  const host = new Hono();
+  host.onError(createErrorHandler());
+  host.all("/api/auth/*", (context) => auth.handler(context.req.raw));
+
   return async function post(path: string, body: unknown): Promise<Response> {
-    return auth.handler(
+    return host.fetch(
       new Request(`${BASE}${path}`, {
         method: "POST",
         headers: { "content-type": "application/json", origin: "http://localhost:3000" },
@@ -60,7 +70,11 @@ describe("sign-in refusals", () => {
     });
 
     expect(response.status).toBe(401);
-    expect(await response.json()).toMatchObject({ code: "identity_sign_in_refused" });
+    expect(await response.json()).toMatchObject({
+      code: "identity_sign_in_refused",
+      message: "identity_sign_in_refused",
+      retryable: false,
+    });
   });
 
   /** @scenario "An address nobody holds is refused on sign-in exactly as a wrong password" */
@@ -85,7 +99,7 @@ describe("sign-up refusals", () => {
 
     const response = await post("/sign-up/email", HOLDER);
 
-    expect(response.ok).toBe(false);
+    expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({ code: "email_already_registered" });
   });
 
@@ -117,22 +131,22 @@ describe("password reset refusals", () => {
 
 describe("answerAuthRefusalByRegisteredCode", () => {
   /** @scenario "An expired verification link is refused as identity_verification_expired" */
-  it("re-answers an expired verification token at the status the endpoint chose", () => {
+  it("re-answers an expired verification token as its handled error", () => {
     const refused = APIError.from("UNAUTHORIZED", { code: "TOKEN_EXPIRED", message: "expired" });
 
     expect(answered({ path: "/verify-email?token=t", refused })).toMatchObject({
-      status: "UNAUTHORIZED",
-      body: { code: "identity_verification_expired" },
+      code: "identity_verification_expired",
+      httpStatus: 410,
     });
   });
 
   /** @scenario "A passkey nobody holds is refused as identity_passkey_not_recognized" */
-  it("re-answers an unknown passkey at the status the endpoint chose", () => {
+  it("re-answers an unknown passkey as its handled error", () => {
     const refused = APIError.from("UNAUTHORIZED", { code: "PASSKEY_NOT_FOUND", message: "gone" });
 
     expect(answered({ path: "/passkey/verify-authentication", refused })).toMatchObject({
-      status: "UNAUTHORIZED",
-      body: { code: "identity_passkey_not_recognized" },
+      code: "identity_passkey_not_recognized",
+      httpStatus: 400,
     });
   });
 
@@ -144,7 +158,8 @@ describe("answerAuthRefusalByRegisteredCode", () => {
     });
 
     expect(answered({ path: "/passkey/verify-registration", refused })).toMatchObject({
-      body: { code: "identity_passkey_already_registered" },
+      code: "identity_passkey_already_registered",
+      httpStatus: 409,
     });
   });
 
@@ -159,7 +174,19 @@ describe("answerAuthRefusalByRegisteredCode", () => {
     const refused = APIError.from("BAD_REQUEST", { code: "INVALID_TOKEN", message: "no" });
 
     expect(answered({ path: "/verify-email?token=t", refused })).toMatchObject({
-      body: { code: "identity_verification_invalid" },
+      code: "identity_verification_invalid",
     });
+  });
+});
+
+describe("releaseHandledRefusal", () => {
+  /** @scenario "A refusal better-auth answers itself keeps better-auth's answer" */
+  it("keeps an untranslated refusal inside better-auth's own answer", async () => {
+    const post = refusalHarness();
+
+    const response = await post("/request-password-reset", { email: "not-an-address" });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).not.toHaveProperty("retryable");
   });
 });

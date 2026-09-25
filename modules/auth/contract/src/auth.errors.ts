@@ -1,4 +1,8 @@
 import { HandledError } from "@langwatch/handled-error";
+import {
+  IdentityCommandRefusedError,
+  PasskeyCommandRefusedError,
+} from "@langwatch/identity-contract";
 
 export class AuthValidateRateLimitedError extends HandledError {
   declare readonly code: "auth_validate_rate_limited";
@@ -169,5 +173,61 @@ export class DirectRegistrationUnavailableError extends HandledError {
       fault: "customer",
     });
     this.name = "DirectRegistrationUnavailableError";
+  }
+}
+
+/** A credential sign-in that did not check out; a wrong password and an unheld address match. */
+export class IdentitySignInRefusedError extends IdentityCommandRefusedError {
+  declare readonly code: "identity_sign_in_refused";
+
+  constructor(detail: string) {
+    super("identity_sign_in_refused", "identity_sign_in_refused", {
+      httpStatus: 401,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "IdentitySignInRefusedError";
+  }
+}
+
+/** A password the policy will not take; type a different one. */
+export class IdentityPasswordRejectedError extends IdentityCommandRefusedError {
+  declare readonly code: "identity_password_rejected";
+
+  constructor(detail: string) {
+    super("identity_password_rejected", "identity_password_rejected", {
+      httpStatus: 400,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "IdentityPasswordRejectedError";
+  }
+}
+
+/** A password-reset link that will not spend: expired, used or never issued, all alike. */
+export class IdentityResetLinkInvalidError extends IdentityCommandRefusedError {
+  declare readonly code: "identity_reset_link_invalid";
+
+  constructor(detail: string) {
+    super("identity_reset_link_invalid", "identity_reset_link_invalid", {
+      httpStatus: 400,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "IdentityResetLinkInvalidError";
+  }
+}
+
+/** The authenticator offered a passkey this account already holds; there is nothing to retry. */
+export class IdentityPasskeyAlreadyRegisteredError extends PasskeyCommandRefusedError {
+  declare readonly code: "identity_passkey_already_registered";
+
+  constructor(detail: string) {
+    super("identity_passkey_already_registered", "identity_passkey_already_registered", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "IdentityPasskeyAlreadyRegisteredError";
   }
 }

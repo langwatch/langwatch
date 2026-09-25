@@ -16,6 +16,7 @@ import {
   requestPathname,
   type AuthApi,
 } from "@langwatch/auth-contract";
+import { HandledError } from "@langwatch/handled-error";
 import type { SignInMethodPolicy, SsoAssertionApi } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -215,8 +216,8 @@ export async function countSignInAttempt({
 }
 
 /**
- * A refusal on a translated route family re-answered under its registered code, status and
- * headers kept, so the browser's registry has words for it (main's handled-errors table).
+ * A refusal on a translated route family re-thrown as its handled error, so the host renders
+ * it in the canonical envelope at its own status (main's handled-errors table).
  * Server-side calls carry no request and stay untouched.
  */
 export function answerAuthRefusalByRegisteredCode(ctx: {
@@ -236,11 +237,22 @@ export function answerAuthRefusalByRegisteredCode(ctx: {
   const [refusal] = findRegisteredRefusals({ pathname, betterAuthCode });
   if (refusal === undefined) return;
 
+  const handled = new refusal.error(`${pathname} refused with ${betterAuthCode}`);
   logger.warn(
-    { path: pathname, betterAuthCode, code: refusal.code },
-    "an auth endpoint refused, and it is answered under its registered code",
+    { path: pathname, betterAuthCode, code: handled.code, status: handled.httpStatus },
+    "an auth endpoint refused, and it is answered as a handled error",
   );
-  throw APIError.from(returned.status, { code: refusal.code, message: refusal.code });
+  throw handled;
+}
+
+/**
+ * better-auth's router error hook: a handled refusal leaves its handler for the host's
+ * renderer; every other failure keeps better-auth's own answer and is logged here.
+ */
+export function releaseHandledRefusal(error: unknown): void {
+  if (HandledError.isHandled(error)) throw error;
+  if (error instanceof APIError && error.status !== "INTERNAL_SERVER_ERROR") return;
+  logger.error({ error }, "an auth endpoint failed");
 }
 
 /**
@@ -398,6 +410,7 @@ export const createAuthOptions = ({
    */
   onAPIError: {
     errorURL: `${deployment.baseUrl}/auth/error`,
+    onError: releaseHandledRefusal,
   },
 
   // Map BetterAuth's expected models to the existing capitalized Prisma tables.

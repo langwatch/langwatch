@@ -1,13 +1,19 @@
 /**
  * @see modules/auth/specs/two-step-set-up.feature
  */
+import { createErrorHandler } from "@langwatch/api";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { APIError, createAuthEndpoint, createAuthMiddleware } from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
+import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
-import { answerAuthRefusalByRegisteredCode, twoFactorPlugin } from "../http.better-auth.channel.ts";
+import {
+  answerAuthRefusalByRegisteredCode,
+  releaseHandledRefusal,
+  twoFactorPlugin,
+} from "../http.better-auth.channel.ts";
 
 const BASE = "http://localhost:3000/api/auth";
 
@@ -24,6 +30,7 @@ function twoStepHarness() {
     secret: "test-secret-test-secret-test-secret",
     database: memoryAdapter(database),
     emailAndPassword: { enabled: true },
+    onAPIError: { onError: releaseHandledRefusal },
     plugins: [
       twoFactorPlugin(),
       {
@@ -56,8 +63,12 @@ function twoStepHarness() {
     },
   });
 
+  const host = new Hono();
+  host.onError(createErrorHandler());
+  host.all("/api/auth/*", (context) => auth.handler(context.req.raw));
+
   async function post(path: string, body: unknown, cookie = ""): Promise<Response> {
-    return auth.handler(
+    return host.fetch(
       new Request(`${BASE}${path}`, {
         method: "POST",
         headers: { "content-type": "application/json", cookie, origin: "http://localhost:3000" },
@@ -111,7 +122,7 @@ describe("setting two-step verification up", () => {
 
     const response = await harness.post("/two-factor/verify-totp", { code: "000000" }, cookie);
 
-    expect(response.ok).toBe(false);
+    expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ code: "identity_mfa_code_invalid" });
   });
 
@@ -133,7 +144,7 @@ describe("setting two-step verification up", () => {
 
 describe("answerAuthRefusalByRegisteredCode", () => {
   /** @scenario "Too many wrong codes is refused as identity_mfa_locked_out" */
-  it("re-answers better-auth's lockout at the status the endpoint chose", () => {
+  it("re-answers better-auth's lockout as its handled error", () => {
     const refused = APIError.from("TOO_MANY_REQUESTS", {
       code: "ACCOUNT_TEMPORARILY_LOCKED",
       message: "Account temporarily locked",
@@ -150,11 +161,7 @@ describe("answerAuthRefusalByRegisteredCode", () => {
       }
     })();
 
-    expect(answer).toBeInstanceOf(APIError);
-    expect(answer).toMatchObject({
-      status: "TOO_MANY_REQUESTS",
-      body: { code: "identity_mfa_locked_out" },
-    });
+    expect(answer).toMatchObject({ code: "identity_mfa_locked_out", httpStatus: 429 });
   });
 
   it("leaves a refusal on another endpoint as it was", () => {

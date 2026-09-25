@@ -26,4 +26,4 @@ Feature: Setting two-step verification up speaks main's rules and our codes
   Scenario: Too many wrong codes is refused as identity_mfa_locked_out
     Given a two-factor endpoint that refused with better-auth's lockout
     When the refusal is answered
-    Then it carries the code "identity_mfa_locked_out" at the status the endpoint chose
+    Then it is the handled error "identity_mfa_locked_out" at its own status

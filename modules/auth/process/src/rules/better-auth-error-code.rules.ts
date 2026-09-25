@@ -1,4 +1,20 @@
+import {
+  IdentityPasskeyAlreadyRegisteredError,
+  IdentityPasswordRejectedError,
+  IdentityResetLinkInvalidError,
+  IdentitySignInRefusedError,
+  TwoStepPasswordInvalidError,
+} from "@langwatch/auth-contract";
 import type { HandledError } from "@langwatch/handled-error";
+import {
+  IdentityMfaCodeInvalidError,
+  IdentityMfaLockedOutError,
+  IdentityPasskeyCeremonyFailedError,
+  IdentityPasskeyNotRecognizedError,
+  IdentityVerificationExpiredError,
+  IdentityVerificationInvalidError,
+} from "@langwatch/identity-contract";
+import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 import { z } from "zod";
 
 const coded = z.union([
@@ -12,11 +28,11 @@ export function refusedWith(error: unknown, codes: readonly string[]): boolean {
   return parsed.success && codes.includes(parsed.data);
 }
 
-/** One better-auth refusal on one route family, and the registered code it answers with. */
+/** One better-auth refusal on one route family, and the handled error it answers as. */
 type BetterAuthRefusal = Readonly<{
   family: string;
   betterAuthCode: string;
-  code: HandledError["code"];
+  error: new (detail: string) => HandledError;
 }>;
 
 /**
@@ -24,95 +40,115 @@ type BetterAuthRefusal = Readonly<{
  * the caller can act, and causes a caller must not tell apart share one code.
  */
 export const BETTER_AUTH_REFUSALS: readonly BetterAuthRefusal[] = [
-  { family: "/two-factor/", betterAuthCode: "INVALID_CODE", code: "identity_mfa_code_invalid" },
+  {
+    family: "/two-factor/",
+    betterAuthCode: "INVALID_CODE",
+    error: IdentityMfaCodeInvalidError,
+  },
   {
     family: "/two-factor/",
     betterAuthCode: "INVALID_BACKUP_CODE",
-    code: "identity_mfa_code_invalid",
+    error: IdentityMfaCodeInvalidError,
   },
   {
     family: "/two-factor/",
     betterAuthCode: "TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE",
-    code: "identity_mfa_locked_out",
+    error: IdentityMfaLockedOutError,
   },
   {
     family: "/two-factor/",
     betterAuthCode: "ACCOUNT_TEMPORARILY_LOCKED",
-    code: "identity_mfa_locked_out",
+    error: IdentityMfaLockedOutError,
   },
   {
     family: "/two-factor/",
     betterAuthCode: "INVALID_PASSWORD",
-    code: "identity_mfa_password_invalid",
+    error: TwoStepPasswordInvalidError,
   },
   {
     family: "/sign-in/",
     betterAuthCode: "INVALID_EMAIL_OR_PASSWORD",
-    code: "identity_sign_in_refused",
+    error: IdentitySignInRefusedError,
   },
-  { family: "/sign-in/", betterAuthCode: "INVALID_PASSWORD", code: "identity_sign_in_refused" },
-  { family: "/sign-up/", betterAuthCode: "USER_ALREADY_EXISTS", code: "email_already_registered" },
+  {
+    family: "/sign-in/",
+    betterAuthCode: "INVALID_PASSWORD",
+    error: IdentitySignInRefusedError,
+  },
+  {
+    family: "/sign-up/",
+    betterAuthCode: "USER_ALREADY_EXISTS",
+    error: EmailAlreadyRegisteredError,
+  },
   {
     family: "/sign-up/",
     betterAuthCode: "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL",
-    code: "email_already_registered",
+    error: EmailAlreadyRegisteredError,
   },
-  { family: "/sign-up/", betterAuthCode: "PASSWORD_TOO_SHORT", code: "identity_password_rejected" },
-  { family: "/sign-up/", betterAuthCode: "PASSWORD_TOO_LONG", code: "identity_password_rejected" },
+  {
+    family: "/sign-up/",
+    betterAuthCode: "PASSWORD_TOO_SHORT",
+    error: IdentityPasswordRejectedError,
+  },
+  {
+    family: "/sign-up/",
+    betterAuthCode: "PASSWORD_TOO_LONG",
+    error: IdentityPasswordRejectedError,
+  },
   {
     family: "/reset-password",
     betterAuthCode: "INVALID_TOKEN",
-    code: "identity_reset_link_invalid",
+    error: IdentityResetLinkInvalidError,
   },
   {
     family: "/reset-password",
     betterAuthCode: "TOKEN_EXPIRED",
-    code: "identity_reset_link_invalid",
+    error: IdentityResetLinkInvalidError,
   },
   {
     family: "/reset-password",
     betterAuthCode: "PASSWORD_TOO_SHORT",
-    code: "identity_password_rejected",
+    error: IdentityPasswordRejectedError,
   },
   {
     family: "/reset-password",
     betterAuthCode: "PASSWORD_TOO_LONG",
-    code: "identity_password_rejected",
+    error: IdentityPasswordRejectedError,
   },
   {
     family: "/verify-email",
     betterAuthCode: "INVALID_TOKEN",
-    code: "identity_verification_invalid",
+    error: IdentityVerificationInvalidError,
   },
   {
     family: "/verify-email",
     betterAuthCode: "TOKEN_EXPIRED",
-    code: "identity_verification_expired",
+    error: IdentityVerificationExpiredError,
   },
   {
     family: "/passkey/",
     betterAuthCode: "PASSKEY_NOT_FOUND",
-    code: "identity_passkey_not_recognized",
+    error: IdentityPasskeyNotRecognizedError,
   },
   {
     family: "/passkey/",
     betterAuthCode: "AUTHENTICATION_FAILED",
-    code: "identity_passkey_not_recognized",
+    error: IdentityPasskeyNotRecognizedError,
   },
   {
     family: "/passkey/",
     betterAuthCode: "CHALLENGE_NOT_FOUND",
-    code: "identity_passkey_ceremony_failed",
+    error: IdentityPasskeyCeremonyFailedError,
   },
   {
     family: "/passkey/",
     betterAuthCode: "FAILED_TO_VERIFY_REGISTRATION",
-    code: "identity_passkey_ceremony_failed",
+    error: IdentityPasskeyCeremonyFailedError,
   },
   {
     family: "/passkey/",
     betterAuthCode: "PREVIOUSLY_REGISTERED",
-    code: "identity_passkey_already_registered",
+    error: IdentityPasskeyAlreadyRegisteredError,
   },
 ];
 
