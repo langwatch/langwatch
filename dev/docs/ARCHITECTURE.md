@@ -99,6 +99,8 @@ share crosses only as its `*Api` ops. Where main hosted a subject elsewhere (`tr
 the port moves it to its owner — main decides *what*, the record decides *where* (Alex, 2026-09-25).
 A tRPC namespace belongs to one module: a procedure main hosted under another subject's namespace
 moves into its owner's namespace and the wire path moves with it (Alex, 2026-09-25).
+Operator views over enterprise subjects (license registry, self-hosted instances) live in an enterprise
+ops module that calls the owners' `*Api`s; core ops never depends on an enterprise contract (Alex, 2026-09-25).
 Enterprise modules mirror the shape exactly under `enterprise/modules/`.
 
 ```
