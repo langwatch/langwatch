@@ -2,12 +2,14 @@
 
 import type { GovernanceRepositories } from "../governance.repositories.ts";
 import { MemoryActivityMonitorRepository } from "./memory.activity-monitor.repository.ts";
+import { MemoryAiToolCatalogRepository } from "./memory.ai-tool-catalog.repository.ts";
 import { MemoryAnomalyRuleRepository } from "./memory.anomaly-rule.repository.ts";
 import { MemoryDepartmentRepository } from "./memory.department.repository.ts";
 import { MemoryDiscoveredAgentRepository } from "./memory.discovered-agent.repository.ts";
 import { MemoryDiscoveredPeopleStore } from "./memory.discovered-people.store.ts";
 import { MemoryDiscoveredPersonRepository } from "./memory.discovered-person.repository.ts";
 import { MemoryErasedIdentifierSuppressionRepository } from "./memory.erased-identifier-suppression.repository.ts";
+import { MemoryGovernanceCostRollupRepository } from "./memory.governance-cost-rollup.repository.ts";
 import { MemoryGovernanceDirectoryRepository } from "./memory.governance-directory.repository.ts";
 import { MemoryGovernanceOcsfExportRepository } from "./memory.governance-ocsf-export.repository.ts";
 import { MemoryRoutingPolicyRepository } from "./memory.governance-routing.repository.ts";
@@ -39,6 +41,7 @@ export class MemoryGovernanceRepositories {
 
     return {
       activityMonitor: MemoryActivityMonitorRepository.create(),
+      aiTools: MemoryAiToolCatalogRepository.create(),
       anomalyRules: MemoryAnomalyRuleRepository.create(store),
       departments: MemoryDepartmentRepository.create(store),
       directory: MemoryGovernanceDirectoryRepository.create(store),
@@ -51,6 +54,7 @@ export class MemoryGovernanceRepositories {
       ingestionPullRuns: MemoryIngestionPullRunRepository.create(),
       ingestionSources: MemoryIngestionSourceRepository.create(),
       ingestionTemplates: MemoryIngestionTemplateRepository.create(store),
+      costRollup: MemoryGovernanceCostRollupRepository.create(),
       ocsfEvents: MemoryOcsfEventsRepository.create(),
       traceActivity: MemoryTraceActivityRepository.create(),
       ocsfExports: MemoryGovernanceOcsfExportRepository.create(store),

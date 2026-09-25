@@ -4,12 +4,11 @@
 import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
 import type {
   activityMonitorTrpc,
+  aiToolsTrpc,
   governanceAgentsTrpc,
+  governanceCostTrpc,
   governancePeopleTrpc,
   sessionPolicyTrpc,
-  AiToolEntry,
-  AiToolProviderOption,
-  AiToolType,
   AnomalyRule,
   AnomalyRuleScope,
   AnomalyRuleSeverity,
@@ -90,27 +89,6 @@ export type GovernanceActorWorkspace = {
   projectSlug: string;
 };
 
-/** One row of the starter-pack checklist the catalog editor renders. */
-export type GovernanceAiToolStarterTile = {
-  slug: string;
-  displayName: string;
-  type: AiToolType;
-};
-
-/** What importing the starter pack did, counted by outcome. */
-export type GovernanceAiToolImportResult = {
-  created: number;
-  updated: number;
-  skipped: number;
-};
-
-/**
- * A routing policy as the tool-catalog drawer's dropdown needs it. The
- * procedure projects the two fields a `<select>` binds and nothing else, so
- * this is a view of `RoutingPolicy` rather than the whole of it.
- */
-export type GovernanceRoutingPolicyOption = { id: string; name: string };
-
 /** The organization's session-lifetime policy. Zero days means unbounded. */
 
 /**
@@ -185,7 +163,9 @@ export type GovernanceOrganizationGraph = {
 export type GovernanceApiMap = ContractApiMap<typeof activityMonitorTrpc> &
   ContractApiMap<typeof sessionPolicyTrpc> &
   ContractApiMap<typeof governancePeopleTrpc> &
-  ContractApiMap<typeof governanceAgentsTrpc> & {
+  ContractApiMap<typeof governanceAgentsTrpc> &
+  ContractApiMap<typeof aiToolsTrpc> &
+  ContractApiMap<typeof governanceCostTrpc> & {
     modelProvider: {
       getResolvedDefault: {
         query: {
@@ -202,101 +182,6 @@ export type GovernanceApiMap = ContractApiMap<typeof activityMonitorTrpc> &
         };
       };
     };
-    aiTools: {
-      adminList: {
-        query: { input: { organizationId: string }; output: AiToolEntry[] };
-      };
-      /**
-       * The reader's own catalogue. No hook here calls it; the write paths
-       * invalidate it, and `useUtils()` can only name a procedure this map
-       * declares.
-       */
-      list: {
-        query: { input: { organizationId: string }; output: AiToolEntry[] };
-      };
-      create: {
-        mutation: {
-          input: {
-            organizationId: string;
-            departmentIds?: string[];
-            /**
-             * Widened on purpose: the router builds its enum from
-             * `AI_TOOL_TYPES` via a cast to `[string, ...string[]]`, so the
-             * parsed field is a plain string, and `AiToolType` is assignable to it.
-             */
-            type: string;
-            displayName: string;
-            iconAsset?: string | null;
-            order?: number;
-            config: Record<string, unknown>;
-          };
-          output: AiToolEntry;
-        };
-      };
-      update: {
-        mutation: {
-          input: {
-            organizationId: string;
-            id: string;
-            displayName?: string;
-            iconAsset?: string | null;
-            /** Pass to overwrite the binding set; empty is org-wide. Omit to leave it. */
-            departmentIds?: string[];
-            order?: number;
-            enabled?: boolean;
-            type?: string;
-            config?: Record<string, unknown>;
-          };
-          output: AiToolEntry;
-        };
-      };
-      remove: {
-        mutation: {
-          input: { organizationId: string; id: string };
-          output: AiToolEntry;
-        };
-      };
-      reorder: {
-        mutation: {
-          input: {
-            organizationId: string;
-            updates: { id: string; order: number }[];
-          };
-          output: GovernanceAcknowledgement;
-        };
-      };
-      setEnabled: {
-        mutation: {
-          input: { organizationId: string; id: string; enabled: boolean };
-          output: AiToolEntry;
-        };
-      };
-      importStarterPack: {
-        mutation: {
-          input: { organizationId: string; slugs?: string[] };
-          output: GovernanceAiToolImportResult;
-        };
-      };
-      starterPackCatalog: {
-        query: {
-          input: { organizationId: string };
-          output: GovernanceAiToolStarterTile[];
-        };
-      };
-      providerOptions: {
-        query: {
-          input: { organizationId: string };
-          output: AiToolProviderOption[];
-        };
-      };
-      routingPolicyOptions: {
-        query: {
-          input: { organizationId: string };
-          output: GovernanceRoutingPolicyOption[];
-        };
-      };
-    };
-
     anomalyRules: {
       list: {
         query: { input: { organizationId: string }; output: AnomalyRule[] };

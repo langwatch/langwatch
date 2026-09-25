@@ -10,6 +10,7 @@ import type {
   PersonalUsageReader,
   QuarantineTraceActivityReader,
 } from "../app/governance.members.ts";
+import type { AiToolCatalogRepository } from "./ai-tool-catalog.repository.ts";
 import type { AnomalyRuleRepository } from "./anomaly-rule.repository.ts";
 import type {
   OcsfEventBatchWriter,
@@ -20,6 +21,7 @@ import type { DiscoveredAgentRepository } from "./discovered-agent.repository.ts
 import type { DiscoveredPersonRepository } from "./discovered-person.repository.ts";
 import type { ErasedIdentifierSuppressionRepository } from "./erased-identifier-suppression.repository.ts";
 import type { GatewaySpendRepository } from "./gateway-spend.repository.ts";
+import type { GovernanceCostRollupRepository } from "./governance-cost-rollup.repository.ts";
 import type { GovernanceDirectoryRepository } from "./governance-directory.repository.ts";
 import type {
   GovernanceOcsfExportRepository,
@@ -41,7 +43,7 @@ import type { SpendSpikeAnomalyRepository } from "./spend-spike-anomaly.reposito
  * The rows the governance module owns, chosen once at boot.
  *
  * The rest of the ingestion-pull half of the module (sources, activity
- * rollups, the pull-run projection and the AI tool catalogue) reads and writes
+ * rollups and the pull-run projection) reads and writes
  * through its own narrow seams and is not yet part of the selection; those
  * rows are listed as unfinished in the conversion report rather than declared
  * here with no memory twin behind them. `ingestionTemplates` is the one row
@@ -50,6 +52,7 @@ import type { SpendSpikeAnomalyRepository } from "./spend-spike-anomaly.reposito
  */
 export interface GovernanceRepositories {
   readonly activityMonitor: ActivityMonitorRepository;
+  readonly aiTools: AiToolCatalogRepository;
   readonly anomalyRules: AnomalyRuleRepository;
   readonly departments: DepartmentRepository;
   readonly directory: GovernanceDirectoryRepository;
@@ -62,6 +65,7 @@ export interface GovernanceRepositories {
   readonly ingestionPullRuns: IngestionPullRunRepository;
   readonly ingestionSources: IngestionSourceRepository;
   readonly ingestionTemplates: IngestionTemplateRepository;
+  readonly costRollup: GovernanceCostRollupRepository;
   readonly ocsfEvents: GovernanceClickHouseRepositories["ocsfEvents"];
   readonly ocsfExports: GovernanceOcsfExportRepository;
   readonly rollupErasure: RollupErasureRepository;

@@ -3,6 +3,7 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { GovernanceRepositories } from "../governance.repositories.ts";
+import { PrismaAiToolCatalogRepository } from "./prisma.ai-tool-catalog.repository.ts";
 import { PrismaAnomalyRuleRepository } from "./prisma.anomaly-rule.repository.ts";
 import { PrismaDepartmentRepository } from "./prisma.department.repository.ts";
 import { PrismaDiscoveredAgentRepository } from "./prisma.discovered-agent.repository.ts";
@@ -33,11 +34,12 @@ export class PostgresGovernanceRepositories {
     members: Readonly<{ prisma: PrismaClient }>,
   ): Omit<
     GovernanceRepositories,
-    "activityMonitor" | "rollupErasure" | "ocsfEvents" | "traceActivity"
+    "activityMonitor" | "costRollup" | "rollupErasure" | "ocsfEvents" | "traceActivity"
   > {
     const { prisma } = members;
 
     return {
+      aiTools: PrismaAiToolCatalogRepository.create(prisma),
       anomalyRules: PrismaAnomalyRuleRepository.create(prisma),
       departments: PrismaDepartmentRepository.create(prisma),
       directory: PrismaGovernanceDirectoryRepository.create(prisma),

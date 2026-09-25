@@ -16,6 +16,7 @@ import type {
   AiToolMemberInput,
   AiToolOrganizationInput,
   AiToolProviderOption,
+  AiToolStarterTileChoice,
   CreateAiToolEntryInput,
   FindAiToolEntryInput,
   ReorderAiToolEntriesInput,
@@ -65,6 +66,14 @@ import type {
   GovernanceCliSourceRequest,
   GovernanceCliSourcesRequest,
 } from "./governance-cli-rest.schemas.ts";
+import type {
+  GovernanceCostDayRecords,
+  GovernanceCostModelBreakdown,
+  GovernanceCostPeriodRecordsInput,
+  GovernanceCostProviderDayBreakdown,
+  GovernanceCostWindowInput,
+  GovernanceSpenderBreakdown,
+} from "./governance-cost.ts";
 import type {
   GovernanceIngestOtlpInput,
   GovernanceIngestResponse,
@@ -512,6 +521,27 @@ export interface GovernanceRestApi {
     input: { organizationId: string; sourceId: string },
     by: EntitlementOperator,
   ): Promise<SourceHealthMetrics>;
+  aiToolListForUser(input: AiToolMemberInput): Promise<AiToolEntry[]>;
+  aiToolProviderAvailability(input: AiToolMemberInput): Promise<{ configuredProviders: string[] }>;
+  aiToolClaudeCodeOtlpEndpoint(
+    input: AiToolOrganizationInput,
+  ): Promise<{ endpoint: string | null }>;
+  aiToolListForAdmin(input: AiToolOrganizationInput): Promise<AiToolEntry[]>;
+  aiToolGetById(input: FindAiToolEntryInput): Promise<AiToolEntry>;
+  aiToolCreate(input: CreateAiToolEntryInput): Promise<AiToolEntry>;
+  aiToolUpdate(input: UpdateAiToolEntryInput): Promise<AiToolEntry>;
+  aiToolRemove(input: FindAiToolEntryInput): Promise<AiToolEntry>;
+  aiToolSeedStarterPack(
+    input: SeedAiToolStarterPackInput,
+  ): Promise<{ created: number; updated: number; skipped: number }>;
+  aiToolStarterPackCatalog(): AiToolStarterTileChoice[];
+  aiToolListProviderOptionsForAdmin(
+    input: AiToolOrganizationInput,
+  ): Promise<AiToolProviderOption[]>;
+  aiToolListRoutingPolicyOptionsForAdmin(
+    input: AiToolOrganizationInput,
+  ): Promise<{ id: string; name: string }[]>;
+  aiToolReorder(input: ReorderAiToolEntriesInput): Promise<void>;
   templateListForUser(input: { organizationId: string }): Promise<IngestionTemplate[]>;
   templateListForOrgAdmin(input: { organizationId: string }): Promise<IngestionTemplate[]>;
   templateGetByIdForOrg(input: { id: string; organizationId: string }): Promise<IngestionTemplate>;
@@ -570,6 +600,22 @@ export interface GovernanceRestApi {
     organizationId: string;
   }): Promise<AgentListingRequestResult>;
   governanceAgentsList(input: { organizationId: string }): Promise<GovernanceAgentRow[]>;
+  governanceCostDailyByProvider(
+    input: GovernanceCostWindowInput,
+    by: EntitlementOperator,
+  ): Promise<GovernanceCostProviderDayBreakdown>;
+  governanceCostSpendByModel(
+    input: GovernanceCostWindowInput,
+    by: EntitlementOperator,
+  ): Promise<GovernanceCostModelBreakdown>;
+  governanceCostPeriodRecords(
+    input: GovernanceCostPeriodRecordsInput,
+    by: EntitlementOperator,
+  ): Promise<GovernanceCostDayRecords>;
+  governanceCostSpenders(
+    input: GovernanceCostWindowInput,
+    by: EntitlementOperator,
+  ): Promise<GovernanceSpenderBreakdown>;
   governancePeopleList(input: { organizationId: string }): Promise<PeopleScreenPerson[]>;
   governancePeopleSuggestions(input: { organizationId: string }): Promise<PeopleScreenSuggestion[]>;
   governancePeopleRunMatch(input: { organizationId: string }): Promise<IdentityMatchRun>;

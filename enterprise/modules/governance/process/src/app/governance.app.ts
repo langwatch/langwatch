@@ -106,6 +106,16 @@ import {
   type GovernanceProjectCaller,
   GovernanceRestApi,
   type IngestionTemplate,
+  type AiToolEntry,
+  type AiToolMemberInput,
+  type AiToolOrganizationInput,
+  type AiToolProviderOption,
+  type AiToolStarterTileChoice,
+  type CreateAiToolEntryInput,
+  type FindAiToolEntryInput,
+  type ReorderAiToolEntriesInput,
+  type SeedAiToolStarterPackInput,
+  type UpdateAiToolEntryInput,
   type CliSessionCard,
   type IssuedPersonalVirtualKeyAnswer,
   type GovernanceCaller,
@@ -151,6 +161,12 @@ import {
   type IdentityMatchRun,
   type OrganizationSessionPolicyShape,
   type GovernanceAgentRow,
+  type GovernanceCostDayRecords,
+  type GovernanceCostModelBreakdown,
+  type GovernanceCostPeriodRecordsInput,
+  type GovernanceCostProviderDayBreakdown,
+  type GovernanceCostWindowInput,
+  type GovernanceSpenderBreakdown,
   type PeopleScreenPerson,
   type PeopleScreenSuggestion,
   type SessionCeilingApplied,
@@ -200,6 +216,10 @@ import { toPullLifecycleSource } from "../rules/pull-schedule.rules.ts";
 import { ratePulledUsage } from "../rules/pulled-usage-rate.rules.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";
 import { AgentDiscoveryService } from "../services/agent-discovery.service.ts";
+import { DefaultGovernanceAiToolCatalogService } from "../services/ai-tool-catalog.service.ts";
+import { ModelProviderAiToolCatalogService } from "../services/ai-tool-provider-catalog.service.ts";
+import { AiToolProviderReachService } from "../services/ai-tool-provider-reach.service.ts";
+import { GovernanceAiToolSlugService } from "../services/ai-tool-slug.service.ts";
 import { AnomalyRuleService } from "../services/anomaly-rule.service.ts";
 import { AnthropicAdminPullerAdapter } from "../services/anthropic-admin-puller.service.ts";
 import { DefaultGovernanceCliSessionInventoryService } from "../services/cli-session-inventory.service.ts";
@@ -225,6 +245,7 @@ import {
   type GovernanceCliPersonDirectory,
 } from "../services/governance-cli-credentials.service.ts";
 import { GovernanceCliService } from "../services/governance-cli.service.ts";
+import { GovernanceCostBreakdownService } from "../services/governance-cost-breakdown.service.ts";
 import { GovernanceIngestAccessService } from "../services/governance-ingest-access.service.ts";
 import type { GovernanceIngestRateLimiter } from "../services/governance-ingest-rate-limit.service.ts";
 import {
@@ -372,6 +393,8 @@ export interface GovernanceAppDependencies {
     | "countWithTraces"
     | "findSharedProjectSlugs"
     | "listActiveByScopes"
+    | "listByTeam"
+    | "listIdsByOrganization"
     | "findWithTeam"
     | "ensureInternal"
     | "findInternalIds"
@@ -399,7 +422,10 @@ export interface GovernanceAppDependencies {
     GatewayApi,
     "createVirtualKey" | "revokeVirtualKey" | "findPersonalVirtualKeys" | "findVirtualKeyById"
   >;
-  modelProviders: Pick<ModelProviderApi, "countEnabledInScopes">;
+  modelProviders: Pick<
+    ModelProviderApi,
+    "countEnabledInScopes" | "findEnabledProviderKeysInScopes"
+  >;
   users: Pick<UserApi, "findById" | "findByEmail" | "findLastHomePath">;
   /** Audit-log owns the AuditLog table: workspace-view rows are written and deduped there. */
   auditLog: Pick<AuditLogApi, "record" | "hasRecordedSince">;
@@ -431,6 +457,7 @@ export interface GovernanceAppDependencies {
       | "findMemberDepartmentsOnDay"
       | "findOpenMemberDepartmentLinks"
       | "findTeamsWithDepartments"
+      | "findMemberTeamIds"
       | "assignTeamDepartment"
       | "findPrimaryIntent"
       | "getTeam"
@@ -655,6 +682,11 @@ export class GovernanceApp implements GovernanceRestApi {
       organizations: dependencies.organizations,
       discoveredAgents: repositories.discoveredAgents,
     });
+    this.costBreakdown = GovernanceCostBreakdownService.create({
+      costRollup: repositories.costRollup,
+      projects: dependencies.projects,
+      discoveredPeople: repositories.discoveredPeople,
+    });
     this.people = GovernancePeopleScreenService.create({
       discoveredPeople: repositories.discoveredPeople,
       matches: repositories.identityMatches,
@@ -670,6 +702,21 @@ export class GovernanceApp implements GovernanceRestApi {
     });
     this.templates = IngestionTemplateService.create({
       repository: repositories.ingestionTemplates,
+    });
+    this.aiTools = DefaultGovernanceAiToolCatalogService.create({
+      repository: repositories.aiTools,
+      slugs: GovernanceAiToolSlugService.create(),
+      providers: ModelProviderAiToolCatalogService.create(),
+      reach: AiToolProviderReachService.create({
+        organizations: dependencies.organizations,
+        projects: dependencies.projects,
+        modelProviders: dependencies.modelProviders,
+      }),
+      departments: repositories.departments,
+      routingPolicies: repositories.routingPolicies,
+      sources: repositories.ingestionSources,
+      members: dependencies.organizations,
+      diagnostics: { warn: (message, context) => logger.warn(context, message) },
     });
     this.ingestionKeys = PersonalIngestionKeyService.create({
       apiKeys: dependencies.apiKeys,
@@ -841,6 +888,8 @@ export class GovernanceApp implements GovernanceRestApi {
   private readonly sessionPolicy: OrganizationSessionPolicyService;
   private readonly people: GovernancePeopleScreenService;
   private readonly agentsScreen: GovernanceAgentsScreenService;
+  private readonly costBreakdown: GovernanceCostBreakdownService;
+  private readonly aiTools: DefaultGovernanceAiToolCatalogService;
   private readonly agentSync: GovernanceAgentSyncService;
   private readonly departments: DepartmentService;
   private readonly agentDiscovery: AgentDiscoveryService;
@@ -1407,6 +1456,44 @@ export class GovernanceApp implements GovernanceRestApi {
     return this.agentsScreen.listAgents(input);
   }
 
+  // ── Governance cost (main's governanceCost router, Enterprise-gated per organization) ──
+
+  async governanceCostDailyByProvider(
+    input: GovernanceCostWindowInput,
+    by: EntitlementOperator,
+  ): Promise<GovernanceCostProviderDayBreakdown> {
+    await this.assertGovernanceCost(input.organizationId, by);
+    return this.costBreakdown.dailyByProvider(input);
+  }
+
+  async governanceCostSpendByModel(
+    input: GovernanceCostWindowInput,
+    by: EntitlementOperator,
+  ): Promise<GovernanceCostModelBreakdown> {
+    await this.assertGovernanceCost(input.organizationId, by);
+    return this.costBreakdown.spendByModel(input);
+  }
+
+  async governanceCostPeriodRecords(
+    input: GovernanceCostPeriodRecordsInput,
+    by: EntitlementOperator,
+  ): Promise<GovernanceCostDayRecords> {
+    await this.assertGovernanceCost(input.organizationId, by);
+    return this.costBreakdown.periodRecords(input);
+  }
+
+  async governanceCostSpenders(
+    input: GovernanceCostWindowInput,
+    by: EntitlementOperator,
+  ): Promise<GovernanceSpenderBreakdown> {
+    await this.assertGovernanceCost(input.organizationId, by);
+    return this.costBreakdown.spenderBreakdown(input);
+  }
+
+  private assertGovernanceCost(organizationId: string, by: EntitlementOperator): Promise<void> {
+    return this.assertEnterprise({ organizationId, by, feature: "GOVERNANCE_COST" });
+  }
+
   governancePeopleList(input: { organizationId: string }): Promise<PeopleScreenPerson[]> {
     return this.people.listPeople(input);
   }
@@ -1637,6 +1724,70 @@ export class GovernanceApp implements GovernanceRestApi {
       planType: plan.type,
       errorMessage: ENTERPRISE_FEATURE_ERRORS[feature],
     });
+  }
+
+  // ── The AI tools catalogue (the console's tRPC) ──────────────────────────
+
+  aiToolListForUser(input: AiToolMemberInput): Promise<AiToolEntry[]> {
+    return this.aiTools.findForMember(input);
+  }
+
+  async aiToolProviderAvailability(
+    input: AiToolMemberInput,
+  ): Promise<{ configuredProviders: string[] }> {
+    return { configuredProviders: await this.aiTools.listConfiguredProvidersForUser(input) };
+  }
+
+  aiToolClaudeCodeOtlpEndpoint(
+    input: AiToolOrganizationInput,
+  ): Promise<{ endpoint: string | null }> {
+    return this.aiTools.findClaudeCodeOtlpEndpoint(input);
+  }
+
+  aiToolListForAdmin(input: AiToolOrganizationInput): Promise<AiToolEntry[]> {
+    return this.aiTools.listForAdmin(input);
+  }
+
+  aiToolGetById(input: FindAiToolEntryInput): Promise<AiToolEntry> {
+    return this.aiTools.getById(input);
+  }
+
+  aiToolCreate(input: CreateAiToolEntryInput): Promise<AiToolEntry> {
+    return this.aiTools.create(input);
+  }
+
+  aiToolUpdate(input: UpdateAiToolEntryInput): Promise<AiToolEntry> {
+    return this.aiTools.update(input);
+  }
+
+  aiToolRemove(input: FindAiToolEntryInput): Promise<AiToolEntry> {
+    return this.aiTools.remove(input);
+  }
+
+  aiToolSeedStarterPack(
+    input: SeedAiToolStarterPackInput,
+  ): Promise<{ created: number; updated: number; skipped: number }> {
+    return this.aiTools.seedStarterPack(input);
+  }
+
+  aiToolStarterPackCatalog(): AiToolStarterTileChoice[] {
+    return DefaultGovernanceAiToolCatalogService.listStarterPackTiles();
+  }
+
+  aiToolListProviderOptionsForAdmin(
+    input: AiToolOrganizationInput,
+  ): Promise<AiToolProviderOption[]> {
+    return this.aiTools.listProviderOptionsForAdmin(input);
+  }
+
+  aiToolListRoutingPolicyOptionsForAdmin(
+    input: AiToolOrganizationInput,
+  ): Promise<{ id: string; name: string }[]> {
+    return this.aiTools.listRoutingPolicyOptionsForAdmin(input);
+  }
+
+  aiToolReorder(input: ReorderAiToolEntriesInput): Promise<void> {
+    return this.aiTools.reorder(input);
   }
 
   // ── Ingestion templates, organization-keyed (the console's tRPC) ──────────

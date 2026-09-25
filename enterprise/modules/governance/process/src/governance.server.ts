@@ -82,9 +82,11 @@ import { IngestionPullService } from "./services/ingestion-pull.service.ts";
 import { PulledUsageEventingAdapter } from "./services/pulled-usage-eventing.service.ts";
 import { SpendSpikeAnomalyEvaluatorService } from "./services/spend-spike-anomaly-evaluator.service.ts";
 import { activityMonitorTrpcTransport } from "./transport/activity-monitor.trpc.ts";
+import { aiToolsTrpcTransport } from "./transport/ai-tools.trpc.ts";
 import { anomalyRulesTrpcTransport } from "./transport/anomaly-rules.trpc.ts";
 import { departmentsTrpcTransport } from "./transport/departments.trpc.ts";
 import { governanceAgentsTrpcTransport } from "./transport/governance-agents.trpc.ts";
+import { governanceCostTrpcTransport } from "./transport/governance-cost.trpc.ts";
 import { governancePeopleTrpcTransport } from "./transport/governance-people.trpc.ts";
 import {
   governanceRest,
@@ -120,6 +122,7 @@ export const governanceServer = defineServerModule("governance")
     governanceRest,
     departmentsTrpcTransport,
     ingestionTemplatesTrpcTransport,
+    aiToolsTrpcTransport,
     ingestionSourcesTrpcTransport,
     governanceTrpcTransport,
     anomalyRulesTrpcTransport,
@@ -131,6 +134,7 @@ export const governanceServer = defineServerModule("governance")
     sessionPolicyTrpcTransport,
     governancePeopleTrpcTransport,
     governanceAgentsTrpcTransport,
+    governanceCostTrpcTransport,
   )
   // The member behind the project credential, and which surface asked. A
   // legacy project key names no member, which is what the admin routes refuse.
