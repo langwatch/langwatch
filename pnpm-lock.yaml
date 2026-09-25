@@ -13234,6 +13234,9 @@ importers:
       '@langwatch/log-contract':
         specifier: workspace:*
         version: link:../../log/contract
+      '@langwatch/metric-contract':
+        specifier: workspace:*
+        version: link:../../metric/contract
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
