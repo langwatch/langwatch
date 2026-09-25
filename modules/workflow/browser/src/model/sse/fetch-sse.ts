@@ -62,6 +62,71 @@ async function describeRefusal(response: Response): Promise<string> {
     : response.statusText;
 }
 
+/** One SSE request's lifetime: it settles once, on the first of finish, failure or timeout. */
+class SseRequest {
+  readonly controller = new AbortController();
+  private timeoutId: ReturnType<typeof setTimeout> | undefined;
+  private settled = false;
+  private readonly abortFromSignal = () => this.controller.abort();
+
+  static create(input: {
+    signal?: AbortSignal;
+    resolve: () => void;
+    reject: (error: Error) => void;
+    onError?: (error: Error) => void;
+  }): SseRequest {
+    const request = new SseRequest(input);
+    input.signal?.addEventListener("abort", request.abortFromSignal, { once: true });
+    return request;
+  }
+
+  private constructor(
+    private readonly input: {
+      signal?: AbortSignal;
+      resolve: () => void;
+      reject: (error: Error) => void;
+      onError?: (error: Error) => void;
+    },
+  ) {}
+
+  finish(): void {
+    if (this.settled) return;
+    this.settled = true;
+    this.cleanup();
+    this.input.resolve();
+  }
+
+  fail(error: Error): void {
+    if (this.settled) return;
+    this.settled = true;
+    this.cleanup();
+    if (this.input.onError) {
+      this.input.onError(error);
+      this.input.resolve();
+    } else {
+      this.input.reject(error);
+    }
+  }
+
+  waitForNextEvent(timeoutMs: number): void {
+    if (this.timeoutId) clearTimeout(this.timeoutId);
+    this.timeoutId = setTimeout(() => {
+      const error = new FetchSSETimeoutError(
+        `Connection timed out with timeout ${timeoutMs}ms waiting for the next event`,
+      );
+      logger.error(error);
+      this.fail(error);
+    }, timeoutMs);
+  }
+
+  /** The caller owns `signal` and outlives this request, so its listener is removed here. */
+  private cleanup(): void {
+    this.input.signal?.removeEventListener("abort", this.abortFromSignal);
+    this.controller.abort();
+    if (this.timeoutId) clearTimeout(this.timeoutId);
+  }
+}
+
 /**
  * Fetches data from an endpoint using SSE (Server-Sent Events)
  * and processes events through callbacks
@@ -77,50 +142,12 @@ export async function fetchSSE<T>({
   onError,
   signal,
 }: FetchSSEOptions<T>): Promise<void> {
-  // Wrap in a Promise so timeout errors can properly reject
-  // instead of becoming unhandled exceptions
   return new Promise((resolve, reject) => {
-    const controller = new AbortController();
-    const abortFromSignal = () => controller.abort();
-    let timeoutId: NodeJS.Timeout | undefined;
-    let isSettled = false;
-
     if (signal?.aborted) {
       resolve();
       return;
     }
-    signal?.addEventListener("abort", abortFromSignal, { once: true });
-
-    const cleanup = () => {
-      // The caller owns `signal` and outlives this request. Without the removal
-      // a settled stream's controller is retained until the caller aborts.
-      signal?.removeEventListener("abort", abortFromSignal);
-      controller.abort();
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-
-    const handleError = (error: Error) => {
-      if (isSettled) return;
-      isSettled = true;
-      cleanup();
-      if (onError) {
-        onError(error);
-        resolve();
-      } else {
-        reject(error);
-      }
-    };
-
-    const setResetableTimeout = (timeoutMs: number) => {
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        const error = new FetchSSETimeoutError(
-          `Connection timed out with timeout ${timeoutMs}ms waiting for the next event`,
-        );
-        logger.error(error);
-        handleError(error);
-      }, timeoutMs);
-    };
+    const request = SseRequest.create({ signal, resolve, reject, onError });
 
     fetchEventSource(endpoint, {
       openWhenHidden: true,
@@ -131,10 +158,10 @@ export async function fetchSSE<T>({
         ...headers,
       },
       body: JSON.stringify(payload),
-      signal: controller.signal,
+      signal: request.controller.signal,
 
       async onopen(response) {
-        setResetableTimeout(timeout);
+        request.waitForNextEvent(timeout);
 
         if (
           response.ok &&
@@ -143,42 +170,26 @@ export async function fetchSSE<T>({
           return;
         }
 
-        handleError(new Error(await describeRefusal(response)));
+        request.fail(new Error(await describeRefusal(response)));
       },
 
       onmessage(ev) {
-        setResetableTimeout(chunkTimeout);
+        request.waitForNextEvent(chunkTimeout);
         const event = JSON.parse(ev.data) as T;
         onEvent(event);
 
-        if (shouldStopProcessing?.(event) && !isSettled) {
-          isSettled = true;
-          cleanup();
-          resolve();
-        }
+        if (shouldStopProcessing?.(event)) request.finish();
       },
 
       onclose() {
-        if (!isSettled) {
-          isSettled = true;
-          cleanup();
-          resolve();
-        }
+        request.finish();
       },
 
       onerror(error) {
-        handleError(toError(error));
+        request.fail(toError(error));
       },
     })
-      .then(() => {
-        if (!isSettled) {
-          isSettled = true;
-          cleanup();
-          resolve();
-        }
-      })
-      .catch((error) => {
-        handleError(toError(error));
-      });
+      .then(() => request.finish())
+      .catch((error) => request.fail(toError(error)));
   });
 }

@@ -5,9 +5,12 @@ import {
   PrismaAuthzMigrationRepository,
 } from "../prisma.authz-migration.repository.ts";
 
-type Row = Record<string, any>;
+type Database = AuthzMigrationDatabase;
+type RowOf<Delegate> = Delegate extends { findMany(args: unknown): Promise<(infer Row)[]> }
+  ? Row
+  : never;
 
-class StubFindManyDelegate {
+class StubFindManyDelegate<Row> {
   readonly calls: unknown[] = [];
 
   constructor(private readonly rows: Row[] = []) {}
@@ -18,7 +21,7 @@ class StubFindManyDelegate {
   }
 }
 
-class StubFindUniqueDelegate {
+class StubFindUniqueDelegate<Row> {
   constructor(private readonly row: Row | null = null) {}
 
   async findUnique(_args: unknown): Promise<Row | null> {
@@ -26,12 +29,12 @@ class StubFindUniqueDelegate {
   }
 }
 
-class StubGrantUsageDelegate extends StubFindManyDelegate {
+class StubGrantUsageDelegate extends StubFindManyDelegate<RowOf<Database["grantUsage"]>> {
   readonly creates: unknown[] = [];
   readonly updates: unknown[] = [];
 
   constructor(
-    rows: Row[] = [],
+    rows: RowOf<Database["grantUsage"]>[] = [],
     private readonly updateError?: unknown,
   ) {
     super(rows);
@@ -50,23 +53,23 @@ class StubGrantUsageDelegate extends StubFindManyDelegate {
 }
 
 class StubAuthzMigrationDatabase implements AuthzMigrationDatabase {
-  readonly organization = new StubFindUniqueDelegate();
-  readonly roleBinding: StubFindManyDelegate;
-  readonly customRole = new StubFindManyDelegate();
-  readonly organizationUser = new StubFindManyDelegate();
-  readonly grant: StubFindManyDelegate;
-  readonly role = new StubFindManyDelegate();
-  readonly teamUser = new StubFindManyDelegate();
-  readonly groupMembership = new StubFindManyDelegate();
-  readonly project = new StubFindManyDelegate();
-  readonly shareLink = new StubFindManyDelegate();
+  readonly organization = new StubFindUniqueDelegate<{ createdAt: Date }>();
+  readonly roleBinding: StubFindManyDelegate<RowOf<Database["roleBinding"]>>;
+  readonly customRole = new StubFindManyDelegate<RowOf<Database["customRole"]>>();
+  readonly organizationUser = new StubFindManyDelegate<RowOf<Database["organizationUser"]>>();
+  readonly grant: StubFindManyDelegate<RowOf<Database["grant"]>>;
+  readonly role = new StubFindManyDelegate<RowOf<Database["role"]>>();
+  readonly teamUser = new StubFindManyDelegate<RowOf<Database["teamUser"]>>();
+  readonly groupMembership = new StubFindManyDelegate<RowOf<Database["groupMembership"]>>();
+  readonly project = new StubFindManyDelegate<RowOf<Database["project"]>>();
+  readonly shareLink = new StubFindManyDelegate<RowOf<Database["shareLink"]>>();
   readonly grantUsage: StubGrantUsageDelegate;
 
   constructor(
     options: {
-      bindings?: Row[];
-      grants?: Row[];
-      usages?: Row[];
+      bindings?: RowOf<Database["roleBinding"]>[];
+      grants?: RowOf<Database["grant"]>[];
+      usages?: RowOf<Database["grantUsage"]>[];
       updateError?: unknown;
     } = {},
   ) {
@@ -118,10 +121,14 @@ describe("PrismaAuthzMigrationRepository", () => {
           source: "migration",
           token: "token_1",
           resourceKind: "TRACE",
+          scopeType: "TRACE",
           scopeId: "trace_1",
           projectId: "project_1",
           principalType: "ANYONE",
           principalId: null,
+          roleKey: null,
+          legacyRole: null,
+          revokedAt: null,
           expiresAt: null,
           maxViews: 10,
         },
@@ -130,10 +137,14 @@ describe("PrismaAuthzMigrationRepository", () => {
           source: "migration",
           token: "token_2",
           resourceKind: "TRACE",
+          scopeType: "TRACE",
           scopeId: "trace_2",
           projectId: "project_1",
           principalType: "ANYONE",
           principalId: null,
+          roleKey: null,
+          legacyRole: null,
+          revokedAt: null,
           expiresAt: null,
           maxViews: null,
         },

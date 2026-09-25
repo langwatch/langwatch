@@ -98,7 +98,7 @@ function GuardrailsPage() {
     [monitorsQuery.data],
   );
   const evaluatorById = useMemo(() => {
-    const map = new Map<string, { id: string; name: string; slug: string }>();
+    const map = new Map<string, GuardrailEvaluator>();
     for (const e of guardrailEvaluators) {
       map.set(e.id, e);
     }
@@ -198,110 +198,16 @@ function GuardrailsPage() {
 
           {isLoadingGuardrails && <Spinner />}
           {showGuardrailsEmpty && (
-            <Card.Root>
-              <Card.Body>
-                <EmptyState.Root>
-                  <EmptyState.Content>
-                    <EmptyState.Indicator>
-                      <Shield size={36} />
-                    </EmptyState.Indicator>
-                    <EmptyState.Title>No guardrails yet</EmptyState.Title>
-                    <EmptyState.Description>
-                      {guardrailEvaluators.length === 0 ? (
-                        <>
-                          No project evaluators are marked as guardrails. Open Evaluations, edit an
-                          evaluator, and switch <strong>executionMode</strong> to{" "}
-                          <code>AS_GUARDRAIL</code> before binding it here.
-                        </>
-                      ) : (
-                        <>
-                          Click <strong>New guardrail</strong> to bind one of your project
-                          evaluators as a pre / post / stream_chunk hook.
-                        </>
-                      )}
-                    </EmptyState.Description>
-                  </EmptyState.Content>
-                </EmptyState.Root>
-              </Card.Body>
-            </Card.Root>
+            <GuardrailsEmptyState hasGuardrailEvaluators={guardrailEvaluators.length > 0} />
           )}
           {showGuardrails && (
-            <Table.Root size="sm" variant="line">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader>Name</Table.ColumnHeader>
-                  <Table.ColumnHeader>Direction</Table.ColumnHeader>
-                  <Table.ColumnHeader>Evaluator</Table.ColumnHeader>
-                  <Table.ColumnHeader>Failure mode</Table.ColumnHeader>
-                  <Table.ColumnHeader />
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {activeRows.map((row) => {
-                  const evaluator = evaluatorById.get(row.evaluatorId);
-                  return (
-                    <Table.Row key={row.id}>
-                      <Table.Cell>
-                        <VStack align="start" gap={0}>
-                          <Text fontSize="sm" fontWeight="medium">
-                            {row.name}
-                          </Text>
-                          {row.description && (
-                            <Text fontSize="xs" color="fg.muted">
-                              {row.description}
-                            </Text>
-                          )}
-                        </VStack>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Badge variant="subtle">{DIRECTION_LABEL[row.direction]}</Badge>
-                      </Table.Cell>
-                      <Table.Cell>
-                        {evaluator ? (
-                          <VStack align="start" gap={0}>
-                            <Text fontSize="sm">{evaluator.name}</Text>
-                            <Text fontSize="2xs" color="fg.muted" fontFamily="mono">
-                              {evaluator.slug}
-                            </Text>
-                          </VStack>
-                        ) : (
-                          <Text fontSize="xs" color="fg.muted" fontFamily="mono">
-                            {row.evaluatorId}
-                          </Text>
-                        )}
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Badge
-                          variant="surface"
-                          colorPalette={row.failureMode === "FAIL_CLOSED" ? "red" : "yellow"}
-                        >
-                          {row.failureMode === "FAIL_CLOSED" ? "fail closed" : "fail open"}
-                        </Badge>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <HStack justify="end" gap={1}>
-                          {canManage && (
-                            <Button size="xs" variant="ghost" onClick={() => setEditing(row)}>
-                              <Pencil size={12} /> Edit
-                            </Button>
-                          )}
-                          {canManage && (
-                            <Button
-                              size="xs"
-                              variant="ghost"
-                              colorPalette="red"
-                              onClick={() => setArchiving(row)}
-                            >
-                              <Archive size={12} />
-                            </Button>
-                          )}
-                        </HStack>
-                      </Table.Cell>
-                    </Table.Row>
-                  );
-                })}
-              </Table.Body>
-            </Table.Root>
+            <GuardrailsTable
+              rows={activeRows}
+              evaluatorById={evaluatorById}
+              canManage={canManage}
+              onEdit={setEditing}
+              onArchive={setArchiving}
+            />
           )}
         </VStack>
       </Box>
@@ -330,6 +236,132 @@ function GuardrailsPage() {
         onConfirm={confirmArchive}
       />
     </AiGatewayLayout>
+  );
+}
+
+function GuardrailsEmptyState({ hasGuardrailEvaluators }: { hasGuardrailEvaluators: boolean }) {
+  return (
+    <Card.Root>
+      <Card.Body>
+        <EmptyState.Root>
+          <EmptyState.Content>
+            <EmptyState.Indicator>
+              <Shield size={36} />
+            </EmptyState.Indicator>
+            <EmptyState.Title>No guardrails yet</EmptyState.Title>
+            <EmptyState.Description>
+              {!hasGuardrailEvaluators ? (
+                <>
+                  No project evaluators are marked as guardrails. Open Evaluations, edit an
+                  evaluator, and switch <strong>executionMode</strong> to <code>AS_GUARDRAIL</code>{" "}
+                  before binding it here.
+                </>
+              ) : (
+                <>
+                  Click <strong>New guardrail</strong> to bind one of your project evaluators as a
+                  pre / post / stream_chunk hook.
+                </>
+              )}
+            </EmptyState.Description>
+          </EmptyState.Content>
+        </EmptyState.Root>
+      </Card.Body>
+    </Card.Root>
+  );
+}
+
+type GuardrailEvaluator = { id: string; name: string; slug: string };
+
+function GuardrailsTable({
+  rows,
+  evaluatorById,
+  canManage,
+  onEdit,
+  onArchive,
+}: {
+  rows: GuardrailRow[];
+  evaluatorById: Map<string, GuardrailEvaluator>;
+  canManage: boolean;
+  onEdit: (row: GuardrailRow) => void;
+  onArchive: (row: GuardrailRow) => void;
+}) {
+  return (
+    <Table.Root size="sm" variant="line">
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader>Name</Table.ColumnHeader>
+          <Table.ColumnHeader>Direction</Table.ColumnHeader>
+          <Table.ColumnHeader>Evaluator</Table.ColumnHeader>
+          <Table.ColumnHeader>Failure mode</Table.ColumnHeader>
+          <Table.ColumnHeader />
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {rows.map((row) => {
+          const evaluator = evaluatorById.get(row.evaluatorId);
+          return (
+            <Table.Row key={row.id}>
+              <Table.Cell>
+                <VStack align="start" gap={0}>
+                  <Text fontSize="sm" fontWeight="medium">
+                    {row.name}
+                  </Text>
+                  {row.description && (
+                    <Text fontSize="xs" color="fg.muted">
+                      {row.description}
+                    </Text>
+                  )}
+                </VStack>
+              </Table.Cell>
+              <Table.Cell>
+                <Badge variant="subtle">{DIRECTION_LABEL[row.direction]}</Badge>
+              </Table.Cell>
+              <Table.Cell>
+                {evaluator ? (
+                  <VStack align="start" gap={0}>
+                    <Text fontSize="sm">{evaluator.name}</Text>
+                    <Text fontSize="2xs" color="fg.muted" fontFamily="mono">
+                      {evaluator.slug}
+                    </Text>
+                  </VStack>
+                ) : (
+                  <Text fontSize="xs" color="fg.muted" fontFamily="mono">
+                    {row.evaluatorId}
+                  </Text>
+                )}
+              </Table.Cell>
+              <Table.Cell>
+                <Badge
+                  variant="surface"
+                  colorPalette={row.failureMode === "FAIL_CLOSED" ? "red" : "yellow"}
+                >
+                  {row.failureMode === "FAIL_CLOSED" ? "fail closed" : "fail open"}
+                </Badge>
+              </Table.Cell>
+              <Table.Cell>
+                <HStack justify="end" gap={1}>
+                  {canManage && (
+                    <Button size="xs" variant="ghost" onClick={() => onEdit(row)}>
+                      <Pencil size={12} /> Edit
+                    </Button>
+                  )}
+                  {canManage && (
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      colorPalette="red"
+                      onClick={() => onArchive(row)}
+                    >
+                      <Archive size={12} />
+                    </Button>
+                  )}
+                </HStack>
+              </Table.Cell>
+            </Table.Row>
+          );
+        })}
+      </Table.Body>
+    </Table.Root>
   );
 }
 

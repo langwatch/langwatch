@@ -13,32 +13,48 @@ import type {
 } from "../authz-migration.repository.ts";
 import { AuthzMigrationRepository } from "../authz-migration.repository.ts";
 
-type DatabaseRow = Record<string, any>;
-
-interface FindUniqueDelegate {
-  findUnique(args: unknown): Promise<DatabaseRow | null>;
+interface FindUniqueDelegate<Row> {
+  findUnique(args: unknown): Promise<Row | null>;
 }
 
-interface FindManyDelegate {
-  findMany(args: unknown): Promise<DatabaseRow[]>;
+interface FindManyDelegate<Row> {
+  findMany(args: unknown): Promise<Row[]>;
 }
 
-interface GrantUsageDelegate extends FindManyDelegate {
+interface GrantUsageDelegate extends FindManyDelegate<{ grantId: string; viewCount: number }> {
   createMany(args: unknown): Promise<unknown>;
   update(args: unknown): Promise<unknown>;
 }
 
+type RoleBindingRecord = Omit<LegacyBindingRow, "createdAtMs"> & { createdAt: Date };
+type CustomRoleRecord = Omit<LegacyRoleRow, "createdAtMs"> & { createdAt: Date };
+type OrganizationUserRecord = Omit<OrganizationMemberFact, "createdAtMs"> & { createdAt: Date };
+type RoleRecord = Omit<RoleHeadRow, "deleted"> & { deletedAt: Date | null };
+type TeamUserRecord = Omit<LegacyTeamRow, "customRoleId" | "createdAtMs"> & {
+  assignedRoleId: string | null;
+  createdAt: Date;
+};
+type ShareLinkRecord = Omit<ShareLinkFactRow, "expiresAtMs" | "createdAtMs"> & {
+  expiresAt: Date | null;
+  createdAt: Date;
+};
+type GrantRecord = Omit<GrantHeadRow, "revoked"> &
+  Omit<ResourceGrantRow, "grantId" | "resourceId" | "expiresAtMs" | "viewCount"> & {
+    revokedAt: Date | null;
+    expiresAt: Date | null;
+  };
+
 export type AuthzMigrationDatabase = Readonly<{
-  organization: FindUniqueDelegate;
-  roleBinding: FindManyDelegate;
-  customRole: FindManyDelegate;
-  organizationUser: FindManyDelegate;
-  grant: FindManyDelegate;
-  role: FindManyDelegate;
-  teamUser: FindManyDelegate;
-  groupMembership: FindManyDelegate;
-  project: FindManyDelegate;
-  shareLink: FindManyDelegate;
+  organization: FindUniqueDelegate<{ createdAt: Date }>;
+  roleBinding: FindManyDelegate<RoleBindingRecord>;
+  customRole: FindManyDelegate<CustomRoleRecord>;
+  organizationUser: FindManyDelegate<OrganizationUserRecord>;
+  grant: FindManyDelegate<GrantRecord>;
+  role: FindManyDelegate<RoleRecord>;
+  teamUser: FindManyDelegate<TeamUserRecord>;
+  groupMembership: FindManyDelegate<{ userId: string; groupId: string }>;
+  project: FindManyDelegate<{ id: string; createdAt: Date }>;
+  shareLink: FindManyDelegate<ShareLinkRecord>;
   grantUsage: GrantUsageDelegate;
   $executeRawUnsafe?(query: string, ...values: unknown[]): Promise<number>;
 }>;
@@ -227,10 +243,10 @@ export class PrismaAuthzMigrationRepository extends AuthzMigrationRepository {
   }: {
     organizationId: string;
   }): Promise<{ userId: string; groupId: string }[]> {
-    return (await this.database.groupMembership.findMany({
+    return this.database.groupMembership.findMany({
       where: { group: { organizationId } },
       select: { userId: true, groupId: true },
-    })) as { userId: string; groupId: string }[];
+    });
   }
 
   async findShareLinkRows({

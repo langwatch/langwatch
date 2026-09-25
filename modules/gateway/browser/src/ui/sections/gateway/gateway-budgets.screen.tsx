@@ -285,118 +285,17 @@ function BudgetsPage() {
                       </Table.Row>
                     </Table.Header>
                     <Table.Body>
-                      {rows.map((b) => {
-                        const spent = Number.parseFloat(b.spentUsd);
-                        const limit = Number.parseFloat(b.limitUsd);
-                        const pct = limit > 0 ? Math.min(100, (spent / limit) * 100) : 0;
-                        // Per-person templates report a headcount, not a
-                        // total. Nobody seen yet is "0 of 0", which is true,
-                        // rather than a dash that reads as broken.
-                        const seatsSeen = b.endUsersSeen ?? 0;
-                        const seatsOver = b.endUsersOver ?? 0;
-                        const seatsOverPct = seatsSeen > 0 ? (seatsOver / seatsSeen) * 100 : 0;
-                        return (
-                          <Table.Row
-                            key={b.id}
-                            cursor="pointer"
-                            _hover={{ bg: "bg.subtle" }}
-                            onClick={() => router.push(`/gateway/budgets/${b.id}`)}
-                          >
-                            <Table.Cell>
-                              <VStack align="start" gap={0}>
-                                <Link href={`/gateway/budgets/${b.id}`}>
-                                  <Text fontWeight="medium">{b.name}</Text>
-                                </Link>
-                                {b.description && (
-                                  <Text fontSize="xs" color="fg.muted">
-                                    {b.description}
-                                  </Text>
-                                )}
-                              </VStack>
-                            </Table.Cell>
-                            <Table.Cell>
-                              <VStack align="start" gap={1}>
-                                <ScopeCell
-                                  scopeType={b.scopeType}
-                                  scopeTarget={b.scopeTarget ?? null}
-                                  providerLabel={b.providerLabel ?? null}
-                                />
-                                {b.unreachableByAnyKey && (
-                                  <Tooltip content="Traffic is attributed to the project a key is scoped to. No active key is scoped so that its traffic reaches this budget, so it will stay at zero and never stop a request.">
-                                    <Badge
-                                      colorPalette="orange"
-                                      variant="subtle"
-                                      fontSize="2xs"
-                                      data-testid="budget-unreachable-badge"
-                                    >
-                                      <TriangleAlert size={10} /> No key sends traffic here
-                                    </Badge>
-                                  </Tooltip>
-                                )}
-                              </VStack>
-                            </Table.Cell>
-                            <Table.Cell>
-                              <Badge variant="subtle" colorPalette="gray">
-                                {b.window.toLowerCase()}
-                              </Badge>
-                            </Table.Cell>
-                            <Table.Cell minWidth="220px">
-                              <BudgetSpendCell
-                                budget={b}
-                                spent={spent}
-                                limit={limit}
-                                pct={pct}
-                                seatsSeen={seatsSeen}
-                                seatsOver={seatsOver}
-                                seatsOverPct={seatsOverPct}
-                              />
-                            </Table.Cell>
-                            <Table.Cell>
-                              <Badge colorPalette={b.onBreach === "BLOCK" ? "red" : "yellow"}>
-                                {b.onBreach.toLowerCase()}
-                              </Badge>
-                            </Table.Cell>
-                            <Table.Cell>
-                              {b.window === "TOTAL" ? (
-                                <Text fontSize="xs" color="fg.muted">
-                                  never
-                                </Text>
-                              ) : (
-                                <Tooltip content={readableDate(b.resetsAt).toLocaleString()}>
-                                  <Text fontSize="xs">{formatTimeAgo(toEpochMs(b.resetsAt))}</Text>
-                                </Tooltip>
-                              )}
-                            </Table.Cell>
-                            <Table.Cell onClick={(e) => e.stopPropagation()} cursor="default">
-                              <Menu.Root>
-                                <Menu.Trigger asChild>
-                                  <Button variant="ghost" size="xs" aria-label="Actions">
-                                    <MoreVertical size={14} />
-                                  </Button>
-                                </Menu.Trigger>
-                                <Menu.Content>
-                                  <Menu.Item
-                                    value="details"
-                                    onClick={() => router.push(`/gateway/budgets/${b.id}`)}
-                                  >
-                                    <Eye size={14} /> Details
-                                  </Menu.Item>
-                                  {canUpdate && (
-                                    <Menu.Item value="edit" onClick={() => setEditing(b)}>
-                                      <Pencil size={14} /> Edit
-                                    </Menu.Item>
-                                  )}
-                                  {canDelete && (
-                                    <Menu.Item value="archive" onClick={() => setArchiving(b)}>
-                                      <Archive size={14} /> Archive
-                                    </Menu.Item>
-                                  )}
-                                </Menu.Content>
-                              </Menu.Root>
-                            </Table.Cell>
-                          </Table.Row>
-                        );
-                      })}
+                      {rows.map((b) => (
+                        <BudgetTableRow
+                          key={b.id}
+                          budget={b}
+                          canUpdate={canUpdate}
+                          canDelete={canDelete}
+                          onOpen={() => router.push(`/gateway/budgets/${b.id}`)}
+                          onEdit={() => setEditing(b)}
+                          onArchive={() => setArchiving(b)}
+                        />
+                      ))}
                     </Table.Body>
                   </Table.Root>
                 </Card.Body>
@@ -438,6 +337,125 @@ function BudgetsPage() {
         onConfirm={confirmArchive}
       />
     </AiGatewayLayout>
+  );
+}
+
+function BudgetTableRow({
+  budget: b,
+  canUpdate,
+  canDelete,
+  onOpen,
+  onEdit,
+  onArchive,
+}: {
+  budget: BudgetListRow;
+  canUpdate: boolean;
+  canDelete: boolean;
+  onOpen: () => void;
+  onEdit: () => void;
+  onArchive: () => void;
+}) {
+  const spent = Number.parseFloat(b.spentUsd);
+  const limit = Number.parseFloat(b.limitUsd);
+  const pct = limit > 0 ? Math.min(100, (spent / limit) * 100) : 0;
+  // Per-person templates report a headcount, not a
+  // total. Nobody seen yet is "0 of 0", which is true,
+  // rather than a dash that reads as broken.
+  const seatsSeen = b.endUsersSeen ?? 0;
+  const seatsOver = b.endUsersOver ?? 0;
+  const seatsOverPct = seatsSeen > 0 ? (seatsOver / seatsSeen) * 100 : 0;
+  return (
+    <Table.Row cursor="pointer" _hover={{ bg: "bg.subtle" }} onClick={onOpen}>
+      <Table.Cell>
+        <VStack align="start" gap={0}>
+          <Link href={`/gateway/budgets/${b.id}`}>
+            <Text fontWeight="medium">{b.name}</Text>
+          </Link>
+          {b.description && (
+            <Text fontSize="xs" color="fg.muted">
+              {b.description}
+            </Text>
+          )}
+        </VStack>
+      </Table.Cell>
+      <Table.Cell>
+        <VStack align="start" gap={1}>
+          <ScopeCell
+            scopeType={b.scopeType}
+            scopeTarget={b.scopeTarget ?? null}
+            providerLabel={b.providerLabel ?? null}
+          />
+          {b.unreachableByAnyKey && (
+            <Tooltip content="Traffic is attributed to the project a key is scoped to. No active key is scoped so that its traffic reaches this budget, so it will stay at zero and never stop a request.">
+              <Badge
+                colorPalette="orange"
+                variant="subtle"
+                fontSize="2xs"
+                data-testid="budget-unreachable-badge"
+              >
+                <TriangleAlert size={10} /> No key sends traffic here
+              </Badge>
+            </Tooltip>
+          )}
+        </VStack>
+      </Table.Cell>
+      <Table.Cell>
+        <Badge variant="subtle" colorPalette="gray">
+          {b.window.toLowerCase()}
+        </Badge>
+      </Table.Cell>
+      <Table.Cell minWidth="220px">
+        <BudgetSpendCell
+          budget={b}
+          spent={spent}
+          limit={limit}
+          pct={pct}
+          seatsSeen={seatsSeen}
+          seatsOver={seatsOver}
+          seatsOverPct={seatsOverPct}
+        />
+      </Table.Cell>
+      <Table.Cell>
+        <Badge colorPalette={b.onBreach === "BLOCK" ? "red" : "yellow"}>
+          {b.onBreach.toLowerCase()}
+        </Badge>
+      </Table.Cell>
+      <Table.Cell>
+        {b.window === "TOTAL" ? (
+          <Text fontSize="xs" color="fg.muted">
+            never
+          </Text>
+        ) : (
+          <Tooltip content={readableDate(b.resetsAt).toLocaleString()}>
+            <Text fontSize="xs">{formatTimeAgo(toEpochMs(b.resetsAt))}</Text>
+          </Tooltip>
+        )}
+      </Table.Cell>
+      <Table.Cell onClick={(e) => e.stopPropagation()} cursor="default">
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <Button variant="ghost" size="xs" aria-label="Actions">
+              <MoreVertical size={14} />
+            </Button>
+          </Menu.Trigger>
+          <Menu.Content>
+            <Menu.Item value="details" onClick={onOpen}>
+              <Eye size={14} /> Details
+            </Menu.Item>
+            {canUpdate && (
+              <Menu.Item value="edit" onClick={onEdit}>
+                <Pencil size={14} /> Edit
+              </Menu.Item>
+            )}
+            {canDelete && (
+              <Menu.Item value="archive" onClick={onArchive}>
+                <Archive size={14} /> Archive
+              </Menu.Item>
+            )}
+          </Menu.Content>
+        </Menu.Root>
+      </Table.Cell>
+    </Table.Row>
   );
 }
 

@@ -146,102 +146,17 @@ function CacheRulesPage() {
             />
           )}
           {showRulesEmpty && (
-            <EmptyState.Root>
-              <EmptyState.Content>
-                <EmptyState.Indicator>
-                  <Zap size={32} />
-                </EmptyState.Indicator>
-                <EmptyState.Title>No cache rules yet</EmptyState.Title>
-                <EmptyState.Description>
-                  Cache rules let operators force, disable, or override cache behaviour across
-                  virtual keys, models, principals, or custom request metadata: no client code
-                  changes required.
-                </EmptyState.Description>
-                {canCreate && (
-                  <Button colorPalette="orange" onClick={() => setCreateOpen(true)} mt={2}>
-                    <Plus size={14} /> New rule
-                  </Button>
-                )}
-              </EmptyState.Content>
-            </EmptyState.Root>
+            <CacheRulesEmptyState canCreate={canCreate} onCreate={() => setCreateOpen(true)} />
           )}
           {showRules && (
-            <Card.Root width="full" overflow="hidden">
-              <Card.Body paddingY={0} paddingX={0}>
-                <Table.Root variant="line" size="md" width="full">
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.ColumnHeader width="60px">Priority</Table.ColumnHeader>
-                      <Table.ColumnHeader>Name</Table.ColumnHeader>
-                      <Table.ColumnHeader>Match</Table.ColumnHeader>
-                      <Table.ColumnHeader>Action</Table.ColumnHeader>
-                      <Table.ColumnHeader>Enabled</Table.ColumnHeader>
-                      <Table.ColumnHeader></Table.ColumnHeader>
-                    </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    {rows.map((r) => (
-                      <Table.Row key={r.id}>
-                        <Table.Cell>
-                          <Badge colorPalette="gray">{r.priority}</Badge>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <VStack align="start" gap={0}>
-                            <Text fontWeight="medium">{r.name}</Text>
-                            {r.description && (
-                              <Text fontSize="xs" color="fg.muted">
-                                {r.description}
-                              </Text>
-                            )}
-                          </VStack>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <MatcherSummary matchers={r.matchers} />
-                        </Table.Cell>
-                        <Table.Cell>
-                          <ActionBadge action={r.action} modeEnum={r.modeEnum} />
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Switch.Root
-                            checked={r.enabled}
-                            onCheckedChange={() => void toggleEnabled(r)}
-                            disabled={!canUpdate}
-                            size="sm"
-                            colorPalette="orange"
-                          >
-                            <Switch.HiddenInput />
-                            <Switch.Control />
-                          </Switch.Root>
-                        </Table.Cell>
-                        <Table.Cell>
-                          {(canUpdate || canDelete) && (
-                            <Menu.Root>
-                              <Menu.Trigger asChild>
-                                <Button variant="ghost" size="xs" aria-label="Actions">
-                                  <MoreVertical size={14} />
-                                </Button>
-                              </Menu.Trigger>
-                              <Menu.Content>
-                                {canUpdate && (
-                                  <Menu.Item value="edit" onClick={() => setEditing(r)}>
-                                    <Pencil size={14} /> Edit
-                                  </Menu.Item>
-                                )}
-                                {canDelete && (
-                                  <Menu.Item value="archive" onClick={() => setArchiving(r)}>
-                                    <Archive size={14} /> Archive
-                                  </Menu.Item>
-                                )}
-                              </Menu.Content>
-                            </Menu.Root>
-                          )}
-                        </Table.Cell>
-                      </Table.Row>
-                    ))}
-                  </Table.Body>
-                </Table.Root>
-              </Card.Body>
-            </Card.Root>
+            <CacheRulesTable
+              rows={rows}
+              canUpdate={canUpdate}
+              canDelete={canDelete}
+              onToggle={(rule) => void toggleEnabled(rule)}
+              onEdit={setEditing}
+              onArchive={setArchiving}
+            />
           )}
         </Box>
       </>
@@ -276,6 +191,129 @@ function CacheRulesPage() {
         onConfirm={confirmArchive}
       />
     </AiGatewayLayout>
+  );
+}
+
+function CacheRulesEmptyState({
+  canCreate,
+  onCreate,
+}: {
+  canCreate: boolean;
+  onCreate: () => void;
+}) {
+  return (
+    <EmptyState.Root>
+      <EmptyState.Content>
+        <EmptyState.Indicator>
+          <Zap size={32} />
+        </EmptyState.Indicator>
+        <EmptyState.Title>No cache rules yet</EmptyState.Title>
+        <EmptyState.Description>
+          Cache rules let operators force, disable, or override cache behaviour across virtual keys,
+          models, principals, or custom request metadata: no client code changes required.
+        </EmptyState.Description>
+        {canCreate && (
+          <Button colorPalette="orange" onClick={onCreate} mt={2}>
+            <Plus size={14} /> New rule
+          </Button>
+        )}
+      </EmptyState.Content>
+    </EmptyState.Root>
+  );
+}
+
+function CacheRulesTable({
+  rows,
+  canUpdate,
+  canDelete,
+  onToggle,
+  onEdit,
+  onArchive,
+}: {
+  rows: CacheRuleListRow[];
+  canUpdate: boolean;
+  canDelete: boolean;
+  onToggle: (rule: CacheRuleListRow) => void;
+  onEdit: (rule: CacheRuleListRow) => void;
+  onArchive: (rule: CacheRuleListRow) => void;
+}) {
+  return (
+    <Card.Root width="full" overflow="hidden">
+      <Card.Body paddingY={0} paddingX={0}>
+        <Table.Root variant="line" size="md" width="full">
+          <Table.Header>
+            <Table.Row>
+              <Table.ColumnHeader width="60px">Priority</Table.ColumnHeader>
+              <Table.ColumnHeader>Name</Table.ColumnHeader>
+              <Table.ColumnHeader>Match</Table.ColumnHeader>
+              <Table.ColumnHeader>Action</Table.ColumnHeader>
+              <Table.ColumnHeader>Enabled</Table.ColumnHeader>
+              <Table.ColumnHeader></Table.ColumnHeader>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {rows.map((r) => (
+              <Table.Row key={r.id}>
+                <Table.Cell>
+                  <Badge colorPalette="gray">{r.priority}</Badge>
+                </Table.Cell>
+                <Table.Cell>
+                  <VStack align="start" gap={0}>
+                    <Text fontWeight="medium">{r.name}</Text>
+                    {r.description && (
+                      <Text fontSize="xs" color="fg.muted">
+                        {r.description}
+                      </Text>
+                    )}
+                  </VStack>
+                </Table.Cell>
+                <Table.Cell>
+                  <MatcherSummary matchers={r.matchers} />
+                </Table.Cell>
+                <Table.Cell>
+                  <ActionBadge action={r.action} modeEnum={r.modeEnum} />
+                </Table.Cell>
+                <Table.Cell>
+                  <Switch.Root
+                    checked={r.enabled}
+                    onCheckedChange={() => onToggle(r)}
+                    disabled={!canUpdate}
+                    size="sm"
+                    colorPalette="orange"
+                  >
+                    <Switch.HiddenInput />
+                    <Switch.Control />
+                  </Switch.Root>
+                </Table.Cell>
+                <Table.Cell>
+                  {(canUpdate || canDelete) && (
+                    <Menu.Root>
+                      <Menu.Trigger asChild>
+                        <Button variant="ghost" size="xs" aria-label="Actions">
+                          <MoreVertical size={14} />
+                        </Button>
+                      </Menu.Trigger>
+                      <Menu.Content>
+                        {canUpdate && (
+                          <Menu.Item value="edit" onClick={() => onEdit(r)}>
+                            <Pencil size={14} /> Edit
+                          </Menu.Item>
+                        )}
+                        {canDelete && (
+                          <Menu.Item value="archive" onClick={() => onArchive(r)}>
+                            <Archive size={14} /> Archive
+                          </Menu.Item>
+                        )}
+                      </Menu.Content>
+                    </Menu.Root>
+                  )}
+                </Table.Cell>
+              </Table.Row>
+            ))}
+          </Table.Body>
+        </Table.Root>
+      </Card.Body>
+    </Card.Root>
   );
 }
 

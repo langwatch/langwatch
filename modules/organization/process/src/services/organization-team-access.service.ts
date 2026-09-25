@@ -243,49 +243,79 @@ export class OrganizationTeamAccessService {
     );
     for (const project of input.projects) {
       const bindings = input.projectBindings.filter(({ scopeId }) => scopeId === project.id);
-      const overriddenUserIds = new Set(bindings.flatMap(({ userId }) => (userId ? [userId] : [])));
-      for (const binding of bindings) {
-        if (!binding.groupId) {
-          continue;
-        }
-
-        for (const member of input.groupMembers.get(binding.groupId) ?? []) {
-          overriddenUserIds.add(member.userId);
-        }
-      }
-
+      const overriddenUserIds = overriddenUserIdsFor({
+        bindings,
+        groupMembers: input.groupMembers,
+      });
       const inherited = input.directMembers
         .filter(({ userId }) => !userId || !overriddenUserIds.has(userId))
         .map(({ viaGroupId: _viaGroupId, ...member }) => ({
           ...member,
           source: "team" as const,
         }));
-      const direct = bindings.map((binding) => {
-        const teamBinding = input.teamBindings.find(
-          (candidate) => candidate.userId && candidate.userId === binding.userId,
-        );
-        const inherits =
-          (!!binding.userId && input.teamBoundUserIds.has(binding.userId)) ||
-          (!!binding.groupId && teamBoundGroupIds.has(binding.groupId));
-
-        return {
-          bindingId: binding.id,
-          userId: binding.userId,
-          groupId: binding.groupId,
-          viaGroupName: binding.groupId ? (binding.group?.name ?? null) : null,
-          name: binding.user?.name ?? binding.group?.name ?? binding.apiKey?.name ?? "Unknown",
-          email: binding.user?.email ?? null,
-          image: binding.user?.image ?? null,
-          role: binding.role,
-          customRoleId: binding.customRoleId,
-          customRoleName: binding.customRole?.name ?? null,
-          source: inherits ? ("override" as const) : ("direct" as const),
-          ...(teamBinding ? { teamRole: teamBinding.role } : {}),
-        };
-      });
+      const direct = bindings.map((binding) =>
+        directProjectAccessEntry({
+          binding,
+          teamBindings: input.teamBindings,
+          teamBoundUserIds: input.teamBoundUserIds,
+          teamBoundGroupIds,
+        }),
+      );
       projectAccess[project.id] = [...inherited, ...direct];
     }
 
     return projectAccess;
   }
+}
+
+/** Everyone a project's bindings name, directly or via a group; they replace their team entry. */
+function overriddenUserIdsFor(input: {
+  bindings: AuthzAccessBinding[];
+  groupMembers: Map<string, OrganizationGroupMember[]>;
+}): Set<string> {
+  const overriddenUserIds = new Set(
+    input.bindings.flatMap(({ userId }) => (userId ? [userId] : [])),
+  );
+  for (const binding of input.bindings) {
+    if (!binding.groupId) {
+      continue;
+    }
+
+    for (const member of input.groupMembers.get(binding.groupId) ?? []) {
+      overriddenUserIds.add(member.userId);
+    }
+  }
+
+  return overriddenUserIds;
+}
+
+/** A project binding as an access entry: an override when its holder already reaches the team. */
+function directProjectAccessEntry(input: {
+  binding: AuthzAccessBinding;
+  teamBindings: AuthzAccessBinding[];
+  teamBoundUserIds: Set<string>;
+  teamBoundGroupIds: Set<string>;
+}): OrganizationTeamAccess["projectAccess"][string][number] {
+  const { binding } = input;
+  const teamBinding = input.teamBindings.find(
+    (candidate) => candidate.userId && candidate.userId === binding.userId,
+  );
+  const inherits =
+    (!!binding.userId && input.teamBoundUserIds.has(binding.userId)) ||
+    (!!binding.groupId && input.teamBoundGroupIds.has(binding.groupId));
+
+  return {
+    bindingId: binding.id,
+    userId: binding.userId,
+    groupId: binding.groupId,
+    viaGroupName: binding.groupId ? (binding.group?.name ?? null) : null,
+    name: binding.user?.name ?? binding.group?.name ?? binding.apiKey?.name ?? "Unknown",
+    email: binding.user?.email ?? null,
+    image: binding.user?.image ?? null,
+    role: binding.role,
+    customRoleId: binding.customRoleId,
+    customRoleName: binding.customRole?.name ?? null,
+    source: inherits ? "override" : "direct",
+    ...(teamBinding ? { teamRole: teamBinding.role } : {}),
+  };
 }
