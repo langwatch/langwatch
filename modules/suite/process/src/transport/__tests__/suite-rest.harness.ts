@@ -18,6 +18,7 @@ import { HandledError } from "@langwatch/handled-error";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import {
+  scenarioSchema,
   scenarioTestSuiteSchema,
   ScenarioTestSuiteNotFoundError,
   type EvaluatorAttachment,
@@ -270,6 +271,22 @@ function memoryScenarioApi(world: SuiteWorld): ScenarioApi {
 
       return found && found.projectId === input.projectId ? found : null;
     },
+    list: async (input) =>
+      [...world.scenarios.values()].map((row) =>
+        scenarioSchema.parse({
+          ...row,
+          projectId: input.projectId,
+          labels: [],
+          parameters: null,
+          simulatorModel: null,
+          judgeModel: null,
+          maxTurns: null,
+          minTurns: null,
+          lastUpdatedById: null,
+          createdAt: NOW,
+          updatedAt: NOW,
+        }),
+      ),
     listTestSuites: async (input) =>
       [...world.testSuites.values()].filter(
         (one) =>

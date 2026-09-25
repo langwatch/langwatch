@@ -187,6 +187,29 @@ export class MemorySuiteRepository extends SuiteRepository {
     } as CreateSuiteCommand & { id: string; slug: string });
   }
 
+  async findPlanEvaluators(input: SuiteIdInput): Promise<EvaluatorAttachment[]> {
+    const plan = this.database.plans.get(input.id);
+    if (plan?.projectId !== input.projectId) return [];
+    return this.database.planEvaluators.get(input.id) ?? [];
+  }
+
+  async findPlanIdsByName(input: { projectId: string; name: string }): Promise<string[]> {
+    return this.joinablePlans(input)
+      .slice(0, 1)
+      .map((plan) => plan.id);
+  }
+
+  private joinablePlans(input: { projectId: string; name: string }): Suite[] {
+    return [...this.database.plans.values()]
+      .filter(
+        (plan) =>
+          isActivePlanOf(plan, input.projectId) &&
+          planNameKey(plan.name) === planNameKey(input.name) &&
+          !plan.labels.includes(CLI_EPHEMERAL_LABEL),
+      )
+      .toSorted((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime());
+  }
+
   /**
    * The plan a NAME resolves to. A throwaway command-line row is skipped for
    * the reason the Postgres query skips it: joining one attaches this run to a
@@ -211,14 +234,7 @@ export class MemorySuiteRepository extends SuiteRepository {
     };
     const now = toDate(nowInstant());
 
-    const joinable = (plan: Suite): boolean =>
-      isActivePlanOf(plan, input.projectId) &&
-      planNameKey(plan.name) === planNameKey(input.name) &&
-      !plan.labels.includes(CLI_EPHEMERAL_LABEL);
-
-    const existing = [...this.database.plans.values()]
-      .filter(joinable)
-      .toSorted((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime())[0];
+    const [existing] = this.joinablePlans(input);
 
     if (existing) {
       const updated = suiteSchema.parse({ ...existing, ...stored, updatedAt: now });

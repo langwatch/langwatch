@@ -80,6 +80,8 @@ function repository(overrides: Partial<SuiteRepository> = {}): SuiteRepository {
     findAll: vi.fn(),
     findById: vi.fn(),
     findBySlug: vi.fn().mockResolvedValue(null),
+    findPlanEvaluators: vi.fn().mockResolvedValue([]),
+    findPlanIdsByName: vi.fn().mockResolvedValue([]),
     update: vi.fn(),
     archive: vi.fn(),
     ...overrides,
@@ -118,7 +120,11 @@ function serviceOptions(
 }
 
 function mockScenarioService(methods: object): ScenarioApi {
-  return createApiFixture<ScenarioApi>(methods as Partial<ScenarioApi>);
+  return createApiFixture<ScenarioApi>({
+    list: async () => [],
+    listTestSuites: async () => [],
+    ...(methods as Partial<ScenarioApi>),
+  });
 }
 
 function mockAgentService(methods: Partial<AgentApi>): AgentApi {

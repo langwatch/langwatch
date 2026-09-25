@@ -1,3 +1,4 @@
+import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
 import type {
   CreateSuiteCommand,
   RunPlanConfigInput,
@@ -30,6 +31,10 @@ export abstract class SuiteRepository {
     scenarioIds: string[];
     targets?: Suite["targets"];
   }): Promise<Suite>;
+  /** A suite row's stored evaluators; empty when it holds none or does not exist. */
+  abstract findPlanEvaluators(input: SuiteIdInput): Promise<EvaluatorAttachment[]>;
+  /** The run plan a NAME joins, matched as `findOrCreatePlanByName` matches it: at most one. */
+  abstract findPlanIdsByName(input: { projectId: string; name: string }): Promise<string[]>;
   /**
    * The plan a NAME resolves to, matched or created, holding the given config.
    * @see specs/suites/run-plan-identity-by-name.feature

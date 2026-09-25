@@ -460,5 +460,26 @@ describe("the back-office single sign-on surface", () => {
       ).rejects.toMatchObject({ code: "NOT_FOUND" });
       expect(context.commands.startLegacyMigration).not.toHaveBeenCalled();
     });
+
+    it("audits a refused migration attempt, as main's back office did", async () => {
+      context.connections.findById.mockResolvedValue(legacyConnection("org_other"));
+      const caller = context.callerFor({ id: STAFF_ID });
+
+      await expect(
+        caller.startLegacyMigration({
+          organizationId: "org_acme",
+          legacyConnectionId: "ssoc_1",
+          providerId: "okta-direct",
+          idp: IDP,
+        }),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+      expect(context.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: STAFF_ID,
+          action: "ssoConnections.startLegacyMigration",
+          organizationId: "org_acme",
+        }),
+      );
+    });
   });
 });

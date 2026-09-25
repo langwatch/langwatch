@@ -12,9 +12,11 @@ import {
   AllScenariosArchivedError,
   AllTargetsArchivedError,
   declaredDefaults,
+  findMissingMappings,
   InvalidScenarioReferencesError,
   InvalidTargetReferencesError,
   isDynamicScope,
+  mergeRunAttachments,
   parseSuiteScope,
   RUN_ALL_SUITE_LABEL,
   RUN_ALL_SUITE_NAME,
@@ -22,6 +24,7 @@ import {
   suiteRunInputSchema,
   suiteRunPlanInputSchema,
   sortSuiteTargets,
+  SuiteEvaluatorMappingsMissingError,
   SuiteScopeEmptyError,
   SuiteTargetsRequiredError,
   withCanonicalOverrides,
@@ -116,6 +119,15 @@ export class SuiteRunService {
       scenarios: scenarioConfigs,
       targets: targetResolution.active,
     });
+    await this.assertRunMappings({
+      projectId: parsed.projectId,
+      scenarioIds: scenarioResolution.active,
+      planId: suite.id,
+      planAttachments: await this.options.repository.findPlanEvaluators({
+        id: suite.id,
+        projectId: parsed.projectId,
+      }),
+    });
 
     return this.execute({
       suite,
@@ -192,6 +204,23 @@ export class SuiteRunService {
             projectId: parsed.projectId,
             attachments: parsed.config.evaluators,
           });
+    const [existingPlanId] = await repository.findPlanIdsByName({
+      projectId: parsed.projectId,
+      name,
+    });
+    await this.assertRunMappings({
+      projectId: parsed.projectId,
+      scenarioIds: scenarioResolution.active,
+      planId: existingPlanId,
+      planAttachments:
+        evaluators ??
+        (existingPlanId === undefined
+          ? []
+          : await repository.findPlanEvaluators({
+              id: existingPlanId,
+              projectId: parsed.projectId,
+            })),
+    });
 
     const { suite, created } = await repository.findOrCreatePlanByName({
       id: (this.options.generateId ?? defaultSuiteId)(),
@@ -213,6 +242,70 @@ export class SuiteRunService {
     });
 
     return { ...result, suiteId: suite.id, planName: suite.name, created };
+  }
+
+  /**
+   * Refuses a run while an attachment in its scope misses a required mapping, before any plan
+   * row is written or any job queued, as main's `assertRunMappings` did. A scenario filed in a
+   * suite runs the suite's copy of a duplicated evaluator; an unfiled one runs the plan's list.
+   */
+  private async assertRunMappings({
+    projectId,
+    scenarioIds,
+    planId,
+    planAttachments,
+  }: {
+    projectId: string;
+    scenarioIds: string[];
+    planId: string | undefined;
+    planAttachments: readonly EvaluatorAttachment[];
+  }): Promise<void> {
+    const { scenarios, evaluators } = this.options;
+    const wanted = new Set(scenarioIds);
+    const filed = (await scenarios.list({ projectId })).filter((scenario) =>
+      wanted.has(scenario.id),
+    );
+    const suiteIds = new Set(filed.flatMap((row) => (row.testSuiteId ? [row.testSuiteId] : [])));
+    if (suiteIds.size === 0 && planAttachments.length === 0) return;
+
+    const suites = (await scenarios.listTestSuites({ projectId, includeArchived: true })).filter(
+      (suite) => suiteIds.has(suite.id),
+    );
+    const hasUnfiledScenario = suiteIds.size === 0 || filed.some((row) => !row.testSuiteId);
+    const scoped = [
+      ...suites.map((suite) => ({
+        suiteId: suite.id,
+        attachments: mergeRunAttachments({ suiteAttachments: suite.evaluators, planAttachments }),
+      })),
+      ...(hasUnfiledScenario && planAttachments.length > 0
+        ? [{ suiteId: planId ?? "", attachments: [...planAttachments] }]
+        : []),
+    ];
+    const evaluatorIds = [
+      ...new Set(
+        scoped.flatMap((entry) => entry.attachments.map((attachment) => attachment.evaluatorId)),
+      ),
+    ];
+    if (evaluatorIds.length === 0) return;
+
+    const saved = await Promise.all(
+      evaluatorIds.map((id) => evaluators.findByIdWithFields({ id, projectId })),
+    );
+    const evaluatorsById = new Map(
+      saved
+        .flatMap((evaluator) => (evaluator ? [evaluator] : []))
+        .map((evaluator) => [evaluator.id, evaluator]),
+    );
+    for (const entry of scoped) {
+      const [missing] = findMissingMappings({ attachments: entry.attachments, evaluatorsById });
+      if (missing) {
+        throw new SuiteEvaluatorMappingsMissingError({
+          evaluatorId: missing.attachment.evaluatorId,
+          suiteId: entry.suiteId,
+          inputs: missing.inputs.map((input) => input.id),
+        });
+      }
+    }
   }
 
   /**

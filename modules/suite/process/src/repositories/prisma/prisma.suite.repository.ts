@@ -1,5 +1,6 @@
 import { isUniqueConstraintError } from "@langwatch/prisma-client/errors";
 import { type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { parseEvaluatorAttachments, type EvaluatorAttachment } from "@langwatch/scenario-contract";
 import {
   CLI_EPHEMERAL_LABEL,
   parseSuiteScope,
@@ -57,6 +58,28 @@ export type SuiteDatabase = Pick<
   PrismaClient,
   "scenario" | "simulationSuite" | "$transaction" | "$executeRaw"
 >;
+
+/** The run plan a NAME joins. */
+function joinablePlanWhere(input: {
+  projectId: string;
+  name: string;
+}): Prisma.SimulationSuiteWhereInput {
+  return {
+    projectId: input.projectId,
+    kind: "run_plan",
+    archivedAt: null,
+    name: { equals: input.name.trim(), mode: "insensitive" },
+    // The command line's throwaway rows are archived as soon as the run is
+    // queued: joining one attaches this run to a plan about to disappear.
+    NOT: { labels: { has: CLI_EPHEMERAL_LABEL } },
+  };
+}
+
+const JOINABLE_PLAN_ORDER: Prisma.SimulationSuiteOrderByWithRelationInput[] = [
+  { updatedAt: "desc" },
+  { createdAt: "desc" },
+  { id: "desc" },
+];
 
 export class PrismaSuiteRepository extends SuiteRepository {
   static create(database: SuiteDatabase): PrismaSuiteRepository {
@@ -183,6 +206,23 @@ export class PrismaSuiteRepository extends SuiteRepository {
     return scenarios.map((scenario) => scenario.id);
   }
 
+  async findPlanEvaluators(input: SuiteIdInput): Promise<EvaluatorAttachment[]> {
+    const row = await this.database.simulationSuite.findFirst({
+      where: { id: input.id, projectId: input.projectId },
+      select: { evaluators: true },
+    });
+    return row ? parseEvaluatorAttachments(row.evaluators) : [];
+  }
+
+  async findPlanIdsByName(input: { projectId: string; name: string }): Promise<string[]> {
+    const row = await this.database.simulationSuite.findFirst({
+      where: joinablePlanWhere(input),
+      orderBy: JOINABLE_PLAN_ORDER,
+      select: { id: true },
+    });
+    return row ? [row.id] : [];
+  }
+
   async findOrCreatePlanByName(input: {
     id: string;
     projectId: string;
@@ -211,17 +251,8 @@ export class PrismaSuiteRepository extends SuiteRepository {
 SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
 
           const existing = await transaction.simulationSuite.findFirst({
-            where: {
-              projectId: input.projectId,
-              kind: "run_plan",
-              archivedAt: null,
-              name: { equals: input.name.trim(), mode: "insensitive" },
-              // The command line's throwaway rows are archived as soon as the
-              // run is queued: joining one attaches this run to a plan about
-              // to disappear from every list.
-              NOT: { labels: { has: CLI_EPHEMERAL_LABEL } },
-            },
-            orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+            where: joinablePlanWhere(input),
+            orderBy: JOINABLE_PLAN_ORDER,
           });
           if (existing) {
             const row = await transaction.simulationSuite.update({

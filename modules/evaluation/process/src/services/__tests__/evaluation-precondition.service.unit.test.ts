@@ -37,10 +37,35 @@ function met(
 
 describe("EvaluationPreconditionService.areMet", () => {
   describe("given preconditions that do not parse", () => {
-    it("lets the evaluation run rather than blocking on a malformed rule", () => {
+    it("skips the trace, as main refused to evaluate a malformed list", () => {
       expect(
         service.areMet({ data: commandData(), preconditions: "nonsense", spans: [], events: null }),
+      ).toBe(false);
+    });
+
+    it("skips the trace when one junk entry sits beside a rule the trace meets", () => {
+      expect(
+        service.areMet({
+          data: commandData(),
+          preconditions: [{ field: "input", rule: "contains", value: "hello" }, { junk: true }],
+          spans: [],
+          events: null,
+        }),
+      ).toBe(false);
+    });
+  });
+
+  describe("given no preconditions stored", () => {
+    it("evaluates every trace", () => {
+      expect(
+        service.areMet({ data: commandData(), preconditions: null, spans: [], events: null }),
       ).toBe(true);
+    });
+  });
+
+  describe("given a rule carrying a key main's parse would strip", () => {
+    it("still applies the rule", () => {
+      expect(met({ field: "input", rule: "contains", value: "hello", id: "row_1" })).toBe(true);
     });
   });
 

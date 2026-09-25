@@ -60,6 +60,8 @@ function buildService(overrides: {
   );
   const repository: SuiteRepository = {
     resolveScopeMembership: async () => [],
+    findPlanIdsByName: async () => [],
+    findPlanEvaluators: async () => [],
     ...overrides.repository,
     findOrCreatePlanByName,
   } as SuiteRepository;
@@ -77,6 +79,8 @@ function buildService(overrides: {
         criteria: [],
         parameters: {},
       })),
+    list: async () => [],
+    listTestSuites: async () => [],
     ...overrides.scenarios,
   } as ScenarioApi;
 

@@ -4,15 +4,13 @@ import type { EvaluationTraceEvent, EvaluationTraceSpan } from "@langwatch/trace
 import safe from "safe-regex2";
 import { z } from "zod";
 
-const preconditionSchema = z
-  .object({
-    field: z.string().min(1),
-    rule: z.enum(["contains", "not_contains", "matches_regex", "is"]),
-    value: z.string().min(1).max(500),
-    key: z.string().optional(),
-    subkey: z.string().optional(),
-  })
-  .strict();
+const preconditionSchema = z.object({
+  field: z.string().min(1),
+  rule: z.enum(["contains", "not_contains", "matches_regex", "is"]),
+  value: z.string().min(1).max(500),
+  key: z.string().optional(),
+  subkey: z.string().optional(),
+});
 
 const preconditionsSchema = z.array(preconditionSchema);
 
@@ -114,9 +112,12 @@ export class EvaluationPreconditionService {
     spans: EvaluationTraceSpan[];
     events: EvaluationTraceEvent[] | null;
   }): boolean {
+    if (input.preconditions === null || input.preconditions === undefined) {
+      return true;
+    }
     const parsed = preconditionsSchema.safeParse(input.preconditions);
     if (!parsed.success) {
-      return true;
+      return false;
     }
 
     const traceData = this.traceData(input);

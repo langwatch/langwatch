@@ -126,6 +126,8 @@ function buildService(agents: AgentApi) {
   }));
   const repository = createApiFixture<SuiteRepository>({
     resolveScopeMembership: async () => [],
+    findPlanIdsByName: async () => [],
+    findPlanEvaluators: async () => [],
     findOrCreatePlanByName: async ({
       id,
       projectId: pid,
@@ -144,6 +146,8 @@ function buildService(agents: AgentApi) {
     }),
   });
   const scenarios = createApiFixture<ScenarioApi>({
+    list: async () => [],
+    listTestSuites: async () => [],
     resolveRunParametersForScenarios: vi.fn(async () => []),
     getReferenceStates: vi.fn(async ({ ids }: { ids: string[] }) =>
       ids.map((id) => ({ id, archivedAt: null })),

@@ -63,6 +63,8 @@ beforeEach(() => {
     repository: MemorySuiteRepository.create({ database }),
     scenarios: createApiFixture<ScenarioApi>({
       findTestSuite: async () => null,
+      list: async () => [],
+      listTestSuites: async () => [],
       getReferenceStates: references,
       resolveRunParametersForScenarios: async () => [],
       getRunConfigs: async ({ ids }) =>
@@ -82,6 +84,8 @@ beforeEach(() => {
     prompts: createApiFixture<PromptApi>({}),
     evaluators: createApiFixture<EvaluatorApi>({
       getAllWithFields: async () => [savedEvaluator("evaluator-1")],
+      findByIdWithFields: async ({ id }) =>
+        id === "evaluator-1" ? savedEvaluator("evaluator-1") : undefined,
     }),
     execution: createApiFixture<SuiteExecution>({
       execute: async (input) => ({
@@ -121,6 +125,38 @@ describe("a run plan's own evaluators", () => {
         code: "suite_evaluator_not_found",
       });
       expect(database.plans.size).toBe(0);
+    });
+  });
+
+  describe("when a run sends an evaluator whose required input has no mapping", () => {
+    it("refuses the run before any plan is written", async () => {
+      await expect(runPlan([{ ...attachment("evaluator-1"), mappings: {} }])).rejects.toMatchObject(
+        {
+          code: "suite_evaluator_mappings_missing",
+          meta: { evaluatorId: "evaluator-1", suiteId: "", inputs: ["output"] },
+        },
+      );
+      expect(database.plans.size).toBe(0);
+    });
+  });
+
+  describe("when a stored plan's evaluator lost a required mapping", () => {
+    it("refuses the next run that joins the plan, naming it", async () => {
+      const { suiteId } = await runPlan([attachment("evaluator-1")]);
+      database.planEvaluators.set(suiteId, [{ ...attachment("evaluator-1"), mappings: {} }]);
+
+      await expect(
+        service.runPlan({
+          projectId,
+          organizationId: "org-1",
+          name: "Nightly",
+          config,
+          idempotencyKey: "idem-2",
+        }),
+      ).rejects.toMatchObject({
+        code: "suite_evaluator_mappings_missing",
+        meta: { suiteId },
+      });
     });
   });
 

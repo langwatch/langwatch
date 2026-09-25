@@ -549,7 +549,7 @@ export class SsoApp implements SsoApiContract {
     input: SsoSetupStartMigrationInput,
     by: SsoOperator,
   ): Promise<SsoSetupRegistered> {
-    return this.#audited({
+    return this.#auditedAttempt({
       by,
       action: "startLegacyMigration",
       args: {
@@ -920,6 +920,38 @@ export class SsoApp implements SsoApiContract {
   }): Promise<T> {
     const operator = await this.#requireOperator(by);
     const answer = await command(operator);
+    await this.#recordOperatorAction({ operator, action, args });
+
+    return answer;
+  }
+
+  /** Gate, record, then run, as main's back office did: a refused attempt still leaves its row. */
+  async #auditedAttempt<T>({
+    by,
+    action,
+    args,
+    command,
+  }: {
+    by: SsoOperator;
+    action: string;
+    args: Record<string, unknown>;
+    command: (operator: SsoConnectionLedgerOperator) => Promise<T>;
+  }): Promise<T> {
+    const operator = await this.#requireOperator(by);
+    await this.#recordOperatorAction({ operator, action, args });
+
+    return command(operator);
+  }
+
+  async #recordOperatorAction({
+    operator,
+    action,
+    args,
+  }: {
+    operator: SsoConnectionLedgerOperator;
+    action: string;
+    args: Record<string, unknown>;
+  }): Promise<void> {
     const connectionId = typeof args.connectionId === "string" ? args.connectionId : undefined;
     const organizationId =
       typeof args.organizationId === "string" ? args.organizationId : undefined;
@@ -934,8 +966,6 @@ export class SsoApp implements SsoApiContract {
       },
       ...(organizationId === undefined ? {} : { organizationId }),
     });
-
-    return answer;
   }
 
   /**

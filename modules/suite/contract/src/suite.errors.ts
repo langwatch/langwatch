@@ -233,3 +233,25 @@ export class SuiteFieldInUseError extends HandledError {
     this.name = "SuiteFieldInUseError";
   }
 }
+
+export class SuiteEvaluatorMappingsMissingError extends HandledError {
+  declare readonly code: "suite_evaluator_mappings_missing";
+
+  constructor({
+    evaluatorId,
+    suiteId,
+    inputs,
+  }: {
+    evaluatorId: string;
+    /** The suite or plan the attachment lives on. */
+    suiteId: string;
+    inputs: string[];
+  }) {
+    super(
+      "suite_evaluator_mappings_missing",
+      `Evaluator is missing required mappings: ${inputs.join(", ")}`,
+      { httpStatus: 422, fault: "customer", meta: { evaluatorId, suiteId, inputs } },
+    );
+    this.name = "SuiteEvaluatorMappingsMissingError";
+  }
+}
