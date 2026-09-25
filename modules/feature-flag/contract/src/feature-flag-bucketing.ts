@@ -7,8 +7,8 @@
 const FNV_OFFSET_BASIS = 0x811c9dc5;
 const FNV_PRIME = 0x01000193;
 
-/** Buckets per flag. 10,000 gives whole-percent rollouts 100 buckets each. */
-export const BUCKET_COUNT = 10_000;
+/** Buckets per flag, one per whole percent, as production has always assigned them. */
+export const BUCKET_COUNT = 100;
 
 export function hashFeatureFlagSubject(value: string): number {
   let hash = FNV_OFFSET_BASIS;

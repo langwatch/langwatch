@@ -47,6 +47,13 @@ describe("bucketForSubject", () => {
     }
   });
 
+  it("assigns the buckets production assigns, one per whole percent", () => {
+    expect(BUCKET_COUNT).toBe(100);
+    expect(
+      ["user_1", "user_2", "user_3"].map((subject) => bucketForSubject({ flagKey: FLAG, subject })),
+    ).toEqual([8, 65, 46]);
+  });
+
   it("gives one subject different buckets under different flags", () => {
     const differing = subjects(200).filter(
       (subject) =>

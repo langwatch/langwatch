@@ -73,13 +73,20 @@ describe("given the Slack alert door", () => {
   });
 
   describe("when the body fails the schema", () => {
-    it("answers the handled validation refusal, never the 500 that told a caller to retry", async () => {
+    /** @scenario "A body missing its required fields is refused by name" */
+    it("answers main's 400 naming the refused fields, never the 500 that told a caller to retry", async () => {
       const api = mount();
 
       const response = await api.post("/api/trigger/slack", { name: "No webhook" });
 
-      expect(response.status).toBe(422);
-      expect(await response.json()).toMatchObject({ code: "validation_error" });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({
+        message: "Invalid request data",
+        errors: expect.arrayContaining([
+          expect.objectContaining({ field: "slack_webhook" }),
+          expect.objectContaining({ field: "alert_type" }),
+        ]),
+      });
       expect(api.created).toEqual([]);
     });
 
@@ -93,9 +100,24 @@ describe("given the Slack alert door", () => {
         alert_type: "CRITICAL",
       });
 
-      expect(response.status).toBe(422);
-      expect(await response.json()).toMatchObject({ code: "validation_error" });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ message: "Invalid request data" });
       expect(api.created).toEqual([]);
+    });
+  });
+
+  describe("when the caller uses the /api/v1 alias", () => {
+    it("creates the trigger exactly as the bare path does", async () => {
+      const api = mount();
+
+      const response = await api.post("/api/v1/trigger/slack", {
+        slack_webhook: "https://hooks.slack.com/services/abc",
+        name: "Billing alerts",
+        alert_type: "INFO",
+      });
+
+      expect(response.status).toBe(200);
+      expect(api.created).toHaveLength(1);
     });
   });
 
@@ -107,12 +129,13 @@ describe("given the Slack alert door", () => {
       const response = await api.postRaw("/api/trigger/slack", "{not json");
 
       expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({ message: "Bad request" });
       expect(api.created).toEqual([]);
     });
   });
 
   describe("when the application refuses the create", () => {
-    it("answers the generic unknown error, with the detail left in the log", async () => {
+    it("answers main's one 500 sentence, with the detail left in the log", async () => {
       const api = mount(async () => {
         throw new Error("connection reset");
       });
@@ -124,7 +147,7 @@ describe("given the Slack alert door", () => {
       });
 
       expect(response.status).toBe(500);
-      expect(await response.json()).toMatchObject({ code: "internal_error" });
+      await expect(response.json()).resolves.toEqual({ message: "Error creating trigger" });
     });
   });
 });
