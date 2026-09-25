@@ -32,6 +32,7 @@ import type {
   RevokeCliSessionInput,
 } from "./cli-sessions.ts";
 import type { TraceDepartmentInput, Department, DepartmentAssignments } from "./department.ts";
+import type { AgentListingRequestResult, AgentSyncSourceListing } from "./governance-agents.ts";
 import type { GovernanceCallSurface } from "./governance-audit.ts";
 import type {
   GovernanceCliBudgetStatusAnswer,
@@ -60,6 +61,12 @@ import type {
   GovernanceIngestResponse,
   GovernanceIngestWebhookInput,
 } from "./governance-ingest-rest.schemas.ts";
+import type {
+  IdentityMatchConfirmed,
+  IdentityMatchRun,
+  PeopleScreenPerson,
+  PeopleScreenSuggestion,
+} from "./governance-people.ts";
 import type { GovernanceActorWorkspace } from "./governance.responses.ts";
 import type { GovernanceSetupState } from "./governance.ts";
 import type {
@@ -546,6 +553,17 @@ export interface GovernanceRestApi {
     organizationId: string;
     maxSessionDurationDays: number;
   }): Promise<SessionCeilingApplied>;
+  governanceAgentsSyncSources(input: { organizationId: string }): Promise<AgentSyncSourceListing[]>;
+  governanceAgentsRequestListing(input: {
+    organizationId: string;
+  }): Promise<AgentListingRequestResult>;
+  governancePeopleList(input: { organizationId: string }): Promise<PeopleScreenPerson[]>;
+  governancePeopleSuggestions(input: { organizationId: string }): Promise<PeopleScreenSuggestion[]>;
+  governancePeopleRunMatch(input: { organizationId: string }): Promise<IdentityMatchRun>;
+  governancePeopleConfirmSuggestion(input: {
+    organizationId: string;
+    suggestionId: string;
+  }): Promise<IdentityMatchConfirmed>;
   cliSessionListForUser(input: CliUserInput): Promise<CliSessionCard[]>;
   cliSessionRevoke(input: RevokeCliSessionInput): Promise<CliSessionRevocation>;
   cliSessionRevokeAll(input: CliUserInput): Promise<CliSessionRevocation>;

@@ -9,12 +9,12 @@ export interface ListableSourceRecord {
 }
 
 /** One ask of one source, filed under the organization's governance project. */
-export interface AgentListingRequestCommand {
+export type AgentListingRequestCommand = {
   tenantId: string;
   occurredAt: number;
   sourceId: string;
   requestId: string;
-}
+};
 
 /** The sources whose provider can list agents; none rather than every source when there are none. */
 export function listableAgentSources<T extends ListableSourceRecord>(sources: readonly T[]): T[] {

@@ -139,7 +139,14 @@ import {
   type SetDefaultRoutingPolicyInput,
   type UpdateRoutingPolicyInput,
   governanceSecrets,
+  AgentListingUnavailableError,
+  type AgentListingRequestResult,
+  type AgentSyncSourceListing,
+  type IdentityMatchConfirmed,
+  type IdentityMatchRun,
   type OrganizationSessionPolicyShape,
+  type PeopleScreenPerson,
+  type PeopleScreenSuggestion,
   type SessionCeilingApplied,
 } from "@langwatch/enterprise-governance-contract";
 import { ScimApi } from "@langwatch/enterprise-scim-contract";
@@ -189,6 +196,7 @@ import { DatabricksGeniePullerService } from "../services/databricks-genie-pulle
 import { DepartmentService } from "../services/department.service.ts";
 import { DirectoryDepartmentSyncService } from "../services/directory-department-sync.service.ts";
 import { ErasureSuppressionService } from "../services/erasure-suppression.service.ts";
+import { GovernanceAgentSyncService } from "../services/governance-agent-sync.service.ts";
 import {
   GovernanceCliAccessService,
   type GovernanceCliAccessApi,
@@ -216,6 +224,7 @@ import {
   type GovernanceIngestTraceCollection,
 } from "../services/governance-ingest-receiver.service.ts";
 import { GovernanceIngestService } from "../services/governance-ingest.service.ts";
+import { GovernancePeopleScreenService } from "../services/governance-people-screen.service.ts";
 import { DefaultGovernancePersonalVirtualKeyService } from "../services/governance-personal-key.service.ts";
 import { DefaultGovernanceRoutingPolicyService } from "../services/governance-routing.service.ts";
 import { DefaultGovernanceSetupStateService } from "../services/governance-setup-state.service.ts";
@@ -614,6 +623,19 @@ export class GovernanceApp implements GovernanceRestApi {
       organizations: dependencies.organizations,
       directory: dependencies.scim,
     });
+    this.agentSync = GovernanceAgentSyncService.create({
+      sources: repositories.ingestionSources,
+      projects: dependencies.projects,
+      listings: repositories.ingestionPullRuns,
+      dispatch: (command) => this.agentListingSender().send(command),
+    });
+    this.people = GovernancePeopleScreenService.create({
+      discoveredPeople: repositories.discoveredPeople,
+      matches: repositories.identityMatches,
+      suggestions: repositories.identityMatchSuggestions,
+      departments: this.departments,
+      organizations: dependencies.organizations,
+    });
     this.identityMatchSuggestions = IdentityMatchSuggestionService.create({
       discoveredPeople: repositories.discoveredPeople,
       matches: repositories.identityMatches,
@@ -791,6 +813,8 @@ export class GovernanceApp implements GovernanceRestApi {
   private readonly personalKeys: DefaultGovernancePersonalVirtualKeyService;
   private readonly cliSessions: DefaultGovernanceCliSessionInventoryService;
   private readonly sessionPolicy: OrganizationSessionPolicyService;
+  private readonly people: GovernancePeopleScreenService;
+  private readonly agentSync: GovernanceAgentSyncService;
   private readonly departments: DepartmentService;
   private readonly agentDiscovery: AgentDiscoveryService;
   private readonly personListing: PersonListingService;
@@ -892,6 +916,13 @@ export class GovernanceApp implements GovernanceRestApi {
 
   connectPulledUsage(commands: EventingSenders): void {
     this.pulledUsageCommands = commands;
+  }
+
+  /** Main's `agentListingDispatcher`: no pull pipeline here is a named refusal. */
+  private agentListingSender() {
+    const sender = this.ingestionPullCommands?.["requestAgentsListing"];
+    if (!sender) throw new AgentListingUnavailableError("event_sourcing_disabled");
+    return sender;
   }
 
   private ingestionPullSender(name: string) {
@@ -1329,6 +1360,39 @@ export class GovernanceApp implements GovernanceRestApi {
     maxSessionDurationDays: number;
   }): Promise<SessionCeilingApplied> {
     return this.sessionPolicy.setMaxDuration(input);
+  }
+
+  governanceAgentsSyncSources(input: {
+    organizationId: string;
+  }): Promise<AgentSyncSourceListing[]> {
+    return this.agentSync.listableSourcesWithLastListing(input);
+  }
+
+  governanceAgentsRequestListing(input: {
+    organizationId: string;
+  }): Promise<AgentListingRequestResult> {
+    return this.agentSync.requestListing(input);
+  }
+
+  governancePeopleList(input: { organizationId: string }): Promise<PeopleScreenPerson[]> {
+    return this.people.listPeople(input);
+  }
+
+  governancePeopleSuggestions(input: {
+    organizationId: string;
+  }): Promise<PeopleScreenSuggestion[]> {
+    return this.people.listSuggestions(input);
+  }
+
+  governancePeopleRunMatch(input: { organizationId: string }): Promise<IdentityMatchRun> {
+    return this.identityMatches.linkProvenMatches(input);
+  }
+
+  governancePeopleConfirmSuggestion(input: {
+    organizationId: string;
+    suggestionId: string;
+  }): Promise<IdentityMatchConfirmed> {
+    return this.identityMatches.confirmSuggestion(input);
   }
 
   // ── Personal CLI sessions: the caller's own devices, answered for their user id alone ──

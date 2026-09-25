@@ -22,6 +22,8 @@ export * from "./governance-ingest-rest.schemas.ts";
 export * from "./governance-rest.schemas.ts";
 export * from "./governance.api.ts";
 export * from "./governance.config.ts";
+export * from "./governance-agents.ts";
+export * from "./governance-people.ts";
 export * from "./session-policy.ts";
 export * from "./source-health.ts";
 export * from "./governance.responses.ts";

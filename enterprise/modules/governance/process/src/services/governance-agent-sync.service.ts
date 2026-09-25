@@ -2,7 +2,9 @@
 
 import {
   AgentListingUnavailableError,
-  type AgentsListingOutcome,
+  type AgentListingRequestResult,
+  type AgentSyncSource,
+  type AgentSyncSourceListing,
 } from "@langwatch/enterprise-governance-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -23,24 +25,6 @@ import { schedulerWillPull } from "../rules/pull-schedule.rules.ts";
 
 /** What one press dispatches, per source. Returns once the ask is recorded. */
 export type AgentListingDispatcher = (command: AgentListingRequestCommand) => Promise<unknown>;
-
-/** A source the screen may name, and may ask. */
-export interface AgentSyncSource {
-  id: string;
-  name: string;
-  sourceType: string;
-}
-
-/** A source the screen may name, plus how the last ask of it ended (`null`: never recorded). */
-export interface AgentSyncSourceListing extends AgentSyncSource {
-  lastListing: AgentsListingOutcome | null;
-}
-
-export interface AgentListingRequestResult {
-  /** How many sources were asked. Never how many answered. */
-  requested: number;
-  sources: AgentSyncSource[];
-}
 
 interface GovernanceAgentSyncDependencies {
   sources: IngestionSourceRepository;

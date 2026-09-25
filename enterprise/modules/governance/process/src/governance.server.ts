@@ -84,6 +84,8 @@ import { SpendSpikeAnomalyEvaluatorService } from "./services/spend-spike-anomal
 import { activityMonitorTrpcTransport } from "./transport/activity-monitor.trpc.ts";
 import { anomalyRulesTrpcTransport } from "./transport/anomaly-rules.trpc.ts";
 import { departmentsTrpcTransport } from "./transport/departments.trpc.ts";
+import { governanceAgentsTrpcTransport } from "./transport/governance-agents.trpc.ts";
+import { governancePeopleTrpcTransport } from "./transport/governance-people.trpc.ts";
 import {
   governanceRest,
   governanceRestCaller,
@@ -127,6 +129,8 @@ export const governanceServer = defineServerModule("governance")
     personalVirtualKeysTrpcTransport,
     routingPolicyTrpcTransport,
     sessionPolicyTrpcTransport,
+    governancePeopleTrpcTransport,
+    governanceAgentsTrpcTransport,
   )
   // The member behind the project credential, and which surface asked. A
   // legacy project key names no member, which is what the admin routes refuse.
