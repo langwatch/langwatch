@@ -214,431 +214,449 @@ export function publishSocket(stagingPath: string, socketPath: string): void {
 }
 
 export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
-  const telemetry = options.telemetry ?? noopTelemetry;
-  const idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
-  const shutdownGraceMs = options.shutdownGraceMs ?? DEFAULT_SHUTDOWN_GRACE_MS;
-  const startedAt = Date.now();
+  const daemon = new Daemon(options);
+  return {
+    socketPath: options.socketPath,
+    listen: () => daemon.listen(),
+    closed: () => daemon.closed,
+    stop: (reason) => daemon.stop(reason),
+    stats: () => daemon.stats(),
+  };
+}
 
-  const window = new ExecutionWindow();
-  const executor = options.executor ?? createCommandExecutor({ window, telemetry });
+type StopReason = "idle" | "stop-requested" | "signal";
 
-  let served = 0;
-  let inflight = 0;
-  let stopping = false;
-  let idleTimer: NodeJS.Timeout | undefined;
-  let uninstallInterceptors: (() => void) | undefined;
+/** One daemon's lifetime: its socket, its idle clock and the requests in flight. */
+class Daemon {
+  readonly options: DaemonServerOptions;
+  readonly telemetry: DaemonTelemetry;
+  readonly idleTimeoutMs: number;
+  readonly startedAt = Date.now();
+  readonly executor: CommandExecutor;
+  readonly closed: Promise<void>;
+  served = 0;
+  inflight = 0;
+  stopping = false;
+  private readonly shutdownGraceMs: number;
+  private readonly window = new ExecutionWindow();
+  private readonly server = net.createServer();
+  private idleTimer: NodeJS.Timeout | undefined;
+  private uninstallInterceptors: (() => void) | undefined;
   /**
    * The socket file THIS daemon published, recorded once listening. Every
    * later unlink is checked against it, so shutdown can never remove a
    * successor's socket; a daemon that never got as far as publishing removes nothing.
    */
-  let publishedSocket: FileIdentity | null = null;
+  private publishedSocket: FileIdentity | null = null;
   /** Live client connections, so shutdown can cut them if a drain times out. */
-  const connections = new Set<net.Socket>();
+  private readonly connections = new Set<net.Socket>();
   /** Woken when `inflight` reaches zero. Only `stop()` ever waits on this. */
-  let drainWaiters: (() => void)[] = [];
-
-  const server = net.createServer();
-  let resolveClosed: () => void;
-  const closedPromise = new Promise<void>((resolve) => {
-    resolveClosed = resolve;
-  });
-
-  const armIdleTimer = (): void => {
-    if (idleTimer) clearTimeout(idleTimer);
-    if (stopping || inflight > 0) return;
-    idleTimer = setTimeout(() => {
-      void stop("idle");
-    }, idleTimeoutMs);
-    // Never let the idle timer alone hold the process open.
-    idleTimer.unref();
+  private drainWaiters: (() => void)[] = [];
+  private resolveClosed: () => void = () => undefined;
+  private readonly onSignal = (): void => {
+    void this.stop("signal");
   };
+
+  constructor(options: DaemonServerOptions) {
+    this.options = options;
+    this.telemetry = options.telemetry ?? noopTelemetry;
+    this.idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
+    this.shutdownGraceMs = options.shutdownGraceMs ?? DEFAULT_SHUTDOWN_GRACE_MS;
+    this.executor =
+      options.executor ?? createCommandExecutor({ window: this.window, telemetry: this.telemetry });
+    this.closed = new Promise<void>((resolve) => {
+      this.resolveClosed = resolve;
+    });
+  }
+
+  stats(): { served: number; inflight: number; uptimeMs: number } {
+    return { served: this.served, inflight: this.inflight, uptimeMs: Date.now() - this.startedAt };
+  }
+
+  /** Counts a request in and stops the idle clock; answers the request's id. */
+  beginRequest(): string {
+    this.inflight++;
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    return `${process.pid}-${++this.served}`;
+  }
+
+  /** Counts a request out, restarts the idle clock and wakes any drain. */
+  endRequest(): void {
+    this.inflight--;
+    this.armIdleTimer();
+    this.noteRequestSettled();
+  }
+
+  track(socket: net.Socket): void {
+    this.connections.add(socket);
+  }
+
+  untrack(socket: net.Socket): void {
+    this.connections.delete(socket);
+  }
+
+  private armIdleTimer(): void {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    if (this.stopping || this.inflight > 0) return;
+    this.idleTimer = setTimeout(() => {
+      void this.stop("idle");
+    }, this.idleTimeoutMs);
+    // Never let the idle timer alone hold the process open.
+    this.idleTimer.unref();
+  }
 
   /** Called on every request completion; wakes a shutdown waiting to drain. */
-  const noteRequestSettled = (): void => {
-    if (inflight > 0) return;
-    const waiters = drainWaiters;
-    drainWaiters = [];
+  private noteRequestSettled(): void {
+    if (this.inflight > 0) return;
+    const waiters = this.drainWaiters;
+    this.drainWaiters = [];
     for (const wake of waiters) wake();
-  };
+  }
 
   /** Resolves true if everything finished in time, false if the grace ran out. */
-  const drainInflight = async (graceMs: number): Promise<boolean> => {
-    if (inflight === 0) return true;
+  private async drainInflight(graceMs: number): Promise<boolean> {
+    if (this.inflight === 0) return true;
     return new Promise<boolean>((resolve) => {
       const timer = setTimeout(() => resolve(false), graceMs);
       timer.unref();
-      drainWaiters.push(() => {
+      this.drainWaiters.push(() => {
         clearTimeout(timer);
         resolve(true);
       });
     });
-  };
+  }
 
-  const stop = async (reason: "idle" | "stop-requested" | "signal"): Promise<void> => {
-    if (stopping) return closedPromise;
-    stopping = true;
-    if (idleTimer) clearTimeout(idleTimer);
+  async stop(reason: StopReason): Promise<void> {
+    if (this.stopping) return this.closed;
+    this.stopping = true;
+    if (this.idleTimer) clearTimeout(this.idleTimer);
 
-    telemetry.daemonStopping({
+    this.telemetry.daemonStopping({
       pid: process.pid,
-      socketPath: options.socketPath,
-      cliVersion: options.cliVersion,
+      socketPath: this.options.socketPath,
+      cliVersion: this.options.cliVersion,
       reason,
     });
 
     // Unlinking here makes the next client see "no daemon" rather than a
-    // corpse to probe — only while the path still leads to the file WE
-    // published, or a rebound successor's socket could be killed on the way
-    // out. Done BEFORE `server.close()`: once we drop our own reference the
-    // inode number can be reused immediately, so this guard would fool itself.
+    // corpse to probe, only while the path still leads to the file WE
+    // published. Done BEFORE `server.close()`: once we drop our own reference
+    // the inode number can be reused immediately, so this guard would fool itself.
     try {
-      unlinkIfSameFile(options.socketPath, publishedSocket);
+      unlinkIfSameFile(this.options.socketPath, this.publishedSocket);
     } catch {
-      // Not "already gone" and not "we never published" — both of those return
-      // false rather than throwing. What lands here is the residual class: a
-      // filesystem refusal (EACCES, EPERM, a directory removed under us).
-      // Shutdown proceeds regardless; a socket we could not unlink is a corpse
-      // the next client's liveness probe cleans up.
+      // A filesystem refusal (EACCES, EPERM, a directory removed under us).
+      // Shutdown proceeds; the next client's liveness probe cleans the corpse.
       void 0;
     }
-    server.close();
+    this.server.close();
 
     // `window.reset()` below restores the daemon's OWN cwd and environment. A
-    // request still executing when that lands would resolve its paths and read
-    // its credentials against the daemon's globals instead of its caller's, and
-    // would then report an exit code the client trusts. So: let them finish.
-    if (!(await drainInflight(shutdownGraceMs))) {
-      // They did not. Cut the connections rather than let clients believe a
-      // result computed under a rewritten environment. The `fallback` frame goes
-      // first so the outcome is DIAGNOSED, not inferred from a dead socket: if
-      // output already crossed DEFAULT_MAX_BUFFER_BYTES, the client reports
-      // truncated output with a non-command status instead of re-running unsafely.
-      for (const connection of connections) {
-        if (connection.destroyed) continue;
-        // `end`, not `write`+`destroy`: destroy() discards anything still in the
-        // write buffer, which would throw away the very frame being sent. The
-        // callback fires once it is flushed, and destroying there bounds the
-        // teardown instead of leaving a half-closed socket holding the loop open.
-        connection.end(encodeFrame({ t: "fallback", reason: "shutting-down-mid-command" }), () =>
-          connection.destroy(),
-        );
-      }
-      connections.clear();
-    }
+    // request still executing when that lands would read its paths and
+    // credentials against the daemon's globals. So: let them finish.
+    if (!(await this.drainInflight(this.shutdownGraceMs))) this.cutConnections();
 
     // The one place a telemetry flush is both necessary and possible.
-    await telemetry.shutdown();
-    uninstallInterceptors?.();
-    process.removeListener("SIGTERM", onSignal);
-    process.removeListener("SIGINT", onSignal);
-    window.reset();
-    resolveClosed();
-    return closedPromise;
-  };
+    await this.telemetry.shutdown();
+    this.uninstallInterceptors?.();
+    process.removeListener("SIGTERM", this.onSignal);
+    process.removeListener("SIGINT", this.onSignal);
+    this.window.reset();
+    this.resolveClosed();
+    return this.closed;
+  }
 
-  const handleConnection = (socket: net.Socket): void => {
-    const decoder = new FrameDecoder<ClientFrame>();
-    let handshaken = false;
-    let execution: { cancel: (code: number) => void } | undefined;
-    let counted = false;
+  /**
+   * The drain timed out. The `fallback` frame goes first so the outcome is
+   * DIAGNOSED, not inferred from a dead socket. `end`, not `write`+`destroy`:
+   * destroy() discards the write buffer, which would throw the frame away.
+   */
+  private cutConnections(): void {
+    for (const connection of this.connections) {
+      if (connection.destroyed) continue;
+      connection.end(encodeFrame({ t: "fallback", reason: "shutting-down-mid-command" }), () =>
+        connection.destroy(),
+      );
+    }
+    this.connections.clear();
+  }
 
-    connections.add(socket);
-
-    /** This connection's request is done: uncount it and wake any drain. */
-    const endRequest = (): void => {
-      if (!counted) return;
-      counted = false;
-      inflight--;
-      armIdleTimer();
-      noteRequestSettled();
-    };
-
-    const send = (frame: ServerFrame): void => {
-      if (socket.destroyed) return;
-      socket.write(encodeFrame(frame));
-    };
-
-    const finish = (): void => {
-      if (!socket.destroyed) socket.end();
-    };
-
-    socket.on("error", () => {
-      // A client that vanished (Ctrl-C, killed shell). Cancel its work so the
-      // daemon does not keep an abandoned command's window held open.
-      execution?.cancel(130);
-    });
-
-    socket.on("close", () => {
-      connections.delete(socket);
-      execution?.cancel(130);
-    });
-
-    const handleFrame = (frame: ClientFrame): void => {
-      switch (frame.t) {
-        case "hello": {
-          if (frame.protocol !== PROTOCOL_VERSION) {
-            send({
-              t: "hello-err",
-              reason: "protocol-skew",
-              cliVersion: options.cliVersion,
-            });
-            finish();
-            return;
-          }
-          // Version skew: a daemon left over from a previous install — or from
-          // before the developer's last rebuild — would silently serve OLD
-          // behaviour to a NEW client. Compare the build, not just the semver:
-          // the semver does not move when the bundle is rebuilt.
-          if (frame.build !== options.build) {
-            send({
-              t: "hello-err",
-              reason: "version-skew",
-              cliVersion: options.cliVersion,
-            });
-            finish();
-            return;
-          }
-          // Defence in depth on top of the per-identity socket path: even a
-          // stale socket file or a truncated-hash collision cannot make us
-          // serve another identity's request with this identity's credentials.
-          if (frame.fingerprint !== options.fingerprint) {
-            send({
-              t: "hello-err",
-              reason: "identity-mismatch",
-              cliVersion: options.cliVersion,
-            });
-            finish();
-            return;
-          }
-          if (stopping) {
-            send({
-              t: "hello-err",
-              reason: "shutting-down",
-              cliVersion: options.cliVersion,
-            });
-            finish();
-            return;
-          }
-
-          handshaken = true;
-          send({
-            t: "hello-ok",
-            protocol: PROTOCOL_VERSION,
-            cliVersion: options.cliVersion,
-            build: options.build,
-            pid: process.pid,
-          });
-          return;
-        }
-
-        case "status": {
-          send({
-            t: "status-ok",
-            pid: process.pid,
-            cliVersion: options.cliVersion,
-            protocol: PROTOCOL_VERSION,
-            socketPath: options.socketPath,
-            uptimeMs: Date.now() - startedAt,
-            idleTimeoutMs,
-            served,
-            inflight,
-          });
-          finish();
-          return;
-        }
-
-        case "stop": {
-          finish();
-          void stop("stop-requested");
-          return;
-        }
-
-        case "cancel": {
-          execution?.cancel(130);
-          return;
-        }
-
-        case "exec": {
-          if (!handshaken) {
-            send({ t: "fallback", reason: "no-handshake" });
-            finish();
-            return;
-          }
-          if (stopping) {
-            send({ t: "fallback", reason: "shutting-down" });
-            finish();
-            return;
-          }
-
-          inflight++;
-          counted = true;
-          if (idleTimer) clearTimeout(idleTimer);
-
-          const requestId = `${process.pid}-${++served}`;
-          const running = executor({
-            requestId,
-            args: frame.args,
-            cwd: frame.cwd,
-            env: frame.env,
-            colorLevel: frame.colorLevel,
-            bin: frame.bin,
-            sink: (stream, chunk) => {
-              send(
-                stream === "stdout"
-                  ? { t: "out", d: chunk.toString("base64") }
-                  : { t: "err", d: chunk.toString("base64") },
-              );
-            },
-          });
-          execution = running;
-
-          running.completed
-            .then((code) => {
-              send({ t: "exit", code });
-              finish();
-              endRequest();
-            })
-            .catch((error: unknown) => {
-              // The window could not be applied — almost always because the
-              // caller's cwd was deleted. No output has been produced, so the
-              // client can safely run the command itself.
-              send({
-                t: "fallback",
-                reason: error instanceof Error ? error.message : "execution-failed",
-              });
-              finish();
-              endRequest();
-            });
-          return;
-        }
-      }
-    };
-
-    socket.on("data", (chunk: Buffer) => {
-      let frames: ClientFrame[];
-      try {
-        frames = decoder.push(chunk);
-      } catch {
-        finish();
-        return;
-      }
-      for (const frame of frames) {
-        try {
-          handleFrame(frame);
-        } catch {
-          endRequest();
-          send({ t: "fallback", reason: "daemon-error" });
-          finish();
-        }
-      }
-    });
-  };
-
-  const listen = async (): Promise<void> => {
-    // The staging path is the one actually handed to bind(), so it is the one
-    // that has to fit sockaddr_un.
+  async listen(): Promise<void> {
+    const { options } = this;
     const stagingPath = stagingSocketPath(options.socketPath, process.pid);
-    // Name the path that ACTUALLY failed. The staging path is the longer of the
-    // two (a pid stands in for `.sock`), so it is the one that overflows first —
-    // and reporting the shared path there printed a path the reader can measure
-    // for themselves and find to be within the limit.
-    let tooLong: string | null = null;
-    if (!isSocketPathUsable(options.socketPath)) {
-      tooLong = options.socketPath;
-    } else if (!isSocketPathUsable(stagingPath)) {
-      tooLong = stagingPath;
-    }
-    if (tooLong !== null) {
-      throw new Error(`socket path is too long for a unix domain socket: ${tooLong}`);
-    }
-
-    ensureSocketDir(options.socketDir);
-
-    // ensureSocketDir repairs the DIRECTORY's mode, but a squatter who got there
-    // while it was still loose has already left their socket file inside it,
-    // and that file is still theirs. Refusing loudly here — rather than letting
-    // `listen()` misread it as DaemonAlreadyRunningError — keeps the squat from
-    // reading as "a daemon is already running" forever, which restarting can't fix.
-    const trust = inspectSocketTrust(options.socketPath);
-    if (trust !== null && SQUATTED_SOCKET_PROBLEMS.has(trust)) {
-      throw new UntrustedSocketDirError(options.socketPath, trust);
-    }
-
-    if (await isSocketAlive(options.socketPath)) {
-      throw new DaemonAlreadyRunningError(options.socketPath);
-    }
-    await cleanStaleSocket(options.socketPath);
-    // And our own staging path, in the rare case a daemon was killed between
-    // binding and publishing and this process inherited its pid. Only one
-    // process holds a pid at a time, so a file there is definitionally the
-    // debris of a dead predecessor, never a live daemon's socket. Costs
-    // nothing when it does not exist, which is essentially always.
-    await cleanStaleSocket(stagingPath);
+    await prepareSocketPath({
+      socketPath: options.socketPath,
+      socketDir: options.socketDir,
+      stagingPath,
+    });
 
     // Only patch the process globals once we are actually going to serve.
-    uninstallInterceptors = installProcessInterceptors();
+    this.uninstallInterceptors = installProcessInterceptors();
 
-    server.on("connection", handleConnection);
+    this.server.on("connection", (socket: net.Socket) => {
+      new DaemonConnection({ daemon: this, socket }).attach();
+    });
 
     await new Promise<void>((resolve, reject) => {
-      server.once("error", reject);
-      server.listen(stagingPath, () => {
-        server.removeListener("error", reject);
+      this.server.once("error", reject);
+      this.server.listen(stagingPath, () => {
+        this.server.removeListener("error", reject);
         resolve();
       });
     });
 
-    // listen() creates the socket with 0755 & ~umask, i.e. connectable by any
-    // local user. Doing this while it still only answers to the private name
-    // means there is no instant at which a loose socket is reachable under the
-    // shared path every client dials.
+    // listen() creates the socket connectable by any local user; tightening it
+    // while it only answers to the private name leaves no loose instant.
     secureSocketFile(stagingPath);
 
     // Our identity, taken from the name only WE can hold, before the shared one
-    // is in play. Reading it back off the shared path after publishing looks
-    // equivalent and is not: anything that replaced that name in the gap would
-    // be recorded as ours, and `stop()` would later delete a stranger's live
-    // socket — the exact outage `unlinkIfSameFile` exists to prevent.
+    // is in play; read back after publishing, a replaced name would read as ours.
     const mine = identifyFile(stagingPath);
 
     try {
       publishSocket(stagingPath, options.socketPath);
     } catch (error) {
-      // We are not the daemon after all. Give the globals back and close the
-      // handle — libuv takes the staging socket file with it — so losing the
-      // race leaves nothing behind but the winner.
-      uninstallInterceptors?.();
-      uninstallInterceptors = undefined;
-      server.close();
+      // We are not the daemon after all: give the globals back and close the
+      // handle, so losing the race leaves nothing behind but the winner.
+      this.uninstallInterceptors?.();
+      this.uninstallInterceptors = undefined;
+      this.server.close();
       throw error;
     }
 
-    publishedSocket = mine;
+    this.publishedSocket = mine;
 
     // Only once we are actually serving: a daemon that lost the race to bind
     // must not install handlers it will never remove.
-    process.once("SIGTERM", onSignal);
-    process.once("SIGINT", onSignal);
+    process.once("SIGTERM", this.onSignal);
+    process.once("SIGINT", this.onSignal);
 
-    telemetry.daemonStarted({
+    this.telemetry.daemonStarted({
       pid: process.pid,
       socketPath: options.socketPath,
       cliVersion: options.cliVersion,
     });
 
-    armIdleTimer();
-  };
+    this.armIdleTimer();
+  }
+}
 
-  const onSignal = (): void => {
-    void stop("signal");
-  };
+/**
+ * Refuses a path that cannot be bound or that a squatter holds, then clears
+ * the debris of a dead predecessor under both names.
+ */
+async function prepareSocketPath({
+  socketPath,
+  socketDir,
+  stagingPath,
+}: {
+  socketPath: string;
+  socketDir: string;
+  stagingPath: string;
+}): Promise<void> {
+  // Name the path that ACTUALLY failed. The staging path is the longer of the
+  // two (a pid stands in for `.sock`), so it is the one that overflows first.
+  const tooLong = [socketPath, stagingPath].find((candidate) => !isSocketPathUsable(candidate));
+  if (tooLong !== undefined) {
+    throw new Error(`socket path is too long for a unix domain socket: ${tooLong}`);
+  }
 
-  return {
-    socketPath: options.socketPath,
-    listen,
-    closed: () => closedPromise,
-    stop,
-    stats: () => ({ served, inflight, uptimeMs: Date.now() - startedAt }),
-  };
+  ensureSocketDir(socketDir);
+
+  // ensureSocketDir repairs the DIRECTORY's mode, but a squatter who got there
+  // while it was still loose has left their socket file inside it. Refusing
+  // loudly keeps the squat from reading as "a daemon is already running".
+  const trust = inspectSocketTrust(socketPath);
+  if (trust !== null && SQUATTED_SOCKET_PROBLEMS.has(trust)) {
+    throw new UntrustedSocketDirError(socketPath, trust);
+  }
+
+  if (await isSocketAlive(socketPath)) {
+    throw new DaemonAlreadyRunningError(socketPath);
+  }
+  await cleanStaleSocket(socketPath);
+  // And our own staging path: only one process holds a pid at a time, so a
+  // file there is the debris of a dead predecessor that inherited this pid.
+  await cleanStaleSocket(stagingPath);
+}
+
+type HelloFrame = Extract<ClientFrame, { t: "hello" }>;
+type ExecFrame = Extract<ClientFrame, { t: "exec" }>;
+
+/**
+ * Why a hello is refused, in the order the checks run: protocol skew, a build
+ * from another install, another identity, or a daemon on its way out.
+ */
+function helloRefusal({
+  frame,
+  options,
+  stopping,
+}: {
+  frame: HelloFrame;
+  options: DaemonServerOptions;
+  stopping: boolean;
+}): "protocol-skew" | "version-skew" | "identity-mismatch" | "shutting-down" | undefined {
+  if (frame.protocol !== PROTOCOL_VERSION) return "protocol-skew";
+  // Compare the build, not just the semver: it does not move on a rebuild.
+  if (frame.build !== options.build) return "version-skew";
+  // Defence in depth on top of the per-identity socket path.
+  if (frame.fingerprint !== options.fingerprint) return "identity-mismatch";
+  if (stopping) return "shutting-down";
+  return undefined;
+}
+
+/** One client connection: its handshake, its frames and the request it runs. */
+class DaemonConnection {
+  private readonly daemon: Daemon;
+  private readonly socket: net.Socket;
+  private readonly decoder = new FrameDecoder<ClientFrame>();
+  private handshaken = false;
+  private execution: { cancel: (code: number) => void } | undefined;
+  private counted = false;
+
+  constructor({ daemon, socket }: { daemon: Daemon; socket: net.Socket }) {
+    this.daemon = daemon;
+    this.socket = socket;
+  }
+
+  attach(): void {
+    const { socket } = this;
+    this.daemon.track(socket);
+    socket.on("error", () => {
+      // A client that vanished (Ctrl-C, killed shell). Cancel its work so the
+      // daemon does not keep an abandoned command's window held open.
+      this.execution?.cancel(130);
+    });
+    socket.on("close", () => {
+      this.daemon.untrack(socket);
+      this.execution?.cancel(130);
+    });
+    socket.on("data", (chunk: Buffer) => this.receive(chunk));
+  }
+
+  private receive(chunk: Buffer): void {
+    let frames: ClientFrame[];
+    try {
+      frames = this.decoder.push(chunk);
+    } catch {
+      this.finish();
+      return;
+    }
+    for (const frame of frames) {
+      try {
+        this.handleFrame(frame);
+      } catch {
+        this.endRequest();
+        this.send({ t: "fallback", reason: "daemon-error" });
+        this.finish();
+      }
+    }
+  }
+
+  /** This connection's request is done: uncount it and wake any drain. */
+  private endRequest(): void {
+    if (!this.counted) return;
+    this.counted = false;
+    this.daemon.endRequest();
+  }
+
+  private send(frame: ServerFrame): void {
+    if (this.socket.destroyed) return;
+    this.socket.write(encodeFrame(frame));
+  }
+
+  private finish(): void {
+    if (!this.socket.destroyed) this.socket.end();
+  }
+
+  private handleFrame(frame: ClientFrame): void {
+    switch (frame.t) {
+      case "hello":
+        return this.hello(frame);
+      case "status":
+        return this.status();
+      case "stop":
+        this.finish();
+        void this.daemon.stop("stop-requested");
+        return;
+      case "cancel":
+        this.execution?.cancel(130);
+        return;
+      case "exec":
+        return this.exec(frame);
+    }
+  }
+
+  private hello(frame: HelloFrame): void {
+    const { options } = this.daemon;
+    const reason = helloRefusal({ frame, options, stopping: this.daemon.stopping });
+    if (reason !== undefined) {
+      this.send({ t: "hello-err", reason, cliVersion: options.cliVersion });
+      this.finish();
+      return;
+    }
+    this.handshaken = true;
+    this.send({
+      t: "hello-ok",
+      protocol: PROTOCOL_VERSION,
+      cliVersion: options.cliVersion,
+      build: options.build,
+      pid: process.pid,
+    });
+  }
+
+  private status(): void {
+    const { daemon } = this;
+    this.send({
+      t: "status-ok",
+      pid: process.pid,
+      cliVersion: daemon.options.cliVersion,
+      protocol: PROTOCOL_VERSION,
+      socketPath: daemon.options.socketPath,
+      uptimeMs: Date.now() - daemon.startedAt,
+      idleTimeoutMs: daemon.idleTimeoutMs,
+      served: daemon.served,
+      inflight: daemon.inflight,
+    });
+    this.finish();
+  }
+
+  private exec(frame: ExecFrame): void {
+    if (!this.handshaken || this.daemon.stopping) {
+      this.send({ t: "fallback", reason: this.handshaken ? "shutting-down" : "no-handshake" });
+      this.finish();
+      return;
+    }
+    this.counted = true;
+    const requestId = this.daemon.beginRequest();
+    const running = this.daemon.executor({
+      requestId,
+      args: frame.args,
+      cwd: frame.cwd,
+      env: frame.env,
+      colorLevel: frame.colorLevel,
+      bin: frame.bin,
+      sink: (stream, chunk) => {
+        const d = chunk.toString("base64");
+        this.send(stream === "stdout" ? { t: "out", d } : { t: "err", d });
+      },
+    });
+    this.execution = running;
+    running.completed
+      .then((code) => {
+        this.send({ t: "exit", code });
+        this.finish();
+        this.endRequest();
+      })
+      .catch((error: unknown) => {
+        // The window could not be applied, almost always because the caller's
+        // cwd was deleted. No output yet, so the client can run it itself.
+        this.send({
+          t: "fallback",
+          reason: error instanceof Error ? error.message : "execution-failed",
+        });
+        this.finish();
+        this.endRequest();
+      });
+  }
 }

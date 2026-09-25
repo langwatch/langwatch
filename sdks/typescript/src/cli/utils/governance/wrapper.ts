@@ -261,45 +261,43 @@ export async function withTelemetrySetupSpinner<T>({
   }
 }
 
-/**
- * Run the named tool routed through the gateway, inheriting stdio for the
- * same interactive UX as invoking it directly. Exits the parent with the
- * child's exit code (or 2 if the budget pre-check fired).
- */
-export async function runWrapped(tool: string, args: string[]): Promise<never> {
-  // A help or version run starts no session: it goes to the tool before
-  // anything below reads the config, signs in, mints a key or writes wiring.
-  const infoRun = infoRunKind(args);
-  if (infoRun) return runInfoRun({ tool, args, kind: infoRun });
+type WrapperModeResult = Awaited<ReturnType<typeof resolveWrapperMode>>;
+type CodexStreaming = {
+  streamer: ReturnType<typeof createCodexIOStreamer>;
+  poll: ReturnType<typeof setInterval>;
+};
 
-  // Before the config is read, so every save below carries it. The Claude
-  // Code plugin's hooks run the CLI through this record when PATH cannot
-  // resolve it, which is the case for a Claude Code started from a desktop
-  // app.
-  recordCliLocation();
-  let cfg = loadConfig();
-  if (!isLoggedIn(cfg)) {
-    if (!shouldAutoLogin()) {
-      process.stderr.write("Not logged in. Run `langwatch login --device` first.\n");
-      process.exit(1);
-    }
-    process.stderr.write("Not logged in. Starting device-flow login...\n");
-    try {
-      cfg = await runDeviceFlowLogin({ cfg });
-    } catch (err) {
-      process.stderr.write(`login failed: ${(err as Error).message ?? "unknown error"}\n`);
-      process.exit(1);
-    }
-    if (!isLoggedIn(cfg)) {
-      process.stderr.write("login did not complete - exiting\n");
-      process.exit(1);
-    }
+/** A signed-in config, logging in inline when auto-login is allowed. */
+async function ensureLoggedIn(initial: GovernanceConfig): Promise<GovernanceConfig> {
+  let cfg = initial;
+  if (isLoggedIn(cfg)) return cfg;
+  if (!shouldAutoLogin()) {
+    process.stderr.write("Not logged in. Run `langwatch login --device` first.\n");
+    process.exit(1);
   }
+  process.stderr.write("Not logged in. Starting device-flow login...\n");
+  try {
+    cfg = await runDeviceFlowLogin({ cfg });
+  } catch (err) {
+    process.stderr.write(`login failed: ${(err as Error).message ?? "unknown error"}\n`);
+    process.exit(1);
+  }
+  if (!isLoggedIn(cfg)) {
+    process.stderr.write("login did not complete - exiting\n");
+    process.exit(1);
+  }
+  return cfg;
+}
 
-  // Wrapper-only telemetry-scope flags, stripped before anything reaches
-  // the child. `--project` pins this tool's telemetry to a team project
-  // (minting a project ingest key); `--personal` clears the pin.
-  const scopeFlags = parseProjectScopeFlags(args);
+async function applyScopeFlags({
+  cfg,
+  tool,
+  scopeFlags,
+}: {
+  cfg: GovernanceConfig;
+  tool: string;
+  scopeFlags: ReturnType<typeof parseProjectScopeFlags>;
+}): Promise<void> {
   if (scopeFlags.personal && scopeFlags.project) {
     process.stderr.write(`${lwTag()} pass either --project or --personal, not both.\n`);
     process.exit(2);
@@ -328,22 +326,19 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
       process.exit(2);
     }
   }
+}
 
-  // Strip the wrapper-only `--tool-mode` flag from the args BEFORE anything
-  // forwards them to the real tool, and resolve any explicit override.
-  // Everything else stays verbatim + in order for the child invocation.
-  const parsedMode = parseToolModeFlag(scopeFlags.args);
-  const toolArgs = parsedMode.args;
-  // A project pin means telemetry-only by definition, so it behaves like
-  // an explicit direct-OTLP override: no gateway-vs-subscription prompt,
-  // no tool_mode persistence. A literal --tool-mode flag still wins.
-  const pathOverride =
-    parsedMode.override ?? (cfg.tool_project_keys?.[tool]?.secret ? "ingestion" : undefined);
-
-  // Decide Path A (gateway) vs Path B (ingestion) for this run. Prompts
-  // (and remembers the answer) only when the org policy allows BOTH paths,
-  // stdin/stdout is a TTY, and there's no pinned preference / override.
-  // Runs BEFORE env injection + spawn so the prompt owns stdin.
+async function choosePath({
+  cfg,
+  tool,
+  toolArgs,
+  pathOverride,
+}: {
+  cfg: GovernanceConfig;
+  tool: string;
+  toolArgs: string[];
+  pathOverride: Parameters<typeof resolveWrapperPath>[0]["override"];
+}): Promise<Awaited<ReturnType<typeof resolveWrapperPath>>> {
   let pathChoice;
   try {
     pathChoice = await resolveWrapperPath({
@@ -364,7 +359,19 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     process.stderr.write(`${lwTag()} cancelled, ${tool} was not started.\n`);
     process.exit(130);
   }
+  return pathChoice;
+}
 
+async function setUpTelemetry({
+  initial,
+  tool,
+  pathChoice,
+}: {
+  initial: GovernanceConfig;
+  tool: string;
+  pathChoice: Awaited<ReturnType<typeof resolveWrapperPath>>;
+}): Promise<{ cfg: GovernanceConfig; modeResult: WrapperModeResult }> {
+  let cfg = initial;
   const toolEnv = envForTool(cfg, tool);
   const gatewayVars = toolEnv.vars;
   const gatewayClears = toolEnv.clears ?? [];
@@ -416,7 +423,10 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
       process.exit(2);
     }
   }
+  return { cfg, modeResult };
+}
 
+function reportModeResult(modeResult: WrapperModeResult): void {
   // Surface any platform-policy path change (e.g. the org admin turned
   // direct OTLP off for this tool, so the wrapper routed through the
   // gateway instead) so the member sees why the path differs.
@@ -456,7 +466,123 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
         `point them at ${modeResult.endpoint ?? "this login"}.\n`,
     );
   }
+}
 
+/**
+ * A remembered gateway choice that can't serve this account/org would re-fail
+ * every run, so drop the pin and the next run re-asks. A transient
+ * gateway-down failure keeps the pin (a retry may succeed).
+ */
+function forgetGatewayPin({
+  cfg,
+  tool,
+  retryable,
+}: {
+  cfg: GovernanceConfig;
+  tool: string;
+  retryable: boolean | undefined;
+}): void {
+  if (!shouldForgetGatewayPin({ pinnedMode: cfg.tool_mode?.[tool], retryable })) return;
+  const toolMode = { ...cfg.tool_mode };
+  delete toolMode[tool];
+  cfg.tool_mode = toolMode;
+  try {
+    saveConfig(cfg);
+    process.stderr.write(
+      `${lwTag()} cleared the saved gateway path for \`${tool}\`; ` +
+        `you'll be asked again next time so you can pick direct OTLP.\n`,
+    );
+  } catch {
+    // Best-effort: a config write failure just leaves the pin in place.
+    void 0;
+  }
+}
+
+async function gatewayPreflight({
+  cfg,
+  tool,
+  modeResult,
+}: {
+  cfg: GovernanceConfig;
+  tool: string;
+  modeResult: WrapperModeResult;
+}): Promise<void> {
+  // Budget pre-check - render Screen-8 box + exit 2 BEFORE exec. Gateway
+  // runs only: the budget gates gateway spend, and an ingestion run
+  // spends nothing through us, so subscription users skip the call.
+  const exceeded = await checkBudget(cfg);
+  if (exceeded) {
+    process.stderr.write(
+      renderBudgetExceeded(exceeded, {
+        fallbackUrl: `${cfg.control_plane_url}/me/budget/request`,
+      }),
+    );
+    process.exit(2);
+  }
+  const probe = await preflightWrapper(cfg, tool);
+  if (!probe.ok) {
+    process.stderr.write(probe.message ?? "preflight failed\n");
+    forgetGatewayPin({ cfg, tool, retryable: probe.retryable });
+    process.exit(2);
+  }
+  if (modeResult.codexConfigPath) {
+    process.stderr.write(
+      `${lwTag()} wired [model_providers.langwatch] in ${modeResult.codexConfigPath}.\n`,
+    );
+  }
+  if (modeResult.codexProfilePath) {
+    process.stderr.write(`${lwTag()} wrote profile body to ${modeResult.codexProfilePath}.\n`);
+  }
+}
+
+async function reportIngestionSetup({
+  cfg,
+  tool,
+  modeResult,
+}: {
+  cfg: GovernanceConfig;
+  tool: string;
+  modeResult: WrapperModeResult;
+}): Promise<void> {
+  // ingestion mode side-effect feedback so the user sees what
+  // the wrapper just did on their behalf.
+  if (modeResult.projectScope) {
+    process.stderr.write(
+      `${lwTag()} telemetry goes to project ` +
+        `${modeResult.projectScope.label ?? "(pinned ingest key)"}.\n`,
+    );
+  }
+  if (modeResult.newKeyMinted) {
+    process.stderr.write(`${lwTag()} minted a personal ingestion key for ${tool}.\n`);
+  }
+  if (modeResult.codexConfigPath) {
+    process.stderr.write(
+      `${lwTag()} wrote [otel] activation block to ${modeResult.codexConfigPath}.\n`,
+    );
+  }
+
+  // Path B only: offer to persist the OTLP telemetry exports so a future
+  // plain `<tool>` (without the langwatch wrapper) captures
+  // automatically. Gated on ingestion mode + opt-out remembered. Runs
+  // BEFORE spawn so the prompt still owns stdin.
+  await maybeOfferIngestionShellRcPersist({
+    cfg,
+    tool,
+    vars: modeResult.vars,
+  });
+}
+
+async function prepareLaunch({
+  cfg,
+  tool,
+  toolArgs,
+  modeResult,
+}: {
+  cfg: GovernanceConfig;
+  tool: string;
+  toolArgs: string[];
+  modeResult: WrapperModeResult;
+}): Promise<void> {
   // Copilot-only pre-spawn warnings (enterprise managed-settings OTel
   // pin + version gate). Deliberately OUTSIDE the gateway-only preflight
   // below — copilot defaults to ingestion, and both conditions make
@@ -480,85 +606,11 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     }
   }
 
-  if (modeResult.mode === "gateway") {
-    // Budget pre-check - render Screen-8 box + exit 2 BEFORE exec. Gateway
-    // runs only: the budget gates gateway spend, and an ingestion run
-    // spends nothing through us, so subscription users skip the call.
-    const exceeded = await checkBudget(cfg);
-    if (exceeded) {
-      process.stderr.write(
-        renderBudgetExceeded(exceeded, {
-          fallbackUrl: `${cfg.control_plane_url}/me/budget/request`,
-        }),
-      );
-      process.exit(2);
-    }
-    const probe = await preflightWrapper(cfg, tool);
-    if (!probe.ok) {
-      process.stderr.write(probe.message ?? "preflight failed\n");
-      // A remembered gateway choice that can't actually serve this account/org
-      // (no virtual key / no provider configured) would re-fail every run. Drop
-      // the pin so the next run re-asks and the user can pick direct OTLP. A
-      // transient gateway-down failure keeps the pin (a retry may succeed).
-      if (
-        shouldForgetGatewayPin({
-          pinnedMode: cfg.tool_mode?.[tool],
-          retryable: probe.retryable,
-        })
-      ) {
-        const toolMode = { ...cfg.tool_mode };
-        delete toolMode[tool];
-        cfg.tool_mode = toolMode;
-        try {
-          saveConfig(cfg);
-          process.stderr.write(
-            `${lwTag()} cleared the saved gateway path for \`${tool}\`; ` +
-              `you'll be asked again next time so you can pick direct OTLP.\n`,
-          );
-        } catch {
-          // Best-effort: a config write failure just leaves the pin in place.
-          void 0;
-        }
-      }
-      process.exit(2);
-    }
-    if (modeResult.codexConfigPath) {
-      process.stderr.write(
-        `${lwTag()} wired [model_providers.langwatch] in ${modeResult.codexConfigPath}.\n`,
-      );
-    }
-    if (modeResult.codexProfilePath) {
-      process.stderr.write(`${lwTag()} wrote profile body to ${modeResult.codexProfilePath}.\n`);
-    }
-  } else {
-    // ingestion mode side-effect feedback so the user sees what
-    // the wrapper just did on their behalf.
-    if (modeResult.projectScope) {
-      process.stderr.write(
-        `${lwTag()} telemetry goes to project ` +
-          `${modeResult.projectScope.label ?? "(pinned ingest key)"}.\n`,
-      );
-    }
-    if (modeResult.newKeyMinted) {
-      process.stderr.write(`${lwTag()} minted a personal ingestion key for ${tool}.\n`);
-    }
-    if (modeResult.codexConfigPath) {
-      process.stderr.write(
-        `${lwTag()} wrote [otel] activation block to ${modeResult.codexConfigPath}.\n`,
-      );
-    }
+  if (modeResult.mode === "gateway") await gatewayPreflight({ cfg, tool, modeResult });
+  else await reportIngestionSetup({ cfg, tool, modeResult });
+}
 
-    // Path B only: offer to persist the OTLP telemetry exports so a future
-    // plain `<tool>` (without the langwatch wrapper) captures
-    // automatically. Gated on ingestion mode + opt-out remembered. Runs
-    // BEFORE spawn so the prompt still owns stdin.
-    await maybeOfferIngestionShellRcPersist({
-      cfg,
-      tool,
-      vars: modeResult.vars,
-    });
-  }
-
+function reportPluginUpdate(): void {
   // Keep the installed plugin current, whichever tool this run wraps —
   // installed once per machine, not once per tool. Stamped to once a day
   // and runs BEFORE spawn so a new version reaches this session rather
@@ -583,74 +635,84 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
         `(best-effort, continuing): ${pluginUpdate.reason}\n`,
     );
   }
+}
 
-  // Scrub conflicting twins from the inherited env before merging ours in.
-  // Legacy creds (e.g. ANTHROPIC_API_KEY) would otherwise race with the
-  // gateway-routed ANTHROPIC_AUTH_TOKEN, surfacing as claude-code's "auth
-  // may not work as expected" warning or a wrong credential picked silently.
-  const parentEnv = { ...process.env };
-  for (const key of modeResult.clears ?? []) {
-    delete parentEnv[key];
+/**
+ * Codex's OTLP spans carry tokens + model only, but its rollout file has the
+ * full transcript with a per-turn trace_id. Poll it while codex runs to stream
+ * each turn as it completes; the poll and the final sweep are idempotent.
+ */
+function startCodexStreaming({
+  tool,
+  modeResult,
+  sinceMs,
+}: {
+  tool: string;
+  modeResult: WrapperModeResult;
+  sinceMs: number;
+}): CodexStreaming[] {
+  const { endpoint, ingestionToken } = modeResult;
+  if (tool !== "codex" || modeResult.mode !== "ingestion" || !endpoint || !ingestionToken) {
+    return [];
   }
-  const env = { ...parentEnv, ...modeResult.vars };
-  // Forward the user's args verbatim and in order, minus the stripped
-  // wrapper flag (`--tool-mode`). Any mode-specific prepends (e.g. codex
-  // `--profile langwatch-gateway`) lead.
-  const finalArgs = [...(modeResult.extraArgs ?? []), ...toolArgs];
+  const codexStreamer = createCodexIOStreamer({
+    sinceMs,
+    endpoint: `${normalizeEndpoint(endpoint)}/v1/traces`,
+    logsEndpoint: `${normalizeEndpoint(endpoint)}/v1/logs`,
+    token: ingestionToken,
+  });
+  let inFlight = false;
+  const codexPoll = setInterval(() => {
+    // Skip a tick if the previous harvest (file read + POST, ≤5s) is still
+    // running so slow ticks can't pile up.
+    if (inFlight) return;
+    inFlight = true;
+    void codexStreamer
+      .harvest(Date.now())
+      .catch(() => 0)
+      .finally(() => {
+        inFlight = false;
+      });
+  }, CODEX_IO_POLL_MS);
+  // The child process drives the lifecycle; never let the poll keep the event
+  // loop alive on its own.
+  codexPoll.unref?.();
+  return [{ streamer: codexStreamer, poll: codexPoll }];
+}
 
-  // Resolve the tool via the user's interactive login shell (zsh/bash) so
-  // aliases/functions are honored, not just the PATH binary. `-i` sources
-  // the rc, and the wrapper's env is re-applied *after* so the rc can't
-  // clobber gateway/OTLP wiring. Args ride "$@" unquoted; `tool` is
-  // whitelisted so the command string is safe from injection.
-  const aliasShell = aliasShellFor();
-
-  const notFoundMessage = toolNotFoundMessage(tool);
-
-  // Stamp the session start so the codex rollout harvest only reads rollout
-  // files this run produced (codex names them by start time + mtime).
-  const sessionStartMs = Date.now();
-
-  // Codex's OTLP spans carry tokens + model only, but its rollout file has
-  // the full transcript with a per-turn trace_id. Poll it while codex runs
-  // to stream each turn as it completes rather than one burst on exit; the
-  // poll and a final sweep are idempotent (span id is trace_id-derived).
-  let codexStreamer: ReturnType<typeof createCodexIOStreamer> | null = null;
-  if (tool === "codex") {
-    if (modeResult.mode === "ingestion") {
-      if (modeResult.endpoint) {
-        if (modeResult.ingestionToken) {
-          codexStreamer = createCodexIOStreamer({
-            sinceMs: sessionStartMs,
-            endpoint: `${normalizeEndpoint(modeResult.endpoint)}/v1/traces`,
-            logsEndpoint: `${normalizeEndpoint(modeResult.endpoint)}/v1/logs`,
-            token: modeResult.ingestionToken,
-          });
-        }
-      }
+/**
+ * Stops polling and does one final sweep so the last turn still lands.
+ * Best-effort: a coding session must never fail or stall on the harvest.
+ */
+async function stopCodexStreaming(streaming: CodexStreaming[]): Promise<void> {
+  for (const { streamer, poll } of streaming) {
+    clearInterval(poll);
+    try {
+      await streamer.harvest(Date.now());
+    } catch {
+      /* content recovery is non-essential; never block exit on it */
+      void 0;
     }
   }
-  let codexPoll: ReturnType<typeof setInterval> | null = null;
-  if (codexStreamer) {
-    let inFlight = false;
-    codexPoll = setInterval(() => {
-      // Skip a tick if the previous harvest (file read + POST, ≤5s) is still
-      // running so slow ticks can't pile up.
-      if (inFlight) return;
-      inFlight = true;
-      void codexStreamer
-        .harvest(Date.now())
-        .catch(() => 0)
-        .finally(() => {
-          inFlight = false;
-        });
-    }, CODEX_IO_POLL_MS);
-    // The child process drives the lifecycle; never let the poll keep the event
-    // loop alive on its own.
-    codexPoll.unref?.();
-  }
+}
 
-  let child;
+function spawnTool({
+  tool,
+  modeResult,
+  finalArgs,
+  env,
+}: {
+  tool: string;
+  modeResult: WrapperModeResult;
+  finalArgs: string[];
+  env: NodeJS.ProcessEnv;
+}): ReturnType<typeof spawn> {
+  // Resolve the tool via the user's interactive login shell (zsh/bash) so
+  // aliases/functions are honored. `-i` sources the rc, and the wrapper's env
+  // is re-applied *after* so the rc can't clobber gateway/OTLP wiring.
+  const aliasShell = aliasShellFor();
+  const notFoundMessage = toolNotFoundMessage(tool);
+  let child: ReturnType<typeof spawn>;
   if (aliasShell) {
     const reapply = buildShellReapply({
       tool,
@@ -684,22 +746,66 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     process.stderr.write(`exec ${tool}: ${err.message}\n`);
     process.exit(1);
   });
+  return child;
+}
+
+/**
+ * Run the named tool routed through the gateway, inheriting stdio for the
+ * same interactive UX as invoking it directly. Exits the parent with the
+ * child's exit code (or 2 if the budget pre-check fired).
+ */
+export async function runWrapped(tool: string, args: string[]): Promise<never> {
+  // A help or version run starts no session: it goes to the tool before
+  // anything below reads the config, signs in, mints a key or writes wiring.
+  const infoRun = infoRunKind(args);
+  if (infoRun) return runInfoRun({ tool, args, kind: infoRun });
+
+  // Before the config is read, so every save below carries it. The Claude
+  // Code plugin's hooks run the CLI through this record when PATH cannot
+  // resolve it, which is the case for a Claude Code started from a desktop
+  // app.
+  recordCliLocation();
+  const loggedIn = await ensureLoggedIn(loadConfig());
+
+  // Wrapper-only telemetry-scope flags, stripped before anything reaches
+  // the child. `--project` pins this tool's telemetry to a team project
+  // (minting a project ingest key); `--personal` clears the pin.
+  const scopeFlags = parseProjectScopeFlags(args);
+  await applyScopeFlags({ cfg: loggedIn, tool, scopeFlags });
+
+  // Strip the wrapper-only `--tool-mode` flag before anything forwards the
+  // args to the real tool. A project pin means telemetry-only by definition,
+  // so it behaves like an explicit direct-OTLP override; a literal flag wins.
+  const parsedMode = parseToolModeFlag(scopeFlags.args);
+  const toolArgs = parsedMode.args;
+  const pathOverride =
+    parsedMode.override ?? (loggedIn.tool_project_keys?.[tool]?.secret ? "ingestion" : undefined);
+
+  const pathChoice = await choosePath({ cfg: loggedIn, tool, toolArgs, pathOverride });
+  const { cfg, modeResult } = await setUpTelemetry({ initial: loggedIn, tool, pathChoice });
+  reportModeResult(modeResult);
+  await prepareLaunch({ cfg, tool, toolArgs, modeResult });
+  reportPluginUpdate();
+
+  // Scrub conflicting twins (e.g. ANTHROPIC_API_KEY) from the inherited env
+  // before merging ours in, so a legacy credential never races ours.
+  const parentEnv = { ...process.env };
+  for (const key of modeResult.clears ?? []) {
+    delete parentEnv[key];
+  }
+  const env = { ...parentEnv, ...modeResult.vars };
+  // The user's args verbatim and in order; mode-specific prepends lead.
+  const finalArgs = [...(modeResult.extraArgs ?? []), ...toolArgs];
+
+  // Stamp the session start so the codex rollout harvest only reads rollout
+  // files this run produced (codex names them by start time + mtime).
+  const codexStreaming = startCodexStreaming({ tool, modeResult, sinceMs: Date.now() });
+
+  const child = spawnTool({ tool, modeResult, finalArgs, env });
   const exitCode = await new Promise<number>((resolve) => {
     child.on("close", (code) => resolve(code ?? 1));
   });
 
-  // Stop polling and do one final sweep so the last turn (completed between the
-  // last poll and exit) still lands. Best-effort: a coding session must never
-  // fail or stall on the content harvest.
-  if (codexPoll) clearInterval(codexPoll);
-  if (codexStreamer) {
-    try {
-      await codexStreamer.harvest(Date.now());
-    } catch {
-      /* content recovery is non-essential; never block exit on it */
-      void 0;
-    }
-  }
-
+  await stopCodexStreaming(codexStreaming);
   process.exit(exitCode);
 }

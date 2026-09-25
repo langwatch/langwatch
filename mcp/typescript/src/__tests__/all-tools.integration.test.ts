@@ -488,6 +488,533 @@ beforeEach(() => {
   promptDetailState = { ...CANNED_PROMPT_DETAIL };
 });
 
+/** A canned answer: the first route whose method and URL match the request answers it. */
+type MockRoute = {
+  method: string;
+  matches: (url: string) => boolean;
+  status: number;
+  answer: (request: { body: string; url: string }) => unknown;
+};
+
+const MOCK_ROUTES: MockRoute[] = [
+  {
+    method: "GET",
+    matches: (url) => url === "/api/v1/query/reference",
+    status: 200,
+    answer: () => QUERY_REFERENCE_FIXTURE,
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/query",
+    status: 200,
+    answer: ({ body }) => {
+      const parsed = JSON.parse(body) as { sql?: string };
+      if (parsed.sql === "__many__") {
+        return {
+          ...CANNED_QUERY_RESULT,
+          rows: Array.from({ length: 120 }, (_, index) => ({
+            day: `2026-09-${String((index % 28) + 1).padStart(2, "0")} 00:00:00.000`,
+            traces: index,
+            messages: null,
+          })),
+        };
+      }
+      return CANNED_QUERY_RESULT;
+    },
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/traces/search",
+    status: 200,
+    answer: ({ body }) => {
+      const parsed = JSON.parse(body);
+      // Return empty results when a special query is used
+      if (parsed.query === "__empty__") {
+        return CANNED_TRACES_EMPTY;
+      } else if (parsed.pageSize === 5) {
+        return CANNED_TRACES_SEARCH_WITH_SCROLL;
+      } else {
+        return CANNED_TRACES_SEARCH;
+      }
+    },
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/traces\/trace-nonexistent(\?|$)/.test(url),
+    status: 404,
+    answer: () => ({ message: "Trace not found" }),
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/traces\/[^/]+(\?|$)/.test(url),
+    status: 200,
+    answer: () => CANNED_TRACE_DETAIL,
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/analytics/timeseries",
+    status: 200,
+    answer: () => CANNED_ANALYTICS,
+  },
+  {
+    method: "GET",
+    matches: (url) => url === "/api/v1/prompts",
+    status: 200,
+    answer: () => CANNED_PROMPTS_LIST,
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/prompts",
+    status: 200,
+    answer: () => CANNED_PROMPT_CREATED,
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/prompts\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => promptDetailState,
+  },
+  {
+    method: "PUT",
+    matches: (url) => /^\/api\/v1\/prompts\/[^/]+$/.test(url),
+    status: 200,
+    answer: ({ body }) => {
+      const parsed = JSON.parse(body) as {
+        commitMessage?: string;
+        model?: string;
+        messages?: { role: string; content: string }[];
+        tags?: string[];
+      };
+      const newVersionId = "ver_p1v4";
+      promptDetailState = {
+        ...promptDetailState,
+        version: 4,
+        versionId: newVersionId,
+        commitMessage: parsed.commitMessage ?? promptDetailState.commitMessage,
+        model: parsed.model ?? promptDetailState.model,
+        messages: parsed.messages ?? promptDetailState.messages,
+        tags:
+          parsed.tags === undefined
+            ? promptDetailState.tags.map((tag) =>
+                tag.name === "latest" ? { name: "latest", versionId: newVersionId } : tag,
+              )
+            : [
+                { name: "latest", versionId: newVersionId },
+                ...parsed.tags
+                  .filter((name) => name !== "latest")
+                  .map((name) => ({ name, versionId: newVersionId })),
+              ],
+      };
+      return CANNED_PROMPT_UPDATED;
+    },
+  },
+  {
+    method: "GET",
+    matches: (url) => url === "/api/v1/scenarios",
+    status: 200,
+    answer: () => CANNED_SCENARIOS_LIST,
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/scenarios",
+    status: 200,
+    answer: () => CANNED_SCENARIO_CREATED,
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/scenarios\/scen_nonexistent(\?|$)/.test(url),
+    status: 404,
+    answer: () => ({ message: "Scenario not found" }),
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/scenarios\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_SCENARIO_DETAIL,
+  },
+  {
+    method: "PUT",
+    matches: (url) => /^\/api\/v1\/scenarios\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_SCENARIO_UPDATED,
+  },
+  {
+    method: "DELETE",
+    matches: (url) => /^\/api\/v1\/scenarios\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_SCENARIO_ARCHIVED,
+  },
+  {
+    method: "GET",
+    matches: (url) => url === "/api/v1/evaluators",
+    status: 200,
+    answer: () => CANNED_EVALUATORS_LIST,
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/evaluators",
+    status: 200,
+    answer: () => CANNED_EVALUATOR_CREATED,
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/evaluators\/evaluator_nonexistent(\?|$)/.test(url),
+    status: 404,
+    answer: () => ({ message: "Evaluator not found" }),
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/evaluators\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_EVALUATOR_DETAIL,
+  },
+  {
+    method: "PUT",
+    matches: (url) => /^\/api\/v1\/evaluators\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_EVALUATOR_UPDATED,
+  },
+  {
+    method: "GET",
+    matches: (url) => url === "/api/v1/model-providers",
+    status: 200,
+    answer: () => CANNED_MODEL_PROVIDERS_LIST,
+  },
+  {
+    method: "PUT",
+    matches: (url) => /^\/api\/v1\/model-providers\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_MODEL_PROVIDER_SET,
+  },
+  {
+    method: "GET",
+    matches: (url) => url === "/api/v1/agents",
+    status: 200,
+    answer: () => CANNED_AGENTS_LIST,
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/agents",
+    status: 201,
+    answer: () => CANNED_AGENT_DETAIL,
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/agents\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_AGENT_DETAIL,
+  },
+  {
+    method: "PATCH",
+    matches: (url) => /^\/api\/v1\/agents\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_AGENT_DETAIL,
+  },
+  {
+    method: "DELETE",
+    matches: (url) => /^\/api\/v1\/agents\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => ({ id: "agent_abc", name: "Test Agent" }),
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/run-plans/run",
+    status: 200,
+    answer: () => CANNED_RUN_PLAN_RUN,
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/run-plans(\?.*)?$/.test(url),
+    status: 200,
+    answer: () => CANNED_RUN_PLANS_LIST,
+  },
+  {
+    method: "POST",
+    matches: (url) => /^\/api\/v1\/run-plans\/[^/]+\/run$/.test(url),
+    status: 200,
+    answer: () => CANNED_RUN_PLAN_RERUN,
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/run-plans\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_RUN_PLAN,
+  },
+  {
+    method: "DELETE",
+    matches: (url) => /^\/api\/v1\/run-plans\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => ({ id: "plan_abc", archived: true }),
+  },
+  {
+    method: "GET",
+    matches: (url) => url === "/api/v1/test-suites",
+    status: 200,
+    answer: () => CANNED_TEST_SUITES_LIST,
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/test-suites",
+    status: 201,
+    answer: () => CANNED_TEST_SUITE_CREATED,
+  },
+  {
+    method: "POST",
+    matches: (url) => /^\/api\/v1\/test-suites\/[^/]+\/run$/.test(url),
+    status: 200,
+    answer: () => CANNED_RUN_PLAN_RUN,
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/test-suites\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_TEST_SUITE_DETAIL,
+  },
+  {
+    method: "PATCH",
+    matches: (url) => /^\/api\/v1\/test-suites\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_TEST_SUITE_RENAMED,
+  },
+  {
+    method: "DELETE",
+    matches: (url) => /^\/api\/v1\/test-suites\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => ({ id: "suite_abc", archived: true }),
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/simulation-runs\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_SIMULATION_RUN_DETAIL,
+  },
+  {
+    method: "GET",
+    matches: (url) => url.startsWith("/api/v1/simulation-runs"),
+    status: 200,
+    answer: () => CANNED_SIMULATION_RUNS,
+  },
+  {
+    method: "GET",
+    matches: (url) => url === "/api/v1/dashboards",
+    status: 200,
+    answer: () => CANNED_DASHBOARDS_LIST,
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/dashboards",
+    status: 201,
+    answer: () => ({ id: "dash_new", name: "New Dashboard" }),
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/dashboards\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_DASHBOARDS_LIST.data[0],
+  },
+  {
+    method: "DELETE",
+    matches: (url) => /^\/api\/v1\/dashboards\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => ({ id: "dash_abc", name: "Main Dashboard" }),
+  },
+  {
+    method: "GET",
+    matches: (url) => url === "/api/v1/workflows",
+    status: 200,
+    answer: () => CANNED_WORKFLOWS_LIST,
+  },
+  {
+    method: "POST",
+    matches: (url) => /^\/api\/v1\/workflows\/[^/]+\/run$/.test(url),
+    status: 200,
+    answer: () => ({ output: "workflow result" }),
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/workflows\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_WORKFLOWS_LIST[0],
+  },
+  {
+    method: "DELETE",
+    matches: (url) => /^\/api\/v1\/workflows\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => ({ id: "wf_abc", archived: true }),
+  },
+  {
+    method: "GET",
+    matches: (url) => url === "/api/v1/monitors",
+    status: 200,
+    answer: () => [
+      {
+        id: "mon_abc",
+        name: "Toxicity Check",
+        slug: "toxicity-check-x1y2z",
+        checkType: "ragas/toxicity",
+        enabled: true,
+        executionMode: "ON_MESSAGE",
+        sample: 1.0,
+        level: "trace",
+        evaluatorId: null,
+        preconditions: [],
+        parameters: {},
+        mappings: {},
+        threadIdleTimeout: null,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      },
+    ],
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/monitors",
+    status: 201,
+    answer: () => ({
+      id: "mon_new",
+      name: "New Monitor",
+      slug: "new-monitor-abc12",
+      checkType: "ragas/toxicity",
+      enabled: true,
+      executionMode: "ON_MESSAGE",
+      sample: 1.0,
+      level: "trace",
+      evaluatorId: null,
+      preconditions: [],
+      parameters: {},
+      mappings: {},
+      threadIdleTimeout: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    }),
+  },
+  {
+    method: "POST",
+    matches: (url) => /^\/api\/v1\/monitors\/[^/]+\/toggle$/.test(url),
+    status: 200,
+    answer: ({ url }) => {
+      const monitorId = url?.split("/")[3];
+      return { id: monitorId, enabled: true };
+    },
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/monitors\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => ({
+      id: "mon_abc",
+      name: "Toxicity Check",
+      slug: "toxicity-check-x1y2z",
+      checkType: "ragas/toxicity",
+      enabled: true,
+      executionMode: "ON_MESSAGE",
+      sample: 1.0,
+      level: "trace",
+      evaluatorId: null,
+      preconditions: [],
+      parameters: {},
+      mappings: {},
+      threadIdleTimeout: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    }),
+  },
+  {
+    method: "PATCH",
+    matches: (url) => /^\/api\/v1\/monitors\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => ({
+      id: "mon_abc",
+      name: "Updated Monitor",
+      slug: "toxicity-check-x1y2z",
+      checkType: "ragas/toxicity",
+      enabled: false,
+      executionMode: "ON_MESSAGE",
+      sample: 0.5,
+      level: "trace",
+      evaluatorId: null,
+      preconditions: [],
+      parameters: {},
+      mappings: {},
+      threadIdleTimeout: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z",
+    }),
+  },
+  {
+    method: "DELETE",
+    matches: (url) => /^\/api\/v1\/monitors\/[^/]+$/.test(url),
+    status: 200,
+    answer: ({ url }) => {
+      const monitorId = url?.split("/").pop();
+      return { id: monitorId, deleted: true };
+    },
+  },
+  {
+    method: "GET",
+    matches: (url) => url.startsWith("/api/v1/secret?"),
+    status: 200,
+    answer: () => [
+      {
+        id: "secret_abc",
+        projectId: "proj_123",
+        name: "MY_API_KEY",
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      },
+      {
+        id: "secret_def",
+        projectId: "proj_123",
+        name: "DB_PASSWORD",
+        createdAt: "2026-01-02T00:00:00Z",
+        updatedAt: "2026-01-02T00:00:00Z",
+      },
+    ],
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/secret\/[^?]+\?/.test(url),
+    status: 200,
+    answer: () => ({
+      id: "secret_abc",
+      projectId: "proj_123",
+      name: "MY_API_KEY",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    }),
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/secret",
+    status: 201,
+    answer: () => ({
+      id: "secret_new",
+      projectId: "proj_123",
+      name: "NEW_SECRET",
+      createdAt: "2026-01-03T00:00:00Z",
+      updatedAt: "2026-01-03T00:00:00Z",
+    }),
+  },
+  {
+    method: "PUT",
+    matches: (url) => url === "/api/v1/secret/secret_abc",
+    status: 200,
+    answer: () => ({
+      id: "secret_abc",
+      projectId: "proj_123",
+      name: "MY_API_KEY",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-03T00:00:00Z",
+    }),
+  },
+  {
+    method: "DELETE",
+    matches: (url) => url === "/api/v1/secret/secret_abc",
+    status: 200,
+    answer: () => ({ id: "secret_abc", deleted: true }),
+  },
+];
+
 function createMockServer(): Server {
   return createServer((req, res) => {
     const authToken = req.headers["x-auth-token"];
@@ -508,395 +1035,16 @@ function createMockServer(): Server {
       const routeKey = `${method} ${url.split("?")[0]}`;
       lastRequests[routeKey] = { method, url, body };
 
-      if (url === "/api/v1/query/reference" && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(QUERY_REFERENCE_FIXTURE));
-        return;
-      }
-      if (url === "/api/v1/query" && method === "POST") {
-        const parsed = JSON.parse(body) as { sql?: string };
-        if (parsed.sql === "__many__") {
-          res.writeHead(200);
-          res.end(
-            JSON.stringify({
-              ...CANNED_QUERY_RESULT,
-              rows: Array.from({ length: 120 }, (_, index) => ({
-                day: `2026-09-${String((index % 28) + 1).padStart(2, "0")} 00:00:00.000`,
-                traces: index,
-                messages: null,
-              })),
-            }),
-          );
-          return;
-        }
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_QUERY_RESULT));
-        return;
-      }
-
-      // --- Trace endpoints ---
-      if (url === "/api/v1/traces/search" && method === "POST") {
-        const parsed = JSON.parse(body);
-        // Return empty results when a special query is used
-        if (parsed.query === "__empty__") {
-          res.writeHead(200);
-          res.end(JSON.stringify(CANNED_TRACES_EMPTY));
-        } else if (parsed.pageSize === 5) {
-          res.writeHead(200);
-          res.end(JSON.stringify(CANNED_TRACES_SEARCH_WITH_SCROLL));
-        } else {
-          res.writeHead(200);
-          res.end(JSON.stringify(CANNED_TRACES_SEARCH));
-        }
-      } else if (url.match(/^\/api\/v1\/traces\/trace-nonexistent(\?|$)/) && method === "GET") {
-        res.writeHead(404);
-        res.end(JSON.stringify({ message: "Trace not found" }));
-      } else if (url.match(/^\/api\/v1\/traces\/[^/]+(\?|$)/) && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_TRACE_DETAIL));
-      }
-      // --- Analytics endpoint ---
-      else if (url === "/api/v1/analytics/timeseries" && method === "POST") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_ANALYTICS));
-      }
-      // --- Prompt endpoints ---
-      else if (url === "/api/v1/prompts" && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_PROMPTS_LIST));
-      } else if (url === "/api/v1/prompts" && method === "POST") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_PROMPT_CREATED));
-      } else if (url.match(/^\/api\/v1\/prompts\/[^/]+$/) && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(promptDetailState));
-      } else if (url.match(/^\/api\/v1\/prompts\/[^/]+$/) && method === "PUT") {
-        const parsed = JSON.parse(body) as {
-          commitMessage?: string;
-          model?: string;
-          messages?: { role: string; content: string }[];
-          tags?: string[];
-        };
-        const newVersionId = "ver_p1v4";
-        promptDetailState = {
-          ...promptDetailState,
-          version: 4,
-          versionId: newVersionId,
-          commitMessage: parsed.commitMessage ?? promptDetailState.commitMessage,
-          model: parsed.model ?? promptDetailState.model,
-          messages: parsed.messages ?? promptDetailState.messages,
-          tags:
-            parsed.tags === undefined
-              ? promptDetailState.tags.map((tag) =>
-                  tag.name === "latest" ? { name: "latest", versionId: newVersionId } : tag,
-                )
-              : [
-                  { name: "latest", versionId: newVersionId },
-                  ...parsed.tags
-                    .filter((name) => name !== "latest")
-                    .map((name) => ({ name, versionId: newVersionId })),
-                ],
-        };
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_PROMPT_UPDATED));
-      }
-      // --- Scenario endpoints ---
-      else if (url === "/api/v1/scenarios" && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_SCENARIOS_LIST));
-      } else if (url === "/api/v1/scenarios" && method === "POST") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_SCENARIO_CREATED));
-      } else if (url.match(/^\/api\/v1\/scenarios\/scen_nonexistent(\?|$)/) && method === "GET") {
-        res.writeHead(404);
-        res.end(JSON.stringify({ message: "Scenario not found" }));
-      } else if (url.match(/^\/api\/v1\/scenarios\/[^/]+$/) && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_SCENARIO_DETAIL));
-      } else if (url.match(/^\/api\/v1\/scenarios\/[^/]+$/) && method === "PUT") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_SCENARIO_UPDATED));
-      } else if (url.match(/^\/api\/v1\/scenarios\/[^/]+$/) && method === "DELETE") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_SCENARIO_ARCHIVED));
-      }
-      // --- Evaluator endpoints ---
-      else if (url === "/api/v1/evaluators" && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_EVALUATORS_LIST));
-      } else if (url === "/api/v1/evaluators" && method === "POST") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_EVALUATOR_CREATED));
-      } else if (
-        url.match(/^\/api\/v1\/evaluators\/evaluator_nonexistent(\?|$)/) &&
-        method === "GET"
-      ) {
-        res.writeHead(404);
-        res.end(JSON.stringify({ message: "Evaluator not found" }));
-      } else if (url.match(/^\/api\/v1\/evaluators\/[^/]+$/) && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_EVALUATOR_DETAIL));
-      } else if (url.match(/^\/api\/v1\/evaluators\/[^/]+$/) && method === "PUT") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_EVALUATOR_UPDATED));
-      }
-      // --- Model Provider endpoints ---
-      else if (url === "/api/v1/model-providers" && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_MODEL_PROVIDERS_LIST));
-      } else if (url.match(/^\/api\/v1\/model-providers\/[^/]+$/) && method === "PUT") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_MODEL_PROVIDER_SET));
-      }
-      // --- Agent endpoints ---
-      else if (url === "/api/v1/agents" && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_AGENTS_LIST));
-      } else if (url === "/api/v1/agents" && method === "POST") {
-        res.writeHead(201);
-        res.end(JSON.stringify(CANNED_AGENT_DETAIL));
-      } else if (url?.match(/^\/api\/v1\/agents\/[^/]+$/) && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_AGENT_DETAIL));
-      } else if (url?.match(/^\/api\/v1\/agents\/[^/]+$/) && method === "PATCH") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_AGENT_DETAIL));
-      } else if (url?.match(/^\/api\/v1\/agents\/[^/]+$/) && method === "DELETE") {
-        res.writeHead(200);
-        res.end(JSON.stringify({ id: "agent_abc", name: "Test Agent" }));
-      }
-      // --- Run plan endpoints ---
-      else if (url === "/api/v1/run-plans/run" && method === "POST") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_RUN_PLAN_RUN));
-      } else if (url?.match(/^\/api\/v1\/run-plans(\?.*)?$/) && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_RUN_PLANS_LIST));
-      } else if (url?.match(/^\/api\/v1\/run-plans\/[^/]+\/run$/) && method === "POST") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_RUN_PLAN_RERUN));
-      } else if (url?.match(/^\/api\/v1\/run-plans\/[^/]+$/) && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_RUN_PLAN));
-      } else if (url?.match(/^\/api\/v1\/run-plans\/[^/]+$/) && method === "DELETE") {
-        res.writeHead(200);
-        res.end(JSON.stringify({ id: "plan_abc", archived: true }));
-      }
-      // --- Test suite endpoints ---
-      else if (url === "/api/v1/test-suites" && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_TEST_SUITES_LIST));
-      } else if (url === "/api/v1/test-suites" && method === "POST") {
-        res.writeHead(201);
-        res.end(JSON.stringify(CANNED_TEST_SUITE_CREATED));
-      } else if (url?.match(/^\/api\/v1\/test-suites\/[^/]+\/run$/) && method === "POST") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_RUN_PLAN_RUN));
-      } else if (url?.match(/^\/api\/v1\/test-suites\/[^/]+$/) && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_TEST_SUITE_DETAIL));
-      } else if (url?.match(/^\/api\/v1\/test-suites\/[^/]+$/) && method === "PATCH") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_TEST_SUITE_RENAMED));
-      } else if (url?.match(/^\/api\/v1\/test-suites\/[^/]+$/) && method === "DELETE") {
-        res.writeHead(200);
-        res.end(JSON.stringify({ id: "suite_abc", archived: true }));
-      }
-      // --- Simulation Run endpoints ---
-      else if (url?.match(/^\/api\/v1\/simulation-runs\/[^/]+$/) && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_SIMULATION_RUN_DETAIL));
-      } else if (url?.match(/^\/api\/v1\/simulation-runs/) && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_SIMULATION_RUNS));
-      }
-      // --- Dashboard endpoints ---
-      else if (url === "/api/v1/dashboards" && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_DASHBOARDS_LIST));
-      } else if (url === "/api/v1/dashboards" && method === "POST") {
-        res.writeHead(201);
-        res.end(JSON.stringify({ id: "dash_new", name: "New Dashboard" }));
-      } else if (url?.match(/^\/api\/v1\/dashboards\/[^/]+$/) && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_DASHBOARDS_LIST.data[0]));
-      } else if (url?.match(/^\/api\/v1\/dashboards\/[^/]+$/) && method === "DELETE") {
-        res.writeHead(200);
-        res.end(JSON.stringify({ id: "dash_abc", name: "Main Dashboard" }));
-      }
-      // --- Workflow endpoints ---
-      else if (url === "/api/v1/workflows" && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_WORKFLOWS_LIST));
-      } else if (url?.match(/^\/api\/v1\/workflows\/[^/]+\/run$/) && method === "POST") {
-        res.writeHead(200);
-        res.end(JSON.stringify({ output: "workflow result" }));
-      } else if (url?.match(/^\/api\/v1\/workflows\/[^/]+$/) && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_WORKFLOWS_LIST[0]));
-      } else if (url?.match(/^\/api\/v1\/workflows\/[^/]+$/) && method === "DELETE") {
-        res.writeHead(200);
-        res.end(JSON.stringify({ id: "wf_abc", archived: true }));
-      }
-      // --- Monitor endpoints ---
-      else if (url === "/api/v1/monitors" && method === "GET") {
-        res.writeHead(200);
-        res.end(
-          JSON.stringify([
-            {
-              id: "mon_abc",
-              name: "Toxicity Check",
-              slug: "toxicity-check-x1y2z",
-              checkType: "ragas/toxicity",
-              enabled: true,
-              executionMode: "ON_MESSAGE",
-              sample: 1.0,
-              level: "trace",
-              evaluatorId: null,
-              preconditions: [],
-              parameters: {},
-              mappings: {},
-              threadIdleTimeout: null,
-              createdAt: "2026-01-01T00:00:00Z",
-              updatedAt: "2026-01-01T00:00:00Z",
-            },
-          ]),
-        );
-      } else if (url === "/api/v1/monitors" && method === "POST") {
-        res.writeHead(201);
-        res.end(
-          JSON.stringify({
-            id: "mon_new",
-            name: "New Monitor",
-            slug: "new-monitor-abc12",
-            checkType: "ragas/toxicity",
-            enabled: true,
-            executionMode: "ON_MESSAGE",
-            sample: 1.0,
-            level: "trace",
-            evaluatorId: null,
-            preconditions: [],
-            parameters: {},
-            mappings: {},
-            threadIdleTimeout: null,
-            createdAt: "2026-01-01T00:00:00Z",
-            updatedAt: "2026-01-01T00:00:00Z",
-          }),
-        );
-      } else if (url?.match(/^\/api\/v1\/monitors\/[^/]+\/toggle$/) && method === "POST") {
-        const monitorId = url?.split("/")[3];
-        res.writeHead(200);
-        res.end(JSON.stringify({ id: monitorId, enabled: true }));
-      } else if (url?.match(/^\/api\/v1\/monitors\/[^/]+$/) && method === "GET") {
-        res.writeHead(200);
-        res.end(
-          JSON.stringify({
-            id: "mon_abc",
-            name: "Toxicity Check",
-            slug: "toxicity-check-x1y2z",
-            checkType: "ragas/toxicity",
-            enabled: true,
-            executionMode: "ON_MESSAGE",
-            sample: 1.0,
-            level: "trace",
-            evaluatorId: null,
-            preconditions: [],
-            parameters: {},
-            mappings: {},
-            threadIdleTimeout: null,
-            createdAt: "2026-01-01T00:00:00Z",
-            updatedAt: "2026-01-01T00:00:00Z",
-          }),
-        );
-      } else if (url?.match(/^\/api\/v1\/monitors\/[^/]+$/) && method === "PATCH") {
-        res.writeHead(200);
-        res.end(
-          JSON.stringify({
-            id: "mon_abc",
-            name: "Updated Monitor",
-            slug: "toxicity-check-x1y2z",
-            checkType: "ragas/toxicity",
-            enabled: false,
-            executionMode: "ON_MESSAGE",
-            sample: 0.5,
-            level: "trace",
-            evaluatorId: null,
-            preconditions: [],
-            parameters: {},
-            mappings: {},
-            threadIdleTimeout: null,
-            createdAt: "2026-01-01T00:00:00Z",
-            updatedAt: "2026-01-02T00:00:00Z",
-          }),
-        );
-      } else if (url?.match(/^\/api\/v1\/monitors\/[^/]+$/) && method === "DELETE") {
-        const monitorId = url?.split("/").pop();
-        res.writeHead(200);
-        res.end(JSON.stringify({ id: monitorId, deleted: true }));
-      }
-      // --- Secret endpoints ---
-      else if (url?.startsWith("/api/v1/secret?") && method === "GET") {
-        res.writeHead(200);
-        res.end(
-          JSON.stringify([
-            {
-              id: "secret_abc",
-              projectId: "proj_123",
-              name: "MY_API_KEY",
-              createdAt: "2026-01-01T00:00:00Z",
-              updatedAt: "2026-01-01T00:00:00Z",
-            },
-            {
-              id: "secret_def",
-              projectId: "proj_123",
-              name: "DB_PASSWORD",
-              createdAt: "2026-01-02T00:00:00Z",
-              updatedAt: "2026-01-02T00:00:00Z",
-            },
-          ]),
-        );
-      } else if (url?.match(/^\/api\/v1\/secret\/[^?]+\?/) && method === "GET") {
-        res.writeHead(200);
-        res.end(
-          JSON.stringify({
-            id: "secret_abc",
-            projectId: "proj_123",
-            name: "MY_API_KEY",
-            createdAt: "2026-01-01T00:00:00Z",
-            updatedAt: "2026-01-01T00:00:00Z",
-          }),
-        );
-      } else if (url === "/api/v1/secret" && method === "POST") {
-        res.writeHead(201);
-        res.end(
-          JSON.stringify({
-            id: "secret_new",
-            projectId: "proj_123",
-            name: "NEW_SECRET",
-            createdAt: "2026-01-03T00:00:00Z",
-            updatedAt: "2026-01-03T00:00:00Z",
-          }),
-        );
-      } else if (url === "/api/v1/secret/secret_abc" && method === "PUT") {
-        res.writeHead(200);
-        res.end(
-          JSON.stringify({
-            id: "secret_abc",
-            projectId: "proj_123",
-            name: "MY_API_KEY",
-            createdAt: "2026-01-01T00:00:00Z",
-            updatedAt: "2026-01-03T00:00:00Z",
-          }),
-        );
-      } else if (url === "/api/v1/secret/secret_abc" && method === "DELETE") {
-        res.writeHead(200);
-        res.end(JSON.stringify({ id: "secret_abc", deleted: true }));
-      }
-      // --- Fallback ---
-      else {
+      const route = MOCK_ROUTES.find(
+        (candidate) => candidate.method === method && candidate.matches(url),
+      );
+      if (!route) {
         res.writeHead(404);
         res.end(JSON.stringify({ message: `Not found: ${method} ${url}` }));
+        return;
       }
+      res.writeHead(route.status);
+      res.end(JSON.stringify(route.answer({ body, url })));
     });
   });
 }

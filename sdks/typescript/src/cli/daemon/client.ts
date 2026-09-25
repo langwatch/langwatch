@@ -94,217 +94,233 @@ interface PendingChunk {
  * before committing output — and the caller runs the command in-process for all of them.
  */
 export async function execViaDaemon(options: DaemonExecOptions): Promise<DaemonExecOutcome> {
-  const stdout = options.stdout ?? process.stdout;
-  const stderr = options.stderr ?? process.stderr;
-  const maxBufferBytes = options.maxBufferBytes ?? DEFAULT_MAX_BUFFER_BYTES;
-  const requestTimeoutMs = options.requestTimeoutMs ?? REQUEST_TIMEOUT_MS;
-
   // BEFORE connect, and above all before the pipelined `exec` hands over args,
-  // cwd and the forwarded LANGWATCH_* env: the socket must be ours. See
-  // identity.ts inspectSocketTrust. Not being able to trust the socket is
-  // exactly "no daemon available" — the command runs in-process, as it would
-  // if nothing were listening at all.
+  // cwd and the forwarded LANGWATCH_* env: the socket must be ours (identity.ts
+  // inspectSocketTrust). An untrusted socket is exactly "no daemon available".
   const untrusted = inspectSocketTrust(options.socketPath);
   if (untrusted) return { served: false, reason: untrusted };
 
   return new Promise<DaemonExecOutcome>((resolve) => {
-    const socket = net.connect(options.socketPath);
-    const decoder = new FrameDecoder<ServerFrame>();
-
-    const buffered: PendingChunk[] = [];
-    let bufferedBytes = 0;
-    /** Once true, output has reached the caller and we can no longer fall back. */
-    let committed = false;
-    let settled = false;
-    let handshakeTimer: NodeJS.Timeout | undefined;
-    let requestTimer: NodeJS.Timeout | undefined;
-    let cancelled = false;
-
-    const send = (frame: ClientFrame): void => {
-      if (!socket.destroyed) socket.write(encodeFrame(frame));
-    };
-
-    const flush = (): void => {
-      for (const chunk of buffered) {
-        (chunk.stream === "stdout" ? stdout : stderr).write(chunk.data);
-      }
-      buffered.length = 0;
-      bufferedBytes = 0;
-    };
-
-    const settle = (outcome: DaemonExecOutcome): void => {
-      if (settled) return;
-      settled = true;
-      if (handshakeTimer) clearTimeout(handshakeTimer);
-      if (requestTimer) clearTimeout(requestTimer);
-      removeSignalHandlers();
-      socket.destroy();
-      resolve(outcome);
-    };
-
-    const onSignal = (): void => {
-      cancelled = true;
-      // Tell the daemon to abandon the command rather than orphaning it, then
-      // let the `exit` frame (code 130) settle us normally.
-      send({ t: "cancel" });
-      // If the daemon does not answer promptly, exit anyway — a Ctrl-C must
-      // never hang.
-      setTimeout(() => {
-        if (committed) flush();
-        settle({ served: true, exitCode: 130 });
-      }, 500).unref();
-    };
-
-    const removeSignalHandlers = (): void => {
-      process.removeListener("SIGINT", onSignal);
-      process.removeListener("SIGTERM", onSignal);
-    };
-
-    socket.setTimeout(CONNECT_TIMEOUT_MS, () => {
-      if (!committed) settle({ served: false, reason: "connect-timeout" });
-    });
-
-    socket.on("error", (error: NodeJS.ErrnoException) => {
-      if (committed) {
-        // Output is already on its way to the caller; re-running would duplicate
-        // it. Surface the failure honestly instead.
-        stderr.write(
-          `langwatch: daemon connection lost mid-command (${error.code ?? error.message})\n`,
-        );
-        settle({ served: true, exitCode: 1 });
-        return;
-      }
-      settle({ served: false, reason: `connect-failed:${error.code ?? "unknown"}` });
-    });
-
-    socket.on("close", () => {
-      if (settled) return;
-      if (committed) {
-        stderr.write("langwatch: daemon closed the connection mid-command\n");
-        settle({ served: true, exitCode: 1 });
-        return;
-      }
-      settle({ served: false, reason: "closed-before-exit" });
-    });
-
-    socket.on("connect", () => {
-      // Clear the connect timeout; the handshake gets its own.
-      socket.setTimeout(0);
-      process.on("SIGINT", onSignal);
-      process.on("SIGTERM", onSignal);
-
-      handshakeTimer = setTimeout(() => {
-        settle({ served: false, reason: "handshake-timeout" });
-      }, HANDSHAKE_TIMEOUT_MS);
-      handshakeTimer.unref();
-
-      // Armed for the WHOLE request, not for the handshake. It is cleared once
-      // output commits: from that point the caller is reading bytes as they
-      // arrive, so a long command is visibly alive and cutting it off would
-      // truncate a stream that is working.
-      requestTimer = setTimeout(() => {
-        stderr.write(REQUEST_TIMEOUT_MESSAGE);
-        // Evicted, not left running: it took an exec and stopped answering, so
-        // the next invocation would find it and wedge the same way.
-        settle({
-          served: true,
-          exitCode: REQUEST_TIMEOUT_EXIT_CODE,
-          evict: true,
-        });
-      }, requestTimeoutMs);
-      requestTimer.unref();
-
-      // Pipelined: the daemon reads frames in order and will not touch `exec`
-      // unless `hello` passed. Saves a round trip on the hot path.
-      send({
-        t: "hello",
-        protocol: PROTOCOL_VERSION,
-        cliVersion: options.cliVersion,
-        build: options.build,
-        fingerprint: options.fingerprint,
-      });
-      send({
-        t: "exec",
-        args: options.args,
-        cwd: options.cwd,
-        env: options.env,
-        colorLevel: options.colorLevel,
-        bin: options.bin,
-      });
-    });
-
-    socket.on("data", (chunk: Buffer) => {
-      let frames: ServerFrame[];
-      try {
-        frames = decoder.push(chunk);
-      } catch {
-        settle({ served: false, reason: "protocol-error" });
-        return;
-      }
-
-      for (const frame of frames) {
-        switch (frame.t) {
-          case "hello-ok": {
-            if (handshakeTimer) clearTimeout(handshakeTimer);
-            break;
-          }
-          case "hello-err": {
-            if (handshakeTimer) clearTimeout(handshakeTimer);
-            settle({
-              served: false,
-              reason: `handshake-refused:${frame.reason}`,
-              // A stale daemon from a previous CLI version must not linger:
-              // it would keep answering (and refusing) every invocation until
-              // its idle timeout, and it is holding credentials.
-              evict: frame.reason === "version-skew" || frame.reason === "protocol-skew",
-            });
-            break;
-          }
-          case "fallback": {
-            if (committed) {
-              // The daemon declined AFTER our output was already flushed past the buffer cap:
-              // re-running would duplicate what the caller has already seen, so we report the
-              // output as incomplete and this exit status as ours. Only shutdown-grace reaches it.
-              stderr.write(
-                `langwatch: daemon stopped mid-command (${frame.reason}); ` +
-                  `the output above is incomplete and this exit status is not the command's — please re-run\n`,
-              );
-              settle({ served: true, exitCode: 1 });
-              break;
-            }
-            settle({ served: false, reason: `daemon-declined:${frame.reason}` });
-            break;
-          }
-          case "out":
-          case "err": {
-            if (cancelled) break;
-            const data = Buffer.from(frame.d, "base64");
-            const stream = frame.t === "out" ? "stdout" : "stderr";
-            if (committed) {
-              (stream === "stdout" ? stdout : stderr).write(data);
-              break;
-            }
-            buffered.push({ stream, data });
-            bufferedBytes += data.byteLength;
-            if (bufferedBytes > maxBufferBytes) {
-              committed = true;
-              if (requestTimer) clearTimeout(requestTimer);
-              flush();
-            }
-            break;
-          }
-          case "exit": {
-            flush();
-            settle({ served: true, exitCode: frame.code });
-            break;
-          }
-          case "status-ok":
-            break;
-        }
-        if (settled) return;
-      }
-    });
+    new DaemonRequest({ options, resolve }).start();
   });
+}
+
+/** One command served over the daemon socket, buffered until its output commits. */
+class DaemonRequest {
+  private readonly options: DaemonExecOptions;
+  private readonly resolve: (outcome: DaemonExecOutcome) => void;
+  private readonly stdout: NodeJS.WritableStream;
+  private readonly stderr: NodeJS.WritableStream;
+  private readonly maxBufferBytes: number;
+  private readonly requestTimeoutMs: number;
+  private readonly socket: net.Socket;
+  private readonly decoder = new FrameDecoder<ServerFrame>();
+  private readonly buffered: PendingChunk[] = [];
+  private bufferedBytes = 0;
+  /** Once true, output has reached the caller and we can no longer fall back. */
+  private committed = false;
+  private settled = false;
+  private handshakeTimer: NodeJS.Timeout | undefined;
+  private requestTimer: NodeJS.Timeout | undefined;
+  private cancelled = false;
+  private readonly onSignal = (): void => {
+    this.cancelled = true;
+    // Tell the daemon to abandon the command rather than orphaning it, then
+    // let the `exit` frame (code 130) settle us normally.
+    this.send({ t: "cancel" });
+    // If the daemon does not answer promptly, exit anyway: a Ctrl-C must never hang.
+    setTimeout(() => {
+      if (this.committed) this.flush();
+      this.settle({ served: true, exitCode: 130 });
+    }, 500).unref();
+  };
+
+  constructor({
+    options,
+    resolve,
+  }: {
+    options: DaemonExecOptions;
+    resolve: (outcome: DaemonExecOutcome) => void;
+  }) {
+    this.options = options;
+    this.resolve = resolve;
+    this.stdout = options.stdout ?? process.stdout;
+    this.stderr = options.stderr ?? process.stderr;
+    this.maxBufferBytes = options.maxBufferBytes ?? DEFAULT_MAX_BUFFER_BYTES;
+    this.requestTimeoutMs = options.requestTimeoutMs ?? REQUEST_TIMEOUT_MS;
+    this.socket = net.connect(options.socketPath);
+  }
+
+  start(): void {
+    const { socket } = this;
+    socket.setTimeout(CONNECT_TIMEOUT_MS, () => {
+      if (!this.committed) this.settle({ served: false, reason: "connect-timeout" });
+    });
+    socket.on("error", (error: NodeJS.ErrnoException) => this.lost(error));
+    socket.on("close", () => this.closed());
+    socket.on("connect", () => this.connected());
+    socket.on("data", (chunk: Buffer) => this.receive(chunk));
+  }
+
+  private send(frame: ClientFrame): void {
+    if (!this.socket.destroyed) this.socket.write(encodeFrame(frame));
+  }
+
+  private write(stream: PendingChunk["stream"], data: Buffer): void {
+    (stream === "stdout" ? this.stdout : this.stderr).write(data);
+  }
+
+  private flush(): void {
+    for (const chunk of this.buffered) this.write(chunk.stream, chunk.data);
+    this.buffered.length = 0;
+    this.bufferedBytes = 0;
+  }
+
+  private settle(outcome: DaemonExecOutcome): void {
+    if (this.settled) return;
+    this.settled = true;
+    if (this.handshakeTimer) clearTimeout(this.handshakeTimer);
+    if (this.requestTimer) clearTimeout(this.requestTimer);
+    process.removeListener("SIGINT", this.onSignal);
+    process.removeListener("SIGTERM", this.onSignal);
+    this.socket.destroy();
+    this.resolve(outcome);
+  }
+
+  private lost(error: NodeJS.ErrnoException): void {
+    if (this.committed) {
+      // Output is already on its way to the caller; re-running would duplicate
+      // it. Surface the failure honestly instead.
+      this.stderr.write(
+        `langwatch: daemon connection lost mid-command (${error.code ?? error.message})\n`,
+      );
+      this.settle({ served: true, exitCode: 1 });
+      return;
+    }
+    this.settle({ served: false, reason: `connect-failed:${error.code ?? "unknown"}` });
+  }
+
+  private closed(): void {
+    if (this.settled) return;
+    if (this.committed) {
+      this.stderr.write("langwatch: daemon closed the connection mid-command\n");
+      this.settle({ served: true, exitCode: 1 });
+      return;
+    }
+    this.settle({ served: false, reason: "closed-before-exit" });
+  }
+
+  private connected(): void {
+    const { options } = this;
+    // Clear the connect timeout; the handshake gets its own.
+    this.socket.setTimeout(0);
+    process.on("SIGINT", this.onSignal);
+    process.on("SIGTERM", this.onSignal);
+
+    this.handshakeTimer = setTimeout(() => {
+      this.settle({ served: false, reason: "handshake-timeout" });
+    }, HANDSHAKE_TIMEOUT_MS);
+    this.handshakeTimer.unref();
+
+    // Armed for the WHOLE request and cleared once output commits: from then
+    // the caller reads bytes as they arrive, so a long command is visibly alive.
+    // Evicted on expiry: it took an exec and stopped answering.
+    this.requestTimer = setTimeout(() => {
+      this.stderr.write(REQUEST_TIMEOUT_MESSAGE);
+      this.settle({ served: true, exitCode: REQUEST_TIMEOUT_EXIT_CODE, evict: true });
+    }, this.requestTimeoutMs);
+    this.requestTimer.unref();
+
+    // Pipelined: the daemon reads frames in order and will not touch `exec`
+    // unless `hello` passed. Saves a round trip on the hot path.
+    this.send({
+      t: "hello",
+      protocol: PROTOCOL_VERSION,
+      cliVersion: options.cliVersion,
+      build: options.build,
+      fingerprint: options.fingerprint,
+    });
+    this.send({
+      t: "exec",
+      args: options.args,
+      cwd: options.cwd,
+      env: options.env,
+      colorLevel: options.colorLevel,
+      bin: options.bin,
+    });
+  }
+
+  private receive(chunk: Buffer): void {
+    let frames: ServerFrame[];
+    try {
+      frames = this.decoder.push(chunk);
+    } catch {
+      this.settle({ served: false, reason: "protocol-error" });
+      return;
+    }
+    for (const frame of frames) {
+      this.handleFrame(frame);
+      if (this.settled) return;
+    }
+  }
+
+  private handleFrame(frame: ServerFrame): void {
+    switch (frame.t) {
+      case "hello-ok":
+        if (this.handshakeTimer) clearTimeout(this.handshakeTimer);
+        return;
+      case "hello-err":
+        if (this.handshakeTimer) clearTimeout(this.handshakeTimer);
+        this.settle({
+          served: false,
+          reason: `handshake-refused:${frame.reason}`,
+          // A stale daemon from a previous CLI version must not linger: it
+          // would refuse every invocation until its idle timeout, holding credentials.
+          evict: frame.reason === "version-skew" || frame.reason === "protocol-skew",
+        });
+        return;
+      case "fallback":
+        return this.declined(frame.reason);
+      case "out":
+      case "err":
+        if (this.cancelled) return;
+        return this.output(frame.t === "out" ? "stdout" : "stderr", Buffer.from(frame.d, "base64"));
+      case "exit":
+        this.flush();
+        this.settle({ served: true, exitCode: frame.code });
+        return;
+      case "status-ok":
+        return;
+    }
+  }
+
+  private declined(reason: string): void {
+    if (!this.committed) {
+      this.settle({ served: false, reason: `daemon-declined:${reason}` });
+      return;
+    }
+    // The daemon declined AFTER our output was flushed past the buffer cap:
+    // re-running would duplicate what the caller has seen, so we report the
+    // output as incomplete and this exit status as ours.
+    this.stderr.write(
+      `langwatch: daemon stopped mid-command (${reason}); ` +
+        `the output above is incomplete and this exit status is not the command's — please re-run\n`,
+    );
+    this.settle({ served: true, exitCode: 1 });
+  }
+
+  private output(stream: PendingChunk["stream"], data: Buffer): void {
+    if (this.committed) {
+      this.write(stream, data);
+      return;
+    }
+    this.buffered.push({ stream, data });
+    this.bufferedBytes += data.byteLength;
+    if (this.bufferedBytes <= this.maxBufferBytes) return;
+    this.committed = true;
+    if (this.requestTimer) clearTimeout(this.requestTimer);
+    this.flush();
+  }
 }
 
 export interface DaemonStatus {

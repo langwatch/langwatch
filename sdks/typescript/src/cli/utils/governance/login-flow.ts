@@ -8,6 +8,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import chalk from "chalk";
+import type { Ora } from "ora";
 
 import { normalizeEndpoint } from "../../../internal/endpoint";
 import { rememberProjectName } from "../identityNotice";
@@ -47,6 +48,235 @@ export interface RunUnifiedLoginOptions {
 }
 
 export type RunDeviceFlowLoginOptions = Omit<RunUnifiedLoginOptions, "kind">;
+
+type LoginResult = Awaited<ReturnType<typeof pollUntilDone>>;
+type DeviceSessionResult = Extract<LoginResult, { kind: "device_session" }>;
+type ProjectKeyResult = Exclude<LoginResult, { kind: "device_session" }>;
+
+/** Adopts the server's gateway URL and per-tool path policy, when it sends them. */
+function applyBootstrap({
+  cfg,
+  bootstrap,
+}: {
+  cfg: GovernanceConfig;
+  bootstrap: Awaited<ReturnType<typeof fetchBootstrapSafely>>;
+}): void {
+  // Pick up the server's authoritative gateway URL. Without this,
+  // self-hosted CLI users would see the SaaS default on whoami/login
+  // output even though the gateway is local. Reflects `LW_GATEWAY_BASE_URL`
+  // or the IS_SAAS-aware fallback; older servers without this field leave
+  // the local default in place.
+  if (bootstrap?.gatewayUrl) {
+    cfg.gateway_url = bootstrap.gatewayUrl;
+    saveConfig(cfg);
+  }
+
+  // Cache the org's per-tool path policy so the `langwatch <tool>`
+  // wrapper gates path selection on the admin's choices offline.
+  // Older servers omit the field; the wrapper then falls back to
+  // the hardcoded defaults.
+  if (bootstrap?.toolPolicies) {
+    cfg.tool_policies = bootstrap.toolPolicies;
+    saveConfig(cfg);
+  }
+}
+
+/** Keeps a cached key the platform still lists, and any hand-placed credential. */
+function reconcileEntries({ cfg, liveSet }: { cfg: GovernanceConfig; liveSet: Set<string> }): {
+  reconciled: GovernanceConfig["default_personal_ingest_keys"];
+  changed: boolean;
+} {
+  const reconciled: GovernanceConfig["default_personal_ingest_keys"] = {};
+  let changed = false;
+  for (const [sourceType, entry] of Object.entries(cfg.default_personal_ingest_keys ?? {})) {
+    const lookupId = extractLookupIdFromToken(entry.secret ?? "");
+    if (lookupId === undefined) {
+      // Not a personal ik-lw- token: a credential the user placed
+      // here by hand. It cannot be matched against the personal
+      // listing, so it is kept, never dropped as stale.
+      reconciled[sourceType] = entry;
+    } else if (liveSet.has(`${sourceType}:${lookupId}`)) {
+      reconciled[sourceType] = entry;
+    } else {
+      // Revoked on the platform — omit from reconciled.
+      changed = true;
+    }
+  }
+  return { reconciled, changed };
+}
+
+async function reconcileIngestKeys(cfg: GovernanceConfig): Promise<void> {
+  const cached = cfg.default_personal_ingest_keys;
+  if (!cached || Object.keys(cached).length === 0) return;
+  try {
+    const liveKeys = await listIngestionKeys(cfg);
+    const liveSet = new Set(liveKeys.map((k) => `${k.sourceType}:${k.lookupId}`));
+    const { reconciled, changed } = reconcileEntries({ cfg, liveSet });
+    if (changed) {
+      cfg.default_personal_ingest_keys = reconciled;
+      saveConfig(cfg);
+    }
+  } catch (error) {
+    // Network error / older server: keep existing cache untouched
+    void error;
+  }
+}
+
+async function refreshWiringAfterLogin(cfg: GovernanceConfig): Promise<void> {
+  try {
+    const refresh = await refreshTelemetryWiringForLogin(cfg);
+    if (refresh.mintedAny) saveConfig(cfg);
+    if (refresh.labels.length > 0) {
+      console.log();
+      console.log(chalk.gray("  Updated telemetry wiring to point at this login:"));
+      for (const label of refresh.labels) {
+        console.log(chalk.gray(`  • ${label}`));
+      }
+    }
+    for (const warning of refresh.warnings ?? []) {
+      console.warn(chalk.yellow(`  ${warning}`));
+    }
+    if (refresh.kept) {
+      console.log();
+      for (const line of keptWiringLines(refresh.kept)) {
+        console.log(chalk.gray(`  ${line}`));
+      }
+    }
+  } catch (error) {
+    // Wiring refresh is best-effort; the session itself is already saved.
+    void error;
+  }
+}
+
+/**
+ * Three states, named rather than nested: undefined means the server predates
+ * the overview endpoint, so the ceremony may fall back to the legacy line; an
+ * empty list means the member has no gateway access.
+ */
+function ceremonyBudgetsFrom(
+  budgetOverview: Awaited<ReturnType<typeof fetchBudgetOverviewSafely>>,
+): LoginCeremonyBudgetLine[] | undefined {
+  if (!budgetOverview) {
+    return undefined;
+  } else if (budgetOverview.gatewayAccess) {
+    return budgetOverview.budgets.map((b) => ({
+      spentUsd: Number.parseFloat(b.spentUsd) || 0,
+      limitUsd: Number.parseFloat(b.limitUsd) || 0,
+      window: b.window,
+      scopePhrase: b.scopePhrase,
+      providerLabel: b.providerLabel,
+      resetsAt: b.resetsAt,
+    }));
+  } else {
+    return [];
+  }
+}
+
+async function completeDeviceSession({
+  cfg,
+  result,
+  spinner,
+  isQuiet,
+}: {
+  cfg: GovernanceConfig;
+  result: DeviceSessionResult;
+  spinner: Ora;
+  isQuiet: boolean;
+}): Promise<GovernanceConfig> {
+  spinner.succeed(`Logged in as ${result.user.email}`);
+  persistDeviceSession(cfg, result);
+  saveConfig(cfg);
+
+  const bootstrap = await fetchBootstrapSafely(cfg);
+
+  applyBootstrap({ cfg, bootstrap });
+
+  // Reconcile cached ingestion keys (#4755): after a fresh login, drop
+  // any locally cached entries whose token was revoked on the platform.
+  // Errors are swallowed — a login must never fail on reconcile; the
+  // worst outcome is a stale cache entry that the per-invocation wrapper
+  // check will catch anyway.
+  await reconcileIngestKeys(cfg);
+
+  // Latest login wins (#6202): telemetry wiring a previous install
+  // persisted (claude settings env, codex [otel] block, gemini/opencode
+  // shell functions) pointing at a DIFFERENT instance would silently
+  // reroute every plain-tool run there. Re-point it at this login now,
+  // minting fresh ingest keys where needed. Best-effort: never fails a login.
+  await refreshWiringAfterLogin(cfg);
+
+  if (isQuiet) return cfg;
+
+  // Per-budget epilogue data. Every budget that binds this key,
+  // labelled with its scope, so the ceremony never presents the
+  // whole organization's cap as if it were personal. Null on older
+  // servers without the endpoint; the ceremony then falls back to
+  // the /bootstrap collapsed line.
+  const budgetOverview = await fetchBudgetOverviewSafely(cfg);
+
+  // Three states, named rather than nested: undefined means the
+  // server predates the overview endpoint and the ceremony may
+  // fall back to the legacy line; an empty list means the member
+  // has no gateway access, which renders nothing budget-related
+  // and stops the legacy line resurfacing it.
+  const ceremonyBudgets = ceremonyBudgetsFrom(budgetOverview);
+
+  console.log();
+  const ceremonyLines = formatLoginCeremony({
+    email: cfg.user?.email ?? result.user.email,
+    organizationName: cfg.organization?.name,
+    tools: bootstrap?.tools,
+    providers: bootstrap?.providers,
+    budget:
+      bootstrap?.budget?.monthlyLimitUsd != null
+        ? {
+            period: bootstrap.budget.period,
+            limitUsd: bootstrap.budget.monthlyLimitUsd,
+            usedUsd: bootstrap.budget.monthlyUsedUsd,
+          }
+        : undefined,
+    budgets: ceremonyBudgets,
+    budgetsUrl: `${cfg.control_plane_url.replace(/\/+$/, "")}/settings/gateway/budgets`,
+  });
+  for (const line of ceremonyLines) {
+    console.log(line);
+  }
+  console.log();
+  console.log(chalk.gray(`  Dashboard: ${cfg.control_plane_url}`));
+
+  return cfg;
+}
+
+function completeProjectKey({
+  cfg,
+  result,
+  spinner,
+}: {
+  cfg: GovernanceConfig;
+  result: ProjectKeyResult;
+  spinner: Ora;
+}): GovernanceConfig {
+  // kind === 'api_key' — write to project-local .env (NO copy-paste)
+  spinner.succeed(`Connected to project ${chalk.bold(result.project.name)}`);
+  // Seed the identity notice's credential-to-project-name cache while the
+  // server is telling us the name anyway, so the first api-key notice
+  // needs no extra round trip.
+  rememberProjectName(result.api_key, result.project.name);
+  const envResult = writeApiKeyToEnv(result.api_key);
+  console.log();
+  console.log(chalk.green("✓ API key saved to .env"));
+  if (envResult.created) {
+    console.log(chalk.gray(`  • Created .env file at ${envResult.path}`));
+  } else if (envResult.updated) {
+    console.log(chalk.gray(`  • Updated existing API key in ${envResult.path}`));
+  } else {
+    console.log(chalk.gray(`  • Added API key to ${envResult.path}`));
+  }
+  console.log();
+  console.log(chalk.gray(`  Project: ${result.project.name} (${result.project.slug})`));
+  console.log(chalk.gray(`  Dashboard: ${cfg.control_plane_url}`));
+  return cfg;
+}
 
 /**
  * Run the canonical device-code login flow end-to-end. Selects what to mint
@@ -107,174 +337,9 @@ export async function runUnifiedLoginFlow(
   try {
     const result = await pollUntilDone({ baseUrl }, dc);
     if (result.kind === "device_session") {
-      spinner.succeed(`Logged in as ${result.user.email}`);
-      persistDeviceSession(cfg, result);
-      saveConfig(cfg);
-
-      const bootstrap = await fetchBootstrapSafely(cfg);
-
-      // Pick up the server's authoritative gateway URL. Without this,
-      // self-hosted CLI users would see the SaaS default on whoami/login
-      // output even though the gateway is local. Reflects `LW_GATEWAY_BASE_URL`
-      // or the IS_SAAS-aware fallback; older servers without this field leave
-      // the local default in place.
-      if (bootstrap?.gatewayUrl) {
-        cfg.gateway_url = bootstrap.gatewayUrl;
-        saveConfig(cfg);
-      }
-
-      // Cache the org's per-tool path policy so the `langwatch <tool>`
-      // wrapper gates path selection on the admin's choices offline.
-      // Older servers omit the field; the wrapper then falls back to
-      // the hardcoded defaults.
-      if (bootstrap?.toolPolicies) {
-        cfg.tool_policies = bootstrap.toolPolicies;
-        saveConfig(cfg);
-      }
-
-      // Reconcile cached ingestion keys (#4755): after a fresh login, drop
-      // any locally cached entries whose token was revoked on the platform.
-      // Errors are swallowed — a login must never fail on reconcile; the
-      // worst outcome is a stale cache entry that the per-invocation wrapper
-      // check will catch anyway.
-      if (
-        cfg.default_personal_ingest_keys &&
-        Object.keys(cfg.default_personal_ingest_keys).length > 0
-      ) {
-        try {
-          const liveKeys = await listIngestionKeys(cfg);
-          const liveSet = new Set(liveKeys.map((k) => `${k.sourceType}:${k.lookupId}`));
-          const reconciled: GovernanceConfig["default_personal_ingest_keys"] = {};
-          let changed = false;
-          for (const [sourceType, entry] of Object.entries(cfg.default_personal_ingest_keys)) {
-            const lookupId = extractLookupIdFromToken(entry.secret ?? "");
-            if (lookupId === undefined) {
-              // Not a personal ik-lw- token: a credential the user placed
-              // here by hand. It cannot be matched against the personal
-              // listing, so it is kept, never dropped as stale.
-              reconciled[sourceType] = entry;
-            } else if (liveSet.has(`${sourceType}:${lookupId}`)) {
-              reconciled[sourceType] = entry;
-            } else {
-              // Revoked on the platform — omit from reconciled.
-              changed = true;
-            }
-          }
-          if (changed) {
-            cfg.default_personal_ingest_keys = reconciled;
-            saveConfig(cfg);
-          }
-        } catch (error) {
-          // Network error / older server: keep existing cache untouched
-          void error;
-        }
-      }
-
-      // Latest login wins (#6202): telemetry wiring a previous install
-      // persisted (claude settings env, codex [otel] block, gemini/opencode
-      // shell functions) pointing at a DIFFERENT instance would silently
-      // reroute every plain-tool run there. Re-point it at this login now,
-      // minting fresh ingest keys where needed. Best-effort: never fails a login.
-      try {
-        const refresh = await refreshTelemetryWiringForLogin(cfg);
-        if (refresh.mintedAny) saveConfig(cfg);
-        if (refresh.labels.length > 0) {
-          console.log();
-          console.log(chalk.gray("  Updated telemetry wiring to point at this login:"));
-          for (const label of refresh.labels) {
-            console.log(chalk.gray(`  • ${label}`));
-          }
-        }
-        for (const warning of refresh.warnings ?? []) {
-          console.warn(chalk.yellow(`  ${warning}`));
-        }
-        if (refresh.kept) {
-          console.log();
-          for (const line of keptWiringLines(refresh.kept)) {
-            console.log(chalk.gray(`  ${line}`));
-          }
-        }
-      } catch (error) {
-        // Wiring refresh is best-effort; the session itself is already saved.
-        void error;
-      }
-
-      if (isQuiet) return cfg;
-
-      // Per-budget epilogue data. Every budget that binds this key,
-      // labelled with its scope, so the ceremony never presents the
-      // whole organization's cap as if it were personal. Null on older
-      // servers without the endpoint; the ceremony then falls back to
-      // the /bootstrap collapsed line.
-      const budgetOverview = await fetchBudgetOverviewSafely(cfg);
-
-      // Three states, named rather than nested: undefined means the
-      // server predates the overview endpoint and the ceremony may
-      // fall back to the legacy line; an empty list means the member
-      // has no gateway access, which renders nothing budget-related
-      // and stops the legacy line resurfacing it.
-      let ceremonyBudgets: LoginCeremonyBudgetLine[] | undefined;
-      if (!budgetOverview) {
-        ceremonyBudgets = undefined;
-      } else if (budgetOverview.gatewayAccess) {
-        ceremonyBudgets = budgetOverview.budgets.map((b) => ({
-          spentUsd: Number.parseFloat(b.spentUsd) || 0,
-          limitUsd: Number.parseFloat(b.limitUsd) || 0,
-          window: b.window,
-          scopePhrase: b.scopePhrase,
-          providerLabel: b.providerLabel,
-          resetsAt: b.resetsAt,
-        }));
-      } else {
-        ceremonyBudgets = [];
-      }
-
-      console.log();
-      const ceremonyLines = formatLoginCeremony({
-        email: cfg.user?.email ?? result.user.email,
-        organizationName: cfg.organization?.name,
-        tools: bootstrap?.tools,
-        providers: bootstrap?.providers,
-        budget:
-          bootstrap?.budget?.monthlyLimitUsd != null
-            ? {
-                period: bootstrap.budget.period,
-                limitUsd: bootstrap.budget.monthlyLimitUsd,
-                usedUsd: bootstrap.budget.monthlyUsedUsd,
-              }
-            : undefined,
-        budgets: ceremonyBudgets,
-        budgetsUrl: `${cfg.control_plane_url.replace(/\/+$/, "")}/settings/gateway/budgets`,
-      });
-      for (const line of ceremonyLines) {
-        console.log(line);
-      }
-      console.log();
-      console.log(chalk.gray(`  Dashboard: ${cfg.control_plane_url}`));
-
-      return cfg;
+      return await completeDeviceSession({ cfg, result, spinner, isQuiet });
     }
-
-    // kind === 'api_key' — write to project-local .env (NO copy-paste)
-    spinner.succeed(`Connected to project ${chalk.bold(result.project.name)}`);
-    // Seed the identity notice's credential-to-project-name cache while the
-    // server is telling us the name anyway, so the first api-key notice
-    // needs no extra round trip.
-    rememberProjectName(result.api_key, result.project.name);
-    const envResult = writeApiKeyToEnv(result.api_key);
-    console.log();
-    console.log(chalk.green("✓ API key saved to .env"));
-    if (envResult.created) {
-      console.log(chalk.gray(`  • Created .env file at ${envResult.path}`));
-    } else if (envResult.updated) {
-      console.log(chalk.gray(`  • Updated existing API key in ${envResult.path}`));
-    } else {
-      console.log(chalk.gray(`  • Added API key to ${envResult.path}`));
-    }
-    console.log();
-    console.log(chalk.gray(`  Project: ${result.project.name} (${result.project.slug})`));
-    console.log(chalk.gray(`  Dashboard: ${cfg.control_plane_url}`));
-    return cfg;
+    return completeProjectKey({ cfg, result, spinner });
   } catch (err) {
     spinner.fail();
     if (err instanceof DeviceFlowError) {
