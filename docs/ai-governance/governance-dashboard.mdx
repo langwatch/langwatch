@@ -4,55 +4,31 @@ description: What the /governance page shows today, where each governance number
 sidebarTitle: /governance dashboard
 ---
 
-`/governance` is the way into the AI Governance section rather than an oversight dashboard of its own. It opens with a greeting, one field for asking a question or jumping to a screen, an **Add Source** action for admins who may manage ingestion sources, and shortcuts to add people, an agent or a tool.
+`/governance` is the entry page for AI Governance. It opens with a greeting, a field for asking a question or jumping to a screen, **Add Source** for admins who can manage ingestion sources, and shortcuts to add people, an agent or a tool.
 
-Under those sit two lists. **Insights** fills once your ingestion sources are pulling, and **Recent activity** lists the screens you were last on. Before your first source reports an event, each list carries one line saying what will fill it.
+The page also shows **Insights** and **Recent activity** lists. Before your first source reports an event, each list says what will appear there.
 
-The page issues no spend, anomaly or source-health read of its own. That is deliberate: it used to carry a panel per subject, each on its own permission, so a reader whose plan or role did not cover one met an error before they met the page.
+The overview page does not read every governance metric itself. Costs, Inventory, Agents and People each own their own data, permissions and empty states.
 
-<Info>**Pairs with:** [AI Governance](/ai-governance/overview), which describes this screen and the rest of the section in full.</Info>
-
-## Where the numbers live
-
-This page carries no strips of metrics. Each subject has its own screen in the section:
+## Where to find each number
 
 | To see | Go to |
 |---|---|
-| The systems reporting AI activity, and the tool catalog | [Inventory](/ai-governance/ingestion-sources/index) |
-| The agents and applications detected across the organization | **Agents** in the sidebar |
-| Departments, and how spend rolls up by them | [People](/ai-governance/people) |
+| Provider bills, LangWatch AI Gateway metering, seats and spender breakdowns | [Costs](/ai-governance/costs) |
+| The tool catalog, environments and connected activity sources | [Inventory](/ai-governance/inventory) |
+| Agents and AI applications detected across the organization | [Agents](/ai-governance/agents) |
+| People, departments and spend attribution labels | [People](/ai-governance/people) |
 
-Alerts raised by the anomaly detector are listed on none of these. See [Anomaly rules](/ai-governance/anomaly-rules) for where an alert does reach you.
+## When admins land here
 
-## When the section becomes an admin's landing page
+LangWatch can send an organization admin to `/governance` when the organization has active governance setup. The signal includes personal keys, routing policies, ingestion sources and recent governance activity.
 
-A setup-state signal decides whether an org admin is sent here, read by the `governance.setupState({ organizationId })` tRPC procedure:
-
-```ts
-{
-  hasPersonalVKs:       boolean,  // any user has minted a personal VK
-  hasRoutingPolicies:   boolean,  // at least one routing policy exists
-  hasIngestionSources:  boolean,  // at least one source exists
-  hasAnomalyRules:      boolean,  // at least one rule defined
-  hasRecentActivity:    boolean,  // any governance event in the last 30d
-  hasApplicationTraces: boolean,  // an application project has traces
-}
-```
-
-Governance reads as active when **any one** of the first five is true. `hasApplicationTraces` is reported alongside them and does not feed that answer.
-
-The same signal backs the `langwatch governance status` output, so the CLI and the app agree on whether an organization has activated governance.
+Application traces alone do not make AI Governance the landing page. An organization that only uses LLMOps project traces still opens on its project workspace.
 
 ## Permissions
 
 Opening `/governance` needs `governance:view`, which an organization Admin holds by default.
 
-The reads behind the section's other screens are permissioned separately. The activity-monitor procedures cap at `activityMonitor:view`, the permission to grant a security analyst who should see activity without managing rules.
+The screens linked from the overview can require narrower permissions. For example, Costs needs `governanceCost:view`, and source management uses `ingestionSources:view` or `ingestionSources:manage`.
 
-## Where to next
-
-- **The section and its four pages**: [AI Governance](/ai-governance/overview).
-- **What the detector evaluates, and where an alert goes**: [Anomaly rules](/ai-governance/anomaly-rules).
-- **Inspect ingestion-source health from the terminal**: [CLI debug](/ai-governance/cli-debug).
-- **Export to your SIEM**: [Compliance architecture](/ai-governance/compliance-architecture).
-- **Audit who did what when**: [Audit log](/platform/audit-log).
+**Also check:** [AI Governance](/ai-governance/overview) for the whole section, [CLI debug](/ai-governance/cli-debug) for source health from the terminal, and [Compliance architecture](/ai-governance/compliance-architecture) for SIEM and audit coverage.

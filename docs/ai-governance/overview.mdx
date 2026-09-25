@@ -5,68 +5,63 @@ sidebarTitle: Overview
 keywords: ai governance, ai inventory, ingestion sources, tool catalog, agents, departments, langwatch
 ---
 
-AI Governance is the part of LangWatch where you administer the AI tools your company uses. It is for the platform or IT team that approves those tools and watches their use, and it gives every developer one page with the tools they may use and their own usage.
+AI Governance is the part of LangWatch where platform and IT teams manage approved AI tools, connected activity sources, agent inventory, spend attribution and each developer's personal tool portal.
 
-The section is in the sidebar under **AI Governance**, with four pages: **Overview**, **Inventory**, **Agents** and **People**. Opening them needs the `governance:view` permission, which an organization Admin holds. Each developer also has a personal home page at `/me`.
+The section is in the sidebar under **AI Governance**. The main pages are **Overview**, **Costs**, **Inventory**, **Agents** and **People**. Opening the section needs `governance:view`, which an organization Admin holds by default.
 
-## The overview page
+## What the overview shows
 
-The overview at `/governance` is the way into the section rather than a dashboard of its own. It opens with a greeting, one field for asking a question or jumping to a screen, an **Add Source** action for admins who may manage ingestion sources, and shortcuts to add people, an agent or a tool.
+The overview at `/governance` is the way into the section rather than a metrics dashboard. It opens with a greeting, a field for asking a question or jumping to a screen, **Add Source** for admins who can manage ingestion sources, and shortcuts to add people, an agent or a tool.
 
-Under those sit two lists. **Insights** fills once your ingestion sources are pulling, and **Recent activity** lists the screens you were last on. LangWatch AI Gateway traffic is under **Gateway > Usage**.
-
-Before your first ingestion source reports an event the page looks the same: each of the two lists carries one line saying what will fill it.
-
-<Frame caption="The overview as an earlier build drew it, with a setup checklist. The page no longer shows this checklist.">
-  ![The AI Governance overview with the setup checklist](/images/ai-governance/governance-overview.png)
+<Frame caption="The AI Governance overview orients admins before they move into Costs, Inventory, Agents or People.">
+  ![The AI Governance overview](/images/ai-governance/governance-overview.png)
 </Frame>
 
-## Inventory
+## What Inventory shows
 
-The inventory has two tabs. **Sources** lists the systems that report AI activity, in two groups: real-time streams that push events as they happen, and sources synced on a schedule. A new source reads **Awaiting first event** until its first event arrives, then **Active**.
+Inventory has three tabs: **Catalog**, **Environments** and **Sources**.
 
-<Frame caption="The Sources tab with two real-time sources, a Claude Code source and a generic OpenTelemetry source, both awaiting their first event.">
-  ![The Sources tab of the inventory](/images/ai-governance/governance-inventory-sources.png)
-</Frame>
+**Catalog** holds the AI tool tiles that developers see on `/me`. Use it to publish coding assistants, model providers and external tools, then scope each tile to the organization or to departments.
 
-**Catalog** holds the tool tiles that developers see on their personal home page, in three groups: coding assistants, model providers and internal tools. Each tile carries its scope.
-
-<Frame caption="The Catalog tab after the starter pack import: four coding assistants and four model providers, each scoped to the organization.">
+<Frame caption="The Catalog tab after the starter pack import, with coding assistants and model providers scoped to the organization.">
   ![The Catalog tab of the inventory](/images/ai-governance/governance-inventory-catalog.png)
 </Frame>
 
-## Personal home page
+**Sources** lists the systems that report AI activity. A source can push events in real time, or LangWatch can pull from a provider API, S3 export or Dataverse table on a schedule.
 
-`/me` shows each developer the tools published in the catalog, the budgets that apply to them, and their usage this month.
+<Frame caption="The Sources tab with connected feeds and their current status.">
+  ![The Sources tab of the inventory](/images/ai-governance/governance-inventory-sources.png)
+</Frame>
 
-<Frame caption="The personal home page: the tool tiles, the personal and organization budgets, and the Spent, Requests and Most-used model cards.">
+## What the personal home page shows
+
+`/me` shows each developer the tools published for them, the budgets that apply to them and their usage this month.
+
+<Frame caption="The personal home page shows tool tiles, budgets and usage for the signed-in developer.">
   ![The personal home page](/images/ai-governance/me-home.png)
 </Frame>
 
 ## Pages
 
 <CardGroup cols={2}>
-  <Card title="Inventory: sources" icon="plug" href="/ai-governance/ingestion-sources/index">
-    The systems that report AI activity to LangWatch: Claude Code, generic OpenTelemetry, Workato, Microsoft Copilot Studio, the OpenAI and Anthropic compliance and admin APIs, Databricks Genie, and custom S3 or HTTP audit logs. Each source shows whether it is active, awaiting its first event or disabled.
+  <Card title="Costs" icon="coins" href="/ai-governance/costs">
+    Provider bills, LangWatch AI Gateway metering, seats, provider breakdowns and spender breakdowns.
   </Card>
-  <Card title="Inventory: tool catalog" icon="grid-2" href="/ai-governance/personal-portal/admin-catalog">
-    The coding assistants, model providers and internal tools that developers see on their personal home page. Import the starter pack, then scope each tile to the whole organization or to departments.
+  <Card title="Inventory" icon="grid-2" href="/ai-governance/inventory">
+    The AI tool catalog, environments and connected sources that report activity to LangWatch.
   </Card>
-  <Card title="Anomaly Rules" icon="triangle-exclamation" href="/ai-governance/anomaly-rules">
-    What the anomaly detector evaluates and what a rule is made of. Rules cannot be created or edited in LangWatch today. Available on Enterprise plans.
+  <Card title="Agents" icon="robot" href="/ai-governance/agents">
+    Registered and provider-discovered agents across the organization, with source, owner context, health and recent usage.
   </Card>
   <Card title="People" icon="users" href="/ai-governance/people">
-    Departments: the accounting label that spend rolls up by. Assign people, teams and projects to a department, and personal AI use follows the person.
+    People, departments and the accounting labels used for spend attribution.
   </Card>
   <Card title="Personal home page" icon="house-user" href="/ai-governance/personal-portal/overview">
-    `/me` shows each developer the tools they may use, the budgets that apply to them, and their spend, requests and most-used model this month.
+    `/me` shows each developer the tools they may use, the budgets that apply to them and their usage this month.
   </Card>
   <Card title="Roles and permissions" icon="user-shield" href="/platform/rbac">
-    Who can open the governance pages and who can change them: `governance:view` and `governance:manage`, plus the permissions for ingestion sources, anomaly rules and the tool catalog.
-  </Card>
-  <Card title="Audit log" icon="scroll" href="/platform/audit-log">
-    Every change made in the settings, the API and the LangWatch AI Gateway, with who made it and from where.
+    Who can open the governance pages and who can change sources, catalog entries, departments and cost views.
   </Card>
 </CardGroup>
 
-**Also check:** [Coding Agents](/coding-agents/overview) for the cost and activity of each coding agent session, and [LangWatch AI Gateway](/ai-gateway/overview) for virtual keys and budgets.
+**Also check:** [Coding Agents](/coding-agents/overview) for coding-agent sessions and pull requests, and [LangWatch AI Gateway](/ai-gateway/overview) for virtual keys, routing and budgets.
