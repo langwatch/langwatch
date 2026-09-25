@@ -412,6 +412,64 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           );
         });
       });
+
+      describe.each([
+        ["a different date axis", { dateField: "updated" }],
+        ["a non-integer scrollStart", { scrollStart: 1.5 }],
+        ["a non-positive scrollStart", { scrollStart: 0 }],
+      ])("when scrollId carries %s", (_label, overrides) => {
+        it("discards the cursor and paginates from the beginning", async () => {
+          setupMocksForCursorTest();
+          const service = new TraceLegacyReadClickHouseRepository({
+            resolveClickHouseClient: testResolveClickHouseClient,
+            traceCanonicalisation,
+          });
+
+          await service.listAllTracesForProject(baseInput, protections, {
+            scrollId: makeScrollId(overrides),
+          });
+
+          const dataCall = mockClickHouseQuery.mock.calls[1]!;
+          expect(dataCall[0].query).not.toContain("ts.TraceId) <");
+          expect(dataCall[0].query).not.toContain("ts.TraceId) >");
+        });
+      });
+    });
+
+    describe("given a page of results", () => {
+      const listPage = async (traceIds: string[]) => {
+        setupStandardMocks(traceIds);
+        const service = new TraceLegacyReadClickHouseRepository({
+          resolveClickHouseClient: testResolveClickHouseClient,
+          traceCanonicalisation,
+        });
+        return service.listAllTracesForProject(baseInput, protections);
+      };
+
+      describe("when the page is full", () => {
+        it("mints a scrollId seeking past the last trace on the occurred axis", async () => {
+          const result = await listPage(["trace-1", "trace-2"]);
+
+          expect(result.scrollId).toBeDefined();
+          const cursor = JSON.parse(Buffer.from(result.scrollId ?? "", "base64").toString("utf-8"));
+          expect(cursor).toMatchObject({
+            lastTraceId: "trace-2",
+            pageSize: 2,
+            sortDirection: "desc",
+            dateField: "occurred",
+          });
+          expect(cursor).not.toHaveProperty("scrollStart");
+          expect(result).not.toHaveProperty("updatedThrough");
+        });
+      });
+
+      describe("when the page is short", () => {
+        it("mints no scrollId", async () => {
+          const result = await listPage(["trace-1"]);
+
+          expect(result.scrollId).toBeUndefined();
+        });
+      });
     });
 
     const setupMocksForQueryTest = () => {

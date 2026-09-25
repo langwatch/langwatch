@@ -23,6 +23,7 @@ import {
 import { usePersonalRouter } from "../../../behavior/personal-workspace-router.ts";
 import {
   type PersonalApiKeyRow,
+  type PersonalBudgetOverview,
   usePersonalContext,
 } from "../../../behavior/use-personal-context.ts";
 import { formatRelativeTime } from "../../../model/relative-time.ts";
@@ -38,6 +39,87 @@ const fmtRelative = (iso: string | null): string => formatRelativeTime(iso ? toE
 
 export function PersonalConfigureScreen() {
   const ctx = usePersonalContext();
+
+  const personalContextQuery = api.user.personalContext.useQuery(
+    { organizationId: ctx.organizationId },
+    { enabled: !!ctx.organizationId, refetchOnWindowFocus: false },
+  );
+  const personalProjectId = personalContextQuery.data?.workspace.project.id ?? null;
+
+  return (
+    <PersonalWorkspaceLayout>
+      <VStack align="stretch" gap={6} width="full">
+        <HStack alignItems="end">
+          <VStack align="start" gap={0}>
+            <Heading as="h2" size="lg">
+              Settings
+            </Heading>
+            <Text color="fg.muted" fontSize="sm">
+              Manage your personal API keys and view your admin-managed budget
+            </Text>
+          </VStack>
+          <Spacer />
+        </HStack>
+
+        <SectionCard title="Profile">
+          <VStack align="stretch" gap={4}>
+            {ctx.organizationId && <AvatarUploadControl organizationId={ctx.organizationId} />}
+            <Field label="Name" value={ctx.fullName} />
+            <Field label="Email" value={ctx.email} hint={`Managed by ${ctx.organizationName} IT`} />
+            <Field label="Joined" value={ctx.joinedOn} />
+            {ctx.routingPolicyName && (
+              <Field
+                label="Routing"
+                value={
+                  <HStack gap={2}>
+                    <Text>{ctx.routingPolicyName}</Text>
+                    <Badge variant="surface" colorPalette="gray" size="sm">
+                      managed by your org
+                    </Badge>
+                  </HStack>
+                }
+              />
+            )}
+          </VStack>
+        </SectionCard>
+
+        <PersonalCredentialsSection organizationId={ctx.organizationId} apiKeys={ctx.apiKeys} />
+
+        {ctx.organizationId ? (
+          <SectionCard
+            title="Default landing page"
+            description="Where to land when you open LangWatch. Auto uses your detected persona."
+          >
+            <HomePagePicker organizationId={ctx.organizationId} />
+          </SectionCard>
+        ) : null}
+
+        {personalContextQuery.data?.workspace.project.apiKey ? (
+          <SectionCard
+            title="Personal OTLP Endpoint"
+            description="Send raw OTLP traces directly to your personal workspace. For tool-specific auto-shape (Claude Code, Cursor, etc.), use the Trace Ingest tile catalog on /me when available."
+          >
+            <PersonalOtlpEndpointPanel
+              apiKey={personalContextQuery.data.workspace.project.apiKey}
+            />
+          </SectionCard>
+        ) : null}
+
+        {personalProjectId ? <WorkspaceFeaturesSection projectId={personalProjectId} /> : null}
+
+        {ctx.budgetOverview.gatewayAccess && <BudgetsSection budgetOverview={ctx.budgetOverview} />}
+      </VStack>
+    </PersonalWorkspaceLayout>
+  );
+}
+
+function PersonalCredentialsSection({
+  organizationId,
+  apiKeys,
+}: {
+  organizationId: string;
+  apiKeys: PersonalApiKeyRow[];
+}) {
   const toaster = usePersonalToaster();
   const showErrorToast = useShowErrorToast();
   const [newKeyLabel, setNewKeyLabel] = useState("");
@@ -81,15 +163,149 @@ export function PersonalConfigureScreen() {
       }),
   });
 
-  const personalContextQuery = api.user.personalContext.useQuery(
-    { organizationId: ctx.organizationId },
-    { enabled: !!ctx.organizationId, refetchOnWindowFocus: false },
-  );
-  const personalProjectId = personalContextQuery.data?.workspace.project.id ?? null;
+  const revokeMutation = api.personalVirtualKeys.revokePersonal.useMutation({
+    onSuccess: () => {
+      void utils.personalVirtualKeys.list.invalidate();
+      setPendingRevokeId(null);
+      toaster.create({
+        title: "Key revoked",
+        description: "The CLI/tool using this key will fail immediately.",
+        type: "success",
+      });
+    },
+    onError: (err) => showErrorToast({ error: err, fallbackTitle: "Couldn't revoke the key" }),
+  });
 
+  const onIssue = () => {
+    if (!newKeyLabel.trim() || !organizationId) return;
+    issueMutation.mutate({
+      organizationId: organizationId,
+      label: newKeyLabel.trim(),
+    });
+  };
+
+  const onRevoke = (id: string) => {
+    if (!organizationId) return;
+    revokeMutation.mutate({ organizationId: organizationId, id });
+  };
+
+  return (
+    <SectionCard
+      title="Personal credentials"
+      description="The keys your tools (Claude Code, Cursor, and the rest) use to reach LangWatch, and the devices your CLI is signed in on. Revoke anything that is stale, lost or compromised."
+      action={
+        credentialsTab === "keys" &&
+        !showAddForm && (
+          <Button size="sm" variant="outline" onClick={() => setShowAddForm(true)}>
+            + Add a new key
+          </Button>
+        )
+      }
+    >
+      <Tabs.Root
+        value={credentialsTab}
+        onValueChange={(event) => selectCredentialsTab(event.value)}
+        colorPalette="blue"
+        // The devices panel reads its inventory on mount, so it is not
+        // mounted until the reader is actually on that tab.
+        lazyMount
+      >
+        <Tabs.List marginBottom={3}>
+          <Tabs.Trigger value="keys">Virtual keys</Tabs.Trigger>
+          <Tabs.Trigger value="devices">Devices</Tabs.Trigger>
+        </Tabs.List>
+
+        <Tabs.Content value="keys">
+          {revealedSecret && (
+            <RevealedSecretBanner
+              secret={revealedSecret}
+              onDismiss={() => setRevealedSecret(null)}
+            />
+          )}
+
+          {showAddForm && (
+            <Box
+              borderWidth="1px"
+              borderColor="border.muted"
+              borderRadius="sm"
+              padding={3}
+              marginBottom={3}
+            >
+              <VStack align="stretch" gap={2}>
+                <Text fontSize="sm" fontWeight="medium">
+                  New personal key
+                </Text>
+                <Input
+                  placeholder="e.g. jane-laptop-2"
+                  size="sm"
+                  value={newKeyLabel}
+                  onChange={(e) => setNewKeyLabel(e.target.value)}
+                />
+                <Text fontSize="xs" color="fg.muted">
+                  Lowercase letters, numbers, dash, underscore. The secret is shown once on
+                  creation.
+                </Text>
+                <HStack gap={2}>
+                  <Button
+                    size="sm"
+                    onClick={onIssue}
+                    loading={issueMutation.isPending}
+                    disabled={!newKeyLabel.trim()}
+                  >
+                    Create key
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setShowAddForm(false);
+                      setNewKeyLabel("");
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </HStack>
+              </VStack>
+            </Box>
+          )}
+
+          {apiKeys.length === 0 ? (
+            <Text fontSize="sm" color="fg.muted">
+              No personal keys yet. Run <code>langwatch login</code> in your terminal to issue your
+              first one.
+            </Text>
+          ) : (
+            <VStack align="stretch" gap={2}>
+              {apiKeys.map((key) => (
+                <ApiKeyRow
+                  key={key.id}
+                  apiKey={key}
+                  isPendingRevoke={pendingRevokeId === key.id}
+                  isRevoking={revokeMutation.isPending && pendingRevokeId === key.id}
+                  onRequestRevoke={() => setPendingRevokeId(key.id)}
+                  onCancelRevoke={() => setPendingRevokeId(null)}
+                  onConfirmRevoke={() => onRevoke(key.id)}
+                />
+              ))}
+            </VStack>
+          )}
+        </Tabs.Content>
+
+        <Tabs.Content value="devices">
+          <DevicesPanel />
+        </Tabs.Content>
+      </Tabs.Root>
+    </SectionCard>
+  );
+}
+
+function WorkspaceFeaturesSection({ projectId }: { projectId: string }) {
+  const toaster = usePersonalToaster();
+  const showErrorToast = useShowErrorToast();
+  const utils = api.useUtils();
   const featuresQuery = api.personalWorkspaceFeatures.get.useQuery(
-    { projectId: personalProjectId ?? "" },
-    { enabled: !!personalProjectId, refetchOnWindowFocus: false },
+    { projectId },
+    { refetchOnWindowFocus: false },
   );
   const featuresEnabled = !!(
     featuresQuery.data?.evaluations &&
@@ -99,11 +315,7 @@ export function PersonalConfigureScreen() {
   );
   const enableAllMutation = api.personalWorkspaceFeatures.enableAll.useMutation({
     onSuccess: () => {
-      if (personalProjectId) {
-        void utils.personalWorkspaceFeatures.get.invalidate({
-          projectId: personalProjectId,
-        });
-      }
+      void utils.personalWorkspaceFeatures.get.invalidate({ projectId });
       toaster.create({
         title: "Advanced features enabled",
         description:
@@ -119,11 +331,7 @@ export function PersonalConfigureScreen() {
   });
   const disableAllMutation = api.personalWorkspaceFeatures.disableAll.useMutation({
     onSuccess: () => {
-      if (personalProjectId) {
-        void utils.personalWorkspaceFeatures.get.invalidate({
-          projectId: personalProjectId,
-        });
-      }
+      void utils.personalWorkspaceFeatures.get.invalidate({ projectId });
       toaster.create({
         title: "Advanced features disabled",
         description:
@@ -138,241 +346,46 @@ export function PersonalConfigureScreen() {
       }),
   });
 
-  const revokeMutation = api.personalVirtualKeys.revokePersonal.useMutation({
-    onSuccess: () => {
-      void utils.personalVirtualKeys.list.invalidate();
-      setPendingRevokeId(null);
-      toaster.create({
-        title: "Key revoked",
-        description: "The CLI/tool using this key will fail immediately.",
-        type: "success",
-      });
-    },
-    onError: (err) => showErrorToast({ error: err, fallbackTitle: "Couldn't revoke the key" }),
-  });
-
-  const onIssue = () => {
-    if (!newKeyLabel.trim() || !ctx.organizationId) return;
-    issueMutation.mutate({
-      organizationId: ctx.organizationId,
-      label: newKeyLabel.trim(),
-    });
-  };
-
-  const onRevoke = (id: string) => {
-    if (!ctx.organizationId) return;
-    revokeMutation.mutate({ organizationId: ctx.organizationId, id });
-  };
-
-  const hasBudgets = ctx.budgetOverview.budgets.length > 0;
-
   return (
-    <PersonalWorkspaceLayout>
-      <VStack align="stretch" gap={6} width="full">
-        <HStack alignItems="end">
-          <VStack align="start" gap={0}>
-            <Heading as="h2" size="lg">
-              Settings
-            </Heading>
-            <Text color="fg.muted" fontSize="sm">
-              Manage your personal API keys and view your admin-managed budget
-            </Text>
-          </VStack>
-          <Spacer />
-        </HStack>
-
-        <SectionCard title="Profile">
-          <VStack align="stretch" gap={4}>
-            {ctx.organizationId && <AvatarUploadControl organizationId={ctx.organizationId} />}
-            <Field label="Name" value={ctx.fullName} />
-            <Field label="Email" value={ctx.email} hint={`Managed by ${ctx.organizationName} IT`} />
-            <Field label="Joined" value={ctx.joinedOn} />
-            {ctx.routingPolicyName && (
-              <Field
-                label="Routing"
-                value={
-                  <HStack gap={2}>
-                    <Text>{ctx.routingPolicyName}</Text>
-                    <Badge variant="surface" colorPalette="gray" size="sm">
-                      managed by your org
-                    </Badge>
-                  </HStack>
-                }
-              />
-            )}
-          </VStack>
-        </SectionCard>
-
-        <SectionCard
-          title="Personal credentials"
-          description="The keys your tools (Claude Code, Cursor, and the rest) use to reach LangWatch, and the devices your CLI is signed in on. Revoke anything that is stale, lost or compromised."
-          action={
-            credentialsTab === "keys" &&
-            !showAddForm && (
-              <Button size="sm" variant="outline" onClick={() => setShowAddForm(true)}>
-                + Add a new key
-              </Button>
-            )
+    <SectionCard
+      title="Workspace features"
+      description="Evaluations, datasets, annotations, and automations are powerful for personal projects too - turn them on when you're ready. Disabling later hides the sidebar entries; existing data is preserved."
+    >
+      <Checkbox
+        checked={featuresEnabled}
+        disabled={
+          featuresQuery.isLoading || enableAllMutation.isPending || disableAllMutation.isPending
+        }
+        onCheckedChange={(details) => {
+          if (details.checked) {
+            enableAllMutation.mutate({ projectId });
+          } else {
+            disableAllMutation.mutate({ projectId });
           }
-        >
-          <Tabs.Root
-            value={credentialsTab}
-            onValueChange={(event) => selectCredentialsTab(event.value)}
-            colorPalette="blue"
-            // The devices panel reads its inventory on mount, so it is not
-            // mounted until the reader is actually on that tab.
-            lazyMount
-          >
-            <Tabs.List marginBottom={3}>
-              <Tabs.Trigger value="keys">Virtual keys</Tabs.Trigger>
-              <Tabs.Trigger value="devices">Devices</Tabs.Trigger>
-            </Tabs.List>
+        }}
+      >
+        Enable advanced features (evaluations, datasets, annotations, automations)
+      </Checkbox>
+    </SectionCard>
+  );
+}
 
-            <Tabs.Content value="keys">
-              {revealedSecret && (
-                <RevealedSecretBanner
-                  secret={revealedSecret}
-                  onDismiss={() => setRevealedSecret(null)}
-                />
-              )}
-
-              {showAddForm && (
-                <Box
-                  borderWidth="1px"
-                  borderColor="border.muted"
-                  borderRadius="sm"
-                  padding={3}
-                  marginBottom={3}
-                >
-                  <VStack align="stretch" gap={2}>
-                    <Text fontSize="sm" fontWeight="medium">
-                      New personal key
-                    </Text>
-                    <Input
-                      placeholder="e.g. jane-laptop-2"
-                      size="sm"
-                      value={newKeyLabel}
-                      onChange={(e) => setNewKeyLabel(e.target.value)}
-                    />
-                    <Text fontSize="xs" color="fg.muted">
-                      Lowercase letters, numbers, dash, underscore. The secret is shown once on
-                      creation.
-                    </Text>
-                    <HStack gap={2}>
-                      <Button
-                        size="sm"
-                        onClick={onIssue}
-                        loading={issueMutation.isPending}
-                        disabled={!newKeyLabel.trim()}
-                      >
-                        Create key
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setShowAddForm(false);
-                          setNewKeyLabel("");
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                    </HStack>
-                  </VStack>
-                </Box>
-              )}
-
-              {ctx.apiKeys.length === 0 ? (
-                <Text fontSize="sm" color="fg.muted">
-                  No personal keys yet. Run <code>langwatch login</code> in your terminal to issue
-                  your first one.
-                </Text>
-              ) : (
-                <VStack align="stretch" gap={2}>
-                  {ctx.apiKeys.map((key) => (
-                    <ApiKeyRow
-                      key={key.id}
-                      apiKey={key}
-                      isPendingRevoke={pendingRevokeId === key.id}
-                      isRevoking={revokeMutation.isPending && pendingRevokeId === key.id}
-                      onRequestRevoke={() => setPendingRevokeId(key.id)}
-                      onCancelRevoke={() => setPendingRevokeId(null)}
-                      onConfirmRevoke={() => onRevoke(key.id)}
-                    />
-                  ))}
-                </VStack>
-              )}
-            </Tabs.Content>
-
-            <Tabs.Content value="devices">
-              <DevicesPanel />
-            </Tabs.Content>
-          </Tabs.Root>
-        </SectionCard>
-
-        {ctx.organizationId ? (
-          <SectionCard
-            title="Default landing page"
-            description="Where to land when you open LangWatch. Auto uses your detected persona."
-          >
-            <HomePagePicker organizationId={ctx.organizationId} />
-          </SectionCard>
-        ) : null}
-
-        {personalContextQuery.data?.workspace.project.apiKey ? (
-          <SectionCard
-            title="Personal OTLP Endpoint"
-            description="Send raw OTLP traces directly to your personal workspace. For tool-specific auto-shape (Claude Code, Cursor, etc.), use the Trace Ingest tile catalog on /me when available."
-          >
-            <PersonalOtlpEndpointPanel
-              apiKey={personalContextQuery.data.workspace.project.apiKey}
-            />
-          </SectionCard>
-        ) : null}
-
-        {personalProjectId ? (
-          <SectionCard
-            title="Workspace features"
-            description="Evaluations, datasets, annotations, and automations are powerful for personal projects too - turn them on when you're ready. Disabling later hides the sidebar entries; existing data is preserved."
-          >
-            <Checkbox
-              checked={featuresEnabled}
-              disabled={
-                featuresQuery.isLoading ||
-                enableAllMutation.isPending ||
-                disableAllMutation.isPending
-              }
-              onCheckedChange={(details) => {
-                if (!personalProjectId) return;
-                if (details.checked) {
-                  enableAllMutation.mutate({ projectId: personalProjectId });
-                } else {
-                  disableAllMutation.mutate({ projectId: personalProjectId });
-                }
-              }}
-            >
-              Enable advanced features (evaluations, datasets, annotations, automations)
-            </Checkbox>
-          </SectionCard>
-        ) : null}
-
-        {ctx.budgetOverview.gatewayAccess && (
-          <SectionCard title="Budgets that apply to you">
-            {hasBudgets && <BudgetOverviewList items={ctx.budgetOverview.budgets} />}
-            {!hasBudgets && ctx.budgetOverview.isResolved && (
-              <VStack align="start" gap={1}>
-                <Text fontSize="sm" color="fg.muted">
-                  No budgets apply to your usage yet.
-                </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  If you'd like one, ask your admin.
-                </Text>
-              </VStack>
-            )}
-          </SectionCard>
-        )}
-      </VStack>
-    </PersonalWorkspaceLayout>
+function BudgetsSection({ budgetOverview }: { budgetOverview: PersonalBudgetOverview }) {
+  const hasBudgets = budgetOverview.budgets.length > 0;
+  return (
+    <SectionCard title="Budgets that apply to you">
+      {hasBudgets && <BudgetOverviewList items={budgetOverview.budgets} />}
+      {!hasBudgets && budgetOverview.isResolved && (
+        <VStack align="start" gap={1}>
+          <Text fontSize="sm" color="fg.muted">
+            No budgets apply to your usage yet.
+          </Text>
+          <Text fontSize="xs" color="fg.muted">
+            If you'd like one, ask your admin.
+          </Text>
+        </VStack>
+      )}
+    </SectionCard>
   );
 }
 

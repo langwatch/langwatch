@@ -339,6 +339,26 @@ export interface ClickHouseTraceLegacyReadOptions {
   resolveTraceSpansBatch?: ResolveTraceSpansBatchFn;
 }
 
+function groupEvaluationsByTrace({
+  traceIds,
+  evalRows,
+}: {
+  traceIds: string[];
+  evalRows: Parameters<typeof mapClickHouseEvaluationToTraceEvaluation>[0][];
+}): Record<string, ReturnType<typeof mapClickHouseEvaluationToTraceEvaluation>[]> {
+  const grouped: Record<string, ReturnType<typeof mapClickHouseEvaluationToTraceEvaluation>[]> = {};
+  for (const id of traceIds) {
+    grouped[id] = [];
+  }
+  for (const row of evalRows) {
+    if (row.TraceId && grouped[row.TraceId]) {
+      grouped[row.TraceId]!.push(mapClickHouseEvaluationToTraceEvaluation(row));
+    }
+  }
+
+  return grouped;
+}
+
 export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadRepository {
   private readonly logger = createLogger("langwatch:traces:clickhouse-service");
   private readonly tracer = getLangWatchTracer("langwatch.traces.clickhouse-service");
@@ -748,6 +768,156 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     );
   }
 
+  private decodeScrollCursor({
+    scrollId,
+    sortDirection,
+    pageSize,
+    dateField,
+  }: {
+    scrollId: string | null | undefined;
+    sortDirection: "asc" | "desc";
+    pageSize: number;
+    dateField: TraceDateField;
+  }): ClickHouseScrollCursor | null {
+    let cursor: ClickHouseScrollCursor | null = null;
+    if (scrollId) {
+      this.logger.debug({ scrollId: scrollId }, "Parsing scrollId from request");
+      try {
+        cursor = JSON.parse(Buffer.from(scrollId, "base64").toString("utf-8"));
+
+        cursor = this.matchingScrollCursor({ cursor, sortDirection, pageSize, dateField });
+
+        this.logger.debug(
+          {
+            cursorParsed: !!cursor,
+            cursorLastTimestamp: cursor?.lastTimestamp,
+            cursorLastTraceId: cursor?.lastTraceId,
+            cursorSortDirection: cursor?.sortDirection,
+            cursorPageSize: cursor?.pageSize,
+          },
+          "Cursor parsing and validation result",
+        );
+      } catch (e) {
+        this.logger.warn(
+          {
+            scrollId,
+            error: e instanceof Error ? e.message : e,
+          },
+          "Invalid scrollId, starting from beginning",
+        );
+      }
+    } else {
+      this.logger.debug("No scrollId provided in request");
+    }
+    return cursor;
+  }
+
+  /** Drops a cursor minted for another sort, page size or date axis, or carrying a bad snapshot. */
+  private matchingScrollCursor({
+    cursor,
+    sortDirection,
+    pageSize,
+    dateField,
+  }: {
+    cursor: ClickHouseScrollCursor | null;
+    sortDirection: "asc" | "desc";
+    pageSize: number;
+    dateField: TraceDateField;
+  }): ClickHouseScrollCursor | null {
+    if (!cursor) return null;
+    if (cursor.sortDirection !== sortDirection) {
+      this.logger.warn(
+        {
+          cursorSortDirection: cursor.sortDirection,
+          requestSortDirection: sortDirection,
+        },
+        "Sort direction mismatch in cursor, ignoring cursor",
+      );
+      return null;
+    }
+    if (cursor.pageSize !== pageSize) {
+      this.logger.warn(
+        {
+          cursorPageSize: cursor.pageSize,
+          requestPageSize: pageSize,
+        },
+        "Page size mismatch in cursor, ignoring cursor",
+      );
+      return null;
+    }
+    if (cursor.scrollStart !== undefined) {
+      const scrollStart = cursor.scrollStart;
+      const hasInvalidType = typeof scrollStart !== "number";
+      const hasInvalidInteger = !Number.isSafeInteger(scrollStart);
+      const isNonPositive = scrollStart <= 0;
+      if (hasInvalidType || hasInvalidInteger || isNonPositive) {
+        // scrollStart binds as {scrollStart:UInt64}; a bad value would fail the query
+        // outright instead of degrading, so drop the cursor like every other mismatch.
+        // Safe INTEGER, not merely finite — UInt64 rejects 1.5 and 2**53 alike.
+        this.logger.warn(
+          { cursorScrollStart: scrollStart },
+          "Invalid scrollStart in cursor, ignoring cursor",
+        );
+        return null;
+      }
+      return cursor;
+    }
+    if ((cursor.dateField ?? "occurred") !== dateField) {
+      this.logger.warn(
+        {
+          cursorDateField: cursor.dateField ?? "occurred",
+          requestDateField: dateField,
+        },
+        "Date axis mismatch in cursor, ignoring cursor",
+      );
+      return null;
+    }
+    return cursor;
+  }
+
+  private buildNextScrollId({
+    lastTrace,
+    traceCount,
+    pageSize,
+    sortDirection,
+    dateField,
+    scrollStart,
+  }: {
+    lastTrace: Trace | null;
+    traceCount: number;
+    pageSize: number;
+    sortDirection: "asc" | "desc";
+    dateField: TraceDateField;
+    scrollStart: number | undefined;
+  }): string | undefined {
+    if (!lastTrace || traceCount !== pageSize) return undefined;
+    const lastSortTimestamp =
+      dateField === "updated" ? lastTrace.timestamps.updated_at : lastTrace.timestamps.started_at;
+    const newCursor: ClickHouseScrollCursor = {
+      lastTimestamp: lastSortTimestamp,
+      lastTraceId: lastTrace.trace_id,
+      pageSize,
+      sortDirection,
+      dateField,
+      // Carried forward unchanged: the snapshot must be the one the
+      // scroll started from, not a fresh reading per page.
+      ...(scrollStart !== undefined ? { scrollStart } : {}),
+    };
+    const newScrollId = Buffer.from(JSON.stringify(newCursor)).toString("base64");
+
+    this.logger.debug(
+      {
+        lastTraceTimestamp: lastTrace.timestamps.started_at,
+        lastTraceId: lastTrace.trace_id,
+        tracesCount: traceCount,
+        pageSize,
+        newScrollId,
+      },
+      "Generated new scrollId",
+    );
+    return newScrollId;
+  }
+
   async listAllTracesForProject(
     input: GetAllTracesForProjectInput,
     protections: Protections,
@@ -778,79 +948,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           const dateField: TraceDateField = options.dateField ?? "occurred";
 
           // Parse cursor from scrollId if present (matches ES service contract)
-          let cursor: ClickHouseScrollCursor | null = null;
-          if (options.scrollId) {
-            this.logger.debug({ scrollId: options.scrollId }, "Parsing scrollId from request");
-            try {
-              cursor = JSON.parse(Buffer.from(options.scrollId, "base64").toString("utf-8"));
-
-              // Validate that cursor parameters match current request
-              if (cursor && cursor.sortDirection !== sortDirection) {
-                this.logger.warn(
-                  {
-                    cursorSortDirection: cursor.sortDirection,
-                    requestSortDirection: sortDirection,
-                  },
-                  "Sort direction mismatch in cursor, ignoring cursor",
-                );
-                cursor = null;
-              } else if (cursor && cursor.pageSize !== pageSize) {
-                this.logger.warn(
-                  {
-                    cursorPageSize: cursor.pageSize,
-                    requestPageSize: pageSize,
-                  },
-                  "Page size mismatch in cursor, ignoring cursor",
-                );
-                cursor = null;
-              } else if (cursor && cursor.scrollStart !== undefined) {
-                const scrollStart = cursor.scrollStart;
-                const hasInvalidType = typeof scrollStart !== "number";
-                const hasInvalidInteger = !Number.isSafeInteger(scrollStart);
-                const isNonPositive = scrollStart <= 0;
-                if (hasInvalidType || hasInvalidInteger || isNonPositive) {
-                  // scrollStart binds as {scrollStart:UInt64}; a bad value would fail the query
-                  // outright instead of degrading, so drop the cursor like every other mismatch.
-                  // Safe INTEGER, not merely finite — UInt64 rejects 1.5 and 2**53 alike.
-                  this.logger.warn(
-                    { cursorScrollStart: scrollStart },
-                    "Invalid scrollStart in cursor, ignoring cursor",
-                  );
-                  cursor = null;
-                }
-              } else if (cursor && (cursor.dateField ?? "occurred") !== dateField) {
-                this.logger.warn(
-                  {
-                    cursorDateField: cursor.dateField ?? "occurred",
-                    requestDateField: dateField,
-                  },
-                  "Date axis mismatch in cursor, ignoring cursor",
-                );
-                cursor = null;
-              }
-
-              this.logger.debug(
-                {
-                  cursorParsed: !!cursor,
-                  cursorLastTimestamp: cursor?.lastTimestamp,
-                  cursorLastTraceId: cursor?.lastTraceId,
-                  cursorSortDirection: cursor?.sortDirection,
-                  cursorPageSize: cursor?.pageSize,
-                },
-                "Cursor parsing and validation result",
-              );
-            } catch (e) {
-              this.logger.warn(
-                {
-                  scrollId: options.scrollId,
-                  error: e instanceof Error ? e.message : e,
-                },
-                "Invalid scrollId, starting from beginning",
-              );
-            }
-          } else {
-            this.logger.debug("No scrollId provided in request");
-          }
+          const cursor = this.decodeScrollCursor({
+            scrollId: options.scrollId,
+            sortDirection,
+            pageSize,
+            dateField,
+          });
 
           // Pass the dashboard time window so span/event filters bound their stored_spans
           // EXISTS subqueries to the same window, pruning partitions instead of cold-scanning.
@@ -942,35 +1045,14 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           // axis we paged by: OccurredAt (started_at) or, for the updated axis,
           // the latest-version UpdatedAt — and records the axis so the next
           // page rejects a cursor from a different axis.
-          let newScrollId: string | undefined;
-          if (lastTrace && traces.length === pageSize) {
-            const lastSortTimestamp =
-              dateField === "updated"
-                ? lastTrace.timestamps.updated_at
-                : lastTrace.timestamps.started_at;
-            const newCursor: ClickHouseScrollCursor = {
-              lastTimestamp: lastSortTimestamp,
-              lastTraceId: lastTrace.trace_id,
-              pageSize,
-              sortDirection,
-              dateField,
-              // Carried forward unchanged: the snapshot must be the one the
-              // scroll started from, not a fresh reading per page.
-              ...(scrollStart !== undefined ? { scrollStart } : {}),
-            };
-            newScrollId = Buffer.from(JSON.stringify(newCursor)).toString("base64");
-
-            this.logger.debug(
-              {
-                lastTraceTimestamp: lastTrace.timestamps.started_at,
-                lastTraceId: lastTrace.trace_id,
-                tracesCount: traces.length,
-                pageSize,
-                newScrollId,
-              },
-              "Generated new scrollId",
-            );
-          }
+          const newScrollId = this.buildNextScrollId({
+            lastTrace,
+            traceCount: traces.length,
+            pageSize,
+            sortDirection,
+            dateField,
+            scrollStart,
+          });
 
           // Group traces (for now, single-trace groups unless groupBy is specified)
           const rawGroups = this.groupTraces(traces, input.groupBy);
@@ -1001,20 +1083,9 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
               traceIds,
             });
 
-            const grouped: Record<
-              string,
-              ReturnType<typeof mapClickHouseEvaluationToTraceEvaluation>[]
-            > = {};
-            for (const id of traceIds) {
-              grouped[id] = [];
-            }
-            for (const row of evalRows) {
-              if (row.TraceId && grouped[row.TraceId]) {
-                grouped[row.TraceId]!.push(mapClickHouseEvaluationToTraceEvaluation(row));
-              }
-            }
-
-            traceChecks = mapTraceEvaluationsToLegacyEvaluations(grouped);
+            traceChecks = mapTraceEvaluationsToLegacyEvaluations(
+              groupEvaluationsByTrace({ traceIds, evalRows }),
+            );
           }
 
           // Projection JOINs — attach child collections the legacy read path
