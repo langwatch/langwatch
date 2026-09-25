@@ -18,9 +18,15 @@ export const lenientPositiveIntSchema = z.coerce
   .optional()
   .catch(undefined);
 
+/** A path version is always present, so a segment that is no version number reads as 0, which none is. */
+const pathVersionSchema = z.preprocess((raw) => {
+  const version = Number(raw);
+  return Number.isInteger(version) && version > 0 ? version : 0;
+}, z.number().int().nonnegative());
+
 export const slugVersionParamsSchema = z.object({
   slug: z.string().min(1),
-  version: lenientPositiveIntSchema.describe(
+  version: pathVersionSchema.describe(
     "The version to restore, as listed by `GET /api/experiments/{slug}/versions`",
   ),
 });
@@ -32,7 +38,7 @@ export const evaluationSlugParamsSchema = z.object({
 
 export const evaluationSlugVersionParamsSchema = z.object({
   evaluationSlug: z.string().min(1),
-  version: lenientPositiveIntSchema,
+  version: pathVersionSchema,
 });
 
 /** A bad page number falls back rather than refusing; a missing slug 400s in the handler. */

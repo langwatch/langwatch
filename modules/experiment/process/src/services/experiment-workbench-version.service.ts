@@ -81,16 +81,15 @@ export class ExperimentWorkbenchVersionService {
   async restoreBySlug(input: {
     projectId: string;
     slug: string;
-    version: number | undefined;
+    version: number;
     actor: WorkbenchActor;
   }): Promise<WorkbenchSaveResult> {
     const { projectId, slug, version, actor } = input;
     const workbench = await this.#experiments.getWorkbenchState({ projectId, slug });
 
-    // A path segment that is not a version number names a version this
-    // experiment never had, which is the same answer as a number it never
-    // had. `version: 0` because no experiment version is ever 0.
-    if (version === undefined) {
+    // A path segment that is not a version number arrives as 0, which no
+    // experiment version ever is: the same answer as a number it never had.
+    if (version === 0) {
       throw new ExperimentVersionNotFoundError({
         experimentId: workbench.experimentId,
         version: 0,

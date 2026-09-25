@@ -63,7 +63,7 @@ describe("the wire main published", () => {
         page: undefined,
         pageSize: undefined,
       });
-      expect(slugVersionParamsSchema.parse({ slug: "s", version: "two" }).version).toBe(undefined);
+      expect(slugVersionParamsSchema.parse({ slug: "s", version: "two" }).version).toBe(0);
     });
 
     it("falls back to the first page of 50, capped at 200, on the experiments list", () => {

@@ -53,7 +53,7 @@ describe("ExperimentWorkbenchVersionService.restoreBySlug", () => {
       service.restoreBySlug({
         projectId: "project_1",
         slug: "my-experiment",
-        version: undefined,
+        version: 0,
         actor,
       }),
     ).rejects.toMatchObject({ code: "experiment_version_not_found" });
