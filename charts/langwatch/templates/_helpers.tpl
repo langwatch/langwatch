@@ -63,9 +63,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{/*
-  LW_GATEWAY_BASE_URL env entry for the pods that talk to the gateway from
-  inside the cluster (the app and the workers, which both resolve Langy's
-  credentials). Renders nothing when there is no gateway to point at.
+  LW_GATEWAY_BASE_URL and LW_GATEWAY_INTERNAL_URL env entries for the pods that
+  talk to the gateway from inside the cluster (the app and the workers, which
+  both resolve Langy's credentials). Renders nothing when there is no gateway.
+  INTERNAL_URL is what the app prefers over gateway.publicUrl for its own and
+  the Langy worker's calls, so a public URL never becomes an in-cluster path.
 
   gateway.internalUrl wins for non-standard topologies (a gateway run outside
   this release, a service mesh address). Otherwise it is the Service this chart
@@ -81,6 +83,8 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 {{- if $url }}
 - name: LW_GATEWAY_BASE_URL
+  value: {{ $url | quote }}
+- name: LW_GATEWAY_INTERNAL_URL
   value: {{ $url | quote }}
 {{- end }}
 {{- end -}}

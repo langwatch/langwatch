@@ -171,3 +171,24 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
       in production
     And it records that no NetworkPolicy is applied because a lone local test
       pod has no siblings to isolate on the network
+
+  # ===========================================================================
+  # Gateway address on a chart install
+  # ===========================================================================
+  # gateway.publicUrl is what a browser or SDK uses. It can be a localhost
+  # port-forward or a hostname that does not resolve inside the cluster, so
+  # in-cluster callers never dial it.
+
+  @unit
+  Scenario: The chart hands the app and workers the in-cluster gateway address
+    Given the chart runs the gateway beside the app
+    When the chart is rendered
+    Then the app and the workers both receive LW_GATEWAY_INTERNAL_URL
+    And it points at the gateway Service of the release
+    And gateway.internalUrl replaces it when the operator sets one
+
+  @unit
+  Scenario: The Langy worker dials the in-cluster gateway, not its public URL
+    Given LW_GATEWAY_INTERNAL_URL and LW_GATEWAY_PUBLIC_URL are both set
+    When the worker gateway address is resolved
+    Then the worker is handed LW_GATEWAY_INTERNAL_URL
