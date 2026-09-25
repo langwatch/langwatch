@@ -184,13 +184,7 @@ function useSuiteFieldRows() {
 
   return useMemo(
     () => ({
-      // The section opens with its first row in place, ready to be named.
-      open: () =>
-        update((draft) => ({
-          ...draft,
-          showFields: true,
-          fields: draft.fields.length > 0 ? draft.fields : [freshRow()],
-        })),
+      open: () => update(draftWithFieldsOpened),
       close: () =>
         update((draft) => ({
           ...draft,
@@ -203,22 +197,10 @@ function useSuiteFieldRows() {
           ...draft,
           fields: [...draft.fields, freshRow()],
         })),
-      patch: (index: number, patch: Partial<Pick<SuiteFieldRow, "identifier" | "type">>) =>
-        update((draft) => ({
-          ...draft,
-          fields: draft.fields.map((row, at) =>
-            at === index ? { ...row, ...patch, error: undefined } : row,
-          ),
-        })),
+      patch: (index: number, patch: SuiteFieldPatch) =>
+        update((draft) => draftWithFieldPatched({ draft, index, patch })),
       reorder: ({ from, to }: { from: number; to: number }) =>
-        update((draft) => {
-          if (to < 0 || to >= draft.fields.length) return draft;
-          const fields = [...draft.fields];
-          const [row] = fields.splice(from, 1);
-          if (!row) return draft;
-          fields.splice(to, 0, row);
-          return { ...draft, fields };
-        }),
+        update((draft) => draftWithFieldMoved({ draft, from, to })),
       remove: (index: number) =>
         update((draft) => ({
           ...draft,
@@ -227,6 +209,52 @@ function useSuiteFieldRows() {
     }),
     [update],
   );
+}
+
+type SuiteFieldPatch = Partial<Pick<SuiteFieldRow, "identifier" | "type">>;
+
+/** The section opens with its first row in place, ready to be named. */
+function draftWithFieldsOpened(draft: SuiteDraft): SuiteDraft {
+  return {
+    ...draft,
+    showFields: true,
+    fields: draft.fields.length > 0 ? draft.fields : [freshRow()],
+  };
+}
+
+function draftWithFieldPatched({
+  draft,
+  index,
+  patch,
+}: {
+  draft: SuiteDraft;
+  index: number;
+  patch: SuiteFieldPatch;
+}): SuiteDraft {
+  return {
+    ...draft,
+    fields: draft.fields.map((row, at) =>
+      at === index ? { ...row, ...patch, error: undefined } : row,
+    ),
+  };
+}
+
+/** Moves one row; a target outside the list, or a missing source row, leaves the draft as it is. */
+function draftWithFieldMoved({
+  draft,
+  from,
+  to,
+}: {
+  draft: SuiteDraft;
+  from: number;
+  to: number;
+}): SuiteDraft {
+  if (to < 0 || to >= draft.fields.length) return draft;
+  const fields = [...draft.fields];
+  const [row] = fields.splice(from, 1);
+  if (!row) return draft;
+  fields.splice(to, 0, row);
+  return { ...draft, fields };
 }
 
 /** The sections not open yet, offered as chips in the order shown. */

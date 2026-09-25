@@ -322,6 +322,27 @@ const SYNCED_BUILDER_WINDOW_NAME = "lwBlockKitBuilder";
 
 // Compact Slack preview: plain-text renders mrkdwn inline; Block Kit shows block count + links to
 // Block Kit Builder (one-shot or synced popup that follows edits).
+/** Navigates the synced popup; a cross-origin hiccup is ignored — the user can click again. */
+function pushToPopup({ popup, url }: { popup: Window; url: string }): void {
+  try {
+    popup.location.replace(url);
+  } catch {
+    // Cross-origin navigation hiccup.
+  }
+}
+
+/**
+ * Strips `window.opener`: a cross-origin write may throw once the popup navigates, and the same
+ * cross-origin block then prevents the popup from reading us anyway.
+ */
+function detachOpener(popup: Window): void {
+  try {
+    popup.opener = null;
+  } catch {
+    // Cross-origin write refused.
+  }
+}
+
 export function CompactSlackPreview({
   payload,
 }: {
@@ -347,11 +368,7 @@ export function CompactSlackPreview({
       syncedPopup.current = null;
       return;
     }
-    try {
-      popup.location.replace(builderUrl);
-    } catch {
-      // Cross-origin navigation hiccup — user can click the button again.
-    }
+    pushToPopup({ popup, url: builderUrl });
   }, [builderUrl]);
 
   const openOnce = () => {
@@ -363,11 +380,7 @@ export function CompactSlackPreview({
     if (!builderUrl) return;
     const existing = syncedPopup.current;
     if (existing && !existing.closed) {
-      try {
-        existing.location.replace(builderUrl);
-      } catch {
-        // ignore — popup will be re-opened below if this throws repeatedly
-      }
+      pushToPopup({ popup: existing, url: builderUrl });
       existing.focus();
       return;
     }
@@ -377,14 +390,7 @@ export function CompactSlackPreview({
     // nabbing (the cross-origin builder can't navigate this tab) while
     // keeping the forward sync channel alive.
     const popup = window.open(builderUrl, SYNCED_BUILDER_WINDOW_NAME, "width=1200,height=900");
-    if (popup) {
-      try {
-        popup.opener = null;
-      } catch {
-        // Cross-origin write may throw once the popup navigates; the same
-        // cross-origin block then prevents the popup from reading us anyway.
-      }
-    }
+    if (popup) detachOpener(popup);
     syncedPopup.current = popup;
   };
 

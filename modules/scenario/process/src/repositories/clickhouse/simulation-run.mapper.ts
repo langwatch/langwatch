@@ -94,6 +94,28 @@ function mapVerdict(verdict: string | null): SimulationVerdict | undefined {
   }
 }
 
+type RunMetadataRead = { kind: "metadata"; value: Record<string, unknown> } | { kind: "absent" };
+
+/**
+ * A run's secret parameter values never belong in a stored row; the fold keeps them out, and
+ * they are dropped again here so a row written by another path cannot serve one. The names, on
+ * `secretParameterNames`, stay.
+ */
+function readRunMetadata(raw: string | null): RunMetadataRead {
+  if (!raw) return { kind: "absent" };
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { kind: "absent" };
+    }
+    const record: Record<string, unknown> = Object.fromEntries(Object.entries(parsed));
+    const { secretParameters: _secretParameters, ...rest } = record;
+    return { kind: "metadata", value: rest };
+  } catch {
+    return { kind: "absent" };
+  }
+}
+
 /**
  * Maps a ClickHouse row to ScenarioRunData. Stored status is the only
  * truth: an unfinished run reads IN_PROGRESS regardless of age — ERROR and
@@ -144,27 +166,8 @@ export function mapClickHouseRowToScenarioRunData(
         }
       : null;
 
-  const metadata = row.Metadata
-    ? (() => {
-        try {
-          const parsed: unknown = JSON.parse(row.Metadata);
-          if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) {
-            return null;
-          }
-          // A run's secret parameter values never belong in a stored row, and
-          // the fold projection keeps them out. Dropped again on the way out
-          // so a row written by another path cannot serve one. The names, on
-          // `secretParameterNames`, stay.
-          const { secretParameters: _secretParameters, ...rest } = parsed as Record<
-            string,
-            unknown
-          >;
-          return rest;
-        } catch {
-          return null;
-        }
-      })()
-    : null;
+  const metadataRead = readRunMetadata(row.Metadata);
+  const metadata = metadataRead.kind === "metadata" ? metadataRead.value : null;
 
   return simulationRunDataSchema.parse({
     scenarioId: row.ScenarioId,

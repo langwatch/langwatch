@@ -29,6 +29,16 @@ const heartbeatActionParamsSchema = z
   })
   .passthrough();
 
+type HeartbeatShape =
+  | {
+      kind: "watched";
+      params: z.infer<typeof heartbeatActionParamsSchema>;
+      customGraphId: string;
+      windowMs: number;
+      isOpen: boolean;
+    }
+  | { kind: "skip" };
+
 interface CandidateTrigger {
   triggerId: string;
   projectId: string;
@@ -211,36 +221,16 @@ export class GraphTriggerHeartbeatService {
 
     const candidates: CandidateTrigger[] = [];
     for (const trigger of triggers) {
-      const parsed = heartbeatActionParamsSchema.safeParse(trigger.actionParams ?? {});
-      if (!parsed.success) {
-        continue;
-      }
-
-      const params = parsed.data;
-      const operator = params.operator;
-      const threshold = params.threshold;
-      const timePeriod = params.timePeriod;
-      if (operator === void 0 || threshold === void 0 || timePeriod === void 0) {
-        continue;
-      }
-
-      const windowMs = Math.max(MIN_BOUND_WINDOW_MS, timePeriod * 60 * 1000);
-      const isNoData = isNoDataPredicate({ operator, threshold });
-      const isOpen = openIds.has(trigger.id);
-      if (!isNoData && !isOpen) {
-        continue;
-      }
-
-      if (!trigger.customGraphId) {
-        continue;
-      }
+      const shape = GraphTriggerHeartbeatService.heartbeatShapeOf({ trigger, openIds });
+      if (shape.kind === "skip") continue;
+      const { params, windowMs, isOpen } = shape;
 
       // ADR-034 Phase 6 source classification. Unknown-source defaults to
       // "trace" so we preserve the pre-Phase-6 behaviour for graphs whose
       // metrics aren't in `field-availability`.
       const lookedUp = await deps.triggerSent.findGraphTriggerSource({
         triggerId: trigger.id,
-        customGraphId: trigger.customGraphId,
+        customGraphId: shape.customGraphId,
         projectId,
         seriesName: params.seriesName,
       });
@@ -256,6 +246,33 @@ export class GraphTriggerHeartbeatService {
     }
 
     return candidates;
+  }
+
+  /** A trigger the sweep watches: a no-data predicate, or an open alert that may resolve. */
+  private static heartbeatShapeOf({
+    trigger,
+    openIds,
+  }: {
+    trigger: { id: string; customGraphId: string | null; actionParams?: unknown };
+    openIds: Set<string>;
+  }): HeartbeatShape {
+    const parsed = heartbeatActionParamsSchema.safeParse(trigger.actionParams ?? {});
+    if (!parsed.success) return { kind: "skip" };
+    const params = parsed.data;
+    const { operator, threshold, timePeriod } = params;
+    if (operator === void 0 || threshold === void 0 || timePeriod === void 0) {
+      return { kind: "skip" };
+    }
+    const isOpen = openIds.has(trigger.id);
+    if (!isNoDataPredicate({ operator, threshold }) && !isOpen) return { kind: "skip" };
+    if (!trigger.customGraphId) return { kind: "skip" };
+    return {
+      kind: "watched",
+      params,
+      customGraphId: trigger.customGraphId,
+      windowMs: Math.max(MIN_BOUND_WINDOW_MS, timePeriod * 60 * 1000),
+      isOpen,
+    };
   }
 
   private static groupCandidatesBySource(

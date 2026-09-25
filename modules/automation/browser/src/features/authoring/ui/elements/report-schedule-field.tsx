@@ -24,6 +24,44 @@ import {
 const FREQUENCIES: Frequency[] = ["daily", "weekly", "monthly"];
 const DAYS_OF_MONTH = Array.from({ length: 31 }, (_, i) => i + 1);
 
+type TimeOfDayRead = { kind: "time"; hour: number; minute: number } | { kind: "invalid" };
+
+/** `HH:MM` from the time input; anything else, or an out-of-range value, is invalid. */
+function readTimeOfDay(value: string): TimeOfDayRead {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value);
+  if (!match) return { kind: "invalid" };
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) return { kind: "invalid" };
+  return { kind: "time", hour, minute };
+}
+
+function CronExpressionField({
+  cron,
+  cronError,
+  onChange,
+}: {
+  cron: string;
+  cronError: string | null;
+  onChange: (cron: string) => void;
+}) {
+  return (
+    <Field.Root invalid={cronError !== null}>
+      <Field.Label>Cron expression</Field.Label>
+      <Input
+        fontFamily="mono"
+        value={cron}
+        placeholder="0 9 * * 1"
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <Field.HelperText>
+        Five fields: minute, hour, day-of-month, month, day-of-week.
+      </Field.HelperText>
+      {cronError !== null ? <Field.ErrorText>{cronError}</Field.ErrorText> : null}
+    </Field.Root>
+  );
+}
+
 /**
  * Schedule picker: frequency + time-of-day (day for weekly/monthly). Unknown cron opens editor.
  */
@@ -79,12 +117,8 @@ export function ReportScheduleField({
   };
 
   const onTimeChange = (value: string) => {
-    const match = /^(\d{1,2}):(\d{2})$/.exec(value);
-    if (!match) return;
-    const hour = Number(match[1]);
-    const minute = Number(match[2]);
-    if (hour > 23 || minute > 59) return;
-    emitParts({ hour, minute });
+    const time = readTimeOfDay(value);
+    if (time.kind === "time") emitParts({ hour: time.hour, minute: time.minute });
   };
 
   // The friendly picker can only emit schedules we already accept, so only the
@@ -105,19 +139,11 @@ export function ReportScheduleField({
       </HStack>
 
       {advanced ? (
-        <Field.Root invalid={cronError !== null}>
-          <Field.Label>Cron expression</Field.Label>
-          <Input
-            fontFamily="mono"
-            value={cron}
-            placeholder="0 9 * * 1"
-            onChange={(e) => onChange({ cron: e.target.value, timezone })}
-          />
-          <Field.HelperText>
-            Five fields: minute, hour, day-of-month, month, day-of-week.
-          </Field.HelperText>
-          {cronError !== null ? <Field.ErrorText>{cronError}</Field.ErrorText> : null}
-        </Field.Root>
+        <CronExpressionField
+          cron={cron}
+          cronError={cronError}
+          onChange={(next) => onChange({ cron: next, timezone })}
+        />
       ) : (
         <VStack align="stretch" gap={4}>
           <HStack gap={3} align="flex-start">

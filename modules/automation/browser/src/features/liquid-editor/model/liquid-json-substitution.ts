@@ -59,82 +59,86 @@ function findMatchingCloseTag(
   return startAfterOpenerEnd + m.index + m[0].length;
 }
 
+/** Where the next `{{` or `{%` starts (-1 when none), and whether it is an output. */
+function nextLiquidStart(source: string, from: number): { at: number; isOutput: boolean } {
+  const nextOutput = source.indexOf("{{", from);
+  const nextTag = source.indexOf("{%", from);
+  const at = nextOutput === -1 || (nextTag !== -1 && nextTag < nextOutput) ? nextTag : nextOutput;
+  return { at, isOutput: at === nextOutput };
+}
+
+/**
+ * The end of a passthrough block (`{% capture %}`, `{% comment %}`) opened by this span, or -1.
+ * Its body is Liquid-only, so the whole region folds into one tag span; with no closer the
+ * span falls through to the single-tag treatment and the editor flags the missing closer.
+ */
+function passthroughBlockEnd({
+  source,
+  span,
+  end,
+  isOutput,
+}: {
+  source: string;
+  span: string;
+  end: number;
+  isOutput: boolean;
+}): number {
+  if (isOutput) return -1;
+  const opener = PASSTHROUGH_OPENER_RE.exec(span);
+  if (!opener) return -1;
+  return findMatchingCloseTag(source, end, PASSTHROUGH_BLOCK_TAGS[opener[1]!]!);
+}
+
+function spanReplacement({
+  source,
+  next,
+  span,
+  isOutput,
+}: {
+  source: string;
+  next: number;
+  span: string;
+  isOutput: boolean;
+}): string {
+  if (!isOutput) return fill(span, " ");
+  if (isInsideString(source, next)) return fill(span, "_");
+  if (span.length >= 2 && !span.includes("\n")) return `"${"_".repeat(span.length - 2)}"`;
+  return fill(span, " ");
+}
+
 export function substituteLiquidForJsonValidation(source: string): LiquidSubstitutionResult {
   const liquidRanges: LiquidSubstitutionResult["liquidRanges"] = [];
   let out = "";
   let i = 0;
 
   while (i < source.length) {
-    const nextOutput = source.indexOf("{{", i);
-    const nextTag = source.indexOf("{%", i);
-    let next: number;
-    if (nextOutput === -1) {
-      next = nextTag;
-    } else if (nextTag === -1) {
-      next = nextOutput;
-    } else {
-      next = Math.min(nextOutput, nextTag);
-    }
-
+    const { at: next, isOutput } = nextLiquidStart(source, i);
     if (next === -1) {
       out += source.slice(i);
       break;
     }
-
     out += source.slice(i, next);
 
-    const isOutput = next === nextOutput;
-    const endMarker = isOutput ? "}}" : "%}";
-    const endIdx = source.indexOf(endMarker, next + 2);
+    const endIdx = source.indexOf(isOutput ? "}}" : "%}", next + 2);
     if (endIdx === -1) {
-      // Unterminated Liquid — leave the rest as-is; the editor's own Liquid
-      // tokenizer will visually flag it, and the substituted text falling
-      // through will let the JSON service report wherever it next chokes.
+      // Unterminated Liquid — leave the rest as-is; the editor's Liquid tokenizer flags it,
+      // and the JSON service reports wherever the substituted text next chokes.
       out += source.slice(next);
       break;
     }
 
     const end = endIdx + 2;
     const span = source.slice(next, end);
-    const spanLength = end - next;
-
-    // Passthrough block tags (`{% capture %}`, `{% comment %}`): the body
-    // is Liquid-only, never inlined into JSON. Per-span substitution would
-    // wrap embedded `{{ ... }}` in `"___"` at top level, producing invalid
-    // JSON -- fold the whole region into one tag span instead.
-    const passthroughOpener = !isOutput ? PASSTHROUGH_OPENER_RE.exec(span) : null;
-    if (passthroughOpener) {
-      const closerName = PASSTHROUGH_BLOCK_TAGS[passthroughOpener[1]!]!;
-      const blockEnd = findMatchingCloseTag(source, end, closerName);
-      if (blockEnd !== -1) {
-        const blockSpan = source.slice(next, blockEnd);
-        out += fill(blockSpan, " ");
-        liquidRanges.push({ start: next, end: blockEnd, kind: "tag" });
-        i = blockEnd;
-        continue;
-      }
-      // No closer — fall through to the single-tag treatment so the user
-      // still gets a clean span replacement up to `%}` and the editor's
-      // Liquid tokenizer can visually flag the missing closer.
+    const blockEnd = passthroughBlockEnd({ source, span, end, isOutput });
+    if (blockEnd !== -1) {
+      out += fill(source.slice(next, blockEnd), " ");
+      liquidRanges.push({ start: next, end: blockEnd, kind: "tag" });
+      i = blockEnd;
+      continue;
     }
 
-    let replacement: string;
-    if (!isOutput) {
-      replacement = fill(span, " ");
-    } else if (isInsideString(source, next)) {
-      replacement = fill(span, "_");
-    } else if (spanLength >= 2 && !span.includes("\n")) {
-      replacement = `"${"_".repeat(spanLength - 2)}"`;
-    } else {
-      replacement = fill(span, " ");
-    }
-
-    out += replacement;
-    liquidRanges.push({
-      start: next,
-      end,
-      kind: isOutput ? "output" : "tag",
-    });
+    out += spanReplacement({ source, next, span, isOutput });
+    liquidRanges.push({ start: next, end, kind: isOutput ? "output" : "tag" });
     i = end;
   }
 

@@ -90,177 +90,184 @@ function variablesForModel(model: MonacoTextModel): VariableInfo[] {
  */
 export function registerLiquidLanguage(monaco: Monaco): void {
   if (!languageRegistered) {
-    monaco.languages.register({ id: LIQUID_LANGUAGE_ID });
-    monaco.languages.setMonarchTokensProvider(LIQUID_LANGUAGE_ID, {
-      tokenizer: {
-        root: [
-          [/\{\{/, { token: "delimiter.liquid", next: "@output" }],
-          [/\{%/, { token: "delimiter.liquid", next: "@tag" }],
-          [/[^{]+/, ""],
-          [/\{/, ""],
-        ],
-        output: [
-          [/\}\}/, { token: "delimiter.liquid", next: "@pop" }],
-          [/\|/, "operator.liquid"],
-          [/[a-zA-Z_][\w.]*/, "variable.liquid"],
-          [/[^}]/, ""],
-        ],
-        tag: [
-          [/%\}/, { token: "delimiter.liquid", next: "@pop" }],
-          [
-            /\b(if|elsif|else|endif|unless|endunless|for|endfor|in|assign|capture|endcapture)\b/,
-            "keyword.liquid",
-          ],
-          [/[a-zA-Z_][\w.]*/, "variable.liquid"],
-          [/[^%]/, ""],
-        ],
-      },
-    });
-
-    monaco.languages.register({ id: LIQUID_JSON_LANGUAGE_ID });
-    monaco.languages.setLanguageConfiguration(LIQUID_JSON_LANGUAGE_ID, {
-      brackets: [
-        ["{", "}"],
-        ["[", "]"],
-      ],
-      autoClosingPairs: [
-        { open: "{", close: "}" },
-        { open: "[", close: "]" },
-        { open: '"', close: '"' },
-        { open: "{{", close: " }}" },
-        { open: "{%", close: " %}" },
-      ],
-      surroundingPairs: [
-        { open: "{", close: "}" },
-        { open: "[", close: "]" },
-        { open: '"', close: '"' },
-      ],
-    });
-    monaco.languages.setMonarchTokensProvider(LIQUID_JSON_LANGUAGE_ID, {
-      defaultToken: "",
-      tokenPostfix: ".liquid-json",
-      keywords: ["true", "false", "null"],
-      tokenizer: {
-        root: [
-          [/\{\{/, { token: "delimiter.liquid", next: "@liquidOutput" }],
-          [/\{%/, { token: "delimiter.liquid", next: "@liquidTag" }],
-          [/[{}[\]]/, "@brackets"],
-          [/[,:]/, "delimiter"],
-          [/"/, { token: "string.quote", next: "@string" }],
-          [/-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/, "number"],
-          [/[a-zA-Z_]\w*/, { cases: { "@keywords": "keyword", "@default": "" } }],
-          [/\s+/, "white"],
-        ],
-        string: [
-          [/\{\{/, { token: "delimiter.liquid", next: "@liquidOutput" }],
-          [/\{%/, { token: "delimiter.liquid", next: "@liquidTag" }],
-          [/[^"\\{]+/, "string"],
-          [/\\(?:[\\"/bfnrt]|u[0-9A-Fa-f]{4})/, "string.escape"],
-          [/\\/, "string"],
-          [/\{/, "string"],
-          [/"/, { token: "string.quote", next: "@pop" }],
-        ],
-        liquidOutput: [
-          [/\}\}/, { token: "delimiter.liquid", next: "@pop" }],
-          [/\|/, "operator.liquid"],
-          [/[a-zA-Z_][\w.]*/, "variable.liquid"],
-          [/[^}]/, ""],
-        ],
-        liquidTag: [
-          [/%\}/, { token: "delimiter.liquid", next: "@pop" }],
-          [
-            /\b(if|elsif|else|endif|unless|endunless|for|endfor|in|assign|capture|endcapture)\b/,
-            "keyword.liquid",
-          ],
-          [/[a-zA-Z_][\w.]*/, "variable.liquid"],
-          [/[^%]/, ""],
-        ],
-      },
-    });
+    registerLiquidGrammars(monaco);
     languageRegistered = true;
   }
+  if (providersRegistered) return;
 
-  if (!providersRegistered) {
-    const completionProvider: languages.CompletionItemProvider = {
-      triggerCharacters: [".", " ", "{", "%"],
-      provideCompletionItems: (model, position) => {
-        // For `liquid-json`, surface Liquid completions only when the cursor
-        // is inside a `{{ }}` / `{% %}` span. Outside, the JSON-bridge
-        // completion provider handles the surface (schema-aware completions
-        // would otherwise be polluted with template variable names).
-        if (model.getLanguageId() === LIQUID_JSON_LANGUAGE_ID) {
-          const offset = model.getOffsetAt(position);
-          if (!positionInsideLiquid(model.getValue(), offset)) return null;
-        }
-        const lineUntil = model.getLineContent(position.lineNumber).slice(0, position.column - 1);
-        const run = /[\w.[\]]*$/.exec(lineUntil)?.[0] ?? "";
-        const range = {
-          startLineNumber: position.lineNumber,
-          endLineNumber: position.lineNumber,
-          startColumn: position.column - run.length,
-          endColumn: position.column,
-        };
-
-        const variableItems = variablesForModel(model).map((variable) => ({
-          label: variable.path,
-          kind: monaco.languages.CompletionItemKind.Variable,
-          insertText: variable.path,
-          range,
-          detail: variable.type,
-          documentation: variable.description ? { value: variable.description } : undefined,
-        }));
-
-        const snippets = [
-          {
-            label: "for m in matches",
-            kind: monaco.languages.CompletionItemKind.Snippet,
-            insertText: "{% for m in matches %}\n\t$0\n{% endfor %}",
-            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-            range,
-            detail: "Iterate matched traces",
-          },
-          {
-            label: "if",
-            kind: monaco.languages.CompletionItemKind.Snippet,
-            insertText: "{% if $1 %}\n\t$0\n{% endif %}",
-            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-            range,
-            detail: "Conditional block",
-          },
-        ];
-
-        return { suggestions: [...variableItems, ...snippets] };
-      },
-    };
-
-    const hoverProvider: languages.HoverProvider = {
-      provideHover: (model, position) => {
-        if (model.getLanguageId() === LIQUID_JSON_LANGUAGE_ID) {
-          const offset = model.getOffsetAt(position);
-          if (!positionInsideLiquid(model.getValue(), offset)) return null;
-        }
-        const word = model.getWordAtPosition(position);
-        if (!word) return null;
-        const match = variablesForModel(model).find(
-          (variable) => rootOf(variable.path) === word.word,
-        );
-        if (!match) return null;
-        return {
-          contents: [
-            { value: `**${match.path}** — \`${match.type}\`` },
-            ...(match.description ? [{ value: match.description }] : []),
-          ],
-        };
-      },
-    };
-
-    for (const id of [LIQUID_LANGUAGE_ID, LIQUID_JSON_LANGUAGE_ID]) {
-      monaco.languages.registerCompletionItemProvider(id, completionProvider);
-      monaco.languages.registerHoverProvider(id, hoverProvider);
-    }
-
-    providersRegistered = true;
+  const completionProvider = liquidCompletionProvider(monaco);
+  const hoverProvider = liquidHoverProvider();
+  for (const id of [LIQUID_LANGUAGE_ID, LIQUID_JSON_LANGUAGE_ID]) {
+    monaco.languages.registerCompletionItemProvider(id, completionProvider);
+    monaco.languages.registerHoverProvider(id, hoverProvider);
   }
+  providersRegistered = true;
+}
+
+function registerLiquidGrammars(monaco: Monaco): void {
+  monaco.languages.register({ id: LIQUID_LANGUAGE_ID });
+  monaco.languages.setMonarchTokensProvider(LIQUID_LANGUAGE_ID, {
+    tokenizer: {
+      root: [
+        [/\{\{/, { token: "delimiter.liquid", next: "@output" }],
+        [/\{%/, { token: "delimiter.liquid", next: "@tag" }],
+        [/[^{]+/, ""],
+        [/\{/, ""],
+      ],
+      output: [
+        [/\}\}/, { token: "delimiter.liquid", next: "@pop" }],
+        [/\|/, "operator.liquid"],
+        [/[a-zA-Z_][\w.]*/, "variable.liquid"],
+        [/[^}]/, ""],
+      ],
+      tag: [
+        [/%\}/, { token: "delimiter.liquid", next: "@pop" }],
+        [
+          /\b(if|elsif|else|endif|unless|endunless|for|endfor|in|assign|capture|endcapture)\b/,
+          "keyword.liquid",
+        ],
+        [/[a-zA-Z_][\w.]*/, "variable.liquid"],
+        [/[^%]/, ""],
+      ],
+    },
+  });
+
+  monaco.languages.register({ id: LIQUID_JSON_LANGUAGE_ID });
+  monaco.languages.setLanguageConfiguration(LIQUID_JSON_LANGUAGE_ID, {
+    brackets: [
+      ["{", "}"],
+      ["[", "]"],
+    ],
+    autoClosingPairs: [
+      { open: "{", close: "}" },
+      { open: "[", close: "]" },
+      { open: '"', close: '"' },
+      { open: "{{", close: " }}" },
+      { open: "{%", close: " %}" },
+    ],
+    surroundingPairs: [
+      { open: "{", close: "}" },
+      { open: "[", close: "]" },
+      { open: '"', close: '"' },
+    ],
+  });
+  monaco.languages.setMonarchTokensProvider(LIQUID_JSON_LANGUAGE_ID, {
+    defaultToken: "",
+    tokenPostfix: ".liquid-json",
+    keywords: ["true", "false", "null"],
+    tokenizer: {
+      root: [
+        [/\{\{/, { token: "delimiter.liquid", next: "@liquidOutput" }],
+        [/\{%/, { token: "delimiter.liquid", next: "@liquidTag" }],
+        [/[{}[\]]/, "@brackets"],
+        [/[,:]/, "delimiter"],
+        [/"/, { token: "string.quote", next: "@string" }],
+        [/-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/, "number"],
+        [/[a-zA-Z_]\w*/, { cases: { "@keywords": "keyword", "@default": "" } }],
+        [/\s+/, "white"],
+      ],
+      string: [
+        [/\{\{/, { token: "delimiter.liquid", next: "@liquidOutput" }],
+        [/\{%/, { token: "delimiter.liquid", next: "@liquidTag" }],
+        [/[^"\\{]+/, "string"],
+        [/\\(?:[\\"/bfnrt]|u[0-9A-Fa-f]{4})/, "string.escape"],
+        [/\\/, "string"],
+        [/\{/, "string"],
+        [/"/, { token: "string.quote", next: "@pop" }],
+      ],
+      liquidOutput: [
+        [/\}\}/, { token: "delimiter.liquid", next: "@pop" }],
+        [/\|/, "operator.liquid"],
+        [/[a-zA-Z_][\w.]*/, "variable.liquid"],
+        [/[^}]/, ""],
+      ],
+      liquidTag: [
+        [/%\}/, { token: "delimiter.liquid", next: "@pop" }],
+        [
+          /\b(if|elsif|else|endif|unless|endunless|for|endfor|in|assign|capture|endcapture)\b/,
+          "keyword.liquid",
+        ],
+        [/[a-zA-Z_][\w.]*/, "variable.liquid"],
+        [/[^%]/, ""],
+      ],
+    },
+  });
+}
+
+/** In `liquid-json`, a cursor outside every `{{ }}` / `{% %}` span. */
+function isOutsideLiquidSpan(model: editor.ITextModel, position: Position): boolean {
+  return (
+    model.getLanguageId() === LIQUID_JSON_LANGUAGE_ID &&
+    !positionInsideLiquid(model.getValue(), model.getOffsetAt(position))
+  );
+}
+
+function liquidCompletionProvider(monaco: Monaco): languages.CompletionItemProvider {
+  return {
+    triggerCharacters: [".", " ", "{", "%"],
+    provideCompletionItems: (model, position) => {
+      // Outside a Liquid span in `liquid-json` the JSON-bridge provider owns the surface.
+      if (isOutsideLiquidSpan(model, position)) return null;
+      const lineUntil = model.getLineContent(position.lineNumber).slice(0, position.column - 1);
+      const run = /[\w.[\]]*$/.exec(lineUntil)?.[0] ?? "";
+      const range = {
+        startLineNumber: position.lineNumber,
+        endLineNumber: position.lineNumber,
+        startColumn: position.column - run.length,
+        endColumn: position.column,
+      };
+
+      const variableItems = variablesForModel(model).map((variable) => ({
+        label: variable.path,
+        kind: monaco.languages.CompletionItemKind.Variable,
+        insertText: variable.path,
+        range,
+        detail: variable.type,
+        documentation: variable.description ? { value: variable.description } : undefined,
+      }));
+
+      const snippets = [
+        {
+          label: "for m in matches",
+          kind: monaco.languages.CompletionItemKind.Snippet,
+          insertText: "{% for m in matches %}\n\t$0\n{% endfor %}",
+          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+          range,
+          detail: "Iterate matched traces",
+        },
+        {
+          label: "if",
+          kind: monaco.languages.CompletionItemKind.Snippet,
+          insertText: "{% if $1 %}\n\t$0\n{% endif %}",
+          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+          range,
+          detail: "Conditional block",
+        },
+      ];
+
+      return { suggestions: [...variableItems, ...snippets] };
+    },
+  };
+}
+
+function liquidHoverProvider(): languages.HoverProvider {
+  return {
+    provideHover: (model, position) => {
+      if (isOutsideLiquidSpan(model, position)) return null;
+      const word = model.getWordAtPosition(position);
+      if (!word) return null;
+      const match = variablesForModel(model).find(
+        (variable) => rootOf(variable.path) === word.word,
+      );
+      if (!match) return null;
+      return {
+        contents: [
+          { value: `**${match.path}** — \`${match.type}\`` },
+          ...(match.description ? [{ value: match.description }] : []),
+        ],
+      };
+    },
+  };
 }
 
 function collectLocals(text: string, known: Set<string>): void {
@@ -460,7 +467,11 @@ function convertDocumentation(
 function registerLiquidJsonBridges(monaco: Monaco): void {
   if (bridgesRegistered) return;
   bridgesRegistered = true;
+  registerJsonBridgeCompletion(monaco);
+  registerJsonBridgeHover(monaco);
+}
 
+function registerJsonBridgeCompletion(monaco: Monaco): void {
   monaco.languages.registerCompletionItemProvider(LIQUID_JSON_LANGUAGE_ID, {
     triggerCharacters: COMPLETION_TRIGGER_CHARACTERS,
     provideCompletionItems: async (model: editor.ITextModel, position: Position) => {
@@ -491,35 +502,16 @@ function registerLiquidJsonBridges(monaco: Monaco): void {
         endColumn: wordInfo.endColumn,
       };
 
-      const suggestions = result.items.map((item) => {
-        const range = item.textEdit?.range
-          ? {
-              startLineNumber: item.textEdit.range.start.line + 1,
-              startColumn: item.textEdit.range.start.character + 1,
-              endLineNumber: item.textEdit.range.end.line + 1,
-              endColumn: item.textEdit.range.end.character + 1,
-            }
-          : fallbackRange;
-        return {
-          label: item.label,
-          kind: convertCompletionKind(monaco, item.kind),
-          insertText: item.insertText ?? item.textEdit?.newText ?? item.label,
-          insertTextRules:
-            item.insertTextFormat === 2
-              ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
-              : undefined,
-          sortText: item.sortText,
-          filterText: item.filterText,
-          detail: item.detail,
-          documentation: convertDocumentation(item.documentation),
-          range,
-        };
-      });
+      const suggestions = result.items.map((item) =>
+        toBridgeSuggestion({ monaco, item, fallbackRange }),
+      );
 
       return { suggestions };
     },
   });
+}
 
+function registerJsonBridgeHover(monaco: Monaco): void {
   monaco.languages.registerHoverProvider(LIQUID_JSON_LANGUAGE_ID, {
     provideHover: async (model: editor.ITextModel, position: Position) => {
       const offset = model.getOffsetAt(position);
@@ -540,19 +532,57 @@ function registerLiquidJsonBridges(monaco: Monaco): void {
       if (!result) return null;
 
       const contents = Array.isArray(result.contents) ? result.contents : [result.contents];
-      const items = contents
-        .map((c) => {
-          if (!c) return null;
-          if (typeof c === "string") return { value: c };
-          if (typeof c === "object" && "value" in c)
-            return { value: String((c as { value: unknown }).value) };
-          return null;
-        })
-        .filter((c): c is { value: string } => c !== null);
+      const items = contents.flatMap((c) => hoverMarkdownOf(c));
 
       return { contents: items };
     },
   });
+}
+
+function toBridgeSuggestion({
+  monaco,
+  item,
+  fallbackRange,
+}: {
+  monaco: Monaco;
+  item: JsonCompletionItem;
+  fallbackRange: {
+    startLineNumber: number;
+    endLineNumber: number;
+    startColumn: number;
+    endColumn: number;
+  };
+}): languages.CompletionItem {
+  const range = item.textEdit?.range
+    ? {
+        startLineNumber: item.textEdit.range.start.line + 1,
+        startColumn: item.textEdit.range.start.character + 1,
+        endLineNumber: item.textEdit.range.end.line + 1,
+        endColumn: item.textEdit.range.end.character + 1,
+      }
+    : fallbackRange;
+  return {
+    label: item.label,
+    kind: convertCompletionKind(monaco, item.kind),
+    insertText: item.insertText ?? item.textEdit?.newText ?? item.label,
+    insertTextRules:
+      item.insertTextFormat === 2
+        ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
+        : undefined,
+    sortText: item.sortText,
+    filterText: item.filterText,
+    detail: item.detail,
+    documentation: convertDocumentation(item.documentation),
+    range,
+  };
+}
+
+/** One hover content entry as markdown; an empty or unreadable entry yields nothing. */
+function hoverMarkdownOf(c: unknown): { value: string }[] {
+  if (!c) return [];
+  if (typeof c === "string") return [{ value: c }];
+  if (typeof c === "object" && "value" in c) return [{ value: String(c.value) }];
+  return [];
 }
 
 /**
