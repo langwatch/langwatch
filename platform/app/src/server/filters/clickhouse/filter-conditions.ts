@@ -214,10 +214,11 @@ export const clickHouseFilterConditions: Record<
     if (!key || values.length < 2) return { sql: "1=0", params: {} };
     // Parse the bounds exactly as the in-memory matcher does
     // (triggerFilter.matcher.ts): `Number`, not `parseFloat`, so a bound with
-    // trailing text like "0x1" is NaN here too instead of parsing to 0 — else
-    // this preview and the trigger matcher would disagree on the same filter
-    // (#8170). `Number("")` is 0, so a blank / whitespace-only bound is
-    // rejected explicitly first.
+    // trailing text like "0.6x" is NaN here too instead of parsing to 0.6 —
+    // else this preview and the trigger matcher would disagree on the same
+    // filter (#8170). (A hex literal like "0x1" is a valid 1 to both, which
+    // is the agreement we want.) `Number("")` is 0, so a blank /
+    // whitespace-only bound is rejected explicitly first.
     const minRaw = values[0] ?? "";
     const maxRaw = values[1] ?? "";
     if (minRaw.trim() === "" || maxRaw.trim() === "") {
