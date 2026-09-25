@@ -7,11 +7,16 @@ import type { PrismaClient } from "~/generated/prisma/client";
  */
 export const CLICKHOUSE_MIGRATION_LOCK_KEY = "clickhouse:migrate";
 
-/** Covers the wait for another pod's run plus this pod's own run. */
-export const CLICKHOUSE_MIGRATION_TXN_TIMEOUT_MS = 30 * 60_000;
+/**
+ * The lock lives as long as this transaction, so it must outlast the wait for
+ * another pod's run plus this pod's own; a crashed pod releases it by dropping
+ * its connection, so a generous bound costs nothing.
+ */
+export const CLICKHOUSE_MIGRATION_TXN_TIMEOUT_MS = 6 * 60 * 60_000;
 
 export const CLICKHOUSE_MIGRATION_TXN_MAX_WAIT_MS = 30_000;
 
+/** Runs `fn` while holding the cluster-wide ClickHouse migration lock. */
 export const withClickHouseMigrationLock = async <T>(
   { prisma }: { prisma: PrismaClient },
   fn: () => Promise<T>,
