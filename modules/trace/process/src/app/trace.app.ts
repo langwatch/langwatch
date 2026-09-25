@@ -170,6 +170,7 @@ import { traceToConversationTurn } from "../rules/trace-thread-conversation.rule
 import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
 import { ClaudeCodeLogEnrichmentService } from "../services/claude-code-log-enrichment.service.ts";
 import { LegacyFilterMatchingService } from "../services/legacy-filter-matching.service.ts";
+import { LogRequestCollectionService } from "../services/log-request-collection.service.ts";
 import { PreconditionTraceDataService } from "../services/precondition-trace-data.service.ts";
 import type { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
 import { TraceCollectorSpanService } from "../services/trace-collector-span.service.ts";
@@ -182,11 +183,10 @@ import {
 import { TraceExportDownloadService } from "../services/trace-export-download.service.ts";
 import { TraceExportService } from "../services/trace-export.service.ts";
 import type { TraceIngestCredentialService } from "../services/trace-ingest-credential.service.ts";
-import { LogRequestCollectionService } from "../services/log-request-collection.service.ts";
 import type { TraceIngestionService } from "../services/trace-ingestion.service.ts";
-import { TraceLogRecordIOService } from "../services/trace-log-record-io.service.ts";
 import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
 import type { TraceLegacyCredentialService } from "../services/trace-legacy-credential.service.ts";
+import { TraceLogRecordIOService } from "../services/trace-log-record-io.service.ts";
 import { TraceMetadataWriteService } from "../services/trace-metadata-write.service.ts";
 import { TracePreconditionSampleService } from "../services/trace-precondition-sample.service.ts";
 import { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";

@@ -31,6 +31,7 @@ import {
   type SecretHandle,
 } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
+import { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 const ROLE = "api";
@@ -155,6 +156,42 @@ describe("the api process installation", () => {
       ).resolves.toEqual([]);
     } finally {
       await Promise.all([first.runtime.stop(), second.runtime.stop()]);
+    }
+  });
+
+  /** @scenario "The api process receives OTLP logs rather than refusing them" */
+  it("collects an OTLP log batch through the installed log module", async () => {
+    const { runtime } = await bootApi();
+
+    try {
+      await expect(
+        runtime.service(TraceApi).otlpLogs({
+          tenantId: "project-1",
+          organizationId: "organization-1",
+          logRequest: {
+            resourceLogs: [
+              {
+                resource: { attributes: [] },
+                scopeLogs: [
+                  {
+                    scope: { name: "app.logger" },
+                    logRecords: [
+                      {
+                        timeUnixNano: "1700000000000000000",
+                        severityNumber: 9,
+                        body: { stringValue: "hello" },
+                        attributes: [],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+      ).resolves.toEqual({ outcome: "collected", acceptedLogRecords: 1, rejectedLogRecords: 0 });
+    } finally {
+      await runtime.stop();
     }
   });
 

@@ -36,3 +36,9 @@ Feature: Composing durable log processing
     When the graph is composed
     Then the pipeline mounts its coding-agent dispatch subscriber
     And nothing is reported at boot about a missing Coding Agent pipeline
+
+  @integration
+  Scenario: The api process receives OTLP logs rather than refusing them
+    Given the api process installed over memory stores
+    When an exporter's log batch reaches Trace's OTLP door
+    Then Log prepares and records it and the door answers collected, not not-served

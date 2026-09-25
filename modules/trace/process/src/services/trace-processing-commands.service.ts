@@ -2,6 +2,7 @@ import type { EventingCommands } from "@langwatch/eventing";
 import {
   TraceCapabilityUnavailableError,
   type AssignTopicCommandData,
+  type LogTraceContribution,
   type RecordSpanCommandData,
   type ResolveOriginCommandData,
 } from "@langwatch/trace-contract";
@@ -52,6 +53,10 @@ export class TraceProcessingCommandsService implements TraceProcessingCommands {
 
   async resolveOrigin(data: ResolveOriginCommandData): Promise<void> {
     await this.#connected("resolveOrigin").resolveOrigin.send(data);
+  }
+
+  async recordLogContributions(data: LogTraceContribution[]): Promise<void> {
+    await this.#connected("recordLogContribution").recordLogContribution.sendBatch(data);
   }
 
   #connected(command: string): TraceProcessingSenders {
