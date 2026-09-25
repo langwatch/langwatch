@@ -25,6 +25,31 @@ export interface SessionBanner {
 }
 
 /**
+ * Service-name fragments, tested in order. Cowork comes before claude: it is the Claude runtime
+ * under another service name, so "claude" alone must not claim it.
+ */
+const SERVICE_NAME_AGENTS: { fragment: string; agent: BannerAgent }[] = [
+  { fragment: "cowork", agent: "claude_cowork" },
+  { fragment: "claude", agent: "claude_code" },
+  { fragment: "opencode", agent: "opencode" },
+  { fragment: "codex", agent: "codex" },
+  { fragment: "gemini", agent: "gemini_cli" },
+  { fragment: "copilot", agent: "copilot" },
+];
+
+/** Span-name namespaces, tested in order; Copilot alone names its call span "chat <model>". */
+const SPAN_NAME_AGENTS: { matches: (name: string) => boolean; agent: BannerAgent }[] = [
+  { matches: (name) => name.startsWith("claude_code."), agent: "claude_code" },
+  {
+    matches: (name) => name.startsWith("opencode.") || name.startsWith("ai.stream"),
+    agent: "opencode",
+  },
+  { matches: (name) => name === "session_task.turn", agent: "codex" },
+  { matches: (name) => name === "llm_call", agent: "gemini_cli" },
+  { matches: (name) => name.startsWith("chat "), agent: "copilot" },
+];
+
+/**
  * The agent, from the resource `service.name` the wrapper stamps (or the
  * agent stamps itself), with the span-name namespace as the fallback for
  * traces ingested without one.
@@ -37,22 +62,12 @@ function detectBannerAgent({
   spans: SpanDetail[];
 }): BannerAgent {
   const service = serviceName.toLowerCase();
-  // Before the claude check: Cowork is the Claude runtime under another
-  // service name, so "claude" alone must not claim it.
-  if (service.includes("cowork")) return "claude_cowork";
-  if (service.includes("claude")) return "claude_code";
-  if (service.includes("opencode")) return "opencode";
-  if (service.includes("codex")) return "codex";
-  if (service.includes("gemini")) return "gemini_cli";
-  if (service.includes("copilot")) return "copilot";
+  const byService = SERVICE_NAME_AGENTS.find(({ fragment }) => service.includes(fragment));
+  if (byService) return byService.agent;
 
   for (const span of spans) {
-    if (span.name.startsWith("claude_code.")) return "claude_code";
-    if (span.name.startsWith("opencode.") || span.name.startsWith("ai.stream")) return "opencode";
-    if (span.name === "session_task.turn") return "codex";
-    if (span.name === "llm_call") return "gemini_cli";
-    // Copilot's call span is "chat <model>" — the only agent naming this way.
-    if (span.name.startsWith("chat ")) return "copilot";
+    const bySpan = SPAN_NAME_AGENTS.find(({ matches }) => matches(span.name));
+    if (bySpan) return bySpan.agent;
   }
   return "unknown";
 }

@@ -14,23 +14,26 @@ export function extractOutputText(output: string | null | undefined): string | n
   if (!raw.startsWith("{") && !raw.startsWith("[")) return raw;
 
   try {
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed === "string") return parsed.length > 0 ? parsed : null;
-    if (Array.isArray(parsed)) return extractMessagesReplyText(parsed);
-    if (!parsed || typeof parsed !== "object") return null;
-
-    const inputOutput = parsed as { type?: unknown; value?: unknown };
-    if (inputOutput.type === "text" && typeof inputOutput.value === "string") {
-      return inputOutput.value.length > 0 ? inputOutput.value : null;
-    }
-    if (inputOutput.type === "chat_messages" && Array.isArray(inputOutput.value)) {
-      return extractMessagesReplyText(inputOutput.value);
-    }
-
-    return null;
+    return extractParsedOutputText(JSON.parse(raw));
   } catch {
     return raw;
   }
+}
+
+/** The reply a parsed output carries: a string, a message list, or a typed text/chat value. */
+function extractParsedOutputText(parsed: unknown): string | null {
+  if (typeof parsed === "string") return parsed.length > 0 ? parsed : null;
+  if (Array.isArray(parsed)) return extractMessagesReplyText(parsed);
+  if (!parsed || typeof parsed !== "object") return null;
+
+  const inputOutput = parsed as { type?: unknown; value?: unknown };
+  if (inputOutput.type === "text" && typeof inputOutput.value === "string") {
+    return inputOutput.value.length > 0 ? inputOutput.value : null;
+  }
+  if (inputOutput.type === "chat_messages" && Array.isArray(inputOutput.value)) {
+    return extractMessagesReplyText(inputOutput.value);
+  }
+  return null;
 }
 
 export function extractSystemText(input: string | null | undefined): string | null {

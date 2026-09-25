@@ -15,6 +15,66 @@ type Paragraph = {
   endIndex: number;
 };
 
+type LinePosition = { top: number; height: number; text?: string };
+
+/** The text split on newlines, with each line's offsets; a trailing newline adds no empty line. */
+function splitParagraphs(value: string): Paragraph[] {
+  const lines: Paragraph[] = [];
+  let lineStart = 0;
+  let newline = value.indexOf("\n");
+  while (newline !== -1) {
+    lines.push({ text: value.slice(lineStart, newline), startIndex: lineStart, endIndex: newline });
+    lineStart = newline + 1;
+    newline = value.indexOf("\n", lineStart);
+  }
+  if (lineStart < value.length) {
+    lines.push({ text: value.slice(lineStart), startIndex: lineStart, endIndex: value.length });
+  }
+  return lines;
+}
+
+/** One fixed-height row per line, in order. */
+function linePositions(paragraphs: Paragraph[]): LinePosition[] {
+  return paragraphs.map((para, idx) => ({
+    top: idx * BORDERLESS_LINE_HEIGHT,
+    height: BORDERLESS_LINE_HEIGHT,
+    text: para.text,
+  }));
+}
+
+/** The text with one line moved, and where the moved line now starts. */
+function moveParagraph({
+  paragraphs,
+  from,
+  to,
+}: {
+  paragraphs: Paragraph[];
+  from: number;
+  to: number;
+}) {
+  const reordered = [...paragraphs];
+  const [removed] = reordered.splice(from, 1);
+  if (removed) reordered.splice(to, 0, removed);
+  return {
+    newText: reordered.map((p) => p.text).join("\n"),
+    movedLineStart: reordered.slice(0, to).reduce((acc, p) => acc + p.text.length + 1, 0),
+  };
+}
+
+/** The line under a vertical offset, or null when the offset is on no line. */
+function lineAt(positions: LinePosition[], relativeY: number): number | null {
+  const index = positions.findIndex(
+    (pos) => relativeY >= pos.top && relativeY < pos.top + pos.height,
+  );
+  return index === -1 ? null : index;
+}
+
+/** The first line whose midpoint is below the offset, else after the last line. */
+function dropIndexAt(positions: LinePosition[], relativeY: number): number {
+  const index = positions.findIndex((pos) => relativeY < pos.top + pos.height / 2);
+  return index === -1 ? positions.length : index;
+}
+
 /**
  * Handles paragraph-level drag and drop for reordering text lines.
  * Only active in borderless mode.
@@ -31,7 +91,7 @@ export const useParagraphDragDrop = ({
   const [dropTargetParagraph, setDropTargetParagraph] = useState<number | null>(null);
 
   // Store paragraph positions in a ref to avoid re-renders during typing
-  const paragraphPositionsRef = useRef<{ top: number; height: number; text?: string }[]>([]);
+  const paragraphPositionsRef = useRef<LinePosition[]>([]);
 
   // Clear cached positions when text changes so they get recalculated
   useEffect(() => {
@@ -39,61 +99,18 @@ export const useParagraphDragDrop = ({
   }, [localValue]);
 
   // Parse text into paragraphs
-  const parseParagraphs = useCallback((): Paragraph[] => {
-    const lines: Paragraph[] = [];
-    let currentIndex = 0;
-
-    const parts = localValue.split(/(\n)/);
-    let lineText = "";
-    let lineStart = 0;
-
-    for (const part of parts) {
-      if (part === "\n") {
-        lines.push({
-          text: lineText,
-          startIndex: lineStart,
-          endIndex: currentIndex,
-        });
-        currentIndex += 1;
-        lineText = "";
-        lineStart = currentIndex;
-      } else {
-        lineText += part;
-        currentIndex += part.length;
-      }
-    }
-
-    if (lineText || lineStart < localValue.length) {
-      lines.push({
-        text: lineText,
-        startIndex: lineStart,
-        endIndex: currentIndex,
-      });
-    }
-
-    return lines;
-  }, [localValue]);
+  const parseParagraphs = useCallback(() => splitParagraphs(localValue), [localValue]);
 
   // Calculate paragraph positions (lazy calculation)
-  const calculateParagraphPositions = useCallback(() => {
-    if (!containerRef.current || !borderless) return [];
-
-    const paragraphs = parseParagraphs();
-    return paragraphs.map((para, idx) => ({
-      top: idx * BORDERLESS_LINE_HEIGHT,
-      height: BORDERLESS_LINE_HEIGHT,
-      text: para.text,
-    }));
-  }, [borderless, parseParagraphs, containerRef]);
+  const calculateParagraphPositions = useCallback(
+    () => (containerRef.current && borderless ? linePositions(parseParagraphs()) : []),
+    [borderless, parseParagraphs, containerRef],
+  );
 
   // Update positions only when needed
   const updateParagraphPositions = useCallback(() => {
-    if (!borderless) {
-      paragraphPositionsRef.current = [];
-      return;
-    }
     paragraphPositionsRef.current = calculateParagraphPositions();
-  }, [borderless, calculateParagraphPositions]);
+  }, [calculateParagraphPositions]);
 
   // Handle paragraph drag start
   const handleParagraphDragStart = useCallback((e: DragEvent, paragraphIndex: number) => {
@@ -125,29 +142,15 @@ export const useParagraphDragDrop = ({
         return;
       }
 
-      const currentParagraphs = parseParagraphs();
-      const newParagraphs = [...currentParagraphs];
-      const [removed] = newParagraphs.splice(draggedParagraph, 1);
-      if (removed) {
-        newParagraphs.splice(targetIndex, 0, removed);
-      }
-
-      const newText = newParagraphs.map((p) => p.text).join("\n");
-
-      // Use undo-able replacement so Ctrl+Z works
+      const { newText, movedLineStart } = moveParagraph({
+        paragraphs: parseParagraphs(),
+        from: draggedParagraph,
+        to: targetIndex,
+      });
+      // Use undo-able replacement so Ctrl+Z works, then sync React state
       const textarea = containerRef.current?.querySelector("textarea");
-      if (textarea) {
-        // Calculate cursor position at the start of the moved line
-        const movedLineStart = newParagraphs
-          .slice(0, targetIndex)
-          .reduce((acc, p) => acc + p.text.length + 1, 0);
-
-        setTextareaValueUndoable(textarea, newText, movedLineStart);
-        // Still call onChange to sync React state
-        onChange(newText);
-      } else {
-        onChange(newText);
-      }
+      if (textarea) setTextareaValueUndoable(textarea, newText, movedLineStart);
+      onChange(newText);
 
       setDraggedParagraph(null);
       setDropTargetParagraph(null);
@@ -174,17 +177,8 @@ export const useParagraphDragDrop = ({
       const container = containerRef.current;
       if (!container) return;
 
-      const rect = container.getBoundingClientRect();
-      const relativeY = e.clientY - rect.top;
-
-      for (let i = 0; i < positions.length; i++) {
-        const pos = positions[i];
-        if (pos && relativeY >= pos.top && relativeY < pos.top + pos.height) {
-          setHoveredParagraph(i);
-          return;
-        }
-      }
-      setHoveredParagraph(null);
+      const relativeY = e.clientY - container.getBoundingClientRect().top;
+      setHoveredParagraph(lineAt(positions, relativeY));
     },
     [borderless, updateParagraphPositions, containerRef],
   );
@@ -199,17 +193,8 @@ export const useParagraphDragDrop = ({
       const container = containerRef.current;
       if (!container) return;
 
-      const rect = container.getBoundingClientRect();
-      const relativeY = e.clientY - rect.top;
-
-      for (let i = 0; i < positions.length; i++) {
-        const pos = positions[i];
-        if (pos && relativeY < pos.top + pos.height / 2) {
-          setDropTargetParagraph(i);
-          return;
-        }
-      }
-      setDropTargetParagraph(positions.length);
+      const relativeY = e.clientY - container.getBoundingClientRect().top;
+      setDropTargetParagraph(dropIndexAt(positions, relativeY));
     },
     [draggedParagraph, borderless, containerRef],
   );
@@ -223,14 +208,13 @@ export const useParagraphDragDrop = ({
   // Get visible positions (only when hovered and needed for UI)
   const getVisibleParagraphPositions = useCallback(
     (isHovered: boolean) => {
-      if ((isHovered || draggedParagraph !== null) && borderless) {
-        // Calculate positions if not yet populated
-        if (paragraphPositionsRef.current.length === 0) {
-          paragraphPositionsRef.current = calculateParagraphPositions();
-        }
-        return paragraphPositionsRef.current;
+      const showsGrips = (isHovered || draggedParagraph !== null) && borderless;
+      if (!showsGrips) return [];
+      // Calculate positions if not yet populated
+      if (paragraphPositionsRef.current.length === 0) {
+        paragraphPositionsRef.current = calculateParagraphPositions();
       }
-      return [];
+      return paragraphPositionsRef.current;
     },
     [borderless, draggedParagraph, calculateParagraphPositions],
   );

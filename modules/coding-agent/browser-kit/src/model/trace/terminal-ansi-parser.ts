@@ -139,109 +139,99 @@ function colorFrom256(index: number): AnsiColor | undefined {
   return { kind: "rgb", hex: xterm256ToHex(index) };
 }
 
+type StyleFlag = "bold" | "dim" | "italic" | "underline" | "inverse" | "strikethrough";
+
+const SGR_SETS: Partial<Record<number, StyleFlag>> = {
+  1: "bold",
+  2: "dim",
+  3: "italic",
+  4: "underline",
+  7: "inverse",
+  9: "strikethrough",
+};
+
+const SGR_CLEARS: Partial<Record<number, (keyof AnsiStyle)[]>> = {
+  22: ["bold", "dim"],
+  23: ["italic"],
+  24: ["underline"],
+  27: ["inverse"],
+  29: ["strikethrough"],
+  39: ["fg"],
+  49: ["bg"],
+};
+
+/** An empty parameter list (`ESC[m`) is a full reset, same as `ESC[0m`. */
+function parseSgrCodes(params: string): number[] {
+  if (params.length === 0) return [0];
+  return params.split(";").map((p) => {
+    const n = parseInt(p, 10);
+    return Number.isNaN(n) ? 0 : n;
+  });
+}
+
+/**
+ * Extended colour at `codes[at]`: `38;5;n` (256) or `38;2;r;g;b` (truecolor); a malformed
+ * introducer is skipped, not a crash. Answers how many further codes it consumed.
+ */
+function applyExtendedColor({
+  next,
+  codes,
+  at,
+}: {
+  next: AnsiStyle;
+  codes: number[];
+  at: number;
+}): number {
+  const target: "fg" | "bg" = codes[at] === 38 ? "fg" : "bg";
+  const mode = codes[at + 1];
+  if (mode === 5) {
+    const resolved = colorFrom256(codes[at + 2] ?? -1);
+    if (resolved) next[target] = resolved;
+    return 2;
+  }
+  if (mode !== 2) return 1;
+  const [r, g, b] = [codes[at + 2], codes[at + 3], codes[at + 4]];
+  if (r != null && g != null && b != null) next[target] = { kind: "rgb", hex: rgbToHex(r, g, b) };
+  return 4;
+}
+
+/** The 16-colour foreground and background ranges; any other code (blink, font, …) is ignored. */
+function applyBasicColor(next: AnsiStyle, code: number): void {
+  if (code >= 30 && code <= 37) next.fg = { kind: "named", name: NAMED[code - 30]! };
+  else if (code >= 90 && code <= 97) next.fg = { kind: "named", name: BRIGHT_NAMED[code - 90]! };
+  else if (code >= 40 && code <= 47) next.bg = { kind: "named", name: NAMED[code - 40]! };
+  else if (code >= 100 && code <= 107) {
+    next.bg = { kind: "named", name: BRIGHT_NAMED[code - 100]! };
+  }
+}
+
+function applySimpleCode(next: AnsiStyle, code: number): void {
+  const flag = SGR_SETS[code];
+  if (flag) {
+    next[flag] = true;
+    return;
+  }
+  const cleared = SGR_CLEARS[code];
+  if (!cleared) {
+    applyBasicColor(next, code);
+    return;
+  }
+  for (const key of cleared) delete next[key];
+}
+
 /**
  * Apply one SGR escape's parameters onto a style, returning a new style.
  * `params` is the raw content between `ESC[` and `m` (e.g. `"1;38;5;196"`).
  */
 function applySgr(style: AnsiStyle, params: string): AnsiStyle {
-  // An empty parameter list (`ESC[m`) is a full reset, same as `ESC[0m`.
-  const codes =
-    params.length === 0
-      ? [0]
-      : params.split(";").map((p) => {
-          const n = parseInt(p, 10);
-          return Number.isNaN(n) ? 0 : n;
-        });
-
-  const next: AnsiStyle = { ...style };
-
+  const codes = parseSgrCodes(params);
+  let next: AnsiStyle = { ...style };
   for (let i = 0; i < codes.length; i++) {
     const code = codes[i]!;
-    switch (code) {
-      case 0:
-        // Full reset — drop every attribute.
-        for (const k of Object.keys(next) as (keyof AnsiStyle)[]) {
-          delete next[k];
-        }
-        break;
-      case 1:
-        next.bold = true;
-        break;
-      case 2:
-        next.dim = true;
-        break;
-      case 3:
-        next.italic = true;
-        break;
-      case 4:
-        next.underline = true;
-        break;
-      case 7:
-        next.inverse = true;
-        break;
-      case 9:
-        next.strikethrough = true;
-        break;
-      case 22:
-        delete next.bold;
-        delete next.dim;
-        break;
-      case 23:
-        delete next.italic;
-        break;
-      case 24:
-        delete next.underline;
-        break;
-      case 27:
-        delete next.inverse;
-        break;
-      case 29:
-        delete next.strikethrough;
-        break;
-      case 38:
-      case 48: {
-        // Extended colour: `38;5;n` (256) or `38;2;r;g;b` (truecolor).
-        const target: "fg" | "bg" = code === 38 ? "fg" : "bg";
-        const mode = codes[i + 1];
-        if (mode === 5) {
-          const resolved = colorFrom256(codes[i + 2] ?? -1);
-          if (resolved) next[target] = resolved;
-          i += 2;
-        } else if (mode === 2) {
-          const r = codes[i + 2];
-          const g = codes[i + 3];
-          const b = codes[i + 4];
-          if (r != null && g != null && b != null) {
-            next[target] = { kind: "rgb", hex: rgbToHex(r, g, b) };
-          }
-          i += 4;
-        } else {
-          // Malformed extended-colour introducer — skip it, don't crash.
-          i += 1;
-        }
-        break;
-      }
-      case 39:
-        delete next.fg;
-        break;
-      case 49:
-        delete next.bg;
-        break;
-      default:
-        if (code >= 30 && code <= 37) {
-          next.fg = { kind: "named", name: NAMED[code - 30]! };
-        } else if (code >= 90 && code <= 97) {
-          next.fg = { kind: "named", name: BRIGHT_NAMED[code - 90]! };
-        } else if (code >= 40 && code <= 47) {
-          next.bg = { kind: "named", name: NAMED[code - 40]! };
-        } else if (code >= 100 && code <= 107) {
-          next.bg = { kind: "named", name: BRIGHT_NAMED[code - 100]! };
-        }
-        // Any other code (blink, font selection, …) is intentionally ignored.
-        break;
-    }
+    if (code === 0) next = {};
+    else if (code === 38 || code === 48) i += applyExtendedColor({ next, codes, at: i });
+    else applySimpleCode(next, code);
   }
-
   return next;
 }
 

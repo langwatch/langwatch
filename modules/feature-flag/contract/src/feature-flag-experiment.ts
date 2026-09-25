@@ -165,6 +165,54 @@ export function resolveExperimentDecision({
     : { enabled: false, decision: "user-not-enrolled" };
 }
 
+function listingViolations({
+  definition,
+  experiment,
+  browserVisibleKeys,
+}: {
+  definition: { key: string; scope: "SYSTEM" | "PRODUCT" };
+  experiment: FeatureFlagExperiment;
+  browserVisibleKeys: readonly string[];
+}): string[] {
+  const violations: string[] = [];
+  if (definition.scope !== "PRODUCT") {
+    violations.push(
+      `${definition.key}: an experiment must be a PRODUCT flag, not ${definition.scope}`,
+    );
+  }
+  if (!browserVisibleKeys.includes(definition.key)) {
+    violations.push(`${definition.key}: an experiment must be listed in FRONTEND_FEATURE_FLAGS`);
+  }
+  if (experiment.title.trim() === "" || experiment.summary.trim() === "") {
+    violations.push(`${definition.key}: an experiment needs a title and a summary`);
+  }
+  return violations;
+}
+
+/**
+ * The browser holds one watermark for the whole catalogue, so versions have to order: a repeated
+ * or lower number would make a newly added experiment invisible to anyone already caught up.
+ */
+function catalogueVersionViolations({
+  key,
+  version,
+  previousVersion,
+}: {
+  key: string;
+  version: number;
+  previousVersion: number;
+}): string[] {
+  if (!Number.isInteger(version) || version < 1) {
+    return [`${key}: catalogueVersion must be a positive integer`];
+  }
+  if (version <= previousVersion) {
+    return [
+      `${key}: catalogueVersion must be greater than every earlier experiment (saw ${version} after ${previousVersion})`,
+    ];
+  }
+  return [];
+}
+
 /**
  * Structural rules an experiment definition must satisfy; experiments must be
  * PRODUCT flags (not SYSTEM) reachable from the browser.
@@ -189,29 +237,14 @@ export function findExperimentDefinitionViolations({
     const { experiment } = definition;
     if (!experiment) continue;
 
-    if (definition.scope !== "PRODUCT") {
-      violations.push(
-        `${definition.key}: an experiment must be a PRODUCT flag, not ${definition.scope}`,
-      );
-    }
-    if (!browserVisibleKeys.includes(definition.key)) {
-      violations.push(`${definition.key}: an experiment must be listed in FRONTEND_FEATURE_FLAGS`);
-    }
-    if (experiment.title.trim() === "" || experiment.summary.trim() === "") {
-      violations.push(`${definition.key}: an experiment needs a title and a summary`);
-    }
-    if (!Number.isInteger(experiment.catalogueVersion) || experiment.catalogueVersion < 1) {
-      violations.push(`${definition.key}: catalogueVersion must be a positive integer`);
-    } else if (experiment.catalogueVersion <= previousVersion) {
-      // The browser holds one watermark for the whole catalogue, so the
-      // versions have to order: a repeated or lower number would make a
-      // newly added experiment invisible to anyone already caught up.
-      violations.push(
-        `${definition.key}: catalogueVersion must be greater than every earlier experiment (saw ${experiment.catalogueVersion} after ${previousVersion})`,
-      );
-    } else {
-      previousVersion = experiment.catalogueVersion;
-    }
+    violations.push(...listingViolations({ definition, experiment, browserVisibleKeys }));
+    const versionViolations = catalogueVersionViolations({
+      key: definition.key,
+      version: experiment.catalogueVersion,
+      previousVersion,
+    });
+    violations.push(...versionViolations);
+    if (versionViolations.length === 0) previousVersion = experiment.catalogueVersion;
 
     if (experiment.publicAnonymous && !publicAnonymousKeys.includes(definition.key)) {
       violations.push(

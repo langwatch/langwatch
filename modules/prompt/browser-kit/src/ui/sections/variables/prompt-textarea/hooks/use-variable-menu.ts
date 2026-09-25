@@ -27,6 +27,119 @@ type UseVariableMenuProps = {
   lastUserCursorPosRef: React.RefObject<number>;
 };
 
+type MenuOption =
+  | { type: "field"; source: AvailableSource; field: { name: string; type: FieldType } }
+  | { type: "create"; name: string };
+
+/** Fields matching the query first, then a create option when no field name matches exactly. */
+function buildMenuOptions({
+  availableSources,
+  menuQuery,
+  canCreate,
+}: {
+  availableSources: AvailableSource[];
+  menuQuery: string;
+  canCreate: boolean;
+}): MenuOption[] {
+  const normalizedQuery = menuQuery.trim().replace(/ /g, "_").toLowerCase();
+  const fieldOptions = availableSources.flatMap((source) =>
+    source.fields
+      .filter((field) => field.name.toLowerCase().includes(menuQuery.toLowerCase()))
+      .map((field): MenuOption => ({ type: "field", source, field })),
+  );
+  const hasExactMatch = fieldOptions.some(
+    (option) => option.type === "field" && option.field.name.toLowerCase() === normalizedQuery,
+  );
+  if (!normalizedQuery || hasExactMatch || !canCreate) return fieldOptions;
+  return [...fieldOptions, { type: "create", name: normalizedQuery }];
+}
+
+/**
+ * The value with `{{name}}` inserted: at the trigger in button mode, else replacing the typed
+ * `{{` and query up to the cursor; the cursor lands after the closing braces.
+ */
+function insertTemplateVariable({
+  value,
+  triggerStart,
+  cursorPos,
+  buttonMenuMode,
+  name,
+}: {
+  value: string;
+  triggerStart: number;
+  cursorPos: number;
+  buttonMenuMode: boolean;
+  name: string;
+}): { newValue: string; newCursorPos: number } {
+  const before = value.substring(0, buttonMenuMode ? triggerStart : triggerStart - 2);
+  const after = value.substring(buttonMenuMode ? triggerStart : cursorPos);
+  return {
+    newValue: `${before}{{${name}}}${after}`,
+    newCursorPos: before.length + name.length + 4,
+  };
+}
+
+function readTextareaCursor(
+  containerRef: React.RefObject<HTMLDivElement | null>,
+  value: string,
+): { nativeTextarea: HTMLTextAreaElement | null | undefined; cursorPos: number } {
+  const nativeTextarea = containerRef.current?.querySelector("textarea");
+  return { nativeTextarea, cursorPos: nativeTextarea?.selectionStart ?? value.length };
+}
+
+/** Inserts `{{name}}` through an undo-able replacement so Ctrl+Z works, then commits the value. */
+function writeTemplateVariable({
+  nativeTextarea,
+  setValueImmediate,
+  ...insertion
+}: Parameters<typeof insertTemplateVariable>[0] & {
+  nativeTextarea: HTMLTextAreaElement | null | undefined;
+  setValueImmediate: (value: string) => void;
+}): void {
+  const { newValue, newCursorPos } = insertTemplateVariable(insertion);
+  if (nativeTextarea) setTextareaValueUndoable(nativeTextarea, newValue, newCursorPos);
+  setValueImmediate(newValue);
+}
+
+/**
+ * Inserts a field: another node's field goes in through the edge it adds (its handle names the
+ * variable), a local field is inserted by name and created, with its mapping, when it is new.
+ */
+function insertFieldVariable({
+  field: { fieldName, fieldType, sourceId, isOtherNodeField },
+  target,
+  existingVariableIds,
+  onAddEdge,
+  onCreateVariable,
+  onSetVariableMapping,
+}: {
+  field: { fieldName: string; fieldType: FieldType; sourceId: string; isOtherNodeField: boolean };
+  target: Omit<Parameters<typeof writeTemplateVariable>[0], "name">;
+} & Pick<
+  UseVariableMenuProps,
+  "existingVariableIds" | "onAddEdge" | "onCreateVariable" | "onSetVariableMapping"
+>): void {
+  if (isOtherNodeField && onAddEdge) {
+    const newHandle = onAddEdge(sourceId, fieldName, {
+      value: target.value,
+      display: `${sourceId}.${fieldName}`,
+      startPos: target.buttonMenuMode ? target.triggerStart : target.triggerStart - 2,
+      endPos: target.cursorPos,
+    });
+    if (newHandle) writeTemplateVariable({ ...target, name: newHandle });
+    return;
+  }
+  writeTemplateVariable({ ...target, name: fieldName });
+  if (existingVariableIds.has(fieldName) || !onCreateVariable) return;
+  onCreateVariable({ identifier: fieldName, type: fieldType });
+  onSetVariableMapping?.(fieldName, sourceId, fieldName);
+}
+
+/** The button inserts at the cursor the user last placed, else at the end of the text. */
+function buttonTriggerStart(lastUserCursorPos: number, value: string): number {
+  return lastUserCursorPos >= 0 ? lastUserCursorPos : value.length;
+}
+
 export const useVariableMenu = ({
   localValue,
   setValueImmediate,
@@ -54,48 +167,10 @@ export const useVariableMenu = ({
   const addButtonRef = useRef<HTMLButtonElement>(null);
 
   // Compute flattened options for keyboard selection
-  const flattenedOptions = useMemo(() => {
-    const normalizedQuery = menuQuery.trim().replace(/ /g, "_").toLowerCase();
-
-    // Filter sources by query
-    const filteredSources = availableSources
-      .map((source) => ({
-        ...source,
-        fields: source.fields.filter((field) =>
-          field.name.toLowerCase().includes(menuQuery.toLowerCase()),
-        ),
-      }))
-      .filter((source) => source.fields.length > 0);
-
-    // Check for exact match
-    const hasExactMatch = filteredSources.some((source) =>
-      source.fields.some((field) => field.name.toLowerCase() === normalizedQuery),
-    );
-
-    const options: (
-      | {
-          type: "field";
-          source: AvailableSource;
-          field: { name: string; type: FieldType };
-        }
-      | { type: "create"; name: string }
-    )[] = [];
-
-    // Add fields FIRST
-    filteredSources.forEach((source) => {
-      source.fields.forEach((field) => {
-        options.push({ type: "field", source, field });
-      });
-    });
-
-    // Add create option LAST (if applicable)
-    const canCreate = normalizedQuery && !hasExactMatch && onCreateVariable;
-    if (canCreate) {
-      options.push({ type: "create", name: normalizedQuery });
-    }
-
-    return options;
-  }, [availableSources, menuQuery, onCreateVariable]);
+  const flattenedOptions = useMemo(
+    () => buildMenuOptions({ availableSources, menuQuery, canCreate: !!onCreateVariable }),
+    [availableSources, menuQuery, onCreateVariable],
+  );
 
   const optionCount = flattenedOptions.length;
 
@@ -141,74 +216,20 @@ export const useVariableMenu = ({
     }) => {
       if (triggerStart === null) return;
 
-      const nativeTextarea = containerRef.current?.querySelector("textarea");
-      const cursorPos = nativeTextarea?.selectionStart ?? localValue.length;
-
-      if (isOtherNodeField && onAddEdge) {
-        const newHandle = onAddEdge(sourceId, fieldName, {
+      insertFieldVariable({
+        field: { fieldName, fieldType, sourceId, isOtherNodeField },
+        target: {
+          ...readTextareaCursor(containerRef, localValue),
+          setValueImmediate,
           value: localValue,
-          display: `${sourceId}.${fieldName}`,
-          startPos: buttonMenuMode ? triggerStart : triggerStart - 2,
-          endPos: cursorPos,
-        });
-
-        if (newHandle) {
-          let newValue: string;
-          let newCursorPos: number;
-
-          if (buttonMenuMode) {
-            const before = localValue.substring(0, triggerStart);
-            const after = localValue.substring(triggerStart);
-            newValue = `${before}{{${newHandle}}}${after}`;
-            newCursorPos = before.length + newHandle.length + 4;
-          } else {
-            const before = localValue.substring(0, triggerStart - 2);
-            const after = localValue.substring(cursorPos);
-            newValue = `${before}{{${newHandle}}}${after}`;
-            newCursorPos = before.length + newHandle.length + 4;
-          }
-
-          // Use undo-able replacement so Ctrl+Z works
-          if (nativeTextarea) {
-            setTextareaValueUndoable(nativeTextarea, newValue, newCursorPos);
-          }
-          setValueImmediate(newValue);
-        }
-
-        closeMenu();
-        return;
-      }
-
-      let newValue: string;
-      let newCursorPos: number;
-
-      if (buttonMenuMode) {
-        const before = localValue.substring(0, triggerStart);
-        const after = localValue.substring(triggerStart);
-        newValue = `${before}{{${fieldName}}}${after}`;
-        newCursorPos = before.length + fieldName.length + 4;
-      } else {
-        const before = localValue.substring(0, triggerStart - 2);
-        const after = localValue.substring(cursorPos);
-        newValue = `${before}{{${fieldName}}}${after}`;
-        newCursorPos = before.length + fieldName.length + 4;
-      }
-
-      // Use undo-able replacement so Ctrl+Z works
-      if (nativeTextarea) {
-        setTextareaValueUndoable(nativeTextarea, newValue, newCursorPos);
-      }
-      setValueImmediate(newValue);
-
-      // Create variable if it doesn't exist
-      if (!existingVariableIds.has(fieldName) && onCreateVariable) {
-        onCreateVariable({ identifier: fieldName, type: fieldType });
-
-        if (onSetVariableMapping) {
-          onSetVariableMapping(fieldName, sourceId, fieldName);
-        }
-      }
-
+          triggerStart,
+          buttonMenuMode,
+        },
+        existingVariableIds,
+        onAddEdge,
+        onCreateVariable,
+        onSetVariableMapping,
+      });
       closeMenu();
     },
     [
@@ -225,78 +246,14 @@ export const useVariableMenu = ({
     ],
   );
 
-  // Select the currently highlighted option
-  const selectHighlightedOption = useCallback(() => {
-    const option = flattenedOptions[highlightedIndex];
-    if (!option) return;
-
-    if (option.type === "field") {
-      const isOtherNodeField = Object.prototype.hasOwnProperty.call(
-        otherNodesFields,
-        option.source.id,
-      );
-      insertVariable({
-        fieldName: option.field.name,
-        fieldType: option.field.type,
-        sourceId: option.source.id,
-        isOtherNodeField,
-      });
-    } else if (option.type === "create" && onCreateVariable) {
-      const normalizedName = option.name.replace(/ /g, "_").toLowerCase();
-      if (triggerStart === null) return;
-
-      const nativeTextarea = containerRef.current?.querySelector("textarea");
-      const cursorPos = nativeTextarea?.selectionStart ?? localValue.length;
-
-      let newValue: string;
-      let newCursorPos: number;
-
-      if (buttonMenuMode) {
-        const before = localValue.substring(0, triggerStart);
-        const after = localValue.substring(triggerStart);
-        newValue = `${before}{{${normalizedName}}}${after}`;
-        newCursorPos = before.length + normalizedName.length + 4;
-      } else {
-        const before = localValue.substring(0, triggerStart - 2);
-        const after = localValue.substring(cursorPos);
-        newValue = `${before}{{${normalizedName}}}${after}`;
-        newCursorPos = before.length + normalizedName.length + 4;
-      }
-
-      // Use undo-able replacement so Ctrl+Z works
-      if (nativeTextarea) {
-        setTextareaValueUndoable(nativeTextarea, newValue, newCursorPos);
-      }
-      setValueImmediate(newValue);
-      onCreateVariable({ identifier: normalizedName, type: "str" });
-      closeMenu();
-    }
-  }, [
-    flattenedOptions,
-    highlightedIndex,
-    insertVariable,
-    otherNodesFields,
-    onCreateVariable,
-    localValue,
-    setValueImmediate,
-    triggerStart,
-    buttonMenuMode,
-    closeMenu,
-    containerRef,
-  ]);
-
   // Handle field selection from menu
   const handleSelectField = useCallback(
     (field: SelectedField) => {
-      const isOtherNodeField = Object.prototype.hasOwnProperty.call(
-        otherNodesFields,
-        field.sourceId,
-      );
       insertVariable({
         fieldName: field.fieldName,
         fieldType: field.fieldType,
         sourceId: field.sourceId,
-        isOtherNodeField,
+        isOtherNodeField: Object.prototype.hasOwnProperty.call(otherNodesFields, field.sourceId),
       });
     },
     [insertVariable, otherNodesFields],
@@ -306,31 +263,15 @@ export const useVariableMenu = ({
   const handleCreateVariable = useCallback(
     (name: string) => {
       if (triggerStart === null || !onCreateVariable) return;
-
-      const nativeTextarea = containerRef.current?.querySelector("textarea");
-      const cursorPos = nativeTextarea?.selectionStart ?? localValue.length;
       const normalizedName = name.replace(/ /g, "_").toLowerCase();
-
-      let newValue: string;
-      let newCursorPos: number;
-
-      if (buttonMenuMode) {
-        const before = localValue.substring(0, triggerStart);
-        const after = localValue.substring(triggerStart);
-        newValue = `${before}{{${normalizedName}}}${after}`;
-        newCursorPos = before.length + normalizedName.length + 4;
-      } else {
-        const before = localValue.substring(0, triggerStart - 2);
-        const after = localValue.substring(cursorPos);
-        newValue = `${before}{{${normalizedName}}}${after}`;
-        newCursorPos = before.length + normalizedName.length + 4;
-      }
-
-      // Use undo-able replacement so Ctrl+Z works
-      if (nativeTextarea) {
-        setTextareaValueUndoable(nativeTextarea, newValue, newCursorPos);
-      }
-      setValueImmediate(newValue);
+      writeTemplateVariable({
+        ...readTextareaCursor(containerRef, localValue),
+        setValueImmediate,
+        value: localValue,
+        triggerStart,
+        buttonMenuMode,
+        name: normalizedName,
+      });
       onCreateVariable({ identifier: normalizedName, type: "str" });
       closeMenu();
     },
@@ -344,6 +285,23 @@ export const useVariableMenu = ({
       containerRef,
     ],
   );
+
+  // Select the currently highlighted option
+  const selectHighlightedOption = useCallback(() => {
+    const option = flattenedOptions[highlightedIndex];
+    if (!option) return;
+    if (option.type === "create") {
+      handleCreateVariable(option.name);
+      return;
+    }
+    handleSelectField({
+      sourceId: option.source.id,
+      sourceName: option.source.name,
+      sourceType: option.source.type,
+      fieldName: option.field.name,
+      fieldType: option.field.type,
+    });
+  }, [flattenedOptions, highlightedIndex, handleCreateVariable, handleSelectField]);
 
   // Handle "Add variable" button click
   const handleAddVariableClick = useCallback(
@@ -362,9 +320,7 @@ export const useVariableMenu = ({
       const rect = button.getBoundingClientRect();
       setMenuPosition({ top: rect.bottom + 4, left: rect.left });
 
-      const cursorPos =
-        lastUserCursorPosRef.current >= 0 ? lastUserCursorPosRef.current : localValue.length;
-      setTriggerStart(cursorPos);
+      setTriggerStart(buttonTriggerStart(lastUserCursorPosRef.current, localValue));
 
       setMenuQuery("");
       setHighlightedIndex(0);
