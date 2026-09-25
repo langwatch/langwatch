@@ -15,12 +15,7 @@
  * anthropic, gemini. Azure/Bedrock customers pin specific deployment
  * names, so they are intentionally excluded.
  */
-import {
-  compareModelSortKeys,
-  type ModelSortKey,
-  type ModelVariant,
-  rankChatModel,
-} from "../../utils/modelTiers";
+import { type ModelVariant, rankChatModels } from "../../utils/modelTiers";
 import { llmModels } from "./loadModelCatalog";
 
 interface RegistryEntry {
@@ -76,20 +71,16 @@ export function pickChatModel(
   provider: string,
   variant: ModelVariant,
 ): string | null {
-  const candidates: (ModelSortKey & { id: string })[] = [];
-  for (const model of Object.values(REGISTRY)) {
-    if (model.provider !== provider || model.mode !== "chat") continue;
-    const parsed = rankChatModel({ id: model.id, provider, variant });
-    if (parsed) candidates.push({ id: model.id, ...parsed });
-  }
-  candidates.sort(compareModelSortKeys);
-  return candidates[0]?.id ?? null;
+  const ids = Object.values(REGISTRY)
+    .filter((model) => model.provider === provider && model.mode === "chat")
+    .map((model) => model.id);
+  return rankChatModels({ ids, provider, variant })[0]?.id ?? null;
 }
 
 /**
  * The chat model a provider card recommends: the newest main-tier model in
  * the catalog, the same pick `<provider>/latest` resolves to where that
- * alias exists. Provider-qualified, e.g. `openai/gpt-5.6-terra`.
+ * alias exists. Provider-qualified, e.g. `openai/gpt-6-sol`.
  */
 export function recommendedChatModel(provider: string): string | null {
   return pickChatModel(provider, "main");
@@ -97,7 +88,7 @@ export function recommendedChatModel(provider: string): string | null {
 
 /**
  * Resolves an alias like `openai/latest-mini` to its concrete current
- * pick, e.g. `openai/gpt-5.6-luna`. Returns `null` if the input is
+ * pick, e.g. `openai/gpt-6-luna`. Returns `null` if the input is
  * not an alias OR if the registry has nothing matching the variant.
  *
  * `latest` is the provider's main tier, `latest-mini` its fast tier; see
@@ -127,7 +118,7 @@ export function expandLatestAlias(model: string): string {
 export interface LatestAliasEntry {
   /** The alias id stored in config and shown as the value, e.g. `openai/latest`. */
   alias: string;
-  /** The concrete model id the alias currently resolves to, e.g. `openai/gpt-5.6-terra`. */
+  /** The concrete model id the alias currently resolves to, e.g. `openai/gpt-6-sol`. */
   resolved: string | null;
   provider: LatestAliasProvider;
   suffix: LatestAliasSuffix;

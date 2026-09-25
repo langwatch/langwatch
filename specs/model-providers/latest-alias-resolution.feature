@@ -19,9 +19,10 @@ Feature: Latest-alias model resolution
     model of a generation and the fast tier carried a "-mini" suffix.
     GPT-5.6 ships named tiers instead, Sol on top, Terra as the balanced
     middle, and Luna as the fast tier, with no unsuffixed model at all.
-    GPT-6 so far ships only Astra, priced as a top tier. A picker that
-    only recognises the older naming sees nothing in GPT-5.6 and silently
-    keeps offering the previous generation.
+    GPT-6 ships Astra on top, Sol as the middle and Luna as the fast tier,
+    so the same name can be the top tier of one generation and the main
+    tier of the next. A picker that only recognises the older naming sees
+    nothing in GPT-5.6 and silently keeps offering the previous generation.
 
     @unit
     Scenario: Latest picks the main tier of the newest generation
@@ -41,10 +42,25 @@ Feature: Latest-alias model resolution
     Scenario: The top tier is never an alias target
       Given the catalog carries GPT-6 Astra, GPT-5.6 Sol, Terra and Luna
       When either OpenAI alias is resolved
-      Then neither resolves to Astra or Sol
+      Then neither resolves to GPT-6 Astra or GPT-5.6 Sol
       # The top tier is the premium-priced one. Picking it as an org-wide
       # default would raise cost for every assistive call. It stays
       # explicitly selectable.
+
+    @unit
+    Scenario: A named tier's role follows its generation's lineup
+      Given the catalog carries GPT-5.6 Sol and Terra, and GPT-6 Astra and Sol
+      When the OpenAI main tier is ranked
+      Then GPT-6 Sol comes first and GPT-5.6 Terra second
+      And neither GPT-5.6 Sol nor GPT-6 Astra ranks
+      # The main tier is the second rung a generation ships, counted from
+      # the top of the Astra, Sol, Terra ladder. Luna is always the fast tier.
+
+    @unit
+    Scenario: A generation shipping only its top tier has no main tier yet
+      Given the catalog carries the GPT-5.6 tiers and GPT-6 Astra only
+      When the OpenAI main tier is ranked
+      Then it is GPT-5.6 Terra
 
     @unit
     Scenario: Older naming still resolves when no newer generation exists
@@ -80,8 +96,8 @@ Feature: Latest-alias model resolution
 
   Rule: Every provider's grammar reads its own tiers
 
-    Each provider names its tiers differently and the ranking reads the
-    id alone: Anthropic's Opus is the main tier and Sonnet the fast one,
+    Each provider names its tiers differently and, OpenAI's named tiers
+    aside, the ranking reads the id alone: Anthropic's Opus is the main tier and Sonnet the fast one,
     with Fable above and Haiku below; Gemini's Flash is the main tier and
     Flash Lite the fast one, with Pro above; DeepSeek's V4 Pro is the main
     tier and V4 Flash the fast one. Dated snapshots, experimental builds,
@@ -143,14 +159,14 @@ Feature: Latest-alias model resolution
     Scenario: The recommendation is the newest main-tier model of each provider
       Given the committed catalog
       When the recommendation is read for OpenAI, Anthropic, Gemini and DeepSeek
-      Then it is GPT-5.6 Terra, Claude Opus 5, Gemini 3.8 Flash and DeepSeek V4 Pro
+      Then it is GPT-6 Sol, Claude Opus 5.5, Gemini 3.8 Flash and DeepSeek V4 Pro
       And each is a chat model the catalog carries
 
     @unit
     Scenario: The recommendation is never the top tier, a serving mode or a batch lane
       Given the committed catalog
       When the recommendation is read for every tiered provider
-      Then it is not Astra, Sol, Fable, Gemini Pro, a dated snapshot, an experimental build or a batch lane
+      Then it is not Astra, GPT-5.6 Sol, Fable, Gemini Pro, a dated snapshot, an experimental build or a batch lane
 
     @unit
     Scenario: The latest alias and the recommendation are the same pick
@@ -162,7 +178,7 @@ Feature: Latest-alias model resolution
     Scenario: Latest-mini resolves to the fast tier of each provider
       Given the committed catalog
       When "latest-mini" is resolved for OpenAI, Anthropic and Gemini
-      Then it is GPT-5.6 Luna, Claude Sonnet 5 and Gemini 3.5 Flash Lite
+      Then it is GPT-6 Luna, Claude Sonnet 5 and Gemini 3.5 Flash Lite
 
   Rule: Every read-time boundary hands a provider the concrete model
 

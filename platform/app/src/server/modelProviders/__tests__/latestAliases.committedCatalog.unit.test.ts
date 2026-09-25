@@ -15,8 +15,8 @@ describe("given the committed model catalog", () => {
   describe("when the recommendation is read per provider", () => {
     /** @scenario The recommendation is the newest main-tier model of each provider */
     it.each([
-      ["openai", "openai/gpt-5.6-terra"],
-      ["anthropic", "anthropic/claude-opus-5"],
+      ["openai", "openai/gpt-6-sol"],
+      ["anthropic", "anthropic/claude-opus-5-5"],
       ["gemini", "gemini/gemini-3.8-flash"],
       ["deepseek", "deepseek/deepseek-v4-pro"],
     ])("recommends %s's newest main-tier model", (provider, expected) => {
@@ -28,8 +28,9 @@ describe("given the committed model catalog", () => {
     it("never recommends the top tier, a serving mode or a batch lane", () => {
       for (const provider of ["openai", "anthropic", "gemini", "deepseek"]) {
         const pick = recommendedChatModel(provider) ?? "";
+        // Sol is the top tier only in GPT-5.6; GPT-6 Sol is a main tier.
         expect(pick).not.toMatch(
-          /astra|-sol|fable|gemini-[\d.]+-pro|:batch|-\d{4}$|-exp$/,
+          /astra|gpt-5\.6-sol|fable|gemini-[\d.]+-pro|:batch|-\d{4}$|-exp$/,
         );
       }
     });
@@ -56,7 +57,7 @@ describe("given the committed model catalog", () => {
 
     /** @scenario Latest-mini resolves to the fast tier of each provider */
     it.each([
-      ["openai", "openai/gpt-5.6-luna"],
+      ["openai", "openai/gpt-6-luna"],
       ["anthropic", "anthropic/claude-sonnet-5"],
       ["gemini", "gemini/gemini-3.5-flash-lite"],
     ])("resolves %s/latest-mini to the newest fast-tier model", (provider, expected) => {

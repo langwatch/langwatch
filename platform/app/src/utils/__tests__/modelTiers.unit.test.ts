@@ -1,11 +1,29 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  compareModelSortKeys,
   type ModelVariant,
-  rankChatModel,
+  rankChatModels,
   TIERED_PROVIDERS,
 } from "../modelTiers";
+
+/**
+ * OpenAI's named-tier generations as they ship: GPT-5.6 with Sol on top,
+ * GPT-6 with Astra on top. Ranked alongside every OpenAI id under test,
+ * since a named tier's role is read against its generation's siblings.
+ */
+const OPENAI_LINEUP = [
+  "openai/gpt-5.6-sol",
+  "openai/gpt-5.6-terra",
+  "openai/gpt-5.6-luna",
+  "openai/gpt-6-astra",
+  "openai/gpt-6-sol",
+  "openai/gpt-6-luna",
+];
+
+const withLineup = (ids: string[]) =>
+  ids.some((id) => id.startsWith("openai/"))
+    ? [...new Set([...ids, ...OPENAI_LINEUP])]
+    : ids;
 
 const ranks = ({
   id,
@@ -15,16 +33,16 @@ const ranks = ({
   id: string;
   variant: ModelVariant;
   provider?: string;
-}) => rankChatModel({ id, provider, variant }) !== null;
+}) =>
+  rankChatModels({ ids: withLineup([id]), provider, variant }).some(
+    (c) => c.id === id,
+  );
 
+/** Sorts exactly the given ids, without the shared lineup. */
 const sorted = (ids: string[], variant: ModelVariant) =>
-  ids
-    .flatMap((id) => {
-      const key = rankChatModel({ id, provider: id.split("/")[0]!, variant });
-      return key ? [{ id, ...key }] : [];
-    })
-    .sort(compareModelSortKeys)
-    .map((c) => c.id);
+  rankChatModels({ ids, provider: ids[0]!.split("/")[0]!, variant }).map(
+    (c) => c.id,
+  );
 
 describe("given the OpenAI chat model tier grammar", () => {
   describe("when ranking main-tier candidates", () => {
@@ -32,21 +50,56 @@ describe("given the OpenAI chat model tier grammar", () => {
       expect(ranks({ id: "openai/gpt-5.5", variant: "main" })).toBe(true);
     });
 
-    it("accepts the named middle tier", () => {
+    it("accepts the named middle tier of each generation", () => {
       expect(ranks({ id: "openai/gpt-5.6-terra", variant: "main" })).toBe(true);
+      expect(ranks({ id: "openai/gpt-6-sol", variant: "main" })).toBe(true);
     });
 
-    it("rejects the top tier", () => {
+    it("rejects the top tier of each generation", () => {
       expect(ranks({ id: "openai/gpt-5.6-sol", variant: "main" })).toBe(false);
       expect(ranks({ id: "openai/gpt-6-astra", variant: "main" })).toBe(false);
     });
 
+    /** @scenario A named tier's role follows its generation's lineup */
+    it("reads sol as the top tier of GPT-5.6 but the main tier of GPT-6", () => {
+      expect(
+        sorted(
+          [
+            "openai/gpt-5.6-sol",
+            "openai/gpt-5.6-terra",
+            "openai/gpt-6-astra",
+            "openai/gpt-6-sol",
+          ],
+          "main",
+        ),
+      ).toEqual(["openai/gpt-6-sol", "openai/gpt-5.6-terra"]);
+    });
+
+    /** @scenario A generation shipping only its top tier has no main tier yet */
+    it("stays on the previous generation while the newest ships only its top tier", () => {
+      expect(
+        sorted(
+          ["openai/gpt-5.6-sol", "openai/gpt-5.6-terra", "openai/gpt-6-astra"],
+          "main",
+        ),
+      ).toEqual(["openai/gpt-5.6-terra"]);
+    });
+
+    it("never ranks a tier name it does not know", () => {
+      expect(sorted(["openai/gpt-7-nova", "openai/gpt-7-sol"], "main")).toEqual(
+        [],
+      );
+    });
+
     it("rejects the fast tier", () => {
       expect(ranks({ id: "openai/gpt-5.6-luna", variant: "main" })).toBe(false);
+      expect(ranks({ id: "openai/gpt-6-luna", variant: "main" })).toBe(false);
     });
 
     it.each([
       "openai/gpt-5.6-terra-pro",
+      "openai/gpt-6-sol-pro",
+      "openai/gpt-6-sol:batch",
       "openai/gpt-5.5-pro",
       "openai/gpt-5.4-nano",
       "openai/gpt-5.3-codex",
@@ -66,12 +119,12 @@ describe("given the OpenAI chat model tier grammar", () => {
 
     it("reads a generation with no minor version as its first release", () => {
       expect(
-        rankChatModel({
-          id: "openai/gpt-6",
+        rankChatModels({
+          ids: ["openai/gpt-6"],
           provider: "openai",
           variant: "main",
         }),
-      ).toEqual({ major: 6, minor: 0, rank: 0 });
+      ).toEqual([{ id: "openai/gpt-6", major: 6, minor: 0, rank: 0 }]);
     });
   });
 
@@ -82,6 +135,7 @@ describe("given the OpenAI chat model tier grammar", () => {
 
     it("accepts the named fast tier", () => {
       expect(ranks({ id: "openai/gpt-5.6-luna", variant: "fast" })).toBe(true);
+      expect(ranks({ id: "openai/gpt-6-luna", variant: "fast" })).toBe(true);
     });
 
     it("rejects the main and top tiers", () => {
@@ -89,6 +143,8 @@ describe("given the OpenAI chat model tier grammar", () => {
         false,
       );
       expect(ranks({ id: "openai/gpt-5.6-sol", variant: "fast" })).toBe(false);
+      expect(ranks({ id: "openai/gpt-6-sol", variant: "fast" })).toBe(false);
+      expect(ranks({ id: "openai/gpt-6-astra", variant: "fast" })).toBe(false);
     });
 
     it("rejects the nano tier, which sits below fast", () => {
@@ -100,7 +156,12 @@ describe("given the OpenAI chat model tier grammar", () => {
     it("puts the newest generation first", () => {
       expect(
         sorted(
-          ["openai/gpt-5.4", "openai/gpt-5.6-terra", "openai/gpt-5.5"],
+          [
+            "openai/gpt-5.4",
+            "openai/gpt-5.6-sol",
+            "openai/gpt-5.6-terra",
+            "openai/gpt-5.5",
+          ],
           "main",
         ),
       ).toEqual(["openai/gpt-5.6-terra", "openai/gpt-5.5", "openai/gpt-5.4"]);
@@ -116,7 +177,10 @@ describe("given the OpenAI chat model tier grammar", () => {
     /** @scenario A generation shipping both an unsuffixed model and a named main tier */
     it("breaks a same-generation tie in favour of the named tier", () => {
       expect(
-        sorted(["openai/gpt-5.7", "openai/gpt-5.7-terra"], "main")[0],
+        sorted(
+          ["openai/gpt-5.7", "openai/gpt-5.7-sol", "openai/gpt-5.7-terra"],
+          "main",
+        )[0],
       ).toBe("openai/gpt-5.7-terra");
     });
   });

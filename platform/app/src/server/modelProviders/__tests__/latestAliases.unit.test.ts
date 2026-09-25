@@ -15,8 +15,8 @@ vi.mock("../loadModelCatalog", () => {
         "openai/gpt-5.5-pro",
         "openai/gpt-5.4",
         // GPT-5.6 ships named tiers and no unsuffixed model: sol on top,
-        // terra in the middle, luna as the fast tier. GPT-6 so far ships
-        // only astra, a top tier.
+        // terra in the middle, luna as the fast tier. This lineup predates
+        // GPT-6 Sol and Luna: GPT-6 ships only astra, its top tier.
         "openai/gpt-5.6-sol",
         "openai/gpt-5.6-sol-pro",
         "openai/gpt-5.6-terra",
@@ -101,9 +101,9 @@ describe("given latest-alias model resolution", () => {
       );
     });
     /** @scenario The top tier is never an alias target */
-    it("never resolves either openai alias to sol or astra", () => {
+    it("never resolves either openai alias to GPT-5.6 Sol or GPT-6 Astra", () => {
       for (const alias of ["openai/latest", "openai/latest-mini"]) {
-        expect(resolveLatestAlias(alias)).not.toMatch(/sol|astra/);
+        expect(resolveLatestAlias(alias)).not.toMatch(/gpt-5\.6-sol|astra/);
       }
     });
     /** @scenario Pro serving modes are skipped */
